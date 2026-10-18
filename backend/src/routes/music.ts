@@ -1,3 +1,5 @@
+import { startSongCover } from "@/lib/music/cover";
+import { listVersions } from "@/lib/imageEdit";
 import { and, eq } from "drizzle-orm";
 import { db } from "@/db";
 import { musicJobs } from "@/db/schema";
@@ -42,6 +44,7 @@ const cardSchema = z.object({
   id: z.string(), state: z.enum(["queued", "running", "done", "failed", "cancelled"]), stage: z.string().nullable(), stage_label: z.string(),
   cut: z.enum(["asked", "ceiling"]).nullable(), max_seconds: z.number().nullable(),
   progress: z.number(), eta_seconds: z.number().nullable(), position: z.number().nullable(), error_line: z.string().nullable(),
+  cover_url: z.string().nullable(), cover_versions: z.array(z.object({ id: z.string(), url: z.string() })),
   versions: z.array(versionSchema), current_id: z.string().nullable(), length: z.enum(["quick", "full"]), title: z.string().nullable(), description: z.string().nullable(), lyrics: z.string().nullable(), duration_s: z.number().nullable(), started_at: z.number(),
 });
 export function musicFileUrl(job: MusicJob): string { return `/api/music/jobs/${encodeURIComponent(job.id)}/files/${encodeURIComponent(job.fileId!)}`; }
@@ -67,10 +70,17 @@ function cardLyricsOf(job: MusicJob): string | null {
   const timed = sungLyricsFromLrc(job.lrc, null, { keepSqueezed: true });
   return sung.length && sung.length < timed.length ? withoutLastLines(words, timed.length - sung.length) : words;
 }
-export function musicCardView(actor: PersonRow, root: MusicJob) {
+export function musicCardView(actor: PersonRow, input: Omit<MusicJob, "coverJobId" | "coverFileId"> & Partial<Pick<MusicJob, "coverJobId" | "coverFileId">>) {
+  const root: MusicJob = { coverJobId: null, coverFileId: null, ...input };
   const versions = musicVersions(actor, root);
   const current = [...versions].sort((a, b) => (b.chosenAt ?? b.createdAt).localeCompare(a.chosenAt ?? a.createdAt) || b.id.localeCompare(a.id))[0];
+  const shown = current ?? root;
+  let covers: { id: string; url: string }[] = [];
+  if (shown.coverFileId && shown.conversationId) {
+    try { covers = listVersions(actor, shown.conversationId, shown.coverFileId).map(({ id, url }) => ({ id, url })); } catch { /* A deleted cover leaves the song playable. */ }
+  }
   return {
+    cover_url: covers.at(-1)?.url ?? null, cover_versions: covers,
     id: root.id, state: root.state, stage: root.stage, stage_label: musicStageLabel(root), progress: root.progress,
     cut: (current ?? root).request.cut ?? null, max_seconds: (current ?? root).request.max_seconds ?? null,
     eta_seconds: root.etaSeconds, position: root.position, error_line: root.errorLine,
@@ -92,6 +102,15 @@ musicRoutes.openapi(getRoute, (c) => {
   const actor = c.get("person"); const job = getMusicJobFor(actor, c.req.valid("param").id);
   if (!job) return c.json({ error: "That song isn't available any more. Ask for it again." }, 404) as never;
   return c.json(musicCardView(actor, job), 200);
+});
+const coverRoute = createRoute({ method: "post", path: "/jobs/{id}/cover", tags: ["Music"], summary: "Make a new cover for the shown song", middleware,
+  request: { params }, responses: { 200: { content: { "application/json": { schema: cardSchema } }, description: "The song card." }, ...refusals } });
+musicRoutes.openapi(coverRoute, async (c) => {
+  const actor = c.get("person"); const root = getMusicJobFor(actor, c.req.valid("param").id);
+  if (!root) return c.json({ error: "That song isn't available any more. Ask for it again." }, 404) as never;
+  const current = musicVersions(actor, root).sort((a, b) => (b.chosenAt ?? b.createdAt).localeCompare(a.chosenAt ?? a.createdAt) || b.id.localeCompare(a.id))[0] ?? root;
+  await startSongCover(actor, current);
+  return c.json(musicCardView(actor, getMusicJobFor(actor, root.id) ?? root), 200);
 });
 const cancelRoute = createRoute({ method: "delete", path: "/jobs/{id}", tags: ["Music"], summary: "Stop a song being made", middleware: viewMiddleware, request: { params },
   responses: { 200: { content: { "application/json": { schema: cardSchema } }, description: "The stopped card." }, ...refusals } });

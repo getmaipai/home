@@ -12,6 +12,7 @@ import { cancelOrDeleteMusic, musicBody, fetchSong, getMusicJob, StackMusicError
 import { MUSIC_NOTE, generationOf, type GenerationProvenance, type MusicJob, type MusicRequest, type MusicTask } from "./types";
 import { musicEngineStatus } from "./ready";
 import { sungLyricsFromLrc } from "./sections";
+import { startSongCover } from "./cover";
 import { modelStampFor } from "./models";
 import { provenanceFor } from "./commercial";
 import { refuseMusicPrompt } from "./policy";
@@ -60,7 +61,7 @@ export async function startMusicJob(input: StartMusicInput): Promise<MusicJob> {
   const job: MusicJob = {
     id: newMusicJobId(), personId: input.actor.id, conversationId: input.conversationId, turnId: input.turnId, task: input.task, request: input.request,
     stackJob: null, state: "queued", stage: "queued", progress: 0, etaSeconds: null, position: null,
-    errorCode: null, errorLine: null, fileId: null, parentFileId: input.parentFileId ?? null,
+    coverJobId: null, coverFileId: null, errorCode: null, errorLine: null, fileId: null, parentFileId: input.parentFileId ?? null,
     seed: null, durationS: null, lrc: null, chosenAt: null, createdAt: now, updatedAt: now, temporary: input.temporary,
   };
   // Reserve before the network await: forgetting the turn during submit can abort admission too.
@@ -170,6 +171,7 @@ async function finish(job: MusicJob, actor: PersonRow, songs: StackSong[], signa
   if (stopped(job)) return;
   job.state = "done"; job.stage = "ready"; job.progress = 1; job.etaSeconds = 0; job.errorCode = null; job.errorLine = null;
   saveMusicJob(job);
+  void startSongCover(actor, job).catch(() => {});
 }
 export async function cancelMusicJob(actor: PersonRow, id: string): Promise<MusicJob | null> {
   const job = getMusicJobFor(actor, id);

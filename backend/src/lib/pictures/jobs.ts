@@ -290,6 +290,8 @@ async function finish(job: PictureJob, actor: PersonRow, pics: StackPic[]): Prom
   job.phase = "ready";
   job.error = null;
   saveJob(job);
+  // A stored cover may update its song, but never changes this picture's outcome.
+  try { const { finishSongCover } = await import("@/lib/music/cover"); finishSongCover(job); } catch { /* optional cover linkage */ }
   if (stackJob) void cancelOrDelete(stackJob);
 }
 

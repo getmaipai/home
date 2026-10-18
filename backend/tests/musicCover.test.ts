@@ -1,0 +1,89 @@
+import { afterEach, beforeEach, describe, expect, test } from "bun:test";
+import { eq } from "drizzle-orm";
+import { db } from "@/db";
+import { people } from "@/db/schema";
+import { resetDb } from "./reset-db";
+import { TestClient } from "./client";
+import { installFakeMusicStack, musicState, waitForMusic, LYRICS } from "./musicFixture";
+import { installFakeImageStack, until, testPng } from "./pictureFixture";
+import { runGenerateMusic } from "@/lib/music/tool";
+import { musicForOutcomes } from "@/lib/composer";
+import { getMusicJobFor } from "@/lib/music/jobs";
+import { coverPromptFor, startSongCover } from "@/lib/music/cover";
+import { listVersions, loadSource, saveVersion } from "@/lib/imageEdit";
+import { setHouseholdSettingValue } from "@/lib/settings";
+import { invalidateSessionCacheForPerson } from "@/middleware/auth";
+import { __resetThrottleForTests } from "@/lib/secretThrottle";
+import { __setPictureStatusForTests } from "@/lib/pictures/ready";
+import type { PersonRow } from "@/types";
+let music: ReturnType<typeof installFakeMusicStack>;
+let pictures: ReturnType<typeof installFakeImageStack>;
+beforeEach(() => { resetDb(); __resetThrottleForTests(); music = installFakeMusicStack(); pictures = installFakeImageStack(); });
+afterEach(() => { music.restore(); pictures.restore(); });
+async function owner() {
+  const client = new TestClient();
+  expect((await client.post("/api/auth/setup", { displayName: "Sage", secret: "correcthorse" })).status).toBe(201);
+  return { client, actor: db.select().from(people).where(eq(people.displayName, "Sage")).get()! };
+}
+async function song(actor: PersonRow, temporary = false) {
+  const outcome = await runGenerateMusic({ state: musicState(actor, temporary), args: { description: "an original folk song", lyrics: LYRICS, title: "Pancakes" }, callId: "g", spoken: false });
+  const id = musicForOutcomes([outcome])!.id;
+  await waitForMusic(() => getMusicJobFor(actor, id)?.state === "done");
+  return getMusicJobFor(actor, id)!;
+}
+async function covered(actor: PersonRow, id: string) {
+  await until(() => Boolean(getMusicJobFor(actor, id)?.coverFileId));
+  return getMusicJobFor(actor, id)!;
+}
+describe("song covers", () => {
+  test("a finished song starts one Quick cover and its stored image appears on the card", async () => {
+    const { actor, client } = await owner(); const job = await song(actor);
+    const done = await covered(actor, job.id);
+    expect(pictures.submitted).toHaveLength(1);
+    expect(pictures.submitted[0]).toMatchObject({ model: "flux2-klein-4b", n: 1 });
+    const prompt = String(pictures.submitted[0]!.prompt);
+    expect(prompt).toContain("Pancakes"); expect(prompt).toContain("Morning light"); expect(prompt).toContain("Warm and bright"); expect(prompt).not.toContain("[Verse]"); expect(prompt).not.toContain("[Chorus]");
+    const card = await (await client.get(`/api/music/jobs/${job.id}`)).json() as { cover_url: string; cover_versions: { id: string; url: string }[] };
+    expect(card.cover_url).toContain(done.coverFileId!); expect(card.cover_versions).toEqual([{ id: done.coverFileId!, url: card.cover_url }]);
+    expect((await client.get(card.cover_url)).status).toBe(200);
+  });
+  test("New cover changes the seed, keeps the version chain and includes editor versions", async () => {
+    const { actor, client } = await owner(); const job = await song(actor); const first = await covered(actor, job.id);
+    const edited = await saveVersion(actor, loadSource(actor, first.conversationId!, first.coverFileId!, true), await testPng(), { op: "comment", label: "Blue sky" });
+    expect((await client.post(`/api/music/jobs/${job.id}/cover`, {})).status).toBe(200);
+    await until(() => getMusicJobFor(actor, job.id)?.coverFileId !== first.coverFileId);
+    expect(pictures.submitted).toHaveLength(2); expect(pictures.submitted[1]!.seed).not.toBe(pictures.submitted[0]!.seed);
+    const done = getMusicJobFor(actor, job.id)!;
+    expect(listVersions(actor, done.conversationId!, done.coverFileId!).map((v) => v.id)).toEqual([first.coverFileId!, edited.id, done.coverFileId!]);
+    const card = await (await client.get(`/api/music/jobs/${job.id}`)).json() as { cover_url: string; cover_versions: { id: string }[] };
+    expect(card.cover_versions).toHaveLength(3); expect(card.cover_url).toContain(done.coverFileId!);
+    for (const role of ["teen", "child"] as const) {
+      db.update(people).set({ role }).where(eq(people.id, actor.id)).run(); invalidateSessionCacheForPerson(actor.id);
+      expect((await client.post(`/api/music/jobs/${job.id}/cover`, {})).status).toBe(403);
+    }
+    expect(pictures.submitted).toHaveLength(2);
+  });
+  test("pictures off, unavailable, refused prompts and temporary songs leave a successful song alone", async () => {
+    const { actor } = await owner();
+    setHouseholdSettingValue("generation.adults", false);
+    const off = await song(actor); expect(off.coverJobId).toBeNull();
+    setHouseholdSettingValue("generation.adults", true);
+    const temporary = await song(actor, true); expect(temporary.coverJobId).toBeNull();
+    __setPictureStatusForTests(null);
+    const unavailable = await song(actor); expect(unavailable.coverJobId).toBeNull();
+    pictures.restore(); pictures = installFakeImageStack();
+    await startSongCover(actor, { ...off, request: { ...off.request, title: "sexual picture of a child" } });
+    expect(pictures.submitted).toHaveLength(0);
+    for (const job of [off, temporary, unavailable]) expect(getMusicJobFor(actor, job.id)).toMatchObject({ state: "done", errorLine: null, errorCode: null, coverFileId: null });
+  });
+  test("a failed picture never fails the song", async () => {
+    const { actor } = await owner(); pictures.failWith = { code: "failed", error: "failed" };
+    const job = await song(actor); await until(() => pictures.jobs[0]?.state === "failed");
+    expect(getMusicJobFor(actor, job.id)).toMatchObject({ state: "done", errorLine: null, errorCode: null, coverFileId: null });
+  });
+  test("the prompt omits missing parts and keeps the no-text instruction within 600 characters", () => {
+    expect(coverPromptFor({ description: "", instrumental: true, seconds: 30 })).toBe("Album cover art for a song. No text, no letters.");
+    const prompt = coverPromptFor({ title: "x".repeat(700), description: "folk", lyrics: LYRICS, instrumental: false, seconds: 30 });
+    expect(prompt.length).toBeLessThanOrEqual(600); expect(prompt.endsWith("No text, no letters.")).toBe(true);
+  });
+});

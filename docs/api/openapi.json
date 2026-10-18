@@ -57910,6 +57910,28 @@
                       "type": "string",
                       "nullable": true
                     },
+                    "cover_url": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "cover_versions": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string"
+                          },
+                          "url": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "url"
+                        ]
+                      }
+                    },
                     "versions": {
                       "type": "array",
                       "items": {
@@ -57974,6 +57996,8 @@
                     "eta_seconds",
                     "position",
                     "error_line",
+                    "cover_url",
+                    "cover_versions",
                     "versions",
                     "current_id",
                     "length",
@@ -58102,6 +58126,28 @@
                       "type": "string",
                       "nullable": true
                     },
+                    "cover_url": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "cover_versions": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string"
+                          },
+                          "url": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "url"
+                        ]
+                      }
+                    },
                     "versions": {
                       "type": "array",
                       "items": {
@@ -58166,6 +58212,211 @@
                     "eta_seconds",
                     "position",
                     "error_line",
+                    "cover_url",
+                    "cover_versions",
+                    "versions",
+                    "current_id",
+                    "length",
+                    "title",
+                    "description",
+                    "lyrics",
+                    "duration_s",
+                    "started_at"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Music is off for this profile",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such song",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Commercial export not allowed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/music/jobs/{id}/cover": {
+      "post": {
+        "tags": [
+          "Music"
+        ],
+        "summary": "Make a new cover for the shown song",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 80
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The song card.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    },
+                    "state": {
+                      "type": "string",
+                      "enum": [
+                        "queued",
+                        "running",
+                        "done",
+                        "failed",
+                        "cancelled"
+                      ]
+                    },
+                    "stage": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "stage_label": {
+                      "type": "string"
+                    },
+                    "progress": {
+                      "type": "number"
+                    },
+                    "eta_seconds": {
+                      "type": "number",
+                      "nullable": true
+                    },
+                    "position": {
+                      "type": "number",
+                      "nullable": true
+                    },
+                    "error_line": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "cover_url": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "cover_versions": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string"
+                          },
+                          "url": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "url"
+                        ]
+                      }
+                    },
+                    "versions": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string"
+                          },
+                          "label": {
+                            "type": "string"
+                          },
+                          "url": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "label",
+                          "url"
+                        ]
+                      }
+                    },
+                    "current_id": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "length": {
+                      "type": "string",
+                      "enum": [
+                        "quick",
+                        "full"
+                      ]
+                    },
+                    "title": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "description": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "lyrics": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "duration_s": {
+                      "type": "number",
+                      "nullable": true
+                    },
+                    "started_at": {
+                      "type": "number"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "state",
+                    "stage",
+                    "stage_label",
+                    "progress",
+                    "eta_seconds",
+                    "position",
+                    "error_line",
+                    "cover_url",
+                    "cover_versions",
                     "versions",
                     "current_id",
                     "length",
@@ -58315,6 +58566,28 @@
                       "type": "string",
                       "nullable": true
                     },
+                    "cover_url": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "cover_versions": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string"
+                          },
+                          "url": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "url"
+                        ]
+                      }
+                    },
                     "versions": {
                       "type": "array",
                       "items": {
@@ -58379,6 +58652,8 @@
                     "eta_seconds",
                     "position",
                     "error_line",
+                    "cover_url",
+                    "cover_versions",
                     "versions",
                     "current_id",
                     "length",
@@ -58535,6 +58810,28 @@
                       "type": "string",
                       "nullable": true
                     },
+                    "cover_url": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "cover_versions": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string"
+                          },
+                          "url": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "url"
+                        ]
+                      }
+                    },
                     "versions": {
                       "type": "array",
                       "items": {
@@ -58599,6 +58896,8 @@
                     "eta_seconds",
                     "position",
                     "error_line",
+                    "cover_url",
+                    "cover_versions",
                     "versions",
                     "current_id",
                     "length",

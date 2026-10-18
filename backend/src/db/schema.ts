@@ -2166,6 +2166,7 @@ export const musicJobs = sqliteTable("music_jobs", {
   conversationId: text("conversation_id"), turnId: text("turn_id"), task: text("task").notNull(), request: text("request").notNull(),
   stackJob: text("stack_job"), state: text("state").notNull(), stage: text("stage"), progress: real("progress").notNull().default(0),
   etaSeconds: real("eta_seconds"), position: integer("position"), errorCode: text("error_code"), errorLine: text("error_line"),
+  coverJobId: text("cover_job_id"), coverFileId: text("cover_file_id"),
   fileId: text("file_id"), parentFileId: text("parent_file_id"), seed: integer("seed"), durationS: real("duration_s"), lrc: text("lrc"),
   chosenAt: text("chosen_at"), createdAt: text("created_at").notNull(), updatedAt: text("updated_at").notNull(), hlc: text("hlc").notNull(),
 }, (table) => [index("music_jobs_person_id_idx").on(table.personId), index("music_jobs_turn_id_idx").on(table.turnId),

@@ -799,6 +799,13 @@
       "when": 1792281214354,
       "tag": "0113_music_jobs",
       "breakpoints": true
+    },
+    {
+      "idx": 114,
+      "version": "6",
+      "when": 1792281214355,
+      "tag": "0114_music_cover",
+      "breakpoints": true
     }
   ]
 }

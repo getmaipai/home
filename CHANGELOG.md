@@ -12,6 +12,7 @@ checklist (`docs/dev.md`). The first release is 0.1.0.
 
 ### Music
 - **A song is as long as its words.** Full sings every part and is the default; Quick sings the hook. You can ask for a length. Words are cut only to that length or the computer's limit, and a squeezed ending gets one longer try. (MUSIC-GEN-21)
+- Every song gets a cover picture when pictures are available and allowed. (MUSIC-GEN-19)
 - **The song card shows while the song is made.** It appears as soon as chat starts the song, with its stage, time left, a bar and Stop, and "Paused while chat is working" while chat answers. It used to appear only when chat finished its reply. (MUSIC-GEN-18)
 - **A quick song sings only the words that fit.** Long words used to be squeezed into the last second of a quick song and sung as nonsense. Now a quick song sings the first whole parts that fit, the card shows just those words, and **Make it full** sings every part. Lines the engine squeezed into an older song are left off its card. (MUSIC-GEN-17)
 
