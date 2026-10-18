@@ -75,7 +75,7 @@ describe("the plan step's disk list", () => {
     expect(view.getByText(/There is enough room/)).toBeTruthy();
     fireEvent.click(button);
     await waitFor(() => expect(done).toHaveBeenCalledTimes(1));
-    expect(start).toHaveBeenCalledWith(undefined, expect.arrayContaining(withoutPictures));
+    expect(start).toHaveBeenCalledWith(undefined, expect.arrayContaining(withoutPictures), []);
     expect((start.mock.calls[0] as unknown[])[1]).not.toContain("pictures");
   });
 
@@ -109,5 +109,52 @@ describe("the plan step's disk list", () => {
     await view.findByText("What gets installed");
     const picturesItem = view.getByRole("checkbox", { name: /Make pictures/ }).closest("li")!;
     expect(within(picturesItem as HTMLElement).getByText("Installed")).toBeTruthy();
+  });
+
+  const licence = { row_id: "video-detailed", component: "ltx-2-3-distilled-mlx", id: "ltx-2.x-community-2026-08-11", name: "LTX-2 Community License", url: "https://example.com/licence", summary: ["It is free for a person or a business that earns under $10 million a year.", "The markings the model puts in a clip are never removed."], accepted_at: null };
+
+  test("Detailed videos are checked by default on the 128 GB plan, the licence is shown plainly and Install waits for the accept", async () => {
+    const start = mock(async () => ({}));
+    const view = render(<PlanStep readPlan={async () => ({ wording: wording("p128", 800 * GIB), licences: [licence] })} start={start} onInstalled={() => {}} />);
+    await view.findByText("What gets installed");
+    const detailed = view.getByRole("checkbox", { name: /Detailed videos/ });
+    expect(detailed.getAttribute("aria-checked")).toBe("true");
+    expect(view.getByText(/under \$10 million a year/)).toBeTruthy();
+    expect(view.getByText(/never removed/)).toBeTruthy();
+    const install = view.getByRole("button", { name: "Install and continue" }) as HTMLButtonElement;
+    expect(install.disabled).toBe(true);
+    fireEvent.click(view.getByRole("checkbox", { name: /I have read it and I accept it/ }));
+    await waitFor(() => expect(install.disabled).toBe(false));
+    fireEvent.click(install);
+    await waitFor(() => expect(start).toHaveBeenCalledTimes(1));
+    const call = start.mock.calls[0] as unknown[];
+    expect(call[1]).toContain("video-detailed");
+    expect(call[2]).toEqual([licence.id]);
+  });
+
+  test("unticking Detailed videos drops the licence and the need to accept, and sends no accept", async () => {
+    const start = mock(async () => ({}));
+    const view = render(<PlanStep readPlan={async () => ({ wording: wording("p128", 800 * GIB), licences: [licence] })} start={start} onInstalled={() => {}} />);
+    await view.findByText("What gets installed");
+    fireEvent.click(view.getByRole("checkbox", { name: /Detailed videos/ }));
+    expect(view.queryByTestId("plan-licence")).toBeNull();
+    fireEvent.click(view.getByRole("button", { name: "Install and continue" }));
+    await waitFor(() => expect(start).toHaveBeenCalledTimes(1));
+    const call = start.mock.calls[0] as unknown[];
+    expect(call[1]).not.toContain("video-detailed");
+    expect(call[2]).toEqual([]);
+  });
+
+  test("with Detailed videos checked and too little free space the check goes red; unticking them updates the total and clears it", async () => {
+    const plan = plans.p128!;
+    const without = plan.default_selected.filter((id) => id !== "video-detailed");
+    const free = selectionTotals(plan, without).required_free_bytes + 2 * GIB + plan.headroom_warn_bytes + GIB;
+    const view = render(<PlanStep readPlan={async () => ({ wording: wording("p128", free), licences: [licence] })} start={async () => ({})} onInstalled={() => {}} />);
+    await view.findByText("What gets installed");
+    expect(view.getByText(/This computer needs about \d+ GB free/)).toBeTruthy();
+    expect(view.queryByRole("button", { name: "Install and continue" })).toBeNull();
+    fireEvent.click(view.getByRole("checkbox", { name: /Detailed videos/ }));
+    await view.findByRole("button", { name: "Install and continue" });
+    expect(view.getByText(/There is enough room/)).toBeTruthy();
   });
 });

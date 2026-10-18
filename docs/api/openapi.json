@@ -22607,6 +22607,15 @@
                     "minimum": 1,
                     "maximum": 512
                   },
+                  "accepted_licences": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "maxLength": 120
+                    },
+                    "maxItems": 8,
+                    "description": "Ids of the licence notices the person read and accepted for licensed rows (Detailed video). A licensed row left on without its accept is refused."
+                  },
                   "components": {
                     "type": "array",
                     "items": {
@@ -22748,6 +22757,49 @@
                         "sizeLine",
                         "diskLine"
                       ]
+                    },
+                    "licences": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "row_id": {
+                            "type": "string"
+                          },
+                          "component": {
+                            "type": "string"
+                          },
+                          "id": {
+                            "type": "string"
+                          },
+                          "name": {
+                            "type": "string"
+                          },
+                          "url": {
+                            "type": "string"
+                          },
+                          "summary": {
+                            "type": "array",
+                            "items": {
+                              "type": "string"
+                            }
+                          },
+                          "accepted_at": {
+                            "type": "string",
+                            "nullable": true
+                          }
+                        },
+                        "required": [
+                          "row_id",
+                          "component",
+                          "id",
+                          "name",
+                          "url",
+                          "summary",
+                          "accepted_at"
+                        ]
+                      },
+                      "description": "The licences of the licensed rows on this plan (Detailed video): the notice to show, and whether it was already accepted."
                     }
                   },
                   "required": [
@@ -24618,6 +24670,15 @@
                     "type": "integer",
                     "minimum": 1,
                     "maximum": 512
+                  },
+                  "accepted_licences": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "maxLength": 120
+                    },
+                    "maxItems": 8,
+                    "description": "Ids of the licence notices the person read and accepted for licensed rows (Detailed video). A licensed row left on without its accept is refused."
                   },
                   "components": {
                     "type": "array",

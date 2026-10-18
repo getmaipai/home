@@ -40,6 +40,8 @@ function stateBadge(row: ComponentRow): { text: string; variant: "secondary" | "
   if (row.state === "failed") return { text: "Did not finish", variant: "destructive" };
   if (row.state === "installed") return { text: row.requirement === "required" ? "Installed, needed" : "Installed", variant: "secondary" };
   if (row.requirement === "unsupported") return { text: "Not for this computer", variant: "outline" };
+  // A recommended part an upgrade did not pull (Detailed video, 74 GB): said quietly here, with the Install button; never a notification.
+  if (row.plan_need === "recommended") return { text: "Recommended, not installed", variant: "outline" };
   return { text: "Not installed", variant: "outline" };
 }
 

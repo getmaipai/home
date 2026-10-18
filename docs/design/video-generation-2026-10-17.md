@@ -350,6 +350,20 @@ Component `ltx-2-3-distilled-mlx` ("Video: Detailed (LTX-2.3)"), group `video`, 
 - **What the finished-clip check does not do.** It looks at frames (five past 6 seconds, three before) with the local vision model; it does not listen. The words a Detailed clip speaks come from the prompt, which passes the same two absolute-line checks and the household-name gate as any prompt, but the model can say words nobody asked for. A check that transcribes the sound track with the Stack's speech-to-text and runs the text through the same minor-sexual line is a named row (VIDEO-LTX-06); until it is built this is a stated gap, not a claim.
 - **Picture to video on Detailed works (VIDEO-LTX-02, measured 2026-10-17 on the Studio through the Stack's job API).** The failure (`broadcast_shapes (1,1024,1,7,12) and (1,2048,1,7,12)`) was not the runtime version: the shipped `vae/encoder/config.json` says the last `compress_all_res` block doubles the channels (1024 to 2048) while the shipped weights keep 1024 (that conv writes 128 x 8 = 1024; the sha256-pinned files cannot be edited). The Stack's worker now builds the picture encoder with each `_res` block's multiplier read from its own weights (`ltx_worker.py`, item 4; no pin change, no new package). A 5 s clip from a generated picture came back with frame 0 equal to the picture, the hero moving and speaking, and an AAC track; 70 s with a cold worker (the model load included), 28 GB resident. Home reads `qualities.detailed.image_to_video` from the Stack: when true a picture can start a Detailed clip (the household default, a length past 5 seconds and "make it Detailed" all stand), and a teen or a child is still Quick whatever the Stack can do. An older Stack that does not say so keeps the old rule: a picture makes a Quick clip and the tool says so. A clip that starts from a picture still offers no card switch.
 
+## 15. Detailed video is in the Recommended plan on 128 GB (owner ruling 2026-10-17)
+
+Jesse ruled that LTX-2.3 Detailed video is part of the Recommended plan on the 128 GB tier (its only tier): the setup wizard checks it by
+default, it can be unticked, and the Recommended free-space figure on that tier is 145 GB (was 61 GB). The Stack's disk-plan row
+`video-detailed` is `recommended` (Stack `VIDEO-LTX-03`), and Home mirrors `shared/diskPlan.json` with `STACK_TAG` e7d7849.
+
+- **Licence first.** The wizard shows the maker's licence plainly under the list (free under 10 million dollars of yearly revenue, the
+  model's own markings stay) and Install waits for the accept. Home refuses the install without it (409), then installs the part through the
+  Stack's component route with that accept, which records it. A licence already accepted is not asked again.
+- **Upgrades never pull it.** The first-run plan does not carry it, and a Home settings install with no choice drops it from the defaults.
+  An existing install shows it under Models and storage as "Recommended, not installed" with an Install button, with no notification. Only a
+  fresh install's wizard or an explicit admin Install downloads it.
+- **Unchanged.** Quick video stays optional; teens and children stay Quick-only (the kids lane gate does not look at installs).
+
 ## Supersedes
 
 - `hub-on-apple-silicon-2026-09-17.md`'s video table: the animated path is Wan2.2 TI2V-5B FastWan on MLX, not LTX-2 (licence), and the

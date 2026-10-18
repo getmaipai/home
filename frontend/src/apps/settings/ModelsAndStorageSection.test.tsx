@@ -67,6 +67,14 @@ describe("Models and storage", () => {
     v.restore();
   });
 
+  test("Detailed video that an upgrade did not pull reads \"Recommended, not installed\" with an Install button, and nothing starts by itself", async () => {
+    const v = mount(overview([row({ id: "ltx-2-3-distilled-mlx", label: "Video: Detailed (LTX-2.3)", group: "video", plan_need: "recommended", download_bytes: 73_600_000_000, full_bytes: 73_600_000_000 })]));
+    expect(await v.findByText("Recommended, not installed")).toBeTruthy();
+    expect(v.getByLabelText("Install Video: Detailed (LTX-2.3)")).toBeTruthy();
+    expect((componentsApi.install as ReturnType<typeof mock>).mock.calls.length).toBe(0);
+    v.restore();
+  });
+
   test("a part with a licence of its own asks once: the points are shown, nothing installs until I accept, then it installs with that licence", async () => {
     const licence = { id: "ltx-2.x-community-2026-08-11", name: "LTX-2.x Community License Agreement (2026-08-11)", url: "https://example.com/licence", summary: ["Free under $10 million a year."], accepted_at: null };
     const v = mount(overview([row({ id: "ltx-2-3-distilled-mlx", label: "Video: Detailed (LTX-2.3)", licence })]));

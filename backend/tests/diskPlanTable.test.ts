@@ -54,7 +54,8 @@ describe("the docs quote the table", () => {
   for (const file of ["docs/user/install-upgrade-uninstall.md", "docs/site-fumadocs/content/docs/user/start-here/install-upgrade-uninstall.mdx"]) {
     test(`${file} gives each plan's free space and no stale 3 GB, 6 GB or 26 GB`, () => {
       const text = readFileSync(join(root, file), "utf8");
-      expect(text).toContain(`| Recommended | 64 GB of memory or more | ${need("p64", "default")} GB |`);
+      expect(text).toContain(`| Recommended | 64 GB of memory | ${need("p64", "default")} GB |`);
+      expect(text).toContain(`| Recommended | 128 GB of memory (adds Detailed videos, about 74 GB) | ${need("p128", "default")} GB |`);
       expect(text).toContain(`| Moderate | 32 GB | ${need("p32", "default")} GB |`);
       expect(text).toContain(`| Minimal | 16 or 24 GB | ${need("p16", "default")} GB |`);
       expect(text).toContain(`about ${need("p128", "everything")} GB`);

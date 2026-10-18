@@ -1,4 +1,5 @@
 import { getStackClient } from "@/lib/stackEngine";
+import { installStackComponent } from "@/lib/stackComponents";
 import { getInstallSelection, getSetupState, resolveMemoryGb } from "@/lib/setupState";
 import type { StackInstallPlan } from "@/lib/stack/client";
 
@@ -63,7 +64,7 @@ async function plannedPulls(client: SetupDownloadClient, vramGb?: number, rowIds
 }
 
 /** `selected`: the disk plan's row ids to install. Without it, the choice saved at the plan step; without that, the first-run set. */
-export async function startSetupDownloads(client: SetupDownloadClient = getStackClient(), options: { vramGb?: number; selected?: readonly string[] } = {}): Promise<number> {
+export async function startSetupDownloads(client: SetupDownloadClient = getStackClient(), options: { vramGb?: number; selected?: readonly string[]; /** Licensed parts (Detailed video) the person kept on and accepted: installed through the Stack's component route, which records the acceptance. Nothing else installs them. */ licensed?: ReadonlyArray<{ component: string; licence: string }>; installComponent?: typeof installStackComponent } = {}): Promise<number> {
   // No number given: use the memory answer saved when the plan was chosen.
   const pulls = await plannedPulls(client, resolveMemoryGb(options.vramGb), options.selected ?? getInstallSelection());
   // Models are useless without the engine build that runs them: the Stack
@@ -86,5 +87,9 @@ export async function startSetupDownloads(client: SetupDownloadClient = getStack
     }
   };
   await Promise.all(Array.from({ length: Math.min(MAX_PARALLEL, pulls.length) }, worker));
-  return pulls.length;
+  const install = options.installComponent ?? installStackComponent;
+  for (const part of options.licensed ?? []) {
+    try { await install(part.component, { acceptedLicence: part.licence }); } catch (error) { console.error(`Could not start installing ${part.component}: ${error instanceof Error ? error.message : String(error)}`); }
+  }
+  return pulls.length + (options.licensed?.length ?? 0);
 }

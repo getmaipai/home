@@ -6,6 +6,8 @@ import { Card, CardContent } from "@maipai/ui/src/dashboard/components/ui/card";
 import { RadioGroup, RadioGroupItem } from "@maipai/ui/src/dashboard/components/ui/radio-group";
 import { Field, FieldContent, FieldLabel } from "@maipai/ui/src/dashboard/components/ui/field";
 import { api, ApiError, type InstallStatusView, type PlanWording } from "@/lib/api";
+import { Checkbox } from "@maipai/ui/src/ui/checkbox";
+import type { PlanLicence } from "../../../../shared/licensedRows";
 import { liveVerdict, PlanDiskList } from "./PlanDiskList";
 
 /** Total graphics memory choices when Home cannot read it (GB). */
@@ -21,8 +23,8 @@ export interface PlanStepProps {
    * install from this screen and the person may go on without it. */
   onReady?: (ready: boolean) => void;
   /** Wizard uses the setup routes; Home settings uses the signed-in ones. */
-  readPlan?: (vramGb?: number) => Promise<{ wording: PlanWording }>;
-  start?: (vramGb?: number, components?: string[]) => Promise<unknown>;
+  readPlan?: (vramGb?: number) => Promise<{ wording: PlanWording; licences?: PlanLicence[] }>;
+  start?: (vramGb?: number, components?: string[], acceptedLicences?: string[]) => Promise<unknown>;
   /** What the AI engine install is doing; the plan waits on it when this computer is installing the engine. */
   readInstall?: () => Promise<InstallStatusView>;
   /** Try the AI engine install again after it failed. */
@@ -42,11 +44,14 @@ export function PlanStep({ onInstalled, onReady, readPlan = api.setupPlan, start
   const [engine, setEngine] = useState<InstallStatusView | null>(null);
   // The disk plan's rows left turned on (INSTALL-DISK-01): starts at the plan's defaults, changes with each checkbox, and the total and the disk check follow.
   const [selected, setSelected] = useState<ReadonlySet<string>>(new Set());
+  // Licensed rows (Detailed video): the notice is shown plainly and the install waits for the accept; unticking the row drops the need.
+  const [licences, setLicences] = useState<PlanLicence[]>([]);
+  const [accepted, setAccepted] = useState<ReadonlySet<string>>(new Set());
 
   useEffect(() => {
     let active = true;
     setFailed(false);
-    readPlan(vram).then((result) => { if (active) { setWording(result.wording); setSelected(new Set(result.wording.disk?.plan.default_selected ?? [])); } }).catch(() => { if (active) setFailed(true); });
+    readPlan(vram).then((result) => { if (active) { setWording(result.wording); setLicences(result.licences ?? []); setSelected(new Set(result.wording.disk?.plan.default_selected ?? [])); } }).catch(() => { if (active) setFailed(true); });
     return () => { active = false; };
   }, [vram, attempt, readPlan]);
 
@@ -76,6 +81,8 @@ export function PlanStep({ onInstalled, onReady, readPlan = api.setupPlan, start
   const verdict = disk ? liveVerdict(disk, selected) : null;
   const diskShort = disk ? verdict!.state === "red" : !!wording?.diskLine;
   const canRecheck = !!wording && !wording.needsMemoryAnswer && (wording.level === "unknown" || diskShort || verdict?.state === "amber");
+  const owed = licences.filter((licence) => selected.has(licence.row_id) && !licence.accepted_at);
+  const unaccepted = owed.some((licence) => !accepted.has(licence.id));
   const canInstall = !!wording && (wording.level === "recommended" || wording.level === "moderate" || wording.level === "minimal") && !diskShort;
   // Continue stays blocked while the plan is still being read and while the
   // Install button is the way forward; it opens only when Home cannot
@@ -87,7 +94,7 @@ export function PlanStep({ onInstalled, onReady, readPlan = api.setupPlan, start
 
   async function install() {
     setBusy(true); setError(null);
-    try { await (disk ? start(vram, [...selected]) : start(vram)); onInstalled(); }
+    try { await (disk ? start(vram, [...selected], owed.map((licence) => licence.id)) : start(vram)); onInstalled(); }
     catch (reason) {
       const next = reason instanceof ApiError ? reason.next : undefined;
       setError(reason instanceof Error ? [reason.message, next].filter(Boolean).join(" ") : "Home couldn't start the download. Press Install again.");
@@ -119,9 +126,20 @@ export function PlanStep({ onInstalled, onReady, readPlan = api.setupPlan, start
             {wording.diskLine ? <Alert variant="destructive"><ErrorIcon /><AlertDescription>{wording.diskLine}</AlertDescription></Alert> : null}
           </>
         )}
+        {owed.map((licence) => (
+          <Alert key={licence.id} data-testid="plan-licence">
+            <AlertDescription>
+              <span className="block font-medium">Before it downloads: the maker's licence ({licence.name})</span>
+              <ul className="list-disc space-y-1 pl-5">{licence.summary.map((line) => <li key={line}>{line}</li>)}</ul>
+              <span className="block break-all">The full licence: {licence.url}</span>
+              <Field orientation="horizontal"><Checkbox id={`licence-${licence.id}`} checked={accepted.has(licence.id)} onCheckedChange={(value) => setAccepted((current) => { const next = new Set(current); if (value === true) next.add(licence.id); else next.delete(licence.id); return next; })} /><FieldContent><FieldLabel htmlFor={`licence-${licence.id}`}>I have read it and I accept it</FieldLabel></FieldContent></Field>
+              <span className="block text-muted-foreground">Not for you? Untick the Detailed videos row above and nothing of it downloads.</span>
+            </AlertDescription>
+          </Alert>
+        ))}
         {error ? <Alert variant="destructive"><ErrorIcon /><AlertDescription>{error}</AlertDescription></Alert> : null}
         {canRecheck ? <Button type="button" variant="secondary" onClick={() => { setWording(null); setAttempt((n) => n + 1); }}>Check again</Button> : null}
-        {canInstall ? <Button type="button" size="lg" disabled={busy} onClick={() => void install()}>{actionLabel}</Button> : null}
+        {canInstall ? <Button type="button" size="lg" disabled={busy || unaccepted} onClick={() => void install()}>{actionLabel}</Button> : null}
         </div>
       </CardContent>
     </Card>
