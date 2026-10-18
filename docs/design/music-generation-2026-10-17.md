@@ -202,9 +202,10 @@ A failed job is the kit `ErrorState` with Try again; the model says in its own w
 ## 9. Who may make music, and the lines no setting lifts
 
 - **Adults**: owner, admin or adult, on their own written chat screen, when `generation.music.enabled` (household, default on) is on and the
-  Stack has the music component installed. No content filter beyond the absolute lines (owner's policy for adults, image-generation note).
-- **Children and teens: off.** No setting turns it on in v1 (as video). A parent's per-child switch is a later row (MUSIC-GEN-13) that needs the
-  band's lyric ceiling designed first. The tool is not offered, the policy node refuses a call that arrives anyway, and every route refuses.
+  Stack has the music component installed. The absolute lines always apply, and since rule 0's 2026-10-18 text an adult's own per-person
+  filters apply too, through `musicProtections` (18.7).
+- **Children and teens: replaced by section 18.7 (owner, 2026-10-18).** Originally: off. A parent's per-child switch is a later row (MUSIC-GEN-13) that needs the
+  band's lyric ceiling designed first. (The old state, until 18.7: the tool was not offered, the policy node refused a call that arrived anyway, and every route refused.)
 - **Never** a guest, a spoken turn, a glance or shared screen, a TV, a robot or a pod (rule 0's surface gate). Playing a finished song on a
   speaker is the media apps' audio session, not generation.
 - **Absolute lines, for everyone**: (1) no lyrics or description with sexual content involving a minor: the picture policy's one list
@@ -542,10 +543,69 @@ ACE-Step already returns timed lyrics, and Home stores them in `music_jobs.lrc`,
   line per row) in a few lines. Cover art reuses `startPictureJob`, the picture version chain and the `ImageEditor` pane unchanged. Fitting
   the lyrics reuses the tool's measured estimate (`secondsFromLyrics`).
 
+### 18.7 Teens and children make songs; a child's request is rewritten, not refused (owner, 2026-10-18; MUSIC-GEN-22)
+
+Jesse: "kids can only make kid friendly content - this applies to everything including music, for example if a kid typed 'make a heavy rock
+song about scary halloween' we just modify that prompt to perhaps 'kid friendly happy light rock wiggles type song about scary halloween (but
+not too scary)'". This replaces section 9's "Children and teens: off" and opens music in the same lanes as pictures and videos, as RULES.md rule 0
+now says (Owner-approved 2026-10-18, Home 9ae5698a: "Picture, video and song generation under this rule"). The age gate is not loosened: the absolute lines, the surface gate and every check below stay
+fixed, and no setting reaches them.
+
+- **One set of protections, one seam (rule 0: "one set of content protections per person, set by age, covers everything Home makes").**
+  Every music floor goes through one function, `musicProtections(audience)` in `lib/music/policy.ts`, which returns the checks for this
+  person: the absolute lines, the person's lane, and their per-person filters. Today it delegates to the existing functions
+  (`promptViolatesMinorLine`, `refusePrompt` with the lane, `teenPromptUnsafe`, `childPromptUnsafe`, and the music floors). When the
+  shared `contentPolicyFor(person, band)` exists (FIX SETUP owns its design), the seam calls it instead: one change, nothing music-only. The
+  seam runs on the prompt, the lyrics, the title and the words as sung. **No music-only word list is added.** Swearing, drugs, gambling and
+  gore filters per person have no shared text check today (`lib/pictures/lane.ts`'s child list has drugs, gambling and gore but no
+  swearing; `teenPromptUnsafe` covers only sexual and unclothed words, not gore or drugs; `lib/contentCeiling.ts` sets profanity off for a
+  child only as guidance to the model, not as a check).
+- **The teen and child song lanes stay off until the shared text check exists (CONTENT-POLICY-01, FIX SETUP).** Songs carry words, so
+  rule 0's "a person who has swearing, drugs, gambling or gore filtered gets none of it in ... a song" needs a deterministic text check
+  that takes the person: in its one shared place (never in `lib/music`), blocking swearing, drugs, gambling and gore for a child and gore
+  and strong profanity for a teen by band default, and failing closed. Until CONTENT-POLICY-01 lands, `musicViewDenial` keeps refusing
+  teens and children as today. Everything else in 18.7 (the seam, the rewriter, the as-sung transcription, cartoon covers) is built behind
+  the closed lane, and the lane opens in one commit when the seam calls the shared check on the rewritten words and on the as-sung
+  transcript.
+- **Family.** Anyone in the household may make songs with or about household members, as rule 0's household option (on by default) allows
+  for pictures and videos. No real person outside the household and no public figure (rule 0's absolute line; the existing
+  `imitates_real_voice` flag and the picture real-person rule).
+- **Who and where.** The lane is the picture lane (`laneOf`, the stricter of the turn's band and the person's own). A teen or child may make
+  songs exactly when they may make pictures (`pictureDenial` for their audience): the home's switch and each child's own switch (`kidLaneOn`),
+  on by default, with no new setting. Written chat only; never a guest, a spoken turn, a glance, a TV, a robot or a pod (rule 0, as before).
+- **Teens.** A teen's song has nothing adult or sexual. The description, lyrics and title pass the teen lane's floor (`refusePrompt` with
+  `lane: "teen"`) and the music floors. A refusal is the teen lane's one short policy line (rule 6). Otherwise as adults.
+- **Children: rewrite, not refuse.** Before any floor, a child's request (description, lyrics, title) goes to a **kid-friendly rewriter**:
+  the household's own chat model, called by Home with a fixed instruction (make it a happy, light, gentle children's song: bouncy, simple, sing-along preschool songs; soften anything scary to "not too scary"; keep the child's topic; nothing violent, sexual, cruel, about real people, or about
+  self-harm) and a JSON answer (`description`, `lyrics`, `title`, `changed`). The rewritten words then pass the child lane's floor
+  (`refusePrompt` with `lane: "child"`, `childPromptUnsafe`) and the music floors. The tool result states what was made instead, and the
+  model tells the child in one kid-friendly sentence, for example "I made it a happy, not-too-scary Halloween song.".
+  - **Hard lines are never rewritten into a song.** When the child's own words, or the rewrite, hit the absolute lines or the child floor
+    (sexual content, graphic violence, self-harm, a real person), no song is made: the child gets the child lane's existing safe redirect
+    line, as pictures do.
+  - **Fail closed.** If the chat model is not ready, times out (10 s) or answers anything but valid JSON, the song uses a **fixed gentle
+    template**: description "a happy, gentle children's song, light and bouncy, not scary", the child's words dropped, the song instrumental.
+    The tool result says the words could not be checked, so the song has music only. If even the template fails a floor, no song.
+  - The rewritten text is the song's stored request. The child's original words are never sent to the Stack, never put in the music job, its
+    provenance, a log line, a trace or an admin view (rule 6a). They stay only where the child's own chat already keeps them: the child's
+    message and the model's tool-call arguments in that chat, which the child and their guardians see, as for every other tool.
+- **Every minor's song is checked as sung (MUSIC-GEN-15, now built for this lane).** After the Stack makes a teen's or child's song, the
+  music worker transcribes it with `whisper-large-v3-turbo` (MIT, part of the Music component; measured 4.9 s for a 60 s song and about
+  2 GB, section 18.1) using the settings of the standing check, and returns the transcript to Home only. Home runs the lane's floor and the
+  music floors on it. A hit, or a transcript that cannot be made or read, **withholds the song**: the card shows the lane's safe line, and the
+  file is deleted. The transcript is never stored or logged (rule 6a). Adults' songs are not transcribed.
+- **Child songs are Quick** (the hook, 18.1a), with the length following those words, which keeps squeezed or invented words least likely.
+- **A child's cover is a cartoon.** The cover (18.4) uses the person's own picture lane, so a child's cover is the child lane's cartoon
+  picture (forced cartoon look, child topic gate) and a teen's has nothing adult. A song's cover does not count toward a child's daily picture
+  allowance; the song itself counts as one picture against it (`reserveKid`), so the existing daily limit also limits songs.
+- **Edits.** A teen or child may change only their own songs made in this chat, through the same rewrite (child) and floors (both), and the
+  sung check runs again on the new version.
+
 ### 18.6 Rules check
 
 S6 (18.2 feeds the existing job card). Rule 9 (cover and karaoke are props on the shipped `MusicTrack`, added in commons first, with no Home
-wrapper). Rule 0 (music stays adults only; 18.1 adds a precondition and no new lane). Rule 6 (a failed cover never fails the song). Rule 5
+wrapper). Rule 0 and docs/SAFETY.md (teens and children make songs only in the picture lanes, 18.7, with a check as sung that withholds; this
+needs the rule text named in 18.7's escalation, Owner-approved by Jesse). Rule 6 (a failed cover never fails the song). S6 (a withheld minor's song shows the lane's safe line on its own card). Rule 5
 (no line count is given to the model; fitting is in code). No rule changes.
 
 ## Supersedes
@@ -562,4 +622,8 @@ wrapper). Rule 0 (music stays adults only; 18.1 adds a precondition and no new l
 - **Section 16's fixed lengths are replaced by 18.1a** (owner, 2026-10-18): with words, a song is as long as its words (6 s a sung line plus 10 s, up to the Stack's ceiling); Quick sings the hook and Full every part. The 45 s and 3-minute defaults remain only for instrumentals. 18.1's points 1 and 3 (fit the words to a fixed quick length) are replaced by 18.1a.
 - Section 5's guidance that a song without a given length is as long as its words is kept. Section 18.1 adds the reverse case: words that are
   too long for the length are fitted to whole sections, not sent whole.
+- **MUSIC-GEN-13 (a parent's per-child music switch) is superseded by 18.7**: songs use the picture lane switches (`kidLaneOn`), with no
+  new setting.
+- **Section 9's "Children and teens: off" is replaced by 18.7** (owner, 2026-10-18): teens and children make songs in the picture lanes; a
+  child's request is rewritten into a kid-friendly song, not refused; every minor's song is transcribed and checked as sung before it is shown.
 - Nothing in `RULES.md` changes.
