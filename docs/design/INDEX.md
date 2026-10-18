@@ -35,7 +35,7 @@ and a proposed design; otherwise the household IP gets blocked.
 | [studio-voice-2026-10-17.md](studio-voice-2026-10-17.md) | current, slice 1 live | VOICE-STUDIO-01, REG-02 (Chat throughput) |
 | [voices-2026-10-18.md](voices-2026-10-18.md) | new 2026-10-18, design only; queued after music | VOICES-01 to -08 (Voices) |
 | [settings-ia-2026-10-18.md](settings-ia-2026-10-18.md) | new 2026-10-18, audit and design only; queued after music, first | SETTINGS-IA-01 to -09 (Settings information architecture) |
-| [library-2026-10-18.md](library-2026-10-18.md) (with its clickable [mockup](assets/library-2026-10-18/index.html)) | new 2026-10-18, audit and design only; queued after music and the licence acknowledgement | LIBRARY-REVAMP-01 to -13 (Library revamp) |
+| [library-2026-10-18.md](library-2026-10-18.md) (with its clickable [mockup](assets/library-2026-10-18/index.html)) | new 2026-10-18, audit and design only; queued after music and the licence acknowledgement | BUG-LIBRARY-KEPT-01 and BUG-LIBRARY-SHARE-CHILD-01 first; LIBRARY-RETENTION-01, LIBRARY-DEDUP-01, LIBRARY-REVAMP-01 to -13 (Library revamp) |
 | [image-tools-2026-10-17.md](image-tools-2026-10-17.md) | current; Stack half landed | IMGTOOLS-01 to -09 |
 | [image-editing-2026-10-17.md](image-editing-2026-10-17.md) | current; built, live check open | IMGEDIT-01 to -06 |
 | [household-lists-reminders-2026-10-17.md](household-lists-reminders-2026-10-17.md) | new 2026-10-17, no code | HOUSEHOLD-01 to -04 (to be cut from the note; today the four bundled plugins and GENUI-05 in Skills and Intelligent UI answers) |
