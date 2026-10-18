@@ -9,11 +9,11 @@ Open **News** from your apps. It reads the same [news shelf](news-shelf.md) that
 
 **Today** shows recent stories. Open a story to read its text. **Following** has Topics and Sources tabs: use **Follow** to keep a channel, or open its row to see stories from that channel. **Saved** holds stories you saved. Select saved stories and choose **Remove** to take them out of that list.
 
-Teens and adults also have **My Mix**. Its reading-based choices arrive with the My Mix update. Children get stories from the Kids' lists, and their reading is never used to learn interests. A child reads inside News, with no links to a publisher's site. Guests do not get News.
+Teens and adults also have **My Mix**. It picks stories from what you open and save, and from your More like this and Less like this choices. Open the menu on My Mix and choose **Reset My Mix** to start over, or turn My Mix off in News settings. Children get stories from the Kids' lists, and their reading is never used to learn interests. A child reads inside News, with no links to a publisher's site. Guests do not get News.
 
 ## News settings
 
-Open the gear in News. Reading choices include My Mix, where stories open and the news digest. These choices take effect as those features arrive. Only an admin can change the **News shelf** lists and extra feed boxes. See [the shelf guide](news-shelf.md).
+Open the gear in News. Reading choices include My Mix, where stories open and the news digest. My Mix works now. The choice of where stories open and the news digest do nothing yet. Only an admin can change the **News shelf** lists and extra feed boxes. See [the shelf guide](news-shelf.md).
 
 ## Without internet
 
