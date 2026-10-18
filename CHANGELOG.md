@@ -7,6 +7,8 @@ checklist (`docs/dev.md`). The first release is 0.1.0.
 
 ## [Unreleased]
 
+- Added the backend Library listing and summary with cursor paging, filters, derived names, generation thumbnails, folded versions, sharing summaries, and audience checks. Storage and Library now classify PDFs and office files as documents.
+
 ## [0.2.23] - 2026-10-18
 
 A phone gets a round menu button and slide-over drawer instead of the icon rail below 640 px wide, shared adult-only Library files stay away from children and teens, and admins can set Library storage rules by type. No database changes. Pins: spec-v0.1.183 and ui-v0.5.276. The engine is unchanged (Stack a89e7ff).
@@ -15,8 +17,6 @@ A phone gets a round menu button and slide-over drawer instead of the icon rail 
 - **A phone shows a menu button, not the rail.** Below 640 px the icon rail is gone; a round button at the top left opens a drawer with Home, Search, your apps, Settings and your profile. Pages no longer run wider than the screen. (MOBILE-RAIL-01, ui-v0.5.276)
 
 - Admins can set Library storage rules by type and preview cleanup. Home warns in Notifications and Repairs at least a day before removing old unpinned generated files. Kept files stay, and chat retention stays separate. Trash days are saved for the later Library Trash feature. (LIBRARY-RETENTION-01)
-- Added the backend Library listing and summary with cursor paging, filters, derived names, generation thumbnails, folded versions, sharing summaries, and audience checks. Storage and Library now classify PDFs and office files as documents.
-
 - Shared adult-only and unclassified Library files are hidden from children and teens, including content and derived image reads. (BUG-LIBRARY-SHARE-CHILD-01)
 
 ## [0.2.22] - 2026-10-18
