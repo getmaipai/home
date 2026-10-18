@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
-import { mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { spawnSync } from "node:child_process";
@@ -9,7 +9,18 @@ const repoRoot = join(import.meta.dir, "..");
 // The logic is the shared getmaipai/.github script; this repo's scripts/wt.sh is a thin wrapper, so the
 // lifecycle is exercised against the shared file in the sibling .github checkout.
 const common = resolve(repoRoot, spawnSync("git", ["-C", repoRoot, "rev-parse", "--git-common-dir"], { encoding: "utf8" }).stdout.trim());
-const script = process.env.MAIPAI_WT_SHARED || join(common, "..", "..", ".github", "standards", "bin", "wt.sh");
+// Same source as the wrapper: the sibling .github checkout's origin/main, never its working tree (which may be stale or mid-edit).
+const sharedFromOrigin = () => {
+  const dir = mkdtempSync(join(tmpdir(), "maipai-wt-shared-"));
+  const std = join(common, "..", "..", ".github");
+  const archive = spawnSync("bash", ["-c", `git -C '${std}' archive origin/main standards/bin | tar -x -C '${dir}'`], { encoding: "utf8" });
+  if (archive.status !== 0) throw new Error(`cannot read .github origin/main:standards/bin: ${archive.stderr}`);
+  return join(dir, "standards", "bin", "wt.sh");
+};
+const script = process.env.MAIPAI_WT_SHARED || sharedFromOrigin();
+// wt.sh reads its session files with node, so a machine without node cannot run these tests; they skip with this reason.
+const hasNode = spawnSync("node", ["-v"], { stdio: "ignore" }).status === 0;
+const hasTmuxBin = spawnSync("tmux", ["-V"], { stdio: "ignore" }).status === 0;
 process.env.WT_T2_GLOBS ??= "backend/src/auth/* docs/design/RULES.md scripts/check.sh";
 const fixture = join(scratch, "home");
 const bare = join(scratch, "origin.git");
@@ -41,7 +52,7 @@ afterAll(() => {
   rmSync(scratch, { recursive: true, force: true });
 });
 
-describe("wt.sh worktree lifecycle", () => {
+describe.skipIf(!hasNode)("wt.sh worktree lifecycle (needs node installed)", () => {
   test("start and done remove the worktree, branch, and session file", () => {
     const started = run(["start", "x"]);
     expect(started.status).toBe(0);
@@ -107,40 +118,65 @@ describe("wt.sh worktree lifecycle", () => {
     expect(spawnSync("tmux", ["-L", socket, "has-session", "-t", tmuxName]).status).not.toBe(0);
   });
 
-  test("reap archives dirty dead work on wip and removes clean merged work", () => {
-    const dirtyStart = run(["start", "recover"]);
-    expect(dirtyStart.status).toBe(0);
-    const dirtyPath = dirtyStart.stdout.trim();
-    const dirtyName = dirtyPath.split("/").at(-1)!.replace(/^home-/, "");
-    writeFileSync(join(dirtyPath, "lost-work.txt"), "keep this\n");
-    const dirtyFile = join(data, "sessions", `${dirtyName}.json`);
-    const dirtyRecord = JSON.parse(readFileSync(dirtyFile, "utf8"));
-    dirtyRecord.pid = 999999999;
-    writeFileSync(dirtyFile, JSON.stringify(dirtyRecord));
+  describe("reaper is report-only unless a worktree is provably dead", () => {
+    const realGit = spawnSync("bash", ["-c", "command -v git"], { encoding: "utf8" }).stdout.trim();
+    const shimDir = join(scratch, "git-shim");
+    const calls = join(scratch, "git-calls.txt");
+    const startDead = (slug: string) => {
+      const started = run(["start", slug]);
+      expect(started.status).toBe(0);
+      const path = started.stdout.trim();
+      const name = path.split("/").at(-1)!.replace(/^home-/, "");
+      const file = join(data, "sessions", `${name}.json`);
+      const rec = JSON.parse(readFileSync(file, "utf8"));
+      rec.pid = 999999999;
+      writeFileSync(file, JSON.stringify(rec));
+      return { path, name, file };
+    };
+    const age = (w: { path: string; name: string }) => {
+      const gitdir = spawnSync(realGit, ["-C", w.path, "rev-parse", "--absolute-git-dir"], { encoding: "utf8" }).stdout.trim();
+      for (const dir of [w.path, gitdir]) spawnSync("find", [dir, "-exec", "touch", "-t", "202001010000", "{}", "+"]);
+      spawnSync("touch", ["-t", "202001010000", join(data, "sessions", `${w.name}.beat`)]);
+    };
+    const reap = (env: Record<string, string> = {}) => run(["reap"], { MAIPAI_WT_REAP_AGE: "0", ...env });
+    const listed = () => spawnSync("git", ["-C", fixture, "worktree", "list", "--porcelain"], { encoding: "utf8" }).stdout;
+    const cleanup = (w: { path: string; name: string; file: string }) => {
+      spawnSync("git", ["-C", fixture, "worktree", "remove", "--force", w.path]);
+      spawnSync("git", ["-C", fixture, "branch", "-D", `wt/${w.name}`]);
+      rmSync(w.file, { force: true });
+      rmSync(join(data, "sessions", `${w.name}.beat`), { force: true });
+    };
 
-    const cleanStart = run(["start", "clean"]);
-    expect(cleanStart.status).toBe(0);
-    const cleanPath = cleanStart.stdout.trim();
-    const cleanName = cleanPath.split("/").at(-1)!.replace(/^home-/, "");
-    const cleanFile = join(data, "sessions", `${cleanName}.json`);
-    const cleanRecord = JSON.parse(readFileSync(cleanFile, "utf8"));
-    cleanRecord.pid = 999999999;
-    writeFileSync(cleanFile, JSON.stringify(cleanRecord));
+    test("a dirty dead worktree is reported, never archived, committed or removed", () => {
+      const w = startDead("recover");
+      writeFileSync(join(w.path, "lost-work.txt"), "keep this\n");
+      age(w);
+      mkdirSync(shimDir, { recursive: true });
+      writeFileSync(join(shimDir, "git"), `#!/usr/bin/env bash\nprintf '%s\\n' "$*" >> '${calls}'\nexec '${realGit}' "$@"\n`, { mode: 0o755 });
+      rmSync(calls, { force: true });
+      expect(reap({ PATH: `${shimDir}:${process.env.PATH}` }).status).toBe(0);
+      expect(readFileSync(join(w.path, "lost-work.txt"), "utf8")).toBe("keep this\n");
+      expect(listed()).toContain(`worktree ${w.path}`);
+      expect(readFileSync(join(data, "reaped.md"), "utf8")).toContain(w.name);
+      expect(spawnSync(realGit, ["-C", fixture, "show-ref", "--verify", `refs/heads/wip/${w.name}`]).status).not.toBe(0);
+      expect(spawnSync(realGit, ["-C", w.path, "log", "--author=MaiPai Reaper", "--oneline"], { encoding: "utf8" }).stdout).toBe("");
+      const seen = existsSync(calls) ? readFileSync(calls, "utf8") : "";
+      expect(seen).not.toMatch(/(^|\s)(add|commit|stash|reset|checkout|clean|branch -f|branch -D|update-ref)(\s|$)/m);
+      expect(seen).not.toMatch(/worktree remove/);
+      cleanup(w);
+    });
 
-    expect(run(["reap"], { MAIPAI_WT_REAP_AGE: "0" }).status).toBe(0);
-    expect(spawnSync("git", ["-C", fixture, "show-ref", "--verify", `refs/heads/wip/${dirtyName}`]).status).toBe(0);
-    expect(readFileSync(join(dirtyPath, "lost-work.txt"), "utf8")).toBe("keep this\n");
-    expect(readFileSync(join(data, "reaped.md"), "utf8")).toContain(dirtyName);
-    expect(spawnSync("git", ["-C", fixture, "worktree", "list", "--porcelain"], { encoding: "utf8" }).stdout).toContain(`worktree ${dirtyPath}`);
-    expect(spawnSync("git", ["-C", fixture, "worktree", "list", "--porcelain"], { encoding: "utf8" }).stdout).not.toContain(`worktree ${cleanPath}`);
-    spawnSync("git", ["-C", fixture, "worktree", "remove", "--force", dirtyPath]);
-    spawnSync("git", ["-C", fixture, "branch", "-D", `wt/${dirtyName}`, `wip/${dirtyName}`]);
-    rmSync(dirtyFile, { force: true });
-    rmSync(join(data, "sessions", `${cleanName}.json`), { force: true });
+    (hasTmuxBin ? test : test.skip)("a clean merged worktree with no activity is removed (needs tmux installed)", () => {
+      const w = startDead("clean");
+      age(w);
+      expect(reap().status).toBe(0);
+      expect(listed()).not.toContain(`worktree ${w.path}`);
+      expect(existsSync(w.file)).toBe(false);
+    });
   });
 });
 
-describe("wt.sh land gate stamp", () => {
+describe.skipIf(!hasNode)("wt.sh land gate stamp (needs node installed)", () => {
   const originMain = () => spawnSync("git", ["--git-dir", bare, "rev-parse", "main"], { encoding: "utf8" }).stdout.trim();
   // A worktree with one committed file; `file` decides the tier (docs T0, other code T1).
   const session = (slug: string, file: string) => {
