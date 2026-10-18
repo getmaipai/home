@@ -53,8 +53,21 @@ export function replaceMusicSection(lyrics: string, section: string, replacement
   return out.join("\n");
 }
 
-/** The tool's measured singing rate: about 4 s a sung line plus 10 s (design note sections 16 and 18.1: 11 lines filled 55 s). */
-export function sungSecondsFor(lines: number): number { return lines * 4 + 10; }
+/** The length follows the words (design note 18.1a). */
+export function secondsForWords(lyrics: string): number {
+  return Math.max(30, sungSecondsFor(lyrics.split(/\r?\n/).filter((line) => line.trim() && !isTag(line)).length));
+}
+/** Whole sections through the first chorus, or the first two sections without a chorus. */
+export function hookOf(lyrics: string): string {
+  const tags = [...lyrics.matchAll(/^[ \t]*\[([^\]\r\n]+)\][ \t]*\r?$/gm)];
+  if (!tags.length) return lyrics;
+  const chorus = tags.findIndex((tag) => /^chorus/i.test(tag[1]!.trim()));
+  const end = tags[chorus >= 0 ? chorus + 1 : 2]?.index;
+  return end === undefined ? lyrics : lyrics.slice(0, end).trimEnd();
+}
+
+/** The tool's measured singing rate: 6 s a sung line plus 10 s (design note 18.1a). */
+export function sungSecondsFor(lines: number): number { return lines * 6 + 10; }
 function isTag(line: string): boolean { return /^\[[^\]]+\]$/.test(line.trim()); }
 /**
  * MUSIC-GEN-17 (design note 18.1): words longer than the song are squeezed into its last second by ACE-Step and sung as nonsense.
@@ -75,7 +88,7 @@ export function fitLyricsToLength(lyrics: string, seconds: number): { lyrics: st
     if (sung && lines && sungSecondsFor(lines + sung) > seconds) break;
     if (sung && !lines && sungSecondsFor(sung) > seconds) {
       // Even the first section is too long: keep its lines that fit, at least one.
-      const room = Math.max(1, Math.floor((seconds - 10) / 4)); let taken = 0;
+      const room = Math.max(1, Math.floor((seconds - 10) / 6)); let taken = 0;
       kept.push(block.filter((row) => !row.trim() || isTag(row) || taken++ < room));
       lines = room; break;
     }

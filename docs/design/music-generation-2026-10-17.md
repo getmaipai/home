@@ -478,8 +478,8 @@ song, 76 s for a hook of 11 lines. The 33 GB admission peak (section 4) is uncha
 6. **Effort is unchanged.** Both kinds use the Stack's default quality for this computer (detailed, the 1.7B planner, on 128 GB). Switching
    planners between songs costs a model load (measured 23 s in section 16), so the effort setting stays the engine's, not the kind's.
 7. **Copy** (spec copy fields, rule S5, read through `describeSetting`): help "What chat makes when nobody says which. Anyone who can make
-   songs can still ask for the other kind. A song is as long as its words."; does "Picks whether chat sings every part or just the hook when
-   nobody says which."; quick "Quick: just the hook, the first verse and chorus."; full "Full: every part of the song." The computer's own longest song
+   songs can still ask for the other kind. A song is as long as its words."; does "Picks whether chat sings every part or only the hook when
+   nobody says which."; quick "Quick: the hook, the first verse and chorus."; full "Full: every part of the song." The computer's own longest song
    (`limits.max_seconds`) goes in the card's hint, not the setting. The guide and the card's hint say the same. The phrases "Quick songs are about 45 seconds" and the 60 s default are gone,
    except for instrumentals.
 

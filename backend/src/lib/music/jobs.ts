@@ -8,8 +8,10 @@ import { attachmentFilePath, createAttachment, readAttachmentForConversation, re
 import { checkStorageCap } from "@/lib/storage/usage";
 import { newFileId, newMusicJobId } from "@/lib/id";
 import type { PersonRow } from "@/types";
-import { cancelOrDeleteMusic, fetchSong, getMusicJob, StackMusicError, submitMusic, type MusicBody, type StackSong } from "./stack";
+import { cancelOrDeleteMusic, musicBody, fetchSong, getMusicJob, StackMusicError, submitMusic, type MusicBody, type StackSong } from "./stack";
 import { MUSIC_NOTE, generationOf, type GenerationProvenance, type MusicJob, type MusicRequest, type MusicTask } from "./types";
+import { musicEngineStatus } from "./ready";
+import { sungLyricsFromLrc } from "./sections";
 import { modelStampFor } from "./models";
 import { provenanceFor } from "./commercial";
 import { refuseMusicPrompt } from "./policy";
@@ -83,7 +85,7 @@ async function watch(job: MusicJob, actor: PersonRow, early: StackSong[] | null 
   const controller = new AbortController(); watching.set(job.id, controller);
   const deadline = Date.now() + 25 * 60 * 1000;
   try {
-    if (early) { await finish(job, actor, early, controller.signal); return; }
+    if (early && await finish(job, actor, early, controller.signal) !== false) return;
     while (!controller.signal.aborted && Date.now() < deadline) {
       let status;
       try { status = await getMusicJob(job.stackJob); }
@@ -93,12 +95,15 @@ async function watch(job: MusicJob, actor: PersonRow, early: StackSong[] | null 
         await sleep(POLL_MS * 2, controller.signal); continue;
       }
       if (controller.signal.aborted || stopped(job)) return;
-      if (status.state === "done") { await finish(job, actor, status.data ?? [], controller.signal); return; }
+      if (status.state === "done") {
+        if (await finish(job, actor, status.data ?? [], controller.signal) === false) continue;
+        return;
+      }
       if (status.state === "failed" || (status.state === "cancelled" && status.code === "no_memory")) { fail(job, status.code ?? "failed"); return; }
       if (status.state === "cancelled") { job.state = "cancelled"; saveMusicJob(job); return; }
       job.state = status.state === "queued" ? "queued" : "running";
       // Stage labels come from a closed map at the card boundary, never from arbitrary Stack text.
-      job.stage = status.stage ?? null; job.progress = Math.max(0, Math.min(0.99, status.progress_fraction ?? 0));
+      job.stage = job.request.retried && status.state === "queued" ? "longer" : status.stage ?? null; job.progress = Math.max(0, Math.min(0.99, status.progress_fraction ?? 0));
       job.etaSeconds = status.eta_seconds ?? null; job.position = status.position ?? null;
       saveMusicJob(job);
       if (stopped(job)) return; // a stop stored by another writer is adopted by saveMusicJob
@@ -111,10 +116,29 @@ async function watch(job: MusicJob, actor: PersonRow, early: StackSong[] | null 
     await cancelOrDeleteMusic(job.stackJob);
   }
 }
-async function finish(job: MusicJob, actor: PersonRow, songs: StackSong[], signal: AbortSignal): Promise<void> {
+async function finish(job: MusicJob, actor: PersonRow, songs: StackSong[], signal: AbortSignal): Promise<false | void> {
   if (stopped(job)) return;
   const song = songs[0];
   if (!song || !Number.isFinite(song.duration_s) || !Number.isFinite(song.seed)) { fail(job, "bad_reply"); return; }
+  if (!job.request.retried && ["text2music", "remake", "variation"].includes(job.task) && song.lrc
+    && sungLyricsFromLrc(song.lrc, song.duration_s).length < sungLyricsFromLrc(song.lrc, null, { keepSqueezed: true }).length) {
+    const ceiling = (await musicEngineStatus())?.limits.max_seconds ?? job.request.max_seconds;
+    if (signal.aborted || stopped(job)) return;
+    if (ceiling !== undefined && job.request.seconds < ceiling) {
+      const previous = job.stackJob!;
+      job.request.seconds = Math.min(ceiling, Math.round(job.request.seconds * 1.3));
+      job.request.retried = true; job.request.max_seconds = ceiling;
+      job.stage = "longer"; job.state = "running"; job.progress = 0; job.etaSeconds = null; job.position = null;
+      saveMusicJob(job);
+      await cancelOrDeleteMusic(previous);
+      if (signal.aborted || stopped(job)) return;
+      const submitted = await submitMusic({ ...musicBody(job.request, "text2music"), timeout_ms: 1 });
+      if (signal.aborted || stopped(job)) { await cancelOrDeleteMusic(submitted.job); return; }
+      job.stackJob = submitted.job; saveMusicJob(job);
+      if (submitted.done) return finish(job, actor, submitted.done, signal);
+      return false;
+    }
+  }
   const bytes = await fetchSong(job.stackJob!);
   if (signal.aborted) return;
   if (bytes.length < 12 || Buffer.from(bytes.subarray(4, 8)).toString() !== "ftyp") { fail(job, "bad_file"); return; }

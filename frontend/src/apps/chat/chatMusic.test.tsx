@@ -6,7 +6,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { MemoryRouter } from "react-router-dom";
 import { cleanup, fireEvent, render, waitFor } from "@testing-library/react";
 import { MusicTrack } from "@maipai/ui/src/elements/music-track";
-import { MusicToolRender, musicFileName } from "@/apps/chat/chatToolUis";
+import { MusicToolRender, musicFileName, musicHint } from "@/apps/chat/chatToolUis";
 import { TOOL_BINDINGS } from "@/apps/chat/elementBindings";
 import type { MusicCard } from "@/lib/musicApi";
 
@@ -18,7 +18,7 @@ let card: MusicCard;
 const V1 = { id: "file-one", label: "Version 1", url: "/api/music/jobs/mus-1/files/file-one" };
 const V2 = { id: "file-two", label: "Version 2", url: "/api/music/jobs/mus-2/files/file-two" };
 function make(over: Partial<MusicCard>): MusicCard {
-  return { id: "mus-1", state: "running", stage: "planning", stage_label: "Planning the song", progress: 0.25, eta_seconds: 40, position: null, error_line: null, versions: [], current_id: null, length: "quick",
+  return { id: "mus-1", state: "running", stage: "planning", stage_label: "Planning the song", progress: 0.25, eta_seconds: 40, position: null, error_line: null, versions: [], current_id: null, length: "quick", cut: null, max_seconds: 240,
     title: "Pancakes", description: "a gentle folk song with an original voice", lyrics: "[Verse]\nMorning light\n[Chorus]\nPancakes rise", duration_s: 60, started_at: Date.now() - 30_000, ...over };
 }
 const done = (over: Partial<MusicCard> = {}): MusicCard => make({ state: "done", stage: "ready", stage_label: "", progress: 1, eta_seconds: 0, versions: [V1], current_id: V1.id, ...over });
@@ -64,6 +64,12 @@ describe("MusicToolRender", () => {
     await waitFor(() => expect(view.getByRole("status").textContent).toContain("Place in line: 2"));
     expect(cardOf(view)?.getAttribute("data-status")).toBe("queued");
     expect(view.container.textContent).toContain("Pancakes");
+  });
+
+  test("a longer retry shows its own stage while waiting for admission", async () => {
+    card = make({ state: "queued", stage: "longer", stage_label: "Making it longer so every line fits", progress: 0 });
+    const view = mount();
+    await waitFor(() => expect(view.getByRole("status").textContent).toContain("Making it longer so every line fits"));
   });
 
   test("while the song is made it shows the stage, the percent, the time left and the clock, and Stop calls the stop route", async () => {
@@ -190,4 +196,10 @@ describe("Quick and Full songs on the card", () => {
     expect(await findByText(/Full song/)).toBeTruthy();
     expect(await findByText("Make it quick")).toBeTruthy();
   });
+});
+
+test("song hints explain the hook, every part, and the computer ceiling", () => {
+  expect(musicHint("quick")).toBe("Quick: the hook. Make it full to sing every part.");
+  expect(musicHint("full")).toBe("Full: every part of the song.");
+  expect(musicHint("full", "ceiling", 120)).toBe("Longer than this computer's longest song (2 minutes), so it sings the first parts that fit.");
 });

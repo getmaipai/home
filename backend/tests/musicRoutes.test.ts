@@ -74,7 +74,7 @@ describe("music routes", () => {
     const id = musicForOutcomes([outcome])!.id; await waitForMusic(() => getMusicJobFor(actor, id)?.state === "done");
     const second = getMusicJobFor(actor, id)!;
     const card = await (await client.get(`/api/music/jobs/${job.id}`)).json() as { description: string; started_at: number; versions: { id: string; label: string; url: string }[]; current_id: string; lyrics: string; title: string; duration_s: number };
-    expect(card).toMatchObject({ current_id: second.fileId, title: "Pancakes", description: "an original folk song", lyrics: LYRICS, duration_s: 38, started_at: Date.parse(job.createdAt) });
+    expect(card).toMatchObject({ current_id: second.fileId, title: "Pancakes", description: "an original folk song", lyrics: LYRICS, duration_s: 52, started_at: Date.parse(job.createdAt) });
     expect(card.versions.map((v) => v.label)).toEqual(["Version 1", "Version 2"]);
     const use = await client.post(`/api/music/jobs/${id}/use`, { file_id: job.fileId });
     expect(use.status).toBe(200); expect((await use.json() as { current_id: string }).current_id).toBe(job.fileId!);

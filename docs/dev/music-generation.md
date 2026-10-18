@@ -24,7 +24,7 @@ code map for working on it.
 - The description, lyrics and title live only on the person's `music_jobs` row; never in provenance, a log line or an error.
 - An edit's source is a song this person made in this conversation; its bytes go to the Stack unchanged with their sha256 (the Stack refuses
   anything it did not make).
-- The chat model writes the lyrics. Tell it to write enough lines for the length: ACE-Step sings invented words past the end of short lyrics.
+- The chat model writes the lyrics without a line count. `secondsForWords` allows 6 seconds per sung line plus 10 (at least 30); `hookOf` selects Quick through the first chorus. A squeezed ending triggers one retry at 30 percent longer, up to the Stack ceiling, through normal admission.
 
 ## Try it on a scratch Stack and Home
 

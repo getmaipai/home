@@ -1,4 +1,5 @@
 // MUSIC-GEN-03: Stack section 12. Words and source bytes travel only in bodies, never in logs or errors.
+import type { MusicRequest } from "./types";
 import { getStackUrl } from "@/lib/stackEngine";
 export type MusicState = "queued" | "running" | "done" | "failed" | "cancelled";
 export interface StackSong { url?: string; duration_s: number; seed: number; lrc?: string; bpm?: number; key?: string; model?: string }
@@ -14,6 +15,12 @@ export interface MusicBody {
   strength?: number; edit?: { op: "trim" | "fade" | "loudness"; from_s?: number; to_s?: number; seconds?: number; where?: "in" | "out" | "both"; lufs?: number };
   timeout_ms: number;
 }
+export function musicBody(request: MusicRequest, task: MusicBody["task"]): Omit<MusicBody, "timeout_ms"> {
+  return { task, caption: request.description, lyrics: request.lyrics, instrumental: request.instrumental, duration_s: request.seconds,
+    bpm: request.bpm, key: request.key, language: request.language, quality: request.quality ?? "quick", seed: request.seed,
+    from_s: request.from_s, to_s: request.to_s, add_s: request.add_s, at: request.at, strength: request.strength, edit: request.edit };
+}
+
 export interface StackMusicJob {
   state: MusicState; stage?: string | null; stage_label?: string | null; progress_fraction?: number | null;
   eta_seconds?: number | null; position?: number | null; code?: string | null; data?: StackSong[];

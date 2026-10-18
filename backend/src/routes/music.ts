@@ -13,7 +13,7 @@ import type { AppEnv } from "@/types";
 import { musicDenial, musicViewDenial, MUSIC_DENIAL_LINE } from "@/lib/music/policy";
 import { musicEngineStatus, musicStatusReady } from "@/lib/music/ready";
 import { cancelMusicJob, getMusicJobFor, musicVersions, openMusicFile, plainMusicFailure, startMusicJob, useMusicVersion, type MusicFileHandle, type MusicJob } from "@/lib/music/jobs";
-import { fullSongsPossible, lengthOf, prepareMusicEdit } from "@/lib/music/tool";
+import { lengthOf, prepareMusicEdit } from "@/lib/music/tool";
 import { refuseMusicPrompt, MUSIC_REFUSAL_LINE } from "@/lib/music/policy";
 import { StackMusicError } from "@/lib/music/stack";
 import { sungLyricsFromLrc, withoutLastLines } from "@/lib/music/sections";
@@ -40,11 +40,13 @@ const params = z.object({ id: z.string().min(1).max(80) });
 const versionSchema = z.object({ id: z.string(), label: z.string(), url: z.string() });
 const cardSchema = z.object({
   id: z.string(), state: z.enum(["queued", "running", "done", "failed", "cancelled"]), stage: z.string().nullable(), stage_label: z.string(),
+  cut: z.enum(["asked", "ceiling"]).nullable(), max_seconds: z.number().nullable(),
   progress: z.number(), eta_seconds: z.number().nullable(), position: z.number().nullable(), error_line: z.string().nullable(),
   versions: z.array(versionSchema), current_id: z.string().nullable(), length: z.enum(["quick", "full"]), title: z.string().nullable(), description: z.string().nullable(), lyrics: z.string().nullable(), duration_s: z.number().nullable(), started_at: z.number(),
 });
 export function musicFileUrl(job: MusicJob): string { return `/api/music/jobs/${encodeURIComponent(job.id)}/files/${encodeURIComponent(job.fileId!)}`; }
 export function musicStageLabel(job: MusicJob): string {
+  if (job.stage === "longer" && ["queued", "running"].includes(job.state)) return "Making it longer so every line fits";
   if (job.state === "queued") return busyLine(job.position);
   if (job.state !== "running") return "";
   switch (job.stage) {
@@ -70,6 +72,7 @@ export function musicCardView(actor: PersonRow, root: MusicJob) {
   const current = [...versions].sort((a, b) => (b.chosenAt ?? b.createdAt).localeCompare(a.chosenAt ?? a.createdAt) || b.id.localeCompare(a.id))[0];
   return {
     id: root.id, state: root.state, stage: root.stage, stage_label: musicStageLabel(root), progress: root.progress,
+    cut: (current ?? root).request.cut ?? null, max_seconds: (current ?? root).request.max_seconds ?? null,
     eta_seconds: root.etaSeconds, position: root.position, error_line: root.errorLine,
     versions: versions.map((job, index) => ({ id: job.fileId!, label: `Version ${index + 1}`, url: musicFileUrl(job) })),
     current_id: current?.fileId ?? null, length: lengthOf((current ?? root).request, (current ?? root).durationS), title: current?.request.title ?? root.request.title ?? null,
@@ -109,7 +112,7 @@ musicRoutes.openapi(useRoute, (c) => {
 // Make it full / Make it quick (owner, 2026-10-17): the same song made again at the other length, as a new version on the same card.
 const lengthRoute = createRoute({ method: "post", path: "/jobs/{id}/length", tags: ["Music"], summary: "Make the shown song again as a quick or a full song", middleware,
   request: { params, body: { content: { "application/json": { schema: z.object({ length: z.enum(["quick", "full"]), file_id: z.string().min(1).max(80).optional() }) } } } },
-  responses: { 200: { content: { "application/json": { schema: cardSchema } }, description: "The card with the new version coming." }, 422: { description: "Full songs are not possible here." }, ...refusals } });
+  responses: { 200: { content: { "application/json": { schema: cardSchema } }, description: "The card with the new version coming." }, 422: { description: "The requested edit cannot be made." }, ...refusals } });
 musicRoutes.openapi(lengthRoute, async (c) => {
   const actor = c.get("person"); const root = getMusicJobFor(actor, c.req.valid("param").id); const { length, file_id } = c.req.valid("json");
   const versions = root ? musicVersions(actor, root).filter((j) => j.state === "done" && j.fileId) : [];
@@ -117,8 +120,7 @@ musicRoutes.openapi(lengthRoute, async (c) => {
   if (!root || !source || !source.conversationId || !source.turnId) return c.json({ error: "That song isn't available any more. Ask for it again." }, 404) as never;
   const engine = await musicEngineStatus();
   if (!musicStatusReady(engine)) return c.json({ error: plainMusicFailure("not_installed") }, 503) as never;
-  if (length === "full" && !fullSongsPossible(engine!)) return c.json({ error: "Full songs need a computer with 128 GB of memory. Quick songs work here." }, 422) as never;
-  const plan = prepareMusicEdit(source, { track: source.fileId!, change: length === "full" ? "make_full" : "make_quick" } as never);
+  const plan = prepareMusicEdit(source, { track: source.fileId!, change: length === "full" ? "make_full" : "make_quick" }, engine!.limits);
   if (!plan.ok) return c.json({ error: plan.line }, 422) as never;
   const refusal = refuseMusicPrompt([plan.request.description, plan.request.lyrics, plan.request.written_lyrics, plan.request.title, plan.request.key, plan.request.language].join(" "));
   if (refusal) return c.json({ error: MUSIC_REFUSAL_LINE[refusal] }, 403) as never;

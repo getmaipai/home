@@ -18,8 +18,10 @@ export interface MusicCard {
   /** Oldest first. Each url is the owner's own audio, with Range support. */
   versions: MusicVersion[];
   current_id: string | null;
-  /** The kind of the version on show: quick (about 45 s) or full (about 3 minutes). */
+  /** The kind of the version on show: quick (the hook) or full (every part). */
   length: "quick" | "full";
+  cut: "asked" | "ceiling" | null;
+  max_seconds: number | null;
   title: string | null;
   description: string | null;
   /** The owner's own words; null when there are none. */

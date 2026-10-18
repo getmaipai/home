@@ -638,8 +638,9 @@ function musicDescriptionOf(card: MusicCard): string | undefined {
 }
 
 /** The plain line under a song while it is made: what each kind is and how long it takes (measured, music design note section 16). */
-export function musicHint(length: "quick" | "full"): string {
-  return length === "full" ? "Full songs are about 3 minutes and take a minute or two." : "Quick songs are about 45 seconds and take under a minute.";
+export function musicHint(length: "quick" | "full", cut: MusicCard["cut"] = null, maxSeconds: number | null = null): string {
+  if (cut === "ceiling" && maxSeconds !== null) return `Longer than this computer's longest song (${maxSeconds / 60} minutes), so it sings the first parts that fit.`;
+  return length === "full" ? "Full: every part of the song." : "Quick: the hook. Make it full to sing every part.";
 }
 
 export const MusicToolRender: ToolCallMessagePartComponent<Record<string, never>, { id: string }> = ({ result }) => {
@@ -687,7 +688,8 @@ export const MusicToolRender: ToolCallMessagePartComponent<Record<string, never>
       onSelectVersion={(id) => setPicked({ base: card.current_id, id })}
       onUseVersion={(id) => { void musicApi.useVersion(card.id, id).then(refresh).catch(refresh); }}
       onStop={() => { void musicApi.stop(card.id).then(refresh).catch(refresh); }}
-      hint={musicHint(card.length)}
+      hint={musicHint(card.length, card.cut, card.max_seconds)}
+      {...(card.state === "queued" && card.stage === "longer" ? { copy: { queued: card.stage_label } } : {})}
       {...(ready ? { actions: <Button type="button" variant="ghost" size="sm" onClick={() => { void musicApi.setLength(card.id, card.length === "full" ? "quick" : "full", shown.id).then(refresh).catch(refresh); }}>{card.length === "full" ? "Make it quick" : "Make it full"}</Button> } : {})}
       {...(ready ? { onShare: () => { void shareClip({ prepared: prepared.data, title, nav: navigator, fallback: () => navigate(`/files?file=${encodeURIComponent(shown.id)}`) }); } } : {})}
     />

@@ -1,4 +1,5 @@
 // MUSIC-GEN-03 review fixes: provenance from the Stack's own answer, the cancel race, existing-song routes, cheap edits and file reads.
+import { secondsForWords } from "@/lib/music/sections";
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { eq } from "drizzle-orm";
 import { unlinkSync } from "node:fs";
@@ -7,7 +8,7 @@ import { attachments, musicJobs } from "@/db/schema";
 import { resetDb } from "./reset-db";
 import { createBenchPeople } from "../scripts/bench/conversationRunner";
 import { installFakeMusicStack, musicState, LYRICS, waitForMusic } from "./musicFixture";
-import { runEditMusic, runGenerateMusic, secondsFromLyrics } from "@/lib/music/tool";
+import { runEditMusic, runGenerateMusic } from "@/lib/music/tool";
 import { cancelMusicJob, getMusicJobFor, type MusicJob } from "@/lib/music/jobs";
 import { __removedMusicJobCountForTests, deleteMusicJobsForTurns, liveJobs } from "@/lib/music/store";
 import { commercialUseOf } from "@/lib/music/commercial";
@@ -136,12 +137,12 @@ describe("the Stack's defaults", () => {
     expect(fake.submitted[2]!.quality).toBe("quick");
   });
   test("with no length given, the song is as long as its words, between 30 s and the Stack maximum", async () => {
-    expect(secondsFromLyrics(LYRICS, 600)).toBe(38);
-    expect(secondsFromLyrics("[Verse]\nOne line", 600)).toBe(30);
-    expect(secondsFromLyrics(Array.from({ length: 100 }, (_, i) => `line ${i}`).join("\n"), 240)).toBe(240);
-    expect(secondsFromLyrics(undefined, 600)).toBe(60);
+    expect(secondsForWords(LYRICS)).toBe(52);
+    expect(secondsForWords("[Verse]\nOne line")).toBe(30);
+    expect(secondsForWords(Array.from({ length: 100 }, (_, i) => `line ${i}`).join("\n"))).toBe(610);
+    expect(secondsForWords("")).toBe(30);
     await generate(owner.owner, { description: "an original folk song", lyrics: LYRICS });
-    expect(fake.submitted[0]!.duration_s).toBe(38);
+    expect(fake.submitted[0]!.duration_s).toBe(52);
     await generate(owner.owner, { description: "an original folk song", lyrics: LYRICS, seconds: 90 });
     expect(fake.submitted[1]!.duration_s).toBe(90);
   });

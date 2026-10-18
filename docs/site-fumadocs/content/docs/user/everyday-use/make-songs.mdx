@@ -11,13 +11,18 @@ A Mac with 64 GB of memory or more, and the music model. An owner or admin gets 
 
 ## Quick and full songs
 
-There are two kinds, like pictures and videos.
+A song is as long as its words. There are two kinds:
 
-- **Quick** songs are about 45 seconds. They are good for a jingle, a hook or trying out words. They take under a minute.
-  If your words are longer than a quick song, it sings the first parts that fit. The card shows just those words. **Make it full** sings all of them.
-- **Full** songs are about 3 minutes, with every part: an intro, verses, a chorus, a bridge and an ending. They take a minute or two. Full songs need a Mac with 128 GB of memory.
+- **Full** sings every part of the song. This is what chat makes unless you ask for quick.
+- **Quick** sings the hook: the first parts through the first chorus.
 
-Chat makes a quick song unless you ask for a whole song, a full song or a long piece. You can also say it yourself, for example "make a full song". The card has **Make it full** or **Make it quick** to make the same song again as the other kind.
+You can ask for a length, such as "make it 60 seconds". If the words are too long, Home sings the first whole parts that fit. The card shows those words and keeps the rest for **Make it full**.
+
+A 64 GB Mac's longest song is 2 minutes. A 128 GB Mac's longest song is 4 minutes. If the words need more time than that, Home sings the first parts that fit and tells you why.
+
+With no words, quick songs are about 45 seconds and full songs are about 3 minutes, up to what your computer can make.
+
+Press **Make it full** or **Make it quick** on the card to make the same song again with every part or just the hook. An owner or admin can change the default in **Settings**.
 
 ## Try it in five steps
 
@@ -25,7 +30,7 @@ Chat makes a quick song unless you ask for a whole song, a full song or a long p
 2. Open a new chat and type "write us a quick song about our dog chasing bubbles".
 3. When the card shows the player, press play. Press **Lyrics** to read the words.
 4. Type "change the chorus so it is about a red ball". A new version plays. Use the arrows to hear the first one again.
-5. Press **Make it full** on the card. In a minute or two, a full song of about 3 minutes plays.
+5. Press **Make it full** on the card. The new version sings every part that fits on your computer.
 
 ## Ask in chat
 
@@ -40,7 +45,7 @@ When it is done, the song plays on the card. Press **Lyrics** to see the words. 
 Tips for a good song:
 
 - Say the style, the mood and the instruments, for example "soft piano and a warm voice".
-- Ask for words that fill the length. If the words are too short, the singer fills the rest with sounds that are not words.
+- Let the length follow the words, or ask for a length you need.
 - Say "no singing" for music only.
 
 ## Change a song by asking
@@ -74,7 +79,7 @@ Songs are made with a model whose makers say its songs may be used for money, fo
 
 ## Choose how it works (owner and admin)
 
-- **Settings**, **Home settings**, **Pictures, videos and music**: **Adults can make music**. Turn it off to stop all song making. **Song length** picks quick (the default) or full songs when nobody says which.
+- **Settings**, **Home settings**, **Pictures, videos and music**: **Adults can make music**. Turn it off to stop all song making. **Song length** picks full (the default) or quick songs when nobody says which.
 - **Settings**, **Models and storage**, **Music**: get the music model, or remove it to free space.
 
 ## Something not working?
@@ -83,7 +88,7 @@ Songs are made with a model whose makers say its songs may be used for money, fo
 - **"Home is busy making another picture, video or song".** Why: Home does one job at a time. Fix: wait. It starts by itself.
 - **"Not enough free memory for music right now".** Why: another big job has the memory. Fix: wait a few minutes, then ask again.
 - **The end of a song has no real words.** Why: the words were shorter than the song. Fix: ask for more words, or a shorter song.
-- **I asked for a full song and got a quick one.** Why: full songs need a Mac with 128 GB of memory. Fix: none on this computer; quick songs still work.
+- **My full song leaves out some words.** Why: the words need more time than the length you asked for or your computer can make. Fix: ask for fewer words, or use a computer that can make a longer song.
 - **"I can only change a song that was made here".** Why: you asked to change a song Home did not make. Fix: ask for a new song.
 - **Home cannot reach the engine.** Why: the AI engine is restarting. Fix: wait a minute and ask again. Still stuck? Open **Repairs**.
 

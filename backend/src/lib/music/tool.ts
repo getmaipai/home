@@ -7,8 +7,8 @@ import { turnAgeBand } from "@/lib/turnMachine/speaker";
 import { musicDenial, MUSIC_DENIAL_LINE, MUSIC_REFUSAL_LINE, refuseMusicPrompt, type MusicAudience } from "./policy";
 import { musicEngineStatus, musicStatusReady } from "./ready";
 import { plainMusicFailure, readMusicFile, sourceMusicJob, startMusicJob } from "./jobs";
-import { resolveMusicSection, replaceMusicSection, fitLyricsToLength } from "./sections";
-import { StackMusicError, type MusicBody } from "./stack";
+import { resolveMusicSection, replaceMusicSection, fitLyricsToLength, secondsForWords, hookOf } from "./sections";
+import { StackMusicError, musicBody, type MusicBody } from "./stack";
 import type { MusicJob, MusicRequest, MusicTask, SongLength } from "./types";
 import { householdSongLength } from "./policy";
 export const GENERATE_MUSIC_TOOL_ID = "generate_music";
@@ -41,58 +41,51 @@ export type MusicToolInput = {
   args: Record<string, unknown>; callId: string; spoken: boolean;
 };
 const newSeed = (prior?: number | null): number => { const seed = Math.floor(Math.random() * 2_147_483_646) + 1; return seed === prior ? seed + 1 : seed; };
-export function musicBody(request: MusicRequest, task: MusicBody["task"]): Omit<MusicBody, "timeout_ms"> {
-  return { task, caption: request.description, lyrics: request.lyrics, instrumental: request.instrumental, duration_s: request.seconds,
-    bpm: request.bpm, key: request.key, language: request.language, quality: request.quality ?? "quick", seed: request.seed,
-    from_s: request.from_s, to_s: request.to_s, add_s: request.add_s, at: request.at, strength: request.strength, edit: request.edit };
-}
 /** The Stack's own default (detailed on a big computer, quick on a small one); quick when it names none. */
 export function defaultQualityOf(engine: { default_quality?: string }): "quick" | "detailed" { return engine.default_quality === "detailed" ? "detailed" : "quick"; }
-/**
- * ACE-Step invents half-sung words when the lyrics are shorter than the song (design note section 5), so a song the person
- * gave no length for is as long as its words: about 4 s per sung line plus 10 s, 30 s at least, the Stack's maximum at most.
- */
-export function secondsFromLyrics(lyrics: string | undefined, maxSeconds: number): number {
-  const lines = (lyrics ?? "").split(/\r?\n/).map((l) => l.trim()).filter((l) => l && !/^\[[^\]]*\]$/.test(l)).length;
-  if (!lines) return Math.min(60, maxSeconds);
-  return Math.min(maxSeconds, Math.max(30, lines * 4 + 10));
-}
-
-/**
- * Quick and Full songs (owner, 2026-10-17: "quick songs and full songs like videos"), measured on the Studio (design note section 16):
- * Quick is about 45 s (10 to 60 s), Full about 3 minutes (150 s to the Stack's maximum, 240 s on a 128 GB Mac) with the whole
- * structure sung. Full needs a Stack that allows 150 s or more; a smaller computer makes a Quick song and says so.
- */
+/** Instrumentals retain their usual lengths; songs with words follow those words. */
 export const QUICK_SONG = { min: 10, default: 45, max: 60 } as const;
 export const FULL_SONG = { min: 150, default: 180, max: 240 } as const;
-export function fullSongsPossible(engine: { limits: { max_seconds: number } }): boolean { return engine.limits.max_seconds >= FULL_SONG.min; }
 export function songSecondsFor(length: SongLength, asked: number | undefined, lyrics: string | undefined, maxSeconds: number): number {
+  if (lyrics) return Math.min(maxSeconds, Math.max(10, asked ?? secondsForWords(lyrics)));
   if (length === "full") return Math.min(maxSeconds, FULL_SONG.max, Math.max(FULL_SONG.min, Math.round(asked ?? FULL_SONG.default)));
-  // An exact length the person asked for is kept (anything under a full song's length); otherwise a quick song is as long as its
-  // words up to a minute, or 45 s.
-  if (asked !== undefined) return Math.min(maxSeconds, FULL_SONG.min - 1, Math.max(QUICK_SONG.min, Math.round(asked)));
-  const wanted = lyrics ? secondsFromLyrics(lyrics, QUICK_SONG.max) : QUICK_SONG.default;
-  return Math.min(maxSeconds, QUICK_SONG.max, Math.max(QUICK_SONG.min, Math.round(wanted)));
+  return Math.min(maxSeconds, asked !== undefined ? FULL_SONG.min - 1 : QUICK_SONG.max, Math.max(QUICK_SONG.min, Math.round(asked ?? QUICK_SONG.default)));
+}
+/** Select the words first, then fit only when a requested length or the computer's ceiling requires it. */
+export function sizeSong(request: MusicRequest, whole: string | undefined, limits: { min_seconds: number; max_seconds: number }, asked?: number): void {
+  delete request.cut; delete request.retried; delete request.written_lyrics;
+  request.max_seconds = limits.max_seconds;
+  const words = !request.instrumental && whole ? (request.length === "quick" ? hookOf(whole) : whole) : undefined;
+  request.seconds = Math.max(limits.min_seconds, songSecondsFor(request.length ?? "full", asked, words, limits.max_seconds));
+  if (words !== undefined) {
+    request.lyrics = words;
+    if (secondsForWords(words) > request.seconds) {
+      request.lyrics = fitLyricsToLength(words, request.seconds).lyrics;
+      request.cut = asked !== undefined ? "asked" : "ceiling";
+    }
+    if (request.lyrics !== whole) request.written_lyrics = whole;
+  }
 }
 /** The length a remake of this song has, from what it was asked as, else from its length. */
 export function lengthOf(request: MusicRequest, durationS: number | null): SongLength {
   return request.length ?? ((durationS ?? request.seconds) >= FULL_SONG.min ? "full" : "quick");
 }
+/** A length as a person says it: seconds under a minute and a half, else whole or half minutes ("2 and a half minutes"). */
+export function spokenLength(seconds: number): string {
+  if (seconds < 90) return `${Math.round(seconds)} seconds`;
+  const halves = Math.round(seconds / 30); const whole = Math.floor(halves / 2);
+  return halves % 2 ? `${whole} and a half minutes` : `${whole} minutes`;
+}
 /** The line the model relays when a song starts: which kind, how long, about how long it takes (measured, design note section 16). */
-export function songOnItsWay(request: MusicRequest, downgraded = false): string {
+export function songOnItsWay(request: MusicRequest): string {
   const length = lengthOf(request, null);
-  const kind = length === "full" ? `A full song of about ${Math.round(request.seconds / 60 * 2) / 2} minutes` : `A quick ${request.seconds} second song`;
-  const wait = length === "full" ? "about a minute or two" : "under a minute";
-  const note = (downgraded ? " Full songs need a computer with 128 GB of memory, so this one is quick; say so in one short sentence." : "")
-    + (request.written_lyrics ? " The words are longer than this song, so it sings the first parts that fit and Make it full on the player sings them all; say so in one short sentence." : "");
+  const duration = spokenLength(request.seconds);
+  const kind = `A ${length} song of about ${duration}${length === "quick" && !request.instrumental ? ": the hook, the first verse and chorus" : ""}`;
+  const wait = request.seconds >= 150 ? "about a minute or two" : "under a minute";
+  const note = request.cut === "asked" ? " The words are longer than the length asked for, so it sings the first parts that fit."
+    : request.cut === "ceiling" ? ` The words are longer than the longest song this computer makes (${spokenLength(request.max_seconds ?? request.seconds)}), so it sings the first parts that fit.` : "";
   const title = request.title ? ` called "${request.title}"` : "";
   return `${kind}${title} is on its way. It takes ${wait} and the player appears below your reply when it is ready. Reply in one or two short sentences: say the song is on its way and about how long it takes. Do not say it is ready, do not describe it, and do not repeat the lyrics, style or tempo: the player shows the words and the person has not heard it yet.${note}`;
-}
-/** MUSIC-GEN-17: the song sings the whole sections of `words` that fit its length; the person's whole words are kept for Make it full. */
-export function fitWords(request: MusicRequest, words: string): void {
-  const fitted = fitLyricsToLength(words, request.seconds);
-  request.lyrics = fitted.lyrics;
-  if (fitted.cut) request.written_lyrics = words; else delete request.written_lyrics;
 }
 export const SECTION_LINE = "Which part should I change? Give its start and end in seconds.";
 export const WHICH_PART_LINE = "Tell me which part the new words replace, for example the chorus or verse 2.";
@@ -101,11 +94,12 @@ function isWholeSong(lyrics: string, stored: string | undefined): boolean {
   return /\[(?:verse|chorus|bridge|intro|outro|pre-chorus|hook|refrain|instrumental)[^\]]*\]/i.test(lyrics) && lyrics.length >= (stored?.length ?? 0) / 2;
 }
 type EditPlan = { ok: true; task: MusicTask; request: MusicRequest; body: Omit<MusicBody, "timeout_ms"> } | { ok: false; line: string };
-export function prepareMusicEdit(source: MusicJob, args: z.infer<typeof editMusicArgs>): EditPlan {
+export function prepareMusicEdit(source: MusicJob, args: z.infer<typeof editMusicArgs>, limits = { min_seconds: 10, max_seconds: source.request.max_seconds ?? FULL_SONG.max }): EditPlan {
   const { from_s: _from, to_s: _to, add_s: _add, at: _at, strength: _strength, edit: _edit, ...stored } = source.request;
   const request: MusicRequest = { ...stored, seconds: source.durationS ?? stored.seconds, seed: source.seed ?? stored.seed,
     ...(args.description !== undefined ? { description: args.description } : {}), ...(args.lyrics !== undefined ? { lyrics: args.lyrics } : {}),
     ...(args.bpm !== undefined ? { bpm: args.bpm } : {}), ...(args.key !== undefined ? { key: args.key } : {}) };
+  delete request.retried;
   let task: MusicTask; let stackTask: MusicBody["task"];
   switch (args.change) {
     case "remake": task = "remake"; stackTask = "text2music"; if (args.seconds !== undefined) request.seconds = args.seconds; break;
@@ -114,8 +108,7 @@ export function prepareMusicEdit(source: MusicJob, args: z.infer<typeof editMusi
       task = "remake"; stackTask = "text2music";
       const length: SongLength = args.change === "make_full" ? "full" : "quick";
       const words = request.written_lyrics ?? request.lyrics;
-      request.length = length; request.seconds = songSecondsFor(length, undefined, request.instrumental ? undefined : words, FULL_SONG.max);
-      if (!request.instrumental && words) fitWords(request, words);
+      request.length = length; sizeSong(request, words, limits);
       break;
     }
     case "variation": task = "variation"; stackTask = "text2music"; request.seed = newSeed(source.seed); if (args.seconds !== undefined) request.seconds = args.seconds; break;
@@ -149,7 +142,7 @@ export function prepareMusicEdit(source: MusicJob, args: z.infer<typeof editMusi
     case "loudness": task = "loudness"; stackTask = "edit"; request.edit = { op: "loudness", lufs: args.lufs ?? -14 }; break;
   }
   // New words (or none, for an instrumental) replace the person's kept words: Make it full must sing what this version sings.
-  if (args.change !== "make_full" && args.change !== "make_quick" && (args.lyrics !== undefined || request.instrumental)) delete request.written_lyrics;
+  if (args.change !== "make_full" && args.change !== "make_quick" && (args.lyrics !== undefined || request.instrumental)) { delete request.written_lyrics; delete request.cut; }
   const duration = source.durationS ?? source.request.seconds;
   const from = request.edit?.op === "trim" ? request.edit.from_s : request.from_s;
   const to = request.edit?.op === "trim" ? request.edit.to_s : request.to_s;
@@ -167,15 +160,13 @@ async function runMusic(input: MusicToolInput, editing: boolean): Promise<ToolEx
   if (!musicStatusReady(engine)) return failed("no_engine", "unavailable");
   const temporary = state.temporary === true || state.ephemeral === true;
   const actor = state.actor as PersonRow;
-  let downgraded = false;
   let request: MusicRequest; let task: MusicTask; let body: Omit<MusicBody, "timeout_ms">; let parentFileId: string | null = null;
   if (editing) {
     const parsed = editMusicArgs.safeParse(args); if (!parsed.success) return failed("bad_arguments", "bad_arguments");
     // sourceMusicJob already proved the song is this person's, made here, in this chat: no bytes are read for it.
     const source = sourceMusicJob(actor, state.conversationId, parsed.data.track, temporary);
     if (!source?.fileId) return refused(plainMusicFailure("source_not_made_here"), "source_not_made_here");
-    const plan = prepareMusicEdit(source, parsed.data);
-    if (plan.ok && plan.request.length === "full" && plan.task === "remake" && !fullSongsPossible(engine!)) return refused("Full songs need a computer with 128 GB of memory. I can make quick songs here.", "full_not_here");
+    const plan = prepareMusicEdit(source, parsed.data, engine!.limits);
     if (!plan.ok) return refused(plan.line, "section_or_range");
     ({ request, task, body } = plan); parentFileId = source.fileId;
     // Only a task that edits the audio itself sends it; a remake or variation is a fresh text2music job and reads and hashes nothing.
@@ -188,18 +179,15 @@ async function runMusic(input: MusicToolInput, editing: boolean): Promise<ToolEx
     const parsed = generateMusicArgs.safeParse(args); if (!parsed.success) return failed("bad_arguments", "bad_arguments");
     const value = parsed.data;
     const lyrics = value.instrumental ? "[Instrumental]" : value.lyrics;
-    // Full only when asked for (the model's `length`, or a length of two and a half minutes or more), else the household's default;
-    // a computer whose Stack cannot make a Full song makes a Quick one and the reply says so.
-    const asked: SongLength = value.length ?? (value.seconds !== undefined && value.seconds >= FULL_SONG.min ? "full" : householdSongLength());
-    const length: SongLength = asked === "full" && !fullSongsPossible(engine!) ? "quick" : asked;
-    downgraded = asked === "full" && length === "quick";
+    const length: SongLength = value.length ?? (value.seconds !== undefined && value.seconds >= 150 ? "full" : householdSongLength());
     request = { description: value.description, lyrics, title: value.title,
       instrumental: value.instrumental ?? false, seconds: songSecondsFor(length, value.seconds, value.instrumental ? undefined : value.lyrics, engine!.limits.max_seconds),
       bpm: value.bpm, key: value.key, language: value.language, quality: defaultQualityOf(engine!), seed: newSeed(), length };
-    if (!request.instrumental && value.lyrics) fitWords(request, value.lyrics);
+    sizeSong(request, value.lyrics, engine!.limits, value.seconds);
     task = "text2music"; body = musicBody(request, "text2music");
   }
   // A request stored before the Stack named a default (or an edit of an older song) takes the Stack's default now.
+  request.max_seconds = engine!.limits.max_seconds;
   request.quality ??= defaultQualityOf(engine!); body.quality = request.quality;
   // Check the effective request, including inherited words and a section replacement, before any job exists.
   const inherited = refuseMusicPrompt([request.description, request.lyrics, request.written_lyrics, request.title, request.key, request.language].join(" "), { imitatesRealVoice: args.imitates_real_voice === true });
@@ -209,7 +197,7 @@ async function runMusic(input: MusicToolInput, editing: boolean): Promise<ToolEx
   try {
     const job = await startMusicJob({ actor, conversationId: state.conversationId, turnId: state.turnId, temporary, task, request, body, parentFileId });
     return outcomeOf({ callId, packageId, status: "succeeded", via: "tool_call", args, durationMs: 0, result: {
-      reply: { text: songOnItsWay(request, downgraded) },
+      reply: { text: songOnItsWay(request) },
       data: { musicJobId: job.id }, actions: [],
     } });
   } catch (error) {

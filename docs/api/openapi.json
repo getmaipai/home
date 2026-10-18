@@ -57882,6 +57882,19 @@
                     "stage_label": {
                       "type": "string"
                     },
+                    "cut": {
+                      "type": "string",
+                      "nullable": true,
+                      "enum": [
+                        "asked",
+                        "ceiling",
+                        null
+                      ]
+                    },
+                    "max_seconds": {
+                      "type": "number",
+                      "nullable": true
+                    },
                     "progress": {
                       "type": "number"
                     },
@@ -57955,6 +57968,8 @@
                     "state",
                     "stage",
                     "stage_label",
+                    "cut",
+                    "max_seconds",
                     "progress",
                     "eta_seconds",
                     "position",
@@ -58059,6 +58074,19 @@
                     "stage_label": {
                       "type": "string"
                     },
+                    "cut": {
+                      "type": "string",
+                      "nullable": true,
+                      "enum": [
+                        "asked",
+                        "ceiling",
+                        null
+                      ]
+                    },
+                    "max_seconds": {
+                      "type": "number",
+                      "nullable": true
+                    },
                     "progress": {
                       "type": "number"
                     },
@@ -58132,6 +58160,8 @@
                     "state",
                     "stage",
                     "stage_label",
+                    "cut",
+                    "max_seconds",
                     "progress",
                     "eta_seconds",
                     "position",
@@ -58257,6 +58287,19 @@
                     "stage_label": {
                       "type": "string"
                     },
+                    "cut": {
+                      "type": "string",
+                      "nullable": true,
+                      "enum": [
+                        "asked",
+                        "ceiling",
+                        null
+                      ]
+                    },
+                    "max_seconds": {
+                      "type": "number",
+                      "nullable": true
+                    },
                     "progress": {
                       "type": "number"
                     },
@@ -58330,6 +58373,8 @@
                     "state",
                     "stage",
                     "stage_label",
+                    "cut",
+                    "max_seconds",
                     "progress",
                     "eta_seconds",
                     "position",
@@ -58462,6 +58507,19 @@
                     "stage_label": {
                       "type": "string"
                     },
+                    "cut": {
+                      "type": "string",
+                      "nullable": true,
+                      "enum": [
+                        "asked",
+                        "ceiling",
+                        null
+                      ]
+                    },
+                    "max_seconds": {
+                      "type": "number",
+                      "nullable": true
+                    },
                     "progress": {
                       "type": "number"
                     },
@@ -58535,6 +58593,8 @@
                     "state",
                     "stage",
                     "stage_label",
+                    "cut",
+                    "max_seconds",
                     "progress",
                     "eta_seconds",
                     "position",
@@ -58593,7 +58653,7 @@
             }
           },
           "422": {
-            "description": "Full songs are not possible here."
+            "description": "The requested edit cannot be made."
           }
         }
       }

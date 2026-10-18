@@ -1,5 +1,4 @@
-// Quick and Full songs (owner, 2026-10-17: "quick songs and full songs like videos"; "forty seconds is not full").
-// Quick is about 45 s (10 to 60 s); Full is about 3 minutes (150 to 240 s) and is made only where the Stack allows it.
+// MUSIC-GEN-21: Quick sings the hook, Full every part, and the length follows the words.
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { eq } from "drizzle-orm";
 import { db } from "@/db";
@@ -32,31 +31,31 @@ describe("song lengths", () => {
     expect(songSecondsFor("full", 600, undefined, 240)).toBe(240);
   });
 
-  test("a song with no kind asked is quick by default, and the household default can be full", async () => {
+  test("a song with no kind asked is full by default, and the household default can be quick", async () => {
     const state = musicState(people.owner, true);
     const quick = await runGenerateMusic({ state, args: { description: "a folk song", lyrics: LYRICS }, callId: "a", spoken: false });
-    expect(reply(quick)).toContain("quick");
-    expect(fake.submitted.at(-1)!.duration_s).toBeLessThanOrEqual(QUICK_SONG.max);
-    expect(householdSongLength()).toBe("quick");
-    setHouseholdSettingValue("generation.music.length", "full");
+    expect(reply(quick)).toContain("full");
+    expect(fake.submitted.at(-1)!.duration_s).toBe(52);
     expect(householdSongLength()).toBe("full");
+    setHouseholdSettingValue("generation.music.length", "quick");
+    expect(householdSongLength()).toBe("quick");
   });
 
-  test("a full song is about three minutes and says so", async () => {
+  test("a full song follows its words and says its kind", async () => {
     const state = musicState(people.owner);
     const out = await runGenerateMusic({ state, args: { description: "a folk song", lyrics: LYRICS, length: "full" }, callId: "f", spoken: false });
     expect(out.status).toBe("succeeded");
-    expect(fake.submitted.at(-1)!.duration_s).toBe(FULL_SONG.default);
+    expect(fake.submitted.at(-1)!.duration_s).toBe(52);
     expect(reply(out)).toContain("full song");
   });
 
-  test("a computer that cannot make full songs makes a quick one and says why", async () => {
+  test("a smaller computer can make a full song", async () => {
     __setMusicStatusForTests(readyMusicStatusForTests({ limits: { min_seconds: 10, max_seconds: 120 }, quality: ["quick"] }));
     const state = musicState(people.owner);
     const out = await runGenerateMusic({ state, args: { description: "a folk song", lyrics: LYRICS, length: "full" }, callId: "d", spoken: false });
     expect(out.status).toBe("succeeded");
-    expect(fake.submitted.at(-1)!.duration_s).toBeLessThanOrEqual(QUICK_SONG.max);
-    expect(reply(out)).toContain("128 GB");
+    expect(fake.submitted.at(-1)!.duration_s).toBe(52);
+    expect(reply(out)).toContain("full song");
   });
 
   test("make it full and make it quick keep the words and the seed", async () => {
@@ -68,7 +67,7 @@ describe("song lengths", () => {
     const full = await runEditMusic({ state, args: { track: "latest", change: "make_full" }, callId: "m", spoken: false });
     expect(full.status).toBe("succeeded");
     const body = fake.submitted.at(-1)!;
-    expect(body).toMatchObject({ task: "text2music", duration_s: FULL_SONG.default, seed, lyrics: LYRICS });
+    expect(body).toMatchObject({ task: "text2music", duration_s: 52, seed, lyrics: LYRICS });
   });
 });
 
@@ -83,11 +82,12 @@ describe("the card's Make it full route", () => {
     const id = musicForOutcomes([out])!.id;
     await waitForMusic(() => getMusicJobFor(actor, id)?.state === "done");
     const card = await (await client.get(`/api/music/jobs/${id}`)).json() as { length: string };
-    expect(card.length).toBe("quick");
+    expect(card.length).toBe("full");
     const res = await client.post(`/api/music/jobs/${id}/length`, { length: "full" });
     expect(res.status).toBe(200);
-    expect(fake.submitted.at(-1)!.duration_s).toBe(FULL_SONG.default);
+    expect(fake.submitted.at(-1)!.duration_s).toBe(52);
     __setMusicStatusForTests(readyMusicStatusForTests({ limits: { min_seconds: 10, max_seconds: 120 } }));
-    expect((await client.post(`/api/music/jobs/${id}/length`, { length: "full" })).status).toBe(422);
+    await waitForMusic(() => fake.deleted.length >= 2);
+    expect((await client.post(`/api/music/jobs/${id}/length`, { length: "full" })).status).toBe(200);
   });
 });

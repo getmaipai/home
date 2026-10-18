@@ -17,6 +17,7 @@ export function installFakeMusicStack() {
     submitted: [] as MusicBody[], deleted: [] as string[], polls: new Map<string, number>(), pollsToFinish: 2,
     fail: null as { code: string; error: string } | null,
     refuse: null as { status: number; code: string; error: string } | null,
+    lrc: LRC as string | ((seconds: number) => string),
     immediate: false, queued: false, model: "ace-step-1-5-turbo" as string | undefined, beforeSubmit: undefined as (() => Promise<void>) | undefined,
     restore() { __setMusicFetchForTests(null); __setMusicStatusForTests(undefined); __setMusicPollMsForTests(null); __resetMusicJobsForTests(); },
   };
@@ -30,7 +31,7 @@ export function installFakeMusicStack() {
       fake.submitted.push(body); const id = `mjob-${fake.submitted.length}`; fake.polls.set(id, 0);
       await fake.beforeSubmit?.();
       if (fake.refuse) return json(fake.refuse, fake.refuse.status);
-      return json({ job: id, ...(fake.immediate ? { data: [{ duration_s: body.duration_s, seed: body.seed ?? 77, lrc: LRC, model: body.task === "edit" ? "none" : fake.model }] } : {}) }, fake.immediate ? 200 : 202);
+      return json({ job: id, ...(fake.immediate ? { data: [{ duration_s: body.duration_s, seed: body.seed ?? 77, lrc: typeof fake.lrc === "function" ? fake.lrc(body.duration_s!) : fake.lrc, model: body.task === "edit" ? "none" : fake.model }] } : {}) }, fake.immediate ? 200 : 202);
     }
     const match = /^\/v1\/audio\/music\/([^/]+)(\/file)?$/.exec(path);
     if (match) {
@@ -41,7 +42,7 @@ export function installFakeMusicStack() {
       if (fake.fail) return json({ state: "failed", ...fake.fail });
       const body = fake.submitted[Number(id.split("-")[1]) - 1]!;
       const result: StackMusicJob = fake.queued ? { state: "queued", stage: "queued", progress_fraction: 0, eta_seconds: 15, position: 2 } : polls >= fake.pollsToFinish
-        ? { state: "done", data: [{ duration_s: body.duration_s, seed: body.seed ?? 77, lrc: LRC, bpm: body.bpm, key: body.key, model: body.task === "edit" ? "none" : fake.model }] }
+        ? { state: "done", data: [{ duration_s: body.duration_s, seed: body.seed ?? 77, lrc: typeof fake.lrc === "function" ? fake.lrc(body.duration_s!) : fake.lrc, bpm: body.bpm, key: body.key, model: body.task === "edit" ? "none" : fake.model }] }
         : { state: polls === 1 ? "queued" : "running", stage: "planning", stage_label: "Planning the song", progress_fraction: 0.25, eta_seconds: 15, position: 2 };
       return json(result);
     }
