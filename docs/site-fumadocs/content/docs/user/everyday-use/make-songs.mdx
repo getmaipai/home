@@ -40,7 +40,7 @@ The first song after a restart takes about a minute more, while the model loads.
 
 If someone is chatting or talking to Home while a song is being made, the card says "Paused while chat is working". It carries on after the reply. The wait is not counted against the song.
 
-When it is done, the song plays on the card. Press **Lyrics** to see the words. Press **Download** to save it or **Share** to send it.
+When it is done, the song plays on the card. **Lyrics** shows the words. The line being sung is lit. Tap a line to jump there. Press **Download** to save it or **Share** to send it.
 
 Tips for a good song:
 

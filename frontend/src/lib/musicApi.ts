@@ -26,6 +26,7 @@ export interface MusicCard {
   description: string | null;
   /** The owner's own words; null when there are none. */
   lyrics: string | null;
+  timed_lyrics: { t: number; line: string; section: string | null }[] | null;
   duration_s: number | null;
   /** Epoch milliseconds the song was asked for. */
   started_at: number;

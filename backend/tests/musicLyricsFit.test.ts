@@ -55,6 +55,14 @@ describe("the lines the engine really sang", () => {
       stage: null, progress: 1, etaSeconds: 0, position: null, errorCode: null, errorLine: null, fileId: null, parentFileId: null, seed: 1, durationS: 60,
       chosenAt: null, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(), temporary: false };
     const squeezed = musicCardView(people.owner, { ...base, lrc: BANANA_LRC, request: { description: "metal", lyrics: BANANA, instrumental: false, seconds: 60 } });
+    expect(squeezed.timed_lyrics).toHaveLength(10);
+    expect(squeezed.timed_lyrics?.[0]).toEqual({ t: 0.24, line: "Riff scream, peel the night", section: "Intro" });
+    expect(squeezed.timed_lyrics?.at(-1)).toEqual({ t: 56, line: "Peel the world, eat it alive, split the fruit and watch it die!", section: "Chorus" });
+    expect(squeezed.timed_lyrics?.some(({ t }) => t >= 59)).toBe(false);
+    const instrumental = musicCardView(people.owner, { ...base, lrc: BANANA_LRC, request: { description: "folk", instrumental: true, seconds: 60 } });
+    expect(instrumental.timed_lyrics).toBeNull();
+    const noTiming = musicCardView(people.owner, { ...base, lrc: null, request: { description: "folk", lyrics: BANANA, instrumental: false, seconds: 60 } });
+    expect(noTiming.timed_lyrics).toBeNull();
     expect(squeezed.lyrics).not.toContain("Peel, bite");
     expect(squeezed.lyrics).toContain("[Chorus]");
     const plain = "[Verse]\nOne\nTwo";

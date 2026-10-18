@@ -57932,6 +57932,30 @@
                         ]
                       }
                     },
+                    "timed_lyrics": {
+                      "type": "array",
+                      "nullable": true,
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "t": {
+                            "type": "number"
+                          },
+                          "line": {
+                            "type": "string"
+                          },
+                          "section": {
+                            "type": "string",
+                            "nullable": true
+                          }
+                        },
+                        "required": [
+                          "t",
+                          "line",
+                          "section"
+                        ]
+                      }
+                    },
                     "versions": {
                       "type": "array",
                       "items": {
@@ -57998,6 +58022,7 @@
                     "error_line",
                     "cover_url",
                     "cover_versions",
+                    "timed_lyrics",
                     "versions",
                     "current_id",
                     "length",
@@ -58148,6 +58173,30 @@
                         ]
                       }
                     },
+                    "timed_lyrics": {
+                      "type": "array",
+                      "nullable": true,
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "t": {
+                            "type": "number"
+                          },
+                          "line": {
+                            "type": "string"
+                          },
+                          "section": {
+                            "type": "string",
+                            "nullable": true
+                          }
+                        },
+                        "required": [
+                          "t",
+                          "line",
+                          "section"
+                        ]
+                      }
+                    },
                     "versions": {
                       "type": "array",
                       "items": {
@@ -58214,6 +58263,7 @@
                     "error_line",
                     "cover_url",
                     "cover_versions",
+                    "timed_lyrics",
                     "versions",
                     "current_id",
                     "length",
@@ -58366,6 +58416,30 @@
                         ]
                       }
                     },
+                    "timed_lyrics": {
+                      "type": "array",
+                      "nullable": true,
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "t": {
+                            "type": "number"
+                          },
+                          "line": {
+                            "type": "string"
+                          },
+                          "section": {
+                            "type": "string",
+                            "nullable": true
+                          }
+                        },
+                        "required": [
+                          "t",
+                          "line",
+                          "section"
+                        ]
+                      }
+                    },
                     "versions": {
                       "type": "array",
                       "items": {
@@ -58432,6 +58506,7 @@
                     "error_line",
                     "cover_url",
                     "cover_versions",
+                    "timed_lyrics",
                     "versions",
                     "current_id",
                     "length",
@@ -58603,6 +58678,30 @@
                         ]
                       }
                     },
+                    "timed_lyrics": {
+                      "type": "array",
+                      "nullable": true,
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "t": {
+                            "type": "number"
+                          },
+                          "line": {
+                            "type": "string"
+                          },
+                          "section": {
+                            "type": "string",
+                            "nullable": true
+                          }
+                        },
+                        "required": [
+                          "t",
+                          "line",
+                          "section"
+                        ]
+                      }
+                    },
                     "versions": {
                       "type": "array",
                       "items": {
@@ -58669,6 +58768,7 @@
                     "error_line",
                     "cover_url",
                     "cover_versions",
+                    "timed_lyrics",
                     "versions",
                     "current_id",
                     "length",
@@ -58847,6 +58947,30 @@
                         ]
                       }
                     },
+                    "timed_lyrics": {
+                      "type": "array",
+                      "nullable": true,
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "t": {
+                            "type": "number"
+                          },
+                          "line": {
+                            "type": "string"
+                          },
+                          "section": {
+                            "type": "string",
+                            "nullable": true
+                          }
+                        },
+                        "required": [
+                          "t",
+                          "line",
+                          "section"
+                        ]
+                      }
+                    },
                     "versions": {
                       "type": "array",
                       "items": {
@@ -58913,6 +59037,7 @@
                     "error_line",
                     "cover_url",
                     "cover_versions",
+                    "timed_lyrics",
                     "versions",
                     "current_id",
                     "length",

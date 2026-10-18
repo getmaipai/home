@@ -683,6 +683,7 @@ export const MusicToolRender: ToolCallMessagePartComponent<Record<string, never>
       startedAt={card.started_at}
       {...(card.error_line ? { error: card.error_line } : {})}
       downloadName={downloadName}
+      timedLyrics={card.timed_lyrics ?? undefined}
       {...(ready && lyrics ? { lyrics } : {})}
       {...(ready ? { versions: card.versions.map((v) => ({ id: v.id, label: v.label })), ...(shownId ? { currentId: shownId } : {}) } : {})}
       onSelectVersion={(id) => setPicked({ base: card.current_id, id })}

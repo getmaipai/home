@@ -45,6 +45,7 @@ const cardSchema = z.object({
   cut: z.enum(["asked", "ceiling"]).nullable(), max_seconds: z.number().nullable(),
   progress: z.number(), eta_seconds: z.number().nullable(), position: z.number().nullable(), error_line: z.string().nullable(),
   cover_url: z.string().nullable(), cover_versions: z.array(z.object({ id: z.string(), url: z.string() })),
+  timed_lyrics: z.array(z.object({ t: z.number(), line: z.string(), section: z.string().nullable() })).nullable(),
   versions: z.array(versionSchema), current_id: z.string().nullable(), length: z.enum(["quick", "full"]), title: z.string().nullable(), description: z.string().nullable(), lyrics: z.string().nullable(), duration_s: z.number().nullable(), started_at: z.number(),
 });
 export function musicFileUrl(job: MusicJob): string { return `/api/music/jobs/${encodeURIComponent(job.id)}/files/${encodeURIComponent(job.fileId!)}`; }
@@ -87,7 +88,8 @@ export function musicCardView(actor: PersonRow, input: Omit<MusicJob, "coverJobI
     versions: versions.map((job, index) => ({ id: job.fileId!, label: `Version ${index + 1}`, url: musicFileUrl(job) })),
     current_id: current?.fileId ?? null, length: lengthOf((current ?? root).request, (current ?? root).durationS), title: current?.request.title ?? root.request.title ?? null,
     description: current?.request.description ?? root.request.description ?? null, started_at: Date.parse(root.createdAt),
-    lyrics: cardLyricsOf(current ?? root), duration_s: current?.durationS ?? root.durationS,
+    timed_lyrics: shown.lrc && !shown.request.instrumental ? sungLyricsFromLrc(shown.lrc, shown.durationS).map(({ t, line, section }) => ({ t, line, section })) : null,
+    lyrics: cardLyricsOf(shown), duration_s: current?.durationS ?? root.durationS,
   };
 }
 const statusRoute = createRoute({ method: "get", path: "/status", tags: ["Music"], summary: "Whether this person can make songs now", middleware,

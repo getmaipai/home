@@ -19,7 +19,7 @@ const V1 = { id: "file-one", label: "Version 1", url: "/api/music/jobs/mus-1/fil
 const V2 = { id: "file-two", label: "Version 2", url: "/api/music/jobs/mus-2/files/file-two" };
 function make(over: Partial<MusicCard>): MusicCard {
   return { id: "mus-1", state: "running", stage: "planning", stage_label: "Planning the song", progress: 0.25, eta_seconds: 40, position: null, error_line: null, versions: [], current_id: null, length: "quick", cut: null, max_seconds: 240,
-    title: "Pancakes", description: "a gentle folk song with an original voice", lyrics: "[Verse]\nMorning light\n[Chorus]\nPancakes rise", duration_s: 60, started_at: Date.now() - 30_000, ...over };
+    title: "Pancakes", description: "a gentle folk song with an original voice", lyrics: "[Verse]\nMorning light\n[Chorus]\nPancakes rise", duration_s: 60, timed_lyrics: null, started_at: Date.now() - 30_000, ...over };
 }
 const done = (over: Partial<MusicCard> = {}): MusicCard => make({ state: "done", stage: "ready", stage_label: "", progress: 1, eta_seconds: 0, versions: [V1], current_id: V1.id, ...over });
 beforeEach(() => {
@@ -97,6 +97,19 @@ describe("MusicToolRender", () => {
     await waitFor(() => expect(view.container.textContent).toContain("Morning light"));
     expect(musicFileName("Pancakes: the \"sunny\" song/1")).toBe("Pancakes the sunny song 1.m4a");
     expect(musicFileName(null)).toBe("song.m4a");
+  });
+
+  test("timed lyrics render as seek buttons in the Lyrics list", async () => {
+    card = done({ timed_lyrics: [
+      { t: 1, line: "Morning light", section: "Verse" },
+      { t: 5, line: "Pancakes rise", section: "Chorus" },
+    ] });
+    const view = mount();
+    await waitFor(() => expect(view.container.querySelector("audio")).not.toBeNull());
+    fireEvent.click(view.getByRole("button", { name: "Lyrics" }));
+    expect(await view.findByRole("button", { name: "Morning light" })).toBeTruthy();
+    fireEvent.click(view.getByRole("button", { name: "Pancakes rise" }));
+    expect(view.container.querySelector("audio")!.currentTime).toBe(5);
   });
 
   test("an instrumental has no lyrics disclosure", async () => {
