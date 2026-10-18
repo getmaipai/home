@@ -16,7 +16,7 @@ import { FaceEnrollmentBody, canViewFaceEnrollment } from "@/apps/people/FaceEnr
 import { OwnMemories, OtherPersonMemories } from "@/apps/memory/PersonMemories";
 import { useTabItem } from "@/shell/tabIdentity";
 import { SettingsRenderer } from "@/shell/pages/settings/SettingsRenderer";
-import { PERSON_LIMIT_GROUP_IDS, PERSON_TOPIC_GROUP_IDS } from "@/shell/pages/settings/personLimits";
+import { PERSON_KID_PICTURES_GROUP_IDS, PERSON_KID_PICTURES_KEYS, PERSON_LIMIT_GROUP_IDS, PERSON_TOPIC_GROUP_IDS } from "@/shell/pages/settings/personLimits";
 
 const PencilIcon = getIcon("pencil");
 type ProfileEntry = PersonRosterEntry | Roster;
@@ -141,6 +141,8 @@ export function PersonProfilePage({ person, onPersonChange }: { person: Roster; 
                     <div className="flex flex-col gap-4 py-2">
                       <p className="text-sm text-muted-foreground">Daily time limits for {profile.display_name}.</p>
                       <SettingsRenderer scope="person" scopeValue={`person:${profile.id}`} only={PERSON_LIMIT_GROUP_IDS} titleOverrides={{ "person.storage": "Storage" }} />
+                      {/* The per-child cartoon switch (KIDS-CREATE-01): a guardian finds it here, on the child's own page, next to the other limits. The home switch and the daily limits are in Home settings, Pictures and videos. */}
+                      <SettingsRenderer scope="person" scopeValue={`person:${profile.id}`} only={PERSON_KID_PICTURES_GROUP_IDS} includeKeys={PERSON_KID_PICTURES_KEYS} titleOverrides={{ "person.likeness": "Pictures and videos" }} />
                     </div>
                   </TabsContent>
                 ) : null}

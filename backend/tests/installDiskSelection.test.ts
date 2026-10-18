@@ -92,6 +92,22 @@ describe("install with a choice of components", () => {
     expect(known.installs.length).toBe(1);
   });
 
+  test("a refusal from the Stack on the licensed install is the answer to the click, in the Stack's own words, and starts nothing else", async () => {
+    const pulls: string[] = [];
+    __setStackClientForTests(stackWith(10 ** 13, pulls));
+    const refusing = (async (url: string | URL | Request, init?: RequestInit) => {
+      const path = new URL(String(url)).pathname;
+      if (init?.method === "POST" && path.endsWith("/install")) return Response.json({ error: "There is not enough room on the engine's disk for Detailed video. Free 40 GB, then try again.", code: "no_room" }, { status: 409 });
+      return Response.json({ tier: "p128", free_disk_bytes: 1e13, disk_margin_bytes: 0, installed_bytes: 0, components: [{ id: "ltx-2-3-distilled-mlx", licence: { ...LICENCE, accepted_at: null } }] });
+    }) as unknown as typeof fetch;
+    __setComponentsFetchForTests(refusing);
+    const result = await beginInstall(undefined, false, ["video-detailed"], [LICENCE.id]);
+    expect(result.ok).toBe(false);
+    if (!result.ok) { expect(result.error).toMatch(/not enough room on the engine's disk/); expect(result.next).toMatch(/press the button again/); }
+    await settle();
+    expect(pulls).toEqual([]);
+  });
+
   test("an upgrade or a Home settings install with no choice never pulls Detailed video: it stays recommended but not installed", async () => {
     const pulls: string[] = [];
     __setStackClientForTests(stackWith(10 ** 13, pulls));

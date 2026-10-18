@@ -81,6 +81,14 @@ function limitSettings() {
       lives_in: "person.storage", honoured_by: ["home"], range: { min: 0, max: 100000 },
     } as SettingsKey)),
     {
+      key: "generation.kid_enabled", scope: "person", selector: "boolean", default: true, label: "This child can make cartoon pictures and videos",
+      level: "basic", secret: false, lives_in: "person.likeness", honoured_by: ["home"],
+    } as unknown as SettingsKey,
+    {
+      key: "likeness.adults", scope: "person", selector: "boolean", default: false, label: "Let other adults make pictures that look like me",
+      level: "basic", secret: false, lives_in: "person.likeness", honoured_by: ["home"],
+    } as unknown as SettingsKey,
+    {
       key: "topics.bodies", scope: "person", selector: "select", default: "default", label: "Bodies and relationships",
       level: "basic", secret: false, lives_in: "person.topics", honoured_by: ["home"],
       range: { options: ["default", "redirect", "gentle"] },
@@ -152,6 +160,17 @@ describe("PersonProfilePage", () => {
       expect(await view.findByText("Bramble")).toBeTruthy();
       expect(view.queryByRole("tab", { name: "Memories" })).toBeNull();
       expect(view.getByRole("tab", { name: "Overview" }).getAttribute("aria-selected")).toBe("true");
+    } finally { restore(); }
+  });
+
+  // KIDS-CREATE-01: the per-child cartoon switch lives in the adults-only likeness card, which a child never sees and a parent never opens for a child. It is drawn on the child's own Limits tab, alone (no likeness consent switch beside it).
+  test("a child's Limits tab carries the child's cartoon switch, and only that key of its card", async () => {
+    const restore = stubProfileAndLimitsFetch();
+    try {
+      const view = renderProfile("/people/person-bramble?tab=limits", viewer({ role: "owner" }));
+      expect(await view.findByText("This child can make cartoon pictures and videos")).toBeTruthy();
+      expect(view.getByText("Pictures and videos")).toBeTruthy();
+      expect(view.queryByText(/look like me/)).toBeNull();
     } finally { restore(); }
   });
 

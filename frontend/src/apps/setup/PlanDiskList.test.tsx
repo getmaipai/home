@@ -132,6 +132,34 @@ describe("the plan step's disk list", () => {
     expect(call[2]).toEqual([licence.id]);
   });
 
+  test("while the licence is not accepted the button says why, and a started download is answered under the button", async () => {
+    const start = mock(async () => ({ started: true, models: 1 }));
+    const view = render(<PlanStep readPlan={async () => ({ wording: wording("p128", 800 * GIB), licences: [licence] })} start={start} onInstalled={() => {}} />);
+    await view.findByText("What gets installed");
+    expect(view.getByTestId("plan-accept-hint").textContent).toMatch(/waiting for you to accept the maker's licence/);
+    expect(view.queryByRole("status")).toBeNull();
+    fireEvent.click(view.getByRole("checkbox", { name: /I have read it and I accept it/ }));
+    await waitFor(() => expect(view.queryByTestId("plan-accept-hint")).toBeNull());
+    fireEvent.click(view.getByRole("button", { name: "Install and continue" }));
+    expect((await view.findByRole("status")).textContent).toMatch(/Download started\. Watch it in the bar at the top/);
+  });
+
+  test("a click that has nothing to download says so, and a refusal from the engine shows as the red alert", async () => {
+    const none = render(<PlanStep readPlan={async () => ({ wording: wording("p128", 800 * GIB), licences: [] })} start={async () => ({ started: true, models: 0 })} onInstalled={() => {}} />);
+    await none.findByText("What gets installed");
+    fireEvent.click(none.getByRole("checkbox", { name: /Detailed videos/ }));
+    fireEvent.click(none.getByRole("button", { name: "Install and continue" }));
+    expect((await none.findByRole("status")).textContent).toMatch(/Nothing to download/);
+    none.unmount();
+    const { ApiError } = await import("@/lib/api");
+    const refused = render(<PlanStep readPlan={async () => ({ wording: wording("p128", 800 * GIB), licences: [] })} start={async () => { throw new ApiError("There is not enough room on the engine's disk.", 409, undefined, "Free some space, then press the button again."); }} onInstalled={() => {}} />);
+    await refused.findByText("What gets installed");
+    fireEvent.click(refused.getByRole("checkbox", { name: /Detailed videos/ }));
+    fireEvent.click(refused.getByRole("button", { name: "Install and continue" }));
+    expect((await refused.findByText(/not enough room on the engine's disk\. Free some space/))).toBeTruthy();
+    expect(refused.queryByRole("status")).toBeNull();
+  });
+
   test("unticking Detailed videos drops the licence and the need to accept, and sends no accept", async () => {
     const start = mock(async () => ({}));
     const view = render(<PlanStep readPlan={async () => ({ wording: wording("p128", 800 * GIB), licences: [licence] })} start={start} onInstalled={() => {}} />);

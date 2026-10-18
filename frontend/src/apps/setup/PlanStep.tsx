@@ -40,6 +40,8 @@ export function PlanStep({ onInstalled, onReady, readPlan = api.setupPlan, start
   const [failed, setFailed] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // The answer to the click, said right under the button (the progress bar is at the top of the page, out of sight from here).
+  const [notice, setNotice] = useState<string | null>(null);
   const [attempt, setAttempt] = useState(0);
   const [engine, setEngine] = useState<InstallStatusView | null>(null);
   // The disk plan's rows left turned on (INSTALL-DISK-01): starts at the plan's defaults, changes with each checkbox, and the total and the disk check follow.
@@ -93,8 +95,13 @@ export function PlanStep({ onInstalled, onReady, readPlan = api.setupPlan, start
   useEffect(() => { onReady?.(blockContinue); }, [blockContinue, onReady]);
 
   async function install() {
-    setBusy(true); setError(null);
-    try { await (disk ? start(vram, [...selected], owed.map((licence) => licence.id)) : start(vram)); onInstalled(); }
+    setBusy(true); setError(null); setNotice(null);
+    try {
+      const result = await (disk ? start(vram, [...selected], owed.map((licence) => licence.id)) : start(vram));
+      const models = typeof result === "object" && result !== null && "models" in result && typeof result.models === "number" ? result.models : null;
+      setNotice(models === 0 ? "Nothing to download: everything you ticked is already installed." : "Download started. Watch it in the bar at the top of this page; you can keep using Home while it finishes.");
+      onInstalled();
+    }
     catch (reason) {
       const next = reason instanceof ApiError ? reason.next : undefined;
       setError(reason instanceof Error ? [reason.message, next].filter(Boolean).join(" ") : "Home couldn't start the download. Press Install again.");
@@ -140,6 +147,8 @@ export function PlanStep({ onInstalled, onReady, readPlan = api.setupPlan, start
         {error ? <Alert variant="destructive"><ErrorIcon /><AlertDescription>{error}</AlertDescription></Alert> : null}
         {canRecheck ? <Button type="button" variant="secondary" onClick={() => { setWording(null); setAttempt((n) => n + 1); }}>Check again</Button> : null}
         {canInstall ? <Button type="button" size="lg" disabled={busy || unaccepted} onClick={() => void install()}>{actionLabel}</Button> : null}
+        {canInstall && unaccepted ? <p className="text-muted-foreground" data-testid="plan-accept-hint">The button is waiting for you to accept the maker's licence above. Accept it, or untick that row, to go on.</p> : null}
+        {notice ? <p role="status">{notice}</p> : null}
         </div>
       </CardContent>
     </Card>

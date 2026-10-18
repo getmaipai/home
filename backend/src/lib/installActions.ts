@@ -11,7 +11,7 @@ import { defaultDiskPaths, planVolumes } from "@/lib/diskPlan";
 import { shippedDiskPlan } from "@/lib/diskPlan";
 import { diskVerdict, type DiskPlan, type DiskVolume } from "../../../shared/diskPlanMath";
 import { setInstallSelection } from "@/lib/setupState";
-import { listStackComponents } from "@/lib/stackComponents";
+import { installStackComponent, listStackComponents } from "@/lib/stackComponents";
 import { isLicensedRow, LICENSED_ROWS, type PlanLicence } from "../../../shared/licensedRows";
 import type { StackInstallPlan } from "@/lib/stack/client";
 
@@ -108,13 +108,19 @@ export async function beginInstall(requestedGb: number | undefined, recordInSetu
       }
     }
   }
+  // A licensed part starts here, before the answer: a refusal from the Stack (no room, engine not ready, licence) is the answer to the click, in the Stack's own sentence, not a line in a log nobody reads.
+  let startedLicensed = 0;
+  for (const part of licensed) {
+    try { await installStackComponent(part.component, { acceptedLicence: part.licence }); startedLicensed += 1; }
+    catch (error) { return { ok: false, error: error instanceof Error && error.message ? error.message : "The engine did not start that download.", next: "Check that the engine is running, then press the button again, or turn that row off." }; }
+  }
   resetInstallStatusCache();
   if (selected) setInstallSelection(selected);
   if (recordInSetup) {
     const roles = [...new Set(plan.models.map((model) => `engines.${model.role}.choice`))];
     replaceSetupStep("plan", { status: "done", plan: { option: "recommended", tier: plan.level, roles } });
   }
-  void startSetupDownloads(getStackClient(), { ...(vramGb ? { vramGb } : {}), ...(selected ? { selected } : {}), ...(licensed.length ? { licensed } : {}) }).catch(() => {});
+  void startSetupDownloads(getStackClient(), { ...(vramGb ? { vramGb } : {}), ...(selected ? { selected } : {}) }).catch(() => {});
   const pending = plan.models.filter((model) => !model.installed).length + (selected && plan.disk ? (plan.optional_models ?? []).filter((model) => !model.installed && plan.disk!.rows.some((row) => selected.includes(row.id) && row.model_ids.includes(model.id))).length : 0);
-  return { ok: true, models: pending };
+  return { ok: true, models: pending + startedLicensed };
 }
