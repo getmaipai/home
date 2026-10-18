@@ -196,45 +196,8 @@ exact production prompt and tools, Glimmer on oMLX, same ddgs. The model is not 
 | Answered current state from memory, no call (election, "is the internet down") | 2 | 0 |
 | Other: news shelf and weather answered by their own tools (designed); after, also one ambiguous "score of the game" that asked which game | 2 | 3 |
 
-Still open: a query with no word in common with the person's (for example "sports results October 16 2026" for "who won last night") is refused
-by design (rule 6 keeps ungrounded arguments as policy refusals), and a model-invented tool name gives the same line (2 of 20 after). Changing
-either needs Jesse's ruling on rule 6 (proposed: search the person's own words instead).
-
-## ENGINE-MLX-02 results (2026-10-17, same day, partial)
-
-Method: two scratch Stacks built from Stack `b17b34b` (the shipped cut-over) in their own data directories and free ports, never the
-live one: A on llama-server b10797 with the live Q4_K_XL file and projector, B on oMLX 0.7.0 with the 19.4 GB MLX weights (hash
-verified). One large engine at a time under the GPU lock, each run under 10 minutes, Home's bench scripts as the driver
-(`MAIPAI_BENCH_UPSTREAM=stack`). The machine was shared with other agents (load average 13 to 36, other builds and tests running), so
-latencies are only comparable inside one engine's runs; counts of calls and replies are not affected. Rows are 3 repeats unless said.
-
-| Bench | llama-server | oMLX as shipped (`b17b34b`) | oMLX + Stack `cf356e8` | Verdict |
-|---|---:|---:|---:|---|
-| Tool corpus, fixed pass (13 rows x 3) | 31 of 39 | 28 of 39 | 31 of 39 | REGRESSION as shipped, level with the fix |
-| Expected tool called, 14 tool rows x 5 (math, convert, time, timer) | 65 of 70 | 15 of 70 | 58 of 70 | REGRESSION as shipped (21 percent); 83 against 93 percent with the fix |
-| Tool name returned with a namespace or token (`math.math`, `generate_image.generate_image`, `timer.timer`, `convert.expression`, `convert<\|message\|>`) | 0 of 87 calls | 15 of 36 in the media run, most math, timer and convert calls | 0 | REGRESSION, fixed in the Stack |
-| Picture tool chosen (generate_image) / video tool chosen (generate_video), 2 repeats | 12 of 12 / 10 of 10 | 0 of 12 (all dotted) / 9 of 10 | 12 of 12 / 10 of 10 | REGRESSION as shipped, PASS with the fix |
-| False tool call on talk rows (no tool wanted) | 0 of 12 | 0 of 12 | 0 | PASS |
-| Reasoning check, 60 generated prompts, greedy | 60 of 60 | 60 of 60 | n/a (the fix does not touch it) | PASS (median 115 and 120 tokens) |
-| Search decision, 30 time-sensitive rows through Home's turn path with fixture search | 28 searched | n/a | 26 searched | PASS (within noise, 2 of 30) |
-| False searches, 30 timeless rows | 0 | n/a | 0 | PASS |
-| Raw tool-call markup shown as the reply (`<atem:parameter ...>`), 60 search-decision turns | 0 of 67 | n/a | 1 of 60 | WATCH (one malformed call the parser leaves in `content`) |
-| Child, teen, spoken, memory, persona length, leaks per 100, SIGKILL, vision | not finished | not finished | not finished | PENDING, see below |
-
-What the numbers say. Quality of the answers is level: the 60 reasoning prompts and the search decision match within noise, and no
-leak of a template token showed in plain prose. Tool use is where the 4-bit weights differ. First, they echo the namespace the chat
-template documents (`# Valid recipients: "math.*"`) onto tools that have none, which Home reads as an unknown tool; the shipped cut-over
-failed every picture request and about four in five math, timer and convert calls. `cf356e8` repairs the name in the Stack, streamed or
-not, and brings the tool rows level with llama-server except that oMLX answers some arithmetic and conversions directly instead of
-calling the tool (`100 divided by 4` 2 of 5 against 5 of 5, `3 pounds in ounces` 1 of 5 against 5 of 5; the answers were correct). Second,
-a malformed call occasionally reaches the reply as raw markup. Neither shows in a conversation as slowness, but both are tool-use
-regressions that the earlier engine comparison did not see because it ran the model's tool names through a harness that never looked them up.
-
-Harness limits found: the budget-offered pass of `tool-calling.ts` and the `chat-ab-01.ts` child and spoken groups returned empty or
-"no reply" rows on both engines while other agents held the machine (Home's 20 s stall rule and the minor gates fired), so those rows are
-not scored here. `chat-ab-01.ts` also refuses to start beside any `bun test` or build, which never stops on this shared Mac; the runs
-here bypassed that guard with a local edit that is not committed.
-
-Verdict so far: `auto` must not select oMLX; llama-server is the default on every tier and oMLX is opt-in through
-`stack.engines.chat.engine` until the pending rows are in and a release carries `cf356e8`. Re-run `media-tool-choice-01.ts` (kept in the session scratchpad `mlxquality`, to be committed with
-this note) on any later oMLX, mlx-lm or weight change before flipping the default back.
+Follow-up CF-SEARCH-02 (owner-approved 2026-10-17, RULES.md rule 6): a search refused as ungrounded ("sports results October 16 2026" for
+"who won last night") is no longer a dead end. Policy runs the search once with a query built from the person's own words (filler stripped,
+nouns, names and dates kept, 120 characters at most), through policy again so every gate and the safety floor apply to it, and the trace
+records `retried_with_user_words`. It never loops; any other ungrounded tool call keeps the refusal line. A model-invented tool name
+(`unknown_tool`, 2 of 20 after the first fix) still gets the refusal line.

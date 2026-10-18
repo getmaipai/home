@@ -16,6 +16,19 @@ export function wordsOf(text: string): string[] {
   return text.toLowerCase().split(/[^a-z0-9']+/).filter((w) => w.length > 0);
 }
 
+/** CF-SEARCH-02: a search query built from the person's own words: filler dropped, the other words kept in order
+ * (nouns, names, dates, numbers), capped at `max` characters on a word boundary. Null when nothing is left. */
+export function ownWordsQuery(text: string, max = 120): string | null {
+  const kept = wordsOf(text).filter((w) => w.length > 1 && !STOPWORDS.has(w));
+  let out = "";
+  for (const w of kept) {
+    const next = out ? `${out} ${w}` : w;
+    if (next.length > max) break;
+    out = next;
+  }
+  return out.length > 0 ? out : null;
+}
+
 export function tokenize(text: string): Set<string> {
   return new Set(
     text

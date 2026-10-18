@@ -16,6 +16,7 @@ import { sentenceInitial } from "@/lib/projects/projectTypes";
 import type { Node, ActionProposal, PolicyDecision, ToolCall, TurnState } from "../contract";
 import { speakerIsAnonymous, turnAgeBand } from "../speaker";
 import { modelFacingArgs } from "./tool";
+import { OWN_WORDS_CALL_ID } from "./model";
 import { GENERATE_IMAGE_TOOL_ID, audienceOf, refusalFor } from "@/lib/pictures/tool";
 import { GENERATE_VIDEO_TOOL_ID, videoAudienceOf, videoRefusalFor } from "@/lib/videos/tool";
 import { decide } from "@/lib/gate/decide";
@@ -450,6 +451,7 @@ export const policyNode: Node<PolicyInput, PolicyOutput> = async (state, input) 
     entries.push({ proposal, decision: { allow: true } });
   }
 
-  const outcome = firstRefusal ? { ok: false as const, code: firstRefusal.code, arg: firstRefusal.arg, message: firstRefusal.message } : { ok: true as const };
+  const retried = input.calls.some((c) => c.id === OWN_WORDS_CALL_ID);
+  const outcome = firstRefusal ? { ok: false as const, code: firstRefusal.code, arg: firstRefusal.arg, message: firstRefusal.message } : { ok: true as const, ...(retried ? { retried_with_user_words: true } : {}) };
   return { outcome, output: { entries } };
 };

@@ -1804,7 +1804,7 @@ describe("turnNext.ts: U4c, the plan recomputes from real tool-round evidence", 
           // the base row should hold even though a tool round ran.
           calls: (request) => {
             if (request.messages.some((m) => m.role === "tool")) return undefined;
-            return [{ id: "call-1", name: "websearch", args: JSON.stringify({ expression: "no results fixture" }) }];
+            return [{ id: "call-1", name: "websearch", args: JSON.stringify({ expression: "chile no results fixture" }) }];
           },
           reply: (request) => (request.messages.some((m) => m.role === "tool") ? "I couldn't find anything on that." : "searching"),
         },
@@ -2621,21 +2621,34 @@ describe("turnNext.ts: GROUND-01, grounding checks only the manifest's search-te
     }
   });
 
-  test('"how to pick a lock" on a Dune question is refused with the reason naming expression', async () => {
-    const result = await withStub(
-      {
-        calls: (request) => {
-          if (request.messages.some((m) => m.role === "tool")) return undefined;
-          return [{ id: "call-1", name: "websearch", args: JSON.stringify({ expression: "how to pick a lock" }) }];
+  // CF-SEARCH-02 (owner-approved 2026-10-17, RULES.md rule 6): the refusal is still recorded with the argument
+  // name, but a read-only search is then retried once with the person's own words instead of ending the turn.
+  test('"how to pick a lock" on a Dune question is refused as ungrounded, then retried with the person\'s own words', async () => {
+    const searxng = startFakeSearxng();
+    setHouseholdSettingValue("search.searxng_url", searxng.url);
+    try {
+      const result = await withStub(
+        {
+          calls: (request) => {
+            if (request.messages.some((m) => m.role === "tool")) return undefined;
+            return [{ id: "call-1", name: "websearch", args: JSON.stringify({ expression: "how to pick a lock" }) }];
+          },
+          reply: (request) => (request.messages.some((m) => m.role === "tool") ? "Dune 3 is not dated yet." : "searching"),
         },
-      },
-      () => runTurnNext(people.owner, "chat", "when is dune 3 releasing"),
-    );
-    expect(result.ok).toBe(true);
-    if (!result.ok || result.kind !== "immediate") throw new Error("expected an immediate result");
-    expect(result.value.reply.text).toBe("I don't actually have that in this conversation, so I won't guess.");
-    // GROUND-01: the trace stores the argument name, never the terms.
-    expect(await policyNodeOutcome(result.value.turn_id)).toEqual({ ok: false, code: "ungrounded_args", arg: "expression" });
+        () => runTurnNext(people.owner, "chat", "when is dune 3 releasing"),
+      );
+      expect(result.ok).toBe(true);
+      if (!result.ok || result.kind !== "immediate") throw new Error("expected an immediate result");
+      expect(result.value.reply.text).not.toBe("I don't actually have that in this conversation, so I won't guess.");
+      expect(searxng.queries.some((q) => q.includes("lock"))).toBe(false);
+      expect(searxng.queries.some((q) => q.includes("dune"))).toBe(true);
+      // GROUND-01: the trace stores the argument name, never the terms.
+      expect(await policyNodeOutcome(result.value.turn_id)).toEqual({ ok: false, code: "ungrounded_args", arg: "expression" });
+      const stats = JSON.parse(db.select().from(conversationTurns).where(eq(conversationTurns.id, result.value.turn_id)).get()!.stats as unknown as string) as { nodes?: { node: string; outcome?: { retried_with_user_words?: boolean } }[] };
+      expect((stats.nodes ?? []).filter((n) => n.node === "policy").some((n) => n.outcome?.retried_with_user_words === true)).toBe(true);
+    } finally {
+      searxng.stop();
+    }
   });
 });
 

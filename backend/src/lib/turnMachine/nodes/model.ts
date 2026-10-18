@@ -11,7 +11,8 @@ import type { LlmMessage, ToolSpec, ToolCall } from "@/lib/llm";
 import { missingRequired } from "@/lib/capabilities";
 import { loadManifestOnly } from "@/lib/plugins";
 import { VIRTUAL_TOOL_REGISTRY } from "@/lib/projects/tool";
-import { isBarePronoun } from "@/lib/text";
+import { isBarePronoun, ownWordsQuery } from "@/lib/text";
+import { detectCsam } from "@maipai/spec/safety/ts/signals.js";
 import { asksForMedia, claimsMedia, MEDIA_NOT_STARTED_LINE, MEDIA_REASK_INSTRUCTION } from "@/lib/mediaClaims";
 import { peopleGuidanceSuffix, PICTURE_NOT_HERE_LINE } from "@/lib/pictures/policy";
 import { laneOfPerson } from "@/lib/pictures/laneGate";
@@ -592,6 +593,17 @@ async function runWatchedGeneration(state: TurnState, messages: LlmMessage[], to
  * shape rather than a second copy of this literal. */
 export function rawUtteranceWebsearchCall(utterance: string): ToolCall {
   return { tool: "websearch", args: { expression: utterance }, id: "builder" };
+}
+
+/** CF-SEARCH-02 (owner-approved 2026-10-17, RULES.md rule 6): marks the one search retried with the person's own words. */
+export const OWN_WORDS_CALL_ID = "own-words";
+
+/** The search the person's own words make when the model's query was refused as ungrounded: filler stripped, nouns,
+ * names and dates kept, capped. Null when nothing is left or the floor's `detectCsam` matches the query, so no retry runs. */
+export function ownWordsSearchCall(utterance: string): ToolCall | null {
+  const query = ownWordsQuery(utterance);
+  if (!query || detectCsam(query).matched.length > 0) return null;
+  return { tool: "websearch", args: { expression: query }, id: OWN_WORDS_CALL_ID };
 }
 
 function builderFallbackOutput(utterance: string, otherCalls: readonly ToolCall[], reasoning: string | undefined, failureCode?: string, failureMessage?: string): { outcome: NodeOutcome; output: ModelOutput } {

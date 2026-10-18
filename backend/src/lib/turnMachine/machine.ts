@@ -15,7 +15,7 @@ import { safetyNode, applySafety, safetyRoute, inputSafetyAfterFailure, type Saf
 import { carriesCrisisSignal } from "@/lib/safety";
 import { commandsNode, type CommandsOutput } from "./nodes/commands";
 import { contextNode, applyContext, type ContextOutput } from "./nodes/context";
-import { modelNode, rawUtteranceWebsearchCall, type ModelOutput } from "./nodes/model";
+import { modelNode, rawUtteranceWebsearchCall, ownWordsSearchCall, type ModelOutput } from "./nodes/model";
 import { policyNode, type PolicyOutput, type PolicyEntry } from "./nodes/policy";
 import { toolNode, type ToolOutput } from "./nodes/tool";
 import { retryEligible } from "./nodes/lookupFallback";
@@ -102,6 +102,9 @@ interface MachineContext {
   // GROUND-02: set once when a refused decorative call was dropped and the model is asked again
   // without tools; a second refusal takes the ordinary path, so this can never loop.
   decorativeDropped?: boolean;
+  // CF-SEARCH-02: set once when the model's search query was refused as ungrounded and the person's own
+  // words were searched instead; a second refusal takes the ordinary path, so this can never loop.
+  rawSearchTried?: boolean;
 }
 
 /** GROUND-02: a tool whose call only decorates the answer (a picture). Refusing its call must never replace the answer. */
@@ -203,6 +206,19 @@ export const turnMachine = setup({
     queryWriterRefused: ({ context, event }) => {
       const { toRun, parkedAsk } = proposalsFrom((event as unknown as { output: PolicyOutput }).output);
       return toRun.length === 0 && parkedAsk === null && context.queryWriterUsed;
+    },
+    // CF-SEARCH-02 (RULES.md rule 6, owner-approved 2026-10-17): the model's search query was refused as
+    // ungrounded ("sports results October 16 2026" for "who won last night"). A read-only lookup is not a dead
+    // end: the person's own words are searched, through policy again (age and surface gates, household-name gate,
+    // child search rules and grounding all run on the new query). Once per turn; not when the model wrote text
+    // beside the call; every other ungrounded tool keeps the refusal line.
+    searchQueryUngrounded: ({ context, event }) => {
+      const { toRun, parkedAsk } = proposalsFrom((event as unknown as { output: PolicyOutput }).output);
+      if (toRun.length > 0 || parkedAsk !== null || context.rawSearchTried || retryRound(context)) return false;
+      if (context.modelDraft && context.modelDraft.trim().length > 0) return false;
+      const entries = (event as unknown as { output: PolicyOutput }).output.entries;
+      if (!(entries.length > 0 && entries.every((e) => !e.decision.allow && e.decision.reason === "ungrounded_args" && e.proposal.request.tool === "websearch"))) return false;
+      return ownWordsSearchCall(context.turnState.utterance) !== null;
     },
     // GROUND-02 (rule 6, a failed tool never fails the answer): every call policy refused was a
     // decorative picture call whose arguments were ungrounded. The picture is optional, so the call
@@ -460,6 +476,7 @@ export const turnMachine = setup({
           // the refused policy output, since queryWriterFallback builds
           // its own fresh one.
           { guard: "queryWriterRefused", target: "queryWriterFallback" },
+          { guard: "searchQueryUngrounded", actions: assign(({ context }) => ({ rawSearchTried: true, step: { kind: "tool_calls" as const, calls: [ownWordsSearchCall(context.turnState.utterance)!] } })), target: "policy", reenter: true },
           // T5: nothing the retry round called could run; on to the phrasing round
           // (roundsUsed 1 is what makes the next model call the phrasing one).
           { guard: "retryRefused", actions: assign({ roundsUsed: ({ context }) => context.roundsUsed + 1 }), target: "model" },

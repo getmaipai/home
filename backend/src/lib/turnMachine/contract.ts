@@ -372,7 +372,7 @@ export interface TurnState {
  * response body earns anywhere it might echo request content back.
  * Optional: every other node's own failure still reports with `code`
  * alone when it has nothing more to say. */
-export type NodeOutcome = { ok: true; required_miss?: boolean; dropped_by_floor?: number; /** SEARCH-ANSWER-06: the model streamed text beside a tool call, so the streamed draft was reset at the gate; it is kept as the answer only if policy then refuses every call as ungrounded or unknown. */ draft_discarded?: boolean } | { ok: false; code: string; arg?: string; message?: string } | { skipped: true; reason: string };
+export type NodeOutcome = { ok: true; required_miss?: boolean; /** CF-SEARCH-02: this policy run judged the one search retried with the person's own words. */ retried_with_user_words?: boolean; dropped_by_floor?: number; /** SEARCH-ANSWER-06: the model streamed text beside a tool call, so the streamed draft was reset at the gate; it is kept as the answer only if policy then refuses every call as ungrounded or unknown. */ draft_discarded?: boolean } | { ok: false; code: string; arg?: string; message?: string } | { skipped: true; reason: string };
 
 export type NodeName = "safety" | "commands" | "context" | "model" | "policy" | "tool" | "answer" | "output_gate";
 
