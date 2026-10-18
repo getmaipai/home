@@ -25,11 +25,11 @@ CREATE UNIQUE INDEX IF NOT EXISTS `api_keys_secret_hash_unique` ON `api_keys` (`
 CREATE UNIQUE INDEX IF NOT EXISTS `api_keys_legacy_hash_unique` ON `api_keys` (`legacy_hash`);
 --> statement-breakpoint
 -- CODE-KEYS-01: each live person_api_tokens row becomes a turn key. The old unpeppered hash stays in legacy_hash only until
--- the key is next used (it is then re-hashed under the pepper and cleared) or until the key expires 90 days from now.
+-- the key is next used (it is then re-hashed under the pepper and cleared) or until the key expires. Each key keeps the old token's own expiry.
 -- The old table stays in place and is never read again; a later migration drops it. Already expired tokens are not carried.
 INSERT INTO `api_keys` (`id`, `person_id`, `name`, `scopes`, `created_at`, `expires_at`, `revoked_at`, `status`, `last_used_at`, `last_used_from`, `limits`, `hint`, `secret_hash`, `legacy_hash`, `legacy_format`, `compatibility`, `provenance`, `hlc`, `updated_at`)
 SELECT 'key_' || lower(hex(randomblob(12))), t.`person_id`, 'Voice and Home Assistant', '["turn"]', t.`created_at`,
-  strftime('%Y-%m-%dT%H:%M:%fZ', 'now', '+90 days'), NULL, 'active', t.`last_used_at`, NULL, '{"requests_per_minute":60}', '----', NULL,
+  t.`expires_at`, NULL, 'active', t.`last_used_at`, NULL, '{"requests_per_minute":60}', '----', NULL,
   t.`token_hash`, 1, 1, 'Carried over from the earlier voice and Home Assistant token',
   (CAST(strftime('%s', 'now') AS INTEGER) * 1000) || ':0:migrate', strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
 FROM `person_api_tokens` t

@@ -180,3 +180,45 @@ test("a disabled person's code key is suspended and ending access revokes every 
   expect(resolveApiKey(code, "code")).toBeNull();
   expect(resolveApiKey(turn, "turn")).toBeNull();
 });
+
+test("admission depends only on the scope asked for: a dual-scope key keeps working for turn when Coding is off", () => {
+  const p = person();
+  setHouseholdSettingValue("coding.enabled", true);
+  const both = createApiKey(p, { name: "Both", scopes: ["turn", "code"] }).secret;
+  const codeOnly = createApiKey(p, { name: "Code", scopes: ["code"] }).secret;
+  expect(resolveApiKey(both, "code")?.id).toBe(p.id);
+  setHouseholdSettingValue("coding.enabled", false);
+  expect(resolveApiKey(both, "turn")?.id).toBe(p.id);
+  expect(resolveApiKey(both, "code")).toBeNull();
+  expect(resolveApiKey(codeOnly, "code")).toBeNull();
+  expect(listApiKeys(p).every(k => k.status === "suspended")).toBe(true);
+});
+
+test("the minor limits apply to coding keys only: a child's voice token keeps 365 days and is not one of the 3 coding keys", () => {
+  const child = person("child");
+  setHouseholdSettingValue("coding.enabled", true);
+  grant(child, "allow");
+  keyPermission(child, true);
+  const days = (k: { expires_at: string }) => (Date.parse(k.expires_at) - Date.now()) / 86400000;
+  const voice = createApiKey(child, { name: "Voice", scopes: ["turn"], expires_in_days: 365 });
+  expect(days(voice.key)).toBeGreaterThan(364);
+  for (let i = 0; i < 3; i++) createApiKey(child, { name: `Code ${i}`, scopes: ["code"], expires_in_days: 30 });
+  expect(() => createApiKey(child, { name: "Fourth", scopes: ["code"], expires_in_days: 30 })).toThrow("limit");
+  expect(() => createApiKey(child, { name: "Long", scopes: ["code"], expires_in_days: 90 })).toThrow("30 days");
+  expect(() => createApiKey(child, { name: "Voice 2", scopes: ["turn"], expires_in_days: 90 })).not.toThrow();
+});
+
+test("a rotated compatibility token lasts about 365 days for adults and children, and hints differ between keys", async () => {
+  const { issueApiToken } = await import("@/lib/apiKeys");
+  for (const role of ["owner", "child"]) {
+    const p = person(role);
+    issueApiToken(p.id);
+    const k = listApiKeys(p).find(x => x.status === "active")!;
+    expect((Date.parse(k.expires_at) - Date.now()) / 86400000).toBeGreaterThan(364);
+  }
+  const p = person();
+  const hints = new Set<string>();
+  for (let i = 0; i < 6; i++) hints.add(createApiKey(p, { name: `Code ${i}`, scopes: ["turn"] }).key.hint);
+  expect(hints.size).toBeGreaterThan(1);
+  for (const h of hints) expect(h).toMatch(/^[A-Z2-7]{4}$/);
+});

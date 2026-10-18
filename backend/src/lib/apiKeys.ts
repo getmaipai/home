@@ -43,6 +43,12 @@ export function constantTimeHashEqual(left: string, right: string): boolean {
   return a.length === 32 && b.length === 32 && crypto.timingSafeEqual(a, b);
 }
 
+/** Four characters from inside the random part. The last base32 character carries only one bit, so it is left out. */
+function hintOf(secret: string): string { return secret.slice(-5, -1); }
+function usable(row: KeyRow): "revoked" | "expired" | null {
+  if (row.revokedAt || row.status === "revoked") return "revoked";
+  return Date.parse(row.expiresAt) <= Date.now() ? "expired" : null;
+}
 function mayHoldKey(person: PersonRow, scope: ApiKeyScope): boolean {
   if (person.deletedAt) return false;
   if (scope === "turn") return true; // Preserve the interim voice token's admission rules.
@@ -54,8 +60,9 @@ function mayHoldKey(person: PersonRow, scope: ApiKeyScope): boolean {
   return getPersonSettingValue(person, "coding.person.api_keys") === true;
 }
 function status(row: KeyRow, person: PersonRow): KeyRow["status"] {
-  if (row.revokedAt || row.status === "revoked") return "revoked";
-  if (Date.parse(row.expiresAt) <= Date.now()) return "expired";
+  const dead = usable(row);
+  if (dead) return dead;
+  // The wire status shows suspended when any scope is held back; admission below checks only the scope asked for.
   return row.scopes.every(s => mayHoldKey(person, s)) ? "active" : "suspended";
 }
 function wire(row: KeyRow, person: PersonRow) {
@@ -87,19 +94,21 @@ export function createApiKey(person: PersonRow, input: z.input<typeof CreateApiK
   if (!body.success) throw new Error("The key details are invalid. Use a name of 1 to 60 characters, turn or code scopes, and 7, 30, 90 or 365 days.");
   const { name, scopes, expires_in_days: days } = body.data;
   if (!scopes.every(s => mayHoldKey(person, s))) throw new Error("Keys are not allowed with your current access. Ask an admin to check your Coding access in Settings.");
+  // Design 3.7 rule 9: the minor limits (30 days, 3 keys) are coding limits. A voice (turn) key keeps the ordinary rules.
   const minor = person.role === "child" || person.role === "teen";
-  if (minor && days > 30) throw new Error("A child's or teen's key lasts at most 30 days. Choose 7 or 30 days.");
+  const codeKey = scopes.includes("code");
+  if (minor && codeKey && days > 30) throw new Error("A child's or teen's coding key lasts at most 30 days. Choose 7 or 30 days.");
   pruneLegacyApiKeyHashes();
   return db.transaction(() => {
     // Count suspended keys too, so turning Coding off cannot bypass the cap.
     const live = listApiKeys(person).filter(k => k.status !== "expired" && k.status !== "revoked");
-    if (live.length >= (minor ? 3 : 10)) throw new Error("You have reached your key limit. Revoke a key before making another.");
+    if (live.length >= 10 || (minor && codeKey && live.filter(k => k.scopes.includes("code")).length >= 3)) throw new Error("You have reached your key limit. Revoke a key before making another.");
     const id = newApiKeyId();
     const secret = `maipai_${id}_${base32(crypto.randomBytes(32))}`;
     const at = new Date().toISOString();
     const rpm = getHouseholdSettingValue("coding.api.rate_per_minute");
     const row = db.insert(apiKeys).values({ id, personId: person.id, name, scopes, createdAt: at,
-      expiresAt: new Date(Date.now() + days * DAY).toISOString(), status: "active", hint: secret.slice(-4),
+      expiresAt: new Date(Date.now() + days * DAY).toISOString(), status: "active", hint: hintOf(secret),
       limits: { requests_per_minute: typeof rpm === "number" && Number.isInteger(rpm) && rpm > 0 ? rpm : 60 },
       secretHash: hashApiKeySecret(secret), compatibility, provenance: "Created in Settings", hlc: nextHlc(), updatedAt: at,
     }).returning().get();
@@ -135,22 +144,22 @@ export function resolveApiKey(secret: string, scope: ApiKeyScope, origin?: KeyOr
   const valid = constantTimeHashEqual(digest, row?.secretHash ?? "0".repeat(64));
   if (!row || (!valid && !legacy)) return null;
   const person = db.select().from(people).where(eq(people.id, row.personId)).get() as PersonRow | undefined;
-  if (!person || !row.scopes.includes(scope) || status(row, person) !== "active") return null;
+  if (!person || !row.scopes.includes(scope) || usable(row) || !mayHoldKey(person, scope)) return null;
   const at = new Date().toISOString();
   if (legacy || !row.lastUsedAt || Date.now() - Date.parse(row.lastUsedAt) >= 60_000) {
     db.update(apiKeys).set({ lastUsedAt: at, ...(origin ? { lastUsedFrom: origin } : {}),
-      ...(legacy ? { secretHash: digest, legacyHash: null, hint: secret.slice(-4) } : {}), updatedAt: at, hlc: nextHlc(),
+      ...(legacy ? { secretHash: digest, legacyHash: null, hint: hintOf(secret) } : {}), updatedAt: at, hlc: nextHlc(),
     }).where(eq(apiKeys.id, row.id)).run();
   }
   return person;
 }
-/** Compatibility endpoints rotate only the former single voice token, not named keys. */
+/** Compatibility endpoints rotate only the former single voice token, not named keys. It keeps the old 365-day lifetime for everyone. */
 export function issueApiToken(personId: string): string {
   const person = db.select().from(people).where(eq(people.id, personId)).get() as PersonRow;
   return db.transaction(() => {
     revokeApiToken(personId);
     return createApiKey(person, { name: "Voice and Home Assistant", scopes: ["turn"],
-      expires_in_days: person.role === "child" || person.role === "teen" ? 30 : 90 }, true).secret;
+      expires_in_days: 365 }, true).secret;
   });
 }
 export function revokeApiToken(personId: string): void {

@@ -15,12 +15,17 @@ test("real migration is idempotent, leaves old rows unread, and upgrades old tok
   const at = new Date().toISOString(); const id = newPersonId();
   db.insert(people).values({ id, displayName: "Willow", role: "owner", avatarSeed: id, source: "hub", createdAt: at, updatedAt: at, hlc: nextHlc() }).run();
   const secret = "maipai_" + randomBytes(32).toString("hex");
-  db.insert(personApiTokens).values({ personId: id, tokenHash: createHash("sha256").update(secret).digest("hex"), createdAt: at, expiresAt: new Date(Date.now() + 86400000).toISOString() }).run();
+  db.insert(personApiTokens).values({ personId: id, tokenHash: createHash("sha256").update(secret).digest("hex"), createdAt: at, expiresAt: new Date(Date.now() + 300 * 86400000).toISOString() }).run();
   sqlite.exec(migration); sqlite.exec(migration);
   const row = db.select().from(apiKeys).get()!;
   expect(row.name).toBe("Voice and Home Assistant");
   expect(row.scopes).toEqual(["turn"]);
-  expect(Date.parse(row.expiresAt) - Date.now()).toBeGreaterThan(89 * 86400000);
+  // The old token keeps its own expiry: about 300 days left stays about 300 days, never cut to 90.
+  const left = (Date.parse(row.expiresAt) - Date.now()) / 86400000;
+  expect(left).toBeGreaterThan(299);
+  expect(left).toBeLessThan(301);
+  expect(row.legacyHash).toHaveLength(64);
+  expect(row.secretHash).toBeNull();
   db.delete(personApiTokens).run();
   expect(resolveApiKey(secret, "turn")?.id).toBe(id);
   expect(db.select().from(apiKeys).get()!.legacyHash).toBeNull();
