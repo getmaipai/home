@@ -1,3 +1,5 @@
+import { trackBackgroundWork } from "@/lib/backgroundWork";
+import { runLibraryRetention } from "@/lib/libraryRetention";
 import { musicJobIdsByTurn, deleteMusicJobsForConversation } from "@/lib/music/store";
 // Conversation history (platform plan 4.14, split): "conversations are
 // per person and per surface... retention defaults: conversations ninety
@@ -3268,6 +3270,7 @@ export function runRetention(): { deleted: number } {
     }
   }
 
+  void trackBackgroundWork(runLibraryRetention(now).catch((err: Error) => console.error(`[library] Storage cleanup failed: ${err.message}. Check Repairs and retry the nightly job.`)));
   return { deleted: expiring.length };
 }
 

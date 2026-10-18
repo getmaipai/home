@@ -212,3 +212,14 @@ export function __clearPictureStoreForTests(): void {
   live.clear();
   lastSaved.clear();
 }
+
+/** Remove only jobs for expired files, preserving batches with kept output. */
+export function deletePictureJobsForFiles(fileIds: readonly string[]): void {
+  if (!fileIds.length) return;
+  const ids = new Set(fileIds);
+  const files = db.select({ id: attachments.id, retention: attachments.retention }).from(attachments).all();
+  const survivors = new Set(files.filter((row) => row.retention === "kept" || !ids.has(row.id)).map((row) => row.id));
+  const remove = (job: PictureJob) => job.files.some((file) => ids.has(file.id)) && !job.files.some((file) => survivors.has(file.id));
+  for (const row of db.select().from(pictureJobs).all()) if (remove(fromRow(row))) db.delete(pictureJobs).where(eq(pictureJobs.id, row.id)).run();
+  for (const store of [memory, live]) for (const [id, job] of store) if (remove(job)) { store.delete(id); lastSaved.delete(id); }
+}

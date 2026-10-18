@@ -156,6 +156,50 @@ and maintenance states at 1440 and 390 pixels in light and dark themes under
 the browser's own health response; the maintenance window uses the isolated
 backend's owner route.
 
+## Library storage retention (LIBRARY-RETENTION-01, 2026-10-18)
+
+The daily `runRetention` job also starts a tracked Library pass. Chat age and
+its existing setting stay separate. `previewLibraryRetention` is read only;
+`GET /api/library/retention/preview` requires an owner or admin and returns
+candidate counts and bytes, usage, budget, per-type rules and warning grace.
+
+Ahead-of-spec declarations live once in `settings/libraryRetentionKeys.ts`.
+For pictures, videos, songs, documents, uploads, generated and trash,
+`storage.library.<type>.mode` and `.threshold_percent` form the rule
+`{mode, threshold_percent}`. Scalar fields use the shipped Settings renderer
+in `household.storage`, including the Storage page. Mode is `keep` or
+`until_storage_threshold`. Documents, uploads and trash default to `keep`;
+the other types default to `until_storage_threshold`. Every threshold defaults
+to 90 percent. `storage.library.trash_days` defaults to 30, settings only until
+LIBRARY-REVAMP-10 supplies the Trash provider.
+
+The budget is the existing `storage.household.cap_bytes`; usage comes from
+`householdUsageBytes`, the same file-record sum as Storage. A zero cap means
+no configured budget and disables cleanup. No second disk quota is added.
+A generated item follows both its display type and the generated rule:
+`keep` in either wins, and both thresholds must be exceeded. Every file is
+counted once. Uploads and fetched files never qualify for automatic removal.
+Generation uses the existing music provenance parser and reserved picture,
+video, poster and edit provenance markers, or stored origin `made`.
+
+For each over-limit rule, Home writes a warning Repairs item and uses the
+existing admin `repairs.new` notification with the full warning. Internal
+settings rows `internal.library_retention.<type>` store the first warning,
+last UTC warning day and rule/budget signature. A repeat run that day does
+not warn twice. Cleanup requires a prior warning at least 24 hours old.
+Changing a rule or budget restarts grace; recovery clears grace but keeps the daily warning stamp. After warning
+work completes, the pass re-reads rules and pins, selects oldest files first,
+and stops at the threshold. Kept records never qualify. File-specific,
+kept-aware music and picture job helpers run before `purgeFileRecord` in a
+transaction; released blobs are unlinked after commit. Turns are untouched.
+The existing attachment read returns 404 after removal, using the existing
+kit image error state. No chat UI is changed.
+
+Generated files created as kept remain kept. This slice does not migrate
+file kinds or build the content/reference store; those remain
+LIBRARY-REVAMP-02 and LIBRARY-DEDUP-01. Trash execution remains
+LIBRARY-REVAMP-10. No new frontend form or status surface is introduced.
+
 ## STATUS-SVC-03
 
 ### Package cache retention

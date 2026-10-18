@@ -9,6 +9,7 @@
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { SettingsKey } from "@maipai/spec/gen/ts/settings-key.js";
+import { LIBRARY_RETENTION_KEYS } from "@/settings/libraryRetentionKeys";
 import { AI_SETTINGS_KEYS } from "@/settings/aiKeys";
 import { HOSTED_SEARCH_SETTINGS_KEYS } from "@/settings/hostedSearchKeys";
 import { MINOR_DDGS_SETTINGS_KEYS, MINOR_DDGS_KEY } from "@/settings/minorDdgsKeys";
@@ -77,7 +78,7 @@ function loadRegistry(): SettingsKey[] {
   // until the shared snapshot is advanced.
   const keys = new Set(parsed.map((entry) => entry.key));
   // THIN-4H: search.brave_api_key likewise rides here until a commons spec tag carries it.
-  const combined = [...parsed, ...[...AI_SETTINGS_KEYS, ...HOSTED_SEARCH_SETTINGS_KEYS, ...MINOR_DDGS_SETTINGS_KEYS, ...NOTIFICATION_SETTINGS_KEYS, ...REFERENCE_SETTINGS_KEYS, ...PICTURE_SETTINGS_KEYS, ...VIDEO_SETTINGS_KEYS, ...MUSIC_SETTINGS_KEYS, ...INSTALL_SETTINGS_KEYS, ...LIKENESS_SETTINGS_KEYS, ...NEWS_SETTINGS_KEYS, ...VOICE_SETTINGS_KEYS, ...AUDIO_SETTINGS_KEYS, ...MEDIA_SETTINGS_KEYS, ...PLACE_SETTINGS_KEYS, ...bundledPackageKeys()].filter((entry) => !keys.has(entry.key))];
+  const combined = [...parsed, ...[...LIBRARY_RETENTION_KEYS, ...AI_SETTINGS_KEYS, ...HOSTED_SEARCH_SETTINGS_KEYS, ...MINOR_DDGS_SETTINGS_KEYS, ...NOTIFICATION_SETTINGS_KEYS, ...REFERENCE_SETTINGS_KEYS, ...PICTURE_SETTINGS_KEYS, ...VIDEO_SETTINGS_KEYS, ...MUSIC_SETTINGS_KEYS, ...INSTALL_SETTINGS_KEYS, ...LIKENESS_SETTINGS_KEYS, ...NEWS_SETTINGS_KEYS, ...VOICE_SETTINGS_KEYS, ...AUDIO_SETTINGS_KEYS, ...MEDIA_SETTINGS_KEYS, ...PLACE_SETTINGS_KEYS, ...bundledPackageKeys()].filter((entry) => !keys.has(entry.key))];
   return combined.map((key) => withPersonGuardFacts(withOwnControl(key)));
 }
 

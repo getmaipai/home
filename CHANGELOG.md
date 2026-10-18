@@ -7,6 +7,8 @@ checklist (`docs/dev.md`). The first release is 0.1.0.
 
 ## [Unreleased]
 
+- Admins can set Library storage rules by type and preview cleanup. Home warns in Notifications and Repairs at least a day before removing old unpinned generated files. Kept files stay, and chat retention stays separate. Trash days are saved for the later Library Trash feature. (LIBRARY-RETENTION-01)
+
 - Shared adult-only and unclassified Library files are hidden from children and teens, including content and derived image reads. (BUG-LIBRARY-SHARE-CHILD-01)
 
 ## [0.2.22] - 2026-10-18

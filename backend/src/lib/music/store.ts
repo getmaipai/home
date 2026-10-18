@@ -98,3 +98,11 @@ export function __resetMusicJobsForTests(): void {
   for (const controller of watching.values()) controller.abort();
   watching.clear(); liveJobs.clear(); memory.clear(); temporarySongs.clear(); removed.clear();
 }
+
+/** Library expiry targets files, never other jobs of their chat turn. */
+export function deleteMusicJobsForFiles(fileIds: readonly string[]): void {
+  if (!fileIds.length) return;
+  const ids = new Set(fileIds);
+  const jobs = [...memory.values(), ...liveJobs.values(), ...db.select().from(musicJobs).where(inArray(musicJobs.fileId, [...fileIds])).all().map(fromRow)];
+  for (const job of jobs) if (job.fileId && ids.has(job.fileId)) deleteUnlessKept(job);
+}
