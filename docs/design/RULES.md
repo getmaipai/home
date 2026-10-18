@@ -31,13 +31,20 @@ sources (`search.web_sources`), which are one household setting only an admin se
 ([record](../plans/web-sources-household-2026-10-12.md)). The
 adult-site host list (locked on for every kid and teen, a custom allow never lifts it) and the output gate stay fixed
 and no setting reaches them. Web search runs without a parent's approval when the household has it on for their controls.
-Picture and video generation under this rule (owner's rulings, 2026-10-17): a teen makes pictures and videos and edits pictures
-with nothing adult or sexual, and a child makes cartoon pictures and videos of safe things in a strict lane (the cartoon look
-forced, a child-safe topic gate, no photos, no references, no real people, edits only of their own cartoons, a daily limit, on by
-default with a switch for the home and one per child). The age gate is not loosened by either: the finished-picture check
-(nothing nude or sexual for a teen or a child whoever is in it, a cartoon and child-safe for a child, a check that cannot run
-withholds), the absolute lines (nothing sexual involving a minor, no real person's likeness without their recorded consent) and
-the surface gate stay fixed, and no setting, including `generation.people_prompts`, reaches them.
+Picture, video and song generation under this rule (owner's rulings, 2026-10-17 and 2026-10-18): one set of content protections
+per person, set by age, covers everything Home makes (chat, search, pictures, videos and songs), so a person who has swearing,
+drugs, gambling or gore filtered gets none of it in a reply, a song, a picture or a video, including a picture of themselves and
+friends doing it. Nothing sexual involving a minor is allowed anywhere, and that is not negotiable. Sexual content, gore and other
+adult content are adult only. A teen makes pictures, videos and songs and edits pictures with nothing adult or sexual. A child
+makes cartoon pictures and videos and kid-friendly songs of safe things in a strict lane (the cartoon look forced, a child-safe
+topic gate, no photos, no references, no real people, edits only of their own cartoons, a daily limit, on by default with a switch
+for the home and one per child). A child's request that is too scary or too adult is rewritten into a kid-friendly version and
+not refused (a heavy rock song about a scary Halloween becomes a happy, light rock song about Halloween that is not too scary),
+and the result is checked as finished, and as sung for a song. Family: anyone in the household may make pictures, videos and songs
+with or of any household member, as a household option that is on by default. The age gate is not loosened by any of this: the
+finished-item check (nothing nude or sexual for a teen or a child whoever is in it, a cartoon and child-safe for a child, a check
+that cannot run withholds), the absolute lines (nothing sexual involving a minor, no real person outside the household, no public
+figure) and the surface gate stay fixed, and no setting, including `generation.people_prompts`, reaches them.
 
 1. **The model decides, not a word rule.** No regex, word list or
    classifier reads open-ended wording to decide whether a message needs
