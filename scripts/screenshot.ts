@@ -1130,6 +1130,34 @@ async function visitRoute(context: BrowserContext, route: RouteSpec, viewport: V
     });
     for (const v of touchTargetViolations) violations.push(`touch-target-floor (under 48px): ${v}`);
 
+    // Jesse, 2026-10-19: on a phone the floating menu button covered the start of nearly every page title
+    // ("Library" read "ibrary"). No visible text may sit under it, on any page.
+    const underMenuButton = await page.evaluate(() => {
+      const button = document.querySelector<HTMLElement>('[data-slot="mobile-menu-button"]');
+      if (!button) return [] as string[];
+      const box = button.getBoundingClientRect();
+      if (box.width === 0 || box.height === 0) return [] as string[];
+      const found: string[] = [];
+      const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
+      for (let node = walker.nextNode(); node; node = walker.nextNode()) {
+        const text = (node.textContent ?? "").trim();
+        const parent = node.parentElement;
+        if (!text || !parent || button.contains(parent) || parent.closest("script,style,[hidden],[aria-hidden='true'],[data-slot='mobile-nav-drawer']")) continue;
+        const style = getComputedStyle(parent);
+        if (style.visibility === "hidden" || style.display === "none" || Number(style.opacity) === 0) continue;
+        const range = document.createRange();
+        range.selectNodeContents(node);
+        for (const rect of Array.from(range.getClientRects())) {
+          if (rect.width < 1 || rect.height < 1) continue;
+          const overlapX = Math.min(rect.right, box.right) - Math.max(rect.left, box.left);
+          const overlapY = Math.min(rect.bottom, box.bottom) - Math.max(rect.top, box.top);
+          if (overlapX > 2 && overlapY > 2) { found.push(`"${text.slice(0, 40)}" (${Math.round(rect.left)},${Math.round(rect.top)})`); break; }
+        }
+      }
+      return found;
+    });
+    for (const v of underMenuButton) violations.push(`text under the menu button: ${v}`);
+
     let screenshotFile: string | undefined;
     if (saveScreenshot) {
       mkdirSync(SCREENS_DIR, { recursive: true });
