@@ -7,6 +7,24 @@ checklist (`docs/dev.md`). The first release is 0.1.0.
 
 ## [Unreleased]
 
+## [0.2.33] - 2026-10-19
+
+The draft you have not sent no longer squashes the chat box, Music, Podcasts and Videos follow your theme instead of a fixed dark blue, and the Coding screens react at once. No database migrations.
+
+### Chat
+- **An unsent draft shows as its own row above the message box**, one line with Restore and a close button, instead of squeezing into the box.
+
+### Music, Podcasts and Videos
+- **The pages follow your selected look and mode.** The fixed dark "cinema" tone is gone.
+
+### Coding
+- **Install and Remove show "pending" and progress at once** in Settings, Coding.
+- **The new-key dialog shows one key**, and the tool connect lines are collapsed and marked "same key".
+- The three coding settings (wait for chat, engine, Splash disk) now come from the shared spec.
+
+### Settings
+- The back link at the top of the settings column is a full-size tap target.
+
 ## [0.2.32] - 2026-10-19
 
 Every color follows your theme, songs and clips made at home show on their shelves, the Coding settings and gateway get their first real-run fixes, and the Stack moves to the build with the Splash coding engine. No database migrations.
