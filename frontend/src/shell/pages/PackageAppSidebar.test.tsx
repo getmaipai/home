@@ -142,7 +142,7 @@ describe("an app that declares a sidebar", () => {
     expect(tabs.className).toContain("lg:hidden");
     const provider = view.container.querySelector('[data-slot="section-sidebar"]') as HTMLElement;
     expect(provider.className).toContain("hidden");
-    expect(provider.className).toContain("lg:flex");
+    expect(provider.className).toMatch(/lg:(flex|block)/); // the kit column is a block that holds its own sticky flex box
     cleanup();
     const phone = open("/apps/demo", 402);
     await phone.findByText("Today's stories");
