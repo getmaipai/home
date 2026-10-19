@@ -37,7 +37,7 @@
       {
         "id": "index",
         "label": "Videos",
-        "icon": "circle-play",
+        "icon": "film",
         "nav": true,
         "kind": "schema",
         "module": "index",
