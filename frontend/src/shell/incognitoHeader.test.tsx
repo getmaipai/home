@@ -10,7 +10,7 @@ import { useHeaderExtra } from "@maipai/ui/src/dashboard/layouts/full/vertical/h
 const tokensCss = readFileSync(new URL("./tokens.css", import.meta.url), "utf8");
 
 const styleTestId = "incognito-header-test-styles";
-const violetPill = "rgb(124, 58, 237)";
+const violetPill = "rgb(164, 52, 255)"; // the kit's --hue-violet (ui-v0.5.293 moved the pill off bg-violet-600)
 const white = "rgb(255, 255, 255)";
 
 function rgb(color: string): [number, number, number] {
@@ -104,7 +104,8 @@ test.each([
     .bg-popover { background-color: var(--popover); }
     .text-foreground { color: var(--foreground); }
     .border-border { border-color: var(--border); }
-    .bg-violet-600 { background-color: ${violetPill}; }
+    .bg-hue-violet { background-color: var(--hue-violet); }
+    .text-hue-violet-foreground { color: ${white}; }
     .text-white { color: ${white}; }
   `;
   document.head.append(style);
