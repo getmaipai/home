@@ -165,15 +165,6 @@ describe("ANSWER-IMG-02: the turn with pictures", () => {
     });
   });
 
-  test("the personal automatic-image switch skips the lookup", async () => {
-    setValue(people.owner, `person:${people.owner.id}`, "chat.auto_lead_image", false);
-    __setAnswerImageDepsForTests(fixtureWorld([TOWER]).deps);
-    await withStub({ calls: () => undefined, reply: () => TWO_PARAGRAPHS }, async () => {
-      const { events } = await streamEvents(people.owner, "what does the Eiffel Tower look like");
-      expect(imagesEvents(events)).toHaveLength(0);
-    });
-  });
-
   test("pictures ready before the answer starts lead it as an image_gallery block; the stored turn and the done value carry it", async () => {
     offerShowImages();
     __setAnswerImageDepsForTests(fixtureWorld([TOWER]).deps);

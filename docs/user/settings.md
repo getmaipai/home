@@ -33,7 +33,6 @@ Switch to the **Me** tab for your own personal preferences:
 - **Voices**: pick a speaking voice and test it.
 - **PIN / password**: change how you sign in.
 - **Your name**: change the name MaiPai calls you. It shows on your messages everywhere.
-- **Show a picture for a named subject**: turn off automatic pictures when you ask about one named movie, show, book, album, game, person, animal, place or product.
 - **Commands**: teach MaiPai a phrase of your own. For example, "when I say movie night, dim the lights."
 - **Devices & sessions**: see what's signed in as you. Sign out anything you don't recognize.
 

@@ -138,7 +138,7 @@ export function autoLeadImageAllowed(input: { actor: PersonRow; band: AgeBand; s
     what: { capabilities: ["tool.offer:show_images"] },
   });
   if (gate.kind !== "allow") return false;
-  return getPersonSettingValue(input.actor, "chat.auto_lead_image") !== false && getPersonSettingValue(input.actor, "reference.images") !== false;
+  return getPersonSettingValue(input.actor, "reference.images") !== false;
 }
 
 /** Starts the pipeline for this turn's first `show_images` call; a second call in the same turn reuses the first.
