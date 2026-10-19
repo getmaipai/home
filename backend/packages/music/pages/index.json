@@ -9,7 +9,10 @@
       "heading": "Created by you",
       "bind": {
         "source": "package",
-        "path": "created-by-you"
+        "path": "songs",
+        "params": {
+          "scope": "made"
+        }
       },
       "item_key_field": "id",
       "item_label_field": "title",

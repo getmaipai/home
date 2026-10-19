@@ -278,7 +278,7 @@ export function mediaAppData(person: PersonRow, appId: MediaAppId, dataId: strin
   }
   switch (dataId) {
     case "made-at-home":
-      return appId === "videos" ? madeFiles(person, "videos").map((file) => ({ id: file.id, title: file.name, channel: null, summary: "", kind: "video", thumbnail: file.thumb_url, backdrop: file.thumb_url, duration_s: file.duration_seconds, copy_label: "Saved" })) : null;
+      return appId === "videos" ? madeFiles(person, "videos").slice(0, 16).map((file) => ({ id: file.id, title: file.name, channel: null, summary: "", kind: "video", thumbnail: file.thumb_url, backdrop: file.thumb_url, duration_s: file.duration_seconds, copy_label: "Saved" })) : null;
     case "featured": {
       // A billboard wants pictures: the newest items that have one, else the newest.
       const items = queryItems(person, appId, { limit: 12 });
@@ -523,7 +523,7 @@ function albumTile(person: PersonRow, id: string, tracks: readonly MediaItem[]):
 }
 
 function musicData(person: PersonRow, dataId: string, params: DataParams): unknown | null {
-  if (dataId === "created-by-you") return madeFiles(person, "music").map((file) => ({ id: file.id, title: file.name, channel: null, summary: "", kind: "track", thumbnail: file.thumb_url, backdrop: file.thumb_url, duration_s: file.duration_seconds, copy_label: "Saved", playing: false, like_label: "Like" }));
+  if (dataId === "songs" && params.scope === "made") return madeFiles(person, "music").slice(0, 16).map((file) => ({ id: file.id, title: file.name, channel: null, summary: "", kind: "track", thumbnail: file.thumb_url, backdrop: file.thumb_url, duration_s: file.duration_seconds, copy_label: "Saved", playing: false, like_label: "Like" }));
   if (dataId === "up-next") return trackRows(person, musicNext(person, params.id ?? ""));
   if (dataId === "songs") return trackRows(person, musicLibrary(person));
   if (dataId === "albums") {
