@@ -7,6 +7,10 @@ checklist (`docs/dev.md`). The first release is 0.1.0.
 
 ## [Unreleased]
 
+### Changed
+
+- News: the title above the page now says where you are (Today, My Mix, Saved, the topic or source you picked) instead of always reading "News", and the page no longer sits hard against the sidebar column.
+
 ### Added
 
 - News: a teen or an adult reading a full article now sees its own pictures and captions in place. Ads, promo and related blocks, tracking pixels, tiny icons and a second copy of the lead picture are left out, and the pictures come through the hub, never from the publisher's address. A child's article stays text only.

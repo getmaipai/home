@@ -8,6 +8,7 @@ import { AsyncState } from "@maipai/ui/src/primitives/AsyncState";
 import { SchemaPage } from "@maipai/ui/src/schema/SchemaPage";
 import { Player } from "@maipai/ui/src/primitives/Player";
 import { PageNodeSchema } from "@maipai/ui/src/schema/types";
+import { cn } from "@maipai/ui/src/utils";
 import { ApiError, api, type Roster } from "@/lib/api";
 import { NotFoundPage } from "@/shell/pages/NotFoundPage";
 import { usePinnedApps } from "@/shell/usePinnedApps";
@@ -21,6 +22,16 @@ import { useAppSidebar } from "@/shell/useAppSidebar";
 const PAGE_FRESH_MS = 5 * 60_000;
 
 /** One page document of a package app. A document the interpreter cannot parse is an error state with a retry, never a crashed page. */
+/** Page titles that name a kind of page, not a place: never drawn as the app's title. */
+const GENERIC_PAGE_TITLES: ReadonlySet<string> = new Set(["Channel", "Story"]);
+
+/** The title that says where the person is inside an app with a sidebar column: the chosen row's label, else the page's own title
+ * unless that only names a kind of page. Undefined when neither says anything, so the app keeps its name for assistive technology. */
+export function contextTitleFor(activeLabel: string | undefined, pageTitle: string | undefined): string | undefined {
+  if (activeLabel) return activeLabel;
+  return pageTitle && !GENERIC_PAGE_TITLES.has(pageTitle) ? pageTitle : undefined;
+}
+
 function appPageQuery(packageId: string, pageId: string) {
   return {
     queryKey: ["app-page", packageId, pageId],
@@ -108,10 +119,18 @@ export function PackageAppPage({ person }: { person: Roster }) {
 
   if (packageId === "" || (page.error instanceof ApiError && page.error.status === 404)) return <NotFoundPage />;
 
+  // NEWS-ARTICLE-PANE-01: with a sidebar column the app's title names where the person is (the chosen row: Today, My Mix, Saved, a
+  // topic, a source), never the app's own name, which the column already carries. A page whose body draws its own header (a story
+  // feed or an article) keeps its title for assistive technology only, so the same words are not drawn twice.
+  const pageDoc = page.data as { title?: string; body?: Array<{ type?: string }> } | undefined;
+  const activeLabel = sidebarProps?.groups?.flatMap((group) => group.items).find((item) => item.active)?.label;
+  const ownHeader = pageDoc?.body?.some((node) => node.type === "answer_blocks") === true;
+  const contextTitle = sidebarProps ? contextTitleFor(activeLabel, pageDoc?.title) : undefined;
+
   const content = (
-    <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-2" data-testid="package-app" data-package={packageId}>
+    <div className={cn("flex min-h-0 min-w-0 flex-1 flex-col gap-2", sidebarProps && "lg:ps-6")} data-testid="package-app" data-package={packageId}>
       {familyHeader ? null : <h1 className="sr-only">{app?.label ?? "App"}</h1>}
-      {app ? <AppToolbar hideSectionsOnWide={sidebar !== undefined} person={person} to={app.to} label={app.label} homeLabel={appHomeLabel(packageId, media)} settingsArea={app.settings_area?.id} sections={app.sections} current={pageId} familyHeader={familyHeader} /> : null}
+      {app ? <AppToolbar hideSectionsOnWide={sidebar !== undefined} person={person} to={app.to} label={app.label} homeLabel={appHomeLabel(packageId, media)} settingsArea={app.settings_area?.id} sections={app.sections} current={pageId} familyHeader={familyHeader} title={contextTitle} titleSrOnly={sidebarProps ? ownHeader || contextTitle === undefined : false} /> : null}
       <AsyncState
         data={page.isError ? null : page.data}
         error={page.isError}
@@ -158,7 +177,7 @@ export function PackageAppPage({ person }: { person: Roster }) {
 }
 
 /** The app's own sections as tabs (when it has any) and the pin control. Pins are per person and private. */
-function AppToolbar({ hideSectionsOnWide = false, person, to, label, homeLabel, settingsArea, sections, current, familyHeader }: { hideSectionsOnWide?: boolean; person: Roster; to: string; label: string; homeLabel: string; settingsArea?: string; sections: Array<{ page: string; label: string }>; current: string; familyHeader: boolean }) {
+function AppToolbar({ hideSectionsOnWide = false, person, to, label, title, titleSrOnly = false, homeLabel, settingsArea, sections, current, familyHeader }: { title?: string; titleSrOnly?: boolean; hideSectionsOnWide?: boolean; person: Roster; to: string; label: string; homeLabel: string; settingsArea?: string; sections: Array<{ page: string; label: string }>; current: string; familyHeader: boolean }) {
   const navigate = useNavigate();
   const { isPinned, togglePin, isLoading, isSaving } = usePinnedApps(person.id);
   const pinned = isPinned(to);
@@ -171,7 +190,7 @@ function AppToolbar({ hideSectionsOnWide = false, person, to, label, homeLabel, 
     return (
       <div className="flex flex-col gap-2">
         <div className="flex items-center gap-1">
-          <h1 className="min-w-0 flex-1 truncate text-2xl font-bold tracking-tight sm:text-3xl">{label}</h1>
+          <h1 className={cn("min-w-0 flex-1 truncate text-2xl font-bold tracking-tight sm:text-3xl", titleSrOnly && "sr-only")}>{title ?? label}</h1>
           {settingsArea ? (
             <Button variant="ghost" size="icon-lg" render={<Link to={`/settings/${settingsArea}`} aria-label={`${label} settings`} />}>
               <GearIcon aria-hidden="true" />
