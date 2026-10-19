@@ -73,7 +73,7 @@ for (const mode of ["delete", "retention"] as const) {
   });
 }
 
-test("generated picture, video and poster records default to kept", async () => {
+test("new generated picture, edit, video and poster records follow the storage rules and survive their chat", async () => {
   const c = context();
   __resetAgeCheckForTests(async (images) => images.map(() => ({ ok: true as const, verdict: { people_count: 0, apparent_min_age_estimate: null, label: "none" as const, is_nude_or_sexual: false, confidence: 1 } })));
   __setKeyframesForTests(async () => null);
@@ -85,12 +85,12 @@ test("generated picture, video and poster records default to kept", async () => 
     const pictureId = getPictureJob(c.actor, pic.id)!.files[0]!.id;
     const source = loadSource(c.actor, c.conversationId, pictureId, true);
     const edited = await saveVersion(c.actor, source, source.bytes, { op: "comment", label: "Soft light" });
-    expect(db.select().from(attachments).where(eq(attachments.id, edited.id)).get()?.retention).toBe("kept");
+    expect(db.select().from(attachments).where(eq(attachments.id, edited.id)).get()?.retention).toBe("conversation");
     const clip = await startVideoJob({ ...c, temporary: false, kind: "generate", prompt: "a boat", body: { prompt: "a boat", audience: "all-ages" } });
     await until(() => getVideoJobFor(c.actor, clip.id)?.state === "done");
     const rows = db.select().from(attachments).where(eq(attachments.turnId, c.turnId)).all();
     expect(rows.map((row) => row.mediaType).sort()).toEqual(["image/jpeg", "image/png", "image/png", "video/mp4"]);
-    expect(rows.every((row) => row.retention === "kept")).toBe(true);
+    expect(rows.every((row) => row.retention === "conversation")).toBe(true);
     expect(deleteConversationById(c.actor, c.conversationId).ok).toBe(true);
     for (const row of rows) expect(readAttachment(c.actor, row.id).ok).toBe(true);
     expect(getVideoJobFor(c.actor, clip.id)?.files).toHaveLength(1);
