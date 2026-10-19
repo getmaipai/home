@@ -1,8 +1,24 @@
 import { afterEach, describe, expect, mock, test } from "bun:test";
+import { __resetStackEngineForTests, __setStackClientForTests } from "@/lib/stackEngine";
+import { StackError } from "@/lib/stack/errors";
 import type { PersonBox } from "./people";
-import { __resolvePeopleAnswerForTests, __setPersonPickerForTests, choosePeople } from "./people";
+import { __resolvePeopleAnswerForTests, __setPeopleRetryPauseForTests, __setPersonPickerForTests, choosePeople, findPeople, PEOPLE_BUSY_LINE } from "./people";
 
-afterEach(() => __setPersonPickerForTests(undefined));
+afterEach(() => {
+  __setPersonPickerForTests(undefined);
+  __setPeopleRetryPauseForTests(4000);
+  __resetStackEngineForTests();
+});
+
+const foundReply = {
+  kind: "done",
+  item: { people: [{ id: 1, x: 0.1, y: 0.1, w: 0.3, h: 0.7, area: 0.21 }], b64_json: "AQ==" },
+} as const;
+
+function stubImageEdit(imageEdit: (...args: never[]) => unknown): void {
+  __setStackClientForTests({ imageEdit } as never);
+  __setPeopleRetryPauseForTests(0);
+}
 
 const people = [
   { id: 1, x: 0.08, y: 0.1, w: 0.32, h: 0.75, area: 0.24 },
@@ -53,5 +69,58 @@ describe("people picker", () => {
     expect(__resolvePeopleAnswerForTests("", "the girl", [1, 2])).toEqual({ reason: "empty" });
     expect(__resolvePeopleAnswerForTests('{"numbers":[9],"sure":true}', "the girl", [1, 2])).toEqual({ reason: "ids_unknown" });
     expect(__resolvePeopleAnswerForTests('{"numbers":[1],"sure":false}', "the boy and girl", [1, 2])).toEqual({ reason: "not_sure" });
+  });
+});
+
+describe("picture tools retry", () => {
+  test("findPeople retries a busy Stack error once and succeeds", async () => {
+    const imageEdit = mock(async () => {
+      if (imageEdit.mock.calls.length === 1) throw new StackError("unexpected", "busy", { status: 503 });
+      return foundReply;
+    });
+    stubImageEdit(imageEdit as never);
+
+    await expect(findPeople(new Uint8Array([1]), "image/png")).resolves.toMatchObject({ people: foundReply.item.people });
+    expect(imageEdit).toHaveBeenCalledTimes(2);
+  });
+
+  test("two busy Stack errors reject with the busy code and line", async () => {
+    const imageEdit = mock(async () => { throw new StackError("unexpected", "busy", { status: 503 }); });
+    stubImageEdit(imageEdit as never);
+
+    await expect(findPeople(new Uint8Array([1]), "image/png")).rejects.toMatchObject({ code: "busy", message: PEOPLE_BUSY_LINE });
+    expect(imageEdit).toHaveBeenCalledTimes(2);
+  });
+
+  test("people_unavailable and no_people are not retried", async () => {
+    const unavailable = mock(async () => { throw new StackError("unexpected", "not available", { status: 404, body: '{"code":"people_unavailable"}' }); });
+    stubImageEdit(unavailable as never);
+    await expect(findPeople(new Uint8Array([1]), "image/png")).rejects.toMatchObject({ code: "unavailable" });
+    expect(unavailable).toHaveBeenCalledTimes(1);
+
+    const none = mock(async () => ({ kind: "done", item: { people: [], b64_json: "AQ==" } }));
+    stubImageEdit(none as never);
+    await expect(findPeople(new Uint8Array([1]), "image/png")).rejects.toMatchObject({ code: "none" });
+    expect(none).toHaveBeenCalledTimes(1);
+  });
+
+  test("an aborted signal prevents retry", async () => {
+    const imageEdit = mock(async () => { throw new StackError("unexpected", "busy", { status: 503 }); });
+    stubImageEdit(imageEdit as never);
+    const controller = new AbortController();
+    controller.abort();
+
+    await expect(findPeople(new Uint8Array([1]), "image/png", controller.signal)).rejects.toMatchObject({ code: "busy" });
+    expect(imageEdit).toHaveBeenCalledTimes(1);
+  });
+
+  test("a running reply retries once and resolves on done", async () => {
+    const imageEdit = mock(async () => imageEdit.mock.calls.length === 1
+      ? ({ kind: "running" } as never)
+      : foundReply);
+    stubImageEdit(imageEdit as never);
+
+    await expect(findPeople(new Uint8Array([1]), "image/png")).resolves.toMatchObject({ people: foundReply.item.people });
+    expect(imageEdit).toHaveBeenCalledTimes(2);
   });
 });
