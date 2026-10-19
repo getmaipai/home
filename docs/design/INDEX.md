@@ -25,6 +25,7 @@ and a proposed design; otherwise the household IP gets blocked.
 
 | Record | Status | Owner row(s) in `docs/BACKLOG.md` |
 |---|---|---|
+| [child-safety-text-2026-10-19.md](child-safety-text-2026-10-19.md) | proposed; architect ruling pending; owner's approval of the rule wording pending | CSAM-TEXT-01 |
 | [content-policy-2026-10-18.md](content-policy-2026-10-18.md) | proposed, design only; architect has not ruled | CONTENT-POLICY-01 to -05; LIKENESS-SIMPLIFY-01 |
 | [RULES.md](RULES.md) | the rulebook; only Jesse changes it | n/a |
 | [ELEMENTS-DECISIONS.md](ELEMENTS-DECISIONS.md) | ledger, current | ELEMENTS-ADOPT-01, -02; the ELT-T1 rows |
