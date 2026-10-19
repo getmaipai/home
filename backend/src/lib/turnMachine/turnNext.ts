@@ -1013,6 +1013,7 @@ function startStream(actor: PersonRow, surface: Surface, text: string, begunValu
   // ANSWER-IMG-02: released text passes the picture placer on its way out,
   // which marks the paragraph boundary the picture set goes after.
   const placer = new AnswerImagePlacer(state, (text) => queue.emit(text));
+  state.releaseAutoLeadText = (withImage) => placer.releaseAutomaticLead(withImage);
   const gate = new StreamGate(
     band,
     actor,

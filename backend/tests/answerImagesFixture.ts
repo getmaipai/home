@@ -44,12 +44,14 @@ export type FixtureSubject = {
   enwiki?: string | null;
   category?: string;
   image?: string;
+  pageImage?: string;
   extract?: string;
   /** File names in the Commons category; each is served as a distinct photo. */
   files?: string[];
   description?: string;
   /** IMGQ-07: a file's own Commons description when it is not `<label> photo <file>`. */
   fileDescriptions?: Record<string, string>;
+  fileCategories?: Record<string, string[]>;
   /** Wikidata P31 for a film (Q11424): pictures from the open web lead. */
   film?: boolean;
 };
@@ -101,6 +103,7 @@ export function fixtureWorld(subjects: FixtureSubject[], opts: { searchRows?: (q
       const files = category ? s?.files ?? [] : s?.image ? [s.image] : [];
       const pages = Object.fromEntries(files.map((f, i) => [String(-1 - i), {
         title: `File:${f}`,
+        categories: (s?.fileCategories?.[f] ?? []).map((title) => ({ title: `Category:${title}` })),
         imageinfo: [{ thumburl: pictureUrl(fileSeed.get(f) ?? 1), url: pictureUrl(fileSeed.get(f) ?? 1), descriptionurl: `https://commons.wikimedia.org/wiki/File:${encodeURIComponent(f)}`, mime: "image/jpeg", extmetadata: { LicenseShortName: { value: "CC BY-SA 4.0" }, LicenseUrl: { value: "https://creativecommons.org/licenses/by-sa/4.0" }, Artist: { value: "<a href=\"x\">Iris</a>" }, ImageDescription: { value: s?.fileDescriptions?.[f] ?? `${s?.label} photo ${f}` } } }],
       }]));
       return { query: { pages } };
@@ -112,6 +115,7 @@ export function fixtureWorld(subjects: FixtureSubject[], opts: { searchRows?: (q
       const s = subjects.find((x) => x.label.toLowerCase() === wanted || (x.enwiki ?? "").toLowerCase() === wanted);
       if (!s || s.enwiki === null) return { query: { pages: { "-1": { title: url.searchParams.get("titles"), missing: "" } } } };
       const title = s.enwiki ?? s.label;
+      if (url.searchParams.get("prop") === "pageimages") return { query: { pages: { "1": { title, original: s.pageImage ? { source: s.pageImage } : undefined } } } };
       return { query: { pages: { "1": { title, pageprops: { wikibase_item: s.id }, extract: s.extract ?? `${title} is a thing.` } } } };
     }
     if (url.hostname === "en.wikipedia.org") {
@@ -126,7 +130,8 @@ export function fixtureWorld(subjects: FixtureSubject[], opts: { searchRows?: (q
     const url = new URL(input.toString());
     log.pictures.push(url.toString());
     await delay(opts.pictureDelayMs);
-    if (opts.failPictures || url.hostname !== "upload.example") return new Response("gone", { status: 404 });
+    if (opts.failPictures || !(url.hostname === "upload.example" || (url.hostname === "upload.wikimedia.org" && subjects.some((s) => s.pageImage === url.toString())))) return new Response("gone", { status: 404 });
+    if (url.hostname === "upload.wikimedia.org") return new Response(await syntheticPhoto(991), { status: 200, headers: { "content-type": "image/jpeg" } });
     const seed = Number(url.pathname.replace(/\D/g, ""));
     if (!photos.has(seed)) photos.set(seed, syntheticPhoto(seed));
     return new Response(await photos.get(seed)!, { status: 200, headers: { "content-type": "image/jpeg" } });

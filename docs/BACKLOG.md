@@ -21,6 +21,11 @@ decision history live in `docs/dev.md` and the records under `docs/plans/` and `
 
 - [x] **PHOTO-CHECK-01: photo inspector handles always-thinking models and unenforced JSON schemas** (S; built). Shared reasoning reserve, one larger retry, safe missing-age handling, and separate unreadable-photo copy.
 
+## Chat answer images and safety copy
+
+- [ ] **CHAT-IMAGE-HONEST-01: honest image results, article lead images and automatic named-subject pictures** (M; backend turn and answer image pipeline). An empty image result tells the model no picture was found or passed checks and asks it to offer retry or Wikipedia; the outcome is failed-soft `found_nothing`. Wikipedia page images lead for a resolved article, before ordinary Commons and search candidates. Written chat may start one lead-image pipeline from exactly one unresolved named subject, controlled by `chat.auto_lead_image`, the existing picture preference and the normal age, surface and temporary-mode gates. Code is built; verification is blocked because the test preload cannot bind a free port. See `docs/design/safety-factual-references-2026-10-19.md` for the separate safety investigation.
+- [ ] **CHAT-SAFETY-COPY-01: explain an adult CSAM stream stop** (S; output copy only). Adult stream stops with category `csam` name the issue and give a safe next step. The blocked content and classifier are unchanged. Code is built; verification is blocked because the test preload cannot bind a free port.
+
 ## Birthdate removal
 
 - [ ] **BIRTHDATE-REMOVE-01: remove birthdate from decisions and ordinary People editing** (M; first part built, 2026-10-18). Home forms use role choices only. People APIs accept and ignore legacy date input, and missing dates are tolerated. Automatic birthday role changes are disabled, including existing scheduled jobs. Legacy import accepts dates without requiring or saving them; unmatched legacy users need a role-selected Home profile unless their legacy role explicitly says admin. The pinned Person spec already makes birthdate optional and nullable; no spec change in this slice. Remaining: remove the stored column through a separately approved migration and remove the spec field with a later spec tag and consumer updates; external image-subject checks remain a separate safety slice. The inventory below records the pre-slice state.

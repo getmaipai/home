@@ -30,6 +30,10 @@ describe("lookupMissed: a lookup that gave the model nothing", () => {
     expect(lookupMissed(outcome({ packageId: "weather", status: "failed", errorCode: "502" }))).toBe(true);
   });
 
+  test("show_images with no picture keeps its safe next-step guidance in the tool result round", () => {
+    expect(lookupMissed(outcome({ packageId: "show_images", status: "failed", failureKind: "found_nothing", userMessage: "No picture was found. Offer retry or Wikipedia." }))).toBe(false);
+  });
+
   test("a search that succeeded with zero rows is missed", () => {
     expect(lookupMissed(outcome({ result: resultWith({ rows: [] }) }))).toBe(true);
   });

@@ -1,7 +1,6 @@
 // ANSWER-IMG-02: `show_images` inside a turn (design: data-scratch/research/
-// chat-images-in-answers.md sections 4.3 and 5). The tool answers the model
-// at once, so the phrasing round never waits on a picture fetch; the picture
-// pipeline runs beside the answer. GENUI-05: when the pipeline settles, its
+// chat-images-in-answers.md sections 4.3 and 5). Automatic lead images and
+// explicit show_images calls run beside the answer. GENUI-05: when the pipeline settles, its
 // set becomes one `image_gallery` answer block (gallery.ts) that goes through
 // the same block filter as every package's blocks (manifest allowlist, spec
 // check, hub picture address, age band, output floor) and joins the turn's
@@ -38,6 +37,10 @@ const ANSWER_IMAGES_FINISH_MS = 1_000;
 
 export type AnswerImageTurnState = {
   subject: string;
+  /** True only for the resolver's deterministic one-picture lead path. */
+  automaticLead?: boolean;
+  /** An explicit call can take ownership while this automatic lookup is still settling. */
+  superseded?: boolean;
   /** The `show_images` call this pipeline answers (the block event carries it). */
   callId: string;
   /** Set once the pipeline settles: the set, or null for no pictures. */
@@ -71,23 +74,38 @@ export function showImagesNames(subject: string, subjects?: unknown): string[] {
   return out;
 }
 
-/** Section 4.3's one line, the same whatever the pipeline later finds: no
- * count, no bytes. ANSWER-IMG-05b kept it short (it is new prompt the
- * answering round must read before its first word). IMG-QUALITY-01a: the
+/** Section 4.3's success line, sent only after a validated picture exists.
+ * No count or bytes reach the model. IMG-QUALITY-01a: the
  * 05b clause that let the model describe the subject "yourself if asked"
  * made it invent how the person looks in the pictures ("white glove and
  * fedora"); the model has not seen the photos, so it is told not to say
  * what they show or how the subject looks in them, and to answer other
  * questions from what it knows. Never mention the photos stays. */
-export function showImagesResultLine(subject: string): string {
-  return `Photos of ${subject} are on their screen. You have not seen them: do not say what they show or how ${subject} looks in them. Answer other questions from what you know; never mention the photos. Do not call show_images again or write its subject or kind in your reply.`;
+export function showImagesResultLine(subject: string, count = 1): string {
+  const visible = count === 1 ? `One picture of ${subject} is on their screen.` : `${count} pictures of ${subject} are on their screen.`;
+  return `${visible} You have not seen them: do not say what they show or how ${subject} looks in them. Answer other questions from what you know; never mention the pictures. Do not call show_images again or write its subject or kind in your reply.`;
 }
-/** SEARCH-IMAGES-02: the line for a `subjects` call. The pipeline has not run
- * yet when the model reads it, so it cannot know which names will get a
- * picture; it is told that only the names where one is found show one, so it
- * never promises a picture for each name. */
-export function showImagesMultiResultLine(names: string[]): string {
-  return `Photos of ${names.join(", ")} may be on their screen. A picture shows only for each name where one was found; a name with no picture shows nothing, so never promise one for every name. You have not seen them: do not say what they show or how any of them looks in them. Answer other questions from what you know; never mention the photos. Do not call show_images again or write its subjects or kind in your reply.`;
+/** The picture lookup is still running when the model needs to start its answer. */
+export function showImagesPendingResultLine(subject: string): string {
+  return `I'm checking for pictures of ${subject}. They may appear below when ready. You have not seen them: do not say what they show or how ${subject} looks in them. Answer other questions from what you know; do not claim pictures are visible or call show_images again.`;
+}
+export function showImagesEmptyResultLine(subject: string, reason?: AnswerImageTrace["skipped"]): string {
+  if (reason === "offline") return `The picture sources are unavailable. Tell the person you could not show a picture of ${subject}, and offer to try again or open the Wikipedia page. Answer any other part of the question from what you know. Do not claim a picture is visible. Do not call show_images again or write its subject or kind in your reply.`;
+  if (reason === "error") return `The picture lookup failed. Tell the person you could not show a picture of ${subject}, and offer to try again or open the Wikipedia page. Answer any other part of the question from what you know. Do not claim a picture is visible. Do not call show_images again or write its subject or kind in your reply.`;
+  return `No picture was found or passed the checks for ${subject}. Tell the person you could not show a poster or picture, and offer to try again or open the Wikipedia page. Answer any other part of the question from what you know. Do not claim a picture is visible. Do not call show_images again or write its subject or kind in your reply.`;
+}
+export function answerImageFailureKind(reason?: AnswerImageTrace["skipped"]): "unavailable" | "errored" | "found_nothing" {
+  if (reason === "offline") return "unavailable";
+  if (reason === "error") return "errored";
+  return "found_nothing";
+}
+/** SEARCH-IMAGES-02: the line for a `subjects` call, built from the names
+ * whose pipelines produced a visible set and the names that did not. */
+export function showImagesMultiResultLine(shown: string[], missing: string[] = []): string {
+  if (shown.length === 0) return `No picture was found or passed the checks for ${missing.join(", ")}. Tell the person you could not show those pictures, and offer to try again or open the Wikipedia page. Answer any other part of the question from what you know. Do not claim pictures are visible. Do not call show_images again or write its subjects or kind in your reply.`;
+  const visible = shown.length === 1 ? `One picture of ${shown[0]} is on their screen.` : `${shown.length} pictures of ${shown.join(", ")} are on their screen.`;
+  const none = missing.length ? ` No picture was found or passed the checks for ${missing.join(", ")}; tell the person you could not show those pictures and offer to try again or open the Wikipedia page.` : "";
+  return `${visible}${none} You have not seen the pictures: do not say what they show or how any subject looks in them. Answer other questions from what you know; never mention the pictures. Do not call show_images again or write its subjects or kind in your reply.`;
 }
 export const SHOW_IMAGES_UNAVAILABLE_LINE ="Photos cannot be shown here. Answer without mentioning photos.";
 
@@ -109,12 +127,47 @@ export function answerImagesAllowed(input: { actor: PersonRow; band: AgeBand; su
   return value !== false;
 }
 
+/** Eligibility for the deterministic one-picture offer. It uses the same
+ * capability, person preference, written-chat, and privacy gates as the
+ * model-offered tool; the selector applies the same band-specific source
+ * and content checks. */
+export function autoLeadImageAllowed(input: { actor: PersonRow; band: AgeBand; surfaceClass: SurfaceClass; spoken: boolean; temporary: boolean; bare: boolean; ephemeral: boolean }): boolean {
+  if (input.surfaceClass !== "written" || input.spoken || input.temporary || input.bare || input.ephemeral) return false;
+  const gate = decide({
+    who: { personId: input.actor.id, role: input.actor.role as Role, band: input.band },
+    what: { capabilities: ["tool.offer:show_images"] },
+  });
+  if (gate.kind !== "allow") return false;
+  return getPersonSettingValue(input.actor, "chat.auto_lead_image") !== false && getPersonSettingValue(input.actor, "reference.images") !== false;
+}
+
 /** Starts the pipeline for this turn's first `show_images` call; a second call in the same turn reuses the first.
  * SEARCH-IMAGES-01: with more than one distinct name each name gets one picture (its own small gallery block, under
  * the answer like any other), run at most three at a time; no model call, and the per-host pace is the fetch
  * module's own shared state, so parallel names are paced together. */
-export function startAnswerImages(state: TurnState, subject: string, kind = "", callId = "", subjects?: unknown): AnswerImageTurnState {
-  if (state.answerImages) return state.answerImages;
+export function startAnswerImages(state: TurnState, subject: string, kind = "", callId = "", subjects?: unknown, singleLead = false): AnswerImageTurnState {
+  if (state.answerImages) {
+    // A model-selected show_images call owns the gallery even if the
+    // resolver's automatic lead started while the model was deciding.
+    // Invalidate its pending result and remove it if it has not streamed yet.
+    if (callId !== "auto-lead-image" && state.answerImages.automaticLead) {
+      const previous = state.answerImages;
+      previous.superseded = true;
+      for (const entry of [previous, ...(previous.extras ?? [])]) {
+        const blockId = entry.block?.block.id;
+        if (!blockId) continue;
+        state.toolEvents = state.toolEvents.filter((event) => !(event.t === "block" && event.block.id === blockId));
+        if (state.placedBlocks) state.placedBlocks = state.placedBlocks.filter((placed) => placed.event.block.id !== blockId);
+      }
+      state.answerImages = undefined;
+    } else {
+      return state.answerImages;
+    }
+  }
+  // Only the resolver's automatic lead is a one-picture result. Keep this
+  // tied to its internal call identity so explicit show_images calls always
+  // retain the selected gallery, even if a caller passes the legacy flag.
+  const automaticLead = singleLead && callId === "auto-lead-image";
   const names = showImagesNames(subject, subjects);
   if (names.length === 0) names.push(subject);
   const many = names.length > 1;
@@ -123,7 +176,7 @@ export function startAnswerImages(state: TurnState, subject: string, kind = "", 
   // IMG-QUALITY-01b: a failed read of the shown set is an empty set, never a failed turn (rule 6).
   let shown: ReturnType<typeof shownPicturesIn> | undefined;
   try { shown = shownPicturesIn(state.conversationId); } catch { shown = undefined; }
-  const entries = names.map((name): AnswerImageTurnState => ({ subject: name, callId, done: Promise.resolve() }));
+  const entries = names.map((name): AnswerImageTurnState => ({ subject: name, callId, ...(automaticLead ? { automaticLead: true } : {}), done: Promise.resolve() }));
   const run = (entry: AnswerImageTurnState): Promise<void> => {
     let timer: ReturnType<typeof setTimeout> | undefined;
     const budget = new Promise<AnswerImageSelection>((resolve) => {
@@ -134,7 +187,15 @@ export function startAnswerImages(state: TurnState, subject: string, kind = "", 
       .catch((): AnswerImageSelection => ({ set: null, trace: { subject: entry.subject, skipped: "error" } }))
       .then((selection) => {
         clearTimeout(timer);
-        entry.result = selection.set && many ? { ...selection.set, visible: 1, items: selection.set.items.slice(0, 1) } : selection.set;
+        if (entry.superseded) return;
+        // A multi-subject show_images call has one picture per requested
+        // name. A single-subject explicit call keeps its complete gallery;
+        // only the automatic lead is reduced to one picture.
+        entry.result = selection.set && automaticLead
+          ? { ...selection.set, visible: 1, items: selection.set.items.slice(0, 1) }
+          : selection.set && many
+            ? { ...selection.set, visible: 1, items: selection.set.items.slice(0, 1) }
+            : selection.set;
         entry.trace = selection.trace;
         addGalleryBlock(state, entry);
       });
@@ -193,9 +254,14 @@ function stampBlock(state: TurnState, event: Extract<ToolStreamEvent, { t: "bloc
  * the answer ends is placed after the reply by `settleAnswerBlocks`. */
 export class AnswerImagePlacer {
   private released = "";
+  private heldAutoLeadText = "";
   constructor(private readonly state: TurnState, private readonly release: (text: string) => void) {}
 
   push(text: string): void {
+    if (this.state.pendingAutoLeadImage) {
+      this.heldAutoLeadText += text;
+      return;
+    }
     if (!this.anythingReady()) {
       this.forward(text);
       return;
@@ -213,6 +279,15 @@ export class AnswerImagePlacer {
     this.forward(text.slice(0, cut));
     this.placeReady();
     if (cut < text.length) this.forward(text.slice(cut));
+  }
+
+  /** The model has either chosen its plain answer or explicitly called show_images. */
+  releaseAutomaticLead(withImage: boolean): void {
+    this.state.pendingAutoLeadImage = undefined;
+    if (withImage && pendingBlocks(this.state).length > 0) this.placeReady();
+    const held = this.heldAutoLeadText;
+    this.heldAutoLeadText = "";
+    if (held) this.push(held);
   }
 
   private anythingReady(): boolean {
@@ -235,7 +310,10 @@ export class AnswerImagePlacer {
  * whole reply. Call before the turn's value is built, so the stored `blocks` carry their `after_paragraph`. */
 export function settleAnswerBlocks(state: TurnState, replyText: string): void {
   const afterParagraph = paragraphCount(replyText);
-  for (const event of pendingBlocks(state)) stampBlock(state, event, afterParagraph, Number.POSITIVE_INFINITY);
+  for (const event of pendingBlocks(state)) {
+    const entry = [state.answerImages, ...(state.answerImages?.extras ?? [])].find((candidate) => candidate?.block?.block.id === event.block.id);
+    stampBlock(state, event, entry?.automaticLead ? 0 : afterParagraph, entry?.automaticLead ? 0 : Number.POSITIVE_INFINITY);
+  }
 }
 
 /** Waits for the picture pipeline (bounded by its own budget) before the turn's value is built, so a gallery that
@@ -248,8 +326,12 @@ export async function settleAnswerImages(state: TurnState, input: { keep: boolea
   if (!entry) return;
   await entry.done;
   const all = [entry, ...(entry.extras ?? [])];
-  const call = state.outcomes.find((o) => o.packageId === SHOW_IMAGES_TOOL_ID && o.status === "succeeded");
-  if (call && entry.trace) call.detail = JSON.stringify(all.length > 1 ? all.map((e) => e.trace) : entry.trace);
+  const call = state.outcomes.find((o) => o.packageId === SHOW_IMAGES_TOOL_ID);
+  if (call && entry.trace) {
+    call.detail = JSON.stringify(all.length > 1 ? all.map((e) => e.trace) : entry.trace);
+    const shown = all.reduce((total, one) => total + (one.block ? (one.result?.visible ?? 0) : 0), 0);
+    if (shown === 0 && call.status === "succeeded") { call.status = "failed"; call.failureKind = answerImageFailureKind(entry.trace.skipped); }
+  }
   if (input.keep) return;
   for (const one of all) {
     const block = one.block;

@@ -45,6 +45,7 @@ News pages are laid out per topic, articles show their own pictures and read lik
 - Added owner-only Origin links from a file to its chat and exact turn. Deleted chats show as plain text; opening a missing turn lands at the end with a note.
 - Selection color consistency still needs a shared-kit change. `FileTile` uses `ring-primary`; `DataTable` uses `bg-primary/10`.
 - The music API supports prompted style remakes and prompted album-cover changes through the existing generation jobs. Remakes keep the selected version's words and title. Finished song turns now tell the model when their song is ready. The in-card Edit panel awaits the MusicTrack kit slot described in `docs/dev.md`.
+- Chat image outcomes record when no picture passes the checks, and article lead images are tried before other results. Explicit picture requests wait at most 600 ms for a leading gallery before the answer starts; late galleries follow the answer. Written chat can show one lead image automatically for one named subject, with a personal switch and the existing image, age, surface and temporary-chat gates. Adult replies stopped by the CSAM floor explain why and what to ask next. No safety detection or refusal behavior changed. See `docs/design/safety-factual-references-2026-10-19.md` for the investigation of a Taxi Driver plot-summary false positive.
 
 ## [0.2.27] - 2026-10-19
 

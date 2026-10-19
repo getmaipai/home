@@ -23,6 +23,10 @@ export type LookupFailureKind = FailureKind;
  * succeeded with zero rows. A fixed read of the outcome's own status and
  * rows, never of any text. */
 export function lookupMissed(outcome: ToolExecutionOutcome): boolean {
+  // show_images' failed-soft result carries model-facing guidance in its
+  // own safe userMessage. Keep it in the normal tool-result round so the
+  // model can narrate the exact no-picture result and offer its next step.
+  if (outcome.packageId === "show_images" && outcome.status === "failed" && outcome.userMessage) return false;
   if (outcome.status === "failed") return true;
   if (outcome.status !== "succeeded") return false;
   // Zero rows is "the search found nothing" only for a search: another tool

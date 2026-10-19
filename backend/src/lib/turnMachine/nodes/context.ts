@@ -23,6 +23,7 @@ import { runSearchAssistShadow } from "@/lib/searchAssist/shadow";
 import { recall, getProfileParagraph, embedQueryForRecall, bumpUsage } from "@/lib/memory";
 import { subjectRosterFor } from "@/lib/subjects";
 import { subjectsForTurn } from "@/lib/askNames";
+import { autoLeadImageAllowed } from "@/lib/answerImages/turn";
 import type { SubjectRef } from "@/lib/unknownNames";
 import { getHouseholdSettingValue } from "@/lib/settings";
 import { evaluateSafety } from "@/lib/safety";
@@ -212,6 +213,13 @@ export const contextNode: Node<ContextInput, ContextOutput> = async (state, inpu
   const recentUserTexts = preview.userTexts;
   const resolvedSubjects = subjectsForTurn({ actor: state.actor, text: input.utterance, signal: state.signal, recentUserTexts, conversationId: conversation.id, supersedes: state.supersedes, turnId: state.turnId, temporary });
   if (resolvedSubjects.section) items.push({ id: "subjects", text: resolvedSubjects.section, source: "subjects", subjects: [], disclosure: "child_ok" });
+  // CHAT-AUTO-LEAD-IMAGE-01: use the turn resolver's one named subject,
+  // never a word rule over the open-ended message. Temporary, spoken,
+  // bare and non-chat turns do not make third-party picture requests.
+  const named = resolvedSubjects.subjects.length === 1 ? resolvedSubjects.subjects[0] : undefined;
+  if (named?.type === "unresolved" && !state.images?.length && state.surface === "chat" && autoLeadImageAllowed({ actor: state.actor, band: state.plan.age_band, surfaceClass: state.planBasis.surfaceClass ?? "spoken", spoken: state.spoken, temporary, bare: !!state.bare, ephemeral: state.ephemeral === true })) {
+    state.pendingAutoLeadImage = { subject: named.surface_form, kind: named.candidate_kinds[0] ?? "" };
+  }
 
   // RECALL-03, run once the window is sized (below): set inside the
   // persisted-chat branch, so a temporary chat recalls nothing.

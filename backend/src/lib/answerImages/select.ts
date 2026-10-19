@@ -1,6 +1,7 @@
 // ANSWER-IMG-02: which pictures an answer may carry, per age band (design:
 // data-scratch/research/chat-images-in-answers.md sections 3, 6 and 9). The
-// model only names a subject (`show_images`); every decision below is data:
+// the model or deterministic turn resolver names a subject; every decision
+// below is data:
 // Wikidata says whether the subject is a person and how old, the band says
 // which sources may be asked, the floor reads the subject and every caption,
 // and ANSWER-IMG-00/01's filter and proxy decide what is a real picture.
@@ -202,7 +203,28 @@ export async function selectAnswerImages(input: { subject: string; kind?: string
         wikimediaCandidates(entity, fetchJson, { leadOnly, band: input.band }).catch(() => []),
         input.band === "adult" && !leadOnly ? wikimediaDepicts(entity, fetchJson, { band: input.band }) : Promise.resolve([]),
       ]);
-      return mergeDepicts(found, depicting).map((c): Candidate => ({ ...c, source: "wikimedia", ...(isNonPhotoFile(entity, c) ? { nonPhoto: true } : {}) }));
+      const commons = mergeDepicts(found, depicting).map((c): Candidate => ({ ...c, source: "wikimedia", ...(isNonPhotoFile(entity, c) ? { nonPhoto: true } : {}) }));
+      // IMGQ-12: Wikipedia's page image is the canonical poster or cover for
+      // a film, show, book, album or game. P18 can be absent or point at a
+      // different asset, so request the resolved article's pageimage as its
+      // own lead candidate. It is exempt from crowding because relevance.ts
+      // exempts article leads from that count.
+      const posterOrCoverSubject = entity.media || /\b(film|movie|show|series|book|album|game)\b/i.test(kind);
+      if (entity.wikipediaTitle && posterOrCoverSubject) {
+        try {
+          const wp = new URL("https://en.wikipedia.org/w/api.php");
+          wp.searchParams.set("action", "query"); wp.searchParams.set("titles", entity.wikipediaTitle);
+          wp.searchParams.set("redirects", "1"); wp.searchParams.set("prop", "pageimages");
+          wp.searchParams.set("piprop", "thumbnail|original"); wp.searchParams.set("pithumbsize", "1280"); wp.searchParams.set("format", "json");
+          const response = await fetchJson(wp.toString()) as { query?: { pages?: Record<string, { thumbnail?: { source?: string }; original?: { source?: string }; title?: string }> } };
+          const page = Object.values(response.query?.pages ?? {})[0];
+          const image = page?.thumbnail?.source ?? page?.original?.source;
+          if (image && /^https:\/\/upload\.wikimedia\.org\//i.test(image)) {
+            commons.unshift({ url: image, page: `https://en.wikipedia.org/wiki/${encodeURIComponent((page?.title ?? entity.wikipediaTitle).replace(/ /g, "_"))}`, title: page?.title ?? entity.label, description: "", lead: true, source: "wikimedia" });
+          }
+        } catch { /* a missing page image leaves the ordinary candidates available */ }
+      }
+      return commons;
     };
     // SearXNG images (source 4): never for a person (it returns look-alikes
     // and strangers); a minor only through safe-search-capable engines. Asked
@@ -261,7 +283,10 @@ export async function selectAnswerImages(input: { subject: string; kind?: string
       .sort((x, y) => y.score - x.score || y.big - x.big || x.i - y.i)
       .map((x) => x.c);
     const commonsRows = candidates.filter((c) => c.source === "wikimedia");
-    const byLead = lead === "wikimedia" ? [...commonsRows, ...searchRanked] : [...searchRanked, ...commonsRows];
+    const articleLead = candidates.filter((c) => c.source === "wikimedia" && c.lead);
+    const ordinary = lead === "wikimedia" ? [...commonsRows, ...searchRanked] : [...searchRanked, ...commonsRows];
+    const articleLeadUrls = new Set(articleLead.map((c) => c.url));
+    const byLead = [...articleLead, ...ordinary.filter((c) => !articleLeadUrls.has(c.url))];
     for (const c of byLead) {
       if (c.source === follow && perSource[lead] >= COMMONS_ENOUGH * 2) { searchSkipped++; continue; }
       if (hasShown && c.page && shown!.sources.has(c.page)) { excludedShown++; continue; }
@@ -298,7 +323,10 @@ export async function selectAnswerImages(input: { subject: string; kind?: string
     const fromLead = validated.filter((image) => kept[Number(image.id.slice(1))]!.source === lead);
     if (fromLead.length >= COMMONS_ENOUGH && fromLead.length < validated.length) {
       trace.search_not_needed = validated.length - fromLead.length;
-      validated = fromLead;
+      // The resolved article's poster/cover is a preferred lead even when
+      // open-web results fill the normal film/show/game row.
+      const articleLeads = validated.filter((image) => kept[Number(image.id.slice(1))]!.lead);
+      validated = [...articleLeads, ...fromLead];
     }
     const items: AnswerImageItem[] = [];
     const weakIds = new Set<string>();

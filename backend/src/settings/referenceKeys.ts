@@ -51,4 +51,15 @@ export const REFERENCE_SETTINGS_KEYS: SettingsKey[] = [
     lives_in: "person.chat",
     honoured_by: ["home"],
   }),
+  SettingsKey.parse({
+    key: "chat.auto_lead_image",
+    scope: "person",
+    selector: "boolean",
+    default: true,
+    label: "Show a picture for a named subject",
+    help: "When you ask about one named movie, show, book, album, game, person, animal, place or product, Home can show one picture above the answer. Age and picture checks still apply.",
+    level: "basic",
+    lives_in: "person.chat",
+    honoured_by: ["home"],
+  }),
 ];

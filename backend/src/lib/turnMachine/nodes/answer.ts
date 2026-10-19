@@ -12,6 +12,7 @@ import { engineComputerAwayFromHome, failureLine, type FailureKind } from "@/lib
 import { COMPOSE_FAILURE_LINE, pictureForOutcomes, videoForOutcomes, musicForOutcomes } from "@/lib/composer";
 import { PICTURE_NOT_HERE_LINE, PROMPT_REFUSAL_LINE } from "@/lib/pictures/policy";
 import { VIDEO_NOT_HERE_LINE, VIDEO_REFUSAL_LINE } from "@/lib/videos/policy";
+import { startAnswerImages } from "@/lib/answerImages/turn";
 
 /** The reasons `policy` can refuse a proposal WITHOUT parking an ask
  * (consent_needed/confirm_needed always carry one, so machine.ts's
@@ -129,6 +130,21 @@ export const answerNode: Node<AnswerInput, AnswerOutput> = async (state, input) 
       return { outcome: { ok: true }, output: { text: input.text, speech: input.speech, sources: input.outcome.sources ?? [], provenance } };
     }
     case "model_text": {
+      // CHAT-AUTO-LEAD-IMAGE-01: only start after the model has chosen a
+      // text answer. A show_images call (or an earlier image pipeline) owns
+      // this turn's pictures. Starting here keeps a slow picture host beside
+      // output release and never delays the first answer text.
+      if (state.pendingAutoLeadImage && state.answerImagesAllowed && !state.answerImages && !state.images?.length && state.outcomes.length === 0) {
+        const { subject, kind } = state.pendingAutoLeadImage;
+        const lead = startAnswerImages(state, subject, kind, "auto-lead-image", undefined, true);
+        // The automatic picture is defined as a lead, so make it available
+        // to the placer before any answer text is released. The stream placer
+        // holds gated text until this bounded lookup resolves. It cannot fail
+        // the answer.
+        await lead.done;
+        if (state.releaseAutoLeadText) state.releaseAutoLeadText(!!lead.block);
+        else state.pendingAutoLeadImage = undefined;
+      }
       // A live acceptance run (U2d) caught this dropping every tool
       // round's own sources on the floor: the state table's own "the
       // outcomes' sources" is listed as this node's input generally,

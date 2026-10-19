@@ -11,7 +11,7 @@ import { outcomeOf, type FailureKind } from "@/lib/turnContext";
 import { lookupFailureKind } from "./lookupFallback";
 import { pickStatusPhrase } from "@/lib/statusPhrases";
 import { START_PROJECT_TOOL_ID, runStartProjectTool, type StartProjectArgs } from "@/lib/projects/tool";
-import { SHOW_IMAGES_TOOL_ID, SHOW_IMAGES_UNAVAILABLE_LINE, showImagesMultiResultLine, showImagesNames, showImagesResultLine, startAnswerImages } from "@/lib/answerImages/turn";
+import { SHOW_IMAGES_TOOL_ID, SHOW_IMAGES_UNAVAILABLE_LINE, answerImageFailureKind, showImagesEmptyResultLine, showImagesMultiResultLine, showImagesNames, showImagesPendingResultLine, showImagesResultLine, startAnswerImages } from "@/lib/answerImages/turn";
 import { GENERATE_IMAGE_TOOL_ID, runGenerateImage } from "@/lib/pictures/tool";
 import { GENERATE_VIDEO_TOOL_ID, runGenerateVideo } from "@/lib/videos/tool";
 import type { Node, ActionProposal, ToolExecutionOutcome } from "../contract";
@@ -83,6 +83,20 @@ function failureKindOf(code: string | undefined): FailureKind {
 }
 
 const MAX_DETAIL_CHARS = 2000;
+/** Keep the leading gallery opportunity while leaving headroom under the first-text budget. */
+const SHOW_IMAGES_LEAD_WAIT_MS = 600;
+
+async function waitForImageLead(done: Promise<void>): Promise<boolean> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    return await Promise.race([
+      done.then(() => true),
+      new Promise<boolean>((resolve) => { timer = setTimeout(() => resolve(false), SHOW_IMAGES_LEAD_WAIT_MS); }),
+    ]);
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
+}
 
 export const toolNode: Node<ToolInput, ToolOutput> = async (state, input, signal) => {
   const outcomes: ToolExecutionOutcome[] = [];
@@ -92,7 +106,13 @@ export const toolNode: Node<ToolInput, ToolOutput> = async (state, input, signal
   // beside a search rather than after it (section 4.3).
   if (state.answerImagesAllowed) {
     const call = input.proposals.find((p) => p.request.tool === SHOW_IMAGES_TOOL_ID && typeof p.request.args.subject === "string" && p.request.args.subject.trim().length > 0);
-    if (call) startAnswerImages(state, (call.request.args.subject as string).trim(), typeof call.request.args.kind === "string" ? call.request.args.kind.trim() : "", call.request.callId, call.request.args.subjects);
+    if (call) {
+      // An explicit picture call owns this turn's gallery; never add the
+      // resolver's automatic lead as a second, redundant image.
+      state.pendingAutoLeadImage = undefined;
+      state.releaseAutoLeadText?.(false);
+      startAnswerImages(state, (call.request.args.subject as string).trim(), typeof call.request.args.kind === "string" ? call.request.args.kind.trim() : "", call.request.callId, call.request.args.subjects);
+    }
   }
   for (const proposal of input.proposals) {
     const { tool, callId } = proposal.request;
@@ -135,16 +155,30 @@ export const toolNode: Node<ToolInput, ToolOutput> = async (state, input, signal
     // the call actually resolves, so a client's tool timeline shows the
     // step running, not just its eventual outcome.
     toolEvents.push({ t: "tool_call", package_id: tool, call_id: callId, args });
-    // ANSWER-IMG-02: show_images answers at once with a fixed line and never
-    // runs a package (the pipeline was started above, beside the answer).
+    // ANSWER-IMG-02: show_images acknowledges at once and never runs a package
+    // (the picture pipeline was started above, beside the answer).
     if (tool === SHOW_IMAGES_TOOL_ID) {
       const subject = typeof args.subject === "string" ? args.subject.trim() : "";
       const names = showImagesNames(subject, args.subjects);
       const kind = typeof args.kind === "string" ? args.kind.trim().slice(0, 80) : "";
-      const line = state.answerImagesAllowed && state.answerImages ? (names.length > 1 ? showImagesMultiResultLine(names) : showImagesResultLine(state.answerImages.subject)) : SHOW_IMAGES_UNAVAILABLE_LINE;
-      const outcome = outcomeOf({ callId, packageId: tool, status: "succeeded", via: "tool_call", args: { subject, ...(names.length > 1 ? { subjects: names } : {}), ...(kind ? { kind } : {}) }, result: { reply: { text: line }, actions: [] }, durationMs: 0 });
+      const permitted = state.answerImagesAllowed && !!state.answerImages;
+      let ready = false;
+      if (permitted && state.answerImages) ready = await waitForImageLead(state.answerImages.done);
+      const pictureEntries = state.answerImages ? [state.answerImages, ...(state.answerImages.extras ?? [])] : [];
+      const shownEntries = pictureEntries.filter((entry) => !!entry.block && (entry.result?.visible ?? 0) > 0);
+      const missingNames = pictureEntries.filter((entry) => !entry.block || (entry.result?.visible ?? 0) === 0).map((entry) => entry.subject);
+      const shown = shownEntries.reduce((count, entry) => count + (entry.result?.visible ?? 0), 0);
+      const shownNames = shownEntries.map((entry) => entry.subject);
+      const failureKind = !permitted ? "errored" as const : ready && shown === 0 ? answerImageFailureKind(state.answerImages?.trace?.skipped) : undefined;
+      const line = !permitted ? SHOW_IMAGES_UNAVAILABLE_LINE
+        : !ready ? showImagesPendingResultLine(names.join(", ") || subject)
+          : shown === 0 ? names.length > 1 ? showImagesMultiResultLine([], missingNames) : showImagesEmptyResultLine(state.answerImages!.subject, state.answerImages!.trace?.skipped)
+            : names.length > 1 ? showImagesMultiResultLine(shownNames, missingNames)
+              : showImagesResultLine(state.answerImages!.subject, shown);
+      const outcome = outcomeOf({ callId, packageId: tool, status: failureKind ? "failed" : "succeeded", ...(failureKind ? { failureKind, userMessage: line } : {}), via: "tool_call", args: { subject, ...(names.length > 1 ? { subjects: names } : {}), ...(kind ? { kind } : {}) }, result: { reply: { text: line }, actions: [] }, durationMs: 0 });
       outcomes.push(outcome);
-      toolEvents.push({ t: "tool_result", call_id: callId, package_id: tool, outcome: { text: line } });
+      if (failureKind) toolEvents.push({ t: "tool_result", call_id: callId, package_id: tool, outcome: { text: line, error_code: failureKind === "found_nothing" ? "found_nothing" : failureKind } });
+      else toolEvents.push({ t: "tool_result", call_id: callId, package_id: tool, outcome: { text: line } });
       continue;
     }
 

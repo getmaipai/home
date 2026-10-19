@@ -176,6 +176,10 @@ export interface TurnState {
   /** ANSWER-IMG-02: the picture pipeline the `show_images` tool started
    * beside the answer (answerImages/turn.ts); its set becomes an `image_gallery` block in `toolEvents` (GENUI-05). */
   answerImages?: import("@/lib/answerImages/turn").AnswerImageTurnState;
+  /** One resolver-selected subject eligible for an automatic lead image. The image is started only after a model text result confirms this turn did not call show_images. */
+  pendingAutoLeadImage?: { subject: string; kind: string };
+  /** Stream placer hook: release answer text held while an eligible automatic lead is resolved. */
+  releaseAutoLeadText?: (withImage: boolean) => void;
   /** GENUI-13c: the answer blocks the placer put in the reply (their events carry `after_paragraph`), in placement
    * order, each with the released-text length it goes after (Infinity: after the whole reply). */
   placedBlocks?: import("@/lib/answerImages/turn").PlacedBlock[];

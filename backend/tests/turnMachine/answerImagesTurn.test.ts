@@ -21,7 +21,7 @@ import { runTurnNext, runTurnNextStream } from "@/lib/turnMachine/turnNext";
 import { __setToolOfferOverridesForTests } from "@/lib/turnMachine/budget";
 import { streamTurnEvents } from "@/routes/turn";
 import { listConversationTurns } from "@/lib/conversationHistory";
-import { SHOW_IMAGES_UNAVAILABLE_LINE, showImagesNames } from "@/lib/answerImages/turn";
+import { SHOW_IMAGES_UNAVAILABLE_LINE, autoLeadImageAllowed, showImagesNames } from "@/lib/answerImages/turn";
 import { __resetAnswerImageFetchForTests } from "@/lib/answerImages/fetch";
 import { __setAnswerImageDepsForTests } from "@/lib/answerImages/select";
 import { createAssistantStreamSink } from "@/lib/assistantStreamWire";
@@ -104,6 +104,14 @@ const storedBlocks = (turnId: string) => JSON.parse(db.select().from(conversatio
 const doneValue = (events: Timed[]) => (events.find((e) => e.event.type === "done")!.event as { value: TurnValue }).value;
 
 describe("ANSWER-IMG-02: where show_images is offered (rule 0's gates)", () => {
+  test("automatic lead pictures use written-chat and privacy gates, and honor the existing image preference", () => {
+    expect(autoLeadImageAllowed({ actor: people.owner, band: "adult", surfaceClass: "written", spoken: false, temporary: false, bare: false, ephemeral: false })).toBe(true);
+    expect(autoLeadImageAllowed({ actor: people.owner, band: "adult", surfaceClass: "written", spoken: false, temporary: true, bare: false, ephemeral: false })).toBe(false);
+    expect(autoLeadImageAllowed({ actor: people.owner, band: "adult", surfaceClass: "spoken", spoken: false, temporary: false, bare: false, ephemeral: false })).toBe(false);
+    setValue(people.owner, `person:${people.owner.id}`, "reference.images", false);
+    expect(autoLeadImageAllowed({ actor: people.owner, band: "adult", surfaceClass: "written", spoken: false, temporary: false, bare: false, ephemeral: false })).toBe(false);
+  });
+
   async function toolsSeen(actor: typeof people.owner, run: (actor: typeof people.owner) => Promise<unknown>): Promise<string[]> {
     let names: string[] = [];
     await withStub({ calls: () => undefined, reply: () => "Fine." }, async (seen) => {
@@ -146,6 +154,26 @@ describe("ANSWER-IMG-02: where show_images is offered (rule 0's gates)", () => {
 });
 
 describe("ANSWER-IMG-02: the turn with pictures", () => {
+  test("a single named subject automatically gets one lead picture before the answer", async () => {
+    __setAnswerImageDepsForTests(fixtureWorld([TOWER]).deps);
+    await withStub({ calls: () => undefined, reply: () => TWO_PARAGRAPHS }, async () => {
+      const { events } = await streamEvents(people.owner, "what does the Eiffel Tower look like");
+      const galleries = imagesEvents(events);
+      expect(galleries).toHaveLength(1);
+      expect(galleryOf(galleries[0]!).props.images).toHaveLength(1);
+      expect(galleryOf(galleries[0]!).after_paragraph).toBe(0);
+    });
+  });
+
+  test("the personal automatic-image switch skips the lookup", async () => {
+    setValue(people.owner, `person:${people.owner.id}`, "chat.auto_lead_image", false);
+    __setAnswerImageDepsForTests(fixtureWorld([TOWER]).deps);
+    await withStub({ calls: () => undefined, reply: () => TWO_PARAGRAPHS }, async () => {
+      const { events } = await streamEvents(people.owner, "what does the Eiffel Tower look like");
+      expect(imagesEvents(events)).toHaveLength(0);
+    });
+  });
+
   test("pictures ready before the answer starts lead it as an image_gallery block; the stored turn and the done value carry it", async () => {
     offerShowImages();
     __setAnswerImageDepsForTests(fixtureWorld([TOWER]).deps);
@@ -165,16 +193,16 @@ describe("ANSWER-IMG-02: the turn with pictures", () => {
       expect(value.reply.text).toBe(TWO_PARAGRAPHS);
       expect("answer_images" in value).toBe(false);
       expect((value.blocks ?? []).filter((b) => b.kind === "image_gallery")).toHaveLength(1);
-      // The model's tool result: the fixed line, no bytes, no count, no address.
+      // The model's tool result: the fixed line with the true count, no bytes, no address.
       const phrasing = seen.find(isPhrasing)!;
       const toolMessage = phrasing.messages.find((m) => m.role === "tool")!.content!.toString();
-      expect(toolMessage).toContain("Photos of Eiffel Tower are on their screen. You have not seen them: do not say what they show or how Eiffel Tower looks in them. Answer other questions from what you know; never mention the photos.");
+      expect(toolMessage).toContain("3 pictures of Eiffel Tower are on their screen.");
       // ANSWER-IMG-05b: the answering round after a pictures-only call gets
       // the short instruction, with no search lines.
       const instruction = phrasing.messages.at(-1)!.content!.toString();
       expect(instruction.startsWith("Answer this message of mine from what you know")).toBe(true);
       expect(instruction).not.toMatch(/results|cite/i);
-      expect(toolMessage).not.toMatch(/answer-image|data:|\b3\b|ai_[a-f0-9]/);
+      expect(toolMessage).not.toMatch(/answer-image|data:|ai_[a-f0-9]/);
       expect(phrasing.tool_choice).toBe("none");
       // Stored, and read back by the history list.
       const row = db.select().from(conversationTurns).where(eq(conversationTurns.id, value.turn_id)).get()!;
@@ -208,14 +236,20 @@ describe("ANSWER-IMG-02: the turn with pictures", () => {
   test("a failed fetch emits no pictures and the answer completes whole", async () => {
     offerShowImages();
     __setAnswerImageDepsForTests(fixtureWorld([TOWER], { failPictures: true }).deps);
-    await withStub(script(TWO_PARAGRAPHS), async () => {
+    await withStub(script(TWO_PARAGRAPHS), async (seen) => {
       const { events } = await streamEvents();
       expect(imagesEvents(events)).toHaveLength(0);
+      expect(events.some(({ event }) => (event as { t?: string; outcome?: { error_code?: string } }).t === "tool_result" && (event as { outcome?: { error_code?: string } }).outcome?.error_code === "found_nothing")).toBe(true);
       const value = doneValue(events);
       expect(value.reply.text).toBe(TWO_PARAGRAPHS);
       expect(storedBlocks(value.turn_id).filter((b) => b.kind === "image_gallery")).toEqual([]);
       const row = db.select().from(conversationTurns).where(eq(conversationTurns.id, value.turn_id)).get()!;
       expect(row.answerImages).toBeNull();
+      const toolMessage = seen.find(isPhrasing)!.messages.find((m) => m.role === "tool")!.content!.toString();
+      expect(toolMessage).toContain("No picture was found or passed the checks");
+      expect(toolMessage).toContain("offer to try again or open the Wikipedia page");
+      const outcomes = JSON.parse(row.outcomes ?? "[]") as Array<{ status: string; failureKind?: string }>;
+      expect(outcomes.find((o) => o.failureKind === "found_nothing")?.status).toBe("failed");
     });
   });
 

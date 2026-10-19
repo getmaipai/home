@@ -180,6 +180,23 @@ describe("IMGQ-04: the pipeline keeps only the subject's pictures", () => {
   });
   afterEach(() => __setAnswerImageDepsForTests(null));
 
+  test("an article lead poster stays first and is exempt from crowded category drops", async () => {
+    const subject: FixtureSubject = {
+      id: "Q999", label: "Dune: Part Three", film: true, category: "Dune: Part Three",
+      files: ["Dune Part Three crowd 1.jpg", "Dune Part Three crowd 2.jpg"],
+      fileDescriptions: { "Dune Part Three crowd 1.jpg": "Crowd at the premiere of Dune Part Three", "Dune Part Three crowd 2.jpg": "Crowd at the screening of Dune Part Three" },
+      fileCategories: { "Dune Part Three crowd 1.jpg": ["Dune: Part Three", "Events in Los Angeles", "2025 in California"], "Dune Part Three crowd 2.jpg": ["Dune: Part Three", "Events in Los Angeles", "2025 in California"] },
+      pageImage: "https://upload.wikimedia.org/wikipedia/en/thumb/a/aa/Dune-poster.jpg/1280px-Dune-poster.jpg", description: "film",
+    };
+    const world = fixtureWorld([subject]);
+    __setAnswerImageDepsForTests(world.deps);
+    const selection = await selectAnswerImages({ subject: subject.label, kind: "movie", actor: people.owner, band: "adult", roster: [] });
+    expect(selection.set?.items[0]?.source.title).toBe("Dune: Part Three");
+    expect(selection.set?.items[0]?.source.url).toContain("en.wikipedia.org/wiki/Dune%3A_Part_Three");
+    expect(selection.trace.dropped_by_relevance?.crowded_categories).toBeUndefined();
+    expect(selection.trace.skipped).toBeUndefined();
+  });
+
   test("a person's category member with only a file-name title is left out and counted", async () => {
     const magician: FixtureSubject = { id: "Q1010", label: "Vincent Marlow", human: true, birth: "+1973-04-04T00:00:00Z", category: "Vincent Marlow", image: "Vincent Marlow 2008.jpg", files: ["Vincent Marlow 2008.jpg", "Vincentmarlow03102003.jpg", "Vincent Marlow stage.jpg", "Vincent Marlow 2014.jpg"] };
     const world = fixtureWorld([magician]);
@@ -248,7 +265,11 @@ describe("IMGQ-04: the pipeline keeps only the subject's pictures", () => {
     use(film, () => [1, 2, 3].map((n) => ({ title: `Velvet Harbour still ${n}`, url: `https://press.example.com/velvet-harbour-still-${n}`, image: pictureUrl(80 + n), engines: ["bing images"] })));
     const result = await selectAnswerImages({ subject: "Velvet Harbour", kind: "film", actor: people.owner, band: "adult", roster: [] });
     expect(result.trace.leading_source).toBe("search");
-    expect(result.set?.items.slice(0, 3).every((i) => i.source.site === "press.example.com")).toBe(true);
+    expect(result.set?.items.slice(0, 3).map((i) => i.source.site)).toEqual([
+      "commons.wikimedia.org",
+      "press.example.com",
+      "press.example.com",
+    ]);
   });
 
   function use(subject: FixtureSubject, rows: () => { title: string; url: string; image: string; engines?: string[] }[]) {
