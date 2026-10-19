@@ -207,11 +207,50 @@ describe("shapes", () => {
     expect(await styleOf(who.child, "data/channel", { kind: "topic", key: "kids" })).toBe("top_stories");
   });
 
-  test("an empty shelf gives an empty block list, not an error", async () => {
+  test("empty topic and source channels keep a valid header block", async () => {
     installNewsApp();
     const who = await household();
-    const json = (await (await post(who.adult, "data/today")).json()) as { blocks: unknown[] };
-    expect(json.blocks).toEqual([]);
+    for (const [body, title, style] of [
+      [{ kind: "topic", key: "health" }, "Health", "special"],
+      [{ kind: "source", key: feeds.household }, "Example Wire", undefined],
+    ] as const) {
+      const response = await post(who.adult, "data/channel", body);
+      expect(response.status).toBe(200);
+      const json = (await response.json()) as { blocks: Array<{ props: { header: { title: string }; layout: string; section_style?: string; featured: unknown[]; rows: unknown[]; shelves: unknown[] } }> };
+      expect(json.blocks).toHaveLength(1);
+      const block = json.blocks[0]!;
+      expect(block.props.header.title).toBe(title);
+      expect(block.props.layout).toBe("channel");
+      expect(block.props.section_style).toBe(style);
+      expect(block.props.featured).toEqual([]);
+      expect(block.props.rows).toEqual([]);
+      expect(block.props.shelves).toEqual([]);
+      expect(AnswerBlock.safeParse(block).success).toBe(true);
+    }
+  });
+
+  test("empty Today keeps its header and filters, and a selected chip uses its section layout", async () => {
+    installNewsApp();
+    const who = await household();
+    const empty = (await (await post(who.adult, "data/today")).json()) as { blocks: Array<{ props: { header: { title: string }; filters?: unknown[]; rows: unknown[] } }> };
+    expect(empty.blocks).toHaveLength(1);
+    expect(empty.blocks[0]!.props.header.title).toBe("Today");
+    expect(empty.blocks[0]!.props.filters).toBeArray();
+    expect(empty.blocks[0]!.props.rows).toEqual([]);
+    expect(AnswerBlock.safeParse(empty.blocks[0]).success).toBe(true);
+
+    putItem(feeds.household, ADULT_HOST, { topics: ["science"], ageHours: 1 });
+    const selected = (await (await post(who.adult, "data/today", { topic: "science" })).json()) as { blocks: Array<{ props: { layout: string; section_style?: string; header: { title: string; channel?: { key: string; followed: boolean } }; filters?: Array<{ id: string; selected: boolean }> } }> };
+    const props = selected.blocks[0]!.props;
+    expect(props.layout).toBe("channel");
+    expect(props.section_style).toBe("special");
+    expect(props.header.title).toBe("Science");
+    expect(props.header.channel).toMatchObject({ kind: "topic", key: "science" });
+    expect(typeof props.header.channel!.followed).toBe("boolean");
+    expect(props.filters?.find((filter) => filter.id === "science")?.selected).toBe(true);
+    const all = (await (await post(who.adult, "data/today")).json()) as { blocks: Array<{ props: { layout: string; section_style?: string } }> };
+    expect(all.blocks[0]!.props.layout).toBe("today");
+    expect(all.blocks[0]!.props.section_style).toBeUndefined();
   });
 });
 

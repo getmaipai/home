@@ -72,6 +72,8 @@ interface FeedRequest {
   topic?: string;
   /** Whether the block carries the topic chip row (Today and My Mix, never a child's, never a channel). */
   filters?: boolean;
+  /** Channel pages may show rows from the full channel window; Today keeps its shorter row window even for a selected chip. */
+  channelRows?: boolean;
   followed: { topics: Set<string>; sources: Set<string> };
   shelf: boolean;
   page: number;
@@ -114,22 +116,20 @@ function feedBlock(env: CardEnv, request: FeedRequest, now: Date): unknown[] {
   const topic = request.topic ?? "";
   const present = new Set([...cards.values()].flatMap((card) => card.topics));
   const filters = request.filters && band !== "child"
-    ? [{ id: "", label: "All", selected: topic === "" }, ...topicsFor(band).filter((entry) => present.has(entry.id)).slice(0, FILTERS_MAX).map((entry) => ({ id: entry.id, label: entry.label, selected: topic === entry.id }))]
+    ? [{ id: "", label: "All", selected: topic === "" }, ...topicsFor(band).filter((entry) => present.has(entry.id) || entry.id === topic).slice(0, FILTERS_MAX).map((entry) => ({ id: entry.id, label: entry.label, selected: topic === entry.id }))]
     : undefined;
   if (topic) for (const [id, card] of cards) if (!card.topics.includes(topic)) cards.delete(id);
-  if (cards.size === 0 && !(topic && filters)) return [];
   const ranked = cards.size === 0 ? { hero: undefined, featured: [], rest: [] } : rankStories({ stories: [...cards.values()].map((card) => rankInputOf(byItem.get(card.item_id)!, card)), now, followed: request.followed, mode: request.signal ? "mix" : "today", signal: request.signal });
   const cardFor = (input: RankInput): StoryCard => cards.get(input.item_id)!;
   const hero = ranked.hero ? withKicker(cardFor(ranked.hero), band, true) : undefined;
   const featured = ranked.featured.map(cardFor).map((card) => withKicker(card, band));
   const shown = new Set([hero?.item_id, ...featured.map((card) => card.item_id)]);
-  const recent = ranked.rest.map(cardFor).filter((card) => now.getTime() - Date.parse(card.published_at) <= ROWS_WINDOW_H * HOUR_MS || request.layout === "channel");
+  const recent = ranked.rest.map(cardFor).filter((card) => now.getTime() - Date.parse(card.published_at) <= ROWS_WINDOW_H * HOUR_MS || request.channelRows);
   recent.sort((a, b) => b.published_at.localeCompare(a.published_at));
   const rows = recent.slice(0, Math.min(ROWS_MAX, ROWS_PAGE * Math.max(1, request.page)))
     .map((card) => ({ ...withKicker(card, band), group: dayGroupOf(new Date(card.published_at), now) }));
   const shelves = request.shelf && !topic ? channelShelf(env, request.followed, shown, now) : [];
   const total = (hero ? 1 : 0) + featured.length + rows.length + shelves.reduce((sum, shelf) => sum + shelf.stories.length, 0);
-  if (total === 0 && !(topic && filters)) return [];
   const lead = hero ?? featured[0] ?? rows[0] ?? shelves[0]?.stories[0];
   const alt = `${request.title}: ${lead ? `${lead.title}, ${lead.publisher}` : "no stories"}${total > 1 ? `, and ${total - 1} more ${total - 1 === 1 ? "story" : "stories"}` : ""}.`;
   return [{
@@ -177,7 +177,14 @@ export async function todayData(person: PersonRow, body: Record<string, unknown>
   const viewer = viewerOf(person, now);
   const env = cardEnv(viewer);
   if (!env) return emptyBlocks(true);
-  const raw = feedBlock(env, { layout: "today", title: "Today", windowH: TODAY_WINDOW_H, followed: followedChannels(person.id), shelf: true, page: pageOf(body), topic: topicParam(body, viewer.band), filters: true, provenance: "news data today" }, now);
+  const followed = followedChannels(person.id);
+  const topic = topicParam(body, viewer.band);
+  const selectedTopic = topic ? topicById(topic) : undefined;
+  const raw = feedBlock(env, {
+    layout: selectedTopic ? "channel" : "today", title: selectedTopic?.label ?? "Today",
+    ...(selectedTopic ? { sectionStyle: selectedTopic.section_style, channel: { kind: "topic" as const, key: topic, followed: isFollowing(person.id, "topic", topic) } } : {}),
+    windowH: TODAY_WINDOW_H, followed, shelf: true, page: pageOf(body), topic, filters: true, provenance: "news data today",
+  }, now);
   await enrichLeadCards(raw, env);
   return { as_of: now.toISOString(), blocks: finishBlocks(person, viewer.band, raw) };
 }
@@ -229,7 +236,7 @@ export async function channelData(person: PersonRow, body: Record<string, unknow
   const followed = followedChannels(person.id);
   const raw = feedBlock(env, {
     layout: "channel", title, ...(subtitle ? { subtitle } : {}), ...(sectionStyle ? { sectionStyle } : {}), channel: { kind, key, followed: isFollowing(person.id, kind, key) },
-    windowH: CHANNEL_WINDOW_H, match, followed, shelf: false, page: pageOf(body), topic: topicParam(body, viewer.band), provenance: "news data channel",
+    windowH: CHANNEL_WINDOW_H, match, followed, shelf: false, channelRows: true, page: pageOf(body), topic: topicParam(body, viewer.band), provenance: "news data channel",
   }, now);
   await enrichLeadCards(raw, env);
   return { as_of: now.toISOString(), blocks: finishBlocks(person, viewer.band, raw) };
