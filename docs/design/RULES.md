@@ -294,6 +294,14 @@ figure) and the surface gate stay fixed, and no setting, including `generation.p
     admin setting picks one of those two (owner's ruling, 2026-10-02).
     Those fixed clips (rule 6) are gated at authoring time, not at
     playback.
+    For an adult's chat, a minor word beside a sexual word is not a
+    refusal by itself: discussion, news, fiction, health and advice are
+    not filtered. An adult's explicit term and an adult's request to
+    write, describe, draw, show, imagine or role-play sexual content
+    with a minor still refuse; every generation prompt and finished
+    picture or clip keeps the absolute check, and a child's and a
+    teen's floors are unchanged (owner's ruling, 2026-10-19;
+    docs/design/child-safety-text-2026-10-19.md).
 11. **Only our own tested Stack components run the models.** Home
     talks to the engines the Stack installs, pins and tests, and to
     nothing else. No LM Studio, Open WebUI, Ollama or other outside
