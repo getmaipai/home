@@ -62,6 +62,7 @@ export function decideReuse(runs: GateRun[], deps: ReuseDeps, now: Date, maxAgeS
     return { reuse: false, why: `no green full gate run in the last ${Math.round(maxAgeSeconds / 3600)} h` };
   }
   let lastWhy = "";
+  let codeWhy = "";
   for (const run of green) {
     if (run.clean !== true) {
       lastWhy = lastWhy || `green run ${run.head.slice(0, 8)} had uncommitted files or moved HEAD, so it did not test a commit`;
@@ -79,9 +80,10 @@ export function decideReuse(runs: GateRun[], deps: ReuseDeps, now: Date, maxAgeS
     if (scope.scope === "docs") {
       return { reuse: true, run, changed, why: `green full gate at ${run.head.slice(0, 8)} (${run.ended_at}), only docs changed since (${changed.length} file(s))` };
     }
-    lastWhy = lastWhy || `code differs from the newest usable green run (${run.head.slice(0, 8)}): ${scope.why}`;
+    codeWhy = codeWhy || `code differs from the newest usable green run (${run.head.slice(0, 8)}): ${scope.why}`;
   }
-  return { reuse: false, why: lastWhy };
+  // A clean run that was compared and differs explains more than an unclean one that was skipped.
+  return { reuse: false, why: codeWhy || lastWhy };
 }
 
 function git(root: string, args: string[]): { ok: boolean; out: string } {

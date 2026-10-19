@@ -177,7 +177,8 @@ describe("main-gate", () => {
 
   test("idle yields when a session queues for the lock mid-run", () => {
     const calls = join(sandbox, "lock-calls");
-    fakeLock(`[ "$1" = status ] || exit 0; echo x >> ${calls}; echo free; [ "$(wc -l < ${calls})" -gt 1 ] && printf 'queue:\n  home-2\n'; exit 0`);
+    // The queue line comes first and a long tail follows, so a reader that stops at the match would make the writer hit SIGPIPE.
+    fakeLock(`[ "$1" = status ] || exit 0; echo x >> ${calls}; echo free; [ "$(wc -l < ${calls})" -gt 1 ] && { echo queue:; for i in $(seq 1 20000); do echo "  home-$i"; done; }; exit 0`);
     commit("idle landing");
     const started = Date.now();
     const result = invoke("sleep 20; exit 0", "idle", { MAIPAI_MAIN_GATE_POLL_SECONDS: "1" });

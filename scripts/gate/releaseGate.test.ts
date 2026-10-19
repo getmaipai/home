@@ -72,6 +72,13 @@ describe("release gate reuse", () => {
     expect(decideReuse([legacy as GateRun], deps([]), now).reuse).toBe(false);
   });
 
+  test("names the clean run that differs, not a newer unclean run it skipped", () => {
+    const runs = [run({ head: "bbbb2222", clean: false, ended_at: "2026-10-19T21:30:00Z" }), run({})];
+    const d = decideReuse(runs, deps(["scripts/check.sh"]), now);
+    expect(d.reuse).toBe(false);
+    expect(d.why).toContain("code differs from the newest usable green run (aaaa1111)");
+  });
+
   test("skips a green run whose commit is not in this repository", () => {
     expect(decideReuse([run({ head: "cccc3333" })], deps([]), now).reuse).toBe(false);
   });

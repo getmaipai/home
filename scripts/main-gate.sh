@@ -18,7 +18,8 @@ kill_tree() {
   for child in $(pgrep -P "$1" 2>/dev/null); do kill_tree "$child"; done
   kill -TERM "$1" 2>/dev/null || true
 }
-lock_queued() { bash "$LOCK" status 2>/dev/null | grep -q '^queue:'; }
+# Read the whole status first: `status | grep -q` under pipefail fails on SIGPIPE when grep exits at the match.
+lock_queued() { local st; st="$(bash "$LOCK" status 2>/dev/null || true)"; [[ $'\n'"$st" == *$'\nqueue:'* ]]; }
 run_gate() {
   local output="$1" status_file="$2"
   set +e
