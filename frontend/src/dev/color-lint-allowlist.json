@@ -1,0 +1,12 @@
+[
+  {
+    "file": "apps/people/FaceEnrollmentPage.tsx",
+    "pattern": "black",
+    "reason": "The live camera preview requires a black base while the camera initializes."
+  },
+  {
+    "file": "apps/people/FaceEnrollmentPage.tsx",
+    "pattern": "bg-black/60",
+    "reason": "The translucent black scrim keeps camera guidance legible over arbitrary live camera frames."
+  }
+]

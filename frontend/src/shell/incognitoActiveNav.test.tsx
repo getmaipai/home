@@ -10,6 +10,7 @@ const tokensCss = readFileSync(new URL("./tokens.css", import.meta.url), "utf8")
 const activeNavRule = tokensCss.match(/html\.incognito body\[class\*="style-"\] \[data-slot="sidebar-inner"\] a\[data-slot="sidebar-menu-button"\]\[data-active\]\s*\{[^}]*\}/)?.[0];
 const styleTestId = "incognito-active-nav-test-styles";
 const violet = "rgb(164, 52, 255)";
+const violetForeground = "rgb(255, 255, 255)";
 
 function rgb(color: string): [number, number, number] {
   if (color === "white") return [255, 255, 255];
@@ -51,7 +52,7 @@ test.each([
   style.dataset.testid = styleTestId;
   style.textContent = `
     :root {
-      --hue-violet: ${violet}; --primary: rgb(33, 166, 255);
+      --hue-violet: ${violet}; --hue-violet-foreground: ${violetForeground}; --primary: rgb(33, 166, 255);
       --background: rgb(244, 247, 251); --foreground: rgb(11, 23, 48);
       --sidebar: rgb(234, 240, 247); --surface-sidebar: rgb(234, 240, 247);
     }
@@ -62,6 +63,7 @@ test.each([
     body { color: var(--foreground); }
     .bg-primary { background-color: var(--primary); }
     .text-background { color: var(--background); }
+    .text-hue-violet-foreground { color: var(--hue-violet-foreground); }
     .bg-sidebar { background-color: var(--sidebar); }
     .sidebar-box [data-slot="sidebar-inner"] { background-color: var(--background); }
     html.incognito body[class*="style-"] { --sidebar: var(--surface-sidebar); }
@@ -93,7 +95,7 @@ test.each([
 
     const activeStyle = getComputedStyle(activePill!);
     expect(activeStyle.backgroundColor).toBe(violet);
-    expect(activeStyle.color).toBe("white");
+    expect(activeStyle.color).toBe(violetForeground);
     expect(contrast(activeStyle.color, activeStyle.backgroundColor)).toBeGreaterThanOrEqual(4.5);
     expect(activeStyle.backgroundColor).not.toBe("rgb(33, 166, 255)");
 

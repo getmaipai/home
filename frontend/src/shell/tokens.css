@@ -132,7 +132,7 @@ html.incognito body[class*="style-"] [data-slot="sidebar-inner"] {
  * current page's link itself with data-active and aria-current="page". */
 html.incognito body[class*="style-"] [data-slot="sidebar-inner"] a[data-slot="sidebar-menu-button"][data-active] {
   background-color: var(--hue-violet);
-  color: white;
+  color: var(--hue-violet-foreground);
 }
 
 html.incognito body[class*="style-"] [data-slot="sidebar-inset"],

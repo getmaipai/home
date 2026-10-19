@@ -3,9 +3,6 @@ import { api } from "@/lib/api";
 
 export type Appearance = "system" | "light" | "dark";
 
-const LIGHT_THEME_COLOR = "#ffffff";
-const DARK_THEME_COLOR = "#0b0b0f";
-
 function applyAppearance(appearance: Appearance) {
   const root = document.documentElement;
   const isDark =
@@ -27,7 +24,8 @@ function applyAppearance(appearance: Appearance) {
   // convention, not just this one row.
   root.classList.toggle("dark", isDark);
   root.classList.toggle("light", !isDark);
-  document.querySelector('meta[name="theme-color"]')?.setAttribute("content", isDark ? DARK_THEME_COLOR : LIGHT_THEME_COLOR);
+  const background = getComputedStyle(root).getPropertyValue("--background").trim();
+  document.querySelector('meta[name="theme-color"]')?.setAttribute("content", background || "Canvas");
 }
 
 /** `ui.appearance` (person scope, backend/src/settings/uiKeys.ts), read
