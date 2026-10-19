@@ -1,4 +1,8 @@
-import { describe, test, expect } from "bun:test";
+import { describe, test, expect, setDefaultTimeout } from "bun:test";
+
+// These tests run the real installer script in a sandbox: one takes about 5 s, which is bun's default limit, so a loaded machine
+// failed it. The gate uses 20 s for the full run; a single-file run needs the same.
+setDefaultTimeout(30_000);
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
