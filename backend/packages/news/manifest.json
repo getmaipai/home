@@ -502,6 +502,7 @@
           "label": "News",
           "sections": [
             "reading",
+            "following",
             "shelf"
           ]
         }
@@ -510,7 +511,7 @@
         {
           "id": "reading",
           "label": "Reading",
-          "icon": "book-open",
+          "icon": "book",
           "kind": "keys",
           "cards": [
             {
@@ -521,9 +522,16 @@
           ]
         },
         {
+          "id": "following",
+          "label": "Following",
+          "icon": "star",
+          "kind": "link",
+          "href": "/apps/news/following"
+        },
+        {
           "id": "shelf",
           "label": "News shelf",
-          "icon": "rss",
+          "icon": "newspaper",
           "kind": "keys",
           "min_role": "admin",
           "cards": [
@@ -632,14 +640,6 @@
                 "state": {
                   "kind": "source",
                   "key": "{key}"
-                }
-              }
-            },
-            "manage": {
-              "label": "Manage",
-              "open": {
-                "navigate": {
-                  "to": "/apps/news/following"
                 }
               }
             }

@@ -4,6 +4,11 @@ All notable changes to the News package, in [Keep a Changelog](https://keepachan
 
 ## [Unreleased]
 
+### Changed
+
+- The column's Manage row is gone: News settings now has a Following row that opens the same page.
+- Pictures inside a story load (their address lacked the width the picture route requires).
+
 ### Added
 
 - A Search page (not in the tab strip) with a search box on every page that shows stories, topic chips on Today and My Mix, a date line, day headings and a line above each headline.

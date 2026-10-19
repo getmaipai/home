@@ -9,7 +9,7 @@ import RailProfileMenu from "@maipai/ui/src/dashboard/layouts/full/vertical/rail
 import { renderWithQueryClient } from "../../../../tests/renderWithQueryClient";
 import { CustomizeRedirect, SettingsEntryRedirect } from "@/shell/pages/settings/SettingsEntryRedirect";
 import { SettingsAreaPage } from "@/shell/pages/settings/SettingsAreaPage";
-import { activeAppHref } from "@/shell/pages/settings/settingsBackLink";
+import { activeAppHref, rememberLastAppRoute } from "@/shell/pages/settings/settingsBackLink";
 import { makePerson, mockHome, type HomeFixture } from "@/shell/pages/settings/settingsTestKit";
 import type { Roster } from "@/lib/api";
 
@@ -64,7 +64,7 @@ function open(person: Roster, url: string, home: Parameters<typeof mockHome>[0] 
 
 const where = (view: ReturnType<typeof open>) => view.getByTestId("where").textContent;
 const column = (_view: ReturnType<typeof open>) => document.body.querySelector<HTMLElement>('[data-slot="settings-column"]')!;
-const rows = (view: ReturnType<typeof open>) => [...within(column(view)).queryAllByRole("link")].map((link) => link.textContent?.trim());
+const rows = (view: ReturnType<typeof open>) => [...within(column(view)).queryAllByRole("link")].filter((link) => !link.closest('[data-slot="settings-back-link"]')).map((link) => link.textContent?.trim());
 
 describe("the settings route", () => {
   test("Not now writes the dismissal setting and leaves pinned apps byte-identical", async () => {
@@ -114,6 +114,15 @@ describe("the settings route", () => {
     await waitFor(() => expect(rows(view)).toContain("Maintenance"));
     expect(rows(view)).toEqual(["General", "People", "Engines and AI", "Pictures, videos and music", "Coding", "Devices", "Search", "Integrations", "Commands", "Voices", "Storage and backups", "Reference library", "Media library", "Maintenance", "Privacy", "Developer tools", "Network and access"]);
     expect(view.getByRole("heading", { level: 1, name: /^General$/ })).toBeTruthy();
+  });
+
+  test("COLUMN-UNIFY-01: the column's first row goes back to the app the person came from, and the title stays", async () => {
+    rememberLastAppRoute("/files?section=all");
+    const view = open(makePerson("adult"), "/settings/chat/general");
+    const back = await waitFor(() => within(column(view)).getByRole("link", { name: "Back to Library" }));
+    expect(back.getAttribute("href")).toBe("/files?section=all");
+    expect(within(column(view)).getByRole("heading", { level: 2, name: "Settings" })).toBeTruthy();
+    window.sessionStorage.clear();
   });
 
   test("a child cannot reach Reference library settings by direct URL", async () => {

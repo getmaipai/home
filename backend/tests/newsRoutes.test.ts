@@ -825,7 +825,9 @@ describe("pictures inside the article (NEWS-ARTICLE-FIGURES-01)", () => {
     const figures = (await open(who.adult, wire.id)).filter((block) => block.type === "figure");
     expect(figures.map((figure) => figure.caption)).toEqual(["The harbor at dawn, before the vote.", "The council chamber."]);
     expect(figures.map((figure) => figure.alt)).toEqual(["The harbor at dawn", "Council chamber"]);
-    expect(figures.map((figure) => figure.src)).toEqual([`/api/plugins/news/images/${wire.id}/figure/0`, `/api/plugins/news/images/${wire.id}/figure/1`]);
+    expect(figures.map((figure) => figure.src)).toEqual([`/api/plugins/news/images/${wire.id}/figure/0?w=1280`, `/api/plugins/news/images/${wire.id}/figure/1?w=1280`]);
+    // The address the page draws is the address that must load (it once lacked the width, so every figure was a broken picture).
+    for (const figure of figures) expect((await who.adult.get(String(figure.src))).status).toBe(200);
   });
 
   test("the publisher's address is in no figure source, and a figure comes through the hub as a cached WebP", async () => {

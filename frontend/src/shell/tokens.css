@@ -674,6 +674,13 @@ html:has([data-slot="chat-shell"]) {
   overscroll-behavior-y: none;
 }
 
+/* Every other page too (owner, 2026-10-19: "the entire app bounces when I scroll up and down to the extremes"): the shell stays put at
+ * the top and bottom of a scroll instead of rubber-banding. */
+html,
+body {
+  overscroll-behavior-y: none;
+}
+
 /* RAIL-01 (owner's layout, 2026-10-06): the rail layout's body scrolls
  * on its own under a fixed-height workspace. Chat (and the showcase's
  * thread) fill that body instead: no padding, no width cap, no page

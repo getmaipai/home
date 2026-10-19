@@ -31,7 +31,7 @@ test("the shipped News manifest passes the sidebar's schema and package checks",
   expect(manifest().contributes?.sidebar).toBeDefined();
 });
 
-test("an adult and a teen get the whole column: Today, My Mix and Saved, topics, followed sources with Manage, and the search", async () => {
+test("an adult and a teen get the whole column: Today, My Mix and Saved, topics, followed sources, and the search", async () => {
   const { client } = await owner();
   const t = await teen(client);
   for (const viewer of [client, t]) {
@@ -39,8 +39,9 @@ test("an adult and a teen get the whole column: Today, My Mix and Saved, topics,
     expect(pagesOf(row, "library")).toEqual(["index", "mix", "saved"]);
     expect(row?.sidebar?.groups.map((g) => g.id)).toEqual(["library", "topics", "following"]);
     expect(row?.sidebar?.search).toBeDefined();
-    const following = row?.sidebar?.groups.find((g) => g.id === "following")?.rows as { manage?: { label: string }; only_followed?: boolean };
-    expect(following.manage?.label).toBe("Manage");
+    const following = row?.sidebar?.groups.find((g) => g.id === "following")?.rows as { manage?: unknown; only_followed?: boolean };
+    // Settings is the one place to manage what is followed: the column has no Manage row.
+    expect(following.manage).toBeUndefined();
     expect(following.only_followed).toBe(true);
   }
 });

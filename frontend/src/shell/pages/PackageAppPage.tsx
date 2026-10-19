@@ -169,11 +169,33 @@ export function PackageAppPage({ person }: { person: Roster }) {
   // NEWS-SIDEBAR-01: an app that declares a sidebar gets its own column beside the content from wide screens up (the kit's one
   // section sidebar); its section tabs give way to it there, and a phone keeps them.
   return sidebarProps ? (
-    <div className="flex min-h-0 flex-1" data-workspace-fill="" data-testid="package-app-frame">
-      <SectionSidebar standalone {...sidebarProps} />
+    <div className="flex min-h-0 flex-1" data-workspace-fill="" data-slot="package-app-frame" data-testid="package-app-frame">
+      <SectionSidebar standalone density="compact" title={app?.label} headerActions={app ? <AppColumnActions person={person} to={app.to} label={app.label} settingsArea={app.settings_area?.id} /> : undefined} {...sidebarProps} />
       {content}
     </div>
   ) : content;
+}
+
+/** COLUMN-UNIFY-01 (owner, 2026-10-19): the app's settings and favorite controls sit in the column's header, after its title, the way
+ * Chat's column carries Chat settings, so the page keeps one row of its own. Below the `lg` breakpoint the column is not drawn and
+ * the toolbar keeps them. */
+function AppColumnActions({ person, to, label, settingsArea }: { person: Roster; to: string; label: string; settingsArea?: string }) {
+  const { isPinned, togglePin, isLoading, isSaving } = usePinnedApps(person.id);
+  const pinned = isPinned(to);
+  const StarIcon = getIcon("star");
+  const GearIcon = getIcon("settings");
+  return (
+    <>
+      {settingsArea ? (
+        <Button variant="ghost" size="icon" title={`${label} settings`} render={<Link to={`/settings/${settingsArea}`} aria-label={`${label} settings`} />}>
+          <GearIcon aria-hidden="true" />
+        </Button>
+      ) : null}
+      <Button variant="ghost" size="icon" disabled={isLoading || isSaving} aria-pressed={pinned} aria-label={pinned ? "Remove from favorites" : "Add to favorites"} title={pinned ? "Remove from favorites" : "Add to favorites"} onClick={() => togglePin(to)}>
+        <StarIcon aria-hidden="true" fill={pinned ? "currentColor" : "none"} />
+      </Button>
+    </>
+  );
 }
 
 /** The app's own sections as tabs (when it has any) and the pin control. Pins are per person and private. */
@@ -192,11 +214,11 @@ function AppToolbar({ hideSectionsOnWide = false, person, to, label, title, titl
         <div className="flex items-center gap-1">
           <h1 className={cn("min-w-0 flex-1 truncate text-2xl font-bold tracking-tight sm:text-3xl", titleSrOnly && "sr-only")}>{title ?? label}</h1>
           {settingsArea ? (
-            <Button variant="ghost" size="icon-lg" render={<Link to={`/settings/${settingsArea}`} aria-label={`${label} settings`} />}>
+            <Button variant="ghost" size="icon-lg" className={hideSectionsOnWide ? "lg:hidden" : undefined} render={<Link to={`/settings/${settingsArea}`} aria-label={`${label} settings`} />}>
               <GearIcon aria-hidden="true" />
             </Button>
           ) : null}
-          <Button variant="ghost" size="icon-lg" disabled={isLoading || isSaving} aria-pressed={pinned} aria-label={pinned ? "Remove from favorites" : "Add to favorites"} onClick={() => togglePin(to)}>
+          <Button variant="ghost" size="icon-lg" className={hideSectionsOnWide ? "lg:hidden" : undefined} disabled={isLoading || isSaving} aria-pressed={pinned} aria-label={pinned ? "Remove from favorites" : "Add to favorites"} onClick={() => togglePin(to)}>
             <StarIcon aria-hidden="true" fill={pinned ? "currentColor" : "none"} />
           </Button>
         </div>
@@ -229,7 +251,7 @@ function AppToolbar({ hideSectionsOnWide = false, person, to, label, title, titl
           </Tabs>
         </div>
       ) : <span />}
-      <div className="flex items-center gap-1">
+      <div className={cn("flex items-center gap-1", hideSectionsOnWide && "lg:hidden")}>
       {settingsArea ? (
         <Button variant="ghost" size="sm" render={<Link to={`/settings/${settingsArea}`} aria-label={`${label} settings`} />}>
           <GearIcon aria-hidden="true" />

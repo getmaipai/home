@@ -7,6 +7,10 @@ checklist (`docs/dev.md`). The first release is 0.1.0.
 
 ## [Unreleased]
 
+- News and every app with a left column: the settings and favorite buttons sit in the column's header, the article's buttons stay fixed at the top while you read (one row, not two), and the page no longer bounces at the top and bottom. Needs `@maipai/ui` 0.5.299.
+- News: pictures inside a story load again (they were broken images), and the column's Manage row is gone: News settings has a Following row instead.
+- Settings: the column starts with a back link to the app you came from (Chat, News and so on).
+
 ## [0.2.30] - 2026-10-19
 
 Pictures in chat are more reliable and honest, "remove the boy on the left" works, and the Library page loses its title band and gains an Origin link. No database migrations.

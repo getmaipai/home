@@ -29,3 +29,14 @@ test("LEFTNAV-APPS-01: a package app and its sections select their own rail icon
   expect(activeAppHrefForApps("/apps/weather/forecast")).toBe("/apps/weather");
   expect(activeAppHrefForApps("/applications")).toBe("/");
 });
+
+import { backLabelFor } from "./settingsBackLink";
+test("COLUMN-UNIFY-01: the settings back link names the app the person came from", () => {
+  expect(backLabelFor("/chat")).toBe("Chat");
+  expect(backLabelFor("/chat?conversation=c1")).toBe("Chat");
+  expect(backLabelFor("/apps/news/story", { news: "News" })).toBe("News");
+  expect(backLabelFor("/apps/unknown")).toBe("Back");
+  expect(backLabelFor("/files?section=all")).toBe("Library");
+  expect(backLabelFor("/")).toBe("Home");
+  expect(backLabelFor("/status")).toBe("Back");
+});

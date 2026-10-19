@@ -42,3 +42,15 @@ export function activeAppHref(pathname: string, packageAreaApps: Readonly<Record
   }
   return appHrefForRoute(pathname);
 }
+
+/** The words for the settings column's back link: the app the person came from (Chat, Library, a package app by its own name, Home). */
+export function backLabelFor(path: string, appLabels: Readonly<Record<string, string>> = {}): string {
+  const pathname = path.split(/[?#]/, 1)[0] ?? path;
+  const packageApp = /^\/apps\/([a-z][a-z0-9-]*)(?=\/|$)/.exec(pathname)?.[1];
+  if (packageApp) return appLabels[packageApp] ?? "Back";
+  if (pathname === "/chat" || pathname.startsWith("/chat/")) return "Chat";
+  if (pathname === "/files" || pathname.startsWith("/files/")) return "Library";
+  if (pathname === "/people" || pathname.startsWith("/people/")) return "People";
+  if (pathname === "/") return "Home";
+  return "Back";
+}

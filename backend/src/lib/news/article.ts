@@ -183,7 +183,7 @@ export async function articleBlock(item: ShelfItem, env: CardEnv, options: { ret
   const loaded = await loadContent(item, band, { retry: options.retry, store: env.store });
   // A figure's `src` is a hub path numbered in the stored article's order; the publisher's address never leaves the hub.
   let figureNumber = 0;
-  const shown = newsImagesOn() ? loaded.blocks.map((block) => (block.type === "figure" ? { ...block, src: `/api/plugins/news/images/${item.id}/figure/${figureNumber++}` } : block)) : loaded.blocks.filter((block) => block.type !== "figure");
+  const shown = newsImagesOn() ? loaded.blocks.map((block) => (block.type === "figure" ? { ...block, src: `/api/plugins/news/images/${item.id}/figure/${figureNumber++}?w=1280` } : block)) : loaded.blocks.filter((block) => block.type !== "figure");
   const blocks = band === "child" ? gateBlocks(loaded.blocks, gate) : shown;
   if (blocks.length === 0 || gate.sawCrisis()) return null;
   const topic = topicsShown(item, band).map((id) => topicById(id)?.label).find((label): label is string => !!label);

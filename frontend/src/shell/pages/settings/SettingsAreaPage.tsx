@@ -28,6 +28,9 @@ import { CodingAdminSettings } from "@/apps/settings/CodingSettings";
 import { baseViewer, packageAreaKeySet, scopeValueFor, visibleRegistry } from "@/shell/pages/settings/settingsViewer";
 import { useSettingsCapabilities } from "@/shell/pages/settings/useSettingsCapabilities";
 import { confirmRouteLeave } from "@/shell/routeLeaveGuard";
+import { useAppRows } from "@/shell/useAppCatalog";
+import { backLabelFor, lastAppRoute } from "@/shell/pages/settings/settingsBackLink";
+import { getIcon } from "@maipai/ui/src/icons";
 import { useSetupChecklist, setupChecklistCountLine } from "@/shell/useSetupChecklist";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@maipai/ui/src/dashboard/components/ui/card";
 import { Button } from "@maipai/ui/src/dashboard/components/ui/button";
@@ -52,6 +55,25 @@ export function SettingsAreaPage({ person, onPersonChange }: { person: Roster; o
   if (!area && !ready) return <Progress mode="spinner" label="Loading settings" />;
   if (!area || !areaAllows(area, baseViewer(person))) return <Navigate to={settingsPath("account")} replace />;
   return <SettingsAreaBody key={area.id} area={area} packageAreas={packageAreas} person={person} onPersonChange={onPersonChange} />;
+}
+
+const BackIcon = getIcon("arrow-left");
+
+/** COLUMN-UNIFY-01 (owner, 2026-10-19: a settings page had no way back to the app): the settings column's first row returns to the
+ * app the person came from, with the column's title under it. The kit draws no title of its own once it is given a back link. */
+function SettingsBackLink() {
+  const rows = useAppRows();
+  const to = lastAppRoute();
+  const label = backLabelFor(to, Object.fromEntries((rows ?? []).map((row) => [row.package, row.label])));
+  return (
+    <>
+      <div className="flex"><Button variant="ghost" size="sm" render={<Link to={to} aria-label={label === "Back" ? label : `Back to ${label}`} onClick={(event) => { if (!confirmRouteLeave()) event.preventDefault(); }} />}>
+        <BackIcon aria-hidden />
+        {label}
+      </Button></div>
+      <h2 className="px-2 text-lg leading-7 font-semibold">Settings</h2>
+    </>
+  );
 }
 
 function scopesOf(area: SettingsAreaDef, viewer: SettingsViewer): Scope[] {
@@ -194,6 +216,7 @@ function SettingsAreaBody({ area, packageAreas, person, onPersonChange }: { area
   return (
     <SettingsShell
       layout="docked"
+      backLink={<SettingsBackLink />}
       labels={{ columnTitle: "Settings" }}
       contentAs="section"
       area={area}

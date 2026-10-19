@@ -101,6 +101,20 @@ describe("an app that declares a sidebar", () => {
     expect(side.getByText("Following")).toBeTruthy();
   });
 
+  test("COLUMN-UNIFY-01: the column carries the app's name, its settings and its favorite control, and the page keeps none from wide screens up", async () => {
+    rows = [{ ...row, settings_area: { id: "demo", title: "Demo news", app: "/apps/demo" } } as AppRow];
+    const view = open("/apps/demo");
+    await view.findByText("Today's stories");
+    const side = await column(view);
+    expect(side.getByRole("heading", { level: 2, name: "Demo news" })).toBeTruthy();
+    expect(side.getByRole("link", { name: "Demo news settings" }).getAttribute("href")).toBe("/settings/demo");
+    expect(side.getByRole("button", { name: "Add to favorites" })).toBeTruthy();
+    // The page's own toolbar copies stay for a phone only (hidden from the `lg` breakpoint up).
+    const toolbarCopies = [...view.container.querySelectorAll<HTMLElement>('[data-testid="package-app"] a[aria-label="Demo news settings"], [data-testid="package-app"] button[aria-label="Add to favorites"]')];
+    expect(toolbarCopies.length).toBeGreaterThan(0);
+    for (const copy of toolbarCopies) expect(copy.closest(".lg\\:hidden")).not.toBeNull();
+  });
+
   test("choosing a topic opens its page with the row's key as state and marks it current", async () => {
     const view = open("/apps/demo");
     const world = await (await column(view)).findByRole("link", { name: "World" });
