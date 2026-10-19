@@ -7,6 +7,10 @@ checklist (`docs/dev.md`). The first release is 0.1.0.
 
 ## [Unreleased]
 
+### Added
+
+- News: a teen or an adult reading a full article now sees its own pictures and captions in place. Ads, promo and related blocks, tracking pixels, tiny icons and a second copy of the lead picture are left out, and the pictures come through the hub, never from the publisher's address. A child's article stays text only.
+
 ### Changed
 
 - News: each topic page has its own layout, as Apple News does for its categories. World, Business, Sports and Kids open on Top Stories, Science, Health and Environment open with two large cards, and Local, Technology and Entertainment open on Today's News with a wide More for you card. Sources keep the lead card and list. Requires `@maipai/spec` 0.1.188 and `@maipai/ui` 0.5.289.

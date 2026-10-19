@@ -14,7 +14,8 @@ import { channelData, householdTodayData, mixData, savedRows, sourceRows, storyD
 import { recentRows, searchData } from "@/lib/news/search";
 import { releasedItem } from "@/lib/news/cards";
 import { bumpNewsCounter } from "@/lib/news/newsCounters";
-import { NEWS_PICTURE_WIDTHS, newsPicture, type NewsPictureWidth } from "@/lib/news/pictures";
+import { NEWS_PICTURE_WIDTHS, newsFigurePicture, newsPicture, type NewsPictureWidth } from "@/lib/news/pictures";
+import { figureAddressesOf } from "@/lib/news/article";
 
 export const newsRoutes = new Hono<AppEnv>();
 
@@ -65,6 +66,32 @@ newsRoutes.post("/actions/:action", requireAuth, async (c) => {
   if (!isAction(action) || !appRouteAllowed(person, "news", "actions", action)) { bumpNewsCounter("route_refused"); return c.json({ error: "no such action" }, 404); }
   const result = await runNewsAction(person, action, await bodyOf(c));
   return result.ok ? c.json(result.value, 200) : c.json({ error: result.error }, result.status);
+});
+
+// NEWS-ARTICLE-FIGURES-01: one picture inside an article. The number is looked up in the requester's own age-band copy of the
+// stored article, so a child, a guessed item or a number past the article's pictures is a 404, never a fetch.
+newsRoutes.get("/images/:item/figure/:n", requireAuth, async (c) => {
+  const person = c.get("person");
+  if (!appImageAllowed(person, "news")) { bumpNewsCounter("route_refused"); return c.json({ error: "no such picture" }, 404); }
+  const rawWidth = c.req.query("w") ?? "";
+  if (!/^(480|1280)$/.test(rawWidth)) return c.json({ error: "Ask for a picture 480 or 1280 pixels wide." }, 400);
+  const rawNumber = c.req.param("n");
+  if (!/^\d{1,2}$/.test(rawNumber)) return c.json({ error: "no such picture" }, 404);
+  const viewer = viewerOf(person);
+  const item = releasedItem(viewer, c.req.param("item"));
+  if (!item) return c.json({ error: "no such picture" }, 404);
+  const address = figureAddressesOf(item, viewer.band)[Number(rawNumber)];
+  if (!address) return c.json({ error: "no such picture" }, 404);
+  const picture = await newsFigurePicture(item.id, Number(rawNumber), address, Number(rawWidth) as NewsPictureWidth, viewer.band);
+  if (!picture) return c.json({ error: "no such picture" }, 404);
+  c.header("Content-Type", "image/webp");
+  c.header("Cache-Control", "private, max-age=86400");
+  c.header("ETag", picture.etag);
+  c.header("X-Content-Type-Options", "nosniff");
+  c.header("Content-Security-Policy", "default-src 'none'");
+  c.header("Cross-Origin-Resource-Policy", "same-origin");
+  if (c.req.header("if-none-match") === picture.etag) return c.body(null, 304);
+  return c.body(new Uint8Array(picture.bytes), 200);
 });
 
 newsRoutes.get("/images/:item", requireAuth, async (c) => {

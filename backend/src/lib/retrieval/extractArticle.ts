@@ -31,6 +31,37 @@ export interface FullArticle { byline?: string; leadCaption?: string; title: str
 
 function plain(el: Element): string { return cleanText(el.textContent ?? ""); }
 
+// A figure in a publisher article counts as a picture of the story, not an ad or a tracker. A block is an ad (or a
+// recommendation) when its own or an ancestor's class or id names one; a picture is not worth drawing under 200 pixels
+// or when it is a pixel, a spacer or an ad-network address.
+const NON_STORY_BLOCK = /(?:^|[\s_-])(?:ads?|advert(?:isement|ising)?|sponsor(?:ed)?|promo(?:tion|ted)?|newsletter|related|recirc|recommend(?:ed|ations?)?|outbrain|taboola|affiliate|commerce|paid)(?:$|[\s_-])/i;
+const NON_STORY_ADDRESS = /(?:doubleclick|googlesyndication|adservice|adsystem|pixel|spacer|1x1|beacon|tracking|\/ads?\/)/i;
+const MIN_FIGURE_PX = 200;
+
+function bestImageAddress(img: Element): string {
+  const srcset: string = img.getAttribute("srcset") ?? img.getAttribute("data-srcset") ?? "";
+  const widest = srcset.split(",").map((part) => part.trim().split(/\s+/)).filter((bits) => bits[0]).map((bits) => ({ url: bits[0]!, w: Number.parseInt(bits[1] ?? "0", 10) || 0 })).sort((a, b) => b.w - a.w)[0];
+  return img.getAttribute("src") || img.getAttribute("data-src") || widest?.url || "";
+}
+
+function newsFigureOf(el: Element, baseUrl: string | undefined): Extract<ArticleBlock, { type: "figure" }> | null {
+  for (let node: Element | null = el; node; node = node.parentElement) {
+    const marks = `${node.getAttribute("class") ?? ""} ${node.getAttribute("id") ?? ""} ${node.getAttribute("data-component") ?? ""}`;
+    if (NON_STORY_BLOCK.test(marks) || node.hasAttribute("data-ad") || node.getAttribute("role") === "complementary") return null;
+  }
+  const img = el.querySelector("img");
+  if (!img) return null;
+  const raw = bestImageAddress(img);
+  if (!raw || /^data:/i.test(raw) || NON_STORY_ADDRESS.test(raw)) return null;
+  const width = Number.parseInt(img.getAttribute("width") ?? "", 10);
+  const height = Number.parseInt(img.getAttribute("height") ?? "", 10);
+  if ((Number.isFinite(width) && width < MIN_FIGURE_PX) || (Number.isFinite(height) && height < MIN_FIGURE_PX)) return null;
+  let src: string;
+  try { const url = baseUrl ? new URL(raw, baseUrl) : new URL(raw); if (!/^https?:$/.test(url.protocol) || url.username || url.password) return null; src = url.href; } catch { return null; }
+  const caption = plain(el.querySelector("figcaption") ?? el);
+  return { type: "figure", src, alt: cleanText(img.getAttribute("alt") ?? ""), caption: el.querySelector("figcaption") ? caption : "" };
+}
+
 /** Extract a closed, renderable block model. This walk deliberately ignores unknown markup. */
 export interface FullArticleOptions {
   book: string; allowedBooks: ReadonlySet<string>; allowLinks: boolean; allowImages: boolean;
@@ -144,7 +175,10 @@ export function extractFullArticle(html: string, opts: FullArticleOptions): Full
       const rows = trs.map((tr) => (Array.from(tr.querySelectorAll(":scope > th,:scope > td")) as Element[]).map(plain)).filter((r) => r.length);
       if (el.matches(".infobox,.infobox_v2,.infobox_v3")) { const pairs = trs.flatMap((tr) => { const th = tr.querySelector("th"); const td = tr.querySelector("td"); const label = th && plain(th), value = td && plain(td); return label && value ? [{ label, value }] : []; }); if (pairs.length) blocks.push({ type: "rows", rows: pairs }); }
       else if (rows.length) { const first = rows[0]!; blocks.push({ type: "table", headers: first, rows: rows.slice(1) }); }
-    } else if (tag === "figure" && opts.allowImages) { const img = el.querySelector("img"); const src = img?.getAttribute("src") ?? ""; if (/^(?:\/|\.\/|https?:\/\/)/i.test(src) && !/^data:/i.test(src)) blocks.push({ type: "figure", src, alt: img?.getAttribute("alt") ?? "", caption: plain(el.querySelector("figcaption") ?? el) }); }
+    } else if (tag === "figure" && opts.allowImages) {
+      if (news) { const figure = newsFigureOf(el, opts.baseUrl); if (figure) blocks.push(figure); continue; }
+      const img = el.querySelector("img"); const src = img?.getAttribute("src") ?? ""; if (/^(?:\/|\.\/|https?:\/\/)/i.test(src) && !/^data:/i.test(src)) blocks.push({ type: "figure", src, alt: img?.getAttribute("alt") ?? "", caption: plain(el.querySelector("figcaption") ?? el) });
+    }
   }
   // Wiktionary and similar definition lists.
   for (const dl of Array.from(root.querySelectorAll("dl")) as Element[]) {

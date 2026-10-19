@@ -755,3 +755,81 @@ test("saving a story pins its enriched picture in the same cache as a feed pictu
   const index = JSON.parse(readFileSync(join(newsPictureDir(), "index.json"), "utf8")) as Record<string, { pinned?: boolean }>;
   expect(index[pictureRefOf(item.id)]!.pinned).toBe(true);
 });
+
+describe("pictures inside the article (NEWS-ARTICLE-FIGURES-01)", () => {
+  const withFigures = (): string => articleHtml().replace("<blockquote>", [
+    `<figure><img src="${ADULT_HOST}/img/real-one.png" alt="The harbor at dawn" width="1200" height="800"><figcaption>The harbor at dawn, before the vote.</figcaption></figure>`,
+    `<div class="ad-slot sponsored"><figure><img src="${ADULT_HOST}/img/ad-banner.png" alt="Buy now"><figcaption>Advertisement</figcaption></figure></div>`,
+    `<figure><img src="${ADULT_HOST}/img/pixel.png" width="1" height="1" alt=""></figure>`,
+    `<figure><img src="${ADULT_HOST}/img/small.png" width="90" height="90" alt="icon"></figure>`,
+    `<aside class="related-stories"><figure><img src="${ADULT_HOST}/img/related.png" alt="Related"><figcaption>Related story</figcaption></figure></aside>`,
+    `<figure><img src="/img/real-two.png" alt="Council chamber"><figcaption>The council chamber.</figcaption></figure>`,
+    `<figure><img src="/img/real-two.png?v=2" alt="Same file again"><figcaption>Duplicate.</figcaption></figure>`,
+    "<blockquote>",
+  ].join(""));
+
+  const open = async (client: TestClient, id: string) => ((await (await post(client, "data/story", { id })).json()) as { blocks: Array<{ props: { blocks: Array<{ type: string; src?: string; alt?: string; caption?: string }> } }> }).blocks[0]!.props.blocks;
+
+  async function seed() {
+    publisher.stop();
+    publisher = await startPublisher({ "/story/page": withFigures() });
+    publisher.attach();
+    installNewsApp();
+    const who = await household();
+    const wire = putItem(feeds.household, ADULT_HOST, { path: "/story/page", title: "Harbor plan" });
+    const kids = putItem(feeds.kids, KIDS_HOST, { path: "/story/page", title: "Harbor plan for kids" });
+    return { who, wire, kids };
+  }
+
+  test("an adult keeps the two real pictures with captions; the ad, the pixel, the tiny icon, the related block and the duplicate are left out", async () => {
+    const { who, wire } = await seed();
+    const figures = (await open(who.adult, wire.id)).filter((block) => block.type === "figure");
+    expect(figures.map((figure) => figure.caption)).toEqual(["The harbor at dawn, before the vote.", "The council chamber."]);
+    expect(figures.map((figure) => figure.alt)).toEqual(["The harbor at dawn", "Council chamber"]);
+    expect(figures.map((figure) => figure.src)).toEqual([`/api/plugins/news/images/${wire.id}/figure/0`, `/api/plugins/news/images/${wire.id}/figure/1`]);
+  });
+
+  test("the publisher's address is in no figure source, and a figure comes through the hub as a cached WebP", async () => {
+    const { who, wire } = await seed();
+    const body = await text(await post(who.adult, "data/story", { id: wire.id }));
+    expect(body).not.toContain("real-one.png");
+    expect(body).not.toContain("wire.example.test/img/real");
+    const first = await who.adult.get(`/api/plugins/news/images/${wire.id}/figure/0?w=480`);
+    expect(first.status).toBe(200);
+    expect(first.headers.get("content-type")).toBe("image/webp");
+    const meta = await sharp(Buffer.from(await first.arrayBuffer())).metadata();
+    expect([meta.format, meta.width]).toEqual(["webp", 480]);
+    const before = publisher.requests.filter((path) => path.startsWith("/img/real")).length;
+    expect((await who.adult.get(`/api/plugins/news/images/${wire.id}/figure/0?w=1280`)).status).toBe(200);
+    expect((await who.adult.get(`/api/plugins/news/images/${wire.id}/figure/0?w=480`)).status).toBe(200);
+    expect(publisher.requests.filter((path) => path.startsWith("/img/real")).length).toBe(before);
+  });
+
+  test("a number the article does not have, a guessed item and a bad width never fetch", async () => {
+    const { who, wire } = await seed();
+    await post(who.adult, "data/story", { id: wire.id });
+    const imagesBefore = publisher.requests.filter((path) => path.startsWith("/img/")).length;
+    expect((await who.adult.get(`/api/plugins/news/images/${wire.id}/figure/2?w=480`)).status).toBe(404);
+    expect((await who.adult.get(`/api/plugins/news/images/${wire.id}/figure/x?w=480`)).status).toBe(404);
+    expect((await who.adult.get(`/api/plugins/news/images/news-nope/figure/0?w=480`)).status).toBe(404);
+    expect((await who.adult.get(`/api/plugins/news/images/${wire.id}/figure/0?w=100`)).status).toBe(400);
+    expect(publisher.requests.filter((path) => path.startsWith("/img/")).length).toBe(imagesBefore);
+  });
+
+  test("a child's article has no figure, and a child asking for a figure number gets a 404", async () => {
+    const { who, wire, kids } = await seed();
+    await post(who.adult, "data/story", { id: wire.id });
+    const blocks = await open(who.child, kids.id);
+    expect(blocks.some((block) => block.type === "figure")).toBe(false);
+    await post(who.child, "data/story", { id: kids.id });
+    expect((await who.child.get(`/api/plugins/news/images/${kids.id}/figure/0?w=480`)).status).toBe(404);
+  });
+
+  test("with News pictures turned off no figure is drawn or fetched", async () => {
+    const { who, wire } = await seed();
+    setHouseholdSettingValue("news.images", false);
+    const blocks = await open(who.adult, wire.id);
+    expect(blocks.some((block) => block.type === "figure")).toBe(false);
+    expect((await who.adult.get(`/api/plugins/news/images/${wire.id}/figure/0?w=480`)).status).toBe(404);
+  });
+});

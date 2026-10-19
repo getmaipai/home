@@ -1,8 +1,8 @@
 // NEWS-02 (news note sections 8 step 3, 10, 11): opening a story. The one reader turns the item's page into the `ArticleBlock`
 // list: one fetch of the item's own address through the shared page guards (the band's blocked sites, the fetch cache with its 24
 // hour news time-to-live, robots.txt, the per-host pace, the SSRF guard, the Archive copy for a gone page), then
-// `extractFullArticle` in its news mode (outbound links kept for a teen or an adult, none for a child; no figures: pictures come
-// through the picture route only). A page whose text is not an article (under 400 characters, the quality rule) or that
+// `extractFullArticle` in its news mode (outbound links kept for a teen or an adult, none for a child; a teen or an adult also keeps
+// the page's own pictures and captions, never an ad, and reaches them only through the picture route: a child's copy holds no figures). A page whose text is not an article (under 400 characters, the quality rule) or that
 // cannot be fetched shows the feed's own summary as a teaser. A failure is remembered 30 minutes; "Try again" bypasses.
 // A child's text passes the minor floor and then the child gate sentence by sentence, into both `blocks` and `speech[]`.
 import { randomSuffix } from "@/lib/id";
@@ -17,6 +17,7 @@ import { gateBlocks, inlineText, speechFor } from "./childGate";
 import { hostOf, imageOf, publishedAtOf, publisherOf, storyIdOf, topicsShown, type CardEnv } from "./cards";
 import { bumpNewsCounter } from "./newsCounters";
 import { topicById } from "./topics";
+import { newsImagesOn } from "./pictures";
 
 const NEWS_TTL_MS = 24 * 60 * 60 * 1000;
 // "Failures remembered 30 minutes" is contentQuality's rule (NEWS-02b); the memory is keyed by the item's address.
@@ -48,6 +49,38 @@ async function readPage(url: string, band: "child" | "teen" | "adult", backgroun
 /** One stored copy per band: a teen is never served text an adult's fetch kept (the minor floor and the blocked-site check ran for the adult's rules, not the teen's). */
 function variantOf(band: "child" | "teen" | "adult"): ContentVariant {
   return band;
+}
+
+/** What the minor floor reads for a teen: the text, and the caption and alt text of every picture. */
+function floorTextOf(blocks: readonly ArticleBlock[]): string {
+  const pictures = blocks.flatMap((block) => (block.type === "figure" ? [block.caption, block.alt] : [])).filter(Boolean);
+  return [textOfBlocks(blocks), ...pictures].join("\n");
+}
+
+const MAX_FIGURES = 12;
+const withoutQuery = (address: string): string => { try { const url = new URL(address); return `${url.hostname}${url.pathname}`; } catch { return address; } };
+
+/** The page's pictures a reader may keep: the same file only once, never the story's own lead picture again, at most twelve. */
+function keepFigures(blocks: readonly ArticleBlock[], leadAddress: string | undefined): ArticleBlock[] {
+  const seen = new Set<string>(leadAddress ? [withoutQuery(leadAddress)] : []);
+  let kept = 0;
+  return blocks.filter((block) => {
+    if (block.type !== "figure") return true;
+    const key = withoutQuery(block.src);
+    if (seen.has(key) || kept >= MAX_FIGURES) return false;
+    seen.add(key);
+    kept++;
+    return true;
+  });
+}
+
+/** The publisher addresses of a stored article's pictures, in order: what `/images/:item/figure/:n` resolves a number against.
+ * Read from the requester's own age-band copy, so a child (whose copy has none) never resolves a figure. */
+export function figureAddressesOf(item: ShelfItem, band: "child" | "teen" | "adult", store: ShelfStore | null = sharedShelfStore()): string[] {
+  if (band === "child") return [];
+  const stored = store?.getContent(item.id, variantOf(band)) ?? null;
+  if (!stored || stored.source === "teaser") return [];
+  return (stored.blocks as ArticleBlock[]).flatMap((block) => (block.type === "figure" ? [block.src] : []));
 }
 
 export function textOfBlocks(blocks: readonly ArticleBlock[]): string {
@@ -95,7 +128,7 @@ async function loadContentOnce(item: ShelfItem, band: "child" | "teen" | "adult"
   const variant = variantOf(band);
   const stored = store?.getContent(item.id, variant) ?? null;
   // A stored copy is served again at release: a teen's meets the minor floor whether or not it was checked when it was kept (a child's is cut sentence by sentence by the child gate).
-  const usable = stored && stored.source !== "teaser" && (band !== "teen" || !tripsMinorFloor(textOfBlocks(stored.blocks as ArticleBlock[]))) ? stored : null;
+  const usable = stored && stored.source !== "teaser" && (band !== "teen" || !tripsMinorFloor(floorTextOf(stored.blocks as ArticleBlock[]))) ? stored : null;
   if (usable && (usable.pinned || Date.now() - Date.parse(usable.fetched_at) < NEWS_TTL_MS)) {
     return { blocks: usable.blocks as ArticleBlock[], source: usable.source, reading_s: usable.reading_s, stored: true };
   }
@@ -114,11 +147,12 @@ async function loadContentOnce(item: ShelfItem, band: "child" | "teen" | "adult"
   else if (failures.has(item.url)) return fallback();
   try {
     const page = await readPage(item.url, band, options.background);
-    const article = extractFullArticle(page.html, { book: "news", allowedBooks: new Set(), allowLinks: band !== "child", allowImages: false, mode: "news", baseUrl: item.url });
-    const blocks = article.blocks.filter((block) => block.type !== "figure");
+    const withPictures = band !== "child" && newsImagesOn();
+    const article = extractFullArticle(page.html, { book: "news", allowedBooks: new Set(), allowLinks: band !== "child", allowImages: withPictures, mode: "news", baseUrl: item.url });
+    const blocks = withPictures ? keepFigures(article.blocks, item.image_url) : article.blocks.filter((block) => block.type !== "figure");
     const text = textOfBlocks(blocks);
     // A minor's fetched text meets the same floor a search page does; one that trips it shows the feed's own text, never the page.
-    if (!acceptArticleText(text) || (band !== "adult" && tripsMinorFloor(text))) {
+    if (!acceptArticleText(text) || (band !== "adult" && tripsMinorFloor(floorTextOf(blocks)))) {
       failures.record(item.url);
       return fallback();
     }
@@ -147,7 +181,10 @@ export async function articleBlock(item: ShelfItem, env: CardEnv, options: { ret
   const title = band === "child" ? gate.text(item.title) : item.title;
   if (!title || (band === "child" && !gate.passes(publisher))) return null;
   const loaded = await loadContent(item, band, { retry: options.retry, store: env.store });
-  const blocks = band === "child" ? gateBlocks(loaded.blocks, gate) : loaded.blocks;
+  // A figure's `src` is a hub path numbered in the stored article's order; the publisher's address never leaves the hub.
+  let figureNumber = 0;
+  const shown = newsImagesOn() ? loaded.blocks.map((block) => (block.type === "figure" ? { ...block, src: `/api/plugins/news/images/${item.id}/figure/${figureNumber++}` } : block)) : loaded.blocks.filter((block) => block.type !== "figure");
+  const blocks = band === "child" ? gateBlocks(loaded.blocks, gate) : shown;
   if (blocks.length === 0 || gate.sawCrisis()) return null;
   const topic = topicsShown(item, band).map((id) => topicById(id)?.label).find((label): label is string => !!label);
   const image = imageOf(item, title, publisher, env);

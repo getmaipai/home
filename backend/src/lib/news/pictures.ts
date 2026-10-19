@@ -49,6 +49,10 @@ type PictureIndex = Record<string, IndexEntry>;
 export function pictureRefOf(itemId: string): string {
   return `nimg_${itemId.replace(/^news-/, "").replace(/[^a-z0-9]/g, "")}`;
 }
+/** The cache key of one picture inside an article (NEWS-ARTICLE-FIGURES-01): the item's key and the figure's number. */
+export function figureRefOf(itemId: string, n: number): string {
+  return `${pictureRefOf(itemId)}_f${n}`;
+}
 const fileOf = (ref: string, width: NewsPictureWidth): string => join(newsPictureDir(), `${ref}-${width}.webp`);
 
 function readIndex(): PictureIndex {
@@ -267,6 +271,15 @@ async function ensure(item: ShelfItem, band: AgeBand): Promise<boolean> {
     failed.set(failureKey, clock() + FAILURE_MEMORY_MS);
     return false;
   }
+  persist(ref, sizes);
+  sharedShelfStore()?.setImageRef(item.id, ref);
+  bumpNewsCounter("picture_fetched");
+  sweepNewsPictures();
+  return existsSync(fileOf(ref, 480));
+}
+
+/** Writes both sizes under one cache key and records them in the index. */
+function persist(ref: string, sizes: Record<NewsPictureWidth, Uint8Array>): void {
   mkdirSync(newsPictureDir(), { recursive: true });
   let total = 0;
   for (const width of NEWS_PICTURE_WIDTHS) {
@@ -276,10 +289,41 @@ async function ensure(item: ShelfItem, band: AgeBand): Promise<boolean> {
   const next = readIndex();
   next[ref] = { bytes: total, lastUsedAt: new Date(clock()).toISOString(), ...(next[ref]?.pinned ? { pinned: true } : {}) };
   writeIndex(next);
-  sharedShelfStore()?.setImageRef(item.id, ref);
+}
+
+/** One picture inside an article: fetched once from the address the item's stored article names, then the cache. */
+async function ensureFigure(itemId: string, n: number, address: string, band: AgeBand): Promise<boolean> {
+  const ref = figureRefOf(itemId, n);
+  if (readIndex()[ref] && NEWS_PICTURE_WIDTHS.every((width) => existsSync(fileOf(ref, width)))) return true;
+  const failureKey = `${ref}:${band}`;
+  if ((failed.get(failureKey) ?? 0) > clock()) return false;
+  const bytes = await downloadOnce(address, band);
+  const sizes = bytes ? await resizeBoth(bytes) : null;
+  if (!sizes) { failed.set(failureKey, clock() + FAILURE_MEMORY_MS); return false; }
+  persist(ref, sizes);
   bumpNewsCounter("picture_fetched");
   sweepNewsPictures();
   return existsSync(fileOf(ref, 480));
+}
+
+/** A figure of an article at one width. `address` comes from the item's own stored article (the route looks it up), never from a
+ * request. Null when pictures are off, the host is backed off or the fetch failed. */
+export async function newsFigurePicture(itemId: string, n: number, address: string, width: NewsPictureWidth, band: AgeBand = "adult"): Promise<{ bytes: Uint8Array; etag: string } | null> {
+  if (!newsImagesOn()) return null;
+  const key = `${figureRefOf(itemId, n)}:${band}`;
+  let pending = inFlight.get(key);
+  if (!pending) {
+    pending = ensureFigure(itemId, n, address, band).finally(() => inFlight.delete(key));
+    inFlight.set(key, pending);
+  }
+  if (!(await pending)) return null;
+  const ref = figureRefOf(itemId, n);
+  const path = fileOf(ref, width);
+  if (!existsSync(path)) return null;
+  const bytes = new Uint8Array(readFileSync(path));
+  const index = readIndex();
+  if (index[ref]) { index[ref].lastUsedAt = new Date(clock()).toISOString(); writeIndex(index); }
+  return { bytes, etag: `"${createHash("sha1").update(bytes).digest("hex").slice(0, 24)}"` };
 }
 
 /** The picture of an item at one width, from the cache; the first request for the item fetches it once. Null when the item
