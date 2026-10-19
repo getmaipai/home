@@ -92,7 +92,7 @@ describe("GET /api/apps", () => {
   test("a package without pages is not an app: the bundled set lists only the apps with pages, by label", async () => {
     const { client } = await owner();
     expect((await fixtureApps(client)).map((row) => row.package)).toEqual([]);
-    expect(((await (await client.get("/api/apps")).json()) as Array<{ package: string }>).map((row) => row.package)).toEqual(["music", "podcasts", "news", "videos", "weather"]);
+    expect(((await (await client.get("/api/apps")).json()) as Array<{ package: string }>).map((row) => row.package)).toEqual(["music", "news", "podcasts", "videos", "weather"]);
   });
 
   test("an installed app lists with its launcher fields, sections and route", async () => {
