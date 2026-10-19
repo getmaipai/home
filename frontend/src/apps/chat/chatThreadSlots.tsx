@@ -4,6 +4,7 @@
 // hands them to the kit Thread.
 import { CHAT_ART_HEIGHT, CHAT_ART_WIDTH, nextChatArt } from "@/apps/chat/chatArt";
 import { useReplyFeedbackForm } from "@/apps/chat/chatFeedbackDialog";
+import { SafeImage } from "@maipai/ui/src/primitives/SafeImage";
 import { FeedbackDialog } from "@maipai/ui/src/elements/feedback-dialog";
 import { MemoryChips } from "@maipai/ui/src/elements/memory-chips";
 import { memoryChipsAllowed, useReplyMemoryChips } from "@/apps/chat/chatMemoryChips";
@@ -561,7 +562,7 @@ export function ChatWelcome() {
   return (
     <>
       <EngineStartingLoader />
-      <img src={art.src} alt={art.alt} width={CHAT_ART_WIDTH} height={CHAT_ART_HEIGHT} loading="lazy" className="mx-auto mb-2 h-auto w-40 max-w-full sm:w-52" />
+      <SafeImage src={art.src} alt={art.alt} kind="picture" width={CHAT_ART_WIDTH} height={CHAT_ART_HEIGHT} className="mx-auto mb-2 h-auto w-40 max-w-full sm:w-52" />
       <EmptyState>
         <EmptyStateGreeting>{on ? "Temporary chat" : "How can I help you today?"}</EmptyStateGreeting>
         {on ? <p className="text-muted-foreground text-center text-sm">This chat won&apos;t be saved to your history.</p> : null}

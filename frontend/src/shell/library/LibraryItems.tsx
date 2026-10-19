@@ -5,6 +5,7 @@ import type { FileTileData } from "@maipai/ui/src/primitives/FileTile";
 import { DataTable, type DataTableColumn, type DataTableSort } from "@maipai/ui/src/elements/data-table";
 import { Button } from "@maipai/ui/src/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@maipai/ui/src/ui/dropdown-menu";
+import { SafeImage, type ImageFallbackKind } from "@maipai/ui/src/primitives/SafeImage";
 import { getIcon } from "@maipai/ui/src/icons";
 import { formatBytes } from "@maipai/ui/src/format";
 import { formatRelative } from "@maipai/ui/src/relativeTime";
@@ -72,13 +73,14 @@ const SORT_TO_TABLE: Record<SortId, DataTableSort> = {
   name: { columnId: "name", direction: "asc" }, size: { columnId: "size", direction: "desc" },
 };
 
-function NameCell({ item }: { item: LibraryItem }) {
-  const Icon = getIcon({ image: "camera", video: "film", audio: "music", document: "file-text" }[fileKind(item.kind) as string] ?? "box");
+const THUMB_KIND: Record<string, ImageFallbackKind> = { image: "picture", video: "video", audio: "music", document: "file" };
+
+export function NameCell({ item }: { item: LibraryItem }) {
+  const kind = THUMB_KIND[fileKind(item.kind) as string] ?? "file";
   return (
     <span className="flex min-w-0 items-center gap-3">
-      <span className="relative flex size-12 shrink-0 items-center justify-center overflow-hidden rounded-md bg-muted text-muted-foreground">
-        <Icon aria-hidden className="size-5" />
-        {hasThumbnail(item) ? <img src={item.thumb_url} alt="" width={48} height={48} loading="lazy" decoding="async" onError={(event) => { event.currentTarget.style.display = "none"; }} className="absolute inset-0 size-full object-cover" /> : null}
+      <span className="flex size-12 shrink-0 overflow-hidden rounded-md">
+        <SafeImage src={hasThumbnail(item) ? item.thumb_url : null} kind={kind} alt="" width={48} height={48} decoding="async" className="size-full object-cover" />
       </span>
       <span className="min-w-0 truncate text-base font-medium text-foreground">{item.name}</span>
     </span>
