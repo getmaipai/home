@@ -17,6 +17,6 @@ describe("the stopped-reply line (a film plot that trips the child-safety floor)
     expect(safetyRefusalLine("child", ["csam"])).toBe(SAFETY_REFUSAL_COPY.child);
   });
   test("the answering round is told to retell such a story in general terms", () => {
-    expect(phrasingInstruction("written", "what is the movie taxi driver about", 3)).toContain("leave out the person's age and any sexual wording");
+    expect(phrasingInstruction("written", "what is the movie taxi driver about", 3)).toContain("leave out their age and any sexual wording");
   });
 });

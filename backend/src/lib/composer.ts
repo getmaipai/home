@@ -1208,7 +1208,7 @@ export function phrasingInstruction(surfaceClass: SurfaceClass, utterance: strin
     "Any specific current fact - who holds an office, a date, a number, a price, a score, what is latest - comes from the results or is left out.",
     "Where the results contradict what you know, the results win.",
     "Where the results do not bear on the question, answer from what you know and say nothing about searching.",
-    "When you retell a story in which a young person is in a sexual or abusive situation, say what happens in general terms: leave out the person's age and any sexual wording.",
+    "Retelling a story that involves a young person in a sexual setting: leave out their age and any sexual wording.",
   ];
   if (searchResultCount > 0) {
     const itemLimit = Math.min(searchResultCount, 7);
