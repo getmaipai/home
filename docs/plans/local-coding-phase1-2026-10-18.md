@@ -35,9 +35,12 @@ Splash where the machine qualifies and the gateway verifies its `/v1/messages` a
 CODE-API-02 carry that check; Splash's claim of those endpoints is untested), llama-server everywhere else and as the fallback
 when Splash's wires fail the check. The design's "wires served natively by the engine, no translating proxy" holds on both.
 
-**Install and remove through the catalog.** The coding model is a catalog `model` package (docs/PACKAGES.md); the coding engine is
-an entry in the catalog's engine index, installed and pinned by the Stack (PACKAGES.md has no `engine` package kind and this note
-adds none). Settings lists both with their size and an Install or Remove button for an admin. Removing a piece while Coding is on is refused with a plain sentence until Coding is turned off; keys stay and are
+**Install and remove through the Stack.** The coding engine is an entry in the catalog's engine index (Splash 1.3.2, landed as
+CODE-STACK-01 C1, catalog 4020d5f), installed and pinned by the Stack (PACKAGES.md has no `engine` package kind and this note adds
+none). The coding model is a Stack-pinned model (`modelCatalog.ts`, landed in CODE-STACK-01 S1), installed through the Stack's
+install plan like every other model: the catalog's `model` package kind cannot carry download pins, quantization, tier or
+removability today, so the earlier wording "a catalog `model` package" is corrected here and the catalog entry (C2) was dropped
+on 2026-10-18. Settings lists both with their size and an Install or Remove button for an admin. Removing a piece while Coding is on is refused with a plain sentence until Coding is turned off; keys stay and are
 suspended while a piece is missing. The model downloads from its pinned source by revision and sha256 through the Stack's
 downloader; the engine installs by its pinned release. Both are downloads at install time, listed on the privacy page
 (docs/THIRD-PARTY-SERVICES.md), never at run time.
@@ -76,6 +79,19 @@ Before Splash ships as the coding engine, record its outbound behaviour in `docs
 update or model-hub check, and how the Stack runs it with those off or offline (`--offline`, environment switches), verified on a
 scratch Stack. The trial saw none in the Splash formula or the Splish source it was compared with, but nothing on record proves
 Splash itself sends nothing. An engine that phones home does not ship.
+
+**Measured 2026-10-18 (Splash 1.3.2, the release archive from the catalog entry, sha256 c3deb1dd, on the owner's Studio).**
+Static scan of the archive: the Python sources (`install/`, `server/`) contain no outbound host except documentation links in
+help text and `127.0.0.1`/`localhost`; the native engine binary contains no URL at all; no telemetry, analytics, crash-report or
+update-check code or keywords appear in either. Run test: Splash served Qwen3.8-27B UD-Q4_K_M from its local store with
+`--offline` under a `sandbox-exec` profile that denies all network except loopback, reached `Ready`, answered a chat request
+correctly (17 times 23 is 391, reasoning separated, 157 tok/s on that short answer) and held no socket other than its own
+listener on 127.0.0.1. So Splash needs no network to run once its model and draft are on disk; the Stack runs it with `--offline`
+and the network denied where the platform allows. Two behaviours the Stack must set: Splash keeps an SSD cache of up to 32 GiB of
+temporary files in the system temp folder by default (`--max-cache-disk` lowers it; `--persistent-cache` stays off), and it uses
+the Neural Engine for part of the work (`--disable-ane` turns that off). Its first start downloads the model and its draft from
+Hugging Face unless they are already present, so the install step (not the run step) is the only outbound moment, and it goes
+through the Stack's pinned downloader, not Splash's own.
 
 ## Out of scope
 
