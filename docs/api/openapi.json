@@ -41688,7 +41688,7 @@
         ],
         "responses": {
           "200": {
-            "description": "Found. Chat provenance is included only for the file owner.",
+            "description": "Found. Chat provenance is included only for the file owner. Home-made song player data follows file access.",
             "content": {
               "application/json": {
                 "schema": {
@@ -41962,6 +41962,94 @@
                     },
                     "chat_deleted": {
                       "type": "boolean"
+                    },
+                    "music": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string"
+                        },
+                        "title": {
+                          "type": "string",
+                          "nullable": true
+                        },
+                        "description": {
+                          "type": "string",
+                          "nullable": true
+                        },
+                        "lyrics": {
+                          "type": "string",
+                          "nullable": true
+                        },
+                        "timed_lyrics": {
+                          "type": "array",
+                          "nullable": true,
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "t": {
+                                "type": "number"
+                              },
+                              "line": {
+                                "type": "string"
+                              },
+                              "section": {
+                                "type": "string",
+                                "nullable": true
+                              }
+                            },
+                            "required": [
+                              "t",
+                              "line",
+                              "section"
+                            ]
+                          }
+                        },
+                        "cover_url": {
+                          "type": "string",
+                          "nullable": true
+                        },
+                        "versions": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "id": {
+                                "type": "string"
+                              },
+                              "label": {
+                                "type": "string"
+                              },
+                              "url": {
+                                "type": "string"
+                              }
+                            },
+                            "required": [
+                              "id",
+                              "label",
+                              "url"
+                            ]
+                          }
+                        },
+                        "current_id": {
+                          "type": "string",
+                          "nullable": true
+                        },
+                        "owner": {
+                          "type": "boolean"
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "title",
+                        "description",
+                        "lyrics",
+                        "timed_lyrics",
+                        "cover_url",
+                        "versions",
+                        "current_id",
+                        "owner"
+                      ]
                     }
                   },
                   "required": [
