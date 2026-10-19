@@ -7,7 +7,7 @@ import { TestClient } from "./client";
 import { newConversationTurnId, newPersonId } from "@/lib/id";
 import { nextHlc } from "@/lib/hlc";
 import { existsSync } from "node:fs";
-import { createAttachment, deleteAttachmentsForTurns, readAttachment, attachmentFilePath } from "@/lib/attachments";
+import { createAttachment, storeFile, deleteAttachmentsForTurns, readAttachment, attachmentFilePath } from "@/lib/attachments";
 import { resolveOrCreateConversation } from "@/lib/conversationHistory";
 import { getHouseholdSettingValue, setHouseholdSettingValue } from "@/lib/settings";
 import { expiringLibraryFiles, previewLibraryRetention, runLibraryRetention } from "@/lib/libraryRetention";
@@ -216,4 +216,77 @@ test("expiring bytes count identical content once (review round 2)", async () =>
   const summary = librarySummary(f.actor, {});
   expect(summary.expiring.items).toBe(2);
   expect(summary.expiring.bytes).toBe(10);
+});
+
+test("Keep pins a detached generated Library item before the grace expires", async () => {
+  const f = fixture();
+  const generated = f.make("conversation");
+  f.make("kept"); f.make("kept");
+  const { updateLibraryFile } = await import("@/lib/libraryEdit");
+  expect(listLibrary(f.actor, {}).items.some(item => item.id === generated.id)).toBe(true);
+  const now = Date.parse("2026-10-19T01:00:00Z");
+  await runLibraryRetention(now);
+  expect(updateLibraryFile(f.actor, generated.id, { keep: true }).ok).toBe(true);
+  expect((await runLibraryRetention(now + DAY)).deleted).toBe(0);
+  expect(db.select().from(attachments).where(eq(attachments.id, generated.id)).get()!.retention).toBe("kept");
+});
+
+
+test("an unpinned generated file with no chat remains a Library item", () => {
+  const f = fixture();
+  const made = storeFile(f.actor, { conversationId: null, turnId: null, mediaType: "image/png", bytes: new Uint8Array([1, 2, 3]), provenance: 'picture-gen:{"v":1,"audience":"all-ages"}', deduplicate: false });
+  if (!made.ok) throw new Error(made.error);
+  expect(made.value.retention).toBe("conversation");
+  expect(listLibrary(f.actor, {}).items.find(item => item.id === made.value.id)).toMatchObject({ chat_id: null, retention: "conversation", can_edit: false });
+});
+
+for (const kind of ["video", "song", "edit"] as const) for (const keep of [true, false]) test(`${kind} companions follow their parent after chat deletion with different storage rules (keep=${keep})`, async () => {
+  const f = fixture();
+  const parent = f.make("conversation", true, kind === "video" ? "video/mp4" : kind === "song" ? "audio/mpeg" : "image/png", true);
+  const { updateLibraryFile } = await import("@/lib/libraryEdit");
+  if (keep && kind === "song") expect(updateLibraryFile(f.actor, parent.id, { keep: true }).ok).toBe(true);
+  const child = f.make("conversation", true, "image/png", true);
+  if (keep && kind !== "song") expect(updateLibraryFile(f.actor, parent.id, { keep: true }).ok).toBe(true);
+  db.update(attachments).set({ provenance: kind === "video" ? 'video-gen:{"v":1,"job":"retention-video"}' : kind === "song" ? 'music-gen:{"kind":"music"}' : 'picture-gen:{"v":1}', createdAt: "2020-01-01T00:00:00Z" }).where(eq(attachments.id, parent.id)).run();
+  db.update(attachments).set({ provenance: kind === "video" ? 'video-poster:{"v":1,"job":"retention-video"}' : kind === "edit" ? `image-edit:${JSON.stringify({ v: 1, root: parent.id })}` : 'picture-gen:{"v":1}', createdAt: "2026-10-18T00:00:00Z" }).where(eq(attachments.id, child.id)).run();
+  if (kind === "song") db.insert(musicJobs).values({ id: "old-song", personId: f.actor.id, turnId: f.turnId, task: "generate", request: "{}", state: "done", fileId: parent.id, coverFileId: child.id, createdAt: "2020-01-01T00:00:00Z", updatedAt: "2020-01-01T00:00:00Z", hlc: nextHlc() }).run();
+  deleteAttachmentsForTurns([f.turnId]);
+  setHouseholdSettingValue("storage.household.cap_bytes", 1);
+  const parentType = kind === "video" ? "videos" : kind === "song" ? "songs" : "pictures";
+  setHouseholdSettingValue(retentionKeys(parentType).mode, "keep");
+  expect(previewLibraryRetention().count).toBe(0);
+  setHouseholdSettingValue(retentionKeys(parentType).mode, "until_storage_threshold");
+  if (!keep && kind !== "edit") setHouseholdSettingValue(retentionKeys("pictures").mode, "keep");
+  const now = Date.parse("2026-10-19T01:00:00Z");
+  await runLibraryRetention(now);
+  await runLibraryRetention(now + DAY);
+  for (const id of [parent.id, child.id]) expect(Boolean(db.select().from(attachments).where(eq(attachments.id, id)).get())).toBe(keep);
+  if (kind === "song") expect(db.select().from(musicJobs).all()).toHaveLength(keep ? 1 : 0);
+});
+
+test("old kept generated files and kept uploads retain their existing retention after chat deletion", async () => {
+  const f = fixture();
+  const made = f.make("kept", true, "image/png", true);
+  const upload = f.make("kept", false, "text/plain", true);
+  for (const id of [made.id, upload.id]) db.update(attachments).set({ createdAt: "2000-01-01T00:00:00Z" }).where(eq(attachments.id, id)).run();
+  deleteAttachmentsForTurns([f.turnId]);
+  setHouseholdSettingValue("storage.household.cap_bytes", 1);
+  setHouseholdSettingValue(retentionKeys("uploads").mode, "until_storage_threshold");
+  const now = Date.parse("2026-10-19T01:00:00Z");
+  await runLibraryRetention(now);
+  expect((await runLibraryRetention(now + DAY)).deleted).toBe(0);
+  for (const id of [made.id, upload.id]) expect(db.select().from(attachments).where(eq(attachments.id, id)).get()).toMatchObject({ retention: "kept", turnId: null });
+});
+test("a purged Library item held only by chat is neither a retention candidate nor a Library item, and leaves with chat", async () => {
+  const f = fixture(); const made = f.make("conversation", true, "image/png", true);
+  const { dropLibraryReference } = await import("@/lib/libraryTrash");
+  const row = db.select().from(attachments).where(eq(attachments.id, made.id)).get()!;
+  expect(dropLibraryReference([row])).toMatchObject([{ id: made.id, freed: false }]);
+  setHouseholdSettingValue("storage.household.cap_bytes", 1);
+  expect(previewLibraryRetention().count).toBe(0);
+  expect(listLibrary(f.actor, {}).items.some(item => item.id === made.id)).toBe(false);
+  expect(existsSync(attachmentFilePath(made.storage_path))).toBe(true);
+  deleteAttachmentsForTurns([f.turnId]);
+  expect(db.select().from(attachments).where(eq(attachments.id, made.id)).get()).toBeUndefined();
+  expect(existsSync(attachmentFilePath(made.storage_path))).toBe(false);
 });

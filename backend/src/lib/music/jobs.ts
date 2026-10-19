@@ -163,7 +163,7 @@ async function finish(job: MusicJob, actor: PersonRow, songs: StackSong[], signa
     }
     if (signal.aborted) return;
     if (!turn) { fail(job, "lost_turn"); return; }
-    const made = createAttachment(actor, { conversationId: job.conversationId!, turnId: job.turnId!, mediaType: "audio/mp4", bytes, provenance: MUSIC_NOTE + JSON.stringify(provenance), deduplicate: false, retention: "kept" });
+    const made = createAttachment(actor, { conversationId: job.conversationId!, turnId: job.turnId!, mediaType: "audio/mp4", bytes, provenance: MUSIC_NOTE + JSON.stringify(provenance), deduplicate: false, retention: "conversation" });
     if (!made.ok) { fail(job, made.status === 403 ? "storage_full" : "save_failed"); return; }
     job.fileId = made.value.id;
   }

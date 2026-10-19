@@ -51,6 +51,31 @@ export async function cleanChatImage(original: Uint8Array): Promise<CleanedChatI
   }
   // sips keeps the EXIF orientation in the JPEG it writes, so the rotate below still applies it.
   const input = HEIC_MIMES.includes(detected.mime) ? await heicToJpeg(original) : original;
+  const pipeline = await cleanedImagePipeline(input);
+  const { data, info } = await pipeline.toBuffer({ resolveWithObject: true });
+  return { bytes: new Uint8Array(data), mediaType: "image/jpeg", width: info.width, height: info.height };
+}
+
+export async function chatImageThumbnail(bytes: Uint8Array): Promise<Uint8Array> {
+  return new Uint8Array(await sharp(bytes).rotate().resize(512, 512, { fit: "inside", withoutEnlargement: true }).jpeg({ quality: 82 }).toBuffer());
+}
+
+/** Shared disk-input picture cleaning for Library streams. Never materializes the original file in JS memory. */
+export async function cleanChatImageFile(path: string, mediaType: string, target: string): Promise<void> {
+  if (Bun.file(path).size > MAX_CHAT_IMAGE_BYTES) throw new Error(CHAT_IMAGE_REFUSAL);
+  const converted = `${target}.converted`;
+  try {
+    let input = path;
+    if (HEIC_MIMES.includes(mediaType)) {
+      if (process.platform !== "darwin") throw new Error("This computer cannot open HEIC pictures. Save it as a JPEG or PNG and add it again.");
+      await run("/usr/bin/sips", ["-s", "format", "jpeg", path, "--out", converted], { timeout: 20_000 });
+      input = converted;
+    }
+    await (await cleanedImagePipeline(input)).toFile(target);
+  } finally { await rm(converted, { force: true }); }
+}
+
+async function cleanedImagePipeline(input: Uint8Array | string) {
   const pipeline = sharp(input, { limitInputPixels: MAX_CHAT_IMAGE_PIXELS, failOn: "error" });
   let metadata: Metadata;
   try {
@@ -63,10 +88,5 @@ export async function cleanChatImage(original: Uint8Array): Promise<CleanedChatI
     throw new Error("That picture is too large to process.");
   }
   // EXIF orientation is applied, then every tag (GPS, camera, time) is dropped: sharp writes none unless asked.
-  const { data, info } = await pipeline.rotate().resize({ width: MAX_CHAT_IMAGE_EDGE, height: MAX_CHAT_IMAGE_EDGE, fit: "inside", withoutEnlargement: true }).jpeg({ quality: 88, mozjpeg: true }).toBuffer({ resolveWithObject: true });
-  return { bytes: new Uint8Array(data), mediaType: "image/jpeg", width: info.width, height: info.height };
-}
-
-export async function chatImageThumbnail(bytes: Uint8Array): Promise<Uint8Array> {
-  return new Uint8Array(await sharp(bytes).rotate().resize(512, 512, { fit: "inside", withoutEnlargement: true }).jpeg({ quality: 82 }).toBuffer());
+  return pipeline.rotate().resize({ width: MAX_CHAT_IMAGE_EDGE, height: MAX_CHAT_IMAGE_EDGE, fit: "inside", withoutEnlargement: true }).jpeg({ quality: 88, mozjpeg: true });
 }

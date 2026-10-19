@@ -139,6 +139,7 @@ describe("IMGGEN-HOME-01: the call, the job and the stored picture", () => {
       const row = db.select().from(attachments).where(eq(attachments.id, job.files[0]!.id)).get()!;
       expect(row.ownerPersonId).toBe(people.owner.id);
       expect(row.mediaType).toBe("image/png");
+      expect(row.retention).toBe("conversation");
       expect(row.provenance.startsWith("picture-gen:")).toBe(true);
       expect(row.provenance).not.toContain("fox");
       // The Stack's copy is deleted once Home stored it.

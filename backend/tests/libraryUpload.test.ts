@@ -87,3 +87,24 @@ test("the same file again is accepted when storage is full, because it needs no 
   expect(((await again.json()) as { duplicate: boolean }).duplicate).toBe(true);
   expect((await send(sage, "c.txt", "hello world", "text/plain")).status).toBe(403);
 });
+
+import { libraryMultipart } from "@/lib/libraryMultipart";
+async function multipartBytes(content: Uint8Array, chunk: number, header = 'Content-Disposition: form-data; name="file"; filename="notes.txt"', tail = "\r\n--abc--\r\n") {
+  const wire = Buffer.concat([Buffer.from(`--abc\r\n${header}\r\n\r\n`), content, Buffer.from(tail)]);
+  let offset = 0;
+  const request = new Request("http://localhost/upload", { method: "POST", headers: { "content-type": "multipart/form-data; boundary=abc" }, body: new ReadableStream<Uint8Array>({ pull(c) { if (offset === wire.length) c.close(); else { c.enqueue(wire.subarray(offset, offset + chunk)); offset = Math.min(wire.length, offset + chunk); } } }) });
+  const parsed = await libraryMultipart(request);
+  return new Uint8Array(await new Response(parsed.body).arrayBuffer());
+}
+for (const chunk of [1, 2, 3, 7, 13, 65536]) test(`multipart preserves complete boundary lookalikes at chunk size ${chunk}`, async () => {
+  const content = Buffer.concat([Buffer.from("hello\r\n--abc--NOT_A_DELIMITER\r\nworld\r\n--abcX\r\n--abc-\r\n--abc\rX"), Buffer.from([0, 255, 128, 13, 10]), Buffer.from("--abc--no\r\nend")]);
+  expect(await multipartBytes(content, chunk)).toEqual(new Uint8Array(content));
+});
+for (const [label, header, tail] of [
+  ["missing filename", 'Content-Disposition: form-data; name="file"', "\r\n--abc--\r\n"],
+  ["huge header", 'Content-Disposition: form-data; name="file"; filename="notes.txt"; x=' + "x".repeat(9000), "\r\n--abc--\r\n"],
+  ["extra part", 'Content-Disposition: form-data; name="file"; filename="notes.txt"', '\r\n--abc\r\nContent-Disposition: form-data; name="other"\r\n\r\nextra\r\n--abc--\r\n'],
+  ["nested part", 'Content-Disposition: form-data; name="file"; filename="notes.txt"\r\nContent-Type: multipart/mixed; boundary=inner', "\r\n--abc--\r\n"],
+]) test(`multipart rejects ${label}`, async () => {
+  await expect(multipartBytes(Buffer.from("hello"), 7, header, tail)).rejects.toThrow();
+});

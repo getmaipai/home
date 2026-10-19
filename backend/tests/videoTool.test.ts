@@ -134,6 +134,8 @@ describe("VIDEO-GEN-05: the call, the job and the stored clip", () => {
       const poster = db.select().from(attachments).where(eq(attachments.id, job.files[0]!.poster_id)).get()!;
       expect(clip.ownerPersonId).toBe(people.owner.id);
       expect(clip.mediaType).toBe("video/mp4");
+      expect(clip.retention).toBe("conversation");
+      expect(poster.retention).toBe("conversation");
       expect(clip.provenance.startsWith("video-gen:")).toBe(true);
       expect(clip.provenance).not.toContain("paper boat");
       expect(poster.mediaType).toBe("image/jpeg");

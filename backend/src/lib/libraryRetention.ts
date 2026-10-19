@@ -1,11 +1,11 @@
 // Library storage rules are independent of chat age. No migration or Trash
 // provider here: only generated, unpinned File records can be reclaimed.
 import { and, eq, asc, inArray, isNull, sql } from "drizzle-orm";
-import { db, sqlite } from "@/db";
+import { db } from "@/db";
 import { attachments, settingsValues } from "@/db/schema";
 import { getHouseholdSettingValue } from "@/lib/settings";
 import { householdCapBytes, householdUsageBytes } from "@/lib/storage/usage";
-import { dropLibraryReference } from "@/lib/libraryTrash";
+import { companionsOf, parentOf, dropLibraryReference } from "@/lib/libraryTrash";
 import { generationOf } from "@/lib/music/types";
 import { nextHlc } from "@/lib/hlc";
 import { raiseIssue, resolveIssue } from "@/lib/issues";
@@ -49,7 +49,7 @@ function candidates() {
   return db.select().from(attachments).where(and(eq(attachments.retention, "conversation"), isNull(attachments.deletedAt))).orderBy(asc(attachments.createdAt), asc(attachments.id)).all()
     // A file a live chat still shows keeps its bytes whatever the Library does, so removing its Library reference would free
     // nothing: it becomes a candidate when its chat is gone (LIBRARY-REVAMP-02 detaches it then).
-    .filter((row) => typeFor(row) !== null && (row.turnId === null || row.conversationId === null));
+    .filter((row) => typeFor(row) !== null && (row.turnId === null || row.conversationId === null) && !parentOf(row));
 }
 /** LIBRARY-RETENTION-PREVIEW-01: this person's own items the storage rules have warned about and will remove at the next
  * nightly run once the 24-hour warning has passed. `expiresAt` is the end of that warning. Cheap when nothing is over a
@@ -81,7 +81,7 @@ export function previewLibraryRetention(now = Date.now(), executable = false) {
   const generatedRule = rule("generated");
   const percent = budgetBytes > 0 ? usageBytes / budgetBytes * 100 : 0;
   let projected = usageBytes;
-  const selected: FileRow[] = [];
+  const selected: { row: FileRow; type: LibraryRetentionType }[] = [];
   const types = LIBRARY_RETENTION_TYPES.map((type) => {
     const r = rule(type);
     // A made item follows both the generated rule and its display type.
@@ -100,12 +100,20 @@ export function previewLibraryRetention(now = Date.now(), executable = false) {
     const t = types.find((entry) => entry.type === typeFor(row))!;
     // Each file is counted once under its display type; generated covers other made files.
     if (!t.over || (executable && !t.ready) || projected / budgetBytes * 100 <= t.effectiveThreshold) continue;
-    const removed = (removedPerHash.get(row.sha256) ?? 0) + 1;
-    removedPerHash.set(row.sha256, removed);
-    const frees = removed === (holders.get(row.sha256) ?? 1) ? row.size : 0;
-    selected.push(row); t.count++; t.bytes += frees; projected -= frees;
+    // Required companions have no independent storage lifetime. The parent's type and warning govern the whole
+    // family, including a cover generated years after its song. A kept family member protects the family.
+    const family = [row, ...companionsOf(row).filter(member => member.deletedAt === null)];
+    if (family.some(member => member.retention === "kept")) continue;
+    for (const member of family) {
+      const removed = (removedPerHash.get(member.sha256) ?? 0) + 1;
+      // A live chat retains its copy even when the Library reference goes.
+      const chatHeld = member.turnId !== null && member.conversationId !== null;
+      if (!chatHeld) removedPerHash.set(member.sha256, removed);
+      const frees = !chatHeld && removed === (holders.get(member.sha256) ?? 1) ? member.size : 0;
+      selected.push({ row: member, type: t.type }); t.count++; t.bytes += frees; projected -= frees;
+    }
   }
-  return { usageBytes, budgetBytes, budgetSource: "storage.household.cap_bytes" as const, configured: budgetBytes > 0, percent, count: selected.length, bytes: types.reduce((n, entry) => n + entry.bytes, 0), types, files: selected.map((r) => ({ id: r.id, type: typeFor(r)!, size: r.size })) };
+  return { usageBytes, budgetBytes, budgetSource: "storage.household.cap_bytes" as const, configured: budgetBytes > 0, percent, count: selected.length, bytes: types.reduce((n, entry) => n + entry.bytes, 0), types, files: selected.map(({ row, type }) => ({ id: row.id, type, size: row.size })) };
 }
 let running: Promise<{ deleted: number; bytes: number }> | null = null;
 export function runLibraryRetention(now = Date.now()): Promise<{ deleted: number; bytes: number }> {

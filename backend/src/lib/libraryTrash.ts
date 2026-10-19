@@ -32,7 +32,7 @@ export function trashDays(): number {
 }
 
 /** The files that travel with an item: a picture's edit versions, a video's poster and a song's cover. */
-function companionsOf(row: Row): Row[] {
+export function companionsOf(row: Row): Row[] {
   const meta = libraryProvenance(row.provenance);
   const job = meta.writer === "video-gen" && typeof meta.job === "string" ? meta.job : null;
   const found = sqlite.query<{ id: string }, (string | null)[]>(
@@ -47,7 +47,7 @@ function companionsOf(row: Row): Row[] {
 }
 
 /** The live item a companion file belongs to (an edit's picture, a poster's video, a cover's song), if any. */
-function parentOf(row: Row): Row | undefined {
+export function parentOf(row: Row): Row | undefined {
   const meta = libraryProvenance(row.provenance);
   const live = (id: string) => db.select().from(attachments).where(and(eq(attachments.id, id), eq(attachments.ownerPersonId, row.ownerPersonId), isNull(attachments.deletedAt))).get();
   if (meta.writer === "image-edit" && typeof meta.root === "string") return live(meta.root);

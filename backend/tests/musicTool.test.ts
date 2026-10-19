@@ -56,7 +56,7 @@ describe("music jobs and their private files", () => {
     const job = getMusicJobFor(people.owner, id)!;
     const row = db.select().from(attachments).where(eq(attachments.id, job.fileId!)).get()!;
     const record = toRecord(row);
-    expect(record).toMatchObject({ origin: "made", kind: "audio", media_type: "audio/mp4", retention: "kept" });
+    expect(record).toMatchObject({ origin: "made", kind: "audio", media_type: "audio/mp4", retention: "conversation" });
     const note = generationOf(row.provenance)!;
     expect(note).toMatchObject({ kind: "music", task: "text2music", model: { id: "ace-step-1-5-turbo", revision: "19671f406d603126926c1b7e2adc169acbcade22", licence: "MIT" }, engine: { id: "music-gen", version: "ca1e85f" }, source_kind: "none", commercial_use: "cleared", duration_s: 60 });
     for (const text of [ARGS.description, ARGS.title, "Morning light"]) expect(row.provenance).not.toContain(text);
@@ -116,7 +116,7 @@ describe("music jobs and their private files", () => {
   test("forgetting turns and chats keeps finished songs; forgetting the person deletes requests and stops watchers without resurrecting them", async () => {
     const state = musicState(people.owner);
     const job = await generate(state);
-    deleteAttachmentsForTurns([state.turnId]); expect(getMusicJobFor(people.owner, job.id)).not.toBeNull(); // BUG-LIBRARY-KEPT-01: a finished song is a kept Library item and outlives its turn
+    deleteAttachmentsForTurns([state.turnId]); expect(getMusicJobFor(people.owner, job.id)).not.toBeNull(); // BUG-LIBRARY-KEPT-01: a finished song is a generated Library item and outlives its turn
     const nextState = musicState(people.owner); const next = await generate(nextState);
     expect(deleteConversationById(people.owner, nextState.conversationId).ok).toBe(true); expect(getMusicJobFor(people.owner, next.id)).not.toBeNull(); // and outlives its chat
     const third = await generate(); deleteAttachmentsForPerson(people.owner.id); expect(getMusicJobFor(people.owner, third.id)).toBeNull();

@@ -138,6 +138,7 @@ describe("picture editor routes", () => {
     expect(version).toMatchObject({ label: "Background removed", op: "remove_background", source: picture.id });
     const row = db.select().from(attachments).where(eq(attachments.id, version.id)).get()!;
     expect(row.mediaType).toBe("image/png");
+    expect(row.retention).toBe("conversation");
     expect(row.turnId).toBe(picture.turnId);
     const note = JSON.parse(row.provenance.replace("image-edit:", "")) as Record<string, unknown>;
     expect(note).toMatchObject({ v: 1, op: "remove_background", source: picture.id, root: picture.id, engine: "vision", model: "apple-vision" });

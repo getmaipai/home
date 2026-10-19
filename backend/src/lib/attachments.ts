@@ -5,7 +5,7 @@ import { deleteMusicJobsForFiles, deleteMusicJobsForPerson, deleteMusicJobsForTu
 // only by its validated relative storage_path.
 import { deletePictureJobsForFiles, deletePictureJobsForPerson, deletePictureJobsForTurns, dropTemporaryPictureJobs, dropTemporaryPictureJobsForPerson } from "@/lib/pictures/jobStore";
 import { createHash } from "node:crypto";
-import { existsSync, readFileSync, statSync, unlinkSync, writeFileSync } from "node:fs";
+import { closeSync, existsSync, openSync, readSync, readFileSync, renameSync, statSync, unlinkSync, writeFileSync } from "node:fs";
 import { dirname, isAbsolute, normalize, relative, resolve } from "node:path";
 import { and, eq, inArray, isNull } from "drizzle-orm";
 // Renamed from the `File` export to `FileRecordSchema` locally: `File` is a
@@ -77,7 +77,14 @@ export function attachmentFilePath(storagePath: string): string {
 export function storedFileIntact(path: string, size: number, sha256: string): boolean {
   try {
     if (!existsSync(path) || statSync(path).size !== size) return false;
-    return createHash("sha256").update(readFileSync(path)).digest("hex") === sha256;
+    const hash = createHash("sha256");
+    const fd = openSync(path, "r");
+    try {
+      const buffer = Buffer.alloc(64 * 1024);
+      let n: number;
+      while ((n = readSync(fd, buffer)) > 0) hash.update(buffer.subarray(0, n));
+      return hash.digest("hex") === sha256;
+    } finally { closeSync(fd); }
   } catch { return false; }
 }
 
@@ -165,10 +172,14 @@ export function createAttachment(actor: PersonRow, input: CreateAttachmentInput)
   return storeFile(actor, input);
 }
 
-export interface StoreFileInput extends Omit<CreateAttachmentInput, "conversationId" | "turnId"> {
+export type StoreFileInput = Omit<CreateAttachmentInput, "conversationId" | "turnId" | "bytes"> & {
   conversationId: string | null;
   turnId: string | null;
-}
+} & ({ bytes: Uint8Array; staged?: never } | {
+  bytes?: never;
+  /** Internal, already hashed staging file. Never supplied by a client. */
+  staged: { path: string; size: number; sha256: string };
+});
 
 /** The one write path for a file record (chat upload, generated output, Library upload). Callers check their own context
  * first: createAttachment above proves the turn is the actor's; lib/libraryUpload.ts has no chat at all. */
@@ -179,8 +190,9 @@ export function storeFile(actor: PersonRow, input: StoreFileInput): AttachmentOp
   const provenance = (input.provenance ?? "composer:upload").trim();
   if (!provenance) return { ok: false, status: 400, error: "attachment provenance is required" };
 
-  const bytes = new Uint8Array(input.bytes);
-  const sha256 = createHash("sha256").update(bytes).digest("hex");
+  const bytes = input.bytes;
+  const size = input.staged?.size ?? bytes!.byteLength;
+  const sha256 = input.staged?.sha256 ?? createHash("sha256").update(bytes!).digest("hex");
 
   // LIBRARY-DEDUP-01: one stored blob per sha256, one file record per owner. A person who sends the same bytes
   // again gets their existing record back; a different person gets their own record that points at the same stored
@@ -194,7 +206,7 @@ export function storeFile(actor: PersonRow, input: StoreFileInput): AttachmentOp
 
   // STORE-CAP-01: refused before anything is written to disk, in the person's own words. Bytes this person already
   // holds, or that the household already stores, add nothing to the matching total (storage/usage.ts).
-  const capCheck = checkStorageCap(actor.role, actor.id, bytes.byteLength, sha256);
+  const capCheck = checkStorageCap(actor.role, actor.id, size, sha256);
   if (!capCheck.ok) return { ok: false, status: 403, error: capCheck.error! };
 
   const id = newFileId();
@@ -203,7 +215,7 @@ export function storeFile(actor: PersonRow, input: StoreFileInput): AttachmentOp
   const filePath = attachmentFilePath(storagePath);
   // Write unless the one stored copy is really on disk and intact; a missing or damaged copy is rewritten from these
   // bytes (they hash to the same digest), so a new record never inherits a broken file.
-  const needsWrite = !stored || !storedFileIntact(filePath, bytes.byteLength, sha256);
+  const needsWrite = !stored || !storedFileIntact(filePath, size, sha256);
   if (needsWrite) ensureDataDir(dirname(filePath));
   const row = {
     id,
@@ -211,7 +223,7 @@ export function storeFile(actor: PersonRow, input: StoreFileInput): AttachmentOp
     conversationId: input.conversationId,
     turnId: input.turnId,
     mediaType,
-    size: bytes.byteLength,
+    size,
     sha256,
     storagePath,
     retention: input.retention ?? "conversation" as const,
@@ -226,10 +238,13 @@ export function storeFile(actor: PersonRow, input: StoreFileInput): AttachmentOp
   };
   const record = toRecord(row);
 
-  if (needsWrite) writeFileSync(filePath, bytes, { mode: 0o600 });
+  if (needsWrite) {
+    if (input.staged) renameSync(input.staged.path, filePath);
+    else writeFileSync(filePath, bytes!, { mode: 0o600 });
+  }
   try {
     db.transaction(() => {
-      ensureContent(sha256, storagePath, bytes.byteLength);
+      ensureContent(sha256, storagePath, size);
       db.insert(attachments).values(row).run();
       syncFileReferences(id);
     });

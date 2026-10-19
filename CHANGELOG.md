@@ -9,6 +9,9 @@ checklist (`docs/dev.md`). The first release is 0.1.0.
 
 ### Added
 - Library listing and summary accept `shared=none` (Only me) for your own files with no shares. Counts and bytes use the same filter as pages.
+- Library uploads stream to disk, with 8 MB chunk sessions for files up to 500 MB and cleanup on cancellation or failure. Bun's server-wide body limit stays unchanged.
+- Adult file owners can recheck an adult-only picture with the existing picture check. Only a confident safe result makes it all-ages; failures keep it adult-only, with rate limiting and an audit log.
+- New generated pictures, edits, videos and songs follow storage rules until pinned with Keep. Existing items and pins are unchanged; no migration.
 
 ## [0.2.25] - 2026-10-18
 

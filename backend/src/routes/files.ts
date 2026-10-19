@@ -1,3 +1,4 @@
+import { recheckFileAudience } from "@/lib/libraryAudience";
 import { fileThumbnail } from "@/lib/fileThumbnails";
 // STORE-SHARE-01: the Library's own HTTP boundary - lib/shares.ts and
 // lib/attachments.ts hold the rules, this is only the wire, the same
@@ -284,6 +285,19 @@ const patchFileRoute = createRoute({
 });
 filesRoutes.openapi(patchFileRoute, (c) => {
   const result = updateLibraryFile(c.get("person"), c.req.valid("param").id, c.req.valid("json"));
+  if (!result.ok) return c.json({ error: result.error }, result.status);
+  return c.json(result.value, 200);
+});
+
+filesRoutes.openapi(createRoute({
+  method: "post", path: "/{id}/recheck-audience", tags: ["Files"], summary: "Recheck my adult-only picture for an all-ages audience",
+  middleware: [requireAuth] as const, request: { params: idParamSchema("id", "file-a1b2c3") },
+  responses: {
+    200: { description: "The stored picture passed the existing picture check.", content: { "application/json": { schema: z.object({ audience: z.literal("all-ages") }) } } },
+    ...errorResponses({ 400: "Picture stays adult-only. Try again later or choose another picture.", 401: "Not signed in", 404: "No eligible picture owned by this adult", 429: "Too many checks. Wait an hour." }),
+  },
+}), async c => {
+  const result = await recheckFileAudience(c.get("person"), c.req.valid("param").id);
   if (!result.ok) return c.json({ error: result.error }, result.status);
   return c.json(result.value, 200);
 });
