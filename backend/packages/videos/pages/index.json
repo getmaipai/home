@@ -2,7 +2,6 @@
   "type": "page",
   "id": "index",
   "title": "Videos",
-  "tone": "cinema",
   "body": [
     {
       "type": "billboard",

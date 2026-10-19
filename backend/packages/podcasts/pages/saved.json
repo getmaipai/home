@@ -2,7 +2,6 @@
   "type": "page",
   "id": "saved",
   "title": "Saved",
-  "tone": "cinema",
   "body": [
     {
       "type": "media_shelf",

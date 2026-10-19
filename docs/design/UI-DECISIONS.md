@@ -2,6 +2,8 @@
 
 This file is the precondition of KIT-ALERT-01, KIT-CAROUSEL-01 and KIT-TOUR-01. A part may be added to the kit only with a row here.
 
+The media cinema page tone was removed 2026-10-19 (Jesse); Music, Podcasts and Videos follow the user's selected theme.
+
 | Part | Decision | Why no existing kit, shadcn or Kibo UI part does the job | Registry or library | Version |
 |---|---|---|---|---|
 | `alert` | Jesse, 2026-10-13 | The kit has no `alert.tsx` today. The install plan identifies no existing kit part for warnings and errors on the Finish setting up on the computer page, the search-down banner and Repairs warnings. | shadcn registry | Not stated in the source plan. |

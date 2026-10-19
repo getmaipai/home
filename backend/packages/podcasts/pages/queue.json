@@ -2,7 +2,6 @@
   "type": "page",
   "id": "queue",
   "title": "Queue",
-  "tone": "cinema",
   "body": [
     {
       "type": "media_shelf",

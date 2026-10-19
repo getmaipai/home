@@ -28,7 +28,7 @@ Titles, channels and people in the mockup are made up.
 
 ## How browsing feels
 
-- A dark, cinema look. Big pictures and rows you swipe sideways.
+- Big pictures and rows you swipe sideways. The cinema page tone was removed 2026-10-19 (Jesse); media pages follow the user's selected theme.
 - Phone: one column. A small player stays docked at the bottom while you look around.
 - Computer: the app icons on the left, 3 to 5 tiles across, the player on the left and Up next on the right.
 - TV: move with the remote, one row in focus at a time, and everything plays full screen.
@@ -68,7 +68,7 @@ The Downloads page shows what is on this device, how much room is left, and the 
 
 | From Loki Doki | From FileTube | New | Left behind |
 |---|---|---|---|
-| The look: big billboard, poster rows, cinema colors | Offline downloads that sync progress back | Audiobooks with chapters | Plex and the movie lookup sites |
+| The look: big billboard and poster rows; the proposed cinema page tone was removed 2026-10-19 (Jesse) | Offline downloads that sync progress back | Audiobooks with chapters | Plex and the movie lookup sites |
 | Podcast details: chapters, transcripts, per-show speed | Player gestures and the docked mini player | One sleep timer, speed and Continue row for the whole home | Streaming the web through the hub |
 | Skipping sponsor parts of a saved video | The home rows: Continue, New, Recently added | A kid look for every media screen | Live TV channels and karaoke |
 | Save once, share with the family | Careful folder scanning that never deletes by mistake | | |

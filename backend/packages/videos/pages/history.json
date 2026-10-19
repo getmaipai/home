@@ -2,7 +2,6 @@
   "type": "page",
   "id": "history",
   "title": "History",
-  "tone": "cinema",
   "body": [
     {
       "type": "media_shelf",

@@ -2,7 +2,6 @@
   "type": "page",
   "id": "index",
   "title": "Listen now",
-  "tone": "cinema",
   "body": [
     {
       "type": "media_shelf",

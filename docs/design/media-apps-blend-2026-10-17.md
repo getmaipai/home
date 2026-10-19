@@ -25,7 +25,7 @@ Media is one platform layer plus five app packages, not five apps with five stor
 (`backend/src/lib/media/`) that owns ingest, the saved-copy store, progress and the offline protocol; one kit `Player` primitive
 (a maintained web player restyled by tokens) and one shell-owned docked mini bar; and one Stack `media` service that pins and runs
 ffmpeg, ffprobe and yt-dlp behind one heavy-job FIFO. The apps (Videos, Shows and Films, Music, Podcasts, Books) are catalog
-`app` packages of schema pages, each emulating its native app (rule S2) in the cinema tone Loki Doki proved. Online sources are
+`app` packages of schema pages, each emulating its native app (rule S2). The original cinema page tone was removed 2026-10-19 (Jesse); media pages follow the user's selected theme. Online sources are
 opt-in, go through the one limiter at a person's pace, and every fetched copy lands in the household's `file` store once, owned by
 the person who asked and shared by pointer. Offline is three layers: the hub's own saved copies (the household works with the
 internet down), Chromium browsers' on-device copies through a scoped service-worker cache, and Go on iPhone and Apple TV carrying
@@ -184,8 +184,7 @@ wide screens and in the phone drawer (rules S1, S2).
 
 ## 6. Layouts
 
-All from kit primitives, tokens only (rule 9b). The cinema tone is a page-tone token the kit already owns (UI.md, CALM-TOKENS-00):
-these apps select the dark page tone and their accent; no app CSS.
+All from kit primitives, tokens only (rule 9b). The cinema page tone described in this original proposal was removed 2026-10-19 (Jesse); media pages follow the user's selected theme. The apps use their accent; no app CSS.
 
 - **Phone (under 640)**: one column. Videos Home: the billboard as a full-width card, then shelves scrolling horizontally. Watch:
   player on top, title, actions row, Up next below; the player docks to a mini bar (kit `Player` layout `mini`) when the person
@@ -448,7 +447,7 @@ No MaiPai-operated service is in any path; no analytics; the privacy page gains 
 Resolved by this note (with the reasoning):
 
 1. **YouTube layout or Netflix layout?** Rule S2 names video as YouTube's layout. Loki Doki's Netflix look is the billboard,
-   shelves and cinema tone, which YouTube's TV layout also has, so the Videos app keeps YouTube's structure in the cinema tone, and
+   shelves, which YouTube's TV layout also has, so the Videos app keeps YouTube's structure while following the user's selected theme, and
    the Netflix layout proper is the Shows and Films app (S2's "and so on" lets each app name its native app). No rule change needed.
 2. **Stream through the hub or play saved copies?** Saved copies. A live privacy proxy is what walled the home IP; a copy fetched
    once at a person's pace is one request, works offline, and is the household's record. An unsaved web result plays on the

@@ -2,7 +2,6 @@
   "type": "page",
   "id": "watch-later",
   "title": "Watch later",
-  "tone": "cinema",
   "body": [
     {
       "type": "media_shelf",

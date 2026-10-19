@@ -152,7 +152,7 @@ it, on any page of a media app except the one playing it; Close unloads it. Othe
 registers the host's element with the audio session (`useAudioRegistration`, kind `video`) for as long as the host holds it: one playing
 thing, the person's video speed, the sleep timer and the Media Session title. The dock reports progress to `/api/plugins/<app>/progress`.
 
-**Look (MEDIA-POLISH-01).** Every Videos page sets `tone: "cinema"` (the kit token set, dark in both themes); shelves are `variant:
+**Look (MEDIA-POLISH-01, updated 2026-10-19).** Music, Podcasts and Videos follow the user's selected theme; the cinema page tone was removed 2026-10-19 (Jesse). Shelves are `variant:
 "plain"` with `hide_when_empty` and `see_all`; Watch is a `split_view` (`main`: the player with `details` and the Like and Watch later
 `actions` toggles on the item's `liked` and `watch_later`; `aside`: Up next as a vertical shelf). A media app's header is the app's
 name with icon buttons and chip tabs (`TabsList variant="pill"`); its play page has none. App pages sit outside `PageHeaderLayout`.

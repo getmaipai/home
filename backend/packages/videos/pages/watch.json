@@ -2,7 +2,6 @@
   "type": "page",
   "id": "watch",
   "title": "Watch",
-  "tone": "cinema",
   "body": [
     {
       "type": "split_view",
