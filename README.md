@@ -13,7 +13,7 @@ Your own private AI at home, with chat, voice, pictures and videos, on your own 
 
 Your chats, people and memories stay in your house. Home goes online only to do what you ask: downloads, updates and web searches.
 
-## What Home does today (v0.2.9)
+## What Home does today
 
 - **Private chat with memory.** Talk to an AI that runs on your own computer. It remembers what matters, shows its sources, and lets you see, fix or forget any memory.
 - **Reads your pictures.** Attach a photo and ask about it. This needs a computer with 32 GB of memory or more.
