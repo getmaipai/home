@@ -2,6 +2,16 @@
 
 All notable changes to the Household news feeds package, in [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) format.
 
+## [0.5.0] - 2026-10-18
+
+### Added
+
+- Grist and The Guardian's wildlife feed for Environment.
+
+### Changed
+
+- Every feed now names one topic (BBC Science and Environment and Popular Science are Science), so a story starts under one topic, and the hub's topic step moves a story only when its words clearly point elsewhere.
+
 ## [0.4.0] - 2026-10-18
 
 ### Removed

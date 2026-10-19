@@ -1721,6 +1721,10 @@ function robotsAllows(robots: string, target: URL): boolean {
   return allowed;
 }
 
+/** What a page read sends. An honest user agent, as every other outbound request of Home sends: without one some publishers (The Guardian)
+ * refuse the page with HTTP 406, and a News story then shows only its feed's short summary. */
+export const PAGE_REQUEST_HEADERS: Readonly<Record<string, string>> = { accept: "text/html,application/xhtml+xml", "user-agent": HOME_USER_AGENT };
+
 async function pageFetch(url: string, countsAgainstPace = true, signal?: AbortSignal, minorBand?: MinorBand, background = false): Promise<AttemptResult> {
   // The pace counts pages, not the robots.txt check that goes with each
   // one (THIN-4A: with both counted, a three-page search spent six
@@ -1728,7 +1732,7 @@ async function pageFetch(url: string, countsAgainstPace = true, signal?: AbortSi
   if (countsAgainstPace && !tryConsume(SEARXNG_PAGE_RATE_LIMIT_KEY, SEARXNG_PAGE_RATE_LIMIT)) throw new HostError("rate_limited", "Web pages are rate-limited - try again shortly");
   await validatePublicPageUrl(url);
   try {
-    const fetchOptions = { method: "GET", headers: { accept: "text/html,application/xhtml+xml" }, signal: signal ?? AbortSignal.timeout(SEARXNG_PAGE_TIMEOUT_MS) };
+    const fetchOptions = { method: "GET", headers: PAGE_REQUEST_HEADERS, signal: signal ?? AbortSignal.timeout(SEARXNG_PAGE_TIMEOUT_MS) };
     let response: Response;
     if (background) {
       // A redirect needs its own robots and budget checks. Leave it for an explicit open.

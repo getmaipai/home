@@ -62,6 +62,8 @@ const ADDED_COLUMNS: ReadonlyArray<readonly [string, string]> = [
   ["image_url", "TEXT"],
   ["image_ref", "TEXT"],
   ["topics", "TEXT"],
+  // Where an item's topic came from: its feed's own label ("feed") or the topic step that read its words ("embed"). Null on an older row.
+  ["topics_src", "TEXT"],
 ];
 
 export interface ShelfStore {
@@ -77,8 +79,10 @@ export interface ShelfStore {
   feedIdsOf(canonicalUrl: string): string[];
   /** NEWS-02: records that a screen asked for the item's picture and the cache holds it (null forgets it). */
   setImageRef(id: string, ref: string | null): void;
-  /** NEWS-02: the topic ids the classifier gave an item. */
-  setTopics(id: string, topics: readonly string[]): void;
+  /** NEWS-02: the topic ids the classifier gave an item, and where they came from (default: the topic step, "embed"). */
+  setTopics(id: string, topics: readonly string[], source?: "feed" | "embed"): void;
+  /** The newest items whose topic is still only their feed's label (or unknown), for the topic step to read. Kids' items never. */
+  pendingTopicItems(limit: number): ShelfItem[];
   /** NEWS-02: the cleaned article of an item, if one is stored for this variant. */
   getContent(itemId: string, variant: ContentVariant): StoredContent | null;
   putContent(itemId: string, variant: ContentVariant, content: Omit<StoredContent, "pinned">): void;
@@ -139,14 +143,16 @@ export function openShelfStore(path: string): ShelfStore {
   const have = new Set(sqlite.query<{ name: string }, []>("PRAGMA table_info(shelf_item)").all().map((column) => column.name));
   for (const [name, type] of ADDED_COLUMNS) if (!have.has(name)) sqlite.exec(`ALTER TABLE shelf_item ADD COLUMN ${name} ${type}`);
   const insert = sqlite.query(
-    `INSERT OR IGNORE INTO shelf_item (id, canonical_url, feed_id, url, title, summary, published_at, fetched_at, publisher, lang, band_ok, hlc, provenance, image_url, topics)
-     VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15)`,
+    `INSERT OR IGNORE INTO shelf_item (id, canonical_url, feed_id, url, title, summary, published_at, fetched_at, publisher, lang, band_ok, hlc, provenance, image_url, topics, topics_src)
+     VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16)`,
   );
   const byId = sqlite.query<Row, [string]>("SELECT * FROM shelf_item WHERE id = ?1");
   const carriers = sqlite.query<{ feed_id: string }, [string]>("SELECT feed_id FROM shelf_item_feed WHERE canonical_url = ?1");
   const setRef = sqlite.query("UPDATE shelf_item SET image_ref = ?2 WHERE id = ?1");
-  const setTopicList = sqlite.query("UPDATE shelf_item SET topics = ?2 WHERE id = ?1");
-  const topicsByCanonical = sqlite.query<{ id: string; topics: string | null }, [string]>("SELECT id, topics FROM shelf_item WHERE canonical_url = ?1");
+  const setTopicList = sqlite.query("UPDATE shelf_item SET topics = ?2, topics_src = ?3 WHERE id = ?1");
+  const pendingTopics = sqlite.query<Row, [number]>(
+    `SELECT * FROM shelf_item WHERE topics IS NOT NULL AND topics NOT LIKE '%"kids"%' AND (topics_src IS NULL OR topics_src = 'feed') ORDER BY COALESCE(published_at, fetched_at) DESC LIMIT ?1`,
+  );
   // A feed that gave no picture on the first poll may give one later: fill it in, never replace one.
   const fillImage = sqlite.query("UPDATE shelf_item SET image_url = ?2 WHERE canonical_url = ?1 AND image_url IS NULL");
   const readContent = sqlite.query<{ blocks: string; source: string; reading_s: number; fetched_at: string; pinned: number }, [string, string]>(
@@ -176,19 +182,12 @@ export function openShelfStore(path: string): ShelfStore {
     put(item) {
       const result = insert.run(
         item.id, item.canonical_url, item.feed_id, item.url, item.title, item.summary, item.published_at ?? null,
-        item.fetched_at, item.publisher, item.lang, item.band_ok, item.hlc, item.provenance, item.image_url ?? null, item.topics && item.topics.length > 0 ? JSON.stringify(item.topics) : null,
+        item.fetched_at, item.publisher, item.lang, item.band_ok, item.hlc, item.provenance, item.image_url ?? null, item.topics && item.topics.length > 0 ? JSON.stringify(item.topics) : null, item.topics && item.topics.length > 0 ? "feed" : null,
       );
       link.run(item.canonical_url, item.feed_id);
       if (result.changes === 0) {
         stricten.run(item.canonical_url, item.band_ok);
         if (item.image_url) fillImage.run(item.canonical_url, item.image_url);
-        // A story two feeds carry keeps the topics of both (NPR's top stories and NPR's World feed).
-        if (item.topics && item.topics.length > 0) {
-          for (const row of topicsByCanonical.all(item.canonical_url)) {
-            const merged = [...new Set([...(topicsOf(row.topics) ?? []), ...item.topics])];
-            if (merged.length !== (topicsOf(row.topics) ?? []).length) setTopicList.run(row.id, JSON.stringify(merged));
-          }
-        }
       }
       return { inserted: result.changes > 0 };
     },
@@ -221,8 +220,11 @@ export function openShelfStore(path: string): ShelfStore {
     setImageRef(id, ref) {
       setRef.run(id, ref);
     },
-    setTopics(id, topics) {
-      setTopicList.run(id, JSON.stringify([...new Set(topics)]));
+    setTopics(id, topics, source = "embed") {
+      setTopicList.run(id, JSON.stringify([...new Set(topics)]), source);
+    },
+    pendingTopicItems(limit) {
+      return pendingTopics.all(limit).map(toItem).filter((item): item is ShelfItem => item !== null);
     },
     getContent(itemId, variant) {
       const row = readContent.get(itemId, variant);

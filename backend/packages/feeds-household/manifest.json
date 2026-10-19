@@ -1,6 +1,6 @@
 {
   "id": "feeds-household",
-  "version": "0.4.0",
+  "version": "0.5.0",
   "kind": "module",
   "category": "Info",
   "display": "Household news feeds",
@@ -99,6 +99,15 @@
       "who": "Variety",
       "opt_in": true,
       "retention": "unknown, see the publisher's own policy"
+    },
+    {
+      "id": "feed-grist-org",
+      "destination": "Grist's own public news feed (grist.org)",
+      "when": "automatically, about every 30 minutes at most, only while nobody is using MaiPai, and only while the News shelf and this list are on in Settings",
+      "what": "a plain, unauthenticated request for the feed file, plus your home's internet address. No name, device ID or cookie goes with it. MaiPai reads only the feed file and never opens the articles. Nothing anyone in the house said, asked, or saved.",
+      "who": "Grist",
+      "opt_in": true,
+      "retention": "unknown, see the publisher's own policy"
     }
   ],
   "permissions": [
@@ -110,7 +119,8 @@
     "net:www.cbc.ca",
     "net:www.si.com",
     "net:www.popsci.com",
-    "net:variety.com"
+    "net:variety.com",
+    "net:grist.org"
   ],
   "notifications": [],
   "backup": "exclude",

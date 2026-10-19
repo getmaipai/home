@@ -34,16 +34,18 @@ describe("feed topic hints", () => {
     expect(topicsHintFor("https://example.com/feed.xml")).toEqual([]);
   });
 
-  test("a story two feeds carry keeps the topics of both, once", () => {
+  test("no household feed names more than one topic, so a story never starts under two", () => {
+    for (const feed of list("feeds-household").feeds) expect((feed.topics_hint ?? []).length).toBeLessThanOrEqual(1);
+  });
+
+  test("a story two feeds carry keeps the topic of the first feed that stored it", () => {
     const store = openShelfStore(":memory:");
     const base = { canonical_url: "https://news.example.com/a", url: "https://news.example.com/a", title: "A story", summary: "Words.", published_at: null, fetched_at: new Date().toISOString(), publisher: "Example", lang: "en", band_ok: "child" as const, provenance: "feed:x" };
     const put = (feed: string, topics: string[]) => store.put({ ...base, id: newNewsItemId(), feed_id: feed, hlc: nextHlc(), topics } as never);
-    const first = put("feed-aaaaaaaaaaaa", ["world"]);
-    expect(first.inserted).toBe(true);
+    expect(put("feed-aaaaaaaaaaaa", ["world"]).inserted).toBe(true);
     expect(put("feed-bbbbbbbbbbbb", ["business"]).inserted).toBe(false);
-    expect(put("feed-cccccccccccc", ["world", "business"]).inserted).toBe(false);
     const items = store.list(["feed-aaaaaaaaaaaa", "feed-bbbbbbbbbbbb"], ["child"], 10);
     expect(items).toHaveLength(1);
-    expect([...(items[0]!.topics ?? [])].sort()).toEqual(["business", "world"]);
+    expect(items[0]!.topics).toEqual(["world"]);
   });
 });

@@ -379,7 +379,7 @@
     "pages": [
       {
         "id": "index",
-        "label": "Today",
+        "label": "News",
         "icon": "newspaper",
         "nav": true,
         "kind": "schema",

@@ -1,4 +1,4 @@
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useMemo } from "react";
 import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
 import { Button } from "@maipai/ui/src/dashboard/components/ui/button";
@@ -18,6 +18,43 @@ import { useMediaDock } from "@/shell/mediaHost";
 import { SectionSidebar } from "@maipai/ui/src/primitives/SectionSidebar";
 import { useAppSidebar } from "@/shell/useAppSidebar";
 
+const PAGE_FRESH_MS = 5 * 60_000;
+
+/** One page document of a package app. A document the interpreter cannot parse is an error state with a retry, never a crashed page. */
+function appPageQuery(packageId: string, pageId: string) {
+  return {
+    queryKey: ["app-page", packageId, pageId],
+    queryFn: async () => {
+      const doc = await api.appPage(packageId, pageId);
+      if (!PageNodeSchema.safeParse(doc).success) throw new Error("This app's page is not valid.");
+      return doc;
+    },
+    staleTime: PAGE_FRESH_MS,
+  };
+}
+
+/** Every page of this app the person can reach from its tabs or its sidebar: the index, the sections, the sidebar's page entries, and the
+ * pages its entries and search open. */
+function pagesOf(app: NonNullable<ReturnType<typeof useAppRows>>[number]): string[] {
+  const ids = new Set<string>(["index", ...app.sections.map((section) => section.page)]);
+  const base = `/apps/${app.package}`;
+  const fromAction = (action: unknown): void => {
+    const to = typeof action === "object" && action !== null ? (action as { navigate?: { to?: unknown } }).navigate?.to : undefined;
+    if (typeof to !== "string") return;
+    if (to === base) ids.add("index");
+    else if (to.startsWith(`${base}/`)) ids.add(to.slice(base.length + 1).split("/")[0] ?? "");
+  };
+  for (const group of app.sidebar?.groups ?? []) {
+    for (const entry of group.pages ?? []) ids.add(entry.page);
+    const rows = group.rows as { open?: unknown; manage?: { open?: unknown } } | undefined;
+    fromAction(rows?.open);
+    fromAction(rows?.manage?.open);
+  }
+  fromAction((app.sidebar?.search as { submit?: unknown } | undefined)?.submit);
+  ids.delete("");
+  return [...ids].sort();
+}
+
 /** APP-KIND-04: one route, `apps/*`, for every installed package app. `/apps/<package>` opens its `index` page and
  * `/apps/<package>/<page>` another of its pages. The page is a spec `page` document the hub serves
  * (`GET /api/plugins/:id/pages/:pageId`), drawn by the kit's SchemaPage inside the package scope: it can read only
@@ -31,17 +68,16 @@ export function PackageAppPage({ person }: { person: Roster }) {
   const app = rows?.find((row) => row.package === packageId);
   useTabItem(app?.label ?? "Apps");
 
-  const page = useQuery({
-    queryKey: ["app-page", packageId, pageId],
-    // A document the interpreter cannot parse is an error state with a retry, never a crashed page.
-    queryFn: async () => {
-      const doc = await api.appPage(packageId, pageId);
-      if (!PageNodeSchema.safeParse(doc).success) throw new Error("This app's page is not valid.");
-      return doc;
-    },
-    enabled: packageId !== "",
-    retry: false,
-  });
+  const page = useQuery({ ...appPageQuery(packageId, pageId), enabled: packageId !== "", retry: false });
+
+  // A page document is static until the package changes, so every page this app can open is fetched once, up front: moving between its
+  // pages then shows the next page at once instead of replacing the whole panel with a loading skeleton while its document loads.
+  const queryClient = useQueryClient();
+  const preload = app ? pagesOf(app).join(",") : "";
+  useEffect(() => {
+    if (packageId === "" || preload === "") return;
+    for (const id of preload.split(",")) void queryClient.prefetchQuery(appPageQuery(packageId, id));
+  }, [queryClient, packageId, preload]);
 
   // MEDIA-VIDEOS-01: a page opened by link (`/apps/videos/watch?id=...`, a reload, a shared address) starts with its query as the page
   // state, which is where the kit's SchemaPage reads a `navigate` action's state. The page waits one render for it, so a data call
@@ -146,14 +182,16 @@ function AppToolbar({ hideSectionsOnWide = false, person, to, label, homeLabel, 
           </Button>
         </div>
         {sections.length > 0 ? (
-          <Tabs value={current} onValueChange={(value) => navigate(value === "index" ? to : `${to}/${String(value)}`)}>
-            <TabsList variant="pill" aria-label="Sections">
-              <TabsTrigger value="index">{homeLabel}</TabsTrigger>
-              {sections.map((section) => (
-                <TabsTrigger key={section.page} value={section.page}>{section.label}</TabsTrigger>
-              ))}
-            </TabsList>
-          </Tabs>
+          <div className={hideSectionsOnWide ? "lg:hidden" : undefined} data-slot="app-section-tabs">
+            <Tabs value={current} onValueChange={(value) => navigate(value === "index" ? to : `${to}/${String(value)}`)}>
+              <TabsList variant="pill" aria-label="Sections">
+                <TabsTrigger value="index">{homeLabel}</TabsTrigger>
+                {sections.map((section) => (
+                  <TabsTrigger key={section.page} value={section.page}>{section.label}</TabsTrigger>
+                ))}
+              </TabsList>
+            </Tabs>
+          </div>
         ) : null}
       </div>
     );

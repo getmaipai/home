@@ -124,8 +124,7 @@
       "publisher": "BBC",
       "lang": "en",
       "topics_hint": [
-        "science",
-        "environment"
+        "science"
       ]
     },
     {
@@ -305,8 +304,7 @@
       "publisher": "Popular Science",
       "lang": "en",
       "topics_hint": [
-        "science",
-        "technology"
+        "science"
       ]
     },
     {
@@ -316,6 +314,24 @@
       "lang": "en",
       "topics_hint": [
         "entertainment"
+      ]
+    },
+    {
+      "url": "https://www.theguardian.com/environment/wildlife/rss",
+      "title": "The Guardian Wildlife",
+      "publisher": "The Guardian",
+      "lang": "en",
+      "topics_hint": [
+        "environment"
+      ]
+    },
+    {
+      "url": "https://grist.org/feed/",
+      "title": "Grist",
+      "publisher": "Grist",
+      "lang": "en",
+      "topics_hint": [
+        "environment"
       ]
     }
   ]

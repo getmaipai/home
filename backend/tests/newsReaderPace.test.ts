@@ -1,7 +1,8 @@
 // The reader and the page pace: a story opened while the hub's shared page bucket is empty waits for a token and is not remembered as a failure.
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { HostError } from "@maipai/spec/emulators/ts/host-emulator.js";
-import { __setPageFetchForTests } from "@/lib/packageHost";
+import { __setPageFetchForTests, PAGE_REQUEST_HEADERS } from "@/lib/packageHost";
+import { HOME_USER_AGENT } from "@/lib/outbound";
 import { __resetNewsArticleForTests, __setPaceWaitForTests, loadContent } from "@/lib/news/article";
 import { resetDb } from "./reset-db";
 import { ADULT_HOST, articleHtml, putItem, removeNewsApp, resetNewsState, seedFeeds } from "./support/newsFixture";
@@ -55,4 +56,9 @@ describe("reading a story while the page pace is empty", () => {
     await loadContent(item, "adult", { store: null, background: true });
     expect(waits).toEqual([]);
   });
+});
+
+test("a page read names Home honestly: The Guardian answered HTTP 406 to a request with no user agent, and the story showed only its summary", () => {
+  expect(PAGE_REQUEST_HEADERS["user-agent"]).toBe(HOME_USER_AGENT);
+  expect(PAGE_REQUEST_HEADERS.accept).toContain("text/html");
 });

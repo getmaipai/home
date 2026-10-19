@@ -7,6 +7,13 @@ checklist (`docs/dev.md`). The first release is 0.1.0.
 
 ## [Unreleased]
 
+- Fixed News stories from The Guardian opening to a one-paragraph summary: Home's page requests sent no name and The Guardian refused them with HTTP 406. Page reads now name Home honestly, as every other request does, so the full article loads.
+- Fixed the missing picture at the top of a News article, and cards whose pictures had collapsed to nothing (a height cap replaced the ratio the picture frame needs).
+- Fixed News stories appearing under several topics and under the wrong one. Every feed now names one topic, and Home reads each story's words and moves it only when another topic clearly fits better (a games piece in a health feed now goes to Entertainment). Grist and The Guardian's wildlife feed are added to Environment.
+- Changed the News sidebar to stay in place with its own scroll while the page scrolls, and the app is now titled News (its first page was called Today). The page's own section tabs hide beside the sidebar on wide screens.
+- Changed how News pages load so moving between sections no longer flashes the whole panel: every page of the app is fetched once up front, and a page keeps what it showed until the new stories arrive.
+- Changed section pages (a topic or a source) to a wide lead story with a list under it, so they no longer repeat Today's grid. The publisher banner on an article is a slim bar.
+
 ### Added
 - Library listing and summary accept `shared=none` (Only me) for your own files with no shares. Counts and bytes use the same filter as pages.
 - Library uploads stream to disk, with 8 MB chunk sessions for files up to 500 MB and cleanup on cancellation or failure. Bun's server-wide body limit stays unchanged.
