@@ -7,18 +7,23 @@ checklist (`docs/dev.md`). The first release is 0.1.0.
 
 ## [Unreleased]
 
-### Changed
+## [0.2.29] - 2026-10-19
 
-- News: a topic with no stories keeps its header (and Today keeps its category chips) instead of showing a bare empty message. A category chosen from the chips on Today now draws the same layout as the same topic chosen in the sidebar. The article page's source banner and toolbar span the full width, the toolbar stays on top while the article scrolls, and the text sits in a narrow reading column.
+Fixes from your first day with 0.2.28: the Erase tool, older chats, pictures under answers, removing a person, News layout details, and a clearer message when a film plot is stopped. No database migration. Pins: `@maipai/spec` 0.1.188, `@maipai/ui` 0.5.297.
 
-### Fixed
+### Chat
+- **Pictures show under answers about films, people, places and things.** The extra "should a picture go here?" step that was off since IMGQ-09 is on now, and it also runs after a web search (the Dune and Taxi Driver questions got text only before). Adults on written chat only.
+- **An older chat opens and takes your message.** Typing in a chat that a New chat had closed (or Retry on it) reopens it instead of failing with "conversation not found" and an id. A chat that retention emptied says so in plain words.
+- **A film plot that gets stopped says why.** When a reply puts a young person's age next to sexual wording anywhere in it (a Taxi Driver summary does), the stop message now says that and how to ask again. The model is also told to retell such plots without the age and the sexual wording. The safety rule itself is unchanged.
+- **Removing a person retries when the picture tools are busy.** "Remove the boy on the left" failed when chat was using the machine; it now waits and tries once more, and says "The picture tools are busy" instead of a vague failure.
 
-- News: the left column now sits against the icon rail with no gap and the page no longer scrolls a little up and down beside it (the column and the page are one viewport tall). Needs `@maipai/ui` 0.5.297.
-- The Erase tool's preview no longer shows your painted area on top of the result, which made an erased object look as if it was still there. Needs `@maipai/ui` 0.5.296.
+### Pictures
+- **The Erase preview no longer shows your painted area on top of the result**, which made an erased object look as if it was still there. Undo brings the paint back.
 
-### Fixed
-
-- Chat: typing in a chat that a New chat had closed (an older chat from the list, or Retry on it) reopens it and sends, instead of failing with "conversation not found" and an id. A chat that retention emptied still cannot take a message, and now says so in plain words.
+### News
+- **A topic with no stories keeps its header** (and Today keeps its category chips). A category picked from the chips on Today draws the same layout as the same topic picked in the sidebar.
+- **The article page's source banner and toolbar span the full width.** The toolbar stays at the top while the article scrolls; the banner scrolls away; the text sits in a narrow reading column.
+- **The left column sits against the icon rail** with no gap, and the page no longer scrolls a little up and down beside it.
 
 ## [0.2.28] - 2026-10-19
 
