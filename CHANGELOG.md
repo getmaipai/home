@@ -7,6 +7,10 @@ checklist (`docs/dev.md`). The first release is 0.1.0.
 
 ## [Unreleased]
 
+## [0.2.27] - 2026-10-19
+
+The Library is rebuilt like a files app: a collapsible sections column, a grid and a list, search and filters, selecting several files, a viewer, sharing, Trash with Restore, rename and Keep, and drag and drop upload. Large uploads (up to 500 MB) are streamed to disk, an adult owner can re-check a mislabeled adult-only picture, and new pictures, videos and songs follow the storage rules. No database changes. Pins: spec-v0.1.187 and ui-v0.5.287. The engine is unchanged.
+
 ### Added
 - The Library page is rebuilt like a files app: a section column (All files, Pictures, Videos, Songs, Documents, Shared with me, Shared by me, Only me, Trash, with counts, hide and show, Settings and your storage at its foot), real thumbnails, grid and list views, search, Mine, sorting, selection with Share, Keep and Delete, a full-screen viewer with details, sharing with people in your home, Send through your device's share sheet, Trash with Restore, Upload with progress cards, and drag and drop. The view is kept in the address, and `/files?file=<id>` still opens one file. See `docs/user/library.md`.
 - The phone menu drawer can list an app's own sections (the Library's) under the apps.
