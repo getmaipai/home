@@ -66,7 +66,7 @@ routes refresh it, and the key list routes refresh it when older than 30 seconds
 
 **H2, the push (`lib/stackCodingSync.ts`).** The Stack keys are the ones in `stack/backend/src/settings.ts`: `coding.keep_warm_minutes`,
 `coding.thinking_budget_ceiling`, `coding.yield_to_chat`, `coding.engine` and `coding.splash_cache_gb` feed `stack.engines.coding.*`. The first two
-are in the pinned spec; the other three are declared in `settings/stackCodingKeys.ts` until a commons spec tag carries them (the spec change is owed).
+are in the pinned spec (spec-v0.1.189 added the last three).
 A save or reset of any of them calls `PUT /stack/v1/settings` and, when every pending Stack value is one of these keys, `POST /stack/v1/settings/apply`
 (the Stack's apply promotes every pending value, so another staged Stack setting is never promoted by a coding change). Values are clamped to the
 Stack's ranges (keep-warm floor 1 minute). A push is also sent at Home start. A Stack that is away never fails the save; the value stays in Home and

@@ -37,7 +37,7 @@ describe("POST /api/voice/hf-token", () => {
 
   test("a non-admin adult is refused: voice.hf_token is a household setting", async () => {
     const unavailable = startStackFixture({
-      "POST /stack/v1/settings/apply": () => offlineResponse("tts", "the test Stack is unavailable"),
+      "PUT /stack/v1/settings": () => offlineResponse("tts", "the test Stack is unavailable"),
     });
     __setStackClientForTests(unavailable.client);
     try {
@@ -68,7 +68,7 @@ describe("POST /api/voice/hf-token", () => {
 
   test("requires the Stack when no speech service is configured", async () => {
     const unavailable = startStackFixture({
-      "POST /stack/v1/settings/apply": () => offlineResponse("tts", "the test Stack is unavailable"),
+      "PUT /stack/v1/settings": () => offlineResponse("tts", "the test Stack is unavailable"),
     });
     __setStackClientForTests(unavailable.client);
     try {
@@ -117,7 +117,7 @@ describe("hf-token routes, with a configured Stack", () => {
   test("POST /api/voice/hf-token writes to the Stack, not Home's own household setting", async () => {
     const receivedValues: { body: Record<string, unknown> | null } = { body: null };
     fixture = startStackFixture({
-      "POST /stack/v1/settings/apply": async (req) => {
+      "PUT /stack/v1/settings": async (req) => {
         receivedValues.body = (await req.json()) as Record<string, unknown>;
         return Response.json({ sections: [], settings: [] });
       },
@@ -136,7 +136,7 @@ describe("hf-token routes, with a configured Stack", () => {
   });
 
   test("POST /api/voice/hf-token still refuses a non-admin adult", async () => {
-    fixture = startStackFixture({ "POST /stack/v1/settings/apply": async () => Response.json({ sections: [], settings: [] }) });
+    fixture = startStackFixture({ "PUT /stack/v1/settings": async () => Response.json({ sections: [], settings: [] }) });
     const owner = await ownerClient();
     const adultRes = await owner.post("/api/people", { displayName: "Marlow", role: "adult", secret: "0000" });
     const adult = (await adultRes.json()) as { id: string };
@@ -152,7 +152,7 @@ describe("hf-token routes, with a configured Stack", () => {
   test("POST /api/voice/hf-token/remove clears the Stack's setting", async () => {
     const receivedValues: { body: Record<string, unknown> | null } = { body: null };
     fixture = startStackFixture({
-      "POST /stack/v1/settings/apply": async (req) => {
+      "PUT /stack/v1/settings": async (req) => {
         receivedValues.body = (await req.json()) as Record<string, unknown>;
         return Response.json({ sections: [], settings: [] });
       },
@@ -167,7 +167,7 @@ describe("hf-token routes, with a configured Stack", () => {
   });
 
   test("a scripted Stack failure answers with the Stack's own status, no household write attempted", async () => {
-    fixture = startStackFixture({ "POST /stack/v1/settings/apply": async () => offlineResponse("tts", "the tts engine is not running") });
+    fixture = startStackFixture({ "PUT /stack/v1/settings": async () => offlineResponse("tts", "the tts engine is not running") });
     const owner = await ownerClient();
     setHouseholdSettingValue("engines.stack.url", fixture.url);
     __setStackClientForTests(fixture.client);

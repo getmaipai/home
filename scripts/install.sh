@@ -1070,6 +1070,7 @@ commons_archive_sha256() {
     ui-v0.5.278) printf '%s\n' "4c86149ec80538072216c879146a2c47edc6dec773ce4703625b0c205718a4da" ;;
     spec-v0.1.187) printf '%s\n' "de8c6dc4cd033adb223c5ceb880f64177cb23e415bb106422ff67e97b052301c" ;;
     spec-v0.1.188) printf '%s\n' "baa0452d951eb8a0e8466195998436a671b8f3b89d386c8a27f0c789244e1043" ;;
+    spec-v0.1.189) printf '%s\n' "ce9f7c653e08df83b05896d706351eeb3b2cf6a989e316dcac61eb45305a6760" ;;
     ui-v0.5.279) printf '%s\n' "fe9d3250e7d1d8253d39e41e90b56d25739523b47e486059985acbaec5eba05b" ;;
     ui-v0.5.280) printf '%s\n' "a0b49373184e9678453c200364325c0cefd4e4e8861043b7667b10bf3adc8b5c" ;;
     ui-v0.5.281) printf '%s\n' "cc91fc50b42a66f794f2d9ebbe6c3e2d1b2c5a0a3d5a9a8f8fbeb33ab30d008c" ;;
@@ -1085,6 +1086,7 @@ commons_archive_sha256() {
     ui-v0.5.296) printf '%s\n' "d307f926da4e26aea3d99341aab2a8e93bd73c5a37039bac3795d9ec0bfd467a" ;;
     ui-v0.5.297) printf '%s\n' "a1e573d0cb70fccf3b1db0c49a4192bff019d8ad3c1e33c8ecaaedcfba679d92" ;;
     ui-v0.5.299) printf '%s\n' "6d7074cdb3388ca6b0780bad79799a0ade60dc6117d4943f311accd5a3fc0e80" ;;
+    ui-v0.5.301) printf '%s\n' "ce6e1fb9fed45bae99c151c652c1d135afb424e80ea0a30cafc5493861ad357d" ;;
     *) return 1 ;;
   esac
 }

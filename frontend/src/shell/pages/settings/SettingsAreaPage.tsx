@@ -67,7 +67,7 @@ function SettingsBackLink() {
   const label = backLabelFor(to, Object.fromEntries((rows ?? []).map((row) => [row.package, row.label])));
   return (
     <>
-      <div className="flex"><Button variant="ghost" size="sm" render={<Link to={to} aria-label={label === "Back" ? label : `Back to ${label}`} onClick={(event) => { if (!confirmRouteLeave()) event.preventDefault(); }} />}>
+      <div className="flex"><Button variant="ghost" size="row" render={<Link to={to} aria-label={label === "Back" ? label : `Back to ${label}`} onClick={(event) => { if (!confirmRouteLeave()) event.preventDefault(); }} />}>
         <BackIcon aria-hidden />
         {label}
       </Button></div>
