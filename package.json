@@ -1,6 +1,6 @@
 {
   "name": "@maipai/home",
-  "version": "0.2.27",
+  "version": "0.2.28",
   "private": true,
   "description": "MaiPai Home: the self-hosted family AI hub. See docs/dev.md.",
   "license": "AGPL-3.0",

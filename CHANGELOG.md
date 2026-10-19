@@ -7,21 +7,18 @@ checklist (`docs/dev.md`). The first release is 0.1.0.
 
 ## [Unreleased]
 
-### Changed
+## [0.2.28] - 2026-10-19
 
-- News: the title above the page now says where you are (Today, My Mix, Saved, the topic or source you picked) instead of always reading "News", and the page no longer sits hard against the sidebar column.
+News pages are laid out per topic, articles show their own pictures and read like Apple News, and the News title says where you are. Chat keeps what you read when the safety check cuts a reply. No database migration. Pins: `@maipai/spec` 0.1.188, `@maipai/ui` 0.5.294.
 
-### Added
+### News
+- **Each topic page has its own layout**, as Apple News does for its categories. World, Business, Sports and Kids open on Top Stories: three tall cards, three cards with the picture on the right, then a list. Science, Health and Environment open with two large cards, then two picture-right cards. Local, Technology and Entertainment open on Today's News, with a wide More for you card. A source you follow keeps the lead card and list.
+- **Articles show their own pictures and captions** for teens and adults. Ads, promo and related blocks, tracking pixels, tiny icons and a second copy of the lead picture are left out, and the pictures come through the hub, never from the publisher's address. A child's article stays text only.
+- **The article page reads like Apple News.** A slim toolbar has Back, Text size, Share, Save and More (Open original, Listen, Key points), and the text sits in a serif reading column. A story card's menu says Open original.
+- **The News title says where you are** (Today, My Mix, Saved, the topic or source you picked) instead of always reading News, and the page no longer sits hard against the sidebar column.
 
-- News: a teen or an adult reading a full article now sees its own pictures and captions in place. Ads, promo and related blocks, tracking pixels, tiny icons and a second copy of the lead picture are left out, and the pictures come through the hub, never from the publisher's address. A child's article stays text only.
-
-### Changed
-
-- News: each topic page has its own layout, as Apple News does for its categories. World, Business, Sports and Kids open on Top Stories, Science, Health and Environment open with two large cards, and Local, Technology and Entertainment open on Today's News with a wide More for you card. Sources keep the lead card and list. Requires `@maipai/spec` 0.1.188 and `@maipai/ui` 0.5.289.
-
-### Fixed
-
-- Chat: when the safety check cuts a reply partway, the thread keeps the words you already read and puts the refusal line under them, so reloading the chat shows what the screen showed. Before, a reload showed only "I can't help with that." The hub log now names the safety category that cut a reply (never the words), so a false alarm can be traced.
+### Chat
+- **A reply the safety check cuts keeps the words you already read**, with the refusal line under them, so reloading the chat shows what the screen showed. The hub log now names the safety category that cut a reply (never the words).
 
 ## [0.2.27] - 2026-10-19
 
