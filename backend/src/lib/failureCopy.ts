@@ -272,7 +272,12 @@ export const SAFETY_REFUSAL_COPY: Record<"adult" | "teen" | "child", string> = {
   child: "I can't talk about that one, so let's pick something else.",
 };
 
-export function safetyRefusalLine(band: "adult" | "teen" | "child"): string {
+/** An adult whose reply was stopped by the child-safety floor (a young person's age next to sexual wording anywhere in the reply,
+ * which a film's plot summary can trip) is told which part tripped it and how to ask, instead of the general line. */
+export const SAFETY_REFUSAL_CSAM_ADULT = "I stopped that reply because it put a young person's age next to sexual wording, which I never write, even when it is a film's plot. Ask for the story without those details and I'll answer.";
+
+export function safetyRefusalLine(band: "adult" | "teen" | "child", categories: readonly string[] = []): string {
+  if (band === "adult" && categories.includes("csam")) return SAFETY_REFUSAL_CSAM_ADULT;
   return SAFETY_REFUSAL_COPY[band];
 }
 
