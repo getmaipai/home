@@ -49,15 +49,23 @@ function usable(row: KeyRow): "revoked" | "expired" | null {
   if (row.revokedAt || row.status === "revoked") return "revoked";
   return Date.parse(row.expiresAt) <= Date.now() ? "expired" : null;
 }
+/** Why a person may not use a coding key right now. "ok" is the only admission; the rest name the plain reply the gateway gives. */
+export type CodeAdmission = "ok" | "not_allowed" | "keys_off" | "coding_off" | "coding_paused";
+/** The person's controls read NOW, every call: nothing is cached on the key, so a key never widens after a controls change. */
+export function codeAdmission(person: PersonRow): CodeAdmission {
+  if (person.deletedAt || !person.enabled || person.memorializedAt || person.role === "guest") return "not_allowed";
+  if (getHouseholdSettingValue("coding.enabled") !== true) return "coding_off";
+  if (getHouseholdSettingValue("coding.paused") === true) return "coding_paused";
+  const effect = effectivePermissions(person.id).find(p => p.action === "use:code")?.effect;
+  if (effect === "deny") return "not_allowed";
+  const minor = person.role === "child" || person.role === "teen";
+  if ((minor || getHouseholdSettingValue("coding.adults_by_default") !== true) && effect !== "allow") return "not_allowed";
+  return getPersonSettingValue(person, "coding.person.api_keys") === true ? "ok" : "keys_off";
+}
 function mayHoldKey(person: PersonRow, scope: ApiKeyScope): boolean {
   if (person.deletedAt) return false;
   if (scope === "turn") return true; // Preserve the interim voice token's admission rules.
-  if (!person.enabled || person.memorializedAt || person.role === "guest" || getHouseholdSettingValue("coding.enabled") !== true || getHouseholdSettingValue("coding.paused") === true) return false;
-  const effect = effectivePermissions(person.id).find(p => p.action === "use:code")?.effect;
-  if (effect === "deny") return false;
-  const minor = person.role === "child" || person.role === "teen";
-  if ((minor || getHouseholdSettingValue("coding.adults_by_default") !== true) && effect !== "allow") return false;
-  return getPersonSettingValue(person, "coding.person.api_keys") === true;
+  return codeAdmission(person) === "ok";
 }
 function status(row: KeyRow, person: PersonRow): KeyRow["status"] {
   const dead = usable(row);
@@ -125,8 +133,14 @@ export function revokeApiKey(personId: string, id: string): boolean {
   return db.update(apiKeys).set({ revokedAt: at, status: "revoked", legacyHash: null, updatedAt: at, hlc: nextHlc() })
     .where(and(eq(apiKeys.personId, personId), eq(apiKeys.id, id))).returning({ id: apiKeys.id }).all().length > 0;
 }
-export function resolveApiKey(secret: string, scope: ApiKeyScope, origin?: KeyOrigin): PersonRow | null {
-  if (secret.length > 256) return null;
+/** What a bearer secret resolved to. `invalid` covers every case where the secret itself does not open a key (unknown, wrong, expired, revoked, wrong scope), so
+ * those cannot be told apart; the other refusals are only reachable by someone holding a real secret. */
+export type ApiKeyOutcome =
+  | { ok: true; person: PersonRow; key: { id: string; limits: KeyRow["limits"] } }
+  | { ok: false; reason: "invalid" | Exclude<CodeAdmission, "ok"> };
+export function resolveApiKeyOutcome(secret: string, scope: ApiKeyScope, origin?: KeyOrigin): ApiKeyOutcome {
+  const invalid = { ok: false, reason: "invalid" } as const;
+  if (secret.length > 256) return invalid;
   const digest = hashApiKeySecret(secret);
   const match = /^maipai_(key_[a-z0-9]{6,})_[A-Z2-7]{52}$/.exec(secret);
   let row: KeyRow | undefined;
@@ -142,16 +156,24 @@ export function resolveApiKey(secret: string, scope: ApiKeyScope, origin?: KeyOr
     }
   }
   const valid = constantTimeHashEqual(digest, row?.secretHash ?? "0".repeat(64));
-  if (!row || (!valid && !legacy)) return null;
+  if (!row || (!valid && !legacy)) return invalid;
   const person = db.select().from(people).where(eq(people.id, row.personId)).get() as PersonRow | undefined;
-  if (!person || !row.scopes.includes(scope) || usable(row) || !mayHoldKey(person, scope)) return null;
+  if (!person || person.deletedAt || !row.scopes.includes(scope) || usable(row)) return invalid;
+  if (scope === "code") {
+    const admission = codeAdmission(person);
+    if (admission !== "ok") return { ok: false, reason: admission };
+  }
   const at = new Date().toISOString();
   if (legacy || !row.lastUsedAt || Date.now() - Date.parse(row.lastUsedAt) >= 60_000) {
     db.update(apiKeys).set({ lastUsedAt: at, ...(origin ? { lastUsedFrom: origin } : {}),
       ...(legacy ? { secretHash: digest, legacyHash: null, hint: hintOf(secret) } : {}), updatedAt: at, hlc: nextHlc(),
     }).where(eq(apiKeys.id, row.id)).run();
   }
-  return person;
+  return { ok: true, person, key: { id: row.id, limits: row.limits } };
+}
+export function resolveApiKey(secret: string, scope: ApiKeyScope, origin?: KeyOrigin): PersonRow | null {
+  const outcome = resolveApiKeyOutcome(secret, scope, origin);
+  return outcome.ok ? outcome.person : null;
 }
 /** Compatibility endpoints rotate only the former single voice token, not named keys. It keeps the old 365-day lifetime for everyone. */
 export function issueApiToken(personId: string): string {

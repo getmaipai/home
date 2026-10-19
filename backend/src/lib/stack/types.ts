@@ -144,6 +144,8 @@ export interface RoleInfo extends ChatRoleContext {
   sharesModelWith: RoleId | null;
   state: RoleState;
   reason: string | null;
+  /** Only the coding role: its engine's slots (CODE-STACK-01 S2). */
+  coding?: { state?: string; slots?: number | null; slots_busy?: number };
   model: {
     id: string;
     sizeBytes: number | null;

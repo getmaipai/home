@@ -33,6 +33,7 @@ import type {
 
 
 const DEFAULT_TIMEOUT_MS = 30_000;
+const CODING_FIRST_BYTE_MS = 180_000;
 
 const KIND_BY_STATUS: Record<number, StackErrorKind> = {
   400: "unknown",
@@ -88,7 +89,18 @@ export interface StackImageToolsStatus {
 export interface StackImageEditItem { b64_json: string; width: number; height: number; content_type: string; operation: string; engine?: string; model?: string; ms?: number; /** find_people and erase_people (IMGEDIT-01): the people the on-device finder saw, numbered, boxes as fractions of the picture. */ people?: Array<{ id: number; x: number; y: number; w: number; h: number; area: number }> }
 export type StackImageEditReply = { kind: "done"; job: string; item: StackImageEditItem } | { kind: "running"; job: string };
 
+/** The coding role's four generation paths on the Stack (CODE-STACK-01). */
+export type CodingWirePath = "/v1/messages" | "/v1/messages/count_tokens" | "/v1/responses" | "/v1/chat/completions";
+/** The coding role's one served model as `GET /v1/models?role=coding` lists it. */
+export interface StackCodingModels { object: "list"; data: Array<{ id: string; role?: string; context_length?: number; thinking_budget_ceiling?: number }> }
+/** `GET /stack/v1/roles` coding entry: only what the gateway reads. */
+export interface StackCodingStatus { state?: string; slots?: number | null; slots_busy?: number }
+
 export interface StackClient {
+  /** CODE-API-01: POST a coding wire request and hand back the engine's reply as the Stack sent it (status, headers, body stream), including a 4xx or 5xx, which the caller maps. Only a Stack that cannot be reached throws. Optional: an older client has no coding wires. */
+  codingWire?(path: CodingWirePath, body: Record<string, unknown>, opts?: { signal?: AbortSignal }): Promise<{ status: number; headers: Headers; body: ReadableStream<Uint8Array> | null }>;
+  /** CODE-API-01: GET /v1/models?role=coding (the one served model, with its context length and thinking ceiling). */
+  codingModels?(opts?: { signal?: AbortSignal }): Promise<StackCodingModels>;
   /** POST /v1/chat/completions. For `stream: true` the Response body reader
    * and its headers come back, not parsed data. */
   chat(request: RoleRequest, opts?: { signal?: AbortSignal }): Promise<
@@ -330,6 +342,17 @@ export function createStackClient(options: StackClientOptions = {}): StackClient
       }
       return call("/v1/chat/completions", jsonInit(request), rawJson<Record<string, unknown>>, opts);
     },
+    async codingWire(path, body, opts) {
+      let res: Response;
+      try {
+        // A cold coding engine takes tens of seconds to load, so the wait for the first byte is longer than the other roles'.
+        res = await withTimeout(doFetch(base + path, { ...jsonInit(body), signal: opts?.signal }), Math.max(timeoutMs, CODING_FIRST_BYTE_MS), timeoutError);
+      } catch (err) {
+        wrapError(err);
+      }
+      return { status: res.status, headers: res.headers, body: res.body };
+    },
+    codingModels: (opts) => call("/v1/models?role=coding", { method: "GET" }, json<StackCodingModels>, opts),
     embeddings: (request, opts) => call("/v1/embeddings", jsonInit(request), rawJson<Record<string, unknown>>, opts),
     tokenize: (request, opts) => call("/v1/tokenize", jsonInit(request), rawJson<TokenCountResponse>, opts),
     transcribe: (form, opts) => call("/v1/audio/transcriptions", formInit(form), rawJson<{ text: string }>, opts),

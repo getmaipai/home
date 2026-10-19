@@ -8,7 +8,7 @@ import { hashSessionToken } from "@/lib/session";
 import { resolveDeviceToken, hashDeviceToken } from "@/lib/deviceTokens";
 import { mayHoldMediaOffline } from "@/lib/devices";
 import { mediaBandOf } from "@/lib/media/band";
-import { resolveApiKey, keyOriginOf, API_KEY_REFUSAL, type ApiKeyScope } from "@/lib/apiKeys";
+import { resolveApiKeyOutcome, keyOriginOf, API_KEY_REFUSAL, type ApiKeyOutcome, type ApiKeyScope } from "@/lib/apiKeys";
 import { getClientIp } from "@/lib/secretThrottle";
 import { TRUST_PROXY } from "@/lib/trustProxy";
 import { personIsGranted } from "@/lib/grants";
@@ -350,16 +350,27 @@ export function requireDeviceSession(kind: DeviceKind, capability?: string) {
 // inbound API surface should never silently also accept "whatever browser
 // session happens to be attached to this request," which isn't a
 // coherent concept for a satellite or a script calling in anyway.
-export function requireApiKey(scope: ApiKeyScope) {
+export interface ApiKeyDoor {
+  /** Also read the secret from an `x-api-key` header when no bearer is sent (the Anthropic wire's own header). */
+  xApiKey?: boolean;
+  /** Render a refusal in this door's own wire format. Without it the turn door's plain body is used. */
+  refuse?: (c: Context<AppEnv>, reason: Extract<ApiKeyOutcome, { ok: false }>["reason"]) => Response;
+}
+export function requireApiKey(scope: ApiKeyScope, door: ApiKeyDoor = {}) {
   return createMiddleware<AppEnv>(async (c, next) => {
     const authHeader = c.req.header("authorization");
-    const token = authHeader?.startsWith("Bearer ") ? authHeader.slice("Bearer ".length) : undefined;
-    // One refusal for a missing, unknown, wrong, expired, revoked, suspended or wrong-scope key, so a key id cannot be probed.
-    if (!token) return c.json({ error: "Unauthorized", message: API_KEY_REFUSAL }, 401);
+    const bearer = authHeader?.startsWith("Bearer ") ? authHeader.slice("Bearer ".length) : undefined;
+    const token = bearer ?? (door.xApiKey ? c.req.header("x-api-key") : undefined);
+    // One refusal for a missing, unknown, wrong, expired, revoked or wrong-scope key, so a key id cannot be probed.
+    const refuse = (reason: Extract<ApiKeyOutcome, { ok: false }>["reason"]) =>
+      door.refuse ? door.refuse(c, reason) : c.json({ error: "Unauthorized", message: API_KEY_REFUSAL }, 401);
+    if (!token) return refuse("invalid");
 
-    const person = resolveApiKey(token, scope, keyOriginOf(getClientIp(c)));
-    if (!person) return c.json({ error: "Unauthorized", message: API_KEY_REFUSAL }, 401);
-    c.set("person", person);
+    const outcome = resolveApiKeyOutcome(token, scope, keyOriginOf(getClientIp(c)));
+    if (!outcome.ok) return refuse(outcome.reason);
+    c.set("person", outcome.person);
+    const rpm = outcome.key.limits?.requests_per_minute;
+    c.set("apiKey", { id: outcome.key.id, requestsPerMinute: typeof rpm === "number" && rpm > 0 ? rpm : null });
     await next();
   });
 }

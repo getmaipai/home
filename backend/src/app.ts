@@ -84,6 +84,7 @@ import { likenessRoutes } from "@/routes/likeness";
 import { attachmentsRoutes } from "@/routes/attachments";
 import { updatesRoutes } from "@/routes/updates";
 import { openaiRoutes } from "@/routes/openai";
+import { codeGatewayRoutes } from "@/routes/codeGateway";
 import { storeRoutes } from "@/routes/store";
 import { listsRoutes } from "@/routes/lists";
 import { widgetsRoutes } from "@/routes/widgets";
@@ -287,6 +288,8 @@ app.route("/api/updates", updatesRoutes);
 // exact path (session-c-brain-and-voice.md step 8), which a client
 // integrating against it expects verbatim.
 app.route("/", openaiRoutes);
+// CODE-API-01: the coding gateway, under its own prefix so the turn door above is untouched. Personal `code` keys only.
+app.route("/code/v1", codeGatewayRoutes);
 
 // Serving the built frontend from this same process (docs/dev.md, the
 // shell/kit/Chat slice): a self-hosted single-process hub, no reverse

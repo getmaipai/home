@@ -7,5 +7,7 @@ export type AppEnv = {
   Variables: {
     person: PersonRow;
     deviceId: string;
+    /** Set by requireApiKey: the key a bearer request used (its id and own per-minute limit); never the secret. */
+    apiKey: { id: string; requestsPerMinute: number | null };
   };
 };
