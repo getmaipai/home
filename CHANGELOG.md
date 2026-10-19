@@ -7,18 +7,23 @@ checklist (`docs/dev.md`). The first release is 0.1.0.
 
 ## [Unreleased]
 
-- Fixed News stories from The Guardian opening to a one-paragraph summary: Home's page requests sent no name and The Guardian refused them with HTTP 406. Page reads now name Home honestly, as every other request does, so the full article loads.
-- Fixed the missing picture at the top of a News article, and cards whose pictures had collapsed to nothing (a height cap replaced the ratio the picture frame needs).
-- Fixed News stories appearing under several topics and under the wrong one. Every feed now names one topic, and Home reads each story's words and moves it only when another topic clearly fits better (a games piece in a health feed now goes to Entertainment). Grist and The Guardian's wildlife feed are added to Environment.
-- Changed the News sidebar to stay in place with its own scroll while the page scrolls, and the app is now titled News (its first page was called Today). The page's own section tabs hide beside the sidebar on wide screens.
-- Changed how News pages load so moving between sections no longer flashes the whole panel: every page of the app is fetched once up front, and a page keeps what it showed until the new stories arrive.
-- Changed section pages (a topic or a source) to a wide lead story with a list under it, so they no longer repeat Today's grid. The publisher banner on an article is a slim bar.
+## [0.2.26] - 2026-10-19
 
-### Added
-- Library listing and summary accept `shared=none` (Only me) for your own files with no shares. Counts and bytes use the same filter as pages.
-- Library uploads stream to disk, with 8 MB chunk sessions for files up to 500 MB and cleanup on cancellation or failure. Bun's server-wide body limit stays unchanged.
-- Adult file owners can recheck an adult-only picture with the existing picture check. Only a confident safe result makes it all-ages; failures keep it adult-only, with rate limiting and an audit log.
-- New generated pictures, edits, videos and songs follow storage rules until pinned with Keep. Existing items and pins are unchanged; no migration.
+News gets fixes for what you reported: the full article opens, pictures show at the right size, each story sits under one topic, the sidebar stays put and pages stop flashing. The Library gets follow-ups to its listing and uploads. No database changes. Pins: spec-v0.1.187 and ui-v0.5.287. The engine is unchanged (Stack a89e7ff).
+
+### News
+- **The full article opens.** Stories from The Guardian showed only a one-paragraph summary ("Continue reading..."), because Home's page requests sent no name and The Guardian refused them with HTTP 406. Page reads now name Home honestly, as every other request does.
+- **The picture at the top of an article shows**, and cards whose pictures had collapsed to nothing are fixed (a height cap had replaced the ratio the picture frame needs).
+- **Each story is under one topic, and the right one.** Every feed now names one topic, and Home reads each story's words and moves it only when another topic clearly fits better (a games piece in a health feed now goes to Entertainment). Grist and The Guardian's wildlife feed are added to Environment.
+- **The sidebar stays in place** with its own scroll while the page scrolls, and the app is titled News (its first page was called Today). The page's own section tabs hide beside the sidebar on wide screens.
+- **Moving between sections no longer flashes the panel.** Every page of the app is fetched once up front, a page keeps what it showed until new stories arrive, and a loading skeleton only appears if loading takes longer than 200 ms.
+- **Section pages (a topic or a source) lead with one wide story and a list**, so they no longer repeat Today's grid. The publisher banner on an article is a slim bar.
+
+### Library
+- Your own files with no shares can be listed on their own (the Only me filter), and counts and bytes use the same filter as pages.
+- Uploads stream to disk in 8 MB chunks for files up to 500 MB, with cleanup if one is cancelled or fails.
+- An adult who owns an adult-only picture can recheck it with the picture check. Only a confident safe result makes it all-ages; a failed check keeps it adult-only, with rate limiting and an audit log.
+- New generated pictures, edits, videos and songs follow the storage rules until you pin them with Keep. Existing items and pins are unchanged.
 
 ## [0.2.25] - 2026-10-18
 
