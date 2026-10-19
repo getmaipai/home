@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-10-19T03:17:58.131Z",
+  "generatedAt": "2026-10-19T03:41:46.756Z",
   "kitTag": "ui-v0.5.287",
   "items": [
     {
@@ -730,7 +730,7 @@
       "group": "media",
       "verdict": "wire-after",
       "verdictReason": "The Library page opens a picture, video or song in MediaViewer with the details panel and the Share action (LIBRARY-REVAMP-09).",
-      "implemented": false,
+      "implemented": true,
       "reading": "The Library page opens a picture, video or song in MediaViewer with the details panel and the Share action (LIBRARY-REVAMP-09)."
     },
     {
@@ -1065,7 +1065,7 @@
       "group": "share",
       "verdict": "wire-after",
       "verdictReason": "The Library page shares a file through ShareDialog over the existing share route, with a household row and per-person rows (LIBRARY-REVAMP-09).",
-      "implemented": false,
+      "implemented": true,
       "reading": "The Library page shares a file through ShareDialog over the existing share route, with a household row and per-person rows (LIBRARY-REVAMP-09)."
     },
     {

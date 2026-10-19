@@ -10,10 +10,6 @@ checklist (`docs/dev.md`). The first release is 0.1.0.
 ### Added
 - The Library page is rebuilt like a files app: a section column (All files, Pictures, Videos, Songs, Documents, Shared with me, Shared by me, Only me, Trash, with counts, hide and show, Settings and your storage at its foot), real thumbnails, grid and list views, search, Mine, sorting, selection with Share, Keep and Delete, a full-screen viewer with details, sharing with people in your home, Send through your device's share sheet, Trash with Restore, Upload with progress cards, and drag and drop. The view is kept in the address, and `/files?file=<id>` still opens one file. See `docs/user/library.md`.
 - The phone menu drawer can list an app's own sections (the Library's) under the apps.
-- Library listing and summary accept `shared=none` (Only me) for your own files with no shares. Counts and bytes use the same filter as pages.
-- Library uploads stream to disk, with 8 MB chunk sessions for files up to 500 MB and cleanup on cancellation or failure. Bun's server-wide body limit stays unchanged.
-- Adult file owners can recheck an adult-only picture with the existing picture check. Only a confident safe result makes it all-ages; failures keep it adult-only, with rate limiting and an audit log.
-- New generated pictures, edits, videos and songs follow storage rules until pinned with Keep. Existing items and pins are unchanged; no migration.
 
 ## [0.2.26] - 2026-10-19
 
