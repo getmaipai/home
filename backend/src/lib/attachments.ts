@@ -5,7 +5,7 @@ import { deleteMusicJobsForFiles, deleteMusicJobsForPerson, deleteMusicJobsForTu
 // only by its validated relative storage_path.
 import { deletePictureJobsForFiles, deletePictureJobsForPerson, deletePictureJobsForTurns, dropTemporaryPictureJobs, dropTemporaryPictureJobsForPerson } from "@/lib/pictures/jobStore";
 import { createHash } from "node:crypto";
-import { closeSync, existsSync, openSync, readSync, readFileSync, renameSync, statSync, unlinkSync, writeFileSync } from "node:fs";
+import { chmodSync, closeSync, existsSync, openSync, readSync, readFileSync, renameSync, statSync, unlinkSync, writeFileSync } from "node:fs";
 import { dirname, isAbsolute, normalize, relative, resolve } from "node:path";
 import { and, eq, inArray, isNull } from "drizzle-orm";
 // Renamed from the `File` export to `FileRecordSchema` locally: `File` is a
@@ -239,7 +239,7 @@ export function storeFile(actor: PersonRow, input: StoreFileInput): AttachmentOp
   const record = toRecord(row);
 
   if (needsWrite) {
-    if (input.staged) renameSync(input.staged.path, filePath);
+    if (input.staged) { chmodSync(input.staged.path, 0o600); renameSync(input.staged.path, filePath); }
     else writeFileSync(filePath, bytes!, { mode: 0o600 });
   }
   try {

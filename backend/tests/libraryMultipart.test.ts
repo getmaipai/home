@@ -45,3 +45,6 @@ test("a second part, a nested multipart part and an oversized header are refused
 test("a missing or unsafe boundary is refused", async () => {
   await expect(libraryMultipart(request(head() + "x", 4, "multipart/form-data"))).rejects.toMatchObject({ status: 400 });
 });
+test("only a field named file counts, not a file name of file", async () => {
+  await expect(libraryMultipart(request('--abc\r\nContent-Disposition: form-data; name="other"; filename="file"\r\n\r\nx\r\n--abc--\r\n', 4))).rejects.toMatchObject({ status: 400 });
+});

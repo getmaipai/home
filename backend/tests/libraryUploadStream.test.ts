@@ -212,3 +212,22 @@ test("a lazy 128 MB stream has bounded peak resident memory", async () => {
   await cancelLibraryUpload(f.actor, upload_id);
   expect(staging()).toEqual([]);
 });
+
+import { statSync } from "node:fs";
+import { testPng } from "./pictureFixture";
+test("a cleaned picture is stored private to the hub (mode 600)", async () => {
+  const f = await fixture();
+  const png = await testPng();
+  const id = await f.start("pic.png");
+  expect((await f.put(id, 0, png)).status).toBe(200);
+  expect((await f.client.post(`/api/library/uploads/${id}/finish`)).status).toBe(201);
+  const row = db.select().from(attachments).get()!;
+  expect(statSync(attachmentFilePath(row.storagePath)).mode & 0o777).toBe(0o600);
+});
+test("the single-request upload is not limited to three at once", async () => {
+  const f = await fixture();
+  for (let i = 0; i < 3; i++) await f.start(`n${i}.txt`);
+  const prefix = '--b\r\nContent-Disposition: form-data; name="file"; filename="x.txt"\r\n\r\nhello';
+  const res = await app.request("/api/library/upload", { method: "POST", headers: { host: "localhost", cookie: f.client.getCookie()!, "content-type": "multipart/form-data; boundary=b" }, body: prefix + "\r\n--b--\r\n" });
+  expect(res.status).toBe(201);
+});

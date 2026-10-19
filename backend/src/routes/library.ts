@@ -50,7 +50,7 @@ libraryRoutes.post("/upload", requireAuth, async c => {
     assertLibraryUploadAllowed(actor);
     const upload = await libraryMultipart(c.req.raw);
     let named;
-    try { named = await beginLibraryUpload(actor, upload.name); }
+    try { named = await beginLibraryUpload(actor, upload.name, Infinity); }
     catch (error) { await upload.body.cancel().catch(() => {}); throw error; }
     id = named.upload_id;
     // Legacy single-request uploads retain Bun's default body limit; larger files use sessions.

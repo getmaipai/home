@@ -4,7 +4,7 @@ import { closeSync, existsSync, openSync, readSync } from "node:fs";
 import { mkdtemp, open, readdir, rm, stat } from "node:fs/promises";
 import { join } from "node:path";
 import { fileTypeFromFile } from "file-type";
-import { and, eq, isNull } from "drizzle-orm";
+import { and, eq, gte, isNull } from "drizzle-orm";
 import { db } from "@/db";
 import { attachments, people } from "@/db/schema";
 import { attachmentFilePath, storeFile } from "@/lib/attachments";
@@ -53,10 +53,10 @@ async function discard(id: string) {
   await session.cancel?.().catch(() => {});
   await rm(session.dir, { recursive: true, force: true });
 }
-export async function beginLibraryUpload(actor: PersonRow, name: string) {
+export async function beginLibraryUpload(actor: PersonRow, name: string, sessionLimit = 3) {
   assertLibraryUploadAllowed(actor);
   // Bound abandoned staging files even before the expiry timer runs.
-  if ([...sessions.values()].filter(s => s.owner === actor.id).length + (starting.get(actor.id) ?? 0) >= 3) throw new UploadError(409, "You already have three uploads running. Finish or cancel one, then try again.");
+  if ([...sessions.values()].filter(s => s.owner === actor.id).length + (starting.get(actor.id) ?? 0) >= sessionLimit) throw new UploadError(409, "You already have three uploads running. Finish or cancel one, then try again.");
   starting.set(actor.id, (starting.get(actor.id) ?? 0) + 1);
   let dir: string | undefined;
   try {
@@ -72,7 +72,13 @@ export async function beginLibraryUpload(actor: PersonRow, name: string) {
     const id = crypto.randomUUID();
     const path = join(dir, "file");
     await (await open(path, "wx", 0o600)).close();
-    const timer = setTimeout(() => { void discard(id).catch(() => {}); }, AGE); timer.unref();
+    // A finish that is still hashing, cleaning or storing at expiry is allowed to complete; the timer retries until it is idle.
+    const expire = () => {
+      const live = sessions.get(id);
+      if (live?.busy) { live.timer = setTimeout(expire, 60_000); live.timer.unref(); return; }
+      void discard(id).catch(() => {});
+    };
+    const timer = setTimeout(expire, AGE); timer.unref();
     sessions.set(id, { owner: actor.id, name: cleanFileName(name.replace(/\\/g, "/").split("/").pop() ?? "").slice(0, 255) || "File", dir, path, size: 0, hash: createHash("sha256"), expires: Date.now() + AGE, busy: false, timer });
     return { upload_id: id, chunk_bytes: LIBRARY_CHUNK_BYTES, max_bytes: cap };
   } catch (error) {
@@ -95,7 +101,7 @@ function capacity(actor: PersonRow, s: Session, size: number, digest: string) {
   if (raw.ok) return;
   if (!s.prefixes) {
     s.prefixes = new Map();
-    for (const row of db.select().from(attachments).all()) {
+    for (const row of db.select({ sha256: attachments.sha256, size: attachments.size, storagePath: attachments.storagePath }).from(attachments).where(gte(attachments.size, size)).all()) {
       if (row.size >= size && checkStorageCap(actor.role, actor.id, size, row.sha256).ok) s.prefixes.set(row.sha256, {
         path: attachmentFilePath(row.storagePath), size: row.size, read: 0, hash: createHash("sha256"),
       });

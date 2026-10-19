@@ -14,7 +14,7 @@ export async function libraryMultipart(request: Request): Promise<{ name: string
         if (end > 8192) throw fail();
         const header = buffer.subarray(0, end).toString();
         const name = /filename="([^"\r\n]*)"/i.exec(header)?.[1];
-        if (!header.startsWith(`--${token}\r\n`) || !/name="file"/i.test(header) || name === undefined || /^content-type:\s*multipart\//im.test(header)) throw fail();
+        if (!header.startsWith(`--${token}\r\n`) || !/(?:^|;)\s*name="file"/im.test(header.replace(/filename="[^"\r\n]*"/gi, "")) || name === undefined || /^content-type:\s*multipart\//im.test(header)) throw fail();
         buffer = buffer.subarray(end + 4);
         const marker = Buffer.from(`\r\n--${token}`);
         let ended = false;
