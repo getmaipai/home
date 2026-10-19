@@ -32,13 +32,14 @@ function isMinorBand(band: AgeBand): boolean {
  * turn-engine caller. */
 export type SafetyDirection = "message" | "reply";
 
-/** CSAM-TEXT-01 (docs/design/child-safety-text-2026-10-19.md, owner's ruling 2026-10-19): `direction` says whether `text` is what an adult
- * typed ("message") or what the assistant says to an adult ("reply"). Only for an ADULT's chat text does it change how the `csam`
- * category reads the text: a message is refused for an explicit term or a request to produce the content, a reply has no `csam` word
- * rule, so discussion, news, fiction and advice are not filtered. With no direction (every non-chat caller, a generation prompt
+/** CSAM-TEXT-01 (docs/design/child-safety-text-2026-10-19.md, owner's ruling 2026-10-19): `direction` says the text is an adult's chat
+ * ("message", what the adult typed) or ("reply", what the assistant says to the adult). For an ADULT's chat text, in either direction,
+ * the `csam` category has no word rule (owner's ruling 2026-10-19, after the explicit-term and request checks refused "what does X
+ * mean" and a code question): the leading providers stop production by the model's own refusal and by output and generation checks,
+ * not by matching an adult's words, so discussion, news, fiction and advice are not filtered. With no direction (every non-chat caller, a generation prompt
  * path) and for a teen, a child or the robot, the full floor applies exactly as before. */
 export function evaluateSafety(text: string, speakerBand: AgeBand, direction?: SafetyDirection): SafetyResult {
-  const csamMode = speakerBand === "adult" && direction !== undefined ? (direction === "message" ? "adult_message" : "adult_reply") : "floor";
+  const csamMode = speakerBand === "adult" && direction !== undefined ? "adult_reply" : "floor";
   const result = checkSafety(text, { isMinor: isMinorBand(speakerBand), csamMode });
   if (result.flagged) {
     // 4.3: "logged with the fact, never the transcript." No structured

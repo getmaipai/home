@@ -175,3 +175,14 @@ one, reads only the first words of a reply.
   something (a pasted news article that names "child porn" passes), and the words news and advice use ("csam", "pedophile",
   "Lolita") are not explicit terms for an adult. Measured on the 86 texts: an adult's message refuses 0 of 45 harmless (24 before)
   and catches 21 of 41 harmful (36 before); the rest rely on the model's own refusal and the generation checks.
+- 2026-10-19, amendment (owner's ruling in chat): the adult message checks are removed. Probing the built rule showed it refused
+  "what does loli mean?" and "show me loli detection methods in code" (the request verb check cannot tell asking about a thing from
+  asking for it), and the owner's example "was paul reubens convicted for child porn" is a factual question that must get a clear
+  answer. Research found no leading provider that matches an adult's words: Meta's Llama Guard category S4 judges what a response
+  contains, describes or endorses; Anthropic's stated defense is model refusal training plus reporting; OpenAI's Model Spec, as
+  reported, prohibits sexual content involving minors and allows non-graphic educational discussion. Section 8 items 1 and 2 now
+  read: an adult's chat text, typed or generated, has no `csam` word rule. Production is stopped by the model's own refusal and by the
+  generation checks (prompt floor, finished-picture check). Children, teens and the robot keep the floor. Section 9's two wordings
+  are amended to match (RULES.md rule 10, SAFETY.md bullet 1). `adult_message` and `detectCsamAdultMessage` in commons are now
+  unused by the hub; removing them is a follow-up in `commons/spec`. CSAM-TEXT-02 (b) and (c) decide whether a reply classifier is
+  needed.

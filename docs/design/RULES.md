@@ -296,11 +296,12 @@ figure) and the surface gate stay fixed, and no setting, including `generation.p
     playback.
     For an adult's chat, a minor word beside a sexual word is not a
     refusal by itself: discussion, news, fiction, health and advice are
-    not filtered. An adult's explicit term and an adult's request to
-    write, describe, draw, show, imagine or role-play sexual content
-    with a minor still refuse; every generation prompt and finished
+    not filtered, and an adult's typed message has no word rule at all
+    (producing such content is stopped by the model's own refusal and by
+    the generation checks, as the leading providers do); every generation prompt and finished
     picture or clip keeps the absolute check, and a child's and a
-    teen's floors are unchanged (owner's ruling, 2026-10-19;
+    teen's floors are unchanged (owner's ruling, 2026-10-19, amended
+    2026-10-19 to drop the adult message check;
     docs/design/child-safety-text-2026-10-19.md).
 11. **Only our own tested Stack components run the models.** Home
     talks to the engines the Stack installs, pins and tests, and to
