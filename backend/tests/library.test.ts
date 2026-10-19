@@ -298,3 +298,82 @@ for (const role of ["child", "teen"] as const) {
     });
   }
 }
+
+test("Only me excludes every share target and includes a file again after unsharing", async () => {
+  const { client, id, file } = await fixture();
+  const person = await (await client.post("/api/people", { displayName: "Clover", role: "adult", secret: "0000" })).json() as { id: string };
+  const privateFile = file(1);
+  const household = file(2);
+  const direct = file(3);
+  const unshared = file(4, "application/pdf");
+  for (const [key, to] of [[household, "household"], [direct, person.id], [unshared, "household"]]) {
+    db.insert(shares).values({ id: `only-${key}`, fileId: key!, fromPersonId: id, to: to!, provenance: "fixture", createdAt: "2026-10-14", hlc: "fixture" }).run();
+  }
+  expect((await page(client.get("/api/library?shared=none"))).items.map(row => row.id)).toEqual([privateFile]);
+  expect((await client.request(`/api/shares/only-${unshared}`, { method: "DELETE" })).status).toBe(200);
+  const rows = (await page(client.get("/api/library?shared=none"))).items;
+  expect(rows.map(row => row.id)).toEqual([unshared, privateFile]);
+  const totals = await summary(client.get("/api/library/summary?shared=none"));
+  expect(totals.items).toBe(rows.length);
+  expect(totals.bytes).toBe(rows.reduce((n, row) => n + row.size_bytes, 0));
+  for (const kind of ["image", "document"]) {
+    const matching = rows.filter(row => row.kind === kind);
+    expect(totals.per_kind[kind]).toEqual({ items: matching.length, bytes: matching.reduce((n, row) => n + row.size_bytes, 0) });
+  }
+  const reader = new TestClient();
+  await reader.post("/api/auth/verify-secret", { personId: person.id, secret: "0000" });
+  for (const filter of ["", "?shared=none", "?shared=by-me", "?shared=with-me", `?owner=${id}`, `?owner=${id}&shared=none`]) {
+    const visible = (await page(reader.get(`/api/library${filter}`))).items;
+    expect(visible.map(row => row.id)).not.toContain(privateFile);
+    expect(visible.map(row => row.id)).not.toContain(unshared);
+    const totals = await summary(reader.get(`/api/library/summary${filter}`));
+    expect(totals.items).toBe(visible.length);
+    expect(totals.bytes).toBe(visible.reduce((n, row) => n + row.size_bytes, 0));
+  }
+});
+
+for (const sort of ["newest", "oldest", "name", "size"] as const) test(`Only me ${sort} pages filter before the limit`, async () => {
+  const { client, id, file } = await fixture();
+  const expected: string[] = [];
+  for (let n = 0; n < 9; n++) {
+    const key = file(n);
+    if (n % 2 === 0) expected.push(key);
+    else db.insert(shares).values({ id: `page-${n}`, fileId: key, fromPersonId: id, to: "household", provenance: "fixture", createdAt: "2026-10-14", hlc: "fixture" }).run();
+  }
+  const query = `/api/library?shared=none&sort=${sort}&limit=2`;
+  const first = await page(client.get(query));
+  expect(first.items).toHaveLength(2);
+  const second = await page(client.get(`${query}&cursor=${first.next_cursor}`));
+  expect(second.items).toHaveLength(2);
+  const third = await page(client.get(`${query}&cursor=${second.next_cursor}`));
+  expect(third.items).toHaveLength(1);
+  expect(third.next_cursor).toBeNull();
+  expect([...first.items, ...second.items, ...third.items].map(row => row.id).sort()).toEqual(expected.sort());
+  expect((await client.get(`/api/library?shared=by-me&sort=${sort}&cursor=${first.next_cursor}`)).status).toBe(400);
+});
+
+for (const role of ["child", "teen"] as const) test(`Only me keeps ${role} ownership and the existing audience rule`, async () => {
+  const { file, reader, minorId, share } = await minorFixture(role);
+  const owned = [file(1, "image/png", 'picture-gen:{"audience":"all-ages"}'), file(2, "image/png", 'picture-gen:{"audience":"adult-only"}'), file(3)];
+  const ownedShared = share(file(4));
+  for (const key of [...owned, ownedShared]) db.update(attachments).set({ ownerPersonId: minorId }).where(eq(attachments.id, key)).run();
+  share(file(5, "image/png", 'picture-gen:{"audience":"all-ages"}'));
+  share(file(6, "image/png", 'picture-gen:{"audience":"adult-only"}'));
+  file(7);
+  const rows = (await page(reader.get("/api/library?shared=none"))).items;
+  // Ownership passes the existing audience predicate, even for unclassified or adult-only rows.
+  expect(rows.map(row => row.id).sort()).toEqual(owned.sort());
+  const totals = await summary(reader.get("/api/library/summary?shared=none"));
+  expect(totals.items).toBe(3);
+  expect(totals.bytes).toBe(9);
+  expect(totals.per_kind.image).toEqual({ items: 3, bytes: 9 });
+});
+
+for (const path of ["/api/library", "/api/library/summary"]) test(`${path} rejects unknown sharing filters with plain allowed values`, async () => {
+  const { client } = await fixture();
+  for (const value of ["unknown", ""]) {
+    const response = await client.get(`${path}?shared=${value}`);
+    expect(response.status).toBe(400);
+    expect(await response.json()).toEqual({ error: "Invalid shared filter. Choose with-me, by-me, or none." });
+  }
+});

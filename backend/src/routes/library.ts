@@ -9,7 +9,7 @@ export const libraryRoutes = apiRouter();
 const kind = z.enum(["image", "video", "audio", "document", "story", "file"]);
 const query = z.object({
   limit: z.coerce.number().int().min(1).max(60).default(60), cursor: z.string().optional(),
-  type: kind.optional(), owner: z.string().min(1).optional(), shared: z.enum(["with-me", "by-me"]).optional(),
+  type: kind.optional(), owner: z.string().min(1).optional(), shared: z.enum(["with-me", "by-me", "none"], { error: "Invalid shared filter. Choose with-me, by-me, or none." }).optional().describe("with-me: shared with the caller; by-me: owned by the caller with a share; none: owned by the caller with no shares (Only me)."),
   search: z.string().max(1000).optional(), sort: z.enum(["newest", "oldest", "name", "size"]).default("newest"),
 });
 const totals = z.object({ items: z.number(), bytes: z.number() });
@@ -22,7 +22,7 @@ const item = z.object({
 libraryRoutes.openapi(createRoute({ method: "get", path: "/", tags: ["Library"], summary: "Visible Library items, paged and filtered",
   middleware: [requireAuth] as const, request: { query }, responses: {
     200: { description: "One page. The next cursor keeps the same filters and sort.", content: { "application/json": { schema: z.object({ items: z.array(item), next_cursor: z.string().nullable() }) } } },
-    ...errorResponses({ 400: "Invalid page address. Open the Library again.", 401: "Not signed in" }),
+    ...errorResponses({ 400: "Invalid page address or filter. Use shared=with-me, by-me, or none.", 401: "Not signed in" }),
   } }), c => {
   try { return c.json(listLibrary(c.get("person"), c.req.valid("query")),200); }
   catch (error) { if (error instanceof LibraryCursorError) return c.json({ error: error.message },400); throw error; }
@@ -30,7 +30,7 @@ libraryRoutes.openapi(createRoute({ method: "get", path: "/", tags: ["Library"],
 libraryRoutes.openapi(createRoute({ method: "get", path: "/summary", tags: ["Library"], summary: "Visible Library counts and stored bytes by kind",
   middleware: [requireAuth] as const, request: { query: query.omit({ cursor: true, limit: true, sort: true }) }, responses: {
     200: { description: "Item counts fold companions and versions. Bytes include all visible stored references, matching Storage. Trash counts the caller's own deleted files; expiring stays zero until the removal preview is wired.", content: { "application/json": { schema: totals.extend({ per_kind: z.record(z.string(),totals), trash: totals, expiring: totals }) } } },
-    ...errorResponses({ 401: "Not signed in" }),
+    ...errorResponses({ 400: "Invalid filter. Use shared=with-me, by-me, or none.", 401: "Not signed in" }),
   } }), c => c.json(librarySummary(c.get("person"),c.req.valid("query")),200));
 
 libraryRoutes.openapi(createRoute({ method: "post", path: "/upload", tags: ["Library"], summary: "Add one file to my Library (one file per request)",

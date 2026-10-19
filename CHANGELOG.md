@@ -7,6 +7,9 @@ checklist (`docs/dev.md`). The first release is 0.1.0.
 
 ## [Unreleased]
 
+### Added
+- Library listing and summary accept `shared=none` (Only me) for your own files with no shares. Counts and bytes use the same filter as pages.
+
 ## [0.2.25] - 2026-10-18
 
 News gets a sidebar on wide screens, its pictures are sized and sharper, and stories open to the full article more reliably. One database migration (0120) moves personal API tokens into a new key store. Pins: spec-v0.1.187 and ui-v0.5.281. The engine is unchanged (Stack a89e7ff).

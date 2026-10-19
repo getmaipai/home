@@ -91,3 +91,12 @@ generated, pinned, following the storage rules, and still tied to a chat.
 - Storage rules never remove a file a live chat still shows (removing its Library reference would free nothing); it becomes a
   candidate when its chat is gone and the generated-file rule has detached it. If a rule removal ever meets a chat-held record it
   keeps the chat-only copy, like a Trash purge does.
+
+## Only me filter (LIBRARY-REVAMP-01, 2026-10-19)
+
+`GET /api/library` and `GET /api/library/summary` accept `shared=with-me|by-me|none`. Only me (`none`) requires the
+caller to own the file and the file to have no rows in `shares`. Both household and person shares exclude it; removing the
+last share includes it again. Shares have no deleted or revoked marker. The shared SQL base applies this filter before
+paging, item counts and per-kind byte aggregation, with the existing access and audience predicate still in force.
+Ownership retains its existing audience exemption for children and teens. Bytes still count each hash once, and items
+still fold companions and versions. An unknown or empty `shared` value returns 400 with the allowed values.

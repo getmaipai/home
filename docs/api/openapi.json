@@ -42011,10 +42011,13 @@
               "type": "string",
               "enum": [
                 "with-me",
-                "by-me"
-              ]
+                "by-me",
+                "none"
+              ],
+              "description": "with-me: shared with the caller; by-me: owned by the caller with a share; none: owned by the caller with no shares (Only me)."
             },
             "required": false,
+            "description": "with-me: shared with the caller; by-me: owned by the caller with a share; none: owned by the caller with no shares (Only me).",
             "name": "shared",
             "in": "query"
           },
@@ -42183,7 +42186,7 @@
             }
           },
           "400": {
-            "description": "Invalid page address. Open the Library again.",
+            "description": "Invalid page address or filter. Use shared=with-me, by-me, or none.",
             "content": {
               "application/json": {
                 "schema": {
@@ -42242,10 +42245,13 @@
               "type": "string",
               "enum": [
                 "with-me",
-                "by-me"
-              ]
+                "by-me",
+                "none"
+              ],
+              "description": "with-me: shared with the caller; by-me: owned by the caller with a share; none: owned by the caller with no shares (Only me)."
             },
             "required": false,
+            "description": "with-me: shared with the caller; by-me: owned by the caller with a share; none: owned by the caller with no shares (Only me).",
             "name": "shared",
             "in": "query"
           },
@@ -42329,6 +42335,16 @@
                     "trash",
                     "expiring"
                   ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid filter. Use shared=with-me, by-me, or none.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
                 }
               }
             }

@@ -7,7 +7,7 @@ import { trashTotals } from "@/lib/libraryTrash";
 import { expiringLibraryFiles } from "@/lib/libraryRetention";
 import type { PersonRow } from "@/types";
 
-export interface LibraryQuery { limit?: number; cursor?: string; type?: string; owner?: string; shared?: "with-me" | "by-me"; search?: string; sort?: "newest" | "oldest" | "name" | "size" }
+export interface LibraryQuery { limit?: number; cursor?: string; type?: string; owner?: string; shared?: "with-me" | "by-me" | "none"; search?: string; sort?: "newest" | "oldest" | "name" | "size" }
 interface Cursor { v: 1; key: string | number; created: string; id: string; scope: string }
 export class LibraryCursorError extends Error {}
 function scope(q: LibraryQuery) { return JSON.stringify([q.type ?? "", q.owner ?? "", q.shared ?? "", q.search ?? "", q.sort ?? "newest"]); }
@@ -30,6 +30,7 @@ function base(actor: PersonRow, q: LibraryQuery) {
   else if (q.owner) { filter += " AND owner_person_id = ?"; params.push(q.owner); }
   if (q.shared === "with-me") { filter += " AND owner_person_id != ?"; params.push(actor.id); }
   if (q.shared === "by-me") { filter += " AND owner_person_id = ? AND share_count > 0"; params.push(actor.id); }
+  if (q.shared === "none") { filter += " AND owner_person_id = ? AND share_count = 0"; params.push(actor.id); }
   if (q.search) { filter += " AND (name LIKE ? ESCAPE '\\' OR prompt LIKE ? ESCAPE '\\' OR title LIKE ? ESCAPE '\\')"; const escaped = `%${q.search.replace(/[\\%_]/g, "\\$&")}%`; params.push(escaped, escaped, escaped); }
   // Companion relations only fold files when their parent passes the same viewer boundary.
   return { params, sql: `WITH meta AS (
