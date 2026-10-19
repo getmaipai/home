@@ -14,6 +14,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@maipai/ui/src/dashboard/components/ui/alert-dialog";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@maipai/ui/src/dashboard/components/ui/card";
 import { Item, ItemActions, ItemContent, ItemDescription, ItemGroup, ItemTitle } from "@maipai/ui/src/dashboard/components/ui/item";
+import { Progress } from "@maipai/ui/src/dashboard/components/ui/progress";
 import { AsyncState } from "@maipai/ui/src/primitives/AsyncState";
 import { SettingsRenderer } from "@maipai/ui/src/settings/SettingsRenderer";
 import { api, ApiError, type AdminApiKey, type CodingGrant, type CodingPiece, type PersonalApiKey, type PersonRosterEntry, type Roster } from "@/lib/api";
@@ -33,7 +34,8 @@ export function CodingAdminSettings() {
   const people = useQuery({ queryKey: ["people"], queryFn: () => api.people() });
   const grants = useQuery({ queryKey: ["coding-grants"], queryFn: () => api.grants() });
   const settings = useQuery({ queryKey: ["settings-values", "household"], queryFn: () => api.settingsValues("household") });
-  const pieces = useQuery({ queryKey: ["coding-pieces"], queryFn: api.codingPieces, refetchInterval: (q) => q.state.data?.pieces.some((piece) => piece.state === "installing") ? 2000 : false });
+  const [pending, setPending] = useState<Record<string, "install" | "remove">>({});
+  const pieces = useQuery({ queryKey: ["coding-pieces"], queryFn: api.codingPieces, refetchInterval: (q) => q.state.data?.pieces.some((piece) => piece.state === "installing") || Object.keys(pending).length > 0 ? 2000 : false });
   const [pieceError, setPieceError] = useState<string | null>(null);
   const [removePiece, setRemovePiece] = useState<CodingPiece | null>(null);
   const [pauseOpen, setPauseOpen] = useState(false);
@@ -54,13 +56,17 @@ export function CodingAdminSettings() {
   };
   const install = async (piece: CodingPiece) => {
     setPieceError(null);
+    setPending((value) => ({ ...value, [piece.id]: "install" }));
     try { await api.installCodingPiece(piece.id); await refresh(); }
     catch (error) { setPieceError(messageOf(error, "Could not start this install.")); }
+    finally { setPending((value) => { const next = { ...value }; delete next[piece.id]; return next; }); }
   };
   const remove = async (piece: CodingPiece) => {
     setPieceError(null);
+    setPending((value) => ({ ...value, [piece.id]: "remove" }));
     try { await api.removeCodingPiece(piece.id); await refresh(); }
     catch (error) { setPieceError(messageOf(error, "Could not remove this piece.")); }
+    finally { setPending((value) => { const next = { ...value }; delete next[piece.id]; return next; }); }
   };
   const roster = (people.data ?? []).filter((entry) => entry.role !== "guest").sort((a, b) => {
     const bandOrder = (entry: PersonRosterEntry) => isAdult(entry) ? 0 : entry.age_band === "teen" || entry.role === "teen" ? 1 : 2;
@@ -86,8 +92,8 @@ export function CodingAdminSettings() {
     <Card><CardHeader><CardTitle>What Coding needs</CardTitle><CardDescription>Home downloads these parts to this computer. Home does not install a coding app.</CardDescription></CardHeader><CardContent>
       <AsyncState data={pieces.data} error={pieces.isError} isFetching={pieces.isFetching} onRetry={() => void pieces.refetch()} errorMessage="Could not load Coding setup." loadingLabel="Loading Coding setup">
         {(view) => view.pieces.length === 0 ? <p className="text-sm text-muted-foreground">Coding needs these pieces.</p> : <ItemGroup variant="card" aria-label="Coding pieces">{view.pieces.map((piece) => <Item key={piece.id}>
-          <ItemContent><ItemTitle>{piece.label} <Badge variant={piece.state === "installed" ? "secondary" : piece.state === "failed" ? "destructive" : "outline"}>{piece.state === "installed" ? "Installed" : piece.state === "notInstalled" ? "Not installed" : piece.state === "installing" ? `${piece.percent ?? 0}%` : piece.state === "unsupported" ? "Not supported" : "Needs attention"}</Badge></ItemTitle><ItemDescription>{piece.summary} · {sizeText(piece.size_bytes)}</ItemDescription>{piece.failure ? <ItemDescription>{piece.failure}</ItemDescription> : null}{piece.remove_block && !piece.can_remove ? <ItemDescription>{piece.remove_block}</ItemDescription> : null}{piece.install_block && !piece.can_install ? <ItemDescription>{piece.install_block}</ItemDescription> : null}</ItemContent>
-          <ItemActions><Button type="button" onClick={() => void install(piece)} disabled={!piece.can_install || piece.state === "installing"}>Install</Button><Button type="button" variant="outline" disabled={!piece.can_remove} onClick={() => setRemovePiece(piece)}>Remove</Button></ItemActions>
+          <ItemContent><ItemTitle>{piece.label} <Badge variant={piece.state === "installed" ? "secondary" : piece.state === "failed" ? "destructive" : "outline"}>{piece.state === "installed" ? "Installed" : piece.state === "notInstalled" ? "Not installed" : piece.state === "installing" ? "Installing" : piece.state === "unsupported" ? "Not supported" : "Needs attention"}</Badge></ItemTitle><ItemDescription>{piece.summary} · {sizeText(piece.size_bytes)}{piece.state === "installing" ? ` · ${piece.percent ?? 0}%` : ""}</ItemDescription>{piece.state === "installing" ? <Progress value={piece.percent ?? 0} aria-label={`Installing ${piece.label}`} /> : null}{piece.failure ? <ItemDescription>{piece.failure}</ItemDescription> : null}{piece.remove_block && !piece.can_remove ? <ItemDescription>{piece.remove_block}</ItemDescription> : null}{piece.install_block && !piece.can_install ? <ItemDescription>{piece.install_block}</ItemDescription> : null}</ItemContent>
+          <ItemActions><Button type="button" onClick={() => void install(piece)} disabled={!piece.can_install || piece.state === "installing" || pending[piece.id] === "install"}>{pending[piece.id] === "install" || piece.state === "installing" ? "Installing" : "Install"}</Button><Button type="button" variant="outline" disabled={!piece.can_remove || pending[piece.id] === "remove"} onClick={() => setRemovePiece(piece)}>{pending[piece.id] === "remove" ? "Removing" : "Remove"}</Button></ItemActions>
         </Item>)}</ItemGroup>}
       </AsyncState>
       <AlertDialog open={removePiece !== null} onOpenChange={(open) => { if (!open) setRemovePiece(null); }}><AlertDialogContent><AlertDialogHeader><AlertDialogTitle>Remove {removePiece?.label}?</AlertDialogTitle><AlertDialogDescription>This removes the piece from this computer. You can install it again later.</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel>Keep it</AlertDialogCancel><AlertDialogAction onClick={() => { const pending = removePiece; setRemovePiece(null); if (pending) void remove(pending); }}>Remove</AlertDialogAction></AlertDialogFooter></AlertDialogContent></AlertDialog>
