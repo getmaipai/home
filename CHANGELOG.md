@@ -11,6 +11,10 @@ checklist (`docs/dev.md`). The first release is 0.1.0.
 
 - News: each topic page has its own layout, as Apple News does for its categories. World, Business, Sports and Kids open on Top Stories, Science, Health and Environment open with two large cards, and Local, Technology and Entertainment open on Today's News with a wide More for you card. Sources keep the lead card and list. Requires `@maipai/spec` 0.1.188 and `@maipai/ui` 0.5.289.
 
+### Fixed
+
+- Chat: when the safety check cuts a reply partway, the thread keeps the words you already read and puts the refusal line under them, so reloading the chat shows what the screen showed. Before, a reload showed only "I can't help with that." The hub log now names the safety category that cut a reply (never the words), so a false alarm can be traced.
+
 ## [0.2.27] - 2026-10-19
 
 The Library is rebuilt like a files app: a collapsible sections column, a grid and a list, search and filters, selecting several files, a viewer, sharing, Trash with Restore, rename and Keep, and drag and drop upload. Large uploads (up to 500 MB) are streamed to disk, an adult owner can re-check a mislabeled adult-only picture, and new pictures, videos and songs follow the storage rules. No database changes. Pins: spec-v0.1.187 and ui-v0.5.287. The engine is unchanged.

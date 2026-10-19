@@ -786,6 +786,8 @@ export async function* streamTurnEvents(
       return;
     }
     const safetyRefusal = err instanceof StreamSafetyRefusal ? err : undefined;
+    // The category names (never the words) go to the log, so a false alarm can be traced to the rule that fired.
+    if (safetyRefusal) console.error(`[turn/stream] safety gate cut the reply: categories=${safetyRefusal.safety.categories.join(",") || "none"} signals=${safetyRefusal.safety.matched_signals.length} released_chars=${fullText.length}`);
     // SAFETY-01 (#85): a streamed refusal's crisis resources reach the
     // client on the error event, the one terminal event this path
     // sends; finalize() below computes them, so it runs first for a

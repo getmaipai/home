@@ -1111,7 +1111,11 @@ function startStream(actor: PersonRow, surface: Surface, text: string, begunValu
         // instant the wire's own error event is, not seconds later once
         // the model's own remaining generation and the rest of the
         // machine finally finish.
-        const value = buildTurnValue(state, startedAt, "safety_refuse", "I can't help with that.");
+        // The words already released stay in the thread, with the refusal line under them: a reload shows what the person read
+        // (RULES.md rule 10: released text is never retracted). A spoken turn keeps the line alone, since nothing is read there.
+        const released = replyText.trim();
+        const keep = released !== "" && surfaceClassOf(state.surface, state.spoken) !== "spoken";
+        const value = buildTurnValue(state, startedAt, "safety_refuse", keep ? `${released}\n\nI can't help with that.` : "I can't help with that.");
         finalizedValue = value;
         logResult(state, actor, surface, text, value);
         return value;

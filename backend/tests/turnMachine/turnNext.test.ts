@@ -3203,9 +3203,12 @@ describe("turnNext.ts: runTurnNextStream() (STREAM-NEXT-01)", () => {
       expect(delivered.join("")).not.toContain("pipe bomb");
       const value = result.finalize(delivered.join(""), (threw as StreamSafetyRefusal).safety);
       expect(value.source).toBe("safety_refuse");
-      expect(value.reply.text).toBe("I can't help with that.");
+      // What the person read stays, with the refusal line under it, so a reload matches the screen.
+      expect(value.reply.text).toBe(`${delivered.join("").trim()}\n\nI can't help with that.`);
+      expect(value.reply.text).not.toContain("pipe bomb");
       const row = db.select().from(conversationTurns).where(eq(conversationTurns.id, value.turn_id)).get();
-      expect(row?.replyText).toBe("I can't help with that.");
+      expect(row?.replyText).toBe(value.reply.text);
+      expect(row?.source).toBe("safety_refuse");
     });
   });
 
@@ -3217,7 +3220,8 @@ describe("turnNext.ts: runTurnNextStream() (STREAM-NEXT-01)", () => {
       expect(threw).toBeInstanceOf(StreamSafetyRefusal);
       expect(delivered.join("")).not.toContain("pipe bomb");
       const value = result.finalize(delivered.join(""), (threw as StreamSafetyRefusal).safety);
-      expect(value.reply.text).toBe("I can't help with that.");
+      expect(value.reply.text.endsWith("I can't help with that.")).toBe(true);
+      expect(value.reply.text).not.toContain("pipe bomb");
     });
   });
 
