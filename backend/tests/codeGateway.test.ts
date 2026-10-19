@@ -17,6 +17,7 @@ import { gateStream } from "@/lib/codeStream";
 import { resetDb } from "./reset-db";
 import { startStackFixture, type StackFixture } from "./stackFixture";
 import type { PersonRow } from "@/types";
+import { __setMissingCodingPieceForTests } from "@/lib/stackCodingPieces";
 
 const HOME = "10.0.0.20";
 const TAILNET = "100.64.1.5";
@@ -93,6 +94,7 @@ beforeEach(() => {
   resetDb();
   __resetRateLimiterForTests();
   __resetCodeGateForTests(2);
+  __setMissingCodingPieceForTests(null); // The fixture Stack answers only the coding wires; pieces are tested in stackCodingPieces.test.ts.
   seen = []; engine = defaultEngine;
   stack = startStackFixture({
     "*": async (req) => {
@@ -800,4 +802,14 @@ describe("review 10: reasoning never reaches a minor on any wire", () => {
       expect(text).toContain("Hello."); expect(text).not.toContain("SECRET-THOUGHT");
     }
   });
+});
+
+test("a missing coding piece answers 503 with the Stack's sentence, then the next request after it returns is served", async () => {
+  const { secret } = adultWithKey();
+  __setMissingCodingPieceForTests("The coding model is not installed. An admin can install it in Settings, Coding.");
+  const res = await call("/code/v1/chat/completions", { secret, body: wiresBody["/code/v1/chat/completions"] });
+  expect(res.status).toBe(503);
+  expect(JSON.stringify(await res.json())).toContain("coding model is not installed");
+  __setMissingCodingPieceForTests(null);
+  expect((await call("/code/v1/chat/completions", { secret, body: wiresBody["/code/v1/chat/completions"] })).status).toBe(200);
 });

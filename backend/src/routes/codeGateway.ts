@@ -35,6 +35,7 @@ import {
   type CodeWire, type Usage,
 } from "@/lib/codeWire";
 import { gateStream } from "@/lib/codeStream";
+import { ensureCodingPiecesFresh, missingCodingPiece } from "@/lib/stackCodingPieces";
 import type { AppEnv } from "@/types";
 
 export const codeGatewayRoutes = new Hono<AppEnv>();
@@ -57,6 +58,7 @@ const door: ApiKeyDoor = {
       case "not_allowed": return refuse(c, 403, "Coding is not turned on for you. Ask an admin.", "coding_not_allowed");
       case "keys_off": return refuse(c, 403, "Your coding access does not include keys. Ask an admin to allow keys in your Coding access.", "keys_not_allowed");
       case "coding_off": return refuse(c, 503, "Coding is turned off in this home. Ask an admin to turn it on in Settings, Coding.", "coding_off", PAUSED_RETRY_SECONDS);
+      case "piece_missing": return refuse(c, 503, missingCodingPiece() ?? "Coding is not fully installed. Ask an admin to install it in Settings, Coding.", "coding_piece_missing", PAUSED_RETRY_SECONDS);
       case "coding_paused": return refuse(c, 503, "Coding is paused by an admin. Try again later.", "coding_paused", PAUSED_RETRY_SECONDS);
     }
   },
@@ -65,6 +67,7 @@ const door: ApiKeyDoor = {
 const viaTransport = async (c: Context, next: () => Promise<void>) => {
   const refusal = transportRefusal(c);
   if (refusal) { recordApiRequest(refusal.status, Date.now()); return refusedBy(c, refusal); }
+  await ensureCodingPiecesFresh();
   return next();
 };
 const tooLarge = (c: Context) => refuse(c, 413, "This request is too large for the coding service. Start a new conversation or send less at once.", "request_too_large");

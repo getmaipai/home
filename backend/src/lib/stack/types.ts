@@ -144,8 +144,6 @@ export interface RoleInfo extends ChatRoleContext {
   sharesModelWith: RoleId | null;
   state: RoleState;
   reason: string | null;
-  /** Only the coding role: its engine's slots (CODE-STACK-01 S2). */
-  coding?: { state?: string; slots?: number | null; slots_busy?: number };
   model: {
     id: string;
     sizeBytes: number | null;
@@ -172,7 +170,7 @@ export interface RoleInfo extends ChatRoleContext {
    * file name. Absent on an older Stack. */
   identity?: { ok: boolean; expected: string | null; actual: string | null; reason: string | null };
   /** CODE-STACK-01: the coding role only. Which engine serves it and why the faster one is not in use; absent on other roles and on an older Stack. */
-  coding?: { state: "notInstalled" | "installed" | "loading" | "ready" | "busy" | "offline"; engine?: "llama-server" | "splash"; engine_requested?: "auto" | "llama-server" | "splash"; engine_reason?: string | null; cannot_fit_reason?: string | null; keep_warm_minutes?: number };
+  coding?: { state: "notInstalled" | "installed" | "loading" | "ready" | "busy" | "offline"; engine?: "llama-server" | "splash"; engine_requested?: "auto" | "llama-server" | "splash"; engine_reason?: string | null; cannot_fit_reason?: string | null; keep_warm_minutes?: number; slots?: number | null; slots_busy?: number };
   /** Models the Stack can select for a chat request. Present on the chat
    * role response; absent when Home itself is the source of role state. */
   models?: Array<{ id: string; name: string }>;

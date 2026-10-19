@@ -51,7 +51,7 @@ function usable(row: KeyRow): "revoked" | "expired" | null {
   return Date.parse(row.expiresAt) <= Date.now() ? "expired" : null;
 }
 /** Why a person may not use a coding key right now. "ok" is the only admission; the rest name the plain reply the gateway gives. */
-export type CodeAdmission = "ok" | "not_allowed" | "keys_off" | "coding_off" | "coding_paused";
+export type CodeAdmission = "ok" | "not_allowed" | "keys_off" | "coding_off" | "coding_paused" | "piece_missing";
 /** The person's controls read NOW, every call: nothing is cached on the key, so a key never widens after a controls change. */
 export function codeAdmission(person: PersonRow): CodeAdmission {
   if (person.deletedAt || !person.enabled || person.memorializedAt || person.role === "guest") return "not_allowed";
@@ -61,13 +61,12 @@ export function codeAdmission(person: PersonRow): CodeAdmission {
   if (effect === "deny") return "not_allowed";
   const minor = person.role === "child" || person.role === "teen";
   if ((minor || getHouseholdSettingValue("coding.adults_by_default") !== true) && effect !== "allow") return "not_allowed";
+  if (missingCodingPiece()) return "piece_missing"; // CODE-STACK-01 H1: the engine or model is not installed; keys are held suspended until it is.
   return getPersonSettingValue(person, "coding.person.api_keys") === true ? "ok" : "keys_off";
 }
 function mayHoldKey(person: PersonRow, scope: ApiKeyScope): boolean {
   if (person.deletedAt) return false;
   if (scope === "turn") return true; // Preserve the interim voice token's admission rules.
-  // CODE-STACK-01 H1: a coding key is held suspended while the engine or the model it needs is not installed; it works again when the piece is back.
-  if (missingCodingPiece()) return false;
   return codeAdmission(person) === "ok";
 }
 function status(row: KeyRow, person: PersonRow): KeyRow["status"] {
