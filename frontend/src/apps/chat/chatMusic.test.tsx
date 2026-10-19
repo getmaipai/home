@@ -106,6 +106,38 @@ describe("MusicToolRender", () => {
     expect(poster.getAttribute("src")).toBe(card.cover_url);
   });
 
+  test("Edit opens the three song actions and sends the typed song and cover prompts", async () => {
+    card = done({ length: "quick" });
+    const view = mount();
+    await waitFor(() => expect(view.container.querySelector("audio")).not.toBeNull());
+    fireEvent.click(view.getByRole("button", { name: "Edit" }));
+    expect(view.getByRole("region", { name: "Edit song" })).toBeTruthy();
+    expect(view.getByRole("button", { name: "Make it full" })).toBeTruthy();
+    fireEvent.change(view.getByLabelText("How should it change? For example: make it heavy metal"), { target: { value: "make it heavy metal" } });
+    fireEvent.click(view.getAllByRole("button", { name: "Make" })[0]!);
+    await waitFor(() => expect(calls.some((call) => call.url.endsWith("/revise") && call.body === JSON.stringify({ change: "make it heavy metal", file_id: V1.id }))).toBe(true));
+    fireEvent.change(view.getByLabelText("Describe the new cover"), { target: { value: "a red guitar under stage lights" } });
+    fireEvent.click(view.getAllByRole("button", { name: "Make" })[1]!);
+    await waitFor(() => expect(calls.some((call) => call.url.endsWith("/cover") && call.body === JSON.stringify({ prompt: "a red guitar under stage lights" }))).toBe(true));
+  });
+
+  test("Edit shows a plain next step when a song change fails", async () => {
+    card = done();
+    globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
+      calls.push({ url, method: init?.method ?? "GET", ...(typeof init?.body === "string" ? { body: init.body } : {}) });
+      if (url.includes("/revise")) return new Response(JSON.stringify({ error: "The music model is busy." }), { status: 503 });
+      if (url.includes("/files/")) return new Response(new Uint8Array(16), { status: 200, headers: { "content-type": "audio/mp4" } });
+      return new Response(JSON.stringify(card), { status: 200, headers: { "content-type": "application/json" } });
+    }) as typeof fetch;
+    const view = mount();
+    await waitFor(() => expect(view.container.querySelector("audio")).not.toBeNull());
+    fireEvent.click(view.getByRole("button", { name: "Edit" }));
+    fireEvent.change(view.getByLabelText("How should it change? For example: make it heavy metal"), { target: { value: "make it loud" } });
+    fireEvent.click(view.getAllByRole("button", { name: "Make" })[0]!);
+    expect(await view.findByRole("alert")).toHaveTextContent("The music model is busy. Check the request and try again.");
+  });
+
   test("a finished song polls until its cover arrives, then stops", async () => {
     card = done({ cover_pending: true });
     const view = mount();
@@ -208,26 +240,31 @@ describe("MusicToolRender", () => {
     const view = mount();
     await waitFor(() => expect(cardOf(view)).not.toBeNull());
     expect(view.container.firstElementChild).toBe(cardOf(view));
-    // Same classes as the kit Element rendered bare: Home added none.
+    // Width comes from the kit's own prop; Home adds no shape override.
     const bare = render(<MusicTrack status="ready" title="Pancakes" src={V1.url} />);
-    expect(cardOf(view)!.className).toBe(bare.container.querySelector("[data-slot=music-track]")!.className);
+    expect(cardOf(view)!.className).toContain("max-w-none");
+    expect(cardOf(view)!.getAttribute("data-width")).toBe("full");
+    expect(bare.container.querySelector("[data-slot=music-track]")!.className).toContain("max-w-xl");
   });
 });
 
 describe("Quick and Full songs on the card", () => {
-  test("a quick song says so, offers Make it full, and the button starts a full version", async () => {
+  test("a quick song offers Make it full inside Edit and the button starts a full version", async () => {
     card = done();
-    const { findByText } = mount();
-    expect(await findByText(/Quick song/)).toBeTruthy();
-    const button = await findByText("Make it full");
+    const view = mount();
+    expect(await view.findByText(/Quick song/)).toBeTruthy();
+    fireEvent.click(await view.findByRole("button", { name: "Edit" }));
+    const button = await view.findByRole("button", { name: "Make it full" });
     fireEvent.click(button);
     await waitFor(() => expect(calls.some((c) => c.url === "/api/music/jobs/mus-1/length" && c.method === "POST" && c.body?.includes('"full"'))).toBe(true));
   });
-  test("a full song offers Make it quick", async () => {
+  test("a full song does not offer a length change in Edit", async () => {
     card = done({ length: "full", duration_s: 180 });
-    const { findByText } = mount();
-    expect(await findByText(/Full song/)).toBeTruthy();
-    expect(await findByText("Make it quick")).toBeTruthy();
+    const view = mount();
+    expect(await view.findByText(/Full song/)).toBeTruthy();
+    fireEvent.click(view.getByRole("button", { name: "Edit" }));
+    expect(view.queryByRole("button", { name: "Make it full" })).toBeNull();
+    expect(view.queryByRole("button", { name: "Make it quick" })).toBeNull();
   });
 });
 

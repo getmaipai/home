@@ -7,6 +7,8 @@ checklist (`docs/dev.md`). The first release is 0.1.0.
 
 ## [Unreleased]
 
+- Song cards use a full-width Edit panel for full-length songs, song changes and new cover art.
+
 ## [0.2.33] - 2026-10-19
 
 The draft you have not sent no longer squashes the chat box, Music, Podcasts and Videos follow your theme instead of a fixed dark blue, and the Coding screens react at once. No database migrations.

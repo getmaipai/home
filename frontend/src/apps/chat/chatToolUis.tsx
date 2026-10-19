@@ -29,6 +29,8 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 // the dashboard Button belongs to the surrounding page chrome, not this
 // row.
 import { Button } from "@maipai/ui/src/ui/button";
+import { Input } from "@maipai/ui/src/ui/input";
+import { Alert, AlertDescription } from "@maipai/ui/src/ui/alert";
 import { getIcon } from "@maipai/ui/src/icons";
 import { Kbd } from "@maipai/ui/src/dashboard/components/ui/kbd";
 import { useSurface } from "@maipai/ui/src/useSurface";
@@ -656,6 +658,10 @@ export const MusicToolRender: ToolCallMessagePartComponent<Record<string, never>
   const card = query.data;
   // The version on show is local state; a new server-side choice (Use this version, a new edit) resets it.
   const [picked, setPicked] = useState<{ base: string | null; id: string } | null>(null);
+  const [songChange, setSongChange] = useState("");
+  const [coverChange, setCoverChange] = useState("");
+  const [editError, setEditError] = useState("");
+  const [editing, setEditing] = useState(false);
   const status = card ? musicStatusOf(card) : "queued";
   const shownId = card ? (picked && picked.base === card.current_id && card.versions.some((v) => v.id === picked.id) ? picked.id : card.current_id) : null;
   const shown = card?.versions.find((v) => v.id === shownId) ?? card?.versions[card.versions.length - 1];
@@ -677,9 +683,34 @@ export const MusicToolRender: ToolCallMessagePartComponent<Record<string, never>
   const description = musicDescriptionOf(card);
   const lyrics = card.lyrics && card.lyrics.trim() !== "[Instrumental]" ? card.lyrics : undefined;
   const ready = status === "ready" && shown !== undefined;
+  const editErrorText = (error: unknown) => {
+    const message = error instanceof Error ? error.message : "Home could not make that change.";
+    return `${message} Check the request and try again.`;
+  };
+  const editContent = <>
+    {card.length !== "full" ? <Button type="button" variant="outline" onClick={() => {
+      setEditing(true); setEditError("");
+      void musicApi.setLength(card.id, "full", shown?.id).then(refresh).catch((error) => setEditError(editErrorText(error))).finally(() => setEditing(false));
+    }} disabled={editing}>Make it full</Button> : null}
+    <Input aria-label="How should it change? For example: make it heavy metal" placeholder="How should it change? For example: make it heavy metal" value={songChange} onChange={(event) => setSongChange(event.currentTarget.value)} maxLength={500} disabled={editing} />
+    <Button type="button" variant="outline" disabled={editing || !songChange.trim()} onClick={() => {
+      const change = songChange.trim(); if (!change || editing) return;
+      setEditing(true); setEditError("");
+      void musicApi.revise(card.id, change, shown?.id).then(() => { setSongChange(""); refresh(); }).catch((error) => setEditError(editErrorText(error))).finally(() => setEditing(false));
+    }}>Make</Button>
+    <Input aria-label="Describe the new cover" placeholder="Describe the new cover" value={coverChange} onChange={(event) => setCoverChange(event.currentTarget.value)} maxLength={500} disabled={editing} />
+    <Button type="button" variant="outline" disabled={editing || !coverChange.trim()} onClick={() => {
+      const prompt = coverChange.trim(); if (!prompt || editing) return;
+      setEditing(true); setEditError("");
+      void musicApi.newCover(card.id, prompt).then(() => { setCoverChange(""); refresh(); }).catch((error) => setEditError(editErrorText(error))).finally(() => setEditing(false));
+    }}>Make</Button>
+    {editError ? <Alert variant="destructive"><AlertDescription>{editError}</AlertDescription></Alert> : null}
+  </>;
   return (
     <MusicTrack
       status={status}
+      width="full"
+      {...(ready ? { editContent, editLabel: "Edit", editPanelLabel: "Edit song" } : {})}
       title={title}
       {...(card.cover_url ? { cover: card.cover_url, coverAlt: `Cover art for ${title}` } : {})}
       {...(description ? { description } : {})}
@@ -699,7 +730,6 @@ export const MusicToolRender: ToolCallMessagePartComponent<Record<string, never>
       onStop={() => { void musicApi.stop(card.id).then(refresh).catch(refresh); }}
       hint={musicHint(card.length, card.cut, card.max_seconds)}
       {...(card.state === "queued" && card.stage === "longer" ? { copy: { queued: card.stage_label } } : {})}
-      {...(ready ? { actions: <Button type="button" variant="ghost" size="sm" onClick={() => { void musicApi.setLength(card.id, card.length === "full" ? "quick" : "full", shown.id).then(refresh).catch(refresh); }}>{card.length === "full" ? "Make it quick" : "Make it full"}</Button> } : {})}
       {...(ready ? { onShare: () => { void shareClip({ prepared: prepared.data, title, nav: navigator, fallback: () => navigate(`/files?file=${encodeURIComponent(shown.id)}`) }); } } : {})}
     />
   );

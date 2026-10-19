@@ -42,6 +42,8 @@ If someone is chatting or talking to Home while a song is being made, the card s
 
 When it is done, the song plays on the card. **Lyrics** shows the words. The line being sung is lit. Tap a line to jump there. Press **Download** to save it or **Share** to send it.
 
+Press **Edit** to make a quick song full, change the song with a short request, or describe new cover art. Home keeps earlier song versions in the version buttons. Only the person who made the song can change it. A new cover may take a little time to appear.
+
 Tips for a good song:
 
 - Say the style, the mood and the instruments, for example "soft piano and a warm voice".
