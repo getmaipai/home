@@ -7,8 +7,16 @@ checklist (`docs/dev.md`). The first release is 0.1.0.
 
 ## [Unreleased]
 
-- Song cards use a full-width Edit panel for full-length songs, song changes and new cover art.
-- Home-made songs in the Library use the chat player, including lyrics, timed lines and owner editing.
+## [0.2.34] - 2026-10-19
+
+Songs get one Edit panel and play the same way in the Library as in chat, and an adult can talk about a film plot without the child-safety stop. No database migrations.
+
+### Chat
+- **An adult's chat is no longer stopped for discussing a film or a story** (the Taxi Driver plot summary was cut off mid-reply). Home still refuses an adult's request that asks for sexual content involving a minor, and the checks for teens, children, the robot, generated pictures, videos and songs, and finished media are unchanged. The shared spec moves to 0.1.192.
+- **Songs have one full-width Edit button.** It opens a panel with Make it full, Change the song (type "make it heavy metal"), and Describe a new cover.
+
+### Library
+- **A song made at home opens in the same player as chat**: cover, lyrics that follow the song (tap a line to jump), versions, and the Edit panel for the song's owner.
 
 ## [0.2.33] - 2026-10-19
 
