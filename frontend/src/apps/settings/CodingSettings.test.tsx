@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, mock, test } from "bun:test";
-import { fireEvent, cleanup } from "@testing-library/react";
+import { fireEvent, cleanup, waitFor } from "@testing-library/react";
 import { CodingKeysSettings } from "@/apps/settings/CodingSettings";
 import { renderWithQueryClient } from "../../../tests/renderWithQueryClient";
 
@@ -20,19 +20,30 @@ function mockKeys(keys: unknown[] = []) {
 }
 
 describe("Coding keys settings", () => {
-  test("the create dialog shows the secret once and drops it when closed", async () => {
+  test("the dialog shows one key, hides setup lines until opened, copies the key, and drops it when closed", async () => {
     const server = mockKeys();
+    const originalClipboard = navigator.clipboard;
+    let copied = "";
+    Object.defineProperty(navigator, "clipboard", { configurable: true, value: { writeText: async (value: string) => { copied = value; } } });
     try {
       const view = renderWithQueryClient(<CodingKeysSettings person={{ id: "person-abcdef", role: "adult" }} />);
       fireEvent.click(await view.findByRole("button", { name: "Create key" }));
       fireEvent.change(view.getByLabelText("Name"), { target: { value: "Work laptop" } });
       fireEvent.click(view.getByRole("button", { name: "Create key" }));
-      expect(await view.findByDisplayValue("maipai_key_abcd1234_SECRET_ONCE")).toBeTruthy();
+      const key = await view.findByDisplayValue("maipai_key_abcd1234_SECRET_ONCE");
+      expect(view.getAllByDisplayValue("maipai_key_abcd1234_SECRET_ONCE")).toHaveLength(1);
+      expect(view.getByText("This is the only key. The tool lines below use this same key.")).toBeTruthy();
+      expect(view.queryByRole("textbox", { name: "Claude Code setup line" })).toBeNull();
+      fireEvent.click(view.getByRole("button", { name: "Setup lines for your tool" }));
       expect(view.getByDisplayValue(/ANTHROPIC_BASE_URL=.*\/code\/v1/)).toBeTruthy();
+      expect(view.getByText("Claude Code · same key")).toBeTruthy();
+      fireEvent.click(view.getAllByRole("button", { name: "Copy" })[0]!);
+      await waitFor(() => expect(copied).toBe("maipai_key_abcd1234_SECRET_ONCE"));
       fireEvent.click(view.getByRole("button", { name: "Done" }));
       expect(view.queryByDisplayValue("maipai_key_abcd1234_SECRET_ONCE")).toBeNull();
       expect(view.queryByText("maipai_key_abcd1234_SECRET_ONCE")).toBeNull();
-    } finally { server.restore(); }
+      expect(key).toBeTruthy();
+    } finally { server.restore(); Object.defineProperty(navigator, "clipboard", { configurable: true, value: originalClipboard }); }
   });
 
   test("the keys list explains why a suspended key is not working", async () => {
