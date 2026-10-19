@@ -7,6 +7,23 @@ checklist (`docs/dev.md`). The first release is 0.1.0.
 
 ## [Unreleased]
 
+## [0.2.30] - 2026-10-19
+
+Pictures in chat are more reliable and honest, "remove the boy on the left" works, and the Library page loses its title band and gains an Origin link. No database migrations.
+
+### Chat
+- **Asking about one named film, show, book, album, place or thing shows one picture above the answer** automatically (it follows your "Show pictures in answers" setting and the usual age checks). When you ask for pictures yourself, all the pictures that were found lead the answer in one row.
+- **An empty picture result says so.** Home no longer says it showed a poster when nothing passed the checks, and offers to try again.
+- **"Remove the boy on the left" finds the person** by position and by the numbered boxes, not only by number.
+- A stopped reply about a film plot gets the plain explanation from 0.2.29 on every path.
+
+### Library
+- **The desktop title band is gone** (the phone keeps room for the menu button). The section name is the page heading.
+- **Origin link.** The details of a file you made in chat link to the chat and the exact message it came from.
+
+### Music
+- Remaking a song in a different style, or changing its cover from a prompt, works through the existing generation jobs (the card that uses it ships next).
+
 ## [0.2.29] - 2026-10-19
 
 Fixes from your first day with 0.2.28: the Erase tool, older chats, pictures under answers, removing a person, News layout details, and a clearer message when a film plot is stopped. No database migration. Pins: `@maipai/spec` 0.1.188, `@maipai/ui` 0.5.297.
@@ -37,15 +54,7 @@ News pages are laid out per topic, articles show their own pictures and read lik
 
 ### Chat
 - **A reply the safety check cuts keeps the words you already read**, with the refusal line under them, so reloading the chat shows what the screen showed. The hub log now names the safety category that cut a reply (never the words).
-- Person removal now uses the numbered picture boxes to understand phrases such as "the boy on the left" before asking the picture model. Its fallback accepts valid answers even when the engine ignores the JSON schema, uses the shared empty-length retry, and logs a reason code without the request text.
-- Made pictures have a visible **Edit** action below them; failure guidance now says to tap the picture, then Edit.
-- Always-visible **Edit** on sent attachments and a stacked 48 px retry action need additive kit props. Home cannot reshape either kit Element under rule 9; these are tracked in IMGTOOLS-10 and IMGTOOLS-11.
 ### Library
-- Removed the desktop Library title band while keeping the phone menu clearance.
-- Added owner-only Origin links from a file to its chat and exact turn. Deleted chats show as plain text; opening a missing turn lands at the end with a note.
-- Selection color consistency still needs a shared-kit change. `FileTile` uses `ring-primary`; `DataTable` uses `bg-primary/10`.
-- The music API supports prompted style remakes and prompted album-cover changes through the existing generation jobs. Remakes keep the selected version's words and title. Finished song turns now tell the model when their song is ready. The in-card Edit panel awaits the MusicTrack kit slot described in `docs/dev.md`.
-- Chat image outcomes record when no picture passes the checks, and article lead images are tried before other results. Explicit picture requests wait at most 600 ms for a leading gallery before the answer starts; late galleries follow the answer. Written chat can show one lead image automatically for one named subject, with the existing image preference and the age, surface and temporary-chat gates. Adult replies stopped by the CSAM floor explain why and what to ask next. No safety detection or refusal behavior changed. See `docs/design/safety-factual-references-2026-10-19.md` for the investigation of a Taxi Driver plot-summary false positive.
 
 ## [0.2.27] - 2026-10-19
 
