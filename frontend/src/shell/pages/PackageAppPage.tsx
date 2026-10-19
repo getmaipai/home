@@ -128,7 +128,7 @@ export function PackageAppPage({ person }: { person: Roster }) {
   const contextTitle = sidebarProps ? contextTitleFor(activeLabel, pageDoc?.title) : undefined;
 
   const content = (
-    <div className={cn("flex min-h-0 min-w-0 flex-1 flex-col gap-2", sidebarProps && "lg:ps-6")} data-testid="package-app" data-package={packageId}>
+    <div className={cn("flex min-h-0 min-w-0 flex-1 flex-col gap-2", sidebarProps && "p-4 lg:ps-6")} data-testid="package-app" data-package={packageId}>
       {familyHeader ? null : <h1 className="sr-only">{app?.label ?? "App"}</h1>}
       {app ? <AppToolbar hideSectionsOnWide={sidebar !== undefined} person={person} to={app.to} label={app.label} homeLabel={appHomeLabel(packageId, media)} settingsArea={app.settings_area?.id} sections={app.sections} current={pageId} familyHeader={familyHeader} title={contextTitle} titleSrOnly={sidebarProps ? ownHeader || contextTitle === undefined : false} /> : null}
       <AsyncState
@@ -169,7 +169,7 @@ export function PackageAppPage({ person }: { person: Roster }) {
   // NEWS-SIDEBAR-01: an app that declares a sidebar gets its own column beside the content from wide screens up (the kit's one
   // section sidebar); its section tabs give way to it there, and a phone keeps them.
   return sidebarProps ? (
-    <div className="flex min-h-0 flex-1" data-testid="package-app-frame">
+    <div className="flex min-h-0 flex-1" data-workspace-fill="" data-testid="package-app-frame">
       <SectionSidebar standalone {...sidebarProps} />
       {content}
     </div>

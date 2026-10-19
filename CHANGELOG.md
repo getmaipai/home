@@ -13,6 +13,7 @@ checklist (`docs/dev.md`). The first release is 0.1.0.
 
 ### Fixed
 
+- News: the left column now sits against the icon rail with no gap and the page no longer scrolls a little up and down beside it (the column and the page are one viewport tall). Needs `@maipai/ui` 0.5.297.
 - The Erase tool's preview no longer shows your painted area on top of the result, which made an erased object look as if it was still there. Needs `@maipai/ui` 0.5.296.
 
 ### Fixed
