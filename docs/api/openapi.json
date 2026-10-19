@@ -41091,7 +41091,7 @@
         ],
         "responses": {
           "200": {
-            "description": "Found.",
+            "description": "Found. Chat provenance is included only for the file owner.",
             "content": {
               "application/json": {
                 "schema": {
@@ -41350,6 +41350,21 @@
                       "type": "string",
                       "pattern": "^[0-9]+:[0-9]+:[a-z0-9]{6,}$",
                       "description": "Hybrid logical clock, matching the shared record envelope. Set at creation and advanced when a mutable field (name, deleted_at, trash_until, retention) changes."
+                    },
+                    "chat_id": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "turn_id": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "chat_title": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "chat_deleted": {
+                      "type": "boolean"
                     }
                   },
                   "required": [
@@ -41366,8 +41381,7 @@
                     "created_at",
                     "hlc"
                   ],
-                  "additionalProperties": false,
-                  "description": "One immutable record for a file a person made or sent: a chat attachment, a package's generated output, or an exported copy (STORE-SPEC-01, home docs/plans/household-storage-2026-09-23.md). The bytes live below the household data directory, content-addressed by sha256 so identical bytes are stored once; this record carries only its owner, kind, origin, provenance, integrity and retention policy. Supersedes attachment.schema.json, generalized to the same shape (no attachment rows existed in any household yet, so the rename cost nothing); also folds in the never-built media.schema.json (MEDIA-RECORD-01). Sharing is never a field here: a share is its own pointer record, share.schema.json, so one file has one owner and any number of share pointers without a second copy of the bytes or a second file record."
+                  "additionalProperties": false
                 }
               }
             }
@@ -42200,10 +42214,29 @@
                           "retention": {
                             "type": "string"
                           },
+                          "origin": {
+                            "type": "string",
+                            "enum": [
+                              "made",
+                              "sent",
+                              "fetched"
+                            ]
+                          },
                           "chat_id": {
                             "type": "string",
                             "nullable": true,
                             "description": "The chat that made or received this item, while it exists and only for the owner."
+                          },
+                          "turn_id": {
+                            "type": "string",
+                            "nullable": true
+                          },
+                          "chat_title": {
+                            "type": "string",
+                            "nullable": true
+                          },
+                          "chat_deleted": {
+                            "type": "boolean"
                           },
                           "can_edit": {
                             "type": "boolean",
@@ -42244,7 +42277,11 @@
                           "owner",
                           "shared_with",
                           "retention",
+                          "origin",
                           "chat_id",
+                          "turn_id",
+                          "chat_title",
+                          "chat_deleted",
                           "can_edit",
                           "audience",
                           "duration_seconds",
