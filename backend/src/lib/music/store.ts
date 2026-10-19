@@ -70,6 +70,13 @@ export function musicJobIdsByTurn(actor: { id: string }, turnIds: readonly strin
   for (const job of jobs.sort((a, b) => a.createdAt.localeCompare(b.createdAt))) if (job.turnId && !ids.has(job.turnId)) ids.set(job.turnId, job.id);
   return ids;
 }
+/** Job state is safe to use as a short factual hint in the owning turn's context. */
+export function musicJobStateByTurnId(turnId: string): string | null {
+  pruneMusicJobs();
+  const live = [...memory.values(), ...liveJobs.values()].find((job) => job.turnId === turnId);
+  if (live) return live.state;
+  return db.select({ state: musicJobs.state }).from(musicJobs).where(eq(musicJobs.turnId, turnId)).get()?.state ?? null;
+}
 // Finished Library songs and the metadata their player reads outlive the chat.
 // Job turn/conversation ids are provenance without foreign keys, so they can stay.
 function deleteUnlessKept(job: MusicJob, fileIsLeaving = false): void {

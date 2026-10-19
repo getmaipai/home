@@ -8,7 +8,7 @@ import { installFakeMusicStack, musicState, waitForMusic, LYRICS } from "./music
 import { installFakeImageStack, until, testPng } from "./pictureFixture";
 import { runGenerateMusic } from "@/lib/music/tool";
 import { musicForOutcomes } from "@/lib/composer";
-import { getMusicJobFor } from "@/lib/music/jobs";
+import { getMusicJobFor, musicVersions } from "@/lib/music/jobs";
 import { listConversationTurns } from "@/lib/conversationHistory";
 import { pictureJobsForTurn, getPictureJob } from "@/lib/pictures/jobs";
 import { saveMusicJob } from "@/lib/music/store";
@@ -113,9 +113,10 @@ describe("song covers", () => {
   test("New cover changes the seed, keeps the version chain and includes editor versions", async () => {
     const { actor, client } = await owner(); const job = await song(actor); const first = await covered(actor, job.id);
     const edited = await saveVersion(actor, loadSource(actor, first.conversationId!, first.coverFileId!, true), await testPng(), { op: "comment", label: "Blue sky" });
-    expect((await client.post(`/api/music/jobs/${job.id}/cover`, {})).status).toBe(200);
+    expect((await client.post(`/api/music/jobs/${job.id}/cover`, { prompt: "A violet mountain at dusk" })).status).toBe(200);
     await until(() => getMusicJobFor(actor, job.id)?.coverFileId !== first.coverFileId);
     expect(pictures.submitted).toHaveLength(2); expect(pictures.submitted[1]!.seed).not.toBe(pictures.submitted[0]!.seed);
+    expect(pictures.submitted[1]!.prompt).toContain("A violet mountain at dusk");
     const done = getMusicJobFor(actor, job.id)!;
     expect(listVersions(actor, done.conversationId!, done.coverFileId!).map((v) => v.id)).toEqual([first.coverFileId!, edited.id, done.coverFileId!]);
     const card = await (await client.get(`/api/music/jobs/${job.id}`)).json() as { cover_url: string; cover_versions: { id: string }[] };
@@ -125,6 +126,22 @@ describe("song covers", () => {
       expect((await client.post(`/api/music/jobs/${job.id}/cover`, {})).status).toBe(403);
     }
     expect(pictures.submitted).toHaveLength(2);
+  });
+  test("prompted song edits reuse the music job and keep the original version, title and lyrics", async () => {
+    const { actor, client } = await owner(); const original = await song(actor);
+    const response = await client.post(`/api/music/jobs/${original.id}/revise`, { change: "make it heavy metal" });
+    expect(response.status).toBe(200);
+    await until(() => music.submitted.length === 2);
+    await waitForMusic(() => musicVersions(actor, getMusicJobFor(actor, original.id)!).some((version) => version.parentFileId === original.fileId && version.task === "remake" && version.state === "done"));
+    const revised = musicVersions(actor, getMusicJobFor(actor, original.id)!)
+      .find((version) => version.parentFileId === original.fileId && version.task === "remake");
+    expect(music.submitted[1]).toMatchObject({ task: "text2music", caption: "an original folk song. Change: make it heavy metal", lyrics: LYRICS });
+    expect(music.submitted[1]!.caption.length).toBeLessThanOrEqual(1200);
+    expect(revised?.request).toMatchObject({ description: music.submitted[1]!.caption, lyrics: LYRICS, title: "Pancakes" });
+    const responseCard = await (await client.get(`/api/music/jobs/${original.id}`)).json() as { versions: { id: string }[]; title: string; lyrics: string };
+    expect(responseCard.versions).toHaveLength(2);
+    expect(responseCard.versions.map((version) => version.id)).toContain(original.fileId!);
+    expect(responseCard.title).toBe("Pancakes"); expect(responseCard.lyrics).toContain("Morning light");
   });
   test("pictures off, unavailable, refused prompts and temporary songs leave a successful song alone", async () => {
     const { actor } = await owner();

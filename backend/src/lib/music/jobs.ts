@@ -50,6 +50,11 @@ export interface StartMusicInput {
   request: MusicRequest; body: Omit<MusicBody, "timeout_ms">; parentFileId?: string | null;
 }
 export async function startMusicJob(input: StartMusicInput): Promise<MusicJob> {
+  if (input.task === "text2music") {
+    if (typeof input.request.description !== "string") throw new StackMusicError(422, "bad_description");
+    // The persisted request is authoritative. Keep the submitted caption in sync with it.
+    input.body.caption = input.request.description;
+  }
   // Charge storage before admission, then check actual bytes again when saving. Temporary audio is memory only.
   const cap = checkStorageCap(input.actor.role, input.actor.id, Math.ceil(input.request.seconds * 32_000));
   if (!cap.ok) throw new StackMusicError(403, "storage_full");

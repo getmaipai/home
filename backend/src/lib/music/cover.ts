@@ -36,13 +36,13 @@ function songCoverBusy(actor: PersonRow, job: MusicJob): boolean {
   const previous = job.coverJobId ? getPictureJob(actor, job.coverJobId) : null;
   return starting.has(job.id) || previous?.state === "queued" || previous?.state === "running";
 }
-export async function startSongCover(actor: PersonRow, job: MusicJob, options: { seed?: number } = {}): Promise<"busy" | void> {
+export async function startSongCover(actor: PersonRow, job: MusicJob, options: { seed?: number; prompt?: string } = {}): Promise<"busy" | void> {
   if (songCoverBusy(actor, job)) return "busy";
   starting.add(job.id);
   try {
     const audience = routeAudience(actor);
     if (job.personId !== actor.id || job.state !== "done" || job.temporary || !job.conversationId || !job.turnId || musicViewDenial(audience) || pictureDenial(audience)) return;
-    const prompt = coverPromptFor(job.request);
+    const prompt = options.prompt?.trim() || coverPromptFor(job.request);
     if (refusePrompt(prompt, { lane: laneOf(audience), depictsRealPerson: job.request.imitates_real_voice === true }) || !(await pictureEngineReady())) return;
     const current = getMusicJobFor(actor, job.id);
     if (!current) return;

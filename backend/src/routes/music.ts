@@ -24,6 +24,8 @@ import { StackMusicError } from "@/lib/music/stack";
 import { sungLyricsFromLrc, withoutLastLines } from "@/lib/music/sections";
 import { commercialUseOf, COMMERCIAL_REFUSAL_LINE } from "@/lib/music/commercial";
 import { busyLine } from "@/lib/videos/jobs";
+import { laneOf } from "@/lib/pictures/lane";
+import { refusePrompt } from "@/lib/pictures/policy";
 export const musicRoutes = apiRouter();
 export function musicRouteAudience(actor: PersonRow) { return { actor, band: speakerAgeBand(actor, new Date()), surface: "chat" as const, surfaceClass: "written" as const, spoken: false }; }
 // Making a song needs the full gate (age, surface and the household switch). A person's own existing song (the card, Stop,
@@ -117,14 +119,40 @@ musicRoutes.openapi(getRoute, async (c) => {
   return c.json(await musicCardView(actor, job), 200);
 });
 const coverRoute = createRoute({ method: "post", path: "/jobs/{id}/cover", tags: ["Music"], summary: "Make a new cover for the shown song", middleware,
-  request: { params }, responses: { 200: { content: { "application/json": { schema: cardSchema } }, description: "The song card." }, ...refusals, ...errorResponses({ 409: "The song or its cover is still being made" }) } });
+  request: { params, body: { content: { "application/json": { schema: z.object({ prompt: z.string().trim().min(3).max(1200).optional() }) } } } }, responses: { 200: { content: { "application/json": { schema: cardSchema } }, description: "The song card." }, ...refusals, ...errorResponses({ 409: "The song or its cover is still being made" }) } });
 musicRoutes.openapi(coverRoute, async (c) => {
   const actor = c.get("person"); const root = getMusicJobFor(actor, c.req.valid("param").id);
   if (!root) return c.json({ error: "That song isn't available any more. Ask for it again." }, 404) as never;
   const current = musicVersions(actor, root).sort((a, b) => (b.chosenAt ?? b.createdAt).localeCompare(a.chosenAt ?? a.createdAt) || b.id.localeCompare(a.id))[0] ?? root;
   if (current.state !== "done") return c.json({ error: "The song is still being made. Try New cover when it is ready." }, 409) as never;
-  if (await startSongCover(actor, current) === "busy") return c.json({ error: "A cover is already being made. It will show in a moment." }, 409) as never;
+  const { prompt } = c.req.valid("json");
+  if (prompt && refusePrompt(prompt, { lane: laneOf(musicRouteAudience(actor)), depictsRealPerson: current.request.imitates_real_voice === true })) return c.json({ error: "That cover request can't be used. Try a different description." }, 403) as never;
+  if (await startSongCover(actor, current, prompt ? { prompt: `${prompt}. Album cover art for ${current.request.title ?? "this song"}. No text, no letters.` } : {}) === "busy") return c.json({ error: "A cover is already being made. It will show in a moment." }, 409) as never;
   return c.json(await musicCardView(actor, getMusicJobFor(actor, root.id) ?? root), 200);
+});
+
+const reviseRoute = createRoute({ method: "post", path: "/jobs/{id}/revise", tags: ["Music"], summary: "Make a new version of the song with a style change", middleware,
+  request: { params, body: { content: { "application/json": { schema: z.object({ change: z.string().trim().min(3).max(600), file_id: z.string().min(1).max(80).optional() }) } } } },
+  responses: { 200: { content: { "application/json": { schema: cardSchema } }, description: "The card with a new version coming." }, 422: { description: "The requested edit cannot be made." }, ...refusals } });
+musicRoutes.openapi(reviseRoute, async (c) => {
+  const actor = c.get("person"); const root = getMusicJobFor(actor, c.req.valid("param").id); const { change, file_id } = c.req.valid("json");
+  const versions = root ? musicVersions(actor, root).filter((j) => j.state === "done" && j.fileId) : [];
+  const source = (file_id ? versions.find((j) => j.fileId === file_id) : versions.sort((a, b) => (b.chosenAt ?? b.createdAt).localeCompare(a.chosenAt ?? a.createdAt))[0]) ?? null;
+  if (!root || !source || !source.conversationId || !source.turnId) return c.json({ error: "That song isn't available any more. Ask for it again." }, 404) as never;
+  const engine = await musicEngineStatus();
+  if (!musicStatusReady(engine)) return c.json({ error: plainMusicFailure("not_installed") }, 503) as never;
+  const description = `${source.request.description.trim()}. Change: ${change}`.slice(0, 1200);
+  const plan = prepareMusicEdit(source, { track: source.fileId!, change: "remake", description }, engine!.limits);
+  if (!plan.ok) return c.json({ error: plan.line }, 422) as never;
+  // The revised prompt is the source of truth for both the stored request and the Stack body.
+  plan.request.description = description;
+  plan.body.caption = description;
+  const refusal = refuseMusicPrompt([description, plan.request.lyrics, plan.request.written_lyrics, plan.request.title, plan.request.key, plan.request.language].filter(Boolean).join(" "), { imitatesRealVoice: plan.request.imitates_real_voice });
+  if (refusal) return c.json({ error: MUSIC_REFUSAL_LINE[refusal] }, 403) as never;
+  plan.request.seconds = Math.min(plan.request.seconds, engine!.limits.max_seconds); plan.body.duration_s = plan.request.seconds;
+  try { await startMusicJob({ actor, conversationId: source.conversationId, turnId: source.turnId, temporary: source.temporary, task: plan.task, request: plan.request, body: plan.body, parentFileId: source.fileId }); }
+  catch (error) { return c.json({ error: plainMusicFailure(error instanceof StackMusicError ? error.code : "failed") }, 503) as never; }
+  return c.json(await musicCardView(actor, root), 200);
 });
 const cancelRoute = createRoute({ method: "delete", path: "/jobs/{id}", tags: ["Music"], summary: "Stop a song being made", middleware: viewMiddleware, request: { params },
   responses: { 200: { content: { "application/json": { schema: cardSchema } }, description: "The stopped card." }, ...refusals } });

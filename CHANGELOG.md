@@ -26,6 +26,7 @@ News pages are laid out per topic, articles show their own pictures and read lik
 - Removed the desktop Library title band while keeping the phone menu clearance.
 - Added owner-only Origin links from a file to its chat and exact turn. Deleted chats show as plain text; opening a missing turn lands at the end with a note.
 - Selection color consistency still needs a shared-kit change. `FileTile` uses `ring-primary`; `DataTable` uses `bg-primary/10`.
+- The music API supports prompted style remakes and prompted album-cover changes through the existing generation jobs. Remakes keep the selected version's words and title. Finished song turns now tell the model when their song is ready. The in-card Edit panel awaits the MusicTrack kit slot described in `docs/dev.md`.
 
 ## [0.2.27] - 2026-10-19
 

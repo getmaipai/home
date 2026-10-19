@@ -8,6 +8,11 @@ import { useDefaultScriptedStack } from "./stackFixture";
 import { __setChatWindowContextForTests } from "@/lib/roleHealth";
 import { countTokens } from "@/lib/tokenCount";
 import { FAILURE_COPY } from "@/lib/failureCopy";
+import { musicContextNote } from "@/lib/conversationHistory";
+
+test("finished music history context says the song is ready", () => {
+  expect(musicContextNote("done")).toBe("[The song finished and is ready in the player below this message.]");
+});
 
 const backgroundFixtures: StackFixture[] = [];
 const conversationStubs: Array<{ stop(): Promise<void> }> = [];

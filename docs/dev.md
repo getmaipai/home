@@ -43,6 +43,10 @@ The spec pin 0.1.185 also declares `coding` sections in the home and account set
 
 The chat song card passes stored cover art to MusicTrack and keeps its existing poll running while the cover picture is queued or running, with a 30 second startup grace and no wait for private chats or an absent picture engine.
 
+The music API now supports style remakes and prompted cover edits on the existing music and picture job paths. A style remake keeps the selected version's title and lyrics, adds the person's change to its original style request, and stores another version under the same song job. Cover prompts use the picture policy and cover-version history. Earlier music turns describe a completed job as ready in the model context, using the current state stored for that turn. The in-card Edit panel is still pending a kit change.
+
+The shipped MusicTrack fixes its own maximum width at `max-w-xl` and has no full-width prop. Home cannot change that under rule 9. FABLE WORK kit request: add `width?: "default" | "full"` to MusicTrack; `full` removes its internal max-width while preserving the phone stack. The in-card Edit panel needs kit-owned open state and an `editContent?: ReactNode` slot, with a 48 px Edit action. Home supplies the three action forms and handlers through that slot; it cannot build a wrapper, Sheet or custom chat form under rule 9. The Library viewer song experience is also pending: rule 9b restricts its non-chat surface to the shadcn/ui set, while the requested shared MusicTrack experience needs an owner-approved design decision or a suitable shipped kit element.
+
 ## LIBRARY-REVAMP-05 backend thumbnails (2026-10-18)
 
 `GET /api/files/{id}/thumb?w=320|640` checks `canAccessFile` before reading a cache or returning 304. A hidden file and an absent file both return plain `attachment not found`. A stored video poster or song cover must independently pass the same boundary. Missing previews return plain `no preview`, including videos without a stored poster. This backend slice does not call Stack `media.preview`.

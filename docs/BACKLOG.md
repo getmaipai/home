@@ -593,6 +593,7 @@ From [music-generation-2026-10-17.md](design/music-generation-2026-10-17.md): AC
 - [ ] **MUSIC-GEN-18: the song card shows while it is made** (S, note 18.2, rule S6). The streamed `tool_result` with `musicJobId` adds the `song` part during the turn; a queued card draws before the first poll.
 - [ ] **MUSIC-GEN-19: cover art** (M, note 18.4). A Quick picture after each song (`cover_file_id`, migration), New cover and Edit cover (the existing picture editor), a kit `MusicTrack` `cover` prop (commons first), and media session artwork.
 - [ ] **MUSIC-GEN-20: karaoke** (M, note 18.5). `timed_lyrics` from the engine's `lrc`; kit `MusicTrack` `timedLyrics` highlights the line being sung, tap a line to seek, reduced motion, phone width.
+- [ ] **MUSIC-CARD-EDIT-01: full-width and shared Library song experience** (M, Home and FABLE WORK). Home's chat card now has one Edit action for full songs, prompted style remakes and prompted covers, with old versions preserved. Remaining: MusicTrack needs an additive `width="full"` prop (it currently fixes `max-w-xl` internally); Library details need a music-owned item endpoint with lyrics, timed lyrics, cover and versions, plus an owner ruling for using the shared chat Element on a non-chat surface under rule 9b. Carry the same component and access checks into Library after that ruling.
 - [ ] **MUSIC-STUDIO-01: music studio app** (L, later; design note first). Versions timeline, region repaint, stems, lyrics beside the waveform; reuses the music Stack API and records.
 
 ## Voices (owner, 2026-10-17; queued after music)
