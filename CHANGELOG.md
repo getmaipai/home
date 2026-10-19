@@ -7,6 +7,14 @@ checklist (`docs/dev.md`). The first release is 0.1.0.
 
 ## [Unreleased]
 
+### Changed
+
+- News: a topic with no stories keeps its header (and Today keeps its category chips) instead of showing a bare empty message. A category chosen from the chips on Today now draws the same layout as the same topic chosen in the sidebar. The article page's source banner and toolbar span the full width, the toolbar stays on top while the article scrolls, and the text sits in a narrow reading column.
+
+### Fixed
+
+- The Erase tool's preview no longer shows your painted area on top of the result, which made an erased object look as if it was still there. Needs `@maipai/ui` 0.5.296.
+
 ### Fixed
 
 - Chat: typing in a chat that a New chat had closed (an older chat from the list, or Retry on it) reopens it and sends, instead of failing with "conversation not found" and an id. A chat that retention emptied still cannot take a message, and now says so in plain words.
