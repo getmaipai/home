@@ -83,13 +83,12 @@ async function runPictureQuestion(firstPass?: { id: string; name: string; args: 
 }
 
 describe("IMGQ-09: answer image re-ask", () => {
-  test("a text-only first pass re-asks and puts the gallery under the answer", async () => {
+  test("an automatic lead gallery suppresses the redundant after-answer re-ask", async () => {
     const { result, seen } = await runPictureQuestion();
     expect(result.ok && result.kind === "immediate" ? result.value.blocks?.filter((b) => b.kind === "image_gallery") : []).toHaveLength(1);
-    expect(seen.filter(isReAsk)).toHaveLength(1);
-    const reAsk = seen.find(isReAsk)!;
-    expect(reAsk.tools?.map((t) => (t as { function: { name: string } }).function.name)).toEqual(["show_images"]);
-    expect(reAsk.tool_choice).toBe("auto");
+    // The automatic lead already supplied the picture, so the after-answer
+    // re-ask must not do the same job a second time.
+    expect(seen.filter(isReAsk)).toHaveLength(0);
   });
 
   test("a successful websearch outcome still permits the re-ask", async () => {
@@ -176,7 +175,9 @@ describe("IMGQ-09: answer image re-ask", () => {
     });
     restores.push(() => modelSpy.mockRestore());
     await withStub({ calls: () => undefined, reply: () => "It is a landmark in Paris." }, async (seen) => {
-      const result = await runTurnNext(people.owner, "chat", "Tell me about the Eiffel Tower");
+      // A broad topic has no single resolver-selected subject, so the
+      // automatic lead does not run; the IMGQ-09 re-ask still does.
+      const result = await runTurnNext(people.owner, "chat", "Tell me about famous landmarks");
       expect(result.ok && result.kind === "immediate" ? result.value.reply.text : "").toContain("landmark");
       expect(result.ok && result.kind === "immediate" ? (result.value.blocks ?? []).filter((b) => b.kind === "image_gallery") : []).toHaveLength(0);
       expect(reAskAttempts).toBe(1);

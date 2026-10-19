@@ -814,7 +814,8 @@ async function finishTurn(begun: BegunTurn): Promise<TurnValue> {
     const outcomesPermitImageReAsk = state.outcomes.every((outcome) =>
       outcome.status === "succeeded" && outcome.packageId !== SHOW_IMAGES_TOOL_ID && isLookupPackage(outcome.packageId),
     );
-    if (state.answerImagesAllowed && process.env.MAIPAI_IMGQ09_REASK !== "0" && replyKept && !state.answerImages && !state.continuation && !state.whoAnswer && outcomesPermitImageReAsk && state.lastTools.some((t) => t.id === SHOW_IMAGES_TOOL_ID)) {
+    const automaticLeadGallery = state.answerImages?.automaticLead === true && !!state.answerImages.block;
+    if (state.answerImagesAllowed && process.env.MAIPAI_IMGQ09_REASK !== "0" && replyKept && !automaticLeadGallery && !state.continuation && !state.whoAnswer && outcomesPermitImageReAsk && state.lastTools.some((t) => t.id === SHOW_IMAGES_TOOL_ID)) {
       const again = await reAskForShowImages(state, gateOutput?.text ?? "", abortSignal);
       if (again) startAnswerImages(state, again.subject, again.kind, again.callId, again.subjects);
     }

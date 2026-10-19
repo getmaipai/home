@@ -144,6 +144,11 @@ export const answerNode: Node<AnswerInput, AnswerOutput> = async (state, input) 
         await lead.done;
         if (state.releaseAutoLeadText) state.releaseAutoLeadText(!!lead.block);
         else state.pendingAutoLeadImage = undefined;
+      } else if (state.pendingAutoLeadImage && state.releaseAutoLeadText) {
+        // A lead can be disqualified by a tool or another image path after
+        // context selected it. Never leave the stream placer holding the
+        // model's answer when the lead will not run.
+        state.releaseAutoLeadText(false);
       }
       // A live acceptance run (U2d) caught this dropping every tool
       // round's own sources on the floor: the state table's own "the

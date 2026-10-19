@@ -217,7 +217,8 @@ export const contextNode: Node<ContextInput, ContextOutput> = async (state, inpu
   // never a word rule over the open-ended message. Temporary, spoken,
   // bare and non-chat turns do not make third-party picture requests.
   const named = resolvedSubjects.subjects.length === 1 ? resolvedSubjects.subjects[0] : undefined;
-  if (named?.type === "unresolved" && !state.images?.length && state.surface === "chat" && autoLeadImageAllowed({ actor: state.actor, band: state.plan.age_band, surfaceClass: state.planBasis.surfaceClass ?? "spoken", spoken: state.spoken, temporary, bare: !!state.bare, ephemeral: state.ephemeral === true })) {
+  const asksAboutSubject = state.signal.clauses.some((clause) => clause.act === "question" || clause.act === "directive");
+  if (asksAboutSubject && named?.type === "unresolved" && !state.images?.length && state.surface === "chat" && autoLeadImageAllowed({ actor: state.actor, band: state.plan.age_band, surfaceClass: state.planBasis.surfaceClass ?? "spoken", spoken: state.spoken, temporary, bare: !!state.bare, ephemeral: state.ephemeral === true })) {
     state.pendingAutoLeadImage = { subject: named.surface_form, kind: named.candidate_kinds[0] ?? "" };
   }
 
