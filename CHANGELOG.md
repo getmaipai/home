@@ -7,6 +7,23 @@ checklist (`docs/dev.md`). The first release is 0.1.0.
 
 ## [Unreleased]
 
+## [0.2.32] - 2026-10-19
+
+Every color follows your theme, songs and clips made at home show on their shelves, the Coding settings and gateway get their first real-run fixes, and the Stack moves to the build with the Splash coding engine. No database migrations.
+
+### Coding
+- **The coding pieces run on the Stack's new Splash coding engine** (Apple silicon with 36 GB or more; llama-server stays the fallback). A paused coding run waits at most 20 s for the machine before it continues. Nothing downloads until an admin chooses Install in Settings, Coding.
+- Fixes found by the first real end-to-end run of keys through the gateway (settings read, adult self-setting, Messages `max_tokens`, usage shape).
+
+### Music and Videos
+- **Songs and clips made at home** show in the Music and Videos library shelves.
+
+### Colors
+- **Every color in Home follows your selected theme.** A few fixed colors (the camera preview backing) stay by design; the audit is in `docs/dev/color-audit-2026-10-19.md`.
+
+### Library
+- Your own files with no shares can be filtered with Only me.
+
 ## [0.2.31] - 2026-10-19
 
 News and Settings layout fixes. No database migrations.
