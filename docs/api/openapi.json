@@ -60601,6 +60601,22 @@
             "in": "path"
           }
         ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "prompt": {
+                    "type": "string",
+                    "minLength": 3,
+                    "maxLength": 1200
+                  }
+                }
+              }
+            }
+          }
+        },
         "responses": {
           "200": {
             "description": "The song card.",
@@ -60826,6 +60842,280 @@
                 }
               }
             }
+          }
+        }
+      }
+    },
+    "/api/music/jobs/{id}/revise": {
+      "post": {
+        "tags": [
+          "Music"
+        ],
+        "summary": "Make a new version of the song with a style change",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 80
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "change": {
+                    "type": "string",
+                    "minLength": 3,
+                    "maxLength": 600
+                  },
+                  "file_id": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 80
+                  }
+                },
+                "required": [
+                  "change"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The card with a new version coming.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    },
+                    "state": {
+                      "type": "string",
+                      "enum": [
+                        "queued",
+                        "running",
+                        "done",
+                        "failed",
+                        "cancelled"
+                      ]
+                    },
+                    "stage": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "stage_label": {
+                      "type": "string"
+                    },
+                    "cut": {
+                      "type": "string",
+                      "nullable": true,
+                      "enum": [
+                        "asked",
+                        "ceiling",
+                        null
+                      ]
+                    },
+                    "max_seconds": {
+                      "type": "number",
+                      "nullable": true
+                    },
+                    "progress": {
+                      "type": "number"
+                    },
+                    "eta_seconds": {
+                      "type": "number",
+                      "nullable": true
+                    },
+                    "position": {
+                      "type": "number",
+                      "nullable": true
+                    },
+                    "error_line": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "cover_pending": {
+                      "type": "boolean"
+                    },
+                    "cover_url": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "cover_versions": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string"
+                          },
+                          "url": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "url"
+                        ]
+                      }
+                    },
+                    "timed_lyrics": {
+                      "type": "array",
+                      "nullable": true,
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "t": {
+                            "type": "number"
+                          },
+                          "line": {
+                            "type": "string"
+                          },
+                          "section": {
+                            "type": "string",
+                            "nullable": true
+                          }
+                        },
+                        "required": [
+                          "t",
+                          "line",
+                          "section"
+                        ]
+                      }
+                    },
+                    "versions": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string"
+                          },
+                          "label": {
+                            "type": "string"
+                          },
+                          "url": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "label",
+                          "url"
+                        ]
+                      }
+                    },
+                    "current_id": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "length": {
+                      "type": "string",
+                      "enum": [
+                        "quick",
+                        "full"
+                      ]
+                    },
+                    "title": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "description": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "lyrics": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "duration_s": {
+                      "type": "number",
+                      "nullable": true
+                    },
+                    "started_at": {
+                      "type": "number"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "state",
+                    "stage",
+                    "stage_label",
+                    "cut",
+                    "max_seconds",
+                    "progress",
+                    "eta_seconds",
+                    "position",
+                    "error_line",
+                    "cover_pending",
+                    "cover_url",
+                    "cover_versions",
+                    "timed_lyrics",
+                    "versions",
+                    "current_id",
+                    "length",
+                    "title",
+                    "description",
+                    "lyrics",
+                    "duration_s",
+                    "started_at"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Music is off for this profile",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such song",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Commercial export not allowed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "The requested edit cannot be made."
           }
         }
       }
