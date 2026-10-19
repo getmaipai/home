@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, jest, test } from "bun:test";
+import { afterEach, beforeEach, describe, expect, jest, spyOn, test } from "bun:test";
 import { act, cleanup, render } from "@testing-library/react";
 import { ReasoningGroup } from "@/apps/chat/chatThreadSlots";
 import { resetThinkingWordForTests } from "@/apps/chat/useThinkingWord";
@@ -72,17 +72,21 @@ describe("ReasoningGroup status word", () => {
   });
 
   test("a later word holds at least 10 seconds", () => {
-    const { container } = render(view(true));
-    // The first change lands between FIRST_HOLD_MS and FIRST_HOLD_MS + 4 s; step to it, then the
-    // word it shows must hold for the full minimum before the next change.
-    act(() => { jest.advanceTimersByTime(FIRST_HOLD_MS - 1); });
-    const first = label(container);
-    let guard = 0;
-    while (label(container) === first && guard++ < 20) act(() => { jest.advanceTimersByTime(250); });
-    expect(label(container)).not.toBe(first);
-    const second = label(container);
-    act(() => { jest.advanceTimersByTime(ROTATE_MIN_MS - 1); });
-    expect(label(container)).toBe(second);
+    // Random 0 puts each change at its earliest time: the first at FIRST_HOLD_MS, the next ROTATE_MIN_MS later.
+    // Stepping in 250 ms jumps to find the first change overshot it and failed whenever the next delay was near
+    // the minimum (about 3% of runs, 8 gate reds by 2026-10-19).
+    const random = spyOn(Math, "random").mockReturnValue(0);
+    try {
+      const { container } = render(view(true));
+      act(() => { jest.advanceTimersByTime(FIRST_HOLD_MS); });
+      const second = label(container);
+      act(() => { jest.advanceTimersByTime(ROTATE_MIN_MS - 1); });
+      expect(label(container)).toBe(second);
+      act(() => { jest.advanceTimersByTime(1); });
+      expect(label(container)).not.toBe(second);
+    } finally {
+      random.mockRestore();
+    }
   });
 
   test("the next turn starts on a different word than the last one showed", () => {
