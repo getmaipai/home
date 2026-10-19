@@ -1,5 +1,5 @@
-import { keepPreviousData, useQueries, useQuery } from "@tanstack/react-query";
-import { useState, type MouseEvent } from "react";
+import { keepPreviousData, useQueries, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useEffect, useState, type MouseEvent } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import type { SectionSidebarGroup, SectionSidebarItem, SectionSidebarProps } from "@maipai/ui/src/primitives/SectionSidebar";
 import { api, type AppRow } from "@/lib/api";
@@ -15,11 +15,17 @@ type Rows = NonNullable<Sidebar["groups"][number]["rows"]>;
 export function useAppSidebar(app: Pick<AppRow, "package" | "to" | "label"> | undefined, sidebar: Sidebar | undefined, current: string, pageState: Record<string, unknown>): Pick<SectionSidebarProps, "groups" | "search"> | null {
   const navigate = useNavigate();
   const location = useLocation();
+  const queryClient = useQueryClient();
+  // A move to another place refreshes the rows in the background (a follow made on the last page shows up) while the column keeps
+  // what it has, so its entries never disappear and come back.
+  const packageId = app?.package;
+  useEffect(() => {
+    if (packageId) void queryClient.invalidateQueries({ queryKey: ["app-sidebar", packageId] });
+  }, [queryClient, packageId, location.key]);
   const rowGroups = (sidebar?.groups ?? []).filter((group) => group.rows);
   const results = useQueries({
     queries: rowGroups.map((group) => ({
-      // A new location refetches, so a follow made on a page shows in the column on the next move.
-      queryKey: ["app-sidebar", app?.package, String((group.rows as Rows).bind.path), location.key],
+      queryKey: ["app-sidebar", app?.package, String((group.rows as Rows).bind.path)],
       queryFn: () => api.appData<Row[] | { rows?: Row[] }>(app!.package, String((group.rows as Rows).bind.path)),
       enabled: app !== undefined,
       placeholderData: keepPreviousData,
