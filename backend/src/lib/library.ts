@@ -6,10 +6,10 @@ import { trashTotals } from "@/lib/libraryTrash";
 import { expiringLibraryFiles } from "@/lib/libraryRetention";
 import type { PersonRow } from "@/types";
 
-export interface LibraryQuery { limit?: number; cursor?: string; type?: string; owner?: string; shared?: "with-me" | "by-me" | "none"; search?: string; sort?: "newest" | "oldest" | "name" | "size" }
+export interface LibraryQuery { limit?: number; cursor?: string; type?: string; origin?: "made" | "sent" | "fetched"; owner?: string; shared?: "with-me" | "by-me" | "none"; search?: string; sort?: "newest" | "oldest" | "name" | "size" }
 interface Cursor { v: 1; key: string | number; created: string; id: string; scope: string }
 export class LibraryCursorError extends Error {}
-function scope(q: LibraryQuery) { return JSON.stringify([q.type ?? "", q.owner ?? "", q.shared ?? "", q.search ?? "", q.sort ?? "newest"]); }
+function scope(q: LibraryQuery) { return q.origin ? JSON.stringify([q.type ?? "", q.origin, q.owner ?? "", q.shared ?? "", q.search ?? "", q.sort ?? "newest"]) : JSON.stringify([q.type ?? "", q.owner ?? "", q.shared ?? "", q.search ?? "", q.sort ?? "newest"]); }
 function cursor(q: LibraryQuery): Cursor | null {
   if (!q.cursor) return null;
   try {
@@ -24,6 +24,8 @@ function base(actor: PersonRow, q: LibraryQuery) {
   const params: (string | number)[] = [actor.id, actor.id, actor.id];
   let filter = "1=1";
   if (q.type) { filter += " AND kind = ?"; params.push(q.type); }
+  if (q.origin === "made") filter += " AND json_extract(meta,'$.writer') IS NOT NULL";
+  else if (q.origin) { filter += " AND origin = ?"; params.push(q.origin); }
   if (q.owner === "me") { filter += " AND owner_person_id = ?"; params.push(actor.id); }
   else if (q.owner === "household") filter += " AND owner_deleted_at IS NOT NULL";
   else if (q.owner) { filter += " AND owner_person_id = ?"; params.push(q.owner); }

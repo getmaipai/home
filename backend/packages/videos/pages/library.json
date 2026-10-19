@@ -5,6 +5,28 @@
   "tone": "cinema",
   "body": [
     {
+      "type": "media_shelf",
+      "heading": "Made at home",
+      "bind": {
+        "source": "package",
+        "path": "made-at-home"
+      },
+      "item_key_field": "id",
+      "item_label_field": "title",
+      "item_subtitle_field": "{channel}",
+      "item_media_field": "thumbnail",
+      "item_meta_field": "duration_s",
+      "aspect": "wide",
+      "variant": "plain",
+      "orientation": "vertical",
+      "on_select": {
+        "play": {
+          "media_id": "{id}"
+        }
+      },
+      "hide_when_empty": true
+    },
+    {
       "type": "picker",
       "state": "channel",
       "label": "Channel",

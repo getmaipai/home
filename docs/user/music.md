@@ -2,7 +2,7 @@
 
 Music plays songs saved in your home library. Ask an admin to add a music folder in Settings, Home, Storage.
 
-Open Listen now to see songs you played, albums just added, radio from your music, and liked songs. Albums, Artists and Songs help you find
+Open Listen now to see songs you played, albums just added, songs made in chat under **Created by you**, radio from your music, and liked songs. Albums, Artists and Songs help you find
 music. Open an album or an artist, then choose Play, Shuffle or Start radio. The songs go into your own Up next list. Like a song on Now playing to
 keep it in Liked.
 

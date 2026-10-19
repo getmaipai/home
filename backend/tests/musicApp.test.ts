@@ -1,7 +1,7 @@
 import { beforeEach, expect, test } from "bun:test";
 import { eq } from "drizzle-orm";
 import { db } from "@/db";
-import { people, mediaItems, mediaSources } from "@/db/schema";
+import { attachments, people, mediaItems, mediaSources } from "@/db/schema";
 import type { PersonRow } from "@/types";
 import { mediaAppData, startMusicQueue, saveProgress, setListed } from "@/lib/media/appHost";
 import { resolveCollection } from "@/lib/media/collections";
@@ -9,6 +9,7 @@ import { resetDb } from "./reset-db";
 import { __resetProgressForTests } from "@/lib/media/progress";
 import { albumKey } from "@/lib/media/music";
 import { itemFromRow } from "@/lib/media/model";
+import { storeFile } from "@/lib/attachments";
 let atlas: PersonRow, sprout: PersonRow;
 const id = (n: number) => `media-song00000${n}`;
 beforeEach(() => {
@@ -78,7 +79,10 @@ test("the Music package passes the hub's own package-page check", async () => {
   const { loadManifestOnly } = await import("@/lib/plugins");
   const loaded = loadManifestOnly("music");
   expect(loaded.ok).toBe(true);
-  if (loaded.ok) expect(appPackageProblems(loaded.value, new URL("../packages/music", import.meta.url).pathname)).toEqual([]);
+  if (loaded.ok) {
+    expect(appPackageProblems(loaded.value, new URL("../packages/music", import.meta.url).pathname)).toEqual([]);
+    expect(loaded.value.contributes?.data?.map((entry) => entry.id)).toContain("created-by-you");
+  }
 });
 test("a playlist is made empty, then a song is added once and a child cannot add a song it may not read", async () => {
   const { musicPlaylistAction } = await import("@/lib/media/appHost");
@@ -116,6 +120,27 @@ test("a page button that carries one id can ask for a shuffled album or for arti
   expect(radioIds).not.toContain("nova");
   expect(startMusicQueue(atlas, { mode: "artist", id: "pippa" }).ok).toBe(true);
   expect(resolveCollection(atlas.id, "queue")!.items.map((entry) => entry.media_id)).toEqual([id(2)]);
+});
+test("Created by you lists visible made tracks newest first, excludes another person's private file and dedupes saved media-items", () => {
+  const other = db.select().from(people).where(eq(people.role, "owner")).get() as PersonRow;
+  const old = storeFile(atlas, { conversationId: null, turnId: null, mediaType: "audio/mp4", bytes: new Uint8Array([1, 2, 3]), provenance: 'music-gen:{"title":"Made earlier","duration_seconds":31}', deduplicate: false });
+  const recent = storeFile(atlas, { conversationId: null, turnId: null, mediaType: "audio/mp4", bytes: new Uint8Array([4, 5, 6]), provenance: 'music-gen:{"title":"Made today","duration_seconds":42}', deduplicate: false });
+  const privateFile = storeFile(other, { conversationId: null, turnId: null, mediaType: "audio/mp4", bytes: new Uint8Array([7, 8, 9]), provenance: 'music-gen:{"title":"Private song"}', deduplicate: false });
+  if (!old.ok) throw new Error(old.error);
+  if (!recent.ok) throw new Error(recent.error);
+  if (!privateFile.ok) throw new Error(privateFile.error);
+  db.update(attachments).set({ createdAt: "2026-10-18T12:00:00.000Z" }).where(eq(attachments.id, old.value.id)).run();
+  db.update(attachments).set({ createdAt: "2026-10-19T12:00:00.000Z" }).where(eq(attachments.id, recent.value.id)).run();
+  expect(rows(atlas, "created-by-you").map((row) => row.id)).toEqual([recent.value.id, old.value.id]);
+  expect(mediaAppData(atlas, "music", "item", { id: recent.value.id })).toMatchObject({ id: recent.value.id, src: `/api/files/${recent.value.id}/content`, poster: `/api/files/${recent.value.id}/thumb?w=320` });
+  db.update(mediaItems).set({ locFileId: recent.value.id }).where(eq(mediaItems.id, id(1))).run();
+  expect(rows(atlas, "created-by-you").map((row) => row.id)).toEqual([old.value.id]);
+});
+test("a child cannot see an adult-only made track", () => {
+  const adultOnly = storeFile(atlas, { conversationId: null, turnId: null, mediaType: "audio/mp4", bytes: new Uint8Array([9, 9, 9]), provenance: 'music-gen:{"title":"Adults only","audience":"adult-only"}', deduplicate: false });
+  if (!adultOnly.ok) throw new Error(adultOnly.error);
+  expect(rows(atlas, "created-by-you").map((row) => row.id)).toContain(adultOnly.value.id);
+  expect(rows(sprout, "created-by-you").map((row) => row.id)).not.toContain(adultOnly.value.id);
 });
 test("artist header, artist albums and more albums read from the same derived groups", () => {
   expect(rows(atlas, "header", "nova", "artist")[0]).toMatchObject({ id: "nova", title: "nova", channel: "5 songs", radio_id: "radio:artist:nova" });

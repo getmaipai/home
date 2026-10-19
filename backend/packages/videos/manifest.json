@@ -85,6 +85,10 @@
     ],
     "data": [
       {
+        "id": "made-at-home",
+        "rows": "list"
+      },
+      {
         "id": "featured",
         "rows": "list"
       },

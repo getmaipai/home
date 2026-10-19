@@ -158,6 +158,10 @@
     ],
     "data": [
       {
+        "id": "created-by-you",
+        "rows": "list"
+      },
+      {
         "id": "history",
         "rows": "list"
       },

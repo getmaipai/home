@@ -5,6 +5,8 @@ description: Ask chat for a short video, stop it, make another, and choose who c
 
 Home can make short videos on your own computer. Nothing is sent to anyone.
 
+Open Videos or its Library to find clips you made in chat under **Made at home**, alongside the videos from your library folders.
+
 ## What you need
 
 A Mac with 128 GB of memory and the video model installed. On any other computer, Home says videos are not available and why.

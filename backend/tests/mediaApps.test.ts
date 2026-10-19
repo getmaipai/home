@@ -7,6 +7,10 @@ import { scanRoot } from "@/lib/media/scan";
 import { __resetProgressForTests, flushProgress } from "@/lib/media/progress";
 import { coerceNumber } from "@/lib/media/appHost";
 import { buildMediaTree } from "./support/mediaTree";
+import { db } from "@/db";
+import { people } from "@/db/schema";
+import { eq } from "drizzle-orm";
+import { storeFile } from "@/lib/attachments";
 
 beforeEach(() => {
   resetDb();
@@ -39,6 +43,25 @@ async function setup() {
 const progress = (client: TestClient, body: Record<string, unknown>) => client.post("/api/plugins/videos/progress", body);
 
 describe("the media-app host: data ids", () => {
+  test("Videos lists made clips through Library visibility and plays them in the existing player", async () => {
+    const { owner, adult, child } = await setup();
+    const adultPerson = db.select().from(people).where(eq(people.id, adult.id)).get()!;
+    const householdOwner = db.select().from(people).where(eq(people.role, "owner")).get()!;
+    const made = storeFile(adultPerson, { conversationId: null, turnId: null, mediaType: "video/mp4", bytes: new Uint8Array([1, 2, 3]), provenance: 'video-gen:{"prompt":"A family kite","seconds":5,"audience":"all-ages"}', deduplicate: false });
+    const adultsOnly = storeFile(adultPerson, { conversationId: null, turnId: null, mediaType: "video/mp4", bytes: new Uint8Array([4, 5, 6]), provenance: 'video-gen:{"prompt":"Adults only","audience":"adult-only"}', deduplicate: false });
+    const privateFile = storeFile(householdOwner, { conversationId: null, turnId: null, mediaType: "video/mp4", bytes: new Uint8Array([7, 8, 9]), provenance: 'video-gen:{"prompt":"Private clip","audience":"all-ages"}', deduplicate: false });
+    if (!made.ok) throw new Error(made.error);
+    if (!adultsOnly.ok) throw new Error(adultsOnly.error);
+    if (!privateFile.ok) throw new Error(privateFile.error);
+    const shelf = await (await adult.client.post("/api/plugins/videos/data/made-at-home", {})).json() as Row[];
+    expect(shelf.map((item) => item.id)).toContain(made.value.id);
+    expect(shelf.map((item) => item.id)).not.toContain(privateFile.value.id);
+    expect((await (await child.client.post("/api/plugins/videos/data/made-at-home", {})).json() as Row[]).map((item) => item.id)).not.toContain(adultsOnly.value.id);
+    expect(await (await adult.client.post("/api/plugins/videos/data/item", { id: made.value.id })).json()).toMatchObject({ id: made.value.id, src: `/api/files/${made.value.id}/content`, kind: "video" });
+    expect((await adult.client.get(`/api/media/items/${made.value.id}`)).status).toBe(200);
+    expect((await child.client.get(`/api/media/items/${adultsOnly.value.id}`)).status).toBe(404);
+  });
+
   test("an adult's rows carry title, channel, copy label and no progress before anything is watched", async () => {
     const { adult, rows } = await setup();
     const recent = await rows(adult.client, "recent");
@@ -159,5 +182,19 @@ describe("the media-app host: gates", () => {
     expect(coerceNumber("abc")).toBeUndefined();
     expect(coerceNumber(null)).toBeUndefined();
     expect(coerceNumber(Number.NaN)).toBeUndefined();
+  });
+
+  test("the Videos package declares the Made at home shelf on Home and Library", async () => {
+    const { appPackageProblems } = await import("@/lib/apps");
+    const { loadManifestOnly } = await import("@/lib/plugins");
+    const loaded = loadManifestOnly("videos");
+    expect(loaded.ok).toBe(true);
+    if (!loaded.ok) return;
+    expect(appPackageProblems(loaded.value, new URL("../packages/videos", import.meta.url).pathname)).toEqual([]);
+    expect(loaded.value.contributes?.data?.map((entry) => entry.id)).toContain("made-at-home");
+    const index = await Bun.file(new URL("../packages/videos/pages/index.json", import.meta.url)).json() as { body: Array<{ heading?: string; bind?: { path?: string } }> };
+    const library = await Bun.file(new URL("../packages/videos/pages/library.json", import.meta.url)).json() as { body: Array<{ heading?: string; bind?: { path?: string } }> };
+    expect(index.body.some((node) => node.heading === "Made at home" && node.bind?.path === "made-at-home")).toBe(true);
+    expect(library.body.some((node) => node.heading === "Made at home" && node.bind?.path === "made-at-home")).toBe(true);
   });
 });

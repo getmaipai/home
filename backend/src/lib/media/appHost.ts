@@ -9,6 +9,7 @@ import { mediaItems, mediaSources } from "@/db/schema";
 import { loadManifestOnly } from "@/lib/plugins";
 import { appIndexFloorOk, appVisibleTo } from "@/lib/apps";
 import type { PersonRow } from "@/types";
+import { listLibrary } from "@/lib/library";
 import { noDiscovery, readableItem, sourceVisibleTo } from "./access";
 import { allowedBandsFor, bandAllows, mediaBandOf, trips } from "./band";
 import { addItem, createCollection, removeItemFrom, resolveCollection, listCollections, setItems, setPointer } from "./collections";
@@ -134,6 +135,37 @@ export function queryItems(person: PersonRow, appId: MediaAppId, filter: ItemFil
   return items;
 }
 
+/** Generated Library files join the app shelves through the Library's own listing (and therefore its file sharing and audience gates).
+ * A saved media-item wins when both records point at the same file. */
+type MadeLibraryFile = ReturnType<typeof listLibrary>["items"][number];
+export function madeFiles(person: PersonRow, appId: "music" | "videos"): MadeLibraryFile[] {
+  const kind = appId === "music" ? "audio" : "video";
+  const savedFileIds = new Set(queryItems(person, appId, { all: true }).map((item) => (item.location as { file_id?: string }).file_id).filter((id): id is string => !!id));
+  const files: MadeLibraryFile[] = [];
+  let cursor: string | undefined;
+  do {
+    const page = listLibrary(person, { type: kind, origin: "made", sort: "newest", limit: 60, ...(cursor ? { cursor } : {}) });
+    files.push(...page.items);
+    cursor = page.next_cursor ?? undefined;
+  } while (cursor);
+  return files.filter((file) => !savedFileIds.has(file.id));
+}
+
+export function madeFileFor(person: PersonRow, appId: "music" | "videos", id: string): MadeLibraryFile | null {
+  return madeFiles(person, appId).find((file) => file.id === id) ?? null;
+}
+
+function madeFileItemView(file: MadeLibraryFile, appId: "music" | "videos"): MediaItemView {
+  const kind = appId === "music" ? "track" : "video";
+  const title = file.name;
+  const poster = file.thumb_url;
+  return {
+    id: file.id, title, channel: null, summary: "", kind, thumbnail: poster, backdrop: poster,
+    duration_s: file.duration_seconds, copy_label: "Saved", src: `/api/files/${encodeURIComponent(file.id)}/content`,
+    subtitle: null, description: null, poster, chapters: [], captions: [], liked: false, watch_later: false,
+  };
+}
+
 export function oneLine(text: string | null, max: number): string {
   const flat = (text ?? "").replace(/\s+/g, " ").trim();
   return flat.length <= max ? flat : `${flat.slice(0, max - 1).trimEnd()}…`;
@@ -245,6 +277,8 @@ export function mediaAppData(person: PersonRow, appId: MediaAppId, dataId: strin
     if (music !== null) return music as never;
   }
   switch (dataId) {
+    case "made-at-home":
+      return appId === "videos" ? madeFiles(person, "videos").map((file) => ({ id: file.id, title: file.name, channel: null, summary: "", kind: "video", thumbnail: file.thumb_url, backdrop: file.thumb_url, duration_s: file.duration_seconds, copy_label: "Saved" })) : null;
     case "featured": {
       // A billboard wants pictures: the newest items that have one, else the newest.
       const items = queryItems(person, appId, { limit: 12 });
@@ -306,6 +340,10 @@ export function mediaAppData(person: PersonRow, appId: MediaAppId, dataId: strin
       return rowsOf(person, upNextItems(person, appId, item, limit));
     }
     case "item": {
+      if (params.id && (appId === "music" || appId === "videos")) {
+        const file = madeFileFor(person, appId, params.id);
+        if (file) return madeFileItemView(file, appId);
+      }
       const item = params.id ? readableIn(person, appId, params.id) : null;
       return item ? itemView(person, appId, item) : [];
     }
@@ -485,6 +523,7 @@ function albumTile(person: PersonRow, id: string, tracks: readonly MediaItem[]):
 }
 
 function musicData(person: PersonRow, dataId: string, params: DataParams): unknown | null {
+  if (dataId === "created-by-you") return madeFiles(person, "music").map((file) => ({ id: file.id, title: file.name, channel: null, summary: "", kind: "track", thumbnail: file.thumb_url, backdrop: file.thumb_url, duration_s: file.duration_seconds, copy_label: "Saved", playing: false, like_label: "Like" }));
   if (dataId === "up-next") return trackRows(person, musicNext(person, params.id ?? ""));
   if (dataId === "songs") return trackRows(person, musicLibrary(person));
   if (dataId === "albums") {

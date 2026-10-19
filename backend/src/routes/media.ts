@@ -22,6 +22,7 @@ import { isScanning, scanRoot, syncMediaScanner, type ScanSummary } from "@/lib/
 import { serveItemArtwork, serveItemBytes } from "@/lib/media/serve";
 import { createRootSource, listSourcesFor, removeSource, ROOT_KINDS } from "@/lib/media/sources";
 import { itemFromRow, sourceFromRow } from "@/lib/media/model";
+import { madeFileFor } from "@/lib/media/appHost";
 import { MediaProgress } from "@maipai/spec/gen/ts/media-progress.js";
 import { MediaCollection } from "@maipai/spec/gen/ts/media-collection.js";
 import { extendMediaBudget, mediaBudget, mediaTimeUpRefusal } from "@/lib/media/watchTime";
@@ -198,7 +199,12 @@ const getItemRoute = createRoute({
 mediaRoutes.openapi(getItemRoute, (c) => {
   const actor = c.get("person");
   const item = readableItem(actor, c.req.valid("param").id);
-  if (!item) return c.json({ error: "That title is not in the library." }, 404);
+  if (!item) {
+    const id = c.req.valid("param").id;
+    const made = madeFileFor(actor, "music", id) ?? madeFileFor(actor, "videos", id);
+    if (!made) return c.json({ error: "That title is not in the library." }, 404);
+    return c.json({ item: { id: made.id, kind: made.kind === "audio" ? "track" : "video", title: made.name }, parts: [], linked: [], page_count: null } as never, 200);
+  }
   return c.json(itemDetail(actor, item), 200);
 });
 

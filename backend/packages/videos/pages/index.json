@@ -44,6 +44,27 @@
     },
     {
       "type": "media_shelf",
+      "heading": "Made at home",
+      "bind": {
+        "source": "package",
+        "path": "made-at-home"
+      },
+      "item_key_field": "id",
+      "item_label_field": "title",
+      "item_subtitle_field": "{channel}",
+      "item_media_field": "thumbnail",
+      "item_meta_field": "duration_s",
+      "aspect": "wide",
+      "variant": "plain",
+      "hide_when_empty": true,
+      "on_select": {
+        "play": {
+          "media_id": "{id}"
+        }
+      }
+    },
+    {
+      "type": "media_shelf",
       "heading": "Continue watching",
       "bind": {
         "source": "package",

@@ -6,6 +6,29 @@
   "body": [
     {
       "type": "media_shelf",
+      "heading": "Created by you",
+      "bind": {
+        "source": "package",
+        "path": "created-by-you"
+      },
+      "item_key_field": "id",
+      "item_label_field": "title",
+      "item_subtitle_field": "{channel}",
+      "item_media_field": "thumbnail",
+      "aspect": "square",
+      "variant": "plain",
+      "orientation": "vertical",
+      "density": "compact",
+      "item_meta_field": "duration_s",
+      "on_select": {
+        "play": {
+          "media_id": "{id}"
+        }
+      },
+      "hide_when_empty": true
+    },
+    {
+      "type": "media_shelf",
       "heading": "Recently played",
       "bind": {
         "source": "package",
