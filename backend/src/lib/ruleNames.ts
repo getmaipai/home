@@ -33,7 +33,7 @@ export function isTypedSourcePackage(packageId: string): boolean {
 
 /** The lookup family whose ladder can fail: the search and the typed
  * sources the forced lookup runs. */
-function isLookupPackage(packageId: string): boolean {
+export function isLookupPackage(packageId: string): boolean {
   return packageId === "websearch" || isTypedSourcePackage(packageId);
 }
 

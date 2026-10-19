@@ -1,3 +1,4 @@
+import { isLookupPackage } from "@/lib/ruleNames";
 import { musicsAllowed } from "@/lib/music/policy";
 import { musicEngineReady } from "@/lib/music/ready";
 import { conversationHasMusic } from "@/lib/music/jobs";
@@ -665,11 +666,6 @@ async function beginTurn(actor: PersonRow, surface: Surface, text: string, opts:
   }
 }
 
-/** Successful, read-only lookups may precede the image re-ask. Any other package or failed outcome skips it. */
-export const RE_ASK_AFTER_PACKAGES = [
-  "websearch", "news", "weather", "sports", "book-lookup", "media-lookup", "place-lookup", "trivia", "math", "convert", "currency",
-] as const;
-
 /** Awaits the machine to "done" and builds the turn's own TurnValue -
  * shared by runTurnNext() (awaited inline, as today) and
  * runTurnNextStream()'s own background run (awaited by its `tokens`
@@ -816,7 +812,7 @@ async function finishTurn(begun: BegunTurn): Promise<TurnValue> {
     // reply has streamed, and append a gallery only if the model calls the tool (auto, never forced). Adult offer path only.
     const replyKept = !gateOutput?.refused && !state.failedGenerationReply && (gateOutput?.text ?? "").trim().length > 0;
     const outcomesPermitImageReAsk = state.outcomes.every((outcome) =>
-      outcome.status === "succeeded" && outcome.packageId !== SHOW_IMAGES_TOOL_ID && RE_ASK_AFTER_PACKAGES.includes(outcome.packageId as (typeof RE_ASK_AFTER_PACKAGES)[number]),
+      outcome.status === "succeeded" && outcome.packageId !== SHOW_IMAGES_TOOL_ID && isLookupPackage(outcome.packageId),
     );
     if (state.answerImagesAllowed && process.env.MAIPAI_IMGQ09_REASK !== "0" && replyKept && !state.answerImages && !state.continuation && !state.whoAnswer && outcomesPermitImageReAsk && state.lastTools.some((t) => t.id === SHOW_IMAGES_TOOL_ID)) {
       const again = await reAskForShowImages(state, gateOutput?.text ?? "", abortSignal);
