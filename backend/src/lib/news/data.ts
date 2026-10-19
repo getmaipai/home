@@ -64,6 +64,8 @@ interface FeedRequest {
   title: string;
   subtitle?: string;
   channel?: { kind: "topic" | "source"; key: string; followed: boolean };
+  /** NEWS-SECTION-STYLES-01: a topic channel's arrangement, the topic's own `section_style` from spec/news/topics.json. */
+  sectionStyle?: "top_stories" | "special" | "todays_news";
   windowH: number;
   match?: (item: ShelfItem) => boolean;
   /** The chosen topic chip (a topic id, or "" for All). The caller has already checked it against the band. */
@@ -134,6 +136,7 @@ function feedBlock(env: CardEnv, request: FeedRequest, now: Date): unknown[] {
     ...blockBase("story_feed", alt, request.provenance),
     props: {
       layout: request.layout,
+      ...(request.layout === "channel" && request.sectionStyle ? { section_style: request.sectionStyle } : {}),
       header: { title: request.title, ...(request.subtitle ? { subtitle: request.subtitle } : {}), dateline: datelineOf(now), ...(request.channel ? { channel: request.channel } : {}) },
       ...(filters ? { filters } : {}),
       ...(hero ? { hero } : {}), featured, shelves, rows, as_of: now.toISOString(),
@@ -206,10 +209,12 @@ export async function channelData(person: PersonRow, body: Record<string, unknow
   let title: string;
   let subtitle: string | undefined;
   let match: (item: ShelfItem) => boolean;
+  let sectionStyle: FeedRequest["sectionStyle"];
   if (kind === "topic") {
     const topic = topicById(key);
     if (!topic || !topicOfferedTo(key, viewer.band)) return null;
     title = topic.label;
+    sectionStyle = topic.section_style;
     const sources = new Set(releaseShelfItems(viewer.band, CANDIDATES, env.store).filter((item) => (item.topics ?? []).includes(key)).map((item) => item.publisher));
     subtitle = sources.size > 0 ? `${sources.size} ${sources.size === 1 ? "source" : "sources"}` : undefined;
     match = (item) => (item.topics ?? []).includes(key);
@@ -223,7 +228,7 @@ export async function channelData(person: PersonRow, body: Record<string, unknow
   }
   const followed = followedChannels(person.id);
   const raw = feedBlock(env, {
-    layout: "channel", title, ...(subtitle ? { subtitle } : {}), channel: { kind, key, followed: isFollowing(person.id, kind, key) },
+    layout: "channel", title, ...(subtitle ? { subtitle } : {}), ...(sectionStyle ? { sectionStyle } : {}), channel: { kind, key, followed: isFollowing(person.id, kind, key) },
     windowH: CHANNEL_WINDOW_H, match, followed, shelf: false, page: pageOf(body), topic: topicParam(body, viewer.band), provenance: "news data channel",
   }, now);
   await enrichLeadCards(raw, env);

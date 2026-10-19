@@ -9,6 +9,8 @@ Open **News** from your apps. It reads the same [news shelf](news-shelf.md) that
 
 On a wide screen News has a sidebar on the left, like the one in Chat. It holds the search box, **Today**, **My Mix** (teens and adults) and **Saved**, then every **Topic** you can open, then the sources you follow, with **Manage** at the end of that list. Choose a topic or a source to see its stories. On a phone the same choices are in the menu drawer.
 
+Each topic page is laid out for its subject, the way Apple News does it. World, Business, Sports and Kids open on **Top Stories**: three tall cards, three cards with the picture on the right, then the rest as a list. Science, Health and Environment open with two large cards, then two cards with the picture on the right. Local, Technology and Entertainment open on **Today's News**: three tall cards, then **More for you** with one wide card. A source you follow keeps one wide lead card over a list.
+
 **Today** shows recent stories. Open a story to read its text. **Following** has Topics and Sources tabs: use **Follow** to keep a channel, or open its row to see stories from that channel. **Saved** holds stories you saved. Select saved stories and choose **Remove** to take them out of that list.
 
 Teens and adults also have **My Mix**. It picks stories from what you open and save, and from your More like this and Less like this choices. Open the menu on My Mix and choose **Reset My Mix** to start over, or turn My Mix off in News settings. Children get stories from the Kids' lists, and their reading is never used to learn interests. A child reads inside News, with no links to a publisher's site. Guests do not get News.

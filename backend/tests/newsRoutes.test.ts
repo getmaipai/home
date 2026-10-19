@@ -193,6 +193,20 @@ describe("shapes", () => {
     expect(today.blocks[0]!.props.shelves[0]!.title).toBe("From your channels");
   });
 
+  test("a topic channel carries its topic's section style, a source channel and Today carry none, and a child's Kids channel keeps its style (NEWS-SECTION-STYLES-01)", async () => {
+    installNewsApp();
+    const who = await household();
+    for (let i = 0; i < 4; i++) putItem(feeds.household, ADULT_HOST, { topics: ["science"], ageHours: 2 + i });
+    putItem(feeds.household, ADULT_HOST, { topics: ["business"], ageHours: 3 });
+    putItem(feeds.kids, KIDS_HOST, { topics: ["kids"], ageHours: 2 });
+    const styleOf = async (client: TestClient, path: string, body: unknown) => ((await (await post(client, path, body)).json()) as { blocks: Array<{ props: Record<string, unknown> }> }).blocks[0]!.props.section_style;
+    expect(await styleOf(who.adult, "data/channel", { kind: "topic", key: "science" })).toBe("special");
+    expect(await styleOf(who.adult, "data/channel", { kind: "topic", key: "business" })).toBe("top_stories");
+    expect(await styleOf(who.adult, "data/channel", { kind: "source", key: feeds.household })).toBeUndefined();
+    expect(await styleOf(who.adult, "data/today", {})).toBeUndefined();
+    expect(await styleOf(who.child, "data/channel", { kind: "topic", key: "kids" })).toBe("top_stories");
+  });
+
   test("an empty shelf gives an empty block list, not an error", async () => {
     installNewsApp();
     const who = await household();
