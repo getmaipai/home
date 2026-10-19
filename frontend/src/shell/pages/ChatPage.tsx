@@ -1260,7 +1260,7 @@ export function ChatPage({ person }: { person: Roster }) {
   const mobileSearchButtonRef = useRef<HTMLButtonElement>(null);
   useEffect(() => {
     if (column.searchOpen && !isLoadingThreads && !hasThreads) column.setSearchOpen(false);
-  }, [column.searchOpen, column.setSearchOpen, hasThreads, isLoadingThreads]);
+  }, [column, column.searchOpen, column.setSearchOpen, hasThreads, isLoadingThreads]);
   useEffect(() => {
     if (!column.searchOpen) return;
     const rows = [desktopSearchRowRef.current, mobileSearchRowRef.current];
@@ -1380,6 +1380,8 @@ export function ChatPage({ person }: { person: Roster }) {
   });
   const [pageSearchParams] = useSearchParams();
   const requestedConversationId = pageSearchParams.get("conversation") ?? undefined;
+  const requestedTurnId = pageSearchParams.get("turn") ?? undefined;
+  const originMessageRole = pageSearchParams.get("message") === "user" ? "user" : "assistant";
   const openingConversationId = requestedConversationId !== unopenableConversationId ? requestedConversationId : undefined;
   // A failed open only counts for that visit: going anywhere else forgets
   // it, so the same chat reached again later is held while it opens.
@@ -1686,6 +1688,9 @@ export function ChatPage({ person }: { person: Roster }) {
                   canUseIncognito={person.age_band === "adult" && canHaveTemporaryChatRole(person.role)}
                   onOpenSettings={() => navigate("/settings/chat")}
                   openingConversationId={openingConversationId}
+                  originConversationId={requestedConversationId}
+                  originTurnId={requestedTurnId}
+                  originMessageRole={originMessageRole}
                   pageSlots={projectPage?.slots}
                   projectFolderId={projectPage?.folderId}
                   focusKey={`${routeLocation.key}:${openingConversationId ?? ""}`}

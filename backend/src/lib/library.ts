@@ -1,8 +1,7 @@
 import { sqlite } from "@/db";
 import { canReadFileAudience, fileAudience, fileVisibilitySql } from "@/lib/access";
 import { mediaKindSql } from "@/lib/storage/usage";
-import { libraryProvenanceSql } from "@/lib/libraryProvenance";
-import { libraryProvenance } from "@/lib/libraryProvenance";
+import { isGeneratedFile, libraryProvenance, libraryProvenanceSql } from "@/lib/libraryProvenance";
 import { trashTotals } from "@/lib/libraryTrash";
 import { expiringLibraryFiles } from "@/lib/libraryRetention";
 import type { PersonRow } from "@/types";
@@ -37,7 +36,8 @@ function base(actor: PersonRow, q: LibraryQuery) {
     SELECT a.*, ${libraryProvenanceSql("a.provenance")} AS meta, ${mediaKindSql("a.media_type")} AS kind,
       p.display_name, p.deleted_at AS owner_deleted_at, coalesce(s.share_count,0) AS share_count, coalesce(s.household,0) AS household,
       pj.prompt AS picture_prompt, vj.prompt AS video_prompt, vj.request AS video_request,
-      mj.request AS music_request, mj.duration_s, mj.cover_file_id, cv.id AS chat_id
+      mj.request AS music_request, mj.duration_s, mj.cover_file_id, cv.id AS chat_id, coalesce(nullif(cv.title,''),'New chat') AS chat_title,
+      a.conversation_id AS source_chat_id, a.turn_id, a.origin
     FROM attachments a JOIN people p ON p.id = a.owner_person_id
     LEFT JOIN conversations cv ON cv.id = a.conversation_id AND cv.person_id = a.owner_person_id AND cv.status != 'deleted'
     LEFT JOIN (SELECT file_id, count(DISTINCT "to") AS share_count, max("to" = 'household') AS household,
@@ -64,7 +64,8 @@ function base(actor: PersonRow, q: LibraryQuery) {
     AND NOT (json_extract(meta,'$.writer') = 'image-edit' AND EXISTS(SELECT 1 FROM filtered r WHERE r.id = json_extract(f.meta,'$.root') AND coalesce(r.companion,0) = 0)))` };
 }
 
-interface Row { chat_id: string | null; turn_id: string | null; id: string; kind: "image" | "video" | "audio" | "document" | "story" | "file"; name: string; media_type: string; size: number; created_at: string; owner_person_id: string; display_name: string; share_count: number; household: number; retention: string; provenance: string; duration: number | null; cover_file_id: string | null; thumbnail: string | null; versions: number }
+interface Row { chat_id: string | null; chat_title: string | null; source_chat_id: string | null; turn_id: string | null; origin: string; id: string; kind: "image" | "video" | "audio" | "document" | "story" | "file"; name: string; media_type: string; size: number; created_at: string; owner_person_id: string; display_name: string; share_count: number; household: number; retention: string; provenance: string; duration: number | null; cover_file_id: string | null; thumbnail: string | null; versions: number }
+function fileOrigin(row: Pick<Row, "origin" | "provenance">): "made" | "sent" | "fetched" { return row.origin === "fetched" ? "fetched" : isGeneratedFile(row) ? "made" : "sent"; }
 export function listLibrary(actor: PersonRow, q: LibraryQuery) {
   const c = cursor(q);
   const b = base(actor,q);
@@ -88,7 +89,12 @@ export function listLibrary(actor: PersonRow, q: LibraryQuery) {
   const expiring = expiringLibraryFiles(actor.id);
   return { items: page.filter(row => canReadFileAudience(actor, { ownerPersonId: row.owner_person_id, provenance: row.provenance })).map(row => ({ id: row.id, kind: row.kind, name: row.name, media_type: row.media_type, size_bytes: row.size, created_at: row.created_at,
     owner: { id: row.owner_person_id, display_name: row.display_name }, shared_with: { count: row.share_count, household: Boolean(row.household) },
-    retention: row.retention, chat_id: row.owner_person_id === actor.id ? row.chat_id : null,
+    retention: row.retention,
+    origin: fileOrigin(row),
+    chat_id: row.owner_person_id === actor.id ? row.chat_id : null,
+    turn_id: row.owner_person_id === actor.id && row.chat_id ? row.turn_id : null,
+    chat_title: row.owner_person_id === actor.id && row.chat_id ? row.chat_title : null,
+    chat_deleted: row.owner_person_id === actor.id && row.source_chat_id !== null && row.chat_id === null,
     can_edit: row.owner_person_id === actor.id && row.chat_id !== null && row.turn_id !== null && row.kind === "image" && ['picture-gen','image-edit'].includes(String((libraryProvenance(row.provenance) as { writer?: string }).writer ?? '')),
     audience: fileAudience(row.provenance), duration_seconds: row.kind === "audio" || row.kind === "video" ? row.duration : null,
     thumb_url: `/api/files/${row.thumbnail}/thumb?w=320`, expires_at: expiring.get(row.id)?.expiresAt ?? null, version_count: row.versions })),

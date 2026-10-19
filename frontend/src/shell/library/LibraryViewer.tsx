@@ -1,7 +1,7 @@
 // The full-screen viewer over the current list: previous and next, zoom, the player for video and songs, an info panel
 // and the person's actions. The page owns the address (`?file=<id>`), so Back closes it and a link opens it after the hub's
 // access check.
-import { useMemo } from "react";
+import { useMemo, type ReactNode } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
 import { MediaViewer, type MediaViewerItem } from "@maipai/ui/src/elements/media-viewer";
@@ -11,6 +11,7 @@ import { getIcon } from "@maipai/ui/src/icons";
 import { api, type LibraryItem, type Roster } from "@/lib/api";
 import { prepareClip, saveClip, shareClip } from "@/lib/shareClip";
 import { canShareFiles, fileKind, isAdultRole, kindWord, ownerName } from "./libraryModel";
+import { libraryOrigin } from "./libraryOrigin";
 import type { ItemActions } from "./LibraryItems";
 
 const ShareIcon = getIcon("users");
@@ -29,12 +30,6 @@ export function viewerItemOf(item: LibraryItem): MediaViewerItem {
   };
 }
 
-function howItWasMade(origin: string | undefined, item: LibraryItem): string {
-  if (origin === "made") return item.chat_id ? "Made by Home in a chat." : "Made by Home. The chat it came from was deleted.";
-  if (item.chat_id) return "Sent in a chat.";
-  return "Added to the Library.";
-}
-
 function Details({ item, me, actions }: { item: LibraryItem; me: Roster; actions: ItemActions }) {
   const mine = item.owner.id === me.id;
   const record = useQuery({ queryKey: ["library-file", item.id], queryFn: () => api.libraryFile(item.id) });
@@ -43,7 +38,8 @@ function Details({ item, me, actions }: { item: LibraryItem; me: Roster; actions
   const names = (shares.data ?? []).map((share) => share.to === "household" ? "Everyone in the home" : people.data?.find((person) => person.id === share.to)?.display_name ?? "Someone in your home");
   const who = item.shared_with.household ? "Everyone in the home can see this." : !mine ? `${item.owner.display_name} shared this with you.` : item.shared_with.count === 0 ? "Only you." : names.length > 0 ? names.join(", ") : `${item.shared_with.count} ${item.shared_with.count === 1 ? "person" : "people"} in your home.`;
   const kept = item.retention === "kept";
-  const row = (label: string, value: string) => <div><dt className="text-muted-foreground">{label}</dt><dd>{value}</dd></div>;
+  const row = (label: string, value: ReactNode) => <div><dt className="text-muted-foreground">{label}</dt><dd>{value}</dd></div>;
+  const origin = libraryOrigin(item, record.data?.origin);
   return (
     <div className="flex flex-col gap-4">
       <dl className="grid gap-3 text-base">
@@ -52,7 +48,7 @@ function Details({ item, me, actions }: { item: LibraryItem; me: Roster; actions
         {row("Size", formatBytes(item.size_bytes))}
         {row("Added", date(item.created_at))}
         {row("Owner", ownerName(item, me))}
-        {row("How it was made", howItWasMade(record.data?.origin, item))}
+        {row("Origin", origin.href ? <Link className="text-primary underline-offset-4 hover:underline" to={origin.href}>{origin.label}</Link> : origin.label)}
         {row("Who can see it", who)}
         {row("Keeping", kept ? "Kept until you delete it." : item.expires_at ? `Home plans to remove this on ${date(item.expires_at)} to make room. Keep it to stop that.` : "Follows your storage rules. Keep it to stop automatic removal.")}
         {item.version_count > 1 ? row("Versions", `${item.version_count} versions. The newest one shows.`) : null}

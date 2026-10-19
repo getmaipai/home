@@ -12,6 +12,9 @@ import { updateLibraryFile } from "@/lib/libraryEdit";
 import { createShare, deleteShare, listSharesForFile, listFilesVisibleToActor, listPersonFilesVisibleToActor } from "@/lib/shares";
 import { File as FileSchema } from "@maipai/spec/gen/ts/file.js";
 import { Share as ShareSchema } from "@maipai/spec/gen/ts/share.js";
+import { eq } from "drizzle-orm";
+import { db } from "@/db";
+import { attachments, conversations } from "@/db/schema";
 
 export const filesRoutes = apiRouter();
 // A share is its own addressable resource (share.schema.json), so its
@@ -63,7 +66,7 @@ const getRoute = createRoute({
   middleware: [requireAuth] as const,
   request: { params: idParamSchema("id", "file-a1b2c3") },
   responses: {
-    200: { content: { "application/json": { schema: FileSchema } }, description: "Found." },
+    200: { content: { "application/json": { schema: FileSchema.extend({ chat_id: z.string().nullable().optional(), turn_id: z.string().nullable().optional(), chat_title: z.string().nullable().optional(), chat_deleted: z.boolean().optional() }) } }, description: "Found. Chat provenance is included only for the file owner." },
     ...errorResponses({ 401: "Not signed in", 404: "No such file, or not shared with you" }),
   },
 });
@@ -71,7 +74,13 @@ filesRoutes.openapi(getRoute, (c) => {
   const actor = c.get("person");
   const result = getAttachment(actor, c.req.valid("param").id);
   if (!result.ok) return c.json({ error: result.error }, 404);
-  return c.json(result.value, 200);
+  const attachment = db.select({ ownerPersonId: attachments.ownerPersonId, conversationId: attachments.conversationId, turnId: attachments.turnId }).from(attachments).where(eq(attachments.id, c.req.valid("param").id)).get();
+  if (!attachment || attachment.ownerPersonId !== actor.id) return c.json(result.value, 200);
+  const conversation = attachment.conversationId
+    ? db.select({ id: conversations.id, title: conversations.title, status: conversations.status }).from(conversations).where(eq(conversations.id, attachment.conversationId)).get()
+    : undefined;
+  const live = conversation && conversation.status !== "deleted" ? conversation : undefined;
+  return c.json({ ...result.value, chat_id: live?.id ?? null, turn_id: live?.id ? attachment.turnId : null, chat_title: live?.title ?? null, chat_deleted: Boolean(attachment.conversationId && !live) }, 200);
 });
 
 // PEOPLE-PROFILE-02: the real bytes, gated by the exact same

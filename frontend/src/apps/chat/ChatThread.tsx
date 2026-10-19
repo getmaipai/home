@@ -1,4 +1,4 @@
-import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type RefObject } from "react";
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type CSSProperties, type RefObject } from "react";
 import { useAssistantDataUI, useAssistantToolUI, useAui, useAuiState, type ToolCallMessagePartComponent } from "@assistant-ui/react";
 import { Thread, type ThreadComponents } from "@maipai/ui/src/elements/thread.aui";
 import { Alert, AlertDescription, AlertTitle } from "@maipai/ui/src/dashboard/components/ui/alert";
@@ -14,6 +14,15 @@ import { ChatColumnControlContext } from "@/apps/chat/chatColumnControl";
 import { AdminContext, ChatAgeBandContext } from "@/apps/chat/chatThreadContexts";
 import { useStatusApps } from "@/shell/useStatusApps";
 import { isSearchLimitedChat } from "@/shell/statusApps";
+import { messageForTurn } from "./chatTurnDeepLinkModel";
+import "@/apps/chat/chatOriginHighlight.css";
+
+type OriginHighlightStyle = CSSProperties & {
+  "--origin-left": string;
+  "--origin-top": string;
+  "--origin-width": string;
+  "--origin-height": string;
+};
 
 export type ChatExtrasContextValue = {
   rootRef: RefObject<HTMLDivElement | null>;
@@ -52,7 +61,7 @@ const BoundToolFallbackGuard: ToolCallMessagePartComponent = (props) => {
 /** getmaipai/home#206: the longest Send waits for a saved chat to open. */
 const OPENING_HOLD_MS = 15_000;
 
-export function ChatThread({ temporary, onEditSend, thinkingModeVisible = false, canUseIncognito = false, onOpenSettings, openingConversationId, pageSlots, projectFolderId, focusKey }: {
+export function ChatThread({ temporary, onEditSend, thinkingModeVisible = false, canUseIncognito = false, onOpenSettings, openingConversationId, originConversationId, originTurnId, originMessageRole = "assistant", pageSlots, projectFolderId, focusKey }: {
   /** Incognito: the kit's temporary-thread styling. */
   temporary?: boolean;
   /** Called with the superseded turn id when an edited message is sent. */
@@ -66,6 +75,10 @@ export function ChatThread({ temporary, onEditSend, thinkingModeVisible = false,
   /** The saved chat the page is opening (its id from the address). Until
    * the thread list has switched to it, Send waits (getmaipai/home#206). */
   openingConversationId?: string;
+  /** Optional Library deep link destination. */
+  originConversationId?: string;
+  originTurnId?: string;
+  originMessageRole?: "user" | "assistant";
   /** Project-home content supplied through the shipped Thread page slots. */
   pageSlots?: Pick<ThreadComponents, "Welcome" | "WelcomeContent" | "BelowComposer" | "BelowComposerContent" | "emptyLayout" | "composerDensity" | "composerPlaceholder">;
   /** Route scope to start a fresh conversation in this project. */
@@ -85,6 +98,12 @@ export function ChatThread({ temporary, onEditSend, thinkingModeVisible = false,
   // ENGINE-DOWN-UI-01: the same state also holds every other engine-dependent
   // control, through the kit Thread's one `engineDown` prop.
   const engineDown = engineDownReason(useContext(ChatAvailabilityContext));
+  const originMessages = useAuiState((s) => s.thread.messages);
+  const originIsLoading = useAuiState((s) => s.thread.isLoading);
+  const originRemoteId = useAuiState((s) => s.threadListItem.remoteId);
+  const [originMissing, setOriginMissing] = useState(false);
+  const [originHighlight, setOriginHighlight] = useState<OriginHighlightStyle | null>(null);
+  const handledOrigin = useRef<string | null>(null);
   const statusApps = useStatusApps().data;
   const searchDown = Array.isArray(statusApps) && statusApps.some(isSearchLimitedChat);
   const householdSettings = useQuery({
@@ -93,6 +112,43 @@ export function ChatThread({ temporary, onEditSend, thinkingModeVisible = false,
   });
   const webSearchOff = Array.isArray(householdSettings.data)
     && householdSettings.data.some((setting) => setting.key === "search.source_mode.web" && setting.value === "offline");
+  useEffect(() => {
+    if (!originConversationId || !originTurnId || originRemoteId !== originConversationId || originIsLoading) return;
+    const key = `${originConversationId}:${originTurnId}`;
+    if (handledOrigin.current === key) return;
+    setOriginMissing(false);
+    const messageId = messageForTurn(originMessages.map((message) => ({
+      id: message.id,
+      role: message.role,
+      turnId: typeof message.metadata?.custom?.turnId === "string" ? message.metadata.custom.turnId : undefined,
+    })), originTurnId, originMessageRole);
+    if (!messageId) {
+      setOriginMissing(true);
+      handledOrigin.current = key;
+      return;
+    }
+    let highlightTimer = 0;
+    let removeScrollTracking = () => {};
+    const openTimer = window.setTimeout(() => {
+      const target = [...document.querySelectorAll<HTMLElement>("[data-message-id]")].find((element) => element.dataset.messageId === messageId);
+      if (!target) return;
+      const reduced = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ?? false;
+      const updateHighlight = () => {
+        const rect = target.getBoundingClientRect();
+        setOriginHighlight({ "--origin-left": `${rect.left}px`, "--origin-top": `${rect.top}px`, "--origin-width": `${rect.width}px`, "--origin-height": `${rect.height}px` });
+      };
+      const trackScroll = () => updateHighlight();
+      document.addEventListener("scroll", trackScroll, true);
+      removeScrollTracking = () => document.removeEventListener("scroll", trackScroll, true);
+      target.scrollIntoView?.({ behavior: reduced ? "auto" : "smooth", block: "center" });
+      highlightTimer = window.setTimeout(() => {
+        updateHighlight();
+        highlightTimer = window.setTimeout(() => { removeScrollTracking(); setOriginHighlight(null); }, reduced ? 700 : 1800);
+      }, reduced ? 0 : 350);
+      handledOrigin.current = key;
+    }, 0);
+    return () => { window.clearTimeout(openTimer); window.clearTimeout(highlightTimer); removeScrollTracking(); };
+  }, [originConversationId, originIsLoading, originMessageRole, originMessages, originRemoteId, originTurnId]);
   // getmaipai/home#206: while a saved chat is still opening (a slow hub
   // answering for its details), the composer belongs to a blank placeholder
   // thread; a message sent there vanished when the saved chat replaced it.
@@ -176,6 +232,8 @@ export function ChatThread({ temporary, onEditSend, thinkingModeVisible = false,
         </Alert>
       ) : null}
       <ChatExtrasContext.Provider value={extraContext}>
+        {originMissing ? <p role="status" className="px-4 py-2 text-sm text-muted-foreground">That message is no longer available. This chat is open at the end.</p> : null}
+        {originHighlight ? <div data-origin-highlight aria-hidden="true" className="pointer-events-none z-50 rounded-lg border-2 border-primary bg-primary/10 motion-reduce:transition-none" style={{ "--origin-left": originHighlight["--origin-left"], "--origin-top": originHighlight["--origin-top"], "--origin-width": originHighlight["--origin-width"], "--origin-height": originHighlight["--origin-height"] } as CSSProperties} /> : null}
         <Thread
           tourId="chat.thread"
           composerTourId="chat.composer"

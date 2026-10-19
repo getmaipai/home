@@ -1,0 +1,12 @@
+[data-origin-highlight] {
+  position: fixed;
+  z-index: 50;
+  left: var(--origin-left);
+  top: var(--origin-top);
+  width: var(--origin-width);
+  height: var(--origin-height);
+  border: 2px solid var(--primary);
+  border-radius: var(--radius-lg);
+  background: color-mix(in oklab, var(--primary) 10%, transparent);
+  pointer-events: none;
+}

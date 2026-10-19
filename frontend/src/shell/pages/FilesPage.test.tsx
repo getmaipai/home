@@ -311,6 +311,25 @@ describe("viewer, menu, sharing and roles", () => {
       await waitFor(() => expect(where()).toBe(""));
     } finally { server.restore(); }
   });
+
+  test("the Origin detail links a chat file to its exact turn", async () => {
+    const server = serve({ items: [item("f-chat-origin", "Lake picture", { origin: "made", chat_id: "conv-origin", turn_id: "turn-origin", chat_title: "Weekend plans" })] });
+    try {
+      page("owner", "/files?file=f-chat-origin");
+      const link = await within(document.body).findByRole("link", { name: "Made in chat: Weekend plans" });
+      expect(link.getAttribute("href")).toBe("/chat?conversation=conv-origin&turn=turn-origin");
+      expect(document.body.textContent).toContain("Origin");
+    } finally { server.restore(); }
+  });
+
+  test("deleted and fetched items show plain Origin text", async () => {
+    const server = serve({ items: [item("f-deleted-origin", "Old picture", { origin: "made", chat_deleted: true })] });
+    try {
+      page("owner", "/files?file=f-deleted-origin");
+      await waitFor(() => expect(document.body.textContent).toContain("The chat was deleted"));
+      expect(document.querySelector('a[href^="/chat?"]')).toBeNull();
+    } finally { server.restore(); }
+  });
   test("a tile opens the viewer and puts the file in the address", async () => {
     const server = serve({ items: [item("f1", "Fox in the snow")] });
     try {

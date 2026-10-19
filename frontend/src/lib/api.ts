@@ -450,10 +450,11 @@ export interface LibraryItem {
   name: string; media_type: string; size_bytes: number; created_at: string;
   owner: { id: string; display_name: string };
   shared_with: { count: number; household: boolean };
-  retention: string; chat_id: string | null; can_edit: boolean;
+  retention: string; origin?: "made" | "sent" | "fetched"; chat_id: string | null; turn_id?: string | null; chat_title?: string | null; chat_deleted?: boolean; can_edit: boolean;
   audience: "all-ages" | "adult-only" | null; duration_seconds: number | null;
   thumb_url: string; expires_at: string | null; version_count: number;
 }
+export type FileRecordWithChat = FileRecord & { chat_id?: string | null; turn_id?: string | null; chat_title?: string | null; chat_deleted?: boolean };
 export interface LibrarySummary {
   items: number; bytes: number; per_kind: Record<string, { items: number; bytes: number }>;
   trash: { items: number; bytes: number }; expiring: { items: number; bytes: number };
@@ -1350,7 +1351,7 @@ export const api = {
     delete filters.sort;
     return request<LibrarySummary>(`/api/library/summary?${libraryParams(filters)}`);
   },
-  libraryFile: (id: string) => request<FileRecord>(`/api/files/${encodeURIComponent(id)}`),
+  libraryFile: (id: string) => request<FileRecordWithChat>(`/api/files/${encodeURIComponent(id)}`),
   updateLibraryFile: (id: string, change: { name?: string | null; keep?: boolean }) => request<{ id: string; name: string | null; retention: string }>(`/api/files/${encodeURIComponent(id)}`, { method: "PATCH", body: JSON.stringify(change) }),
   trashLibraryFile: (id: string) => request<{ id: string; deleted_at: string; trash_until: string }>(`/api/files/${encodeURIComponent(id)}`, { method: "DELETE" }),
   recheckLibraryAudience: (id: string) => request<{ audience: "all-ages" }>(`/api/files/${encodeURIComponent(id)}/recheck-audience`, { method: "POST" }),

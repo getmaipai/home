@@ -4,6 +4,9 @@ Built 2026-10-19 for LIBRARY-REVAMP-07, -08 and -09. The route is `/files`; `Fil
 `frontend/src/shell/library/` holds the parts. The design is [library-2026-10-18.md](../design/library-2026-10-18.md); the backend is
 [library-storage.md](library-storage.md).
 
+The Library route sits beside Chat, outside `PageHeaderLayout`, so it has no desktop title band. `FullLayout` still supplies the
+phone menu clearance. The count and storage summary remain the page heading.
+
 ## State lives in the address
 
 `libraryModel.ts` parses and writes the query string: `section` (all, pictures, videos, songs, documents, shared-with-me, shared-by-me,
@@ -22,6 +25,19 @@ the summary of the current filters, and the storage meter from the caller's own 
   because the table's header draws no actions cell). Viewer: `MediaViewer`. Sharing: `ShareDialog`. Uploads: `JobProgress` cards.
 - Rule 9: no `className` on an Element that changes its look, and no component whose root is an Element with a box around it. The
   parts that render an Element return it inside a fragment as a use site that maps data to it (`lint:ui-rules` passes with no baseline change).
+
+## Origin links
+
+`GET /api/library` returns `origin`, `chat_id`, `turn_id`, `chat_title` and `chat_deleted`. The three chat identifiers and the deleted
+marker are scoped to the file owner; shared recipients receive null identifiers and no deleted marker. `GET /api/files/{id}` adds the
+same chat fields only to the owner's file record. A soft-deleted conversation leaves its attachment reference intact, so the listing
+can say the chat was deleted without exposing a dead link. Files without a chat show their plain origin.
+
+The details panel links to `/chat?conversation=<id>&turn=<id>`. A sent file adds `message=user`, so the link targets the user's message
+that carried the file; a made file targets the assistant reply. `ChatPage` opens the requested conversation through its existing
+thread-list route. `ChatThread` waits for history, finds the requested message for that turn, centers it, and shows a short
+token-colored outline. Reduced-motion users get an immediate scroll and a shorter outline. If the turn is gone, Chat stays at the end
+and shows a plain status message. The existing conversation access boundary still decides whether a child or teen can open the chat.
 
 ## Who sees what
 

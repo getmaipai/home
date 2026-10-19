@@ -16,7 +16,7 @@ The address in your browser remembers what you picked. Send that address to some
 
 ## Look at a file
 
-Pick a file to open it big. Use the arrow keys, or the arrows on screen, to move to the next file. Press **Esc** to close. The **i** button shows details: its size, who made it, who can see it and how long Home will keep it.
+Pick a file to open it big. Use the arrow keys, or the arrows on screen, to move to the next file. Press **Esc** to close. The **i** button shows details, including where the file came from, who can see it and how long Home will keep it. A file made or sent in a chat has an **Origin** link. Pick it to open that chat at the message with the file. If the chat was deleted, the details say so.
 
 Pictures zoom with the **+** and **-** buttons. Videos and songs play right in the window.
 

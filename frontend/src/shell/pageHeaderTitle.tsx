@@ -30,7 +30,6 @@ import { CommandsIcon } from "@/shell/pages/CommandsPage";
 import { DevicesIcon } from "@/shell/pages/DevicesPage";
 import { PrivacyIcon } from "@/shell/pages/PrivacyPage";
 import { UsersIcon } from "@/shell/pages/UsersPage";
-import { FilesIcon } from "@/shell/pages/FilesPage";
 import { NotificationsIcon } from "@/apps/notifications/NotificationsPage";
 import { StatusIcon } from "@/shell/pages/StatusPage";
 
@@ -62,7 +61,6 @@ const MANAGE_PAGE_ENTRIES: Record<string, PageHeaderEntry> = {
   "/privacy": { icon: PrivacyIcon, label: "Privacy" },
   "/users": { icon: UsersIcon, label: "Users" },
   "/notifications": { icon: NotificationsIcon, label: "Notifications" },
-  "/files": { icon: FilesIcon, label: "Library" },
 };
 
 function entryFor(pathname: string): PageHeaderEntry | undefined {

@@ -22,6 +22,10 @@ News pages are laid out per topic, articles show their own pictures and read lik
 - Person removal now uses the numbered picture boxes to understand phrases such as "the boy on the left" before asking the picture model. Its fallback accepts valid answers even when the engine ignores the JSON schema, uses the shared empty-length retry, and logs a reason code without the request text.
 - Made pictures have a visible **Edit** action below them; failure guidance now says to tap the picture, then Edit.
 - Always-visible **Edit** on sent attachments and a stacked 48 px retry action need additive kit props. Home cannot reshape either kit Element under rule 9; these are tracked in IMGTOOLS-10 and IMGTOOLS-11.
+### Library
+- Removed the desktop Library title band while keeping the phone menu clearance.
+- Added owner-only Origin links from a file to its chat and exact turn. Deleted chats show as plain text; opening a missing turn lands at the end with a note.
+- Selection color consistency still needs a shared-kit change. `FileTile` uses `ring-primary`; `DataTable` uses `bg-primary/10`.
 
 ## [0.2.27] - 2026-10-19
 

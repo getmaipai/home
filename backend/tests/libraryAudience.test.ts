@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, expect, test } from "bun:test";
 import { eq } from "drizzle-orm";
 import { db } from "@/db";
-import { attachments, people, conversationTurns, shares } from "@/db/schema";
+import { attachments, people, conversations, conversationTurns, shares } from "@/db/schema";
 import { createAttachment, getAttachment, readAttachment } from "@/lib/attachments";
 import { resolveOrCreateConversation } from "@/lib/conversationHistory";
 import { nextHlc } from "@/lib/hlc";
@@ -18,6 +18,41 @@ import { installFakeImageStack, testPng, until } from "./pictureFixture";
 
 beforeEach(() => resetDb());
 afterEach(() => { __resetAgeCheckForTests(); __setKeyframesForTests(null); });
+
+test("Library origin links are owner-only and deleted chats have no destination", async () => {
+  const owner = new TestClient();
+  const setup = await owner.post("/api/auth/setup", { displayName: "Sage", secret: "correcthorse" });
+  const ownerId = ((await setup.json()) as { person: { id: string } }).person.id;
+  const actor = db.select().from(people).where(eq(people.id, ownerId)).get()!;
+  const made = await owner.post("/api/people", { displayName: "Bramble", role: "adult", secret: "0000" });
+  const readerId = ((await made.json()) as { id: string }).id;
+  const reader = new TestClient();
+  await reader.post("/api/auth/verify-secret", { personId: readerId, secret: "0000" });
+  const conversation = resolveOrCreateConversation(actor, "chat");
+  if (!conversation.ok) throw new Error(conversation.error);
+  const conversationId = conversation.value.id;
+  const turnId = newConversationTurnId();
+  db.insert(conversationTurns).values({ id: turnId, personId: actor.id, surface: "chat", conversationId, userText: "show a picture", replyText: "Here it is.", source: "model", safetyAction: "allow", createdAt: new Date().toISOString(), hlc: nextHlc() }).run();
+  const attachment = createAttachment(actor, { conversationId, turnId, mediaType: "application/pdf", bytes: new TextEncoder().encode("notes"), deduplicate: false });
+  if (!attachment.ok) throw new Error(attachment.error);
+  const fileId = attachment.value.id;
+  db.insert(shares).values({ id: newShareId(), fileId, fromPersonId: ownerId, to: "household", provenance: "fixture", createdAt: new Date().toISOString(), hlc: nextHlc() }).run();
+
+  const ownerItem = ((await owner.get("/api/library").then(response => response.json())) as { items: { id: string; chat_id: string | null; turn_id: string | null; chat_title: string | null; chat_deleted: boolean }[] }).items.find(item => item.id === fileId)!;
+  expect(ownerItem).toMatchObject({ chat_id: conversationId, turn_id: turnId, chat_title: conversation.value.title ?? "New chat", chat_deleted: false });
+  const readerItem = ((await reader.get("/api/library").then(response => response.json())) as { items: { id: string; chat_id: string | null; turn_id: string | null; chat_title: string | null; chat_deleted: boolean }[] }).items.find(item => item.id === fileId)!;
+  expect(readerItem).toMatchObject({ chat_id: null, turn_id: null, chat_title: null, chat_deleted: false });
+
+  db.update(conversations).set({ status: "deleted" }).where(eq(conversations.id, conversationId)).run();
+  const deleted = ((await owner.get("/api/library").then(response => response.json())) as { items: { id: string; chat_id: string | null; turn_id: string | null; chat_title: string | null; chat_deleted: boolean }[] }).items.find(item => item.id === fileId)!;
+  expect(deleted).toMatchObject({ chat_id: null, turn_id: null, chat_title: null, chat_deleted: true });
+  const record = await owner.get(`/api/files/${fileId}`).then(response => response.json()) as { chat_id?: string | null; turn_id?: string | null; chat_deleted?: boolean };
+  expect(record).toMatchObject({ chat_id: null, turn_id: null, chat_deleted: true });
+  const sharedRecord = await reader.get(`/api/files/${fileId}`).then(response => response.json()) as { chat_id?: string | null; turn_id?: string | null; chat_deleted?: boolean };
+  expect(sharedRecord).not.toHaveProperty("chat_id");
+  expect(sharedRecord).not.toHaveProperty("turn_id");
+  expect(sharedRecord).not.toHaveProperty("chat_deleted");
+});
 
 for (const role of ["child", "teen"] as const) {
   test(`${role} cannot discover or read adult-only and unclassified household files`, async () => {

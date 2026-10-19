@@ -121,7 +121,6 @@ function PageHeaderLayout() {
     "/devices": "Devices",
     "/privacy": "Privacy",
     "/users": "Users",
-    "/files": "Library",
     "/reference": "Reference",
     "/dev/ui": "Chat showcase",
   };
@@ -259,6 +258,8 @@ function RoutesWithIncognito({ person, onPersonChange, onSignedOut }: { person: 
           <Route path="chat" element={<ChatPage person={person} />} />
           <Route path="chat/projects" element={<ProjectsPage person={person} />} />
           <Route path="chat/projects/:id" element={<ChatPage person={person} />} />
+          {/* Like Chat, Library owns its page header and leaves FullLayout's phone menu clearance intact. */}
+          <Route path="files" element={<FilesPage person={person} />} />
           {/* APP-SET-02 (RULES S4): the settings areas draw no slim title bar,
               like ChatGPT's own settings page: the column title is the page's
               heading, so these routes sit beside chat, outside
@@ -292,7 +293,6 @@ function RoutesWithIncognito({ person, onPersonChange, onSignedOut }: { person: 
             <Route path="devices" element={<DevicesPage person={person} />} />
             <Route path="privacy" element={<PrivacyPage />} />
             <Route path="users" element={<UsersPage person={person} />} />
-            <Route path="files" element={<FilesPage person={person} />} />
             <Route path="reference/*" element={<ReferencePage />} />
             <Route path="all-apps" element={<AllAppsPage person={person} />} />
             {/* MEDIA-VIDEOS-01: the Pick up shelf's `/media/<id>` link opens the item in the app that owns its kind. */}

@@ -17,7 +17,7 @@ const totals = z.object({ items: z.number(), bytes: z.number() });
 const item = z.object({
   id: z.string(), kind, name: z.string(), media_type: z.string(), size_bytes: z.number(), created_at: z.string(),
   owner: z.object({ id: z.string(), display_name: z.string() }), shared_with: z.object({ count: z.number(), household: z.boolean() }),
-  retention: z.string(), chat_id: z.string().nullable().describe("The chat that made or received this item, while it exists and only for the owner."), can_edit: z.boolean().describe("A picture the owner can open in the picture editor (it lives in its chat); false once the chat is gone."), audience: z.enum(["all-ages", "adult-only"]).nullable(), duration_seconds: z.number().nullable(),
+  retention: z.string(), origin: z.enum(["made", "sent", "fetched"]), chat_id: z.string().nullable().describe("The chat that made or received this item, while it exists and only for the owner."), turn_id: z.string().nullable(), chat_title: z.string().nullable(), chat_deleted: z.boolean(), can_edit: z.boolean().describe("A picture the owner can open in the picture editor (it lives in its chat); false once the chat is gone."), audience: z.enum(["all-ages", "adult-only"]).nullable(), duration_seconds: z.number().nullable(),
   thumb_url: z.string().describe("Placeholder for LIBRARY-REVAMP-05; thumbnail serving is not built yet."), expires_at: z.string().nullable(), version_count: z.number(),
 });
 libraryRoutes.openapi(createRoute({ method: "get", path: "/", tags: ["Library"], summary: "Visible Library items, paged and filtered",

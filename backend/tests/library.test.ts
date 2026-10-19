@@ -54,6 +54,7 @@ test("derived metadata, escaped search, filters, sorts and physical per-kind byt
   file(8, "text/plain");
   const rows = await page(client.get("/api/library?sort=name"));
   expect(rows.items).toHaveLength(6);
+  expect(rows.items.find(item => item.id === root)?.origin).toBe("made");
   expect((await page(client.get("/api/library?type=file"))).items).toHaveLength(1);
   expect((await page(client.get("/api/library?type=document"))).items).toHaveLength(2);
   expect((await page(client.get("/api/library?type=story"))).items).toHaveLength(0);
