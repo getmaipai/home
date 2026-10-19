@@ -114,6 +114,22 @@ test("job prompts, song titles and covers use the shipped writer relations", asy
   expect((await new TestClient().get("/api/library")).status).toBe(401);
 });
 
+test("a Home-made song's file details include its player data for owner and shared viewers", async () => {
+  const { client, id, file } = await fixture();
+  const song = file(30, "audio/mp4", 'music-gen:{"job_id":"song-player"}');
+  const cover = file(31, "image/png", 'picture-gen:{"job":"song-cover"}');
+  const other = await (await client.post("/api/people", { displayName: "Bramble", role: "adult", secret: "0000" })).json() as { id: string };
+  const reader = new TestClient();
+  await reader.post("/api/auth/verify-secret", { personId: other.id, secret: "0000" });
+  db.insert(musicJobs).values({ id: "song-player", personId: id, task: "text2music", state: "done", request: JSON.stringify({ title: "River song", lyrics: "[Verse]\nMorning light" }), fileId: song, coverFileId: cover, durationS: 42, lrc: "[00:01.00]Morning light", createdAt: "2026-10-14T12:00:00.000Z", updatedAt: "2026-10-14T12:00:00.000Z", hlc: nextHlc() }).run();
+  db.insert(shares).values({ id: "share-song-player", fileId: song, fromPersonId: id, to: other.id, provenance: "fixture", createdAt: "2026-10-14T12:00:00.000Z", hlc: nextHlc() }).run();
+  for (const [viewer, owner] of [[client, true], [reader, false]] as const) {
+    const details = await viewer.get(`/api/files/${song}`).then(response => response.json()) as Record<string, unknown>;
+    expect(details).toMatchObject({ music: { id: "song-player", lyrics: "[Verse]\nMorning light", timed_lyrics: [{ t: 1, line: "Morning light", section: null }], cover_url: `/api/files/${song}/thumb?w=640`, owner } });
+    expect((details.music as { versions: unknown[] }).versions).toHaveLength(1);
+  }
+});
+
 test("owner and sharing filters count targets once and keep departed files under household", async () => {
   const { client, id, file } = await fixture();
   const made = await (await client.post("/api/people", { displayName: "Clover", role: "adult", secret: "0000" })).json() as { id: string };

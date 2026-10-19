@@ -24,7 +24,7 @@ function item(id: string, name: string, over: Partial<LibraryItem> = {}): Librar
 }
 const summary = (items: number, bytes = items * 2048, trash = 0): LibrarySummary => ({ items, bytes, per_kind: { image: { items, bytes }, video: { items: 0, bytes: 0 }, audio: { items: 0, bytes: 0 }, document: { items: 0, bytes: 0 }, story: { items: 0, bytes: 0 }, file: { items: 0, bytes: 0 } }, trash: { items: trash, bytes: 0 }, expiring: { items: 0, bytes: 0 } });
 
-interface Server { moreStatus?: number; items?: LibraryItem[]; next?: string | null; listStatus?: number; trash?: unknown[]; usage?: unknown }
+interface Server { moreStatus?: number; items?: LibraryItem[]; next?: string | null; listStatus?: number; trash?: unknown[]; usage?: unknown; music?: unknown }
 function serve(server: Server = {}) {
   const original = globalThis.fetch;
   const calls: { url: string; method: string }[] = [];
@@ -46,7 +46,7 @@ function serve(server: Server = {}) {
     if (url === "/api/people") return Promise.resolve(Response.json([{ id: "person-me", display_name: "Nova", avatar_seed: "a" }, { id: "person-sage", display_name: "Sage", avatar_seed: "b" }]));
     if (/^\/api\/files\/[^/]+$/.test(url) && method === "DELETE") return Promise.resolve(Response.json({ id: "x", deleted_at: "2026-10-18T00:00:00.000Z", trash_until: "2026-11-17T00:00:00.000Z" }));
     if (/^\/api\/files\/[^/]+$/.test(url) && method === "PATCH") return Promise.resolve(Response.json({ id: "x", name: null, retention: "kept" }));
-    if (/^\/api\/files\/[^/]+$/.test(url)) return Promise.resolve(Response.json({ id: url.split("/").pop(), owner_person_id: "person-me", origin: "sent", kind: "image", media_type: "image/png", size: 10, sha256: "a", storage_path: "x", retention: "kept", provenance: {}, created_at: "2026-10-16T00:00:00.000Z", hlc: "h" }));
+    if (/^\/api\/files\/[^/]+$/.test(url)) return Promise.resolve(Response.json({ id: url.split("/").pop(), owner_person_id: "person-me", origin: "sent", kind: "audio", media_type: "audio/mp4", size: 10, sha256: "a", storage_path: "x", retention: "kept", provenance: {}, created_at: "2026-10-16T00:00:00.000Z", hlc: "h", ...(server.music ? { music: server.music } : {}) }));
     if (url.endsWith("/shares") && method === "GET") return Promise.resolve(Response.json([]));
     return Promise.resolve(new Response("{}", { status: 200 }));
   }) as unknown as typeof fetch;
@@ -299,6 +299,26 @@ describe("selection, batch actions and Trash", () => {
 });
 
 describe("viewer, menu, sharing and roles", () => {
+  test("a Home song uses the lyrics player in the viewer, and Edit is owner-only", async () => {
+    const music = { id: "song-job", title: "River song", description: "folk", lyrics: "[Verse]\nMorning light", timed_lyrics: [{ t: 1, line: "Morning light", section: null }], cover_url: "/api/files/f-song/thumb?w=640", versions: [{ id: "f-song", label: "Version 1", url: "/api/files/f-song/content" }], current_id: "f-song", owner: true };
+    const server = serve({ items: [item("f-song", "River song", { kind: "audio", media_type: "audio/mp4", duration_seconds: 42 })], music });
+    try {
+      page("owner", "/files?file=f-song");
+      const dialog = await waitFor(() => { const el = document.querySelector('[role="dialog"]'); expect(el).not.toBeNull(); return el as HTMLElement; });
+      await waitFor(() => expect(dialog.querySelector("audio")).not.toBeNull());
+      fireEvent.click(within(dialog).getByRole("button", { name: "Lyrics" }));
+      await waitFor(() => expect(dialog.textContent).toContain("Morning light"));
+      expect(within(dialog).getByRole("button", { name: "Edit" })).toBeTruthy();
+    } finally { server.restore(); }
+    const shared = serve({ items: [item("f-song", "River song", { kind: "audio", media_type: "audio/mp4", owner: { id: "person-other", display_name: "Sage" } })], music: { ...music, owner: false } });
+    try {
+      page("adult", "/files?file=f-song");
+      await waitFor(() => expect(document.querySelector('[role="dialog"] audio')).not.toBeNull());
+      expect(document.querySelector('[role="dialog"]')?.querySelector('[aria-label="Edit"]')).toBeNull();
+      expect(document.body.textContent).toContain("Lyrics");
+    } finally { shared.restore(); }
+  });
+
   test("a link with ?file= opens the viewer on that file with its details; closing removes it from the address", async () => {
     const server = serve({ items: [item("f1", "Fox in the snow"), item("f2", "Garden at dawn", { shared_with: { count: 1, household: true } })] });
     try {

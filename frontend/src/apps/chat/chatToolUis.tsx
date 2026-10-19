@@ -18,9 +18,11 @@ import { picturesApi, type PictureCard } from "@/lib/picturesApi";
 import { etaLabel } from "@/lib/etaLabel";
 import { VideoPlayer } from "@maipai/ui/src/elements/video-player";
 import { videosApi, type VideoItem } from "@/lib/videosApi";
-import { MusicTrack, type MusicTrackStatus } from "@maipai/ui/src/elements/music-track";
-import { musicApi, type MusicCard } from "@/lib/musicApi";
+import { MusicTrack } from "@maipai/ui/src/elements/music-track";
+import { musicApi } from "@/lib/musicApi";
 import { prepareClip, saveClip, shareClip } from "@/lib/shareClip";
+import { useMusicTrackProps } from "@/apps/chat/MusicCardView";
+export { musicFileName, musicHint } from "@/apps/chat/MusicCardView";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@maipai/ui/src/ui/dropdown-menu";
 // The Elements' own smaller `Button` (not the dashboard `Button` this
 // file otherwise uses), because this one renders as a sibling of Copy/
@@ -29,8 +31,6 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 // the dashboard Button belongs to the surrounding page chrome, not this
 // row.
 import { Button } from "@maipai/ui/src/ui/button";
-import { Input } from "@maipai/ui/src/ui/input";
-import { Alert, AlertDescription } from "@maipai/ui/src/ui/alert";
 import { getIcon } from "@maipai/ui/src/icons";
 import { Kbd } from "@maipai/ui/src/dashboard/components/ui/kbd";
 import { useSurface } from "@maipai/ui/src/useSurface";
@@ -607,11 +607,7 @@ function videoHint(item: { quality?: "quick" | "detailed"; clip: { has_sound?: b
   if (item.quality === "detailed") return "Detailed: with sound and speech.";
   return "Quick: about 2 minutes, no sound. Ask for Detailed to add sound and speech.";
 }
-// MUSIC-GEN-04: a song the person asked for (`generate_music`, `edit_music`; the turn names the job as `TurnValue.music`; the part is named "song" because "music" is the music-lookup spec sheet).
-// One tool-call part, one shipped Element (the kit's MusicTrack): the stage line, clock, time left and Stop while it is
-// made, then the kit Player in its audio layout with the lyrics, the version stepper (Previous and Next switch what is
-// shown; Use this version makes an older one the one the next edit starts from), Download and Share. Polling stops once
-// nothing is being made. Save to Music waits for MUSIC-GEN-09 and Make another has no route yet, so neither is passed.
+// MUSIC-GEN-04: chat and the Library viewer render the same Home song player.
 const MUSIC_POLL_MS = 1_000;
 const MUSIC_SETTLED = new Set(["done", "failed", "cancelled"]);
 
@@ -624,113 +620,12 @@ function useMusicCard(id: string | undefined) {
   });
 }
 
-function musicStatusOf(card: MusicCard): MusicTrackStatus {
-  if (card.state === "done" && card.versions.length > 0) return "ready";
-  if (card.state === "queued") return "queued";
-  if (card.state === "running") return "generating";
-  if (card.state === "cancelled") return "cancelled";
-  return "failed";
-}
-
-/** The file name a song is saved under: its title, with only characters every system accepts. */
-export function musicFileName(title: string | null | undefined): string {
-  const base = (title ?? "").replace(/[^\p{L}\p{N} _-]+/gu, " ").replace(/\s+/g, " ").trim().slice(0, 80).trim();
-  return `${base || "song"}.m4a`;
-}
-
-function musicDescriptionOf(card: MusicCard): string | undefined {
-  const caption = (card.description ?? "").replace(/\s+/g, " ").trim();
-  const style = caption.length > 70 ? `${caption.slice(0, 67).trimEnd()}...` : caption;
-  const seconds = card.duration_s;
-  const length = typeof seconds === "number" && seconds > 0 ? `${Math.floor(seconds / 60)}:${String(Math.round(seconds % 60)).padStart(2, "0")}` : "";
-  return [card.length === "full" ? "Full song" : "Quick song", style, length].filter(Boolean).join(", ") || undefined;
-}
-
-/** The plain line under a song while it is made: what each kind is and how long it takes (measured, music design note section 16). */
-export function musicHint(length: "quick" | "full", cut: MusicCard["cut"] = null, maxSeconds: number | null = null): string {
-  if (cut === "ceiling" && maxSeconds !== null) return `Longer than this computer's longest song (${maxSeconds / 60} minutes), so it sings the first parts that fit.`;
-  return length === "full" ? "Full: every part of the song." : "Quick: the hook. Make it full to sing every part.";
-}
-
 export const MusicToolRender: ToolCallMessagePartComponent<Record<string, never>, { id: string }> = ({ result }) => {
   const query = useMusicCard(result?.id);
   const navigate = useNavigate();
-  const card = query.data;
-  // The version on show is local state; a new server-side choice (Use this version, a new edit) resets it.
-  const [picked, setPicked] = useState<{ base: string | null; id: string } | null>(null);
-  const [songChange, setSongChange] = useState("");
-  const [coverChange, setCoverChange] = useState("");
-  const [editError, setEditError] = useState("");
-  const [editing, setEditing] = useState(false);
-  const status = card ? musicStatusOf(card) : "queued";
-  const shownId = card ? (picked && picked.base === card.current_id && card.versions.some((v) => v.id === picked.id) ? picked.id : card.current_id) : null;
-  const shown = card?.versions.find((v) => v.id === shownId) ?? card?.versions[card.versions.length - 1];
-  const downloadName = musicFileName(card?.title);
-  // The file is fetched when the song is ready, so Share can call the system share sheet inside the click
-  // (a share call after an await loses the user gesture and Safari refuses it).
-  const prepared = useQuery({
-    queryKey: ["music-share", shown?.url],
-    queryFn: ({ signal }) => prepareClip(shown!.url, signal, { type: "audio/mp4", name: downloadName }),
-    enabled: status === "ready" && shown !== undefined,
-    staleTime: Infinity,
-    gcTime: 10 * 60_000,
-    retry: false,
-  });
+  const card = query.data ?? { id: result?.id ?? "", state: "queued" as const, stage: null, stage_label: "", progress: 0, eta_seconds: null, position: null, error_line: null, cover_url: null, cover_versions: [], cover_pending: false, versions: [], current_id: null, length: "full" as const, cut: null, max_seconds: null, title: null, description: null, lyrics: null, timed_lyrics: null, duration_s: null, started_at: Date.now() };
+  const trackProps = useMusicTrackProps({ card, navigate, onRefresh: () => { void query.refetch(); }, onStop: () => { void musicApi.stop(card.id).then(() => query.refetch()).catch(() => query.refetch()); } });
   if (!result) return null;
-  if (!card) return query.isError ? <ErrorState layout="inline" title="I couldn't check on that song" detail="Reload the chat to try again." retrying={false} /> : <MusicTrack status="queued" title="Your song" />;
-  const refresh = () => { void query.refetch(); };
-  const title = card.title ?? "Your song";
-  const description = musicDescriptionOf(card);
-  const lyrics = card.lyrics && card.lyrics.trim() !== "[Instrumental]" ? card.lyrics : undefined;
-  const ready = status === "ready" && shown !== undefined;
-  const editErrorText = (error: unknown) => {
-    const message = error instanceof Error ? error.message : "Home could not make that change.";
-    return `${message} Check the request and try again.`;
-  };
-  const editContent = <>
-    {card.length !== "full" ? <Button type="button" variant="outline" onClick={() => {
-      setEditing(true); setEditError("");
-      void musicApi.setLength(card.id, "full", shown?.id).then(refresh).catch((error) => setEditError(editErrorText(error))).finally(() => setEditing(false));
-    }} disabled={editing}>Make it full</Button> : null}
-    <Input aria-label="How should it change? For example: make it heavy metal" placeholder="How should it change? For example: make it heavy metal" value={songChange} onChange={(event) => setSongChange(event.currentTarget.value)} maxLength={500} disabled={editing} />
-    <Button type="button" variant="outline" disabled={editing || !songChange.trim()} onClick={() => {
-      const change = songChange.trim(); if (!change || editing) return;
-      setEditing(true); setEditError("");
-      void musicApi.revise(card.id, change, shown?.id).then(() => { setSongChange(""); refresh(); }).catch((error) => setEditError(editErrorText(error))).finally(() => setEditing(false));
-    }}>Make</Button>
-    <Input aria-label="Describe the new cover" placeholder="Describe the new cover" value={coverChange} onChange={(event) => setCoverChange(event.currentTarget.value)} maxLength={500} disabled={editing} />
-    <Button type="button" variant="outline" disabled={editing || !coverChange.trim()} onClick={() => {
-      const prompt = coverChange.trim(); if (!prompt || editing) return;
-      setEditing(true); setEditError("");
-      void musicApi.newCover(card.id, prompt).then(() => { setCoverChange(""); refresh(); }).catch((error) => setEditError(editErrorText(error))).finally(() => setEditing(false));
-    }}>Make</Button>
-    {editError ? <Alert variant="destructive"><AlertDescription>{editError}</AlertDescription></Alert> : null}
-  </>;
-  return (
-    <MusicTrack
-      status={status}
-      width="full"
-      {...(ready ? { editContent, editLabel: "Edit", editPanelLabel: "Edit song" } : {})}
-      title={title}
-      {...(card.cover_url ? { cover: card.cover_url, coverAlt: `Cover art for ${title}` } : {})}
-      {...(description ? { description } : {})}
-      {...(ready ? { src: shown.url } : {})}
-      progress={Math.round(card.progress * 100)}
-      {...(card.stage_label && card.state !== "queued" ? { phaseLabel: card.stage_label } : {})}
-      {...(etaLabel(card.eta_seconds) ? { etaLabel: etaLabel(card.eta_seconds)! } : {})}
-      queuePosition={card.position}
-      startedAt={card.started_at}
-      {...(card.error_line ? { error: card.error_line } : {})}
-      downloadName={downloadName}
-      timedLyrics={card.timed_lyrics ?? undefined}
-      {...(ready && lyrics ? { lyrics } : {})}
-      {...(ready ? { versions: card.versions.map((v) => ({ id: v.id, label: v.label })), ...(shownId ? { currentId: shownId } : {}) } : {})}
-      onSelectVersion={(id) => setPicked({ base: card.current_id, id })}
-      onUseVersion={(id) => { void musicApi.useVersion(card.id, id).then(refresh).catch(refresh); }}
-      onStop={() => { void musicApi.stop(card.id).then(refresh).catch(refresh); }}
-      hint={musicHint(card.length, card.cut, card.max_seconds)}
-      {...(card.state === "queued" && card.stage === "longer" ? { copy: { queued: card.stage_label } } : {})}
-      {...(ready ? { onShare: () => { void shareClip({ prepared: prepared.data, title, nav: navigator, fallback: () => navigate(`/files?file=${encodeURIComponent(shown.id)}`) }); } } : {})}
-    />
-  );
+  if (!query.data) return query.isError ? <ErrorState layout="inline" title="I couldn't check on that song" detail="Reload the chat to try again." retrying={false} /> : <MusicTrack status="queued" title="Your song" />;
+  return <MusicTrack {...trackProps} />;
 };

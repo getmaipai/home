@@ -8,6 +8,7 @@ checklist (`docs/dev.md`). The first release is 0.1.0.
 ## [Unreleased]
 
 - Song cards use a full-width Edit panel for full-length songs, song changes and new cover art.
+- Home-made songs in the Library use the chat player, including lyrics, timed lines and owner editing.
 
 ## [0.2.33] - 2026-10-19
 

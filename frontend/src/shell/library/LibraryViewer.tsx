@@ -5,10 +5,13 @@ import { useMemo, type ReactNode } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
 import { MediaViewer, type MediaViewerItem } from "@maipai/ui/src/elements/media-viewer";
+import { MusicTrack } from "@maipai/ui/src/elements/music-track";
 import { Button } from "@maipai/ui/src/ui/button";
 import { formatBytes } from "@maipai/ui/src/format";
 import { getIcon } from "@maipai/ui/src/icons";
 import { api, type LibraryItem, type Roster } from "@/lib/api";
+import type { MusicCard } from "@/lib/musicApi";
+import { useMusicTrackProps } from "@/apps/chat/MusicCardView";
 import { prepareClip, saveClip, shareClip } from "@/lib/shareClip";
 import { canShareFiles, fileKind, isAdultRole, kindWord, ownerName } from "./libraryModel";
 import { libraryOrigin } from "./libraryOrigin";
@@ -40,8 +43,18 @@ function Details({ item, me, actions }: { item: LibraryItem; me: Roster; actions
   const kept = item.retention === "kept";
   const row = (label: string, value: ReactNode) => <div><dt className="text-muted-foreground">{label}</dt><dd>{value}</dd></div>;
   const origin = libraryOrigin(item, record.data?.origin);
+  const song = record.data?.music;
+  const songCard: MusicCard = song ? {
+    id: song.id, state: "done", stage: "ready", stage_label: "", progress: 1, eta_seconds: null, position: null, error_line: null,
+    cover_url: song.cover_url, cover_versions: [], cover_pending: false, versions: song.versions, current_id: song.current_id,
+    length: "full", cut: null, max_seconds: null, title: song.title, description: song.description, lyrics: song.lyrics,
+    timed_lyrics: song.timed_lyrics, duration_s: item.duration_seconds, started_at: Date.parse(item.created_at),
+  } : { id: "", state: "queued", stage: null, stage_label: "", progress: 0, eta_seconds: null, position: null, error_line: null, cover_url: null, cover_versions: [], cover_pending: false, versions: [], current_id: null, length: "full", cut: null, max_seconds: null, title: null, description: null, lyrics: null, timed_lyrics: null, duration_s: null, started_at: 0 };
+  const songTrackProps = useMusicTrackProps({ card: songCard, owner: song?.owner ?? false, onRefresh: () => { void record.refetch(); } });
   return (
-    <div className="flex flex-col gap-4">
+    <>
+      {song ? <MusicTrack {...songTrackProps} /> : null}
+      <div className="flex flex-col gap-4">
       <dl className="grid gap-3 text-base">
         {row("Name", item.name)}
         {row("Type", `${kindWord(item.kind)}, ${item.media_type}`)}
@@ -62,7 +75,8 @@ function Details({ item, me, actions }: { item: LibraryItem; me: Roster; actions
         </div>
       ) : null}
       {item.can_edit && item.chat_id ? <Button asChild variant="secondary"><Link to={`/chat?conversation=${encodeURIComponent(item.chat_id)}`}>Edit in its chat</Link></Button> : mine && item.kind === "image" && !item.chat_id && record.data?.origin === "made" ? <p className="text-muted-foreground text-base">Its chat was deleted, so it cannot be edited here.</p> : null}
-    </div>
+      </div>
+    </>
   );
 }
 

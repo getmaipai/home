@@ -480,7 +480,12 @@ export interface LibraryItem {
   audience: "all-ages" | "adult-only" | null; duration_seconds: number | null;
   thumb_url: string; expires_at: string | null; version_count: number;
 }
-export type FileRecordWithChat = FileRecord & { chat_id?: string | null; turn_id?: string | null; chat_title?: string | null; chat_deleted?: boolean };
+export interface LibrarySongDetails {
+  id: string; title: string | null; description: string | null; lyrics: string | null;
+  timed_lyrics: { t: number; line: string; section: string | null }[] | null; cover_url: string | null;
+  versions: { id: string; label: string; url: string }[]; current_id: string | null; owner: boolean;
+}
+export type FileRecordWithChat = FileRecord & { chat_id?: string | null; turn_id?: string | null; chat_title?: string | null; chat_deleted?: boolean; music?: LibrarySongDetails };
 export interface LibrarySummary {
   items: number; bytes: number; per_kind: Record<string, { items: number; bytes: number }>;
   trash: { items: number; bytes: number }; expiring: { items: number; bytes: number };
