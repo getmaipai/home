@@ -102,7 +102,7 @@ llmRoutes.post("/chat", requireRole("owner", "admin"), bodyLimit({ maxSize: 256 
     .filter((m) => m && typeof m.content === "string")
     .map((m) => m.content)
     .join("\n");
-  const inputSafety = evaluateSafety(requestText, band);
+  const inputSafety = evaluateSafety(requestText, band, "message");
   notifyIfFlagged(actor, inputSafety, "[llm]");
   if (inputSafety.action === "refuse") {
     return c.json({ text: REFUSAL_TEXT, model: "safety_refuse" });
@@ -116,7 +116,7 @@ llmRoutes.post("/chat", requireRole("owner", "admin"), bodyLimit({ maxSize: 256 
   if (!result.ok) {
     return c.json({ error: result.error, code: result.code }, result.status);
   }
-  const outputSafety = evaluateSafety(result.value.text, band);
+  const outputSafety = evaluateSafety(result.value.text, band, "reply");
   notifyIfFlagged(actor, outputSafety, "[llm]");
   if (outputSafety.action === "refuse") {
     return c.json({ ...result.value, text: REFUSAL_TEXT });

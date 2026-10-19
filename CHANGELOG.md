@@ -26,6 +26,9 @@ The draft you have not sent no longer squashes the chat box, Music, Podcasts and
 
 ### Settings
 - The back link at the top of the settings column is a full-size tap target.
+### Chat
+
+- **An adult's chat is no longer filtered for discussion of children and sexual abuse.** Asking about a film, a news article, true crime, fiction, health or personal advice no longer trips the child-safety word rule, and the model's replies to an adult are no longer cut by it. A request to write, describe, draw, show or role-play sexual content with a child, and explicit terms in a request, still refuse; every picture, video and music request and every finished picture or clip keeps the strict check, and a teen's and a child's chat are unchanged. Needs `@maipai/spec` 0.1.192.
 
 ## [0.2.32] - 2026-10-19
 

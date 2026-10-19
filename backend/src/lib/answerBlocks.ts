@@ -83,7 +83,7 @@ export function filterAnswerBlocks(
     let refused = false;
     const flagged: { notify_parent: boolean; categories: string[] } = { notify_parent: false, categories: [] };
     for (const text of humanStrings({ alt: block.alt, provenance: block.provenance, props: block.props })) {
-      const safety = forOutput(evaluateSafety(text, band));
+      const safety = forOutput(evaluateSafety(text, band, "reply"));
       if (carriesCrisisSignal(safety)) onCrisisSignal?.(safety);
       if (safety.flagged) {
         flagged.notify_parent ||= safety.notify_parent;

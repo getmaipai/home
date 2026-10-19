@@ -1,8 +1,8 @@
 # Child safety in chat text: depiction is refused, discussion is not (CSAM-TEXT-01)
 
-Date: 2026-10-19. Status: proposed; awaiting the owner's approval of the exact rule wording in section 9 and the architect's
-verdict. Owner: Jesse. This is the long-term record of the incident, the evidence, the research, the options weighed, the decision and
-the build plan. Nothing here is built except the small same-sentence tweak in section 6.
+Date: 2026-10-19. Status: owner-approved (rule wording, section 9, approved 2026-10-19); S1 (spec 0.1.192) and S2 (hub) built, S3
+docs landed with this record. Owner: Jesse. This is the long-term record of the incident, the evidence, the research, the options weighed, the decision and
+the build plan. Built: the small same-sentence tweak in section 6, and S1 to S3 of section 12 (see section 15).
 
 ## 1. The owner's ruling
 
@@ -166,4 +166,12 @@ one, reads only the first words of a reply.
 ## 15. Status log
 
 - 2026-10-19: incident; measurement; interim same-sentence tweak landed on commons main; research; owner's ruling; Fable design
-  weighed; this record written; architect ruling pending.
+  weighed; this record written; architect ruled NEEDS-RULE-CHANGE (only the owner's approval of the two wordings was missing); owner
+  approved both wordings the same day.
+- 2026-10-19: S1 built: commons `spec-v0.1.192` (`SafetyContext.csamMode`). S2 built: `evaluateSafety(text, band, direction)`; the chat
+  turn's message check, StreamGate, ReasoningLane, `evaluateReply`, answer blocks, composer rows and the LLM route pass the direction.
+  S3: RULES.md rule 10 sentence committed with `Owner-approved: 2026-10-19`; SAFETY.md bullet 1 reworded in `getmaipai/.github`.
+  Refinements found while building, within the owner's ruling: an adult's explicit term refuses only in a sentence that asks for
+  something (a pasted news article that names "child porn" passes), and the words news and advice use ("csam", "pedophile",
+  "Lolita") are not explicit terms for an adult. Measured on the 86 texts: an adult's message refuses 0 of 45 harmless (24 before)
+  and catches 21 of 41 harmful (36 before); the rest rely on the model's own refusal and the generation checks.

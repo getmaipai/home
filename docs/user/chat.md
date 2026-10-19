@@ -207,3 +207,7 @@ If a reply cut off early, a **Continue** button appears under it. Tap it and Mai
 ## Still need help?
 
 If Chat won't send a message or load a reply, see [Fix a problem](fix-a-problem.md).
+
+## What Home will not do, and what it will talk about
+
+As an adult you can ask Home about films, news, true crime, fiction, health and personal advice, including difficult subjects such as child abuse, without it being stopped for the topic. Home will not write, describe or make sexual content involving a child, and it will not make a picture or video of one, whatever the wording or the framing. A teen's and a child's chats follow stricter rules.

@@ -106,7 +106,7 @@ class ReasoningLane {
   ) {}
 
   private refuses(text: string): boolean {
-    const safety = forOutput(evaluateSafety(text, this.band));
+    const safety = forOutput(evaluateSafety(text, this.band, "reply"));
     notifyOncePerTurn(this.actor, safety, this.turnId, "[turn]");
     return safety.action === "refuse";
   }
@@ -307,7 +307,7 @@ export class StreamGate {
    * sentence on the streamed path reaches a parent exactly as it would
    * on the old path - never a second, silent check. */
   private checkAndNotify(chunk: string): SafetyResult {
-    const safety = forOutput(evaluateSafety(chunk, this.band));
+    const safety = forOutput(evaluateSafety(chunk, this.band, "reply"));
     notifyOncePerTurn(this.actor, safety, this.turnId, "[turn]");
     return safety;
   }
@@ -324,7 +324,7 @@ export class StreamGate {
    * checkAndNotify()'s own unconditional call above it. */
   private wholeRefusal(next: string): SafetyResult | undefined {
     if (!this.checked.trim()) return undefined;
-    const whole = forOutput(evaluateSafety(`${this.checked}${next}`, this.band));
+    const whole = forOutput(evaluateSafety(`${this.checked}${next}`, this.band, "reply"));
     if (whole.action !== "refuse") return undefined;
     notifyOncePerTurn(this.actor, whole, this.turnId, "[turn]");
     return whole;

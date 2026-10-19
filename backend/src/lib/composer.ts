@@ -714,7 +714,7 @@ export function specSheetCandidateForOutcome(outcome: ToolExecutionOutcome, band
 }
 
 function floorSpecSheet(part: Omit<StructuredPart, "tool_id">, band: AgeBand): Omit<StructuredPart, "tool_id"> | null {
-  const rows = part.rows.filter((row) => forOutput(evaluateSafety(row.value, band)).action !== "refuse");
+  const rows = part.rows.filter((row) => forOutput(evaluateSafety(row.value, band, "reply")).action !== "refuse");
   return rows.length ? { ...part, rows } : null;
 }
 

@@ -30,8 +30,16 @@ function isMinorBand(band: AgeBand): boolean {
  * speakerAgeBand()) - also exercised directly (routes/safety.ts,
  * tests/safety.test.ts) so the wiring is proven independent of any one
  * turn-engine caller. */
-export function evaluateSafety(text: string, speakerBand: AgeBand): SafetyResult {
-  const result = checkSafety(text, { isMinor: isMinorBand(speakerBand) });
+export type SafetyDirection = "message" | "reply";
+
+/** CSAM-TEXT-01 (docs/design/child-safety-text-2026-10-19.md, owner's ruling 2026-10-19): `direction` says whether `text` is what an adult
+ * typed ("message") or what the assistant says to an adult ("reply"). Only for an ADULT's chat text does it change how the `csam`
+ * category reads the text: a message is refused for an explicit term or a request to produce the content, a reply has no `csam` word
+ * rule, so discussion, news, fiction and advice are not filtered. With no direction (every non-chat caller, a generation prompt
+ * path) and for a teen, a child or the robot, the full floor applies exactly as before. */
+export function evaluateSafety(text: string, speakerBand: AgeBand, direction?: SafetyDirection): SafetyResult {
+  const csamMode = speakerBand === "adult" && direction !== undefined ? (direction === "message" ? "adult_message" : "adult_reply") : "floor";
+  const result = checkSafety(text, { isMinor: isMinorBand(speakerBand), csamMode });
   if (result.flagged) {
     // 4.3: "logged with the fact, never the transcript." No structured
     // host.log exists yet (that's 4.9's package host); this is a
@@ -82,8 +90,8 @@ export interface ReplyEvaluation {
 const ACTION_RANK: Record<SafetyResult["action"], number> = { allow: 0, allow_with_resources: 1, refuse: 2 };
 
 export function evaluateReply(reply: { text: string; speech?: string }, speakerBand: AgeBand): ReplyEvaluation {
-  const text = forOutput(evaluateSafety(reply.text, speakerBand));
-  const speech = reply.speech !== undefined && reply.speech !== reply.text ? forOutput(evaluateSafety(reply.speech, speakerBand)) : undefined;
+  const text = forOutput(evaluateSafety(reply.text, speakerBand, "reply"));
+  const speech = reply.speech !== undefined && reply.speech !== reply.text ? forOutput(evaluateSafety(reply.speech, speakerBand, "reply")) : undefined;
   if (!speech) return { text, effective: text };
   const stricter = ACTION_RANK[speech.action] > ACTION_RANK[text.action] ? speech : text;
   const effective: SafetyResult = {
