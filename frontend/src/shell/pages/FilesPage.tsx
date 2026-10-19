@@ -320,7 +320,7 @@ export function FilesPage({ person }: { person: Roster }) {
         <div className="flex flex-wrap items-center gap-3">
           {wide && collapsed ? <SectionSidebarShowButton onClick={() => setCollapsed(false)} controls="library-sidebar" /> : null}
           <div className="min-w-0 flex-1">
-            <h2 className="truncate text-2xl font-semibold tracking-tight">{sectionOf(view.section).label}</h2>
+            <h1 className="truncate text-2xl font-semibold tracking-tight">{sectionOf(view.section).label}</h1>
             <p className="text-base text-muted-foreground" aria-live="polite">{headline}</p>
           </div>
           {canAdd ? <Button type="button" onClick={() => fileInput.current?.click()}><UploadIcon aria-hidden className="size-4" />Upload</Button>
