@@ -37245,7 +37245,8 @@ Top flaky tests (fails / fails at a head that later passed): `discoverRobots()` 
 
 1. **`main-gate` reports, never reverts, once a day.** `scripts/main-gate.sh once` from launchd (`com.maipai.main-gate`,
    `StartCalendarInterval` 04:00, no `KeepAlive`, no `RunAtLoad`); `loop` exits 2. A red writes the note with the commits since last
-   green and a person decides. The plist is machine config, not in the repo.
+   green and a person decides. The plist is machine config, not in the repo. (Since RELEASE-GATE-01, 2026-10-19, `wt.sh land`
+   also starts `main-gate.sh idle`, which gates main only on a free lock and yields to any waiting session.)
 2. **Bench lane.** `scripts/gate/flakes.json` gains `bench.{backend,frontend}` (file plus reason). The gate never runs those files;
    `bash scripts/check.sh --bench` runs only them, one shard per workspace, no lock, with `MAIPAI_BENCH=1` so budget assertions
    written as `test.skipIf(!process.env.MAIPAI_BENCH)` run there (first one: GATE-01's 50 ms decide budget). Listed: backend
@@ -37309,6 +37310,32 @@ mounted kept fetching into whichever file ran next. Contained three ways: those 
 `frontend/tests/preload.ts` unmounts the rendered tree after every test (RTL `cleanup`, imported after the DOM exists because the
 library reads `document` at load, which a hoisted static import would break); and the engines test counts only `/api/engines`
 requests. Resetting `globalThis.fetch` after every test was tried and rejected: many files install one mock per file.
+
+## RELEASE-GATE-01: a release reuses a clean green full gate (2026-10-19)
+
+Owner's ask: releases were too slow. Measured in `data-scratch/gate-stats/runs.jsonl` on 2026-10-19: eight releases that day, a
+green full gate median about 470 s (backend `bun test` about 380 s of it), lock waits up to 390 s on top, and the release skill
+asked for two runs (the worktree and a clean clone). Decided in the AskUserQuestion wizard: reuse a green gate, and gate `main`
+after landings so there is one to reuse.
+
+1. **`check.sh --release`.** `scripts/gate/releaseGate.ts` looks for a green, full-scope gate run from the last 4 hours
+   (`MAIPAI_RELEASE_GATE_MAX_AGE` overrides) that tested exactly a commit, then diffs that commit's tree against the release
+   working tree. When the difference is docs-only by `classifyScope()`, the run is reused and `--release` runs the docs scope (the
+   secrets scan, PII wordlist, prose and reading-level checks still run). The release's own version bump (root `package.json`
+   with only `version` changed) is release metadata, not code. Anything else runs the full gate. The match is on content, not
+   ancestry, so a branch gated and then rebased by `wt.sh land` still counts when nothing else changed the code.
+2. **`clean` on every gate record.** `check.sh` records whether the tree had no uncommitted or untracked files at the start and
+   HEAD was unchanged at the end. Only clean runs are reusable; records written before this field are not.
+3. **`main-gate.sh idle` after each landing.** `scripts/wt.sh land` starts it in the background from main's own copy of the
+   script. It runs `once` only while the machine gate lock is free, polls the lock every 5 s and kills its run the moment a session
+   queues (no session waits on it; a yielded run leaves no record in `runs.jsonl`), and a landing during a run makes it go again
+   on the newer main. Logs go to
+   `data-scratch/main-gate/idle.log`; `MAIPAI_WT_NO_MAIN_GATE=1` turns it off for one `land`. A red still writes the note and never
+   reverts (GATE-FAST-01).
+
+Replayed against the eight 2026-10-19 releases before step 3 existed, step 1 alone found no reusable run for any of them: each
+release bundled several landings that were each gated narrow or on a branch, so no full run ever matched the shipped code.
+Step 3 is what makes it pay off. The clean-clone part of a release stays, as install, typecheck and build only.
 
 ## Muse Glimmer 30B is the chat model above 24 GB (STACK-MUSE-01, 2026-10-16)
 

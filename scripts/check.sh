@@ -23,6 +23,11 @@
 # --docs is kept only so an existing "docs commit" habit still works -
 # if the diff actually reaches wider than docs, the computed (wider)
 # scope runs instead and says so, rather than silently under-checking.
+#
+# --release (RELEASE-GATE-01, 2026-10-19): the release gate. When a clean,
+# green full run from the last 4 hours covers every code change in this
+# commit (scripts/gate/releaseGate.ts), it runs only the docs-scope checks
+# for the changelog and docs; otherwise it runs the full gate.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 GATE_COMMON_DIR="$(git rev-parse --git-common-dir)"
@@ -34,12 +39,14 @@ FULL_FORCED=0
 DOCS_REQUESTED=0
 PRE_ONLY=0
 BENCH_ONLY=0
+RELEASE_REQUESTED=0
 for arg in "$@"; do
   case "$arg" in
     --full) FULL_FORCED=1 ;;
     --docs) DOCS_REQUESTED=1 ;;
     --pre) PRE_ONLY=1 ;;
     --bench) BENCH_ONLY=1 ;;
+    --release) RELEASE_REQUESTED=1 ;;
   esac
 done
 
@@ -67,6 +74,12 @@ fi
 
 GATE_START_EPOCH=$(date +%s)
 GATE_STARTED_AT=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+# RELEASE-GATE-01: a release reuses a green full run only when that run
+# tested exactly a commit (no uncommitted or untracked files at the start,
+# and HEAD unchanged at the end), so record the tree state now.
+GATE_START_HEAD="$(git rev-parse HEAD 2>/dev/null || echo unknown)"
+GATE_TREE_CLEAN=0
+[ -z "$(git status --porcelain 2>/dev/null)" ] && GATE_TREE_CLEAN=1
 GATE_STAGE_LOG="$(mktemp)"
 GATE_FAILURE_LOG="$(mktemp)"
 GATE_FIRST_RED=""
@@ -142,6 +155,7 @@ on_exit() {
       GATE_STATS_WORKTREE="$(pwd -P)" GATE_STATS_SCOPE="${SCOPE:-unknown}" GATE_STATS_SCOPE_REASON="${SCOPE_WHY:-unknown}" \
       GATE_STATS_LOAD="$GATE_LOAD" GATE_STATS_LOCK_WAIT="$GATE_LOCK_WAIT" GATE_STATS_HEAD="$(git rev-parse HEAD 2>/dev/null || echo unknown)" \
       GATE_STATS_MERGE_BASE="${GATE_DIFF_BASE:-}" GATE_STATS_LANE="${GATE_LOCK_LABEL:-none}" GATE_STATS_KIND="$GATE_RUN_KIND" \
+      GATE_STATS_CLEAN="$([ "$GATE_TREE_CLEAN" = 1 ] && [ "$(git rev-parse HEAD 2>/dev/null)" = "$GATE_START_HEAD" ] && echo 1 || echo 0)" \
       bun scripts/gate/stats.ts "$GATE_STATS_OUTPUT" "$GATE_STAGE_LOG" "$GATE_FAILURE_LOG" || echo "gate stats append failed" >&2
   fi
   rm -f "$GATE_STAGE_LOG" "$GATE_FAILURE_LOG"
@@ -302,6 +316,14 @@ else
   if [ "$DOCS_REQUESTED" = 1 ] && [ "$SCOPE" != "docs" ]; then
     echo "== scope: $SCOPE ($SCOPE_WHY) - wider than the --docs requested, running $SCOPE instead of narrowing to it"
   fi
+fi
+if [ "$RELEASE_REQUESTED" = 1 ]; then
+  if RELEASE_WHY="$(MAIPAI_GATE_STATS_OUTPUT="$GATE_STATS_OUTPUT" bun scripts/gate/releaseGate.ts)"; then
+    SCOPE=docs
+  else
+    SCOPE=full
+  fi
+  SCOPE_WHY="${RELEASE_WHY#release gate: }"
 fi
 echo "== scope: $SCOPE ($SCOPE_WHY)"
 if [ -z "${GATE_DIFF_BASE:-}" ]; then GATE_DIFF_BASE="$(gate_diff_base 2>/dev/null || true)"; fi

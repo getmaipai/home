@@ -32,8 +32,9 @@ function commit(name: string) {
   return git(["rev-parse", "HEAD"]);
 }
 
-function invoke(gate: string) {
-  return run("bash", [fixtureScript, "once"], repo, {
+function invoke(gate: string, mode = "once", env: Record<string, string> = {}) {
+  return run("bash", [fixtureScript, mode], repo, {
+    ...env,
     MAIPAI_MAIN_GATE_CMD: gate,
     MAIPAI_MAIN_GATE_ROOT: repo,
     MAIPAI_MAIN_GATE_WT: wt,
@@ -131,6 +132,61 @@ describe("main-gate", () => {
     const result = invoke("echo '== backend: bun test'; echo 'failure details'; exit 1");
     const note = readNote(join(repo, "data-scratch", "main-gate", `${sha}.md`), result);
     expect(note).not.toContain("Probable cause");
+  });
+
+  // RELEASE-GATE-01: the idle run after a landing never makes a session wait for the gate lock.
+  function fakeLock(script: string) {
+    writeFileSync(join(sandbox, "standards", "standards", "bin", "gate-lock.sh"), `#!/usr/bin/env bash\n${script}\n`);
+  }
+
+  test("idle runs the gate when the lock is free", () => {
+    fakeLock('[ "$1" = status ] && echo free');
+    const sha = commit("idle landing");
+    const result = invoke("exit 0", "idle", { MAIPAI_MAIN_GATE_POLL_SECONDS: "1" });
+    expect(result.status, result.stderr + result.stdout).toBe(0);
+    expect(readFileSync(join(repo, "data-scratch", "main-gate", "last-green"), "utf8").trim()).toBe(sha);
+  });
+
+  test("idle appends the gate's own stats record when the run finishes", () => {
+    fakeLock('[ "$1" = status ] && echo free');
+    commit("idle landing");
+    const result = invoke('echo "{\\"exit\\":0}" >> "$MAIPAI_GATE_STATS_OUTPUT"; exit 0', "idle", { MAIPAI_MAIN_GATE_POLL_SECONDS: "1" });
+    expect(result.status, result.stderr + result.stdout).toBe(0);
+    expect(readFileSync(join(repo, "data-scratch", "gate-stats", "runs.jsonl"), "utf8").trim()).toBe('{"exit":0}');
+  });
+
+  test("a second idle call while one runs asks it to go again instead of starting another", () => {
+    fakeLock('[ "$1" = status ] && echo free');
+    mkdirSync(join(repo, "data-scratch", "main-gate", "idle.run"), { recursive: true });
+    writeFileSync(join(repo, "data-scratch", "main-gate", "idle.run", "pid"), `${process.pid}\n`);
+    commit("idle landing");
+    const result = invoke("echo should-not-run; exit 1", "idle");
+    expect(result.status).toBe(0);
+    expect(result.stdout).toContain("already going");
+    expect(existsSync(join(repo, "data-scratch", "main-gate", "idle.again"))).toBe(true);
+  });
+
+  test("idle skips when another gate holds the lock", () => {
+    fakeLock('[ "$1" = status ] && echo "held: home-1\t\t1\tnow"');
+    commit("idle landing");
+    const result = invoke("echo should-not-run; exit 1", "idle");
+    expect(result.status).toBe(0);
+    expect(result.stdout).toContain("gate lock is busy");
+    expect(readFileSync(join(repo, "data-scratch", "main-gate", "last-green"), "utf8").trim()).toBe(base);
+  });
+
+  test("idle yields when a session queues for the lock mid-run", () => {
+    const calls = join(sandbox, "lock-calls");
+    fakeLock(`[ "$1" = status ] || exit 0; echo x >> ${calls}; echo free; [ "$(wc -l < ${calls})" -gt 1 ] && printf 'queue:\n  home-2\n'; exit 0`);
+    commit("idle landing");
+    const started = Date.now();
+    const result = invoke("sleep 20; exit 0", "idle", { MAIPAI_MAIN_GATE_POLL_SECONDS: "1" });
+    expect(result.status, result.stderr + result.stdout).toBe(0);
+    expect(result.stdout).toContain("yielded");
+    expect(Date.now() - started).toBeLessThan(10_000);
+    expect(readFileSync(join(repo, "data-scratch", "main-gate", "last-green"), "utf8").trim()).toBe(base);
+    expect(existsSync(join(repo, "data-scratch", "main-gate", "idle.run"))).toBe(false);
+    expect(existsSync(join(repo, "data-scratch", "gate-stats", "runs.jsonl"))).toBe(false);
   });
 
   test("unchanged tip is a no-op", () => {

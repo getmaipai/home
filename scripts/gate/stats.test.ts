@@ -51,6 +51,7 @@ describe("gate run statistics", () => {
       failing_test_names: ["(fail) fixture > fails"],
       load_at_lock_time: "3.1 2.8 2.2",
       lock_wait_seconds: 9,
+      clean: false,
       stages: [{ stage: "backend: typecheck", seconds: 12 }, { stage: "backend: bun test", seconds: 30 }],
     });
   });

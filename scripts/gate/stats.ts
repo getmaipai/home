@@ -19,10 +19,13 @@ export type GateRun = {
   head: string;
   merge_base: string;
   lane: string;
+  /** True when the run tested exactly `head`: a clean tree at the start and HEAD unchanged at the end (RELEASE-GATE-01). */
+  clean: boolean;
   stages: GateStage[];
 };
 
-export type GateRunInput = Omit<GateRun, "run_kind" | "seconds" | "first_red_stage" | "failing_test_names" | "flaky_tests" | "stages"> & {
+export type GateRunInput = Omit<GateRun, "run_kind" | "seconds" | "first_red_stage" | "failing_test_names" | "flaky_tests" | "stages" | "clean"> & {
+  clean?: boolean;
   run_kind: "gate" | "pre";
   start_epoch: number;
   stages_log: string;
@@ -79,6 +82,7 @@ export function makeGateRun(input: GateRunInput, endedAt = new Date()): GateRun 
     head: input.head,
     merge_base: input.merge_base,
     lane: input.lane,
+    clean: input.clean === true,
     stages,
   };
 }
@@ -116,6 +120,7 @@ if (import.meta.main) {
     head: env.GATE_STATS_HEAD ?? "unknown",
     merge_base: env.GATE_STATS_MERGE_BASE ?? "",
     lane: env.GATE_STATS_LANE ?? "unknown",
+    clean: env.GATE_STATS_CLEAN === "1",
     stages_log: lines(stagesLog).join("\n"),
     failures_log: lines(failuresLog).join("\n"),
   });

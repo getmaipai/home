@@ -11,11 +11,43 @@ LOCK="${MAIPAI_STANDARDS_DIR:-$ROOT/../.github}/standards/bin/gate-lock.sh"
 GATE_CMD="${MAIPAI_MAIN_GATE_CMD:-bash scripts/check.sh}"
 
 git_root() { git -C "$ROOT" rev-parse --show-toplevel; }
+YIELDED=75
+GATE_PID=""
+kill_tree() {
+  local child
+  for child in $(pgrep -P "$1" 2>/dev/null); do kill_tree "$child"; done
+  kill -TERM "$1" 2>/dev/null || true
+}
+lock_queued() { bash "$LOCK" status 2>/dev/null | grep -q '^queue:'; }
 run_gate() {
   local output="$1" status_file="$2"
   set +e
-  (cd "$WT" && export MAIPAI_COMMONS_DIR="${MAIPAI_COMMONS_DIR:-$ROOT/../commons}" MAIPAI_STANDARDS_DIR="${MAIPAI_STANDARDS_DIR:-$ROOT/../.github}"; eval "$GATE_CMD") >"$output" 2>&1
-  local rc=$?
+  local stats_tmp="" rc
+  # idle mode: the gate's runs.jsonl record is held back until the run ends, so a yielded run is not logged as red.
+  [[ -n "${MAIN_GATE_YIELD:-}" ]] && stats_tmp="$(mktemp)"
+  (cd "$WT" && export MAIPAI_COMMONS_DIR="${MAIPAI_COMMONS_DIR:-$ROOT/../commons}" MAIPAI_STANDARDS_DIR="${MAIPAI_STANDARDS_DIR:-$ROOT/../.github}"
+   [[ -z "$stats_tmp" ]] || export MAIPAI_GATE_STATS_OUTPUT="$stats_tmp"
+   eval "$GATE_CMD") >"$output" 2>&1 &
+  GATE_PID=$!
+  if [[ -n "$stats_tmp" ]]; then
+    # A session that queues for the machine gate lock never waits on this run.
+    while kill -0 "$GATE_PID" 2>/dev/null; do
+      if lock_queued; then
+        kill_tree "$GATE_PID"; wait "$GATE_PID" 2>/dev/null; GATE_PID=""
+        rm -f "$stats_tmp"; printf '%s\n' "$YIELDED" > "$status_file"; set -e; return 0
+      fi
+      sleep "${MAIPAI_MAIN_GATE_POLL_SECONDS:-5}"
+    done
+  fi
+  wait "$GATE_PID"
+  rc=$?
+  GATE_PID=""
+  if [[ -n "$stats_tmp" ]]; then
+    local runs="$ROOT/data-scratch/gate-stats/runs.jsonl"
+    mkdir -p "$(dirname "$runs")"
+    [[ ! -s "$stats_tmp" ]] || cat "$stats_tmp" >> "$runs"
+    rm -f "$stats_tmp"
+  fi
   set -e
   printf '%s\n' "$rc" > "$status_file"
   return 0
@@ -92,6 +124,8 @@ once() {
     origin_main="$(git -C "$WT" rev-parse FETCH_HEAD)"
     git -C "$WT" checkout --detach "$origin_main"
     git -C "$WT" reset --hard "$origin_main"
+    # Untracked leftovers would mark the run as not clean, and a release could not reuse it.
+    git -C "$WT" clean -fdq
   else
     git -C "$ROOT" worktree add --detach "$WT" "$origin_main"
   fi
@@ -103,6 +137,11 @@ once() {
   output="$(mktemp)"; status_file="$(mktemp)"
   run_gate "$output" "$status_file"
   rc="$(cat "$status_file")"
+  if (( rc == YIELDED )); then
+    echo "main-gate: yielded $origin_main to a session waiting for the gate lock; the next landing tries again"
+    rm -f "$output" "$status_file"
+    return 0
+  fi
   # A failing check.sh stage is the last started stage before its final report.
   stage="$(awk '/^== / && $0 !~ /all checks passed/{s=substr($0,4)} END{print s}' "$output")"
   if (( rc != 0 )); then
@@ -145,8 +184,43 @@ once() {
   return 1
 }
 
+# RELEASE-GATE-01 (2026-10-19): `wt.sh land` starts `idle` in the background
+# after each landing so main's newest commit gets a clean full gate a release
+# can reuse (check.sh --release). It runs only while the machine gate lock is
+# free and yields the moment a session queues for it. One idle run at a time;
+# a landing during a run asks that run to go again on the newer main.
+idle() {
+  mkdir -p "$STATE"
+  local running="$STATE/idle.run" again="$STATE/idle.again"
+  # mkdir is atomic, so two landings at the same moment cannot both start a run.
+  if ! mkdir "$running" 2>/dev/null; then
+    if kill -0 "$(cat "$running/pid" 2>/dev/null)" 2>/dev/null; then
+      touch "$again"
+      echo "main-gate: an idle run is already going; it will check the newer main when it ends"
+      return 0
+    fi
+    rm -rf "$running"
+    mkdir "$running" 2>/dev/null || { touch "$again"; echo "main-gate: another idle run just started"; return 0; }
+  fi
+  echo "$$" > "$running/pid"
+  # Killing this run also stops its gate, so it never keeps the machine lock unattended.
+  # shellcheck disable=SC2064 # expand now: $running is local and gone by the time the trap fires
+  trap "[[ -z \"\$GATE_PID\" ]] || kill_tree \"\$GATE_PID\"; rm -rf '$running'" EXIT
+  trap 'exit 143' TERM INT HUP
+  while :; do
+    rm -f "$again"
+    if [[ "$(bash "$LOCK" status 2>/dev/null | head -1)" != free ]]; then
+      echo "main-gate: the gate lock is busy, skipped; the next landing tries again"
+      return 0
+    fi
+    MAIN_GATE_YIELD=1 once || true
+    [[ -f "$again" ]] || return 0
+  done
+}
+
 case "${1:-once}" in
   once) once ;;
+  idle) idle ;;
   loop) echo "main-gate: the loop mode was retired on 2026-10-16 (GATE-FAST-01); run 'once' from launchd daily or by hand." >&2; exit 2 ;;
-  *) echo "usage: main-gate.sh [once]" >&2; exit 2 ;;
+  *) echo "usage: main-gate.sh [once|idle]" >&2; exit 2 ;;
 esac
