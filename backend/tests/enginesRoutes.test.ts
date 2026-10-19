@@ -273,7 +273,7 @@ describe("/api/engines", () => {
   test("POST /settings/apply sends the values through and returns the new state", async () => {
     let seenBody: unknown;
     configure({
-      "POST /stack/v1/settings/apply": async (req) => {
+      "PUT /stack/v1/settings": async (req) => {
         seenBody = await req.json();
         return Response.json({ sections: [{ id: "chat", label: "Chat" }], settings: [{ ...STACK_SETTING_FIXTURE, in_effect: false }] });
       },

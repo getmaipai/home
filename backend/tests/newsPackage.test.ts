@@ -27,8 +27,8 @@ test("News declares list rows, local person keys and the shelf matrix without pr
   expect(manifest.contributes.data.filter((entry: { rows?: string }) => entry.rows === "list").map((entry: { id: string }) => entry.id)).toEqual(["topics", "sources", "saved", "search-recents"]);
   for (const key of manifest.config) expect(SettingsKey.safeParse(key).success).toBe(true);
   expect(manifest.config.filter((key: { scope: string }) => key.scope === "person").map((key: { key: string }) => key.key)).toEqual(["news.my_mix", "news.reader_open", "news.digest"]);
-  expect(manifest.contributes.settings_area.sections[1].min_role).toBe("admin");
-  expect(manifest.contributes.settings_area.sections[1].cards[0].matrix.columns.map((column: { band: string }) => column.band)).toEqual(["child", "teen", "adult"]);
+  expect(manifest.contributes.settings_area.sections[2].min_role).toBe("admin");
+  expect(manifest.contributes.settings_area.sections[2].cards[0].matrix.columns.map((column: { band: string }) => column.band)).toEqual(["child", "teen", "adult"]);
   expect(manifest.contributes.widgets[0]).toEqual({ id: "headlines", title: "News", size: "row", refresh_s: 900, inputs: {} });
 });
 
