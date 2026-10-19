@@ -685,7 +685,7 @@ aider --model openai/maipai-coder`, "Continue and Cline use the same address and
       </div>
       <div class="card"><div class="ch">${ic("history")}Today</div><div class="counts"><div><b>184</b><span>Requests</span></div><div><b>1.2M</b><span>Words read</span></div><div><b>96k</b><span>Words written</span></div><div><b>0</b><span>Refused</span></div></div></div>
     </div></div></div>`;
-  R.newkey = () => { S.newKey = S.newKey || "maipai_key_8hq2_r4nk7vd2w9xyc3qmz6tbf5ejpls8ua7gh1okr7Qe"; return R.keys(); };
+  R.newkey = () => { S.newKey = S.newKey || "maipai_key_example_0000_demo_key_shown_once"; return R.keys(); };
 
   // Code app
   function slist(curId) {
@@ -852,7 +852,7 @@ aider --model openai/maipai-coder`, "Continue and Cline use the same address and
     if (d.net) { S.net = d.net; return render(); }
     if (d.host) { S.hosts[d.host] = !S.hosts[d.host]; return render(); }
     if (d.step) { const lim = { maxS: [1, 4], perP: [1, 4], rpm: [10, 600] }[d.step]; const inc = d.step === "rpm" ? 10 : 1; S[d.step] = Math.max(lim[0], Math.min(lim[1], S[d.step] + (+d.d) * inc)); return render(); }
-    if (d.newkey !== undefined) { S.creating = true; S.screen = "newkey"; S.newKey = "maipai_key_8hq2_r4nk7vd2w9xyc3qmz6tbf5ejpls8ua7gh1okr7Qe"; render(); $("#dlg").innerHTML = keyDialog(); $("#dlg").hidden = false; return; }
+    if (d.newkey !== undefined) { S.creating = true; S.screen = "newkey"; S.newKey = "maipai_key_example_0000_demo_key_shown_once"; render(); $("#dlg").innerHTML = keyDialog(); $("#dlg").hidden = false; return; }
     if (d.mkkey !== undefined) { S.creating = false; S.keys = 3; render(); $("#dlg").innerHTML = keyDialog(); $("#dlg").hidden = false; return; }
     if (d.closedlg !== undefined) { closeAll(); if (S.screen === "pr") { S.screen = "session"; render(); } if (S.screen === "newkey") { S.showKey = false; S.keys = 3; render(); toast("The key is hidden for good. Make a new one if you lose it."); } return; }
     if (d.snip) { S.snip = d.snip; return render(); }
@@ -892,7 +892,7 @@ aider --model openai/maipai-coder`, "Continue and Cline use the same address and
   const hs = location.hash.slice(1).split("-");
   for (const h of hs) {
     if (h === "how") view("how");
-    else if (SCREENS.some(([k]) => k === h)) { S.screen = h; if (h === "plan") { S.mode = "plan"; } if (h === "changes") S.tab = "changes"; if (h === "terminal") S.tab = "terminal"; if (h === "newkey") { S.newKey = "maipai_key_8hq2_r4nk7vd2w9xyc3qmz6tbf5ejpls8ua7gh1okr7Qe"; S.showKey = true; S.keys = 3; } }
+    else if (SCREENS.some(([k]) => k === h)) { S.screen = h; if (h === "plan") { S.mode = "plan"; } if (h === "changes") S.tab = "changes"; if (h === "terminal") S.tab = "terminal"; if (h === "newkey") { S.newKey = "maipai_key_example_0000_demo_key_shown_once"; S.showKey = true; S.keys = 3; } }
     else if (h === "phone" || h === "desktop") { S.size = h; $$(".bar [data-size]").forEach((x) => x.setAttribute("aria-pressed", x.dataset.size === h)); }
     else if (h === "paused") { S.paused = true; syncPause(); }
   }
