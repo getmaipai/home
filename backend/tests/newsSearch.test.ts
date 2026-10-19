@@ -179,11 +179,12 @@ describe("the Search page's data", () => {
   async function seed() {
     installNewsApp();
     const who = await household();
-    const a = putItem(feeds.household, ADULT_HOST, { title: "Harbor council votes", summary: "The council met on Tuesday.", topics: ["local"], ageHours: 1 });
+    // Items that must count as "Today" are minutes old, so the test does not depend on the time of day (an hour-old item falls on yesterday just after local midnight).
+    const a = putItem(feeds.household, ADULT_HOST, { title: "Harbor council votes", summary: "The council met on Tuesday.", topics: ["local"], ageHours: 0.1 });
     const b = putItem(feeds.household, ADULT_HOST, { title: "Science of harbor seals", topics: ["science"], ageHours: 30 });
-    const c = putItem(feeds.household, ADULT_HOST, { title: "Stock markets close", topics: ["business"], ageHours: 2 });
-    const adultOnly = putItem(feeds.household, ADULT_HOST, { title: "Harbor adult only", bandOk: "adult", ageHours: 2 });
-    const kid = putItem(feeds.kids, KIDS_HOST, { title: "Otters tour the harbor", topics: ["kids"], ageHours: 3 });
+    const c = putItem(feeds.household, ADULT_HOST, { title: "Stock markets close", topics: ["business"], ageHours: 0.2 });
+    const adultOnly = putItem(feeds.household, ADULT_HOST, { title: "Harbor adult only", bandOk: "adult", ageHours: 0.2 });
+    const kid = putItem(feeds.kids, KIDS_HOST, { title: "Otters tour the harbor", topics: ["kids"], ageHours: 0.3 });
     return { who, a, b, c, adultOnly, kid };
   }
 
