@@ -7,6 +7,16 @@ checklist (`docs/dev.md`). The first release is 0.1.0.
 
 ## [Unreleased]
 
+## [0.2.35] - 2026-10-19
+
+Pictures that fail to load show a neutral placeholder instead of a broken-image icon, and an adult can use the coding tools on files that mention child protections. No database migrations. Pins: ui-v0.5.303 (spec stays 0.1.192).
+
+### Changed
+- **A picture that cannot load shows a placeholder tile, not a broken-image icon.** The Library's thumbnails and the pictures in chat use one shared picture part, so a picture that fails to load looks the same everywhere.
+
+### Fixed
+- **An adult's coding session is no longer refused for reading or editing files about child protections.** Home's own safety code and its tests name minors and sexual content on purpose, and the coding tools were stopping on those words. Adults now follow the same rule as adult chat: a request that asks for sexual content involving a minor is still refused. Teens and children keep the full set of checks.
+
 ## [0.2.34] - 2026-10-19
 
 Songs get one Edit panel and play the same way in the Library as in chat, and an adult can talk about a film plot without the child-safety stop. No database migrations.
