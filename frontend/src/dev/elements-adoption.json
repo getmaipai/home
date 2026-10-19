@@ -1,6 +1,6 @@
 {
-  "generatedAt": "2026-10-19T16:56:43.078Z",
-  "kitTag": "ui-v0.5.301",
+  "generatedAt": "2026-10-19T17:14:25.353Z",
+  "kitTag": "ui-v0.5.302",
   "items": [
     {
       "file": "ActivityCardsShowcase.tsx",
@@ -34,6 +34,14 @@
       "verdictReason": "Developer-only story fixture for DataTable row selection (ui-v0.5.283), covered by the Commons showcase tests; not a standalone Home product surface.",
       "implemented": false,
       "reading": "Developer-only story fixture for DataTable row selection (ui-v0.5.283), covered by the Commons showcase tests; not a standalone Home product surface."
+    },
+    {
+      "file": "DraftRestoreComposerShowcase.tsx",
+      "name": "DraftRestoreComposerShowcase",
+      "group": "DraftRestoreComposerShowcase",
+      "verdict": "support",
+      "verdictReason": "Developer-only story fixture for the draft card above the composer (ui-v0.5.302), covered by the Commons showcase tests; not a standalone Home product surface.",
+      "implemented": false
     },
     {
       "file": "K02bShowcase.tsx",
@@ -439,6 +447,14 @@
       "verdict": "wire-after",
       "verdictReason": "Deferred until retrieval anchors from the document tool (ATTACH-PREVIEW-01).",
       "implemented": false
+    },
+    {
+      "file": "draft-restore-context.ts",
+      "name": "draft-restore-context",
+      "group": "draft-restore",
+      "verdict": "support",
+      "verdictReason": "Kit-internal context that lifts the draft card above the composer input; Home keeps its existing slot code and uses no new surface.",
+      "implemented": true
     },
     {
       "file": "draft-restore.tsx",
