@@ -171,6 +171,8 @@ export interface RoleInfo extends ChatRoleContext {
    * one the Stack pinned (`expected`); for the embed role both are the .gguf
    * file name. Absent on an older Stack. */
   identity?: { ok: boolean; expected: string | null; actual: string | null; reason: string | null };
+  /** CODE-STACK-01: the coding role only. Which engine serves it and why the faster one is not in use; absent on other roles and on an older Stack. */
+  coding?: { state: "notInstalled" | "installed" | "loading" | "ready" | "busy" | "offline"; engine?: "llama-server" | "splash"; engine_requested?: "auto" | "llama-server" | "splash"; engine_reason?: string | null; cannot_fit_reason?: string | null; keep_warm_minutes?: number };
   /** Models the Stack can select for a chat request. Present on the chat
    * role response; absent when Home itself is the source of role state. */
   models?: Array<{ id: string; name: string }>;

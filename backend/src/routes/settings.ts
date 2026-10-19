@@ -7,6 +7,8 @@ import { eq } from "drizzle-orm";
 import type { PersonRow } from "@/types";
 import { listValues, setValue, resetValue } from "@/lib/settings";
 import { getRegistry } from "@/lib/settingsRegistry";
+import { ensureCodingPiecesFresh } from "@/lib/stackCodingPieces";
+import { isCodingStackKey, pushCodingSettings } from "@/lib/stackCodingSync";
 import { issueApiToken, revokeApiToken, listApiKeys, listApiKeysForAdmin, createApiKey, renameApiKey, revokeApiKey, CreateApiKeyInput } from "@/lib/apiKeys";
 import { SettingsKey } from "@maipai/spec/gen/ts/settings-key.js";
 import { listRobotsPairedUnderPerson, publishSettingsChanged } from "@/lib/deviceCommands";
@@ -159,6 +161,8 @@ settingsRoutes.openapi(putRoute, async (c) => {
   if (body.scope === "household" && body.key === ENGINE_WHERE_KEY) await applyEngineWhere(body.value);
   else if (body.scope === "household" && ["engines.stack.remote.host", "engines.stack.remote.ssh_port", "engines.stack.remote.local_port", "engines.stack.remote.allow_tailnet"].includes(body.key)) refreshConfiguredEngineLink();
   publishSettingsChanged(body.scope, body.key, result.value.value);
+  // CODE-STACK-01 H2: a coding setting the Stack reads goes to the Stack now; the answer to the save does not wait on it failing.
+  if (body.scope === "household" && isCodingStackKey(body.key)) await pushCodingSettings([body.key]);
   const personScope = /^person:([a-z0-9-]+)$/.exec(body.scope);
   if (personScope && body.key === "tts.voice_id") refreshRobotClips(listRobotsPairedUnderPerson(personScope[1]!));
   if (body.scope === "household" && ["home.base_url", "home.access_token"].includes(body.key)) refreshHomeAssistantEvents();
@@ -209,6 +213,7 @@ settingsRoutes.openapi(resetRoute, async (c) => {
   }
   if (body.scope === "household" && body.key === "search.searxng_url") await checkSearchInstance({ force: true });
   publishSettingsChanged(body.scope, body.key, result.value.value);
+  if (body.scope === "household" && isCodingStackKey(body.key)) await pushCodingSettings([body.key]);
   if (body.scope === "household" && ["home.base_url", "home.access_token"].includes(body.key)) refreshHomeAssistantEvents();
   if (body.scope === "household" && body.key === "safety.alarm.sensors") refreshSafetyAlarmSensors();
   if (body.scope === "household" && ["network.lan_exposure", "network.hub_port"].includes(body.key)) scheduleHubRestart();
@@ -277,7 +282,10 @@ settingsRoutes.openapi(createRoute({
   summary: "List the signed-in person's keys (never a secret)",
   middleware: [requireAuth] as const,
   responses: { 200: { content: { "application/json": { schema: z.object({ keys: z.array(ApiKeySchema) }) } }, description: "The person's keys." }, ...errorResponses({ 401: "Not signed in" }) },
-}), (c) => c.json({ keys: listApiKeys(c.get("person")) }, 200));
+}), async (c) => {
+  await ensureCodingPiecesFresh();
+  return c.json({ keys: listApiKeys(c.get("person")) }, 200);
+});
 
 settingsRoutes.openapi(createRoute({
   method: "post", path: "/api-keys", tags: ["Settings"],
@@ -322,8 +330,9 @@ settingsRoutes.openapi(createRoute({
   request: { params: z.object({ personId: z.string() }) },
   responses: { 200: { content: { "application/json": { schema: z.object({ keys: z.array(AdminApiKeySchema) }) } }, description: "The person's keys, without private details." },
     ...errorResponses({ 401: "Not signed in", 403: "Not allowed", 404: "No such person" }) },
-}), (c) => {
+}), async (c) => {
   const target = db.select().from(people).where(eq(people.id, c.req.valid("param").personId)).get() as PersonRow | undefined;
   if (!target || target.deletedAt) return c.json({ error: "No such person. Reload the people list and try again." }, 404);
+  await ensureCodingPiecesFresh();
   return c.json({ keys: listApiKeysForAdmin(target) }, 200);
 });

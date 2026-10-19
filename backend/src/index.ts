@@ -45,6 +45,7 @@ import { KeystoreProtectionFailedError } from "@/lib/keystore";
 import { recordBootGap, recordStatusSample, pruneStatusEvents } from "@/lib/statusHistory";
 import { runConfiguredInternetProbe } from "@/lib/internetProbe";
 import { warmStack } from "@/lib/stackWarmup";
+import { pushCodingSettings } from "@/lib/stackCodingSync";
 import { syncStackRequirementIssue } from "@/lib/stackRequirement";
 import { initSafetyAlarm } from "@/lib/safetyAlarm";
 import { migratePendingAsksThroughGate } from "@/lib/gate/pendingAskMigration";
@@ -273,6 +274,8 @@ await initCrashBootHold();
 void startKiwixSidecar();
 // STACK-DDGS-01: learn the Stack's DuckDuckGo search service address and health (never throws, never blocks boot).
 startDdgsStackSync();
+// CODE-STACK-01 H2: Home's coding settings are the Stack's source; send them at start (never throws; the Stack may not be up yet and gets them on the next change).
+void pushCodingSettings();
 void startAllSidecars();
 resumeReferenceJobsOnBoot();
 // Warm Home-owned chat when the Stack does not serve it.

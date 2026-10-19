@@ -81,15 +81,20 @@ function newestPerModel(jobs: StackJob[]): StackJob[] {
   return [...byModel.values()].sort((a, b) => a.createdAt.localeCompare(b.createdAt));
 }
 
+function isCodingEngineInstall(job: StackJob): boolean {
+  return job.kind === "engine.install" && typeof job.input?.engine === "string" && job.input.engine.startsWith("splash");
+}
+
 /** The component installs still moving. A finished or failed one is not shown here: a failure is a Repairs item with Try again (the Stack raises it). */
 export function summarizeBackground(allJobs: StackJob[]): BackgroundInstall | null {
-  const active = allJobs.filter((job) => job.kind === "component.install" && (job.state === "queued" || job.state === "running" || job.state === "stalled"));
+  // CODE-STACK-01 H1: the Splash coding engine installs by its own job kind; it rides the strip beside the component installs.
+  const active = allJobs.filter((job) => (job.kind === "component.install" || isCodingEngineInstall(job)) && (job.state === "queued" || job.state === "running" || job.state === "stalled"));
   if (active.length === 0) return null;
   const completedBytes = active.reduce((sum, job) => sum + job.completedBytes, 0);
   const totalBytes = active.reduce((sum, job) => sum + job.totalBytes, 0);
   const speed = active.reduce((sum, job) => sum + (job.bytesPerSecond ?? 0), 0);
   const left = Math.max(0, totalBytes - completedBytes);
-  const name = (job: StackJob): string => typeof job.input?.label === "string" ? job.input.label : "more AI";
+  const name = (job: StackJob): string => typeof job.input?.label === "string" ? job.input.label : isCodingEngineInstall(job) ? "the coding engine" : "more AI";
   const stalled = active.every((job) => job.state === "stalled");
   return {
     state: stalled ? "stalled" : "running",

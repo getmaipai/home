@@ -96,3 +96,31 @@ test("the picture engine has no build of its own: only real engines are installe
   await startSetupDownloads(client, { selected: ["chat", "pictures", "video"] });
   expect(installed.sort()).toEqual(["llama-server", "video-gen"]);
 });
+
+// CODE-STACK-01 H1: the recommended setup installs the coding engine and model from the Stack's own plan. The coding model and,
+// where Splash can run, its draft (which names the splash engine) are rows of the Stack's plan; nothing here names Splash or sizes.
+test("the Stack's plan carries the coding model and its Splash draft, so setup installs the Splash engine and both pulls", async () => {
+  const order: string[] = [];
+  const pull = (id: string, role: string, engine: string) => ({ id, role, revision: "r", licence: "Apache-2.0", engine, url: `https://example.invalid/${id}`, sha256: "a".repeat(64), starter: false, installed: false });
+  const client: SetupDownloadClient = {
+    modelCatalog: async () => ({ models: [] }),
+    installPlan: async () => ({ level: "p128", models: [pull("chat-a", "chat", "llama-server"), pull("coding-model", "coding", "llama-server"), pull("coding-draft", "coding", "splash")], optional_models: [] } as never),
+    engineAction: async (name, action) => { order.push(`${action}:${name}`); return {}; },
+    pullModel: async ({ id }) => { order.push(`pull:${id}`); return {}; },
+  };
+  await startSetupDownloads(client);
+  expect(order.slice(0, 2)).toEqual(["install:llama-server", "install:splash"]);
+  expect(order.filter((step) => step.startsWith("pull:")).sort()).toEqual(["pull:chat-a", "pull:coding-draft", "pull:coding-model"]);
+});
+
+test("on a computer whose plan has no coding rows, setup installs no Splash engine", async () => {
+  const order: string[] = [];
+  const client: SetupDownloadClient = {
+    modelCatalog: async () => ({ models: [] }),
+    installPlan: async () => ({ level: "p32", models: [{ id: "chat-a", role: "chat", revision: "r", licence: "MIT", engine: "llama-server", url: "https://example.invalid/a", sha256: "a".repeat(64), starter: true, installed: false }], optional_models: [] } as never),
+    engineAction: async (name, action) => { order.push(`${action}:${name}`); return {}; },
+    pullModel: async ({ id }) => { order.push(`pull:${id}`); return {}; },
+  };
+  await startSetupDownloads(client);
+  expect(order).toEqual(["install:llama-server", "pull:chat-a"]);
+});

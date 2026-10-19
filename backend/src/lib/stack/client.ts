@@ -139,6 +139,8 @@ export interface StackClient {
     action: "start" | "stop" | "restart" | "install",
     opts?: { signal?: AbortSignal },
   ): Promise<Record<string, unknown>>;
+  /** DELETE /stack/v1/engines/{name}/builds/{tag}: remove an installed engine build. The Stack refuses, in a sentence, while the build serves a running role. Optional so an older Stack or a test double without it still type-checks. */
+  removeEngineBuild?(name: string, tag: string, opts?: { signal?: AbortSignal }): Promise<{ ok: true }>;
   models(opts?: { signal?: AbortSignal }): Promise<Record<string, unknown>>;
   modelCatalog(opts?: { signal?: AbortSignal }): Promise<Record<string, unknown>>;
   /** POST /stack/v1/models: install a pinned model and start its download job. */
@@ -151,6 +153,10 @@ export interface StackClient {
   settings(opts?: { signal?: AbortSignal }): Promise<{ sections: Array<{ id: string; label: string }>; settings: StackSetting[] }>;
   applySettings(values: Record<string, unknown>, opts?: { signal?: AbortSignal }): Promise<{ sections: Array<{ id: string; label: string }>; settings: StackSetting[] }>;
   /** SEARXNG-SET-03: Stack-owned SearXNG settings preview and revert. */
+  /** PUT /stack/v1/settings: store values, validated against the Stack's declaration. A setting that needs a restart becomes pending; the rest take effect now. Optional so a test double without it still type-checks. */
+  updateSettings?(values: Record<string, unknown>, opts?: { signal?: AbortSignal }): Promise<{ sections: Array<{ id: string; label: string }>; settings: StackSetting[] }>;
+  /** POST /stack/v1/settings/apply with no body: promote every pending value to in effect. */
+  promotePendingSettings?(opts?: { signal?: AbortSignal }): Promise<{ sections: Array<{ id: string; label: string }>; settings: StackSetting[] }>;
   searchPreview(opts?: { signal?: AbortSignal }): Promise<Record<string, unknown>>;
   searchRevert(opts?: { signal?: AbortSignal }): Promise<Record<string, unknown>>;
   budget(opts?: { signal?: AbortSignal }): Promise<BudgetResponse>;
@@ -456,6 +462,7 @@ export function createStackClient(options: StackClientOptions = {}): StackClient
     }, opts),
     engineAction: (name, action, opts) =>
       call(`/stack/v1/engines/${encodeURIComponent(name)}/${action}`, { method: "POST" }, json<Record<string, unknown>>, opts),
+    removeEngineBuild: (name, tag, opts) => call(`/stack/v1/engines/${encodeURIComponent(name)}/builds/${encodeURIComponent(tag)}`, { method: "DELETE" }, json<{ ok: true }>, opts),
     models: (opts) => call("/stack/v1/models", { method: "GET" }, json<Record<string, unknown>>, opts),
     modelCatalog: (opts) => call("/stack/v1/models/catalog", { method: "GET" }, json<Record<string, unknown>>, opts),
     pullModel: (body, opts) => call("/stack/v1/models", jsonInit(body), json<Record<string, unknown>>, opts),
@@ -466,6 +473,8 @@ export function createStackClient(options: StackClientOptions = {}): StackClient
     healthFix: (code, opts) => call(`/stack/v1/health/${encodeURIComponent(code)}/fix`, { method: "POST" }, json<Record<string, unknown>>, opts),
     settings: (opts) => call("/stack/v1/settings", { method: "GET" }, json<{ sections: Array<{ id: string; label: string }>; settings: StackSetting[] }>, opts),
     applySettings: (values, opts) => call("/stack/v1/settings/apply", jsonInit(values), json<{ sections: Array<{ id: string; label: string }>; settings: StackSetting[] }>, opts),
+    updateSettings: (values, opts) => call("/stack/v1/settings", { ...jsonInit(values), method: "PUT" }, json<{ sections: Array<{ id: string; label: string }>; settings: StackSetting[] }>, opts),
+    promotePendingSettings: (opts) => call("/stack/v1/settings/apply", { method: "POST" }, json<{ sections: Array<{ id: string; label: string }>; settings: StackSetting[] }>, opts),
     searchPreview: (opts) => call("/stack/v1/search/preview", { method: "GET" }, json<Record<string, unknown>>, opts),
     searchRevert: (opts) => call("/stack/v1/search/revert", { method: "POST" }, json<Record<string, unknown>>, opts),
     budget: (opts) => call("/stack/v1/hardware/budget", { method: "GET" }, json<BudgetResponse>, opts),

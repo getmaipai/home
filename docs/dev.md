@@ -39,6 +39,40 @@ Changed files: `backend/src/lib/apiKeys.ts` (was `apiToken.ts`), `backend/src/li
 
 The spec pin 0.1.185 also declares `coding` sections in the home and account settings areas. Home hides them (`NOT_YET_BUILT_SECTIONS` in `frontend/src/shell/pages/settings/settingsAreas.ts`) until CODE-SET-01 builds the Coding screens, so no one sees switches that do nothing yet; the `coding.*` keys still exist in the registry and API.
 
+## Coding installs and settings: Home's side of CODE-STACK-01 H1 and H2 (CODE-SET-01 backend, 2026-10-19)
+
+Backend only; the Settings screens are the frontend slice of CODE-SET-01. Home installs no client in phase 1.
+
+**H1, the pieces (`/api/coding-setup`, owner and admin only).** `lib/stackCodingPieces.ts` reads the Stack (`GET /stack/v1/roles` coding block,
+`/engines`, `/models`, `/models/catalog`, the jobs list, `/components`) and answers three pieces: `engine` (Splash where the Stack chose or wants it,
+otherwise the shared llama-server, which cannot be removed here), `model` (the coding model, installed and removed through the component routes, so its
+Splash draft goes with it) and `draft` (shown with its own size, never installed or removed alone). Sizes are the Stack's (`sizeBytes`, else the catalog
+pin's `approx_bytes`); Home holds no numbers. The engine size is not shown (the Stack states none). Routes: `GET /pieces`, `POST /pieces/{id}/install`
+(202), `DELETE /pieces/{id}`. Removal while `coding.enabled` is on is refused with one sentence ("Coding is on ... Turn Coding off in Settings, then
+remove it."), without calling the Stack; the list reports it as `remove_block`. The Stack's own refusals (no room, an engine build still serving a role)
+pass through unchanged. Status uses the existing mechanisms: the Splash download rides the install strip (`summarizeBackground` counts the Stack's
+`engine.install` job for `splash`), a failed engine install raises a Repairs item (source `coding`, key `engine_install`, fix "Try again") that clears
+when Splash installs, and the Stack's `coding.engine-fallback` health item already reaches Repairs through `stackHealthSync`.
+
+**First run needs no new code.** The Stack's install plan lists the coding model and, where Splash can run, its draft (engine `splash`);
+`setup/checks/setupDownloads.ts` installs each engine a pull names before the pulls, so the recommended setup brings in Splash and both models on a
+qualifying machine and neither on a machine without those rows (both cases tested).
+
+**Keys while a piece is missing.** `mayHoldKey` in `lib/apiKeys.ts` also asks `missingCodingPiece()`: with the coding model missing or still downloading,
+or the shared engine missing, every coding key reads `suspended` and cannot authenticate or be made, and the voice key is untouched. The key check is
+synchronous, so the answer is the last reading (unknown reads as nothing missing, so a Stack that is briefly away never suspends keys); the pieces
+routes refresh it, and the key list routes refresh it when older than 30 seconds while Coding is on. The `/code/v1` gateway should call
+`ensureCodingPiecesFresh()` before its gate, and `missingCodingPiece()` is the sentence to put in its 503.
+
+**H2, the push (`lib/stackCodingSync.ts`).** The Stack keys are the ones in `stack/backend/src/settings.ts`: `coding.keep_warm_minutes`,
+`coding.thinking_budget_ceiling`, `coding.yield_to_chat`, `coding.engine` and `coding.splash_cache_gb` feed `stack.engines.coding.*`. The first two
+are in the pinned spec; the other three are declared in `settings/stackCodingKeys.ts` until a commons spec tag carries them (the spec change is owed).
+A save or reset of any of them calls `PUT /stack/v1/settings` and, when every pending Stack value is one of these keys, `POST /stack/v1/settings/apply`
+(the Stack's apply promotes every pending value, so another staged Stack setting is never promoted by a coding change). Values are clamped to the
+Stack's ranges (keep-warm floor 1 minute). A push is also sent at Home start. A Stack that is away never fails the save; the value stays in Home and
+goes out on the next change or start. Note: `StackClient.applySettings` posts its values to `/settings/apply`, which the Stack ignores (the Stack
+stores through `PUT /settings`); the voice token path uses it, so it needs the same check (not changed here).
+
 ## Music chat covers (2026-10-18)
 
 The chat song card passes stored cover art to MusicTrack and keeps its existing poll running while the cover picture is queued or running, with a 30 second startup grace and no wait for private chats or an absent picture engine.

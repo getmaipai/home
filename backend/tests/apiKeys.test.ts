@@ -7,6 +7,7 @@ import { newPersonId } from "@/lib/id";
 import { createApiKey, listApiKeys, renameApiKey, revokeApiKey, resolveApiKey, constantTimeHashEqual } from "@/lib/apiKeys";
 import { setHouseholdSettingValue } from "@/lib/settings";
 import { nextHlc } from "@/lib/hlc";
+import { __setMissingCodingPieceForTests } from "@/lib/stackCodingPieces";
 import { resetDb } from "./reset-db";
 import type { PersonRow } from "@/types";
 
@@ -221,4 +222,25 @@ test("a rotated compatibility token lasts about 365 days for adults and children
   for (let i = 0; i < 6; i++) hints.add(createApiKey(p, { name: `Code ${i}`, scopes: ["turn"] }).key.hint);
   expect(hints.size).toBeGreaterThan(1);
   for (const h of hints) expect(h).toMatch(/^[A-Z2-7]{4}$/);
+});
+
+// CODE-STACK-01 H1: a coding key is held suspended while the engine or the model it needs is not installed, and works again when it is back.
+test("a coding key is suspended while a coding piece is missing and active again when it returns; a voice key is unaffected", () => {
+  const p = person();
+  setHouseholdSettingValue("coding.enabled", true);
+  setHouseholdSettingValue("coding.adults_by_default", true);
+  keyPermission(p, true);
+  const { secret } = createApiKey(p, { name: "Code", scopes: ["code"] });
+  const { secret: turn } = createApiKey(p, { name: "Voice", scopes: ["turn"] });
+  try {
+    expect(resolveApiKey(secret, "code")?.id).toBe(p.id);
+    __setMissingCodingPieceForTests("The coding model is not installed. An admin can install it in Settings, Coding.");
+    expect(resolveApiKey(secret, "code")).toBeNull();
+    expect(listApiKeys(p).find(k => k.scopes.includes("code"))!.status).toBe("suspended");
+    expect(resolveApiKey(turn, "turn")?.id).toBe(p.id);
+    expect(() => createApiKey(p, { name: "Second", scopes: ["code"] })).toThrow();
+    __setMissingCodingPieceForTests(null);
+    expect(resolveApiKey(secret, "code")?.id).toBe(p.id);
+    expect(listApiKeys(p).find(k => k.scopes.includes("code"))!.status).toBe("active");
+  } finally { __setMissingCodingPieceForTests(null); }
 });

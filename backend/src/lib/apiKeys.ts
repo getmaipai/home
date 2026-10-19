@@ -10,6 +10,7 @@ import { newApiKeyId } from "@/lib/id";
 import { nextHlc } from "@/lib/hlc";
 import { effectivePermissions } from "@/lib/permissions";
 import { getHouseholdSettingValue, getPersonSettingValue } from "@/lib/settings";
+import { missingCodingPiece } from "@/lib/stackCodingPieces";
 import type { PersonRow } from "@/types";
 
 export type ApiKeyScope = "turn" | "code";
@@ -65,6 +66,8 @@ export function codeAdmission(person: PersonRow): CodeAdmission {
 function mayHoldKey(person: PersonRow, scope: ApiKeyScope): boolean {
   if (person.deletedAt) return false;
   if (scope === "turn") return true; // Preserve the interim voice token's admission rules.
+  // CODE-STACK-01 H1: a coding key is held suspended while the engine or the model it needs is not installed; it works again when the piece is back.
+  if (missingCodingPiece()) return false;
   return codeAdmission(person) === "ok";
 }
 function status(row: KeyRow, person: PersonRow): KeyRow["status"] {
