@@ -57,30 +57,65 @@ function clampOne(value: unknown, ceiling: number, field: string): number {
   return value < 0 ? ceiling : Math.min(Math.floor(value), ceiling);
 }
 
+/** The fields each wire defines and the coding role honours. Anything else a client sends (an engine's own `id_slot`, `lora`, `n_predict`, `grammar`, `cache_prompt`)
+ * is dropped. Thinking fields are not here: they are rebuilt below from the ceiling. */
+const ALLOWED: Record<CodeWire, readonly string[]> = {
+  messages: ["model", "messages", "system", "max_tokens", "stream", "tools", "tool_choice", "stop_sequences", "metadata"],
+  count_tokens: ["model", "messages", "system", "tools", "tool_choice"],
+  chat: ["model", "messages", "max_tokens", "max_completion_tokens", "stream", "stream_options", "tools", "tool_choice", "parallel_tool_calls", "stop", "seed", "logit_bias", "response_format", "user"],
+  responses: ["model", "input", "instructions", "max_output_tokens", "stream", "tools", "tool_choice", "parallel_tool_calls", "text", "user", "metadata", "previous_response_id"],
+};
+/** The cap on one answer when the client names none, so a request cannot ask the engine for an unbounded answer by leaving the limit out. */
+export const DEFAULT_OUTPUT_TOKENS = 16384;
+const EFFORTS = ["none", "minimal", "low", "medium"];
+
 export interface ShapeOptions { ceiling: number; minor: boolean; topicBlock: string }
 
-/** The request the Stack gets. Never adds thinking, never raises a budget; a minor always gets an explicit off in the wire's own words. */
+/** True when the client asked for thinking in any of the ways the wires have. */
+function asksForThinking(b: Json): boolean {
+  const thinking = isObj(b.thinking) ? b.thinking : null;
+  const reasoning = isObj(b.reasoning) ? b.reasoning : null;
+  const kwargs = isObj(b.chat_template_kwargs) ? b.chat_template_kwargs : null;
+  return (thinking !== null && thinking.type !== "disabled") || (b.thinking_budget_tokens !== undefined && b.thinking_budget_tokens !== 0)
+    || (typeof b.reasoning_effort === "string" && b.reasoning_effort !== "none") || (typeof reasoning?.effort === "string" && reasoning.effort !== "none")
+    || kwargs?.enable_thinking === true;
+}
+
+/** The request the Stack gets. Never raises a budget: a client that asks for thinking in any form gets the ceiling at most, a minor (or a ceiling of 0) gets an
+ * explicit off in the wire's own words. */
 export function shapeRequest(wire: CodeWire, body: Json, o: ShapeOptions): Json {
-  const out: Json = { ...body };
-  for (const key of DROPPED_SAMPLING) delete out[key];
-  delete out.timeout_ms;
+  const out: Json = {};
+  for (const key of ALLOWED[wire]) if (body[key] !== undefined) out[key] = body[key];
   out.model = "coding"; // The gateway serves the coding role whatever model name the tool sends (Claude Code sends its own for background calls).
   const ceiling = Math.max(0, Math.floor(o.ceiling));
-  if (out.thinking_budget_tokens !== undefined) out.thinking_budget_tokens = clampOne(out.thinking_budget_tokens, ceiling, "thinking_budget_tokens");
-  if (out.thinking !== undefined && out.thinking !== null) {
-    if (!isObj(out.thinking)) throw new CodeRequestError("thinking must be an object like {\"type\": \"enabled\", \"budget_tokens\": 1000}.");
-    const thinking = { ...out.thinking };
-    if (thinking.budget_tokens !== undefined) thinking.budget_tokens = clampOne(thinking.budget_tokens, ceiling, "thinking.budget_tokens");
-    out.thinking = thinking;
-  }
-  if (o.minor) {
+  if (isObj(body.thinking) && body.thinking.budget_tokens !== undefined) clampOne(body.thinking.budget_tokens, ceiling, "thinking.budget_tokens");
+  if (body.thinking !== undefined && body.thinking !== null && !isObj(body.thinking)) throw new CodeRequestError("thinking must be an object like {\"type\": \"enabled\", \"budget_tokens\": 1000}.");
+  if (body.thinking_budget_tokens !== undefined) clampOne(body.thinking_budget_tokens, ceiling, "thinking_budget_tokens");
+
+  if (o.minor || ceiling === 0) {
     // A minor's turn never receives reasoning, because the hub does not ask for it (SAFETY.md, owner's ruling 2026-09-22). The Stack makes an explicit off real.
-    delete out.thinking_budget_tokens;
-    delete out.reasoning_effort;
-    out.chat_template_kwargs = { ...(isObj(out.chat_template_kwargs) ? out.chat_template_kwargs : {}), enable_thinking: false };
+    out.chat_template_kwargs = { enable_thinking: false };
     if (wire === "messages" || wire === "count_tokens") out.thinking = { type: "disabled" };
     if (wire === "responses") out.reasoning = { effort: "none" };
-  }
+  } else if (asksForThinking(body)) {
+    const own = isObj(body.thinking) && body.thinking.budget_tokens !== undefined ? body.thinking.budget_tokens : body.thinking_budget_tokens;
+    const budget = own === undefined ? ceiling : clampOne(own, ceiling, "thinking budget");
+    const effort = (v: unknown) => (typeof v === "string" && EFFORTS.includes(v) ? v : "medium"); // "high" and anything unknown is held to medium
+    if (wire === "messages" || wire === "count_tokens") out.thinking = { type: "enabled", budget_tokens: budget };
+    else {
+      out.thinking_budget_tokens = budget;
+      if (wire === "chat" && body.reasoning_effort !== undefined) out.reasoning_effort = effort(body.reasoning_effort);
+      if (wire === "responses" && isObj(body.reasoning)) out.reasoning = { ...(typeof body.reasoning.summary === "string" ? { summary: body.reasoning.summary } : {}), effort: effort(body.reasoning.effort) };
+    }
+  } else if (isObj(body.thinking) && body.thinking.type === "disabled" && (wire === "messages" || wire === "count_tokens")) out.thinking = { type: "disabled" };
+
+  const positive = (v: unknown) => typeof v === "number" && Number.isFinite(v) && v > 0;
+  if (wire === "messages" && !positive(out.max_tokens)) out.max_tokens = DEFAULT_OUTPUT_TOKENS;
+  if (wire === "chat" && !positive(out.max_tokens) && !positive(out.max_completion_tokens)) out.max_tokens = DEFAULT_OUTPUT_TOKENS;
+  if (wire === "responses" && !positive(out.max_output_tokens)) out.max_output_tokens = DEFAULT_OUTPUT_TOKENS;
+  // The engine reports usage on a chat stream only when asked; the daily cap counts it.
+  if (wire === "chat" && out.stream === true) out.stream_options = { ...(isObj(body.stream_options) ? body.stream_options : {}), include_usage: true };
+
   if (o.topicBlock) {
     // The band's topic block is the first system part of every minor's call.
     if (wire === "responses") out.instructions = typeof out.instructions === "string" && out.instructions ? `${o.topicBlock}\n\n${out.instructions}` : o.topicBlock;
@@ -90,6 +125,26 @@ export function shapeRequest(wire: CodeWire, body: Json, o: ShapeOptions): Json 
     else out.system = o.topicBlock;
   }
   return out;
+}
+
+// ---- everything a person put in a request -----------------------------------------------------------------------------------------------
+
+/** Keys whose strings are structure, not words. */
+const STRUCTURAL = new Set(["type", "id", "role", "model", "object", "status", "stop_reason", "stop_sequence", "finish_reason", "name", "call_id", "item_id", "tool_use_id", "tool_call_id", "output_index", "content_index", "index", "media_type", "system_fingerprint", "service_tier", "signature", "event", "created", "created_at"]);
+/** Every string of words in `value`: nested content, tool results, documents, anything. Base64 payloads are not words. */
+export function collectText(value: unknown, into: string[] = [], key = "", parent: Json | null = null): string[] {
+  if (typeof value === "string") {
+    const binary = key === "data" && parent !== null && (parent.type === "base64" || (typeof parent.media_type === "string" && !parent.media_type.startsWith("text/")));
+    if (!STRUCTURAL.has(key) && !binary && value.trim()) into.push(value);
+  } else if (Array.isArray(value)) for (const v of value) collectText(v, into, key, parent);
+  else if (isObj(value)) for (const [k, v] of Object.entries(value)) collectText(v, into, k, value);
+  return into;
+}
+/** For a minor: all of the request the person (or their tool, on their behalf) supplied, not just the newest message. Tool definitions are the tool's own configuration and are not read. */
+export function allRequestText(wire: CodeWire, body: Json): string {
+  const parts: string[] = [];
+  for (const field of ["messages", "system", "input", "instructions"]) if (body[field] !== undefined) collectText(body[field], parts);
+  return parts.join("\n");
 }
 
 // ---- errors in the wire's own shape ---------------------------------------------------------------------------------------------------
@@ -230,6 +285,8 @@ export interface Classified {
   scrubbed?: string;
   /** The frame's parsed JSON, for usage counts. */
   json?: unknown;
+  /** What the safety floor reads in this frame when that is more than `text` (a delta with text and tool arguments, or a frame of a shape this gateway does not know). */
+  checkText?: string;
 }
 export interface FrameState { reasoningBlocks: Set<number>; dropReasoning: boolean }
 
@@ -237,9 +294,13 @@ export interface FrameState { reasoningBlocks: Set<number>; dropReasoning: boole
 export function classifyFrame(wire: CodeWire, frame: Frame, state: FrameState): Classified {
   if (!frame.data || frame.data === "[DONE]") return { channel: "other", text: "", dropWhole: false };
   let j: unknown;
-  try { j = JSON.parse(frame.data); } catch { return { channel: "other", text: "", dropWhole: false }; }
-  if (!isObj(j)) return { channel: "other", text: "", dropWhole: false };
-  return { ...classifyParsed(wire, frame, j, state), json: j };
+  // Data that is not JSON could carry anything, so it is read as text.
+  try { j = JSON.parse(frame.data); } catch { return { channel: "other", text: "", dropWhole: false, checkText: frame.data }; }
+  if (!isObj(j)) return { channel: "other", text: "", dropWhole: false, checkText: frame.data };
+  const c = classifyParsed(wire, frame, j, state);
+  // A frame this gateway has no name for is read for any words in it (a `.done` event, an initial content block, a refusal field).
+  const checkText = c.checkText ?? (c.channel === "other" ? collectText(j).join("\n") || undefined : undefined);
+  return { ...c, json: j, ...(checkText !== undefined ? { checkText } : {}) };
 }
 
 function classifyParsed(wire: CodeWire, frame: Frame, j: Json, state: FrameState): Classified {
@@ -271,7 +332,8 @@ function classifyParsed(wire: CodeWire, frame: Frame, j: Json, state: FrameState
     const scrubbed = hasReasoningKey && !empty ? withDelta(clean) : undefined;
     if (hasReasoningKey && !text && !args) return { channel: "reasoning", text: reasoning, dropWhole: empty, scrubbed };
     const base = state.dropReasoning ? clean : d;
-    if (text) return { channel: "text", text, dropWhole: false, scrubbed, withText: t => withDelta({ ...base, content: t }) };
+    const both = text && args ? `${text}\n${args}` : undefined; // a delta can carry words and a tool call's arguments together: both are read
+    if (text) return { channel: "text", text, dropWhole: false, scrubbed, checkText: both, withText: t => withDelta({ ...base, content: t }) };
     if (args) return { channel: "args", text: args, dropWhole: false, scrubbed };
     return other;
   }

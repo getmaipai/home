@@ -15,7 +15,9 @@ export interface StreamGateOptions {
   /** The person's own words already showed self-harm intent: the crisis resources are added to the answer. */
   crisis: boolean;
   keepAliveMs?: number;
-  onFinish: (info: { usage: Usage; outcome: StreamOutcome }) => void;
+  /** How long the engine may stay silent before the stream is ended with a plain error. */
+  idleMs?: number;
+  onFinish: (info: { usage: Usage; outcome: StreamOutcome; outputChars: number }) => void;
 }
 
 const WINDOW_CHARS = 400;
@@ -36,6 +38,8 @@ export function gateStream(upstream: ReadableStream<Uint8Array>, o: StreamGateOp
   let pending = "";
   let tail = "";
   let refused = false;
+  let outputChars = 0;
+  const held_text: string[] = []; // a held (minor's) answer, read as one text at the end
   let finished = false;
   let ticker: ReturnType<typeof setInterval> | undefined;
   let controller!: ReadableStreamDefaultController<Uint8Array>;
@@ -46,7 +50,7 @@ export function gateStream(upstream: ReadableStream<Uint8Array>, o: StreamGateOp
     if (finished) return;
     finished = true;
     if (ticker) clearInterval(ticker);
-    o.onFinish({ usage, outcome });
+    o.onFinish({ usage, outcome, outputChars });
   };
   const close = () => { try { controller.close(); } catch { /* already closed */ } };
 
@@ -60,6 +64,16 @@ export function gateStream(upstream: ReadableStream<Uint8Array>, o: StreamGateOp
     if (verdict.action === "refuse") refused = true;
     tail = (tail + pending).slice(-OVERLAP_CHARS);
     pending = "";
+  }
+
+  /** Words in the answer: an adult's are checked window by window as they arrive, a minor's are gathered and checked once, whole, before anything is released. */
+  let lastText: { index: number; text: string; withText?: (t: string) => string } | null = null;
+  let lastChannel = "";
+  function observe(text: string, channel: string) {
+    if (!text) return;
+    outputChars += text.length;
+    // Deltas of one kind run together as the engine wrote them; a change of kind starts a new line.
+    if (strict) { held_text.push(channel === lastChannel ? text : `\n${text}`); lastChannel = channel; } else check(text);
   }
 
   /** Releases the text frame held back; when the answer showed self-harm intent, the crisis resources ride on it as extra text. */
@@ -76,29 +90,37 @@ export function gateStream(upstream: ReadableStream<Uint8Array>, o: StreamGateOp
     const c = classifyFrame(o.wire, frame, state);
     noteUsage(usage, c.json);
     const forward = strict && c.scrubbed ? c.scrubbed : frame.raw;
+    const words = c.checkText ?? c.text;
     if (c.channel === "reasoning") {
       if (strict) { if (!c.dropWhole && c.scrubbed) { releaseHeld(true); out(c.scrubbed); } return; }
-      check(c.text);
+      check(words);
       if (refused) return;
       releaseHeld(false); out(frame.raw);
       return;
     }
-    if (c.channel === "text" || c.channel === "args") {
-      check(c.text);
-      if (refused) return;
-      if (c.channel === "text") { releaseHeld(false); held = { raw: forward, text: c.text, withText: c.withText }; return; }
-      releaseHeld(true); out(forward);
-      return;
-    }
+    observe(words, c.channel);
+    if (refused) return;
+    // A frame that is not words ends a run of words (a block closing, the finish): whatever an adult's window still holds is read now, before the held frame goes out.
+    if (c.channel === "other" && !strict) { check("", true); if (refused) return; }
+    if (c.channel === "text" && strict) { buffered.push(forward); lastText = { index: buffered.length - 1, text: c.text, withText: c.withText }; return; }
+    if (c.channel === "text") { releaseHeld(false); held = { raw: forward, text: c.text, withText: c.withText }; return; }
     releaseHeld(true);
     out(forward);
+  }
+
+  /** Reads the next chunk, or gives up when the engine has been silent for too long. */
+  function readNext(): ReturnType<typeof reader.read> {
+    return new Promise((resolve, reject) => {
+      const timer = setTimeout(() => reject(new Error("idle")), o.idleMs ?? 300_000);
+      reader.read().then(v => { clearTimeout(timer); resolve(v); }, e => { clearTimeout(timer); reject(e); });
+    });
   }
 
   async function run() {
     let outcome: StreamOutcome = "ok";
     try {
       for (;;) {
-        const { value, done } = await reader.read();
+        const { value, done } = await readNext();
         if (done) break;
         for (const frame of parser.push(dec.decode(value, { stream: true }))) {
           handle(frame);
@@ -107,19 +129,31 @@ export function gateStream(upstream: ReadableStream<Uint8Array>, o: StreamGateOp
         if (refused) break;
       }
       if (!refused) for (const frame of parser.flush()) { handle(frame); if (refused) break; }
-      if (!refused) check("", true);
+      if (!refused) {
+        if (strict) {
+          // The answer is held whole, so it is read whole, once, as the non-streamed path reads it; the crisis offer follows what the whole answer says.
+          const verdict = codingFloor(held_text.join(""), o.band, "out");
+          if (verdict.crisis) crisis = true;
+          if (verdict.action === "refuse") refused = true;
+        } else check("", true);
+      }
       if (refused) {
         outcome = "refused";
-        await reader.cancel().catch(() => {});
+        void reader.cancel().catch(() => {});
         held = null;
         send(errorFrame(o.wire, outputRefusalLine(o.band), "safety_refused"));
         return;
       }
       releaseHeld(true);
-      if (strict) for (const raw of buffered) send(raw);
+      if (strict) {
+        // The resources ride on the last text frame; the whole answer has been read by now, so what it showed is known.
+        if (crisis && lastText?.withText) buffered[lastText.index] = lastText.withText(`${lastText.text}\n\n${crisisText()}`);
+        for (const raw of buffered) send(raw);
+      }
     } catch {
       outcome = "upstream_error";
       held = null;
+      void reader.cancel().catch(() => {});
       send(errorFrame(o.wire, "The coding engine stopped answering. Send the request again.", "upstream_error"));
     } finally {
       finish(outcome);

@@ -171,6 +171,14 @@ export function resolveApiKeyOutcome(secret: string, scope: ApiKeyScope, origin?
   }
   return { ok: true, person, key: { id: row.id, limits: row.limits } };
 }
+/** The same admission again for a key already accepted, read fresh: a request that waited in a queue is checked before it is sent on. `role` is the role it was accepted with. */
+export function recheckCodeKey(keyId: string, role: string): "ok" | "invalid" | Exclude<CodeAdmission, "ok"> {
+  const row = db.select().from(apiKeys).where(eq(apiKeys.id, keyId)).get();
+  if (!row || usable(row) || !row.scopes.includes("code")) return "invalid";
+  const person = db.select().from(people).where(eq(people.id, row.personId)).get() as PersonRow | undefined;
+  if (!person || person.deletedAt) return "invalid";
+  return person.role !== role ? "not_allowed" : codeAdmission(person);
+}
 export function resolveApiKey(secret: string, scope: ApiKeyScope, origin?: KeyOrigin): PersonRow | null {
   const outcome = resolveApiKeyOutcome(secret, scope, origin);
   return outcome.ok ? outcome.person : null;

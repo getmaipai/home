@@ -20,18 +20,18 @@
 import { Hono, type Context } from "hono";
 import { bodyLimit } from "hono/body-limit";
 import { requireApiKey, type ApiKeyDoor } from "@/middleware/auth";
-import { API_KEY_REFUSAL } from "@/lib/apiKeys";
+import { API_KEY_REFUSAL, recheckCodeKey } from "@/lib/apiKeys";
 import { getHouseholdSettingValue } from "@/lib/settings";
 import { getStackClient } from "@/lib/stackEngine";
 import { StackError } from "@/lib/stack/errors";
 import { topicBlockFor } from "@/lib/topicPrompt";
 import {
-  codingQueue, dailyTokenRefusal, maxStreamsFor, rateRefusal, recordApiRequest, refreshCodingSlots, streamCounter, tokenLedger,
+  codingQueue, dailyTokenRefusal, maxStreamsFor, rateRefusal, recordApiRequest, refreshCodingSlots, streamCounter, streamIdleMs, tokenLedger,
   transportRefusal, type GateRefusal, type Slot,
 } from "@/lib/codeGate";
 import { alertIfMinor, bandOf, codingFloor, crisisText, inputRefusalLine, outputRefusalLine } from "@/lib/codeSafety";
 import {
-  appendCrisis, CodeRequestError, errorBody, noteUsage, parseBody, personText, scanReply, shapeRequest, WIRE_PATH, wireOfPath,
+  allRequestText, appendCrisis, CodeRequestError, errorBody, noteUsage, parseBody, personText, scanReply, shapeRequest, WIRE_PATH, wireOfPath,
   type CodeWire, type Usage,
 } from "@/lib/codeWire";
 import { gateStream } from "@/lib/codeStream";
@@ -120,7 +120,9 @@ async function proxy(c: Context<AppEnv>, wire: CodeWire): Promise<Response> {
     let crisis = false;
     const counts = wire !== "count_tokens";
     if (counts) {
-      const text = personText(wire, body);
+      // A child or teen has every string of the request read (all messages, tool results, documents, the system field, an assistant prefill);
+      // an adult's newest words are read, because their earlier turns were read when they were new.
+      const text = minor ? allRequestText(wire, body) : personText(wire, body);
       if (text.trim()) {
         const verdict = codingFloor(text, band, "in");
         alertIfMinor(person, verdict.result);
@@ -142,6 +144,9 @@ async function proxy(c: Context<AppEnv>, wire: CodeWire): Promise<Response> {
       if (got === "aborted") { letGo(); return answer(new Response(null, { status: 499 })); }
       if (got === "full" || got === "timeout") { letGo(); return answer(refuse(c, 429, "Coding is busy with other people's requests. Try again in a minute.", "queue_full", 30)); }
       slot = got;
+      // The wait may have been long: a pause, a revoked key, a removed grant or a changed role now stops the request before it reaches the engine.
+      const again = recheckCodeKey(key.id, person.role);
+      if (again !== "ok") { letGo(); return answer(door.refuse!(c, again)); }
     }
 
     const client = getStackClient();
@@ -155,12 +160,15 @@ async function proxy(c: Context<AppEnv>, wire: CodeWire): Promise<Response> {
     }
     if (upstream.status < 200 || upstream.status >= 300 || !upstream.body) { letGo(); return answer(await mapUpstreamFailure(c, upstream)); }
 
-    const settle = (usage: Usage) => { tokenLedger.add(person.id, usage.input + usage.output); letGo(); };
+    // The daily cap counts the engine's own usage; when it reports none, bytes divided by four stand in, and the input is counted even if the stream breaks.
+    // A request is admitted by what was used before it, so the cap can be overshot by one request.
+    const estimatedInput = Math.ceil(JSON.stringify(shaped).length / 4);
+    const settle = (usage: Usage, outputChars: number) => { tokenLedger.add(person.id, (usage.input > 0 ? usage.input : estimatedInput) + (usage.output > 0 ? usage.output : Math.ceil(outputChars / 4))); letGo(); };
     const wantsStream = counts && body.stream === true && (upstream.headers.get("content-type") ?? "").includes("text/event-stream");
     if (wantsStream) {
       const stream = gateStream(upstream.body, {
-        wire, band, crisis,
-        onFinish: ({ usage, outcome }) => { settle(usage); recordApiRequest(outcome === "ok" ? 200 : outcome === "refused" ? 403 : outcome === "cancelled" ? 499 : 502, started); },
+        wire, band, crisis, idleMs: streamIdleMs(),
+        onFinish: ({ usage, outcome, outputChars }) => { settle(usage, outputChars); recordApiRequest(outcome === "ok" ? 200 : outcome === "refused" ? 403 : outcome === "cancelled" ? 499 : 502, started); },
       });
       return new Response(stream, { status: 200, headers: { "content-type": "text/event-stream", "cache-control": "no-cache, no-store", "x-accel-buffering": "no" } });
     }
@@ -173,9 +181,10 @@ async function proxy(c: Context<AppEnv>, wire: CodeWire): Promise<Response> {
     } catch { letGo(); return answer(refuse(c, 502, "The coding engine did not answer properly. Send the request again.", "engine_error")); }
     const usage: Usage = { input: 0, output: 0 };
     noteUsage(usage, reply);
-    settle(usage);
+    const replyScan = scanReply(wire, reply, minor);
+    settle(usage, replyScan.scan.text.length + replyScan.scan.args.length);
     if (wire === "count_tokens") return answer(new Response(JSON.stringify(reply), { status: 200, headers: { "content-type": "application/json", "cache-control": "no-store" } }));
-    const { scan, reply: scrubbed } = scanReply(wire, reply, minor);
+    const { scan, reply: scrubbed } = replyScan;
     const out = codingFloor([minor ? "" : scan.reasoning, scan.text, scan.args].filter(Boolean).join("\n"), band, "out");
     if (out.action === "refuse") return answer(refuse(c, 403, outputRefusalLine(band), "safety_refused"));
     const final = crisis || out.crisis ? appendCrisis(wire, scrubbed, crisisText()) : scrubbed;

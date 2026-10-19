@@ -4,6 +4,7 @@
 import type { Context } from "hono";
 import { getClientIp as rawPeerAddress } from "@maipai/core/src/secretThrottle";
 import { keyOriginOf } from "@/lib/apiKeys";
+import { TRUST_PROXY } from "@/lib/trustProxy";
 import { tryConsume } from "@/lib/rateLimiter";
 import { getHouseholdSettingValue, getPersonSettingValue } from "@/lib/settings";
 import { getStackClient } from "@/lib/stackEngine";
@@ -24,6 +25,8 @@ export function isTailnetAddress(address: string): boolean {
   return plain.startsWith("fd7a:115c:a1e0:");
 }
 
+const proxyTrusted = (): boolean => trustProxyOverride ?? TRUST_PROXY;
+
 function publicHost(): string | null {
   const configured = process.env.APP_ORIGIN ?? process.env.PUBLIC_ORIGIN;
   if (!configured) return null;
@@ -42,14 +45,19 @@ export function transportRefusal(c: Context): GateRefusal | null {
   const origin = keyOriginOf(peer);
   if (!origin) return { status: 403, code: "unknown_source", message: "Home could not tell where this request came from. Connect directly from your home network." };
   const loopback = origin.address === "::1" || origin.address.startsWith("127.");
+  // Behind a configured reverse proxy (lib/trustProxy.ts) the proxy's own connection is the loopback peer, so a loopback peer says nothing about the person's device.
+  if (loopback && proxyTrusted()) {
+    return { status: 403, code: "behind_proxy", message: "Coding is not available through the proxy on this computer. Connect to the home address directly from your own device." };
+  }
   if (new URL(c.req.url).protocol !== "https:" && !loopback) {
     return { status: 403, code: "https_only", message: "Coding needs a secure address. Use the https address from Settings, Coding, not http." };
   }
-  if (origin.place === "home_network") return null;
+  // The tailnet ranges come first: an IPv6 tailnet address (fd7a:115c:a1e0::/48) also looks like a private household range.
   if (isTailnetAddress(origin.address)) {
     return getHouseholdSettingValue("coding.api.away") === true ? null
       : { status: 403, code: "away_off", message: "Coding works only on your home network right now. An admin can allow Tailscale in Settings, Coding." };
   }
+  if (origin.place === "home_network") return null;
   return { status: 403, code: "network", message: "Coding works only on your home network, or over Tailscale if an admin allowed it." };
 }
 
@@ -205,9 +213,16 @@ export async function refreshCodingSlots(): Promise<number> {
 }
 export const codingQueue = createFairQueue({ slots: () => slotsOverride ? slotsOverride() : slotsCache?.slots ?? 1 });
 
+let trustProxyOverride: boolean | null = null;
+let streamIdleOverride: number | null = null;
+export function __setTrustProxyForTests(on: boolean | null): void { trustProxyOverride = on; }
+export function __setStreamIdleForTests(ms: number | null): void { streamIdleOverride = ms; }
+/** How long an engine may stay silent mid-answer before the gateway lets go of it. Prompt processing of a very long context is slow, so it is generous. */
+export const streamIdleMs = (): number => streamIdleOverride ?? 300_000;
+
 /** Test-only: one place that forgets every counter, bucket and queued request, and pins the slot count. */
 export function __resetCodeGateForTests(slots: number | null = null): void {
-  tokenLedger.reset(); streamCounter.reset(); codingQueue.reset(); slotsCache = null;
+  tokenLedger.reset(); streamCounter.reset(); codingQueue.reset(); slotsCache = null; trustProxyOverride = null; streamIdleOverride = null;
   slotsOverride = slots === null ? null : () => slots;
 }
 
