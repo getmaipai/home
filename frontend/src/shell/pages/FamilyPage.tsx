@@ -10,6 +10,7 @@ import { getIcon } from "@maipai/ui/src/icons";
 import type { Icon } from "@maipai/ui/src/icons";
 import { GRID_COLUMNS } from "@maipai/ui/src/responsive";
 import { ROLE_LABELS, ACCENT_RING_CLASS, isProfileClosedTo } from "@/apps/people/roles";
+import { AdminCodingAccessRow } from "@/apps/settings/CodingSettings";
 import { api, ApiError, isOwnerOrAdminRole, type DeviceInfo, type Entity, type PersonRosterEntry, type Roster } from "@/lib/api";
 import { useTabItem } from "@/shell/tabIdentity";
 
@@ -116,10 +117,14 @@ export function FamilyPage({ person }: { person: Roster }) {
             </CardHeader>
             <div className={`grid gap-4 ${GRID_COLUMNS.default}`}>
               {ordered.map((entry) => {
+                const familyBody = <FamilyBody title={entry.display_name} subtitle={ROLE_LABELS[entry.role]} detail={entry.bio} avatarName={entry.display_name} avatarClassName={personAvatarClass(entry)} />;
+                if (isOwnerOrAdminRole(person.role)) {
+                  return <Card key={entry.id}><CardContent><div className="flex flex-col gap-4">{isProfileClosedTo(person, entry) ? familyBody : <Link to={`/people/${entry.id}`} className="block rounded-xl transition-shadow hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">{familyBody}</Link>}<AdminCodingAccessRow personId={entry.id} personName={entry.display_name} /></div></CardContent></Card>;
+                }
                 const card = (
                   <Card>
                     <CardContent>
-                      <FamilyBody title={entry.display_name} subtitle={ROLE_LABELS[entry.role]} detail={entry.bio} avatarName={entry.display_name} avatarClassName={personAvatarClass(entry)} />
+                      {familyBody}
                     </CardContent>
                   </Card>
                 );

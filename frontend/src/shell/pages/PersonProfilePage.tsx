@@ -17,6 +17,7 @@ import { OwnMemories, OtherPersonMemories } from "@/apps/memory/PersonMemories";
 import { useTabItem } from "@/shell/tabIdentity";
 import { SettingsRenderer } from "@/shell/pages/settings/SettingsRenderer";
 import { PERSON_KID_PICTURES_GROUP_IDS, PERSON_KID_PICTURES_KEYS, PERSON_LIMIT_GROUP_IDS, PERSON_TOPIC_GROUP_IDS } from "@/shell/pages/settings/personLimits";
+import { AdminCodingAccessRow } from "@/apps/settings/CodingSettings";
 
 const PencilIcon = getIcon("pencil");
 type ProfileEntry = PersonRosterEntry | Roster;
@@ -124,6 +125,7 @@ export function PersonProfilePage({ person, onPersonChange }: { person: Roster; 
                   <div className="flex flex-col gap-4 py-2">
                     {viewingSelf ? null : <p className="text-sm text-muted-foreground">{`${profile.display_name}'s profile in this household.`}</p>}
                     <SharedMediaSection profile={profile} viewingSelf={viewingSelf} />
+                    {isOwnerOrAdminRole(person.role) ? <AdminCodingAccessRow personId={profile.id} personName={profile.display_name} /> : null}
                     {viewingSelf ? <FaceStatusRow profile={profile} /> : (canViewFaceEnrollment(person, profile) ? <Card><FaceEnrollmentBody profile={profile} viewer={person} viewingSelf={false} /></Card> : null)}
                   </div>
                 </TabsContent>

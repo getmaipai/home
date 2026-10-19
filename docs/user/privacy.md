@@ -30,6 +30,8 @@ An adult can also generate an API token for another app or device. This page sho
 
 When an admin installs local Coding, the Stack downloads the coding model and its Splash draft from Hugging Face or the mirror chosen in Stack settings, and downloads the Splash engine archive from GitHub. Each happens once during installation and sends only the file request and your home's internet address. Nothing anyone said or saved is sent. At run time, Splash makes no outside connection; it runs offline. A person's personal Coding key lets an app or device they gave it to send prompts and code to Home over the home network, or over the tailnet when away access is on, and get replies. An admin can revoke the key. Nothing is sent outward through this gateway.
 
+Coding keys are stored on this computer. A coding tool sends its request to the Home coding gateway on your home network. The request stays on the home network unless an admin turns on away access through the household's Tailscale network. The coding model answers on this computer. If an admin turns Coding off, personal coding keys stop working.
+
 ## Pictures and videos of a person
 
 A picture, video or style that looks like someone in your home is made on your own computer, only when that adult has said yes in their own settings. Home keeps a dated note each time they change their answer, and a list of each time something was made that looks like them. Only they can read it. No photo or prompt is kept in that list. Nothing about it leaves your house.

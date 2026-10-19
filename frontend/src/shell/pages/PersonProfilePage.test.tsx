@@ -48,6 +48,7 @@ function stubFetch(byPath: Record<string, unknown>) {
   const original = globalThis.fetch;
   globalThis.fetch = mock((input: RequestInfo | URL) => {
     const url = String(input);
+    if (url.includes("/api/settings/api-keys/people/")) return Promise.resolve(Response.json({ keys: [{ id: "key_abcd1234", person_id: "person-bramble", scopes: ["code"], status: "active", created_at: "2026-10-01T00:00:00.000Z", expires_at: "2027-01-01T00:00:00.000Z", revoked_at: null, hint: "QWER" }] }));
     if (url.includes("/api/people")) return Promise.resolve(Response.json(people));
     if (url.includes("/api/files")) return Promise.resolve(Response.json([]));
     if (url.includes("/api/biometric-prints")) return Promise.resolve(Response.json([]));
@@ -160,6 +161,16 @@ describe("PersonProfilePage", () => {
       expect(await view.findByText("Bramble")).toBeTruthy();
       expect(view.queryByRole("tab", { name: "Memories" })).toBeNull();
       expect(view.getByRole("tab", { name: "Overview" }).getAttribute("aria-selected")).toBe("true");
+    } finally { restore(); }
+  });
+
+  test("an admin sees the privacy-limited Coding access row on a person's profile", async () => {
+    const restore = stubFetch({});
+    try {
+      const view = renderProfile("/people/person-bramble", viewer({ role: "owner" }));
+      expect(await view.findByText(/Hint •••• QWER/)).toBeTruthy();
+      expect(view.queryByText("Laptop, Claude Code")).toBeNull();
+      expect(view.queryByText(/last used|host/i)).toBeNull();
     } finally { restore(); }
   });
 

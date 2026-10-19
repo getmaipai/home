@@ -24,6 +24,7 @@ import { settingsArea, settingsPath } from "@/shell/pages/settings/settingsAreas
 import { usePackageAreas } from "@/shell/pages/settings/packageAreas";
 import { SettingsSectionContent, beforeSettingChange } from "@/shell/pages/settings/SettingsSectionContent";
 import { SettingsView } from "@/shell/pages/settings/settingsViews";
+import { CodingAdminSettings } from "@/apps/settings/CodingSettings";
 import { baseViewer, packageAreaKeySet, scopeValueFor, visibleRegistry } from "@/shell/pages/settings/settingsViewer";
 import { useSettingsCapabilities } from "@/shell/pages/settings/useSettingsCapabilities";
 import { confirmRouteLeave } from "@/shell/routeLeaveGuard";
@@ -72,7 +73,7 @@ function SettingsAreaBody({ area, packageAreas, person, onPersonChange }: { area
   useTabItem(area.title);
 
   const registryQuery = useQuery<SettingsKey[]>({ queryKey: ["settings-registry"], queryFn: () => api.settingsRegistry(), staleTime: Infinity });
-  const { capabilities, ready } = useSettingsCapabilities(person);
+  const { capabilities, ready } = useSettingsCapabilities(person, area.id === "account");
   const viewer: SettingsViewer = { ...baseViewer(person), capabilities };
   const packageKeys = registryQuery.data ? packageAreaKeySet(packageAreas, registryQuery.data) : undefined;
   const registry = registryQuery.data
@@ -151,7 +152,9 @@ function SettingsAreaBody({ area, packageAreas, person, onPersonChange }: { area
   } else if (active) {
     content = active.kind === "view"
       ? <>{active.view ? <SettingsView view={active.view} person={person} onPersonChange={onPersonChange} /> : null}</>
-      : <SettingsSectionContent section={active} viewer={viewer} registry={registry} packageKeys={packageKeys} person={person} onPersonChange={onPersonChange} focusKey={focusKey} />;
+      : area.id === "home" && active.id === "coding"
+        ? <CodingAdminSettings />
+        : <SettingsSectionContent section={active} viewer={viewer} registry={registry} packageKeys={packageKeys} person={person} onPersonChange={onPersonChange} focusKey={focusKey} />;
   }
 
   const checklistItems = setupChecklist.checklist.data ?? [];

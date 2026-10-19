@@ -105,6 +105,32 @@ export interface SiteBlocksView {
   setBy: Record<string, string>;
 }
 
+export interface PersonalApiKey {
+  id: string; person_id: string; name: string; scopes: Array<"turn" | "code">; created_at: string; expires_at: string;
+  revoked_at: string | null; status: "active" | "expired" | "revoked" | "suspended"; last_used_at: string | null;
+  suspended_reason: string | null;
+  last_used_from: { place: "home_network" | "away"; address: string } | null; limits: { requests_per_minute: number };
+  hint: string; provenance: string; hlc: string;
+}
+export interface AdminApiKey {
+  id: string; person_id: string; scopes: Array<"turn" | "code">; status: PersonalApiKey["status"];
+  created_at: string; expires_at: string; revoked_at: string | null; hint?: string;
+}
+export interface CodingPiece {
+  id: "engine" | "model" | "draft"; name: string; label: string; summary: string;
+  state: "installed" | "installing" | "notInstalled" | "failed" | "unsupported";
+  size_bytes: number | null; percent: number | null; failure: string | null;
+  can_install: boolean; install_block: string | null; can_remove: boolean; remove_block: string | null;
+}
+export interface CodingPiecesView {
+  stack: "ok" | "unreachable"; message: string | null; coding_enabled: boolean; engine: "splash" | "llama-server" | null;
+  missing: string | null; pieces: CodingPiece[];
+}
+export interface CodingGrant {
+  id: string; person: string; action: string; effect: "allow" | "deny"; valid_from?: string | null; valid_to?: string | null;
+  granted_by_person_id: string; created_at: string; deleted_at?: string | null;
+}
+
 export interface ReferenceBookView {
   id: string; source_label: string; language: string | null; size_bytes: number | null;
   snapshot_date: string | null; licence: string; article_count: number;
@@ -1034,6 +1060,21 @@ export const api = {
   // result into a real command item.
   search: (q: string) => request<{ groups: SearchGroup[] }>(`/api/search?q=${encodeURIComponent(q)}`).then((r) => r.groups),
   settingsRegistry: () => request<SettingsKey[]>("/api/settings/registry"),
+  codingAccess: () => request<{ allowed: boolean; can_create: boolean }>("/api/settings/coding-access"),
+  codingPieces: () => request<CodingPiecesView>("/api/coding-setup/pieces"),
+  installCodingPiece: (id: CodingPiece["id"]) => request<{ job: string | null; piece: CodingPiece["id"] }>(`/api/coding-setup/pieces/${id}/install`, { method: "POST" }),
+  removeCodingPiece: (id: CodingPiece["id"]) => request<{ piece: CodingPiece["id"]; removed: true }>(`/api/coding-setup/pieces/${id}`, { method: "DELETE" }),
+  apiKeys: () => request<{ keys: PersonalApiKey[] }>("/api/settings/api-keys"),
+  createApiKey: (input: { name: string; scopes: Array<"turn" | "code">; expires_in_days: 7 | 30 | 90 | 365 }) =>
+    request<{ key: PersonalApiKey; secret: string }>("/api/settings/api-keys", { method: "POST", body: JSON.stringify(input) }),
+  renameApiKey: (id: string, name: string) => request<{ success: true }>(`/api/settings/api-keys/${encodeURIComponent(id)}`, { method: "PATCH", body: JSON.stringify({ name }) }),
+  revokeApiKey: (id: string) => request<{ success: true }>(`/api/settings/api-keys/${encodeURIComponent(id)}`, { method: "DELETE" }),
+  adminApiKeys: (personId: string) => request<{ keys: AdminApiKey[] }>(`/api/settings/api-keys/people/${encodeURIComponent(personId)}`),
+  adminRevokeApiKey: (personId: string, id: string) => request<{ success: true }>(`/api/settings/api-keys/people/${encodeURIComponent(personId)}/${encodeURIComponent(id)}`, { method: "DELETE" }),
+  adminRevokeAllApiKeys: (personId: string) => request<{ revoked: number }>(`/api/settings/api-keys/people/${encodeURIComponent(personId)}`, { method: "DELETE" }),
+  grants: (personId?: string) => request<CodingGrant[]>(`/api/grants${personId ? `?person=${encodeURIComponent(personId)}` : ""}`),
+  createGrant: (input: { person: string; action: string; effect: "allow" | "deny" }) => request<CodingGrant>("/api/grants", { method: "POST", body: JSON.stringify(input) }),
+  revokeGrant: (id: string) => request<{ id: string }>(`/api/grants/${encodeURIComponent(id)}`, { method: "DELETE" }),
   wakewordStatus: () => request<{ detectors: { id: string; label: string; file: string }[]; installed: boolean }>("/api/voice/wakewords"),
   settingsValues: (scope: string, key?: string) =>
     request<ResolvedSetting[]>(`/api/settings?scope=${encodeURIComponent(scope)}${key ? `&key=${encodeURIComponent(key)}` : ""}`),

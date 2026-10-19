@@ -157,14 +157,14 @@ test("the middleware gives one refusal for every failure and never echoes a secr
   expect((await ask("/turn", turn.secret)).status).toBe(200);
 });
 
-test("the admin read carries no name, hint, address or use", async () => {
+test("the admin read carries only the key hint and no name, address or use", async () => {
   const { listApiKeysForAdmin } = await import("@/lib/apiKeys");
   const p = person();
   const { secret } = createApiKey(p, { name: "Kitchen speaker", scopes: ["turn"] });
   resolveApiKey(secret, "turn", { place: "away", address: "192.0.2.44" });
   const text = JSON.stringify(listApiKeysForAdmin(p));
-  for (const hidden of ["Kitchen speaker", "192.0.2.44", secret.slice(-4), "last_used", "hint", "name"]) expect(text).not.toContain(hidden);
-  expect(Object.keys(listApiKeysForAdmin(p)[0]!).sort()).toEqual(["created_at", "expires_at", "id", "person_id", "revoked_at", "scopes", "status"]);
+  for (const hidden of ["Kitchen speaker", "192.0.2.44", secret.slice(-4), "last_used", "name"]) expect(text).not.toContain(hidden);
+  expect(Object.keys(listApiKeysForAdmin(p)[0]!).sort()).toEqual(["created_at", "expires_at", "hint", "id", "person_id", "revoked_at", "scopes", "status"]);
 });
 
 test("a disabled person's code key is suspended and ending access revokes every key", async () => {

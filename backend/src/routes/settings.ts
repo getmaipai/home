@@ -9,7 +9,7 @@ import { listValues, setValue, resetValue } from "@/lib/settings";
 import { getRegistry } from "@/lib/settingsRegistry";
 import { ensureCodingPiecesFresh } from "@/lib/stackCodingPieces";
 import { isCodingStackKey, pushCodingSettings } from "@/lib/stackCodingSync";
-import { issueApiToken, revokeApiToken, listApiKeys, listApiKeysForAdmin, createApiKey, renameApiKey, revokeApiKey, CreateApiKeyInput } from "@/lib/apiKeys";
+import { issueApiToken, revokeApiToken, listApiKeys, listApiKeysForAdmin, createApiKey, renameApiKey, revokeApiKey, codeAdmission, CreateApiKeyInput } from "@/lib/apiKeys";
 import { SettingsKey } from "@maipai/spec/gen/ts/settings-key.js";
 import { listRobotsPairedUnderPerson, publishSettingsChanged } from "@/lib/deviceCommands";
 import { listDevicesByKind } from "@/lib/devices";
@@ -271,11 +271,25 @@ const ApiKeySchema = z.object({
   id: z.string(), person_id: z.string(), name: z.string(), scopes: z.array(z.enum(["turn", "code"])),
   created_at: z.string(), expires_at: z.string(), revoked_at: z.string().nullable(),
   status: z.enum(["active", "expired", "revoked", "suspended"]),
+  suspended_reason: z.string().nullable(),
   last_used_at: z.string().nullable(), last_used_from: z.object({ place: z.enum(["home_network", "away"]), address: z.string() }).nullable(),
   limits: z.object({ requests_per_minute: z.number().int().min(1) }), hint: z.string(), provenance: z.string(), hlc: z.string(),
 });
-const AdminApiKeySchema = ApiKeySchema.pick({ id: true, person_id: true, scopes: true, status: true, created_at: true, expires_at: true, revoked_at: true });
+const AdminApiKeyPersonParam = z.object({ personId: z.string(), id: z.string().regex(/^key_[a-z0-9]{6,}$/) });
+const AdminApiKeySchema = ApiKeySchema.pick({ id: true, person_id: true, scopes: true, status: true, created_at: true, expires_at: true, revoked_at: true, hint: true });
 const keyIdParam = z.object({ id: z.string().regex(/^key_[a-z0-9]{6,}$/) });
+
+settingsRoutes.openapi(createRoute({
+  method: "get", path: "/coding-access", tags: ["Settings"],
+  summary: "Whether the signed-in person may open their Coding key settings",
+  middleware: [requireAuth] as const,
+  responses: { 200: { content: { "application/json": { schema: z.object({ allowed: z.boolean(), can_create: z.boolean() }) } }, description: "Access to the person's own Coding keys and whether a new key may be made now." }, ...errorResponses({ 401: "Not signed in" }) },
+}), (c) => {
+  const actor = c.get("person");
+  const admission = codeAdmission(actor);
+  const hasUsableCodeKey = listApiKeys(actor).some((key) => key.scopes.includes("code") && key.status !== "revoked" && key.status !== "expired");
+  return c.json({ allowed: admission === "ok" || hasUsableCodeKey, can_create: admission === "ok" }, 200);
+});
 
 settingsRoutes.openapi(createRoute({
   method: "get", path: "/api-keys", tags: ["Settings"],
@@ -325,14 +339,43 @@ settingsRoutes.openapi(createRoute({
 
 settingsRoutes.openapi(createRoute({
   method: "get", path: "/api-keys/people/{personId}", tags: ["Settings"],
-  summary: "Admin read of a person's keys: ids, scopes, status and dates only (no names, hints, hosts or use)",
+  summary: "Admin read of a person's keys: scopes, status, dates and key hints (no names, hosts or use)",
   middleware: [requireRole("owner", "admin")] as const,
   request: { params: z.object({ personId: z.string() }) },
-  responses: { 200: { content: { "application/json": { schema: z.object({ keys: z.array(AdminApiKeySchema) }) } }, description: "The person's keys, without private details." },
+  responses: { 200: { content: { "application/json": { schema: z.object({ keys: z.array(AdminApiKeySchema) }) } }, description: "The person's keys, without names, addresses or use details." },
     ...errorResponses({ 401: "Not signed in", 403: "Not allowed", 404: "No such person" }) },
 }), async (c) => {
   const target = db.select().from(people).where(eq(people.id, c.req.valid("param").personId)).get() as PersonRow | undefined;
   if (!target || target.deletedAt) return c.json({ error: "No such person. Reload the people list and try again." }, 404);
   await ensureCodingPiecesFresh();
   return c.json({ keys: listApiKeysForAdmin(target) }, 200);
+});
+
+settingsRoutes.openapi(createRoute({
+  method: "delete", path: "/api-keys/people/{personId}/{id}", tags: ["Settings"],
+  summary: "Admin revoke of one coding key for a person",
+  middleware: [requireRole("owner", "admin")] as const,
+  request: { params: AdminApiKeyPersonParam },
+  responses: { 200: { content: { "application/json": { schema: z.object({ success: z.literal(true) }) } }, description: "Revoked." }, ...errorResponses({ 401: "Not signed in", 403: "Not allowed", 404: "No such person or key" }) },
+}), (c) => {
+  const { personId, id } = c.req.valid("param");
+  const target = db.select().from(people).where(eq(people.id, personId)).get() as PersonRow | undefined;
+  if (!target || target.deletedAt || !listApiKeys(target).some((key) => key.id === id && key.scopes.includes("code"))) return c.json({ error: "No such coding key. Reload the list and try again." }, 404);
+  revokeApiKey(personId, id);
+  return c.json({ success: true as const }, 200);
+});
+
+settingsRoutes.openapi(createRoute({
+  method: "delete", path: "/api-keys/people/{personId}", tags: ["Settings"],
+  summary: "Admin revoke all coding keys for a person",
+  middleware: [requireRole("owner", "admin")] as const,
+  request: { params: z.object({ personId: z.string() }) },
+  responses: { 200: { content: { "application/json": { schema: z.object({ revoked: z.number().int().nonnegative() }) } }, description: "All coding keys were revoked." }, ...errorResponses({ 401: "Not signed in", 403: "Not allowed", 404: "No such person" }) },
+}), (c) => {
+  const { personId } = c.req.valid("param");
+  const target = db.select().from(people).where(eq(people.id, personId)).get() as PersonRow | undefined;
+  if (!target || target.deletedAt) return c.json({ error: "No such person. Reload the people list and try again." }, 404);
+  const ids = listApiKeys(target).filter((key) => key.scopes.includes("code") && key.status !== "revoked").map((key) => key.id);
+  for (const id of ids) revokeApiKey(personId, id);
+  return c.json({ revoked: ids.length }, 200);
 });

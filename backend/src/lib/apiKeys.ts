@@ -76,18 +76,26 @@ function status(row: KeyRow, person: PersonRow): KeyRow["status"] {
   return row.scopes.every(s => mayHoldKey(person, s)) ? "active" : "suspended";
 }
 function wire(row: KeyRow, person: PersonRow) {
+  const currentStatus = status(row, person);
+  const admission = row.scopes.includes("code") ? codeAdmission(person) : "ok";
+  const suspendedReason = currentStatus !== "suspended" ? null : admission === "coding_off" ? "Coding is turned off by an admin."
+    : admission === "coding_paused" ? "An admin paused Coding."
+      : admission === "piece_missing" ? missingCodingPiece() ?? "A Coding piece is missing."
+        : admission === "keys_off" ? "An admin turned off API keys for your account."
+          : admission === "not_allowed" ? "Your Coding access changed. Ask an admin to check it."
+            : "Your key is not active.";
   return { id: row.id, person_id: row.personId, name: row.name, scopes: row.scopes,
     created_at: row.createdAt, expires_at: row.expiresAt, revoked_at: row.revokedAt,
-    status: status(row, person), last_used_at: row.lastUsedAt, last_used_from: row.lastUsedFrom,
+    status: currentStatus, suspended_reason: suspendedReason, last_used_at: row.lastUsedAt, last_used_from: row.lastUsedFrom,
     limits: row.limits, hint: row.hint, provenance: row.provenance, hlc: row.hlc };
 }
 export function listApiKeys(person: PersonRow) {
   return db.select().from(apiKeys).where(eq(apiKeys.personId, person.id)).all().map(r => wire(r, person));
 }
-/** Explicit whitelist: administrative reads carry no name, hint or activity. */
+/** Explicit whitelist: administrative reads carry the short key hint, never a name or activity. */
 export function listApiKeysForAdmin(person: PersonRow) {
   return listApiKeys(person).map(k => ({ id: k.id, person_id: k.person_id, scopes: k.scopes,
-    status: k.status, created_at: k.created_at, expires_at: k.expires_at, revoked_at: k.revoked_at }));
+    status: k.status, created_at: k.created_at, expires_at: k.expires_at, revoked_at: k.revoked_at, hint: k.hint }));
 }
 function base32(bytes: Uint8Array): string {
   const alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567";

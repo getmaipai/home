@@ -23,6 +23,7 @@ import { PicturesLibrary } from "@/apps/settings/PicturesLibrary";
 import { LikenessSettings } from "@/apps/settings/LikenessSettings";
 import { VideoLibrary } from "@/apps/settings/VideoLibrary";
 import { CommandsSection } from "@/apps/settings/CommandsSection";
+import { CodingKeysSettings } from "@/apps/settings/CodingSettings";
 import { SizingPanel } from "@/shell/pages/settings/SizingPanel";
 import { Card, CardContent, CardHeader, CardTitle } from "@maipai/ui/src/dashboard/components/ui/card";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@maipai/ui/src/dashboard/components/ui/alert-dialog";
@@ -80,6 +81,7 @@ function HomeRoutingStatsSettings() { return <RoutingStatsSection />; }
 
 export const SETTINGS_VIEWS: Record<string, ComponentType<SettingsViewProps>> = {
   "account.profile": AccountProfile,
+  "account.coding_keys": CodingKeysSettings,
   "account.voice": AccountVoiceControls,
   "home.commands": HomeCommandsSettings,
   "home.voice_catalog": HomeVoiceCatalogSettings,
