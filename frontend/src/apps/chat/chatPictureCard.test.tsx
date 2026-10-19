@@ -55,15 +55,24 @@ describe("the picture card", () => {
     }
   });
 
-  test("a finished picture shows in the gallery with the Edit button", async () => {
+  test("a finished picture has an always-visible Edit button that opens the editor", async () => {
     const restore = stub(card({ state: "done", percent: 100, files: [FILE] }));
     const onEdit = mock((_target: { id: string; name: string; src: string }) => undefined);
     const v = renderWithQueryClient(
       <ImageEditContext.Provider value={{ onEdit, label: "Edit picture", canEdit: () => true }}><PictureToolRender {...props} /></ImageEditContext.Provider>,
     );
-    await waitFor(() => expect(v.getByRole("button", { name: "Edit picture" })).toBeTruthy());
-    fireEvent.click(v.getByRole("button", { name: "Edit picture" }));
+    await waitFor(() => expect(v.getByRole("button", { name: "Edit" })).toBeTruthy());
+    fireEvent.click(v.getByRole("button", { name: "Edit" }));
     expect(onEdit).toHaveBeenCalledWith({ id: "file-1", name: "a red fox", src: FILE.url });
+    restore();
+  });
+
+  test("a picture the person may not edit has no Edit button", async () => {
+    const restore = stub(card({ state: "done", percent: 100, files: [FILE] }));
+    const v = renderWithQueryClient(<ImageEditContext.Provider value={{ onEdit: () => undefined, label: "Edit picture", canEdit: () => false }}><PictureToolRender {...props} /></ImageEditContext.Provider>);
+    await waitFor(() => expect(v.container.querySelector('[data-slot="image-gallery"]')).toBeTruthy());
+    expect(v.queryByRole("button", { name: "Edit" })).toBeNull();
+    expect(v.queryByRole("button", { name: "Edit picture" })).toBeNull();
     restore();
   });
 
@@ -111,4 +120,5 @@ describe("the picture card", () => {
     await waitFor(() => expect(picturesApi.again).toHaveBeenCalledWith("pic-1"));
     restore();
   });
+
 });

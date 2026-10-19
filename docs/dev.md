@@ -37511,6 +37511,8 @@ client side. Comment sends `edit_masked` (or `edit`) to the picture engine and r
 with provenance; it is gated like picture creation, and a Comment on an uploaded photo refuses undressing phrasings (`asksToUndress`).
 Generated pictures are marked by Home when the engine makes them, never by a file name. Numbers: `docs/design/image-tools-2026-10-17.md`.
 
+`remove_people` uses the Stack's normalized person boxes before it asks the picture-reading model. A single spatial phrase selects the leftmost, rightmost, middle, top, bottom, front or back box (or a numbered position such as second from the left); boxes within 5% of the image width are treated as a tie and sent to the model. Category words such as boy or girl do not narrow the candidates. The model's JSON is parsed tolerantly because the engine does not enforce `json_schema`; `complete()` owns the single empty-length retry and central reasoning reserve. Picker failures log only one reason code, never the request or image. `ImageGallery` offers a visible Edit action below each made picture. The sent-message attachment's Edit control still appears on hover for pointer devices, so an always-visible action needs the additive kit prop tracked in BACKLOG. The kit `ErrorState` owns the failed-picture retry row; it needs a stacked layout prop for a full-width message followed by a left-aligned 48 px retry button. Home cannot change either Element's shape under RULES rule 9; see IMGTOOLS-10 and IMGTOOLS-11.
+
 ### Videos (VIDEO-GEN-04 to 08)
 
 `generate_video` (`min_role: adult`; `prompt`, `from_picture`, `orientation`, `seconds` 1 to 5, `style`, `depicts_real_person`), offered only when

@@ -481,22 +481,29 @@ export const PictureToolRender: ToolCallMessagePartComponent<Record<string, neve
     return query.isError ? <ErrorState layout="inline" title="I couldn't check on that picture" detail="Reload the chat to try again." retrying={false} /> : null;
   }
   if (card.files.length > 0) {
-    // The kit's own Edit button opens the editor on a picture of the person's own (a stored file in this chat).
+    // The gallery's hover Edit affordance stays useful on a pointer; the explicit gallery action is always visible,
+    // including on touch. Both are kit props and open the same editor target.
     const target = (image: { id: string; src: string; alt: string }) => ({ id: image.id, name: image.alt || "picture", src: image.src });
+    const editable = (image: { id: string; src: string; alt: string }) => Boolean(edit && (!edit.canEdit || edit.canEdit(target(image))));
+    const editActions = edit ? card.files.flatMap((file, index) => {
+      const image = { id: file.id, src: file.url, alt: file.alt };
+      return editable(image) ? [{ id: `edit-picture-${file.id}`, label: card.files.length === 1 ? "Edit" : `Edit picture ${index + 1}`, onSelect: () => edit.onEdit(target(image)) }] : [];
+    }) : [];
+    const qualityActions = card.switch_to && card.can_vary ? [{
+      id: "switch-quality",
+      label: card.switch_to === "detailed" ? "Make it Detailed" : "Make it Quick",
+      hint: card.switch_to === "detailed" ? "Slower, with finer detail" : "Faster, a few seconds",
+      disabled: retrying,
+      onSelect: () => { setRetrying(true); void picturesApi.again(card.id, card.switch_to!).then(() => query.refetch()).catch(() => undefined).finally(() => setRetrying(false)); },
+    }] : [];
     return (
       <ImageGallery
         images={galleryImagesOf(card)}
         maxVisible={4}
         size="large"
-        {...(edit ? { onEditImage: (image: { id: string; src: string; alt: string }) => edit.onEdit(target(image)), canEditImage: (image: { id: string; src: string; alt: string }) => (edit.canEdit ? edit.canEdit(target(image)) : true), editLabel: edit.label ?? "Edit picture" } : {})}
+        {...(edit ? { onEditImage: (image: { id: string; src: string; alt: string }) => edit.onEdit(target(image)), canEditImage: editable, editLabel: edit.label ?? "Edit picture" } : {})}
         /* IMGGEN-QUALITY-01: the on-the-fly choice. A Quick picture offers Detailed (slower, finer); a Detailed one offers Quick. No model names. */
-        {...(card.switch_to && card.can_vary ? { actions: [{
-          id: "switch-quality",
-          label: card.switch_to === "detailed" ? "Make it Detailed" : "Make it Quick",
-          hint: card.switch_to === "detailed" ? "Slower, with finer detail" : "Faster, a few seconds",
-          disabled: retrying,
-          onSelect: () => { setRetrying(true); void picturesApi.again(card.id, card.switch_to!).then(() => query.refetch()).catch(() => undefined).finally(() => setRetrying(false)); },
-        }] } : {})}
+        {...(editActions.length + qualityActions.length > 0 ? { actions: [...editActions, ...qualityActions] } : {})}
       />
     );
   }

@@ -210,7 +210,7 @@ async function runEditPictureUnmetered(input: RunEditInput): Promise<ToolExecuti
           progress("finding people", 10);
           // The picture is read the way the tools read it (orientation applied) so the outlines and the pixels line up.
           const upright = new Uint8Array(await sharp(base.bytes, { failOn: "error", limitInputPixels: 64_000_000 }).rotate().png().toBuffer());
-          const cannotKeep = "I can't tell where every person in this photo is, so I won't change it. Open it with Edit and paint the part you want changed.";
+          const cannotKeep = "I can't tell where every person in this photo is, so I won't change it. Tap the picture, then Edit, and paint the part you want changed.";
           const found = await peopleMaskWithCount(upright, "image/png", "all", signal).catch((error) => {
             // The person finder found none: the people cannot be kept safe, so nothing is changed.
             if (error instanceof PeopleError && error.code === "none") throw new PeopleError("failed", cannotKeep);

@@ -28,7 +28,7 @@ Home makes two kinds of picture. **Quick** is the usual one: a few seconds, clea
 
 Ask in chat, in your own words. Attach a picture, or point at one already in the chat, and say what you want:
 
-- "Remove the man in the red jacket from this picture." Home finds the people, takes out only the one you mean, and fills the place from what is around it. Nothing new is drawn, so this works on any picture you have. If it cannot tell which person you mean, it says so and does nothing; say where they stand or what they wear, or open the picture with **Edit** and paint over them with **Erase**.
+- "Remove the boy on the left from this picture." Home uses where people stand to tell which one you mean. It takes out only that person and fills the place from what is around it. Nothing new is drawn, so this works on any picture you have. If Home still cannot tell, it says so and does nothing; say where they stand or what they wear, or tap the picture, then **Edit**, and paint over them with **Erase**.
 - "Make the sky clear." "Make the car yellow." "Change the background to a beach." "Fix the lighting, it is too dark." The picture model makes the change. It can redraw small parts of the rest of the picture, so check the result.
 - "Add her to this picture." Attach the scene and a photo of the person (two pictures on one message) and say who is in the photo. Home uses a photo of a person only if that person lives in your home, is an adult, and has said yes in their own **Settings, Pictures and videos**. A child is never used. A photo of anyone else is not used.
 - "Remove the background" and "make it bigger" also work from chat.
@@ -37,8 +37,8 @@ The original is never changed. The new picture is the next version of it: press 
 
 ## Change a picture in the editor
 
-- **Edit.** Press **Edit** on the picture. In the editor, choose **Comment**, click the part you want to change (or drag a box), and say what you want, like "make the sky pink". Home shows the new picture as a preview. Press **Apply** to keep it as a new version, or discard it. Only the part you pointed at changes.
-- **The editor tools.** Press **Edit** on a picture to open it in the editor: **Remove background** (keeps the subject), **Erase** (paint over something and Home fills the hole), **Upscale** (2x or 4x, bigger and sharper), **Resize**, **Markup** (draw or write on it) and **Comment** (above). The first four run on your computer in a few seconds and need no picture model. A change you apply becomes a new version, and the original stays.
+- **Edit.** For a picture Home made, press **Edit** below it. For a picture you sent, tap it to show **Edit** on the picture. On a computer, move the pointer over a sent picture to show **Edit**. In the editor, choose **Comment**, tap the part you want to change (or drag a box), and say what you want, like "make the sky pink". Home shows the new picture as a preview. Press **Apply** to keep it as a new version, or discard it. Only the part you pointed at changes.
+- **The editor tools.** Press **Edit** to open a picture in the editor: **Remove background** (keeps the subject), **Erase** (paint over something and Home fills the hole), **Upscale** (2x or 4x, bigger and sharper), **Resize**, **Markup** (draw or write on it) and **Comment** (above). The first four run on your computer in a few seconds and need no picture model. A change you apply becomes a new version, and the original stays.
 - **Make a variation.** Open the **More** menu under the reply and choose **Make a variation**. You get another picture from the same words.
 - **Try again.** If a picture did not work, the card says why and has a **Try again** button.
 
@@ -96,7 +96,7 @@ The page also lists every time someone made something that looks like them, and 
 | The reply says it is coming but no picture shows yet | The picture started and the reply did not finish | Wait a minute. The card fills in |
 | You asked chat to change a picture and got a new one | The picture tool cannot change an existing picture | Press **Edit** on the picture instead |
 | A style file is refused | Over 120 MB in the form, or it names a real person or a child in an adult scene, or it was made for another picture model (Pony, Illustrious and SDXL styles do not fit yet) | For a big file, type its path on this computer instead. Otherwise use a different style |
-| No **Edit** button | The picture is not in this chat | Open it from **Files** |
+| You cannot find **Edit** | The picture may not be in this chat | Open the picture in this chat and choose **Edit**. If it is in **Files**, open it there |
 
 ## Private chats
 
