@@ -7,6 +7,10 @@ checklist (`docs/dev.md`). The first release is 0.1.0.
 
 ## [Unreleased]
 
+### Fixed
+
+- Chat: typing in a chat that a New chat had closed (an older chat from the list, or Retry on it) reopens it and sends, instead of failing with "conversation not found" and an id. A chat that retention emptied still cannot take a message, and now says so in plain words.
+
 ## [0.2.28] - 2026-10-19
 
 News pages are laid out per topic, articles show their own pictures and read like Apple News, and the News title says where you are. Chat keeps what you read when the safety check cuts a reply. No database migration. Pins: `@maipai/spec` 0.1.188, `@maipai/ui` 0.5.294.

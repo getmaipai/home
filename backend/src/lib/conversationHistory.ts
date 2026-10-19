@@ -1179,12 +1179,20 @@ export function resolveOrCreateConversation(
     const session = temporarySessions.get(conversationId);
     if (session) {
       if (session.conversation.person !== actor.id || session.conversation.surface !== surface) {
-        return { ok: false, status: 400, error: `conversation not found: ${conversationId}` };
+        return { ok: false, status: 400, error: "This chat can no longer take a new message. Start a new chat to keep going." };
       }
       session.lastActivityAt = Date.now();
       return { ok: true, value: session.conversation };
     }
-    const row = db.select().from(conversations).where(eq(conversations.id, conversationId)).get();
+    let row = db.select().from(conversations).where(eq(conversations.id, conversationId)).get();
+    // A chat that a New chat closed still has its thread; the person opening it again and typing is the explicit resume, so it
+    // reopens (the same swap `resumeConversation` does) instead of failing with an id. A closed chat with no turns left (retention
+    // emptied it) keeps the refusal below: nothing may grow back into it.
+    if (row && row.personId === actor.id && row.surface === surface && row.status === "closed"
+      && db.select({ id: conversationTurns.id }).from(conversationTurns).where(eq(conversationTurns.conversationId, row.id)).limit(1).get()) {
+      const resumed = resumeConversation(actor, row.id);
+      if (resumed.ok) row = db.select().from(conversations).where(eq(conversations.id, conversationId)).get();
+    }
     // A code review (2026-09-05) found the surface check missing: a
     // conversation_id from this actor's own "chat" conversation passed
     // for a "tv" turn, silently attaching a tv-surface turn under a
@@ -1193,7 +1201,7 @@ export function resolveOrCreateConversation(
     // Closed conversations require the explicit resume operation. A stale
     // turn request must never silently undo retention or reactivate a chat.
     if (!row || row.personId !== actor.id || row.status !== "open" || row.surface !== surface) {
-      return { ok: false, status: 400, error: `conversation not found: ${conversationId}` };
+      return { ok: false, status: 400, error: "This chat can no longer take a new message. Start a new chat to keep going." };
     }
     // The persistence-boundary design (docs/plans/privacy-mode-2026-09-24.md,
     // 2026-09-26, issue #163): a durable row is never silently accepted

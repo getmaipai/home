@@ -830,6 +830,24 @@ describe("runRetention()", () => {
     expect(db.select().from(conversationTurns).where(eq(conversationTurns.conversationId, closedId)).all().length).toBe(0); // no new turn attached
   });
 
+  test("a chat a New chat closed takes the next message and reopens, closing the newer one (never a 'conversation not found')", async () => {
+    const { actor } = await owner();
+    const first = await runTurnNext(actor, "chat", "good morning");
+    expect(first.ok).toBe(true);
+    if (!first.ok) return;
+    const oldId = first.value.conversation_id;
+    const fresh = createConversation(actor, { surface: "chat" });
+    expect(fresh.ok).toBe(true);
+    if (!fresh.ok) return;
+    expect(db.select().from(conversations).where(eq(conversations.id, oldId)).get()!.status).toBe("closed");
+
+    const again = await runTurnNext(actor, "chat", "and one more thing", { conversationId: oldId });
+    expect(again.ok).toBe(true);
+    expect(db.select().from(conversations).where(eq(conversations.id, oldId)).get()!.status).toBe("open");
+    expect(db.select().from(conversations).where(eq(conversations.id, fresh.value.id)).get()!.status).toBe("closed");
+    expect(db.select().from(conversationTurns).where(eq(conversationTurns.conversationId, oldId)).all().length).toBe(2);
+  });
+
   // The floor: a safety-flagged minor turn survives even past a shortened
   // household retention setting, because the setting can only shorten
   // retention for a normal turn, never a flagged-minor one below the
