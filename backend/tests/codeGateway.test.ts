@@ -813,3 +813,15 @@ test("a missing coding piece answers 503 with the Stack's sentence, then the nex
   __setMissingCodingPieceForTests(null);
   expect((await call("/code/v1/chat/completions", { secret, body: wiresBody["/code/v1/chat/completions"] })).status).toBe(200);
 });
+
+// CSAM-TEXT-01 (owner's ruling 2026-10-19): an adult's coding traffic has no minor-word-plus-sexual-word rule, so our own source files about age gates reach the model.
+// A teen keeps the full floor on the same text.
+test("an adult may send source code about child protections; the same text from a teen is still refused", async () => {
+  const text = (await Bun.file(new URL("../src/lib/access.ts", import.meta.url).pathname).text()).slice(0, 12000);
+  const body = { model: "maipai-coder", max_tokens: 20, messages: [{ role: "user", content: `Reply OK.\n${text}` }] };
+  const adult = adultWithKey();
+  expect((await call("/code/v1/chat/completions", { secret: adult.secret, body })).status).toBe(200);
+  const teen = minorWithKey("teen");
+  expect((await call("/code/v1/chat/completions", { secret: teen.secret, body })).status).toBe(403);
+});
+

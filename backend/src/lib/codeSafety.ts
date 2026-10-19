@@ -17,7 +17,9 @@ export type FloorVerdict = { action: SafetyResult["action"]; crisis: boolean; re
 
 /** The floor on `text` for `band`. `direction` "out" reads a reply (a refuse category refuses even beside self-harm), "in" reads the person's words. */
 export function codingFloor(text: string, band: AgeBand, direction: "in" | "out"): FloorVerdict {
-  let result = evaluateSafety(text, band);
+  // CSAM-TEXT-01 (owner's ruling 2026-10-19): an adult's typed message and the model's reply carry no minor-word-plus-sexual-word rule. Passing the direction
+  // selects that mode for an adult; a teen, a child and the robot keep the full floor exactly as before (evaluateSafety ignores it for them).
+  let result = evaluateSafety(text, band, direction === "in" ? "message" : "reply");
   if (band === "adult" && result.flagged) {
     const categories = result.categories.filter(c => ADULT_CATEGORIES.has(c));
     const action: SafetyResult["action"] = categories.length === 0 ? "allow"
