@@ -166,28 +166,25 @@ const ROUTES: Array<[string, string, (body: unknown, form: FormData | null) => {
   [
     "/stack/v1/settings/apply",
     "POST",
-    () => ({
-      status: 200,
-      body: {
-        sections: [{ id: "stack", label: "Stack" }],
-        settings: [
-          {
-            key: "stack.jobs.max",
-            scope: "device",
-            selector: "number",
-            range: { min: 1, max: 4 },
-            default: 1,
-            label: "Max jobs",
-            level: "basic",
-            lives_in: "stack",
-            honoured_by: ["home"],
-            needs_restart: false,
-            in_effect: 2,
-            pending: null,
-          },
-        ],
-      },
-    }),
+    () => ({ status: 200, body: { sections: [{ id: "stack", label: "Stack" }], settings: [] } }),
+  ],
+  [
+    "/stack/v1/settings",
+    "PUT",
+    (body) => {
+      const values = body as Record<string, unknown>;
+      return {
+        status: 200,
+        body: {
+          sections: [{ id: "stack", label: "Stack" }],
+          settings: [{
+            key: "stack.jobs.max", scope: "device", selector: "number", range: { min: 1, max: 4 },
+            default: 1, label: "Max jobs", level: "basic", lives_in: "stack", honoured_by: ["home"],
+            needs_restart: false, in_effect: values["stack.jobs.max"], pending: null,
+          }],
+        },
+      };
+    },
   ],
   [
     "/stack/v1/hardware/budget",
@@ -268,7 +265,7 @@ beforeAll(() => {
       const [, , handler] = route;
       let body: unknown = null;
       let form: FormData | null = null;
-      if (method === "POST") {
+      if (method === "POST" || method === "PUT") {
         const ct = req.headers.get("content-type") ?? "";
         if (ct.includes("application/json")) body = await req.json();
         else if (ct.includes("multipart/form-data")) form = (await req.formData()) as FormData;
@@ -498,7 +495,8 @@ describe("createStackClient", () => {
     expect((await client.health()).health[0]!.code).toBe("engine.crashed.chat");
     expect(((await client.healthFix("engine.crashed.chat")) as { ok: boolean }).ok).toBe(true);
     expect((await client.settings()).settings[0]!.key).toBe("stack.jobs.max");
-    expect(((await client.applySettings({ "stack.jobs.max": 2 })) as { settings: Array<{ in_effect: unknown }> }).settings[0]!.in_effect).toBe(2);
+    const applied = await client.applySettings({ "stack.jobs.max": 2 });
+    expect(applied.settings[0]!.in_effect).toBe(2);
     expect((await client.searchPreview()).diff).toEqual(["search.formats: [html, json]"]);
     expect(await client.searchRevert()).toEqual({ reverted: true });
     expect((await client.budget()).pressure).toBe("normal");

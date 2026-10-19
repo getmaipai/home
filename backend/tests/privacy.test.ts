@@ -155,6 +155,26 @@ describe("the hub's own connections", () => {
     expect(row?.what).not.toContain("recognition model");
   });
 
+  test("coding downloads and the inbound coding gateway appear when Coding is on", () => {
+    setHouseholdSettingValue("coding.enabled", true);
+    const rows = privacyConnections();
+    const model = rows.find((row) => row.id === "platform:coding-model-download");
+    const engine = rows.find((row) => row.id === "platform:coding-engine-download");
+    const gateway = rows.find((row) => row.id === "platform:inbound-coding-gateway");
+    expect(model?.destination).toContain("Hugging Face");
+    expect(model?.when).toContain("coding model and its Splash draft");
+    expect(model?.what).toContain("file request and your home's internet address");
+    expect(model?.what).toContain("Nothing anyone in the house said");
+    expect(engine?.destination).toBe("github.com");
+    expect(engine?.when).toContain("once");
+    expect(engine?.what).toContain("Nothing anyone in the house said");
+    expect(gateway?.direction).toBe("inbound");
+    expect(gateway?.when).toContain("personal Coding key");
+    expect(gateway?.what).toContain("tailnet");
+    expect(gateway?.what).toContain("revoke");
+    expect(gateway?.what).toContain("Nothing is sent outward");
+  });
+
   // REFERENCE-LIBRARY-01: the kiwix-tools binary download was a real
   // gap left by KIWIX-SIDECAR-01 (kiwix-serve itself sends nothing, but
   // installing it does), found while adding the row for this item's own
@@ -206,7 +226,7 @@ describe("the hub's own connections", () => {
   test("direction structurally marks inbound rows - every other row is outbound", () => {
     const rows = privacyConnections();
     const inbound = rows.filter((r) => r.direction === "inbound");
-    expect(inbound.map((r) => r.id)).toEqual(["platform:robot-hub-endpoints", "platform:robot-people", "platform:robot-live-view", "platform:inbound-api"]);
+    expect(inbound.map((r) => r.id)).toEqual(["platform:robot-hub-endpoints", "platform:robot-people", "platform:robot-live-view", "platform:inbound-api", "platform:inbound-coding-gateway"]);
     for (const row of rows) {
       if (!inbound.includes(row)) expect(row.direction).toBe("outbound");
     }

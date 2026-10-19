@@ -34,7 +34,7 @@ import type { PackageManifest } from "@maipai/spec/gen/ts/manifest.js";
 import type { PrivacyConnection } from "@/wire";
 import { getHouseholdSettingValue } from "@/lib/settings";
 import { INTERNET_PROBE_ENABLED_KEY, INTERNET_PROBE_DNS_NAME_KEY, INTERNET_PROBE_TCP_ADDRESS_KEY, INTERNET_PROBE_TCP_PORT_KEY } from "@/settings/coreKeys";
-import { isRemoteStackSelected } from "@/lib/stackEngine";
+import { isRemoteStackSelected, isStackConfigured } from "@/lib/stackEngine";
 
 function ddgsPicked(): boolean {
   return webSourcesPicked().includes("ddgs");
@@ -99,6 +99,10 @@ export function platformConnections(): PrivacyConnection[] {
   const internetProbeDns = String(getHouseholdSettingValue(INTERNET_PROBE_DNS_NAME_KEY) ?? "example.com");
   const internetProbeAddress = String(getHouseholdSettingValue(INTERNET_PROBE_TCP_ADDRESS_KEY) ?? "1.1.1.1");
   const internetProbePort = Number(getHouseholdSettingValue(INTERNET_PROBE_TCP_PORT_KEY) ?? 443);
+  // Coding's pieces are owned and installed by the selected Stack. Until
+  // the household has a Stack with the coding feature available, these
+  // install and inbound rows do not describe a connection it can make.
+  const codingVisible = getHouseholdSettingValue("coding.enabled") === true || isStackConfigured();
 
   const rows: (PrivacyConnection | null)[] = [
     !isRemoteStackSelected() ? {
@@ -133,6 +137,14 @@ export function platformConnections(): PrivacyConnection[] {
     // endpointing; transcription model downloads belong to the Stack.
     row("platform:stt-models", sttHosts, {
       when: "the first time someone uses streaming speech input, when Home downloads its small voice-activity model to cut speech into sentences; speech recognition runs on the Stack",
+      what: DOWNLOAD_CARRIES,
+    }),
+    row("platform:coding-model-download", codingVisible ? "Hugging Face or the mirror chosen in Stack settings" : null, {
+      when: "once, when an admin installs the coding model and its Splash draft",
+      what: "the file request and your home's internet address. Nothing anyone in the house said, asked, or saved.",
+    }),
+    row("platform:coding-engine-download", codingVisible ? "github.com" : null, {
+      when: "once, when an admin installs the Splash coding engine",
       what: DOWNLOAD_CARRIES,
     }),
     // Home Assistant's own-LAN sensor stream gets its row below only when
@@ -409,6 +421,18 @@ function inboundConnections(): PrivacyConnection[] {
       retention: "no separate record kept beyond the normal conversation history any chat turn already creates",
       direction: "inbound",
     },
+    ...(getHouseholdSettingValue("coding.enabled") === true || isStackConfigured() ? [{
+      id: "platform:inbound-coding-gateway",
+      source: "MaiPai Home",
+      sourceKind: "platform" as const,
+      destination: "your own network only - nothing leaves the house for this row",
+      when: "when an app or device uses a personal Coding key an admin gave to that person",
+      what: "the reverse of every other row here: the app or device sends prompts and code to Home over your home network, or over your tailnet when 'away' is on, and gets replies back. An admin can revoke the key. Nothing is sent outward.",
+      who: "the app or device holding that person's key",
+      optIn: true,
+      retention: "the normal conversation history, if Home saves it under your household settings",
+      direction: "inbound" as const,
+    }] : []),
   ];
 }
 

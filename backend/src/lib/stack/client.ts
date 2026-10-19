@@ -472,7 +472,19 @@ export function createStackClient(options: StackClientOptions = {}): StackClient
     selfHeal: (opts) => call("/stack/v1/engines/self-heal", { method: "GET" }, json<StackSelfHeal>, opts),
     healthFix: (code, opts) => call(`/stack/v1/health/${encodeURIComponent(code)}/fix`, { method: "POST" }, json<Record<string, unknown>>, opts),
     settings: (opts) => call("/stack/v1/settings", { method: "GET" }, json<{ sections: Array<{ id: string; label: string }>; settings: StackSetting[] }>, opts),
-    applySettings: (values, opts) => call("/stack/v1/settings/apply", jsonInit(values), json<{ sections: Array<{ id: string; label: string }>; settings: StackSetting[] }>, opts),
+    applySettings: async (values, opts) => {
+      // Settings are stored by PUT /settings. The apply endpoint has no
+      // body; it only promotes pending values. Keep this one helper for
+      // callers that need a setting to take effect now, while avoiding
+      // promoting unrelated pending changes staged by an admin.
+      const stored = await call("/stack/v1/settings", { ...jsonInit(values), method: "PUT" }, json<{ sections: Array<{ id: string; label: string }>; settings: StackSetting[] }>, opts);
+      const keys = new Set(Object.keys(values));
+      const pending = stored.settings.filter((setting) => setting.pending !== null && setting.pending !== undefined);
+      if (pending.length > 0 && pending.every((setting) => keys.has(setting.key))) {
+        return call("/stack/v1/settings/apply", { method: "POST" }, json<{ sections: Array<{ id: string; label: string }>; settings: StackSetting[] }>, opts);
+      }
+      return stored;
+    },
     updateSettings: (values, opts) => call("/stack/v1/settings", { ...jsonInit(values), method: "PUT" }, json<{ sections: Array<{ id: string; label: string }>; settings: StackSetting[] }>, opts),
     promotePendingSettings: (opts) => call("/stack/v1/settings/apply", { method: "POST" }, json<{ sections: Array<{ id: string; label: string }>; settings: StackSetting[] }>, opts),
     searchPreview: (opts) => call("/stack/v1/search/preview", { method: "GET" }, json<Record<string, unknown>>, opts),
