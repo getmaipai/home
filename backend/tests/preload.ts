@@ -18,6 +18,10 @@ import { __drainBackgroundWorkForTests } from "@/lib/backgroundWork";
 import type { StackFixture } from "./stackFixture";
 import { HostError } from "@maipai/spec/emulators/ts/host-emulator.js";
 
+// IMGQ-09: the answer-picture re-ask is on in production (an extra model call after the reply). Tests that count model calls or
+// script one reply must not see it, so it is off for every test unless a test deletes this variable to turn it on.
+process.env.MAIPAI_IMGQ09_REASK ??= "0";
+
 let defaultScriptedStack: StackFixture;
 
 // FLAKE-LOAD-01 (cause d, port collision): a test server started with `Bun.serve({ port: 0 })` and no hostname binds the
