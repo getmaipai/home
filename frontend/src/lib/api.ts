@@ -1344,7 +1344,10 @@ export const api = {
   // than a second listing endpoint.
   library: (query: LibraryQuery = {}) => request<{ items: LibraryItem[]; next_cursor: string | null }>(`/api/library?${libraryParams({ limit: 60, ...query })}`),
   librarySummary: (query: LibraryQuery = {}) => {
-    const { cursor: _cursor, limit: _limit, sort: _sort, ...filters } = query;
+    const filters: LibraryQuery = { ...query };
+    delete filters.cursor;
+    delete filters.limit;
+    delete filters.sort;
     return request<LibrarySummary>(`/api/library/summary?${libraryParams(filters)}`);
   },
   libraryFile: (id: string) => request<FileRecord>(`/api/files/${encodeURIComponent(id)}`),
