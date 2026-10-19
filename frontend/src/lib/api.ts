@@ -440,6 +440,34 @@ export interface PersonDeletionPreview {
   export: { allowed: boolean; url: string | null };
 }
 
+export interface LibraryQuery {
+  cursor?: string; limit?: number; type?: string; owner?: string;
+  shared?: "with-me" | "by-me" | "none"; search?: string;
+  sort?: "newest" | "oldest" | "name" | "size";
+}
+export interface LibraryItem {
+  id: string; kind: "image" | "video" | "audio" | "document" | "story" | "file";
+  name: string; media_type: string; size_bytes: number; created_at: string;
+  owner: { id: string; display_name: string };
+  shared_with: { count: number; household: boolean };
+  retention: string; chat_id: string | null; can_edit: boolean;
+  audience: "all-ages" | "adult-only" | null; duration_seconds: number | null;
+  thumb_url: string; expires_at: string | null; version_count: number;
+}
+export interface LibrarySummary {
+  items: number; bytes: number; per_kind: Record<string, { items: number; bytes: number }>;
+  trash: { items: number; bytes: number }; expiring: { items: number; bytes: number };
+}
+export interface LibraryTrashItem {
+  kind: string; id: string; title: string; deleted_at: string; trash_until: string | null;
+  can_restore: boolean; can_purge: boolean;
+}
+function libraryParams(query: LibraryQuery): string {
+  const params = new URLSearchParams();
+  for (const [key, value] of Object.entries(query)) if (value !== undefined && value !== "") params.set(key, String(value));
+  return params.toString();
+}
+
 export interface VisibleFile {
   file: FileRecord;
   owner_person_id: string;
@@ -1314,6 +1342,18 @@ export const api = {
   // one person's own files (still filtered to what I may see) - the
   // profile page's shared-media grid, reusing this one route rather
   // than a second listing endpoint.
+  library: (query: LibraryQuery = {}) => request<{ items: LibraryItem[]; next_cursor: string | null }>(`/api/library?${libraryParams({ limit: 60, ...query })}`),
+  librarySummary: (query: LibraryQuery = {}) => {
+    const { cursor: _cursor, limit: _limit, sort: _sort, ...filters } = query;
+    return request<LibrarySummary>(`/api/library/summary?${libraryParams(filters)}`);
+  },
+  libraryFile: (id: string) => request<FileRecord>(`/api/files/${encodeURIComponent(id)}`),
+  updateLibraryFile: (id: string, change: { name?: string | null; keep?: boolean }) => request<{ id: string; name: string | null; retention: string }>(`/api/files/${encodeURIComponent(id)}`, { method: "PATCH", body: JSON.stringify(change) }),
+  trashLibraryFile: (id: string) => request<{ id: string; deleted_at: string; trash_until: string }>(`/api/files/${encodeURIComponent(id)}`, { method: "DELETE" }),
+  recheckLibraryAudience: (id: string) => request<{ audience: "all-ages" }>(`/api/files/${encodeURIComponent(id)}/recheck-audience`, { method: "POST" }),
+  libraryTrash: () => request<{ rows: LibraryTrashItem[] }>("/api/trash"),
+  restoreLibraryFile: (id: string) => request<{ success: boolean }>(`/api/trash/file/${encodeURIComponent(id)}/restore`, { method: "POST" }),
+  purgeLibraryFile: (id: string) => request<{ success: boolean }>(`/api/trash/file/${encodeURIComponent(id)}`, { method: "DELETE" }),
   files: (ownerId?: string) => request<VisibleFile[]>(`/api/files${ownerId ? `?owner=${encodeURIComponent(ownerId)}` : ""}`),
   fileShares: (fileId: string) => request<Share[]>(`/api/files/${encodeURIComponent(fileId)}/shares`),
   // Not a fetch - just the path a real <img>/<video> element loads

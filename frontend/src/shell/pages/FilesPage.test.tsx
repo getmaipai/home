@@ -1,170 +1,455 @@
-import { afterEach, describe, expect, mock, test } from "bun:test";
-import { cleanup, fireEvent, waitFor } from "@testing-library/react";
+import { afterEach, beforeEach, describe, expect, mock, test } from "bun:test";
+import { cleanup, fireEvent, waitFor, within } from "@testing-library/react";
+import { MemoryRouter, useLocation } from "react-router-dom";
 import { FilesPage } from "@/shell/pages/FilesPage";
 import { renderWithQueryClient } from "../../../tests/renderWithQueryClient";
-import type { Roster, VisibleFile } from "@/lib/api";
+import { stubMatchMedia } from "../../../tests/stubMatchMedia";
+import type { LibraryItem, LibrarySummary, Roster } from "@/lib/api";
 
-afterEach(cleanup);
+const PHONE = "(max-width: 639.98px)";
+const WIDE = "(min-width: 1024px)";
+const VIEWER_WIDE = "(min-width: 960px)";
+afterEach(() => { cleanup(); localStorage.clear(); });
+beforeEach(() => stubMatchMedia({ [WIDE]: true, [VIEWER_WIDE]: true }));
 
-function makePerson(): Roster {
-  return { id: "person-abc123", display_name: "Nova", nickname: null, role: "owner", avatar_seed: "person-abc123", source: "hub", local_only: false, created_at: "2026-09-04T00:00:00.000Z", updated_at: "2026-09-04T00:00:00.000Z", deleted_at: null, enabled: true, guest_expires_at: null, memorialized_at: null, hlc: "1788000000000:0:test", hasSecret: true } as Roster;
+function person(role: Roster["role"] = "owner", id = "person-me"): Roster {
+  return { id, display_name: "Nova", nickname: null, role, avatar_seed: id, source: "hub", local_only: false, created_at: "2026-09-04T00:00:00.000Z", updated_at: "2026-09-04T00:00:00.000Z", deleted_at: null, enabled: true, guest_expires_at: null, memorialized_at: null, hlc: "1788000000000:0:test", hasSecret: true } as Roster;
 }
-
-type FileKind = "image" | "video" | "audio" | "document" | "story" | "other";
-const MIME_TYPES: Record<FileKind, string> = {
-  image: "image/png", video: "video/mp4", audio: "audio/mpeg", document: "application/pdf", story: "text/markdown", other: "application/octet-stream",
-};
-
-function file(id: string, owner: string, shared = false, kind: FileKind = "image"): VisibleFile {
-  return { owner_person_id: owner, shared, household: false, former_owner_name: null, file: { id, owner_person_id: owner, origin: "made", kind, media_type: MIME_TYPES[kind], size: 2048, sha256: "a".repeat(64), storage_path: `people/${owner}/files/${id}`, retention: "kept", provenance: {}, created_at: "2026-09-04T00:00:00.000Z", hlc: "1788000000000:0:test" } as VisibleFile["file"] as VisibleFile["file"] };
+function item(id: string, name: string, over: Partial<LibraryItem> = {}): LibraryItem {
+  return {
+    id, kind: "image", name, media_type: "image/png", size_bytes: 2048, created_at: "2026-10-16T00:00:00.000Z", owner: { id: "person-me", display_name: "Nova" },
+    shared_with: { count: 0, household: false }, retention: "kept", chat_id: null, can_edit: false, audience: null, duration_seconds: null,
+    thumb_url: `/api/files/${id}/thumb?w=320`, expires_at: null, version_count: 1, ...over,
+  };
 }
+const summary = (items: number, bytes = items * 2048, trash = 0): LibrarySummary => ({ items, bytes, per_kind: { image: { items, bytes }, video: { items: 0, bytes: 0 }, audio: { items: 0, bytes: 0 }, document: { items: 0, bytes: 0 }, story: { items: 0, bytes: 0 }, file: { items: 0, bytes: 0 } }, trash: { items: trash, bytes: 0 }, expiring: { items: 0, bytes: 0 } });
 
-function mockFetch(files: VisibleFile[]) {
-  const originalFetch = globalThis.fetch;
-  const fetchMock = mock((input: RequestInfo | URL, init?: RequestInit) => {
+interface Server { moreStatus?: number; items?: LibraryItem[]; next?: string | null; listStatus?: number; trash?: unknown[]; usage?: unknown }
+function serve(server: Server = {}) {
+  const original = globalThis.fetch;
+  const calls: { url: string; method: string }[] = [];
+  const items = server.items ?? [];
+  globalThis.fetch = mock((input: RequestInfo | URL, init?: RequestInit) => {
     const url = typeof input === "string" ? input : input instanceof Request ? input.url : input.toString();
-    if (url.includes("/api/files/") && url.includes("/shares")) return Promise.resolve(Response.json([{ id: "share-abc123", file_id: "file-abc123", from_person_id: "person-abc123", to: "person-sage123", provenance: "library", created_at: "2026-09-04T00:00:00.000Z", hlc: "1788000000000:0:test" }]));
-    if (url.includes("/api/files")) return Promise.resolve(Response.json(files));
-    if (url.includes("/api/people")) return Promise.resolve(Response.json([{ id: "person-abc123", display_name: "Nova" }, { id: "person-sage123", display_name: "Sage" }]));
-    if (url.includes("/api/shares/") && init?.method === "DELETE") return Promise.resolve(Response.json({ deletedShareIds: ["share-abc123"] }));
-    if (url.includes("/api/files/") && init?.method === "POST") return Promise.resolve(Response.json({ id: "share-new123" }));
+    const method = init?.method ?? "GET";
+    calls.push({ url, method });
+    if (url.startsWith("/api/library/summary")) return Promise.resolve(Response.json(summary(items.length, items.length * 2048, server.trash?.length ?? 0)));
+    if (url.startsWith("/api/library?")) {
+      if (server.listStatus) return Promise.resolve(Response.json({ error: "Home could not load your Library. Check that Home is running, then try again." }, { status: server.listStatus }));
+      const cursor = new URL(url, "http://x").searchParams.get("cursor");
+      if (cursor && server.moreStatus) return Promise.resolve(Response.json({ error: "The page address is invalid. Open the Library again." }, { status: server.moreStatus }));
+      return Promise.resolve(Response.json({ items: cursor ? [item("f-more", "Second page")] : items, next_cursor: cursor ? null : server.next ?? null }));
+    }
+    if (url === "/api/trash") return Promise.resolve(Response.json({ rows: server.trash ?? [] }));
+    if (url.startsWith("/api/trash/file/")) return Promise.resolve(Response.json({ success: true }));
+    if (url === "/api/storage/usage") return Promise.resolve(Response.json(server.usage ?? { people: [{ personId: "person-me", displayName: "Nova", role: "owner", usageBytes: 3 * 1024 * 1024, capBytes: 20 * 1024 ** 3, byKind: [{ kind: "image", bytes: 2 * 1024 * 1024 }, { kind: "video", bytes: 1024 * 1024 }] }], household: null }));
+    if (url === "/api/people") return Promise.resolve(Response.json([{ id: "person-me", display_name: "Nova", avatar_seed: "a" }, { id: "person-sage", display_name: "Sage", avatar_seed: "b" }]));
+    if (/^\/api\/files\/[^/]+$/.test(url) && method === "DELETE") return Promise.resolve(Response.json({ id: "x", deleted_at: "2026-10-18T00:00:00.000Z", trash_until: "2026-11-17T00:00:00.000Z" }));
+    if (/^\/api\/files\/[^/]+$/.test(url) && method === "PATCH") return Promise.resolve(Response.json({ id: "x", name: null, retention: "kept" }));
+    if (/^\/api\/files\/[^/]+$/.test(url)) return Promise.resolve(Response.json({ id: url.split("/").pop(), owner_person_id: "person-me", origin: "sent", kind: "image", media_type: "image/png", size: 10, sha256: "a", storage_path: "x", retention: "kept", provenance: {}, created_at: "2026-10-16T00:00:00.000Z", hlc: "h" }));
+    if (url.endsWith("/shares") && method === "GET") return Promise.resolve(Response.json([]));
     return Promise.resolve(new Response("{}", { status: 200 }));
-  });
-  globalThis.fetch = fetchMock as unknown as typeof fetch;
-  return { fetchMock, restore: () => { globalThis.fetch = originalFetch; } };
+  }) as unknown as typeof fetch;
+  return { calls, restore: () => { globalThis.fetch = original; }, listUrls: () => calls.filter((call) => call.url.startsWith("/api/library?")).map((call) => new URL(call.url, "http://x").searchParams) };
 }
+function Where() { const location = useLocation(); return <output data-testid="where">{location.search}</output>; }
+function page(role: Roster["role"] = "owner", entry = "/files") {
+  return renderWithQueryClient(<MemoryRouter initialEntries={[entry]}><FilesPage person={person(role)} /><Where /></MemoryRouter>);
+}
+const where = () => document.querySelector('[data-testid="where"]')!.textContent;
+const tile = (name: string) => Array.from(document.querySelectorAll<HTMLElement>('[data-slot="file-tile-main"]')).find((el) => el.getAttribute("aria-label")?.startsWith(name));
 
-describe("FilesPage", () => {
-  test("explains what the Library will hold when there are no files", async () => {
-    const { restore } = mockFetch([]);
+describe("Library states", () => {
+  test("loading shows a status with a plain label, then the tiles", async () => {
+    const server = serve({ items: [item("f1", "Fox in the snow")] });
     try {
-      renderWithQueryClient(<FilesPage person={makePerson()} />);
-      await waitFor(() => expect(document.body.textContent).toContain("Nothing here yet. Stories, pictures and documents you make in chat are kept here."));
-    } finally { restore(); }
+      page();
+      expect(document.querySelector('[role="status"][aria-label="Loading your files"]')).not.toBeNull();
+      await waitFor(() => expect(tile("Fox in the snow")).toBeTruthy());
+      expect(document.querySelector('[aria-label="Loading your files"]')).toBeNull();
+    } finally { server.restore(); }
   });
-
-  test("the kit table sorts its returned Library rows by owner", async () => {
-    const { restore } = mockFetch([file("file-owned123", "person-abc123"), file("file-shared123", "person-sage123", true, "document")]);
+  test("an empty Library explains what lands here and offers Upload", async () => {
+    const server = serve();
     try {
-      renderWithQueryClient(<FilesPage person={makePerson()} />);
-      await waitFor(() => expect(document.body.textContent).toContain("image/png"));
-      const header = document.querySelector('[data-slot="data-table-header-row"] button[aria-label="Sort by Owner"]')!;
-      fireEvent.click(header);
-      await waitFor(() => {
-        const rows = Array.from(document.querySelectorAll('[data-slot="data-table-body"] [data-slot="data-table-row"]'));
-        expect(rows[0]?.textContent).toContain("Sage");
-        expect(rows[1]?.textContent).toContain("You");
-      });
-    } finally { restore(); }
+      page();
+      await waitFor(() => expect(document.body.textContent).toContain("Nothing here yet. Pictures, videos and songs you make in chat land here"));
+      expect(within(document.body).getAllByRole("button", { name: "Upload" }).length).toBeGreaterThan(0);
+    } finally { server.restore(); }
   });
-
-  test("shows owned and shared files under their real owners and filters the list", async () => {
-    const { restore } = mockFetch([file("file-abc123", "person-abc123"), file("file-sage123", "person-sage123", true, "document")]);
+  test("a failed load says what to do and Try again loads again", async () => {
+    const server = serve({ listStatus: 500 });
     try {
-      renderWithQueryClient(<FilesPage person={makePerson()} />);
-      await waitFor(() => expect(document.body.textContent).toContain("image/png"));
-      expect(document.body.textContent).toContain("You");
-      expect(document.body.textContent).toContain("Sage");
-      fireEvent.change(document.querySelector<HTMLInputElement>("#library-search")!, { target: { value: "Sage" } });
-      await waitFor(() => expect(document.body.textContent).not.toContain("image/png"));
-      expect(document.body.textContent).toContain("application/pdf");
-    } finally { restore(); }
+      page();
+      await waitFor(() => expect(document.querySelector('[role="alert"]')?.textContent).toContain("Check that Home is running, then try again."));
+      const before = server.listUrls().length;
+      fireEvent.click(within(document.body).getByRole("button", { name: "Try again" }));
+      await waitFor(() => expect(server.listUrls().length).toBeGreaterThan(before));
+    } finally { server.restore(); }
   });
-
-  test("a file shared by someone no longer here is listed under the household, with who shared it", async () => {
-    const left = { ...file("file-left123", "person-gone123", true), household: true, former_owner_name: "Bramble" };
-    const { restore } = mockFetch([left]);
+  test("no matches offers Clear filters, which clears the search", async () => {
+    const server = serve();
     try {
-      renderWithQueryClient(<FilesPage person={makePerson()} />);
-      await waitFor(() => expect(document.body.textContent).toContain("Household, shared by Bramble"));
-      expect(document.body.textContent).not.toContain("person-gone123");
-    } finally { restore(); }
+      page("owner", "/files?q=zebra");
+      await waitFor(() => expect(document.body.textContent).toContain("No matches. Try a different word or clear a filter."));
+      fireEvent.click(within(document.body).getByRole("button", { name: "Clear filters" }));
+      await waitFor(() => expect(where()).toBe(""));
+    } finally { server.restore(); }
   });
-
-  test("file details preserve retention and share/unshare actions", async () => {
-    const { fetchMock, restore } = mockFetch([file("file-abc123", "person-abc123")]);
+  test("the header reads the count and size of the section", async () => {
+    const server = serve({ items: [item("f1", "A"), item("f2", "B")] });
     try {
-      renderWithQueryClient(<FilesPage person={makePerson()} />);
-      await waitFor(() => expect(document.body.textContent).toContain("image/png"));
-      fireEvent.click(document.querySelector('[aria-label="More actions"]')!);
-      fireEvent.click(await waitFor(() => document.querySelector('[role="menuitem"]')!));
-      await waitFor(() => expect(document.body.textContent).toContain("Kept until deleted"));
-      expect(document.body.textContent).toContain("Sage");
-      fireEvent.click(document.querySelectorAll("button").item(Array.from(document.querySelectorAll("button")).findIndex((button) => button.textContent === "Unshare"))!);
-      await waitFor(() => expect(fetchMock.mock.calls.some(([input, init]) => String(input).includes("/api/shares/share-abc123") && init?.method === "DELETE")).toBe(true));
-    } finally { restore(); }
+      page();
+      await waitFor(() => expect(document.body.textContent).toContain("2 items · 4 KB"));
+    } finally { server.restore(); }
   });
-
-  test("kit row actions stay attached to the selected file row", async () => {
-    const { restore } = mockFetch([
-      file("file-first123", "person-abc123"),
-      file("file-second123", "person-abc123", false, "document"),
-    ]);
+  test("the next page loads on request and joins the first", async () => {
+    const server = serve({ items: [item("f1", "First page")], next: "cursor-2" });
     try {
-      renderWithQueryClient(<FilesPage person={makePerson()} />);
-      await waitFor(() => expect(document.body.textContent).toContain("application/pdf"));
-      const row = Array.from(document.querySelectorAll('[data-slot="data-table-body"] [data-slot="data-table-row"]'))
-        .find((candidate) => candidate.textContent?.includes("application/pdf")) as HTMLElement;
-      fireEvent.click(row.querySelector('[aria-label="More actions"]')!);
-      fireEvent.click(await waitFor(() => document.querySelector('[role="menuitem"]')!));
-      await waitFor(() => expect(document.body.textContent).toContain("file-second123"));
-      expect(document.body.textContent).not.toContain("file-first123");
-    } finally { restore(); }
+      page();
+      await waitFor(() => expect(tile("First page")).toBeTruthy());
+      fireEvent.click(within(document.body).getByRole("button", { name: "Show more files" }));
+      await waitFor(() => expect(tile("Second page")).toBeTruthy());
+      expect(tile("First page")).toBeTruthy();
+    } finally { server.restore(); }
   });
+});
 
-  test("File parts show name, size and the Library download route for every file kind", async () => {
-    const kinds: FileKind[] = ["image", "video", "audio", "document", "story", "other"];
-    for (const kind of kinds) {
-      const id = `file-${kind}123`;
-      const { restore } = mockFetch([file(id, "person-abc123", false, kind)]);
+describe("a later page that fails", () => {
+  test("keeps the files already shown and offers Try again under them", async () => {
+    const server = serve({ items: [item("f1", "First page")], next: "cursor-2", moreStatus: 400 });
+    try {
+      page();
+      await waitFor(() => expect(tile("First page")).toBeTruthy());
+      fireEvent.click(within(document.body).getByRole("button", { name: "Show more files" }));
+      await waitFor(() => expect(document.querySelector('[role="alert"]')?.textContent).toContain("Home could not load more files."));
+      expect(tile("First page")).toBeTruthy();
+    } finally { server.restore(); }
+  });
+});
+
+describe("sections, search, filters and sort", () => {
+  test("a section click sets the address and asks the hub for that type; counts show", async () => {
+    const server = serve({ items: [item("f1", "Fox")] });
+    try {
+      page();
+      await waitFor(() => expect(tile("Fox")).toBeTruthy());
+      const nav = document.querySelector("#library-sidebar")!;
+      await waitFor(() => expect(nav.textContent).toContain("Pictures1"));
+      fireEvent.click(within(nav as HTMLElement).getByRole("link", { name: /^Pictures/ }));
+      await waitFor(() => expect(where()).toBe("?section=pictures"));
+      await waitFor(() => expect(server.listUrls().some((query) => query.get("type") === "image")).toBe(true));
+    } finally { server.restore(); }
+  });
+  test("Only me and Shared with me are sections with their own filter", async () => {
+    const server = serve({ items: [item("f1", "Fox")] });
+    try {
+      page("owner", "/files?section=only-me");
+      await waitFor(() => expect(server.listUrls().some((query) => query.get("shared") === "none")).toBe(true));
+      cleanup();
+      page("owner", "/files?section=shared-with-me");
+      await waitFor(() => expect(server.listUrls().some((query) => query.get("shared") === "with-me")).toBe(true));
+      expect(within(document.body).queryByText("Mine")).toBeNull();
+    } finally { server.restore(); }
+  });
+  test("search is debounced into the address and the request; Mine adds owner=me", async () => {
+    const server = serve({ items: [item("f1", "Fox")] });
+    try {
+      page();
+      await waitFor(() => expect(tile("Fox")).toBeTruthy());
+      const field = document.querySelector<HTMLInputElement>('input[aria-label="Search your Library"]')!;
+      fireEvent.change(field, { target: { value: "fox" } });
+      await waitFor(() => expect(where()).toBe("?q=fox"), { timeout: 2000 });
+      await waitFor(() => expect(server.listUrls().some((query) => query.get("search") === "fox")).toBe(true));
+      fireEvent.click(within(document.body).getByText("Mine"));
+      await waitFor(() => expect(where()).toBe("?filter=mine&q=fox"));
+      await waitFor(() => expect(server.listUrls().some((query) => query.get("owner") === "me" && query.get("search") === "fox")).toBe(true));
+    } finally { server.restore(); }
+  });
+  test("sort and list view live in the address", async () => {
+    const server = serve({ items: [item("f1", "Fox")] });
+    try {
+      page("owner", "/files?sort=size&view=list");
+      await waitFor(() => expect(document.querySelector('[data-slot="data-table"]')).not.toBeNull());
+      await waitFor(() => expect(server.listUrls().some((query) => query.get("sort") === "size")).toBe(true));
+      fireEvent.click(within(document.body).getByRole("button", { name: "Grid view" }));
+      await waitFor(() => expect(where()).toBe("?sort=size"));
+      expect(document.querySelector('[data-slot="file-grid"]')).not.toBeNull();
+    } finally { server.restore(); }
+  });
+  test("the table's Name header sorts through the hub, not in the browser", async () => {
+    const server = serve({ items: [item("f1", "Fox")] });
+    try {
+      page("owner", "/files?view=list");
+      await waitFor(() => expect(document.querySelector('[data-slot="data-table"]')).not.toBeNull());
+      fireEvent.click(within(document.body).getAllByRole("button", { name: /Sort by Name/ })[0]!);
+      await waitFor(() => expect(where()).toContain("sort=name"));
+    } finally { server.restore(); }
+  });
+});
+
+describe("layout by screen", () => {
+  test("wide: the section column with Settings at its foot, and no chip row", async () => {
+    stubMatchMedia({ [WIDE]: true, [VIEWER_WIDE]: true });
+    const server = serve({ items: [item("f1", "Fox")] });
+    try {
+      page();
+      await waitFor(() => expect(tile("Fox")).toBeTruthy());
+      const column = document.querySelector("#library-sidebar")!;
+      expect(column.textContent).toContain("Settings");
+      expect(["All files", "Pictures", "Videos", "Songs", "Documents", "Shared with me", "Shared by me", "Only me", "Trash"].every((label) => column.textContent!.includes(label))).toBe(true);
+      expect(document.querySelector('[aria-label="Library sections"]')).toBeNull();
+    } finally { server.restore(); }
+  });
+  test("phone: a chip row of the same sections and a search box in the page", async () => {
+    stubMatchMedia({ [PHONE]: true });
+    const server = serve({ items: [item("f1", "Fox")] });
+    try {
+      page();
+      await waitFor(() => expect(tile("Fox")).toBeTruthy());
+      const chips = document.querySelector('[aria-label="Library sections"]') as HTMLElement;
+      expect(chips).not.toBeNull();
+      expect(within(chips).getByText("Only me")).toBeTruthy();
+      fireEvent.click(within(chips).getByText("Videos"));
+      await waitFor(() => expect(where()).toBe("?section=videos"));
+    } finally { server.restore(); }
+  });
+  test("the column can be hidden and the choice is remembered for this person", async () => {
+    const server = serve({ items: [item("f1", "Fox")] });
+    try {
+      page();
+      await waitFor(() => expect(tile("Fox")).toBeTruthy());
+      fireEvent.click(within(document.body).getByRole("button", { name: "Hide sidebar" }));
+      expect(localStorage.getItem("maipai.library.sidebar-collapsed.person-me")).toBe("1");
+      await waitFor(() => expect(within(document.body).getByRole("button", { name: "Show sidebar" })).toBeTruthy());
+      cleanup();
+      page();
+      await waitFor(() => expect(within(document.body).getByRole("button", { name: "Show sidebar" })).toBeTruthy());
+    } finally { server.restore(); }
+  });
+});
+
+describe("selection, batch actions and Trash", () => {
+  test("Select shows the batch bar; Delete asks first, then moves to Trash with the per-item result", async () => {
+    const server = serve({ items: [item("f1", "Fox"), item("f2", "Garden", { owner: { id: "person-other", display_name: "Sage" } })] });
+    try {
+      page();
+      await waitFor(() => expect(tile("Fox")).toBeTruthy());
+      fireEvent.click(within(document.body).getByRole("button", { name: "Select" }));
+      fireEvent.click(tile("Fox")!);
+      fireEvent.click(tile("Garden")!);
+      await waitFor(() => expect(document.querySelector('[role="toolbar"][aria-label="Batch actions"]')?.textContent).toContain("2 selected"));
+      fireEvent.click(within(document.querySelector('[role="toolbar"]') as HTMLElement).getByRole("button", { name: "Delete" }));
+      expect(document.body.textContent).toContain("Move 2 files to Trash?");
+      expect(server.calls.some((call) => call.method === "DELETE")).toBe(false);
+      fireEvent.click(within(document.body).getByRole("button", { name: "Move to Trash" }));
+      await waitFor(() => expect(server.calls.filter((call) => call.method === "DELETE" && call.url === "/api/files/f1").length).toBe(1));
+      // The file that is not theirs is never sent to the hub.
+      expect(server.calls.some((call) => call.url === "/api/files/f2" && call.method === "DELETE")).toBe(false);
+    } finally { server.restore(); }
+  });
+  test("Keep pins the selected files", async () => {
+    const server = serve({ items: [item("f1", "Fox", { retention: "conversation" })] });
+    try {
+      page();
+      await waitFor(() => expect(tile("Fox")).toBeTruthy());
+      fireEvent.click(within(document.body).getByRole("button", { name: "Select" }));
+      fireEvent.click(tile("Fox")!);
+      fireEvent.click(within(document.querySelector('[role="toolbar"]') as HTMLElement).getByRole("button", { name: "Keep" }));
+      await waitFor(() => expect(server.calls.some((call) => call.url === "/api/files/f1" && call.method === "PATCH")).toBe(true));
+    } finally { server.restore(); }
+  });
+  test("the S key turns selection on and the slash key focuses search", async () => {
+    const server = serve({ items: [item("f1", "Fox")] });
+    try {
+      page();
+      await waitFor(() => expect(tile("Fox")).toBeTruthy());
+      fireEvent.keyDown(document, { key: "s" });
+      await waitFor(() => expect(document.querySelector('[role="toolbar"][aria-label="Batch actions"]')).not.toBeNull());
+      fireEvent.keyDown(document, { key: "s" });
+      await waitFor(() => expect(document.querySelector('[role="toolbar"][aria-label="Batch actions"]')).toBeNull());
+      fireEvent.keyDown(document, { key: "/" });
+      expect(document.activeElement?.getAttribute("aria-label")).toBe("Search your Library");
+    } finally { server.restore(); }
+  });
+  test("the Trash section lists deleted files with days left and Restore", async () => {
+    const server = serve({ trash: [{ kind: "file", id: "f9", title: "Old picture", deleted_at: "2026-10-17T00:00:00.000Z", trash_until: new Date(Date.now() + 5 * 86_400_000 + 3_600_000).toISOString(), can_restore: true, can_purge: true }, { kind: "media_item", id: "m1", title: "A saved video", deleted_at: "2026-10-17T00:00:00.000Z", trash_until: null, can_restore: true, can_purge: true }] });
+    try {
+      page("owner", "/files?section=trash");
+      await waitFor(() => expect(document.querySelector('[data-testid="library-trash"]')?.textContent).toContain("Old picture"));
+      const trash = document.querySelector('[data-testid="library-trash"]') as HTMLElement;
+      expect(trash.textContent).toContain("6 days left");
+      expect(trash.textContent).not.toContain("A saved video");
+      fireEvent.click(within(trash).getByRole("button", { name: "Restore Old picture" }));
+      await waitFor(() => expect(server.calls.some((call) => call.url === "/api/trash/file/f9/restore" && call.method === "POST")).toBe(true));
+    } finally { server.restore(); }
+  });
+  test("Delete forever and Empty Trash ask first", async () => {
+    const server = serve({ trash: [{ kind: "file", id: "f9", title: "Old picture", deleted_at: "2026-10-17T00:00:00.000Z", trash_until: null, can_restore: true, can_purge: true }] });
+    try {
+      page("owner", "/files?section=trash");
+      await waitFor(() => expect(document.querySelector('[data-testid="library-trash"]')).not.toBeNull());
+      fireEvent.click(within(document.body).getByRole("button", { name: "Empty Trash" }));
+      expect(document.body.textContent).toContain("Delete 1 file forever?");
+      expect(server.calls.some((call) => call.method === "DELETE")).toBe(false);
+      fireEvent.click(within(document.body).getByRole("button", { name: "Delete forever" }));
+      await waitFor(() => expect(server.calls.some((call) => call.url === "/api/trash/file/f9" && call.method === "DELETE")).toBe(true));
+    } finally { server.restore(); }
+  });
+});
+
+describe("viewer, menu, sharing and roles", () => {
+  test("a link with ?file= opens the viewer on that file with its details; closing removes it from the address", async () => {
+    const server = serve({ items: [item("f1", "Fox in the snow"), item("f2", "Garden at dawn", { shared_with: { count: 1, household: true } })] });
+    try {
+      page("owner", "/files?file=f2");
+      const dialog = await waitFor(() => { const el = document.querySelector('[role="dialog"]'); expect(el).not.toBeNull(); return el as HTMLElement; });
+      await waitFor(() => expect(dialog.textContent).toContain("Garden at dawn"));
+      await waitFor(() => expect(dialog.textContent).toContain("Everyone in the home can see this."));
+      expect(dialog.textContent).toContain("Kept until you delete it.");
+      fireEvent.click(within(dialog).getByRole("button", { name: "Close" }));
+      await waitFor(() => expect(where()).toBe(""));
+    } finally { server.restore(); }
+  });
+  test("a tile opens the viewer and puts the file in the address", async () => {
+    const server = serve({ items: [item("f1", "Fox in the snow")] });
+    try {
+      page();
+      await waitFor(() => expect(tile("Fox in the snow")).toBeTruthy());
+      fireEvent.click(tile("Fox in the snow")!);
+      await waitFor(() => expect(where()).toBe("?file=f1"));
+      expect(document.querySelector('[role="dialog"]')).not.toBeNull();
+    } finally { server.restore(); }
+  });
+  test("the tile menu offers Share, Rename, Keep and Delete for your own file, and only Open and Download for another's", async () => {
+    const server = serve({ items: [item("f1", "Mine", { retention: "conversation" }), item("f2", "Theirs", { owner: { id: "person-other", display_name: "Sage" } })] });
+    try {
+      page();
+      await waitFor(() => expect(tile("Mine")).toBeTruthy());
+      const open = async (name: string) => {
+        const trigger = document.querySelector<HTMLElement>(`[aria-label="Actions for ${name}"]`)!;
+        fireEvent.pointerDown(trigger, { button: 0, ctrlKey: false, pointerType: "mouse" });
+        return await waitFor(() => { const menu = document.querySelector('[role="menu"]'); expect(menu).not.toBeNull(); return menu as HTMLElement; });
+      };
+      const mine = await open("Mine");
+      expect(Array.from(mine.querySelectorAll('[role="menuitem"]')).map((el) => el.textContent)).toEqual(["Open", "Download", "Share", "Rename", "Keep", "Delete"]);
+      fireEvent.keyDown(mine, { key: "Escape" });
+      await waitFor(() => expect(document.querySelector('[role="menu"]')).toBeNull());
+      const theirs = await open("Theirs");
+      expect(Array.from(theirs.querySelectorAll('[role="menuitem"]')).map((el) => el.textContent)).toEqual(["Open", "Download"]);
+    } finally { server.restore(); }
+  });
+  test("Share opens the dialog over the existing share route; turning on a person adds a share", async () => {
+    const server = serve({ items: [item("f1", "Fox")] });
+    try {
+      page();
+      await waitFor(() => expect(tile("Fox")).toBeTruthy());
+      const trigger = document.querySelector<HTMLElement>('[aria-label="Actions for Fox"]')!;
+      fireEvent.pointerDown(trigger, { button: 0, ctrlKey: false, pointerType: "mouse" });
+      fireEvent.click(await waitFor(() => within(document.body).getByRole("menuitem", { name: "Share" })));
+      const dialog = await waitFor(() => { const el = document.querySelector('[role="dialog"]'); expect(el?.textContent).toContain("Share Fox"); return el as HTMLElement; });
+      await waitFor(() => expect(dialog.textContent).toContain("Sage"));
+      const sage = within(dialog).getAllByRole("switch").find((el) => el.getAttribute("aria-label")?.includes("Sage"))!;
+      fireEvent.click(sage);
+      await waitFor(() => expect(server.calls.some((call) => call.url === "/api/files/f1/shares" && call.method === "POST")).toBe(true));
+    } finally { server.restore(); }
+  });
+  test("a child has no Share, no Shared by me and asks a grown-up to add a file", async () => {
+    const server = serve({ items: [item("f1", "Fox")] });
+    try {
+      page("child");
+      await waitFor(() => expect(tile("Fox")).toBeTruthy());
+      const column = document.querySelector("#library-sidebar")!;
+      expect(column.textContent).not.toContain("Shared by me");
+      expect(within(document.body).queryByRole("button", { name: "Upload" })).toBeNull();
+      expect(within(document.body).getByRole("button", { name: "Ask to add a file" })).toBeTruthy();
+      const trigger = document.querySelector<HTMLElement>('[aria-label="Actions for Fox"]')!;
+      fireEvent.pointerDown(trigger, { button: 0, ctrlKey: false, pointerType: "mouse" });
+      await waitFor(() => expect(document.querySelector('[role="menu"]')).not.toBeNull());
+      expect(within(document.querySelector('[role="menu"]') as HTMLElement).queryByRole("menuitem", { name: "Share" })).toBeNull();
+    } finally { server.restore(); }
+  });
+  test("Mark all-ages shows only for an adult owner on an adults-only picture", async () => {
+    const adultOnly = item("f1", "After hours", { audience: "adult-only", retention: "conversation" });
+    for (const [role, expected] of [["adult", true], ["teen", false]] as const) {
+      const server = serve({ items: [adultOnly] });
       try {
-        const { container } = renderWithQueryClient(<FilesPage person={makePerson()} />);
-        await waitFor(() => expect(document.body.textContent).toContain(MIME_TYPES[kind]));
-        fireEvent.click(document.querySelector('[aria-label="More actions"]')!);
-        fireEvent.click(await waitFor(() => document.querySelector('[role="menuitem"]')!));
-        const name = await waitFor(() => container.querySelector('[data-slot="file-name"]'));
-        expect(name?.textContent).toBe(id);
-        expect(container.querySelector('[data-slot="file-size"]')?.textContent).toBe("2.0 KB");
-        const download = container.querySelector<HTMLAnchorElement>('[data-slot="file-download"]');
-        expect(download?.href).toBe(`http://localhost/api/files/${id}/content`);
-        expect(download?.download).toBe(id);
-      } finally { restore(); cleanup(); }
+        page(role);
+        await waitFor(() => expect(tile("After hours")).toBeTruthy());
+        const trigger = document.querySelector<HTMLElement>('[aria-label="Actions for After hours"]')!;
+        fireEvent.pointerDown(trigger, { button: 0, ctrlKey: false, pointerType: "mouse" });
+        await waitFor(() => expect(document.querySelector('[role="menu"]')).not.toBeNull());
+        expect(within(document.querySelector('[role="menu"]') as HTMLElement).queryByRole("menuitem", { name: "Mark all-ages" }) !== null).toBe(expected);
+      } finally { server.restore(); cleanup(); }
     }
   });
-
-  test("kit search and source and kind filters continue to filter the returned file rows", async () => {
-    const { restore } = mockFetch([
-      file("file-owned123", "person-abc123", false, "image"),
-      file("file-shared123", "person-sage123", true, "document"),
-      file("file-audio123", "person-abc123", false, "audio"),
-    ]);
+  test("the storage meter shows the person's own bytes and Identical files count once", async () => {
+    const server = serve({ items: [item("f1", "Fox")] });
     try {
-      renderWithQueryClient(<FilesPage person={makePerson()} />);
-      await waitFor(() => expect(document.body.textContent).toContain("image/png"));
-      const source = document.querySelector('[aria-label="Whose"]')!;
-      fireEvent.click(source);
-      fireEvent.click(await waitFor(() => document.querySelector('[role="option"]:nth-child(2)')!));
-      await waitFor(() => expect(document.body.textContent).not.toContain("application/pdf"));
-      expect(document.body.textContent).toContain("image/png");
-      expect(document.body.textContent).toContain("audio/mpeg");
-      const kind = document.querySelector('[aria-label="Kind"]')!;
-      fireEvent.click(kind);
-      fireEvent.click(await waitFor(() => Array.from(document.querySelectorAll('[role="option"]')).find((option) => option.textContent === "Image")!));
-      await waitFor(() => expect(document.body.textContent).toContain("image/png"));
-      expect(document.body.textContent).not.toContain("audio/mpeg");
-      fireEvent.change(document.querySelector<HTMLInputElement>("#library-search")!, { target: { value: "no match" } });
-      await waitFor(() => expect(document.body.textContent).toContain("Nothing here yet."));
-    } finally { restore(); }
+      page();
+      await waitFor(() => expect(document.querySelector('[data-testid="library-storage"]')?.textContent).toContain("3 MB of 20 GB used"));
+      const bar = document.querySelector('[data-slot="storage-bar"]')!;
+      expect(bar.getAttribute("aria-label")).toContain("Pictures 2 MB");
+      expect(document.querySelector('[data-testid="library-storage"]')?.textContent).toContain("Identical files count once.");
+    } finally { server.restore(); }
   });
+});
 
-  test("a child only sees the files returned by the visibility-filtered Library route", async () => {
-    const child = { ...makePerson(), id: "person-child123", role: "child" } as Roster;
-    const { fetchMock, restore } = mockFetch([file("file-visible123", child.id, false, "image")]);
+describe("uploads", () => {
+  class FakeXhr {
+    static last: FakeXhr | null = null;
+    static outcome: { status: number; body: string } = { status: 201, body: "{}" };
+    upload: { onprogress: ((event: { lengthComputable: boolean; loaded: number }) => void) | null } = { onprogress: null };
+    onload: (() => void) | null = null; onerror: (() => void) | null = null; onabort: (() => void) | null = null;
+    status = 0; responseText = ""; withCredentials = false; method = ""; url = "";
+    open(method: string, url: string) { this.method = method; this.url = url; FakeXhr.last = this; }
+    addEventListener() {}
+    send() { setTimeout(() => { this.upload.onprogress?.({ lengthComputable: true, loaded: 1 }); this.status = FakeXhr.outcome.status; this.responseText = FakeXhr.outcome.body; this.onload?.(); }, 0); }
+    abort() { this.onabort?.(); }
+  }
+  const original = globalThis.XMLHttpRequest;
+  beforeEach(() => { (globalThis as unknown as { XMLHttpRequest: unknown }).XMLHttpRequest = FakeXhr; FakeXhr.last = null; });
+  afterEach(() => { globalThis.XMLHttpRequest = original; });
+  const choose = (name = "notes.txt") => {
+    const input = document.querySelector<HTMLInputElement>('input[type="file"]')!;
+    Object.defineProperty(input, "files", { value: [new File(["hello"], name, { type: "text/plain" })], configurable: true });
+    fireEvent.change(input);
+  };
+
+  test("a chosen file goes up as one request with a progress card and the Library refreshes", async () => {
+    FakeXhr.outcome = { status: 201, body: JSON.stringify({ id: "f9", name: "notes.txt", kind: "document", media_type: "text/plain", size_bytes: 5, duplicate: false }) };
+    const server = serve({ items: [item("f1", "Fox")] });
     try {
-      renderWithQueryClient(<FilesPage person={child} />);
-      await waitFor(() => expect(document.body.textContent).toContain("image/png"));
-      expect(document.body.textContent).not.toContain("file-private123");
-      expect(fetchMock.mock.calls.some(([input]) => String(input).includes("/api/files"))).toBe(true);
-    } finally { restore(); }
+      page();
+      await waitFor(() => expect(tile("Fox")).toBeTruthy());
+      const before = server.listUrls().length;
+      choose();
+      await waitFor(() => expect(document.querySelector('[data-slot="job-progress"]')?.textContent).toContain("notes.txt"));
+      expect(FakeXhr.last).toMatchObject({ method: "POST", url: "/api/library/upload", withCredentials: true });
+      await waitFor(() => expect(document.querySelector('[data-slot="job-progress"]')?.textContent).toContain("Added"));
+      await waitFor(() => expect(server.listUrls().length).toBeGreaterThan(before));
+    } finally { server.restore(); }
+  });
+  test("a refused file shows the hub's plain sentence and Try again", async () => {
+    FakeXhr.outcome = { status: 403, body: JSON.stringify({ error: "Your storage is full. Delete some files, or ask a grown-up for more room." }) };
+    const server = serve({ items: [item("f1", "Fox")] });
+    try {
+      page();
+      await waitFor(() => expect(tile("Fox")).toBeTruthy());
+      choose("big.mov");
+      await waitFor(() => expect(document.querySelector('[data-testid="library-page"]')?.textContent).toContain("Your storage is full. Delete some files, or ask a grown-up for more room."));
+      expect(within(document.body).getByRole("button", { name: "Try again" })).toBeTruthy();
+    } finally { server.restore(); }
+  });
+  test("a child's Upload asks a grown-up and sends nothing", async () => {
+    const server = serve({ items: [item("f1", "Fox")] });
+    try {
+      page("child");
+      await waitFor(() => expect(tile("Fox")).toBeTruthy());
+      choose();
+      await new Promise((resolve) => setTimeout(resolve, 100));
+      expect(FakeXhr.last).toBeNull();
+      expect(document.querySelector('[data-slot="job-progress"]')).toBeNull();
+    } finally { server.restore(); }
   });
 });

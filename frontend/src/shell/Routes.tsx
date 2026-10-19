@@ -1,4 +1,5 @@
-import { lazy, Suspense, useEffect } from "react";
+import { lazy, Suspense, useEffect, useState, type ReactNode } from "react";
+import { DrawerSectionsContext } from "@/shell/drawerSections";
 import { NotFoundPage } from "@/shell/pages/NotFoundPage";
 import { Navigate, Outlet, Route, Routes as RouterRoutes, useLocation } from "react-router-dom";
 import FullLayout from "@maipai/ui/src/dashboard/layouts/full/FullLayout";
@@ -173,6 +174,8 @@ function RoutesWithIncognito({ person, onPersonChange, onSignedOut }: { person: 
   const { pinned: pinnedRoutes, togglePin } = usePinnedApps(person.id);
   const { on: incognito, setOn: setIncognito } = useIncognitoContext();
   const locked = useSessionLocked();
+  // The phone menu drawer's section list for the page that is open (a page with a section column sets it).
+  const [drawerSections, setDrawerSections] = useState<ReactNode>(null);
   const tourRunner = useTourRunner(person);
   const activeTour = tourRunner.active;
   const helpEntries = tourRunner.availableTours.length
@@ -210,6 +213,7 @@ function RoutesWithIncognito({ person, onPersonChange, onSignedOut }: { person: 
     // per-page one) since FullLayout's own Header - where ChatHeaderBar
     // actually renders (a sibling of this Outlet, not a descendant) -
     // needs the SAME provider instance ChatPage writes into.
+    <DrawerSectionsContext.Provider value={setDrawerSections}>
     <TabIdentityProvider temporary={incognito} locked={locked} ageBand={person.age_band}>
     <ChatHeaderDataProvider>
       <BrowserAlerts person={person} />
@@ -251,7 +255,7 @@ function RoutesWithIncognito({ person, onPersonChange, onSignedOut }: { person: 
             Notifications, System status, Incognito, Settings, Help and Log
             out. Pages draw their own slim title bar; chat draws its own
             beside the history column. */}
-        <Route element={<FullLayout rail activeAppHref={selectedAppHref} railApps={railApps(appCatalog, pinnedRoutes)} onRailAppPinChange={(url) => togglePin(url)} railAllAppsHref={ALL_APPS_PATH} settingsHref="/settings" headerSearchRemote={api.search} railTourId="shell.rail" railItemTourId={(item) => item.name === "Chat" ? "rail.chat" : undefined} incognitoTourId="shell.incognito" railProfile={<RailProfile person={person} incognito={incognito} onIncognitoChange={onIncognitoChange} onSignedOut={onSignedOut} helpEntries={helpEntries} />} sidebarItemStatus={(item) => sidebarItemStatus(statusAppsQuery.data ?? [], item)} />}>
+        <Route element={<FullLayout rail mobileSections={drawerSections} activeAppHref={selectedAppHref} railApps={railApps(appCatalog, pinnedRoutes)} onRailAppPinChange={(url) => togglePin(url)} railAllAppsHref={ALL_APPS_PATH} settingsHref="/settings" headerSearchRemote={api.search} railTourId="shell.rail" railItemTourId={(item) => item.name === "Chat" ? "rail.chat" : undefined} incognitoTourId="shell.incognito" railProfile={<RailProfile person={person} incognito={incognito} onIncognitoChange={onIncognitoChange} onSignedOut={onSignedOut} helpEntries={helpEntries} />} sidebarItemStatus={(item) => sidebarItemStatus(statusAppsQuery.data ?? [], item)} />}>
           <Route path="chat" element={<ChatPage person={person} />} />
           <Route path="chat/projects" element={<ProjectsPage person={person} />} />
           <Route path="chat/projects/:id" element={<ChatPage person={person} />} />
@@ -302,6 +306,7 @@ function RoutesWithIncognito({ person, onPersonChange, onSignedOut }: { person: 
       </RouterRoutes>
     </ChatHeaderDataProvider>
     </TabIdentityProvider>
+    </DrawerSectionsContext.Provider>
   );
 }
 

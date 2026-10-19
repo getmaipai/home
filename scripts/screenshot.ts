@@ -22,9 +22,9 @@
 //   docs/plans/wave-2.md's shared-file protocol - noted in this
 //   session's dev doc and the backlog instead, run for now via this
 //   repo's own `bun run a11y`.
-// - `bun run screenshots --files-review`: Files only, seeded with the six
-//   spec kinds in the browser request layer and captured at desktop/phone
-//   in both themes. The same browser fixture is used by --a11y-only.
+// - `bun run screenshots --files-review`: Library only (real seeded files), captured at
+//   desktop/phone
+//   in both themes. --a11y-only uses the same seeded files.
 // - `bun run screenshots --mobile-smoke` (MOBILE-LIVE-01): the phone smoke
 //   walk in scripts/mobileSmoke.ts. 390x844, touch, phone user agent, over
 //   the machine's LAN address (plain http, a non-secure context, exactly
@@ -365,6 +365,8 @@ const engineDownReview = process.argv.includes("--engine-down-review");
 // APP-SET-02: the settings areas (Account, Chat settings, Home settings) as an admin, an adult, a teen and a child see them.
 const appSettingsReview = process.argv.includes("--app-settings-review");
 const adminHomeReview = process.argv.includes("--admin-home-review");
+// LIBRARY-REVAMP-13: the Library page as the owner, a teen and a child see it, at 1440 and 390, with real seeded files.
+const libraryReview = process.argv.includes("--library-review");
 const referenceSettingsReview = process.argv.includes("--reference-settings-review");
 // MINOR-SEARCH-01e-10: the Blocked sites card (a tick-box grid) in Home settings, Search, as an admin.
 const blockedSitesReview = process.argv.includes("--blocked-sites-review");
@@ -717,6 +719,12 @@ async function seedHousehold(): Promise<string> {
   if (!place.ok) throw new Error(`seed household.home failed: ${place.status}`);
 
   await seedPeopleAndThings(sessionValue);
+  // LIBRARY-REVAMP-13: the Library routes are drawn from real seeded files (pictures with real pixels, a shared and an adults-only
+  // one), so the accessibility scan and the Files review see a filled page, not the empty state.
+  if (a11yOnly || filesReview) {
+    const seed = Bun.spawnSync({ cmd: ["bun", "run", "scripts/seed-library-review.ts", "Sage", "Marlow", "12"], cwd: join(ROOT, "backend"), env: { ...process.env, MAIPAI_DATA_DIR: DATA_DIR }, stdout: "inherit", stderr: "inherit" });
+    if (seed.exitCode !== 0) throw new Error("seed-library-review.ts failed");
+  }
 
   return sessionValue;
 }
@@ -852,46 +860,6 @@ async function settleAnimations(page: import("playwright").Page) {
   });
 }
 
-/** Files-page demo data stays in the screenshot browser request layer: it
- * never enters the household DB or a real person's storage. Keep all six
- * spec kinds visible in the page and a stable MIME/size for the File parts. */
-function screenshotLibraryFiles() {
-  const owner = SCREENSHOT_FILE_OWNER_ID;
-  if (!owner) throw new Error("Files screenshot fixture has no seeded owner");
-  const createdAt = "2026-10-07T00:00:00.000Z";
-  const fixtures = [
-    ["image", "image/png", 187_432],
-    ["video", "video/mp4", 2_345_678],
-    ["audio", "audio/mpeg", 523_901],
-    ["document", "application/pdf", 83_012],
-    ["story", "text/markdown", 4_281],
-    ["other", "application/octet-stream", 16_384],
-  ] as const;
-  return fixtures.map(([kind, mediaType, size], index) => {
-    const id = `file-screenshot${kind}01`;
-    return {
-      owner_person_id: owner,
-      shared: false,
-      household: false,
-      former_owner_name: null,
-      file: {
-        id,
-        owner_person_id: owner,
-        origin: "made",
-        kind,
-        media_type: mediaType,
-        size,
-        sha256: String(index + 1).repeat(64),
-        storage_path: `people/${owner}/files/${id}`,
-        retention: "kept",
-        provenance: { conversation_id: null, turn_id: null, package_id: null, job_id: null, requested_by_person_id: null, note: null },
-        created_at: createdAt,
-        hlc: `1791331200000:${index}:screenshot`,
-      },
-    };
-  });
-}
-
 /** Navigates to one route, waits for its real content (never a spinner or
  * an empty shell), runs the axe scan and the overflow check, and - unless
  * `a11yOnly` - saves the PNG. Throws on a navigation/selector failure
@@ -925,9 +893,6 @@ async function visitRoute(context: BrowserContext, route: RouteSpec, viewport: V
         { id: "wikipedia-simple:default", source: "wikipedia-simple", flavour: "default", name: "Simple English Wikipedia", language: "English", sizeBytes: 4_000_000_000, sha256: "demo", snapshotDate: "2026-10-01", installed: false, child: true, wikipedia: true, bands: ["child", "teen", "adult"] },
         { id: "wikipedia-en:mini", source: "wikipedia-en", flavour: "mini", name: "English Wikipedia Mini", language: "English", sizeBytes: 12_000_000_000, sha256: "demo", snapshotDate: "2026-10-01", installed: false, child: false, wikipedia: true, bands: ["child", "teen", "adult"] },
       ] }));
-    }
-    if (route.slug === "files") {
-      await page.route("**/api/files", (request) => request.fulfill({ status: 200, json: screenshotLibraryFiles() }));
     }
     if (route.slug === "status") {
       const today = new Date();
@@ -1018,11 +983,9 @@ async function visitRoute(context: BrowserContext, route: RouteSpec, viewport: V
     }
 
     if (route.slug === "files") {
-      // force: the click's "stable" wait runs on animation frames, which a page in a background context (these
-      // visits run side by side) may never get. The button was just rendered and is on top; the click is reliable.
-      await page.getByRole("button", { name: "More actions" }).first().click({ force: true });
-      await page.getByRole("menuitem", { name: "View details" }).click({ force: true });
-      await page.locator('[data-slot="file-root"]').waitFor();
+      // The seeded Library (scripts/seed-library-review.ts): wait for real tiles and their thumbnails, not the empty state.
+      await page.locator('[data-slot="file-grid"] [data-slot="file-tile"]').first().waitFor();
+      await page.waitForTimeout(1200);
       await page.evaluate(() => {
         document.querySelectorAll<HTMLElement>(".overflow-x-auto").forEach((element) => { element.scrollLeft = 0; });
         window.scrollTo(0, 0);
@@ -2943,6 +2906,121 @@ async function captureAppSettingsReview(browser: Browser, ownerSession: string):
             await page.screenshot({ path: file, fullPage: false });
             console.log(`Wrote ${file}`);
           }
+        } finally {
+          await context.close();
+        }
+      }
+    }
+  }
+}
+
+/** LIBRARY-REVAMP-13: the Library with real seeded pictures, a shared picture, an adults-only picture and 90 more files, as the
+ * owner (both themes, grid, list, the viewer, the Share dialog), a teen and a child (light). Prints what each page drew so an
+ * error or empty state throws instead of being judged by eye; images go under data-scratch/library-review/ to be opened. */
+async function captureLibraryReview(browser: Browser, ownerSession: string): Promise<void> {
+  const outDir = join(ROOT, "data-scratch", "library-review");
+  mkdirSync(outDir, { recursive: true });
+  const seed = Bun.spawnSync({ cmd: ["bun", "run", "scripts/seed-library-review.ts", "Sage", "Marlow", process.env.LIBRARY_REVIEW_BULK ?? "90"], cwd: join(ROOT, "backend"), env: { ...process.env, MAIPAI_DATA_DIR: DATA_DIR }, stdout: "inherit", stderr: "inherit" });
+  if (seed.exitCode !== 0) throw new Error("seed-library-review.ts failed");
+  if (Number(process.env.LIBRARY_REVIEW_BULK ?? 0) >= 1000) {
+    // LIBRARY-REVAMP-07's measured scroll: load every page of the seeded Library, then scroll top to bottom and record frame times.
+    for (const slug of ["desktop", "phone"] as const) {
+      const viewport = VIEWPORTS.find((v) => v.slug === slug)!;
+      const context = await newContext(browser, viewport, "light", ownerSession);
+      try {
+        const page = await context.newPage();
+        page.setDefaultTimeout(PAGE_VISIT_TIMEOUT_MS * 20);
+        await page.goto(`${BASE_URL}/files`);
+        await page.locator('[data-slot="file-grid"]').waitFor();
+        const timing = await page.evaluate(async () => {
+          const time = async (url: string) => { const t = performance.now(); const res = await fetch(url); await res.text(); return Math.round(performance.now() - t); };
+          return { listFirst: await time("/api/library?limit=60"), summary: await time("/api/library/summary"), thumb: await time("/api/files/none/thumb?w=320") };
+        });
+        console.log(`library api ${slug}: ${JSON.stringify(timing)}`);
+        const loadStart = Date.now();
+        for (let guard = 0; guard < 30; guard++) {
+          const more = page.locator('button:has-text("more files")');
+          if (!(await more.count())) break;
+          await more.first().click({ force: true, timeout: 2000 }).catch(() => {});
+          await page.waitForTimeout(200);
+        }
+        const tiles = await page.locator('[data-slot="file-tile"]').count();
+        console.log(`library scroll ${slug}: alert=${await page.locator('[role="alert"]').allInnerTexts()} button=${await page.locator('button:has-text("more files")').allInnerTexts()}`);
+        const result = await page.evaluate(async () => {
+          const frames: number[] = [];
+          let last = performance.now();
+          const scroller = document.scrollingElement as HTMLElement;
+          const total = scroller.scrollHeight - window.innerHeight;
+          const started = performance.now();
+          await new Promise<void>((done) => {
+            const tick = (now: number) => {
+              frames.push(now - last); last = now;
+              const progress = Math.min(1, (now - started) / 6000);
+              scroller.scrollTop = total * progress;
+              if (progress < 1) requestAnimationFrame(tick); else done();
+            };
+            requestAnimationFrame(tick);
+          });
+          frames.sort((a, b) => a - b);
+          const pct = (q: number) => frames[Math.min(frames.length - 1, Math.floor(frames.length * q))]!;
+          return { frames: frames.length, p50: pct(0.5), p95: pct(0.95), p99: pct(0.99), max: frames[frames.length - 1], over33: frames.filter((f) => f > 33.4).length, height: total };
+        });
+        console.log(`library scroll ${slug}: tiles=${tiles} loadMs=${Date.now() - loadStart} ${JSON.stringify(result)}`);
+      } finally { await context.close(); }
+    }
+    return;
+  }
+  const people = (await (await fetch(`${BASE_URL}/api/people`, { headers: { Cookie: `session=${ownerSession}` } })).json()) as Array<{ id: string; display_name: string }>;
+  const signIn = async (name: string) => {
+    const id = people.find((person) => person.display_name === name)?.id;
+    if (!id) throw new Error(`library review: no ${name}`);
+    const res = await fetch(`${BASE_URL}/api/auth/select`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ personId: id }) });
+    const session = res.headers.get("set-cookie")?.split(";")[0]?.split("=")[1];
+    if (!session) throw new Error(`library review: ${name} sign-in carried no session cookie`);
+    return session;
+  };
+  const personas: Array<[string, string, readonly ("light" | "dark")[]]> = [["owner", ownerSession, ["light", "dark"]], ["teen", await signIn("Marlow"), ["light"]], ["child", await signIn("Nova"), ["light"]]];
+  for (const [who, session, themes] of personas) {
+    for (const slug of ["desktop", "phone"] as const) {
+      const viewport = VIEWPORTS.find((v) => v.slug === slug)!;
+      for (const theme of themes) {
+        const context = await newContext(browser, viewport, theme, session);
+        try {
+          const page = await context.newPage();
+          page.setDefaultTimeout(PAGE_VISIT_TIMEOUT_MS);
+          const problems: string[] = [];
+          page.on("console", (message) => { if (message.type() === "error") problems.push(message.text()); });
+          page.on("pageerror", (error) => problems.push(String(error)));
+          const shot = async (name: string) => { await settleAnimations(page); await page.screenshot({ path: join(outDir, `${who}-${slug}-${theme}-${name}.png`) }); };
+          await page.goto(`${BASE_URL}/files`);
+          await page.locator('[data-testid="library-page"]').waitFor();
+          await page.waitForTimeout(2500);
+          if (!(await page.locator('[data-slot="file-grid"]').count())) { await shot("no-grid"); console.log(`library ${who} ${slug} ${theme}: no grid. ${(await page.locator("body").innerText()).slice(0, 600)}`); }
+          const facts = await page.evaluate(() => ({
+            tiles: document.querySelectorAll('[data-slot="file-tile"]').length,
+            names: [...document.querySelectorAll('[data-slot="file-tile-name"]')].slice(0, 12).map((n) => n.textContent),
+            overflow: document.documentElement.scrollWidth > window.innerWidth,
+            sidebar: Boolean(document.querySelector('#library-sidebar')),
+          }));
+          console.log(`library ${who} ${slug} ${theme}: ${JSON.stringify(facts)}`);
+          if (facts.overflow) throw new Error(`library ${who} ${slug} ${theme} scrolls sideways`);
+          if (who === "teen" && facts.names.includes("After hours")) throw new Error("library review: a teen sees an adults-only picture");
+          await shot("grid");
+          if (who === "owner" && theme === "light") {
+            await page.goto(`${BASE_URL}/files?view=list`);
+            await page.locator('[data-slot="data-table"]').first().waitFor();
+            await shot("list");
+            const first = await page.evaluate(async () => (await (await fetch("/api/library?limit=1&search=Fox")).json()).items[0].id as string);
+            await page.goto(`${BASE_URL}/files?file=${first}`);
+            await page.getByRole("dialog").waitFor();
+            await page.waitForTimeout(600);
+            await shot("viewer");
+            await page.keyboard.press("Escape");
+            await page.goto(`${BASE_URL}/files?section=shared-by-me`);
+            await page.locator('[data-slot="file-grid"]').waitFor();
+            await shot("shared-by-me");
+          }
+          if (problems.length) console.log(`library ${who} ${slug} ${theme} console problems: ${problems.slice(0, 3).join(" | ")}`);
         } finally {
           await context.close();
         }
@@ -10690,6 +10768,12 @@ async function main() {
     if (blockedSitesReview) {
       await captureBlockedSitesReview(browser, sessionValue);
       console.log("completed named review: --blocked-sites-review");
+      return;
+    }
+
+    if (libraryReview) {
+      await captureLibraryReview(browser, sessionValue);
+      console.log("completed named review: --library-review");
       return;
     }
 

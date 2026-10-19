@@ -1,180 +1,384 @@
-import { useState } from "react";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore, type CSSProperties } from "react";
+import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
+import { useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
 import { getIcon } from "@maipai/ui/src/icons";
-import { AsyncState } from "@maipai/ui/src/primitives/AsyncState";
-import { Button } from "@maipai/ui/src/dashboard/components/ui/button";
-import { Input as TableInput } from "@maipai/ui/src/dashboard/components/ui/input";
-import { Label } from "@maipai/ui/src/dashboard/components/ui/label";
-import { Select as TableSelect, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@maipai/ui/src/dashboard/components/ui/select";
-import { Card, CardContent, CardHeader, CardTitle } from "@maipai/ui/src/dashboard/components/ui/card";
-import { Input } from "@maipai/ui/src/ui/input";
+import { formatBytes } from "@maipai/ui/src/format";
+import { useIsPhoneLayout } from "@maipai/ui/src/dashboard/layouts/full/FullLayout";
+import { SectionSidebar, SectionSidebarDrawerSections, SectionSidebarShowButton, type SectionSidebarGroup, type SectionSidebarItem } from "@maipai/ui/src/primitives/SectionSidebar";
+import { RouteSkeleton } from "@maipai/ui/src/primitives/RouteSkeleton";
+import { BatchBar, SelectModeToggle } from "@maipai/ui/src/primitives/BatchBar";
+import { CardSizeSlider, useCardSize } from "@maipai/ui/src/primitives/CardSizeSlider";
+import { DestructiveConfirm } from "@maipai/ui/src/primitives/DestructiveConfirm";
+import { EmptyState } from "@maipai/ui/src/primitives/EmptyState";
 import { Select } from "@maipai/ui/src/primitives/Select";
-import { File } from "@maipai/ui/src/elements/file";
-import { DataTable } from "@maipai/ui/src/elements/data-table";
-import { DataTableRowActions } from "@/shell/components/DataTableRowActions";
-import { tableColumns, useDataTableModel } from "@/shell/components/dataTableModel";
-import { api, ApiError, type PersonRosterEntry, type Roster, type VisibleFile } from "@/lib/api";
+import { Button } from "@maipai/ui/src/ui/button";
+import { Input } from "@maipai/ui/src/ui/input";
+import { Alert, AlertDescription } from "@maipai/ui/src/ui/alert";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@maipai/ui/src/ui/dialog";
+import { api, ApiError, type LibraryItem, type LibraryQuery, type Roster } from "@/lib/api";
 import { useTabItem } from "@/shell/tabIdentity";
+import { useDrawerSections } from "@/shell/drawerSections";
+import { readLibrarySidebarCollapsed, writeLibrarySidebarCollapsed } from "@/shell/library/librarySidebarPreference";
+import { meetsMinRole } from "@/apps/people/roles";
+import {
+  SECTIONS, SORT_LABELS, canAddFiles, canShareFiles, filterAllowed, filtersOf, parseView, queryOf, sectionOf, viewParams,
+  type LibraryView, type SectionId, type SortId,
+} from "@/shell/library/libraryModel";
+import { batchSentence, useLibraryActions } from "@/shell/library/useLibraryActions";
+import { LibraryItems, type ItemActions } from "@/shell/library/LibraryItems";
+import { LibraryViewer } from "@/shell/library/LibraryViewer";
+import { LibraryShareDialog } from "@/shell/library/LibraryShareDialog";
+import { LibraryTrash } from "@/shell/library/LibraryTrash";
+import { LibraryStorage } from "@/shell/library/LibraryStorage";
+import { UploadTray, useLibraryUploads } from "@/shell/library/LibraryUploads";
 
 export const FilesIcon = getIcon("folder");
-const Download = getIcon("download");
+const UploadIcon = getIcon("upload-cloud");
+const GridIcon = getIcon("layout-grid");
+const ListIcon = getIcon("layout-list");
 
-const KIND_LABELS: Record<string, string> = { image: "Image", video: "Video", audio: "Audio", document: "Document", story: "Story", other: "File" };
-const kindLabel = (kind: string) => KIND_LABELS[kind] ?? KIND_LABELS.other!;
-
-interface FileRow extends Record<string, unknown> {
-  file: string;
-  owner: string;
-  kind: string;
-  id: string;
-}
-
-/** The old /files Library, rebuilt with the Home page patterns. It keeps
- * STORE-SHARE-01's real visibility semantics and share management while
- * moving the direct route into the current sidebar. */
-export function FilesPage({ person }: { person: Roster }) {
-  useTabItem("Library");
-  const [search, setSearch] = useState("");
-  const [source, setSource] = useState("all");
-  const [kind, setKind] = useState("all");
-  // The picture editor's Share opens the Library with that file chosen (`/files?file=<id>`): sharing stays this page's one mechanism.
-  const [selectedId, setSelectedId] = useState<string | null>(() => (typeof window === "undefined" ? null : new URLSearchParams(window.location.search).get("file")));
-  const [shareTarget, setShareTarget] = useState("household");
-  const queryClient = useQueryClient();
-  const filesQuery = useQuery<VisibleFile[]>({ queryKey: ["files"], queryFn: () => api.files() });
-  const peopleQuery = useQuery<PersonRosterEntry[]>({ queryKey: ["people"], queryFn: () => api.people() });
-  const rows = filesQuery.data ?? [];
-  const people = peopleQuery.data ?? [];
-  const nameFor = (id: string) => id === person.id ? "You" : people.find((entry) => entry.id === id)?.display_name ?? id;
-  // STORE-DELETE-01: a file whose owner left while it was shared is listed
-  // under the household, with who shared it.
-  const ownerLabel = (row: VisibleFile) => row.household ? `Household, shared by ${row.former_owner_name ?? "someone no longer here"}` : nameFor(row.owner_person_id);
-  const filtered = rows.filter((row) => {
-    if (source === "mine" && row.shared) return false;
-    if (source === "shared" && !row.shared) return false;
-    if (kind !== "all" && row.file.kind !== kind) return false;
-    const text = `${row.file.media_type} ${row.file.id} ${ownerLabel(row)} ${kindLabel(row.file.kind)}`.toLocaleLowerCase();
-    return text.includes(search.trim().toLocaleLowerCase());
-  });
-  const selected = rows.find((row) => row.file.id === selectedId) ?? null;
-  const canManageSelected = selected !== null && !selected.shared;
-  const sharesQuery = useQuery({ queryKey: ["file-shares", selectedId], queryFn: () => api.fileShares(selectedId!), enabled: canManageSelected && selectedId !== null });
-  const shareTargets = people.filter((entry) => entry.id !== person.id);
-  const tableRows: FileRow[] = filtered.map((row) => {
-    const visible = {
-      file: row.file.media_type,
-      owner: ownerLabel(row),
-      kind: kindLabel(row.file.kind),
-    };
-    Object.defineProperty(visible, "id", { value: row.file.id });
-    return visible as unknown as FileRow;
-  });
-  const model = useDataTableModel(tableRows, tableColumns<FileRow>(["file", "owner", "kind"], { file: 200, owner: 260, kind: 120 }), "Nothing here yet. Stories, pictures and documents you make in chat are kept here.");
-
-  async function shareSelected() {
-    if (!selected) return;
-    try {
-      await api.shareFile(selected.file.id, shareTarget);
-      await queryClient.invalidateQueries({ queryKey: ["file-shares", selected.file.id] });
-    } catch (error) { toast.error(error instanceof ApiError ? error.message : "Could not share that file."); }
-  }
-
-  async function unshare(shareId: string) {
-    try {
-      await api.unshare(shareId);
-      await queryClient.invalidateQueries({ queryKey: ["file-shares", selectedId] });
-      await queryClient.invalidateQueries({ queryKey: ["files"] });
-    } catch (error) { toast.error(error instanceof ApiError ? error.message : "Could not unshare that file."); }
-  }
-
-  return (
-    <>
-      <CardHeader>
-        <CardTitle><span className="flex items-center gap-2"><FilesIcon size={16} className="text-muted-foreground" />Library</span></CardTitle>
-      </CardHeader>
-      <AsyncState data={filesQuery.data} error={filesQuery.isError} isFetching={filesQuery.isFetching} onRetry={() => filesQuery.refetch()} errorMessage={filesQuery.error instanceof ApiError ? filesQuery.error.message : "Could not load your Library."} loadingLabel="Loading your files">
-        {() => <>
-          <Card>
-            <CardContent>
-              <div className="grid gap-4 sm:grid-cols-3">
-              <div className="flex flex-col gap-2">
-                <label htmlFor="library-search" className="text-sm font-medium">Search your Library</label>
-                <Input id="library-search" type="search" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search files" />
-              </div>
-              <div className="flex flex-col gap-2">
-                <label htmlFor="library-source" className="text-sm font-medium">Whose</label>
-                <Select aria-label="Whose" value={source} onValueChange={setSource} options={["all", "mine", "shared"]} getLabel={(value) => ({ all: "Everyone", mine: "Mine", shared: "Shared with me" })[value as "all" | "mine" | "shared"] ?? value} />
-              </div>
-              <div className="flex flex-col gap-2">
-                <label htmlFor="library-kind" className="text-sm font-medium">Kind</label>
-                <Select aria-label="Kind" value={kind} onValueChange={setKind} options={["all", ...Object.keys(KIND_LABELS)]} getLabel={(value) => value === "all" ? "All kinds" : kindLabel(value)} />
-              </div>
-              </div>
-            </CardContent>
-          </Card>
-          <DataTable
-            {...model}
-            caption="Library files"
-            getRowId={(row) => row.id}
-            toolbar={<div className="flex w-full flex-col gap-3">
-              <div className="flex flex-wrap items-center justify-between gap-3">
-                <TableInput size="row" type="search" aria-label="Search table rows" value={model.filter} onChange={(event) => { model.setFilter(event.target.value); model.setPageIndex(0); }} placeholder="Search rows…" />
-                <Button type="button" size="row" variant="outline" aria-label="Download table as CSV" onClick={model.downloadCsv}><Download aria-hidden="true" className="size-4" /><span>Download CSV</span></Button>
-              </div>
-              <div className="flex flex-wrap items-center justify-between gap-3">
-                <div className="flex gap-2"><Button type="button" size="row" variant="secondary" disabled={model.currentPage === 0} onClick={() => model.setPageIndex((page) => Math.max(0, page - 1))}>Previous</Button><Button type="button" size="row" disabled={model.currentPage + 1 >= model.pageCount} onClick={() => model.setPageIndex((page) => Math.min(model.pageCount - 1, page + 1))}>Next</Button></div>
-                <p className="text-sm text-muted-foreground" aria-live="polite">Page {model.currentPage + 1} of {model.pageCount}</p>
-                <div className="flex items-center gap-2"><Label htmlFor={model.pageSizeId}>Rows per page:</Label><TableSelect value={String(model.pageSize)} onValueChange={(value) => { model.setPageSize(Number(value)); model.setPageIndex(0); }}><SelectTrigger id={model.pageSizeId} size="row"><SelectValue /></SelectTrigger><SelectContent>{model.availablePageSizes.map((size) => <SelectItem key={size} value={String(size)}>{size}</SelectItem>)}</SelectContent></TableSelect></div>
-              </div>
-            </div>}
-            rowActions={(row) => <DataTableRowActions actions={[{ label: "View details", onClick: () => setSelectedId(row.id) }]} />}
-          />
-          {tableRows.length > 0 ? (
-            <Card>
-              <CardHeader><CardTitle>File details</CardTitle></CardHeader>
-              <CardContent>
-                <div className="flex flex-col gap-3">
-                <label htmlFor="library-file" className="text-sm font-medium">Select a file</label>
-                <Select aria-label="Select a file" value={selectedId ?? "none"} onValueChange={(value) => setSelectedId(value === "none" ? null : value)} options={["none", ...filtered.map((row) => row.file.id)]} getLabel={(value) => {
-                  const row = rows.find((entry) => entry.file.id === value);
-                  return value === "none" ? "Choose a file" : row ? `${row.file.media_type}, ${ownerLabel(row)}` : value;
-                }} />
-                {selected ? <>
-                  <FileDetails file={selected} ownerLabel={ownerLabel(selected)} kindLabel={kindLabel(selected.file.kind)} />
-                  <dl className="grid gap-2 text-sm sm:grid-cols-2">
-                    <div><dt className="text-muted-foreground">Retention</dt><dd>{selected.file.retention === "kept" ? "Kept until deleted" : "Follows the conversation"}</dd></div>
-                  </dl>
-                  {canManageSelected ? <div className="flex flex-col gap-3 border-t border-border pt-3">
-                    <h2 className="text-sm font-medium">Shared with</h2>
-                    {(sharesQuery.data ?? []).length === 0 ? <p className="text-sm text-muted-foreground">Not shared with anyone yet.</p> : (sharesQuery.data ?? []).map((share) => <div key={share.id} className="flex items-center justify-between gap-2"><span className="truncate text-sm">{share.to === "household" ? "The whole household" : nameFor(share.to)}</span><Button variant="outline" size="row" onClick={() => void unshare(share.id)}>Unshare</Button></div>)}
-                    <div className="flex flex-col gap-2 sm:flex-row">
-                      <Select aria-label="Share with" value={shareTarget} onValueChange={setShareTarget} options={["household", ...shareTargets.map((entry) => entry.id)]} getLabel={(value) => value === "household" ? "The whole household" : shareTargets.find((entry) => entry.id === value)?.display_name ?? value} />
-                      <Button size="row" onClick={() => void shareSelected()}>Share</Button>
-                    </div>
-                  </div> : null}
-                </> : null}
-                </div>
-              </CardContent>
-            </Card>
-          ) : null}
-        </>}
-      </AsyncState>
-    </>
+const LG_QUERY = "(min-width: 1024px)";
+function useWide(): boolean {
+  return useSyncExternalStore(
+    (onChange) => {
+      if (typeof window === "undefined" || typeof window.matchMedia !== "function") return () => {};
+      const query = window.matchMedia(LG_QUERY);
+      query.addEventListener("change", onChange);
+      return () => query.removeEventListener("change", onChange);
+    },
+    () => typeof window !== "undefined" && typeof window.matchMedia === "function" && window.matchMedia(LG_QUERY).matches,
+    () => false,
   );
 }
+const editable = (target: EventTarget | null): boolean => target instanceof HTMLElement && (target.isContentEditable || /^(input|textarea|select)$/i.test(target.tagName));
+const itemsWord = (count: number) => `${count} ${count === 1 ? "item" : "items"}`;
+const CHILD_ADD = "Ask a grown-up to add this file. Adding files to the Library is turned off for your profile.";
 
-function FileDetails({ file, ownerLabel, kindLabel }: { file: VisibleFile; ownerLabel: string; kindLabel: string }) {
-  return <>
-    <File.Root>
-      <File.Icon mimeType={file.file.media_type} />
-      <File.Name>{file.file.id}</File.Name>
-      <File.Size bytes={file.file.size} />
-      <File.Download data={new URL(api.fileContentUrl(file.file.id), window.location.origin === "null" ? "http://localhost" : window.location.origin).href} sourceType="url" mimeType={file.file.media_type} filename={file.file.id} hitArea48 />
-    </File.Root>
-    <dl className="grid gap-2 text-sm sm:grid-cols-2">
-      <div><dt className="text-muted-foreground">Owner</dt><dd>{ownerLabel}</dd></div>
-      <div><dt className="text-muted-foreground">Kind</dt><dd>{kindLabel}</dd></div>
-    </dl>
-  </>;
+/** The Library: a Dropbox-style page. Sections, search, filters and sort are all in the address; the hub does the filtering
+ * and paging; the kit draws the tiles, the table, the viewer and the share dialog. No folders. */
+export function FilesPage({ person }: { person: Roster }) {
+  useTabItem("Library");
+  const [params, setParams] = useSearchParams();
+  const view = useMemo(() => parseView(params), [params]);
+  const wide = useWide();
+  const phone = useIsPhoneLayout();
+  const [cardSize, setCardSize] = useCardSize("library");
+  const actions = useLibraryActions(person.id);
+  const canAdd = canAddFiles(person);
+  const canShare = canShareFiles(person);
+
+  const update = useCallback((change: Partial<LibraryView>, replace = true) => {
+    const next = { ...view, ...change };
+    if (!filterAllowed(next.section, next.filter)) next.filter = "any";
+    setParams(viewParams(next), { replace });
+  }, [view, setParams]);
+
+  // Search: the field keeps its own text and the address follows a moment later.
+  const [searchText, setSearchText] = useState(view.q);
+  useEffect(() => { setSearchText(view.q); }, [view.q]);
+  useEffect(() => {
+    if (searchText === view.q) return;
+    const timer = window.setTimeout(() => update({ q: searchText }), 250);
+    return () => window.clearTimeout(timer);
+  }, [searchText, view.q, update]);
+
+  const trashView = view.section === "trash";
+  const query: LibraryQuery = useMemo(() => queryOf(view), [view]);
+  const list = useInfiniteQuery({
+    queryKey: ["library", query],
+    queryFn: ({ pageParam }) => api.library({ ...query, ...(pageParam ? { cursor: pageParam } : {}) }),
+    initialPageParam: "" as string,
+    getNextPageParam: (last) => last.next_cursor ?? undefined,
+    enabled: !trashView,
+  });
+  const items = useMemo(() => {
+    const seen = new Set<string>();
+    return (list.data?.pages ?? []).flatMap((page) => page.items).filter((item) => !seen.has(item.id) && seen.add(item.id));
+  }, [list.data]);
+  const summary = useQuery({ queryKey: ["library-summary", filtersOf(query)], queryFn: () => api.librarySummary(query) });
+  const everything = useQuery({ queryKey: ["library-summary", {}], queryFn: () => api.librarySummary({}) });
+  const withMe = useQuery({ queryKey: ["library-summary", { shared: "with-me" }], queryFn: () => api.librarySummary({ shared: "with-me" }) });
+  const byMe = useQuery({ queryKey: ["library-summary", { shared: "by-me" }], queryFn: () => api.librarySummary({ shared: "by-me" }), enabled: person.role !== "child" });
+  const onlyMe = useQuery({ queryKey: ["library-summary", { shared: "none" }], queryFn: () => api.librarySummary({ shared: "none" }) });
+  const trash = useQuery({ queryKey: ["library-trash"], queryFn: () => api.libraryTrash(), enabled: trashView });
+  const trashRows = (trash.data?.rows ?? []).filter((row) => row.kind === "file");
+
+  // Selection.
+  const [selected, setSelected] = useState<string[]>([]);
+  const [selecting, setSelecting] = useState(false);
+  const [confirm, setConfirm] = useState<LibraryItem[] | null>(null);
+  const [renaming, setRenaming] = useState<LibraryItem | null>(null);
+  const [renameText, setRenameText] = useState("");
+  const [sharing, setSharing] = useState<LibraryItem[] | null>(null);
+  const [busy, setBusy] = useState(false);
+  const selectedItems = items.filter((item) => selected.includes(item.id));
+  const leaveSelection = useCallback(() => { setSelecting(false); setSelected([]); }, []);
+  useEffect(() => { leaveSelection(); }, [view.section, view.filter, view.q, leaveSelection]);
+
+  // A link to one file (`?file=<id>`) that is not on the loaded page is fetched on its own and drawn from its record.
+  const deepId = view.file;
+  const loaded = deepId !== null && items.some((item) => item.id === deepId);
+  // The listing has no route for one item, so a link first pages on through the list (up to 12 pages) to find it with its
+  // name and sharing; only then does it fall back to the file's own record.
+  const pagesLoaded = list.data?.pages.length ?? 0;
+  const searchingDeep = deepId !== null && !loaded && !trashView && (list.isPending || (list.hasNextPage && pagesLoaded < 12));
+  useEffect(() => {
+    if (searchingDeep && list.hasNextPage && !list.isFetchingNextPage) void list.fetchNextPage();
+  }, [searchingDeep, list]);
+  const deep = useQuery({ queryKey: ["library-file", deepId], queryFn: () => api.libraryFile(deepId!), enabled: deepId !== null && !loaded && !searchingDeep, retry: false });
+  const people = useQuery({ queryKey: ["people"], queryFn: () => api.people(), enabled: deep.data !== undefined });
+  const deepItem = useMemo<LibraryItem | null>(() => deep.data && deepId ? {
+    id: deep.data.id, kind: deep.data.kind === "image" || deep.data.kind === "video" || deep.data.kind === "audio" || deep.data.kind === "document" || deep.data.kind === "story" ? deep.data.kind : "file",
+    name: ({ image: "Picture", video: "Video", audio: "Song", document: "Document" } as Record<string, string>)[deep.data.kind] ?? "File",
+    media_type: deep.data.media_type, size_bytes: deep.data.size, created_at: deep.data.created_at,
+    owner: { id: deep.data.owner_person_id, display_name: deep.data.owner_person_id === person.id ? person.display_name : people.data?.find((entry) => entry.id === deep.data!.owner_person_id)?.display_name ?? "Someone in your home" },
+    shared_with: { count: 0, household: false }, retention: deep.data.retention, chat_id: null, can_edit: false, audience: null, duration_seconds: null,
+    thumb_url: `/api/files/${deep.data.id}/thumb?w=320`, expires_at: null, version_count: 1,
+  } : null, [deep.data, deepId, people.data, person.id, person.display_name]);
+  const viewerList = useMemo(() => (deepItem && !loaded ? [deepItem, ...items] : items), [deepItem, loaded, items]);
+  useEffect(() => {
+    if (deep.isError && deepId) {
+      toast.error(deep.error instanceof ApiError && deep.error.message ? deep.error.message : "That file is not available to you. Ask the person who added it to share it again.");
+      update({ file: null });
+    }
+  }, [deep.isError, deep.error, deepId, update]);
+
+  const closeViewer = useCallback(() => update({ file: null }), [update]);
+
+  const doTrash = useCallback(async (targets: readonly LibraryItem[]) => {
+    setBusy(true);
+    try {
+      const result = await actions.trash(targets);
+      leaveSelection(); setConfirm(null);
+      if (result.done.includes(view.file ?? "")) closeViewer();
+      const sentence = batchSentence(result, (count) => `${count === 1 ? `'${targets.find((item) => item.id === result.done[0])?.name ?? "File"}'` : `${count} files`} moved to Trash. Kept 30 days`, result.done.length ? "could not be moved" : "could not be moved to Trash");
+      const done = [...result.done];
+      if (done.length > 0) toast(sentence, { action: { label: "Undo", onClick: () => { void actions.restore(done).then((back) => { if (back.refused.length) toast.error(batchSentence(back, (count) => `${count} restored`, "could not be restored")); }); } } });
+      else toast.error(sentence);
+    } finally { setBusy(false); }
+  }, [actions, closeViewer, leaveSelection, view.file]);
+
+  const requestTrash = useCallback((targets: readonly LibraryItem[]) => {
+    const own = targets.filter((item) => item.owner.id === person.id);
+    if (own.length === 0) { toast.error("That file is not yours to delete. Ask the person who added it."); return; }
+    const sharedOne = own.length === 1 && (own[0]!.shared_with.count > 0 || own[0]!.shared_with.household);
+    if (own.length === 1 && !sharedOne && targets.length === 1) void doTrash(own);
+    else setConfirm([...targets]);
+  }, [doTrash, person.id]);
+
+  const itemActions: ItemActions = useMemo(() => ({
+    open: (item) => update({ file: item.id }, false),
+    rename: (item) => { setRenaming(item); setRenameText(item.name); },
+    keep: (item) => { void actions.keep([item]).then((result) => result.refused.length ? toast.error(batchSentence(result, () => "", "could not be kept")) : toast(`'${item.name}' is kept until you delete it.`)); },
+    share: (item) => setSharing([item]),
+    trash: (item) => requestTrash([item]),
+    recheck: (item) => {
+      toast("Checking the picture. This can take a minute.");
+      void actions.recheck(item.id).then(() => toast.success(`'${item.name}' is now marked all-ages.`)).catch((error: unknown) => toast.error(actions.reason(error)));
+    },
+  }), [actions, requestTrash, update]);
+
+  // Upload: the button, a dropped file, a pasted picture.
+  const uploads = useLibraryUploads(useCallback(() => { void actions.refresh(); }, [actions]));
+  const fileInput = useRef<HTMLInputElement>(null);
+  const [dragging, setDragging] = useState(false);
+  const addFiles = (files: readonly File[]) => { if (!canAdd) toast.error(CHILD_ADD); else uploads.add(files); };
+  useEffect(() => {
+    const onPaste = (event: ClipboardEvent) => {
+      if (editable(event.target)) return;
+      const files = Array.from(event.clipboardData?.files ?? []);
+      if (files.length > 0 && canAdd) uploads.add(files);
+    };
+    document.addEventListener("paste", onPaste);
+    return () => document.removeEventListener("paste", onPaste);
+  }, [canAdd, uploads]);
+
+  // Keyboard: / searches, S selects, Delete moves to Trash.
+  useEffect(() => {
+    const onKey = (event: KeyboardEvent) => {
+      if (event.metaKey || event.ctrlKey || event.altKey || editable(event.target)) return;
+      const modal = document.querySelector('[role="dialog"], [role="alertdialog"]');
+      if (event.key === "/" && !modal) {
+        const field = document.querySelector<HTMLInputElement>('input[type="search"][aria-label="Search your Library"]');
+        if (field) { event.preventDefault(); field.focus(); }
+      } else if ((event.key === "s" || event.key === "S") && !modal && !trashView) {
+        event.preventDefault(); setSelecting((on) => { if (on) setSelected([]); return !on; });
+      } else if (event.key === "Delete") {
+        const viewing = view.file ? viewerList.find((item) => item.id === view.file) : undefined;
+        if (viewing) { event.preventDefault(); requestTrash([viewing]); }
+        else if (selectedItems.length > 0 && !modal) { event.preventDefault(); requestTrash(selectedItems); }
+      }
+    };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [requestTrash, selectedItems, trashView, view.file, viewerList]);
+
+  // The infinite page: the next 60 load as the end comes into view.
+  const sentinel = useRef<HTMLDivElement>(null);
+  const { hasNextPage, isFetchingNextPage, fetchNextPage, isFetchNextPageError } = list;
+  useEffect(() => {
+    const node = sentinel.current;
+    if (!node || !hasNextPage || isFetchNextPageError || typeof IntersectionObserver === "undefined") return;
+    const observer = new IntersectionObserver((entries) => { if (entries.some((entry) => entry.isIntersecting) && !isFetchingNextPage) void fetchNextPage(); }, { rootMargin: "600px" });
+    observer.observe(node);
+    return () => observer.disconnect();
+  }, [hasNextPage, isFetchingNextPage, fetchNextPage, isFetchNextPageError, items.length]);
+
+  const counts: Record<SectionId, number | undefined> = {
+    all: everything.data?.items, pictures: everything.data?.per_kind.image?.items, videos: everything.data?.per_kind.video?.items,
+    songs: everything.data?.per_kind.audio?.items, documents: everything.data?.per_kind.document?.items,
+    "shared-with-me": withMe.data?.items, "shared-by-me": byMe.data?.items, "only-me": onlyMe.data?.items, trash: everything.data?.trash.items,
+  };
+  const sections = SECTIONS.filter((section) => !(section.id === "shared-by-me" && person.role === "child"));
+  const goSectionRef = useRef<(id: SectionId) => void>(() => {});
+  goSectionRef.current = (id) => update({ section: id, file: null }, false);
+  const goSection = (id: SectionId) => goSectionRef.current(id);
+  const countsKey = JSON.stringify(counts);
+  const groups = useMemo<SectionSidebarGroup[]>(() => {
+    const row = (id: SectionId): SectionSidebarItem => {
+      const section = sectionOf(id);
+      const count = counts[id];
+      return {
+        id, label: section.label, icon: section.icon, active: view.section === id,
+        href: `/files${id === "all" ? "" : `?section=${id}`}`,
+        onClick: (event) => {
+          if (event.button !== 0 || event.metaKey || event.ctrlKey) return;
+          event.preventDefault(); goSectionRef.current(id);
+        },
+        ...(count !== undefined ? { trailing: <span className="text-base text-muted-foreground tabular-nums">{count}</span> } : {}),
+      };
+    };
+    const ids = sections.map((section) => section.id);
+    return [
+      { id: "kinds", items: ids.slice(0, 5).map(row) },
+      { id: "more", items: ids.slice(5).map(row) },
+    ];
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [view.section, countsKey, person.role]);
+  const footer = useMemo<SectionSidebarItem[]>(() => [{ id: "settings", label: "Settings", icon: "settings", href: meetsMinRole(person.role, "admin") ? "/settings/home" : "/settings/account" }], [person.role]);
+  const drawer = useMemo(() => <SectionSidebarDrawerSections groups={groups} footer={footer} />, [groups, footer]);
+  useDrawerSections(drawer);
+  const [collapsed, setCollapsedState] = useState(() => readLibrarySidebarCollapsed(person.id));
+  const setCollapsed = (next: boolean) => { setCollapsedState(next); writeLibrarySidebarCollapsed(person.id, next); };
+
+  const current = trashView ? undefined : summary.data;
+  const headline = trashView ? (trashRows.length > 0 || trash.data ? itemsWord(trashRows.length) : "") : current ? `${itemsWord(current.items)} · ${formatBytes(current.bytes)}` : "";
+  const filtersOn = view.q.trim() !== "" || view.filter !== "any";
+  const searchField = (
+    <Input type="search" aria-label="Search your Library" placeholder="Search your Library" value={searchText} onChange={(event) => setSearchText(event.target.value)}
+      onKeyDown={(event) => { if (event.key === "Escape" && searchText) { event.preventDefault(); setSearchText(""); } }} />
+  );
+
+  const loadError = (message: string, retry: () => void) => (
+    <div className="flex flex-col items-start gap-3">
+      <Alert variant="destructive" role="alert"><AlertDescription>{message}</AlertDescription></Alert>
+      <Button type="button" variant="secondary" onClick={retry}>Try again</Button>
+    </div>
+  );
+  const status = (() => {
+    if (trashView) {
+      if (trash.isError) return loadError("Home could not load your Trash. Check that Home is running, then try again.", () => void trash.refetch());
+      if (!trash.data) return <RouteSkeleton label="Loading your files" />;
+      return <LibraryTrash rows={trashRows} busy={busy} onRestore={(ids) => { setBusy(true); void actions.restore(ids).then((r) => toast(batchSentence(r, (n) => `${n === 1 ? "File" : `${n} files`} restored`, "could not be restored"))).finally(() => setBusy(false)); }}
+        onPurge={(ids) => { setBusy(true); void actions.purge(ids).then((r) => toast(batchSentence(r, (n) => `${n === 1 ? "File" : `${n} files`} deleted forever`, "could not be deleted"))).finally(() => setBusy(false)); }} />;
+    }
+    if (list.isError && !list.isFetchNextPageError) return loadError(list.error instanceof ApiError && list.error.message ? list.error.message : "Home could not load your Library. Check that Home is running, then try again.", () => void list.refetch());
+    if (list.isPending) return <RouteSkeleton label="Loading your files" />;
+    if (items.length === 0) {
+      if (filtersOn) return <EmptyState icon="search" text="No matches. Try a different word or clear a filter." actionLabel="Clear filters" onAction={() => { setSearchText(""); update({ q: "", filter: "any" }); }} />;
+      if (view.section === "all") return <EmptyState icon="folder" text="Nothing here yet. Pictures, videos and songs you make in chat land here, along with files you upload. Drop a file anywhere on this page to add it." {...(canAdd ? { actionLabel: "Upload", onAction: () => fileInput.current?.click() } : {})} />;
+      return <EmptyState icon={sectionOf(view.section).icon} text={`Nothing in ${sectionOf(view.section).label} yet.`} actionLabel="Show all files" onAction={() => goSection("all")} />;
+    }
+    return (
+      <div className="flex flex-col gap-4" style={{ "--maipai-card-size": `${cardSize}px` } as CSSProperties}>
+        <LibraryItems items={items} me={person} layout={view.layout} phone={phone} selectedIds={selected} onSelectionChange={setSelected} selectionMode={selecting}
+          onExitSelectionMode={leaveSelection} actions={itemActions} sort={view.sort} onSort={(sort) => update({ sort })} />
+        {list.isFetchNextPageError ? loadError("Home could not load more files. Check that Home is running, then try again.", () => void fetchNextPage()) : null}
+        {hasNextPage ? <div ref={sentinel} className="flex justify-center"><Button type="button" variant="secondary" disabled={isFetchingNextPage} onClick={() => void fetchNextPage()}>{isFetchingNextPage ? "Loading more files" : "Show more files"}</Button></div> : null}
+      </div>
+    );
+  })();
+
+  const batchActions = (
+    <>
+      {canShare ? <Button type="button" variant="secondary" disabled={selectedItems.length === 0} onClick={() => setSharing(selectedItems)}>Share</Button> : null}
+      <Button type="button" variant="secondary" disabled={selectedItems.length === 0 || busy} onClick={() => { setBusy(true); void actions.keep(selectedItems).then((result) => { toast(batchSentence(result, (n) => `${n} kept until you delete ${n === 1 ? "it" : "them"}`, "could not be kept")); leaveSelection(); }).finally(() => setBusy(false)); }}>Keep</Button>
+      <Button type="button" variant="destructive" disabled={selectedItems.length === 0 || busy} onClick={() => requestTrash(selectedItems)}>Delete</Button>
+    </>
+  );
+
+  return (
+    <div className="flex min-h-0 flex-1" data-testid="library-page"
+      onDragOver={(event) => { if (event.dataTransfer?.types.includes("Files")) { event.preventDefault(); setDragging(true); } }}
+      onDragLeave={(event) => { if (event.currentTarget === event.target) setDragging(false); }}
+      onDrop={(event) => { setDragging(false); const files = Array.from(event.dataTransfer?.files ?? []); if (files.length > 0) { event.preventDefault(); addFiles(files); } }}>
+      <SectionSidebar standalone title="Library" groups={groups} footer={footer} footerSlot={<div className="px-3 pb-2"><LibraryStorage me={person} /></div>} density="compact" collapsedStyle="hidden" collapsed={collapsed} onCollapsedChange={setCollapsed}
+        sidebarProps={{ id: "library-sidebar" }}
+        search={{ value: searchText, onChange: setSearchText, label: "Search your Library", onSubmit: () => update({ q: searchText }) }} />
+      <div className="flex min-w-0 flex-1 flex-col gap-4 p-4">
+        <div className="flex flex-wrap items-center gap-3">
+          {wide && collapsed ? <SectionSidebarShowButton onClick={() => setCollapsed(false)} controls="library-sidebar" /> : null}
+          <div className="min-w-0 flex-1">
+            <h2 className="truncate text-2xl font-semibold tracking-tight">{sectionOf(view.section).label}</h2>
+            <p className="text-base text-muted-foreground" aria-live="polite">{headline}</p>
+          </div>
+          {canAdd ? <Button type="button" onClick={() => fileInput.current?.click()}><UploadIcon aria-hidden className="size-4" />Upload</Button>
+            : <Button type="button" variant="secondary" onClick={() => toast(CHILD_ADD)}>Ask to add a file</Button>}
+          <input ref={fileInput} type="file" multiple hidden aria-label="Choose files to add" onChange={(event) => { const files = Array.from(event.target.files ?? []); event.target.value = ""; if (files.length > 0) addFiles(files); }} />
+        </div>
+
+        {!wide ? (
+          <div role="group" aria-label="Library sections" className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-1">
+            {sections.map((section) => <div key={section.id} className="shrink-0"><Button type="button" variant={view.section === section.id ? "secondary" : "outline"} aria-pressed={view.section === section.id} onClick={() => goSection(section.id)}>{section.label}</Button></div>)}
+          </div>
+        ) : null}
+        {!wide && !trashView ? searchField : null}
+
+        {!trashView ? (
+          <div className="flex flex-wrap items-center gap-3">
+            {filterAllowed(view.section, "mine") ? <div role="group" aria-label="Filters"><Button type="button" variant={view.filter === "mine" ? "secondary" : "outline"} aria-pressed={view.filter === "mine"} onClick={() => update({ filter: view.filter === "mine" ? "any" : "mine" })}>Mine</Button></div> : null}
+            <div className="sm:ml-auto"><Select aria-label="Sort by" value={view.sort} onValueChange={(value) => update({ sort: value as SortId })} options={Object.keys(SORT_LABELS)} getLabel={(value) => SORT_LABELS[value as SortId]} /></div>
+            {view.layout === "grid" && !phone ? <CardSizeSlider size={cardSize} onChange={setCardSize} label="Tile size" /> : null}
+            <div role="group" aria-label="Layout" className="flex gap-1">
+              <Button type="button" variant={view.layout === "grid" ? "secondary" : "ghost"} size="icon" aria-pressed={view.layout === "grid"} aria-label="Grid view" onClick={() => update({ layout: "grid" })}><GridIcon aria-hidden className="size-4" /></Button>
+              <Button type="button" variant={view.layout === "list" ? "secondary" : "ghost"} size="icon" aria-pressed={view.layout === "list"} aria-label="List view" onClick={() => update({ layout: "list" })}><ListIcon aria-hidden className="size-4" /></Button>
+            </div>
+            {!selecting && selected.length === 0 ? <SelectModeToggle label="Select" onClick={() => setSelecting(true)} /> : null}
+          </div>
+        ) : null}
+
+        {selecting || selected.length > 0 ? <BatchBar count={selected.length} onExit={leaveSelection}>{batchActions}</BatchBar> : null}
+        {confirm ? (
+          <DestructiveConfirm
+            message={confirm.length === 1 ? `Delete '${confirm[0]!.name}'?` : `Move ${confirm.length} files to Trash?`}
+            detail={`${confirm.some((item) => item.shared_with.household) ? "It is shared with everyone in the home. " : confirm.some((item) => item.shared_with.count > 0) ? "Some of it is shared with people in your home. " : ""}${confirm.some((item) => item.shared_with.count > 0 || item.shared_with.household) ? "They lose access now. " : ""}You can get it back from Trash for 30 days.`}
+            confirmLabel="Move to Trash" busyLabel="Moving" busy={busy} cancelLabel="Keep it"
+            onConfirm={() => void doTrash(confirm)} onCancel={() => setConfirm(null)} />
+        ) : null}
+
+        <UploadTray cards={uploads.cards} onCancel={uploads.cancel} onRetry={uploads.retry} onDismiss={uploads.dismiss} />
+        {dragging ? <div role="status" className="rounded-lg border-2 border-dashed border-primary p-6 text-center text-base">Drop to add to your Library</div> : null}
+        {status}
+        {!wide ? <div className="max-w-xl"><LibraryStorage me={person} /></div> : null}
+      </div>
+
+      <LibraryViewer phone={phone} items={viewerList} me={person} currentId={view.file} onCurrentIdChange={(id) => update({ file: id })} onClose={closeViewer} actions={itemActions} />
+      {sharing ? <LibraryShareDialog items={sharing} me={person} open onOpenChange={(open) => { if (!open) setSharing(null); }} /> : null}
+      <Dialog open={renaming !== null} onOpenChange={(open) => { if (!open) setRenaming(null); }}>
+        <DialogContent>
+          <form onSubmit={(event) => {
+            event.preventDefault();
+            const target = renaming; if (!target) return;
+            void actions.rename(target.id, renameText).then(() => { setRenaming(null); toast.success("Renamed."); }).catch((error: unknown) => toast.error(actions.reason(error)));
+          }}>
+            <DialogHeader><DialogTitle>Rename file</DialogTitle><DialogDescription>Leave it empty to go back to the name Home chose.</DialogDescription></DialogHeader>
+            <label htmlFor="library-rename" className="text-base font-medium">Name</label>
+            <Input id="library-rename" value={renameText} maxLength={1000} onChange={(event) => setRenameText(event.target.value)} />
+            <DialogFooter><Button type="button" variant="ghost" onClick={() => setRenaming(null)}>Cancel</Button><Button type="submit">Save name</Button></DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
 }

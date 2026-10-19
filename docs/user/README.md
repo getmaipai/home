@@ -15,6 +15,7 @@ day the hub arrives; the rest are for when you need them.
 - [Talking to Home](voice.md): allow the microphone, pick a voice, and turn natural speech sounds on or off.
 - [Weather](weather.md): ask in chat, open the Weather app, and set your places and units.
 - [All apps](all-apps.md): find any app, and choose which ones sit in the left rail.
+- [The Library](library.md): find, look at, add, share, keep and delete the pictures, videos, songs and files in your home.
 - [Pictures](pictures.md): ask chat for a picture, stop it, change it, and choose who can make pictures and which styles are on.
 - [Videos](videos.md): ask chat for a short video, stop it, make another, and choose who can make videos and which styles are on.
 - [Songs](songs.md): ask chat to write and make a song, change it by asking, play it, and choose who can make songs.
