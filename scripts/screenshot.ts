@@ -1158,6 +1158,19 @@ async function visitRoute(context: BrowserContext, route: RouteSpec, viewport: V
     });
     for (const v of underMenuButton) violations.push(`text under the menu button: ${v}`);
 
+    // The phone header band takes body height on Chat (the workspace is one viewport tall): the composer must stay on screen.
+    if (route.slug === "chat" && viewport.slug === "phone") {
+      const composer = await page.evaluate(() => {
+        const box = Array.from(document.querySelectorAll<HTMLElement>('textarea, [role="textbox"], [contenteditable="true"]')).find((el) => { const r = el.getBoundingClientRect(); return r.width > 0 && r.height > 0; });
+        if (!box) return null;
+        const r = box.getBoundingClientRect();
+        return { top: Math.round(r.top), bottom: Math.round(r.bottom), height: window.innerHeight };
+      });
+      console.log(`   chat composer on the phone: ${JSON.stringify(composer)}`);
+      if (!composer) violations.push("chat composer not found on the phone");
+      else if (composer.bottom > composer.height + 1 || composer.top < 0) violations.push(`chat composer is off screen on the phone (top ${composer.top}, bottom ${composer.bottom}, viewport ${composer.height})`);
+    }
+
     let screenshotFile: string | undefined;
     if (saveScreenshot) {
       mkdirSync(SCREENS_DIR, { recursive: true });
