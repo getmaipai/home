@@ -7,7 +7,7 @@ describe("hero slides", () => {
     expect(slides.map((slide) => slide.id)).toEqual([
       "hero.home", "hero.privacy", "hero.try", "hero.kids", "hero.apps", "hero.offline", "hero.bot",
     ]);
-    expect(slides[0]?.text).toContain("Your own AI, music, videos");
+    expect(slides[0]?.text).toContain("Your own private AI at home, with chat, voice, pictures and videos");
     expect(slides[4]?.text).toContain("New features and abilities");
     expect(slides[6]?.text).toContain("A robot friend");
   });

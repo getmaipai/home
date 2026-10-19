@@ -83,8 +83,8 @@ describe("the answer's pictures (the image_gallery block, kit image gallery)", (
   test("a tile that fails to paint shows the kit's placeholder, never a broken image", () => {
     const { getAllByRole, container } = render(<Render data={live(set(3))} />);
     fireEvent.error(getAllByRole("img")[1]!);
-    expect(getAllByRole("img")).toHaveLength(2);
-    expect(container.querySelector("svg.lucide-image-off")).not.toBeNull();
+    expect(container.querySelectorAll("img")).toHaveLength(2);
+    expect(container.querySelector("[data-slot='safe-image-fallback'][data-kind='picture']")).not.toBeNull();
   });
 
   // Focus going back to the tile is checked in a real browser by
