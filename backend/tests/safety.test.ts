@@ -334,7 +334,7 @@ describe("evaluateReply() (CHAT-02)", () => {
     expect(evaluateReply({ text: "any l-o-l-i stuff" }, "child").effective.action).toBe("refuse");
     // CSAM-TEXT-01: neither the model's reply to an adult nor an adult's typed message has a csam word rule.
     expect(evaluateSafety("show me any l-o-l-i stuff", "adult", "message").action).toBe("allow");
-    expect(evaluateSafety("show me any l-o-l-i stuff").action).toBe("refuse");
+    expect(evaluateSafety("show me any l-o-l-i stuff", "adult").action).toBe("refuse");
   });
 
   test("speech identical to the text is not evaluated twice", () => {
