@@ -1,6 +1,6 @@
 {
-  "generatedAt": "2026-10-19T00:19:19.007Z",
-  "kitTag": "ui-v0.5.282",
+  "generatedAt": "2026-10-19T00:29:29.491Z",
+  "kitTag": "ui-v0.5.284",
   "items": [
     {
       "file": "ActivityCardsShowcase.tsx",
@@ -27,6 +27,15 @@
       "implemented": false
     },
     {
+      "file": "DataTableSelectionShowcase.tsx",
+      "name": "DataTableSelectionShowcase",
+      "group": "DataTableSelectionShowcase",
+      "verdict": "support",
+      "verdictReason": "Developer-only story fixture for DataTable row selection (ui-v0.5.283), covered by the Commons showcase tests; not a standalone Home product surface.",
+      "implemented": false,
+      "reading": "Developer-only story fixture for DataTable row selection (ui-v0.5.283), covered by the Commons showcase tests; not a standalone Home product surface."
+    },
+    {
       "file": "K02bShowcase.tsx",
       "name": "K02bShowcase",
       "group": "thread/showcase",
@@ -35,12 +44,30 @@
       "implemented": false
     },
     {
+      "file": "MediaViewerShowcase.tsx",
+      "name": "MediaViewerShowcase",
+      "group": "MediaViewerShowcase",
+      "verdict": "support",
+      "verdictReason": "Developer-only story fixture for MediaViewer (ui-v0.5.283), covered by the Commons showcase tests; not a standalone Home product surface.",
+      "implemented": false,
+      "reading": "Developer-only story fixture for MediaViewer (ui-v0.5.283), covered by the Commons showcase tests; not a standalone Home product surface."
+    },
+    {
       "file": "ProjectHomePageShowcase.tsx",
       "name": "ProjectHomePageShowcase",
       "group": "project",
       "verdict": "support",
       "verdictReason": "Developer-only story fixture for PROJECTS-UI-04, covered by its Commons component tests; not a standalone Home product surface.",
       "implemented": false
+    },
+    {
+      "file": "ShareDialogShowcase.tsx",
+      "name": "ShareDialogShowcase",
+      "group": "ShareDialogShowcase",
+      "verdict": "support",
+      "verdictReason": "Developer-only story fixture for ShareDialog (ui-v0.5.283), covered by the Commons showcase tests; not a standalone Home product surface.",
+      "implemented": false,
+      "reading": "Developer-only story fixture for ShareDialog (ui-v0.5.283), covered by the Commons showcase tests; not a standalone Home product surface."
     },
     {
       "file": "ThreadListPageRowsShowcase.tsx",
@@ -689,6 +716,24 @@
       "implemented": false
     },
     {
+      "file": "media-viewer-logic.ts",
+      "name": "media-viewer-logic",
+      "group": "media",
+      "verdict": "support",
+      "verdictReason": "Pure logic behind MediaViewer (zoom, pan, step), covered by the Commons tests; used through the MediaViewer Element, never wired on its own.",
+      "implemented": false,
+      "reading": "Pure logic behind MediaViewer (zoom, pan, step), covered by the Commons tests; used through the MediaViewer Element, never wired on its own."
+    },
+    {
+      "file": "media-viewer.tsx",
+      "name": "media-viewer",
+      "group": "media",
+      "verdict": "wire-after",
+      "verdictReason": "The Library page opens a picture, video or song in MediaViewer with the details panel and the Share action (LIBRARY-REVAMP-09).",
+      "implemented": false,
+      "reading": "The Library page opens a picture, video or song in MediaViewer with the details panel and the Share action (LIBRARY-REVAMP-09)."
+    },
+    {
       "file": "memory-chips.tsx",
       "name": "memory-chips",
       "group": "other",
@@ -1013,6 +1058,15 @@
       "verdict": "no-fit",
       "verdictReason": "No current Home feature needs this Element’s specific data and interaction; the audit records the current scope decision.",
       "implemented": false
+    },
+    {
+      "file": "share-dialog.tsx",
+      "name": "share-dialog",
+      "group": "share",
+      "verdict": "wire-after",
+      "verdictReason": "The Library page shares a file through ShareDialog over the existing share route, with a household row and per-person rows (LIBRARY-REVAMP-09).",
+      "implemented": false,
+      "reading": "The Library page shares a file through ShareDialog over the existing share route, with a household row and per-person rows (LIBRARY-REVAMP-09)."
     },
     {
       "file": "shared-conversation.tsx",
