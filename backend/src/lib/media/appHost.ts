@@ -568,7 +568,7 @@ export function saveProgress(person: PersonRow, appId: MediaAppId, args: Progres
   // A show's "skip the last N seconds" (media-source skip_outro_s): reaching that point counts as finishing the episode.
   if (reason !== "ended" && duration !== undefined && duration > 0) {
     const outro = outroSecondsOf(item);
-    if (outro > 0 && position >= duration - outro) { reason = "ended"; outroHit = true; }
+    if (outro > 0 && "seconds" in position && position.seconds >= duration - outro) { reason = "ended"; outroHit = true; }
   }
   const device = typeof args.device_id === "string" && /^device-[a-z0-9]{6,}$/.test(args.device_id) ? args.device_id : null;
   const outcome = writeProgress(person, item, {
