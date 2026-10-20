@@ -5,6 +5,28 @@ import { Card } from "@maipai/ui/src/dashboard/components/ui/card";
 import { bodyHealthText, didPutDownCountIncrease, RobotBody } from "@/apps/settings/RobotBody";
 import { renderWithQueryClient } from "../../../tests/renderWithQueryClient";
 import { ApiError, type DeviceInfo, type SessionInfo } from "@/lib/api";
+import { MemoryRouter } from "react-router-dom";
+
+function settingsFetch(extra: boolean, patchCalls: unknown[] = []) {
+  const original = globalThis.fetch;
+  const baseRegistry = ["robot.barge_in.open_mic", "robot.camera.watch_level", "robot.follow_up.seconds", "robot.gestures.enabled", "robot.idle.level", "robot.initiative.allowed_here"].map((key) => ({ key, scope: "device", selector: key.endsWith("seconds") ? "number" : key.endsWith("level") ? "select" : "boolean", default: key.endsWith("seconds") ? 10 : false, label: key, help: "Registry-provided help.", level: "basic", secret: false, lives_in: "robot.hello", honoured_by: ["home"] }));
+  const registry = [...baseRegistry, ...(extra ? [{ ...baseRegistry[0]!, key: "robot.hello.future", label: "robot.hello.future" }] : [])];
+  globalThis.fetch = mock((input: RequestInfo | URL, init?: RequestInit) => {
+    const url = String(input);
+    if (url.endsWith("/api/settings/registry")) return Promise.resolve(Response.json(registry));
+    if (url.includes("/api/settings?scope=device%3Arobot-1")) return Promise.resolve(Response.json(registry.map((row) => ({ key: row.key, value: row.default, source: "default", label: row.label, help: row.help, level: row.level, secret: false }))));
+    if (url.endsWith("/api/settings") && init?.method === "PUT") {
+      patchCalls.push(JSON.parse(String(init.body)));
+      return Promise.resolve(Response.json({ key: "robot.follow_up.seconds", value: 12, source: "user", label: "Follow up seconds", level: "basic", secret: false }));
+    }
+    if (url.endsWith("/api/devices/robot-1") && init?.method === "PATCH") {
+      patchCalls.push(JSON.parse(String(init.body)));
+      return Promise.resolve(Response.json({ ...device({ id: "robot-1", kind: "robot" }), name: "Renamed" }));
+    }
+    throw new Error(`unstubbed settings fetch: ${url} (${init?.method ?? "GET"})`);
+  }) as unknown as typeof fetch;
+  return () => { globalThis.fetch = original; };
+}
 
 afterEach(cleanup);
 
@@ -33,7 +55,7 @@ function session(overrides: Partial<SessionInfo> = {}): SessionInfo {
 }
 
 function renderSection() {
-  return renderWithQueryClient(<DevicesSection />);
+  return renderWithQueryClient(<DevicesSection person={{ id: "person-1", role: "adult" } as never} />);
 }
 
 function stubFetch(
@@ -91,6 +113,31 @@ describe("DevicesSection", () => {
     expect(bodyHealthText({ ...base, motors_latched: [], thermal: { level: "nominal", temp_c: 40, vision_hz: 15, fault: false } })).toBeNull();
     expect(bodyHealthText({ ...base, motors_latched: ["antenna_left"] })).toContain("antenna_left");
     expect(bodyHealthText({ ...base, thermal: { level: "gestures_suspended", temp_c: 76, vision_hz: 2, fault: false } })).toContain("gestures paused");
+  });
+  test("robot Settings is admin only and draws all registry keys from robot device cards", async () => {
+    const restore = settingsFetch(true);
+    try {
+      const admin = renderWithQueryClient(<MemoryRouter><Card><RobotBody device={device({ id: "robot-1", kind: "robot", name: "Riff" })} viewerRole="admin" onRemove={() => {}} confirmingRemove={false} onConfirmRemove={() => {}} onCancelRemove={() => {}} busy={false} onSetMuted={async () => {}} onStartLiveView={async () => ({ view_id: "v", stream: "" })} onStopLiveView={async () => {}} onAnswerMotorReboot={async () => {}} /></Card></MemoryRouter>);
+      fireEvent.click(admin.getByRole("button", { name: "Settings" }));
+      await admin.findByText("robot.hello.future");
+      expect(admin.getByText("robot.barge_in.open_mic")).toBeTruthy();
+      cleanup();
+      const adult = renderWithQueryClient(<Card><RobotBody device={device({ id: "robot-1", kind: "robot", name: "Riff" })} viewerRole="adult" onRemove={() => {}} confirmingRemove={false} onConfirmRemove={() => {}} onCancelRemove={() => {}} busy={false} onSetMuted={async () => {}} onStartLiveView={async () => ({ view_id: "v", stream: "" })} onStopLiveView={async () => {}} onAnswerMotorReboot={async () => {}} /></Card>);
+      expect(adult.queryByRole("button", { name: "Settings" })).toBeNull();
+    } finally { restore(); }
+  });
+
+  test("saving robot name calls the device PATCH route", async () => {
+    const calls: unknown[] = [];
+    const restore = settingsFetch(false, calls);
+    try {
+      const view = renderWithQueryClient(<MemoryRouter><Card><RobotBody device={device({ id: "robot-1", kind: "robot", name: "Riff" })} viewerRole="owner" onRemove={() => {}} confirmingRemove={false} onConfirmRemove={() => {}} onCancelRemove={() => {}} busy={false} onSetMuted={async () => {}} onStartLiveView={async () => ({ view_id: "v", stream: "" })} onStopLiveView={async () => {}} onAnswerMotorReboot={async () => {}} /></Card></MemoryRouter>);
+      fireEvent.click(view.getByRole("button", { name: "Settings" }));
+      const input = view.getByLabelText("Name");
+      fireEvent.change(input, { target: { value: "Riff Two" } });
+      fireEvent.click(view.getByRole("button", { name: "Save name and area" }));
+      await waitFor(() => expect(calls).toContainEqual({ name: "Riff Two", area: null }));
+    } finally { restore(); }
   });
   test("empty devices and sessions say so, not a blank page", async () => {
     const restore = stubFetch([], []);

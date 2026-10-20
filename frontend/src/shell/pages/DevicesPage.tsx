@@ -24,7 +24,7 @@ export function DevicesPage({ person }: { person: Roster }) {
   const [search, setSearch] = useState("");
   return (
     <SettingsShell area={DEVICES_AREA} viewer={baseViewer(person)} activeSection="devices" layout="docked" contentAs="section" sectionHref={() => "/devices"} onNavigate={() => navigate("/devices")} searchQuery={search} onSearchChange={setSearch} onBack={() => navigate("/settings/account")}>
-      <DevicesSection search={search} />
+      <DevicesSection search={search} person={person} />
     </SettingsShell>
   );
 }

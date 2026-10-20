@@ -283,6 +283,7 @@ export interface DeviceInfo {
   area: string | null;
   lastSeenAt: string | null;
   createdAt: string;
+  ipAddress?: string;
   capabilities: string[];
   /** ROBOT-CARD-01: robots only; `null` until the first report. */
   offlineScope?: Array<"media.offline" | "offline.records">;
@@ -881,6 +882,8 @@ export const api = {
     request<{ success: true }>(`/api/devices/${encodeURIComponent(id)}/offline-scope`, { method: "PATCH", body: JSON.stringify({ offline_scope }) }),
   revokeDevice: (id: string) =>
     request<{ success: true }>(`/api/devices/${encodeURIComponent(id)}`, { method: "DELETE" }),
+  updateDevice: (id: string, input: { name?: string; area?: string | null }) =>
+    request<DeviceInfo>(`/api/devices/${encodeURIComponent(id)}`, { method: "PATCH", body: JSON.stringify(input) }),
   // ROBOT-DEVICE-01: "Add a robot" - discover a unit on the LAN, then
   // approve the code it spoke through Quick Connect's own existing
   // approve route (it already mints a "robot" device token generically;

@@ -11,8 +11,8 @@ import { apiRouter, errorResponses, idParamSchema } from "@/lib/openapi";
 import { LIVE_VIEW_CONTENT_TYPE, getLiveView, liveViewAdmits, liveViewStream, pushLiveFrame, startLiveView, stopLiveView } from "@/lib/liveView";
 import { requireAuth, requireRole, requireDeviceSession, resolveHumanSession } from "@/middleware/auth";
 import { mediaBandOf } from "@/lib/media/band";
-import { mayHoldMediaOffline, listDevicesForPerson, listDevicesByKind, deleteDevice, getDeviceById, setDeviceOfflineScope } from "@/lib/devices";
-import { getDeviceState, getPendingMotorRebootOffer, markMotorRebootAnswered, resolveRequestDevice, stateForViewer, upsertDeviceState } from "@/lib/deviceStates";
+import { mayHoldMediaOffline, listDevicesForPerson, listDevicesByKind, deleteDevice, getDeviceById, setDeviceOfflineScope, updateDevice } from "@/lib/devices";
+import { forgetRobotSocketAddress, getDeviceState, getPendingMotorRebootOffer, getRobotSocketAddress, markMotorRebootAnswered, recordRobotSocketAddress, resolveRequestDevice, stateForViewer, upsertDeviceState } from "@/lib/deviceStates";
 import { speakerAgeBand } from "@/lib/ageBand";
 import { RobotState } from "@maipai/spec/gen/ts/robot-state.js";
 import { discoverRobots } from "@/lib/robotDiscovery";
@@ -47,6 +47,7 @@ const DeviceSchema = z.object({
   area: z.string().nullable(),
   lastSeenAt: z.string().nullable(),
   createdAt: z.string(),
+  ipAddress: z.string().optional(),
   // A code review (2026-09-28): stored on pairing (createDevice) but never
   // surfaced before now - ROBOT-CARD-01 (not yet built) is what actually
   // renders it; carried here so that page has something to read once it
@@ -86,7 +87,7 @@ devicesRoutes.openapi(listRoute, (c) => {
   const actor = c.get("person");
   const devices = listDevicesForPerson(actor.id);
   return c.json(
-    devices.map((d) => ({ id: d.id, kind: d.kind, name: d.name, area: d.area, lastSeenAt: d.lastSeenAt, createdAt: d.createdAt, capabilities: d.capabilities, offlineScope: d.offlineScope as Array<"media.offline" | "offline.records">, state: d.kind === "robot" ? stateForViewer(getDeviceState(d.id), actor) : null })),
+    devices.map((d) => ({ id: d.id, kind: d.kind, name: d.name, area: d.area, lastSeenAt: d.lastSeenAt, createdAt: d.createdAt, ...(d.kind === "robot" && (actor.role === "owner" || actor.role === "admin") && getRobotSocketAddress(d.id) ? { ipAddress: getRobotSocketAddress(d.id)! } : {}), capabilities: d.capabilities, offlineScope: d.offlineScope as Array<"media.offline" | "offline.records">, state: d.kind === "robot" ? stateForViewer(getDeviceState(d.id), actor) : null })),
     200,
   );
 });
@@ -107,7 +108,7 @@ const listRobotsRoute = createRoute({
 devicesRoutes.openapi(listRobotsRoute, (c) => {
   const robots = listDevicesByKind("robot");
   return c.json(
-    robots.map((d) => ({ id: d.id, kind: d.kind, name: d.name, area: d.area, lastSeenAt: d.lastSeenAt, createdAt: d.createdAt, capabilities: d.capabilities, offlineScope: d.offlineScope as Array<"media.offline" | "offline.records">, state: stateForViewer(getDeviceState(d.id), c.get("person")) })),
+    robots.map((d) => ({ id: d.id, kind: d.kind, name: d.name, area: d.area, lastSeenAt: d.lastSeenAt, createdAt: d.createdAt, ...(getRobotSocketAddress(d.id) ? { ipAddress: getRobotSocketAddress(d.id)! } : {}), capabilities: d.capabilities, offlineScope: d.offlineScope as Array<"media.offline" | "offline.records">, state: stateForViewer(getDeviceState(d.id), c.get("person")) })),
     200,
   );
 });
@@ -127,8 +128,35 @@ const updateMyStateRoute = createRoute({
 devicesRoutes.openapi(updateMyStateRoute, (c) => {
   const device = resolveRequestDevice(c);
   if (!device) return c.json({ error: "Not signed in" }, 401);
+  recordRobotSocketAddress(c, device.id);
   upsertDeviceState(device.id, c.req.valid("json"));
   return c.body(null, 204);
+});
+
+const PatchDeviceSchema = z.object({
+  name: z.string().trim().min(1, "A name is 1 to 60 characters.").max(60, "A name is 1 to 60 characters.").optional(),
+  area: z.string().trim().min(1, "An area is 1 to 60 characters.").max(60, "An area is 1 to 60 characters.").nullable().optional(),
+}).refine((body) => body.name !== undefined || body.area !== undefined, { message: "Provide a name or area." });
+const patchDeviceRoute = createRoute({
+  method: "patch",
+  path: "/{id}",
+  tags: ["Devices"],
+  summary: "Update a paired device's name or area",
+  middleware: [requireRole("owner", "admin")] as const,
+  request: { params: idParamSchema("id", "device-a1b2c3"), body: { content: { "application/json": { schema: PatchDeviceSchema } } } },
+  responses: {
+    200: { content: { "application/json": { schema: DeviceSchema } }, description: "Updated device." },
+    ...errorResponses({ 400: "Invalid name or area", 404: "No such device" }),
+  },
+});
+devicesRoutes.openapi(patchDeviceRoute, (c) => {
+  const { id } = c.req.valid("param");
+  const raw = c.req.valid("json");
+  const existing = getDeviceById(id);
+  if (!existing) return c.json({ error: "No such device" }, 404);
+  const updated = updateDevice(id, raw);
+  if (!updated) return c.json({ error: "No such device" }, 404);
+  return c.json({ id: updated.id, kind: updated.kind, name: updated.name, area: updated.area, lastSeenAt: updated.lastSeenAt, createdAt: updated.createdAt, capabilities: updated.capabilities, offlineScope: updated.offlineScope as Array<"media.offline" | "offline.records">, state: updated.kind === "robot" ? stateForViewer(getDeviceState(id), c.get("person")) : null }, 200);
 });
 
 const HubEndpointsSchema = z.array(z.object({
@@ -147,6 +175,8 @@ const hubEndpointsRoute = createRoute({
   },
 });
 devicesRoutes.openapi(hubEndpointsRoute, async (c) => {
+  const device = resolveRequestDevice(c);
+  if (device) recordRobotSocketAddress(c, device.id);
   const includeOverlay = getHouseholdSettingValue("robot.offlan.tailnet") === true;
   const instanceId = getHubInstanceId();
   const endpoints = await listHubEndpoints();
@@ -403,6 +433,7 @@ devicesRoutes.openapi(deleteRoute, (c) => {
   const actor = c.get("person");
   const { id } = c.req.valid("param");
   if (!deleteDevice(id, actor.id)) return c.json({ error: "No such device" }, 404);
+  forgetRobotSocketAddress(id);
   closeDeviceCommandChannel(id);
   return c.json({ success: true as const }, 200);
 });

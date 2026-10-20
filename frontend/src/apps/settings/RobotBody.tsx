@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Badge } from "@maipai/ui/src/ui/badge";
 import { Button } from "@maipai/ui/src/ui/button";
 import { CardAction, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@maipai/ui/src/dashboard/components/ui/card";
@@ -7,6 +7,13 @@ import { Image } from "@maipai/ui/src/elements/image";
 import { ErrorState } from "@maipai/ui/src/elements/error-state";
 import { ApiError, type DeviceInfo, type RobotDeviceState } from "@/lib/api";
 import { robotCapabilityLabel } from "@/apps/settings/capabilityLabels";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@maipai/ui/src/ui/dialog";
+import { Input } from "@maipai/ui/src/ui/input";
+import { Label } from "@maipai/ui/src/dashboard/components/ui/label";
+import { SettingsRenderer } from "@/shell/pages/settings/SettingsRenderer";
+import areasFile from "@maipai/spec/settings/areas.json";
+import { api, isOwnerOrAdminRole } from "@/lib/api";
+import type { Role } from "@maipai/ui/src/settings/settingsAudience";
 
 const ACTIVITY_LABELS: Record<RobotDeviceState["activity"], string> = {
   starting: "Starting up",
@@ -74,8 +81,10 @@ export function RobotBody({
   onStartLiveView,
   onStopLiveView,
   onAnswerMotorReboot,
+  viewerRole = "adult",
 }: {
   device: DeviceInfo;
+  viewerRole?: Role;
   onRemove: () => void;
   confirmingRemove: boolean;
   onConfirmRemove: () => void;
@@ -87,6 +96,24 @@ export function RobotBody({
   onAnswerMotorReboot: (answer: "yes" | "no") => Promise<void>;
 }) {
   const state = device.state ?? null;
+  const admin = isOwnerOrAdminRole(viewerRole);
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [forgetConfirming, setForgetConfirming] = useState(false);
+  const [name, setName] = useState(device.name);
+  const [area, setArea] = useState(device.area ?? "");
+  const [saveBusy, setSaveBusy] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
+  const cards = useMemo(() => ((areasFile as { device_cards?: Array<{ device_kind: string; group: string; scope: "device"; label: string; min_role?: string }> }).device_cards ?? []).filter((card) => card.device_kind === "robot" && card.scope === "device" && (!card.min_role || card.min_role === "admin" || card.min_role === "owner")), []);
+  async function saveIdentity(): Promise<void> {
+    setSaveBusy(true);
+    setSaveError(null);
+    try {
+      await api.updateDevice(device.id, { name, area: area.trim() || null });
+      window.dispatchEvent(new Event("devices-updated"));
+    } catch (error) {
+      setSaveError(error instanceof ApiError ? error.message : "Could not save this robot.");
+    } finally { setSaveBusy(false); }
+  }
   const lastPutDownCount = useRef<number | undefined>(state?.put_down_count);
   const [putDownChanged, setPutDownChanged] = useState(false);
   const [askedMuted, setAskedMuted] = useState<boolean | null>(null);
@@ -202,6 +229,7 @@ export function RobotBody({
             {unreachable ? (
               <Row label="Last heard from">{state.unreachableSince ? whenText(state.unreachableSince) : "Unknown"}</Row>
             ) : null}
+            {admin && device.ipAddress ? <Row label="IP address">{device.ipAddress}</Row> : null}
             <Row label="Microphone">{state.muted ? "Muted" : "On"}</Row>
             <Row label="Tracking">{state.tracking ? "On" : "Off"}</Row>
             {motion === "held" ? <p className="text-sm font-medium">Being carried</p> : null}
@@ -293,13 +321,34 @@ export function RobotBody({
                   </Button>
                 </>
               ) : null}
-              <Button variant="ghost" aria-label={`Remove ${device.name}`} onClick={onRemove}>
-                Remove
-              </Button>
+              {admin ? <Button variant="outline" onClick={() => { setName(device.name); setArea(device.area ?? ""); setSettingsOpen(true); }}>Settings</Button> : null}
+              {/* DEVICES-02: an admin forgets a robot from its Settings dialog. */}
+              {admin ? null : (
+                <Button variant="ghost" aria-label={`Remove ${device.name}`} onClick={onRemove}>
+                  Remove
+                </Button>
+              )}
             </>
           )}
         </div>
       </CardFooter>
+      {admin ? <Dialog open={settingsOpen} onOpenChange={setSettingsOpen}>
+        <DialogContent>
+          <DialogHeader><DialogTitle>{device.name} settings</DialogTitle><DialogDescription>Change this robot's name, area and settings.</DialogDescription></DialogHeader>
+          <div className="flex flex-col gap-3">
+            <Label htmlFor={`robot-name-${device.id}`}>Name</Label>
+            <Input id={`robot-name-${device.id}`} value={name} maxLength={60} onChange={(event) => setName(event.target.value)} />
+            <Label htmlFor={`robot-area-${device.id}`}>Area</Label>
+            <Input id={`robot-area-${device.id}`} value={area} maxLength={60} onChange={(event) => setArea(event.target.value)} />
+            <Button disabled={saveBusy || !name.trim()} onClick={() => void saveIdentity()}>{saveBusy ? "Saving…" : "Save name and area"}</Button>
+            {saveError ? <p role="alert" className="text-sm text-destructive">{saveError}</p> : null}
+          </div>
+          {cards.map((card) => <SettingsRenderer key={`${card.scope}:${card.group}`} scope="device" scopeValue={`device:${device.id}`} only={[card.group]} titleOverrides={{ [card.group]: card.label }} />)}
+          <DialogFooter>
+            {forgetConfirming || confirmingRemove ? <><p className="mr-auto text-base font-medium">Forget {device.name}? It will need to be paired again.</p><Button variant="destructive" onClick={onConfirmRemove} disabled={busy}>{busy ? "Working…" : "Yes, forget it"}</Button><Button variant="ghost" onClick={() => { setForgetConfirming(false); onCancelRemove(); }}>Keep it</Button></> : <Button variant="destructive" onClick={() => { setForgetConfirming(true); onRemove(); }}>Forget this robot</Button>}
+          </DialogFooter>
+        </DialogContent>
+      </Dialog> : null}
     </>
   );
 }

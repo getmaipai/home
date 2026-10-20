@@ -11,8 +11,28 @@ import { getDeviceById, type Device } from "@/lib/devices";
 import { hashSessionToken } from "@/lib/session";
 import { speakerAgeBand } from "@/lib/ageBand";
 import type { AppEnv, PersonRow } from "@/types";
+import { getConnInfo } from "hono/bun";
 
 export const ROBOT_STATE_STALE_MS = 45_000;
+const robotSocketAddresses = new Map<string, string>();
+
+/** Capture only the transport peer on a request authenticated as this robot. */
+export function recordRobotSocketAddress(c: Context<AppEnv>, deviceId: string): void {
+  try {
+    const address = getConnInfo(c).remote.address;
+    if (address) robotSocketAddresses.set(deviceId, address);
+  } catch {
+    // Some test and non-Bun contexts do not expose connection metadata.
+  }
+}
+
+export function getRobotSocketAddress(deviceId: string): string | null {
+  return robotSocketAddresses.get(deviceId) ?? null;
+}
+
+export function forgetRobotSocketAddress(deviceId: string): void {
+  robotSocketAddresses.delete(deviceId);
+}
 
 type DeviceStateRow = typeof deviceStates.$inferSelect;
 

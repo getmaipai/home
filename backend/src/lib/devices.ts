@@ -91,6 +91,17 @@ export function getDeviceById(id: string): Device | null {
   return row ? toDevice(row) : null;
 }
 
+/** Update only the admin-editable display fields; undefined leaves a field unchanged. */
+export function updateDevice(id: string, input: { name?: string; area?: string | null }): Device | null {
+  const current = getDeviceById(id);
+  if (!current) return null;
+  const changes: Partial<typeof devices.$inferInsert> = { updatedAt: new Date().toISOString(), hlc: nextHlc() };
+  if (input.name !== undefined) changes.name = input.name;
+  if (input.area !== undefined) changes.area = input.area;
+  db.update(devices).set(changes).where(eq(devices.id, id)).run();
+  return getDeviceById(id);
+}
+
 /** Every device of one kind, household-wide - unlike listDevicesForPerson,
  * not scoped to whoever paired it. ROBOT-DEVICE-01's password-rotation UI
  * needs this: Quick Connect mints a robot's device under whichever admin

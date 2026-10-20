@@ -27090,6 +27090,9 @@
                       "createdAt": {
                         "type": "string"
                       },
+                      "ipAddress": {
+                        "type": "string"
+                      },
                       "capabilities": {
                         "type": "array",
                         "items": {
@@ -27327,6 +27330,9 @@
                         "nullable": true
                       },
                       "createdAt": {
+                        "type": "string"
+                      },
+                      "ipAddress": {
                         "type": "string"
                       },
                       "capabilities": {
@@ -27827,6 +27833,348 @@
           },
           "403": {
             "description": "Signed in, but not a robot device",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/devices/{id}": {
+      "patch": {
+        "tags": [
+          "Devices"
+        ],
+        "summary": "Update a paired device's name or area",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "device-a1b2c3"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 60
+                  },
+                  "area": {
+                    "type": "string",
+                    "nullable": true,
+                    "minLength": 1,
+                    "maxLength": 60
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Updated device.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    },
+                    "kind": {
+                      "type": "string",
+                      "enum": [
+                        "robot",
+                        "pod",
+                        "tv",
+                        "phone",
+                        "desktop",
+                        "browser"
+                      ]
+                    },
+                    "name": {
+                      "type": "string"
+                    },
+                    "area": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "lastSeenAt": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "createdAt": {
+                      "type": "string"
+                    },
+                    "ipAddress": {
+                      "type": "string"
+                    },
+                    "capabilities": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "offlineScope": {
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "enum": [
+                          "media.offline",
+                          "offline.records"
+                        ]
+                      }
+                    },
+                    "state": {
+                      "type": "object",
+                      "nullable": true,
+                      "properties": {
+                        "activity": {
+                          "type": "string",
+                          "enum": [
+                            "starting",
+                            "idle",
+                            "listening",
+                            "thinking",
+                            "speaking",
+                            "reconnecting",
+                            "sleeping"
+                          ],
+                          "description": "The robot's current interaction phase, so the hub can show an accurate Devices-page card, including the distinct startup state. reconnecting means the robot lost the hub link and is trying to restore it. sleeping means the robot is deliberately idle, not unreachable. A consumer that meets an activity value it does not know treats it as unknown, not as an error."
+                        },
+                        "muted": {
+                          "type": "boolean"
+                        },
+                        "tracking": {
+                          "type": "boolean"
+                        },
+                        "on_battery": {
+                          "type": "boolean",
+                          "nullable": true
+                        },
+                        "battery_level": {
+                          "type": "number",
+                          "nullable": true
+                        },
+                        "daemon_version": {
+                          "type": "string",
+                          "nullable": true
+                        },
+                        "app_version": {
+                          "type": "string",
+                          "nullable": true
+                        },
+                        "motion": {
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "enum": [
+                                "resting"
+                              ]
+                            },
+                            {
+                              "type": "string",
+                              "enum": [
+                                "held"
+                              ]
+                            },
+                            {
+                              "type": "object",
+                              "nullable": true,
+                              "enum": [
+                                null
+                              ]
+                            },
+                            {
+                              "nullable": true
+                            }
+                          ],
+                          "description": "Whether the body is resting on a surface or being held, so the hub can show when someone is carrying the robot. Null means the body cannot tell; omission means the producer does not yet report this field. A consumer that meets a value it does not know treats it as unknown, not as an error."
+                        },
+                        "put_down_count": {
+                          "type": "integer",
+                          "minimum": 0,
+                          "description": "How many times the robot has been put down since it started, a non-negative running count the hub can compare between frames. Omission means the producer does not yet report this field."
+                        },
+                        "motors_latched": {
+                          "type": "array",
+                          "items": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "description": "Names of the motors the robot's motor gate has latched off after a failed recovery, so the hub can show which parts are down. An empty list means none are latched. Omission means the producer does not yet report this field."
+                        },
+                        "motors_stuck": {
+                          "type": "boolean",
+                          "description": "Whether the robot's stuck-servo recovery ladder is currently running (any stage other than healthy), so the card can say the body is working on a motor problem. Omission means the producer does not yet report this field."
+                        },
+                        "motors_reboot_offer": {
+                          "type": "array",
+                          "items": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "description": "Names of the latched motors for which the robot asks the hub to offer a reboot to an adult (a latched servo error that cycling the motor mode did not clear). Always a subset of motors_latched. An empty list means no offer is pending; omission means the producer does not yet report this field. The hub shows one card offer and, on an adult's yes, sends a motor_reboot command naming these motors; the robot never reboots a motor on its own while a person may be touching the head."
+                        },
+                        "thermal": {
+                          "type": "object",
+                          "properties": {
+                            "level": {
+                              "type": "string",
+                              "enum": [
+                                "nominal",
+                                "vision_slowed",
+                                "gestures_suspended",
+                                "idle_still"
+                              ],
+                              "description": "The thermal governor's current step: nominal, vision slowed, gestures suspended, then idle and still. A consumer that meets a level it does not know treats it as unknown, not as an error."
+                            },
+                            "temp_c": {
+                              "anyOf": [
+                                {
+                                  "type": "number",
+                                  "description": "The last measured body temperature in degrees Celsius. Null means no reading is available."
+                                },
+                                {
+                                  "nullable": true,
+                                  "description": "The last measured body temperature in degrees Celsius. Null means no reading is available."
+                                },
+                                {
+                                  "nullable": true
+                                }
+                              ],
+                              "description": "The last measured body temperature in degrees Celsius. Null means no reading is available."
+                            },
+                            "vision_hz": {
+                              "type": "number",
+                              "minimum": 0,
+                              "description": "The camera processing rate the governor currently allows, in frames per second."
+                            },
+                            "fault": {
+                              "type": "boolean",
+                              "description": "Whether the temperature sensor could not be read, so the level is a best guess."
+                            }
+                          },
+                          "required": [
+                            "level",
+                            "temp_c",
+                            "vision_hz",
+                            "fault"
+                          ],
+                          "additionalProperties": false,
+                          "description": "The robot's thermal governor state, so the hub can say why the robot has slowed down. Omission means the producer does not report thermal state (no monitor wired)."
+                        },
+                        "reachable": {
+                          "type": "boolean"
+                        },
+                        "unreachableSince": {
+                          "type": "string",
+                          "nullable": true
+                        }
+                      },
+                      "required": [
+                        "activity",
+                        "muted",
+                        "tracking",
+                        "on_battery",
+                        "battery_level",
+                        "daemon_version",
+                        "app_version",
+                        "reachable",
+                        "unreachableSince"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "kind",
+                    "name",
+                    "area",
+                    "lastSeenAt",
+                    "createdAt",
+                    "capabilities",
+                    "offlineScope",
+                    "state"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid name or area",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such device",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Devices"
+        ],
+        "summary": "Revoke a device - deletes it and every token pointing at it",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "device-a1b2c3"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Revoked.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    }
+                  },
+                  "required": [
+                    "success"
+                  ]
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such device (or it isn't mine)",
             "content": {
               "application/json": {
                 "schema": {
@@ -28587,58 +28935,6 @@
           },
           "404": {
             "description": "No open view for this robot",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/devices/{id}": {
-      "delete": {
-        "tags": [
-          "Devices"
-        ],
-        "summary": "Revoke a device - deletes it and every token pointing at it",
-        "parameters": [
-          {
-            "schema": {
-              "type": "string",
-              "example": "device-a1b2c3"
-            },
-            "required": true,
-            "name": "id",
-            "in": "path"
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Revoked.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "success": {
-                      "type": "boolean",
-                      "enum": [
-                        true
-                      ]
-                    }
-                  },
-                  "required": [
-                    "success"
-                  ]
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "No such device (or it isn't mine)",
             "content": {
               "application/json": {
                 "schema": {

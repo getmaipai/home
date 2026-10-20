@@ -41,6 +41,55 @@ describe("GET /api/devices", () => {
   });
 });
 
+describe("PATCH /api/devices/:id", () => {
+  test("admin changes a robot name and area, clears the area, and returns 404 for an unknown id", async () => {
+    const { client, personId } = await owner();
+    const { deviceId } = issueDeviceToken(personId, "robot", "Old name");
+    let response = await client.request(`/api/devices/${deviceId}`, { method: "PATCH", body: { name: "  StackChan  ", area: "  Kitchen  " } });
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({ id: deviceId, name: "StackChan", area: "Kitchen" });
+    response = await client.request(`/api/devices/${deviceId}`, { method: "PATCH", body: { area: null } });
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({ area: null });
+    response = await client.request("/api/devices/device-unknown", { method: "PATCH", body: { name: "Robot" } });
+    expect(response.status).toBe(404);
+  });
+
+  test("rejects a non-admin and a 61-character name with the plain validation message", async () => {
+    const { client: admin, personId } = await owner();
+    const { deviceId } = issueDeviceToken(personId, "robot", "Robot");
+    const response = await admin.request(`/api/devices/${deviceId}`, { method: "PATCH", body: { name: "x".repeat(61) } });
+    expect(response.status).toBe(400);
+    expect(await response.json()).toMatchObject({ error: "A name is 1 to 60 characters." });
+    const adult = new TestClient();
+    const adultRes = await admin.post("/api/people", { displayName: "Marlow", role: "adult", secret: "0000" });
+    const adultRow = await adultRes.json() as { id: string };
+    await adult.post("/api/auth/select", { personId: adultRow.id });
+    await adult.post("/api/auth/verify-secret", { personId: adultRow.id, secret: "0000" });
+    expect((await adult.request(`/api/devices/${deviceId}`, { method: "PATCH", body: { name: "Robot" } })).status).toBe(403);
+  });
+});
+
+describe("robot socket address", () => {
+  test("stores the socket peer despite x-forwarded-for and exposes it only to an admin", async () => {
+    const { client: admin, personId } = await owner();
+    const { deviceId, token } = issueDeviceToken(personId, "robot", "Robot");
+    storeRobotCredential(deviceId, "192.0.2.44", "robot", "a-freshly-rotated-password");
+    const robot = new TestClient("192.0.2.44");
+    await robot.post("/api/auth/devices/redeem", { token });
+    expect((await robot.get("/api/devices/me/hub-endpoints", { "x-forwarded-for": "203.0.113.9" })).status).toBe(200);
+    const rows = await admin.get("/api/devices/robots").then((response) => response.json()) as Array<{ id: string; ipAddress?: string }>;
+    expect(rows.find((row) => row.id === deviceId)?.ipAddress).toBe("192.0.2.44");
+    const adultRes = await admin.post("/api/people", { displayName: "Marlow", role: "adult", secret: "0000" });
+    const { id } = await adultRes.json() as { id: string };
+    const adult = new TestClient();
+    await adult.post("/api/auth/select", { personId: id });
+    await adult.post("/api/auth/verify-secret", { personId: id, secret: "0000" });
+    const personal = await adult.get("/api/devices").then((response) => response.json()) as Array<Record<string, unknown>>;
+    expect(personal.every((row) => !("ipAddress" in row))).toBe(true);
+  });
+});
+
 describe("GET /api/devices/me/hub-endpoints", () => {
   test("requires a paired robot device session", async () => {
     const anon = new TestClient();

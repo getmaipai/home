@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Section } from "@maipai/ui/src/primitives/Section";
 import { List } from "@maipai/ui/src/primitives/List";
@@ -13,6 +13,7 @@ import { listKept, removeAllOfflineMedia } from "@/lib/offlineMedia";
 import { Card } from "@maipai/ui/src/dashboard/components/ui/card";
 import { RobotBody } from "@/apps/settings/RobotBody";
 import { api, ApiError, type DeviceInfo, type SessionInfo } from "@/lib/api";
+import type { Roster } from "@/lib/api";
 
 function whenText(iso: string): string {
   return new Date(iso).toLocaleString();
@@ -33,10 +34,15 @@ const DEVICE_KIND_LABELS: Record<DeviceInfo["kind"], string> = {
 // caller's own profile, not a household-wide admin view (devices.ts's
 // own comment) - a personal Profile action, the same PERSON_TREE scope
 // PIN/password change already has, not gated behind AdminGatedContent.
-export function DevicesSection({ search = "" }: { search?: string }) {
+export function DevicesSection({ search = "", person }: { search?: string; person?: Roster }) {
   const matchesSearch = (text: string) => text.toLocaleLowerCase().includes(search.trim().toLocaleLowerCase());
   const queryClient = useQueryClient();
   const devicesQuery = useQuery<DeviceInfo[]>({ queryKey: ["devices"], queryFn: () => api.devices(), refetchInterval: 5000 });
+  useEffect(() => {
+    const refresh = () => void queryClient.invalidateQueries({ queryKey: ["devices"] });
+    window.addEventListener("devices-updated", refresh);
+    return () => window.removeEventListener("devices-updated", refresh);
+  }, [queryClient]);
   const keptQuery = useQuery({ queryKey: ["offline-media"], queryFn: listKept });
   const sessionsQuery = useQuery<SessionInfo[]>({ queryKey: ["sessions"], queryFn: () => api.sessions() });
   const [confirming, setConfirming] = useState<{ kind: "device" | "session"; id: string; label: string } | null>(null);
@@ -102,6 +108,7 @@ export function DevicesSection({ search = "" }: { search?: string }) {
                 <Card key={r.id} data-testid="robot-card">
                 <RobotBody
                   device={r}
+                  viewerRole={person?.role ?? "adult"}
                   busy={busy}
                   onSetMuted={(muted) => api.setRobotMuted(r.id, muted).then(() => undefined)}
                   onAnswerMotorReboot={(answer) => api.answerMotorReboot(r.id, answer).finally(() => void devicesQuery.refetch()).then(() => undefined)}
