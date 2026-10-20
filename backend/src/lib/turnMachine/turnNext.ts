@@ -74,6 +74,7 @@ import type { GateDecision } from "@/lib/gate/types";
 
 export interface RunTurnNextOpts {
   robotName?: string;
+  deviceId?: string;
   conversationId?: string;
   turnId?: string;
   images?: import("@/wire").ChatImagePart[];
@@ -440,9 +441,11 @@ async function beginTurn(actor: PersonRow, surface: Surface, text: string, opts:
     return { ok: false, result: { ok: false, status: 503, code: "engine_unavailable", error: engineUnavailableLine({ spoken: opts.spoken === true, surface, actor }) } };
   }
 
-  const resolved = resolveOrCreateConversation(actor, surface, opts.conversationId, { temporary: opts.temporary });
+  const resolved = resolveOrCreateConversation(actor, surface, opts.conversationId, { temporary: opts.temporary, deviceId: surface === "robot" ? opts.deviceId : null });
   if (!resolved.ok) return { ok: false, result: { ok: false, status: resolved.status as 400 | 503, code: resolved.code ?? "invalid_input", error: resolved.error } };
   const conversation = resolved.value;
+  // The robot device id is session evidence and is carried through the
+  // conversation so its post-turn judge can assign robot-only memories.
   const temporary = isTemporaryConversation(conversation.id) || conversation.mode === "temporary";
 
   // THIN-0N: the speaker's effective band (an unidentified robot speaker
@@ -574,6 +577,7 @@ async function beginTurn(actor: PersonRow, surface: Surface, text: string, opts:
   const state: TurnState = {
     turnId,
     conversationId: conversation.id,
+    ...(surface === "robot" && opts.deviceId ? { deviceId: opts.deviceId } : {}),
     actor,
     surface,
     ...(surface === "robot" && opts.robotName ? { robotName: opts.robotName } : {}),

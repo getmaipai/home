@@ -175,6 +175,7 @@ export interface RememberInput {
    * second time). Only safe when the vector was computed for precisely
    * the text being stored. */
   precomputed_embedding?: { space: string; vector: readonly number[]; preprocess: string };
+  device_id?: string | null;
 }
 
 export function remember(actor: PersonRow, input: RememberInput): MemoryOpResult<MemoryRecord> {
@@ -195,6 +196,7 @@ export function remember(actor: PersonRow, input: RememberInput): MemoryOpResult
     validFrom: input.valid_from,
     validTo: input.valid_to,
     precomputedEmbedding: input.precomputed_embedding,
+    deviceId: input.device_id,
   });
   if (!result.ok) return { ok: false, status: result.status, error: result.error };
   return { ok: true, value: toMemoryRecord(result.record) };
@@ -327,6 +329,12 @@ export interface ListOptions {
   /** See canRead()'s own comment: turn-scoped recall only, never the
    * parental-view routes. */
   selfOnly?: boolean;
+  deviceId?: string | null;
+  /** "all": also list robot-bound records for any robot. Only the Memory
+   * page's list route sets it, so a person sees their own rapport with each
+   * robot and each robot's own facts, still through canRead. Recall and
+   * similarByVector never read it. */
+  robotBound?: "all";
   /** CHAT-08 (a): read a record as of this moment by its own validity
    * bounds (validAt() above). Defaults to "now" (the calling moment)
    * when omitted, which is what a bare list/recall read means today: a
@@ -354,6 +362,7 @@ export function list(actor: PersonRow, opts: ListOptions = {}): MemoryRecord[] {
   if (opts.scope) rows = rows.filter((r) => r.scope === opts.scope);
   if (opts.person) rows = rows.filter((r) => r.person === opts.person);
   rows = rows.filter((r) => validAt(r, asOf));
+  if (opts.robotBound !== "all") rows = rows.filter((r) => r.deviceId === null || (opts.deviceId != null && r.deviceId === opts.deviceId));
   rows = rows.filter((r) => canRead(actor, r, roleOf, opts.selfOnly));
   rows.sort((a, b) => {
     if (a.pinned !== b.pinned) return a.pinned ? -1 : 1;
@@ -431,6 +440,8 @@ export interface RecallOptions extends ListOptions {
    * retracted statement's facts are hidden here and archived by
    * logTurn() once the edit is a real row. */
   excludeSource?: string;
+  /** Robot turns may read shared records and records bound to this robot. */
+  deviceId?: string | null;
    /** The query's own embedding (step 5), pre-computed by the caller:
     * recall() itself stays synchronous (pure scoring given a vector it's
     * handed is CPU work, not I/O), so any caller that can afford the
@@ -617,6 +628,7 @@ export function recall(actor: PersonRow, query: string, opts: RecallOptions = {}
   if (opts.scope) conditions.push(eq(memoryRecords.scope, opts.scope));
   if (opts.person) conditions.push(eq(memoryRecords.person, opts.person));
   let rows = db.select().from(memoryRecords).where(and(...conditions)).all().filter((r) => validAt(r, asOf));
+  rows = rows.filter((r) => r.deviceId === null || (opts.deviceId != null && r.deviceId === opts.deviceId));
   // Never the profile paragraph: the retired turn engine's buildSystemPrompt()
   // already injects it unconditionally via getProfileParagraph(), "not
   // a recall() candidate... never something that competes with other
@@ -822,6 +834,7 @@ export function similarByVector(
   const roleOf = rolesById();
   const asOf = opts.asOf ?? new Date();
   let rows = db.select().from(memoryRecords).where(activeStatusScopePersonWhere(opts)).all().filter((r) => validAt(r, asOf));
+  rows = rows.filter((r) => r.deviceId === null || (opts.deviceId != null && r.deviceId === opts.deviceId));
   // A plain fact ("Rover: a family friend" vs. free-text prose) must
   // never dedupe against an existing entity record - a code review
   // (2026-09-05) found that without this exclusion, a fact whose
@@ -1012,6 +1025,7 @@ export interface SupersedeInput {
    * both, same as a bare remember(). */
   valid_from?: string | null;
   valid_to?: string | null;
+  device_id?: string | null;
 }
 
 export interface SupersedeOptions {
@@ -1080,6 +1094,7 @@ export function supersede(
     embedding_space: old.embeddingSpace,
     valid_from: input.valid_from ?? null,
     valid_to: input.valid_to ?? null,
+    device_id: old.deviceId,
   });
   if (!created.ok) return created;
 

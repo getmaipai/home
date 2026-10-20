@@ -71,7 +71,7 @@ import { listOpenQuestions, openQuestionDeclined, queueOpenQuestion, turnSubject
 import type { ToolExecutionOutcome } from "@/lib/turnContext";
 import type { Entity } from "@maipai/spec/gen/ts/entity.js";
 import { db, sqlite } from "@/db";
-import { conversationTurns, people, memoryRecords } from "@/db/schema";
+import { conversationTurns, conversations, people, memoryRecords } from "@/db/schema";
 import { complete, embed, completeBackground, type LlmMessage } from "@/lib/llm";
 import {
   remember,
@@ -174,7 +174,7 @@ export function categoryToRecordKind(category: Category): "memory" | "entity" {
 // with provenance kept, so the store never holds two identical active
 // rows for the same statement. remember() stores fact.text verbatim,
 // so the comparison is verbatim too. Returns the matching row or null.
-function exactActiveMatch(speaker: PersonRow, fact: ExtractedFact): MemoryRecordRow | null {
+function exactActiveMatch(speaker: PersonRow, fact: ExtractedFact, deviceId: string | null = null): MemoryRecordRow | null {
   const conditions = [
     eq(memoryRecords.status, "active"),
     eq(memoryRecords.scope, fact.scope),
@@ -182,6 +182,7 @@ function exactActiveMatch(speaker: PersonRow, fact: ExtractedFact): MemoryRecord
     eq(memoryRecords.text, fact.text),
   ];
   if (fact.scope === "person") conditions.push(eq(memoryRecords.person, speaker.id));
+  conditions.push(deviceId ? eq(memoryRecords.deviceId, deviceId) : isNull(memoryRecords.deviceId));
   return db.select().from(memoryRecords).where(and(...conditions)).get() ?? null;
 }
 
@@ -210,6 +211,7 @@ const EXTRACTION_SCHEMA = {
             text: { type: "string" },
             category: { type: "string", enum: CATEGORY_VALUES as unknown as string[] },
             scope: { type: "string", enum: ["person", "household"] },
+            robot_memory: { type: "string", enum: ["shared", "rapport", "own"] },
             importance: { type: "number" },
             valid_from: { type: ["string", "null"] },
             valid_to: { type: ["string", "null"] },
@@ -235,7 +237,7 @@ const EXTRACTION_SCHEMA = {
               required: ["type", "name", "stated"],
             },
           },
-          required: ["text", "category", "scope", "importance"],
+          required: ["text", "category", "scope", "importance", "robot_memory"],
         },
       },
     },
@@ -342,6 +344,7 @@ CRITICAL - do NOT extract:
 SUBJECT AND RELATION - when a fact is about a named person, pet, place, organization or thing, set "subject" to that name and kind (the person the fact is about, never ${speakerName} for ${speakerName}'s own preferences; null when the fact is about ${speakerName} alone or about the world). When ${speakerName}'s own sentence states how a named person or thing relates to ${speakerName} ("my coworker ...", "my sister ...", "our dog ..." followed by the name), set "relation" with the vocabulary type read from ${speakerName}'s side (${speakerName} is the "from" end: ${RELATION_PHRASE_GUIDE}), the name, and "stated": true; "stated": false only when you worked the relation out from context rather than ${speakerName} saying it. Null when there is none.
 
 SCOPE - "person": a fact about ${speakerName} specifically. "household": a fact the whole family should know (the wifi password, the dog's name, the trash pickup day) - use household only when a new family member would need to be told it too.
+ROBOT MEMORY - set robot_memory to "shared" for facts about the person or home; "rapport" for a running relationship between ${speakerName} and this robot; "own" for a fact about this robot itself. Use shared on non-robot turns. Keep the scope for shared facts as above; rapport is person scope; own is household scope.
 
 Category options: ${CATEGORY_VALUES.join(", ")}.
 Importance 0 to 1: identity/relationship = 0.9-1.0, strong preference = 0.7-0.8, project/goal = 0.5-0.6, minor fact = 0.3-0.4.
@@ -362,6 +365,7 @@ export interface ExtractedFact {
   text: string;
   category: Category;
   scope: "person" | "household";
+  robot_memory: "shared" | "rapport" | "own";
   importance: number;
   valid_from: string | null;
   valid_to: string | null;
@@ -416,6 +420,7 @@ function normalizeFact(raw: unknown): ExtractedFact | null {
     valid_to: normalizeDate(r.valid_to),
     subject,
     relation,
+    robot_memory: r.robot_memory === "rapport" || r.robot_memory === "own" ? r.robot_memory : "shared",
   };
 }
 
@@ -1239,6 +1244,10 @@ export async function judgeTurn(turn: ConversationTurnRow): Promise<JudgeTurnRes
     return { ok: true, factsWritten: 0 };
   }
   const speakerName = sanitizeForPrompt(speaker.displayName);
+  const conversation = turn.conversationId
+    ? db.select({ deviceId: conversations.deviceId }).from(conversations).where(eq(conversations.id, turn.conversationId)).get()
+    : undefined;
+  const robotDeviceId = conversation?.deviceId ?? null;
   const extraction = await extractFacts(speakerName, turn);
   if (extraction.facts === null) {
     // A remote link loss is transport state, not bad model output. Keep the
@@ -1301,6 +1310,10 @@ export async function judgeTurn(turn: ConversationTurnRow): Promise<JudgeTurnRes
   // than just a rendered summary.
   const writtenIds: string[] = [];
   for (const fact of shaped) {
+    const robotBound = robotDeviceId !== null && fact.robot_memory !== "shared";
+    if (robotBound) {
+      fact.scope = fact.robot_memory === "rapport" ? "person" : "household";
+    }
     const notAName = subjectNotAName(speaker, fact);
     if (notAName) {
       console.log(`[memoryJudge] turn ${turn.id}: dropped a fact whose subject "${notAName.toLowerCase()}" is a pronoun or a relation word, not a name`);
@@ -1336,7 +1349,7 @@ export async function judgeTurn(turn: ConversationTurnRow): Promise<JudgeTurnRes
     // bump is not a content change, the same rule bumpMatchUsage()
     // follows). The re-assertion is counted on the turn's drop line
     // beside MEM-06's own reasons.
-    const reassert = exactActiveMatch(speaker, fact);
+    const reassert = exactActiveMatch(speaker, fact, robotBound ? robotDeviceId : null);
     if (reassert) {
       if (fact.category === "state") {
         const newValidTo =
@@ -1375,7 +1388,7 @@ export async function judgeTurn(turn: ConversationTurnRow): Promise<JudgeTurnRes
       ? similarByVector(
           speaker,
           vector,
-          fact.scope === "person" ? { scope: "person", person: speaker.id } : { scope: "household" },
+          fact.scope === "person" ? { scope: "person", person: speaker.id, deviceId: robotBound ? robotDeviceId : null } : { scope: "household", deviceId: robotBound ? robotDeviceId : null },
           categoryToRecordKind(fact.category),
         )
       : [];
@@ -1433,6 +1446,7 @@ export async function judgeTurn(turn: ConversationTurnRow): Promise<JudgeTurnRes
           text: decision.mergedText ?? fact.text,
           importance: fact.importance,
           source: turn.id,
+          device_id: robotBound ? robotDeviceId : null,
           valid_from: fact.valid_from,
           valid_to: fact.valid_to,
           subject_id: subject?.id,
@@ -1477,6 +1491,7 @@ export async function judgeTurn(turn: ConversationTurnRow): Promise<JudgeTurnRes
         category: fact.category,
         tier: categoryToTier(fact.category),
         scope: fact.scope,
+        device_id: robotBound ? robotDeviceId : null,
         person: fact.scope === "person" ? speaker.id : undefined,
         source: turn.id,
         importance: fact.importance,

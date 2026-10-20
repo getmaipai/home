@@ -16,6 +16,7 @@ export function toMemoryRecord(row: MemoryRecordRow): MemoryRecord {
     status: row.status,
     scope: row.scope,
     person: row.person,
+    device_id: row.deviceId ?? null,
     subject_id: row.subjectId ?? null,
     source: row.source,
     importance: row.importance,

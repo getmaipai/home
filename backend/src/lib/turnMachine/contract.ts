@@ -157,6 +157,7 @@ export interface TurnState {
    * compute it as an elapsed value rather than an absolute one. */
   startedAt: number;
   conversationId: string;
+  deviceId?: string;
   actor: PersonRow;
   surface: Surface;
   /** Current paired robot name; only used to replace the identity line on robot turns. */

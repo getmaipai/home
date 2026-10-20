@@ -1,8 +1,8 @@
-import { describe, test, mock, afterEach } from "bun:test";
+import { describe, test, mock, afterEach, expect } from "bun:test";
 import { cleanup, fireEvent } from "@testing-library/react";
 import { OwnMemories } from "@/apps/memory/PersonMemories";
 import { renderWithQueryClient } from "../../../tests/renderWithQueryClient";
-import type { MemoryRecord } from "@/lib/api";
+import type { MemoryRecordWithDevice as MemoryRecord } from "@/lib/api";
 import { waitForGone } from "../../../tests/waitForGone";
 
 afterEach(cleanup);
@@ -78,6 +78,36 @@ describe("OwnMemories", () => {
       const archiveButton = await findByRole("button", { name: 'Archive "Riff prefers oat milk in coffee"' });
       fireEvent.click(archiveButton);
       await waitForGone(() => queryByText("Riff prefers oat milk in coffee"));
+    } finally {
+      globalThis.fetch = original;
+    }
+  });
+
+  test("a robot's rapport and its own facts sit under \"<robot name>'s memories\", apart from ordinary memories", async () => {
+    const rows = [
+      record({ id: "mem-plain", text: "Pippa prefers oat milk" }),
+      record({ id: "mem-rover-a", text: "Pippa and Rover share the walrus joke", device_id: "device-aaaaaa", device_name: "Rover" }),
+      record({ id: "mem-rover-b", text: "Rover likes teal", scope: "household", person: null, device_id: "device-aaaaaa", device_name: "Rover" }),
+      record({ id: "mem-atlas", text: "Pippa tells Atlas about giraffes", device_id: "device-bbbbbb", device_name: "Atlas" }),
+    ];
+    const original = globalThis.fetch;
+    globalThis.fetch = mock((input: RequestInfo | URL) => {
+      const url = typeof input === "string" ? input : input.toString();
+      if (url.includes("/api/memory")) return Promise.resolve(new Response(JSON.stringify(rows), { status: 200 }));
+      throw new Error(`unstubbed fetch: ${url}`);
+    }) as unknown as typeof fetch;
+    try {
+      const { findByRole, getByText } = renderWithQueryClient(<OwnMemories filterIds={null} actorIsAdult={false} />);
+      const rover = await findByRole("heading", { name: "Rover's memories" });
+      const atlas = await findByRole("heading", { name: "Atlas's memories" });
+      const roverSection = rover.closest("section")!;
+      const atlasSection = atlas.closest("section")!;
+      expect(roverSection.textContent).toContain("Pippa and Rover share the walrus joke");
+      expect(roverSection.textContent).toContain("Rover likes teal");
+      expect(roverSection.textContent).not.toContain("giraffes");
+      expect(atlasSection.textContent).toContain("Pippa tells Atlas about giraffes");
+      expect(roverSection.contains(getByText("Pippa prefers oat milk"))).toBe(false);
+      expect(atlasSection.contains(getByText("Pippa prefers oat milk"))).toBe(false);
     } finally {
       globalThis.fetch = original;
     }

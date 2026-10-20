@@ -1,7 +1,8 @@
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { List } from "@maipai/ui/src/primitives/List";
 import { AsyncState } from "@maipai/ui/src/primitives/AsyncState";
+import { Section } from "@maipai/ui/src/primitives/Section";
 import { Select } from "@maipai/ui/src/primitives/Select";
 import { DestructiveConfirm } from "@maipai/ui/src/primitives/DestructiveConfirm";
 import { BatchBar, SelectModeToggle } from "@maipai/ui/src/primitives/BatchBar";
@@ -9,7 +10,7 @@ import { useSelectMode } from "@/kit/hooks/useSelectMode";
 import { Checkbox } from "@maipai/ui/src/ui/checkbox";
 import { Button } from "@maipai/ui/src/ui/button";
 import { getIcon } from "@maipai/ui/src/icons";
-import { api, ApiError, type MemoryRecord } from "@/lib/api";
+import { api, ApiError, type MemoryRecordWithDevice as MemoryRecord } from "@/lib/api";
 
 const ArchiveIcon = getIcon("archive");
 
@@ -124,6 +125,31 @@ function MemoryRows({
   );
 }
 
+/** ROBOT-MEMORY-01: a person's rapport with a robot and the robot's own
+ * facts sit under "<robot name>'s memories", one kit Section per robot, after
+ * the ordinary memories. The hub only lists what canRead allows, so a group
+ * here is never another person's. */
+function MemoryGroups({ records, children }: { records: MemoryRecord[]; children: (rows: MemoryRecord[]) => ReactNode }) {
+  const plain = records.filter((m) => !m.device_id);
+  const byRobot = new Map<string, { name: string; rows: MemoryRecord[] }>();
+  for (const m of records) {
+    if (!m.device_id) continue;
+    const group = byRobot.get(m.device_id) ?? { name: m.device_name ?? "Robot", rows: [] };
+    group.rows.push(m);
+    byRobot.set(m.device_id, group);
+  }
+  return (
+    <>
+      {plain.length > 0 || byRobot.size === 0 ? children(plain) : null}
+      {[...byRobot.entries()].map(([id, group]) => (
+        <Section key={id} heading={`${group.name}'s memories`}>
+          {children(group.rows)}
+        </Section>
+      ))}
+    </>
+  );
+}
+
 // The per-person view an adult can open for a child (session E step 5),
 // alongside forget/export - both real routes (backend/src/routes/
 // memory.ts's own /export, /forget) with no frontend caller anywhere
@@ -221,15 +247,19 @@ export function OtherPersonMemories({ personId, personName }: { personId: string
         loadingLabel="Loading memories"
       >
         {(records) => (
-          <MemoryRows
-            records={records}
-            selectMode={false}
-            selected={new Set()}
-            onToggle={() => {}}
-            onArchive={handleArchive}
-            archivingId={archivingId}
-            subtitle={(m) => m.category}
-          />
+          <MemoryGroups records={records}>
+            {(rows) => (
+              <MemoryRows
+                records={rows}
+                selectMode={false}
+                selected={new Set()}
+                onToggle={() => {}}
+                onArchive={handleArchive}
+                archivingId={archivingId}
+                subtitle={(m) => m.category}
+              />
+            )}
+          </MemoryGroups>
         )}
       </AsyncState>
     </div>
@@ -387,17 +417,21 @@ export function OwnMemories({ filterIds, actorIsAdult }: { filterIds: Set<string
         loadingLabel="Loading memories"
       >
         {() => (
-          <MemoryRows
-            records={records}
-            selectMode={selectMode.active}
-            selected={selectMode.selected}
-            onToggle={selectMode.toggle}
-            onArchive={handleArchive}
-            archivingId={archivingId}
-            actorIsAdult={actorIsAdult}
-            audienceId={audienceId}
-            onSetAudience={handleSetAudience}
-          />
+          <MemoryGroups records={records}>
+            {(rows) => (
+              <MemoryRows
+                records={rows}
+                selectMode={selectMode.active}
+                selected={selectMode.selected}
+                onToggle={selectMode.toggle}
+                onArchive={handleArchive}
+                archivingId={archivingId}
+                actorIsAdult={actorIsAdult}
+                audienceId={audienceId}
+                onSetAudience={handleSetAudience}
+              />
+            )}
+          </MemoryGroups>
         )}
       </AsyncState>
     </div>

@@ -167,6 +167,10 @@ export function resetDb(): void {
   db.delete(deviceTokens).run();
   db.delete(robotCredentials).run();
   db.delete(deviceStates).run();
+  // ROBOT-MEMORY-01: memory_records.device_id cascades, so the rows that reference a record go first.
+  db.delete(memoryEmbeddings).run();
+  db.delete(pendingEmbeddings).run();
+  db.delete(pendingMemoryWork).run();
   db.delete(devices).run();
   db.delete(passkeyCredentials).run();
   db.delete(totpSecrets).run();

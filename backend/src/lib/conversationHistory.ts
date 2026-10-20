@@ -1058,6 +1058,7 @@ export function toConversationRecord(row: ConversationRow): Conversation {
   return Conversation.parse({
     id: row.id,
     person: row.personId,
+    device_id: row.deviceId ?? null,
     surface: row.surface,
     mode: row.mode,
     companion_id: row.companionId,
@@ -1079,6 +1080,7 @@ function conversationToDbValues(c: Conversation) {
   return {
     id: c.id,
     personId: c.person,
+    deviceId: c.device_id ?? null,
     surface: c.surface,
     mode: c.mode ?? "chat",
     companionId: c.companion_id,
@@ -1100,7 +1102,7 @@ function conversationToDbValues(c: Conversation) {
  * homes it's headed for (a real DB row, or - TEMP-CHAT-01 - a
  * process-memory-only session): one definition of what "new" means,
  * shared rather than kept twice. Pure: never touches the DB. */
-function buildNewConversationRecord(actor: PersonRow, surface: Surface, companionId: string | null | undefined, mode: Conversation["mode"]): Conversation {
+function buildNewConversationRecord(actor: PersonRow, surface: Surface, companionId: string | null | undefined, mode: Conversation["mode"], deviceId: string | null = null): Conversation {
   const now = new Date().toISOString();
   // Set at creation from the person's own persona pick (the contract:
   // "A conversation's companion_id is set at creation from that
@@ -1117,6 +1119,7 @@ function buildNewConversationRecord(actor: PersonRow, surface: Surface, companio
   return Conversation.parse({
     id: newConversationId(),
     person: actor.id,
+    device_id: deviceId,
     surface,
     mode,
     companion_id: resolvedCompanionId,
@@ -1132,8 +1135,8 @@ function buildNewConversationRecord(actor: PersonRow, surface: Surface, companio
   });
 }
 
-function insertNewConversation(actor: PersonRow, surface: Surface, companionId?: string | null, mode: Conversation["mode"] = "chat"): Conversation {
-  const record = buildNewConversationRecord(actor, surface, companionId, mode);
+function insertNewConversation(actor: PersonRow, surface: Surface, companionId?: string | null, mode: Conversation["mode"] = "chat", deviceId: string | null = null): Conversation {
+  const record = buildNewConversationRecord(actor, surface, companionId, mode, deviceId);
   try {
     db.insert(conversations).values(conversationToDbValues(record)).run();
   } catch (err) {
@@ -1164,7 +1167,7 @@ export function resolveOrCreateConversation(
   actor: PersonRow,
   surface: Surface,
   conversationId?: string,
-  opts: { temporary?: boolean } = {},
+  opts: { temporary?: boolean; deviceId?: string | null } = {},
 ): ConversationOpResult<Conversation> {
   if (conversationId) {
     // TEMP-CHAT-01: a given id is authoritative regardless of whether
@@ -1200,7 +1203,7 @@ export function resolveOrCreateConversation(
     //
     // Closed conversations require the explicit resume operation. A stale
     // turn request must never silently undo retention or reactivate a chat.
-    if (!row || row.personId !== actor.id || row.status !== "open" || row.surface !== surface) {
+    if (!row || row.personId !== actor.id || row.status !== "open" || row.surface !== surface || (surface === "robot" && row.deviceId !== (opts.deviceId ?? null))) {
       return { ok: false, status: 400, error: "This chat can no longer take a new message. Start a new chat to keep going." };
     }
     // The persistence-boundary design (docs/plans/privacy-mode-2026-09-24.md,
@@ -1233,13 +1236,13 @@ export function resolveOrCreateConversation(
     .select()
     .from(conversations)
     .where(and(eq(conversations.personId, actor.id), eq(conversations.surface, surface), eq(conversations.status, "open")))
-    .all();
+    .all().filter((r) => surface !== "robot" || r.deviceId === (opts.deviceId ?? null));
   if (openOnes.length > 0) {
     openOnes.sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
     return { ok: true, value: toConversationRecord(openOnes[0]!) };
   }
 
-  return { ok: true, value: insertNewConversation(actor, surface) };
+  return { ok: true, value: insertNewConversation(actor, surface, undefined, "chat", surface === "robot" ? opts.deviceId ?? null : null) };
 }
 
 // ==== Session C step 2: pendingAsk (Tier 2 confirmation / ask continuation) ====

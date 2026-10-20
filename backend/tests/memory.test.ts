@@ -12,6 +12,7 @@ import { CREDENTIAL_SAFE_MESSAGE } from "@/lib/memoryContentPolicy";
 import { nextHlc } from "@/lib/hlc";
 import { compareHlc } from "@/lib/hlc";
 import type { PersonRow, MemoryRecordRow } from "@/types";
+import { issueDeviceToken } from "@/lib/deviceTokens";
 import { injectVector } from "./fixtures/injectVector";
 
 beforeEach(() => {
@@ -72,6 +73,18 @@ describe("POST /api/memory (remember)", () => {
     expect((body as MemoryRecord).status).toBe("active");
     // Step 10: every write sets a real, spec-shaped hlc.
     expect((body as MemoryRecord).hlc).toMatch(/^[0-9]+:[0-9]+:[a-z0-9]{6,}$/);
+  });
+
+  test("robot-bound memories are visible only to their robot, while shared facts remain available", async () => {
+    const { ownerRow } = await ownerAndChildRows();
+    const robotA = issueDeviceToken(ownerRow.id, "robot", "Rover").deviceId;
+    const robotB = issueDeviceToken(ownerRow.id, "robot", "Bruno").deviceId;
+    expect(remember(ownerRow, { text: "Pippa and Rover tell the moon joke", category: "fact", tier: "durable", scope: "person", person: ownerRow.id, device_id: robotA, source: "test", importance: 0.8 }).ok).toBe(true);
+    expect(remember(ownerRow, { text: "Pippa's birthday is in May", category: "fact", tier: "durable", scope: "person", person: ownerRow.id, source: "test", importance: 0.8 }).ok).toBe(true);
+    expect(list(ownerRow, { deviceId: robotA }).map((m) => m.text)).toContain("Pippa and Rover tell the moon joke");
+    expect(list(ownerRow, { deviceId: robotB }).map((m) => m.text)).not.toContain("Pippa and Rover tell the moon joke");
+    expect(list(ownerRow).map((m) => m.text)).not.toContain("Pippa and Rover tell the moon joke");
+    expect(list(ownerRow, { deviceId: robotB }).map((m) => m.text)).toContain("Pippa's birthday is in May");
   });
 
   // Step 10 (session-a-intelligence.md): "every write sets a monotonic

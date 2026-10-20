@@ -23,8 +23,8 @@ import { apiRouter, errorResponses, ErrorSchema } from "@/lib/openapi";
 import { isOwnerOrAdmin } from "@/lib/access";
 import type { AppEnv, PersonRow } from "@/types";
 import { db } from "@/db";
-import { conversationTurns, memoryRecords } from "@/db/schema";
-import { and, eq } from "drizzle-orm";
+import { conversationTurns, memoryRecords, devices } from "@/db/schema";
+import { and, eq, inArray } from "drizzle-orm";
 import { savedFromTurnSource } from "@/lib/conversationHistory";
 
 // apiRouter()'s OpenAPIHono extends Hono, so every plain `.post()`/`.get()`
@@ -196,7 +196,7 @@ const memoryListRoute = createRoute({
   middleware: [requireAuth] as const,
   request: { query: MemoryListQuerySchema },
   responses: {
-    200: { content: { "application/json": { schema: z.array(MemoryRecord) } }, description: "The visible memory records, in the usual list shape." },
+    200: { content: { "application/json": { schema: z.array(MemoryRecord.extend({ device_name: z.string().optional().describe("The robot's current name, present when device_id is set.") })) } }, description: "The visible memory records, in the usual list shape; robot-bound ones carry device_id and device_name." },
     400: { content: { "application/json": { schema: ErrorSchema } }, description: "as_of must be an ISO date-time" },
     401: { content: { "application/json": { schema: ErrorSchema } }, description: "Not signed in" },
   },
@@ -216,7 +216,10 @@ memoryRoutes.openapi(memoryListRoute, (c): ReturnType<typeof memoryListRoute ext
     asOf = new Date(parsed);
   }
   if (asOf !== undefined && include_superseded === "true") opts.includeSuperseded = true;
-  return c.json(list(actor, { ...opts, asOf })) as any;
+  const records = list(actor, { ...opts, asOf, robotBound: "all" });
+  const robotIds = [...new Set(records.flatMap((r) => r.device_id ? [r.device_id] : []))];
+  const names = new Map(db.select({ id: devices.id, name: devices.name }).from(devices).where(robotIds.length ? inArray(devices.id, robotIds) : eq(devices.id, "")).all().map((d) => [d.id, d.name]));
+  return c.json(records.map((r) => ({ ...r, ...(r.device_id ? { device_name: names.get(r.device_id) ?? "Robot" } : {}) }))) as any;
 });
 
 // POST, not GET: recall has a real side effect (it bumps uses/

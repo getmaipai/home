@@ -199,7 +199,8 @@ export const memoryRecords = sqliteTable("memory_records", {
   // recall/list/similarByVector query); this column exists specifically
   // for exportPerson() to skip tombstones without a second status value.
   deletedAt: text("deleted_at"),
-}, (table) => [index("memory_records_status_scope_person_idx").on(table.status, table.scope, table.person)]);
+  deviceId: text("device_id").references(() => devices.id, { onDelete: "cascade" }),
+}, (table) => [index("memory_records_status_scope_person_idx").on(table.status, table.scope, table.person), index("memory_records_device_id_idx").on(table.deviceId)]);
 // PERF-4 (code review, 2026-09-06): recall() and similarByVector() both
 // filter on status (always) plus scope/person (often) before ever
 // touching a vector - without this, every recall was a full table scan
@@ -433,6 +434,7 @@ export const conversations = sqliteTable(
     // title (decided once, not retried). null = still open to a model title.
     titleSource: text("title_source"),
     settings: text("settings"),
+    deviceId: text("device_id").references(() => devices.id, { onDelete: "set null" }),
     status: text("status").notNull().default("open"), // open|closed|deleted
     summary: text("summary"),
     summaryThroughTurn: text("summary_through_turn"),
@@ -460,6 +462,7 @@ export const conversations = sqliteTable(
   (table) => [
     index("conversations_person_surface_status_idx").on(table.personId, table.surface, table.status),
     index("conversations_mode_idx").on(table.mode),
+    index("conversations_device_id_idx").on(table.deviceId),
   ],
 );
 

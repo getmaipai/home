@@ -86,6 +86,7 @@ export interface ContextInput {
 
 export interface ContextOutput {
   conversationId: string;
+  deviceId?: string;
   temporary: boolean;
   items: ContextItem[];
   reasoning: TurnState["reasoning"];
@@ -139,7 +140,7 @@ export function datesText(input: { now: Date; locale: string; modelCutoff: strin
 let windowItemSeq = 0;
 
 export const contextNode: Node<ContextInput, ContextOutput> = async (state, input) => {
-  const resolved = resolveOrCreateConversation(state.actor, state.surface, state.conversationId || undefined, { temporary: input.temporary });
+  const resolved = resolveOrCreateConversation(state.actor, state.surface, state.conversationId || undefined, { temporary: input.temporary, deviceId: state.surface === "robot" ? state.deviceId : null });
   if (!resolved.ok) {
     return { outcome: { ok: false, code: String(resolved.status) }, output: { conversationId: state.conversationId, temporary: false, items: [], reasoning: decideReasoning(state) } };
   }
@@ -203,7 +204,7 @@ export const contextNode: Node<ContextInput, ContextOutput> = async (state, inpu
   // household's own data adds: no memory, profile, episode, clock or roster.
   if (state.bare) {
     pushWindow(await buildConversationWindow(conversation, windowOpts));
-    return { outcome: { ok: true }, output: { conversationId: conversation.id, temporary, items, reasoning: decideReasoning(state) } };
+    return { outcome: { ok: true }, output: { conversationId: conversation.id, ...(conversation.device_id ? { deviceId: conversation.device_id } : {}), temporary, items, reasoning: decideReasoning(state) } };
   }
 
   // THIN-7E (ASK-01, rule 12): the names in the utterance, resolved before the model runs
@@ -262,6 +263,7 @@ export const contextNode: Node<ContextInput, ContextOutput> = async (state, inpu
       queryVector,
       withholdSensitive,
       anonymous,
+      deviceId: state.deviceId ?? null,
       // #88's own excludeSource (THIN-7C): an edited turn's own resend never
       // recalls what the replaced turn put in memory.
       excludeSource: state.supersedes,
@@ -526,7 +528,7 @@ export const contextNode: Node<ContextInput, ContextOutput> = async (state, inpu
     minorSearchGate(state, temporary),
   );
 
-  return { outcome: { ok: true }, output: { conversationId: conversation.id, temporary, items, reasoning, disclosureWithheld, searchAssist, subjects: resolvedSubjects.subjects, unknownAsk: resolvedSubjects.unknownAsk, ...(promptLimit ? { promptLimit } : {}), ...(pictureParts.length > 0 ? { pictureParts } : {}) } };
+  return { outcome: { ok: true }, output: { conversationId: conversation.id, ...(conversation.device_id ? { deviceId: conversation.device_id } : {}), temporary, items, reasoning, disclosureWithheld, searchAssist, subjects: resolvedSubjects.subjects, unknownAsk: resolvedSubjects.unknownAsk, ...(promptLimit ? { promptLimit } : {}), ...(pictureParts.length > 0 ? { pictureParts } : {}) } };
 };
 
 /** Applies the node's output onto TurnState, the same small
@@ -535,6 +537,7 @@ export const contextNode: Node<ContextInput, ContextOutput> = async (state, inpu
  * inspect its output without a whole TurnState to mutate. */
 export function applyContext(state: import("../contract").TurnState, output: ContextOutput): void {
   state.conversationId = output.conversationId;
+  state.deviceId = output.deviceId;
   state.temporary = output.temporary;
   state.context = output.items;
   state.reasoning = output.reasoning;

@@ -3845,7 +3845,7 @@
         ],
         "responses": {
           "200": {
-            "description": "The visible memory records, in the usual list shape.",
+            "description": "The visible memory records, in the usual list shape; robot-bound ones carry device_id and device_name.",
             "content": {
               "application/json": {
                 "schema": {
@@ -4296,6 +4296,10 @@
                         ],
                         "default": null,
                         "description": "Set when a person asks to forget this record (session-a-intelligence.md step 10): the row is kept as a tombstone, not hard-deleted, so a later sync cannot resurrect it. text is wiped and embedding_space cleared when this is set; status becomes archived. Distinct from a person's own deleted_at (person.schema.json): this is about ONE memory, not the whole person."
+                      },
+                      "device_name": {
+                        "type": "string",
+                        "description": "The robot's current name, present when device_id is set."
                       }
                     },
                     "required": [
@@ -4315,8 +4319,7 @@
                       "last_used_at",
                       "hlc"
                     ],
-                    "additionalProperties": false,
-                    "description": "The shared shape for Memory, Entity, and Episode (platform plan 3.1 lists them as one row with one field set); record_kind is the discriminator. Embeddings themselves never sync (embedding_space only names the space). See 4.4 for the store's recall and maintenance rules this shape supports."
+                    "additionalProperties": false
                   }
                 }
               }

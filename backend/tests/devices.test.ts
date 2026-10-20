@@ -5,7 +5,7 @@ import { startFakeSshd } from "./fixtures/fakeSshd";
 import { issueDeviceToken } from "@/lib/deviceTokens";
 import { hasRotatedRobotCredential, getRobotCredential, storeRobotCredential } from "@/lib/robotCredentials";
 import { db } from "@/db";
-import { people } from "@/db/schema";
+import { people, memoryRecords, memoryEmbeddings } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import { setHouseholdSettingValue } from "@/lib/settings";
 import { privacyConnections } from "@/lib/privacy";
@@ -222,6 +222,24 @@ describe("PUT /api/devices/me/state", () => {
 });
 
 describe("DELETE /api/devices/:id", () => {
+  test("deletes only memories bound to the forgotten robot", async () => {
+    const { client, personId } = await owner();
+    const a = issueDeviceToken(personId, "robot", "Rover").deviceId;
+    const b = issueDeviceToken(personId, "robot", "Bruno").deviceId;
+    const person = db.select().from(people).where(eq(people.id, personId)).get()!;
+    const { remember } = await import("@/lib/memory");
+    const joke = remember(person, { text: "Rover's private moon joke", category: "fact", tier: "durable", scope: "person", person: personId, device_id: a, source: "test", importance: 0.8 });
+    // An embedding row references the record; Forget must clear it first or the delete fails.
+    if (joke.ok) db.insert(memoryEmbeddings).values({ memoryId: joke.value.id, space: "test", dims: 1, vector: Buffer.from(new Float32Array([1]).buffer), hlc: "1:0:aaaaaa" }).run();
+    remember(person, { text: "Bruno's private moon joke", category: "fact", tier: "durable", scope: "person", person: personId, device_id: b, source: "test", importance: 0.8 });
+    remember(person, { text: "The family celebrates in May", category: "fact", tier: "durable", scope: "household", source: "test", importance: 0.8 });
+    const res = await client.request(`/api/devices/${a}`, { method: "DELETE" });
+    expect(res.status).toBe(200);
+    const rows = db.select().from(memoryRecords).all();
+    expect(rows.some((r) => r.deviceId === a)).toBe(false);
+    expect(rows.some((r) => r.deviceId === b)).toBe(true);
+    expect(rows.some((r) => r.deviceId === null)).toBe(true);
+  });
   test("revokes a device I own", async () => {
     const { client, personId } = await owner();
     const { deviceId } = issueDeviceToken(personId, "phone", "My phone");

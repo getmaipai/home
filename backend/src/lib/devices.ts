@@ -4,9 +4,9 @@
 // device management feature on its own - just the record shape Wave 3's
 // link will pair a robot into, laid now because device tokens and Quick
 // Connect both need somewhere to hang a name/kind/area.
-import { and, eq, ne } from "drizzle-orm";
+import { and, eq, inArray, ne } from "drizzle-orm";
 import { db } from "@/db";
-import { devices, deviceTokens, sessions } from "@/db/schema";
+import { devices, deviceTokens, sessions, memoryRecords, memoryEmbeddings, pendingEmbeddings, pendingMemoryWork } from "@/db/schema";
 import { newDeviceId } from "@/lib/id";
 import { nextHlc } from "@/lib/hlc";
 import { deleteReceivedBackupsForDevice } from "@/lib/receivedBackups";
@@ -169,6 +169,16 @@ export function deleteDevice(id: string, personId: string): boolean {
   // covers that, the same "DB delete alone doesn't propagate fast
   // enough" gap its own doc comment already names for the `enabled` flag.
   db.delete(sessions).where(eq(sessions.deviceId, id)).run();
+  // Robot memories are private to this device. Delete explicitly as well
+  // as relying on the FK cascade so this remains correct for every DB path.
+  // Embedding and pending-work rows reference the record, so they go first.
+  const boundIds = db.select({ id: memoryRecords.id }).from(memoryRecords).where(eq(memoryRecords.deviceId, id)).all().map((r) => r.id);
+  if (boundIds.length > 0) {
+    db.delete(memoryEmbeddings).where(inArray(memoryEmbeddings.memoryId, boundIds)).run();
+    db.delete(pendingEmbeddings).where(inArray(pendingEmbeddings.memoryId, boundIds)).run();
+    db.delete(pendingMemoryWork).where(inArray(pendingMemoryWork.memoryId, boundIds)).run();
+    db.delete(memoryRecords).where(inArray(memoryRecords.id, boundIds)).run();
+  }
   invalidateSessionCacheForPerson(personId);
   // robot_credentials.device_id is deliberately NOT a foreign key (a code
   // review, 2026-09-28): a rotated password needs to survive its device

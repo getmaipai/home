@@ -351,6 +351,7 @@ export interface TurnContext {
   turnId: string;
   conversationId: string;
   actorId: string;
+  deviceId?: string;
   surface: Surface;
   utterance: string;
   /** The conversation window as sent, roles kept: assistant lines are

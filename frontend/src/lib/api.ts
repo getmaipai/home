@@ -291,6 +291,8 @@ export interface DeviceInfo {
   offlineScope?: Array<"media.offline" | "offline.records">;
   state?: RobotDeviceState | null;
 }
+
+export type MemoryRecordWithDevice = MemoryRecord & { device_name?: string };
 // ROBOT-CARD-01: the robot's last reported frame plus the hub's derived
 // reachability, hand-typed to match backend/src/routes/devices.ts's
 // DeviceSchema.state.
@@ -1339,7 +1341,7 @@ export const api = {
   // (assertCanForgetOrExport-adjacent) every other per-person read in
   // this app already relies on server-side, not re-implemented here.
   memories: (personId?: string) =>
-    request<MemoryRecord[]>(`/api/memory${personId ? `?person=${encodeURIComponent(personId)}` : ""}`),
+    request<MemoryRecordWithDevice[]>(`/api/memory${personId ? `?person=${encodeURIComponent(personId)}` : ""}`),
   forgetPersonMemories: (personId: string) =>
     request<{ deleted: number }>("/api/memory/forget", { method: "POST", body: JSON.stringify({ personId }) }),
   // Distinct from forgetPersonMemories above (that erases every record

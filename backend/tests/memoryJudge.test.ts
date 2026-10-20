@@ -1081,7 +1081,7 @@ describe("the judge drops its own prompt's examples, placeholders and credential
   test("the review's cases: a first-person trip resolved to 'his', a wedding said as 'wedding', a confirmation of the assistant's line, all kept", async () => {
     const { rejectPromptEchoes, turnDateFor } = await import("@/lib/memoryJudge");
     const date = turnDateFor(new Date(2026, 8, 13, 12).toISOString());
-    const fact = (text: string) => ({ text, category: "fact" as const, scope: "person" as const, importance: 0.5, valid_from: null, valid_to: null, subject: null, relation: null });
+    const fact = (text: string) => ({ text, category: "fact" as const, scope: "person" as const, robot_memory: "shared" as const, importance: 0.5, valid_from: null, valid_to: null, subject: null, relation: null });
     expect(rejectPromptEchoes([fact(`Sage was in Ohio visiting his parents, ${date}`)], "Sage", date, "we drove out to see my parents in Ohio").kept.length).toBe(1);
     expect(rejectPromptEchoes([fact("Sage is getting married in October 2026")], "Sage", date, "our wedding is in October").kept.length).toBe(1);
     expect(rejectPromptEchoes([fact("Sage dislikes cilantro")], "Sage", date, "yep, that's right\nso you still can't stand cilantro?").kept.length).toBe(1);
@@ -1101,7 +1101,7 @@ describe("the judge drops its own prompt's examples, placeholders and credential
     const stamp = new Date(2026, 8, 13, 12).toISOString();
     const prompt = buildExtractionPrompt("Sage", stamp);
     for (const example of promptExampleTexts("Sage", turnDateFor(stamp))) expect(prompt).toContain(example);
-    const measured = { text: "Sage's blood pressure is usually <120 over 80", category: "fact" as const, scope: "person" as const, importance: 0.5, valid_from: null, valid_to: null, subject: null, relation: null };
+    const measured = { text: "Sage's blood pressure is usually <120 over 80", category: "fact" as const, scope: "person" as const, robot_memory: "shared" as const, importance: 0.5, valid_from: null, valid_to: null, subject: null, relation: null };
     expect(rejectPromptEchoes([measured], "Sage", turnDateFor(stamp), "my blood pressure is usually under 120 over 80").kept.length).toBe(1);
   });
 });
@@ -1110,7 +1110,7 @@ describe("MEM-06: a fact is grounded in the speaker's words", () => {
   test("a fact the speaker did not ground is dropped as ungrounded, in every form", async () => {
     const { rejectUngrounded, turnDateFor } = await import("@/lib/memoryJudge");
     const date = turnDateFor(new Date(2026, 8, 13, 12).toISOString());
-    const fact = (text: string) => ({ text, category: "fact" as const, scope: "person" as const, importance: 0.5, valid_from: null, valid_to: null, subject: null, relation: null });
+    const fact = (text: string) => ({ text, category: "fact" as const, scope: "person" as const, robot_memory: "shared" as const, importance: 0.5, valid_from: null, valid_to: null, subject: null, relation: null });
     expect(rejectUngrounded([fact("Sage was in Ohio visiting his parents")], "Sage", date, "we drove out to see my parents in Ohio").kept.length).toBe(1);
     expect(rejectUngrounded([fact("Sage is getting married in October 2026")], "Sage", date, "we're getting married in October").kept.length).toBe(1);
     // The half threshold decides: one shared content word of five drops the
@@ -1130,7 +1130,7 @@ describe("MEM-06: a fact is grounded in the speaker's words", () => {
   test("a copied turn date grounds its day number only inside that date", async () => {
     const { rejectUngrounded, turnDateFor } = await import("@/lib/memoryJudge");
     const date = turnDateFor(new Date(2026, 9, 1, 12).toISOString());
-    const fact = (text: string) => ({ text, category: "fact" as const, scope: "person" as const, importance: 0.5, valid_from: null, valid_to: null, subject: null, relation: null });
+    const fact = (text: string) => ({ text, category: "fact" as const, scope: "person" as const, robot_memory: "shared" as const, importance: 0.5, valid_from: null, valid_to: null, subject: null, relation: null });
     const userText = "we were in Mexico visiting my wife's family";
     expect(rejectUngrounded([fact(`Marlow was in Mexico visiting his wife's family, ${date}`)], "Marlow", date, userText).kept.length).toBe(1);
     expect(rejectUngrounded([fact(`Marlow was in Mexico visiting his wife's family, ${date}; 2 trips`)], "Marlow", date, userText).dropped.length).toBe(1);
@@ -1141,7 +1141,7 @@ describe("MEM-06 (c): a fact cites the eligible clause it came from", () => {
   test("a fact grounded in an eligible clause is kept with that clause; ineligible, ungrounded, and subject-mismatched facts are dropped", async () => {
     const { citeClause, turnDateFor } = await import("@/lib/memoryJudge");
     const date = turnDateFor(new Date(2026, 8, 13, 12).toISOString());
-    const fact = (text: string, subject: { name: string; kind: "person" } | null = null) => ({ text, category: "fact" as const, scope: "person" as const, importance: 0.5, valid_from: null, valid_to: null, subject, relation: null });
+    const fact = (text: string, subject: { name: string; kind: "person" } | null = null) => ({ text, category: "fact" as const, scope: "person" as const, robot_memory: "shared" as const, importance: 0.5, valid_from: null, valid_to: null, subject, relation: null });
     const userText = "add milk to the list, and Pippa has soccer practice on Tuesdays";
     const signal = {
       primary_act: "inform" as const,
@@ -1192,7 +1192,7 @@ describe("MEM-06: the clause shapes the record", () => {
     const { shapeByClause, turnDateFor } = await import("@/lib/memoryJudge");
     const turnCreatedAt = new Date(2026, 8, 13, 12).toISOString();
     const date = turnDateFor(turnCreatedAt);
-    const fact = (text: string, subject: { name: string; kind: "person" } | null = null, category: "fact" | "state" | "goal" | "event" = "fact", importance = 0.5, valid_to: string | null = null) => ({ text, category, scope: "person" as const, importance, valid_from: null, valid_to, subject, relation: null });
+    const fact = (text: string, subject: { name: string; kind: "person" } | null = null, category: "fact" | "state" | "goal" | "event" = "fact", importance = 0.5, valid_to: string | null = null) => ({ text, category, scope: "person" as const, robot_memory: "shared" as const, importance, valid_from: null, valid_to, subject, relation: null });
     const clause = (partial: Partial<{ act: "inform" | "commissive"; stance: "asserted" | "reported"; subject: { kind: "speaker" } | { kind: "household" } | { kind: "world" }; emotion: "happiness"; emotion_intensity: "none" | "low" | "moderate" | "high" }>) => ({
       range: { start: 0, end: 50 },
       act: partial.act ?? ("inform" as const),
@@ -2270,7 +2270,7 @@ describe("MEM-06: a quoted, hypothetical or joking clause writes nothing", () =>
   test("a fact whose best clause carries a quoted, hypothetical or joking stance is dropped with that reason; an asserted inform clause keeps it", async () => {
     const { citeClause, turnDateFor } = await import("@/lib/memoryJudge");
     const date = turnDateFor(new Date(2026, 8, 13, 12).toISOString());
-    const fact = (text: string, subject: { name: string; kind: "person" } | null = null) => ({ text, category: "fact" as const, scope: "person" as const, importance: 0.5, valid_from: null, valid_to: null, subject, relation: null });
+    const fact = (text: string, subject: { name: string; kind: "person" } | null = null) => ({ text, category: "fact" as const, scope: "person" as const, robot_memory: "shared" as const, importance: 0.5, valid_from: null, valid_to: null, subject, relation: null });
     const clause = (partial: Partial<{ act: "inform" | "commissive"; stance: "asserted" | "reported" | "quoted" | "hypothetical" | "joke" | "unknown"; subject: { kind: "speaker" } | { kind: "household" } }>) => ({
       range: { start: 0, end: 100 },
       act: partial.act ?? ("inform" as const),
@@ -2385,7 +2385,7 @@ describe("CUR-01: an exact re-assertion is not a second record", () => {
 });
 
 describe("MEMORY-FIX-01: judge grounding and prompt fixes", () => {
-  const fact = (text: string) => ({ text, category: "fact" as const, scope: "person" as const, importance: 0.5, valid_from: null, valid_to: null, subject: null, relation: null });
+  const fact = (text: string) => ({ text, category: "fact" as const, scope: "person" as const, robot_memory: "shared" as const, importance: 0.5, valid_from: null, valid_to: null, subject: null, relation: null });
   async function ground(text: string, said: string) {
     const { rejectUngrounded, turnDateFor } = await import("@/lib/memoryJudge");
     const date = turnDateFor(new Date(2026, 9, 11, 12).toISOString());

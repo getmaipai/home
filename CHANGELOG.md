@@ -8,6 +8,7 @@ checklist (`docs/dev.md`). The first release is 0.1.0.
 ## [Unreleased]
 
 ### Added
+- Each robot keeps its own memories with the people it talks to, no other robot or chat reads them, and Forget removes them.
 - Robots get unique names, and each robot answers to the name on its card.
 
 ## [0.2.35] - 2026-10-19
