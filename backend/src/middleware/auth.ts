@@ -248,6 +248,8 @@ function authenticate(c: Context<AppEnv>): PersonRow | Response {
   if (device?.kind === "robot" && !robotSessionMayReach(c.req.method, c.req.path)) {
     return c.json({ error: "Forbidden" }, 403);
   }
+  // ROBOT-VOICE-01: a paired device's session says which device speaks (routes/tts.ts picks that robot's voice).
+  if (deviceId) c.set("deviceId", deviceId);
   return person;
 }
 

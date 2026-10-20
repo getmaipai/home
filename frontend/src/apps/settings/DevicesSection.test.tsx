@@ -10,10 +10,12 @@ import { MemoryRouter } from "react-router-dom";
 function settingsFetch(extra: boolean, patchCalls: unknown[] = [], patchError?: string) {
   const original = globalThis.fetch;
   const baseRegistry = ["robot.barge_in.open_mic", "robot.camera.watch_level", "robot.follow_up.seconds", "robot.gestures.enabled", "robot.idle.level", "robot.initiative.allowed_here", "robot.face.color", "robot.night.mode"].map((key) => ({ key, scope: "device", selector: key.endsWith("seconds") ? "number" : key.endsWith("level") || key === "robot.face.color" ? "select" : "boolean", default: key.endsWith("seconds") ? 10 : key === "robot.face.color" ? "mint" : key === "robot.night.mode", range: key === "robot.face.color" ? { options: ["mint", "sky", "peach", "lavender", "lemon", "rose", "cloud"] } : undefined, label: key === "robot.face.color" ? "Face color" : key === "robot.night.mode" ? "Night mode" : key, help: "Registry-provided help.", level: "basic", secret: false, lives_in: "robot.hello", honoured_by: ["home"] }));
+  baseRegistry.push({ key: "robot.voice.id", scope: "device", selector: "select", range: { options_from: "voices.tts" }, default: "default", label: "Voice", help: "Robot voice.", level: "basic", secret: false, lives_in: "robot.hello", honoured_by: ["home"] } as never);
   const registry = [...baseRegistry, ...(extra ? [{ ...baseRegistry[0]!, key: "robot.hello.future", label: "robot.hello.future" }] : [])];
   globalThis.fetch = mock((input: RequestInfo | URL, init?: RequestInit) => {
     const url = String(input);
     if (url.endsWith("/api/settings/registry")) return Promise.resolve(Response.json(registry));
+    if (url.endsWith("/api/voice/voices")) return Promise.resolve(Response.json({ voices: [{ id: "pocket-tts-voice-alba", name: "Alba", description: "", language: "en", country: "", gender: "", source: "preset", engine: "pocket", onDisk: true, licence: null, revision: "test" }, { id: "community-test", name: "Community", description: "", language: "en", country: "", gender: "", source: "community", engine: "pocket", onDisk: true, licence: null, revision: "test" }] }));
     if (url.includes("/api/settings?scope=device%3Arobot-1")) return Promise.resolve(Response.json(registry.map((row) => ({ key: row.key, value: row.default, source: "default", label: row.label, help: row.help, level: row.level, secret: false }))));
     if (url.endsWith("/api/settings") && init?.method === "PUT") {
       patchCalls.push(JSON.parse(String(init.body)));
@@ -127,6 +129,18 @@ describe("DevicesSection", () => {
       cleanup();
       const adult = renderWithQueryClient(<Card><RobotBody device={device({ id: "robot-1", kind: "robot", name: "Riff" })} viewerRole="adult" onRemove={() => {}} confirmingRemove={false} onConfirmRemove={() => {}} onCancelRemove={() => {}} busy={false} onSetMuted={async () => {}} onStartLiveView={async () => ({ view_id: "v", stream: "" })} onStopLiveView={async () => {}} onAnswerMotorReboot={async () => {}} /></Card>);
       expect(adult.queryByRole("button", { name: "Settings" })).toBeNull();
+    } finally { restore(); }
+  });
+
+  test("robot Voice row lists mocked voices with Same as its person first", async () => {
+    const restore = settingsFetch(false);
+    try {
+      const view = renderWithQueryClient(<MemoryRouter><Card><RobotBody device={device({ id: "robot-1", kind: "robot", name: "Riff" })} viewerRole="admin" onRemove={() => {}} confirmingRemove={false} onConfirmRemove={() => {}} onCancelRemove={() => {}} busy={false} onSetMuted={async () => {}} onStartLiveView={async () => ({ view_id: "v", stream: "" })} onStopLiveView={async () => {}} onAnswerMotorReboot={async () => {}} /></Card></MemoryRouter>);
+      fireEvent.click(view.getByRole("button", { name: "Settings" }));
+      await view.findByText("Voice");
+      fireEvent.click(view.getByRole("combobox", { name: "Voice" }));
+      const choices = await view.findAllByRole("option");
+      expect(choices.map((choice) => choice.textContent)).toEqual(["Same as its person", "Alba"]);
     } finally { restore(); }
   });
 

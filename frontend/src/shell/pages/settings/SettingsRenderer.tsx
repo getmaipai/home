@@ -30,6 +30,7 @@ interface SettingsRendererProps {
   mergeGroups?: boolean;
   /** Read one narrowly authorized setting when embedding a person control. */
   settingKey?: string;
+  optionsFrom?: Readonly<Record<string, readonly { value: string; label: string }[]>>;
 }
 
 const REGISTRY_QUERY_KEY = ["settings-registry"];
@@ -49,7 +50,7 @@ const REGISTRY_QUERY_KEY = ["settings-registry"];
  * `Section` primitive `SettingsRenderer.tsx` renders with. `honouredBy`
  * is always "home": this repo is Home, the same constant `SettingsPage.
  * tsx`'s own instances already pass. */
-export function SettingsRenderer({ scope, scopeValue, only, includeKeys, includeKeysByGroup, expandAdvanced = false, titleOverrides = {}, plainRows = false, mergeGroups = false, settingKey }: SettingsRendererProps) {
+export function SettingsRenderer({ scope, scopeValue, only, includeKeys, includeKeysByGroup, expandAdvanced = false, titleOverrides = {}, plainRows = false, mergeGroups = false, settingKey, optionsFrom }: SettingsRendererProps) {
   // NOTIFY-SHARE-02: SettingField's own PersonMultiSelect control
   // needs the viewer's own id to drop from its option list -
   // `scopeValue` is already exactly "person:<id>" for a person-scope
@@ -211,8 +212,8 @@ export function SettingsRenderer({ scope, scopeValue, only, includeKeys, include
             <>
               {groups.map((group) => plainRows ? (
                 <div key={group.id} id={`settings-${group.id}`} className="flex flex-col divide-y divide-border">
-                  {group.basic.map((s) => <SettingField key={s.def.key} setting={s} onChange={(v) => handleChange(s.def.key, v)} onReset={() => handleReset(s.def.key)} disabled={pendingKey === s.def.key} selfPersonId={selfPersonId} />)}
-                  {group.advanced.map((s) => <SettingField key={s.def.key} setting={s} onChange={(v) => handleChange(s.def.key, v)} onReset={() => handleReset(s.def.key)} disabled={pendingKey === s.def.key} selfPersonId={selfPersonId} />)}
+                  {group.basic.map((s) => <SettingField key={s.def.key} setting={s} onChange={(v) => handleChange(s.def.key, v)} onReset={() => handleReset(s.def.key)} disabled={pendingKey === s.def.key} selfPersonId={selfPersonId} optionsFrom={optionsFrom} />)}
+                  {group.advanced.map((s) => <SettingField key={s.def.key} setting={s} onChange={(v) => handleChange(s.def.key, v)} onReset={() => handleReset(s.def.key)} disabled={pendingKey === s.def.key} selfPersonId={selfPersonId} optionsFrom={optionsFrom} />)}
                 </div>
               ) : (
                 <Card
@@ -231,7 +232,7 @@ export function SettingsRenderer({ scope, scopeValue, only, includeKeys, include
                   <CardContent>
                     <div className="flex flex-col divide-y divide-border">
                     {group.basic.map((s) => (
-                      <SettingField key={s.def.key} setting={s} onChange={(v) => handleChange(s.def.key, v)} onReset={() => handleReset(s.def.key)} disabled={pendingKey === s.def.key} selfPersonId={selfPersonId} />
+                      <SettingField key={s.def.key} setting={s} onChange={(v) => handleChange(s.def.key, v)} onReset={() => handleReset(s.def.key)} disabled={pendingKey === s.def.key} selfPersonId={selfPersonId} optionsFrom={optionsFrom} />
                     ))}
                     {group.advanced.length > 0 ? (
                       group.foldAdvanced && !expandAdvanced && !advancedOpen[group.id] ? (
@@ -247,7 +248,7 @@ export function SettingsRenderer({ scope, scopeValue, only, includeKeys, include
                       ) : (
                         <div className="flex flex-col divide-y divide-border border-t border-border pt-1">
                           {group.advanced.map((s) => (
-                            <SettingField key={s.def.key} setting={s} onChange={(v) => handleChange(s.def.key, v)} onReset={() => handleReset(s.def.key)} disabled={pendingKey === s.def.key} selfPersonId={selfPersonId} />
+                            <SettingField key={s.def.key} setting={s} onChange={(v) => handleChange(s.def.key, v)} onReset={() => handleReset(s.def.key)} disabled={pendingKey === s.def.key} selfPersonId={selfPersonId} optionsFrom={optionsFrom} />
                           ))}
                         </div>
                       )

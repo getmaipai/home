@@ -11,6 +11,7 @@ import type { StackVoice } from "@/lib/stack/types";
 import { turnAllowsVoiceCues } from "@/routes/turn";
 import { listIssues } from "@/lib/issues";
 import { startStackFixture, IDENTITY_HEADERS, offlineResponse, type StackFixture } from "./stackFixture";
+import { issueDeviceToken } from "@/lib/deviceTokens";
 
 beforeEach(() => {
   __setTtsTagsForTests(null);
@@ -112,6 +113,61 @@ describe("POST /api/tts", () => {
 
       const res = await owner.post("/api/tts", { text: "hi" });
       expect(res.status).toBe(200);
+      expect(receivedVoiceUrls).toEqual(["vera"]);
+    });
+
+    afterEach(() => __setOfferedVoicesForTests(undefined));
+
+    async function pairedRobot(personId: string) {
+      const minted = issueDeviceToken(personId, "robot", "Voice robot", ["speaker", "no_vendor_login"]);
+      const robot = new TestClient();
+      expect((await robot.post("/api/auth/devices/redeem", { token: minted.token })).status).toBe(200);
+      return { robot, deviceId: minted.deviceId };
+    }
+
+    async function setRobotVoice(owner: TestClient, deviceId: string, voice: string) {
+      const listed = ["mira", "community-voice", "vera", "alba"].map((name): StackVoice => ({ id: `pocket-tts-voice-${name}`, name, description: "", language: "en", country: "", gender: "unknown", source: "preset", engine: "pocket", onDisk: true, licence: null, revision: "test" }));
+      fixture.client.voices = async () => listed;
+      __setOfferedVoicesForTests(listed);
+      const result = await owner.put("/api/settings", { scope: `device:${deviceId}`, key: "robot.voice.id", value: voice });
+      expect(result.status).toBe(200);
+    }
+
+    test("a robot's listed device voice is sent to speech synthesis", async () => {
+      const owner = new TestClient();
+      const { person } = (await (await owner.post("/api/auth/setup", { displayName: "Sage", secret: "correcthorse" })).json()) as { person: { id: string } };
+      const { robot, deviceId } = await pairedRobot(person.id);
+      await setRobotVoice(owner, deviceId, "mira");
+      expect((await robot.post("/api/tts", { text: "hi" })).status).toBe(200);
+      expect(receivedVoiceUrls).toEqual(["mira"]);
+    });
+
+    test("robot voice default keeps the person's selected voice", async () => {
+      const owner = new TestClient();
+      const { person } = (await (await owner.post("/api/auth/setup", { displayName: "Sage", secret: "correcthorse" })).json()) as { person: { id: string } };
+      await owner.put("/api/settings", { scope: `person:${person.id}`, key: "tts.voice_id", value: "vera" });
+      const { robot, deviceId } = await pairedRobot(person.id);
+      await setRobotVoice(owner, deviceId, "default");
+      expect((await robot.post("/api/tts", { text: "hi" })).status).toBe(200);
+      expect(receivedVoiceUrls).toEqual(["vera"]);
+    });
+
+    test("a child's robot ignores a non-preset device voice", async () => {
+      const owner = new TestClient();
+      await owner.post("/api/auth/setup", { displayName: "Sage", secret: "correcthorse" });
+      const { id: childId } = (await (await owner.post("/api/people", { displayName: "Bramble", role: "child" })).json()) as { id: string };
+      await owner.put("/api/settings", { scope: `person:${childId}`, key: "tts.voice_id", value: "alba" });
+      const { robot, deviceId } = await pairedRobot(childId);
+      await setRobotVoice(owner, deviceId, "community-voice");
+      expect((await robot.post("/api/tts", { text: "hi" })).status).toBe(200);
+      expect(receivedVoiceUrls).toEqual(["alba"]);
+    });
+
+    test("a person session does not use a robot's voice setting", async () => {
+      const owner = new TestClient();
+      const { person } = (await (await owner.post("/api/auth/setup", { displayName: "Sage", secret: "correcthorse" })).json()) as { person: { id: string } };
+      await owner.put("/api/settings", { scope: `person:${person.id}`, key: "tts.voice_id", value: "vera" });
+      expect((await owner.post("/api/tts", { text: "hi" })).status).toBe(200);
       expect(receivedVoiceUrls).toEqual(["vera"]);
     });
 

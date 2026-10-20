@@ -113,6 +113,17 @@ describe("robot clip bundles", () => {
     expect(bytes.toString()).toContain(clip.text);
   });
 
+  test("robot clips use the robot device voice", async () => {
+    const { owner, personId } = await household();
+    const { deviceId } = await robotFor(personId);
+    fixture.client.voices = async () => [{ id: "pocket-tts-voice-vera", name: "Vera", description: "", language: "en", country: "", gender: "unknown", source: "preset", engine: "pocket", onDisk: true, licence: null, revision: "test" }];
+    const voice = await owner.put("/api/settings", { scope: `device:${deviceId}`, key: "robot.voice.id", value: "vera" });
+    expect(voice.status).toBe(200);
+    await renderClipBundle(deviceId);
+    expect(received.length).toBeGreaterThan(0);
+    expect(received.every((call) => call.voice === "vera")).toBe(true);
+  });
+
   test("changing the voice re-renders every clip and bumps the bundle sha", async () => {
     const { owner, personId } = await household();
     const { robot, deviceId } = await robotFor(personId);

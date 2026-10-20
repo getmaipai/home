@@ -1,11 +1,12 @@
 import { createRoute, z } from "@hono/zod-openapi";
 import { apiRouter, errorResponses } from "@/lib/openapi";
+import { listPlayableVoices, isPlayableVoiceId } from "@/lib/voiceList";
 import { requireAuth, requireRole } from "@/middleware/auth";
 import { db } from "@/db";
 import { people } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import type { PersonRow } from "@/types";
-import { getHouseholdSettingValue, listValues, setValue, resetValue } from "@/lib/settings";
+import { getHouseholdSettingValue, listValues, setValue, resetValue, parseScope, assertCanAccessScope } from "@/lib/settings";
 import { getRegistry } from "@/lib/settingsRegistry";
 import { ensureCodingPiecesFresh } from "@/lib/stackCodingPieces";
 import { isCodingStackKey, pushCodingSettings } from "@/lib/stackCodingSync";
@@ -155,12 +156,19 @@ settingsRoutes.openapi(putRoute, async (c) => {
     const hostsRefusal = validateCustomHosts(body.key, body.value);
     if (hostsRefusal) return c.json({ error: hostsRefusal }, 400);
   }
+  // ROBOT-VOICE-01: authorization decides first; only an allowed writer learns whether a voice is on this hub.
+  const voiceDefinition = getRegistry().find((entry) => entry.key === body.key);
+  const voiceScope = parseScope(body.scope);
+  if (voiceDefinition?.range?.options_from === "voices.tts" && body.value !== voiceDefinition.default && voiceScope?.kind === voiceDefinition.scope && assertCanAccessScope(actor, voiceScope, "write").ok) {
+    const available = await listPlayableVoices();
+    if (typeof body.value !== "string" || !isPlayableVoiceId(available, body.value)) return c.json({ error: "That voice is not on this hub. Choose one from the list." }, 400);
+  }
   // CAP-GATE-01: packages that require what is being turned off are named
   // first; nothing is saved or removed until the person confirms.
   const roleOff = body.scope === "household" && body.value === "off" ? /^engines\.([a-z]+)\.choice$/.exec(body.key)?.[1] : undefined;
   const warning = roleOff ? removalConfirmation(packagesLosingCapability([roleOff])) : null;
   if (warning && body.confirmRemoval !== true) return c.json({ error: warning }, 400);
-  const result = setValue(actor, body.scope, body.key, body.value);
+  const result = await setValue(actor, body.scope, body.key, body.value);
   if (!result.ok) {
     return result.status === 400 ? c.json({ error: result.error }, 400) : c.json({ error: result.error }, 403);
   }

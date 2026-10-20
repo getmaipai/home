@@ -18,6 +18,7 @@ import type { Role } from "@maipai/ui/src/settings/settingsAudience";
 import { robotSelfTestPartsFor, type RobotSelfTestPart } from "@maipai/home-backend/src/wire";
 import type { RobotSelfTestResult } from "@maipai/home-backend/src/wire";
 import { Alert, AlertDescription } from "@maipai/ui/src/ui/alert";
+import { playableVoices, voiceFriendlyName } from "@/lib/voice/voiceBrowserRows";
 
 const ACTIVITY_LABELS: Record<RobotDeviceState["activity"], string> = {
   starting: "Starting up",
@@ -104,6 +105,14 @@ export function RobotBody({
   const featureCapabilities = device.capabilities.filter((capability) => capability !== NO_VENDOR_LOGIN);
   const admin = isOwnerOrAdminRole(viewerRole);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [robotVoices, setRobotVoices] = useState<Awaited<ReturnType<typeof api.stackVoices>>["voices"]>([]);
+  useEffect(() => {
+    if (!settingsOpen) return;
+    let active = true;
+    void api.stackVoices().then((result) => { if (active) setRobotVoices(result.voices); }).catch(() => { if (active) setRobotVoices([]); });
+    return () => { active = false; };
+  }, [settingsOpen]);
+  const robotVoiceOptions = [{ value: "default", label: "Same as its person" }, ...playableVoices(robotVoices).map((voice) => ({ value: voice.id, label: voiceFriendlyName(voice) }))];
   const [forgetConfirming, setForgetConfirming] = useState(false);
   const [name, setName] = useState(device.name);
   const [area, setArea] = useState(device.area ?? "");
@@ -383,7 +392,7 @@ export function RobotBody({
             <Input id={`robot-area-${device.id}`} value={area} maxLength={60} onChange={(event) => setArea(event.target.value)} />
             <Button disabled={saveBusy || !name.trim()} onClick={() => void saveIdentity()}>{saveBusy ? "Saving…" : "Save name and area"}</Button>
           </div>
-          {cards.map((card) => <SettingsRenderer key={`${card.scope}:${card.group}`} scope="device" scopeValue={`device:${device.id}`} only={[card.group]} titleOverrides={{ [card.group]: card.label }} />)}
+          {cards.map((card) => <SettingsRenderer key={`${card.scope}:${card.group}`} scope="device" scopeValue={`device:${device.id}`} only={[card.group]} titleOverrides={{ [card.group]: card.label }} optionsFrom={{ "voices.tts": robotVoiceOptions }} />)}
           <DialogFooter>
             {forgetConfirming || confirmingRemove ? <><p className="mr-auto text-base font-medium">Forget {device.name}? It will need to be paired again.</p><Button variant="destructive" onClick={onConfirmRemove} disabled={busy}>{busy ? "Working…" : "Yes, forget it"}</Button><Button variant="ghost" onClick={() => { setForgetConfirming(false); onCancelRemove(); }}>Keep it</Button></> : <Button variant="destructive" onClick={() => { setForgetConfirming(true); onRemove(); }}>Forget this robot</Button>}
           </DialogFooter>

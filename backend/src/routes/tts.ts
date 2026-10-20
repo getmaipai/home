@@ -1,7 +1,8 @@
 import { createRoute, z } from "@hono/zod-openapi";
 import { requireAuth } from "@/middleware/auth";
 import { synthesizeSpeech } from "@/lib/tts";
-import { getHouseholdSettingValue, getPersonSettingValue } from "@/lib/settings";
+import { getHouseholdSettingValue } from "@/lib/settings";
+import { voiceForSpeech } from "@/lib/voiceForSpeech";
 import { speakerAgeBand } from "@/lib/ageBand";
 import { getTtsTags } from "@/lib/ttsCapabilities";
 import { DEFAULT_HESITATION_LEVEL, HESITATION_LEVELS, planForPerson, type HesitationLevel } from "@/lib/voiceCues";
@@ -30,7 +31,7 @@ const ttsSynthesizeRoute = createRoute({
   tags: ["Voice"],
   summary: "Synthesize speech",
   description:
-    "Returns the signed-in person's text as an audio/wav stream using their own tts.voice_id setting. " +
+    "Returns the signed-in person's text as an audio/wav stream using their own tts.voice_id setting, or the robot's selected voice for a robot device session. " +
     "Pipes the TTS backend's response stream straight through without buffering.",
   middleware: [requireAuth] as const,
   request: {
@@ -57,7 +58,7 @@ ttsRoutes.openapi(ttsSynthesizeRoute, async (c) => {
   const actor = c.get("person");
   const body = c.req.valid("json");
   if (body.turn_id && body.generation !== undefined && isOwnedStaleTurnGeneration(body.turn_id, actor.id, body.generation)) return c.json({ error: "That reply was stopped, so this sentence was not spoken. Ask again to hear a new answer.", code: "turn_cancelled" }, 409);
-  const voiceId = getPersonSettingValue(actor, "tts.voice_id") as string;
+  const voiceId = voiceForSpeech({ actor, deviceId: c.get("deviceId") });
   const startedAt = Date.now();
   // REG-02: the composer adds a spoken cue to a model-worded spoken turn's sentence, never to the written text.
   let spoken = body.text;

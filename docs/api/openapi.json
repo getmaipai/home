@@ -7878,7 +7878,7 @@
           "Voice"
         ],
         "summary": "Synthesize speech",
-        "description": "Returns the signed-in person's text as an audio/wav stream using their own tts.voice_id setting. Pipes the TTS backend's response stream straight through without buffering.",
+        "description": "Returns the signed-in person's text as an audio/wav stream using their own tts.voice_id setting, or the robot's selected voice for a robot device session. Pipes the TTS backend's response stream straight through without buffering.",
         "requestBody": {
           "content": {
             "application/json": {

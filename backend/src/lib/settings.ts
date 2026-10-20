@@ -211,6 +211,12 @@ function validateSelectorValue(keyDef: SettingsKey, value: unknown): SettingsOpR
         }
         break;
       }
+      // ROBOT-VOICE-01: the voice list lives in the Stack; the route checks the id against it after authorization.
+      // Here a voice id is a plain token, never a URL (same shape rule as tts.voice_id).
+      if (range?.options_from === "voices.tts") {
+        if (typeof value !== "string" || !/^[a-z0-9][a-z0-9_-]{0,79}$/.test(value)) return { ok: false, status: 400, error: "That voice is not on this hub. Choose one from the list." };
+        break;
+      }
       // Dynamic option sets can be empty during first-run setup (for
       // example, before any chat model is installed). Their declared
       // default sentinel remains a valid choice while the live options

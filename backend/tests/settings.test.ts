@@ -1,4 +1,4 @@
-import { describe, expect, test, beforeEach } from "bun:test";
+import { describe, expect, test, beforeEach, afterEach } from "bun:test";
 import { TestClient } from "./client";
 import { resetDb } from "./reset-db";
 import { __resetThrottleForTests } from "@/lib/secretThrottle";
@@ -16,6 +16,10 @@ import { companionsAllowed } from "@/lib/companions";
 import { eq, and } from "drizzle-orm";
 import { db } from "@/db";
 import { people, settingsValues } from "@/db/schema";
+import { issueDeviceToken } from "@/lib/deviceTokens";
+import { __setStackClientForTests, __resetStackEngineForTests } from "@/lib/stackEngine";
+import type { StackVoice } from "@/lib/stack/types";
+import { startStackFixture } from "./stackFixture";
 import { CORE_SETTINGS_KEYS, INTERNET_PROBE_ENABLED_KEY, INTERNET_PROBE_DNS_NAME_KEY, INTERNET_PROBE_TCP_ADDRESS_KEY, INTERNET_PROBE_TCP_PORT_KEY } from "@/settings/coreKeys";
 
 test("internet probe settings are household general controls and default on", () => {
@@ -29,6 +33,42 @@ test("internet probe settings are household general controls and default on", ()
 beforeEach(() => {
   resetDb();
   __resetThrottleForTests();
+});
+afterEach(() => __resetStackEngineForTests());
+
+describe("PUT /api/settings robot.voice.id", () => {
+  test("accepts a listed voice and refuses an unknown one with the voice list message", async () => {
+    const owner = new TestClient();
+    const { person } = (await (await owner.post("/api/auth/setup", { displayName: "Sage", secret: "correcthorse" })).json()) as { person: { id: string } };
+    const fixture = startStackFixture({});
+    const voices = [{ id: "pocket-tts-voice-alba", name: "Alba", description: "", language: "en", country: "", gender: "unknown", source: "preset", engine: "pocket", onDisk: true, licence: null, revision: "test" }] as StackVoice[];
+    const originalVoices = fixture.client.voices.bind(fixture.client);
+    fixture.client.voices = async () => voices;
+    __setStackClientForTests(fixture.client);
+    try {
+      const { deviceId } = issueDeviceToken(person.id, "robot", "Riff");
+      const listed = await owner.put("/api/settings", { scope: `device:${deviceId}`, key: "robot.voice.id", value: "alba" });
+      expect(listed.status).toBe(200);
+      const unknown = await owner.put("/api/settings", { scope: `device:${deviceId}`, key: "robot.voice.id", value: "not-installed" });
+      expect(unknown.status).toBe(400);
+      expect(await unknown.json()).toEqual({ error: "That voice is not on this hub. Choose one from the list." });
+    } finally {
+      fixture.client.voices = originalVoices;
+      fixture.stop();
+      __resetStackEngineForTests();
+    }
+  });
+
+  test("a non-admin gets 403 for a bad voice, not the voice list message", async () => {
+    const owner = new TestClient();
+    const { person } = (await (await owner.post("/api/auth/setup", { displayName: "Sage", secret: "correcthorse" })).json()) as { person: { id: string } };
+    const adult = (await (await owner.post("/api/people", { displayName: "Adult", role: "adult", secret: "adultsecret" })).json()) as { id: string };
+    const adultClient = new TestClient();
+    await adultClient.post("/api/auth/verify-secret", { personId: adult.id, secret: "adultsecret" });
+    const { deviceId } = issueDeviceToken(person.id, "robot", "Riff");
+    const res = await adultClient.put("/api/settings", { scope: `device:${deviceId}`, key: "robot.voice.id", value: "not-installed" });
+    expect(res.status).toBe(403);
+  });
 });
 
 describe("companions.allowed", () => {

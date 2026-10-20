@@ -9,10 +9,11 @@ import { registerFixHandler, raiseIssue, resolveIssue } from "@/lib/issues";
 import { dataDir } from "@/lib/paths";
 import { evaluateReply } from "@/lib/safety";
 import { safetySensorMappings, type SafetyAlarmKind } from "@/lib/safetyAlarm";
-import { getSettingValueForPerson } from "@/lib/settings";
+import { getDeviceSettingValue } from "@/lib/settings";
 import { speakerAgeBand } from "@/lib/ageBand";
-import { VOICE_SETTINGS_KEYS } from "@/settings/voiceKeys";
+import { VOICE_SETTINGS_KEYS, VOICE_ENGINE_DEFAULT, VOICE_PRESET_NAMES } from "@/settings/voiceKeys";
 import { synthesizeSpeech } from "@/lib/tts";
+import { voiceForSpeech } from "@/lib/voiceForSpeech";
 
 export interface RobotClip {
   id: string;
@@ -228,9 +229,13 @@ function adultVoice(deviceId: string): string {
   if (!robot?.personId) return defaultVoice;
   const person = db.select().from(people)
     .where(and(eq(people.id, robot.personId), eq(people.enabled, true), isNull(people.deletedAt))).get();
-  if (!person || speakerAgeBand(person, new Date()) !== "adult") return defaultVoice;
-  const voice = getSettingValueForPerson(person.id, "tts.voice_id");
-  return typeof voice === "string" && voice ? voice : defaultVoice;
+  if (!person) return defaultVoice;
+  // A child's private tts.voice_id never reaches a robot's clips; only a preset or the engine default from the device applies.
+  if (speakerAgeBand(person, new Date()) !== "adult") {
+    const robotVoice = getDeviceSettingValue(deviceId, "robot.voice.id");
+    return typeof robotVoice === "string" && (robotVoice === VOICE_ENGINE_DEFAULT || VOICE_PRESET_NAMES.includes(robotVoice as typeof VOICE_PRESET_NAMES[number])) ? robotVoice : defaultVoice;
+  }
+  return voiceForSpeech({ actor: person, deviceId });
 }
 
 function atomicWrite(path: string, bytes: Uint8Array): void {

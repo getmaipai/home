@@ -45,9 +45,10 @@ interface SettingFieldProps {
    * multi-select's own option list (see PersonMultiSelect's header).
    * Unused by every other selector. */
   selfPersonId?: string;
+  optionsFrom?: Readonly<Record<string, readonly { value: string; label: string }[]>>;
 }
 
-export function SettingField({ setting, onChange, onReset, disabled, selfPersonId }: SettingFieldProps) {
+export function SettingField({ setting, onChange, onReset, disabled, selfPersonId, optionsFrom }: SettingFieldProps) {
   const { def } = setting;
   const resolved = setting.resolved as MergedSetting["resolved"] & Pick<ResolvedSetting, "does" | "state" | "reason">;
   const [draft, setDraft] = useState<string>(String(resolved.value ?? ""));
@@ -169,20 +170,20 @@ export function SettingField({ setting, onChange, onReset, disabled, selfPersonI
     );
   } else if (def.selector === "select") {
     const options = (def.range as { options?: string[] } | undefined)?.options ?? [];
+    const source = (def.range as { options_from?: string } | undefined)?.options_from;
+    const runtimeOptions = source ? optionsFrom?.[source] : undefined;
     const optionDescriptions = (def as { copy?: { options?: Record<string, string> } }).copy?.options;
     const optionLabels = (def as { copy?: { option_labels?: Record<string, string> } }).copy?.option_labels;
     // MINOR-TOPICS-01e: a key's spec copy names its options in plain words; titleCaseOption is the fallback.
     const getLabel = (option: string) => optionLabels?.[option] ?? (def.key === "household.locale" ? localeDisplayName(option) : titleCaseOption(option));
     control = (
-      <Select value={String(resolved.value)} onValueChange={onChange} disabled={disabled}>
+      <Select value={String(resolved.value)} onValueChange={onChange} disabled={disabled || Boolean(source && !runtimeOptions && !source.startsWith("models."))}>
         <SelectTrigger aria-label={def.label}>
           <SelectValue />
         </SelectTrigger>
         <SelectContent>
-          {options.map((option) => (
-            <SelectItem key={option} value={option}>
-              {optionDescriptions?.[option] ?? getLabel(option)}
-            </SelectItem>
+          {runtimeOptions ? runtimeOptions.map((option) => <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>) : options.map((option) => (
+            <SelectItem key={option} value={option}>{optionDescriptions?.[option] ?? getLabel(option)}</SelectItem>
           ))}
         </SelectContent>
       </Select>
