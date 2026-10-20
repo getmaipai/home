@@ -1,0 +1,26 @@
+# Bronze criteria per getmaipai/.github's docs/PACKAGES.md.
+package: books
+scale: bronze
+bronze:
+  tests_green:
+    met: true
+    note: Home's backend/tests/booksApp.test.ts covers the app host gates, the Reader locator, audiobook chapters and progress.
+  routing_examples:
+    met: true
+    note: an app package has no chat tool, so it has no routing examples
+  privacy_row_per_data_source:
+    met: true
+    note: "data_sources is empty. The app reads only files on the hub, with no outside requests"
+  offline_behavior_stated:
+    met: true
+    note: "offline: degraded - books and audiobooks saved on the hub open with the internet off while the hub is reachable."
+  smoke_test:
+    met: true
+    note: smoke.kind static, the manifest and pages load
+  readme_and_changelog:
+    met: true
+  lint_clean:
+    met: true
+silver:
+  diagnostics_and_reauth:
+    met: false

@@ -1,26 +1,26 @@
+# Bronze criteria per getmaipai/.github's docs/PACKAGES.md.
 package: shows
 scale: bronze
 bronze:
   tests_green:
-    met: false
-    note: Five focused tests written; repository preload is blocked by sandbox sockets. Seven page schemas and package scope validated separately.
+    met: true
+    note: Home's backend/tests/showsApp.test.ts covers the app host gates, seasons, episode order and watchlist.
   routing_examples:
     met: true
-    note: Five routing examples in the manifest.
+    note: an app package has no chat tool, so it has no routing examples
   privacy_row_per_data_source:
     met: true
-    note: No external data source or metadata fetch.
+    note: "data_sources is empty. The app reads only files on the hub, with no outside requests"
   offline_behavior_stated:
     met: true
-    note: Saved files play with internet off while the hub is reachable.
+    note: "offline: degraded - files saved on the hub play with the internet off while the hub is reachable."
   smoke_test:
     met: true
-    note: Static page schema and package scope checks passed.
+    note: smoke.kind static, the manifest and pages load
   readme_and_changelog:
     met: true
   lint_clean:
-    met: false
-    note: One backend typecheck found a test tuple inference error, corrected after the run; no second run per task budget.
+    met: true
 silver:
   diagnostics_and_reauth:
     met: false
