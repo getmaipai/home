@@ -10,9 +10,9 @@ describe("voice browser helpers", () => {
     expect(voiceTargets(roster as PersonRosterEntry[], roster[1]!)).toEqual([roster[1]!, roster[4]!]);
     expect(voiceTargets(roster as PersonRosterEntry[], roster[2]!)).toEqual([]);
   });
-  test("playableVoices keeps every preset, installed or not", () => {
+  test("playableVoices keeps every preset, installed or not, and the voices made at home", () => {
     const rows = [{ id: "a", source: "preset", onDisk: true }, { id: "b", source: "preset", onDisk: false }, { id: "c", source: "community", onDisk: true }, { id: "d", source: "cloned", onDisk: true }] as StackVoice[];
-    expect(playableVoices(rows).map((voice) => voice.id)).toEqual(["a", "b"]);
+    expect(playableVoices(rows).map((voice) => voice.id)).toEqual(["a", "b", "d"]);
   });
   test("friendly names: catalog name, id's last token, never an engine word", () => {
     expect(voiceFriendlyName({ id: "x-voice-alba", name: "Alba" })).toBe("Alba");

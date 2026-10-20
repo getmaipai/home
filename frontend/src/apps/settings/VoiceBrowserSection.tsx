@@ -7,6 +7,7 @@ import { Button } from "@maipai/ui/src/ui/button";
 import { api, type PersonRosterEntry, type ResolvedSetting, type Roster } from "@/lib/api";
 import { playableVoices, previewIdFor, voiceChoices, voiceTargets } from "@/lib/voice/voiceBrowserRows";
 import { voicePreviewPlayer, type VoicePreviewState } from "@/lib/voice/voicePreviewPlayer";
+import { HouseholdVoicesSection } from "@/apps/settings/HouseholdVoicesSection";
 
 /** "Choose a voice for <who>": ONE dropdown bound to tts.voice_id, a Test button beside it. */
 export function VoiceBrowserSection({ person }: { person: Roster }) {
@@ -85,5 +86,6 @@ export function VoiceBrowserSection({ person }: { person: Roster }) {
     {preview.error ? <p role="alert">{preview.error}</p> : null}
     {saveError ? <p role="alert">{saveError}</p> : null}
     <p role="status" className="text-sm text-muted-foreground">{saved ? "Saved." : ""}</p>
+    {isGuardian ? <HouseholdVoicesSection /> : null}
   </>;
 }

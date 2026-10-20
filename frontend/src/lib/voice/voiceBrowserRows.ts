@@ -32,10 +32,10 @@ export function voiceTargets(roster: readonly PersonRosterEntry[], actor: Roster
   return [actor, ...roster.filter((person) => person.id !== actor.id && person.role === "child")];
 }
 
-/** Every preset voice the engine offers. A voice not yet downloaded still counts: the Stack installs it the first
+/** Every preset voice the engine offers, and the voices an admin made from a clip (source "cloned"; the backend lists them for adults only). A voice not yet downloaded still counts: the Stack installs it the first
  * time it is previewed or spoken (the live Stack lists 26 presets with only one on disk). */
 export function playableVoices(rows: readonly StackVoice[]): StackVoice[] {
-  return rows.filter((voice) => voice.source === "preset");
+  return rows.filter((voice) => voice.source === "preset" || voice.source === "cloned");
 }
 
 /** A stored voice that is not on the list still gets its plain name. */

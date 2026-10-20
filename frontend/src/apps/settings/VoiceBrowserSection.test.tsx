@@ -2,6 +2,7 @@ import { afterEach, describe, expect, test, mock, spyOn } from "bun:test";
 import { cleanup, fireEvent, waitFor } from "@testing-library/react";
 import { api } from "@/lib/api";
 import { voicePreviewPlayer } from "@/lib/voice/voicePreviewPlayer";
+import { householdVoicesApi } from "@/lib/householdVoicesApi";
 import { VoiceBrowserSection } from "@/apps/settings/VoiceBrowserSection";
 import { renderWithQueryClient } from "../../../tests/renderWithQueryClient";
 import type { StackVoice, Roster } from "@/lib/api";
@@ -40,11 +41,21 @@ describe("VoiceBrowserSection", () => {
     expect(view.queryAllByRole("radio")).toHaveLength(0);
     expect(document.body.textContent).not.toMatch(/chatterbox|pocket|orpheus|mlx|clone|upload|unknown|catalog/i);
   });
-  test("lists every preset, installed or not, and no community or cloned rows", async () => {
-    const view = renderPage([...three(), voice("c", { name: "Community", source: "community" }), voice("k", { name: "Cloned", source: "cloned" })], ["alba", "javert", "mira"]);
+  test("lists every preset and the voices made at home, but no community rows", async () => {
+    const view = renderPage([...three(), voice("c", { name: "Community", source: "community" }), voice("k", { name: "Cloned", source: "preset" })], ["alba", "javert", "mira"]);
+    spyOn(householdVoicesApi, "list").mockResolvedValue({ voices: [] });
     fireEvent.click(await trigger(view));
     const names = (await view.findAllByRole("option")).map((option) => option.textContent);
-    expect(names).toEqual(["Default voice", "Alba", "Javert", "Mira"]);
+    expect(names).toEqual(["Default voice", "Alba", "Javert", "Mira", "Cloned"]);
+  });
+  test("shows household voices to an owner and hides them from an adult", async () => {
+    spyOn(householdVoicesApi, "list").mockResolvedValue({ voices: [] });
+    const owner = renderPage(three(), ["alba", "javert", "mira"], { role: "owner" });
+    await owner.findByRole("heading", { name: "Voices made at home" });
+    cleanup(); mock.restore();
+    const adult = renderPage(three());
+    await trigger(adult);
+    expect(adult.queryByRole("heading", { name: "Voices made at home" })).toBeNull();
   });
   test("the dropdown shows the stored voice", async () => {
     const view = renderPage(three(), ["alba", "javert", "mira"], { voice: "javert" });
