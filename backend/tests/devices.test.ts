@@ -249,6 +249,24 @@ describe("DELETE /api/devices/:id", () => {
     expect(await client.get("/api/devices").then((r) => r.json())).toEqual([]);
   });
 
+  test("an admin who did not pair a robot may forget it; an adult may not; a phone stays its owner's", async () => {
+    const { client: ownerClient, personId } = await owner();
+    const robot = issueDeviceToken(personId, "robot", "Reachy Mini").deviceId;
+    const phone = issueDeviceToken(personId, "phone", "Sage phone").deviceId;
+    const signIn = async (displayName: string, role: string) => {
+      const created = (await (await ownerClient.post("/api/people", { displayName, role, secret: "0000" })).json()) as { id: string };
+      const client = new TestClient();
+      await client.post("/api/auth/verify-secret", { personId: created.id, secret: "0000" });
+      return client;
+    };
+    const adult = await signIn("Quill", "adult");
+    const admin = await signIn("Marlow", "admin");
+    expect((await adult.request(`/api/devices/${robot}`, { method: "DELETE" })).status).toBe(404);
+    expect((await admin.request(`/api/devices/${phone}`, { method: "DELETE" })).status).toBe(404);
+    expect((await admin.request(`/api/devices/${robot}`, { method: "DELETE" })).status).toBe(200);
+    expect(getDeviceById(robot)).toBeNull();
+  });
+
   test("404 for a device that isn't mine", async () => {
     const { client } = await owner();
     const res = await client.request("/api/devices/device-doesnotexist", { method: "DELETE" });

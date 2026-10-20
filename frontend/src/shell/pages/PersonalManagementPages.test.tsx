@@ -2,8 +2,8 @@ import { MemoryRouter } from "react-router-dom";
 import { afterEach, describe, expect, mock, test } from "bun:test";
 import { cleanup, waitFor } from "@testing-library/react";
 import { VoicesPage } from "@/shell/pages/VoicesPage";
+import { DevicesSection } from "@/apps/settings/DevicesSection";
 import { CommandsPage } from "@/shell/pages/CommandsPage";
-import { DevicesPage } from "@/shell/pages/DevicesPage";
 import { renderWithQueryClient } from "../../../tests/renderWithQueryClient";
 import type { Roster } from "@/lib/api";
 
@@ -55,10 +55,10 @@ describe("Next personal management pages", () => {
     } finally { restore(); }
   });
 
-  test("a child can reach the real Devices section", async () => {
+  test("a child reaches their own devices and sessions in the Devices section", async () => {
     const restore = mockApi();
     try {
-      renderWithQueryClient(<MemoryRouter><DevicesPage person={makePerson()} /></MemoryRouter>);
+      renderWithQueryClient(<MemoryRouter><DevicesSection /></MemoryRouter>);
       await waitFor(() => expect(document.body.textContent).toContain("Signed-in sessions"));
       expect(document.body.textContent).toContain("Devices");
     } finally { restore(); }

@@ -10,10 +10,7 @@ import { Switch } from "@maipai/ui/src/ui/switch";
 import { Label } from "@maipai/ui/src/dashboard/components/ui/label";
 import { Alert, AlertDescription } from "@maipai/ui/src/ui/alert";
 import { listKept, removeAllOfflineMedia } from "@/lib/offlineMedia";
-import { Card } from "@maipai/ui/src/dashboard/components/ui/card";
-import { RobotBody } from "@/apps/settings/RobotBody";
 import { api, ApiError, type DeviceInfo, type SessionInfo } from "@/lib/api";
-import type { Roster } from "@/lib/api";
 
 function whenText(iso: string): string {
   return new Date(iso).toLocaleString();
@@ -34,10 +31,10 @@ const DEVICE_KIND_LABELS: Record<DeviceInfo["kind"], string> = {
 // caller's own profile, not a household-wide admin view (devices.ts's
 // own comment) - a personal Profile action, the same PERSON_TREE scope
 // PIN/password change already has, not gated behind AdminGatedContent.
-export function DevicesSection({ search = "", person }: { search?: string; person?: Roster }) {
+export function DevicesSection({ search = "" }: { search?: string }) {
   const matchesSearch = (text: string) => text.toLocaleLowerCase().includes(search.trim().toLocaleLowerCase());
   const queryClient = useQueryClient();
-  const devicesQuery = useQuery<DeviceInfo[]>({ queryKey: ["devices"], queryFn: () => api.devices(), refetchInterval: 5000 });
+  const devicesQuery = useQuery<DeviceInfo[]>({ queryKey: ["devices"], queryFn: () => api.devices() });
   useEffect(() => {
     const refresh = () => void queryClient.invalidateQueries({ queryKey: ["devices"] });
     window.addEventListener("devices-updated", refresh);
@@ -96,32 +93,11 @@ export function DevicesSection({ search = "", person }: { search?: string; perso
         >
           {(allRows) => {
             const allDevices = allRows.filter((d) => matchesSearch(`${d.name} ${d.kind} ${d.area ?? ""}`));
-            // ROBOT-CARD-01: a robot gets its live card (state polled every
-            // 5s above); every other kind keeps the plain list row.
-            const robots = allDevices.filter((d) => d.kind === "robot");
             const devices = allDevices.filter((d) => d.kind !== "robot");
-            return allDevices.length === 0 ? (
+            return devices.length === 0 ? (
               <EmptyState icon="inbox" text="No devices paired to your profile yet." />
             ) : (
               <div className="flex flex-col gap-4">
-              {robots.map((r) => (
-                <Card key={r.id} data-testid="robot-card">
-                <RobotBody
-                  device={r}
-                  viewerRole={person?.role ?? "adult"}
-                  busy={busy}
-                  onSetMuted={(muted) => api.setRobotMuted(r.id, muted).then(() => undefined)}
-                  onAnswerMotorReboot={(answer) => api.answerMotorReboot(r.id, answer).finally(() => void devicesQuery.refetch()).then(() => undefined)}
-                  onStartLiveView={() => api.startRobotLiveView(r.id)}
-                  onStopLiveView={(viewId) => api.stopRobotLiveView(viewId).then(() => undefined)}
-                  confirmingRemove={confirming?.kind === "device" && confirming.id === r.id}
-                  onRemove={() => setConfirming({ kind: "device", id: r.id, label: r.name })}
-                  onConfirmRemove={handleRevoke}
-                  onCancelRemove={() => setConfirming(null)}
-                />
-                </Card>
-              ))}
-              {devices.length > 0 ? (
               <List
                 items={devices}
                 getKey={(d) => d.id}
@@ -175,7 +151,6 @@ export function DevicesSection({ search = "", person }: { search?: string; perso
                   )
                 }
               />
-              ) : null}
               </div>
             );
           }}

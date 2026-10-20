@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Badge } from "@maipai/ui/src/ui/badge";
 import { Button } from "@maipai/ui/src/ui/button";
 import { CardAction, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@maipai/ui/src/dashboard/components/ui/card";
@@ -7,18 +7,11 @@ import { Image } from "@maipai/ui/src/elements/image";
 import { ErrorState } from "@maipai/ui/src/elements/error-state";
 import { ApiError, type DeviceInfo, type RobotDeviceState } from "@/lib/api";
 import { NO_VENDOR_LOGIN, robotCapabilityLabel } from "@/apps/settings/capabilityLabels";
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@maipai/ui/src/ui/dialog";
-import { Input } from "@maipai/ui/src/ui/input";
-import { FieldError } from "@maipai/ui/src/dashboard/components/ui/field";
-import { Label } from "@maipai/ui/src/dashboard/components/ui/label";
-import { SettingsRenderer } from "@/shell/pages/settings/SettingsRenderer";
-import areasFile from "@maipai/spec/settings/areas.json";
 import { api, isOwnerOrAdminRole } from "@/lib/api";
 import type { Role } from "@maipai/ui/src/settings/settingsAudience";
 import { robotSelfTestPartsFor, type RobotSelfTestPart } from "@maipai/home-backend/src/wire";
 import type { RobotSelfTestResult } from "@maipai/home-backend/src/wire";
 import { Alert, AlertDescription } from "@maipai/ui/src/ui/alert";
-import { playableVoices, voiceFriendlyName } from "@/lib/voice/voiceBrowserRows";
 
 const ACTIVITY_LABELS: Record<RobotDeviceState["activity"], string> = {
   starting: "Starting up",
@@ -77,11 +70,7 @@ function Row({ label, children }: { label: string; children: React.ReactNode }) 
  * holds the shipped header, content and footer parts. */
 export function RobotBody({
   device,
-  onRemove,
-  confirmingRemove,
-  onConfirmRemove,
-  onCancelRemove,
-  busy,
+  busy = false,
   onSetMuted,
   onStartLiveView,
   onStopLiveView,
@@ -90,11 +79,7 @@ export function RobotBody({
 }: {
   device: DeviceInfo;
   viewerRole?: Role;
-  onRemove: () => void;
-  confirmingRemove: boolean;
-  onConfirmRemove: () => void;
-  onCancelRemove: () => void;
-  busy: boolean;
+  busy?: boolean;
   onSetMuted: (muted: boolean) => Promise<void>;
   onStartLiveView: () => Promise<{ view_id: string; stream: string }>;
   onStopLiveView: (viewId: string) => Promise<void>;
@@ -104,37 +89,6 @@ export function RobotBody({
   // no_vendor_login describes the pairing gate (ROBOT-PAIR-02), not a feature, so it gets no badge.
   const featureCapabilities = device.capabilities.filter((capability) => capability !== NO_VENDOR_LOGIN);
   const admin = isOwnerOrAdminRole(viewerRole);
-  const [settingsOpen, setSettingsOpen] = useState(false);
-  const [robotVoices, setRobotVoices] = useState<Awaited<ReturnType<typeof api.stackVoices>>["voices"]>([]);
-  useEffect(() => {
-    if (!settingsOpen) return;
-    let active = true;
-    void api.stackVoices().then((result) => { if (active) setRobotVoices(result.voices); }).catch(() => { if (active) setRobotVoices([]); });
-    return () => { active = false; };
-  }, [settingsOpen]);
-  const robotVoiceOptions = [{ value: "default", label: "Same as its person" }, ...playableVoices(robotVoices).map((voice) => ({ value: voice.id, label: voiceFriendlyName(voice) }))];
-  const [forgetConfirming, setForgetConfirming] = useState(false);
-  const [cancelInstallConfirming, setCancelInstallConfirming] = useState(false);
-  const [cancelInstallBusy, setCancelInstallBusy] = useState(false);
-  const [cancelInstallError, setCancelInstallError] = useState<string | null>(null);
-  const [hostedInstall, setHostedInstall] = useState(false);
-  const [name, setName] = useState(device.name);
-  const [area, setArea] = useState(device.area ?? "");
-  const [saveBusy, setSaveBusy] = useState(false);
-  const [saveError, setSaveError] = useState<string | null>(null);
-  useEffect(() => {
-    if (!admin || device.lastSeenAt !== null) return;
-    let active = true;
-    void api.robotInstallStatus(device.id).then(() => { if (active) setHostedInstall(true); }).catch(() => { if (active) setHostedInstall(false); });
-    return () => { active = false; };
-  }, [admin, device.id, device.lastSeenAt]);
-  async function cancelInstall(): Promise<void> {
-    setCancelInstallBusy(true);
-    setCancelInstallError(null);
-    try { await api.cancelRobotInstall(device.id); window.dispatchEvent(new Event("devices-updated")); }
-    catch (error) { setCancelInstallError(error instanceof ApiError ? error.message : "The install could not be cancelled. Check the connection and try again."); }
-    finally { setCancelInstallBusy(false); }
-  }
   const [selfTests, setSelfTests] = useState<Partial<Record<RobotSelfTestPart, RobotSelfTestResult | { kind: "offline" | "timeout" | "error"; message: string }>>>({});
   const [selfTestBusy, setSelfTestBusy] = useState<RobotSelfTestPart | null>(null);
   async function runSelfTest(part: RobotSelfTestPart): Promise<void> {
@@ -151,17 +105,6 @@ export function RobotBody({
           ? { kind: "timeout", message: apiError.message }
           : { kind: "error", message: apiError?.message ?? "Could not test that part. Reload the page and try again." } }));
     } finally { setSelfTestBusy(null); }
-  }
-  const cards = useMemo(() => ((areasFile as { device_cards?: Array<{ device_kind: string; group: string; scope: "device"; label: string; min_role?: string }> }).device_cards ?? []).filter((card) => card.device_kind === "robot" && card.scope === "device" && (!card.min_role || card.min_role === "admin" || card.min_role === "owner")), []);
-  async function saveIdentity(): Promise<void> {
-    setSaveBusy(true);
-    setSaveError(null);
-    try {
-      await api.updateDevice(device.id, { name, area: area.trim() || null });
-      window.dispatchEvent(new Event("devices-updated"));
-    } catch (error) {
-      setSaveError(error instanceof ApiError ? error.message : "Could not save this robot.");
-    } finally { setSaveBusy(false); }
   }
   const lastPutDownCount = useRef<number | undefined>(state?.put_down_count);
   const [putDownChanged, setPutDownChanged] = useState(false);
@@ -352,77 +295,31 @@ export function RobotBody({
       </CardContent>
       <CardFooter>
         <div className="flex w-full flex-wrap items-center justify-end gap-2">
-          {cancelInstallError ? <Alert variant="destructive"><AlertDescription>{cancelInstallError}</AlertDescription></Alert> : null}
-          {cancelInstallConfirming ? (
+          {state !== null ? (
             <>
-              <p className="mr-auto text-base font-medium">Cancel install and forget {device.name}? This revokes its enrollment code and deletes its saved firmware backup.</p>
-              <Button variant="destructive" disabled={cancelInstallBusy} onClick={() => void cancelInstall()}>{cancelInstallBusy ? "Working…" : "Yes, cancel install"}</Button>
-              <Button variant="ghost" disabled={cancelInstallBusy} onClick={() => setCancelInstallConfirming(false)}>Keep installing</Button>
-            </>
-          ) : confirmingRemove && !admin ? (
-            <>
-              <p className="mr-auto text-base font-medium">Remove {device.name}? It will need to be paired again.</p>
-              <Button variant="destructive" onClick={onConfirmRemove} disabled={busy}>
-                {busy ? "Working…" : "Yes, remove it"}
-              </Button>
-              <Button variant="ghost" onClick={onCancelRemove}>
-                Keep it
-              </Button>
-            </>
-          ) : (
-            <>
-              {admin && hostedInstall && device.lastSeenAt === null && !cancelInstallConfirming ? <Button variant="destructive" onClick={() => setCancelInstallConfirming(true)}>Cancel install</Button> : null}
-              {state !== null ? (
-                <>
-                  {askedMuted !== null && !muteError ? (
-                    <p className="mr-auto text-sm text-muted-foreground">Asked {device.name} to {askedMuted ? "mute" : "unmute"}, waiting for it.</p>
-                  ) : null}
-                  {liveView ? (
-                    <Button variant="outline" onClick={stopLive}>
-                      Stop live view
-                    </Button>
-                  ) : (
-                    <Button variant="outline" disabled={busy || unreachable || liveStarting} onClick={() => void startLive()}>
-                      {liveStarting ? "Opening…" : "Live view"}
-                    </Button>
-                  )}
-                  <Button
-                    variant="outline"
-                    disabled={busy || unreachable || askedMuted !== null}
-                    onClick={() => void askMute(!state.muted)}
-                  >
-                    {state.muted ? "Unmute microphone" : "Mute microphone"}
-                  </Button>
-                </>
+              {askedMuted !== null && !muteError ? (
+                <p className="mr-auto text-sm text-muted-foreground">Asked {device.name} to {askedMuted ? "mute" : "unmute"}, waiting for it.</p>
               ) : null}
-              {admin ? <Button variant="outline" onClick={() => { setName(device.name); setArea(device.area ?? ""); setSettingsOpen(true); }}>Settings</Button> : null}
-              {/* DEVICES-02: an admin forgets a robot from its Settings dialog. */}
-              {admin ? null : (
-                <Button variant="ghost" aria-label={`Remove ${device.name}`} onClick={onRemove}>
-                  Remove
+              {liveView ? (
+                <Button variant="outline" onClick={stopLive}>
+                  Stop live view
+                </Button>
+              ) : (
+                <Button variant="outline" disabled={busy || unreachable || liveStarting} onClick={() => void startLive()}>
+                  {liveStarting ? "Opening…" : "Live view"}
                 </Button>
               )}
+              <Button
+                variant="outline"
+                disabled={busy || unreachable || askedMuted !== null}
+                onClick={() => void askMute(!state.muted)}
+              >
+                {state.muted ? "Unmute microphone" : "Mute microphone"}
+              </Button>
             </>
-          )}
+          ) : null}
         </div>
       </CardFooter>
-      {admin ? <Dialog open={settingsOpen} onOpenChange={(next) => { setSettingsOpen(next); if (!next) { setForgetConfirming(false); onCancelRemove(); } }}>
-        <DialogContent scroll="viewport">
-          <DialogHeader><DialogTitle>{device.name} settings</DialogTitle><DialogDescription>Change this robot's name, area and settings.</DialogDescription></DialogHeader>
-          <div className="flex flex-col gap-3">
-            <Label htmlFor={`robot-name-${device.id}`}>Name</Label>
-            <Input id={`robot-name-${device.id}`} value={name} maxLength={60} aria-invalid={saveError !== null} onChange={(event) => setName(event.target.value)} />
-            <FieldError errors={saveError ? [{ message: saveError }] : []} />
-            <Label htmlFor={`robot-area-${device.id}`}>Area</Label>
-            <Input id={`robot-area-${device.id}`} value={area} maxLength={60} onChange={(event) => setArea(event.target.value)} />
-            <Button disabled={saveBusy || !name.trim()} onClick={() => void saveIdentity()}>{saveBusy ? "Saving…" : "Save name and area"}</Button>
-          </div>
-          {cards.map((card) => <SettingsRenderer key={`${card.scope}:${card.group}`} scope="device" scopeValue={`device:${device.id}`} only={[card.group]} titleOverrides={{ [card.group]: card.label }} optionsFrom={{ "voices.tts": robotVoiceOptions }} />)}
-          <DialogFooter>
-            {forgetConfirming || confirmingRemove ? <><p className="mr-auto text-base font-medium">Forget {device.name}? It will need to be paired again. This also deletes the robot's memories and its saved firmware backup.</p><Button variant="destructive" onClick={onConfirmRemove} disabled={busy}>{busy ? "Working…" : "Yes, forget it"}</Button><Button variant="ghost" onClick={() => { setForgetConfirming(false); onCancelRemove(); }}>Keep it</Button></> : <Button variant="destructive" onClick={() => { setForgetConfirming(true); onRemove(); }}>Forget this robot</Button>}
-          </DialogFooter>
-        </DialogContent>
-      </Dialog> : null}
     </>
   );
 }

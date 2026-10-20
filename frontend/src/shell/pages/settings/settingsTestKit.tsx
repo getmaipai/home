@@ -89,6 +89,7 @@ export function mockHome({ robots = false, robotsEnabled = robots, wakeword = fa
     }
     if (url.includes("/api/voice/wakewords")) return Promise.resolve(Response.json({ detectors: [], installed: wakeword }));
     if (url.endsWith("/api/commands")) return Promise.resolve(Response.json([]));
+    if (url.includes("/api/auth/sessions")) return Promise.resolve(Response.json([]));
     if (url.includes("/api/devices/robots")) return Promise.resolve(Response.json(robots ? [{ id: "d1", kind: "robot", name: "Robot", capabilities: [] }] : []));
     if (url.includes("/api/devices")) return Promise.resolve(Response.json(robots ? [{ id: "d1", kind: "robot", name: "Robot", capabilities: [] }] : []));
     if (url.endsWith("/api/people") || url.includes("/api/people?")) return Promise.resolve(Response.json(hasChild ? [{ id: "person-kid", role: "child", display_name: "Kid" }] : []));

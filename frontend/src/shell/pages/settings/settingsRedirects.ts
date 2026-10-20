@@ -55,6 +55,8 @@ export function retiredManagePageTarget(pathname: string, viewer: { canManageHou
   const path = pathname.replace(/\/$/, "");
   if (path === "/voices") return viewer.canManageHousehold ? settingsPath("home", "voices") : settingsPath("account", "voice");
   if (path === "/engines" || path === "/models") return viewer.canManageHousehold ? settingsPath("home", "ai") : ACCOUNT;
+  // ROBOT-ADMIN-PLACE-01: /devices was a person's own devices and sessions; they are in Account, Profile and sign-in now.
+  if (path === "/devices") return settingsPath("account", "profile");
   return undefined;
 }
 

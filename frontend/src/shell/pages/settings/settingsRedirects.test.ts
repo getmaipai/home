@@ -79,6 +79,10 @@ describe("retiredManagePageTarget", () => {
     expect(retiredManagePageTarget("/models", member)).toBe("/settings/account");
     expect(retiredManagePageTarget("/voices", member)).toBe("/settings/account/voice");
   });
+  test("/devices lands on Account, Profile and sign-in for everyone (ROBOT-ADMIN-PLACE-01)", () => {
+    expect(retiredManagePageTarget("/devices", admin)).toBe("/settings/account/profile");
+    expect(retiredManagePageTarget("/devices", member)).toBe("/settings/account/profile");
+  });
   test("a page that has not moved is not redirected", () => {
     expect(retiredManagePageTarget("/users", admin)).toBeUndefined();
     expect(retiredManagePageTarget("/backups", admin)).toBeUndefined();

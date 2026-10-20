@@ -3,6 +3,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { FaceEnrollmentBody, canViewFaceEnrollment } from "@/apps/people/FaceEnrollmentBody";
 import { VoiceEnrollmentBody } from "@/apps/people/VoiceEnrollmentBody";
 import { ProfileForm } from "@/apps/people/ProfileForm";
+import { DevicesSection } from "@/apps/settings/DevicesSection";
 import { AwaySessionsSection } from "@/apps/settings/AwaySessionsSection";
 import { ChatSkillsSection } from "@/shell/pages/settings/ChatSkillsSection";
 import { ChatShortcutsView } from "@/shell/pages/settings/ChatShortcutsView";
@@ -15,6 +16,7 @@ import { ModelsAndStorageSection } from "@/apps/settings/ModelsAndStorageSection
 import { UsersSection } from "@/apps/settings/UsersSection";
 import { EnginesConsole } from "@/shell/pages/EnginesPage";
 import { HuggingFaceTokenSection } from "@/apps/settings/HuggingFaceTokenSection";
+import { HouseholdRobotsSection } from "@/apps/settings/HouseholdRobotsSection";
 import { AddRobotSection } from "@/apps/settings/AddRobotSection";
 import { StackChanInstallDialog } from "@/apps/settings/StackChanInstallDialog";
 import { RobotPasswordSection } from "@/apps/settings/RobotPasswordSection";
@@ -49,6 +51,7 @@ function AccountProfile({ person, onPersonChange }: SettingsViewProps) {
         </CardContent>
       </Card>
       <AwaySessionsSection />
+      <DevicesSection />
       {canViewFaceEnrollment(person, person) ? <Card><FaceEnrollmentBody profile={person} viewer={person} /></Card> : null}
       {canViewFaceEnrollment(person, person) ? <Card><VoiceEnrollmentBody profile={person} viewer={person} /></Card> : null}
     </>
@@ -78,7 +81,7 @@ function HomeEngineAdminSettings({ person }: SettingsViewProps) {
 function HomeUsersAdminSettings({ person }: SettingsViewProps) { return <UsersSection person={person} />; }
 function HomeDevicesAdminSettings({ person }: SettingsViewProps) {
   const { capabilities } = useSettingsCapabilities(person);
-  return capabilities.includes("robots.enabled") ? <><StackChanInstallDialog /><AddRobotSection /><RobotPasswordSection /></> : null;
+  return capabilities.includes("robots.enabled") ? <><HouseholdRobotsSection /><StackChanInstallDialog /><AddRobotSection /><RobotPasswordSection /></> : null;
 }
 function AccountLikenessView() { useTabItem("Pictures and videos"); return <LikenessSettings />; }
 function PicturesLibraryView() { useTabItem("Pictures and videos"); return <><PicturesLibrary /><VideoLibrary /></>; }

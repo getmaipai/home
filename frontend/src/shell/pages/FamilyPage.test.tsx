@@ -1,7 +1,8 @@
 import { afterEach, describe, expect, mock, test } from "bun:test";
 import { cleanup, fireEvent, waitFor } from "@testing-library/react";
 import { MemoryRouter, useLocation } from "react-router-dom";
-import { fetchFamilyBots, FamilyPage } from "@/shell/pages/FamilyPage";
+import { FamilyPage } from "@/shell/pages/FamilyPage";
+import { fetchFamilyBots } from "@/apps/settings/RobotCards";
 import { renderWithQueryClient } from "../../../tests/renderWithQueryClient";
 import type { PersonRosterEntry, Roster } from "@/lib/api";
 import { Tour } from "@maipai/spec/gen/ts/tour.js";
@@ -290,11 +291,24 @@ describe("FamilyPage", () => {
     const restore = mockFamilyFetch([], [], [], []);
     try {
       renderFamilyPage(makePerson(), "/people?tab=bots");
-      await waitFor(() => expect(document.body.textContent).toContain("Nothing here yet."));
+      await waitFor(() => expect(document.body.textContent).toContain("No robots yet."));
     } finally { restore(); }
   });
 
-  test("Bots filters the caller's devices for a non-admin and hides the trigger", async () => {
+  test("an adult sees the Bots tab with only the robots paired to them, and no management control", async () => {
+    const restore = mockFamilyFetch([], [], [
+      { id: "robot-1", kind: "robot", name: "Bramble", area: null, capabilities: [] },
+      { id: "phone-1", kind: "phone", name: "Phone", area: null, capabilities: [] },
+    ]);
+    try {
+      const view = renderFamilyPage(makePerson({ role: "adult" }), "/people?tab=bots");
+      await waitFor(() => expect(view.getByText("Bramble")).toBeTruthy());
+      expect(view.queryByText("Phone")).toBeNull();
+      for (const name of ["Settings", "Forget this robot", "Cancel install", "Remove Bramble"]) expect(view.queryByRole("button", { name })).toBeNull();
+    } finally { restore(); }
+  });
+
+  test("Bots filters the caller's devices for a child and hides the trigger", async () => {
     const restore = mockFamilyFetch([], [], [
       { id: "robot-1", kind: "robot", name: "Bramble", area: null, capabilities: [] },
       { id: "phone-1", kind: "phone", name: "Phone", area: null, capabilities: [] },

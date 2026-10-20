@@ -487,9 +487,11 @@ devicesRoutes.openapi(deleteRoute, async (c) => {
   const actor = c.get("person");
   const { id } = c.req.valid("param");
   const current = getDeviceById(id);
-  if (!current || current.personId !== actor.id) return c.json({ error: "No such device" }, 404);
+  // ROBOT-ADMIN-PLACE-01: a robot belongs to the household, so any admin may forget it, not only the admin who paired it.
+  const adminForgetsRobot = current?.kind === "robot" && (actor.role === "owner" || actor.role === "admin");
+  if (!current || (current.personId !== actor.id && !adminForgetsRobot)) return c.json({ error: "No such device" }, 404);
   if (current.kind === "robot") await forgetRobotHost(id);
-  if (!deleteDevice(id, actor.id)) return c.json({ error: "No such device" }, 404);
+  if (!deleteDevice(id, current.personId)) return c.json({ error: "No such device" }, 404);
   forgetRobotSocketAddress(id);
   closeDeviceCommandChannel(id);
   return c.json({ success: true as const }, 200);

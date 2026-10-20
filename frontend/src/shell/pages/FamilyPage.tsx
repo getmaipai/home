@@ -12,10 +12,10 @@ import { GRID_COLUMNS } from "@maipai/ui/src/responsive";
 import { ROLE_LABELS, ACCENT_RING_CLASS, isProfileClosedTo } from "@/apps/people/roles";
 import { AdminCodingAccessRow } from "@/apps/settings/CodingSettings";
 import { api, ApiError, isOwnerOrAdminRole, type DeviceInfo, type Entity, type PersonRosterEntry, type Roster } from "@/lib/api";
+import { RobotCards, fetchFamilyBots, familyBotsQueryKey } from "@/apps/settings/RobotCards";
 import { useTabItem } from "@/shell/tabIdentity";
 
 const PetIcon = getIcon("box");
-const RobotIcon = getIcon("bot");
 
 /** The inside of one directory card: the kit's own `Avatar` or icon, name,
  * role/area, bio and a small badge, centered. The page owns the `Card`
@@ -73,10 +73,13 @@ export function FamilyPage({ person }: { person: Roster }) {
   useTabItem("Family");
   const [params, setParams] = useSearchParams();
   const requestedTab = params.get("tab");
-  const activeTab = requestedTab === "pets" ? "pets" : requestedTab === "bots" && isOwnerOrAdminRole(person.role) ? "bots" : "people";
+  // A child is spoken to by the robot and sees no Devices view (devices-and-robot-link note, Users and gates).
+  const seesRobots = isOwnerOrAdminRole(person.role) || person.role === "adult" || person.role === "teen";
+  const botsQuery = useQuery<DeviceInfo[]>({ queryKey: familyBotsQueryKey(person), queryFn: () => fetchFamilyBots(person), enabled: seesRobots });
+  const showBots = isOwnerOrAdminRole(person.role) || (seesRobots && (botsQuery.data?.length ?? 0) > 0);
+  const activeTab = requestedTab === "pets" ? "pets" : requestedTab === "bots" && showBots ? "bots" : "people";
   const query = useQuery<PersonRosterEntry[]>({ queryKey: ["people"], queryFn: () => api.people() });
   const petsQuery = useQuery<Entity[]>({ queryKey: ["entities", "pet"], queryFn: () => api.entities("pet") });
-  const botsQuery = useQuery<DeviceInfo[]>({ queryKey: ["robots", person.id, person.role], queryFn: () => fetchFamilyBots(person), enabled: isOwnerOrAdminRole(person.role) });
 
   function onTabChange(value: string) {
     setParams((previous) => {
@@ -93,7 +96,7 @@ export function FamilyPage({ person }: { person: Roster }) {
       <TabsList>
         <TabsTrigger value="people">People{query.data ? <> <Badge>{query.data.length}</Badge></> : null}</TabsTrigger>
         <TabsTrigger value="pets">Pets{petsQuery.data ? <> <Badge>{petsQuery.data.length}</Badge></> : null}</TabsTrigger>
-        {isOwnerOrAdminRole(person.role) ? <TabsTrigger value="bots">Bots{botsQuery.data ? <> <Badge>{botsQuery.data.length}</Badge></> : null}</TabsTrigger> : null}
+        {showBots ? <TabsTrigger value="bots">Bots{botsQuery.data ? <> <Badge>{botsQuery.data.length}</Badge></> : null}</TabsTrigger> : null}
       </TabsList>
       <TabsContent value="people">
     <AsyncState
@@ -151,17 +154,9 @@ export function FamilyPage({ person }: { person: Roster }) {
         </AsyncState>
       </TabsContent>
       <TabsContent value="bots">
-        <AsyncState data={botsQuery.data} error={botsQuery.isError} isFetching={botsQuery.isFetching} onRetry={() => botsQuery.refetch()} errorMessage={botsQuery.error instanceof ApiError ? botsQuery.error.message : "Could not load bots."} loadingLabel="Loading bots">
-          {(bots: DeviceInfo[]) => bots.length === 0 ? <EmptyState icon="inbox" text="Nothing here yet." /> : <div className={`grid gap-4 ${GRID_COLUMNS.default}`}>{bots.map((bot) => <Card key={bot.id}><CardContent><FamilyBody title={bot.name} subtitle={bot.area} icon={RobotIcon} /></CardContent></Card>)}</div>}
-        </AsyncState>
+        <RobotCards person={person} />
       </TabsContent>
     </Tabs>
     </>
   );
-}
-
-export function fetchFamilyBots(person: Roster): Promise<DeviceInfo[]> {
-  return isOwnerOrAdminRole(person.role)
-    ? api.robotDevices()
-    : api.devices().then((devices) => devices.filter((device) => device.kind === "robot"));
 }

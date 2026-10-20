@@ -27,7 +27,6 @@ import { BackupsIcon } from "@/shell/pages/BackupsPage";
 import { StorageIcon } from "@/shell/pages/StoragePage";
 import { VoicesIcon } from "@/shell/pages/VoicesPage";
 import { CommandsIcon } from "@/shell/pages/CommandsPage";
-import { DevicesIcon } from "@/shell/pages/DevicesPage";
 import { PrivacyIcon } from "@/shell/pages/PrivacyPage";
 import { UsersIcon } from "@/shell/pages/UsersPage";
 import { NotificationsIcon } from "@/apps/notifications/NotificationsPage";
@@ -57,7 +56,6 @@ const MANAGE_PAGE_ENTRIES: Record<string, PageHeaderEntry> = {
   "/backups": { icon: BackupsIcon, label: "Backups" },
   "/voices": { icon: VoicesIcon, label: "Voices" },
   "/commands": { icon: CommandsIcon, label: "Commands" },
-  "/devices": { icon: DevicesIcon, label: "Devices" },
   "/privacy": { icon: PrivacyIcon, label: "Privacy" },
   "/users": { icon: UsersIcon, label: "Users" },
   "/notifications": { icon: NotificationsIcon, label: "Notifications" },

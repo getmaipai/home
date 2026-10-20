@@ -85,7 +85,7 @@ const ROUTE_NAMES: Record<string, string> = {
   "/storage": "Storage", "/engines": "Engines", "/performance": "Performance",
   "/updates": "Updates", "/repairs": "Repairs", "/status": "Status",
   "/backups": "Backups", "/voices": "Voices", "/commands": "Commands",
-  "/devices": "Devices", "/privacy": "Privacy", "/users": "Users",
+  "/privacy": "Privacy", "/users": "Users",
   "/models": "AI models", "/files": "Library", "/dev/ui": "Chat showcase",
   "/sign-in": "Sign in",
 };

@@ -1,19 +1,25 @@
 import { describe, expect, test, mock, afterEach } from "bun:test";
 import { cleanup, fireEvent, render, waitFor } from "@testing-library/react";
 import { DevicesSection } from "@/apps/settings/DevicesSection";
+import { HouseholdRobotsSection } from "@/apps/settings/HouseholdRobotsSection";
+import { RobotCards } from "@/apps/settings/RobotCards";
 import { Card } from "@maipai/ui/src/dashboard/components/ui/card";
 import { bodyHealthText, didPutDownCountIncrease, RobotBody } from "@/apps/settings/RobotBody";
 import { renderWithQueryClient } from "../../../tests/renderWithQueryClient";
 import { ApiError, type DeviceInfo, type SessionInfo } from "@/lib/api";
 import { MemoryRouter } from "react-router-dom";
 
-function settingsFetch(extra: boolean, patchCalls: unknown[] = [], patchError?: string) {
+function settingsFetch(extra: boolean, patchCalls: unknown[] = [], patchError?: string, spy: { deletes?: string[]; cancels?: string[]; installing?: boolean; robot?: Partial<DeviceInfo> } = {}) {
   const original = globalThis.fetch;
   const baseRegistry = ["robot.barge_in.open_mic", "robot.camera.watch_level", "robot.follow_up.seconds", "robot.gestures.enabled", "robot.idle.level", "robot.initiative.allowed_here", "robot.face.color", "robot.night.mode"].map((key) => ({ key, scope: "device", selector: key.endsWith("seconds") ? "number" : key.endsWith("level") || key === "robot.face.color" ? "select" : "boolean", default: key.endsWith("seconds") ? 10 : key === "robot.face.color" ? "mint" : key === "robot.night.mode", range: key === "robot.face.color" ? { options: ["mint", "sky", "peach", "lavender", "lemon", "rose", "cloud"] } : undefined, label: key === "robot.face.color" ? "Face color" : key === "robot.night.mode" ? "Night mode" : key, help: "Registry-provided help.", level: "basic", secret: false, lives_in: "robot.hello", honoured_by: ["home"] }));
   baseRegistry.push({ key: "robot.voice.id", scope: "device", selector: "select", range: { options_from: "voices.tts" }, default: "default", label: "Voice", help: "Robot voice.", level: "basic", secret: false, lives_in: "robot.hello", honoured_by: ["home"] } as never);
   const registry = [...baseRegistry, ...(extra ? [{ ...baseRegistry[0]!, key: "robot.hello.future", label: "robot.hello.future" }] : [])];
   globalThis.fetch = mock((input: RequestInfo | URL, init?: RequestInit) => {
     const url = String(input);
+    if (url.endsWith("/api/devices/robots")) return Promise.resolve(Response.json([device({ id: "robot-1", kind: "robot", name: "Riff", ...spy.robot })]));
+    if (url.endsWith("/api/devices/robot-1") && init?.method === "DELETE") { spy.deletes?.push(new URL(url, "http://x").pathname); return Promise.resolve(Response.json({ success: true })); }
+    if (url.endsWith("/api/robots/hosts/robot-1/cancel-install") && init?.method === "POST") { spy.cancels?.push(url); return Promise.resolve(Response.json({ removed: true })); }
+    if (url.endsWith("/api/robots/hosts/robot-1/install-status")) return Promise.resolve(spy.installing ? Response.json({ hosted: true, enrollment_pending: true }) : Response.json({ error: "No install" }, { status: 404 }));
     if (url.endsWith("/api/settings/registry")) return Promise.resolve(Response.json(registry));
     if (url.endsWith("/api/voice/voices")) return Promise.resolve(Response.json({ voices: [{ id: "pocket-tts-voice-alba", name: "Alba", description: "", language: "en", country: "", gender: "", source: "preset", engine: "pocket", onDisk: true, licence: null, revision: "test" }, { id: "community-test", name: "Community", description: "", language: "en", country: "", gender: "", source: "community", engine: "pocket", onDisk: true, licence: null, revision: "test" }] }));
     if (url.includes("/api/settings?scope=device%3Arobot-1")) return Promise.resolve(Response.json(registry.map((row) => ({ key: row.key, value: row.default, source: "default", label: row.label, help: row.help, level: row.level, secret: false }))));
@@ -57,8 +63,16 @@ function session(overrides: Partial<SessionInfo> = {}): SessionInfo {
   };
 }
 
+function renderDetail() {
+  return renderWithQueryClient(<MemoryRouter initialEntries={["/?device=robot-1"]}><HouseholdRobotsSection /></MemoryRouter>);
+}
+
+function renderRobots() {
+  return renderWithQueryClient(<RobotCards person={{ id: "person-1", role: "adult" } as never} />);
+}
+
 function renderSection() {
-  return renderWithQueryClient(<DevicesSection person={{ id: "person-1", role: "adult" } as never} />);
+  return renderWithQueryClient(<DevicesSection />);
 }
 
 function stubFetch(
@@ -96,6 +110,7 @@ function stubFetch(
       sessionRows = sessionRows.filter((s) => s.id !== sessionDelete[1]);
       return Promise.resolve(new Response(JSON.stringify({ success: true }), { status: 200 }));
     }
+    if (url.endsWith("/api/devices/robots")) return Promise.resolve(Response.json(deviceRows.filter((d) => d.kind === "robot")));
     if (url.endsWith("/api/devices")) return Promise.resolve(new Response(JSON.stringify(deviceRows), { status: 200 }));
     if (url.endsWith("/api/auth/sessions")) return Promise.resolve(new Response(JSON.stringify(sessionRows), { status: 200 }));
     throw new Error(`unstubbed fetch: ${url} (${method})`);
@@ -117,33 +132,6 @@ describe("DevicesSection", () => {
     expect(bodyHealthText({ ...base, motors_latched: ["antenna_left"] })).toContain("antenna_left");
     expect(bodyHealthText({ ...base, thermal: { level: "gestures_suspended", temp_c: 76, vision_hz: 2, fault: false } })).toContain("gestures paused");
   });
-  test("robot Settings is admin only and draws all registry keys from robot device cards", async () => {
-    const restore = settingsFetch(true);
-    try {
-      const admin = renderWithQueryClient(<MemoryRouter><Card><RobotBody device={device({ id: "robot-1", kind: "robot", name: "Riff" })} viewerRole="admin" onRemove={() => {}} confirmingRemove={false} onConfirmRemove={() => {}} onCancelRemove={() => {}} busy={false} onSetMuted={async () => {}} onStartLiveView={async () => ({ view_id: "v", stream: "" })} onStopLiveView={async () => {}} onAnswerMotorReboot={async () => {}} /></Card></MemoryRouter>);
-      fireEvent.click(admin.getByRole("button", { name: "Settings" }));
-      await admin.findByText("robot.hello.future");
-      expect(admin.getByText("robot.barge_in.open_mic")).toBeTruthy();
-      expect(admin.getByText("Face color")).toBeTruthy();
-      expect(admin.getByText("Night mode")).toBeTruthy();
-      cleanup();
-      const adult = renderWithQueryClient(<Card><RobotBody device={device({ id: "robot-1", kind: "robot", name: "Riff" })} viewerRole="adult" onRemove={() => {}} confirmingRemove={false} onConfirmRemove={() => {}} onCancelRemove={() => {}} busy={false} onSetMuted={async () => {}} onStartLiveView={async () => ({ view_id: "v", stream: "" })} onStopLiveView={async () => {}} onAnswerMotorReboot={async () => {}} /></Card>);
-      expect(adult.queryByRole("button", { name: "Settings" })).toBeNull();
-    } finally { restore(); }
-  });
-
-  test("robot Voice row lists mocked voices with Same as its person first", async () => {
-    const restore = settingsFetch(false);
-    try {
-      const view = renderWithQueryClient(<MemoryRouter><Card><RobotBody device={device({ id: "robot-1", kind: "robot", name: "Riff" })} viewerRole="admin" onRemove={() => {}} confirmingRemove={false} onConfirmRemove={() => {}} onCancelRemove={() => {}} busy={false} onSetMuted={async () => {}} onStartLiveView={async () => ({ view_id: "v", stream: "" })} onStopLiveView={async () => {}} onAnswerMotorReboot={async () => {}} /></Card></MemoryRouter>);
-      fireEvent.click(view.getByRole("button", { name: "Settings" }));
-      await view.findByText("Voice");
-      fireEvent.click(view.getByRole("combobox", { name: "Voice" }));
-      const choices = await view.findAllByRole("option");
-      expect(choices.map((choice) => choice.textContent)).toEqual(["Same as its person", "Alba"]);
-    } finally { restore(); }
-  });
-
   test("robot self tests show only reported parts, disable offline, and render pass and timeout results", async () => {
     const original = globalThis.fetch;
     globalThis.fetch = mock((_input: RequestInfo | URL, init?: RequestInit) => {
@@ -152,7 +140,7 @@ describe("DevicesSection", () => {
       return Promise.resolve(new Response(JSON.stringify({ code: "robot_no_answer", error: "The robot did not answer the test. Restart it, then try again." }), { status: 504 }));
     }) as unknown as typeof fetch;
     try {
-      const view = render(<Card><RobotBody device={device({ id: "robot-test", kind: "robot", capabilities: ["speaker", "head_pan_tilt"], state: { activity: "idle", muted: false, tracking: false, reachable: true, unreachableSince: null } })} viewerRole="admin" onRemove={() => {}} confirmingRemove={false} onConfirmRemove={() => {}} onCancelRemove={() => {}} busy={false} onSetMuted={async () => {}} onStartLiveView={async () => ({ view_id: "v", stream: "" })} onStopLiveView={async () => {}} onAnswerMotorReboot={async () => {}} /></Card>);
+      const view = render(<Card><RobotBody device={device({ id: "robot-test", kind: "robot", capabilities: ["speaker", "head_pan_tilt"], state: { activity: "idle", muted: false, tracking: false, reachable: true, unreachableSince: null } })} viewerRole="admin" onSetMuted={async () => {}} onStartLiveView={async () => ({ view_id: "v", stream: "" })} onStopLiveView={async () => {}} onAnswerMotorReboot={async () => {}} /></Card>);
       expect(view.queryByRole("button", { name: "Face" })).toBeNull();
       fireEvent.click(view.getByRole("button", { name: "Speaker" }));
       await view.findByText("Passed");
@@ -160,19 +148,48 @@ describe("DevicesSection", () => {
       await view.findByRole("alert");
 
       cleanup();
-      const offline = render(<Card><RobotBody device={device({ id: "robot-offline", kind: "robot", capabilities: ["speaker"], state: { activity: "idle", muted: false, tracking: false, reachable: false, unreachableSince: "2026-10-20T10:00:00Z" } })} viewerRole="admin" onRemove={() => {}} confirmingRemove={false} onConfirmRemove={() => {}} onCancelRemove={() => {}} busy={false} onSetMuted={async () => {}} onStartLiveView={async () => ({ view_id: "v", stream: "" })} onStopLiveView={async () => {}} onAnswerMotorReboot={async () => {}} /></Card>);
+      const offline = render(<Card><RobotBody device={device({ id: "robot-offline", kind: "robot", capabilities: ["speaker"], state: { activity: "idle", muted: false, tracking: false, reachable: false, unreachableSince: "2026-10-20T10:00:00Z" } })} viewerRole="admin" onSetMuted={async () => {}} onStartLiveView={async () => ({ view_id: "v", stream: "" })} onStopLiveView={async () => {}} onAnswerMotorReboot={async () => {}} /></Card>);
       expect((offline.getByRole("button", { name: "Speaker" }) as HTMLButtonElement).disabled).toBe(true);
     } finally { globalThis.fetch = original; }
   });
 
+  test("a household robot opens in a detail view with every registry key, and the settings dialog is gone", async () => {
+    const restore = settingsFetch(true);
+    try {
+      const view = renderDetail();
+      await view.findByText("robot.hello.future");
+      expect(view.getByText("robot.barge_in.open_mic")).toBeTruthy();
+      expect(view.getByText("Face color")).toBeTruthy();
+      expect(view.getByText("Night mode")).toBeTruthy();
+      expect(view.queryByRole("dialog")).toBeNull();
+      expect(view.getByRole("button", { name: "Forget this robot" })).toBeTruthy();
+    } finally { restore(); }
+  });
+  test("the list shows one row per household robot and opens a row to its detail", async () => {
+    const restore = settingsFetch(false);
+    try {
+      const view = renderWithQueryClient(<MemoryRouter><HouseholdRobotsSection /></MemoryRouter>);
+      fireEvent.click(await view.findByRole("link", { name: "Riff settings" }));
+      expect(await view.findByRole("button", { name: "Back to robots" })).toBeTruthy();
+      expect(view.getByLabelText("Name")).toBeTruthy();
+    } finally { restore(); }
+  });
+  test("robot Voice row lists mocked voices with Same as its person first", async () => {
+    const restore = settingsFetch(false);
+    try {
+      const view = renderDetail();
+      await view.findByText("Voice");
+      fireEvent.click(view.getByRole("combobox", { name: "Voice" }));
+      const choices = await view.findAllByRole("option");
+      expect(choices.map((choice) => choice.textContent)).toEqual(["Same as its person", "Alba"]);
+    } finally { restore(); }
+  });
   test("saving robot name calls the device PATCH route", async () => {
     const calls: unknown[] = [];
     const restore = settingsFetch(false, calls);
     try {
-      const view = renderWithQueryClient(<MemoryRouter><Card><RobotBody device={device({ id: "robot-1", kind: "robot", name: "Riff" })} viewerRole="owner" onRemove={() => {}} confirmingRemove={false} onConfirmRemove={() => {}} onCancelRemove={() => {}} busy={false} onSetMuted={async () => {}} onStartLiveView={async () => ({ view_id: "v", stream: "" })} onStopLiveView={async () => {}} onAnswerMotorReboot={async () => {}} /></Card></MemoryRouter>);
-      fireEvent.click(view.getByRole("button", { name: "Settings" }));
-      const input = view.getByLabelText("Name");
-      fireEvent.change(input, { target: { value: "Riff Two" } });
+      const view = renderDetail();
+      fireEvent.change(await view.findByLabelText("Name"), { target: { value: "Riff Two" } });
       fireEvent.click(view.getByRole("button", { name: "Save name and area" }));
       await waitFor(() => expect(calls).toContainEqual({ name: "Riff Two", area: null }));
     } finally { restore(); }
@@ -180,12 +197,45 @@ describe("DevicesSection", () => {
   test("shows the duplicate robot name response under the name field", async () => {
     const restore = settingsFetch(false, [], "Another robot is already called StackChan. Pick a different name.");
     try {
-      const view = renderWithQueryClient(<MemoryRouter><Card><RobotBody device={device({ id: "robot-1", kind: "robot", name: "Riff" })} viewerRole="owner" onRemove={() => {}} confirmingRemove={false} onConfirmRemove={() => {}} onCancelRemove={() => {}} busy={false} onSetMuted={async () => {}} onStartLiveView={async () => ({ view_id: "v", stream: "" })} onStopLiveView={async () => {}} onAnswerMotorReboot={async () => {}} /></Card></MemoryRouter>);
-      fireEvent.click(view.getByRole("button", { name: "Settings" }));
-      fireEvent.change(view.getByLabelText("Name"), { target: { value: "StackChan" } });
+      const view = renderDetail();
+      fireEvent.change(await view.findByLabelText("Name"), { target: { value: "StackChan" } });
       fireEvent.click(view.getByRole("button", { name: "Save name and area" }));
       expect(await view.findByRole("alert")).toHaveTextContent("Another robot is already called StackChan. Pick a different name.");
       expect(view.getByLabelText("Name")).toHaveAttribute("aria-invalid", "true");
+    } finally { restore(); }
+  });
+  test("Forget asks once, in the detail view, then calls the revoke route and returns to the list", async () => {
+    const deletes: string[] = [];
+    const restore = settingsFetch(false, [], undefined, { deletes });
+    try {
+      const view = renderDetail();
+      fireEvent.click(await view.findByRole("button", { name: "Forget this robot" }));
+      expect(view.getByText(/Forget Riff\?/)).toBeTruthy();
+      expect(view.queryByRole("button", { name: "Forget this robot" })).toBeNull();
+      fireEvent.click(view.getByRole("button", { name: "Yes, forget it" }));
+      await waitFor(() => expect(deletes).toEqual(["/api/devices/robot-1"]));
+    } finally { restore(); }
+  });
+  test("a robot still installing offers Cancel install, with one confirmation", async () => {
+    const cancels: string[] = [];
+    const restore = settingsFetch(false, [], undefined, { cancels, installing: true, robot: { lastSeenAt: null } });
+    try {
+      const view = renderDetail();
+      fireEvent.click(await view.findByRole("button", { name: "Cancel install" }));
+      fireEvent.click(view.getByRole("button", { name: "Yes, cancel install" }));
+      await waitFor(() => expect(cancels.length).toBe(1));
+    } finally { restore(); }
+  });
+  test("a robot card on the Family page has no management control for anyone", async () => {
+    const restore = stubFetch([device({ id: "robot-1", kind: "robot", name: "Riff", state: { activity: "idle", muted: false, tracking: false, reachable: true, unreachableSince: null } })], []);
+    try {
+      for (const role of ["adult", "admin"] as const) {
+        const view = renderWithQueryClient(<RobotCards person={{ id: "person-1", role } as never} />);
+        await view.findByText("Riff");
+        for (const name of ["Settings", "Forget this robot", "Cancel install", "Remove Riff"]) expect(view.queryByRole("button", { name })).toBeNull();
+        expect(view.getByRole("button", { name: "Mute microphone" })).toBeTruthy();
+        cleanup();
+      }
     } finally { restore(); }
   });
   test("empty devices and sessions say so, not a blank page", async () => {
@@ -276,7 +326,7 @@ describe("DevicesSection", () => {
       [],
     );
     try {
-      const { findByTestId } = renderSection();
+      const { findByTestId } = renderRobots();
       const card = await findByTestId("robot-card");
       expect(card.textContent).toContain("Muted");
       expect(card.textContent).toContain("Level unknown");
@@ -315,7 +365,7 @@ describe("DevicesSection", () => {
       [],
     );
     try {
-      const { findByTestId } = renderSection();
+      const { findByTestId } = renderRobots();
       const card = await findByTestId("robot-card");
       for (const label of [
         "Motion control",
@@ -356,7 +406,7 @@ describe("DevicesSection", () => {
       [],
     );
     try {
-      const { findByText } = renderSection();
+      const { findByText } = renderRobots();
       await findByText("Reconnecting");
       await findByText("Sleeping");
     } finally {
@@ -371,7 +421,7 @@ describe("DevicesSection", () => {
       state: { activity: "idle", muted: false, tracking: true, motion: "held", put_down_count: 1, reachable: true, unreachableSince: null },
     })], []);
     try {
-      const { findByText, findByTestId } = renderSection();
+      const { findByText, findByTestId } = renderRobots();
       await findByText("Being carried");
       const card = await findByTestId("robot-card");
       expect(card.textContent).not.toContain("Reachy was moved.");
@@ -400,7 +450,7 @@ describe("DevicesSection", () => {
       [],
     );
     try {
-      const { findByText, findByTestId } = renderSection();
+      const { findByText, findByTestId } = renderRobots();
       await findByText("Not responding");
       const card = await findByTestId("robot-card");
       expect(card.textContent).toContain("Last heard from");
@@ -415,21 +465,8 @@ describe("DevicesSection", () => {
   test("a robot with no report yet says it is waiting", async () => {
     const restore = stubFetch([device({ kind: "robot", name: "Riff", state: null })], []);
     try {
-      const { findByText } = renderSection();
+      const { findByText } = renderRobots();
       await findByText("Waiting for first report");
-    } finally {
-      restore();
-    }
-  });
-
-  test("removing a robot from its card asks first, then calls the revoke route", async () => {
-    const actions: Array<[string, string]> = [];
-    const restore = stubFetch([device({ id: "robot-1", kind: "robot", name: "Riff", state: null })], [], (kind, id) => actions.push([kind, id]));
-    try {
-      const { findByRole } = renderSection();
-      fireEvent.click(await findByRole("button", { name: "Remove Riff" }));
-      fireEvent.click(await findByRole("button", { name: "Yes, remove it" }));
-      await waitFor(() => expect(actions).toEqual([["device", "robot-1"]]));
     } finally {
       restore();
     }
@@ -444,7 +481,7 @@ describe("DevicesSection", () => {
       state: { activity: "idle", muted: false, tracking: false, reachable: true, unreachableSince: null },
     })], [], () => {}, (id, body) => commands.push([id, body]));
     try {
-      const { findByRole } = renderSection();
+      const { findByRole } = renderRobots();
       fireEvent.click(await findByRole("button", { name: "Mute microphone" }));
       await waitFor(() => expect(commands).toEqual([["robot-mute", { kind: "mute" }]]));
     } finally {
@@ -465,11 +502,6 @@ describe("DevicesSection", () => {
         name: "Riff",
         state: { activity: "idle", muted: false, tracking: false, reachable: true, unreachableSince: null },
       })}
-      onRemove={() => {}}
-      confirmingRemove={false}
-      onConfirmRemove={() => {}}
-      onCancelRemove={() => {}}
-      busy={false}
       onSetMuted={onSetMuted}
       onStartLiveView={async () => ({ view_id: "view-1", stream: "/api/devices/live-view/view-1" })}
       onStopLiveView={async () => {}}
@@ -491,11 +523,6 @@ describe("DevicesSection", () => {
         name: "Riff",
         state: { activity: "idle", muted: false, tracking: false, reachable, unreachableSince: null, motors_latched: ["body_yaw", "stewart_3"], ...(offer ? { motors_reboot_offer: offer } : {}) },
       })}
-      onRemove={() => {}}
-      confirmingRemove={false}
-      onConfirmRemove={() => {}}
-      onCancelRemove={() => {}}
-      busy={false}
       onSetMuted={async () => {}}
       onStartLiveView={async () => ({ view_id: "view-1", stream: "/api/devices/live-view/view-1" })}
       onStopLiveView={async () => {}}
@@ -537,11 +564,6 @@ describe("DevicesSection", () => {
         name: "Riff",
         state: { activity: "idle", muted: false, tracking: false, reachable: true, unreachableSince: null },
       })}
-      onRemove={() => {}}
-      confirmingRemove={false}
-      onConfirmRemove={() => {}}
-      onCancelRemove={() => {}}
-      busy={false}
       onSetMuted={async () => {}}
       onStartLiveView={start}
       onStopLiveView={stop}

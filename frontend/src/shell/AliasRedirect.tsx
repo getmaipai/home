@@ -7,7 +7,7 @@ const ALIASES: Record<string, string> = {
   "/settings/backups": "/backups",
   "/settings/voices": "/voices",
   "/settings/commands": "/commands",
-  "/settings/devices": "/devices",
+  "/settings/devices": "/settings/account/profile",
   "/settings/repairs": "/repairs",
   "/settings/updates": "/updates",
 };

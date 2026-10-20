@@ -59,7 +59,6 @@ const StatusPage = lazyNamed(() => import("@/shell/pages/StatusPage"), "StatusPa
 const UiShowcasePage = lazyNamed(() => import("@/shell/pages/UiShowcasePage"), "UiShowcasePage");
 const BackupsPage = lazyNamed(() => import("@/shell/pages/BackupsPage"), "BackupsPage");
 const CommandsPage = lazyNamed(() => import("@/shell/pages/CommandsPage"), "CommandsPage");
-const DevicesPage = lazyNamed(() => import("@/shell/pages/DevicesPage"), "DevicesPage");
 const PrivacyPage = lazyNamed(() => import("@/shell/pages/PrivacyPage"), "PrivacyPage");
 const UsersPage = lazyNamed(() => import("@/shell/pages/UsersPage"), "UsersPage");
 const FilesPage = lazyNamed(() => import("@/shell/pages/FilesPage"), "FilesPage");
@@ -118,7 +117,6 @@ function PageHeaderLayout() {
     "/status": "Status",
     "/backups": "Backups",
     "/commands": "Commands",
-    "/devices": "Devices",
     "/privacy": "Privacy",
     "/users": "Users",
     "/reference": "Reference",
@@ -269,7 +267,7 @@ function RoutesWithIncognito({ person, onPersonChange, onSignedOut }: { person: 
           <Route path="settings" element={<SettingsEntryRedirect person={person} />} />
           <Route path="settings/:area/:section?" element={<Suspense fallback={<RouteSkeleton />}><SettingsAreaPage person={person} onPersonChange={onPersonChange} /></Suspense>} />
           {/* ENGINES-AI-01: the Manage pages that moved into Home settings are links that land on their section. */}
-          {["voices", "engines", "models"].map((path) => (
+          {["voices", "engines", "models", "devices"].map((path) => (
             <Route key={path} path={path} element={<Navigate to={retiredManagePageTarget(`/${path}`, { canManageHousehold: meetsMinRole(person.role, "admin") }) ?? "/settings/account"} replace />} />
           ))}
           <Route path="customize" element={<CustomizeRedirect person={person} />} />
@@ -290,7 +288,6 @@ function RoutesWithIncognito({ person, onPersonChange, onSignedOut }: { person: 
             <Route path="status" element={<StatusPage person={person} />} />
             <Route path="backups" element={<BackupsPage person={person} />} />
             <Route path="commands" element={meetsMinRole(person.role, "adult") ? <CommandsPage person={person} /> : <Navigate to="/settings/account" replace />} />
-            <Route path="devices" element={<DevicesPage person={person} />} />
             <Route path="privacy" element={<PrivacyPage />} />
             <Route path="users" element={<UsersPage person={person} />} />
             <Route path="reference/*" element={<ReferencePage />} />

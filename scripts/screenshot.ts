@@ -189,6 +189,7 @@ const chatStatsReview = process.argv.includes("--chat-stats-review");
 const liveVoiceSessionReview = process.argv.includes("--live-voice-session-review");
 const canvasPaneReview = process.argv.includes("--canvas-pane-review");
 const liveViewReview = process.argv.includes("--live-view-review");
+const robotAdminReview = process.argv.includes("--robot-admin-review");
 const chatToolsRowReview = process.argv.includes("--chat-tools-row-review");
 const librarySourcesReview = process.argv.includes("--library-sources-review");
 const specSheetsReview = process.argv.includes("--spec-sheets-review");
@@ -425,7 +426,8 @@ const ROUTES: RouteSpec[] = [
   // added later without an entry here is a real gap," so closing it now
   // rather than leaving Users permanently unchecked by the matrix.
   { slug: "settings-users", path: "/users" },
-  { slug: "settings-devices", path: "/devices" },
+  // ROBOT-ADMIN-PLACE-01: /devices is a redirect now; the page that holds its content is Account, Profile (undersized-control debt: PROFILE-TOUCH-01).
+  { slug: "settings-robot-devices", path: "/settings/home/robot" },
   { slug: "files", path: "/files" },
   { slug: "reference", path: "/reference" },
   { slug: "reference-article", path: "/reference/wikipedia/A/Aspen" },
@@ -7669,7 +7671,7 @@ async function captureLiveViewReview(browser: Browser, sessionValue: string): Pr
         await page.route("**/api/devices**", async (route) => {
           const request = route.request();
           const url = new URL(request.url());
-          if (request.method() === "GET" && url.pathname === "/api/devices") {
+          if (request.method() === "GET" && (url.pathname === "/api/devices" || url.pathname === "/api/devices/robots")) {
             await route.fulfill({ json: [{
               id: "device-riff-live", kind: "robot", name: "Riff", area: "Living room",
               lastSeenAt: "2026-10-16T12:00:00.000Z", createdAt: "2026-10-01T12:00:00.000Z", capabilities: ["mute"],
@@ -7688,7 +7690,7 @@ async function captureLiveViewReview(browser: Browser, sessionValue: string): Pr
           }
           await route.continue();
         });
-        await page.goto(`${BASE_URL}/devices`);
+        await page.goto(`${BASE_URL}/people?tab=bots`);
         await page.getByTestId("robot-card").waitFor({ timeout: 15000 });
         await settleAnimations(page);
         const before = join(outDir, `live-view-closed-${viewport.width}-${theme}.png`);
@@ -7705,6 +7707,59 @@ async function captureLiveViewReview(browser: Browser, sessionValue: string): Pr
       } finally {
         await context.close();
       }
+    }
+  }
+}
+
+/** ROBOT-ADMIN-PLACE-01: Home settings, Devices at 1280 by 720: the robot list, then the robot's detail view with
+ * Forget in the header and the confirmation open. Every control the person needs must be on screen without scrolling
+ * the page. The robot is a stand-in; the run fails if the lifecycle button is not inside the viewport. */
+async function captureRobotAdminReview(browser: Browser, sessionValue: string): Promise<void> {
+  const outDir = join(ROOT, "data-scratch", "screenshots", "robot-admin");
+  mkdirSync(outDir, { recursive: true });
+  const viewport = { slug: "desktop-720", width: 1280, height: 720 } as unknown as (typeof VIEWPORTS)[number];
+  for (const theme of THEMES) {
+    const context = await newContext(browser, viewport, theme, sessionValue);
+    try {
+      const page = await context.newPage();
+      const robot = {
+        id: "device-riff-admin", kind: "robot", name: "Riff", area: "Living room",
+        lastSeenAt: "2026-10-16T12:00:00.000Z", createdAt: "2026-10-01T12:00:00.000Z", capabilities: ["mute"],
+        state: { activity: "idle", muted: false, tracking: true, reachable: true, unreachableSince: null, battery_level: 0.82, app_version: "0.1.0", daemon_version: "1.4.2" },
+      };
+      await page.route("**/api/devices**", async (route) => {
+        const url = new URL(route.request().url());
+        if (route.request().method() === "GET" && (url.pathname === "/api/devices" || url.pathname === "/api/devices/robots")) { await route.fulfill({ json: [robot] }); return; }
+        await route.continue();
+      });
+      await page.goto(`${BASE_URL}/settings/home/robot`);
+      const robotsSwitch = page.getByRole("switch", { name: "Robots" });
+      await robotsSwitch.waitFor({ timeout: 15000 });
+      if ((await robotsSwitch.getAttribute("aria-checked")) !== "true") { await robotsSwitch.click(); await page.getByText("Saved.").waitFor({ timeout: 15000 }); await page.reload(); }
+      await page.getByRole("link", { name: "Riff settings" }).waitFor({ timeout: 15000 }).catch(async (error: unknown) => {
+        await page.screenshot({ path: join(outDir, `robot-list-failed-${theme}.png`) });
+        throw error;
+      });
+      await settleAnimations(page);
+      const list = join(outDir, `robot-list-1280-${theme}.png`);
+      await page.screenshot({ path: list });
+      console.log(`Wrote ${list}`);
+      await page.getByRole("link", { name: "Riff settings" }).click();
+      const forget = page.getByRole("button", { name: "Forget this robot" });
+      await forget.waitFor({ timeout: 15000 });
+      await settleAnimations(page);
+      const box = await forget.boundingBox();
+      if (!box || box.y + box.height > 720) throw new Error(`captureRobotAdminReview: Forget this robot is below the 720 px screen (y=${box?.y ?? "none"}).`);
+      const detail = join(outDir, `robot-detail-1280-${theme}.png`);
+      await page.screenshot({ path: detail });
+      console.log(`Wrote ${detail}`);
+      await forget.click();
+      await page.getByRole("button", { name: "Yes, forget it" }).waitFor({ timeout: 15000 });
+      const confirm = join(outDir, `robot-forget-1280-${theme}.png`);
+      await page.screenshot({ path: confirm });
+      console.log(`Wrote ${confirm}`);
+    } finally {
+      await context.close();
     }
   }
 }
@@ -10734,6 +10789,12 @@ async function main() {
       return;
     }
 
+    if (!a11yOnly && robotAdminReview) {
+      await captureRobotAdminReview(browser, sessionValue);
+      console.log("completed named review: --robot-admin-review");
+      return;
+    }
+
     if (!a11yOnly && liveViewReview) {
       await captureLiveViewReview(browser, sessionValue);
       console.log("completed named review: --live-view-review");
@@ -10991,7 +11052,7 @@ async function main() {
       await capturePhoneHeaderFoldReview(browser, sessionValue);
     }
 
-    if (!a11yOnly && !docsReview && !setupReviewCaptures && !filesReview && !referenceReview && !laneBTouchTargetsReview && !settingsReview && !chatReview && !chatStatsReview && !chatResearchReview && !chatTemporaryReview && !chatContinueReview && !fitVerdictReview && !chatAcceptanceReview && !shellRailReview && !chatThreadActionsReview && !chatListReview && !chatSearchReview && !chatMobileSheetReview && !chatShortcutsReview && !chatFindHeaderAlignmentReview && !chatFindBubbleHoverWidthReview && !chatHeaderTitleReview && !phoneHeaderFoldReview && !nextChatArtifactReview && !nextChatComposerReview && !nextSidebarReview && !notificationsReview && !lookReview && !pictureReview && !showcaseScrollReview && !liveVoiceSessionReview && !canvasPaneReview && !liveViewReview && !chatToolsRowReview) {
+    if (!a11yOnly && !docsReview && !setupReviewCaptures && !filesReview && !referenceReview && !laneBTouchTargetsReview && !settingsReview && !chatReview && !chatStatsReview && !chatResearchReview && !chatTemporaryReview && !chatContinueReview && !fitVerdictReview && !chatAcceptanceReview && !shellRailReview && !chatThreadActionsReview && !chatListReview && !chatSearchReview && !chatMobileSheetReview && !chatShortcutsReview && !chatFindHeaderAlignmentReview && !chatFindBubbleHoverWidthReview && !chatHeaderTitleReview && !phoneHeaderFoldReview && !nextChatArtifactReview && !nextChatComposerReview && !nextSidebarReview && !notificationsReview && !lookReview && !pictureReview && !showcaseScrollReview && !liveVoiceSessionReview && !canvasPaneReview && !liveViewReview && !robotAdminReview && !chatToolsRowReview) {
       await captureHero(browser, sessionValue);
       const phone = VIEWPORTS.find((v) => v.slug === "phone")!;
       const desktop = VIEWPORTS.find((v) => v.slug === "desktop")!;
@@ -11022,7 +11083,7 @@ async function main() {
       ? SETUP_REVIEW_COMBOS
       : filesReview || referenceReview
       ? FILES_REVIEW_COMBOS
-      : docsReview || notificationsReview || lookReview || pictureReview || fitVerdictReview || laneBTouchTargetsReview || chatShortcutsReview || chatMobileSheetReview || liveVoiceSessionReview || canvasPaneReview || liveViewReview || chatToolsRowReview
+      : docsReview || notificationsReview || lookReview || pictureReview || fitVerdictReview || laneBTouchTargetsReview || chatShortcutsReview || chatMobileSheetReview || liveVoiceSessionReview || canvasPaneReview || liveViewReview || robotAdminReview || chatToolsRowReview
         ? []
         : a11yOnly || settingsReview || chatReview || chatStatsReview || chatResearchReview || chatContinueReview || fitVerdictReview
           ? A11Y_ONLY_COMBOS
