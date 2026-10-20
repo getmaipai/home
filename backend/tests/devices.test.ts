@@ -15,7 +15,7 @@ import { getDeviceById } from "@/lib/devices";
 import { DEFAULT_PERSONA } from "@/lib/persona";
 import { buildStablePrefix } from "@/lib/turnShared";
 
-beforeEach(() => resetDb());
+beforeEach(() => { resetDb(); setHouseholdSettingValue("home.robots.enabled", true); });
 
 async function owner(): Promise<{ client: TestClient; personId: string }> {
   const client = new TestClient();

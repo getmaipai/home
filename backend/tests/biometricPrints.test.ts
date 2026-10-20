@@ -10,9 +10,9 @@ import { storeRobotCredential } from "@/lib/robotCredentials";
 import type { DeviceKind } from "@/lib/devices";
 import { encryptSecret } from "@/lib/secrets";
 import { newBiometricPrintId } from "@/lib/id";
-import { setValue } from "@/lib/settings";
+import { setHouseholdSettingValue, setValue } from "@/lib/settings";
 
-beforeEach(() => resetDb());
+beforeEach(() => { resetDb(); setHouseholdSettingValue("home.robots.enabled", true); });
 
 async function ownerSession(): Promise<TestClient> {
   const client = new TestClient();

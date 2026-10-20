@@ -1,4 +1,5 @@
 import { describe, expect, test, beforeEach } from "bun:test";
+import { setHouseholdSettingValue } from "@/lib/settings";
 import { resetDb } from "./reset-db";
 import {
   normalizeEndpointUrl,
@@ -13,6 +14,7 @@ import {
 
 beforeEach(() => {
   resetDb();
+  setHouseholdSettingValue("home.robots.enabled", true);
 });
 
 describe("normalizeEndpointUrl()", () => {

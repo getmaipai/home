@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, test } from "bun:test";
+import { setHouseholdSettingValue } from "@/lib/settings";
 import { eq } from "drizzle-orm";
 import { TestClient } from "./client";
 import { resetDb } from "./reset-db";
@@ -8,7 +9,7 @@ import { deleteDevice } from "@/lib/devices";
 import { issueDeviceToken } from "@/lib/deviceTokens";
 import { storeRobotCredential } from "@/lib/robotCredentials";
 
-beforeEach(() => resetDb());
+beforeEach(() => { resetDb(); setHouseholdSettingValue("home.robots.enabled", true); });
 
 async function ownerSession(): Promise<{ client: TestClient; personId: string }> {
   const client = new TestClient();

@@ -33,6 +33,7 @@ let received: Array<{ text: string; voice: string | null }> = [];
 
 beforeEach(() => {
   resetDb();
+  setHouseholdSettingValue("home.robots.enabled", true);
   received = [];
   fixture = startStackFixture({
     "POST /v1/audio/speech": async (req) => {

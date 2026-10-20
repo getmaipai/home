@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, test } from "bun:test";
+import { setHouseholdSettingValue } from "@/lib/settings";
 import { eq } from "drizzle-orm";
 import { app } from "@/app";
 import { db, sqlite } from "@/db";
@@ -9,7 +10,7 @@ import { startRobotSelfTest, __setRobotSelfTestTimeoutForTests } from "@/lib/rob
 import { TestClient } from "./client";
 import { resetDb } from "./reset-db";
 
-beforeEach(() => resetDb());
+beforeEach(() => { resetDb(); setHouseholdSettingValue("home.robots.enabled", true); });
 
 async function setup(capabilities = ["speaker", "eyes", "head_pan_tilt", "lights", "mic", "no_vendor_login"]): Promise<{ admin: TestClient; robot: TestClient; deviceId: string; personId: string }> {
   const admin = new TestClient();
