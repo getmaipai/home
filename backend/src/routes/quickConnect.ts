@@ -13,6 +13,7 @@ import { db } from "@/db";
 import { people } from "@/db/schema";
 import { renderClipBundle } from "@/lib/robotClips";
 import { robotsEnabled, ROBOTS_OFF_MESSAGE } from "@/lib/robots";
+import { matchHostedRobotSecret, consumeHostedRobotSecret } from "@/lib/robotHost";
 
 export const quickConnectRoutes = apiRouter();
 
@@ -37,6 +38,7 @@ const createRouteDef = createRoute({
             // unbuilt); the field exists so the row can carry it the
             // moment one does.
             capabilities: z.array(z.string()).default([]),
+            pairing_secret: z.string().optional(),
           }),
         },
       },
@@ -58,12 +60,14 @@ const createRouteDef = createRoute({
   },
 });
 quickConnectRoutes.openapi(createRouteDef, (c) => {
-  const { label, kind, capabilities } = c.req.valid("json");
+  const { label, kind, capabilities, pairing_secret } = c.req.valid("json");
   if (kind === "robot" && !robotsEnabled()) {
     return c.json({ error: ROBOTS_OFF_MESSAGE }, 403);
   }
-  const req = createQuickConnect(label, kind, capabilities);
+  const matched = matchHostedRobotSecret({ kind, pairingSecret: pairing_secret });
+  const req = createQuickConnect(label, kind, capabilities, matched?.existingDeviceId, matched?.personId);
   if (!req) return c.json({ error: "Too many Quick Connect requests right now. Wait a moment and try again." }, 429);
+  if (matched) consumeHostedRobotSecret(matched.existingDeviceId);
   return c.json({ code: req.code, poll_token: req.pollToken }, 200);
 });
 
@@ -117,7 +121,7 @@ quickConnectRoutes.openapi(pollRoute, (c) => {
     // it must redeem it like any other native client (POST
     // /api/auth/devices/redeem), which is where the rotation gate lives.
     if (approved.kind !== "robot") issueSession(c, approved.personId, sessionSignInSource(c));
-    const { token, deviceId, expiresAt } = issueDeviceToken(approved.personId, approved.kind, approved.label, approved.capabilities);
+    const { token, deviceId, expiresAt } = issueDeviceToken(approved.personId, approved.kind, approved.label, approved.capabilities, approved.existingDeviceId);
     if (approved.kind === "robot") {
       void renderClipBundle(deviceId).catch(() => {
         console.error("[robot-clips] pairing render failed; check Repairs to retry the bundle");

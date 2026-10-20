@@ -21,7 +21,7 @@ import { eq, lt, asc, isNotNull } from "drizzle-orm";
 import { db } from "@/db";
 import { deviceTokens, devices, people } from "@/db/schema";
 import { newDeviceTokenId } from "@/lib/id";
-import { createDevice, touchDevice, type DeviceKind } from "@/lib/devices";
+import { createDevice, getDeviceById, touchDevice, type DeviceKind } from "@/lib/devices";
 
 // The token lives a year, but a household rule revokes any device token (every kind, a TV included) that has not been used
 // for 180 days: such a device pairs again. `resolveDeviceToken` enforces it on every request and redeem also refuses disabled,
@@ -57,17 +57,22 @@ export function issueDeviceToken(
   kind: DeviceKind,
   label: string,
   capabilities: string[] = [],
+  existingDeviceId?: string,
 ): { token: string; deviceId: string; expiresAt: string } {
   pruneExpiredDeviceTokens();
   pruneOldestIfOverLimit(personId);
 
-  const device = createDevice(kind, label, personId, capabilities);
+  if (existingDeviceId) {
+    const existing = getDeviceById(existingDeviceId);
+    if (!existing || existing.kind !== kind || existing.personId !== personId) throw new Error("The existing device does not belong to this person.");
+  }
+  const deviceId = existingDeviceId ?? createDevice(kind, label, personId, capabilities).id;
   const token = randomBytes(32).toString("hex");
   const expiresAt = new Date(Date.now() + TTL_MS).toISOString();
   db.insert(deviceTokens)
     .values({
       id: newDeviceTokenId(),
-      deviceId: device.id,
+      deviceId,
       personId,
       tokenHash: hashDeviceToken(token),
       expiresAt,
@@ -76,7 +81,12 @@ export function issueDeviceToken(
       createdAt: new Date().toISOString(),
     })
     .run();
-  return { token, deviceId: device.id, expiresAt };
+  return { token, deviceId, expiresAt };
+}
+
+/** True once any token was ever issued for this device (hosted robots get a fresh pairing secret only until then). */
+export function deviceHasToken(deviceId: string): boolean {
+  return !!db.select({ id: deviceTokens.id }).from(deviceTokens).where(eq(deviceTokens.deviceId, deviceId)).get();
 }
 
 /** Resolves a device token to its person, stamping where it came in from

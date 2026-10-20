@@ -28,6 +28,7 @@ import { listRobotPeople } from "@/lib/robotPeople";
 import { acceptRobotSelfTestResult, startRobotSelfTest } from "@/lib/robotSelfTestRuns";
 import { robotSelfTestPartsFor } from "@/wire";
 import { RobotSelfTestResult } from "@maipai/spec/gen/ts/robot-self-test-result.js";
+import { forgetRobotHost } from "@/lib/robotHost";
 
 export const devicesRoutes = apiRouter();
 
@@ -482,9 +483,12 @@ const deleteRoute = createRoute({
     ...errorResponses({ 404: "No such device (or it isn't mine)" }),
   },
 });
-devicesRoutes.openapi(deleteRoute, (c) => {
+devicesRoutes.openapi(deleteRoute, async (c) => {
   const actor = c.get("person");
   const { id } = c.req.valid("param");
+  const current = getDeviceById(id);
+  if (!current || current.personId !== actor.id) return c.json({ error: "No such device" }, 404);
+  if (current.kind === "robot") await forgetRobotHost(id);
   if (!deleteDevice(id, actor.id)) return c.json({ error: "No such device" }, 404);
   forgetRobotSocketAddress(id);
   closeDeviceCommandChannel(id);

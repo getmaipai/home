@@ -29807,6 +29807,9 @@
                       "type": "string"
                     },
                     "default": []
+                  },
+                  "pairing_secret": {
+                    "type": "string"
                   }
                 },
                 "required": [
@@ -30020,6 +30023,93 @@
           },
           "403": {
             "description": "Robots are turned off on this home",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/robots/hosts": {
+      "post": {
+        "tags": [
+          "Robots"
+        ],
+        "summary": "Start a Bot app on Home for a StackChan",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "label": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 60
+                  }
+                },
+                "required": [
+                  "label"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Hosted robot created.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "device_id": {
+                      "type": "string"
+                    },
+                    "ports": {
+                      "type": "object",
+                      "properties": {
+                        "voice": {
+                          "type": "number"
+                        },
+                        "avatar": {
+                          "type": "number"
+                        },
+                        "vision": {
+                          "type": "number"
+                        }
+                      },
+                      "required": [
+                        "voice",
+                        "avatar",
+                        "vision"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "device_id",
+                    "ports"
+                  ]
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Robots are turned off or admin access is required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Robot host could not start",
             "content": {
               "application/json": {
                 "schema": {

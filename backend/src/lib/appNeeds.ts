@@ -4,6 +4,7 @@ import { missingRequired, unavailableCapabilities } from "@/lib/capabilities";
 import { serviceComponent } from "@/lib/serviceComponent";
 import type { PackageManifest } from "@maipai/spec/gen/ts/manifest.js";
 import type { AppNeed, StatusApp } from "@/lib/statusApps";
+import { listRobotHostStatusApps } from "@/lib/robotHost";
 export type { StatusApp } from "@/lib/statusApps";
 
 const CORE_APPS: StatusApp[] = [
@@ -66,7 +67,7 @@ export function listStatusApps(): StatusApp[] {
     ...app,
     needs: [...app.needs, ...(BUILT_IN_PLUGIN_SERVICES[app.id] ?? [])],
   }));
-  return [...core, ...installed];
+  return [...core, ...installed, ...listRobotHostStatusApps()];
 }
 
 export function configuredServiceComponents(): string[] {

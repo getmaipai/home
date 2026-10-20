@@ -20,6 +20,18 @@ function insertPerson(): string {
 
 beforeEach(() => resetDb());
 
+describe("issueDeviceToken() for an existing device", () => {
+  test("binds the token to that device without creating a second one, and refuses another person's device", async () => {
+    const { createHostedRobot } = await import("@/lib/devices");
+    const personId = insertPerson();
+    const robot = createHostedRobot("Rivet", personId);
+    const issued = issueDeviceToken(personId, "robot", "Rivet", [], robot.id);
+    expect(issued.deviceId).toBe(robot.id);
+    expect(listDevicesForPerson(personId)).toHaveLength(1);
+    expect(() => issueDeviceToken(insertPerson(), "robot", "Rivet", [], robot.id)).toThrow();
+  });
+});
+
 describe("issueDeviceToken()", () => {
   test("mints a token AND the Device row it points at", () => {
     const personId = insertPerson();

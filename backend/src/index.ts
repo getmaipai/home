@@ -16,6 +16,7 @@ import { runPlugin, registerAllPackageNotificationTypes, registerAllPackageProje
 import { cleanupStaleSnapshots } from "@/lib/backup";
 import { sampleEngineStats } from "@/lib/engineStats";
 import { startAllSidecars, registerGracefulExit } from "@/lib/sidecars";
+import { startRobotHosts } from "@/lib/robotHost";
 import { startKiwixSidecar } from "@/lib/kiwixSidecar";
 import { resumeReferenceJobsOnBoot } from "@/lib/referencePresetEngine";
 import { initCrashBootHold } from "@/lib/dirtyBoot";
@@ -278,6 +279,8 @@ void startKiwixSidecar();
 startDdgsStackSync();
 // CODE-STACK-01 H2: Home's coding settings are the Stack's source; send them at start (never throws; the Stack may not be up yet and gets them on the next change).
 void pushCodingSettings();
+// ROBOT-HOST-01: hosted StackChan Bot apps register here (never throws; one failing host raises its own Repairs item).
+void startRobotHosts();
 void startAllSidecars();
 resumeReferenceJobsOnBoot();
 // Warm Home-owned chat when the Stack does not serve it.

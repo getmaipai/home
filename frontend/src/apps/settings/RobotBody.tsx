@@ -394,7 +394,7 @@ export function RobotBody({
           </div>
           {cards.map((card) => <SettingsRenderer key={`${card.scope}:${card.group}`} scope="device" scopeValue={`device:${device.id}`} only={[card.group]} titleOverrides={{ [card.group]: card.label }} optionsFrom={{ "voices.tts": robotVoiceOptions }} />)}
           <DialogFooter>
-            {forgetConfirming || confirmingRemove ? <><p className="mr-auto text-base font-medium">Forget {device.name}? It will need to be paired again.</p><Button variant="destructive" onClick={onConfirmRemove} disabled={busy}>{busy ? "Working…" : "Yes, forget it"}</Button><Button variant="ghost" onClick={() => { setForgetConfirming(false); onCancelRemove(); }}>Keep it</Button></> : <Button variant="destructive" onClick={() => { setForgetConfirming(true); onRemove(); }}>Forget this robot</Button>}
+            {forgetConfirming || confirmingRemove ? <><p className="mr-auto text-base font-medium">Forget {device.name}? It will need to be paired again. This also deletes the robot's memories and its saved firmware backup.</p><Button variant="destructive" onClick={onConfirmRemove} disabled={busy}>{busy ? "Working…" : "Yes, forget it"}</Button><Button variant="ghost" onClick={() => { setForgetConfirming(false); onCancelRemove(); }}>Keep it</Button></> : <Button variant="destructive" onClick={() => { setForgetConfirming(true); onRemove(); }}>Forget this robot</Button>}
           </DialogFooter>
         </DialogContent>
       </Dialog> : null}

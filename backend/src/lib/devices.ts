@@ -92,6 +92,11 @@ export function getDeviceById(id: string): Device | null {
   return row ? toDevice(row) : null;
 }
 
+/** Create a device record before its first token is issued (hosted robots). */
+export function createHostedRobot(name: string, personId: string): Device {
+  return createDevice("robot", name, personId, ["no_vendor_login"]);
+}
+
 /** Update only the admin-editable display fields; undefined leaves a field unchanged. */
 export type UpdateDeviceResult =
   | { ok: true; device: Device }

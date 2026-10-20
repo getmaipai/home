@@ -300,6 +300,13 @@ export interface SidecarConfig {
    * health endpoint - it's then considered healthy as long as its process
    * hasn't exited (no periodic poll loop starts). */
   healthUrl?: string;
+  /** Custom health probe for non-HTTP sidecars. */
+  healthCheck?: () => Promise<boolean>;
+  /** Called with the failure text before the generic crash item is raised; return true when the owner raised its own
+   * Repairs item (so there is exactly one). */
+  onFailure?: (reason: string) => Promise<boolean> | boolean;
+  /** Called whenever the sidecar is seen healthy (start or recovery). */
+  onHealthy?: () => void;
   /** Ascending start order, descending stop order. Ties keep insertion
    * order (Array.sort is stable). Default 0. */
   startupOrder?: number;
@@ -399,6 +406,13 @@ export function getSidecar(
   const entry = registry.get(id);
   if (!entry) return undefined;
   return { status: entry.status, baseUrl: baseUrlFor(entry.config) };
+}
+
+/** Remove a declaration and its restart handler after its owner forgets it. */
+export function unregisterSidecar(id: string): void {
+  const entry = registry.get(id);
+  if (entry?.healthTimer) clearInterval(entry.healthTimer);
+  registry.delete(id);
 }
 
 export type SidecarStartPhase = "installing" | "preparing" | "starting";
@@ -1224,6 +1238,7 @@ async function checkHealthUrl(url: string): Promise<boolean> {
 
 async function raiseCrashIssue(id: string, detail: string): Promise<void> {
   const label = registry.get(id)?.config.label;
+  if (await registry.get(id)?.config.onFailure?.(detail)) return;
   await raiseIssue({
     source: `sidecar:${id}`,
     key: "crashed",
@@ -1248,15 +1263,15 @@ export async function startSidecar(id: string): Promise<void> {
   const { config } = entry;
   markSidecarStartPhase(id, "starting");
   try {
-    const healthCheck = config.healthUrl
+    const healthCheck = config.healthCheck ?? (config.healthUrl
       ? () => checkHealthUrl(config.healthUrl!)
-      : async () => true;
+      : async () => true);
     const proc = await spawnAndWaitHealthy({
       command: config.command,
       cwd: config.cwd,
       port: config.port,
       healthCheck,
-      minUptimeMs: config.healthUrl ? 0 : NO_HEALTH_URL_GRACE_MS,
+      minUptimeMs: config.healthUrl || config.healthCheck ? 0 : NO_HEALTH_URL_GRACE_MS,
       label: id,
     });
     // A code review (2026-09-06) found a race here: stopSidecar() called
@@ -1280,6 +1295,7 @@ export async function startSidecar(id: string): Promise<void> {
     entry.restartAttempts = 0;
     log(entry, "started");
     resolveIssue(`sidecar:${id}`, "crashed");
+    config.onHealthy?.();
     startHealthLoop(entry);
   } catch (err) {
     clearSidecarStart(id);
@@ -1305,7 +1321,7 @@ function startHealthLoop(entry: SidecarEntry): void {
   // exiting on its own is the only failure this shape can detect, and
   // nothing currently registers a sidecar with no health URL, so that
   // detection is deferred rather than built for zero real callers.
-  if (!entry.config.healthUrl) return;
+  if (!entry.config.healthUrl && !entry.config.healthCheck) return;
   entry.healthTimer = setInterval(() => void pollHealth(entry), healthPollMs);
 }
 
@@ -1315,12 +1331,13 @@ async function pollHealth(entry: SidecarEntry): Promise<void> {
     await handleDown(entry, `process exited (code ${entry.proc.exitCode})`);
     return;
   }
-  const healthy = await checkHealthUrl(entry.config.healthUrl!);
+  const healthy = entry.config.healthCheck ? await entry.config.healthCheck() : await checkHealthUrl(entry.config.healthUrl!);
   if (healthy) {
     entry.consecutiveFailures = 0;
     if (entry.status !== "running") {
       entry.status = "running";
       resolveIssue(`sidecar:${entry.config.id}`, "crashed");
+      entry.config.onHealthy?.();
     }
     return;
   }
