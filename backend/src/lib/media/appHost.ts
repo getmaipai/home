@@ -672,10 +672,11 @@ function musicLibrary(person: PersonRow): MediaItem[] {
  * The file visibility check is delegated to madeFileFor. A person's own root is valid when the
  * fresh hub has no household root; readableIn still applies the ordinary source and band gates. */
 function promoteMadeMusicFile(person: PersonRow, fileId: string): MediaItem | null {
+  // A file saved by an earlier press is a media item already (and no longer listed as a made file): reuse it.
+  const existing = db.select().from(mediaItems).where(eq(mediaItems.locFileId, fileId)).get();
+  if (existing) return readableIn(person, "music", existing.id);
   const file = madeFileFor(person, "music", fileId);
   if (!file) return null;
-  const existing = db.select().from(mediaItems).where(eq(mediaItems.locFileId, file.id)).get();
-  if (existing) return readableIn(person, "music", existing.id);
   const roots = allowedSources(person).filter((candidate) => candidate.kind === "root");
   // Reuse only a root the person can actually read items from (its `visible_to` is the household or names them).
   const readable = (candidate: MediaSource): boolean => candidate.visible_to === "household" || (Array.isArray(candidate.visible_to) && candidate.visible_to.includes(person.id));
