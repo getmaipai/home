@@ -27,7 +27,7 @@ import { apiRouter, errorResponses } from "@/lib/openapi";
 import { issueSession, sessionSignInSource } from "@/lib/session";
 import { redeemDeviceToken } from "@/lib/deviceTokens";
 import { getDeviceById } from "@/lib/devices";
-import { hasRotatedRobotCredential } from "@/lib/robotCredentials";
+import { hasRotatedRobotCredential, robotNeedsPasswordRotation } from "@/lib/robotCredentials";
 import { db } from "@/db";
 import { people } from "@/db/schema";
 
@@ -65,9 +65,10 @@ deviceAuthRoutes.openapi(redeemRoute, (c) => {
   const person = db.select({ enabled: people.enabled }).from(people).where(and(eq(people.id, redeemed.personId), isNull(people.deletedAt))).get();
   if (!person || !person.enabled) return c.json({ error: "Unknown or expired device token" }, 401);
 
-  // ROBOT-DEVICE-01 (bot/docs/dev/design-reachy-mini-2026-09-27.md
-  // section 8): "a robot with the published password is refused by
-  // Home's add flow until it is [rotated]." A code review (2026-09-27)
+  // ROBOT-PAIR-02 (robot-register-test-configure-2026-10-20.md section 1):
+  // the gate follows the body. A robot with no published vendor login
+  // declares no_vendor_login and skips rotation; every other robot keeps
+  // ROBOT-DEVICE-01's published-password refusal. A code review (2026-09-27)
   // found the prior landing only enforced this in one browser tab's own
   // React state - the server handed out a working, year-long token the
   // moment the robot's own poll consumed the approval, with nothing
@@ -76,7 +77,7 @@ deviceAuthRoutes.openapi(redeemRoute, (c) => {
   // place every device token (native client, and eventually the robot's
   // own hub client, RM-05) is traded for a working session.
   const device = getDeviceById(redeemed.deviceId);
-  if (device && device.kind === "robot" && !hasRotatedRobotCredential(device.id)) {
+  if (device && robotNeedsPasswordRotation(device) && !hasRotatedRobotCredential(device.id)) {
     return c.json(
       { error: "This robot's password has not been rotated off the vendor default yet.", code: "robot_password_unrotated" },
       403,

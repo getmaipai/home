@@ -69,6 +69,16 @@ describe("RobotPasswordSection", () => {
     }
   });
 
+  test("a robot that reports no_vendor_login is not listed for rotation", async () => {
+    const restore = stubFetch({ devices: [device({ name: "StackChan", capabilities: ["speaker", "no_vendor_login"] })] });
+    try {
+      const { container } = renderSection();
+      await waitFor(() => expect(container.textContent).toBe(""));
+    } finally {
+      restore();
+    }
+  });
+
   test("a robot still on the vendor default shows that badge", async () => {
     const restore = stubFetch({ devices: [device()], rotated: false });
     try {

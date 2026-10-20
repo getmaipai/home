@@ -55,6 +55,35 @@ describe("POST /api/auth/devices/redeem", () => {
     expect(me.status).toBe(401);
   });
 
+  test("a robot that reports no_vendor_login redeems without a rotated password", async () => {
+    const owner = new TestClient();
+    await owner.post("/api/auth/setup", { displayName: "Sage", secret: "correcthorse" });
+    const person = db.select().from(people).where(eq(people.displayName, "Sage")).get()!;
+    const { token } = issueDeviceToken(person.id, "robot", "StackChan", ["speaker", "eyes", "no_vendor_login"]);
+    const res = await new TestClient().post("/api/auth/devices/redeem", { token });
+    expect(res.status).toBe(200);
+  });
+
+  test("a robot that reports no capabilities still requires a rotated password", async () => {
+    const owner = new TestClient();
+    await owner.post("/api/auth/setup", { displayName: "Sage", secret: "correcthorse" });
+    const person = db.select().from(people).where(eq(people.displayName, "Sage")).get()!;
+    const { token } = issueDeviceToken(person.id, "robot", "StackChan", []);
+    const res = await new TestClient().post("/api/auth/devices/redeem", { token });
+    expect(res.status).toBe(403);
+    expect((await res.json() as { code: string }).code).toBe("robot_password_unrotated");
+  });
+
+  test("older Reachy capabilities still require a rotated password", async () => {
+    const owner = new TestClient();
+    await owner.post("/api/auth/setup", { displayName: "Sage", secret: "correcthorse" });
+    const person = db.select().from(people).where(eq(people.displayName, "Sage")).get()!;
+    const { token } = issueDeviceToken(person.id, "robot", "Reachy Mini", ["head_6dof", "antennas"]);
+    const res = await new TestClient().post("/api/auth/devices/redeem", { token });
+    expect(res.status).toBe(403);
+    expect((await res.json() as { code: string }).code).toBe("robot_password_unrotated");
+  });
+
   test("a robot device token redeems normally once its password is rotated", async () => {
     const owner = new TestClient();
     await owner.post("/api/auth/setup", { displayName: "Sage", secret: "correcthorse" });

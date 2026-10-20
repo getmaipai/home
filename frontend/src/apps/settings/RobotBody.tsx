@@ -6,7 +6,7 @@ import { Progress } from "@maipai/ui/src/dashboard/components/ui/progress";
 import { Image } from "@maipai/ui/src/elements/image";
 import { ErrorState } from "@maipai/ui/src/elements/error-state";
 import { ApiError, type DeviceInfo, type RobotDeviceState } from "@/lib/api";
-import { robotCapabilityLabel } from "@/apps/settings/capabilityLabels";
+import { NO_VENDOR_LOGIN, robotCapabilityLabel } from "@/apps/settings/capabilityLabels";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@maipai/ui/src/ui/dialog";
 import { Input } from "@maipai/ui/src/ui/input";
 import { Label } from "@maipai/ui/src/dashboard/components/ui/label";
@@ -96,6 +96,8 @@ export function RobotBody({
   onAnswerMotorReboot: (answer: "yes" | "no") => Promise<void>;
 }) {
   const state = device.state ?? null;
+  // no_vendor_login describes the pairing gate (ROBOT-PAIR-02), not a feature, so it gets no badge.
+  const featureCapabilities = device.capabilities.filter((capability) => capability !== NO_VENDOR_LOGIN);
   const admin = isOwnerOrAdminRole(viewerRole);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [forgetConfirming, setForgetConfirming] = useState(false);
@@ -211,9 +213,9 @@ export function RobotBody({
         </CardAction>
       </CardHeader>
       <CardContent>
-        {device.capabilities.length > 0 ? (
+        {featureCapabilities.length > 0 ? (
           <div className="mb-4 flex flex-wrap gap-2" aria-label="Robot capabilities">
-            {device.capabilities.map((capability) => (
+            {featureCapabilities.map((capability) => (
               <Badge key={capability} variant="outline">
                 {robotCapabilityLabel(capability)}
               </Badge>

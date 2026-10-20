@@ -8,6 +8,7 @@ import { Input } from "@maipai/ui/src/ui/input";
 import { Button } from "@maipai/ui/src/ui/button";
 import { api, ApiError, type DeviceInfo, type DiscoveredRobotInfo } from "@/lib/api";
 import { RobotPasswordRow } from "./RobotPasswordSection";
+import { NO_VENDOR_LOGIN } from "./capabilityLabels";
 
 const TOTP_REQUIRED_MESSAGE = "A current TOTP code is required to approve a new device";
 const AWAIT_ROBOT_POLL_MS = 2000;
@@ -76,6 +77,7 @@ export function AddRobotSection() {
   const newRobot = awaitingRobot
     ? (robotsQuery.data ?? []).find((d) => priorRobotIds !== null && !priorRobotIds.has(d.id))
     : undefined;
+  const noVendorLogin = newRobot?.capabilities.includes(NO_VENDOR_LOGIN) ?? false;
   // A code review (2026-09-27) found this flow had no way out when the
   // robot never claims the approval at all (an expired code, a reboot
   // mid-pairing, RM-05 not existing yet so nothing ever polls) - the
@@ -219,11 +221,26 @@ export function AddRobotSection() {
         </form>
       ) : newRobot ? (
         <div className="flex max-w-sm flex-col gap-2">
-          <p className="text-base text-[var(--primary)]">
-            Approved and paired. It still has the vendor's published default password - rotate
-            it now to finish adding it.
-          </p>
-          <RobotPasswordRow device={newRobot} defaultOpen onRotated={() => setRotationDone(true)} />
+          {noVendorLogin ? (
+            <>
+              <p className="text-base text-[var(--primary)]">
+                Approved and paired. No vendor password to change. It's ready to use.
+              </p>
+              <div className="flex">
+                <Button variant="outline" onClick={startOver}>
+                  Pair another robot
+                </Button>
+              </div>
+            </>
+          ) : (
+            <>
+              <p className="text-base text-[var(--primary)]">
+                Approved and paired. It still has the vendor's published default password - rotate
+                it now to finish adding it.
+              </p>
+              <RobotPasswordRow device={newRobot} defaultOpen onRotated={() => setRotationDone(true)} />
+            </>
+          )}
         </div>
       ) : robotsQuery.isError ? (
         <div className="flex max-w-sm flex-col gap-2">

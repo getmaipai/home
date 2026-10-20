@@ -7,6 +7,7 @@ import { Badge } from "@maipai/ui/src/ui/badge";
 import { Input } from "@maipai/ui/src/ui/input";
 import { Button } from "@maipai/ui/src/ui/button";
 import { api, ApiError, type DeviceInfo } from "@/lib/api";
+import { NO_VENDOR_LOGIN } from "./capabilityLabels";
 
 // ROBOT-DEVICE-01: "the add flow refuses to finish while the unit's
 // published default SSH password stands and rotates it into the
@@ -120,7 +121,8 @@ export function RobotPasswordSection() {
   // mints a robot's device under whichever admin approved the pairing, so
   // a different admin still needs to see it here to rotate its password.
   const devicesQuery = useQuery<DeviceInfo[]>({ queryKey: ["robot-devices"], queryFn: () => api.robotDevices() });
-  const robots = devicesQuery.data ?? [];
+  // ROBOT-PAIR-02: a body that reports no_vendor_login has no published password to rotate.
+  const robots = (devicesQuery.data ?? []).filter((d) => !d.capabilities.includes(NO_VENDOR_LOGIN));
 
   if (devicesQuery.isFetching && !devicesQuery.data) return null;
   if (robots.length === 0) return null;

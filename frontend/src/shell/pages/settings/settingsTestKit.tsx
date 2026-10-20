@@ -88,8 +88,8 @@ export function mockHome({ robots = false, wakeword = false, hasChild = false, s
     }
     if (url.includes("/api/voice/wakewords")) return Promise.resolve(Response.json({ detectors: [], installed: wakeword }));
     if (url.endsWith("/api/commands")) return Promise.resolve(Response.json([]));
-    if (url.includes("/api/devices/robots")) return Promise.resolve(Response.json(robots ? [{ id: "d1", kind: "robot", name: "Robot" }] : []));
-    if (url.includes("/api/devices")) return Promise.resolve(Response.json(robots ? [{ id: "d1", kind: "robot", name: "Robot" }] : []));
+    if (url.includes("/api/devices/robots")) return Promise.resolve(Response.json(robots ? [{ id: "d1", kind: "robot", name: "Robot", capabilities: [] }] : []));
+    if (url.includes("/api/devices")) return Promise.resolve(Response.json(robots ? [{ id: "d1", kind: "robot", name: "Robot", capabilities: [] }] : []));
     if (url.endsWith("/api/people") || url.includes("/api/people?")) return Promise.resolve(Response.json(hasChild ? [{ id: "person-kid", role: "child", display_name: "Kid" }] : []));
     if (url.includes("/api/plugins/skills")) return Promise.resolve(Response.json([]));
     if (url.includes("/api/biometric-prints")) return Promise.resolve(Response.json([]));

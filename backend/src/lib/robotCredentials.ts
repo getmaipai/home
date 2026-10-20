@@ -8,6 +8,7 @@
 import { eq, desc } from "drizzle-orm";
 import { db } from "@/db";
 import { robotCredentials } from "@/db/schema";
+import type { Device } from "@/lib/devices";
 import { encryptSecret, decryptSecret } from "@/lib/secrets";
 
 export function storeRobotCredential(deviceId: string, host: string, sshUsername: string, password: string): void {
@@ -51,4 +52,10 @@ export function getMostRecentRobotCredentialForHost(host: string): RobotCredenti
 
 export function hasRotatedRobotCredential(deviceId: string): boolean {
   return db.select({ deviceId: robotCredentials.deviceId }).from(robotCredentials).where(eq(robotCredentials.deviceId, deviceId)).get() != null;
+}
+
+/** The redeem gate follows the robot body: only an explicit capability
+ * reporting no published vendor login skips password rotation. */
+export function robotNeedsPasswordRotation(device: Pick<Device, "kind" | "capabilities">): boolean {
+  return device.kind === "robot" && !device.capabilities.includes("no_vendor_login");
 }

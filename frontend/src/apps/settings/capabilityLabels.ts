@@ -1,3 +1,6 @@
+/** ROBOT-PAIR-02: a body with no published vendor login; it describes the pairing gate, not a feature. */
+export const NO_VENDOR_LOGIN = "no_vendor_login";
+
 export const ROBOT_CAPABILITY_LABELS: Record<string, string> = {
   head_pan_tilt: "Head turns and nods",
   light_ring: "Light ring",
