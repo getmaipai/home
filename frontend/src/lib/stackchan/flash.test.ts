@@ -100,4 +100,12 @@ describe("StackChan browser flash", () => {
     const urls = (globalThis.fetch as unknown as { mock: { calls: Array<[RequestInfo | URL]> } }).mock.calls.map((call) => String(call[0]));
     expect(urls.some((url) => url.endsWith("flash-backup"))).toBe(false);
   });
+  test("a port that never closes does not hold back the error", async () => {
+    const part = new Uint8Array([1, 2, 3, 4]);
+    stub(part, await digest(part));
+    const { transport } = standIn();
+    const started = Date.now();
+    await expect(installStackChan({ ...transport, read: () => new Promise<Uint8Array>(() => {}), close: () => new Promise<void>(() => {}) }, {}, { stallTimeoutMs: 20 })).rejects.toThrow(STALL_TIMEOUT_MESSAGE);
+    expect(Date.now() - started).toBeLessThan(5000);
+  });
 });

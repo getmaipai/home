@@ -7,6 +7,7 @@ export type FlashPart = { path: string; offset: number; size: number; sha256: st
 export type FlashManifest = { builds: Array<{ chipFamily: string; parts: FlashPart[] }>; flash_size: string };
 export type FlashStage = "Connecting" | "Backing up" | "Writing" | "Checking" | "Restarting";
 export const CONNECT_TIMEOUT_MS = 30_000;
+export const CLOSE_WAIT_MS = 2_000;
 export const STALL_TIMEOUT_MS = 45_000;
 export const CONNECT_TIMEOUT_MESSAGE = "The StackChan did not answer on this USB port within 30 seconds. Choose the USB JTAG/serial debug unit port, close any other app using it, unplug and replug the StackChan, then try again.";
 export const SKIP_BACKUP_KEY = "stackchan.skipBackup";
@@ -144,7 +145,8 @@ export async function installStackChan(transport: FlashTransport, callbacks: Ins
     await transport.hardReset();
     return { deviceId: host.device_id };
   } finally {
-    await transport.close?.();
+    // A read that is stuck can keep the port busy, so closing may never finish; the result must not wait on it.
+    await Promise.race([Promise.resolve(transport.close?.()).catch(() => undefined), new Promise((resolve) => setTimeout(resolve, CLOSE_WAIT_MS))]);
   }
 }
 
