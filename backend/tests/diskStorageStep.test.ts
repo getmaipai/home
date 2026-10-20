@@ -17,10 +17,12 @@ describe("the storage step asks for what the plan needs", () => {
   });
 
   test("a models drive too small for the plan is refused with the plan's figure and what to do", () => {
-    const rows = spaceRows({ models: "/small-disk/models" }, false, { freeBytes: (path) => (path.startsWith("/small-disk") ? 30 * GIB : 5000 * GIB), device: (path) => (path.startsWith("/small-disk") ? 2 : 1) });
+    // Half the recorded plan's need, so the test holds for every plan level this machine has recorded.
+    const smallGb = Math.max(1, Math.floor(aiRequiredBytes(plan) / GIB / 2));
+    const rows = spaceRows({ models: "/small-disk/models" }, false, { freeBytes: (path) => (path.startsWith("/small-disk") ? smallGb * GIB : 5000 * GIB), device: (path) => (path.startsWith("/small-disk") ? 2 : 1) });
     const models = rows.find((row) => row.class === "models");
     expect(models?.kind).toBe("refusal");
-    expect(models?.text).toMatch(/^The \w+ setup needs about \d+ GB free on this drive, and it has 30 GB\. Choose a folder on a drive with more room\.$/);
+    expect(models?.text).toMatch(new RegExp(`^The \\w+ setup needs about \\d+ GB free on this drive, and it has ${smallGb}(?:\\.0)? GB\\. Choose a folder on a drive with more room\\.$`));
     expect(rows.find((row) => row.class === "records")).toBeUndefined();
   });
 
