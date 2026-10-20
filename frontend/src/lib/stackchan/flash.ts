@@ -10,7 +10,6 @@ export const CONNECT_TIMEOUT_MS = 30_000;
 export const CLOSE_WAIT_MS = 2_000;
 export const STALL_TIMEOUT_MS = 45_000;
 export const CONNECT_TIMEOUT_MESSAGE = "The StackChan did not answer on this USB port within 30 seconds. Choose the USB JTAG/serial debug unit port, close any other app using it, unplug and replug the StackChan, then try again.";
-export const SKIP_BACKUP_KEY = "stackchan.skipBackup";
 export const STALL_TIMEOUT_MESSAGE = "The StackChan stopped answering during the backup. Check the USB cable, unplug and replug the StackChan, then try again.";
 export interface FlashTransport {
   connect(): Promise<void>;
