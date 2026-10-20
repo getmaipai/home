@@ -105,7 +105,9 @@ async function reapStaleBotApp(host: HostRecord): Promise<void> {
   if (!Number.isInteger(pid) || pid <= 1) return;
   try { process.kill(pid, 0); } catch { rmSync(pidFile(host.deviceId), { force: true }); return; }
   const command = commandOf(pid);
-  if (!command.includes("maipai-bot-host") || !command.includes(join(roots, host.deviceId))) return;
+  // The shipped launcher execs `python3 -m maipai_body.hub_host`, so either name marks our Bot app.
+  const ours = command.includes("maipai-bot-host") || command.includes("maipai_body.hub_host");
+  if (!ours || !command.includes(join(roots, host.deviceId))) return;
   for (const signal of ["SIGTERM", "SIGKILL"] as const) {
     try { process.kill(pid, signal); } catch { break; }
     const end = Date.now() + 4000;
@@ -140,6 +142,8 @@ function register(host: HostRecord, releaseDir: string): void {
       await waitForOwnPortsToClear(host, 3000);
       const taken = await firstPortInUse(host);
       if (taken !== null) throw new Error(`port-in-use:${taken}`);
+      // A Forget while this start waited must not recreate the robot's directory.
+      if (!configs.has(host.deviceId)) throw new Error("robot host forgotten");
       if (!deviceHasToken(host.deviceId)) writeSecret(host);
     },
     onSpawn: (pid) => { try { writeFileSync(pidFile(host.deviceId), String(pid), { mode: 0o600 }); } catch { /* the pid file is a convenience for the next boot */ } },
@@ -216,14 +220,15 @@ export async function startRobotHosts(): Promise<void> {
   }
 }
 export async function stopRobotHosts(): Promise<void> {
-  for (const [id, host] of configs) {
+  // All at once: each stop can wait several seconds for its own Bot app to exit.
+  await Promise.all([...configs].map(async ([id, host]) => {
     await stopSidecar(sidecarId(id));
     await waitForOwnPortsToClear(host, 3000);
     rmSync(pidFile(id), { force: true });
     // Robots off: no stale "stopped" or "can't start" item (its Restart button would be refused anyway).
     resolveIssue(sidecarId(id), "port-in-use");
     resolveIssue(`sidecar:${sidecarId(id)}`, "crashed");
-  }
+  }));
 }
 export async function forgetRobotHost(deviceId: string): Promise<void> {
   if (!validId(deviceId)) throw new Error("That is not a robot device id.");

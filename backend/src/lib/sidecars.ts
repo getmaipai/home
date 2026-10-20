@@ -696,6 +696,8 @@ export async function sweepOrphanProcesses(
 
 export interface SpawnAndWaitOptions {
   command: string[];
+  /** Called with the child's pid right after it is spawned, before it is healthy. */
+  onSpawn?: (pid: number) => void;
   cwd?: string;
   /** Freed via freePort() before spawning, when given. */
   port?: number;
@@ -785,6 +787,7 @@ export async function spawnAndWaitHealthy(
     stderr: opts.logName ? "pipe" : "inherit",
     ...(opts.env ? { env: opts.env } : {}),
   });
+  if (proc.pid) opts.onSpawn?.(proc.pid);
   if (opts.logName) {
     const logger = createLogger(logsDir, opts.logName);
     void pipeAndLog(proc.stdout as ReadableStream<Uint8Array>, process.stdout, logger);
@@ -1275,6 +1278,13 @@ export async function startSidecar(id: string): Promise<void> {
   markSidecarStartPhase(id, "starting");
   try {
     await config.beforeStart?.();
+    // A stop, or Robots turned off, while beforeStart() was waiting must not spawn the child anyway.
+    if (entry.stopping || (config.canStart && !config.canStart())) {
+      clearSidecarStart(id);
+      if (entry.status === "starting") entry.status = "stopped";
+      log(entry, "start aborted: stopped before spawning");
+      return;
+    }
     const healthCheck = config.healthCheck ?? (config.healthUrl
       ? () => checkHealthUrl(config.healthUrl!)
       : async () => true);
@@ -1285,6 +1295,7 @@ export async function startSidecar(id: string): Promise<void> {
       healthCheck,
       minUptimeMs: config.healthUrl || config.healthCheck ? 0 : NO_HEALTH_URL_GRACE_MS,
       label: id,
+      onSpawn: config.onSpawn,
     });
     // A code review (2026-09-06) found a race here: stopSidecar() called
     // while this await was in flight sets `stopping` and status
@@ -1302,7 +1313,6 @@ export async function startSidecar(id: string): Promise<void> {
     }
     clearSidecarStart(id);
     entry.proc = proc;
-    if (proc.pid) config.onSpawn?.(proc.pid);
     entry.status = "running";
     entry.consecutiveFailures = 0;
     entry.restartAttempts = 0;

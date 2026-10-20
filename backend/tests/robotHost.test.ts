@@ -452,6 +452,31 @@ describe("review fixes", () => {
     stranger.kill();
   });
 
+  test("a leftover Bot app started by the shipped launcher (python -m maipai_body.hub_host) is recognised and stopped", async () => {
+    const { id } = await owner();
+    const { deviceId } = await createRobotHost({ label: "Rivet", personId: id });
+    await stopRobotHosts();
+    __resetSidecarsForTests();
+    __resetRobotHostsForTests();
+    // The shell stays the parent (two commands), so its command line keeps the module name and this host's data directory.
+    const orphan = Bun.spawn(["/bin/sh", "-c", "sleep 30; true", "maipai_body.hub_host", "run", "--data-dir", join(roots, deviceId)]);
+    writeFileSync(join(roots, deviceId, "host.pid"), String(orphan.pid));
+    await sleep(200);
+    await startRobotHosts();
+    await orphan.exited;
+    expect(orphan.signalCode).toBe("SIGTERM");
+    expect(getSidecar(`robot-host:${deviceId}`)?.status).toBe("running");
+  });
+
+  test("turning Robots off stops every robot brain at once", async () => {
+    const { id } = await owner();
+    await createRobotHost({ label: "Rivet", personId: id });
+    await createRobotHost({ label: "Sprout", personId: id });
+    const started = Date.now();
+    await stopRobotHosts();
+    expect(Date.now() - started).toBeLessThan(9000);
+  });
+
   test("Forget still deletes the device when the directory cannot be removed", async () => {
     const { client, id } = await owner();
     const { deviceId } = await createRobotHost({ label: "Rivet", personId: id });
