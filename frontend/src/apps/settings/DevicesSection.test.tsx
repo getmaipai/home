@@ -2,6 +2,7 @@ import { describe, expect, test, mock, afterEach } from "bun:test";
 import { cleanup, fireEvent, render, waitFor } from "@testing-library/react";
 import { DevicesSection } from "@/apps/settings/DevicesSection";
 import { HouseholdRobotsSection } from "@/apps/settings/HouseholdRobotsSection";
+import { RobotSelfTests } from "@/apps/settings/RobotSelfTests";
 import { RobotCards } from "@/apps/settings/RobotCards";
 import { Card } from "@maipai/ui/src/dashboard/components/ui/card";
 import { bodyHealthText, didPutDownCountIncrease, RobotBody } from "@/apps/settings/RobotBody";
@@ -140,7 +141,7 @@ describe("DevicesSection", () => {
       return Promise.resolve(new Response(JSON.stringify({ code: "robot_no_answer", error: "The robot did not answer the test. Restart it, then try again." }), { status: 504 }));
     }) as unknown as typeof fetch;
     try {
-      const view = render(<Card><RobotBody device={device({ id: "robot-test", kind: "robot", capabilities: ["speaker", "head_pan_tilt"], state: { activity: "idle", muted: false, tracking: false, reachable: true, unreachableSince: null } })} viewerRole="admin" onSetMuted={async () => {}} onStartLiveView={async () => ({ view_id: "v", stream: "" })} onStopLiveView={async () => {}} onAnswerMotorReboot={async () => {}} /></Card>);
+      const view = render(<RobotSelfTests device={device({ id: "robot-test", kind: "robot", capabilities: ["speaker", "head_pan_tilt"], state: { activity: "idle", muted: false, tracking: false, reachable: true, unreachableSince: null } })} />);
       expect(view.queryByRole("button", { name: "Face" })).toBeNull();
       fireEvent.click(view.getByRole("button", { name: "Speaker" }));
       await view.findByText("Passed");
@@ -148,7 +149,7 @@ describe("DevicesSection", () => {
       await view.findByRole("alert");
 
       cleanup();
-      const offline = render(<Card><RobotBody device={device({ id: "robot-offline", kind: "robot", capabilities: ["speaker"], state: { activity: "idle", muted: false, tracking: false, reachable: false, unreachableSince: "2026-10-20T10:00:00Z" } })} viewerRole="admin" onSetMuted={async () => {}} onStartLiveView={async () => ({ view_id: "v", stream: "" })} onStopLiveView={async () => {}} onAnswerMotorReboot={async () => {}} /></Card>);
+      const offline = render(<RobotSelfTests device={device({ id: "robot-offline", kind: "robot", capabilities: ["speaker"], state: { activity: "idle", muted: false, tracking: false, reachable: false, unreachableSince: "2026-10-20T10:00:00Z" } })} />);
       expect((offline.getByRole("button", { name: "Speaker" }) as HTMLButtonElement).disabled).toBe(true);
     } finally { globalThis.fetch = original; }
   });
@@ -232,7 +233,7 @@ describe("DevicesSection", () => {
       for (const role of ["adult", "admin"] as const) {
         const view = renderWithQueryClient(<RobotCards person={{ id: "person-1", role } as never} />);
         await view.findByText("Riff");
-        for (const name of ["Settings", "Forget this robot", "Cancel install", "Remove Riff"]) expect(view.queryByRole("button", { name })).toBeNull();
+        for (const name of ["Settings", "Forget this robot", "Cancel install", "Remove Riff", "Speaker", "Head"]) expect(view.queryByRole("button", { name })).toBeNull();
         expect(view.getByRole("button", { name: "Mute microphone" })).toBeTruthy();
         cleanup();
       }

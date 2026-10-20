@@ -16,6 +16,7 @@ import { Item, ItemContent, ItemDescription, ItemGroup, ItemTitle } from "@maipa
 import areasFile from "@maipai/spec/settings/areas.json";
 import { SettingsRenderer } from "@/shell/pages/settings/SettingsRenderer";
 import { api, ApiError, type DeviceInfo } from "@/lib/api";
+import { RobotSelfTests } from "@/apps/settings/RobotSelfTests";
 import { playableVoices, voiceFriendlyName } from "@/lib/voice/voiceBrowserRows";
 
 const DEVICE_PARAM = "device";
@@ -142,6 +143,7 @@ function RobotDetail({ device, onClose }: { device: DeviceInfo; onClose: () => v
         ) : null}
         {lifecycleError ? <Alert variant="destructive"><AlertDescription>{lifecycleError}</AlertDescription></Alert> : null}
         <p className="text-base"><Badge variant="secondary">{statusText(device)}</Badge>{device.ipAddress ? <> IP address {device.ipAddress}</> : null}</p>
+        <RobotSelfTests device={device} />
         <div className="flex flex-col gap-3">
           <Label htmlFor={`robot-name-${device.id}`}>Name</Label>
           <Input id={`robot-name-${device.id}`} value={name} maxLength={60} aria-invalid={saveError !== null} onChange={(event) => setName(event.target.value)} />
