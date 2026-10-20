@@ -89,4 +89,15 @@ describe("StackChan browser flash", () => {
     const slow: FlashTransport = { ...transport, read: async (_address, size, progress) => { for (let i = 0; i < 4; i++) { await new Promise((resolve) => setTimeout(resolve, 15)); progress?.(i, 4); } return new Uint8Array(size); } };
     await installStackChan(slow, {}, { stallTimeoutMs: 40 });
   });
+  test("skipBackup never reads the flash or posts a backup, and still writes each part", async () => {
+    const part = new Uint8Array([1, 2, 3, 4]);
+    stub(part, await digest(part));
+    const { transport, writes } = standIn();
+    let reads = 0;
+    await installStackChan({ ...transport, read: async (_address, size) => { reads++; return new Uint8Array(size); } }, {}, { skipBackup: true });
+    expect(reads).toBe(0);
+    expect(writes.map((write) => write.address)).toEqual([0x10000, 0x9000]);
+    const urls = (globalThis.fetch as unknown as { mock: { calls: Array<[RequestInfo | URL]> } }).mock.calls.map((call) => String(call[0]));
+    expect(urls.some((url) => url.endsWith("flash-backup"))).toBe(false);
+  });
 });
