@@ -146,7 +146,7 @@ const patchDeviceRoute = createRoute({
   request: { params: idParamSchema("id", "device-a1b2c3"), body: { content: { "application/json": { schema: PatchDeviceSchema } } } },
   responses: {
     200: { content: { "application/json": { schema: DeviceSchema } }, description: "Updated device." },
-    ...errorResponses({ 400: "Invalid name or area", 404: "No such device" }),
+    ...errorResponses({ 400: "Invalid name or area", 404: "No such device", 409: "Another robot already has this name" }),
   },
 });
 devicesRoutes.openapi(patchDeviceRoute, (c) => {
@@ -154,8 +154,10 @@ devicesRoutes.openapi(patchDeviceRoute, (c) => {
   const raw = c.req.valid("json");
   const existing = getDeviceById(id);
   if (!existing) return c.json({ error: "No such device" }, 404);
-  const updated = updateDevice(id, raw);
-  if (!updated) return c.json({ error: "No such device" }, 404);
+  const result = updateDevice(id, raw);
+  if (!result.ok && result.reason === "robot_name_taken") return c.json({ error: `Another robot is already called ${result.existingName}. Pick a different name.` }, 409);
+  if (!result.ok) return c.json({ error: "No such device" }, 404);
+  const updated = result.device;
   return c.json({ id: updated.id, kind: updated.kind, name: updated.name, area: updated.area, lastSeenAt: updated.lastSeenAt, createdAt: updated.createdAt, capabilities: updated.capabilities, offlineScope: updated.offlineScope as Array<"media.offline" | "offline.records">, state: updated.kind === "robot" ? stateForViewer(getDeviceState(id), c.get("person")) : null }, 200);
 });
 

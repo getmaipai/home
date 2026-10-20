@@ -73,6 +73,7 @@ import { decidePendingAsk } from "@/lib/gate/pendingAskMigration";
 import type { GateDecision } from "@/lib/gate/types";
 
 export interface RunTurnNextOpts {
+  robotName?: string;
   conversationId?: string;
   turnId?: string;
   images?: import("@/wire").ChatImagePart[];
@@ -226,8 +227,8 @@ function buildTurnValue(state: TurnState, startedAt: number, source: TurnValue["
 async function measuredContextSegments(state: TurnState): Promise<Partial<Record<ContextSegmentKey, number>> | undefined> {
   if (state.bare || state.generations.length === 0) return undefined;
   try {
-  const base = contextToMessages(state.context, state.utterance, state.persona, state.plan, state.signal, state.planBasis.surfaceClass ?? "spoken", state.pictureParts ?? [], false, state.topicBlock);
-  const memoryCut = contextToMessages(state.context, state.utterance, state.persona, state.plan, state.signal, state.planBasis.surfaceClass ?? "spoken", state.pictureParts ?? [], true, state.topicBlock);
+  const base = contextToMessages(state.context, state.utterance, state.persona, state.plan, state.signal, state.planBasis.surfaceClass ?? "spoken", state.pictureParts ?? [], false, state.topicBlock, state.robotName);
+  const memoryCut = contextToMessages(state.context, state.utterance, state.persona, state.plan, state.signal, state.planBasis.surfaceClass ?? "spoken", state.pictureParts ?? [], true, state.topicBlock, state.robotName);
   const windowEnd = 1 + state.context.filter((item) => item.source === "window").length;
   const [prefix, withTools, withHistory, withMemory] = await Promise.all([
     countTokens(base.slice(0, 1)),
@@ -575,6 +576,7 @@ async function beginTurn(actor: PersonRow, surface: Surface, text: string, opts:
     conversationId: conversation.id,
     actor,
     surface,
+    ...(surface === "robot" && opts.robotName ? { robotName: opts.robotName } : {}),
     ...(surface === "robot" ? { speakerEvidence: opts.speakerEvidence ?? null, present: opts.present ?? null } : {}),
     utterance: text,
     ...(offerTurn ? { offer: offerTurn } : {}),

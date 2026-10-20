@@ -125,8 +125,8 @@ export function deriveCrisisResources(safety: SafetyResult): string | undefined 
 // the stable prefix's own fragments one at a time, including the
 // identity line and this suffix on their own, ahead of the persona's
 // dials - it needs the exact real text, never a re-typed copy.
-export function identityLine(persona: Persona): string {
-  return `You are ${persona.display_name}, a private, self-hosted AI assistant for this household.`;
+export function identityLine(persona: Persona, identityName = persona.display_name): string {
+  return `You are ${identityName}, a private, self-hosted AI assistant for this household.`;
 }
 
 // TRUEUP-01 (docs/plans/chat-trueup-2026-09-23.md, the owner's rule of
@@ -361,22 +361,22 @@ export function capSection(text: string, maxChars: number): string {
  * companion/rules/naturalness sections it composes with are unchanged
  * (the spoken persona fragments stay, as the designed fallback until
  * EVAL-03). */
-export function buildStablePrefix(persona: Persona = DEFAULT_PERSONA, surfaceClass: SurfaceClass = "spoken", topicBlock = ""): string {
-  const prefix = stablePrefixBody(persona, surfaceClass);
+export function buildStablePrefix(persona: Persona = DEFAULT_PERSONA, surfaceClass: SurfaceClass = "spoken", topicBlock = "", identityName?: string): string {
+  const prefix = stablePrefixBody(persona, surfaceClass, identityName);
   // MINOR-TOPICS-01c: the sensitive-subject block follows the persona sections; "" (an adult) adds nothing.
   return topicBlock.length > 0 ? `${prefix}\n\n${topicBlock}` : prefix;
 }
 
-function stablePrefixBody(persona: Persona, surfaceClass: SurfaceClass): string {
+function stablePrefixBody(persona: Persona, surfaceClass: SurfaceClass, identityName?: string): string {
   if (surfaceClass === "written") {
-    const base = `${identityLine(persona)} ${stableSuffixFor("written")}`;
+    const base = `${identityLine(persona, identityName)} ${stableSuffixFor("written")}`;
     const voiceSection = capSection(composePersonaPrompt(persona, "written"), MAX_WRITTEN_VOICE_SECTION_CHARS);
     return voiceSection.length > 0 ? `${base} ${voiceSection}` : base;
   }
   const companionSection = capSection(composePersonaPrompt(persona, surfaceClass), MAX_COMPANION_SECTION_CHARS);
   const rulesSection = capSection(INFORMATION_HANDLING_POLICY, MAX_RULES_SECTION_CHARS);
   const naturalnessSection = capSection(NATURALNESS_POLICY, MAX_NATURALNESS_SECTION_CHARS);
-  return `${identityLine(persona)} ${stableSuffixFor(surfaceClass)} ${companionSection} ${rulesSection} ${naturalnessSection}`;
+  return `${identityLine(persona, identityName)} ${stableSuffixFor(surfaceClass)} ${companionSection} ${rulesSection} ${naturalnessSection}`;
 }
 
 // A `routing.patterns` entry is a literal string with at most one `*`

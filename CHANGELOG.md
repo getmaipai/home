@@ -7,6 +7,9 @@ checklist (`docs/dev.md`). The first release is 0.1.0.
 
 ## [Unreleased]
 
+### Added
+- Robots get unique names, and each robot answers to the name on its card.
+
 ## [0.2.35] - 2026-10-19
 
 Pictures that fail to load show a neutral placeholder instead of a broken-image icon, and an adult can use the coding tools on files that mention child protections. No database migrations. Pins: ui-v0.5.303 (spec stays 0.1.192).

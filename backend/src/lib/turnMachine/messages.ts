@@ -171,7 +171,7 @@ function isStableContext(source: ContextItem["source"]): boolean {
  * prefix NEXT-CACHE-01 needed. The plan line follows labelled context
  * and precedes the raw words, as the approved CHAT-LATE-SYSTEM-01
  * verdict requires for every model and surface class. */
-export function contextToMessages(context: readonly ContextItem[], utterance: string, persona: Persona, plan: ReplyPlan, signal: TurnSignal, surfaceClass: SurfaceClass, pictures: readonly LlmImagePart[] = [], cutAfterMemory = false, topicBlock = ""): LlmMessage[] {
+export function contextToMessages(context: readonly ContextItem[], utterance: string, persona: Persona, plan: ReplyPlan, signal: TurnSignal, surfaceClass: SurfaceClass, pictures: readonly LlmImagePart[] = [], cutAfterMemory = false, topicBlock = "", identityName?: string): LlmMessage[] {
   // VISION-02c: pictures ride with the person's raw words on the final
   // user message; the labelled text section never replaces the image parts.
   const windowItems = context.filter((item) => item.source === "window");
@@ -209,7 +209,7 @@ export function contextToMessages(context: readonly ContextItem[], utterance: st
   // role "system" on every surface class; the coordinator's own
   // follow-up ruling named the volatile message's own plan line as the
   // real suspect instead - see below.
-  messages.push({ role: "system", content: `${buildStablePrefix(persona, promptSurfaceClass, topicBlock)}${stableContextLines}` });
+  messages.push({ role: "system", content: `${buildStablePrefix(persona, promptSurfaceClass, topicBlock, identityName)}${stableContextLines}` });
   // The window already alternates user/assistant/tool roles correctly
   // (buildConversationWindow()'s own job); this machine never rebuilds
   // that ordering, only replays the window's own roles verbatim.

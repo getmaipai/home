@@ -9,6 +9,7 @@ import { ApiError, type DeviceInfo, type RobotDeviceState } from "@/lib/api";
 import { NO_VENDOR_LOGIN, robotCapabilityLabel } from "@/apps/settings/capabilityLabels";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@maipai/ui/src/ui/dialog";
 import { Input } from "@maipai/ui/src/ui/input";
+import { FieldError } from "@maipai/ui/src/dashboard/components/ui/field";
 import { Label } from "@maipai/ui/src/dashboard/components/ui/label";
 import { SettingsRenderer } from "@/shell/pages/settings/SettingsRenderer";
 import areasFile from "@maipai/spec/settings/areas.json";
@@ -339,11 +340,11 @@ export function RobotBody({
           <DialogHeader><DialogTitle>{device.name} settings</DialogTitle><DialogDescription>Change this robot's name, area and settings.</DialogDescription></DialogHeader>
           <div className="flex flex-col gap-3">
             <Label htmlFor={`robot-name-${device.id}`}>Name</Label>
-            <Input id={`robot-name-${device.id}`} value={name} maxLength={60} onChange={(event) => setName(event.target.value)} />
+            <Input id={`robot-name-${device.id}`} value={name} maxLength={60} aria-invalid={saveError !== null} onChange={(event) => setName(event.target.value)} />
+            <FieldError errors={saveError ? [{ message: saveError }] : []} />
             <Label htmlFor={`robot-area-${device.id}`}>Area</Label>
             <Input id={`robot-area-${device.id}`} value={area} maxLength={60} onChange={(event) => setArea(event.target.value)} />
             <Button disabled={saveBusy || !name.trim()} onClick={() => void saveIdentity()}>{saveBusy ? "Saving…" : "Save name and area"}</Button>
-            {saveError ? <p role="alert" className="text-sm text-destructive">{saveError}</p> : null}
           </div>
           {cards.map((card) => <SettingsRenderer key={`${card.scope}:${card.group}`} scope="device" scopeValue={`device:${device.id}`} only={[card.group]} titleOverrides={{ [card.group]: card.label }} />)}
           <DialogFooter>

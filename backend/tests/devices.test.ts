@@ -11,6 +11,9 @@ import { setHouseholdSettingValue } from "@/lib/settings";
 import { privacyConnections } from "@/lib/privacy";
 import { getHubInstanceId } from "@/lib/hubIdentity";
 import { addManagedEndpoint } from "@/lib/hubEndpoints";
+import { getDeviceById } from "@/lib/devices";
+import { DEFAULT_PERSONA } from "@/lib/persona";
+import { buildStablePrefix } from "@/lib/turnShared";
 
 beforeEach(() => resetDb());
 
@@ -38,6 +41,35 @@ describe("GET /api/devices", () => {
     expect(body).toHaveLength(1);
     expect(body[0]!.name).toBe("Living room TV");
     expect(body[0]!.kind).toBe("tv");
+  });
+});
+
+describe("robot names", () => {
+  test("pairing suffixes duplicate robot names, but a TV may share the name", async () => {
+    const { client, personId } = await owner();
+    const first = issueDeviceToken(personId, "robot", "StackChan");
+    const second = issueDeviceToken(personId, "robot", "StackChan");
+    const tv = issueDeviceToken(personId, "tv", "StackChan");
+    expect((await client.get("/api/devices").then((r) => r.json()) as Array<{ id: string; name: string }>).map(({ id, name }) => ({ id, name })))
+      .toEqual(expect.arrayContaining([
+        { id: first.deviceId, name: "StackChan" },
+        { id: second.deviceId, name: "StackChan 2" },
+        { id: tv.deviceId, name: "StackChan" },
+      ]));
+  });
+
+  test("rename refuses another robot's name with the existing name in its message, and allows own name", async () => {
+    const { client, personId } = await owner();
+    const first = issueDeviceToken(personId, "robot", "StackChan");
+    const second = issueDeviceToken(personId, "robot", "Rover");
+    const refused = await client.request(`/api/devices/${second.deviceId}`, { method: "PATCH", body: { name: " stackchan " } });
+    expect(refused.status).toBe(409);
+    expect(await refused.json()).toEqual({ error: "Another robot is already called StackChan. Pick a different name." });
+    const allowed = await client.request(`/api/devices/${first.deviceId}`, { method: "PATCH", body: { name: " stackchan " } });
+    expect(allowed.status).toBe(200);
+    expect(await allowed.json()).toMatchObject({ id: first.deviceId, name: "stackchan" });
+    const renamedRobot = getDeviceById(first.deviceId)!;
+    expect(buildStablePrefix(DEFAULT_PERSONA, "spoken", "", renamedRobot.name)).toStartWith("You are stackchan, a private, self-hosted AI assistant for this household.");
   });
 });
 

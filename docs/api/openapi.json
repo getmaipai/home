@@ -28132,6 +28132,16 @@
                 }
               }
             }
+          },
+          "409": {
+            "description": "Another robot already has this name",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
           }
         }
       },

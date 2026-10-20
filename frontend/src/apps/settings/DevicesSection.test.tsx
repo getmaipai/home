@@ -7,7 +7,7 @@ import { renderWithQueryClient } from "../../../tests/renderWithQueryClient";
 import { ApiError, type DeviceInfo, type SessionInfo } from "@/lib/api";
 import { MemoryRouter } from "react-router-dom";
 
-function settingsFetch(extra: boolean, patchCalls: unknown[] = []) {
+function settingsFetch(extra: boolean, patchCalls: unknown[] = [], patchError?: string) {
   const original = globalThis.fetch;
   const baseRegistry = ["robot.barge_in.open_mic", "robot.camera.watch_level", "robot.follow_up.seconds", "robot.gestures.enabled", "robot.idle.level", "robot.initiative.allowed_here"].map((key) => ({ key, scope: "device", selector: key.endsWith("seconds") ? "number" : key.endsWith("level") ? "select" : "boolean", default: key.endsWith("seconds") ? 10 : false, label: key, help: "Registry-provided help.", level: "basic", secret: false, lives_in: "robot.hello", honoured_by: ["home"] }));
   const registry = [...baseRegistry, ...(extra ? [{ ...baseRegistry[0]!, key: "robot.hello.future", label: "robot.hello.future" }] : [])];
@@ -21,6 +21,7 @@ function settingsFetch(extra: boolean, patchCalls: unknown[] = []) {
     }
     if (url.endsWith("/api/devices/robot-1") && init?.method === "PATCH") {
       patchCalls.push(JSON.parse(String(init.body)));
+      if (patchError) return Promise.resolve(Response.json({ error: patchError }, { status: 409 }));
       return Promise.resolve(Response.json({ ...device({ id: "robot-1", kind: "robot" }), name: "Renamed" }));
     }
     throw new Error(`unstubbed settings fetch: ${url} (${init?.method ?? "GET"})`);
@@ -137,6 +138,17 @@ describe("DevicesSection", () => {
       fireEvent.change(input, { target: { value: "Riff Two" } });
       fireEvent.click(view.getByRole("button", { name: "Save name and area" }));
       await waitFor(() => expect(calls).toContainEqual({ name: "Riff Two", area: null }));
+    } finally { restore(); }
+  });
+  test("shows the duplicate robot name response under the name field", async () => {
+    const restore = settingsFetch(false, [], "Another robot is already called StackChan. Pick a different name.");
+    try {
+      const view = renderWithQueryClient(<MemoryRouter><Card><RobotBody device={device({ id: "robot-1", kind: "robot", name: "Riff" })} viewerRole="owner" onRemove={() => {}} confirmingRemove={false} onConfirmRemove={() => {}} onCancelRemove={() => {}} busy={false} onSetMuted={async () => {}} onStartLiveView={async () => ({ view_id: "v", stream: "" })} onStopLiveView={async () => {}} onAnswerMotorReboot={async () => {}} /></Card></MemoryRouter>);
+      fireEvent.click(view.getByRole("button", { name: "Settings" }));
+      fireEvent.change(view.getByLabelText("Name"), { target: { value: "StackChan" } });
+      fireEvent.click(view.getByRole("button", { name: "Save name and area" }));
+      expect(await view.findByRole("alert")).toHaveTextContent("Another robot is already called StackChan. Pick a different name.");
+      expect(view.getByLabelText("Name")).toHaveAttribute("aria-invalid", "true");
     } finally { restore(); }
   });
   test("empty devices and sessions say so, not a blank page", async () => {

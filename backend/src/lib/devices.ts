@@ -4,7 +4,7 @@
 // device management feature on its own - just the record shape Wave 3's
 // link will pair a robot into, laid now because device tokens and Quick
 // Connect both need somewhere to hang a name/kind/area.
-import { eq } from "drizzle-orm";
+import { and, eq, ne } from "drizzle-orm";
 import { db } from "@/db";
 import { devices, deviceTokens, sessions } from "@/db/schema";
 import { newDeviceId } from "@/lib/id";
@@ -52,10 +52,11 @@ function toDevice(row: typeof devices.$inferSelect): Device {
  * moment. */
 export function createDevice(kind: DeviceKind, name: string, personId: string, capabilities: string[] = []): Device {
   const now = new Date().toISOString();
+  const cleanName = name.trim().slice(0, 60) || "A device";
   const row = {
     id: newDeviceId(),
     kind,
-    name: name.trim().slice(0, 60) || "A device",
+    name: kind === "robot" ? availableRobotName(cleanName) : cleanName,
     area: null,
     capabilities: JSON.stringify(capabilities),
     personId,
@@ -92,14 +93,42 @@ export function getDeviceById(id: string): Device | null {
 }
 
 /** Update only the admin-editable display fields; undefined leaves a field unchanged. */
-export function updateDevice(id: string, input: { name?: string; area?: string | null }): Device | null {
+export type UpdateDeviceResult =
+  | { ok: true; device: Device }
+  | { ok: false; reason: "not_found" }
+  | { ok: false; reason: "robot_name_taken"; existingName: string };
+
+export function updateDevice(id: string, input: { name?: string; area?: string | null }): UpdateDeviceResult {
   const current = getDeviceById(id);
-  if (!current) return null;
+  if (!current) return { ok: false, reason: "not_found" };
+  if (input.name !== undefined && current.kind === "robot") {
+    const taken = findRobotName(input.name, id);
+    if (taken) return { ok: false, reason: "robot_name_taken", existingName: taken };
+  }
   const changes: Partial<typeof devices.$inferInsert> = { updatedAt: new Date().toISOString(), hlc: nextHlc() };
-  if (input.name !== undefined) changes.name = input.name;
+  if (input.name !== undefined) changes.name = input.name.trim().slice(0, 60);
   if (input.area !== undefined) changes.area = input.area;
   db.update(devices).set(changes).where(eq(devices.id, id)).run();
-  return getDeviceById(id);
+  const device = getDeviceById(id);
+  return device ? { ok: true, device } : { ok: false, reason: "not_found" };
+}
+
+/** Robot names are spoken to, so only robot peers participate in uniqueness. */
+function findRobotName(name: string, exceptId?: string): string | null {
+  const normalized = name.trim().toLowerCase();
+  const rows = db.select({ id: devices.id, name: devices.name }).from(devices)
+    .where(exceptId ? and(eq(devices.kind, "robot"), ne(devices.id, exceptId)) : eq(devices.kind, "robot"))
+    .all();
+  return rows.find((row) => row.name.trim().toLowerCase() === normalized)?.name ?? null;
+}
+
+function availableRobotName(name: string): string {
+  if (!findRobotName(name)) return name;
+  for (let number = 2; ; number++) {
+    const suffix = ` ${number}`;
+    const candidate = `${name.slice(0, 60 - suffix.length).trimEnd()}${suffix}`;
+    if (!findRobotName(candidate)) return candidate;
+  }
 }
 
 /** Every device of one kind, household-wide - unlike listDevicesForPerson,

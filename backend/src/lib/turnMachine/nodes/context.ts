@@ -440,7 +440,7 @@ export const contextNode: Node<ContextInput, ContextOutput> = async (state, inpu
   const thinking = state.budget.thinking_budget_tokens > 0 && reasoning.emit;
   const summaryItem: ContextItem[] = preview.summaryLine ? [{ id: "window-system-summary", text: preview.summaryLine, source: "window", subjects: [], disclosure: "child_ok" }] : [];
   const tools = state.budget.tools_offered.slice().sort().map((id) => toolSpecFor(id, laneOfPerson(state.actor))).filter((t): t is NonNullable<typeof t> => t !== null);
-  const rest = await countTokens(contextToMessages([...items, ...summaryItem], input.utterance, state.persona, state.plan, state.signal, surfaceClass, pictureParts, false, state.topicBlock), { tools });
+  const rest = await countTokens(contextToMessages([...items, ...summaryItem], input.utterance, state.persona, state.plan, state.signal, surfaceClass, pictureParts, false, state.topicBlock, state.robotName), { tools });
   // A Stack that reports no context length leaves the window unmeasured
   // too (THIN-3A's named minimum): its 2,048-token stand-in is a floor,
   // not the engine's real size.
@@ -463,7 +463,7 @@ export const contextNode: Node<ContextInput, ContextOutput> = async (state, inpu
     // written chat offer a new chat carrying the summary; a spoken turn
     // never hears it and answers from the message alone.
     const core = items.filter((item) => item.source === "utterance" || item.source === "attachment" || item.source === "profile" || item.source === "roster");
-    const countCore = (withSummary: boolean) => countTokens(contextToMessages([...core, ...(withSummary ? summaryItem : [])], input.utterance, state.persona, state.plan, state.signal, surfaceClass, pictureParts, false, state.topicBlock));
+  const countCore = (withSummary: boolean) => countTokens(contextToMessages([...core, ...(withSummary ? summaryItem : [])], input.utterance, state.persona, state.plan, state.signal, surfaceClass, pictureParts, false, state.topicBlock, state.robotName));
     const withSummary = await countCore(true);
     const alone = withSummary !== null && withSummary + reply <= context ? withSummary : await countCore(false);
     const written = surfaceClass === "written";

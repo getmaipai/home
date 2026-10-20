@@ -802,7 +802,7 @@ const modelRound: Node<ModelInput, ModelOutput> = async (state, input, signal) =
 
   // THIN-7C: a bare turn and a continuation offer no tool, ever.
   const toolsAllowed = input.toolsAllowed && !noToolsTurn(state);
-  let messages: LlmMessage[] = state.bare ? bareMessages(state.context, input.utterance) : contextToMessages(state.context, input.utterance, state.persona, state.plan, state.signal, state.planBasis.surfaceClass ?? "spoken", state.pictureParts ?? [], false, state.topicBlock);
+  let messages: LlmMessage[] = state.bare ? bareMessages(state.context, input.utterance) : contextToMessages(state.context, input.utterance, state.persona, state.plan, state.signal, state.planBasis.surfaceClass ?? "spoken", state.pictureParts ?? [], false, state.topicBlock, state.robotName);
   if (state.continuation) messages = [...messages, ...continuationMessages(state.continuation.assistantText)];
   let tools: ToolSpec[];
   let tool_choice: "auto" | "none" | undefined;

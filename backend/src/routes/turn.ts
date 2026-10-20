@@ -28,6 +28,7 @@ import { db } from "@/db";
 import { readAttachment, getTemporaryChatImage } from "@/lib/attachments";
 import { getStackClient, isStackConfigured } from "@/lib/stackEngine";
 import { createAssistantStreamSink } from "@/lib/assistantStreamWire";
+import { getDeviceById } from "@/lib/devices";
 
 // THIN-7C (docs/design/RULES.md rule 12): this route calls one path, the turn
 // machine (turnMachine/turnNext.ts). Bare mode, document attachments,
@@ -321,6 +322,8 @@ turnRoutes.post("/", requireAuth, bodyLimit({ maxSize: TURN_BODY_LIMIT }), async
   const parsedEvidence = z.object({ speaker_evidence: evidence.optional(), present: present.optional(), ask_answer: askAnswer.optional() }).safeParse(body);
   if (!parsedEvidence.success) return c.json({ error: "Invalid turn request", code: "invalid_input" }, 400);
   const surface = (body.surface ?? "chat") as Surface;
+  const deviceId = c.get("deviceId");
+  const robotName = surface === "robot" && deviceId ? getDeviceById(deviceId)?.name : undefined;
   // TEMP-CHAT-01: the clean 403, checked here even though
   // resolveOrCreateConversation() (conversationHistory.ts) asserts the
   // identical thing again on its own construction path - the same
@@ -345,7 +348,7 @@ turnRoutes.post("/", requireAuth, bodyLimit({ maxSize: TURN_BODY_LIMIT }), async
   const modelSelection = await resolveTurnModel(body.model, surface, isMinor, false);
   // runTurnNext() always resolves "immediate" (its own header note); the
   // explicit kind check is TypeScript's, not a real branch.
-  const next = await runTurnNext(actor, surface, body.text ?? "", { conversationId: body.conversation_id, temporary: body.temporary, supersedes: body.supersedes, spoken: body.spoken === true, thinking: dropReasoning ? false : body.thinking, model: modelSelection.model, ask_answer: parsedEvidence.data.ask_answer, ...(surface === "robot" ? { speakerEvidence: parsedEvidence.data.speaker_evidence ?? null, present: parsedEvidence.data.present ?? null } : {}) }); // Evidence is only honored on the robot surface.
+  const next = await runTurnNext(actor, surface, body.text ?? "", { conversationId: body.conversation_id, temporary: body.temporary, supersedes: body.supersedes, spoken: body.spoken === true, thinking: dropReasoning ? false : body.thinking, model: modelSelection.model, ask_answer: parsedEvidence.data.ask_answer, ...(robotName ? { robotName } : {}), ...(surface === "robot" ? { speakerEvidence: parsedEvidence.data.speaker_evidence ?? null, present: parsedEvidence.data.present ?? null } : {}) }); // Evidence is only honored on the robot surface.
   const result: TurnOpResult = next.ok && next.kind === "immediate" ? { ok: true, value: next.value } : next.ok ? { ok: false, status: 503, code: "unavailable", error: "the turn machine returned a stream result unexpectedly" } : next;
   if (!result.ok) {
     return c.json({ error: result.error, code: result.code }, result.status);
@@ -907,6 +910,8 @@ turnRoutes.post("/stream", requireAuth, streamTurnBodyLimit, async (c) => {
   const parsedEvidence = z.object({ speaker_evidence: evidence.optional(), present: present.optional(), ask_answer: askAnswer.optional() }).safeParse(body);
   if (!parsedEvidence.success) return c.json({ error: "Invalid turn request", code: "invalid_input" }, 400);
   const surface = (body.surface ?? "chat") as Surface;
+  const deviceId = c.get("deviceId");
+  const robotName = surface === "robot" && deviceId ? getDeviceById(deviceId)?.name : undefined;
   const spokenTurn = surfaceClassOf(body.bare === true ? "chat" : surface, body.spoken === true) === "spoken";
   // getmaipai/home#91 (a code review of the original ephemeral fix,
   // 2026-09-13): honoring the flag for whatever text a caller sends
@@ -979,6 +984,7 @@ turnRoutes.post("/stream", requireAuth, streamTurnBodyLimit, async (c) => {
       ...(currentLocation ? { currentLocation } : {}),
       thinking: dropReasoning ? false : body.thinking,
       model: modelSelection.model,
+      ...(robotName ? { robotName } : {}),
       signal: abortController.signal,
       ask_answer: parsedEvidence.data.ask_answer,
       supersedes: body.supersedes,
