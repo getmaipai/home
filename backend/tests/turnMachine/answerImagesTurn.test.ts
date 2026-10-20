@@ -114,6 +114,8 @@ describe("ANSWER-IMG-02: where show_images is offered (rule 0's gates)", () => {
 
   async function toolsSeen(actor: typeof people.owner, run: (actor: typeof people.owner) => Promise<unknown>): Promise<string[]> {
     let names: string[] = [];
+    // These turns ask about a named subject, so the automatic lead picture would look it up; never over the real network.
+    __setAnswerImageDepsForTests(fixtureWorld([TOWER]).deps);
     await withStub({ calls: () => undefined, reply: () => "Fine." }, async (seen) => {
       await run(actor);
       names = toolNames(seen.find((r) => (r.tools?.length ?? 0) > 0));
