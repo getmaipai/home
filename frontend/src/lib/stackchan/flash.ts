@@ -1,4 +1,4 @@
-import { ESPLoader, Transport } from "esptool-js";
+import type { ESPLoader, Transport } from "esptool-js";
 
 export const FLASH_BYTES = 16 * 1024 * 1024;
 export const ENROLL_NVS_OFFSET = 0x9000;
@@ -124,18 +124,28 @@ export async function installStackChan(transport: FlashTransport, callbacks: Ins
 
 export function createBrowserSerialTransport(port: unknown): FlashTransport {
   const serialPort = port as ConstructorParameters<typeof Transport>[0];
-  const transport = new Transport(serialPort, false);
-  const loader = new ESPLoader({ transport, port: serialPort, baudrate: 460_800, romBaudrate: 460_800, debugLogging: false });
-  let connected = false;
+  // esptool-js loads only when an install starts, so every other page stays free of it.
+  let session: { transport: Transport; loader: ESPLoader } | null = null;
+  const loader = (): ESPLoader => {
+    if (!session) throw new Error("The robot is not connected yet. Plug it in, then try again.");
+    return session.loader;
+  };
   return {
-    async connect() { if (!connected) { await loader.main(); connected = true; } },
-    read: (address, size, onProgress) => loader.readFlash(address, size, onProgress ? (_packet, completed, total) => onProgress(completed, total) : null),
-    async write(address, bytes, onProgress) {
-      await loader.writeFlash({ fileArray: [{ address, data: bytes }], flashMode: "keep", flashFreq: "keep", flashSize: "16MB", eraseAll: false, compress: true, reportProgress: (_i, complete, total) => onProgress?.(complete, total) });
+    async connect() {
+      if (session) return;
+      const esptool = await import("esptool-js");
+      const transport = new esptool.Transport(serialPort, false);
+      const espLoader = new esptool.ESPLoader({ transport, port: serialPort, baudrate: 460_800, romBaudrate: 460_800, debugLogging: false });
+      try { await espLoader.main(); } catch (error) { await transport.disconnect().catch(() => undefined); throw error; }
+      session = { transport, loader: espLoader };
     },
-    md5: (address, size) => loader.flashMd5sum(address, size),
-    hardReset: () => loader.after("hard_reset"),
-    async close() { await transport.disconnect(); },
+    read: (address, size, onProgress) => loader().readFlash(address, size, onProgress ? (_packet, completed, total) => onProgress(completed, total) : null),
+    async write(address, bytes, onProgress) {
+      await loader().writeFlash({ fileArray: [{ address, data: bytes }], flashMode: "keep", flashFreq: "keep", flashSize: "16MB", eraseAll: false, compress: true, reportProgress: (_i, complete, total) => onProgress?.(complete, total) });
+    },
+    md5: (address, size) => loader().flashMd5sum(address, size),
+    hardReset: () => loader().after("hard_reset"),
+    async close() { await session?.transport.disconnect(); },
   };
 }
 
