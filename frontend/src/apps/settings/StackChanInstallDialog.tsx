@@ -105,7 +105,7 @@ export function StackChanInstallDialog({ updateOf }: { updateOf?: string } = {})
           <DialogHeader>
             <DialogTitle>{updating ? "Update firmware" : "Add a StackChan"}</DialogTitle>
             <DialogDescription>
-              {updateDone ? "The firmware is updated. The StackChan restarts by itself and reconnects within a minute, with its name, Wi-Fi and pairing unchanged." : !installFinished ? "You need Chrome or Edge on a computer, Home opened at its https address, and the StackChan plugged into this computer with a USB-C data cable." : online ? "Your StackChan is online and ready." : "On a phone, join the robot's Wi-Fi hotspot and choose your home Wi-Fi. Home never asks for the Wi-Fi password."}
+              {updateDone ? "The firmware is written. If the StackChan has not restarted within 10 seconds, unplug its USB cable and plug it back in (the reset from this page does not restart every unit). It then reconnects within a minute, with its name, Wi-Fi and pairing unchanged." : !installFinished ? "You need Chrome or Edge on a computer, Home opened at its https address, and the StackChan plugged into this computer with a USB-C data cable." : online ? "Your StackChan is online and ready." : "On a phone, join the robot's Wi-Fi hotspot and choose your home Wi-Fi. Home never asks for the Wi-Fi password."}
             </DialogDescription>
           </DialogHeader>
           {message ? <Alert variant="destructive"><AlertDescription>{message}</AlertDescription></Alert> : null}
