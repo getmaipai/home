@@ -1,29 +1,29 @@
 {
   "_note": "A Home release bumps this pin.",
-  "version": "0.2.6",
+  "version": "0.2.7",
   "repo": "getmaipai/bot",
   "assets": {
     "darwin-arm64": {
       "name": "bot-darwin-arm64.tar.gz",
-      "sha256": "fc3c2778b2ea2d181ff5b5bce393919a5bfdf3c69a1d0e42223e621f7ae80447",
-      "size": 105579516
+      "sha256": "f1d30b38c56cf87ca786b1c85edb975cf114cf99245df7b7c94462cd26c99080",
+      "size": 105599937
     },
     "linux-x64": {
       "name": "bot-linux-x64.tar.gz",
-      "sha256": "5ae81d3fde1f2ac9a1d8a998b8a439d16fe5cde2d4779d4f4f4fbc688362ec7c",
-      "size": 241287069
+      "sha256": "c65e5399280b60ee03dc8ba5a41e27a70ff841a166e63863f07b7e9b56df48ee",
+      "size": 241277612
     },
     "linux-arm64": {
       "name": "bot-linux-arm64.tar.gz",
-      "sha256": "cb37b2890e600c875ff28584a2a1a75dde2b69952d07097eee70d9c1c31f2ac8",
-      "size": 207160242
+      "sha256": "8b4283799e571e3b90d949aa8ca84ed16875b05912e61081dc9b808dc44fa5d8",
+      "size": 207157826
     }
   },
   "firmware": {
     "stackchan": {
-      "name": "stackchan-firmware-0.2.6.tar.gz",
-      "sha256": "ab5c7a67d36dfd85752a4ae58dc035a851afe5c955b31120c92a250df48ffb9a",
-      "size": 3174505
+      "name": "stackchan-firmware-0.2.7.tar.gz",
+      "sha256": "b5c372d739becb68ff6745218c40d644fc93caa080151faddb52c37dfbf5d092",
+      "size": 3176087
     }
   },
   "signing_keys": [

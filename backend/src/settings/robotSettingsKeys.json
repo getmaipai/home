@@ -273,7 +273,7 @@
         "lively"
       ]
     },
-    "default": "calm",
+    "default": "still",
     "label": "Robot idle movement",
     "help": "Robot-only device setting delivered by Home as settings_changed.",
     "level": "basic",
