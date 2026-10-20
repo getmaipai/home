@@ -92,6 +92,8 @@ export async function makeEnrollImage(deviceId: string): Promise<Buffer> {
   const endpoint = (await listHubEndpoints()).find((item) => item.kind === "lan" && ips.includes(new URL(item.url).hostname));
   const lanHost = endpoint ? new URL(endpoint.url).hostname : ips[0];
   if (!lanHost) throw new Error("Home could not find a LAN address for the robot. Connect Home to the same Wi-Fi network, then try again.");
+  // A retried install would otherwise leave the earlier single-use code valid until it expires.
+  await revokeEnrollment(deviceId);
   const out = join(robotHostDataDir(deviceId), `enroll-${crypto.randomUUID()}.nvs`);
   try {
     const proc = await runProvision([

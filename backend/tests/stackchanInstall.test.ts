@@ -149,6 +149,15 @@ describe("StackChan install integrity and backup", () => {
     expect(JSON.stringify(await (await client.get(`/api/robots/hosts/${host.deviceId}/install-status`)).json())).not.toContain("token-id");
   });
 
+  test("a second enroll-image revokes the earlier code first", async () => {
+    const { client, id } = await owner(); const release = provisionRelease();
+    const host = await createRobotHost({ label: "Rivet", personId: id });
+    expect((await client.post(`/api/robots/hosts/${host.deviceId}/enroll-image`)).status).toBe(200);
+    expect(existsSync(join(release, "revoked"))).toBe(false);
+    expect((await client.post(`/api/robots/hosts/${host.deviceId}/enroll-image`)).status).toBe(200);
+    expect(existsSync(join(release, "revoked"))).toBe(true);
+  });
+
   test("enrollment process error is returned without adding another try-again", async () => {
     const { client, id } = await owner(); provisionRelease("fail"); const host = await createRobotHost({ label: "Rivet", personId: id });
     expect(await (await client.post(`/api/robots/hosts/${host.deviceId}/enroll-image`)).json()).toEqual({ error: "The robot app could not write the image. Try again." });
