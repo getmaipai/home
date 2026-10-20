@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, test, mock } from "bun:test";
-import { installStackChan, md5Hex, type FlashTransport } from "./flash";
+import { CONNECT_TIMEOUT_MESSAGE, installStackChan, md5Hex, STALL_TIMEOUT_MESSAGE, type FlashTransport } from "./flash";
 
 const originalFetch = globalThis.fetch;
 afterEach(() => { globalThis.fetch = originalFetch; });
@@ -59,5 +59,34 @@ describe("StackChan browser flash", () => {
     const next = standIn();
     await installStackChan(next.transport, {}, { firstInstall: false });
     expect(next.writes.map((write) => write.address)).toEqual([0x10000]);
+  });
+  test("a chip that never answers ends with the plain message, releases the port and writes nothing", async () => {
+    const part = new Uint8Array([1, 2, 3, 4]);
+    stub(part, await digest(part));
+    const { transport, writes } = standIn();
+    let closed = false;
+    const stages: string[] = [];
+    await expect(installStackChan({ ...transport, connect: () => new Promise<void>(() => {}), close: async () => { closed = true; } }, { onStage: (stage) => stages.push(stage) }, { connectTimeoutMs: 20 })).rejects.toThrow(CONNECT_TIMEOUT_MESSAGE);
+    expect(closed).toBe(true);
+    expect(stages).toContain("Connecting");
+    expect(writes).toEqual([]);
+  });
+
+  test("a backup read that stops making progress ends with the plain message and writes nothing", async () => {
+    const part = new Uint8Array([1, 2, 3, 4]);
+    stub(part, await digest(part));
+    const { transport, writes } = standIn();
+    let closed = false;
+    await expect(installStackChan({ ...transport, read: () => new Promise<Uint8Array>(() => {}), close: async () => { closed = true; } }, {}, { stallTimeoutMs: 20 })).rejects.toThrow(STALL_TIMEOUT_MESSAGE);
+    expect(closed).toBe(true);
+    expect(writes).toEqual([]);
+  });
+
+  test("a backup that keeps making progress is not cut off by the stall timer", async () => {
+    const part = new Uint8Array([1, 2, 3, 4]);
+    stub(part, await digest(part));
+    const { transport } = standIn();
+    const slow: FlashTransport = { ...transport, read: async (_address, size, progress) => { for (let i = 0; i < 4; i++) { await new Promise((resolve) => setTimeout(resolve, 15)); progress?.(i, 4); } return new Uint8Array(size); } };
+    await installStackChan(slow, {}, { stallTimeoutMs: 40 });
   });
 });

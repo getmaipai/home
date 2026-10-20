@@ -5,7 +5,11 @@ export const ENROLL_NVS_OFFSET = 0x9000;
 export const WRITE_ENROLL_NVS_ON_FIRST_INSTALL = true;
 export type FlashPart = { path: string; offset: number; size: number; sha256: string };
 export type FlashManifest = { builds: Array<{ chipFamily: string; parts: FlashPart[] }>; flash_size: string };
-export type FlashStage = "Backing up" | "Writing" | "Checking" | "Restarting";
+export type FlashStage = "Connecting" | "Backing up" | "Writing" | "Checking" | "Restarting";
+export const CONNECT_TIMEOUT_MS = 30_000;
+export const STALL_TIMEOUT_MS = 45_000;
+export const CONNECT_TIMEOUT_MESSAGE = "The StackChan did not answer on this USB port within 30 seconds. Choose the USB JTAG/serial debug unit port, close any other app using it, unplug and replug the StackChan, then try again.";
+export const STALL_TIMEOUT_MESSAGE = "The StackChan stopped answering during the backup. Check the USB cable, unplug and replug the StackChan, then try again.";
 export interface FlashTransport {
   connect(): Promise<void>;
   read(address: number, size: number, progress?: (completed: number, total: number) => void): Promise<Uint8Array>;
@@ -78,8 +82,19 @@ export function md5Hex(bytes: Uint8Array): string {
   return [a0, b0, c0, d0].map((word) => [0, 8, 16, 24].map((shift) => ((word >>> shift) & 255).toString(16).padStart(2, "0")).join("")).join("");
 }
 
-export async function installStackChan(transport: FlashTransport, callbacks: InstallCallbacks & { onHostCreated?: (deviceId: string) => void } = {}, options: { firstInstall?: boolean } = {}): Promise<{ deviceId: string }> {
+/** Rejects with `message` when `work` has not settled in `ms`, or (with `onProgress`) when no progress arrives for `ms`. */
+function withDeadline<T>(work: (poke: () => void) => Promise<T>, ms: number, message: string, onTimeout: () => void): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    let timer: ReturnType<typeof setTimeout>;
+    const arm = () => { clearTimeout(timer); timer = setTimeout(() => { onTimeout(); reject(new Error(message)); }, ms); };
+    arm();
+    work(arm).then((value) => { clearTimeout(timer); resolve(value); }, (error) => { clearTimeout(timer); reject(error); });
+  });
+}
+
+export async function installStackChan(transport: FlashTransport, callbacks: InstallCallbacks & { onHostCreated?: (deviceId: string) => void } = {}, options: { firstInstall?: boolean; connectTimeoutMs?: number; stallTimeoutMs?: number } = {}): Promise<{ deviceId: string }> {
   const firstInstall = options.firstInstall ?? true;
+  const release = () => void transport.close?.()?.catch?.(() => undefined);
   callbacks.onStage?.("Checking");
   const manifestResponse = await fetch("/api/robots/stackchan/flash-manifest", { credentials: "include", cache: "no-store" });
   if (!manifestResponse.ok) {
@@ -96,9 +111,13 @@ export async function installStackChan(transport: FlashTransport, callbacks: Ins
   }));
 
   try {
+    callbacks.onStage?.("Connecting");
+    console.info("StackChan install: connecting to the chip");
+    await withDeadline(() => transport.connect(), options.connectTimeoutMs ?? CONNECT_TIMEOUT_MS, CONNECT_TIMEOUT_MESSAGE, release);
+    console.info("StackChan install: connected, backing up the flash");
     callbacks.onStage?.("Backing up", 0, FLASH_BYTES);
-    await transport.connect();
-    const backup = await transport.read(0, FLASH_BYTES, (completed, total) => callbacks.onStage?.("Backing up", completed, total));
+    const backup = await withDeadline((poke) => transport.read(0, FLASH_BYTES, (completed, total) => { poke(); callbacks.onStage?.("Backing up", completed, total); }), options.stallTimeoutMs ?? STALL_TIMEOUT_MS, STALL_TIMEOUT_MESSAGE, release);
+    console.info("StackChan install: backup read complete");
     if (backup.length !== FLASH_BYTES) throw new Error("The full flash backup was incomplete. Check the USB cable and try again.");
     const host = await postJson<{ device_id: string }>("/api/robots/hosts", { label: "StackChan" });
     callbacks.onHostCreated?.(host.device_id);
@@ -135,7 +154,7 @@ export function createBrowserSerialTransport(port: unknown): FlashTransport {
       if (session) return;
       const esptool = await import("esptool-js");
       const transport = new esptool.Transport(serialPort, false);
-      const espLoader = new esptool.ESPLoader({ transport, port: serialPort, baudrate: 460_800, romBaudrate: 460_800, debugLogging: false });
+      const espLoader = new esptool.ESPLoader({ transport, port: serialPort, baudrate: 460_800, romBaudrate: 460_800, debugLogging: false, terminal: { clean() {}, writeLine: (line: string) => console.info("esptool:", line), write: (text: string) => console.info("esptool:", text) } });
       try { await espLoader.main(); } catch (error) { await transport.disconnect().catch(() => undefined); throw error; }
       session = { transport, loader: espLoader };
     },
