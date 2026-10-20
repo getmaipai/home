@@ -1,4 +1,5 @@
 import { describe, expect, test, beforeEach } from "bun:test";
+import { setHouseholdSettingValue } from "@/lib/settings";
 import { TestClient } from "./client";
 import { resetDb } from "./reset-db";
 import { issueDeviceToken } from "@/lib/deviceTokens";
@@ -7,7 +8,7 @@ import { db } from "@/db";
 import { people, sessions } from "@/db/schema";
 import { eq, isNull, and } from "drizzle-orm";
 
-beforeEach(() => resetDb());
+beforeEach(() => { resetDb(); setHouseholdSettingValue("home.robots.enabled", true); });
 
 describe("POST /api/auth/devices/redeem", () => {
   test("a valid device token sets a session cookie for whichever address answers", async () => {

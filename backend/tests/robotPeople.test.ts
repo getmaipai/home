@@ -7,12 +7,12 @@ import { issueDeviceToken } from "@/lib/deviceTokens";
 import { storeRobotCredential } from "@/lib/robotCredentials";
 import { encryptSecret } from "@/lib/secrets";
 import { newBiometricPrintId } from "@/lib/id";
-import { setValue } from "@/lib/settings";
+import { setHouseholdSettingValue, setValue } from "@/lib/settings";
 import type { DeviceKind } from "@/lib/devices";
 import { TestClient } from "./client";
 import { resetDb } from "./reset-db";
 
-beforeEach(() => resetDb());
+beforeEach(() => { resetDb(); setHouseholdSettingValue("home.robots.enabled", true); });
 
 type Roster = { as_of: string; people: Array<{ person_id: string; age_band: string; follow_up: boolean }> };
 

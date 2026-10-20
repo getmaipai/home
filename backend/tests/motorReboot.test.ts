@@ -8,9 +8,9 @@ import { db } from "@/db";
 import { deviceCommands, people } from "@/db/schema";
 import { issueDeviceToken } from "@/lib/deviceTokens";
 import { storeRobotCredential } from "@/lib/robotCredentials";
-import { getDeviceSettingValue } from "@/lib/settings";
+import { getDeviceSettingValue, setHouseholdSettingValue } from "@/lib/settings";
 
-beforeEach(() => resetDb());
+beforeEach(() => { resetDb(); setHouseholdSettingValue("home.robots.enabled", true); });
 
 async function household() {
   const owner = new TestClient();

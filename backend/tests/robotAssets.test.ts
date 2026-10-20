@@ -1,4 +1,5 @@
 import { beforeEach, afterEach, describe, expect, test } from "bun:test";
+import { setHouseholdSettingValue } from "@/lib/settings";
 import { mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { createHash } from "node:crypto";
 import { eq } from "drizzle-orm";
@@ -10,7 +11,7 @@ import { issueDeviceToken } from "@/lib/deviceTokens";
 import { storeRobotCredential } from "@/lib/robotCredentials";
 import { ROBOT_ASSETS, robotAssetPath } from "@/lib/robotAssets";
 
-beforeEach(() => resetDb());
+beforeEach(() => { resetDb(); setHouseholdSettingValue("home.robots.enabled", true); });
 afterEach(() => rmSync(robotAssetPath(ROBOT_ASSETS[0]!.id).replace(/\/[^/]+$/, ""), { recursive: true, force: true }));
 
 async function household() {
