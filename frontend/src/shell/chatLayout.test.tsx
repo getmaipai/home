@@ -33,7 +33,7 @@ function renderChat(width: number) {
     <TooltipProvider>
       <MemoryRouter initialEntries={["/chat"]}>
         <Routes>
-          <Route element={<FullLayout rail railProfile={<RailProfileMenu displayName="Sage" subtitle="Owner" settingsHref="/settings" helpHref="https://example.com/help" onLogout={() => {}} />} />}>
+          <Route element={<FullLayout rail railCoreDestinations={[{ name: "Media", url: "/media", icon: "film" }]} railProfile={<RailProfileMenu displayName="Sage" subtitle="Owner" settingsHref="/settings" helpHref="https://example.com/help" onLogout={() => {}} />} />}>
             <Route path="/chat" element={<div data-slot="chat-shell"><h1>Chat</h1></div>} />
           </Route>
         </Routes>
@@ -44,7 +44,7 @@ function renderChat(width: number) {
 
 // The brand mark is the Home destination (owner, 2026-10-06), so "Home"
 // is one link at the top of the rail, not a logo plus a second Home icon.
-const railLabels = ["Home", "Chat", "Library", "Family"];
+const railLabels = ["Home", "Chat", "Media", "Library", "Family"];
 
 // Design rule S3 (docs/design/RULES.md): the main navigation renders on an
 // app page at desktop and mobile widths, as the permanent icon rail with
@@ -84,6 +84,26 @@ describe("chat shell layout", () => {
   test("the rail never expands: it has no sidebar trigger", () => {
     const view = renderChat(1440);
     expect(view.queryByRole("button", { name: /toggle (app menu|sidebar)/i })).toBeNull();
+  });
+
+  test("Media is a fixed core destination immediately after Chat", async () => {
+    const view = renderChat(1440);
+    const rail = view.getByRole("navigation", { name: "Primary navigation" });
+    await waitFor(() => expect(view.getByRole("link", { name: "Media" }).getAttribute("href")).toBe("/media"));
+    const labels = [...rail.querySelectorAll("a")].map((link) => link.getAttribute("aria-label"));
+    expect(labels.indexOf("Media")).toBe(labels.indexOf("Chat") + 1);
+    expect(view.getByRole("link", { name: "Media" }).getAttribute("data-slot")).toBe("app-rail-core-destination");
+  });
+
+  test("Media is a fixed core destination in the phone drawer immediately after Chat", async () => {
+    const view = renderChat(390);
+    fireEvent.click(await view.findByRole("button", { name: "Open menu" }));
+    const drawer = await view.findByRole("dialog");
+    const media = await within(drawer).findByRole("link", { name: "Media" });
+    expect(media.getAttribute("href")).toBe("/media");
+    expect(media.getAttribute("data-slot")).toBe("app-rail-core-destination");
+    const labels = [...drawer.querySelectorAll("a")].map((link) => link.getAttribute("aria-label"));
+    expect(labels.indexOf("Media")).toBe(labels.indexOf("Chat") + 1);
   });
 
   test("Settings, Help and Log out are reachable from the profile menu at the rail's foot", async () => {

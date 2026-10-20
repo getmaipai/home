@@ -64,6 +64,7 @@ const UsersPage = lazyNamed(() => import("@/shell/pages/UsersPage"), "UsersPage"
 const FilesPage = lazyNamed(() => import("@/shell/pages/FilesPage"), "FilesPage");
 const ReferencePage = lazyNamed(() => import("@/shell/pages/ReferencePage"), "ReferencePage");
 const PackageAppPage = lazyNamed(() => import("@/shell/pages/PackageAppPage"), "PackageAppPage");
+const MediaPage = lazyNamed(() => import("@/shell/pages/MediaPage"), "MediaPage");
 const AllAppsPage = lazyNamed(() => import("@/shell/pages/AllAppsPage"), "AllAppsPage");
 const MicTestPage = lazyNamed(() => import("@/shell/pages/MicTestPage"), "MicTestPage");
 const SettingsAreaPage = lazyNamed(() => import("@/shell/pages/settings/SettingsAreaPage"), "SettingsAreaPage");
@@ -252,12 +253,13 @@ function RoutesWithIncognito({ person, onPersonChange, onSignedOut }: { person: 
             Notifications, System status, Incognito, Settings, Help and Log
             out. Pages draw their own slim title bar; chat draws its own
             beside the history column. */}
-        <Route element={<FullLayout rail mobileSections={drawerSections} activeAppHref={selectedAppHref} railApps={railApps(appCatalog, pinnedRoutes)} onRailAppPinChange={(url) => togglePin(url)} railAllAppsHref={ALL_APPS_PATH} settingsHref="/settings" headerSearchRemote={api.search} railTourId="shell.rail" railItemTourId={(item) => item.name === "Chat" ? "rail.chat" : undefined} incognitoTourId="shell.incognito" railProfile={<RailProfile person={person} incognito={incognito} onIncognitoChange={onIncognitoChange} onSignedOut={onSignedOut} helpEntries={helpEntries} />} sidebarItemStatus={(item) => sidebarItemStatus(statusAppsQuery.data ?? [], item)} />}>
+        <Route element={<FullLayout rail mobileSections={drawerSections} activeAppHref={selectedAppHref} railApps={railApps(appCatalog, pinnedRoutes)} railCoreDestinations={[{ name: "Media", url: "/media", icon: "film" }]} onRailAppPinChange={(url) => togglePin(url)} railAllAppsHref={ALL_APPS_PATH} settingsHref="/settings" headerSearchRemote={api.search} railTourId="shell.rail" railItemTourId={(item) => item.name === "Chat" ? "rail.chat" : undefined} incognitoTourId="shell.incognito" railProfile={<RailProfile person={person} incognito={incognito} onIncognitoChange={onIncognitoChange} onSignedOut={onSignedOut} helpEntries={helpEntries} />} sidebarItemStatus={(item) => sidebarItemStatus(statusAppsQuery.data ?? [], item)} />}>
           <Route path="chat" element={<ChatPage person={person} />} />
           <Route path="chat/projects" element={<ProjectsPage person={person} />} />
           <Route path="chat/projects/:id" element={<ChatPage person={person} />} />
           {/* Like Chat, Library owns its page header and leaves FullLayout's phone menu clearance intact. */}
           <Route path="files" element={<FilesPage person={person} />} />
+          <Route path="media" element={<MediaPage />} />
           {/* APP-SET-02 (RULES S4): the settings areas draw no slim title bar,
               like ChatGPT's own settings page: the column title is the page's
               heading, so these routes sit beside chat, outside
