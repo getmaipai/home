@@ -5,13 +5,13 @@ import { db } from "@/db";
 import { people } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import type { PersonRow } from "@/types";
-import { listValues, setValue, resetValue } from "@/lib/settings";
+import { getHouseholdSettingValue, listValues, setValue, resetValue } from "@/lib/settings";
 import { getRegistry } from "@/lib/settingsRegistry";
 import { ensureCodingPiecesFresh } from "@/lib/stackCodingPieces";
 import { isCodingStackKey, pushCodingSettings } from "@/lib/stackCodingSync";
 import { issueApiToken, revokeApiToken, listApiKeys, listApiKeysForAdmin, createApiKey, renameApiKey, revokeApiKey, codeAdmission, CreateApiKeyInput } from "@/lib/apiKeys";
 import { SettingsKey } from "@maipai/spec/gen/ts/settings-key.js";
-import { listRobotsPairedUnderPerson, publishSettingsChanged } from "@/lib/deviceCommands";
+import { closeRobotDeviceCommandChannels, listRobotsPairedUnderPerson, publishSettingsChanged } from "@/lib/deviceCommands";
 import { listDevicesByKind } from "@/lib/devices";
 import { renderClipBundle } from "@/lib/robotClips";
 import { refreshHomeAssistantEvents } from "@/lib/integrations/homeAssistant";
@@ -71,6 +71,19 @@ const registryRoute = createRoute({
   },
 });
 settingsRoutes.openapi(registryRoute, (c) => c.json(getRegistry(), 200));
+
+const capabilitiesRoute = createRoute({
+  method: "get",
+  path: "/capabilities",
+  tags: ["Settings"],
+  summary: "Settings capabilities the signed-in viewer may need to draw their pages",
+  middleware: [requireAuth] as const,
+  responses: {
+    200: { content: { "application/json": { schema: z.object({ robotsEnabled: z.boolean() }) } }, description: "Boolean capabilities derived from household settings." },
+    ...errorResponses({ 401: "Not signed in" }),
+  },
+});
+settingsRoutes.openapi(capabilitiesRoute, (c) => c.json({ robotsEnabled: getHouseholdSettingValue("home.robots.enabled") === true }, 200));
 
 const listRoute = createRoute({
   method: "get",
@@ -151,6 +164,7 @@ settingsRoutes.openapi(putRoute, async (c) => {
     return result.status === 400 ? c.json({ error: result.error }, 400) : c.json({ error: result.error }, 403);
   }
   if (warning) await reconcileCapabilities();
+  if (body.scope === "household" && body.key === "home.robots.enabled" && body.value === false) closeRobotDeviceCommandChannels();
   if (body.scope === "household" && body.key === "search.searxng_url") await checkSearchInstance({ force: true });
   if (body.scope === "household" && body.key === "network.tailnet_access") {
     if (body.value === true) {
@@ -211,6 +225,7 @@ settingsRoutes.openapi(resetRoute, async (c) => {
   if (!result.ok) {
     return result.status === 400 ? c.json({ error: result.error }, 400) : c.json({ error: result.error }, 403);
   }
+  if (body.scope === "household" && body.key === "home.robots.enabled" && result.value.value === false) closeRobotDeviceCommandChannels();
   if (body.scope === "household" && body.key === "search.searxng_url") await checkSearchInstance({ force: true });
   publishSettingsChanged(body.scope, body.key, result.value.value);
   if (body.scope === "household" && isCodingStackKey(body.key)) await pushCodingSettings([body.key]);

@@ -12,6 +12,14 @@ beforeEach(() => {
 });
 
 describe("Quick Connect end to end", () => {
+  test("robot codes are refused while Robots is off, while a TV remains unaffected", async () => {
+    const robot = new TestClient();
+    const refused = await robot.post("/api/auth/quick-connect/code", { label: "Reachy Mini", kind: "robot" });
+    expect(refused.status).toBe(403);
+    expect(await refused.json()).toEqual({ error: "Robots are turned off on this home. An admin can turn them on in Settings, Devices." });
+    const tv = await new TestClient().post("/api/auth/quick-connect/code", { label: "Living room TV", kind: "tv" });
+    expect(tv.status).toBe(200);
+  });
   test("a TV's code, approved by a signed-in phone, lets the TV poll its way to a session and a device token", async () => {
     const tv = new TestClient();
     const codeRes = await tv.post("/api/auth/quick-connect/code", { label: "Living room TV", kind: "tv" });
@@ -125,12 +133,13 @@ describe("Quick Connect end to end", () => {
   // pure exposure with no gate on it. A robot only gets a device_token
   // now; deviceAuth.test.ts covers the actual rotation gate at redeem.
   test("a robot's own poll gets a device token but no immediate session, unlike a TV's", async () => {
+    const phone = new TestClient();
+    await phone.post("/api/auth/setup", { displayName: "Sage", secret: "correcthorse" });
+    expect((await phone.request("/api/settings", { method: "PUT", body: { scope: "household", key: "home.robots.enabled", value: true } })).status).toBe(200);
     const robot = new TestClient();
     const codeRes = await robot.post("/api/auth/quick-connect/code", { label: "Reachy Mini", kind: "robot" });
     const { code, poll_token } = (await codeRes.json()) as { code: string; poll_token: string };
 
-    const phone = new TestClient();
-    await phone.post("/api/auth/setup", { displayName: "Sage", secret: "correcthorse" });
     await phone.post("/api/auth/quick-connect/approve", { code });
 
     const approvedPoll = await robot.get(`/api/auth/quick-connect/poll?poll_token=${poll_token}`);

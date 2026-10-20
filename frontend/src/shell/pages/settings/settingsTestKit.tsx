@@ -45,7 +45,7 @@ export interface HomeFixture {
   restore: () => void;
 }
 
-export function mockHome({ robots = false, wakeword = false, hasChild = false, setupChecklist = [], pinnedApps, apps, extraKeys = [], places = [] }: { apps?: unknown[]; extraKeys?: SettingsKey[]; places?: Array<Record<string, unknown>>; robots?: boolean; wakeword?: boolean; hasChild?: boolean; setupChecklist?: Array<{ id: string; title: string; reason: string; done: boolean; open: { label: string; href: string } }>; pinnedApps?: string[] } = {}): HomeFixture {
+export function mockHome({ robots = false, robotsEnabled = robots, wakeword = false, hasChild = false, setupChecklist = [], pinnedApps, apps, extraKeys = [], places = [] }: { apps?: unknown[]; extraKeys?: SettingsKey[]; places?: Array<Record<string, unknown>>; robots?: boolean; robotsEnabled?: boolean; wakeword?: boolean; hasChild?: boolean; setupChecklist?: Array<{ id: string; title: string; reason: string; done: boolean; open: { label: string; href: string } }>; pinnedApps?: string[] } = {}): HomeFixture {
   const original = globalThis.fetch;
   const requests: string[] = [];
   const scopes: string[] = [];
@@ -67,6 +67,7 @@ export function mockHome({ robots = false, wakeword = false, hasChild = false, s
     if (apps && route0(url) === "/api/apps") return Promise.resolve(Response.json(apps));
     if (route0(url) === "/api/entities") return Promise.resolve(Response.json(places));
     if (url.includes("/api/settings/registry")) return Promise.resolve(Response.json(registry));
+    if (url.endsWith("/api/settings/capabilities")) return Promise.resolve(Response.json({ robotsEnabled }));
     if (url.endsWith("/api/voice/cloned")) return Promise.resolve(Response.json({ voices: [] }));
     // ENGINES-AI-01: Engines and AI now draws the engines console and the model list as its trail view, so the
     // fixture answers what those read (an unconfigured Stack and a small Mac) instead of the bare "{}" below.

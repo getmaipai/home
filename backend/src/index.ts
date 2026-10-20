@@ -50,6 +50,7 @@ import { syncStackRequirementIssue } from "@/lib/stackRequirement";
 import { initSafetyAlarm } from "@/lib/safetyAlarm";
 import { migratePendingAsksThroughGate } from "@/lib/gate/pendingAskMigration";
 import { migrateWikipediaFallbackToSourceMode } from "@/lib/retrieval/sourceModeMigration";
+import { migrateRobotsSwitch } from "@/lib/robotsSwitchMigration";
 import { purgeLegacyHubLogs } from "@/lib/legacyHubLogPurge";
 import { startConfiguredEngineLinkIfSelected, stopConfiguredEngineLink } from "@/lib/remoteStackSettings";
 import { ensureSetupState } from "@/lib/setupState";
@@ -222,6 +223,7 @@ const styleRemovalInterval = setInterval(() => void drainStyleRemovals(), 5 * 60
 migratePendingAsksThroughGate();
 // KS-MODE-01: a stored search.wikipedia_fallback becomes the source-mode override, once.
 migrateWikipediaFallbackToSourceMode();
+migrateRobotsSwitch();
 void runAllSmokeTests().then(({ ran, failed }) => {
   if (failed > 0) console.error(`[smoke] ${failed}/${ran} bundled package(s) failed their smoke test at boot`);
 });

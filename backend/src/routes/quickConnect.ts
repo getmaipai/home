@@ -12,6 +12,7 @@ import { isTotpEnabled, verifyTotp } from "@/lib/totp";
 import { db } from "@/db";
 import { people } from "@/db/schema";
 import { renderClipBundle } from "@/lib/robotClips";
+import { getHouseholdSettingValue } from "@/lib/settings";
 
 export const quickConnectRoutes = apiRouter();
 
@@ -53,11 +54,14 @@ const createRouteDef = createRoute({
       },
       description: "A pending Quick Connect request, good for 5 minutes.",
     },
-    ...errorResponses({ 429: "Too many Quick Connect requests right now" }),
+    ...errorResponses({ 403: "Robots are turned off on this home", 429: "Too many Quick Connect requests right now" }),
   },
 });
 quickConnectRoutes.openapi(createRouteDef, (c) => {
   const { label, kind, capabilities } = c.req.valid("json");
+  if (kind === "robot" && getHouseholdSettingValue("home.robots.enabled") !== true) {
+    return c.json({ error: "Robots are turned off on this home. An admin can turn them on in Settings, Devices." }, 403);
+  }
   const req = createQuickConnect(label, kind, capabilities);
   if (!req) return c.json({ error: "Too many Quick Connect requests right now. Wait a moment and try again." }, 429);
   return c.json({ code: req.code, poll_token: req.pollToken }, 200);

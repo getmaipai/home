@@ -3912,6 +3912,23 @@
                         ],
                         "description": "self: the companion's own memory of itself, not shared with anyone. companion (SPEC-01, dev.md 'Coherence review' question 1, 'one memory record, seven bumps'): the same idea keyed to one specific companion by companion_id, for a household running more than one companion package (COMP-03 onward) where 'itself' is no longer one thing."
                       },
+                      "device_id": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "pattern": "^device-[a-z0-9]{6,}$",
+                            "description": "The robot this record belongs to. Null means every surface may read it. Not the device that wrote the record: that is the {device6} part of the id."
+                          },
+                          {
+                            "nullable": true,
+                            "description": "The robot this record belongs to. Null means every surface may read it. Not the device that wrote the record: that is the {device6} part of the id."
+                          },
+                          {
+                            "nullable": true
+                          }
+                        ],
+                        "description": "The robot this record belongs to. Null means every surface may read it. Not the device that wrote the record: that is the {device6} part of the id."
+                      },
                       "person": {
                         "anyOf": [
                           {
@@ -4716,6 +4733,30 @@
                       "help": {
                         "type": "string"
                       },
+                      "confirm_off": {
+                        "type": "object",
+                        "properties": {
+                          "title": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "body": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "action": {
+                            "type": "string",
+                            "minLength": 1
+                          }
+                        },
+                        "required": [
+                          "title",
+                          "body",
+                          "action"
+                        ],
+                        "additionalProperties": false,
+                        "description": "Confirmation shown before a boolean setting is turned off."
+                      },
                       "copy": {
                         "type": "object",
                         "properties": {
@@ -4886,6 +4927,44 @@
                     "additionalProperties": false,
                     "description": "One entry in the settings registry (spec/settings/keys.json) or a package manifest's config[]. See platform plan 3.2 and .github's docs/SETTINGS.md."
                   }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/settings/capabilities": {
+      "get": {
+        "tags": [
+          "Settings"
+        ],
+        "summary": "Settings capabilities the signed-in viewer may need to draw their pages",
+        "responses": {
+          "200": {
+            "description": "Boolean capabilities derived from household settings.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "robotsEnabled": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "robotsEnabled"
+                  ]
                 }
               }
             }
@@ -8400,6 +8479,23 @@
                       "pattern": "^person-[a-z0-9]{6,}$",
                       "description": "Whose conversation this is. A conversation is never shared across people."
                     },
+                    "device_id": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "pattern": "^device-[a-z0-9]{6,}$",
+                          "description": "The robot this conversation happened on. Null for every other surface."
+                        },
+                        {
+                          "nullable": true,
+                          "description": "The robot this conversation happened on. Null for every other surface."
+                        },
+                        {
+                          "nullable": true
+                        }
+                      ],
+                      "description": "The robot this conversation happened on. Null for every other surface."
+                    },
                     "surface": {
                       "type": "string",
                       "enum": [
@@ -9546,6 +9642,23 @@
                       "pattern": "^person-[a-z0-9]{6,}$",
                       "description": "Whose conversation this is. A conversation is never shared across people."
                     },
+                    "device_id": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "pattern": "^device-[a-z0-9]{6,}$",
+                          "description": "The robot this conversation happened on. Null for every other surface."
+                        },
+                        {
+                          "nullable": true,
+                          "description": "The robot this conversation happened on. Null for every other surface."
+                        },
+                        {
+                          "nullable": true
+                        }
+                      ],
+                      "description": "The robot this conversation happened on. Null for every other surface."
+                    },
                     "surface": {
                       "type": "string",
                       "enum": [
@@ -9804,6 +9917,23 @@
                       "type": "string",
                       "pattern": "^person-[a-z0-9]{6,}$",
                       "description": "Whose conversation this is. A conversation is never shared across people."
+                    },
+                    "device_id": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "pattern": "^device-[a-z0-9]{6,}$",
+                          "description": "The robot this conversation happened on. Null for every other surface."
+                        },
+                        {
+                          "nullable": true,
+                          "description": "The robot this conversation happened on. Null for every other surface."
+                        },
+                        {
+                          "nullable": true
+                        }
+                      ],
+                      "description": "The robot this conversation happened on. Null for every other surface."
                     },
                     "surface": {
                       "type": "string",
@@ -29707,6 +29837,16 @@
                     "code",
                     "poll_token"
                   ]
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Robots are turned off on this home",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
                 }
               }
             }

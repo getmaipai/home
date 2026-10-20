@@ -15,6 +15,7 @@ import { speakerAgeBand } from "./ageBand";
 import { minorVisibleSettingKeys } from "./settingsMinorSnapshot";
 import { listActivePeople } from "./access";
 import { listDevicesByKind } from "./devices";
+import { getHouseholdSettingValue } from "@/lib/settings";
 import { areWakewordAssetsInstalled } from "./wakewordAssets";
 import type { PersonRow } from "@/types";
 
@@ -44,6 +45,7 @@ export function settingsViewerFor(actor: PersonRow): SettingsViewer {
   const capabilities = new Set<string>();
   if (areWakewordAssetsInstalled()) capabilities.add("wakeword.assets");
   if (listDevicesByKind("robot").length > 0) capabilities.add("robot.paired");
+  if (getHouseholdSettingValue("home.robots.enabled") === true) capabilities.add("robots.enabled");
   if (listActivePeople().some((p) => p.role === "child")) capabilities.add("household.has_child");
   return { role: actor.role as Role, band: speakerAgeBand(actor, new Date()), capabilities };
 }

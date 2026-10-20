@@ -11,6 +11,7 @@ import { deviceCommands, devices } from "@/db/schema";
 import { updateMutedFromDeviceCommand } from "@/lib/deviceStates";
 import { nextHlc } from "@/lib/hlc";
 import { getRegistryKey } from "@/lib/settingsRegistry";
+import { getHouseholdSettingValue } from "@/lib/settings";
 import { declineRobotOfferFromChannel, snoozeRobotOffer } from "@/lib/robotOffers";
 
 export const DEVICE_COMMAND_RETENTION_MS = 24 * 60 * 60 * 1000;
@@ -241,6 +242,10 @@ export function deviceCommandWebSocket(deviceId: string, lastEventId?: string): 
   let connection: ActiveConnection | undefined;
   return {
     onOpen(_event, ws) {
+      if (getHouseholdSettingValue("home.robots.enabled") !== true) {
+        ws.close(4403, "robots_off");
+        return;
+      }
       const previous = connections.get(deviceId);
       if (previous) disposeConnection(previous, 4001, "replaced by a newer device connection");
       connection = {
@@ -341,6 +346,14 @@ export function deviceCommandWebSocket(deviceId: string, lastEventId?: string): 
 export function closeDeviceCommandChannel(deviceId: string): void {
   const connection = connections.get(deviceId);
   if (connection) disposeConnection(connection, 4003, "device session revoked");
+}
+
+/** Close every connected robot channel when the household switch is turned off. */
+export function closeRobotDeviceCommandChannels(): void {
+  for (const [deviceId, connection] of connections) {
+    const device = db.select({ kind: devices.kind }).from(devices).where(eq(devices.id, deviceId)).get();
+    if (device?.kind === "robot") disposeConnection(connection, 4403, "robots_off");
+  }
 }
 
 export function __resetDeviceCommandsForTests(): void {

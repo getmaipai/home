@@ -1072,6 +1072,7 @@ export const api = {
   // result into a real command item.
   search: (q: string) => request<{ groups: SearchGroup[] }>(`/api/search?q=${encodeURIComponent(q)}`).then((r) => r.groups),
   settingsRegistry: () => request<SettingsKey[]>("/api/settings/registry"),
+  settingsCapabilities: () => request<{ robotsEnabled: boolean }>("/api/settings/capabilities"),
   codingAccess: () => request<{ allowed: boolean; can_create: boolean }>("/api/settings/coding-access"),
   codingPieces: () => request<CodingPiecesView>("/api/coding-setup/pieces"),
   installCodingPiece: (id: CodingPiece["id"]) => request<{ job: string | null; piece: CodingPiece["id"] }>(`/api/coding-setup/pieces/${id}/install`, { method: "POST" }),

@@ -931,4 +931,20 @@ describe("secret: true settings keys are encrypted at rest", () => {
   test("the unset default (an empty string, never encrypted) round-trips cleanly", () => {
     expect(getHouseholdSettingValue("voice.hf_token")).toBe("");
   });
+
+  test("home.robots.enabled is admin-only and face palette values are checked", async () => {
+    const owner = new TestClient();
+    await owner.post("/api/auth/setup", { displayName: "Sage", secret: "correcthorse" });
+    const adult = await owner.post("/api/people", { displayName: "Rover", role: "adult", secret: "correcthorse" });
+    const { id } = (await adult.json()) as { id: string };
+    const adultClient = new TestClient();
+    await adultClient.post("/api/auth/verify-secret", { personId: id, secret: "correcthorse" });
+    expect(await (await owner.get("/api/settings/capabilities")).json()).toEqual({ robotsEnabled: false });
+    expect((await owner.request("/api/settings", { method: "PUT", body: { scope: "household", key: "home.robots.enabled", value: true } })).status).toBe(200);
+    expect(await (await adultClient.get("/api/settings/capabilities")).json()).toEqual({ robotsEnabled: true });
+    const refused = await adultClient.request("/api/settings", { method: "PUT", body: { scope: "household", key: "home.robots.enabled", value: true } });
+    expect(refused.status).toBe(403);
+    const invalid = await owner.request("/api/settings", { method: "PUT", body: { scope: "device:robot-abc123", key: "robot.face.color", value: "ultraviolet" } });
+    expect(invalid.status).toBe(400);
+  });
 });

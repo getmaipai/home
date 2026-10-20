@@ -88,6 +88,13 @@ describe("the sections that had no entry draw inside Home settings", () => {
     expect(await view.findByRole("heading", { name: heading })).toBeTruthy();
   });
 
+  test("the robot add, install, and password sections stay hidden while Robots is off", async () => {
+    const view = open(makePerson("owner"), "/settings/home/robot", { robots: true, robotsEnabled: false });
+    await waitFor(() => expect(where(view)).toBe("/settings/home/robot"));
+    expect(view.queryByRole("heading", { name: "Add a robot" })).toBeNull();
+    expect(view.queryByRole("heading", { name: "Robot passwords" })).toBeNull();
+  });
+
   test("an admin sees them too", async () => {
     const view = open(makePerson("admin"), "/settings/home/ai");
     expect(await view.findByRole("heading", { name: "Engine computer link" })).toBeTruthy();

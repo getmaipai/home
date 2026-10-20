@@ -21,13 +21,19 @@ export function useSettingsCapabilities(person: Roster, includeCodingAccess = fa
     queryFn: async () => (admin ? await api.robotDevices() : (await api.devices()).filter((device) => device.kind === "robot")),
     enabled: adultOrUp && adultBand,
   });
+  const settingsCapabilities = useQuery({
+    queryKey: ["settings-capabilities"],
+    queryFn: () => api.settingsCapabilities(),
+    enabled: adultOrUp,
+  });
   const people = useQuery({ queryKey: ["people"], queryFn: () => api.people(), enabled: adultOrUp && adultBand });
   const coding = useQuery({ queryKey: ["coding-access", person.id], queryFn: api.codingAccess, enabled: includeCodingAccess && person.role !== "guest" });
   const capabilities: string[] = [];
   if (wakeword.data?.installed === true) capabilities.push("wakeword.assets");
   if ((robots.data?.length ?? 0) > 0) capabilities.push("robot.paired");
+  if (adultOrUp && settingsCapabilities.data?.robotsEnabled === true) capabilities.push("robots.enabled");
   if (people.data?.some((entry) => entry.role === "child")) capabilities.push("household.has_child");
   if (coding.data?.allowed === true) capabilities.push("coding.allowed_for_me");
   const settled = (query: { isLoading: boolean; fetchStatus: string }) => !query.isLoading || query.fetchStatus === "idle";
-  return { capabilities, ready: settled(wakeword) && settled(robots) && settled(people) && settled(coding) };
+  return { capabilities, ready: settled(wakeword) && settled(robots) && settled(settingsCapabilities) && settled(people) && settled(coding) };
 }

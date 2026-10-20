@@ -26,6 +26,7 @@ async function ownerSession(): Promise<{ client: TestClient; personId: string }>
   const client = new TestClient();
   expect((await client.post("/api/auth/setup", { displayName: "Sage", secret: "correcthorse" })).status).toBe(201);
   const person = db.select({ id: people.id }).from(people).where(eq(people.displayName, "Sage")).get()!;
+  expect((await client.request("/api/settings", { method: "PUT", body: { scope: "household", key: "home.robots.enabled", value: true } })).status).toBe(200);
   return { client, personId: person.id };
 }
 
@@ -50,9 +51,11 @@ class DeviceSocket {
   readonly ws: WebSocket;
   private readonly buffered: WireMessage[] = [];
   private readonly waiters: Array<{ match: (message: WireMessage) => boolean; resolve: (message: WireMessage) => void }> = [];
+  readonly closed: Promise<CloseEvent>;
 
   constructor(url: string, headers: Record<string, string>) {
     this.ws = new WebSocket(url, { headers });
+    this.closed = new Promise((resolve) => this.ws.addEventListener("close", resolve, { once: true }));
     this.ws.addEventListener("message", (event) => {
       const message = JSON.parse(String(event.data)) as WireMessage;
       const index = this.waiters.findIndex((waiter) => waiter.match(message));
@@ -83,6 +86,31 @@ class DeviceSocket {
 }
 
 describe("GET /api/devices/me/events", () => {
+  test("robot channel is closed with robots_off when disabled, both on connect and on a setting change", async () => {
+    const { client: owner, personId } = await ownerSession();
+    const { client: robot } = await robotSession(personId);
+    const cookie = robot.getCookie();
+    if (!cookie) throw new Error("robot session cookie missing");
+    const server = Bun.serve({ hostname: "127.0.0.1", port: 0, fetch: app.fetch, websocket });
+    try {
+      const url = `ws://127.0.0.1:${server.port}/api/devices/me/events`;
+      const open = new DeviceSocket(url, { cookie });
+      await open.open();
+      const stopped = await owner.request("/api/settings", { method: "PUT", body: { scope: "household", key: "home.robots.enabled", value: false } });
+      expect(stopped.status).toBe(200);
+      const stopClose = await open.closed;
+      expect(stopClose.code).toBe(4403);
+      expect(stopClose.reason).toBe("robots_off");
+
+      const reconnect = new DeviceSocket(url, { cookie });
+      await reconnect.open();
+      const connectClose = await reconnect.closed;
+      expect(connectClose.code).toBe(4403);
+      expect(connectClose.reason).toBe("robots_off");
+    } finally {
+      server.stop(true);
+    }
+  });
   test("refuses a WebSocket upgrade without a device session", async () => {
     expect((await app.request("/api/devices/me/events")).status).toBe(401);
     const server = Bun.serve({ hostname: "127.0.0.1", port: 0, fetch: app.fetch, websocket });
@@ -176,6 +204,21 @@ describe("GET /api/devices/me/events", () => {
       const event = await socket.next((message) => message.type === "device-command" && message.kind === "settings_changed");
       expect(event.payload).toEqual({ values: { "voice.wakeword.enabled": true } });
 
+      const face = await owner.request("/api/settings", {
+        method: "PUT",
+        body: { scope: `device:${deviceId}`, key: "robot.face.color", value: "sky" },
+      });
+      expect(face.status).toBe(200);
+      const faceEvent = await socket.next((message) => message.type === "device-command" && message.kind === "settings_changed");
+      expect(faceEvent.payload).toEqual({ values: { "robot.face.color": "sky" } });
+      const night = await owner.request("/api/settings", {
+        method: "PUT",
+        body: { scope: `device:${deviceId}`, key: "robot.night.mode", value: false },
+      });
+      expect(night.status).toBe(200);
+      const nightEvent = await socket.next((message) => message.type === "device-command" && message.kind === "settings_changed");
+      expect(nightEvent.payload).toEqual({ values: { "robot.night.mode": false } });
+
       const personSetting = await owner.request("/api/settings", {
         method: "PUT",
         body: { scope: `person:${personId}`, key: "ui.show_turn_stats", value: true },
@@ -186,6 +229,19 @@ describe("GET /api/devices/me/events", () => {
       socket.ws.close();
     } finally {
       server.stop(true);
+    }
+  });
+
+  test("a non-admin cannot write robot face or night settings", async () => {
+    const { client: owner, personId } = await ownerSession();
+    const { deviceId } = await robotSession(personId);
+    const created = await owner.post("/api/people", { displayName: "Rover", role: "adult", secret: "adultsecret" });
+    const { id } = (await created.json()) as { id: string };
+    const adult = new TestClient();
+    await adult.post("/api/auth/verify-secret", { personId: id, secret: "adultsecret" });
+    for (const [key, value] of [["robot.face.color", "mint"], ["robot.night.mode", true]] as const) {
+      const refused = await adult.request("/api/settings", { method: "PUT", body: { scope: `device:${deviceId}`, key, value } });
+      expect(refused.status).toBe(403);
     }
   });
 

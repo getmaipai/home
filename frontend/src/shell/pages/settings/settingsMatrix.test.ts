@@ -20,16 +20,17 @@ const band = (role: Role) => (role === "child" ? "child" : role === "teen" ? "te
 
 /** The capabilities a role's page can learn (see useSettingsCapabilities):
  * adults and up learn wake word and robots, adult accounts learn of a child. */
-function viewerFor(role: Role, home: { robots: boolean; wakeword: boolean; child: boolean }): SettingsViewer {
+function viewerFor(role: Role, home: { robots: boolean; robotsEnabled?: boolean; wakeword: boolean; child: boolean }): SettingsViewer {
   const adultOrUp = ["owner", "admin", "adult"].includes(role);
   const capabilities: string[] = [];
   if (adultOrUp && home.wakeword) capabilities.push("wakeword.assets");
   if (adultOrUp && home.robots) capabilities.push("robot.paired");
+  if (adultOrUp && home.robotsEnabled === true) capabilities.push("robots.enabled");
   if (adultOrUp && home.child) capabilities.push("household.has_child");
   return { role, band: band(role), capabilities, selfId: `person-${role}` };
 }
 
-const FULL_HOME = { robots: true, wakeword: true, child: true };
+const FULL_HOME = { robots: true, robotsEnabled: true, wakeword: true, child: true };
 const EMPTY_HOME = { robots: false, wakeword: false, child: false };
 
 function sectionIds(areaId: string, viewer: SettingsViewer): string[] {
@@ -94,6 +95,14 @@ describe("which sections each role sees", () => {
       expect(sections).toEqual(role === "owner" || role === "admin" ? home : []);
     }
     expect(sectionIds("home", viewerFor("admin", FULL_HOME))).toEqual(["general", "people", "ai", "pictures", "coding", "robot", "search", "integrations", "commands", "voices", "storage", "reference-library", "media-library", "maintenance", "privacy", "developer", "network"]);
+  });
+
+  test("a fresh home's Devices area exposes only the Robots card; enabling it reveals the other robot cards", () => {
+    const fresh = keysOf("home", viewerFor("admin", EMPTY_HOME));
+    expect([...fresh].filter((key) => key.startsWith("home.robots.")).sort()).toEqual(["home.robots.enabled"]);
+    expect([...fresh].some((key) => key.startsWith("robot."))).toBe(false);
+    const enabled = keysOf("home", viewerFor("admin", FULL_HOME));
+    expect([...enabled].some((key) => key.startsWith("robot."))).toBe(true);
   });
 
   test("a teen sees no Robot card and no household or expert card; a child neither", () => {

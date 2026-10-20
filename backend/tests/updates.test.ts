@@ -4,7 +4,7 @@ import { restoreDefaultScriptedStack } from "./stackFixture";
 import { resetDb } from "./reset-db";
 import { __resetThrottleForTests } from "@/lib/secretThrottle";
 import { __resetRateLimiterForTests } from "@/lib/rateLimiter";
-import { checkForAppUpdate, checkForUpdates, cachedUpdateProjection, isNewerVersion } from "@/lib/updates";
+import { checkForAppUpdate, checkForBotUpdate, checkForUpdates, cachedUpdateProjection, isNewerVersion } from "@/lib/updates";
 import { issueDeviceToken } from "@/lib/deviceTokens";
 import { upsertDeviceState } from "@/lib/deviceStates";
 import { listPending } from "@/lib/notifications";
@@ -450,6 +450,7 @@ describe("robot update rows", () => {
     const owner = new TestClient();
     const res = await owner.post("/api/auth/setup", { displayName: "Sage", secret: "correcthorse" });
     const { person } = (await res.json()) as { person: { id: string } };
+    expect((await owner.request("/api/settings", { method: "PUT", body: { scope: "household", key: "home.robots.enabled", value: true } })).status).toBe(200);
     return { owner, personId: person.id };
   }
 
@@ -477,6 +478,19 @@ describe("robot update rows", () => {
       const body = await readRobots(owner);
       expect(body.robots).toEqual([]);
       expect(body.robotsError).toBeNull();
+    } finally {
+      github.restore();
+    }
+  });
+
+  test("a paired robot makes no Bot release request while the household switch is off", async () => {
+    const { owner, personId } = await ownerAndPersonId();
+    pairRobot(personId, "Reachy");
+    expect((await owner.request("/api/settings", { method: "PUT", body: { scope: "household", key: "home.robots.enabled", value: false } })).status).toBe(200);
+    const github = fakeGitHub({ [BOT_URL]: { status: 200, body: release("v0.2.0") } });
+    try {
+      await checkForBotUpdate();
+      expect(github.urls).toEqual([]);
     } finally {
       github.restore();
     }

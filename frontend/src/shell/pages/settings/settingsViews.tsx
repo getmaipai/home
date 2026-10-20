@@ -29,6 +29,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@maipai/ui/src/dashboa
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@maipai/ui/src/dashboard/components/ui/alert-dialog";
 import { useState } from "react";
 import { useTabItem } from "@/shell/tabIdentity";
+import { useSettingsCapabilities } from "@/shell/pages/settings/useSettingsCapabilities";
 import type { PersonRosterEntry, Roster } from "@/lib/api";
 
 export interface SettingsViewProps {
@@ -74,7 +75,10 @@ function HomeEngineAdminSettings({ person }: SettingsViewProps) {
 }
 // The user list, ready for the People section once the spec names this trail view (the report's commons order).
 function HomeUsersAdminSettings({ person }: SettingsViewProps) { return <UsersSection person={person} />; }
-function HomeDevicesAdminSettings() { return <><AddRobotSection /><RobotPasswordSection /></>; }
+function HomeDevicesAdminSettings({ person }: SettingsViewProps) {
+  const { capabilities } = useSettingsCapabilities(person);
+  return capabilities.includes("robots.enabled") ? <><AddRobotSection /><RobotPasswordSection /></> : null;
+}
 function AccountLikenessView() { useTabItem("Pictures and videos"); return <LikenessSettings />; }
 function PicturesLibraryView() { useTabItem("Pictures and videos"); return <><PicturesLibrary /><VideoLibrary /></>; }
 function HomeRoutingStatsSettings() { return <RoutingStatsSection />; }

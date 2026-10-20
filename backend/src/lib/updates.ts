@@ -37,6 +37,7 @@ import { trigger } from "@/lib/notifications";
 import { tryConsume } from "@/lib/rateLimiter";
 import { listDevicesByKind } from "@/lib/devices";
 import { getDeviceState } from "@/lib/deviceStates";
+import { getHouseholdSettingValue } from "@/lib/settings";
 
 // ROBOT-UPDATES-01: the same unauthenticated GitHub release check, now
 // parameterised by repo. Each repo has its own cached `app_update_state`
@@ -213,6 +214,7 @@ export async function checkForAppUpdate(): Promise<UpdateProjection> {
  * Bot). Never throws; a failure is recorded on the Bot's own state row
  * and surfaces as `robotsError`, never touching Home's own row. */
 export async function checkForBotUpdate(): Promise<void> {
+  if (getHouseholdSettingValue("home.robots.enabled") !== true) return;
   if (listDevicesByKind("robot").length === 0) return;
   await checkRelease(BOT_TARGET);
 }
