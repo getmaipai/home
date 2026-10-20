@@ -87,7 +87,8 @@ describe.skipIf(!hasNode)("wt.sh worktree lifecycle (needs node installed)", () 
     const stamp = JSON.parse(readFileSync(join(data, "gate-stamps", `${name}.json`), "utf8"));
     expect(stamp.tier).toBe("T0");
     expect(stamp.head).toBe(spawnSync("git", ["-C", path, "rev-parse", "HEAD"], { encoding: "utf8" }).stdout.trim());
-    expect(run(["done"], { MAIPAI_WT_SESSION: name }).status).toBe(0);
+    // NOTE.md is never committed, so done must discard it on purpose; plain done refuses uncommitted files.
+    expect(run(["done", "--abandon"], { MAIPAI_WT_SESSION: name }).status).toBe(0);
   });
 
   test("tier classifies explicit paths and the branch diff", () => {
