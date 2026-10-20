@@ -108,7 +108,7 @@ block (CHAR-01) is the robot's presence on the chat screen, not a Devices part.
    match in the pairing wizard.
 3. **DEVICES-01 (S):** the Devices page on the `device` records with the state pill, the own-rows-only last-seen and Sign
    out; the phone column.
-4. **DEVICES-02 (S):** a robot's settings area as data (S4) gathering the keys that exist today.
+4. **DEVICES-02:** superseded and cut in [robot-register-test-configure-2026-10-20.md](robot-register-test-configure-2026-10-20.md).
 5. **DEVICES-03 (S):** the link page with its counts and the never-sync list in words.
 6. **ROBOTLINK-BENCH-01:** a 24-hour disconnected robot re-pairs with no lost record and no duplicate; measured, not argued.
 
