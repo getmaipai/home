@@ -319,7 +319,8 @@ turnRoutes.post("/", requireAuth, bodyLimit({ maxSize: TURN_BODY_LIMIT }), async
     spoken?: boolean;
     ask_answer?: unknown;
   };
-  const parsedEvidence = z.object({ speaker_evidence: evidence.optional(), present: present.optional(), ask_answer: askAnswer.optional() }).safeParse(body);
+  // A robot that cannot tell who is speaking sends speaker_evidence: null (the hosted StackChan always did); that means "no evidence", the same as leaving it out.
+  const parsedEvidence = z.object({ speaker_evidence: evidence.nullish(), present: present.optional(), ask_answer: askAnswer.optional() }).safeParse(body);
   if (!parsedEvidence.success) return c.json({ error: "Invalid turn request", code: "invalid_input" }, 400);
   const surface = (body.surface ?? "chat") as Surface;
   const deviceId = c.get("deviceId");
@@ -907,7 +908,7 @@ turnRoutes.post("/stream", requireAuth, streamTurnBodyLimit, async (c) => {
       if (!metadata || metadata.width !== part.width || metadata.height !== part.height) return c.json({ error: "Picture metadata did not match its stored copy." }, 400);
     }
   }
-  const parsedEvidence = z.object({ speaker_evidence: evidence.optional(), present: present.optional(), ask_answer: askAnswer.optional() }).safeParse(body);
+  const parsedEvidence = z.object({ speaker_evidence: evidence.nullish(), present: present.optional(), ask_answer: askAnswer.optional() }).safeParse(body);
   if (!parsedEvidence.success) return c.json({ error: "Invalid turn request", code: "invalid_input" }, 400);
   const surface = (body.surface ?? "chat") as Surface;
   const deviceId = c.get("deviceId");

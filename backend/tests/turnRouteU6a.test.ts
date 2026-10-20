@@ -269,4 +269,13 @@ describe("POST /api/turn - THIN-0D, speaker_evidence reaches the default path", 
       expect(memoryCount()).toBe(1);
     });
   });
+
+  test("a robot that sends speaker_evidence null (it cannot tell who is speaking) gets an answer, not a 400, and writes no memory", async () => {
+    const { client } = await owner();
+    await withStubReply("Okay.", async () => {
+      const unknownSpeaker = await client.post("/api/turn", { surface: "robot", text, speaker_evidence: null, present: null });
+      expect(unknownSpeaker.status).toBe(200);
+      expect(memoryCount()).toBe(0);
+    });
+  });
 });
