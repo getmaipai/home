@@ -17,6 +17,7 @@ import { issueDeviceToken } from "@/lib/deviceTokens";
 beforeEach(() => {
   __setTtsTagsForTests(null);
   resetDb();
+  setHouseholdSettingValue("home.robots.enabled", true);
   __resetThrottleForTests();
   __setStackClientForTests(null);
 });
