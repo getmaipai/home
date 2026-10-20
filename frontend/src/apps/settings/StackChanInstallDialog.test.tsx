@@ -37,6 +37,7 @@ describe("StackChan install browser check", () => {
     await waitFor(() => expect(view.getByText(/About 6 minutes longer/)).toBeTruthy());
     expect(view.getByText(/about 1 to 2 minutes/)).toBeTruthy();
     expect(view.getByText(/Chrome or Edge on a computer/)).toBeTruthy();
+    expect(view.getByText(/USB JTAG\/serial debug unit/)).toBeTruthy();
     expect(asked).toBe(0);
     fireEvent.click(view.getByRole("button", { name: "Install without a backup" }));
     await waitFor(() => expect(asked).toBe(1));

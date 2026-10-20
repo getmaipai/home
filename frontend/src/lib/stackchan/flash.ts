@@ -180,3 +180,14 @@ export function createBrowserSerialTransport(port: unknown, onLog?: (line: strin
 export function browserCanFlash(target: Pick<Window, "isSecureContext"> = window, browserNavigator: Navigator = navigator): boolean {
   return "serial" in browserNavigator && Boolean((browserNavigator as Navigator & { serial?: unknown }).serial) && target.isSecureContext;
 }
+
+export const MAX_LOG_LINES = 60;
+/** Keeps the details short: one line per progress report is replaced by its latest, and only the last 60 lines are kept. */
+export function addLogLine(previous: string[], raw: string): string[] {
+  const line = raw.trim();
+  if (!line) return previous;
+  const progress = /^(Writing at|Wrote|Reading at|Read)\b/i.test(line);
+  const last = previous[previous.length - 1];
+  const base = progress && last !== undefined && /^(Writing at|Wrote|Reading at|Read)\b/i.test(last) ? previous.slice(0, -1) : previous;
+  return [...base, line].slice(-MAX_LOG_LINES);
+}

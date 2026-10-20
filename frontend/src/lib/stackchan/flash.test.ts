@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, test, mock } from "bun:test";
-import { CONNECT_TIMEOUT_MESSAGE, installStackChan, md5Hex, STALL_TIMEOUT_MESSAGE, type FlashTransport } from "./flash";
+import { addLogLine, CONNECT_TIMEOUT_MESSAGE, MAX_LOG_LINES, installStackChan, md5Hex, STALL_TIMEOUT_MESSAGE, type FlashTransport } from "./flash";
 
 const originalFetch = globalThis.fetch;
 afterEach(() => { globalThis.fetch = originalFetch; });
@@ -107,5 +107,14 @@ describe("StackChan browser flash", () => {
     const started = Date.now();
     await expect(installStackChan({ ...transport, read: () => new Promise<Uint8Array>(() => {}), close: () => new Promise<void>(() => {}) }, {}, { stallTimeoutMs: 20 })).rejects.toThrow(STALL_TIMEOUT_MESSAGE);
     expect(Date.now() - started).toBeLessThan(5000);
+  });
+  test("the details list replaces progress lines with the latest and keeps only the last lines", () => {
+    let lines: string[] = [];
+    for (const line of ["Connecting...", "Writing at 0x0000 (1 %)", "Writing at 0x1000 (2 %)", "Writing at 0x2000 (3 %)", "Wrote 4096 bytes", "Hash of data verified."]) lines = addLogLine(lines, line);
+    expect(lines).toEqual(["Connecting...", "Wrote 4096 bytes", "Hash of data verified."]);
+    let many: string[] = [];
+    for (let i = 0; i < MAX_LOG_LINES + 25; i++) many = addLogLine(many, `step ${i}`);
+    expect(many).toHaveLength(MAX_LOG_LINES);
+    expect(addLogLine(["a"], "   ")).toEqual(["a"]);
   });
 });

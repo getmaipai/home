@@ -4,9 +4,10 @@ import { Button } from "@maipai/ui/src/ui/button";
 import { Progress } from "@maipai/ui/src/ui/progress";
 import { Alert, AlertDescription } from "@maipai/ui/src/ui/alert";
 import { api, ApiError } from "@/lib/api";
-import { browserCanFlash, createBrowserSerialTransport, FLASH_BYTES, installStackChan, STALL_TIMEOUT_MESSAGE, type FlashStage, type FlashTransport } from "@/lib/stackchan/flash";
+import { addLogLine, browserCanFlash, createBrowserSerialTransport, FLASH_BYTES, installStackChan, STALL_TIMEOUT_MESSAGE, type FlashStage, type FlashTransport } from "@/lib/stackchan/flash";
 
 const BROWSER_MESSAGE = "Installing needs Chrome or Edge on a computer, with Home opened at its https address. Open Home there and try again.";
+const PORT_HELP = "When Chrome asks which port to use, choose \"USB JTAG/serial debug unit\" (it may be listed as usbmodem). Do not choose a Bluetooth entry.";
 const ONLINE_MESSAGE = "The robot did not reach Home. Check it joined the same Wi-Fi as this hub, then press Retry.";
 
 export function StackChanInstallDialog() {
@@ -60,7 +61,7 @@ export function StackChanInstallDialog() {
     let hostCreated = false;
     try {
       const port = await (navigator as Navigator & { serial: { requestPort(): Promise<unknown> } }).serial.requestPort();
-      const transport = createBrowserSerialTransport(port, (line) => setLines((previous) => [...previous.slice(-200), line.trim()].filter(Boolean)));
+      const transport = createBrowserSerialTransport(port, (line) => setLines((previous) => addLogLine(previous, line)));
       transportRef.current = transport;
       const result = await installStackChan(transport, { onStage: (next, completed, total) => {
         setStage(next);
@@ -105,6 +106,7 @@ export function StackChanInstallDialog() {
           {message ? <Alert variant="destructive"><AlertDescription>{message}</AlertDescription></Alert> : null}
           {stalledInBackup && !working ? <p>The backup did not work with this computer or cable. Press Start over, unplug and replug the StackChan, then choose Install without a backup. The firmware now on it will be replaced and cannot be restored from Home.</p> : null}
           {choosing ? <>
+            <p>{PORT_HELP}</p>
             <p><strong>Back up first, then install.</strong> Saves the StackChan's whole memory, then installs. About 6 minutes longer.</p>
             <p><strong>Install without a backup.</strong> Faster, about 1 to 2 minutes. The firmware now on the StackChan is replaced and cannot be restored from Home.</p>
           </> : null}
@@ -112,7 +114,7 @@ export function StackChanInstallDialog() {
           {installFinished && deviceId && !online && !onlineFailed ? <p>On a phone, join the robot's Wi-Fi hotspot and choose your home Wi-Fi. Home never asks for the Wi-Fi password.</p> : null}
           {onlineFailed ? <Alert variant="destructive"><AlertDescription>{ONLINE_MESSAGE}</AlertDescription></Alert> : null}
           {online ? <p>The robot is online.</p> : null}
-          {lines.length > 0 ? <details><summary>Show details</summary><pre>{lines.join("\n")}</pre></details> : null}
+          {lines.length > 0 ? <details><summary>Show details</summary><pre className="max-h-48 overflow-auto whitespace-pre-wrap text-base">{lines.join("\n")}</pre></details> : null}
           <DialogFooter>
             {stalledInBackup && !working ? <Button onClick={startOver}>Start over</Button> : null}
             {canStop ? <Button variant="outline" onClick={stopInstall}>Stop</Button> : null}
