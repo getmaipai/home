@@ -18,8 +18,7 @@ APPROVED with conditions, all met below except the one named under "Deferred".
 | Who | Where | What |
 |---|---|---|
 | Admin | Settings, Home, Devices | A row per household robot. Opening a row (`?device=<id>`) shows one detail view: status and IP, name and area, the robot's settings cards, and in its header the one lifecycle button, **Forget this robot** (or **Cancel install** while a hosted install has never connected). Add a StackChan, Add a robot and the robot password section stay below the list. |
-| Adult, teen, admin | Family, Bots tab | The live card: state, battery, versions, mute, live view (hub policy), motor-restart answer. Admins also get Test this robot and the IP row, which the hub already limits to admins. No management control for anyone. An admin sees every household robot; an adult or teen sees the robots paired to them. |
-| Child | nothing | The robot talks to them; no Devices view (the 2026-10-17 note's gates). |
+| Everyone signed in | Family, Bots tab | A robot is a household member like a pet (owner's ruling 2026-10-20): everyone sees every robot and "Belongs to <name>". The live card: state, battery, versions, mute, live view (hub policy), motor-restart answer. Admins also get Test this robot and the IP row, which the hub limits to admins. No management control for anyone. A child sees the card and its owner with no controls. Anyone but a child or guest may mute any robot; unmuting stays with its owner and admins. |
 | Everyone | Settings, Account, Profile and sign-in | Their own phones and browsers (Remove, offline copies switch), Copies in this browser, Signed-in sessions. The settings IA already files "signed-in devices" under Profile and sign-in. |
 
 `/devices` and `/settings/devices` redirect to Account, Profile and sign-in for every role, so old links, bookmarks and the setup
@@ -36,7 +35,7 @@ checklist keep working.
 4. **Any admin may forget a robot.** `DELETE /api/devices/{id}` refused every admin but the one who paired the robot (Quick Connect
    mints the device under the approving admin). A robot is the household's, so an owner or admin may forget it; a phone is
    still only its owner's. Rename and Cancel install were already admin-only on the hub.
-5. **The robot list is the existing `GET /api/devices/robots`.** Phones and browsers are personal and never appear in household lists.
+5. **The robot list is the existing `GET /api/devices/robots`,** now open to anyone signed in and carrying `ownerName` and `ownerId`; the IP address stays admin-only. Phones and browsers are personal and never appear in household lists.
    The robot password section stays its own section for now (see Deferred).
 
 ## Deferred
@@ -47,4 +46,3 @@ checklist keep working.
 - Order on the page: the household Robot settings card draws above the robot list because the spec draws a section's keys before its
   trail view. Opening a robot scrolls its detail to the top. A spec `lead_view` for this section would put the list first; commons release.
 - Folding the robot password row into the detail view (one place per robot).
-- Opening robot reads to every adult household-wide (today an adult sees robots paired to them). A privacy-scope call for Jesse.

@@ -7,6 +7,9 @@
 import { getCookie } from "hono/cookie";
 import { createRoute, z } from "@hono/zod-openapi";
 import { upgradeWebSocket } from "hono/bun";
+import { db } from "@/db";
+import { people } from "@/db/schema";
+import { eq } from "drizzle-orm";
 import { apiRouter, errorResponses, idParamSchema } from "@/lib/openapi";
 import { LIVE_VIEW_CONTENT_TYPE, getLiveView, liveViewAdmits, liveViewStream, pushLiveFrame, startLiveView, stopLiveView } from "@/lib/liveView";
 import { requireAuth, requireRole, requireDeviceSession, resolveHumanSession } from "@/middleware/auth";
@@ -52,6 +55,9 @@ const DeviceSchema = z.object({
   lastSeenAt: z.string().nullable(),
   createdAt: z.string(),
   ipAddress: z.string().optional(),
+  // ROBOT-ADMIN-PLACE-01: a robot is a household member like a pet; everyone sees who owns it.
+  ownerName: z.string().optional(),
+  ownerId: z.string().optional(),
   // A code review (2026-09-28): stored on pairing (createDevice) but never
   // surfaced before now - ROBOT-CARD-01 (not yet built) is what actually
   // renders it; carried here so that page has something to read once it
@@ -103,16 +109,19 @@ const listRobotsRoute = createRoute({
   method: "get",
   path: "/robots",
   tags: ["Devices"],
-  summary: "Every paired robot, household-wide",
-  middleware: [requireRole("owner", "admin")] as const,
+  summary: "Every paired robot, household-wide, with who owns each (anyone signed in)",
+  middleware: [requireAuth] as const,
   responses: {
     200: { content: { "application/json": { schema: z.array(DeviceSchema) } }, description: "Every device of kind \"robot\", regardless of who paired it." },
   },
 });
 devicesRoutes.openapi(listRobotsRoute, (c) => {
+  const viewer = c.get("person");
+  const admin = viewer.role === "owner" || viewer.role === "admin";
   const robots = listDevicesByKind("robot");
+  const ownerNames = new Map(db.select({ id: people.id, name: people.displayName }).from(people).all().map((row) => [row.id, row.name] as const));
   return c.json(
-    robots.map((d) => ({ id: d.id, kind: d.kind, name: d.name, area: d.area, lastSeenAt: d.lastSeenAt, createdAt: d.createdAt, ...(getRobotSocketAddress(d.id) ? { ipAddress: getRobotSocketAddress(d.id)! } : {}), capabilities: d.capabilities, offlineScope: d.offlineScope as Array<"media.offline" | "offline.records">, state: stateForViewer(getDeviceState(d.id), c.get("person")) })),
+    robots.map((d) => ({ id: d.id, kind: d.kind, name: d.name, area: d.area, lastSeenAt: d.lastSeenAt, createdAt: d.createdAt, ...(admin && getRobotSocketAddress(d.id) ? { ipAddress: getRobotSocketAddress(d.id)! } : {}), ...(ownerNames.has(d.personId) ? { ownerName: ownerNames.get(d.personId)!, ownerId: d.personId } : {}), capabilities: d.capabilities, offlineScope: d.offlineScope as Array<"media.offline" | "offline.records">, state: stateForViewer(getDeviceState(d.id), viewer) })),
     200,
   );
 });
@@ -343,11 +352,14 @@ devicesRoutes.openapi(sendCommandRoute, (c) => {
   const actor = c.get("person");
   const { id } = c.req.valid("param");
   const device = getDeviceById(id);
-  if (!device || (device.personId !== actor.id && actor.role !== "owner" && actor.role !== "admin")) {
+  const { kind } = c.req.valid("json");
+  // ROBOT-ADMIN-PLACE-01: a robot is the household's. Anyone but a child or guest may ask it to mute (the privacy-safe
+  // direction); unmuting stays with the person who paired it and admins.
+  const mayMuteAnyRobot = kind === "mute" && actor.role !== "child" && actor.role !== "guest";
+  if (!device || (device.personId !== actor.id && actor.role !== "owner" && actor.role !== "admin" && !(mayMuteAnyRobot && device.kind === "robot"))) {
     return c.json({ error: "No such device" }, 404);
   }
   if (device.kind !== "robot") return c.json({ error: "Not a robot" }, 400);
-  const { kind } = c.req.valid("json");
   const command = issueDeviceCommand(device.id, kind, {});
   return c.json({ id: command.id }, 202);
 });

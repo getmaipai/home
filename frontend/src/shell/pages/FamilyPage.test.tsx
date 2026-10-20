@@ -2,7 +2,6 @@ import { afterEach, describe, expect, mock, test } from "bun:test";
 import { cleanup, fireEvent, waitFor } from "@testing-library/react";
 import { MemoryRouter, useLocation } from "react-router-dom";
 import { FamilyPage } from "@/shell/pages/FamilyPage";
-import { fetchFamilyBots } from "@/apps/settings/RobotCards";
 import { renderWithQueryClient } from "../../../tests/renderWithQueryClient";
 import type { PersonRosterEntry, Roster } from "@/lib/api";
 import { Tour } from "@maipai/spec/gen/ts/tour.js";
@@ -295,38 +294,32 @@ describe("FamilyPage", () => {
     } finally { restore(); }
   });
 
-  test("an adult sees the Bots tab with only the robots paired to them, and no management control", async () => {
-    const restore = mockFamilyFetch([], [], [
-      { id: "robot-1", kind: "robot", name: "Bramble", area: null, capabilities: [] },
-      { id: "phone-1", kind: "phone", name: "Phone", area: null, capabilities: [] },
+  test("everyone sees every robot and who it belongs to, and an adult has no management control", async () => {
+    const restore = mockFamilyFetch([], [], [], [
+      { id: "robot-1", kind: "robot", name: "Bramble", area: null, capabilities: [], ownerName: "Sage", ownerId: "p-owner", state: { activity: "idle", muted: false, tracking: false, reachable: true, unreachableSince: null } },
     ]);
     try {
       const view = renderFamilyPage(makePerson({ role: "adult" }), "/people?tab=bots");
       await waitFor(() => expect(view.getByText("Bramble")).toBeTruthy());
-      expect(view.queryByText("Phone")).toBeNull();
+      expect(view.getByText(/Belongs to Sage/)).toBeTruthy();
       for (const name of ["Settings", "Forget this robot", "Cancel install", "Remove Bramble"]) expect(view.queryByRole("button", { name })).toBeNull();
+      expect(view.getByRole("button", { name: "Mute microphone" })).toBeTruthy();
     } finally { restore(); }
   });
 
-  test("Bots filters the caller's devices for a child and hides the trigger", async () => {
-    const restore = mockFamilyFetch([], [], [
-      { id: "robot-1", kind: "robot", name: "Bramble", area: null, capabilities: [] },
-      { id: "phone-1", kind: "phone", name: "Phone", area: null, capabilities: [] },
+  test("a child sees the robot and its owner but has no controls", async () => {
+    const restore = mockFamilyFetch([], [], [], [
+      { id: "robot-1", kind: "robot", name: "Bramble", area: null, capabilities: [], ownerName: "Sage", ownerId: "p-owner", state: { activity: "idle", muted: false, tracking: false, reachable: true, unreachableSince: null } },
     ]);
-    const fetchMock = globalThis.fetch as unknown as ReturnType<typeof mock>;
     try {
-      const person = makePerson({ role: "child" });
-      const view = renderFamilyPage(person, "/people?tab=bots");
-      expect(view.queryByRole("tab", { name: "Bots" })).toBeNull();
-      expect(view.getByRole("tab", { name: "People" })).toHaveAttribute("aria-selected", "true");
-      expect(view.queryByText("Bramble")).toBeNull();
-      expect(fetchMock).not.toHaveBeenCalledWith(expect.stringContaining("/api/devices"), expect.anything());
-      const filtered = await fetchFamilyBots(person);
-      expect(filtered.map((device) => device.name)).toEqual(["Bramble"]);
-      expect(fetchMock).toHaveBeenCalledWith(expect.stringContaining("/api/devices"), expect.anything());
-      expect(fetchMock).not.toHaveBeenCalledWith(expect.stringContaining("/api/devices/robots"), expect.anything());
+      const view = renderFamilyPage(makePerson({ role: "child" }), "/people?tab=bots");
+      await waitFor(() => expect(view.getByText("Bramble")).toBeTruthy());
+      expect(view.getByText(/Belongs to Sage/)).toBeTruthy();
+      expect(view.queryByRole("button", { name: "Mute microphone" })).toBeNull();
+      expect(view.queryByRole("button", { name: "Live view" })).toBeNull();
     } finally { restore(); }
   });
+
 });
 
 // NEXT-RETIRE-02C: the "tab lives in the URL" cases from the retired old-shell

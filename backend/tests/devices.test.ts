@@ -307,16 +307,38 @@ describe("DELETE /api/devices/:id", () => {
 });
 
 describe("GET /api/devices/robots", () => {
-  test("requires admin", async () => {
+  test("any signed-in person sees every robot and its owner, without its IP address; a stranger is refused", async () => {
     const { client: ownerClient, personId } = await owner();
-    const adultRes = await ownerClient.post("/api/people", { displayName: "Marlow", role: "adult", secret: "0000" });
-    const adult = (await adultRes.json()) as { id: string };
-    const adultClient = new TestClient();
-    await adultClient.post("/api/auth/verify-secret", { personId: adult.id, secret: "0000" });
-    issueDeviceToken(personId, "robot", "Reachy Mini");
+    const robot = issueDeviceToken(personId, "robot", "Reachy Mini").deviceId;
+    const signIn = async (displayName: string, role: string) => {
+      const created = (await (await ownerClient.post("/api/people", { displayName, role, secret: "0000" })).json()) as { id: string };
+      const client = new TestClient();
+      await client.post("/api/auth/verify-secret", { personId: created.id, secret: "0000" });
+      return client;
+    };
+    expect((await new TestClient().get("/api/devices/robots")).status).toBe(401);
+    for (const role of ["child", "teen", "adult"]) {
+      const body = (await (await (await signIn(`Kid ${role}`, role)).get("/api/devices/robots")).json()) as Array<{ id: string; ownerName?: string; ipAddress?: string }>;
+      expect(body).toEqual([expect.objectContaining({ id: robot, ownerName: "Sage" })]);
+      expect(body[0]!.ipAddress).toBeUndefined();
+    }
+    expect((await (await ownerClient.get("/api/devices/robots")).json() as Array<{ ownerName?: string }>)[0]!.ownerName).toBe("Sage");
+  });
 
-    const res = await adultClient.get("/api/devices/robots");
-    expect(res.status).toBe(403);
+  test("an adult may mute someone else's robot but not unmute it; a child may do neither", async () => {
+    const { client: ownerClient, personId } = await owner();
+    const robot = issueDeviceToken(personId, "robot", "Reachy Mini").deviceId;
+    const signIn = async (displayName: string, role: string) => {
+      const created = (await (await ownerClient.post("/api/people", { displayName, role, secret: "0000" })).json()) as { id: string };
+      const client = new TestClient();
+      await client.post("/api/auth/verify-secret", { personId: created.id, secret: "0000" });
+      return client;
+    };
+    const adult = await signIn("Quill", "adult");
+    const child = await signIn("Nova", "child");
+    expect((await adult.post(`/api/devices/${robot}/commands`, { kind: "mute" })).status).toBe(202);
+    expect((await adult.post(`/api/devices/${robot}/commands`, { kind: "unmute" })).status).toBe(404);
+    expect((await child.post(`/api/devices/${robot}/commands`, { kind: "mute" })).status).toBe(404);
   });
 
   test("lists a robot household-wide, even for an admin who didn't pair it", async () => {

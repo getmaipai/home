@@ -76,9 +76,12 @@ export function RobotBody({
   onStopLiveView,
   onAnswerMotorReboot,
   viewerRole = "adult",
+  viewerId,
 }: {
   device: DeviceInfo;
   viewerRole?: Role;
+  /** Who is looking: only the robot's owner or an admin may unmute it; a child or guest controls nothing. */
+  viewerId?: string;
   busy?: boolean;
   onSetMuted: (muted: boolean) => Promise<void>;
   onStartLiveView: () => Promise<{ view_id: string; stream: string }>;
@@ -89,6 +92,8 @@ export function RobotBody({
   // no_vendor_login describes the pairing gate (ROBOT-PAIR-02), not a feature, so it gets no badge.
   const featureCapabilities = device.capabilities.filter((capability) => capability !== NO_VENDOR_LOGIN);
   const admin = isOwnerOrAdminRole(viewerRole);
+  const mayControl = viewerRole !== "child" && viewerRole !== "guest";
+  const mayUnmute = admin || viewerId === undefined || device.ownerId === undefined || device.ownerId === viewerId;
   const [selfTests, setSelfTests] = useState<Partial<Record<RobotSelfTestPart, RobotSelfTestResult | { kind: "offline" | "timeout" | "error"; message: string }>>>({});
   const [selfTestBusy, setSelfTestBusy] = useState<RobotSelfTestPart | null>(null);
   async function runSelfTest(part: RobotSelfTestPart): Promise<void> {
@@ -196,7 +201,7 @@ export function RobotBody({
     <>
       <CardHeader>
         <CardTitle className="truncate">{device.name}</CardTitle>
-        <CardDescription>{device.area ?? "Robot"}</CardDescription>
+        <CardDescription>{[device.area ?? "Robot", device.ownerName ? `Belongs to ${device.ownerName}` : null].filter(Boolean).join(" · ")}</CardDescription>
         <CardAction>
           <Badge variant={unreachable ? "destructive" : "secondary"}>{status}</Badge>
           <Badge variant="secondary">Paired</Badge>
@@ -295,7 +300,7 @@ export function RobotBody({
       </CardContent>
       <CardFooter>
         <div className="flex w-full flex-wrap items-center justify-end gap-2">
-          {state !== null ? (
+          {state !== null && mayControl ? (
             <>
               {askedMuted !== null && !muteError ? (
                 <p className="mr-auto text-sm text-muted-foreground">Asked {device.name} to {askedMuted ? "mute" : "unmute"}, waiting for it.</p>
@@ -311,7 +316,7 @@ export function RobotBody({
               )}
               <Button
                 variant="outline"
-                disabled={busy || unreachable || askedMuted !== null}
+                disabled={busy || unreachable || askedMuted !== null || (state.muted && !mayUnmute)}
                 onClick={() => void askMute(!state.muted)}
               >
                 {state.muted ? "Unmute microphone" : "Mute microphone"}

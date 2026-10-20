@@ -27226,6 +27226,12 @@
                       "ipAddress": {
                         "type": "string"
                       },
+                      "ownerName": {
+                        "type": "string"
+                      },
+                      "ownerId": {
+                        "type": "string"
+                      },
                       "capabilities": {
                         "type": "array",
                         "items": {
@@ -27426,7 +27432,7 @@
         "tags": [
           "Devices"
         ],
-        "summary": "Every paired robot, household-wide",
+        "summary": "Every paired robot, household-wide, with who owns each (anyone signed in)",
         "responses": {
           "200": {
             "description": "Every device of kind \"robot\", regardless of who paired it.",
@@ -27466,6 +27472,12 @@
                         "type": "string"
                       },
                       "ipAddress": {
+                        "type": "string"
+                      },
+                      "ownerName": {
+                        "type": "string"
+                      },
+                      "ownerId": {
                         "type": "string"
                       },
                       "capabilities": {
@@ -28341,6 +28353,12 @@
                       "type": "string"
                     },
                     "ipAddress": {
+                      "type": "string"
+                    },
+                    "ownerName": {
+                      "type": "string"
+                    },
+                    "ownerId": {
                       "type": "string"
                     },
                     "capabilities": {

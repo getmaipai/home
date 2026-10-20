@@ -73,11 +73,8 @@ export function FamilyPage({ person }: { person: Roster }) {
   useTabItem("Family");
   const [params, setParams] = useSearchParams();
   const requestedTab = params.get("tab");
-  // A child is spoken to by the robot and sees no Devices view (devices-and-robot-link note, Users and gates).
-  const seesRobots = isOwnerOrAdminRole(person.role) || person.role === "adult" || person.role === "teen";
-  const botsQuery = useQuery<DeviceInfo[]>({ queryKey: familyBotsQueryKey(person), queryFn: () => fetchFamilyBots(person), enabled: seesRobots });
-  const showBots = isOwnerOrAdminRole(person.role) || (seesRobots && (botsQuery.data?.length ?? 0) > 0);
-  const activeTab = requestedTab === "pets" ? "pets" : requestedTab === "bots" && showBots ? "bots" : "people";
+  const botsQuery = useQuery<DeviceInfo[]>({ queryKey: familyBotsQueryKey(person), queryFn: () => fetchFamilyBots(person) });
+  const activeTab = requestedTab === "pets" ? "pets" : requestedTab === "bots" ? "bots" : "people";
   const query = useQuery<PersonRosterEntry[]>({ queryKey: ["people"], queryFn: () => api.people() });
   const petsQuery = useQuery<Entity[]>({ queryKey: ["entities", "pet"], queryFn: () => api.entities("pet") });
 
@@ -96,7 +93,7 @@ export function FamilyPage({ person }: { person: Roster }) {
       <TabsList>
         <TabsTrigger value="people">People{query.data ? <> <Badge>{query.data.length}</Badge></> : null}</TabsTrigger>
         <TabsTrigger value="pets">Pets{petsQuery.data ? <> <Badge>{petsQuery.data.length}</Badge></> : null}</TabsTrigger>
-        {showBots ? <TabsTrigger value="bots">Bots{botsQuery.data ? <> <Badge>{botsQuery.data.length}</Badge></> : null}</TabsTrigger> : null}
+        <TabsTrigger value="bots">Bots{botsQuery.data ? <> <Badge>{botsQuery.data.length}</Badge></> : null}</TabsTrigger>
       </TabsList>
       <TabsContent value="people">
     <AsyncState

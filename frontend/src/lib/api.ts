@@ -286,6 +286,9 @@ export interface DeviceInfo {
   lastSeenAt: string | null;
   createdAt: string;
   ipAddress?: string;
+  /** The household robots route: who the robot belongs to, shown to everyone like a pet's owner. */
+  ownerName?: string;
+  ownerId?: string;
   capabilities: string[];
   /** ROBOT-CARD-01: robots only; `null` until the first report. */
   offlineScope?: Array<"media.offline" | "offline.records">;
