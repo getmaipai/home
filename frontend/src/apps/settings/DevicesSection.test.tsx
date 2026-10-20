@@ -9,7 +9,7 @@ import { MemoryRouter } from "react-router-dom";
 
 function settingsFetch(extra: boolean, patchCalls: unknown[] = [], patchError?: string) {
   const original = globalThis.fetch;
-  const baseRegistry = ["robot.barge_in.open_mic", "robot.camera.watch_level", "robot.follow_up.seconds", "robot.gestures.enabled", "robot.idle.level", "robot.initiative.allowed_here"].map((key) => ({ key, scope: "device", selector: key.endsWith("seconds") ? "number" : key.endsWith("level") ? "select" : "boolean", default: key.endsWith("seconds") ? 10 : false, label: key, help: "Registry-provided help.", level: "basic", secret: false, lives_in: "robot.hello", honoured_by: ["home"] }));
+  const baseRegistry = ["robot.barge_in.open_mic", "robot.camera.watch_level", "robot.follow_up.seconds", "robot.gestures.enabled", "robot.idle.level", "robot.initiative.allowed_here", "robot.face.color", "robot.night.mode"].map((key) => ({ key, scope: "device", selector: key.endsWith("seconds") ? "number" : key.endsWith("level") || key === "robot.face.color" ? "select" : "boolean", default: key.endsWith("seconds") ? 10 : key === "robot.face.color" ? "mint" : key === "robot.night.mode", range: key === "robot.face.color" ? { options: ["mint", "sky", "peach", "lavender", "lemon", "rose", "cloud"] } : undefined, label: key === "robot.face.color" ? "Face color" : key === "robot.night.mode" ? "Night mode" : key, help: "Registry-provided help.", level: "basic", secret: false, lives_in: "robot.hello", honoured_by: ["home"] }));
   const registry = [...baseRegistry, ...(extra ? [{ ...baseRegistry[0]!, key: "robot.hello.future", label: "robot.hello.future" }] : [])];
   globalThis.fetch = mock((input: RequestInfo | URL, init?: RequestInit) => {
     const url = String(input);
@@ -122,6 +122,8 @@ describe("DevicesSection", () => {
       fireEvent.click(admin.getByRole("button", { name: "Settings" }));
       await admin.findByText("robot.hello.future");
       expect(admin.getByText("robot.barge_in.open_mic")).toBeTruthy();
+      expect(admin.getByText("Face color")).toBeTruthy();
+      expect(admin.getByText("Night mode")).toBeTruthy();
       cleanup();
       const adult = renderWithQueryClient(<Card><RobotBody device={device({ id: "robot-1", kind: "robot", name: "Riff" })} viewerRole="adult" onRemove={() => {}} confirmingRemove={false} onConfirmRemove={() => {}} onCancelRemove={() => {}} busy={false} onSetMuted={async () => {}} onStartLiveView={async () => ({ view_id: "v", stream: "" })} onStopLiveView={async () => {}} onAnswerMotorReboot={async () => {}} /></Card>);
       expect(adult.queryByRole("button", { name: "Settings" })).toBeNull();
