@@ -29,3 +29,8 @@ Lint: `tsc --noEmit` (backend); `tsc --noEmit && eslint .` (frontend). `bash scr
 `--pre` for the cheap preflight, plain `check.sh` for the full gate (it takes the machine-wide lock; never hand-roll a wait).
 
 A `@maipai/*` pin bump, a lockfile conflict or a bundled-manifest change: load [docs/PINNING.md](docs/PINNING.md) first.
+
+**Releases (one releaser).** Tag and update the live hub only with `scripts/release-home.sh --owner-approved` (see its header), and only after the
+owner said yes in that turn. It refuses a downgrade, a second tag while the live hub is behind, and two runs at once. Sessions that finish
+work land it on `main` and say so; they never tag or run the installer themselves. One session owns releases at a time: the StackChan
+firmware session on the Studio (2026-10-20).
