@@ -20,6 +20,8 @@ import { isOwnerOrAdmin } from "@/lib/access";
 import { clearMatchingValues } from "@/lib/settings";
 import type { PersonRow } from "@/types";
 import type { ClonedVoiceInfo } from "@/wire";
+import type { StackVoice } from "@/lib/stack/types";
+import { appendLogLine } from "@/lib/log";
 
 export type ClonedVoiceOpResult<T> =
   | { ok: true; value: T }
@@ -50,6 +52,8 @@ const EXTENSION_BY_MIME: Record<string, string> = {
   "audio/x-flac": "flac",
 };
 
+const NEW_VOICE_EXTENSIONS = new Set(["wav", "mp3", "flac"]);
+
 function toInfo(row: typeof clonedVoices.$inferSelect, creatorName: string): ClonedVoiceInfo {
   return {
     id: row.id,
@@ -58,7 +62,22 @@ function toInfo(row: typeof clonedVoices.$inferSelect, creatorName: string): Clo
     creatorName,
     bytes: row.bytes,
     createdAt: row.createdAt,
+    ...(row.temperature !== null ? { temperature: row.temperature } : {}),
+    ...(row.pitchSemitones !== null ? { pitchSemitones: row.pitchSemitones } : {}),
   };
+}
+
+// VOICES-03: the HouseholdVoice record's own ranges.
+const MAX_LABEL_LENGTH = 60;
+const TEMPERATURE_RANGE = { min: 0.1, max: 2.0 };
+const PITCH_RANGE = { min: -12, max: 12 };
+const inRange = (value: number, range: { min: number; max: number }) => Number.isFinite(value) && value >= range.min && value <= range.max;
+
+export interface HouseholdVoiceOptions {
+  /** Sampling temperature, 0.1 to 2.0; null or absent means the engine default. */
+  temperature?: number | null;
+  /** Pitch offset in semitones, -12 to 12, formants kept; null or absent means no shift. */
+  pitchSemitones?: number | null;
 }
 
 /** Household-wide, like the community catalog: anyone can select any voice. */
@@ -76,15 +95,24 @@ export function saveClonedVoice(
   label: string,
   bytes: Uint8Array,
   mimeType: string,
+  options: HouseholdVoiceOptions = {},
 ): ClonedVoiceOpResult<ClonedVoiceInfo> {
+  // VOICES-04: making a voice is for an owner or an admin, with no other limit (SAFETY.md, owner-approved 2026-10-18).
+  if (!isOwnerOrAdmin(creator)) return { ok: false, status: 403, error: "Only an owner or an admin can make a voice." };
   const trimmedLabel = label.trim();
   if (!trimmedLabel) return { ok: false, status: 400, error: "label is required" };
+  if (trimmedLabel.length > MAX_LABEL_LENGTH) return { ok: false, status: 400, error: `The name can be ${MAX_LABEL_LENGTH} characters or fewer.` };
   if (bytes.byteLength === 0) return { ok: false, status: 400, error: "the uploaded file is empty" };
   if (bytes.byteLength > MAX_BYTES) {
     return { ok: false, status: 400, error: `file must be ${MAX_BYTES / (1024 * 1024)}MB or smaller` };
   }
   const extension = EXTENSION_BY_MIME[mimeType];
-  if (!extension) return { ok: false, status: 400, error: `unsupported audio type: ${mimeType}` };
+  // The voice engine on this computer decodes WAV, MP3 and FLAC only (it has no ffmpeg); older rows in other formats stay usable.
+  if (!extension || !NEW_VOICE_EXTENSIONS.has(extension)) return { ok: false, status: 400, error: "Use a WAV, MP3 or FLAC recording. Save it in one of those formats and choose it again." };
+  const temperature = options.temperature ?? null;
+  const pitchSemitones = options.pitchSemitones ?? null;
+  if (temperature !== null && !inRange(temperature, TEMPERATURE_RANGE)) return { ok: false, status: 400, error: "The sampling temperature must be a number from 0.1 to 2.0." };
+  if (pitchSemitones !== null && !inRange(pitchSemitones, PITCH_RANGE)) return { ok: false, status: 400, error: "The pitch offset must be a number from -12 to 12 semitones." };
 
   ensureDataDir(clonedVoicesDir);
   const id = newClonedVoiceId();
@@ -100,6 +128,8 @@ export function saveClonedVoice(
     mimeType,
     bytes: bytes.byteLength,
     createdAt: new Date().toISOString(),
+    temperature,
+    pitchSemitones,
   };
   try {
     db.insert(clonedVoices).values(row).run();
@@ -118,6 +148,8 @@ export function saveClonedVoice(
     }
     throw err;
   }
+  // One audit line: who made it and with which settings; never the person's name, the voice's name or the clip.
+  appendLogLine(`voice.created id=${id} by=${creator.id} role=${creator.role} temperature=${temperature ?? "default"} pitch=${pitchSemitones ?? 0}`);
   return { ok: true, value: toInfo(row, creator.displayName) };
 }
 
@@ -148,6 +180,10 @@ export function deleteClonedVoice(actor: PersonRow, id: string): ClonedVoiceOpRe
   // match to it (not the host/port it happened to resolve through) is
   // real going forward, not just checked once.
   clearMatchingValues("tts.voice_id", `/cloned/${id}/file`);
+  // The plain-token form (a person's tts.voice_id, a robot's robot.voice.id) holds the bare id.
+  clearMatchingValues("tts.voice_id", id);
+  clearMatchingValues("robot.voice.id", id);
+  appendLogLine(`voice.deleted id=${id} by=${actor.id} role=${actor.role}`);
   const filePath = join(clonedVoicesDir, row.fileName);
   try {
     if (existsSync(filePath)) unlinkSync(filePath);
@@ -189,4 +225,30 @@ export function clonedVoiceExists(id: string): boolean {
 export function clonedVoiceUrl(id: string): string {
   const baseUrl = isRemoteStackSelected() ? "http://127.0.0.1:8772" : selfBaseUrl();
   return `${baseUrl}/api/voice/cloned/${id}/file`;
+}
+
+const VOICE_TOKEN = /^voice-[a-z0-9]{6,}$/;
+const VOICE_ADDRESS = /\/cloned\/(voice-[a-z0-9]{6,})\/file/;
+
+/** What a saved voice choice (`tts.voice_id`, `robot.voice.id`) means when it names a voice made at home: the clip's address and the
+ * voice's own temperature and pitch. Both the plain token and the older address form are understood; null for anything else. */
+export function householdVoiceSpeech(stored: unknown): { voiceUrl: string; temperature?: number; pitchSemitones?: number } | null {
+  if (typeof stored !== "string") return null;
+  const id = VOICE_TOKEN.test(stored) ? stored : VOICE_ADDRESS.exec(stored)?.[1];
+  if (!id) return null;
+  const row = db.select().from(clonedVoices).where(eq(clonedVoices.id, id)).get();
+  if (!row) return null;
+  return {
+    voiceUrl: clonedVoiceUrl(id),
+    ...(row.temperature !== null ? { temperature: row.temperature } : {}),
+    ...(row.pitchSemitones !== null ? { pitchSemitones: row.pitchSemitones } : {}),
+  };
+}
+
+/** The household's voices as entries of the voice list (speech engine: Chatterbox Turbo). */
+export function householdVoiceEntries(): StackVoice[] {
+  return db.select().from(clonedVoices).all().map((row) => ({
+    id: row.id, name: row.label, description: "A voice made at home.", language: "en", country: "unknown", gender: "unknown" as const,
+    source: "cloned" as const, engine: "chatterbox-turbo", onDisk: true, licence: null, revision: "1",
+  }));
 }

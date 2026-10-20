@@ -100,11 +100,11 @@ describe("listClonedVoices()", () => {
     const teen = makePerson("Nova", "teen");
     const child = makePerson("Poppy", "child");
     saveClonedVoice(jesse, "Dad's voice", WAV_BYTES, "audio/wav");
-    saveClonedVoice(child, "Poppy's voice", WAV_BYTES, "audio/wav");
-    saveClonedVoice(teen, "Teen voice", WAV_BYTES, "audio/wav");
-    expect(listClonedVoices().map((v) => v.label).sort()).toEqual(["Dad's voice", "Poppy's voice", "Teen voice"]);
-    void admin;
+    saveClonedVoice(admin, "Marlow's voice", WAV_BYTES, "audio/wav");
+    expect(listClonedVoices().map((v) => v.label).sort()).toEqual(["Dad's voice", "Marlow's voice"]);
     void adult;
+    void teen;
+    void child;
   });
 });
 
@@ -124,20 +124,18 @@ describe("deleteClonedVoice()", () => {
   test("an owner/admin can delete someone else's recording", () => {
     const jesse = makePerson("Jesse", "owner");
     const marlow = makePerson("Marlow", "admin");
-    const nova = makePerson("Nova", "child");
-    const saved = saveClonedVoice(nova, "Nova's voice", WAV_BYTES, "audio/wav");
+    const saved = saveClonedVoice(marlow, "Marlow's voice", WAV_BYTES, "audio/wav");
     if (!saved.ok) throw new Error("setup failed");
 
     const result = deleteClonedVoice(jesse, saved.value.id);
     expect(result.ok).toBe(true);
     expect(clonedVoiceExists(saved.value.id)).toBe(false);
-    void marlow;
   });
 
   test("a non-creator, non-admin is refused", () => {
-    const nova = makePerson("Nova", "child");
+    const jesse = makePerson("Jesse", "owner");
     const marlow = makePerson("Marlow", "adult");
-    const saved = saveClonedVoice(nova, "Nova's voice", WAV_BYTES, "audio/wav");
+    const saved = saveClonedVoice(jesse, "Dad's voice", WAV_BYTES, "audio/wav");
     if (!saved.ok) throw new Error("setup failed");
 
     const result = deleteClonedVoice(marlow, saved.value.id);
@@ -246,5 +244,80 @@ describe("clonedVoiceUrl()", () => {
   test("uses the reverse SSH forward when the Stack is remote", () => {
     setHouseholdSettingValue("engines.stack.where", "another_computer");
     expect(clonedVoiceUrl("voice-abc123")).toBe("http://127.0.0.1:8772/api/voice/cloned/voice-abc123/file");
+  });
+});
+
+// VOICES-03/04: who may make a voice, the record's ranges, the audit line, and what a saved choice means.
+import { householdVoiceEntries, householdVoiceSpeech } from "@/lib/clonedVoices";
+
+describe("making a voice (VOICES-04)", () => {
+  test("only an owner or an admin can make one: a member, teen and child get 403 and nothing is stored", () => {
+    for (const role of ["adult", "teen", "child"]) {
+      const result = saveClonedVoice(makePerson(`P${role}`, role), "Nope", WAV_BYTES, "audio/wav");
+      expect(result).toEqual({ ok: false, status: 403, error: "Only an owner or an admin can make a voice." });
+    }
+    expect(listClonedVoices()).toHaveLength(0);
+    expect(existsSync(clonedVoicesDir) ? readdirSync(clonedVoicesDir) : []).toHaveLength(0);
+    expect(saveClonedVoice(makePerson("Mara", "admin"), "Ok", WAV_BYTES, "audio/wav").ok).toBe(true);
+    expect(saveClonedVoice(makePerson("Jess", "owner"), "Ok too", WAV_BYTES, "audio/wav").ok).toBe(true);
+  });
+
+  test("temperature and pitch are kept and listed; without them both keys are absent", () => {
+    const jesse = makePerson("Jesse", "owner");
+    const cutey = saveClonedVoice(jesse, "Cutey", WAV_BYTES, "audio/wav", { temperature: 1.05, pitchSemitones: -1 });
+    const plain = saveClonedVoice(jesse, "Plain", WAV_BYTES, "audio/wav");
+    if (!cutey.ok || !plain.ok) throw new Error("setup failed");
+    expect(cutey.value).toMatchObject({ temperature: 1.05, pitchSemitones: -1 });
+    expect("temperature" in plain.value).toBe(false);
+    expect("pitchSemitones" in plain.value).toBe(false);
+    expect(listClonedVoices().find((v) => v.id === cutey.value.id)).toMatchObject({ temperature: 1.05, pitchSemitones: -1 });
+  });
+
+  test.each([[0.05, undefined], [2.5, undefined], [Number.NaN, undefined]])("temperature %p is refused with the plain message", (temperature, pitchSemitones) => {
+    const result = saveClonedVoice(makePerson("Jesse", "owner"), "X", WAV_BYTES, "audio/wav", { temperature, pitchSemitones });
+    expect(result).toEqual({ ok: false, status: 400, error: "The sampling temperature must be a number from 0.1 to 2.0." });
+  });
+  test.each([13, -13, Number.NaN])("pitch %p is refused with the plain message", (pitchSemitones) => {
+    const result = saveClonedVoice(makePerson("Jesse", "owner"), "X", WAV_BYTES, "audio/wav", { pitchSemitones });
+    expect(result).toEqual({ ok: false, status: 400, error: "The pitch offset must be a number from -12 to 12 semitones." });
+  });
+  test("the boundary values are accepted", () => {
+    const jesse = makePerson("Jesse", "owner");
+    for (const options of [{ temperature: 0.1, pitchSemitones: -12 }, { temperature: 2.0, pitchSemitones: 12 }]) {
+      expect(saveClonedVoice(jesse, "Edge", WAV_BYTES, "audio/wav", options).ok).toBe(true);
+    }
+  });
+  test("a 61-character name is refused; a recording the engine cannot read is refused in plain words", () => {
+    const jesse = makePerson("Jesse", "owner");
+    expect(saveClonedVoice(jesse, "n".repeat(61), WAV_BYTES, "audio/wav")).toEqual({ ok: false, status: 400, error: "The name can be 60 characters or fewer." });
+    const webm = saveClonedVoice(jesse, "Rec", WAV_BYTES, "audio/webm");
+    expect(webm).toMatchObject({ ok: false, status: 400 });
+    if (!webm.ok) expect(webm.error).toContain("WAV, MP3 or FLAC");
+  });
+
+  test("householdVoiceSpeech understands the plain token and the older address form, and nothing else", () => {
+    const jesse = makePerson("Jesse", "owner");
+    const made = saveClonedVoice(jesse, "Cutey", WAV_BYTES, "audio/wav", { temperature: 1.05, pitchSemitones: -1 });
+    if (!made.ok) throw new Error("setup failed");
+    const expected = { voiceUrl: clonedVoiceUrl(made.value.id), temperature: 1.05, pitchSemitones: -1 };
+    expect(householdVoiceSpeech(made.value.id)).toEqual(expected);
+    expect(householdVoiceSpeech(`http://127.0.0.1:8787/api/voice/cloned/${made.value.id}/file`)).toEqual(expected);
+    for (const other of ["voice-unknownunknown", "default", "alba", "", 5, null, undefined]) expect(householdVoiceSpeech(other)).toBeNull();
+  });
+
+  test("householdVoiceEntries lists each voice as a cloned entry named by its label", () => {
+    const made = saveClonedVoice(makePerson("Jesse", "owner"), "Cutey", WAV_BYTES, "audio/wav");
+    if (!made.ok) throw new Error("setup failed");
+    expect(householdVoiceEntries()).toEqual([expect.objectContaining({ id: made.value.id, name: "Cutey", source: "cloned", engine: "chatterbox-turbo", onDisk: true })]);
+  });
+
+  test("deleting a voice clears a person's saved choice that holds the plain token, and a robot's", () => {
+    const jesse = makePerson("Jesse", "owner");
+    const made = saveClonedVoice(jesse, "Cutey", WAV_BYTES, "audio/wav");
+    if (!made.ok) throw new Error("setup failed");
+    setPersonTtsVoiceUnchecked(jesse, made.value.id);
+    expect(getPersonSettingValue(jesse, "tts.voice_id")).toBe(made.value.id);
+    expect(deleteClonedVoice(jesse, made.value.id).ok).toBe(true);
+    expect(getPersonSettingValue(jesse, "tts.voice_id")).not.toBe(made.value.id);
   });
 });

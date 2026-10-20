@@ -1002,6 +1002,10 @@ export const clonedVoices = sqliteTable("cloned_voices", {
   mimeType: text("mime_type").notNull(),
   bytes: integer("bytes").notNull(),
   createdAt: text("created_at").notNull(),
+  // VOICES-03/04 (HouseholdVoice): the voice's own sampling temperature (0.1 to 2.0) and pitch offset in semitones
+  // (-12 to 12); null means the engine default and no shift.
+  temperature: real("temperature"),
+  pitchSemitones: real("pitch_semitones"),
 });
 
 export const scheduledJobs = sqliteTable("scheduled_jobs", {

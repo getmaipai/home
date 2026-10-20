@@ -617,6 +617,10 @@ export interface ClonedVoiceInfo {
   creatorName: string;
   bytes: number;
   createdAt: string;
+  /** VOICES-03: the voice's own sampling temperature (0.1 to 2.0); absent means the engine default. */
+  temperature?: number;
+  /** VOICES-03: pitch offset in semitones (-12 to 12), formants kept; absent means no shift. */
+  pitchSemitones?: number;
 }
 
 export interface StackVoice {

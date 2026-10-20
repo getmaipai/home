@@ -16394,6 +16394,12 @@
                           },
                           "createdAt": {
                             "type": "string"
+                          },
+                          "temperature": {
+                            "type": "number"
+                          },
+                          "pitchSemitones": {
+                            "type": "number"
                           }
                         },
                         "required": [
@@ -16467,6 +16473,12 @@
                     },
                     "createdAt": {
                       "type": "string"
+                    },
+                    "temperature": {
+                      "type": "number"
+                    },
+                    "pitchSemitones": {
+                      "type": "number"
                     }
                   },
                   "required": [

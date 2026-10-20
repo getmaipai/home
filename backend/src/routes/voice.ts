@@ -25,7 +25,8 @@ import {
   deleteClonedVoice,
   getClonedVoiceFile,
   clonedVoiceExists,
-  clonedVoiceUrl,
+  householdVoiceEntries,
+  householdVoiceSpeech,
   MAX_BYTES as MAX_CLONED_VOICE_BYTES,
 } from "@/lib/clonedVoices";
 import type { AppEnv } from "@/types";
@@ -33,8 +34,15 @@ import { apiRouter, errorResponses } from "@/lib/openapi";
 import type { StackVoice } from "@/lib/stack/types";
 import { StackError } from "@/lib/stack/errors";
 import { speakerAgeBand } from "@/lib/ageBand";
+import { cacheHouseholdPreview, dropHouseholdPreview, householdPreviewAudio, renderHouseholdVoice } from "@/lib/householdVoiceCheck";
 
 export const voiceRoutes = apiRouter();
+
+/** A form field that is absent or blank is "not given"; anything else is parsed as a number (NaN is refused by the lib). */
+function optionalNumber(value: unknown): number | null {
+  if (typeof value !== "string" || !value.trim()) return null;
+  return Number(value);
+}
 
 const stackVoicesRoute = createRoute({
   method: "get", path: "/voices", tags: ["Voice"], summary: "List voices available from the Stack",
@@ -56,7 +64,10 @@ voiceRoutes.openapi(stackVoicesRoute, async (c) => {
     : "Ask the person who manages Home to start it in Settings, then Engines.";
   if (!isStackConfigured()) return c.json({ error: `The Stack that speaks for Home is not running. ${outageHelp}` }, 503);
   try {
-    const all: StackVoice[] = await getStackClient().voices();
+    const stackVoices: StackVoice[] = await getStackClient().voices();
+    // Voices an admin made from a clip are spoken by Chatterbox Turbo, so they are offered only beside it, and never to a child or teen.
+    const clipVoices = speakerAgeBand(c.get("person"), new Date()) === "adult" && stackVoices.some((voice) => voice.engine === "chatterbox-turbo") ? householdVoiceEntries() : [];
+    const all: StackVoice[] = [...stackVoices, ...clipVoices];
     // Owner ruling 2026-10-17: an owner or admin lists every voice (a voice not yet downloaded installs on first
     // preview); everyone else sees only voices already on disk, so Test never ends in a refusal.
     const voices = isOwnerOrAdmin(c.get("person")) ? all : all.filter((voice) => voice.onDisk);
@@ -85,6 +96,18 @@ voiceRoutes.openapi(voicePreviewRoute, async (c) => {
     ? "Open Settings, then Engines, and check the voice setup."
     : "Ask the person who manages Home to check the voice setup in Settings.";
   if (!isStackConfigured()) return c.json({ error: `Home could not prepare this voice preview. ${help}` }, 503);
+  if (householdVoiceSpeech(id)) {
+    if (speakerAgeBand(actor, new Date()) !== "adult") return c.json({ error: "This voice is not available for your account. Ask the person who manages Home to choose a voice." }, 403);
+    let audio = householdPreviewAudio(id);
+    if (!audio) {
+      const rendered = await renderHouseholdVoice(id, c.req.raw.signal);
+      if (!rendered.ok) return c.json({ error: rendered.error }, 400);
+      if (!rendered.audio || rendered.audio.byteLength <= 44) return c.json({ error: `Home could not prepare this voice preview. ${help}` }, 503);
+      cacheHouseholdPreview(id, rendered.audio);
+      audio = rendered.audio;
+    }
+    return new Response(audio, { status: 200, headers: { "content-type": "audio/wav", "cache-control": "private, max-age=86400" } });
+  }
   try {
     const client = getStackClient();
     const voices = await client.voices();
@@ -422,6 +445,8 @@ const clonedListRoute = createRoute({
                 creatorName: z.string(),
                 bytes: z.number().int().nonnegative(),
                 createdAt: z.string(),
+                temperature: z.number().optional(),
+                pitchSemitones: z.number().optional(),
               }),
             ),
           }),
@@ -479,6 +504,8 @@ const clonedUploadRoute = createRoute({
             creatorName: z.string(),
             bytes: z.number().int().nonnegative(),
             createdAt: z.string(),
+            temperature: z.number().optional(),
+            pitchSemitones: z.number().optional(),
           }),
         },
       },
@@ -496,11 +523,19 @@ voiceRoutes.openapi(clonedUploadRoute, async (c) => {
   if (!(file instanceof File)) return c.json({ error: "an audio file is required" }, 400);
   if (typeof label !== "string") return c.json({ error: "label is required" }, 400);
   const bytes = new Uint8Array(await file.arrayBuffer());
-  const result = saveClonedVoice(actor, label, bytes, file.type);
+  const options = { temperature: optionalNumber(body.temperature), pitchSemitones: optionalNumber(body.pitch_semitones) };
+  const result = saveClonedVoice(actor, label, bytes, file.type, options);
   if (!result.ok) {
     if (result.status === 404) return c.json({ error: result.error }, 404);
     return result.status === 400 ? c.json({ error: result.error }, 400) : c.json({ error: result.error }, 403);
   }
+  // The engine measures the clip and refuses one outside 6 to 30 seconds; such a voice is not kept.
+  const check = await renderHouseholdVoice(result.value.id, c.req.raw.signal);
+  if (!check.ok) {
+    deleteClonedVoice(actor, result.value.id);
+    return c.json({ error: check.error }, 400);
+  }
+  if (check.audio && check.audio.byteLength > 44) cacheHouseholdPreview(result.value.id, check.audio);
   return c.json(result.value, 201);
 });
 
@@ -533,7 +568,8 @@ voiceRoutes.openapi(clonedSelectRoute, async (c) => {
   const actor = c.get("person");
   const id = c.req.valid("param").id;
   if (!clonedVoiceExists(id)) return c.json({ error: `cloned voice not found: ${id}` }, 404);
-  const result = setPersonTtsVoiceUnchecked(actor, clonedVoiceUrl(id));
+  if (speakerAgeBand(actor, new Date()) !== "adult") return c.json({ error: "This voice is not available for your account. Ask the person who manages Home to choose a voice." }, 403);
+  const result = setPersonTtsVoiceUnchecked(actor, id);
   if (!result.ok) {
     return result.status === 400 ? c.json({ error: result.error }, 400) : c.json({ error: result.error }, 403);
   }
@@ -575,6 +611,7 @@ voiceRoutes.openapi(clonedDeleteRoute, async (c) => {
     if (result.status === 404) return c.json({ error: result.error }, 404);
     return c.json({ error: result.error }, 403);
   }
+  dropHouseholdPreview(id);
   return c.json({ success: true } as { success: true }, 200);
 });
 

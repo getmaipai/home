@@ -213,7 +213,7 @@ describe("cloned voices", () => {
     const selectRes = await adultClient.post(`/api/voice/cloned/${uploaded.id}/select`, {});
     expect(selectRes.status).toBe(200);
     const selected = (await selectRes.json()) as { value: string };
-    expect(selected.value).toMatch(new RegExp(`/api/voice/cloned/${uploaded.id}/file$`));
+    expect(selected.value).toBe(uploaded.id);
 
     // The file-serving route is real and unauthenticated for the Stack's voice fetch.
     const fileRes = await new TestClient().get(`/api/voice/cloned/${uploaded.id}/file`);

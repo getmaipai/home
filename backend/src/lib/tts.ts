@@ -6,6 +6,7 @@
 import { getTtsTags } from "@/lib/ttsCapabilities";
 import { sanitizeSpeechTags } from "@/lib/voiceCues";
 import { getOfferedVoices, resolveVoice } from "@/lib/voiceResolve";
+import { householdVoiceSpeech } from "@/lib/clonedVoices";
 import { getStackClient, isStackConfigured, resolveStackOffline, stackFailureResult } from "@/lib/stackEngine";
 
 const TTS_UNAVAILABLE_COPY = "Home can't speak right now because its voice engine is not running. Read the reply on screen and try again in a minute. If it keeps happening, an owner or admin can check Repairs.";
@@ -30,10 +31,13 @@ export type TtsOpResult =
  * already restricted by that setting key's own `select` options, not
  * anything this function re-checks. */
 /** The Stack's /v1/audio/speech accepts text and voice_url. */
-async function synthesizeViaStack(text: string, voiceUrl?: string): Promise<TtsOpResult> {
+async function synthesizeViaStack(text: string, voiceUrl?: string, household?: { temperature?: number; pitchSemitones?: number }): Promise<TtsOpResult> {
   const form = new FormData();
   form.append("text", text);
   if (voiceUrl) form.append("voice_url", voiceUrl);
+  // VOICES-04: a household voice carries its own sampling temperature and pitch offset (set when it was made, never per request).
+  if (household?.temperature !== undefined) form.append("temperature", String(household.temperature));
+  if (household?.pitchSemitones !== undefined && household.pitchSemitones !== 0) form.append("pitch_semitones", String(household.pitchSemitones));
   form.append("model", "tts");
   try {
     const client = getStackClient();
@@ -61,7 +65,11 @@ export async function synthesizeSpeech(rawText: string, voiceUrl?: string): Prom
 
   try {
     // VOICE-PICK-01: a saved voice the engine in use does not offer, or "default", is not sent; the engine speaks its own default.
-    const result = await synthesizeViaStack(text, resolveVoice(voiceUrl, await getOfferedVoices()).voiceUrl);
+    // A voice an admin made from a clip is not on the Stack's list: Home sends its clip address and its own settings.
+    const household = householdVoiceSpeech(voiceUrl);
+    const result = household
+      ? await synthesizeViaStack(text, household.voiceUrl, household)
+      : await synthesizeViaStack(text, resolveVoice(voiceUrl, await getOfferedVoices()).voiceUrl);
     return result.ok ? result : { ...result, error: TTS_UNAVAILABLE_COPY };
   } catch {
     return { ok: false, status: 503, code: "unavailable", error: TTS_UNAVAILABLE_COPY };

@@ -16,6 +16,7 @@ export function voiceForSpeech(input: { actor: PersonRow; deviceId?: string; com
     const robotVoice = getDeviceSettingValue(input.deviceId, "robot.voice.id");
     if (typeof robotVoice === "string" && robotVoice !== VOICE_ENGINE_DEFAULT) selected = robotVoice;
   }
-  if (speakerAgeBand(input.actor, new Date()) !== "adult" && !isPresetVoice(selected)) return personVoice;
+  // A child or teen never speaks in a voice made from a clip (VOICES-04), whoever chose it: only a preset or the engine default.
+  if (speakerAgeBand(input.actor, new Date()) !== "adult" && !isPresetVoice(selected)) return isPresetVoice(personVoice) ? personVoice : VOICE_ENGINE_DEFAULT;
   return selected;
 }
