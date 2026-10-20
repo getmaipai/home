@@ -96,7 +96,7 @@ export function StackChanInstallDialog() {
     <>
       <Button onClick={openDialog}>Add a StackChan</Button>
       <Dialog open={open} onOpenChange={(next) => { if (!working) setOpen(next); }}>
-        <DialogContent>
+        <DialogContent scroll="viewport">
           <DialogHeader>
             <DialogTitle>Add a StackChan</DialogTitle>
             <DialogDescription>

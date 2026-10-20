@@ -407,7 +407,7 @@ export function RobotBody({
         </div>
       </CardFooter>
       {admin ? <Dialog open={settingsOpen} onOpenChange={setSettingsOpen}>
-        <DialogContent>
+        <DialogContent scroll="viewport">
           <DialogHeader><DialogTitle>{device.name} settings</DialogTitle><DialogDescription>Change this robot's name, area and settings.</DialogDescription></DialogHeader>
           <div className="flex flex-col gap-3">
             <Label htmlFor={`robot-name-${device.id}`}>Name</Label>

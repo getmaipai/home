@@ -51,4 +51,13 @@ describe("StackChan install browser check", () => {
     await waitFor(() => expect(view.getByText(/Installing needs Chrome or Edge/)).toBeTruthy());
     expect(view.queryByRole("button", { name: "Install without a backup" })).toBeNull();
   });
+
+  test("the dialog caps its height at the screen and scrolls, so its buttons are always reachable", async () => {
+    Object.defineProperty(navigator, "serial", { configurable: true, value: { requestPort: () => new Promise(() => {}) } });
+    Object.defineProperty(window, "isSecureContext", { configurable: true, value: true });
+    const view = render(<StackChanInstallDialog />);
+    fireEvent.click(view.getByRole("button", { name: "Add a StackChan" }));
+    await waitFor(() => expect(view.getByRole("dialog")).toBeTruthy());
+    expect(view.getByRole("dialog").className).toContain("overflow-y-auto");
+  });
 });
