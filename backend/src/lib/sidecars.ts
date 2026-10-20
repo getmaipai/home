@@ -288,6 +288,8 @@ export type SidecarBackupMode = "exclude" | "include";
 
 export interface SidecarConfig {
   id: string;
+  /** Optional plain-language name used in Repairs. */
+  label?: string;
   command: string[];
   cwd?: string;
   /** Fixed port the sidecar binds - freed (see freePort()) before every
@@ -474,7 +476,7 @@ export async function checkStalledSidecarStarts(nowMs: number = Date.now()): Pro
       severity: "warning",
       title: "The offline library is taking a long time to start",
       detail: diag.message,
-      fix: registry.has(id) ? { label: `Restart ${id}`, action: `restart_sidecar:${id}` } : null,
+      fix: registry.has(id) ? { label: registry.get(id)!.config.label ? "Restart" : `Restart ${id}`, action: `restart_sidecar:${id}` } : null,
     });
     // The start may have ended while the row was being raised.
     if (!startProgress.has(id)) resolveIssue(`sidecar:${id}`, "slow_start");
@@ -1221,13 +1223,14 @@ async function checkHealthUrl(url: string): Promise<boolean> {
 }
 
 async function raiseCrashIssue(id: string, detail: string): Promise<void> {
+  const label = registry.get(id)?.config.label;
   await raiseIssue({
     source: `sidecar:${id}`,
     key: "crashed",
     severity: "error",
-    title: `${id} isn't running`,
+    title: label ? `${label} stopped` : `${id} isn't running`,
     detail,
-    fix: { label: `Restart ${id}`, action: `restart_sidecar:${id}` },
+    fix: { label: label ? "Restart" : `Restart ${id}`, action: `restart_sidecar:${id}` },
   });
 }
 

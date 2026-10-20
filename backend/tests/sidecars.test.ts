@@ -79,6 +79,14 @@ describe("registerSidecar/getSidecar/listSidecars", () => {
     expect(getSidecar("no-port")).toEqual({ status: "stopped", baseUrl: null });
   });
 
+  test("a labelled sidecar uses its display label in crash Repairs", async () => {
+    registerSidecar({ id: "pippa-brain", label: "Robot brain for Pippa", command: ["/no/such/bot-app"] });
+    await startSidecar("pippa-brain");
+    const issue = listIssues().find((i) => i.source === "sidecar:pippa-brain");
+    expect(issue?.title).toBe("Robot brain for Pippa stopped");
+    expect(issue?.fix?.label).toBe("Restart");
+  });
+
   test("baseUrl is derived from the declared port", () => {
     registerSidecar({ id: "with-port", command: ["true"], port: 9999 });
     expect(getSidecar("with-port")!.baseUrl).toBe("http://127.0.0.1:9999");

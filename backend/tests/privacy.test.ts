@@ -137,6 +137,16 @@ describe("the hub's own connections", () => {
     expect(row?.who).toBe(expected);
   });
 
+  test("the Bot release privacy row appears only when a release is pinned", async () => {
+    const { __setBotReleaseForTests } = await import("@/lib/botRelease");
+    const pin = { version: "1.0.0", repo: "getmaipai/bot", assets: { "darwin-arm64": { name: "bot.tar.gz", sha256: "abc" } }, signing_keys: [] };
+    __setBotReleaseForTests({ pin });
+    const row = platformConnections().find((connection) => connection.id === "platform:bot-release");
+    expect(row?.destination).toBe("github.com, objects.githubusercontent.com");
+    expect(row?.when).toBe("when you add your first StackChan");
+    __setBotReleaseForTests({ pin: null });
+  });
+
   test("Home declares no downloads for the deleted embedding and background engines", () => {
     const byId = new Map(platformConnections().map((r) => [r.id, r]));
     expect(byId.has("platform:background-model")).toBe(false);

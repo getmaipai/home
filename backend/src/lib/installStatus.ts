@@ -57,6 +57,9 @@ export interface InstallStatus {
   background: BackgroundInstall | null;
 }
 
+let robotReleaseInstall: { state: "running"; completedBytes: number; totalBytes: number } | null = null;
+export function setRobotReleaseInstall(value: typeof robotReleaseInstall): void { robotReleaseInstall = value; cache = null; }
+
 export const EMPTY_INSTALL: InstallStatus = {
   state: "none", chatReady: false, complete: false, percent: 0, completedBytes: 0, totalBytes: 0,
   bytesPerSecond: null, etaSeconds: null, items: [], problem: null, stage: null, stageLabel: null, background: null,
@@ -169,6 +172,10 @@ export async function getInstallStatus(): Promise<InstallStatus> {
     const engine = engineInstallStatus();
     if (engine.state === "running") value = { ...EMPTY_INSTALL, state: "installing_engine", stage: engine.stage, stageLabel: engine.stageLabel };
     else if (engine.state === "failed") value = { ...EMPTY_INSTALL, state: "engine_failed", problem: engine.problem };
+  }
+  if (robotReleaseInstall) {
+    const item: InstallItem = { id: "robot-app", model: "robot-app", role: null, label: "Robot app", state: "running", completedBytes: robotReleaseInstall.completedBytes, totalBytes: robotReleaseInstall.totalBytes, reason: null };
+    value = { ...value, items: [...value.items, item] };
   }
   cache = { at: Date.now(), value };
   return value;

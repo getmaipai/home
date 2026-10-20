@@ -35,6 +35,7 @@ import type { PrivacyConnection } from "@/wire";
 import { getHouseholdSettingValue } from "@/lib/settings";
 import { INTERNET_PROBE_ENABLED_KEY, INTERNET_PROBE_DNS_NAME_KEY, INTERNET_PROBE_TCP_ADDRESS_KEY, INTERNET_PROBE_TCP_PORT_KEY } from "@/settings/coreKeys";
 import { isRemoteStackSelected, isStackConfigured } from "@/lib/stackEngine";
+import { hasBotReleaseAssets } from "@/lib/botRelease";
 
 function ddgsPicked(): boolean {
   return webSourcesPicked().includes("ddgs");
@@ -93,6 +94,7 @@ export function platformConnections(): PrivacyConnection[] {
   const wakewordHosts = hostsOf(WAKEWORD_ALL_ASSETS.map((a) => a.url));
   const visionHosts = hostsOf(VISION_ALL_ASSETS.map((a) => a.url));
   const robotAssetHosts = hostsOf(ROBOT_ASSETS.map((asset) => asset.source_url));
+  const botReleaseHosts = hasBotReleaseAssets() ? "github.com, objects.githubusercontent.com" : null;
   const voiceHost = hostsOf([voiceCatalogUrl()]);
   const sttHosts = hostsOf([SILERO_VAD_ASSET.url]);
   const internetProbeOn = getHouseholdSettingValue(INTERNET_PROBE_ENABLED_KEY) !== false;
@@ -128,6 +130,10 @@ export function platformConnections(): PrivacyConnection[] {
     row("platform:robot-assets", robotAssetHosts, {
       when: "once, when MaiPai prepares the pinned models a paired robot uses",
       what: "the file name of each pinned robot model being downloaded, and your home's internet address. Nothing anyone in the house said, asked, or saved.",
+    }),
+    row("platform:bot-release", botReleaseHosts, {
+      when: "when you add your first StackChan",
+      what: "the robot app download from GitHub, and your home's internet address. Nothing anyone in the house said, asked, or saved.",
     }),
     row("platform:voice-list", voiceHost, {
       when: "when an adult opens the list of voices to pick one",
