@@ -191,6 +191,8 @@ settingsRoutes.openapi(putRoute, async (c) => {
   if (body.scope === "household" && isCodingStackKey(body.key)) await pushCodingSettings([body.key]);
   const personScope = /^person:([a-z0-9-]+)$/.exec(body.scope);
   if (personScope && body.key === "tts.voice_id") refreshRobotClips(listRobotsPairedUnderPerson(personScope[1]!));
+  const robotVoiceScope = /^device:([a-z0-9-]+)$/.exec(body.scope);
+  if (robotVoiceScope && body.key === "robot.voice.id") refreshRobotClips([robotVoiceScope[1]!]);
   if (body.scope === "household" && ["home.base_url", "home.access_token"].includes(body.key)) refreshHomeAssistantEvents();
   if (body.scope === "household" && body.key === "safety.alarm.sensors") {
     refreshSafetyAlarmSensors();
@@ -244,6 +246,8 @@ settingsRoutes.openapi(resetRoute, async (c) => {
   if (body.scope === "household" && body.key === "search.searxng_url") await checkSearchInstance({ force: true });
   publishSettingsChanged(body.scope, body.key, result.value.value);
   if (body.scope === "household" && isCodingStackKey(body.key)) await pushCodingSettings([body.key]);
+  const resetRobotVoiceScope = /^device:([a-z0-9-]+)$/.exec(body.scope);
+  if (resetRobotVoiceScope && body.key === "robot.voice.id") refreshRobotClips([resetRobotVoiceScope[1]!]);
   if (body.scope === "household" && ["home.base_url", "home.access_token"].includes(body.key)) refreshHomeAssistantEvents();
   if (body.scope === "household" && body.key === "safety.alarm.sensors") refreshSafetyAlarmSensors();
   if (body.scope === "household" && ["network.lan_exposure", "network.hub_port"].includes(body.key)) scheduleHubRestart();

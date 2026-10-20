@@ -5,7 +5,7 @@
 // engine default while the settings page still showed the old name. This module is the one place that decides, from
 // the voices the engine offers right now, what is sent and whether the saved choice had to be set aside.
 import { getStackClient, isStackConfigured } from "@/lib/stackEngine";
-import { VOICE_ENGINE_DEFAULT } from "@/settings/voiceKeys";
+import { VOICE_ENGINE_DEFAULT, VOICE_PRESET_NAMES } from "@/settings/voiceKeys";
 import type { StackVoice } from "@/lib/stack/types";
 
 export interface VoiceResolution {
@@ -18,6 +18,11 @@ export interface VoiceResolution {
 /** A saved name matches an offered voice by its id or by the preset name its id ends with. */
 export function voiceMatchesStored(voiceId: string, stored: string): boolean {
   return voiceId === stored || voiceId.endsWith(`-${stored}`);
+}
+
+/** The Stack's short picker name, derived with the same exact matching rule as saved voices. */
+export function voicePresetName(voiceId: string): string | undefined {
+  return VOICE_PRESET_NAMES.find((name) => voiceId.endsWith(`-${name}`));
 }
 
 /** `offered` is null when the Stack's list could not be read: the saved value is sent as before. */

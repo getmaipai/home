@@ -124,6 +124,32 @@ describe("robot clip bundles", () => {
     expect(received.every((call) => call.voice === "vera")).toBe(true);
   });
 
+  test("changing a robot voice re-renders its clips with the new voice", async () => {
+    const { owner, personId } = await household();
+    const { deviceId } = await robotFor(personId);
+    await renderClipBundle(deviceId);
+    received = [];
+    fixture.client.voices = async () => [{ id: "pocket-tts-voice-alba", name: "Alba", description: "", language: "en", country: "", gender: "unknown", source: "preset", engine: "pocket", onDisk: true, licence: null, revision: "test" }];
+    const result = await owner.put("/api/settings", { scope: `device:${deviceId}`, key: "robot.voice.id", value: "pocket-tts-voice-alba" });
+    expect(result.status).toBe(200);
+    await waitFor(async () => (await readBundle(deviceId))?.clips.every((clip) => clip.voice_id === "pocket-tts-voice-alba") ? await readBundle(deviceId) : null);
+    expect(received.length).toBeGreaterThan(0);
+    expect(received.every((call) => call.voice === "pocket-tts-voice-alba")).toBe(true);
+  });
+
+  test.each(["child", "teen"] as const)("a %s robot uses a full Stack preset id for clips", async (role) => {
+    const { owner } = await household();
+    const created = await owner.post("/api/people", { displayName: `Profile ${role}`, role });
+    const personId = (await created.json() as { id: string }).id;
+    const { deviceId } = await robotFor(personId);
+    fixture.client.voices = async () => [{ id: "pocket-tts-voice-alba", name: "Alba", description: "", language: "en", country: "", gender: "unknown", source: "preset", engine: "pocket", onDisk: true, licence: null, revision: "test" }];
+    const result = await owner.put("/api/settings", { scope: `device:${deviceId}`, key: "robot.voice.id", value: "pocket-tts-voice-alba" });
+    expect(result.status).toBe(200);
+    await renderClipBundle(deviceId);
+    expect((await readBundle(deviceId))?.clips.every((clip) => clip.voice_id === "pocket-tts-voice-alba")).toBe(true);
+    expect(received.every((call) => call.voice === "pocket-tts-voice-alba")).toBe(true);
+  });
+
   test("changing the voice re-renders every clip and bumps the bundle sha", async () => {
     const { owner, personId } = await household();
     const { robot, deviceId } = await robotFor(personId);

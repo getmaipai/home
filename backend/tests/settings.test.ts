@@ -49,6 +49,8 @@ describe("PUT /api/settings robot.voice.id", () => {
       const { deviceId } = issueDeviceToken(person.id, "robot", "Riff");
       const listed = await owner.put("/api/settings", { scope: `device:${deviceId}`, key: "robot.voice.id", value: "alba" });
       expect(listed.status).toBe(200);
+      const fullId = await owner.put("/api/settings", { scope: `device:${deviceId}`, key: "robot.voice.id", value: "pocket-tts-voice-alba" });
+      expect(fullId.status).toBe(200);
       const unknown = await owner.put("/api/settings", { scope: `device:${deviceId}`, key: "robot.voice.id", value: "not-installed" });
       expect(unknown.status).toBe(400);
       expect(await unknown.json()).toEqual({ error: "That voice is not on this hub. Choose one from the list." });

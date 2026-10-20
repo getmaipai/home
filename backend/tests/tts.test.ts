@@ -7,6 +7,7 @@ import { getHouseholdSettingValue, setHouseholdSettingValue } from "@/lib/settin
 import { __setStackClientForTests, __resetStackEngineForTests } from "@/lib/stackEngine";
 import { __setTtsTagsForTests } from "@/lib/ttsCapabilities";
 import { __setOfferedVoicesForTests } from "@/lib/voiceResolve";
+import { renderClipBundle } from "@/lib/robotClips";
 import type { StackVoice } from "@/lib/stack/types";
 import { turnAllowsVoiceCues } from "@/routes/turn";
 import { listIssues } from "@/lib/issues";
@@ -131,6 +132,9 @@ describe("POST /api/tts", () => {
       __setOfferedVoicesForTests(listed);
       const result = await owner.put("/api/settings", { scope: `device:${deviceId}`, key: "robot.voice.id", value: voice });
       expect(result.status).toBe(200);
+      // A voice change re-renders the robot's clips; let that finish so only the turn's synthesis is counted.
+      await renderClipBundle(deviceId).catch(() => null);
+      receivedVoiceUrls = [];
     }
 
     test("a robot's listed device voice is sent to speech synthesis", async () => {
@@ -161,6 +165,20 @@ describe("POST /api/tts", () => {
       await setRobotVoice(owner, deviceId, "community-voice");
       expect((await robot.post("/api/tts", { text: "hi" })).status).toBe(200);
       expect(receivedVoiceUrls).toEqual(["alba"]);
+    });
+
+    test.each(["child", "teen"] as const)("a %s robot speaks with a full Stack preset id", async (role) => {
+      const owner = new TestClient();
+      await owner.post("/api/auth/setup", { displayName: "Sage", secret: "correcthorse" });
+      const { id } = (await (await owner.post("/api/people", { displayName: `Profile ${role}`, role })).json()) as { id: string };
+      const { robot, deviceId } = await pairedRobot(id);
+      fixture.client.voices = async () => [{ id: "pocket-tts-voice-alba", name: "Alba", description: "", language: "en", country: "", gender: "unknown", source: "preset", engine: "pocket", onDisk: true, licence: null, revision: "test" }];
+      __setOfferedVoicesForTests([{ id: "pocket-tts-voice-alba", name: "Alba", description: "", language: "en", country: "", gender: "unknown", source: "preset", engine: "pocket", onDisk: true, licence: null, revision: "test" }]);
+      await owner.put("/api/settings", { scope: `device:${deviceId}`, key: "robot.voice.id", value: "pocket-tts-voice-alba" });
+      await renderClipBundle(deviceId).catch(() => null);
+      receivedVoiceUrls = [];
+      expect((await robot.post("/api/tts", { text: "hi" })).status).toBe(200);
+      expect(receivedVoiceUrls).toEqual(["pocket-tts-voice-alba"]);
     });
 
     test("a person session does not use a robot's voice setting", async () => {
