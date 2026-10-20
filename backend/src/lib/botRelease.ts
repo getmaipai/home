@@ -17,10 +17,13 @@ export interface BotReleasePin {
   repo: string;
   assets: Record<string, { name: string; sha256: string; size?: number } | null>;
   signing_keys?: string[];
+  /** Firmware sets shipped in the same release, keyed by body (today only "stackchan"). */
+  firmware?: Record<string, { name: string; sha256: string; size?: number } | null>;
 }
 export type BotReleaseFetch = (input: string | URL | Request, init?: RequestInit) => Promise<Response>;
 type ReleaseOptions = { dataDir?: string; fetch?: BotReleaseFetch; pin?: BotReleasePin };
 type Release = { dir: string; version: string };
+type Asset = { name: string; sha256: string; size?: number };
 
 const GITHUB_RATE = { capacity: 5, refillPerSecond: 1 / 600 };
 const HEADER_TIMEOUT_MS = 30_000;
@@ -44,6 +47,10 @@ export function __setBotReleaseForTests(options: { fetch?: BotReleaseFetch | nul
 export function hasBotReleaseAssets(): boolean {
   const selected = pinOverride ?? (pin as BotReleasePin);
   return Object.values(selected.assets ?? {}).some(Boolean);
+}
+/** The keys a release's SHA256SUMS and the StackChan flash manifest must be signed by. */
+export function botReleaseSigningKeys(): string[] {
+  return (pinOverride ?? (pin as BotReleasePin)).signing_keys ?? [];
 }
 
 function platformKey(): string {
@@ -208,25 +215,39 @@ function prune(releases: string, selectedDir: string): void {
 }
 
 const inFlight = new Map<string, Promise<Release>>();
-export function ensureBotRelease(opts: ReleaseOptions = {}): Promise<Release> {
-  const selected = opts.pin ?? pinOverride ?? (pin as BotReleasePin);
-  const key = join(opts.dataDir ?? dataDir, "robots", "releases", selected?.version ?? "");
+function once(key: string, run: () => Promise<Release>): Promise<Release> {
   const running = inFlight.get(key);
   if (running) return running;
-  const started = ensureBotReleaseOnce(opts).finally(() => inFlight.delete(key));
+  const started = run().finally(() => inFlight.delete(key));
   inFlight.set(key, started);
   return started;
 }
 
-async function ensureBotReleaseOnce(opts: ReleaseOptions): Promise<Release> {
+export function ensureBotRelease(opts: ReleaseOptions = {}): Promise<Release> {
   const selected = opts.pin ?? pinOverride ?? (pin as BotReleasePin);
-  if (!selected || selected.version === "0.0.0" || Object.keys(selected.assets ?? {}).length === 0) {
-    throw new Error("This version of Home doesn't include a robot app yet. Update Home to add a StackChan.");
-  }
-  const asset = selected.assets[platformKey()];
-  if (!asset) throw new Error(`The pinned robot app does not support ${platformKey()}. Update Home to add a StackChan.`);
   const releases = join(opts.dataDir ?? dataDir, "robots", "releases");
-  const destName = `${selected.version}-${platformKey()}`;
+  return once(join(releases, selected?.version ?? ""), async () => {
+    if (!selected || selected.version === "0.0.0" || Object.keys(selected.assets ?? {}).length === 0) {
+      throw new Error("This version of Home doesn't include a robot app yet. Update Home to add a StackChan.");
+    }
+    const asset = selected.assets[platformKey()];
+    if (!asset) throw new Error(`The pinned robot app does not support ${platformKey()}. Update Home to add a StackChan.`);
+    return installAsset(opts, selected, asset, releases, `${selected.version}-${platformKey()}`);
+  });
+}
+
+/** The signed StackChan firmware set (flash manifest plus the parts it names), a separate asset of the same bot release. */
+export function ensureStackChanFirmware(opts: ReleaseOptions = {}): Promise<Release> {
+  const selected = opts.pin ?? pinOverride ?? (pin as BotReleasePin);
+  const firmware = join(opts.dataDir ?? dataDir, "robots", "firmware");
+  return once(join(firmware, selected?.version ?? ""), async () => {
+    const asset = selected?.version === "0.0.0" ? null : selected?.firmware?.stackchan;
+    if (!selected || !asset) throw new Error("This version of Home doesn't include StackChan firmware yet. Update Home to install a StackChan.");
+    return installAsset(opts, selected, asset, firmware, `${selected.version}-stackchan`);
+  });
+}
+
+async function installAsset(opts: ReleaseOptions, selected: BotReleasePin, asset: Asset, releases: string, destName: string): Promise<Release> {
   const dest = join(releases, destName);
   const marker = join(dest, ".verified");
   if (existsSync(marker)) {

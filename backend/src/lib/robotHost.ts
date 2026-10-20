@@ -16,7 +16,7 @@ import { raiseIssue, resolveIssue } from "@/lib/issues";
 import type { StatusApp } from "@/lib/statusApps";
 
 export type HostPorts = { voice: number; avatar: number; vision: number };
-type HostRecord = { deviceId: string; label: string; personId: string; ports: HostPorts; secretHash?: string; createdAt: string };
+export type HostRecord = { deviceId: string; label: string; personId: string; ports: HostPorts; secretHash?: string; enrollCodeId?: string; createdAt: string };
 
 const roots = join(dataDir, "robots");
 const configs = new Map<string, HostRecord>();
@@ -26,6 +26,8 @@ const sha256 = (value: string): Buffer => createHash("sha256").update(value).dig
 let releaseForTests: (() => Promise<{ dir: string }>) | null = null;
 /** Test-only: replaces the Bot app release lookup with a stand-in directory. */
 export function __setRobotHostReleaseForTests(fn: (() => Promise<{ dir: string }>) | null): void { releaseForTests = fn; }
+/** The installed Bot app release every host launch and provision command runs from. */
+export function robotHostRelease(): Promise<{ dir: string }> { return (releaseForTests ?? ensureBotRelease)(); }
 /** Test-only: forgets the in-memory host map, as a fresh process would. */
 export function __resetRobotHostsForTests(): void { configs.clear(); }
 
@@ -37,6 +39,16 @@ function hostPath(id: string): string {
 function readHost(id: string): HostRecord | null {
   try { return JSON.parse(readFileSync(hostPath(id), "utf8")) as HostRecord; } catch { return null; }
 }
+export function getRobotHostRecord(id: string): HostRecord | null { return readHost(id); }
+export function updateRobotHostRecord(id: string, update: Partial<Pick<HostRecord, "enrollCodeId">>): HostRecord {
+  const host = readHost(id);
+  if (!host) throw new Error("This robot host could not be found. Try again or remove the robot.");
+  Object.assign(host, update);
+  writeHost(host);
+  configs.set(id, host);
+  return host;
+}
+export function robotHostDataDir(id: string): string { return join(roots, id); }
 function writeHost(host: HostRecord): void {
   const file = hostPath(host.deviceId);
   mkdirSync(join(roots, host.deviceId), { recursive: true, mode: 0o700 });
@@ -171,7 +183,7 @@ async function setupOnce(host: HostRecord): Promise<void> {
   const id = sidecarId(host.deviceId);
   const state = getSidecar(id)?.status;
   if (state === "running" || state === "starting") return;
-  const release = await (releaseForTests ?? ensureBotRelease)();
+  const release = await robotHostRelease();
   // The release download can take a while; Robots may have been turned off (or the robot forgotten) meanwhile.
   if (!robotsEnabled() || !getDeviceById(host.deviceId) || !configs.has(host.deviceId)) return;
   register(host, release.dir);
@@ -182,7 +194,7 @@ export async function createRobotHost({ label, personId }: { label: string; pers
   if (!robotsEnabled()) throw new Error("Robots are turned off on this home.");
   const cleanLabel = label.trim().slice(0, 60) || "StackChan";
   // The release comes first so a failed download leaves no half-made robot behind.
-  await (releaseForTests ?? ensureBotRelease)();
+  await robotHostRelease();
   const device = createHostedRobot(cleanLabel, personId);
   try {
     const reserved = new Set<number>();

@@ -37,9 +37,9 @@ exec ${process.execPath} -e "Bun.listen({hostname:'127.0.0.1',port:$V,socket:{da
   chmodSync(script, 0o755);
   return dir;
 }
-async function waitUntil(check: () => boolean, ms = 8000): Promise<void> {
+async function waitUntil(check: () => boolean | Promise<boolean>, ms = 8000): Promise<void> {
   const end = Date.now() + ms;
-  while (Date.now() < end) { if (check()) return; await new Promise((r) => setTimeout(r, 50)); }
+  while (Date.now() < end) { if (await check()) return; await new Promise((r) => setTimeout(r, 50)); }
   throw new Error("timed out waiting");
 }
 function connects(port: number): Promise<boolean> {
@@ -267,14 +267,11 @@ describe("Robots switch and Forget", () => {
     const b = await createRobotHost({ label: "Bruno", personId: id });
     const put = (value: boolean) => client.put("/api/settings", { scope: "household", key: "home.robots.enabled", value });
     expect((await put(false)).status).toBe(200);
-    expect(getSidecar(`robot-host:${a.deviceId}`)?.status).toBe("stopped");
-    expect(getSidecar(`robot-host:${b.deviceId}`)?.status).toBe("stopped");
-    expect(await connects(a.ports.voice)).toBe(false);
+    await waitUntil(async () => getSidecar(`robot-host:${a.deviceId}`)?.status === "stopped" && getSidecar(`robot-host:${b.deviceId}`)?.status === "stopped" && !(await connects(a.ports.voice)), 15000);
     expect((await put(true)).status).toBe(200);
-    expect(getSidecar(`robot-host:${a.deviceId}`)?.status).toBe("running");
-    expect(getSidecar(`robot-host:${b.deviceId}`)?.status).toBe("running");
+    await waitUntil(async () => getSidecar(`robot-host:${a.deviceId}`)?.status === "running" && getSidecar(`robot-host:${b.deviceId}`)?.status === "running" && await connects(a.ports.voice), 15000);
     expect(listSidecars().filter((s) => s.id.startsWith("robot-host:"))).toHaveLength(2);
-  });
+  }, 40_000);
 
   test("Forget stops and unregisters the host, removes only its directory, and refuses path characters", async () => {
     const { id } = await owner();

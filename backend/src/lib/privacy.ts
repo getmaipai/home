@@ -133,7 +133,7 @@ export function platformConnections(): PrivacyConnection[] {
     }),
     row("platform:bot-release", botReleaseHosts, {
       when: "when you add your first StackChan",
-      what: "the robot app download from GitHub, and your home's internet address. Nothing anyone in the house said, asked, or saved.",
+      what: "the robot app and signed StackChan firmware images from GitHub, and your home's internet address. Nothing anyone in the house said, asked, or saved.",
     }),
     row("platform:voice-list", voiceHost, {
       when: "when an adult opens the list of voices to pick one",

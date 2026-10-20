@@ -114,10 +114,27 @@ export function RobotBody({
   }, [settingsOpen]);
   const robotVoiceOptions = [{ value: "default", label: "Same as its person" }, ...playableVoices(robotVoices).map((voice) => ({ value: voice.id, label: voiceFriendlyName(voice) }))];
   const [forgetConfirming, setForgetConfirming] = useState(false);
+  const [cancelInstallConfirming, setCancelInstallConfirming] = useState(false);
+  const [cancelInstallBusy, setCancelInstallBusy] = useState(false);
+  const [cancelInstallError, setCancelInstallError] = useState<string | null>(null);
+  const [hostedInstall, setHostedInstall] = useState(false);
   const [name, setName] = useState(device.name);
   const [area, setArea] = useState(device.area ?? "");
   const [saveBusy, setSaveBusy] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
+  useEffect(() => {
+    if (!admin || device.lastSeenAt !== null) return;
+    let active = true;
+    void api.robotInstallStatus(device.id).then(() => { if (active) setHostedInstall(true); }).catch(() => { if (active) setHostedInstall(false); });
+    return () => { active = false; };
+  }, [admin, device.id, device.lastSeenAt]);
+  async function cancelInstall(): Promise<void> {
+    setCancelInstallBusy(true);
+    setCancelInstallError(null);
+    try { await api.cancelRobotInstall(device.id); window.dispatchEvent(new Event("devices-updated")); }
+    catch (error) { setCancelInstallError(error instanceof ApiError ? error.message : "The install could not be cancelled. Check the connection and try again."); }
+    finally { setCancelInstallBusy(false); }
+  }
   const [selfTests, setSelfTests] = useState<Partial<Record<RobotSelfTestPart, RobotSelfTestResult | { kind: "offline" | "timeout" | "error"; message: string }>>>({});
   const [selfTestBusy, setSelfTestBusy] = useState<RobotSelfTestPart | null>(null);
   async function runSelfTest(part: RobotSelfTestPart): Promise<void> {
@@ -335,7 +352,14 @@ export function RobotBody({
       </CardContent>
       <CardFooter>
         <div className="flex w-full flex-wrap items-center justify-end gap-2">
-          {confirmingRemove ? (
+          {cancelInstallError ? <Alert variant="destructive"><AlertDescription>{cancelInstallError}</AlertDescription></Alert> : null}
+          {cancelInstallConfirming ? (
+            <>
+              <p className="mr-auto text-base font-medium">Cancel install and forget {device.name}? This revokes its enrollment code and deletes its saved firmware backup.</p>
+              <Button variant="destructive" disabled={cancelInstallBusy} onClick={() => void cancelInstall()}>{cancelInstallBusy ? "Working…" : "Yes, cancel install"}</Button>
+              <Button variant="ghost" disabled={cancelInstallBusy} onClick={() => setCancelInstallConfirming(false)}>Keep installing</Button>
+            </>
+          ) : confirmingRemove ? (
             <>
               <p className="mr-auto text-base font-medium">Remove {device.name}? It will need to be paired again.</p>
               <Button variant="destructive" onClick={onConfirmRemove} disabled={busy}>
@@ -347,6 +371,7 @@ export function RobotBody({
             </>
           ) : (
             <>
+              {admin && hostedInstall && device.lastSeenAt === null && !cancelInstallConfirming ? <Button variant="destructive" onClick={() => setCancelInstallConfirming(true)}>Cancel install</Button> : null}
               {state !== null ? (
                 <>
                   {askedMuted !== null && !muteError ? (

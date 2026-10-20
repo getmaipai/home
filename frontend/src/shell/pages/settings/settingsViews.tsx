@@ -16,6 +16,7 @@ import { UsersSection } from "@/apps/settings/UsersSection";
 import { EnginesConsole } from "@/shell/pages/EnginesPage";
 import { HuggingFaceTokenSection } from "@/apps/settings/HuggingFaceTokenSection";
 import { AddRobotSection } from "@/apps/settings/AddRobotSection";
+import { StackChanInstallDialog } from "@/apps/settings/StackChanInstallDialog";
 import { RobotPasswordSection } from "@/apps/settings/RobotPasswordSection";
 import { RoutingStatsSection } from "@/apps/settings/RoutingStatsSection";
 import { ReferenceLibrarySettings } from "@/apps/settings/ReferenceLibrarySettings";
@@ -77,7 +78,7 @@ function HomeEngineAdminSettings({ person }: SettingsViewProps) {
 function HomeUsersAdminSettings({ person }: SettingsViewProps) { return <UsersSection person={person} />; }
 function HomeDevicesAdminSettings({ person }: SettingsViewProps) {
   const { capabilities } = useSettingsCapabilities(person);
-  return capabilities.includes("robots.enabled") ? <><AddRobotSection /><RobotPasswordSection /></> : null;
+  return capabilities.includes("robots.enabled") ? <><StackChanInstallDialog /><AddRobotSection /><RobotPasswordSection /></> : null;
 }
 function AccountLikenessView() { useTabItem("Pictures and videos"); return <LikenessSettings />; }
 function PicturesLibraryView() { useTabItem("Pictures and videos"); return <><PicturesLibrary /><VideoLibrary /></>; }

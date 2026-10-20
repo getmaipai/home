@@ -897,6 +897,8 @@ export const api = {
   // device under whichever admin approved the pairing, so a different
   // admin still needs to find it here to rotate its password.
   robotDevices: () => request<DeviceInfo[]>("/api/devices/robots"),
+  robotInstallStatus: (deviceId: string) => request<{ hosted: true; enrollment_pending: boolean }>(`/api/robots/hosts/${encodeURIComponent(deviceId)}/install-status`),
+  cancelRobotInstall: (deviceId: string) => request<{ removed: true }>(`/api/robots/hosts/${encodeURIComponent(deviceId)}/cancel-install`, { method: "POST" }),
   setRobotMuted: (id: string, muted: boolean) =>
     request<{ id: string }>(`/api/devices/${encodeURIComponent(id)}/commands`, {
       method: "POST",

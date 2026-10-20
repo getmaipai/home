@@ -1,9 +1,9 @@
 import { afterEach, describe, expect, test } from "bun:test";
 import { createHash, generateKeyPairSync, sign } from "node:crypto";
-import { existsSync, mkdirSync, mkdtempSync, readdirSync, readlinkSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, readlinkSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
-import { ensureBotRelease, __setBotReleaseForTests } from "@/lib/botRelease";
+import { ensureBotRelease, ensureStackChanFirmware, __setBotReleaseForTests } from "@/lib/botRelease";
 import { __resetRateLimiterForTests } from "@/lib/rateLimiter";
 
 const dirs: string[] = [];
@@ -25,8 +25,25 @@ function testPin(bytes: Uint8Array, sha = createHash("sha256").update(bytes).dig
 }
 function fetchBody(bytes: Uint8Array) { return async () => new Response(bytes); }
 const rel = (dir: string) => join(dir, "robots/releases");
+const firmwareDir = (dir: string) => join(dir, "robots/firmware");
 
 describe("ensureBotRelease", () => {
+  test("installs the pinned StackChan firmware asset and verifies its marker", async () => {
+    const bytes = await archive({ "flash-manifest.json": "{}", "app.bin": "firmware" }); const dir = temp();
+    const pin = { ...testPin(bytes), firmware: { stackchan: { name: "stackchan.tar.gz", sha256: createHash("sha256").update(bytes).digest("hex") } } };
+    const got = await ensureStackChanFirmware({ dataDir: dir, pin, fetch: fetchBody(bytes) });
+    expect(got.dir).toBe(join(firmwareDir(dir), "1.2.3-stackchan"));
+    expect(readFileSync(join(got.dir, ".verified"), "utf8").trim()).toBe(pin.firmware.stackchan.sha256);
+    expect(readFileSync(join(got.dir, "app.bin"), "utf8")).toBe("firmware");
+  });
+  test("refuses a bad firmware hash and pins without firmware", async () => {
+    const bytes = await archive({ "flash-manifest.json": "{}" }); const dir = temp();
+    const pin = { ...testPin(bytes), firmware: { stackchan: { name: "stackchan.tar.gz", sha256: "00".repeat(32) } } };
+    await expect(ensureStackChanFirmware({ dataDir: dir, pin, fetch: fetchBody(bytes) })).rejects.toThrow("damaged");
+    expect(existsSync(join(firmwareDir(dir), "1.2.3-stackchan"))).toBe(false);
+    await expect(ensureStackChanFirmware({ dataDir: dir, pin: testPin(bytes), fetch: fetchBody(bytes) })).rejects.toThrow("doesn't include StackChan firmware yet");
+    await expect(ensureStackChanFirmware({ dataDir: dir, pin: { ...pin, version: "0.0.0" }, fetch: fetchBody(bytes) })).rejects.toThrow("doesn't include StackChan firmware yet");
+  });
   test("unpacks, verifies and reuses matching marker", async () => {
     const bytes = await archive({ "bot/robot": "ready" }); const dir = temp(); let calls = 0;
     const opts = { dataDir: dir, pin: testPin(bytes), fetch: async () => { calls++; return new Response(bytes); } };
