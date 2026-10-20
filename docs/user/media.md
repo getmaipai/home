@@ -1,10 +1,12 @@
 ---
 title: Media
-description: Open the media apps available to your profile from one place.
+description: Open your videos, shows, music, podcasts and books from one place.
 ---
 
 # Media
 
-Choose **Media** in the rail to see the media apps available to your profile. The tabs open the existing Videos, Shows and Films, Music, Podcasts and Books apps. A tab is shown only when that app is available to you.
+Tap **Media** in the left rail. It sits right under Chat.
 
-Each app keeps its own pages and library. Home applies the media access rules for your age and the sources shared with you when you open and read media.
+You'll see a tab for each media app you can use: Videos, Shows and Films, Music, Podcasts and Books. Tap a tab to open that app.
+
+You only see the tabs you're allowed to use. Each app keeps its own library. Kids see only what a grown-up allowed.
