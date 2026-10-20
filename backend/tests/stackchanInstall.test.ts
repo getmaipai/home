@@ -67,6 +67,7 @@ function provisionRelease(mode: "ok" | "fail" = "ok"): string {
 if [ "$1" = "provision" ] && [ "$2" = "enroll-image" ]; then
   if [ "${mode}" = "fail" ]; then echo 'The robot app could not write the image. Try again.' >&2; exit 1; fi
   while [ "$1" != "--out" ]; do shift; done
+  case "$2" in *.bin) ;; *) echo 'The real NVS generator accepts only a .bin output file.' >&2; exit 1;; esac
   printf 'NVS-TEST-CODE-abc' > "$2"; chmod 600 "$2"
   echo '{"code_id":"c1","expires_at":"2026-10-21T00:00:00Z"}'; exit 0
 fi
@@ -144,7 +145,7 @@ describe("StackChan install integrity and backup", () => {
     expect(res.status).toBe(200); expect(res.headers.get("cache-control")).toBe("no-store"); expect(res.headers.get("content-type")).toContain("application/octet-stream");
     const bytes = Buffer.from(await res.arrayBuffer()); expect(bytes.toString()).toBe("NVS-TEST-CODE-abc");
     expect(getRobotHostRecord(host.deviceId)?.enrollCodeId).toBe("c1");
-    expect(readdirSync(join(homeDataDir, "robots", host.deviceId)).filter((name) => name.startsWith("enroll-") && name.endsWith(".nvs"))).toEqual([]);
+    expect(readdirSync(join(homeDataDir, "robots", host.deviceId)).filter((name) => name.startsWith("enroll-") && name.endsWith(".bin"))).toEqual([]);
     expect(bytes.toString()).not.toContain("token-id");
     expect(JSON.stringify(await (await client.get(`/api/robots/hosts/${host.deviceId}/install-status`)).json())).not.toContain("token-id");
   });

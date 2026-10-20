@@ -94,7 +94,8 @@ export async function makeEnrollImage(deviceId: string): Promise<Buffer> {
   if (!lanHost) throw new Error("Home could not find a LAN address for the robot. Connect Home to the same Wi-Fi network, then try again.");
   // A retried install would otherwise leave the earlier single-use code valid until it expires.
   await revokeEnrollment(deviceId);
-  const out = join(robotHostDataDir(deviceId), `enroll-${crypto.randomUUID()}.nvs`);
+  // The NVS generator in the shipped bot app writes only files named *.bin.
+  const out = join(robotHostDataDir(deviceId), `enroll-${crypto.randomUUID()}.bin`);
   try {
     const proc = await runProvision([
       "enroll-image", "--data-dir", robotHostDataDir(deviceId), "--ws-url", `ws://${lanHost}:${host.ports.voice}`,
