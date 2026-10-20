@@ -30017,6 +30017,16 @@
                 }
               }
             }
+          },
+          "403": {
+            "description": "Robots are turned off on this home",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
           }
         }
       }
