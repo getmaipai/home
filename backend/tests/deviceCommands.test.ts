@@ -86,6 +86,21 @@ class DeviceSocket {
 }
 
 describe("GET /api/devices/me/events", () => {
+  test("robots off refuses robot turn and TTS routes, while browsers remain unaffected", async () => {
+    const { client: owner, personId } = await ownerSession();
+    const { client: robot } = await robotSession(personId);
+    const browserToken = issueDeviceToken(personId, "browser", "Browser").token;
+    const browser = new TestClient();
+    await browser.post("/api/auth/devices/redeem", { token: browserToken });
+    for (const path of ["/api/turn", "/api/tts"]) expect((await robot.post(path, { text: "hello" })).status).not.toBe(403);
+    await owner.request("/api/settings", { method: "PUT", body: { scope: "household", key: "home.robots.enabled", value: false } });
+    for (const path of ["/api/turn", "/api/tts"]) {
+      const denied = await robot.post(path, { text: "hello" });
+      expect(denied.status).toBe(403);
+      expect(await denied.json()).toEqual({ error: "Robots are turned off on this home. An admin can turn them on in Settings, Devices." });
+      expect((await browser.post(path, { text: "hello" })).status).not.toBe(403);
+    }
+  });
   test("robot channel is closed with robots_off when disabled, both on connect and on a setting change", async () => {
     const { client: owner, personId } = await ownerSession();
     const { client: robot } = await robotSession(personId);

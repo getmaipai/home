@@ -4,11 +4,13 @@ import { resetDb } from "./reset-db";
 import { __resetThrottleForTests } from "@/lib/secretThrottle";
 import { transcribeUtterance } from "@/lib/stt";
 import { encodeWav } from "@/lib/sttSession";
-import { websocket } from "hono/bun";
 import { app } from "@/app";
 import { setHouseholdSettingValue } from "@/lib/settings";
 import { __setStackClientForTests, __resetStackEngineForTests } from "@/lib/stackEngine";
 import { listIssues } from "@/lib/issues";
+import { issueDeviceToken } from "@/lib/deviceTokens";
+import { storeRobotCredential } from "@/lib/robotCredentials";
+import { websocket } from "hono/bun";
 import { startStackFixture, IDENTITY_HEADERS, offlineResponse, type StackFixture } from "./stackFixture";
 
 let fixture: StackFixture | undefined;
@@ -23,6 +25,43 @@ afterEach(() => {
   fixture?.stop();
   fixture = undefined;
   __resetStackEngineForTests();
+});
+
+test("turning Robots off closes robot STT sockets but leaves browser STT sockets open", async () => {
+  const admin = await owner();
+  await admin.request("/api/settings", { method: "PUT", body: { scope: "household", key: "home.robots.enabled", value: true } });
+  const person = (await (await admin.get("/api/auth/me")).json()) as { id: string };
+  const robotToken = issueDeviceToken(person.id, "robot", "Rover");
+  storeRobotCredential(robotToken.deviceId, "192.0.2.1", "seed", "seed-password");
+  const robot = new TestClient();
+  await robot.post("/api/auth/devices/redeem", { token: robotToken.token });
+  const browserToken = issueDeviceToken(person.id, "browser", "Browser");
+  const browser = new TestClient();
+  await browser.post("/api/auth/devices/redeem", { token: browserToken.token });
+  const server = Bun.serve({ hostname: "127.0.0.1", port: 0, fetch: app.fetch, websocket });
+  const connect = async (client: TestClient) => {
+    const cookie = client.getCookie();
+    if (!cookie) throw new Error("session cookie missing");
+    const ws = new WebSocket(`ws://127.0.0.1:${server.port}/api/stt/stream`, { headers: { cookie } });
+    await new Promise<void>((resolve, reject) => {
+      ws.addEventListener("open", () => resolve(), { once: true });
+      ws.addEventListener("error", () => reject(new Error("STT socket failed to open")), { once: true });
+    });
+    return ws;
+  };
+  try {
+    const robotSocket = await connect(robot);
+    const browserSocket = await connect(browser);
+    const closed = new Promise<CloseEvent>((resolve) => robotSocket.addEventListener("close", resolve, { once: true }));
+    await admin.request("/api/settings", { method: "PUT", body: { scope: "household", key: "home.robots.enabled", value: false } });
+    const event = await closed;
+    expect(event.code).toBe(4403);
+    expect(event.reason).toBe("robots_off");
+    expect(browserSocket.readyState).toBe(WebSocket.OPEN);
+    browserSocket.close();
+  } finally {
+    server.stop(true);
+  }
 });
 
 async function owner(): Promise<TestClient> {

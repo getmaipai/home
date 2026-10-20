@@ -146,6 +146,10 @@ export function isQuickConnectPending(pollToken: string): boolean {
   return !!req && !req.approvedPersonId && !req.consumed;
 }
 
+export function quickConnectKindForCode(code: string): DeviceKind | null {
+  return getByCode(code)?.kind ?? null;
+}
+
 /** Test-only: forgets every pending request. */
 export function __resetQuickConnectForTests(): void {
   requestsByCode.clear();

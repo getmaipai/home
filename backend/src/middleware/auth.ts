@@ -13,6 +13,7 @@ import { getClientIp } from "@/lib/secretThrottle";
 import { TRUST_PROXY } from "@/lib/trustProxy";
 import { personIsGranted } from "@/lib/grants";
 import { getDeviceById, type DeviceKind } from "@/lib/devices";
+import { robotsEnabled, ROBOTS_OFF_MESSAGE } from "@/lib/robots";
 import { Person } from "@maipai/spec/gen/ts/person.js";
 import type { AppEnv, PersonRow } from "@/types";
 
@@ -123,7 +124,7 @@ export function resolveSession(token: string): PersonRow | null {
 // by person, not by session) if the same person ever holds two devices'
 // sessions - simplest correct fix, no cache invalidation ordering to get
 // right.
-function resolveSessionDeviceId(token: string): string | null {
+export function resolveSessionDeviceId(token: string): string | null {
   const tokenHash = hashSessionToken(token);
   const row = db.select({ deviceId: sessions.deviceId }).from(sessions).where(eq(sessions.tokenHash, tokenHash)).get();
   return row?.deviceId ?? null;
@@ -236,6 +237,10 @@ function authenticate(c: Context<AppEnv>): PersonRow | Response {
   // happen today (the FK and deleteDevice()), but it must never read as an
   // unscoped person session if it ever does.
   if (deviceId && !device) return c.json({ error: "Unauthorized" }, 401);
+  // A WebSocket upgrade passes so the socket route can close with 4403 robots_off, the code the robot reads.
+  if (device?.kind === "robot" && !robotsEnabled() && c.req.header("upgrade")?.toLowerCase() !== "websocket") {
+    return c.json({ error: ROBOTS_OFF_MESSAGE }, 403);
+  }
   if (device?.kind === "robot" && !robotSessionMayReach(c.req.method, c.req.path)) {
     return c.json({ error: "Forbidden" }, 403);
   }

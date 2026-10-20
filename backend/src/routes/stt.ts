@@ -11,11 +11,21 @@ import { voiceFailureLine } from "@/lib/failureCopy";
 import { getStackClient, isStackConfigured } from "@/lib/stackEngine";
 import type { SttStatusResponse, SttTranscribeResponse } from "@maipai/spec/voice/ts/sttTypes.js";
 import type { AppEnv } from "@/types";
+import { robotsEnabled } from "@/lib/robots";
+import { getDeviceById } from "@/lib/devices";
+import { getCookie } from "hono/cookie";
+import { resolveSessionDeviceId } from "@/middleware/auth";
 import { apiRouter, errorResponses } from "@/lib/openapi";
 
 export const sttRoutes = apiRouter();
 
 const SESSION_CONFIG = { sampleRate: 16_000, silenceTimeoutS: 0.8, partialIntervalS: 1.5 };
+const robotSttSockets = new Set<{ close(code: number, reason: string): void }>();
+
+export function closeRobotSttSockets(): void {
+  for (const socket of robotSttSockets) socket.close(4403, "robots_off");
+  robotSttSockets.clear();
+}
 
 // WS handshake itself has no cookie-friendly way to fail with a JSON
 // body, so auth is checked as a real precondition (requireAuth's own
@@ -24,12 +34,21 @@ const SESSION_CONFIG = { sampleRate: 16_000, silenceTimeoutS: 0.8, partialInterv
 sttRoutes.get(
   "/stream",
   requireAuth,
-  upgradeWebSocket(() => {
+  upgradeWebSocket((c) => {
     let session: SttSession | null = null;
     let ended = false;
     const pendingPcm: Float32Array[] = [];
+    let trackedRobotSocket: { close(code: number, reason: string): void } | undefined;
+    const sessionToken = getCookie(c, "session");
+    const deviceId = sessionToken ? resolveSessionDeviceId(sessionToken) : null;
+    const isRobot = !!deviceId && getDeviceById(deviceId)?.kind === "robot";
     return {
       onOpen(_evt, ws) {
+        if (isRobot) {
+          trackedRobotSocket = { close: (code, reason) => ws.close(code, reason) };
+          robotSttSockets.add(trackedRobotSocket);
+          if (!robotsEnabled()) trackedRobotSocket.close(4403, "robots_off");
+        }
         void getEndpointer().then((endpointer) => {
           if (ended) return;
           const config = endpointer
@@ -79,6 +98,7 @@ sttRoutes.get(
         session.pushPcm(new Float32Array(evt.data));
       },
       onClose() {
+        if (trackedRobotSocket) robotSttSockets.delete(trackedRobotSocket);
         ended = true;
         pendingPcm.length = 0;
         session?.close();

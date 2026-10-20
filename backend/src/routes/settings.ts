@@ -25,6 +25,7 @@ import { packagesLosingCapability, reconcileCapabilities, removalConfirmation } 
 import { detectLanIps } from "@/lib/hubEndpoints";
 import { scheduleHubRestart } from "@/lib/hubRestart";
 import { turnOnTailscaleAccess, setTailscaleRenewalActive } from "@/lib/tailscale";
+import { closeRobotSttSockets } from "@/routes/stt";
 
 export const settingsRoutes = apiRouter();
 
@@ -164,7 +165,10 @@ settingsRoutes.openapi(putRoute, async (c) => {
     return result.status === 400 ? c.json({ error: result.error }, 400) : c.json({ error: result.error }, 403);
   }
   if (warning) await reconcileCapabilities();
-  if (body.scope === "household" && body.key === "home.robots.enabled" && body.value === false) closeRobotDeviceCommandChannels();
+  if (body.scope === "household" && body.key === "home.robots.enabled" && body.value === false) {
+    closeRobotDeviceCommandChannels();
+    closeRobotSttSockets();
+  }
   if (body.scope === "household" && body.key === "search.searxng_url") await checkSearchInstance({ force: true });
   if (body.scope === "household" && body.key === "network.tailnet_access") {
     if (body.value === true) {
@@ -225,7 +229,10 @@ settingsRoutes.openapi(resetRoute, async (c) => {
   if (!result.ok) {
     return result.status === 400 ? c.json({ error: result.error }, 400) : c.json({ error: result.error }, 403);
   }
-  if (body.scope === "household" && body.key === "home.robots.enabled" && result.value.value === false) closeRobotDeviceCommandChannels();
+  if (body.scope === "household" && body.key === "home.robots.enabled" && result.value.value === false) {
+    closeRobotDeviceCommandChannels();
+    closeRobotSttSockets();
+  }
   if (body.scope === "household" && body.key === "search.searxng_url") await checkSearchInstance({ force: true });
   publishSettingsChanged(body.scope, body.key, result.value.value);
   if (body.scope === "household" && isCodingStackKey(body.key)) await pushCodingSettings([body.key]);

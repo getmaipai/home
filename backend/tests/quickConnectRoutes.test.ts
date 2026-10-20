@@ -20,6 +20,29 @@ describe("Quick Connect end to end", () => {
     const tv = await new TestClient().post("/api/auth/quick-connect/code", { label: "Living room TV", kind: "tv" });
     expect(tv.status).toBe(200);
   });
+  test("robot approval is refused if Robots was turned off after the request", async () => {
+    const phone = new TestClient();
+    await phone.post("/api/auth/setup", { displayName: "Sage", secret: "correcthorse" });
+    await phone.request("/api/settings", { method: "PUT", body: { scope: "household", key: "home.robots.enabled", value: true } });
+    const robot = new TestClient();
+    const { code, poll_token } = await robot.post("/api/auth/quick-connect/code", { label: "Rover", kind: "robot" }).then((r) => r.json() as Promise<{ code: string; poll_token: string }>);
+    await phone.request("/api/settings", { method: "PUT", body: { scope: "household", key: "home.robots.enabled", value: false } });
+    const approval = await phone.post("/api/auth/quick-connect/approve", { code });
+    expect(approval.status).toBe(403);
+    expect(await approval.json()).toEqual({ error: "Robots are turned off on this home. An admin can turn them on in Settings, Devices." });
+    expect(await (await robot.get(`/api/auth/quick-connect/poll?poll_token=${poll_token}`)).json()).toEqual({ status: "pending" });
+  });
+  test("an approved robot poll expires without creating a device when Robots is turned off", async () => {
+    const phone = new TestClient();
+    await phone.post("/api/auth/setup", { displayName: "Sage", secret: "correcthorse" });
+    await phone.request("/api/settings", { method: "PUT", body: { scope: "household", key: "home.robots.enabled", value: true } });
+    const robot = new TestClient();
+    const { code, poll_token } = await robot.post("/api/auth/quick-connect/code", { label: "Rover", kind: "robot" }).then((r) => r.json() as Promise<{ code: string; poll_token: string }>);
+    await phone.post("/api/auth/quick-connect/approve", { code });
+    await phone.request("/api/settings", { method: "PUT", body: { scope: "household", key: "home.robots.enabled", value: false } });
+    expect(await (await robot.get(`/api/auth/quick-connect/poll?poll_token=${poll_token}`)).json()).toEqual({ status: "expired" });
+    expect(await (await phone.get("/api/devices")).json()).toEqual([]);
+  });
   test("a TV's code, approved by a signed-in phone, lets the TV poll its way to a session and a device token", async () => {
     const tv = new TestClient();
     const codeRes = await tv.post("/api/auth/quick-connect/code", { label: "Living room TV", kind: "tv" });

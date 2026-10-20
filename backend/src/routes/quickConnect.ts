@@ -7,12 +7,12 @@ import { apiRouter, errorResponses } from "@/lib/openapi";
 import { requireAuth } from "@/middleware/auth";
 import { issueSession, sessionSignInSource } from "@/lib/session";
 import { issueDeviceToken } from "@/lib/deviceTokens";
-import { createQuickConnect, approveQuickConnect, consumeQuickConnect, isQuickConnectPending } from "@/lib/quickConnect";
+import { createQuickConnect, approveQuickConnect, consumeQuickConnect, isQuickConnectPending, quickConnectKindForCode } from "@/lib/quickConnect";
 import { isTotpEnabled, verifyTotp } from "@/lib/totp";
 import { db } from "@/db";
 import { people } from "@/db/schema";
 import { renderClipBundle } from "@/lib/robotClips";
-import { getHouseholdSettingValue } from "@/lib/settings";
+import { robotsEnabled, ROBOTS_OFF_MESSAGE } from "@/lib/robots";
 
 export const quickConnectRoutes = apiRouter();
 
@@ -59,8 +59,8 @@ const createRouteDef = createRoute({
 });
 quickConnectRoutes.openapi(createRouteDef, (c) => {
   const { label, kind, capabilities } = c.req.valid("json");
-  if (kind === "robot" && getHouseholdSettingValue("home.robots.enabled") !== true) {
-    return c.json({ error: "Robots are turned off on this home. An admin can turn them on in Settings, Devices." }, 403);
+  if (kind === "robot" && !robotsEnabled()) {
+    return c.json({ error: ROBOTS_OFF_MESSAGE }, 403);
   }
   const req = createQuickConnect(label, kind, capabilities);
   if (!req) return c.json({ error: "Too many Quick Connect requests right now. Wait a moment and try again." }, 429);
@@ -98,6 +98,7 @@ quickConnectRoutes.openapi(pollRoute, (c) => {
   // this ever became consumable. This just redeems that already-2FA'd
   // approval.
   if (approved) {
+    if (approved.kind === "robot" && !robotsEnabled()) return c.json({ status: "expired" as const }, 200);
     // Step 7: the approver could have been disabled (or deleted) in the
     // window between /approve and this poll picking the approval up -
     // the 5-minute Quick Connect TTL is long enough for that to matter,
@@ -162,12 +163,14 @@ const approveRoute = createRoute({
   },
   responses: {
     200: { content: { "application/json": { schema: z.object({ success: z.literal(true) }) } }, description: "Approved." },
-    ...errorResponses({ 400: "Unknown, expired, or already-approved code", 401: "A current TOTP code is required to approve a new device" }),
+    ...errorResponses({ 400: "Unknown, expired, or already-approved code", 401: "A current TOTP code is required to approve a new device", 403: "Robots are turned off on this home" }),
   },
 });
 quickConnectRoutes.openapi(approveRoute, (c) => {
   const actor = c.get("person");
   const { code, totpToken } = c.req.valid("json");
+
+  if (quickConnectKindForCode(code) === "robot" && !robotsEnabled()) return c.json({ error: ROBOTS_OFF_MESSAGE }, 403);
 
   if (isTotpEnabled(actor.id)) {
     if (!totpToken || !verifyTotp(actor.id, totpToken)) {

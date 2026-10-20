@@ -11,7 +11,7 @@ import { deviceCommands, devices } from "@/db/schema";
 import { updateMutedFromDeviceCommand } from "@/lib/deviceStates";
 import { nextHlc } from "@/lib/hlc";
 import { getRegistryKey } from "@/lib/settingsRegistry";
-import { getHouseholdSettingValue } from "@/lib/settings";
+import { robotsEnabled } from "@/lib/robots";
 import { declineRobotOfferFromChannel, snoozeRobotOffer } from "@/lib/robotOffers";
 
 export const DEVICE_COMMAND_RETENTION_MS = 24 * 60 * 60 * 1000;
@@ -242,7 +242,7 @@ export function deviceCommandWebSocket(deviceId: string, lastEventId?: string): 
   let connection: ActiveConnection | undefined;
   return {
     onOpen(_event, ws) {
-      if (getHouseholdSettingValue("home.robots.enabled") !== true) {
+      if (!robotsEnabled()) {
         ws.close(4403, "robots_off");
         return;
       }
