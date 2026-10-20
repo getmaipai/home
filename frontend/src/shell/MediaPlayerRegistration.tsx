@@ -2,7 +2,7 @@
 // across media and chat voice, the person's video speed applies, the sleep timer reaches it and the Media Session shows its title.
 // MEDIA-POLISH-01: the element is the media host's own (mediaHost.tsx), registered for as long as the host holds the item, on the
 // watch page, in the docked mini bar and while the person is in another app. It draws nothing.
-import { useMemo } from "react";
+import { useEffect, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import { useAudioRegistration } from "@/shell/audioSessionContext";
@@ -14,6 +14,7 @@ interface PlayedItem {
   channel: string | null;
   poster: string | null;
   duration_s: number | null;
+  kind?: string;
   chapters: Array<{ start_s: number; title: string }>;
 }
 
@@ -53,5 +54,13 @@ export function MediaPlayerRegistration({ appId, mediaId, element }: { appId: st
     [played, appId],
   );
   useAudioRegistration(played ? element : null, { kind: audioKindOfApp(appId), item: audioItem });
+  useEffect(() => {
+    if (appId !== "books" || !element || !mediaId || !played || played.kind !== "chapter") return;
+    const report = (reason: string) => { if (Number.isFinite(element.currentTime)) void api.mediaProgress(appId, { media_id: mediaId, position_s: element.currentTime, duration_s: Number.isFinite(element.duration) ? element.duration : played.duration_s ?? 0, reason }, reason === "unload").catch(() => {}); };
+    const pause = () => report("pause"); const seek = () => report("seek"); const ended = () => report("ended"); const unload = () => report("unload");
+    element.addEventListener("pause", pause); element.addEventListener("seeked", seek); element.addEventListener("ended", ended); window.addEventListener("pagehide", unload);
+    const timer = setInterval(() => { if (!element.paused && !element.ended) report("interval"); }, 10_000);
+    return () => { unload(); clearInterval(timer); element.removeEventListener("pause", pause); element.removeEventListener("seeked", seek); element.removeEventListener("ended", ended); window.removeEventListener("pagehide", unload); };
+  }, [appId, mediaId, element, played]);
   return null;
 }

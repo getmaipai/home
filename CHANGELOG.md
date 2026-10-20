@@ -8,6 +8,7 @@ checklist (`docs/dev.md`). The first release is 0.1.0.
 ## [Unreleased]
 
 ### Added
+- Books app for EPUB, PDF, audiobook chapters, linked editions and reading progress; Shows and Films app for local shows, films, seasons, episodes and a personal watchlist.
 - Each robot keeps its own memories with the people it talks to, no other robot or chat reads them, and Forget removes them.
 - Robots get unique names, and each robot answers to the name on its card.
 

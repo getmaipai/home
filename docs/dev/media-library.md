@@ -160,6 +160,20 @@ name with icon buttons and chip tabs (`TabsList variant="pill"`); its play page 
 **Not built, and why.**
 
 - Captions: the item's `subtitles` are file ids with no serving route yet, so `captions` is empty.
+## Books (MEDIA-BOOKS-01)
+
+The Books package (`backend/packages/books/`) uses the shared host for books, audiobooks and chapter parts. Its `reader` node uses the pinned kit Reader for EPUB CFI and PDF page locators. The host validates and saves the locator plus percent; audiobooks resolve parts in order and link matching book editions. Shelves omit chapter parts and progress rolls up across folder audiobook parts. Read-aloud, bookmarks, notes and player sleep controls remain open.
+
+## Shows and Films (MEDIA-SHOWS-01)
+
+The Shows package (`backend/packages/shows/`) uses the shared media records and host. It groups episodes by source and series, sorts season and episode numbers, serves season and episode rows with next-to-watch progress, and stores personal watchlist status in a `watchlist` collection. Content words, age band, source visibility and allowlist discovery gates apply before grouping. No online metadata lookup is performed.
+
+## Books and Shows packages
+
+Books (`backend/packages/books/`) uses the shared host for books, audiobooks and chapter parts. Its `reader` node uses the pinned kit Reader for EPUB CFI and PDF page locators. The host validates and saves each locator with its percent; audiobook folders resolve parts in order and link matching book editions. Chapter parts stay off shelves and folder progress rolls up to the audiobook. Read-aloud, bookmarks, notes and player sleep controls remain open.
+
+Shows and Films (`backend/packages/shows/`) groups episodes by source and series, sorts season and episode numbers, and serves season and episode rows with next-to-watch progress. Its personal watchlist is a `watchlist` collection. Age band, source visibility, content words and allowlist discovery gates apply before grouping. It performs no online metadata lookup.
+
 ## Kid mode
 
 MEDIA-KID-01 adds the backend policy and the minimum player hook. `media.allowlist_only` is a person key: on for Child controls,

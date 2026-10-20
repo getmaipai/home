@@ -170,7 +170,7 @@ describe("the media-app host: gates", () => {
   test("a person who is not signed in is refused; an app that is not installed and an unknown id fall through to the generic route", async () => {
     const { adult } = await setup();
     expect((await new TestClient().post("/api/plugins/videos/data/recent", {})).status).toBe(401);
-    expect((await adult.client.post("/api/plugins/shows/data/recent", {})).status).toBe(404);
+    expect((await adult.client.post("/api/plugins/photos/data/recent", {})).status).toBe(404);
     expect((await adult.client.post("/api/plugins/videos/data/not_an_id", {})).status).toBe(404);
     expect((await adult.client.post("/api/plugins/weather/data/places", {})).status).toBe(200);
   });

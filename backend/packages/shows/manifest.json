@@ -1,0 +1,206 @@
+{
+  "id": "shows",
+  "version": "0.1.0",
+  "kind": "app",
+  "category": "Media",
+  "display": "Shows and Films",
+  "description": "Watch shows and films from your home library, pick a season and play on from where you stopped.",
+  "routing": {
+    "examples": [
+      "open Shows and Films",
+      "show my watchlist",
+      "continue my show",
+      "show films on the hub",
+      "pick a season of my show"
+    ],
+    "patterns": []
+  },
+  "author": "MaiPai",
+  "license": "AGPL-3.0",
+  "homepage": "https://github.com/getmaipai/home",
+  "requires": [],
+  "optional": [],
+  "platforms": [
+    "home"
+  ],
+  "min_role": "child",
+  "consequential": false,
+  "offline": "degraded",
+  "config": [],
+  "data_sources": [],
+  "permissions": [],
+  "notifications": [],
+  "backup": "exclude",
+  "background": false,
+  "contributes": {
+    "pages": [
+      {
+        "id": "index",
+        "label": "Shows and Films",
+        "icon": "film",
+        "nav": true,
+        "kind": "schema",
+        "module": "index"
+      },
+      {
+        "id": "shows",
+        "label": "Shows",
+        "icon": "film",
+        "nav": true,
+        "kind": "schema",
+        "module": "shows"
+      },
+      {
+        "id": "films",
+        "label": "Films",
+        "icon": "film",
+        "nav": true,
+        "kind": "schema",
+        "module": "films"
+      },
+      {
+        "id": "watchlist",
+        "label": "Watchlist",
+        "icon": "film",
+        "nav": true,
+        "kind": "schema",
+        "module": "watchlist"
+      },
+      {
+        "id": "show",
+        "label": "Show",
+        "icon": "film",
+        "nav": false,
+        "kind": "schema",
+        "module": "show"
+      },
+      {
+        "id": "film",
+        "label": "Film",
+        "icon": "film",
+        "nav": false,
+        "kind": "schema",
+        "module": "film"
+      },
+      {
+        "id": "watch",
+        "label": "Watch",
+        "icon": "film",
+        "nav": false,
+        "kind": "schema",
+        "module": "watch"
+      }
+    ],
+    "data": [
+      {
+        "id": "featured",
+        "rows": "list"
+      },
+      {
+        "id": "continue-adult",
+        "rows": "list"
+      },
+      {
+        "id": "continue-child",
+        "rows": "list"
+      },
+      {
+        "id": "recent",
+        "rows": "list"
+      },
+      {
+        "id": "shows",
+        "rows": "list"
+      },
+      {
+        "id": "films",
+        "rows": "list"
+      },
+      {
+        "id": "genres",
+        "rows": "list"
+      },
+      {
+        "id": "genre",
+        "rows": "list"
+      },
+      {
+        "id": "detail",
+        "rows": "list"
+      },
+      {
+        "id": "seasons",
+        "rows": "list"
+      },
+      {
+        "id": "episodes",
+        "rows": "list"
+      },
+      {
+        "id": "watchlist",
+        "rows": "list"
+      },
+      {
+        "id": "item",
+        "rows": "list"
+      },
+      {
+        "id": "up-next",
+        "rows": "list"
+      }
+    ],
+    "settings_area": {
+      "id": "shows",
+      "title": "Shows and Films",
+      "app": "/apps/shows",
+      "audience": {
+        "min_role": "child"
+      },
+      "groups": [
+        {
+          "label": "Shows and Films",
+          "sections": [
+            "speed",
+            "storage"
+          ]
+        }
+      ],
+      "sections": [
+        {
+          "id": "speed",
+          "label": "Video speed",
+          "icon": "gauge",
+          "kind": "link",
+          "href": "/settings/account/voice",
+          "keywords": [
+            "playback",
+            "speed",
+            "faster",
+            "slower"
+          ]
+        },
+        {
+          "id": "storage",
+          "label": "Library folders and storage",
+          "icon": "hard-drive",
+          "kind": "link",
+          "href": "/settings/home/storage",
+          "min_role": "admin",
+          "keywords": [
+            "library",
+            "folders",
+            "saved copies",
+            "trash"
+          ]
+        }
+      ]
+    }
+  },
+  "min_app": "0.1.0",
+  "tier": 0,
+  "quality_scale": "bronze",
+  "smoke": {
+    "kind": "static"
+  },
+  "incognito": "unaffected"
+}

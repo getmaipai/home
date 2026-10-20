@@ -14,8 +14,8 @@ export const MEDIA_APP_FOR_KIND: Readonly<Record<string, MediaAppTarget>> = {
   track: { app: "music", page: "play" },
   podcast_episode: { app: "podcasts", page: "play" },
   book: { app: "books", page: "read" },
-  audiobook: { app: "books", page: "read" },
-  chapter: { app: "books", page: "read" },
+  audiobook: { app: "books", page: "listen" },
+  chapter: { app: "books", page: "listen" },
 };
 
 export const MEDIA_APP_IDS: readonly string[] = [...new Set(Object.values(MEDIA_APP_FOR_KIND).map((target) => target.app))];
@@ -42,7 +42,12 @@ export function mediaAppOfPath(pathname: string): string | null {
 
 /** MEDIA-POLISH-01: the page of `app` that plays one item (`watch` for Videos), or null for an app that is not a media app. */
 export function playPageOf(app: string): string | null {
+  if (app === "books") return "listen";
   return Object.values(MEDIA_APP_FOR_KIND).find((target) => target.app === app)?.page ?? null;
+}
+
+export function isMediaPlayPage(app: string, page: string): boolean {
+  return page === playPageOf(app) || (app === "books" && page === "read");
 }
 
 /** The first tab of a media app: "Home" for Videos and Shows, "Listen now" for the audio apps (Apple's and Spotify's word), "Reading now" for Books. */

@@ -1,0 +1,242 @@
+{
+  "type": "page",
+  "id": "index",
+  "title": "Shows and Films",
+  "body": [
+    {
+      "type": "billboard",
+      "bind": {
+        "source": "package",
+        "path": "featured"
+      },
+      "label": "Shows and Films",
+      "size": "hero",
+      "autoplay": false,
+      "item_key_field": "id",
+      "item_title_field": "title",
+      "item_subtitle_field": "{summary}",
+      "item_eyebrow_field": "{channel}",
+      "item_art_field": "backdrop",
+      "primary": {
+        "label": "Play",
+        "icon": "play",
+        "action": {
+          "play": {
+            "media_id": "{play_id}"
+          }
+        }
+      },
+      "secondary": [
+        {
+          "label": "More info",
+          "icon": "info",
+          "action": {
+            "navigate": {
+              "to": "/apps/shows/{detail_page}?id={id}",
+              "state": {
+                "id": "{id}",
+                "season": "{next_season}"
+              }
+            }
+          }
+        }
+      ],
+      "hide_when_empty": true,
+      "empty_state": {
+        "type": "empty_state",
+        "icon": "film",
+        "text": "This title is not available. Go back to Shows and Films and choose another."
+      }
+    },
+    {
+      "type": "media_shelf",
+      "heading": "Continue watching",
+      "bind": {
+        "source": "package",
+        "path": "continue-adult"
+      },
+      "item_key_field": "id",
+      "item_label_field": "title",
+      "item_subtitle_field": "{channel}",
+      "item_media_field": "thumbnail",
+      "item_progress_field": "progress",
+      "item_badge_field": "copy_label",
+      "aspect": "wide",
+      "variant": "plain",
+      "orientation": "horizontal",
+      "on_select": {
+        "play": {
+          "media_id": "{id}"
+        }
+      },
+      "empty_state": {
+        "type": "empty_state",
+        "icon": "film",
+        "text": "No titles here yet. Pick another section, or ask a grown-up to add some."
+      },
+      "hide_when_empty": true
+    },
+    {
+      "type": "media_shelf",
+      "heading": "Keep watching",
+      "bind": {
+        "source": "package",
+        "path": "continue-child"
+      },
+      "item_key_field": "id",
+      "item_label_field": "title",
+      "item_subtitle_field": "{channel}",
+      "item_media_field": "thumbnail",
+      "item_progress_field": "progress",
+      "item_badge_field": "copy_label",
+      "aspect": "wide",
+      "variant": "plain",
+      "orientation": "horizontal",
+      "on_select": {
+        "play": {
+          "media_id": "{id}"
+        }
+      },
+      "empty_state": {
+        "type": "empty_state",
+        "icon": "film",
+        "text": "No titles here yet. Pick another section, or ask a grown-up to add some."
+      },
+      "hide_when_empty": true
+    },
+    {
+      "type": "media_shelf",
+      "heading": "Recently added",
+      "bind": {
+        "source": "package",
+        "path": "recent"
+      },
+      "item_key_field": "id",
+      "item_label_field": "title",
+      "item_subtitle_field": "{channel}",
+      "item_media_field": "thumbnail",
+      "item_progress_field": "progress",
+      "aspect": "poster",
+      "variant": "plain",
+      "on_select": {
+        "navigate": {
+          "to": "/apps/shows/{detail_page}?id={id}",
+          "state": {
+            "id": "{id}",
+            "season": "{next_season}"
+          }
+        }
+      },
+      "empty_state": {
+        "type": "empty_state",
+        "icon": "film",
+        "text": "No titles here yet. Pick another section, or ask a grown-up to add some."
+      },
+      "hide_when_empty": true
+    },
+    {
+      "type": "media_shelf",
+      "heading": "Films",
+      "bind": {
+        "source": "package",
+        "path": "films"
+      },
+      "item_key_field": "id",
+      "item_label_field": "title",
+      "item_subtitle_field": "{channel}",
+      "item_media_field": "thumbnail",
+      "item_progress_field": "progress",
+      "aspect": "poster",
+      "variant": "plain",
+      "on_select": {
+        "navigate": {
+          "to": "/apps/shows/{detail_page}?id={id}",
+          "state": {
+            "id": "{id}",
+            "season": "{next_season}"
+          }
+        }
+      },
+      "empty_state": {
+        "type": "empty_state",
+        "icon": "film",
+        "text": "No titles here yet. Pick another section, or ask a grown-up to add some."
+      },
+      "hide_when_empty": true
+    },
+    {
+      "type": "picker",
+      "state": "genre",
+      "label": "Genre",
+      "bind": {
+        "source": "package",
+        "path": "genres"
+      },
+      "item_key_field": "id",
+      "item_label_field": "label",
+      "variant": "pill"
+    },
+    {
+      "type": "media_shelf",
+      "heading": "By genre",
+      "bind": {
+        "source": "package",
+        "path": "genre",
+        "params": {
+          "genre": "$state.genre"
+        }
+      },
+      "item_key_field": "id",
+      "item_label_field": "title",
+      "item_subtitle_field": "{channel}",
+      "item_media_field": "thumbnail",
+      "item_progress_field": "progress",
+      "aspect": "poster",
+      "variant": "plain",
+      "on_select": {
+        "navigate": {
+          "to": "/apps/shows/{detail_page}?id={id}",
+          "state": {
+            "id": "{id}",
+            "season": "{next_season}"
+          }
+        }
+      },
+      "empty_state": {
+        "type": "empty_state",
+        "icon": "film",
+        "text": "No titles here yet. Pick another section, or ask a grown-up to add some."
+      },
+      "hide_when_empty": true
+    },
+    {
+      "type": "media_shelf",
+      "heading": "Shows",
+      "bind": {
+        "source": "package",
+        "path": "shows"
+      },
+      "item_key_field": "id",
+      "item_label_field": "title",
+      "item_subtitle_field": "{channel}",
+      "item_media_field": "thumbnail",
+      "item_progress_field": "progress",
+      "aspect": "poster",
+      "variant": "plain",
+      "on_select": {
+        "navigate": {
+          "to": "/apps/shows/{detail_page}?id={id}",
+          "state": {
+            "id": "{id}",
+            "season": "{next_season}"
+          }
+        }
+      },
+      "empty_state": {
+        "type": "empty_state",
+        "icon": "film",
+        "text": "No titles here yet. Pick another section, or ask a grown-up to add some."
+      }
+    }
+  ]
+}

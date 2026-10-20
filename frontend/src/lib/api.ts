@@ -1310,7 +1310,7 @@ export const api = {
     request<T>(`/api/plugins/${encodeURIComponent(pkg)}/data/${encodeURIComponent(dataId)}`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) }),
   mediaItem: (id: string) => request<{ item: { id: string; kind: string; title: string } }>(`/api/media/items/${encodeURIComponent(id)}`),
   // MEDIA-POLISH-01: the docked mini bar's progress report (POST /api/plugins/:id/progress, the media app host's own action).
-  mediaProgress: (pkg: string, body: { media_id: string; position_s: number; duration_s: number; reason: string }, keepalive = false) =>
+  mediaProgress: (pkg: string, body: { media_id: string; position_s?: number; duration_s?: number; reason: string; locator?: unknown; percent?: number }, keepalive = false) =>
     request<{ ok: true }>(`/api/plugins/${encodeURIComponent(pkg)}/progress`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body), keepalive }),
   appPage: (pkg: string, page: string) => request<unknown>(`/api/plugins/${encodeURIComponent(pkg)}/pages/${encodeURIComponent(page)}`),
   // GET /api/repairs (backend/src/routes/repairs.ts): real and fully

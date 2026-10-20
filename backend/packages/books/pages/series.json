@@ -1,0 +1,36 @@
+{
+  "type": "page",
+  "id": "series",
+  "title": "Series",
+  "body": [
+    {
+      "type": "media_shelf",
+      "heading": "Series",
+      "bind": {
+        "source": "package",
+        "path": "series"
+      },
+      "item_key_field": "id",
+      "item_label_field": "title",
+      "item_subtitle_field": "{channel}",
+      "item_media_field": "thumbnail",
+      "item_progress_field": "progress",
+      "aspect": "poster",
+      "variant": "plain",
+      "on_select": {
+        "navigate": {
+          "to": "/apps/books/series-detail",
+          "state": {
+            "series": "{series}"
+          }
+        }
+      },
+      "layout": "grid",
+      "empty_state": {
+        "type": "empty_state",
+        "icon": "book-open",
+        "text": "No series yet. Add series tags to your books, then scan the folder again."
+      }
+    }
+  ]
+}

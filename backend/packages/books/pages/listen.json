@@ -1,0 +1,77 @@
+{
+  "type": "page",
+  "id": "listen",
+  "title": "Audiobook",
+  "body": [
+    {
+      "type": "player",
+      "bind": {
+        "source": "package",
+        "path": "item",
+        "params": {
+          "id": "$state.id"
+        }
+      },
+      "kind": "audio",
+      "layout": "audio",
+      "autoplay_next": false,
+      "empty_state": {
+        "type": "empty_state",
+        "icon": "book-open",
+        "text": "This audiobook could not open. Go back to Books and try another."
+      }
+    },
+    {
+      "type": "media_shelf",
+      "heading": "Chapters",
+      "bind": {
+        "source": "package",
+        "path": "chapters",
+        "params": {
+          "id": "$state.id"
+        }
+      },
+      "item_key_field": "key",
+      "item_label_field": "title",
+      "item_subtitle_field": "{channel}",
+      "item_media_field": "thumbnail",
+      "item_progress_field": "progress",
+      "aspect": "square",
+      "variant": "plain",
+      "on_select": {
+        "play": {
+          "media_id": "{id}"
+        }
+      },
+      "orientation": "vertical",
+      "density": "compact",
+      "hide_when_empty": true,
+      "item_index_field": "index",
+      "item_meta_field": "duration_s"
+    },
+    {
+      "type": "media_shelf",
+      "heading": "Read along",
+      "bind": {
+        "source": "package",
+        "path": "linked-editions",
+        "params": {
+          "id": "$state.id"
+        }
+      },
+      "item_key_field": "id",
+      "item_label_field": "title",
+      "item_subtitle_field": "{channel}",
+      "item_media_field": "thumbnail",
+      "item_progress_field": "progress",
+      "aspect": "poster",
+      "variant": "plain",
+      "on_select": {
+        "play": {
+          "media_id": "{id}"
+        }
+      },
+      "hide_when_empty": true
+    }
+  ]
+}

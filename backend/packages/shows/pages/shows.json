@@ -1,0 +1,37 @@
+{
+  "type": "page",
+  "id": "shows",
+  "title": "Shows",
+  "body": [
+    {
+      "type": "media_shelf",
+      "heading": "Shows",
+      "bind": {
+        "source": "package",
+        "path": "shows"
+      },
+      "item_key_field": "id",
+      "item_label_field": "title",
+      "item_subtitle_field": "{channel}",
+      "item_media_field": "thumbnail",
+      "item_progress_field": "progress",
+      "aspect": "poster",
+      "variant": "plain",
+      "on_select": {
+        "navigate": {
+          "to": "/apps/shows/{detail_page}?id={id}",
+          "state": {
+            "id": "{id}",
+            "season": "{next_season}"
+          }
+        }
+      },
+      "empty_state": {
+        "type": "empty_state",
+        "icon": "film",
+        "text": "No titles here yet. Pick another section, or ask a grown-up to add some."
+      },
+      "layout": "grid"
+    }
+  ]
+}

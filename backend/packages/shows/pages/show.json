@@ -1,0 +1,111 @@
+{
+  "type": "page",
+  "id": "show",
+  "title": "Show",
+  "body": [
+    {
+      "type": "billboard",
+      "bind": {
+        "source": "package",
+        "path": "detail",
+        "params": {
+          "id": "$state.id"
+        }
+      },
+      "label": "Shows and Films",
+      "size": "hero",
+      "autoplay": false,
+      "item_key_field": "id",
+      "item_title_field": "title",
+      "item_subtitle_field": "{summary}",
+      "item_eyebrow_field": "{channel}",
+      "item_art_field": "backdrop",
+      "primary": {
+        "label": "Play",
+        "icon": "play",
+        "action": {
+          "play": {
+            "media_id": "{play_id}"
+          }
+        }
+      },
+      "secondary": [
+        {
+          "label": "My list",
+          "icon": "plus",
+          "action": {
+            "call": {
+              "target": "/api/plugins/shows/watchlist",
+              "args": {
+                "media_id": "{id}",
+                "status": "want"
+              }
+            }
+          }
+        },
+        {
+          "label": "Mark finished",
+          "icon": "check",
+          "action": {
+            "call": {
+              "target": "/api/plugins/shows/watchlist",
+              "args": {
+                "media_id": "{id}",
+                "status": "completed"
+              }
+            }
+          }
+        }
+      ],
+      "hide_when_empty": false,
+      "empty_state": {
+        "type": "empty_state",
+        "icon": "film",
+        "text": "This title is not available. Go back to Shows and Films and choose another."
+      }
+    },
+    {
+      "type": "picker",
+      "variant": "pill",
+      "state": "season",
+      "label": "Seasons",
+      "bind": {
+        "source": "package",
+        "path": "seasons",
+        "params": {
+          "id": "$state.id"
+        }
+      },
+      "item_key_field": "id",
+      "item_label_field": "label"
+    },
+    {
+      "type": "media_shelf",
+      "heading": "Episodes",
+      "bind": {
+        "source": "package",
+        "path": "episodes",
+        "params": {
+          "id": "$state.id",
+          "season": "$state.season"
+        }
+      },
+      "item_key_field": "id",
+      "item_label_field": "title",
+      "item_subtitle_field": "{summary}",
+      "item_media_field": "thumbnail",
+      "item_highlight_field": "up_next",
+      "item_progress_field": "progress",
+      "item_meta_field": "duration_s",
+      "aspect": "wide",
+      "variant": "plain",
+      "orientation": "vertical",
+      "hide_when_empty": true,
+      "on_select": {
+        "play": {
+          "media_id": "{id}"
+        }
+      }
+    }
+  ]
+}

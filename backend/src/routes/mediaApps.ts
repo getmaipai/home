@@ -5,9 +5,11 @@
 import { apiRouter } from "@/lib/openapi";
 import { requireAuth } from "@/middleware/auth";
 import { appRouteAllowed } from "@/lib/apps";
+import { getCookie } from "hono/cookie";
+import { hashSessionToken } from "@/lib/session";
 import "@/lib/media/podcastApp"; // registers the Podcasts data ids and item view with the shared host
 import { podcastRoutes } from "./podcastApp";
-import { musicPlaylistAction, startMusicQueue, coerceNumber, mediaAppAllowed, mediaAppData, saveProgress, setListed, MEDIA_APP_IDS, type DataParams, type MediaAppId } from "@/lib/media/appHost";
+import { musicPlaylistAction, startMusicQueue, coerceNumber, mediaAppAllowed, mediaAppData, saveProgress, setListed, setWatchlist, MEDIA_APP_IDS, type DataParams, type MediaAppId } from "@/lib/media/appHost";
 
 type Body = Record<string, unknown>;
 
@@ -21,6 +23,10 @@ function paramsOf(body: Body): DataParams {
     id: typeof body.id === "string" ? body.id : undefined,
     scope: typeof body.scope === "string" && body.scope !== "" ? body.scope : undefined,
     channel: typeof body.channel === "string" && body.channel !== "" ? body.channel : undefined,
+    series: typeof body.series === "string" ? body.series : undefined,
+    season: coerceNumber(body.season),
+    genre: typeof body.genre === "string" ? body.genre : undefined,
+    status: typeof body.status === "string" ? body.status : undefined,
     limit: coerceNumber(body.limit),
   };
 }
@@ -42,8 +48,15 @@ export function createMediaAppRoutes(appId: MediaAppId) {
   routes.post("/progress", requireAuth, async (c, next) => {
     const person = c.get("person");
     if (!mediaAppAllowed(person, appId)) return next();
-    const result = saveProgress(person, appId, await bodyOf(c.req.raw));
+    const result = saveProgress(person, appId, await bodyOf(c.req.raw), new Date(), `s:${hashSessionToken(getCookie(c, "session")!)}`);
     return result.ok ? c.json({ ok: true as const, ...result.value }, 200) : c.json({ error: result.error }, result.status);
+  });
+
+  if (appId === "shows") routes.post("/watchlist", requireAuth, async (c, next) => {
+    const person = c.get("person");
+    if (!mediaAppAllowed(person, appId)) return next();
+    const result = setWatchlist(person, await bodyOf(c.req.raw));
+    return result.ok ? c.json({ ok: true, ...result.value }, 200) : c.json({ error: result.error }, result.status);
   });
 
   routes.post("/playlist", requireAuth, async (c, next) => {

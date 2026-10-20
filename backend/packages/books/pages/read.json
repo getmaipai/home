@@ -1,0 +1,43 @@
+{
+  "type": "page",
+  "id": "read",
+  "title": "Reader",
+  "body": [
+    {
+      "type": "reader",
+      "bind": {
+        "source": "package",
+        "path": "item",
+        "params": {
+          "id": "$state.id"
+        }
+      },
+      "theme": "paper",
+      "font_size": 1,
+      "on_locator": {
+        "call": {
+          "target": "/api/plugins/books/progress",
+          "args": {
+            "media_id": "{id}",
+            "locator": "{locator}",
+            "percent": "{percent}",
+            "reason": "pause"
+          }
+        }
+      },
+      "on_close": {
+        "navigate": {
+          "to": "/apps/books/index",
+          "state": {
+            "id": "{id}"
+          }
+        }
+      },
+      "empty_state": {
+        "type": "empty_state",
+        "icon": "book-open",
+        "text": "This book could not open. Go back to Books and try another."
+      }
+    }
+  ]
+}

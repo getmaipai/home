@@ -1,0 +1,39 @@
+{
+  "type": "page",
+  "id": "series-detail",
+  "title": "Series",
+  "body": [
+    {
+      "type": "media_shelf",
+      "heading": "Books in this series",
+      "bind": {
+        "source": "package",
+        "path": "series-items",
+        "params": {
+          "series": "$state.series"
+        }
+      },
+      "item_key_field": "id",
+      "item_label_field": "title",
+      "item_subtitle_field": "{channel}",
+      "item_media_field": "thumbnail",
+      "item_progress_field": "progress",
+      "aspect": "poster",
+      "variant": "plain",
+      "on_select": {
+        "navigate": {
+          "to": "/apps/books/detail",
+          "state": {
+            "id": "{id}"
+          }
+        }
+      },
+      "layout": "grid",
+      "empty_state": {
+        "type": "empty_state",
+        "icon": "book-open",
+        "text": "This series is empty. Go back to Books and choose another."
+      }
+    }
+  ]
+}

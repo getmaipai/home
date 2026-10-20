@@ -9,6 +9,10 @@ import { mediaItems, mediaSources } from "@/db/schema";
 import { loadManifestOnly } from "@/lib/plugins";
 import { appIndexFloorOk, appVisibleTo } from "@/lib/apps";
 import type { PersonRow } from "@/types";
+import { MediaProgress as MediaProgressSchema } from "@maipai/spec/gen/ts/media-progress.js";
+import { z } from "zod";
+import { itemDetail } from "./items";
+import type { MediaBudget } from "./watchTime";
 import { listLibrary } from "@/lib/library";
 import { noDiscovery, readableItem, sourceVisibleTo } from "./access";
 import { allowedBandsFor, bandAllows, mediaBandOf, trips } from "./band";
@@ -26,7 +30,7 @@ export const MEDIA_APPS = {
   shows: { kinds: ["episode", "film"] as MediaKind[], noun: "title" },
   music: { kinds: ["track"] as MediaKind[], noun: "song" },
   podcasts: { kinds: ["podcast_episode"] as MediaKind[], noun: "episode" },
-  books: { kinds: ["book", "audiobook"] as MediaKind[], noun: "book" },
+  books: { kinds: ["book", "audiobook", "chapter"] as MediaKind[], noun: "book" },
 } as const;
 export type MediaAppId = keyof typeof MEDIA_APPS;
 export const MEDIA_APP_IDS = Object.keys(MEDIA_APPS) as MediaAppId[];
@@ -50,6 +54,7 @@ export interface MediaRow {
   completed?: boolean;
   /** "Saved" (the copy is on this hub) or "Not saved" (stream only). */
   copy_label: string;
+  action_label?: string;
 }
 
 export interface MediaItemView extends MediaRow {
@@ -69,6 +74,10 @@ export interface MediaItemView extends MediaRow {
   position_s?: number;
   liked: boolean;
   watch_later: boolean;
+  format?: "epub" | "pdf";
+  locator?: unknown;
+  parent_id?: string;
+  linked?: MediaRow[];
   up_next?: { id: string; title: string; subtitle?: string; art?: string };
 }
 
@@ -100,6 +109,11 @@ export function readableIn(person: PersonRow, appId: MediaAppId, id: string): Me
   const item = readableItem(person, id);
   if (item && appId === "music" && !allowedSources(person).some((source) => source.id === item.source_id && source.kind === "root")) return null;
   if (!item || !(MEDIA_APPS[appId].kinds as readonly string[]).includes(item.kind)) return null;
+  if (item.kind === "chapter") {
+    const parent = item.parent_id ? readableItem(person, item.parent_id) : null;
+    if (!parent || parent.kind !== "audiobook") return null;
+  }
+  if (appId === "shows" && !showWordsAllowed(person, item)) return null;
   if (allowlistOnly(person) && !allowedSources(person).some((source) => source.id === item.source_id)) return null;
   return item;
 }
@@ -124,12 +138,13 @@ export function queryItems(person: PersonRow, appId: MediaAppId, filter: ItemFil
     inArray(mediaItems.sourceId, sources.map((source) => source.id)), inArray(mediaItems.bandOk, allowedBandsFor(person)),
   ];
   if (filter.where) conditions.push(filter.where);
+  if (appId === "books") conditions.push(sql`${mediaItems.kind} <> 'chapter'`);
   const limit = filter.limit ?? 50;
   const rows = db.select().from(mediaItems).where(and(...conditions)).orderBy(...(filter.order ?? [desc(mediaItems.addedAt)])).limit(filter.all ? -1 : limit * 2 + 2).all();
   const items: MediaItem[] = [];
   for (const row of rows) {
     const item = itemFromRow(row);
-    if (bandAllows(person, item)) items.push(item);
+    if (bandAllows(person, item) && (appId !== "shows" || showWordsAllowed(person, item))) items.push(item);
     if (!filter.all && items.length >= limit) break;
   }
   return items;
@@ -210,6 +225,18 @@ export function contextFor(person: PersonRow, items: readonly MediaItem[]): RowC
     const item = items.find((candidate) => candidate.id === progress.media_id);
     progressById.set(progress.media_id, { percent: percentOf(progress.position, progress.duration_s ?? item?.duration_s ?? null), completed: progress.completed });
   }
+  for (const item of items) {
+    if (item.kind !== "audiobook") continue;
+    const parts = itemDetail(person, item).parts;
+    if (!parts.length) continue;
+    const progress = getProgressMany(person.id, parts.map((part) => part.id));
+    const duration = parts.reduce((sum, part) => sum + (part.duration_s ?? 0), 0);
+    const played = parts.reduce((sum, part) => {
+      const saved = progress.find((row) => row.media_id === part.id);
+      return sum + (saved?.completed ? part.duration_s ?? 0 : saved && "seconds" in saved.position ? Math.min(saved.position.seconds, part.duration_s ?? saved.position.seconds) : 0);
+    }, 0);
+    progressById.set(item.id, { percent: duration > 0 ? played / duration * 100 : null, completed: progress.length === parts.length && progress.every((row) => row.completed) });
+  }
   return { progressById };
 }
 
@@ -219,6 +246,7 @@ export function rowOf(item: MediaItem, context: RowContext): MediaRow {
   const row: MediaRow = {
     id: item.id, title: item.title, channel: eyebrowOf(item), summary: oneLine(item.description, 140) || item.subtitle || "", kind: item.kind, thumbnail: art, backdrop: art,
     duration_s: item.duration_s, copy_label: copyLabelOf(item),
+    ...(item.kind === "book" || item.kind === "audiobook" ? { action_label: item.kind === "book" ? "Read" : "Listen" } : {}),
   };
   if (seen?.completed) row.completed = true;
   else if (seen?.percent !== null && seen?.percent !== undefined && seen.percent > 0) row.progress = Math.min(1, Math.round(seen.percent) / 100);
@@ -250,6 +278,10 @@ export interface DataParams {
   /** What `id` names, for a data id that serves more than one page (Music's `header`: album, artist or playlist). */
   scope?: string;
   channel?: string;
+  series?: string;
+  season?: number;
+  genre?: string;
+  status?: string;
   limit?: number;
 }
 
@@ -272,6 +304,49 @@ export function mediaAppData(person: PersonRow, appId: MediaAppId, dataId: strin
   if (noDiscovery(person) && (DISCOVERY_IDS as readonly string[]).includes(dataId)) return [];
   // Up next outside Music is a suggestion list (series order, then the newest); Music's up-next is the person's own queue.
   if (noDiscovery(person) && dataId === "up-next" && appId !== "music") return [];
+  if (appId === "shows") return showsData(person, dataId, params, limit) as ReturnType<typeof mediaAppData>;
+  if (appId === "books") {
+    const titles = () => queryItems(person, "books", { all: true, order: [sql`lower(${mediaItems.title})`] });
+    if (dataId === "books" || dataId === "audiobooks") return rowsOf(person, titles().filter((item) => item.kind === (dataId === "books" ? "book" : "audiobook")));
+    if (dataId === "continue-reading" || dataId === "continue-listening") {
+      const found = new Set<string>(); const items: MediaItem[] = [];
+      for (const progress of recentProgress(person.id, 200)) {
+        if (progress.completed || (percentOf(progress.position, progress.duration_s) ?? 0) <= 0) continue;
+        let item = readableIn(person, "books", progress.media_id);
+        if (item?.kind === "chapter" && item.parent_id) item = readableIn(person, "books", item.parent_id);
+        if (!item || item.kind !== (dataId === "continue-reading" ? "book" : "audiobook") || found.has(item.id)) continue;
+        found.add(item.id); items.push(item);
+      }
+      return rowsOf(person, items.slice(0, limit));
+    }
+    if (dataId === "series") {
+      const groups = new Map<string, MediaItem[]>();
+      for (const item of titles()) if (item.series) groups.set(item.series, [...(groups.get(item.series) ?? []), item]);
+      return [...groups].sort(([a], [b]) => a.localeCompare(b)).map(([series, items]) => ({ ...rowsOf(person, [items[0]!])[0]!, title: series, series, summary: `${items.length} book${items.length === 1 ? "" : "s"}` }));
+    }
+    if (dataId === "series-items") return rowsOf(person, titles().filter((item) => item.series === params.series).sort((a, b) => (a.series_index ?? 0) - (b.series_index ?? 0) || a.title.localeCompare(b.title)));
+    if (dataId === "editions" || dataId === "linked-editions") {
+      const item = params.id ? readableIn(person, "books", params.id) : null;
+      const parent = item?.kind === "chapter" && item.parent_id ? readableIn(person, "books", item.parent_id) : item;
+      return parent ? rowsOf(person, [...(dataId === "editions" ? [parent] : []), ...itemDetail(person, parent).linked.filter((linked) => readableIn(person, "books", linked.id))]) : [];
+    }
+    if (dataId === "chapters") {
+      const item = params.id ? readableIn(person, "books", params.id) : null;
+      const parent = item?.kind === "chapter" && item.parent_id ? readableIn(person, "books", item.parent_id) : item;
+      if (!parent) return [];
+      const parts = itemDetail(person, parent).parts.filter((part) => readableIn(person, "books", part.id));
+      if (parts.length) return rowsOf(person, parts).map((row, index) => ({ ...row, key: row.id, index: index + 1 }));
+      const saved = getProgress(person.id, parent.id); const at = saved && "seconds" in saved.position ? saved.position.seconds : 0;
+      return parent.chapters.map((chapter, index) => {
+        const end = parent.chapters[index + 1]?.start_s ?? parent.duration_s ?? chapter.start_s; const length = Math.max(0, end - chapter.start_s);
+        const row: MediaRow & { key: string; index: number; position_s: number } = { ...rowOf(parent, contextFor(person, [parent])), key: `${parent.id}-${index}`, index: index + 1, title: chapter.title, duration_s: length || null, position_s: chapter.start_s };
+        delete row.progress; delete row.completed;
+        if (saved?.completed || (length > 0 && at >= end)) row.completed = true;
+        else if (length > 0 && at > chapter.start_s) row.progress = Math.min(1, (at - chapter.start_s) / length);
+        return row;
+      });
+    }
+  }
   if (appId === "music") {
     const music = musicData(person, dataId, params);
     if (music !== null) return music as never;
@@ -345,7 +420,7 @@ export function mediaAppData(person: PersonRow, appId: MediaAppId, dataId: strin
         if (file) return madeFileItemView(file, appId);
       }
       const item = params.id ? readableIn(person, appId, params.id) : null;
-      return item ? itemView(person, appId, item) : [];
+      return item ? (appId === "books" ? bookItemView(person, item) : itemView(person, appId, item)) : [];
     }
     case "item-actions": {
       const item = params.id ? readableIn(person, appId, params.id) : null;
@@ -359,6 +434,7 @@ export function mediaAppData(person: PersonRow, appId: MediaAppId, dataId: strin
 
 /** What to play after `item`: the person's watch-later queue first, then the rest of the channel in order, then the newest others. */
 function upNextItems(person: PersonRow, appId: MediaAppId, item: MediaItem, limit: number): MediaItem[] {
+  if (appId === "shows") { if (item.kind !== "episode") return []; const siblings = showEpisodes(person, item); return siblings.slice(siblings.findIndex((candidate) => candidate.id === item.id) + 1).slice(0, limit); }
   const out: MediaItem[] = [];
   const seen = new Set<string>([item.id]);
   const add = (candidates: readonly MediaItem[]) => {
@@ -409,6 +485,38 @@ function itemView(person: PersonRow, appId: MediaAppId, item: MediaItem): MediaI
   return itemViewHooks.get(appId)?.(person, item, view) ?? view;
 }
 
+/** Books keep their locator; folder audiobooks resolve to the latest part or the next unfinished one. */
+function bookItemView(person: PersonRow, requested: MediaItem): MediaItemView {
+  let item = requested;
+  let parent = item.kind === "chapter" && item.parent_id ? readableIn(person, "books", item.parent_id) : null;
+  if (item.kind === "audiobook") {
+    const parts = itemDetail(person, item).parts.filter((part) => readableIn(person, "books", part.id));
+    if (parts.length) {
+      parent = item;
+      const latest = recentProgress(person.id, 200).find((progress) => parts.some((part) => part.id === progress.media_id));
+      const index = latest ? parts.findIndex((part) => part.id === latest.media_id) : 0;
+      item = parts[latest?.completed && index < parts.length - 1 ? index + 1 : index]!;
+    }
+  }
+  const view = itemView(person, "books", item);
+  delete view.up_next;
+  const progress = getProgress(person.id, item.id);
+  if (item.kind === "book") {
+    view.format = item.media_type === "application/pdf" ? "pdf" : "epub";
+    if (progress && "locator" in progress.position) view.locator = progress.position.locator;
+  }
+  const edition = parent ?? item;
+  view.linked = rowsOf(person, itemDetail(person, edition).linked.filter((linked) => readableIn(person, "books", linked.id)));
+  if (parent) {
+    view.parent_id = parent.id; view.title = parent.title; view.poster = artworkUrl(parent) ?? view.poster;
+    view.chapters = [{ start_s: 0, title: item.title }];
+    const parts = itemDetail(person, parent).parts.filter((part) => readableIn(person, "books", part.id));
+    const next = parts[parts.findIndex((part) => part.id === item.id) + 1];
+    if (next && !noDiscovery(person)) view.up_next = { id: next.id, title: next.title };
+  }
+  return view;
+}
+
 // ---- the actions ----------------------------------------------------------------------------------------------------------------
 
 /** `call.args` placeholders arrive as strings ("12.5"); a number, a numeric string, or nothing. */
@@ -431,14 +539,28 @@ export interface ProgressArgs {
   duration_s?: unknown;
   reason?: unknown;
   device_id?: unknown;
+  locator?: unknown;
+  percent?: unknown;
 }
 
 /** The one progress path for an app page: coerce, check the title is readable here, then `writeProgress` (mergeProgress inside). */
-export function saveProgress(person: PersonRow, appId: MediaAppId, args: ProgressArgs, now = new Date()): ActionResult<{ applied: boolean; completed: boolean }> {
+export function saveProgress(person: PersonRow, appId: MediaAppId, args: ProgressArgs, now = new Date(), meterKey?: string): ActionResult<{ applied: boolean; completed: boolean; budget?: MediaBudget }> {
   const item = typeof args.media_id === "string" ? readableIn(person, appId, args.media_id) : null;
   if (!item) return { ok: false, status: 404, error: `That ${MEDIA_APPS[appId].noun} is not in the library.` };
-  const position = coerceNumber(args.position_s);
-  if (position === undefined || position < 0) return { ok: false, status: 400, error: "Where to save the place was missing. Play the item again." };
+  let position: import("./progress").Position;
+  if (item.kind === "book") {
+    const locator = z.discriminatedUnion("kind", [
+      z.object({ kind: z.literal("cfi"), cfi: z.string().min(1).max(8192), spine_index: z.number().int().min(0).nullable().optional(), block_index: z.number().int().min(0).nullable().optional(), page: z.null().optional() }).strict(),
+      z.object({ kind: z.literal("page"), page: z.number().int().min(1), cfi: z.null().optional(), spine_index: z.null().optional(), block_index: z.null().optional() }).strict(),
+    ]).safeParse(args.locator);
+    const percent = coerceNumber(args.percent);
+    if (!locator.success || percent === undefined || percent < 0 || percent > 100 || locator.data.kind !== (item.media_type === "application/pdf" ? "page" : "cfi")) return { ok: false, status: 400, error: "The reading place was not valid. Open the book and turn the page again." };
+    position = MediaProgressSchema.shape.position.parse({ locator: locator.data, percent });
+  } else {
+    const seconds = coerceNumber(args.position_s);
+    if (seconds === undefined || seconds < 0) return { ok: false, status: 400, error: "Where to save the place was missing. Play the item again." };
+    position = { seconds };
+  }
   const duration = coerceNumber(args.duration_s);
   let outroHit = false;
   let reason = typeof args.reason === "string" && (PROGRESS_REASONS as readonly string[]).includes(args.reason) ? args.reason : "interval";
@@ -449,9 +571,9 @@ export function saveProgress(person: PersonRow, appId: MediaAppId, args: Progres
   }
   const device = typeof args.device_id === "string" && /^device-[a-z0-9]{6,}$/.test(args.device_id) ? args.device_id : null;
   const outcome = writeProgress(person, item, {
-    position: { seconds: position }, duration_s: duration !== undefined && duration >= 0 ? duration : undefined, device_id: device,
+    position, duration_s: duration !== undefined && duration >= 0 ? duration : undefined, device_id: device,
     events: reason === "ended" ? { finish: true } : undefined, ...(outroHit ? { completed: true } : {}), stamp: correctedStamp({ serverNow: now }),
-  }, { now, immediate: reason !== "interval" });
+  }, { now, immediate: item.kind === "book" || reason !== "interval", meterKey });
   if (!outcome.ok) {
     return outcome.refusal === "other_persons_device"
       ? { ok: false, status: 403, error: "This screen belongs to someone else, so it cannot save your place. Sign in on your own screen." }
@@ -467,7 +589,61 @@ export function saveProgress(person: PersonRow, appId: MediaAppId, args: Progres
     const later = resolveCollection(person.id, laterKindOf(appId));
     if (later?.items.some((entry) => entry.media_id === item.id)) removeItemFrom(later, item.id);
   }
-  return { ok: true, value: { applied: outcome.positionApplied, completed: outcome.progress.completed } };
+  if (appId === "shows") {
+    const list = showCollection(person); const entry = list?.items.find((e) => { const saved = readableIn(person, "shows", e.media_id); return saved && (saved.id === item.id || item.kind === "episode" && saved.kind === "episode" && saved.source_id === item.source_id && saved.series === item.series); });
+    if (list && entry?.status === "want") addItem(list, entry.media_id, { status: "watching" });
+  }
+  return { ok: true, value: { applied: outcome.positionApplied, completed: outcome.progress.completed, budget: outcome.budget } };
+}
+
+function showEpisodes(person: PersonRow, item: MediaItem): MediaItem[] { return item.kind === "episode" ? queryItems(person, "shows", { all: true, where: and(eq(mediaItems.sourceId, item.source_id), item.series === null ? isNull(mediaItems.series) : eq(mediaItems.series, item.series)) }).filter((entry) => item.series !== null || entry.id === item.id).sort((a,b) => (a.season ?? 0)-(b.season ?? 0) || (a.episode ?? 0)-(b.episode ?? 0) || a.id.localeCompare(b.id)) : [item]; }
+function showWordsAllowed(person: PersonRow, item: MediaItem): boolean { return bandAllows(person, { ...item, title: [item.title, item.series, item.genre].filter(Boolean).join(". ") }); }
+function showTitles(items: MediaItem[]): MediaItem[] { const seen = new Set<string>(); return items.filter((item) => { const key = item.kind === "episode" && item.series ? JSON.stringify([item.source_id, item.series]) : item.id; if (seen.has(key)) return false; seen.add(key); return true; }); }
+function showRow(person: PersonRow, item: MediaItem) {
+  const episodes = showEpisodes(person, item); const context = contextFor(person, episodes);
+  const next = episodes.find((episode) => !context.progressById.get(episode.id)?.completed) ?? episodes[0]!;
+  return { ...rowOf(item, context), title: item.kind === "episode" ? item.series ?? item.title : item.title, play_id: next.id,
+    next_season: next.season === null ? "" : String(next.season), detail_page: item.kind === "film" ? "film" : "show",
+    summary: item.description ?? "", channel: item.kind === "film" ? [item.year, item.genre].filter(Boolean).join(" · ") : `${new Set(episodes.map((e) => e.season)).size} seasons`,
+    play_label: context.progressById.get(next.id)?.percent ? "Resume" : "Play" };
+}
+function showCollection(person: PersonRow, create = false): MediaCollection | null { return listCollections(person.id, "watchlist").find((c) => c.title === "Shows and Films") ?? (create ? createCollection(person.id, "watchlist", "Shows and Films") : null); }
+function showsData(person: PersonRow, dataId: string, params: DataParams, limit: number): unknown | null {
+  const all = () => queryItems(person, "shows", { all: true }).filter((item) => showWordsAllowed(person, item));
+  const rows = (items: MediaItem[]) => showTitles(items).slice(0, limit).map((item) => showRow(person, item));
+  const item = params.id ? readableIn(person, "shows", params.id) : null;
+  switch (dataId) {
+    case "featured": return rows(all()).slice(0, 5);
+    case "recent": return rows(all());
+    case "shows": return rows(all().filter((i) => i.kind === "episode").sort((a,b) => (a.series ?? a.title).localeCompare(b.series ?? b.title)));
+    case "films": return rows(all().filter((i) => i.kind === "film").sort((a,b) => a.title.localeCompare(b.title)));
+    case "genres": return { rows: noDiscovery(person) ? [] : [...new Set(all().map((i) => i.genre).filter((g): g is string => !!g))].sort().map((g) => ({ id:g,label:g })) };
+    case "genre": return noDiscovery(person) || !params.genre ? [] : rows(all().filter((i) => i.genre === params.genre));
+    case "detail": return item ? [showRow(person,item)] : [];
+    case "seasons": return { rows: item?.kind === "episode" ? [...new Set(showEpisodes(person,item).filter((episode) => readableIn(person,"shows",episode.id)).map((e) => e.season ?? 0))].map((s) => ({ id:String(s),label:`Season ${s}` })) : [] };
+    case "episodes": {
+      if (item?.kind !== "episode") return [];
+      const episodes = showEpisodes(person,item).filter((episode) => readableIn(person,"shows",episode.id)); const context = contextFor(person,episodes); const next = episodes.find((e) => !context.progressById.get(e.id)?.completed);
+      return episodes.filter((e) => e.season === (params.season ?? next?.season ?? episodes[0]?.season)).map((episode) => { const row = rowOf(episode,context); const done = context.progressById.get(episode.id)?.completed === true; return { ...row,title: episode.episode ? `${episode.episode}. ${episode.title}` : episode.title,summary:oneLine(episode.description,140),progress:done ? 1 : row.progress,up_next:next?.id === episode.id,copy_label:done ? "Watched" : "Saved" }; });
+    }
+    case "watchlist": return (showCollection(person)?.items ?? []).filter((e) => !params.status || params.status === "all" || e.status === params.status).flatMap((e) => { const saved = readableIn(person,"shows",e.media_id); return saved ? [{...showRow(person,saved),copy_label:e.status === "want" ? "Want to watch" : e.status === "watching" ? "Watching" : "Completed"}] : []; });
+    case "continue": case "continue-adult": case "continue-child": return rows(itemsInOrder(person,"shows",recentProgress(person.id,200).filter((p) => !p.completed && "seconds" in p.position && p.position.seconds > 0).map((p) => p.media_id),limit));
+    case "item": return item ? itemView(person,"shows",item) : [];
+    case "up-next": return item ? rowsOf(person,upNextItems(person,"shows",item,limit)) : [];
+    default: return null;
+  }
+}
+function watchlist(person: PersonRow, create = false): MediaCollection | null { return listCollections(person.id, "watchlist").find((c) => c.title === "Shows and Films") ?? (create ? createCollection(person.id, "watchlist", "Shows and Films") : null); }
+export function setWatchlist(person: PersonRow, args: Record<string, unknown>): ActionResult<{ status: string }> {
+  const item = typeof args.media_id === "string" ? readableIn(person, "shows", args.media_id) : null;
+  if (!item) return { ok: false, status: 404, error: "This title is not available. Go back to Shows and Films and choose another." };
+  const status = args.status ?? "want";
+  if (status !== "want" && status !== "watching" && status !== "completed") return { ok: false, status: 400, error: "This watchlist status is not valid." };
+  const collection = watchlist(person, true)!;
+  const existing = collection.items.find((entry) => { const saved = readableIn(person, "shows", entry.media_id); return saved && (saved.id === item.id || item.kind === "episode" && item.series !== null && saved.kind === "episode" && saved.source_id === item.source_id && saved.series === item.series); });
+  const anchor = existing?.media_id ?? (item.kind === "episode" ? showEpisodes(person, item)[0]?.id ?? item.id : item.id);
+  addItem(collection, anchor, { status: status as "want" | "watching" | "completed" });
+  return { ok: true, value: { status: String(status) } };
 }
 
 /** Add to or remove from the person's own liked or watch later list. `on: true` adds and `on: false` removes (both idempotent); with `on`

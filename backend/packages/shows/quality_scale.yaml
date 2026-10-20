@@ -1,0 +1,26 @@
+package: shows
+scale: bronze
+bronze:
+  tests_green:
+    met: false
+    note: Five focused tests written; repository preload is blocked by sandbox sockets. Seven page schemas and package scope validated separately.
+  routing_examples:
+    met: true
+    note: Five routing examples in the manifest.
+  privacy_row_per_data_source:
+    met: true
+    note: No external data source or metadata fetch.
+  offline_behavior_stated:
+    met: true
+    note: Saved files play with internet off while the hub is reachable.
+  smoke_test:
+    met: true
+    note: Static page schema and package scope checks passed.
+  readme_and_changelog:
+    met: true
+  lint_clean:
+    met: false
+    note: One backend typecheck found a test tuple inference error, corrected after the run; no second run per task budget.
+silver:
+  diagnostics_and_reauth:
+    met: false

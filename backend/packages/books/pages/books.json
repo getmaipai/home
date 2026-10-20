@@ -1,0 +1,36 @@
+{
+  "type": "page",
+  "id": "books",
+  "title": "Books",
+  "body": [
+    {
+      "type": "media_shelf",
+      "heading": "Books",
+      "bind": {
+        "source": "package",
+        "path": "books"
+      },
+      "item_key_field": "id",
+      "item_label_field": "title",
+      "item_subtitle_field": "{channel}",
+      "item_media_field": "thumbnail",
+      "item_progress_field": "progress",
+      "aspect": "poster",
+      "variant": "plain",
+      "on_select": {
+        "navigate": {
+          "to": "/apps/books/detail",
+          "state": {
+            "id": "{id}"
+          }
+        }
+      },
+      "layout": "grid",
+      "empty_state": {
+        "type": "empty_state",
+        "icon": "book-open",
+        "text": "No books yet. Ask an admin to add a book folder in Settings, Home, Storage."
+      }
+    }
+  ]
+}

@@ -1,0 +1,48 @@
+{
+  "type": "page",
+  "id": "detail",
+  "title": "Book detail",
+  "body": [
+    {
+      "type": "media_shelf",
+      "heading": "Read and listen",
+      "bind": {
+        "source": "package",
+        "path": "editions",
+        "params": {
+          "id": "$state.id"
+        }
+      },
+      "item_key_field": "id",
+      "item_label_field": "title",
+      "item_subtitle_field": "{channel} · {action_label}",
+      "item_media_field": "thumbnail",
+      "item_progress_field": "progress",
+      "aspect": "poster",
+      "variant": "plain",
+      "on_select": {
+        "play": {
+          "media_id": "{id}"
+        }
+      },
+      "orientation": "vertical",
+      "empty_state": {
+        "type": "empty_state",
+        "icon": "book-open",
+        "text": "This book is not in your library. Go back to Books and choose another."
+      },
+      "row_actions": [
+        {
+          "icon": "play",
+          "label": "Open",
+          "label_field": "action_label",
+          "action": {
+            "play": {
+              "media_id": "{id}"
+            }
+          }
+        }
+      ]
+    }
+  ]
+}

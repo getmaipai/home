@@ -14,7 +14,7 @@ import { NotFoundPage } from "@/shell/pages/NotFoundPage";
 import { usePinnedApps } from "@/shell/usePinnedApps";
 import { useAppRows } from "@/shell/useAppCatalog";
 import { useTabItem } from "@/shell/tabIdentity";
-import { appHomeLabel, isMediaApp, playPageOf, usesFamilyHeader } from "@/shell/mediaApps";
+import { appHomeLabel, isMediaApp, isMediaPlayPage, playPageOf, usesFamilyHeader } from "@/shell/mediaApps";
 import { useMediaDock } from "@/shell/mediaHost";
 import { SectionSidebar } from "@maipai/ui/src/primitives/SectionSidebar";
 import { useAppSidebar } from "@/shell/useAppSidebar";
@@ -109,7 +109,7 @@ export function PackageAppPage({ person }: { person: Roster }) {
   // on the page that is playing it right now.
   const dock = useMediaDock();
   const held = dock.current;
-  const onItsPlayPage = held !== null && held.appId === packageId && pageId === playPageOf(packageId) && queryState.id === held.id;
+  const onItsPlayPage = held !== null && held.appId === packageId && isMediaPlayPage(packageId, pageId) && (queryState.id === held.id || (packageId === "books" && pageId === "listen"));
   const docked = media && held !== null && held.started && !onItsPlayPage ? held : null;
   const CloseIcon = getIcon("x");
 
@@ -208,7 +208,7 @@ function AppToolbar({ hideSectionsOnWide = false, person, to, label, title, titl
   // MEDIA-POLISH-01: a media app's own header, as the native app has it (YouTube's): its name large with its icon controls on the
   // end side, then its sections as chip tabs. The play page has no header: the picture starts the page.
   if (familyHeader) {
-    if (current === playPageOf(to.split("/")[2] ?? "")) return null;
+    if (isMediaPlayPage(to.split("/")[2] ?? "", current)) return null;
     return (
       <div className="flex flex-col gap-2">
         <div className="flex items-center gap-1">

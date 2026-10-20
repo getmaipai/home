@@ -1,0 +1,127 @@
+{
+  "type": "page",
+  "id": "index",
+  "title": "Books",
+  "body": [
+    {
+      "type": "media_shelf",
+      "heading": "Continue reading",
+      "bind": {
+        "source": "package",
+        "path": "continue-reading"
+      },
+      "item_key_field": "id",
+      "item_label_field": "title",
+      "item_subtitle_field": "{channel}",
+      "item_media_field": "thumbnail",
+      "item_progress_field": "progress",
+      "aspect": "poster",
+      "variant": "plain",
+      "on_select": {
+        "play": {
+          "media_id": "{id}"
+        }
+      },
+      "hide_when_empty": true
+    },
+    {
+      "type": "media_shelf",
+      "heading": "Continue listening",
+      "bind": {
+        "source": "package",
+        "path": "continue-listening"
+      },
+      "item_key_field": "id",
+      "item_label_field": "title",
+      "item_subtitle_field": "{channel}",
+      "item_media_field": "thumbnail",
+      "item_progress_field": "progress",
+      "aspect": "square",
+      "variant": "plain",
+      "on_select": {
+        "play": {
+          "media_id": "{id}"
+        }
+      },
+      "hide_when_empty": true
+    },
+    {
+      "type": "media_shelf",
+      "heading": "Books",
+      "bind": {
+        "source": "package",
+        "path": "books"
+      },
+      "item_key_field": "id",
+      "item_label_field": "title",
+      "item_subtitle_field": "{channel}",
+      "item_media_field": "thumbnail",
+      "item_progress_field": "progress",
+      "aspect": "poster",
+      "variant": "plain",
+      "on_select": {
+        "navigate": {
+          "to": "/apps/books/detail",
+          "state": {
+            "id": "{id}"
+          }
+        }
+      },
+      "see_all": {
+        "label": "EPUB and PDF",
+        "action": {
+          "navigate": {
+            "to": "/apps/books/books",
+            "state": {
+              "id": "{id}"
+            }
+          }
+        }
+      },
+      "empty_state": {
+        "type": "empty_state",
+        "icon": "book-open",
+        "text": "No books yet. Ask an admin to add a book folder in Settings, Home, Storage."
+      }
+    },
+    {
+      "type": "media_shelf",
+      "heading": "Audiobooks",
+      "bind": {
+        "source": "package",
+        "path": "audiobooks"
+      },
+      "item_key_field": "id",
+      "item_label_field": "title",
+      "item_subtitle_field": "{channel}",
+      "item_media_field": "thumbnail",
+      "item_progress_field": "progress",
+      "aspect": "square",
+      "variant": "plain",
+      "on_select": {
+        "navigate": {
+          "to": "/apps/books/detail",
+          "state": {
+            "id": "{id}"
+          }
+        }
+      },
+      "see_all": {
+        "label": "m4b and mp3 folders",
+        "action": {
+          "navigate": {
+            "to": "/apps/books/audiobooks",
+            "state": {
+              "id": "{id}"
+            }
+          }
+        }
+      },
+      "empty_state": {
+        "type": "empty_state",
+        "icon": "book-open",
+        "text": "No audiobooks yet. Ask an admin to add an audiobook folder in Settings, Home, Storage."
+      }
+    }
+  ]
+}
