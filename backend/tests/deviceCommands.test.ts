@@ -100,6 +100,8 @@ describe("GET /api/devices/me/events", () => {
       expect(await denied.json()).toEqual({ error: "Robots are turned off on this home. An admin can turn them on in Settings, Devices." });
       expect((await browser.post(path, { text: "hello" })).status).not.toBe(403);
     }
+    const smuggled = await robot.request("/api/devices/me/hub-endpoints", { headers: { upgrade: "websocket" } });
+    expect(smuggled.status).toBe(403);
   });
   test("robot channel is closed with robots_off when disabled, both on connect and on a setting change", async () => {
     const { client: owner, personId } = await ownerSession();

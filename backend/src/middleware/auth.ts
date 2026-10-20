@@ -221,6 +221,13 @@ export function robotSessionMayReach(method: string, path: string): boolean {
   return ROBOT_SESSION_ROUTES.some(([m, pattern]) => m === method && pattern.test(path));
 }
 
+// With Robots off, only the two robot socket upgrades pass, so those routes can close with 4403 robots_off,
+// the code the robot reads. Every other robot request, Upgrade header or not, gets the 403.
+const ROBOT_SOCKET_PATHS = /^\/api\/(devices\/me\/events|stt\/stream)\/?$/;
+function robotSocketUpgrade(c: Context<AppEnv>): boolean {
+  return c.req.method === "GET" && ROBOT_SOCKET_PATHS.test(c.req.path) && c.req.header("upgrade")?.toLowerCase() === "websocket";
+}
+
 // requireAuth and requireRole used to duplicate this whole sequence
 // (found by a code review, 2026-09-04): now both call it once.
 function authenticate(c: Context<AppEnv>): PersonRow | Response {
@@ -237,10 +244,7 @@ function authenticate(c: Context<AppEnv>): PersonRow | Response {
   // happen today (the FK and deleteDevice()), but it must never read as an
   // unscoped person session if it ever does.
   if (deviceId && !device) return c.json({ error: "Unauthorized" }, 401);
-  // A WebSocket upgrade passes so the socket route can close with 4403 robots_off, the code the robot reads.
-  if (device?.kind === "robot" && !robotsEnabled() && c.req.header("upgrade")?.toLowerCase() !== "websocket") {
-    return c.json({ error: ROBOTS_OFF_MESSAGE }, 403);
-  }
+  if (device?.kind === "robot" && !robotsEnabled() && !robotSocketUpgrade(c)) return c.json({ error: ROBOTS_OFF_MESSAGE }, 403);
   if (device?.kind === "robot" && !robotSessionMayReach(c.req.method, c.req.path)) {
     return c.json({ error: "Forbidden" }, 403);
   }
