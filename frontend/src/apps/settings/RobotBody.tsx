@@ -359,7 +359,7 @@ export function RobotBody({
               <Button variant="destructive" disabled={cancelInstallBusy} onClick={() => void cancelInstall()}>{cancelInstallBusy ? "Working…" : "Yes, cancel install"}</Button>
               <Button variant="ghost" disabled={cancelInstallBusy} onClick={() => setCancelInstallConfirming(false)}>Keep installing</Button>
             </>
-          ) : confirmingRemove ? (
+          ) : confirmingRemove && !admin ? (
             <>
               <p className="mr-auto text-base font-medium">Remove {device.name}? It will need to be paired again.</p>
               <Button variant="destructive" onClick={onConfirmRemove} disabled={busy}>
@@ -406,7 +406,7 @@ export function RobotBody({
           )}
         </div>
       </CardFooter>
-      {admin ? <Dialog open={settingsOpen} onOpenChange={setSettingsOpen}>
+      {admin ? <Dialog open={settingsOpen} onOpenChange={(next) => { setSettingsOpen(next); if (!next) { setForgetConfirming(false); onCancelRemove(); } }}>
         <DialogContent scroll="viewport">
           <DialogHeader><DialogTitle>{device.name} settings</DialogTitle><DialogDescription>Change this robot's name, area and settings.</DialogDescription></DialogHeader>
           <div className="flex flex-col gap-3">
