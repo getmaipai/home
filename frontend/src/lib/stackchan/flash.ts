@@ -93,7 +93,7 @@ function withDeadline<T>(work: (poke: () => void) => Promise<T>, ms: number, mes
   });
 }
 
-export async function installStackChan(transport: FlashTransport, callbacks: InstallCallbacks & { onHostCreated?: (deviceId: string) => void } = {}, options: { firstInstall?: boolean; connectTimeoutMs?: number; stallTimeoutMs?: number; skipBackup?: boolean } = {}): Promise<{ deviceId: string }> {
+export async function installStackChan(transport: FlashTransport, callbacks: InstallCallbacks & { onHostCreated?: (deviceId: string) => void } = {}, options: { firstInstall?: boolean; connectTimeoutMs?: number; stallTimeoutMs?: number; skipBackup?: boolean; existingDeviceId?: string } = {}): Promise<{ deviceId: string }> {
   const firstInstall = options.firstInstall ?? true;
   const release = () => void transport.close?.()?.catch?.(() => undefined);
   callbacks.onStage?.("Checking");
@@ -116,21 +116,32 @@ export async function installStackChan(transport: FlashTransport, callbacks: Ins
     callbacks.onStage?.("Connecting");
     console.info("StackChan install: connecting to the chip");
     await withDeadline(() => transport.connect(), options.connectTimeoutMs ?? CONNECT_TIMEOUT_MS, CONNECT_TIMEOUT_MESSAGE, release);
-    console.info("StackChan install: connected, backing up the flash");
-    if (options.skipBackup) {
-      console.info("StackChan install: backup skipped by the owner's choice");
+    console.info("StackChan install: connected");
+    // An update of a robot Home already knows writes the firmware only: no new robot entry, no backup, and the setup memory
+    // (name, Wi-Fi, pairing, hub address) is left exactly as it is.
+    const existing = options.existingDeviceId;
+    let deviceId: string;
+    let image: Uint8Array | null = null;
+    if (existing) {
+      console.info("StackChan update: writing the firmware only; setup memory is kept");
+      deviceId = existing;
     } else {
-      callbacks.onStage?.("Backing up", 0, FLASH_BYTES);
-      const backup = await withDeadline((poke) => transport.read(0, FLASH_BYTES, (completed, total) => { poke(); callbacks.onStage?.("Backing up", completed, total); }), options.stallTimeoutMs ?? STALL_TIMEOUT_MS, STALL_TIMEOUT_MESSAGE, release);
-      console.info("StackChan install: backup read complete");
-      if (backup.length !== FLASH_BYTES) throw new Error("The full flash backup was incomplete. Check the USB cable and try again.");
-      backupBytes = backup;
+      if (options.skipBackup) {
+        console.info("StackChan install: backup skipped by the owner's choice");
+      } else {
+        callbacks.onStage?.("Backing up", 0, FLASH_BYTES);
+        const backup = await withDeadline((poke) => transport.read(0, FLASH_BYTES, (completed, total) => { poke(); callbacks.onStage?.("Backing up", completed, total); }), options.stallTimeoutMs ?? STALL_TIMEOUT_MS, STALL_TIMEOUT_MESSAGE, release);
+        console.info("StackChan install: backup read complete");
+        if (backup.length !== FLASH_BYTES) throw new Error("The full flash backup was incomplete. Check the USB cable and try again.");
+        backupBytes = backup;
+      }
+      const host = await postJson<{ device_id: string }>("/api/robots/hosts", { label: "StackChan" });
+      callbacks.onHostCreated?.(host.device_id);
+      deviceId = host.device_id;
+      if (backupBytes) await postBytes(`/api/robots/hosts/${encodeURIComponent(deviceId)}/flash-backup`, backupBytes);
+      image = await responseBytes(`/api/robots/hosts/${encodeURIComponent(deviceId)}/enroll-image`, "POST");
     }
-    const host = await postJson<{ device_id: string }>("/api/robots/hosts", { label: "StackChan" });
-    callbacks.onHostCreated?.(host.device_id);
-    if (backupBytes) await postBytes(`/api/robots/hosts/${encodeURIComponent(host.device_id)}/flash-backup`, backupBytes);
-    const image = await responseBytes(`/api/robots/hosts/${encodeURIComponent(host.device_id)}/enroll-image`, "POST");
-    const regions = [...images.map(({ part, bytes }) => ({ address: part.offset, bytes })), ...(firstInstall && WRITE_ENROLL_NVS_ON_FIRST_INSTALL ? [{ address: ENROLL_NVS_OFFSET, bytes: image }] : [])];
+    const regions = [...images.map(({ part, bytes }) => ({ address: part.offset, bytes })), ...(image && firstInstall && WRITE_ENROLL_NVS_ON_FIRST_INSTALL ? [{ address: ENROLL_NVS_OFFSET, bytes: image }] : [])];
     for (let index = 0; index < regions.length; index++) {
       const region = regions[index]!;
       callbacks.onStage?.("Writing", index, regions.length);
@@ -142,7 +153,7 @@ export async function installStackChan(transport: FlashTransport, callbacks: Ins
     }
     callbacks.onStage?.("Restarting");
     await transport.hardReset();
-    return { deviceId: host.device_id };
+    return { deviceId };
   } finally {
     // A read that is stuck can keep the port busy, so closing may never finish; the result must not wait on it.
     await Promise.race([Promise.resolve(transport.close?.()).catch(() => undefined), new Promise((resolve) => setTimeout(resolve, CLOSE_WAIT_MS))]);

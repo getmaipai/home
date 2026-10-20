@@ -117,4 +117,16 @@ describe("StackChan browser flash", () => {
     expect(many).toHaveLength(MAX_LOG_LINES);
     expect(addLogLine(["a"], "   ")).toEqual(["a"]);
   });
+  test("an update of a known robot writes the firmware only: no new robot, no backup, no setup memory", async () => {
+    const part = new Uint8Array([1, 2, 3, 4]);
+    stub(part, await digest(part));
+    const { transport, writes } = standIn();
+    let reads = 0;
+    const result = await installStackChan({ ...transport, read: async (_address, size) => { reads++; return new Uint8Array(size); } }, {}, { existingDeviceId: "device-known" });
+    expect(result.deviceId).toBe("device-known");
+    expect(reads).toBe(0);
+    expect(writes.map((write) => write.address)).toEqual([0x10000]);
+    const urls = (globalThis.fetch as unknown as { mock: { calls: Array<[RequestInfo | URL]> } }).mock.calls.map((call) => String(call[0]));
+    expect(urls.some((url) => url.endsWith("/hosts") || url.endsWith("flash-backup") || url.endsWith("enroll-image"))).toBe(false);
+  });
 });

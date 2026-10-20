@@ -16,6 +16,7 @@ import { Item, ItemContent, ItemDescription, ItemGroup, ItemTitle } from "@maipa
 import areasFile from "@maipai/spec/settings/areas.json";
 import { SettingsRenderer } from "@/shell/pages/settings/SettingsRenderer";
 import { api, ApiError, type DeviceInfo } from "@/lib/api";
+import { StackChanInstallDialog } from "@/apps/settings/StackChanInstallDialog";
 import { RobotSelfTests } from "@/apps/settings/RobotSelfTests";
 import { playableVoices, voiceFriendlyName } from "@/lib/voice/voiceBrowserRows";
 
@@ -85,7 +86,6 @@ function RobotDetail({ device, onClose }: { device: DeviceInfo; onClose: () => v
     return () => { active = false; };
   }, []);
   useEffect(() => {
-    if (device.lastSeenAt !== null) return;
     let active = true;
     void api.robotInstallStatus(device.id).then(() => { if (active) setHostedInstall(true); }).catch(() => { if (active) setHostedInstall(false); });
     return () => { active = false; };
@@ -126,7 +126,7 @@ function RobotDetail({ device, onClose }: { device: DeviceInfo; onClose: () => v
       subtitle={device.area ?? "Robot"}
       onClose={onClose}
       closeLabel="Back to robots"
-      actions={confirming ? null : <Button variant="destructive" onClick={() => setConfirming(true)}>{installing ? "Cancel install" : "Forget this robot"}</Button>}
+      actions={confirming ? null : <>{hostedInstall && !installing ? <StackChanInstallDialog updateOf={device.id} /> : null}<Button variant="destructive" onClick={() => setConfirming(true)}>{installing ? "Cancel install" : "Forget this robot"}</Button></>}
     >
       <div className="flex flex-col gap-4">
         {confirming ? (

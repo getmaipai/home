@@ -60,4 +60,19 @@ describe("StackChan install browser check", () => {
     await waitFor(() => expect(view.getByRole("dialog")).toBeTruthy());
     expect(view.getByRole("dialog").className).toContain("overflow-y-auto");
   });
+
+  test("an update offers one Update firmware choice, says the robot keeps its Wi-Fi, and asks for the USB port only after it", async () => {
+    let asked = 0;
+    Object.defineProperty(navigator, "serial", { configurable: true, value: { requestPort: () => { asked++; return new Promise(() => {}); } } });
+    Object.defineProperty(window, "isSecureContext", { configurable: true, value: true });
+    const view = render(<StackChanInstallDialog updateOf="device-known" />);
+    fireEvent.click(view.getByRole("button", { name: "Update firmware" }));
+    await waitFor(() => expect(view.getByText(/keeps its name, Wi-Fi and pairing/)).toBeTruthy());
+    expect(view.queryByRole("button", { name: "Install without a backup" })).toBeNull();
+    expect(view.queryByRole("button", { name: "Back up first, then install" })).toBeNull();
+    expect(asked).toBe(0);
+    const buttons = view.getAllByRole("button", { name: "Update firmware" });
+    fireEvent.click(buttons[buttons.length - 1]!);
+    await waitFor(() => expect(asked).toBe(1));
+  });
 });

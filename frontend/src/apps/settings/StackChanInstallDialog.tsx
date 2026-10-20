@@ -10,7 +10,11 @@ const BROWSER_MESSAGE = "Installing needs Chrome or Edge on a computer, with Hom
 const PORT_HELP = "When Chrome asks which port to use, choose \"USB JTAG/serial debug unit\" (it may be listed as usbmodem). Do not choose a Bluetooth entry.";
 const ONLINE_MESSAGE = "The robot did not reach Home. Check it joined the same Wi-Fi as this hub, then press Retry.";
 
-export function StackChanInstallDialog() {
+/** With `updateOf` it updates the firmware of a robot Home already knows (no new entry, no backup, the robot keeps its
+ * name, Wi-Fi and pairing); without it, it adds a new StackChan. */
+export function StackChanInstallDialog({ updateOf }: { updateOf?: string } = {}) {
+  const updating = updateOf !== undefined;
+  const [updateDone, setUpdateDone] = useState(false);
   const [open, setOpen] = useState(false);
   const [stage, setStage] = useState<FlashStage | null>(null);
   const [progress, setProgress] = useState(0);
@@ -67,8 +71,9 @@ export function StackChanInstallDialog() {
         setStage(next);
         setCompleted(completed ?? 0);
         setProgress(total && completed !== undefined ? Math.min(100, Math.round(completed / total * 100)) : 0);
-      }, onHostCreated: (id) => { hostCreated = true; setDeviceId(id); } }, { skipBackup });
-      setDeviceId(result.deviceId);
+      }, onHostCreated: (id) => { hostCreated = true; setDeviceId(id); } }, { skipBackup, existingDeviceId: updateOf });
+      if (updating) setUpdateDone(true);
+      else setDeviceId(result.deviceId);
       setInstallFinished(true);
       setStage(null);
     } catch (error) {
@@ -94,18 +99,22 @@ export function StackChanInstallDialog() {
 
   return (
     <>
-      <Button onClick={openDialog}>Add a StackChan</Button>
+      <Button onClick={openDialog}>{updating ? "Update firmware" : "Add a StackChan"}</Button>
       <Dialog open={open} onOpenChange={(next) => { if (!working) setOpen(next); }}>
         <DialogContent scroll="viewport">
           <DialogHeader>
-            <DialogTitle>Add a StackChan</DialogTitle>
+            <DialogTitle>{updating ? "Update firmware" : "Add a StackChan"}</DialogTitle>
             <DialogDescription>
-              {!installFinished ? "You need Chrome or Edge on a computer, Home opened at its https address, and the StackChan plugged into this computer with a USB-C data cable." : online ? "Your StackChan is online and ready." : "On a phone, join the robot's Wi-Fi hotspot and choose your home Wi-Fi. Home never asks for the Wi-Fi password."}
+              {updateDone ? "The firmware is updated. The StackChan restarts by itself and reconnects within a minute, with its name, Wi-Fi and pairing unchanged." : !installFinished ? "You need Chrome or Edge on a computer, Home opened at its https address, and the StackChan plugged into this computer with a USB-C data cable." : online ? "Your StackChan is online and ready." : "On a phone, join the robot's Wi-Fi hotspot and choose your home Wi-Fi. Home never asks for the Wi-Fi password."}
             </DialogDescription>
           </DialogHeader>
           {message ? <Alert variant="destructive"><AlertDescription>{message}</AlertDescription></Alert> : null}
           {stalledInBackup && !working ? <p>The backup did not work with this computer or cable. Press Start over, unplug and replug the StackChan, then choose Install without a backup. The firmware now on it will be replaced and cannot be restored from Home.</p> : null}
-          {choosing ? <>
+          {choosing && updating ? <>
+            <p>{PORT_HELP}</p>
+            <p><strong>Update firmware.</strong> Writes the newest MaiPai firmware, about 1 to 2 minutes. The StackChan keeps its name, Wi-Fi and pairing, so you do not set up its Wi-Fi again.</p>
+          </> : null}
+          {choosing && !updating ? <>
             <p>{PORT_HELP}</p>
             <p><strong>Back up first, then install.</strong> Saves the StackChan's whole memory, then installs. About 6 minutes longer.</p>
             <p><strong>Install without a backup.</strong> Faster, about 1 to 2 minutes. The firmware now on the StackChan is replaced and cannot be restored from Home.</p>
@@ -119,8 +128,10 @@ export function StackChanInstallDialog() {
             {stalledInBackup && !working ? <Button onClick={startOver}>Start over</Button> : null}
             {canStop ? <Button variant="outline" onClick={stopInstall}>Stop</Button> : null}
             {onlineFailed ? <Button onClick={retryOnline}>Retry</Button> : null}
-            {choosing ? <Button variant="outline" onClick={() => void startInstall(true)}>Install without a backup</Button> : null}
-            {choosing ? <Button onClick={() => void startInstall(false)}>Back up first, then install</Button> : null}
+            {choosing && updating ? <Button onClick={() => void startInstall(true)}>Update firmware</Button> : null}
+            {choosing && !updating ? <Button variant="outline" onClick={() => void startInstall(true)}>Install without a backup</Button> : null}
+            {choosing && !updating ? <Button onClick={() => void startInstall(false)}>Back up first, then install</Button> : null}
+            {updateDone && !working ? <Button onClick={() => setOpen(false)}>Done</Button> : null}
             {message === BROWSER_MESSAGE && !working ? <Button onClick={openDialog}>Try again</Button> : null}
             {deviceId && !working && (!installFinished || online || onlineFailed || message) ? <Button onClick={() => setOpen(false)}>{online ? "Done" : "Close"}</Button> : null}
           </DialogFooter>
