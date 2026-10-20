@@ -307,6 +307,12 @@ export interface SidecarConfig {
   onFailure?: (reason: string) => Promise<boolean> | boolean;
   /** Called whenever the sidecar is seen healthy (start or recovery). */
   onHealthy?: () => void;
+  /** Runs at the top of every start (first start, crash restart, Repairs Restart). Throwing fails that start like a spawn failure. */
+  beforeStart?: () => Promise<void> | void;
+  /** Called with the child's pid once it is running. */
+  onSpawn?: (pid: number) => void;
+  /** Return false to refuse every start (timer restarts and the Repairs Restart button included). */
+  canStart?: () => boolean;
   /** Ascending start order, descending stop order. Ties keep insertion
    * order (Array.sort is stable). Default 0. */
   startupOrder?: number;
@@ -333,6 +339,8 @@ interface SidecarEntry {
   consecutiveFailures: number;
   restartAttempts: number;
   healthTimer: ReturnType<typeof setInterval> | null;
+  /** The pending crash-backoff restart, cancelled by stopSidecar() and unregisterSidecar(). */
+  restartTimer?: ReturnType<typeof setTimeout> | null;
   /** True only during an intentional stopSidecar() - so its own health
    * loop tick (already scheduled, may fire mid-teardown) and the process
    * exit it causes are never mistaken for a crash. */
@@ -412,6 +420,8 @@ export function getSidecar(
 export function unregisterSidecar(id: string): void {
   const entry = registry.get(id);
   if (entry?.healthTimer) clearInterval(entry.healthTimer);
+  if (entry?.restartTimer) clearTimeout(entry.restartTimer);
+  if (entry) { entry.stopping = true; entry.restartTimer = null; }
   registry.delete(id);
 }
 
@@ -1258,11 +1268,13 @@ export async function startSidecar(id: string): Promise<void> {
   const entry = registry.get(id);
   if (!entry) throw new Error(`no sidecar registered as "${id}"`);
   if (entry.proc || entry.status === "starting") return;
+  if (entry.config.canStart && !entry.config.canStart()) return;
   entry.stopping = false;
   entry.status = "starting";
   const { config } = entry;
   markSidecarStartPhase(id, "starting");
   try {
+    await config.beforeStart?.();
     const healthCheck = config.healthCheck ?? (config.healthUrl
       ? () => checkHealthUrl(config.healthUrl!)
       : async () => true);
@@ -1290,6 +1302,7 @@ export async function startSidecar(id: string): Promise<void> {
     }
     clearSidecarStart(id);
     entry.proc = proc;
+    if (proc.pid) config.onSpawn?.(proc.pid);
     entry.status = "running";
     entry.consecutiveFailures = 0;
     entry.restartAttempts = 0;
@@ -1365,7 +1378,14 @@ async function handleDown(entry: SidecarEntry, reason: string): Promise<void> {
   const attempt = entry.restartAttempts;
   const delay = backoffMs[Math.min(attempt, backoffMs.length - 1)]!;
   entry.restartAttempts++;
-  setTimeout(() => void startSidecar(entry.config.id), delay);
+  if (entry.stopping) return;
+  const id = entry.config.id;
+  entry.restartTimer = setTimeout(() => {
+    entry.restartTimer = null;
+    // A stop or an unregister since the crash cancels this restart; an error must never become an unhandled rejection.
+    if (registry.get(id) !== entry || entry.stopping) return;
+    startSidecar(id).catch(() => {});
+  }, delay);
 }
 
 export async function stopSidecar(id: string): Promise<void> {
@@ -1374,9 +1394,17 @@ export async function stopSidecar(id: string): Promise<void> {
   entry.stopping = true;
   if (entry.healthTimer) clearInterval(entry.healthTimer);
   entry.healthTimer = null;
-  entry.proc?.kill();
+  if (entry.restartTimer) clearTimeout(entry.restartTimer);
+  entry.restartTimer = null;
+  const proc = entry.proc;
+  proc?.kill();
   entry.proc = null;
   entry.status = "stopped";
+  // Wait for the child's real exit (our own child, so a stuck one is force-killed) so its ports are free when this returns.
+  if (proc) {
+    const gone = (ms: number) => Promise.race([proc.exited.then(() => true), new Promise<boolean>((r) => setTimeout(() => r(false), ms).unref?.())]);
+    if (!(await gone(5000))) { proc.kill(9); await gone(2000); }
+  }
 }
 
 /** Boots every registered sidecar, ascending startupOrder. Awaited in

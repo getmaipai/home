@@ -3,7 +3,7 @@
 // plus a single-use pairing secret (only its sha256 is stored) that lets the Bot app pair without a code.
 import { randomBytes, createHash, timingSafeEqual } from "node:crypto";
 import { createServer, createConnection } from "node:net";
-import { mkdirSync, readFileSync, writeFileSync, readdirSync, existsSync, rmSync, chmodSync } from "node:fs";
+import { mkdirSync, readFileSync, writeFileSync, readdirSync, existsSync, rmSync, chmodSync, renameSync } from "node:fs";
 import { join } from "node:path";
 import { dataDir } from "@/lib/paths";
 import { createHostedRobot, deleteDevice, getDeviceById, listDevicesByKind } from "@/lib/devices";
@@ -40,13 +40,17 @@ function readHost(id: string): HostRecord | null {
 function writeHost(host: HostRecord): void {
   const file = hostPath(host.deviceId);
   mkdirSync(join(roots, host.deviceId), { recursive: true, mode: 0o700 });
-  writeFileSync(file, JSON.stringify(host, null, 2), { mode: 0o600 });
-  chmodSync(file, 0o600);
+  const temp = `${file}.${randomBytes(4).toString("hex")}.tmp`;
+  writeFileSync(temp, JSON.stringify(host, null, 2), { mode: 0o600 });
+  chmodSync(temp, 0o600);
+  renameSync(temp, file);
 }
 function writeSecret(host: HostRecord): void {
   const secret = randomBytes(32).toString("hex");
-  host.secretHash = sha256(secret).toString("hex");
-  writeHost(host);
+  const current = readHost(host.deviceId) ?? host;
+  current.secretHash = sha256(secret).toString("hex");
+  host.secretHash = current.secretHash;
+  writeHost(current);
   const file = join(roots, host.deviceId, "pairing-secret");
   writeFileSync(file, secret, { mode: 0o600 });
   chmodSync(file, 0o600);
@@ -67,7 +71,7 @@ function tcpConnects(port: number): Promise<boolean> {
   });
 }
 function statusApp(host: HostRecord): StatusApp {
-  return { id: sidecarId(host.deviceId), name: `Robot brain for ${host.label}`, needs: [] };
+  return { id: sidecarId(host.deviceId), name: `Robot brain for ${host.label}`, needs: [{ kind: "engine", id: sidecarId(host.deviceId), name: "Robot brain", purpose: `Run ${host.label}`, required: true }] };
 }
 
 async function raisePortIssue(host: HostRecord, port: number | null): Promise<void> {
@@ -76,7 +80,7 @@ async function raisePortIssue(host: HostRecord, port: number | null): Promise<vo
     source: sidecarId(host.deviceId), key: "port-in-use", severity: "error",
     title: `Robot brain for ${host.label} can't start`,
     detail: `${which} in use by another program. Close that program or restart the computer, then try again.`,
-    fix: null,
+    fix: { label: "Try again", action: `restart_sidecar:${sidecarId(host.deviceId)}` },
   });
 }
 /** A stopped host's process may take a moment to release its ports; waits for that, never kills anything. */
@@ -87,6 +91,26 @@ async function waitForOwnPortsToClear(host: HostRecord, ms: number): Promise<voi
 async function firstPortInUse(host: HostRecord): Promise<number | null> {
   for (const port of Object.values(host.ports)) if (await tcpConnects(port)) return port;
   return null;
+}
+
+const pidFile = (deviceId: string): string => join(roots, deviceId, "host.pid");
+function commandOf(pid: number): string {
+  try { return Bun.spawnSync(["ps", "-o", "command=", "-p", String(pid)]).stdout.toString(); } catch { return ""; }
+}
+/** A Bot app left over from a previous Home run is stopped, but only when its recorded pid is alive and its command line is
+ * our Bot app with this host's data directory. Anything else is left strictly alone. */
+async function reapStaleBotApp(host: HostRecord): Promise<void> {
+  let pid: number;
+  try { pid = Number(readFileSync(pidFile(host.deviceId), "utf8").trim()); } catch { return; }
+  if (!Number.isInteger(pid) || pid <= 1) return;
+  try { process.kill(pid, 0); } catch { rmSync(pidFile(host.deviceId), { force: true }); return; }
+  const command = commandOf(pid);
+  if (!command.includes("maipai-bot-host") || !command.includes(join(roots, host.deviceId))) return;
+  for (const signal of ["SIGTERM", "SIGKILL"] as const) {
+    try { process.kill(pid, signal); } catch { break; }
+    const end = Date.now() + 4000;
+    while (Date.now() < end) { try { process.kill(pid, 0); } catch { rmSync(pidFile(host.deviceId), { force: true }); return; } await new Promise((r) => setTimeout(r, 100)); }
+  }
 }
 
 function register(host: HostRecord, releaseDir: string): void {
@@ -107,27 +131,45 @@ function register(host: HostRecord, releaseDir: string): void {
     ],
     // Healthy means the voice port accepts a connection. No port is given to the sidecar: it never frees a port by killing its holder.
     healthCheck: () => tcpConnects(host.ports.voice),
-    // Exit 75 is the Bot app's "a port is taken by another program" code.
+    // Robots off refuses every start, the timer restart and the Repairs Restart button included.
+    canStart: () => robotsEnabled() && !!getDeviceById(host.deviceId),
+    // Every start (first, crash restart, Try again): stop a leftover Bot app of ours, make sure the ports are free, and give an
+    // unpaired robot a fresh single-use secret.
+    beforeStart: async () => {
+      await reapStaleBotApp(host);
+      await waitForOwnPortsToClear(host, 3000);
+      const taken = await firstPortInUse(host);
+      if (taken !== null) throw new Error(`port-in-use:${taken}`);
+      if (!deviceHasToken(host.deviceId)) writeSecret(host);
+    },
+    onSpawn: (pid) => { try { writeFileSync(pidFile(host.deviceId), String(pid), { mode: 0o600 }); } catch { /* the pid file is a convenience for the next boot */ } },
+    // "port-in-use:N" (found before start) and exit 75 (the Bot app's own code) are one Repairs item, not a crash item.
     onFailure: async (reason) => {
-      if (!/\bcode 75\b/.test(reason)) return false;
-      await raisePortIssue(host, await firstPortInUse(host));
+      const named = /port-in-use:(\d+)/.exec(reason);
+      if (!named && !/\bcode 75\b/.test(reason)) return false;
+      await raisePortIssue(host, named ? Number(named[1]) : await firstPortInUse(host));
       return true;
     },
     onHealthy: () => resolveIssue(sidecarId(host.deviceId), "port-in-use"),
   });
 }
 
-async function setup(host: HostRecord): Promise<void> {
+const inFlight = new Map<string, Promise<void>>();
+function setup(host: HostRecord): Promise<void> {
+  const running = inFlight.get(host.deviceId);
+  if (running) return running;
+  const work = setupOnce(host).finally(() => inFlight.delete(host.deviceId));
+  inFlight.set(host.deviceId, work);
+  return work;
+}
+async function setupOnce(host: HostRecord): Promise<void> {
   if (!robotsEnabled()) return;
   const id = sidecarId(host.deviceId);
   const state = getSidecar(id)?.status;
   if (state === "running" || state === "starting") return;
-  await waitForOwnPortsToClear(host, 3000);
-  const taken = await firstPortInUse(host);
-  if (taken !== null) { await raisePortIssue(host, taken); return; }
   const release = await (releaseForTests ?? ensureBotRelease)();
-  // The first start of a host whose device has no token yet gets a fresh single-use secret.
-  if (!deviceHasToken(host.deviceId)) writeSecret(host);
+  // The release download can take a while; Robots may have been turned off (or the robot forgotten) meanwhile.
+  if (!robotsEnabled() || !getDeviceById(host.deviceId) || !configs.has(host.deviceId)) return;
   register(host, release.dir);
   await startSidecar(id);
 }
@@ -177,6 +219,10 @@ export async function stopRobotHosts(): Promise<void> {
   for (const [id, host] of configs) {
     await stopSidecar(sidecarId(id));
     await waitForOwnPortsToClear(host, 3000);
+    rmSync(pidFile(id), { force: true });
+    // Robots off: no stale "stopped" or "can't start" item (its Restart button would be refused anyway).
+    resolveIssue(sidecarId(id), "port-in-use");
+    resolveIssue(`sidecar:${sidecarId(id)}`, "crashed");
   }
 }
 export async function forgetRobotHost(deviceId: string): Promise<void> {
@@ -190,9 +236,11 @@ export async function forgetRobotHost(deviceId: string): Promise<void> {
   resolveIssue(id, "port-in-use");
   resolveIssue(`sidecar:${id}`, "crashed");
   const dir = join(roots, deviceId);
-  if (existsSync(dir)) rmSync(dir, { recursive: true, force: true });
+  try { if (existsSync(dir)) rmSync(dir, { recursive: true, force: true }); }
+  catch (error) { console.error(`[robot-host] could not remove ${dir}: ${(error as Error).message}. Delete that folder by hand.`); }
 }
 export function listRobotHostStatusApps(): StatusApp[] {
+  if (!robotsEnabled()) return [];
   const persisted = existsSync(roots)
     ? readdirSync(roots, { withFileTypes: true }).filter((x) => x.isDirectory() && validId(x.name)).map((x) => readHost(x.name)).filter((x): x is HostRecord => !!x && !!getDeviceById(x.deviceId))
     : [];

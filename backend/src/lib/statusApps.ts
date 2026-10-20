@@ -5,6 +5,7 @@ import { serviceDetail, serviceState } from "@/lib/serviceHealth";
 import { serviceComponent } from "@/lib/serviceComponent";
 import { roleHealth, STACK_REFUSAL_KEY } from "@/lib/roleHealth";
 import { stackOfflineSeverity } from "@/lib/stackEngine";
+import { getSidecar } from "@/lib/sidecars";
 export type StatusApp = { id: string; name: string; needs: AppNeed[] };
 export type StatusEventLike = { component: string; state: string; at: string };
 
@@ -22,6 +23,11 @@ function normalized(state: string | undefined): NeedState {
 }
 
 function currentState(component: string, state: string | undefined): NeedState | "unknown" {
+  // A hosted robot's Bot app is a sidecar: running is fine, still starting or unhealthy is degraded, anything else is down.
+  if (component.startsWith("robot-host:")) {
+    const status = getSidecar(component)?.status;
+    return status === "running" ? "operational" : status === "starting" || status === "unhealthy" ? "degraded" : "down";
+  }
   if (component.startsWith("service:")) {
     const derived = serviceState(component);
     if (derived === "unknown") return "unknown";

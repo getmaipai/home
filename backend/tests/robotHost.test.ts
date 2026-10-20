@@ -12,8 +12,9 @@ import { resetDb } from "./reset-db";
 import { setHouseholdSettingValue } from "@/lib/settings";
 import { __resetQuickConnectForTests } from "@/lib/quickConnect";
 import { __resetRateLimiterForTests } from "@/lib/rateLimiter";
-import { __resetSidecarsForTests, __setSidecarTimingForTestsOnly, getSidecar, listSidecars } from "@/lib/sidecars";
-import { __resetFixHandlersForTests, listIssues } from "@/lib/issues";
+import { __resetSidecarsForTests, __setSidecarTimingForTestsOnly, getSidecar, listSidecars, registerSidecar, unregisterSidecar, stopSidecar } from "@/lib/sidecars";
+import { needStates } from "@/lib/statusApps";
+import { __resetFixHandlersForTests, listIssues, fixIssue } from "@/lib/issues";
 import { createRobotHost, forgetRobotHost, startRobotHosts, stopRobotHosts, listRobotHostStatusApps, __resetRobotHostsForTests, __setRobotHostReleaseForTests } from "@/lib/robotHost";
 
 const roots = join(dataDir, "robots");
@@ -30,8 +31,8 @@ function standIn(): string {
 D="$3"
 V="$7"
 if [ -f "$D/exit75" ]; then echo "Port $V is in use by another program" >&2; exit 75; fi
-if [ -f "$D/crash-once" ]; then rm -f "$D/crash-once"; exec ${process.execPath} -e "Bun.listen({hostname:'127.0.0.1',port:$V,socket:{data(){}}});setTimeout(()=>process.exit(1),700)"; fi
-exec ${process.execPath} -e "Bun.listen({hostname:'127.0.0.1',port:$V,socket:{data(){}}});setInterval(()=>{},1000)"
+if [ -f "$D/crash-once" ]; then rm -f "$D/crash-once"; exec ${process.execPath} -e "Bun.listen({hostname:'127.0.0.1',port:$V,socket:{data(){}}});setTimeout(()=>process.exit(1),700)" -- "$0" "$D"; fi
+exec ${process.execPath} -e "Bun.listen({hostname:'127.0.0.1',port:$V,socket:{data(){}}});setInterval(()=>{},1000)" -- "$0" "$D"
 `);
   chmodSync(script, 0o755);
   return dir;
@@ -214,10 +215,11 @@ describe("ports and failures", () => {
     expect(items[0]!.title).toBe("Robot brain for Rivet can't start");
     expect(items[0]!.detail).toContain(`Port ${ports.avatar}`);
     expect(await connects(ports.avatar)).toBe(true);
-    expect(getSidecar(`robot-host:${deviceId}`)).toBeUndefined();
-    // Once the other program is gone the host starts and the item resolves.
+    expect(getSidecar(`robot-host:${deviceId}`)?.status).toBe("crashed");
+    expect(items[0]!.fix?.label).toBe("Try again");
+    // Try again once the other program is gone: the host starts and the item resolves.
     other.stop(true);
-    await startRobotHosts();
+    expect((await fixIssue(items[0]!.id)).ok).toBe(true);
     expect(getSidecar(`robot-host:${deviceId}`)?.status).toBe("running");
     expect(robotIssues().filter((i) => !i.resolved_at)).toEqual([]);
   });
@@ -328,3 +330,138 @@ describe("POST /api/robots/hosts", () => {
   });
 });
 function readdirSyncSafe(): string[] { return existsSync(roots) ? readdirSync(roots) : []; }
+
+describe("review fixes", () => {
+  const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+  test("a crash-restart timer is cancelled by unregister and by stop (no unhandled rejection, no orphan)", async () => {
+    for (const how of ["unregister", "stop"] as const) {
+      const id = `timer-${how}`;
+      registerSidecar({ id, command: ["sh", "-c", "sleep 0.4"], healthCheck: async () => true });
+      const { startSidecar } = await import("@/lib/sidecars");
+      await startSidecar(id);
+      await waitUntil(() => getSidecar(id)?.status === "crashed");
+      if (how === "unregister") unregisterSidecar(id); else await stopSidecar(id);
+      await sleep(400);
+      expect(getSidecar(id)?.status).toBe(how === "stop" ? "stopped" : undefined as never);
+    }
+  });
+
+  test("Robots off wins over the crash timer and the Repairs Restart button", async () => {
+    const { id } = await owner();
+    const { deviceId } = await createRobotHost({ label: "Rivet", personId: id });
+    await stopRobotHosts();
+    setHouseholdSettingValue("home.robots.enabled", false);
+    const { startSidecar } = await import("@/lib/sidecars");
+    await startSidecar(`robot-host:${deviceId}`);
+    expect(getSidecar(`robot-host:${deviceId}`)?.status).toBe("stopped");
+    expect(robotIssues().filter((i) => !i.resolved_at)).toEqual([]);
+  });
+
+  test("Robots turned off during the release download starts nothing", async () => {
+    const { id } = await owner();
+    const { deviceId } = await createRobotHost({ label: "Rivet", personId: id });
+    await stopRobotHosts();
+    __resetSidecarsForTests();
+    __resetRobotHostsForTests();
+    let release!: (v: { dir: string }) => void;
+    const dir = releases[0]!;
+    __setRobotHostReleaseForTests(() => new Promise((r) => { release = r; }));
+    const starting = startRobotHosts();
+    await sleep(100);
+    setHouseholdSettingValue("home.robots.enabled", false);
+    release({ dir });
+    await starting;
+    expect(getSidecar(`robot-host:${deviceId}`)).toBeUndefined();
+  });
+
+  test("every start of an unpaired host writes a fresh pairing secret, including a crash restart", async () => {
+    const { id } = await owner();
+    const { deviceId } = await createRobotHost({ label: "Rivet", personId: id });
+    const first = readFileSync(join(roots, deviceId, "pairing-secret"), "utf8");
+    await stopRobotHosts();
+    __resetSidecarsForTests();
+    __resetRobotHostsForTests();
+    __setSidecarTimingForTestsOnly({ healthPollMs: 100, backoffMs: [100] });
+    writeFileSync(join(roots, deviceId, "crash-once"), "");
+    await startRobotHosts();
+    const second = readFileSync(join(roots, deviceId, "pairing-secret"), "utf8");
+    expect(second).not.toBe(first);
+    await waitUntil(() => listIssues().some((i) => i.source === `sidecar:robot-host:${deviceId}`));
+    await waitUntil(() => getSidecar(`robot-host:${deviceId}`)?.status === "running");
+    const third = readFileSync(join(roots, deviceId, "pairing-secret"), "utf8");
+    expect(third).not.toBe(second);
+    expect(new Bun.CryptoHasher("sha256").update(third).digest("hex")).toBe(hostJson(deviceId).secretHash!);
+  });
+
+  test("the status page reflects the host: running ok, stopped down, Robots off lists nothing", async () => {
+    const { id } = await owner();
+    const { deviceId } = await createRobotHost({ label: "Rivet", personId: id });
+    const app = listRobotHostStatusApps()[0]!;
+    expect(app.needs).toHaveLength(1);
+    expect(needStates(app, [])[0]!.state).toBe("operational");
+    await stopSidecar(`robot-host:${deviceId}`);
+    expect(needStates(app, [])[0]!.state).toBe("down");
+    setHouseholdSettingValue("home.robots.enabled", false);
+    expect(listRobotHostStatusApps()).toEqual([]);
+  });
+
+  test("host.json is replaced atomically and leaves no temp files", async () => {
+    const { id } = await owner();
+    const { deviceId } = await createRobotHost({ label: "Rivet", personId: id });
+    expect(readdirSync(join(roots, deviceId)).filter((n) => n.endsWith(".tmp"))).toEqual([]);
+    expect(mode(join(roots, deviceId, "host.json"))).toBe(0o600);
+  });
+
+  test("two starts at once run the setup once", async () => {
+    const { id } = await owner();
+    const { deviceId } = await createRobotHost({ label: "Rivet", personId: id });
+    await stopRobotHosts();
+    __resetSidecarsForTests();
+    __resetRobotHostsForTests();
+    let calls = 0;
+    const dir = releases[0]!;
+    __setRobotHostReleaseForTests(async () => { calls++; await sleep(150); return { dir }; });
+    await Promise.all([startRobotHosts(), startRobotHosts()]);
+    expect(calls).toBe(1);
+    expect(getSidecar(`robot-host:${deviceId}`)?.status).toBe("running");
+  });
+
+  test("a leftover Bot app of ours is stopped at start; an unrelated process with a recorded pid is not touched", async () => {
+    const { id } = await owner();
+    const { deviceId, ports } = await createRobotHost({ label: "Rivet", personId: id });
+    await stopRobotHosts();
+    __resetSidecarsForTests();
+    __resetRobotHostsForTests();
+    const stranger = Bun.spawn(["sleep", "30"]);
+    writeFileSync(join(roots, deviceId, "host.pid"), String(stranger.pid));
+    const orphan = Bun.spawn([join(releases[0]!, "bot/bin/maipai-bot-host"), "run", "--data-dir", join(roots, deviceId), "--hub-url", "http://127.0.0.1:1", "--voice-port", String(ports.voice)]);
+    await waitUntil(() => stranger.exitCode === null && orphan.exitCode === null);
+    await sleep(500);
+    // The stranger is recorded first: it must survive; the orphan is not recorded, so it still holds the port and is reported, not killed.
+    await startRobotHosts();
+    expect(stranger.exitCode).toBeNull();
+    expect(orphan.exitCode).toBeNull();
+    expect(robotIssues().filter((i) => !i.resolved_at)).toHaveLength(1);
+    // Now record the orphan: it is ours, so it is stopped and the host starts.
+    writeFileSync(join(roots, deviceId, "host.pid"), String(orphan.pid));
+    expect((await fixIssue(robotIssues().find((i) => !i.resolved_at)!.id)).ok).toBe(true);
+    await orphan.exited;
+    expect(stranger.exitCode).toBeNull();
+    expect(getSidecar(`robot-host:${deviceId}`)?.status).toBe("running");
+    stranger.kill();
+  });
+
+  test("Forget still deletes the device when the directory cannot be removed", async () => {
+    const { client, id } = await owner();
+    const { deviceId } = await createRobotHost({ label: "Rivet", personId: id });
+    await stopRobotHosts();
+    const dir = join(roots, deviceId);
+    chmodSync(dir, 0o500);
+    try {
+      const res = await client.request(`/api/devices/${deviceId}`, { method: "DELETE" });
+      expect(res.status).toBe(200);
+      expect(db.select().from(devices).where(eq(devices.id, deviceId)).get()).toBeUndefined();
+    } finally { chmodSync(dir, 0o700); }
+  });
+});
