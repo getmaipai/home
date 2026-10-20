@@ -46,6 +46,11 @@ describe("settings registry and the spec's areas", () => {
         }
       }
     }
+    // SPEC-ROBOT-TEST-01: a device's own card (areas.json device_cards) places its group on that device's page.
+    for (const c of (getSettingsAreas() as { device_cards?: Card[] }).device_cards ?? []) if (c.group) {
+      const id = `${c.scope}:${c.group}:*`;
+      cards.set(id, (cards.get(id) ?? 0) + 1);
+    }
     for (const key of getRegistry()) {
       // Location keys are drawn by the kit's LocationField, not counted as cards here.
       if (key.level === "expert" || key.selector === "location" || !key.honoured_by.includes("home")) continue;
