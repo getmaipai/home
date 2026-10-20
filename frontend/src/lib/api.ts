@@ -81,6 +81,8 @@ import type {
   TurnErrorDetail,
 } from "@maipai/home-backend/src/wire";
 import { isOwnerOrAdminRole, canHaveTemporaryChatRole } from "@maipai/home-backend/src/wire";
+import type { RobotSelfTestPart, RobotSelfTestResult } from "@maipai/home-backend/src/wire";
+export type { RobotSelfTestPart, RobotSelfTestResult } from "@maipai/home-backend/src/wire";
 import { readTextLines } from "@maipai/spec/streaming/ts/lineReader.js";
 
 // GET /api/people (routes/people.ts) returns toRoster()'s output directly
@@ -901,6 +903,8 @@ export const api = {
   // MOTOR-REBOOT-CARD: an adult's answer to the robot's offer to restart a latched motor. Only "yes" sends a command.
   answerMotorReboot: (id: string, answer: "yes" | "no") =>
     request<unknown>(`/api/devices/${encodeURIComponent(id)}/motor-reboot`, { method: "POST", body: JSON.stringify({ answer }) }),
+  robotSelfTest: (id: string, part: RobotSelfTestPart) =>
+    request<RobotSelfTestResult>(`/api/devices/${encodeURIComponent(id)}/self-test`, { method: "POST", body: JSON.stringify({ part }) }),
   // LIVE-VIEW-01: open and close the hub's live view of one robot's camera. `stream` is the
   // hub's own multipart JPEG route; the browser shows it in an image and closing it stops the view.
   startRobotLiveView: (id: string) =>

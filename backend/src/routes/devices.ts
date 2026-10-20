@@ -25,6 +25,9 @@ import { listHubEndpoints } from "@/lib/hubEndpoints";
 import { getHubInstanceId } from "@/lib/hubIdentity";
 import { getHouseholdSettingValue } from "@/lib/settings";
 import { listRobotPeople } from "@/lib/robotPeople";
+import { acceptRobotSelfTestResult, startRobotSelfTest } from "@/lib/robotSelfTestRuns";
+import { robotSelfTestPartsFor } from "@/wire";
+import { RobotSelfTestResult } from "@maipai/spec/gen/ts/robot-self-test-result.js";
 
 export const devicesRoutes = apiRouter();
 
@@ -131,6 +134,54 @@ devicesRoutes.openapi(updateMyStateRoute, (c) => {
   recordRobotSocketAddress(c, device.id);
   upsertDeviceState(device.id, c.req.valid("json"));
   return c.body(null, 204);
+});
+
+const selfTestResultRoute = createRoute({
+  method: "post", path: "/me/self-test/{run_id}", tags: ["Devices"],
+  summary: "Return one part self-test result to the waiting hub request",
+  middleware: [requireDeviceSession("robot")] as const,
+  request: { params: z.object({ run_id: z.string().min(1).max(64) }), body: { content: { "application/json": { schema: RobotSelfTestResult } } } },
+  responses: { 204: { description: "Result accepted." }, ...errorResponses({ 400: "Invalid result", 401: "Not signed in", 403: "Not a robot device", 404: "Unknown or expired test" }) },
+});
+devicesRoutes.openapi(selfTestResultRoute, (c) => {
+  const result = c.req.valid("json");
+  if (result.run_id !== c.req.valid("param").run_id) return c.json({ error: "Unknown or expired test" }, 404);
+  const accepted = acceptRobotSelfTestResult(c.get("deviceId"), result);
+  if (accepted === "invalid") return c.json({ error: "Invalid result" }, 400);
+  if (accepted === "unknown") return c.json({ error: "Unknown or expired test" }, 404);
+  return c.body(null, 204);
+});
+
+const selfTestRoute = createRoute({
+  method: "post", path: "/{id}/self-test", tags: ["Devices"],
+  summary: "Test one reported part of a paired robot",
+  middleware: [requireRole("owner", "admin")] as const,
+  request: { params: idParamSchema("id", "device-a1b2c3"), body: { content: { "application/json": { schema: z.object({ part: z.enum(["speaker", "face", "head", "lights", "mic"]) }) } } } },
+  responses: {
+    200: { content: { "application/json": { schema: RobotSelfTestResult } }, description: "The robot's pass or fail result." },
+    ...errorResponses({ 400: "Part was not reported", 403: "Admin only", 404: "No such robot" }),
+    409: { content: { "application/json": { schema: z.object({ code: z.literal("robot_offline"), lastSeenAt: z.string().nullable(), error: z.string() }) } }, description: "The robot is not reachable." },
+    504: { content: { "application/json": { schema: z.object({ code: z.literal("robot_no_answer"), error: z.string() }) } }, description: "The robot did not answer before the test timed out." },
+  },
+});
+devicesRoutes.openapi(selfTestRoute, async (c) => {
+  const actor = c.get("person");
+  const { id } = c.req.valid("param");
+  const device = getDeviceById(id);
+  if (!device || (device.personId !== actor.id && actor.role !== "owner" && actor.role !== "admin")) return c.json({ error: "No such robot" }, 404);
+  if (device.kind !== "robot") return c.json({ error: "No such robot" }, 404);
+  const { part } = c.req.valid("json");
+  if (!robotSelfTestPartsFor(device).includes(part)) return c.json({ error: "This robot did not report that part." }, 400);
+  const state = getDeviceState(device.id);
+  if (!state?.reachable) {
+    const lastSeenAt = state?.unreachableSince ?? device.lastSeenAt;
+    // The clock time is left to the page, which knows the viewer's time zone.
+    return c.json({ code: "robot_offline" as const, lastSeenAt, error: "This robot is offline. Check that it is on and on your Wi-Fi, then try again." }, 409);
+  }
+  const run = startRobotSelfTest(device.id, part);
+  const result = await run.result;
+  if (!result) return c.json({ code: "robot_no_answer" as const, error: "The robot did not answer the test. Restart it, then try again." }, 504);
+  return c.json(result, 200);
 });
 
 const PatchDeviceSchema = z.object({

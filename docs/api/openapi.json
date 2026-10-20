@@ -27844,6 +27844,294 @@
         }
       }
     },
+    "/api/devices/me/self-test/{run_id}": {
+      "post": {
+        "tags": [
+          "Devices"
+        ],
+        "summary": "Return one part self-test result to the waiting hub request",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 64
+            },
+            "required": true,
+            "name": "run_id",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "run_id": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 64
+                  },
+                  "part": {
+                    "type": "string",
+                    "enum": [
+                      "speaker",
+                      "face",
+                      "head",
+                      "lights",
+                      "mic"
+                    ]
+                  },
+                  "ok": {
+                    "type": "boolean"
+                  },
+                  "detail": {
+                    "type": "string",
+                    "maxLength": 200
+                  },
+                  "took_ms": {
+                    "type": "integer",
+                    "minimum": 0
+                  }
+                },
+                "required": [
+                  "run_id",
+                  "part",
+                  "ok",
+                  "detail",
+                  "took_ms"
+                ],
+                "additionalProperties": false,
+                "description": "Device-to-hub answer to self_test. detail is plain words, never audio, a transcript or an image."
+              }
+            }
+          }
+        },
+        "responses": {
+          "204": {
+            "description": "Result accepted."
+          },
+          "400": {
+            "description": "Invalid result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not a robot device",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Unknown or expired test",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/devices/{id}/self-test": {
+      "post": {
+        "tags": [
+          "Devices"
+        ],
+        "summary": "Test one reported part of a paired robot",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "device-a1b2c3"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "part": {
+                    "type": "string",
+                    "enum": [
+                      "speaker",
+                      "face",
+                      "head",
+                      "lights",
+                      "mic"
+                    ]
+                  }
+                },
+                "required": [
+                  "part"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The robot's pass or fail result.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "run_id": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 64
+                    },
+                    "part": {
+                      "type": "string",
+                      "enum": [
+                        "speaker",
+                        "face",
+                        "head",
+                        "lights",
+                        "mic"
+                      ]
+                    },
+                    "ok": {
+                      "type": "boolean"
+                    },
+                    "detail": {
+                      "type": "string",
+                      "maxLength": 200
+                    },
+                    "took_ms": {
+                      "type": "integer",
+                      "minimum": 0
+                    }
+                  },
+                  "required": [
+                    "run_id",
+                    "part",
+                    "ok",
+                    "detail",
+                    "took_ms"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Device-to-hub answer to self_test. detail is plain words, never audio, a transcript or an image."
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Part was not reported",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Admin only",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such robot",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The robot is not reachable.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "robot_offline"
+                      ]
+                    },
+                    "lastSeenAt": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "error": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "code",
+                    "lastSeenAt",
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "504": {
+            "description": "The robot did not answer before the test timed out.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "robot_no_answer"
+                      ]
+                    },
+                    "error": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "code",
+                    "error"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/devices/{id}": {
       "patch": {
         "tags": [

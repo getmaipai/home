@@ -409,6 +409,18 @@ function inboundConnections(): PrivacyConnection[] {
       direction: "inbound",
     },
     {
+      id: "platform:robot-self-tests",
+      source: "MaiPai Home",
+      sourceKind: "platform",
+      destination: "your own network only - nothing leaves the house for this row",
+      when: "when an admin tests a reported part of a paired robot",
+      what: "Robot tests: an admin can ask a paired robot to say a fixed line, show its faces, move its head, light up or listen for 3 seconds. Only a pass or fail line comes back: never audio, words heard or pictures.",
+      who: "the paired robot and the admin who started the test",
+      optIn: true,
+      retention: "the result is held in memory for up to 10 minutes and is never written to the database",
+      direction: "outbound",
+    },
+    {
       id: "platform:inbound-api",
       source: "MaiPai Home",
       sourceKind: "platform",

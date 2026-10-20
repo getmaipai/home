@@ -93,6 +93,7 @@ describe("robotSessionMayReach", () => {
     expect(robotSessionMayReach("GET", "/api/devices/me/assets/example-model")).toBe(true);
     expect(robotSessionMayReach("GET", "/api/devices/me/events")).toBe(true);
     expect(robotSessionMayReach("GET", "/api/devices/me/people")).toBe(true);
+    expect(robotSessionMayReach("POST", "/api/devices/me/self-test/run-1")).toBe(true);
   });
 
   test("refuses lookalikes and siblings", () => {
@@ -105,6 +106,8 @@ describe("robotSessionMayReach", () => {
     expect(robotSessionMayReach("POST", "/api/devices/me/events")).toBe(false);
     expect(robotSessionMayReach("POST", "/api/devices/me/people")).toBe(false);
     expect(robotSessionMayReach("GET", "/api/devices/me/people/x")).toBe(false);
+    expect(robotSessionMayReach("POST", "/api/devices/me/self-test/a/b")).toBe(false);
+    expect(robotSessionMayReach("POST", "/api/devices/robot-1/self-test")).toBe(false);
     expect(robotSessionMayReach("PUT", "/api/devices/me/state/../../people")).toBe(false);
   });
 });

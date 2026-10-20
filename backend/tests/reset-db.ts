@@ -6,6 +6,7 @@ import { dataDir } from "@/lib/paths";
 import { __resetSettingsCacheForTests } from "@/lib/settings";
 import { quietHoursAwayFromNow } from "./support/quietHours";
 import { __resetDeviceCommandsForTests } from "@/lib/deviceCommands";
+import { __resetRobotSelfTestsForTests } from "@/lib/robotSelfTestRuns";
 import { __resetCommandsCacheForTests } from "@/lib/commands";
 import { __resetTurnActivityForTests } from "@/lib/turnActivity";
 import { __resetOutputNotificationsForTests } from "@/lib/turnShared";
@@ -140,6 +141,7 @@ function assertDisposableTestDataDir(): void {
 export function resetDb(): void {
   assertDisposableTestDataDir();
   __resetDeviceCommandsForTests();
+  __resetRobotSelfTestsForTests();
   __resetServiceHealthForTests();
   db.delete(approvals).run();
   db.delete(setupState).run();

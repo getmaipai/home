@@ -15,6 +15,9 @@ import { SettingsRenderer } from "@/shell/pages/settings/SettingsRenderer";
 import areasFile from "@maipai/spec/settings/areas.json";
 import { api, isOwnerOrAdminRole } from "@/lib/api";
 import type { Role } from "@maipai/ui/src/settings/settingsAudience";
+import { robotSelfTestPartsFor, type RobotSelfTestPart } from "@maipai/home-backend/src/wire";
+import type { RobotSelfTestResult } from "@maipai/home-backend/src/wire";
+import { Alert, AlertDescription } from "@maipai/ui/src/ui/alert";
 
 const ACTIVITY_LABELS: Record<RobotDeviceState["activity"], string> = {
   starting: "Starting up",
@@ -106,6 +109,23 @@ export function RobotBody({
   const [area, setArea] = useState(device.area ?? "");
   const [saveBusy, setSaveBusy] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
+  const [selfTests, setSelfTests] = useState<Partial<Record<RobotSelfTestPart, RobotSelfTestResult | { kind: "offline" | "timeout" | "error"; message: string }>>>({});
+  const [selfTestBusy, setSelfTestBusy] = useState<RobotSelfTestPart | null>(null);
+  async function runSelfTest(part: RobotSelfTestPart): Promise<void> {
+    setSelfTestBusy(part);
+    setSelfTests((previous) => ({ ...previous, [part]: undefined }));
+    try {
+      const result = await api.robotSelfTest(device.id, part);
+      setSelfTests((previous) => ({ ...previous, [part]: result }));
+    } catch (error) {
+      const apiError = error instanceof ApiError ? error : null;
+      setSelfTests((previous) => ({ ...previous, [part]: apiError?.status === 409
+        ? { kind: "offline", message: apiError.message }
+        : apiError?.status === 504
+          ? { kind: "timeout", message: apiError.message }
+          : { kind: "error", message: apiError?.message ?? "Could not test that part. Reload the page and try again." } }));
+    } finally { setSelfTestBusy(null); }
+  }
   const cards = useMemo(() => ((areasFile as { device_cards?: Array<{ device_kind: string; group: string; scope: "device"; label: string; min_role?: string }> }).device_cards ?? []).filter((card) => card.device_kind === "robot" && card.scope === "device" && (!card.min_role || card.min_role === "admin" || card.min_role === "owner")), []);
   async function saveIdentity(): Promise<void> {
     setSaveBusy(true);
@@ -250,6 +270,23 @@ export function RobotBody({
             <Row label="Body software">{state.daemon_version ?? "Unknown"}</Row>
           </dl>
         )}
+        {admin ? (
+          <div className="mt-4" data-testid="robot-self-tests">
+            <p className="text-base font-medium">Test this robot</p>
+            <div className="mt-2 flex flex-wrap gap-2">
+              {robotSelfTestPartsFor(device).map((part) => {
+                const label: Record<RobotSelfTestPart, string> = { speaker: "Speaker", face: "Face", head: "Head", lights: "Lights", mic: "Microphone" };
+                const result = selfTests[part];
+                return <div key={part}>
+                  <Button variant="outline" disabled={unreachable || selfTestBusy !== null} onClick={() => void runSelfTest(part)}>{selfTestBusy === part ? "Testing…" : label[part]}</Button>
+                  {result && "ok" in result ? <p className="mt-1 text-sm"><Badge variant={result.ok ? "secondary" : "destructive"}>{result.ok ? "Passed" : "Failed"}</Badge> {result.detail} ({result.took_ms} ms)</p> : null}
+                  {result && "kind" in result && result.kind === "offline" ? <p className="mt-1 text-sm text-muted-foreground">{result.message}</p> : null}
+                  {result && "kind" in result && (result.kind === "timeout" || result.kind === "error") ? <Alert variant="destructive"><AlertDescription>{result.message}</AlertDescription></Alert> : null}
+                </div>;
+              })}
+            </div>
+          </div>
+        ) : null}
         {rebootOffer.length > 0 ? (
           <div className="mt-4 flex flex-col gap-2" data-testid="motor-reboot-offer">
             <p className="text-base font-medium">

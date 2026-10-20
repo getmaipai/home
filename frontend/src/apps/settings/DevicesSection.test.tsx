@@ -128,6 +128,27 @@ describe("DevicesSection", () => {
     } finally { restore(); }
   });
 
+  test("robot self tests show only reported parts, disable offline, and render pass and timeout results", async () => {
+    const original = globalThis.fetch;
+    globalThis.fetch = mock((_input: RequestInfo | URL, init?: RequestInit) => {
+      const body = JSON.parse(String(init?.body ?? "{}")) as { part?: string };
+      if (body.part === "speaker") return Promise.resolve(Response.json({ run_id: "r1", part: "speaker", ok: true, detail: "Clear sound", took_ms: 10 }));
+      return Promise.resolve(new Response(JSON.stringify({ code: "robot_no_answer", error: "The robot did not answer the test. Restart it, then try again." }), { status: 504 }));
+    }) as unknown as typeof fetch;
+    try {
+      const view = render(<Card><RobotBody device={device({ id: "robot-test", kind: "robot", capabilities: ["speaker", "head_pan_tilt"], state: { activity: "idle", muted: false, tracking: false, reachable: true, unreachableSince: null } })} viewerRole="admin" onRemove={() => {}} confirmingRemove={false} onConfirmRemove={() => {}} onCancelRemove={() => {}} busy={false} onSetMuted={async () => {}} onStartLiveView={async () => ({ view_id: "v", stream: "" })} onStopLiveView={async () => {}} onAnswerMotorReboot={async () => {}} /></Card>);
+      expect(view.queryByRole("button", { name: "Face" })).toBeNull();
+      fireEvent.click(view.getByRole("button", { name: "Speaker" }));
+      await view.findByText("Passed");
+      fireEvent.click(view.getByRole("button", { name: "Head" }));
+      await view.findByRole("alert");
+
+      cleanup();
+      const offline = render(<Card><RobotBody device={device({ id: "robot-offline", kind: "robot", capabilities: ["speaker"], state: { activity: "idle", muted: false, tracking: false, reachable: false, unreachableSince: "2026-10-20T10:00:00Z" } })} viewerRole="admin" onRemove={() => {}} confirmingRemove={false} onConfirmRemove={() => {}} onCancelRemove={() => {}} busy={false} onSetMuted={async () => {}} onStartLiveView={async () => ({ view_id: "v", stream: "" })} onStopLiveView={async () => {}} onAnswerMotorReboot={async () => {}} /></Card>);
+      expect((offline.getByRole("button", { name: "Speaker" }) as HTMLButtonElement).disabled).toBe(true);
+    } finally { globalThis.fetch = original; }
+  });
+
   test("saving robot name calls the device PATCH route", async () => {
     const calls: unknown[] = [];
     const restore = settingsFetch(false, calls);

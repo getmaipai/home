@@ -131,6 +131,7 @@ export function issueDeviceCommand(
   deviceId: string,
   kind: DeviceCommandKind,
   payload: DeviceCommandPayload,
+  expiresInMs = DEVICE_COMMAND_RETENTION_MS,
 ): DeviceCommandShape {
   pruneOldCommands();
   const issuedAt = new Date().toISOString();
@@ -141,7 +142,7 @@ export function issueDeviceCommand(
     kind,
     payload,
     issued_at: issuedAt,
-    expires_at: new Date(Date.parse(issuedAt) + DEVICE_COMMAND_RETENTION_MS).toISOString(),
+    expires_at: new Date(Date.parse(issuedAt) + expiresInMs).toISOString(),
     hlc,
   }) as DeviceCommandShape;
   db.insert(deviceCommands).values({

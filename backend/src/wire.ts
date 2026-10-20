@@ -13,6 +13,9 @@ import type { conversationTurns, conversations } from "./db/schema";
 export type { HardwareInfo, CudaDevice } from "./lib/hardware";
 // APP-SET-02: what a child or teen saw in Settings before the per-app areas.
 export { minorVisibleSettingKeys } from "./lib/settingsMinorSnapshot";
+export { ROBOT_SELF_TEST_PARTS, robotSelfTestPartsFor } from "./lib/robotSelfTest";
+export type { RobotSelfTestPart } from "./lib/robotSelfTest";
+export type { RobotSelfTestResult } from "@maipai/spec/gen/ts/robot-self-test-result.js";
 
 // The wire shapes a browser client needs, kept alias-free (relative
 // imports only, never "@/...") so frontend/src/lib/api.ts can import this
