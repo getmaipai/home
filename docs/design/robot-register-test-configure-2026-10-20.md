@@ -74,6 +74,28 @@ see nothing new.
   what it erases.
 - Quiet hours stay household and person keys; the robot's settings link to them rather than copying them (principle 4).
 
+## 4. Voice and what an admin sees (owner ask, 2026-10-20)
+
+Jesse asked to assign a robot things like its name and voice and to see its info: online, IP address and the like.
+
+- **Info (in DEVICES-02).** The robot card already shows online or not responding, last heard from, capability badges, battery,
+  MaiPai version and body software (`RobotBody.tsx`). DEVICES-02 adds one admin-only `Row label="IP address"` to that card's
+  existing `<dl>`, nothing else. The address is the socket address of the robot's last signed-in request (`getConnInfo`, never a
+  forwarded header), kept in memory beside the robot state, never written to the database; after a hub restart it appears once the
+  robot next checks in. A home-network address shown only to an admin; nothing leaves the home.
+- **Voice (three later slices, after DEVICES-02).**
+  1. UI-SETTINGS-OPTIONS-01 (commons `ui`): the kit settings renderer and shell take runtime options for a key whose range is
+     `options_from`, through a prop, so a `select` with fetched options draws in the kit field part. No Home-side picker.
+  2. SPEC-ROBOT-VOICE-01 (commons `spec`): device key `robot.voice.id`, group `robot.hello`, `select`, `range.options_from:
+     "voices.tts"`, default `default`, label "Voice", honoured by home.
+  3. ROBOT-VOICE-01 (home): `options_from: "voices.tts"` resolves to the one voice list `tts.voice_id` uses, in backend validation
+     and in the options passed to the renderer. `POST /api/tts` on a robot device session speaks with the device's `robot.voice.id`
+     when it is not `default`. Child floor: when the robot's person is a child, a non-preset voice is ignored and today's voice is
+     used, the same rule `settings.ts` applies to `tts.voice_id`; a fail-first test proves it.
+     Supersedes: `routes/tts.ts` choosing the voice only from the person's `tts.voice_id` (a robot session now checks its device
+     key first).
+  No bot or firmware change for voice: the robot already speaks through `POST /api/tts`.
+
 ## Kit Elements and parts (rule 9)
 
 `card`, `button`, `badge` (pass, fail, no answer), `dialog` (settings, forget), the kit settings shell and its field parts, `input`
@@ -85,9 +107,12 @@ see nothing new.
 |---|---|---|---|
 | SPEC-ROBOT-TEST-01 | commons | S | `no_vendor_login` capability, `self_test` command, `robot-self-test-result` record, the `robot.hello` device card in `areas.json`, spec tag |
 | ROBOT-PAIR-02 | home | S, T2 (auth) | the spec pin |
-| DEVICES-02 | home | M | the spec pin (the areas card) |
+| DEVICES-02 | home | M | the spec pin; name, area, the settings card, the admin IP row |
 | ROBOT-TEST-01 | home | M | the spec pin |
 | BOT-SELF-TEST-01 | bot | M | the spec pin; the StackChan profile declares `no_vendor_login`; StackChan and Reachy answer `self_test` |
+| UI-SETTINGS-OPTIONS-01 | commons | S | runtime options for `options_from` keys in the kit settings renderer, ui tag |
+| SPEC-ROBOT-VOICE-01 | commons | S | UI-SETTINGS-OPTIONS-01; the `robot.voice.id` device key, spec tag |
+| ROBOT-VOICE-01 | home | M | both tags; voice list resolution, `/api/tts` on a robot session, child floor test |
 | ROBOT-BODY-JOIN-01 | bot, home | later | its own note |
 
 ## Reuse check (principle 6)
@@ -102,11 +127,18 @@ see nothing new.
   StackChan-only controls; Home must not learn a vendor name and needs the admin gate.
 - **A shipped diagnostics or self-test component:** none in the kit registry or the shadcn dashboard pages fits a per-part
   pass or fail list; the `card`, `button`, `badge` and `alert` Elements cover it.
+- **`VoiceBrowserSection.tsx` (the person voice picker):** weighed for `robot.voice.id` and not reused. It is a Home-side picker
+  outside the settings shell, which S4 rules out for a device card; its voice list is reused as the one `voices.tts` source.
+- **`lib/robotClips.ts` `adultVoice`:** ROBOT-VOICE-01 routes it and `routes/tts.ts` through one voice-choosing function, so a
+  robot's clips and its live speech use the same voice. Order on a robot session: a turn's companion voice (COMP-04) first, then
+  `robot.voice.id` when not `default`, then the person's `tts.voice_id`; the child floor applies to the result.
 
 ## Supersedes
 
 - [devices-and-robot-link-2026-10-17.md](devices-and-robot-link-2026-10-17.md) section 2's robot pairing step, as built in
   ROBOT-DEVICE-01: the redeem gate refusing every robot with an unrotated password. It now follows `no_vendor_login`.
+- `routes/tts.ts` choosing the voice only from the person's `tts.voice_id` (ROBOT-VOICE-01): a robot session checks its device
+  key `robot.voice.id` first.
 - The same note's section 3 "A robot's settings" wording and its slice 4, DEVICES-02 (S). DEVICES-02 is cut here as an M row.
 
 ## Legacy verdicts (rule 8)
