@@ -136,6 +136,23 @@ test("Created by you lists visible made tracks newest first, excludes another pe
   db.update(mediaItems).set({ locFileId: recent.value.id }).where(eq(mediaItems.id, id(1))).run();
   expect(rows(atlas, "songs", undefined, "made").map((row) => row.id)).toEqual([old.value.id]);
 });
+test("playing a visible made Library song promotes it into the shared media queue without a household root", () => {
+  // A fresh hub may not have a household library root. Promotion can use the person's own root.
+  db.delete(mediaItems).where(eq(mediaItems.sourceId, "msrc-music000001")).run();
+  db.delete(mediaSources).where(eq(mediaSources.id, "msrc-music000001")).run();
+  const made = storeFile(atlas, { conversationId: null, turnId: null, mediaType: "audio/mp4", bytes: new Uint8Array([8, 7, 6]), provenance: 'music-gen:{"title":"Queue me","duration_seconds":27}', deduplicate: false });
+  if (!made.ok) throw new Error(made.error);
+  const pageRows = rows(atlas, "songs", undefined, "made");
+  expect(pageRows.map((row) => row.id)).toContain(made.value.id);
+  // This is the page's play action: it posts the made row's id to the ordinary track queue action.
+  expect(startMusicQueue(atlas, { mode: "track", id: made.value.id }).ok).toBe(true);
+  const queue = resolveCollection(atlas.id, "queue")!;
+  expect(queue.items).toHaveLength(1);
+  expect(queue.items[0]!.media_id).not.toBe(made.value.id);
+  expect(mediaAppData(atlas, "music", "item", { id: queue.items[0]!.media_id })).toMatchObject({ src: `/api/media/items/${queue.items[0]!.media_id}/content` });
+  expect(startMusicQueue(atlas, { mode: "track", id: made.value.id }).ok).toBe(true);
+  expect(db.select().from(mediaItems).where(eq(mediaItems.locFileId, made.value.id)).all()).toHaveLength(1);
+});
 test("a child cannot see an adult-only made track", () => {
   const adultOnly = storeFile(atlas, { conversationId: null, turnId: null, mediaType: "audio/mp4", bytes: new Uint8Array([9, 9, 9]), provenance: 'music-gen:{"title":"Adults only","audience":"adult-only"}', deduplicate: false });
   if (!adultOnly.ok) throw new Error(adultOnly.error);

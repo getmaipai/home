@@ -19,6 +19,7 @@ import { allowedBandsFor, bandAllows, mediaBandOf, trips } from "./band";
 import { addItem, createCollection, removeItemFrom, resolveCollection, listCollections, setItems, setPointer } from "./collections";
 import { itemFromRow, sourceFromRow, type MediaCollection, type MediaItem, type MediaSource } from "./model";
 import { correctedStamp, getProgress, getProgressMany, percentOf, recentProgress, writeProgress } from "./progress";
+import { nextHlc } from "@/lib/hlc";
 
 import { albumKey, artistKey, albumOrder, groupTracks, radioTracks, shuffled } from "./music";
 
@@ -666,6 +667,42 @@ function musicLibrary(person: PersonRow): MediaItem[] {
   // No page-sized cap before grouping: every readable track belongs to its derived album.
   return queryItems(person, "music", { all: true, order: [sql`lower(${mediaItems.title})`] });
 }
+
+/** Turn a visible generated Library audio file into the shared media record used by Music queues.
+ * The file visibility check is delegated to madeFileFor. A person's own root is valid when the
+ * fresh hub has no household root; readableIn still applies the ordinary source and band gates. */
+function promoteMadeMusicFile(person: PersonRow, fileId: string): MediaItem | null {
+  const file = madeFileFor(person, "music", fileId);
+  if (!file) return null;
+  const existing = db.select().from(mediaItems).where(eq(mediaItems.locFileId, file.id)).get();
+  if (existing) return readableIn(person, "music", existing.id);
+  const roots = allowedSources(person).filter((candidate) => candidate.kind === "root");
+  // Reuse only a root the person can actually read items from (its `visible_to` is the household or names them).
+  const readable = (candidate: MediaSource): boolean => candidate.visible_to === "household" || (Array.isArray(candidate.visible_to) && candidate.visible_to.includes(person.id));
+  let source = roots.find((candidate) => candidate.scope === "household" && readable(candidate))
+    ?? roots.find((candidate) => candidate.scope === "person" && candidate.owner_person_id === person.id && readable(candidate));
+  if (!source) {
+    // Generated Library files exist before a household has configured any scanned media roots.
+    // Give this person's generated tracks a normal, private root so all later reads use the same gate.
+    const sourceId = `msrc-made-${person.id}`;
+    const now = new Date().toISOString();
+    db.insert(mediaSources).values({
+      id: sourceId, kind: "root", scope: "person", ownerPersonId: person.id,
+      label: "Created by you", visibleTo: JSON.stringify([person.id]), createdAt: now,
+      hlc: nextHlc(), provenance: "music:generated-library",
+    }).run();
+    source = allowedSources(person).find((candidate) => candidate.id === sourceId);
+  }
+  if (!source) return null;
+  const now = new Date().toISOString();
+  const id = `media-${crypto.randomUUID().replace(/-/g, "")}`;
+  db.insert(mediaItems).values({
+    id, kind: "track", title: file.name, sourceId: source.id, locFileId: file.id, mediaType: file.media_type,
+    durationS: file.duration_seconds, size: file.size_bytes, playable: "original", bandOk: file.audience === "adult-only" ? "adult" : "child",
+    addedAt: file.created_at, createdAt: now, hlc: nextHlc(), provenance: "music:generated-library",
+  }).run();
+  return readableIn(person, "music", id);
+}
 function musicNext(person: PersonRow, id: string): MediaItem[] {
   const queue = resolveCollection(person.id, "queue");
   const index = queue?.items.findIndex((entry) => entry.media_id === id) ?? -1;
@@ -824,13 +861,14 @@ export function startMusicQueue(person: PersonRow, args: Record<string, unknown>
     const collection = resolveCollection(person.id, id);
     if (collection?.kind === "playlist") tracks = playlistTracks(person, collection);
   } else {
-    const item = library.find((item) => item.id === id);
+    const item = library.find((item) => item.id === id) ?? (id ? promoteMadeMusicFile(person, id) : null);
     if (item) {
       const current = resolveCollection(person.id, "queue")!;
-      const index = current.items.findIndex((entry) => entry.media_id === id);
-      if (index >= 0) { setPointer(current, index); return { ok: true, value: { id } }; }
-      tracks = albumOrder(library.filter((candidate) => albumKey(candidate) === albumKey(item)));
-      tracks = tracks.slice(tracks.findIndex((candidate) => candidate.id === id));
+      const index = current.items.findIndex((entry) => entry.media_id === item.id);
+      if (index >= 0) { setPointer(current, index); return { ok: true, value: { id: item.id } }; }
+      const currentLibrary = library.some((candidate) => candidate.id === item.id) ? library : [...library, item];
+      tracks = albumOrder(currentLibrary.filter((candidate) => albumKey(candidate) === albumKey(item)));
+      tracks = tracks.slice(tracks.findIndex((candidate) => candidate.id === item.id));
     }
   }
   if (shuffle) tracks = shuffled(tracks);
