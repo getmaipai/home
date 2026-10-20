@@ -1,24 +1,40 @@
 // Robot app releases are pinned by a Home release in botReleasePin.json.
+// ensureBotRelease downloads the asset for this platform, checks its sha256 (and the signed SHA256SUMS when the pin carries
+// signing keys), lists and extracts it into a staging dir, walks the tree on disk, then renames it to
+// releases/<version>-<platform>/ with a .verified marker holding the sha256. The on-disk walk is the real link guard.
 import { createHash } from "node:crypto";
-import { createWriteStream, existsSync, mkdirSync, readdirSync, rmSync, writeFileSync } from "node:fs";
-import { join, resolve } from "node:path";
-import { pipeline } from "node:stream/promises";
-import { Readable } from "node:stream";
+import { existsSync, lstatSync, mkdirSync, readdirSync, readFileSync, realpathSync, renameSync, rmSync, writeFileSync } from "node:fs";
+import { basename, join, sep } from "node:path";
+import { open, type FileHandle } from "node:fs/promises";
 import pin from "./botReleasePin.json";
+import { setRobotReleaseInstall } from "@/lib/installStatus";
 import { dataDir } from "@/lib/paths";
 import { tryConsume } from "@/lib/rateLimiter";
 import { verifyEnvelopeSignature, type SignedEnvelope } from "@/lib/storeIndex";
-import { setRobotReleaseInstall } from "@/lib/installStatus";
 
 export interface BotReleasePin {
   version: string;
   repo: string;
-  assets: Record<string, { name: string; sha256: string } | null>;
-  signing_keys: string[];
+  assets: Record<string, { name: string; sha256: string; size?: number } | null>;
+  signing_keys?: string[];
 }
 export type BotReleaseFetch = (input: string | URL | Request, init?: RequestInit) => Promise<Response>;
-// One token per install attempt (not per file), so a signed download still counts once.
+type ReleaseOptions = { dataDir?: string; fetch?: BotReleaseFetch; pin?: BotReleasePin };
+type Release = { dir: string; version: string };
+
 const GITHUB_RATE = { capacity: 5, refillPerSecond: 1 / 600 };
+const HEADER_TIMEOUT_MS = 30_000;
+const IDLE_TIMEOUT_MS = 60_000;
+const DEFAULT_MAX_BYTES = 1024 * 1024 * 1024;
+
+const NETWORK_ERROR = "Home couldn't download the robot app (the connection timed out or failed). Check the internet connection, then try again.";
+const damaged = (name: string) => `The robot app download looks damaged (${name}). Try again; if it keeps failing, update Home.`;
+const tooLarge = (name: string) => `The robot app download is too large (${name}). Try again; if it keeps failing, update Home.`;
+const UNSAFE_PATH = "The robot app download contains an unsafe path. Try again; if it keeps failing, update Home.";
+const UNSUPPORTED_LINK = "The robot app download contains an unsupported link. Try again; if it keeps failing, update Home.";
+const OUTSIDE_LINK = "The robot app download contains a link outside the release directory. Try again; if it keeps failing, update Home.";
+const UNSUPPORTED_FILE = "The robot app download contains an unsupported file. Try again; if it keeps failing, update Home.";
+
 let fetchOverride: BotReleaseFetch | null = null;
 let pinOverride: BotReleasePin | null = null;
 export function __setBotReleaseForTests(options: { fetch?: BotReleaseFetch | null; pin?: BotReleasePin | null }): void {
@@ -26,7 +42,7 @@ export function __setBotReleaseForTests(options: { fetch?: BotReleaseFetch | nul
   pinOverride = options.pin ?? null;
 }
 export function hasBotReleaseAssets(): boolean {
-  const selected = pinOverride ?? pin as BotReleasePin;
+  const selected = pinOverride ?? (pin as BotReleasePin);
   return Object.values(selected.assets ?? {}).some(Boolean);
 }
 
@@ -36,24 +52,142 @@ function platformKey(): string {
   return `${os}-${arch}`;
 }
 
-function safeTarEntries(text: string, root: string): void {
-  for (const raw of text.split("\n").filter(Boolean)) {
-    const name = raw.replace(/\\/g, "/");
-    if (name.startsWith("/") || /^[A-Za-z]:/.test(name) || name.split("/").includes("..")) throw new Error("archive contains a path outside the release directory");
-    const target = resolve(root, name);
-    if (target !== root && !target.startsWith(`${root}/`)) throw new Error("archive contains a path outside the release directory");
-  }
-}
+/** An error whose message is already written for the person; the outer catch passes it through unchanged. */
+class ReleaseError extends Error {}
 
-async function runTar(args: string[]): Promise<string> {
-  const proc = Bun.spawn(["tar", ...args], { stdout: "pipe", stderr: "pipe" });
-  const [out, err, code] = await Promise.all([new Response(proc.stdout).text(), new Response(proc.stderr).text(), proc.exited]);
-  if (code !== 0) throw new Error(err || "could not unpack the robot app");
+async function runTar(args: string[], name: string): Promise<string> {
+  let out = "";
+  let code = 1;
+  try {
+    const proc = Bun.spawn(["tar", ...args], { stdout: "pipe", stderr: "pipe" });
+    [out, , code] = await Promise.all([new Response(proc.stdout).text(), new Response(proc.stderr).text(), proc.exited]);
+  } catch {
+    throw new ReleaseError(damaged(name));
+  }
+  if (code !== 0) throw new ReleaseError(damaged(name));
   return out;
 }
 
-async function fetchWithTimeout(fetcher: BotReleaseFetch, url: string): Promise<Response> {
-  return fetcher(url, { signal: AbortSignal.timeout(30_000) });
+function assertSafeNames(listing: string): void {
+  for (const raw of listing.split("\n").filter(Boolean)) {
+    const name = raw.replace(/\\/g, "/");
+    if (name.startsWith("/") || /^[A-Za-z]:/.test(name) || name.split("/").includes("..")) throw new ReleaseError(UNSAFE_PATH);
+  }
+}
+
+function assertNoHardlinks(verboseListing: string): void {
+  // GNU tar and bsdtar both start a hardlink line with "h" in a verbose listing (and bsdtar also prints "link to").
+  // Symlinks are checked on disk after extraction, so this only refuses hardlinks.
+  for (const line of verboseListing.split("\n")) if (line.startsWith("h")) throw new ReleaseError(UNSUPPORTED_LINK);
+}
+
+/**
+ * Walks the extracted tree with lstat: only directories, regular files and links whose real path (followed the way the
+ * kernel follows it, so chains like `d -> .` then `e -> d/../x` are caught) stays inside the root. A dangling link is refused.
+ */
+function inspectTree(root: string): void {
+  const rootReal = realpathSync(root);
+  const visit = (dir: string) => {
+    for (const name of readdirSync(dir)) {
+      const path = join(dir, name);
+      const stat = lstatSync(path);
+      if (stat.isSymbolicLink()) {
+        let target: string;
+        try {
+          target = realpathSync(path);
+        } catch {
+          throw new ReleaseError(OUTSIDE_LINK);
+        }
+        if (target !== rootReal && !target.startsWith(`${rootReal}${sep}`)) throw new ReleaseError(OUTSIDE_LINK);
+      } else if (stat.isDirectory()) visit(path);
+      else if (!stat.isFile()) throw new ReleaseError(UNSUPPORTED_FILE);
+    }
+  };
+  visit(root);
+}
+
+/** Waits for the response headers only; the body has its own idle timeout. Network failures never consume a rate token. */
+async function fetchHeaders(fetcher: BotReleaseFetch, url: string): Promise<Response> {
+  const controller = new AbortController();
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    return await Promise.race([
+      fetcher(url, { signal: controller.signal }),
+      new Promise<never>((_, reject) => {
+        timer = setTimeout(() => {
+          controller.abort();
+          reject(new Error("timeout"));
+        }, HEADER_TIMEOUT_MS);
+      }),
+    ]);
+  } catch {
+    throw new ReleaseError(NETWORK_ERROR);
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+/** Writes the body to `file`, hashing as it goes. Refuses more than `maxBytes` and a body that stalls for 60 s. */
+async function download(body: ReadableStream<Uint8Array>, file: string, maxBytes: number, totalBytes: number, name: string): Promise<string> {
+  const hash = createHash("sha256");
+  const reader = body.getReader();
+  let handle: FileHandle | undefined;
+  let completed = 0;
+  try {
+    handle = await open(file, "wx", 0o600);
+    while (true) {
+      let timer: ReturnType<typeof setTimeout> | undefined;
+      let item: Awaited<ReturnType<typeof reader.read>>;
+      try {
+        item = await Promise.race([
+          reader.read(),
+          new Promise<never>((_, reject) => {
+            timer = setTimeout(() => reject(new Error("idle")), IDLE_TIMEOUT_MS);
+          }),
+        ]);
+      } catch {
+        throw new ReleaseError(NETWORK_ERROR);
+      } finally {
+        clearTimeout(timer);
+      }
+      if (item.done) break;
+      completed += item.value.length;
+      if (completed > maxBytes) throw new ReleaseError(tooLarge(name));
+      hash.update(item.value);
+      await handle.write(item.value);
+      setRobotReleaseInstall({ state: "running", completedBytes: completed, totalBytes });
+    }
+  } catch (error) {
+    void reader.cancel().catch(() => {});
+    throw error instanceof ReleaseError ? error : new ReleaseError(`Home couldn't save the robot app (${name}). Check that the disk has free space, then try again.`);
+  } finally {
+    await handle?.close();
+  }
+  return hash.digest("hex");
+}
+
+async function verifySignature(fetcher: BotReleaseFetch, selected: BotReleasePin, assetName: string, digest: string): Promise<void> {
+  const keys = selected.signing_keys ?? [];
+  if (keys.length === 0) return;
+  const base = `https://github.com/${selected.repo}/releases/download/v${selected.version}`;
+  const sumsResponse = await fetchHeaders(fetcher, `${base}/SHA256SUMS`);
+  const sigResponse = await fetchHeaders(fetcher, `${base}/SHA256SUMS.sig.json`);
+  let sums: string;
+  let envelope: SignedEnvelope<{ sha256: string }>;
+  try {
+    if (!sumsResponse.ok || !sigResponse.ok) throw new Error("status");
+    sums = await sumsResponse.text();
+    envelope = (await sigResponse.json()) as SignedEnvelope<{ sha256: string }>;
+    if (!envelope?.signed || !Array.isArray(envelope.signatures) || typeof envelope.signed.sha256 !== "string") throw new Error("shape");
+  } catch {
+    throw new ReleaseError(`The robot app signature files look damaged (${assetName}). Try again; if it keeps failing, update Home.`);
+  }
+  const escaped = assetName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const sumsDigest = createHash("sha256").update(sums).digest("hex");
+  const listed = new RegExp(`^${digest}\\s+\\*?${escaped}$`, "m").test(sums);
+  if (!verifyEnvelopeSignature(envelope, keys) || envelope.signed.sha256 !== sumsDigest || !listed) {
+    throw new ReleaseError(`The robot app signature did not verify (${assetName}). Try again; if it keeps failing, update Home.`);
+  }
 }
 
 function compareVersions(a: string, b: string): number {
@@ -63,11 +197,19 @@ function compareVersions(a: string, b: string): number {
   return 0;
 }
 
-// One download at a time per release folder: a second caller waits for the first instead of unpacking over it.
-const inFlight = new Map<string, Promise<{ dir: string; version: string }>>();
+/** Keeps the release just selected plus the newest other one; never removes what the caller is about to use. */
+function prune(releases: string, selectedDir: string): void {
+  const versionOf = (dirName: string) => dirName.replace(/-(?:darwin|linux|win32)-[^-]+$/, "");
+  const others = readdirSync(releases, { withFileTypes: true })
+    .filter((entry) => entry.isDirectory() && !entry.name.startsWith(".") && entry.name !== selectedDir)
+    .map((entry) => entry.name)
+    .sort((a, b) => compareVersions(versionOf(b), versionOf(a)));
+  for (const old of others.slice(1)) rmSync(join(releases, old), { recursive: true, force: true });
+}
 
-export function ensureBotRelease(opts: { dataDir?: string; fetch?: BotReleaseFetch; pin?: BotReleasePin } = {}): Promise<{ dir: string; version: string }> {
-  const selected = opts.pin ?? pinOverride ?? pin as BotReleasePin;
+const inFlight = new Map<string, Promise<Release>>();
+export function ensureBotRelease(opts: ReleaseOptions = {}): Promise<Release> {
+  const selected = opts.pin ?? pinOverride ?? (pin as BotReleasePin);
   const key = join(opts.dataDir ?? dataDir, "robots", "releases", selected?.version ?? "");
   const running = inFlight.get(key);
   if (running) return running;
@@ -76,63 +218,72 @@ export function ensureBotRelease(opts: { dataDir?: string; fetch?: BotReleaseFet
   return started;
 }
 
-async function ensureBotReleaseOnce(opts: { dataDir?: string; fetch?: BotReleaseFetch; pin?: BotReleasePin }): Promise<{ dir: string; version: string }> {
-  const selected = opts.pin ?? pinOverride ?? pin as BotReleasePin;
-  if (!selected || selected.version === "0.0.0" || Object.keys(selected.assets ?? {}).length === 0) throw new Error("This version of Home doesn't include a robot app yet. Update Home to add a StackChan.");
+async function ensureBotReleaseOnce(opts: ReleaseOptions): Promise<Release> {
+  const selected = opts.pin ?? pinOverride ?? (pin as BotReleasePin);
+  if (!selected || selected.version === "0.0.0" || Object.keys(selected.assets ?? {}).length === 0) {
+    throw new Error("This version of Home doesn't include a robot app yet. Update Home to add a StackChan.");
+  }
   const asset = selected.assets[platformKey()];
   if (!asset) throw new Error(`The pinned robot app does not support ${platformKey()}. Update Home to add a StackChan.`);
-  const base = opts.dataDir ?? dataDir;
-  const releases = join(base, "robots", "releases");
-  const dest = join(releases, selected.version);
-  if (existsSync(join(dest, ".verified"))) return { dir: dest, version: selected.version };
+  const releases = join(opts.dataDir ?? dataDir, "robots", "releases");
+  const destName = `${selected.version}-${platformKey()}`;
+  const dest = join(releases, destName);
+  const marker = join(dest, ".verified");
+  if (existsSync(marker)) {
+    try {
+      if (readFileSync(marker, "utf8").trim() === asset.sha256.toLowerCase()) return { dir: dest, version: selected.version };
+    } catch {
+      // An unreadable marker means download again.
+    }
+  }
+
   const fetcher = opts.fetch ?? fetchOverride ?? fetch;
-  if (!tryConsume("bot-release-download", GITHUB_RATE)) throw new Error("Home tried to download the robot app too many times in a row. Wait 10 minutes, then try again.");
   const partial = join(releases, ".partial");
   mkdirSync(partial, { recursive: true });
-  mkdirSync(releases, { recursive: true });
+  for (const entry of readdirSync(partial)) rmSync(join(partial, entry), { recursive: true, force: true });
+  for (const entry of readdirSync(releases)) if (entry.startsWith(".staging-")) rmSync(join(releases, entry), { recursive: true, force: true });
   const file = join(partial, `${asset.name}.${crypto.randomUUID()}.part`);
+  const staging = join(releases, `.staging-${crypto.randomUUID()}`);
+
   setRobotReleaseInstall({ state: "running", completedBytes: 0, totalBytes: 0 });
   try {
-    const url = `https://github.com/${selected.repo}/releases/download/v${selected.version}/${asset.name}`;
-    const response = await fetchWithTimeout(fetcher, url);
-    if (!response.ok || !response.body) throw new Error(`The robot app download failed (${asset.name}, HTTP ${response.status}). Try again; if it keeps failing, update Home.`);
-    const out = createWriteStream(file, { flags: "wx", mode: 0o600 });
-    let completed = 0;
-    const hash = createHash("sha256");
-    const stream = new ReadableStream({
-      async start(controller) {
-        const reader = response.body!.getReader();
-        try { while (true) { const item = await reader.read(); if (item.done) break; completed += item.value.length; hash.update(item.value); setRobotReleaseInstall({ state: "running", completedBytes: completed, totalBytes: Number(response.headers.get("content-length") ?? 0) }); controller.enqueue(item.value); } controller.close(); }
-        catch (error) { controller.error(error); }
-      },
-    });
-    await pipeline(Readable.fromWeb(stream as never), out);
-    const digest = hash.digest("hex");
-    if (digest.toLowerCase() !== asset.sha256.toLowerCase()) throw new Error(`The robot app download didn't match its fingerprint (${asset.name}). Try again; if it keeps failing, update Home.`);
-    if (selected.signing_keys.length) {
-      const sumName = "SHA256SUMS";
-      const sumsResponse = await fetchWithTimeout(fetcher, `https://github.com/${selected.repo}/releases/download/v${selected.version}/${sumName}`);
-      const sigResponse = await fetchWithTimeout(fetcher, `https://github.com/${selected.repo}/releases/download/v${selected.version}/SHA256SUMS.sig.json`);
-      if (!sumsResponse.ok || !sigResponse.ok) throw new Error("The robot app signature files could not be downloaded. Try again; if it keeps failing, update Home.");
-      const sums = await sumsResponse.text();
-      const envelope = await sigResponse.json() as SignedEnvelope<{ sha256: string }>;
-      if (!verifyEnvelopeSignature(envelope, selected.signing_keys) || envelope.signed.sha256 !== createHash("sha256").update(sums).digest("hex") || !new RegExp(`^${digest}\\s+\\*?${asset.name.replace(/[.*+?^${}()|[\\]\\]/g, "\\$&")}$`, "m").test(sums)) throw new Error(`The robot app signature did not verify (${asset.name}). Try again; if it keeps failing, update Home.`);
+    const response = await fetchHeaders(fetcher, `https://github.com/${selected.repo}/releases/download/v${selected.version}/${asset.name}`);
+    if (!response.ok || !response.body) {
+      throw new ReleaseError(`Home couldn't download the robot app (${asset.name}, HTTP ${response.status}). Check the internet connection, then try again.`);
     }
-    rmSync(dest, { recursive: true, force: true }); mkdirSync(dest, { recursive: true });
-    const listing = await runTar(["-tzf", file]); safeTarEntries(listing, resolve(dest));
-    const links = await runTar(["-tvzf", file]);
-    for (const line of links.split("\n")) if (/^[lh]/.test(line)) {
-      const target = line.split(/(?: -> | link to )/).at(-1) ?? "";
-      if (target.startsWith("/") || target.split("/").includes("..")) throw new Error("archive contains a link outside the release directory");
+    // The token is spent only once a response arrived, so a flaky network never locks the install out.
+    if (!tryConsume("bot-release-download", GITHUB_RATE)) {
+      void response.body.cancel().catch(() => {});
+      throw new ReleaseError("Home tried to download the robot app too many times in a row. Wait 10 minutes, then try again.");
     }
-    await runTar(["--no-same-owner", "-xzf", file, "-C", dest]);
-    writeFileSync(join(dest, ".verified"), `${digest}\n`, { mode: 0o600 });
+    const maxBytes = asset.size ?? DEFAULT_MAX_BYTES;
+    const contentLength = Number(response.headers.get("content-length") ?? 0);
+    if (contentLength > maxBytes) {
+      void response.body.cancel().catch(() => {});
+      throw new ReleaseError(tooLarge(asset.name));
+    }
+    const digest = await download(response.body, file, maxBytes, contentLength, asset.name);
+    if (digest.toLowerCase() !== asset.sha256.toLowerCase()) throw new ReleaseError(damaged(asset.name));
+    await verifySignature(fetcher, selected, asset.name, digest);
+
+    assertSafeNames(await runTar(["-tzf", file], asset.name));
+    assertNoHardlinks(await runTar(["-tvzf", file], asset.name));
+    mkdirSync(staging);
+    const gnu = process.platform !== "darwin";
+    await runTar(["--no-same-owner", "--no-same-permissions", ...(gnu ? ["--no-overwrite-dir"] : []), "-xzf", file, "-C", staging], asset.name);
+    inspectTree(staging);
+    writeFileSync(join(staging, ".verified"), `${digest.toLowerCase()}\n`);
+    rmSync(dest, { recursive: true, force: true });
+    renameSync(staging, dest);
     rmSync(file, { force: true });
-    const older = readdirSync(releases, { withFileTypes: true }).filter((entry) => entry.isDirectory() && entry.name !== ".partial").map((entry) => entry.name).sort(compareVersions).reverse();
-    for (const old of older.slice(2)) rmSync(join(releases, old), { recursive: true, force: true });
+    prune(releases, basename(dest));
     return { dir: dest, version: selected.version };
   } catch (error) {
-    rmSync(file, { force: true }); rmSync(dest, { recursive: true, force: true });
-    throw error instanceof Error ? error : new Error(`The robot app download failed (${asset.name}). Try again; if it keeps failing, update Home.`);
-  } finally { setRobotReleaseInstall(null); }
+    rmSync(file, { force: true });
+    rmSync(staging, { recursive: true, force: true });
+    if (error instanceof ReleaseError) throw new Error(error.message);
+    throw new Error(`Home couldn't install the robot app (${asset.name}). Try again; if it keeps failing, update Home.`);
+  } finally {
+    setRobotReleaseInstall(null);
+  }
 }
