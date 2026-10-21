@@ -255,7 +255,7 @@ export function planLine(plan: ReplyPlan, signal: TurnSignal, surfaceClass: Surf
 /** New turn-machine path: name the subject the signal classifier chose,
  * so a world question cannot be prompted as an answer about the speaker
  * (or the companion). */
-export function planLineForTurnMachine(plan: ReplyPlan, signal: TurnSignal, surfaceClass: SurfaceClass = "spoken"): string {
+export function planLineForTurnMachine(plan: ReplyPlan, signal: TurnSignal, surfaceClass: SurfaceClass = "spoken", engagement?: "brief" | "balanced" | "curious"): string {
   const about = {
     self: "the person asking",
     other: "the other person",
@@ -263,7 +263,11 @@ export function planLineForTurnMachine(plan: ReplyPlan, signal: TurnSignal, surf
     world: "the world",
     computed: "the calculation",
   }[signal.target];
-  const line = planLineAbout(plan, signal, surfaceClass, about);
+  const aboutLine = planLineAbout(plan, signal, surfaceClass, about);
+  // RECENCY-02 (the robot on Qwen3.6): the plan line is the last thing the model reads, and for a neutral statement it says "no required
+  // move" and "no unnecessary follow-up", which cancelled a lively companion's habit of bringing back what the person said earlier. A curious
+  // companion's spoken turns carry one more sentence that points the model at what it already has in front of it. Memory use, not voice.
+  const line = surfaceClass === "spoken" && engagement === "curious" ? `${aboutLine} If something you remember about them, or they said earlier, fits, tie it in playfully.` : aboutLine;
   // THIN-0B: a mode control held a record back, so the model is told, and
   // told where to send the question.
   // Turn-machine path only; planLine() above keeps the frozen wording.

@@ -235,7 +235,7 @@ export function contextToMessages(context: readonly ContextItem[], utterance: st
   if (!cutAfterMemory && dataLines.length > 0) userContent += `\n\nOther labelled context:\n${dataLines.join("\n\n")}`;
   if (!cutAfterMemory && clockLines.length > 0) userContent += `\n\nClock:\n${clockLines.join("\n")}`;
   if (!cutAfterMemory) {
-    userContent += `\n\nHow to answer this one: ${planLineForTurnMachine(plan, signal, promptSurfaceClass)}`;
+    userContent += `\n\nHow to answer this one: ${planLineForTurnMachine(plan, signal, promptSurfaceClass, persona.engagement)}`;
     userContent += `\n\nThe person's words:\n${utterance}`;
   }
   messages.push(pictures.length > 0 ? { role: "user", content: userContent, images: [...pictures] } : { role: "user", content: userContent });

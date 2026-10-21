@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import type { TurnSignal } from "@maipai/spec/gen/ts/turn-signal.js";
 import { fallbackSignal } from "@/lib/turnSignal";
-import { planFor, planLine, type PlanInput } from "@/lib/register";
+import { planFor, planLine, planLineForTurnMachine, type PlanInput } from "@/lib/register";
 
 const base = (act: TurnSignal["primary_act"], emotion: TurnSignal["expressed_emotion"] = "neutral", intensity: TurnSignal["emotion_intensity"] = "none"): TurnSignal => ({
   ...fallbackSignal("test", "adult"), primary_act: act, expressed_emotion: emotion, emotion_intensity: intensity,
@@ -153,5 +153,17 @@ describe("planFor", () => {
     test("keeps today's numbers, same as spoken", () => {
       expect(planFor(input(base("question"), { surfaceClass: "glance" })).max_words).toBe(60);
     });
+  });
+});
+
+describe("RECENCY-02: a curious companion's spoken turn points at what it remembers", () => {
+  const tie = "If something you remember about them, or they said earlier, fits, tie it in playfully.";
+  test("a curious companion's spoken plan line carries the tie-in sentence, a balanced one's does not, and the written class never does", () => {
+    const signal = base("inform");
+    const plan = planFor(input(signal, { surface: "robot" }));
+    expect(planLineForTurnMachine(plan, signal, "spoken", "curious")).toContain(tie);
+    expect(planLineForTurnMachine(plan, signal, "spoken", "balanced")).not.toContain(tie);
+    expect(planLineForTurnMachine(plan, signal, "spoken")).not.toContain(tie);
+    expect(planLineForTurnMachine(plan, signal, "written", "curious")).not.toContain(tie);
   });
 });
