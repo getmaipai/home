@@ -392,6 +392,21 @@ describe("SttSession - RMS fallback VAD (no Silero model installed in tests)", (
     session.close();
   });
 
+  test("end() on a listen where nobody spoke answers no_speech at once", async () => {
+    const events: SttWireEvent[] = [];
+    const session = new SttSession(config({ silenceTimeoutS: 10 }), (e) => events.push(e));
+
+    for (let i = 0; i < 5; i++) session.pushPcm(silenceFrame());
+    await flush();
+    session.end();
+    await flush();
+    await flush();
+
+    expect(events.filter((e) => e.t === "no_speech")).toHaveLength(1);
+    expect(events.some((e) => e.t === "final")).toBe(false);
+    session.close();
+  });
+
   test("the 30s force-flush fires on an unbroken loud tone that never dips into silence", async () => {
     scriptTranscript("force flushed");
     const events: SttWireEvent[] = [];

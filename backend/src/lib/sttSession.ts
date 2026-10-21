@@ -230,7 +230,10 @@ export class SttSession {
   end(): void {
     this.chain = this.chain
       .then(() => {
-        if (!this.closed && this.speaking) void this.finalize();
+        if (this.closed) return;
+        if (this.speaking) void this.finalize();
+        // Nothing was said: answer now, so a robot that asks to end a quiet listen does not wait for a reply that never comes.
+        else if (!this.finalizing) this.send({ t: "no_speech" });
       })
       .catch(() => {});
   }
