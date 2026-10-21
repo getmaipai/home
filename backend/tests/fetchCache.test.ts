@@ -41,6 +41,7 @@ beforeEach(() => {
   __setListsReadyForTests(true);
   __resetRateLimiterForTests();
   __resetReferenceCountersForTests();
+  __setPageReaderForTests(null); // another file's fake page reader must never stand in for the real read
   __resetSearchCacheForTests();
   __resetSearchRotationForTests();
   __resetSearxngEnginesCacheForTests();
