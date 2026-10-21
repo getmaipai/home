@@ -1,11 +1,15 @@
 // COMPANIONS-APP-01: the Companions app's data. Who sees what by type, "Set as my default", the admin-only parts, and the age rule on
 // every way a companion can be written.
-import { beforeEach, describe, expect, test } from "bun:test";
+import { installExplicitCompanions, removeExplicitCompanions } from "./explicitCompanions";
+import { afterAll, beforeAll, beforeEach, describe, expect, test } from "bun:test";
 import { TestClient } from "./client";
 import { resetDb } from "./reset-db";
 import { issueDeviceToken } from "@/lib/deviceTokens";
 
 beforeEach(() => resetDb());
+
+beforeAll(installExplicitCompanions);
+afterAll(removeExplicitCompanions);
 
 interface Card { id: string; type: string; is_default: boolean; dials: Array<{ label: string; value: string }>; who_can_use: string }
 interface Listing { allowed: boolean; companions: Card[]; robots: Array<{ id: string; companion_id: string }> | null }
@@ -31,7 +35,7 @@ describe("the companion list follows the person's type", () => {
   test("a signed-out visitor is refused", async () => {
     expect((await new TestClient().get("/api/companions")).status).toBe(401);
   });
-  test("a child sees child companions only, a teen child and teen, an adult all", async () => {
+  test("a child sees companions for everyone only, a teen those and teen ones, an adult all", async () => {
     const { child, teen, adult, list } = await setup();
     const types = async (client: TestClient) => new Set((await list(client)).companions.map((card) => card.type));
     expect(await types(child.client)).toEqual(new Set(["child"]));
@@ -42,7 +46,10 @@ describe("the companion list follows the person's type", () => {
     const { adult, list } = await setup();
     const nova = (await list(adult.client)).companions.find((card) => card.id === "lively-adult")!;
     expect(nova.dials.map((dial) => dial.label)).toEqual(["How it talks", "Word choice", "Questions back", "Casual chatter"]);
-    expect(nova.who_can_use).toBe("Adults only.");
+    expect(nova.who_can_use).toContain("Anyone in the family");
+    expect((nova as unknown as { type_label: string }).type_label).toBe("Companion for everyone");
+    const explicit = (await list(adult.client)).companions.find((card) => card.id === "zz-test-adult")!;
+    expect(explicit.who_can_use).toBe("Adults only.");
     expect((await list(adult.client)).companions.find((card) => card.is_default)?.id).toBe("default");
   });
   test("only owners and admins get the robots list", async () => {
@@ -74,9 +81,9 @@ describe("one companion in full", () => {
   });
   test("a companion above the person's type is a 404, not a hint that it exists", async () => {
     const { child, teen } = await setup();
-    expect((await child.client.get("/api/companions/lively-adult")).status).toBe(404);
-    expect((await child.client.get("/api/companions/lively-teen")).status).toBe(404);
-    expect((await teen.client.get("/api/companions/lively-adult")).status).toBe(404);
+    expect((await child.client.get("/api/companions/zz-test-adult")).status).toBe(404);
+    expect((await child.client.get("/api/companions/zz-test-teen")).status).toBe(404);
+    expect((await teen.client.get("/api/companions/zz-test-adult")).status).toBe(404);
     expect((await child.client.get("/api/companions/no-such")).status).toBe(404);
   });
   test("a robot using the companion is named for an admin", async () => {
@@ -100,17 +107,17 @@ describe("Set as my default", () => {
   });
   test("refuses a companion above the person's type, with a sentence that says what to do", async () => {
     const { child, teen } = await setup();
-    const refused = await child.client.put("/api/companions/lively-adult/default");
+    const refused = await child.client.put("/api/companions/zz-test-adult/default");
     expect(refused.status).toBe(403);
     expect(((await refused.json()) as { error: string }).error).toContain("Choose one from your list");
-    expect((await teen.client.put("/api/companions/lively-adult/default")).status).toBe(403);
+    expect((await teen.client.put("/api/companions/zz-test-adult/default")).status).toBe(403);
     expect((await child.client.put("/api/companions/no-such/default")).status).toBe(404);
   });
   test("the settings route holds the same line, and a stale value reads as the default", async () => {
     const { child, owner, list } = await setup();
-    const viaSettings = await child.client.put("/api/settings", { scope: `person:${child.id}`, key: "persona.active_id", value: "lively-adult" });
+    const viaSettings = await child.client.put("/api/settings", { scope: `person:${child.id}`, key: "persona.active_id", value: "zz-test-adult" });
     expect(viaSettings.status).toBe(400);
-    const byAdmin = await owner.put("/api/settings", { scope: `person:${child.id}`, key: "persona.active_id", value: "lively-adult" });
+    const byAdmin = await owner.put("/api/settings", { scope: `person:${child.id}`, key: "persona.active_id", value: "zz-test-adult" });
     expect(byAdmin.status).toBe(400);
     expect((await list(child.client)).companions.find((card) => card.is_default)?.id).toBe("default");
   });

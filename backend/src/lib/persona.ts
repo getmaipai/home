@@ -136,6 +136,11 @@ function loadPersonaCatalog(): Persona[] {
 
 export const PERSONAS: readonly Persona[] = loadPersonaCatalog();
 
+/** Tests that add or remove a companion package re-read the catalog in place (the array every importer already holds). */
+export function __reloadPersonasForTests(): void {
+  (PERSONAS as Persona[]).splice(0, PERSONAS.length, ...loadPersonaCatalog());
+}
+
 // Fails loudly, right here, rather than letting a `!`-asserted
 // DEFAULT_PERSONA silently be `undefined` and crash with a confusing
 // TypeError somewhere far downstream (composePersonaPrompt(undefined),

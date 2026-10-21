@@ -1,7 +1,6 @@
 // ROBOT-COMPANION-01 (owner's ruling, 2026-10-21): a robot's companion sets its band; an admin assigns the robot's controls.
+import { installExplicitCompanions, removeExplicitCompanions } from "./explicitCompanions";
 import { afterAll, beforeAll, beforeEach, describe, expect, test } from "bun:test";
-import { mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
-import { join } from "node:path";
 import { eq } from "drizzle-orm";
 import { TestClient } from "./client";
 import { resetDb } from "./reset-db";
@@ -12,7 +11,6 @@ import { decide } from "@/lib/gate/decide";
 import { effectiveBand } from "@/lib/turnContext";
 import { robotCompanionBand, robotCompanionOf, companionsForControls } from "@/lib/robotCompanion";
 import { PERSONAS, adaptPersonaToBand, composePersonaPrompt } from "@/lib/persona";
-import { PACKAGES_DIR } from "@/lib/paths";
 import { companionVoiceKey } from "@/settings/companionVoiceKeys";
 import { voiceForSpeech } from "@/lib/voiceForSpeech";
 import { setHouseholdSettingValue, setValue } from "@/lib/settings";
@@ -20,16 +18,8 @@ import type { PersonRow } from "@/types";
 
 beforeEach(() => resetDb());
 
-// Two explicit companions for the pairing tests: no bundled companion is explicit, so these exist only while this file runs.
-const EXPLICIT = { "zz-test-teen": "teen", "zz-test-adult": "adult" } as const;
-beforeAll(() => {
-  for (const [id, audience] of Object.entries(EXPLICIT)) {
-    mkdirSync(join(PACKAGES_DIR, id), { recursive: true });
-    const manifest = JSON.parse(readFileSync(join(PACKAGES_DIR, "lively-adult", "manifest.json"), "utf-8"));
-    writeFileSync(join(PACKAGES_DIR, id, "manifest.json"), JSON.stringify({ ...manifest, id, display: id, min_role: audience, companion: { ...manifest.companion, display_name: id === "zz-test-teen" ? "Tester Teen" : "Tester Adult", audience } }));
-  }
-});
-afterAll(() => { for (const id of Object.keys(EXPLICIT)) rmSync(join(PACKAGES_DIR, id), { recursive: true, force: true }); });
+beforeAll(installExplicitCompanions);
+afterAll(removeExplicitCompanions);
 
 async function setup() {
   const owner = new TestClient();

@@ -55,7 +55,7 @@ describe("the All apps page with 60 apps", () => {
     fireEvent.click(await view.findByRole("link", { name: "All apps" }));
     const search = await view.findByRole("searchbox", { name: "Search apps" });
     expect(document.activeElement).toBe(search);
-    await waitFor(() => expect(view.container.querySelectorAll("[data-app-tile]").length).toBe(65));
+    await waitFor(() => expect(view.container.querySelectorAll("[data-app-tile]").length).toBe(66));
     expect(view.getByRole("heading", { name: "All apps" })).toBeTruthy();
   });
 
@@ -73,7 +73,7 @@ describe("the All apps page with 60 apps", () => {
     start();
     const view = open();
     const search = await view.findByRole("searchbox", { name: "Search apps" });
-    await waitFor(() => expect(view.container.querySelectorAll("[data-app-tile]").length).toBe(65));
+    await waitFor(() => expect(view.container.querySelectorAll("[data-app-tile]").length).toBe(66));
     fireEvent.change(search, { target: { value: "app 07" } });
     expect(view.container.querySelectorAll("[data-app-tile]").length).toBe(1);
     fireEvent.change(search, { target: { value: "forecast" } });
@@ -81,7 +81,7 @@ describe("the All apps page with 60 apps", () => {
     fireEvent.change(search, { target: { value: "no such app" } });
     expect(view.getByText(/No apps match "no such app"/)).toBeTruthy();
     fireEvent.click(view.getByRole("button", { name: "Clear search" }));
-    await waitFor(() => expect(view.container.querySelectorAll("[data-app-tile]").length).toBe(65));
+    await waitFor(() => expect(view.container.querySelectorAll("[data-app-tile]").length).toBe(66));
   });
 
   test("a star saves the same list the rail draws, in order, and removing one saves it without that app", async () => {

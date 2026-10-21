@@ -1,9 +1,9 @@
 import { afterEach, describe, expect, test, mock, spyOn } from "bun:test";
-import { cleanup, fireEvent, render, waitFor } from "@testing-library/react";
+import { cleanup, render } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { api, type RobotCompanionInfo, type StackVoice } from "@/lib/api";
 import { RobotCompanionChoices } from "@/apps/settings/RobotCompanionChoices";
-import { CompanionVoiceSelect, companionVoiceKey } from "@/apps/settings/CompanionVoiceSelect";
+import { companionVoiceKey } from "@/lib/companionVoice";
 
 afterEach(() => { cleanup(); mock.restore(); });
 
@@ -31,17 +31,9 @@ describe("RobotCompanionChoices", () => {
   });
 });
 
-describe("CompanionVoiceSelect", () => {
+describe("companionVoiceKey", () => {
   test("names the setting the way the hub does", () => {
     expect(companionVoiceKey("lively-child")).toBe("companion.voice.lively_child");
-  });
-  test("saves the household setting for the companion", async () => {
-    spyOn(api, "stackVoices").mockResolvedValue({ voices: [voice("voice-bee1234", "Bee-Mo")] });
-    const save = spyOn(api, "setSetting").mockResolvedValue({} as never);
-    const view = render(<CompanionVoiceSelect companionId="rivet" companionName="Rivet" value="default" />);
-    const select = await view.findByRole("combobox", { name: "Rivet's voice" });
-    fireEvent.click(select);
-    fireEvent.click(await view.findByRole("option", { name: "Bee Mo" }));
-    await waitFor(() => expect(save).toHaveBeenCalledWith("household", "companion.voice.rivet", "voice-bee1234"));
+    expect(companionVoiceKey("rivet")).toBe("companion.voice.rivet");
   });
 });
