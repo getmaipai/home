@@ -97,6 +97,8 @@ export interface StackCodingModels { object: "list"; data: Array<{ id: string; r
 export interface StackCodingStatus { state?: string; slots?: number | null; slots_busy?: number }
 
 export interface StackClient {
+  mediaRoots(opts?: { signal?: AbortSignal }): Promise<{ read: string[]; write: string[] }>;
+  setMediaRoots(roots: { read: string[]; write: string[] }, opts?: { signal?: AbortSignal }): Promise<{ read: string[]; write: string[] }>;
   /** CODE-API-01: POST a coding wire request and hand back the engine's reply as the Stack sent it (status, headers, body stream), including a 4xx or 5xx, which the caller maps. Only a Stack that cannot be reached throws. Optional: an older client has no coding wires. */
   codingWire?(path: CodingWirePath, body: Record<string, unknown>, opts?: { signal?: AbortSignal }): Promise<{ status: number; headers: Headers; body: ReadableStream<Uint8Array> | null }>;
   /** CODE-API-01: GET /v1/models?role=coding (the one served model, with its context length and thinking ceiling). */
@@ -468,6 +470,11 @@ export function createStackClient(options: StackClientOptions = {}): StackClient
     pullModel: (body, opts) => call("/stack/v1/models", jsonInit(body), json<Record<string, unknown>>, opts),
     modelAction: (id, action, opts) => call(`/stack/v1/models/${encodeURIComponent(id)}/actions`, jsonInit({ action }), json<Record<string, unknown>>, opts),
     health: (opts) => call("/stack/v1/health", { method: "GET" }, json<{ health: HealthItem[] }>, opts),
+    mediaRoots: (opts) => call("/stack/v1/media", { method: "GET" }, async (res) => {
+      const body = await json<{ media?: { roots?: { read?: unknown; write?: unknown } } }>(res);
+      return { read: Array.isArray(body.media?.roots?.read) ? body.media!.roots!.read as string[] : [], write: Array.isArray(body.media?.roots?.write) ? body.media!.roots!.write as string[] : [] };
+    }, opts),
+    setMediaRoots: (roots, opts) => call("/stack/v1/media/roots", jsonInit(roots), json<{ read: string[]; write: string[] }>, opts),
     requestSelfHealRestart: (role, reason, opts) => call("/stack/v1/engines/self-heal/restart", jsonInit({ role, reason }), json<{ accepted: boolean; why: string | null }>, opts),
     selfHeal: (opts) => call("/stack/v1/engines/self-heal", { method: "GET" }, json<StackSelfHeal>, opts),
     healthFix: (code, opts) => call(`/stack/v1/health/${encodeURIComponent(code)}/fix`, { method: "POST" }, json<Record<string, unknown>>, opts),

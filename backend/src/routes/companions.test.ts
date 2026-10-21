@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { OpenAPIHono } from "@hono/zod-openapi";
 import { createHash } from "node:crypto";
 import { join } from "node:path";
-import { rmSync } from "node:fs";
+import { rmSync, mkdirSync, writeFileSync } from "node:fs";
 import { db } from "@/db";
 import { devices, people, sessions, settingsValues } from "@/db/schema";
 import { companionsRoutes } from "@/routes/companions";
@@ -16,6 +16,7 @@ import { __setPicturesFetchForTests } from "@/lib/pictures/stack";
 import { __setPictureStatusForTests, readyStatusForTests } from "@/lib/pictures/ready";
 import { __clearCompanionLookJobsForTests } from "@/lib/companionLookJobs";
 import { __setCharacterPictureCapabilityForTests } from "@/lib/companionLook";
+import { addTake, takePath, __resetCompanionStatesForTests } from "@/lib/companionStates";
 
 const app = new OpenAPIHono();
 app.route("/api/companions", companionsRoutes);
@@ -46,8 +47,8 @@ function fixture() {
   return loaded.value.companion;
 }
 
-beforeEach(() => { resetDb(); rmSync(companionRoot, { recursive: true, force: true }); __reloadPersonasForTests(); __clearCompanionLookJobsForTests(); __setPicturesFetchForTests(null); __setPictureStatusForTests(undefined); __setCharacterPictureCapabilityForTests(null); });
-afterEach(() => { resetDb(); rmSync(companionRoot, { recursive: true, force: true }); __reloadPersonasForTests(); __clearCompanionLookJobsForTests(); __setPicturesFetchForTests(null); __setPictureStatusForTests(undefined); __setCharacterPictureCapabilityForTests(null); });
+beforeEach(() => { resetDb(); rmSync(companionRoot, { recursive: true, force: true }); __reloadPersonasForTests(); __clearCompanionLookJobsForTests(); __resetCompanionStatesForTests(); __setPicturesFetchForTests(null); __setPictureStatusForTests(undefined); __setCharacterPictureCapabilityForTests(null); });
+afterEach(() => { resetDb(); rmSync(companionRoot, { recursive: true, force: true }); __reloadPersonasForTests(); __clearCompanionLookJobsForTests(); __resetCompanionStatesForTests(); __setPicturesFetchForTests(null); __setPictureStatusForTests(undefined); __setCharacterPictureCapabilityForTests(null); });
 
 async function keyedPicture() {
   const svg = Buffer.from('<svg width="512" height="512"><circle cx="256" cy="256" r="150" fill="red"/></svg>');
@@ -306,5 +307,26 @@ describe("household companion routes", () => {
     if (!created.ok) throw new Error(created.error);
     const response = await request(`companions/${created.value.id}/status`, adult, "PUT", { status: "ready" });
     expect(response.status).toBe(400); expect(((await response.json()) as { error: string }).error).toBe("Add at least 3 example lines before marking this companion ready.");
+  });
+
+  test("states view follows the media vocabulary, files support byte ranges, and bundled states are blocked", async () => {
+    const adult = addPerson("person-states", "adult"), other = addPerson("person-states-other", "adult");
+    const created = createHouseholdCompanion({ ...fixture(), display_name: "State routes" }, { display_name: "person-states", person_id: "person-states" });
+    if (!created.ok) throw new Error(created.error);
+    const take = addTake(created.value.id, "idle", { source: "upload", label: "Idle take" });
+    const path = takePath(created.value.id, "idle", take.id, "clip.h264.mp4")!;
+    mkdirSync(join(path, ".."), { recursive: true }); writeFileSync(path, Buffer.from("0123456789"));
+    const stateResponse = await request(`companions/${created.value.id}/states`, adult);
+    expect(stateResponse.status).toBe(200);
+    const stateBody = await stateResponse.json() as { states: Array<{ id: string; required: boolean }> };
+    expect(stateBody.states.map((s) => s.id)).toEqual(["idle", "idle_look", "listening", "thinking", "working", "speaking", "needs_you", "greeting", "happy", "oops", "celebrate", "sleeping"]);
+    expect(stateBody.states[0]?.required).toBe(true);
+    const partial = await app.request(`http://localhost/api/companions/${created.value.id}/states/idle/${take.id}/clip.h264.mp4`, { headers: { cookie: `session=${adult}`, range: "bytes=2-5" } });
+    expect(partial.status).toBe(206); expect(partial.headers.get("content-range")).toBe("bytes 2-5/10"); expect(await partial.text()).toBe("2345");
+    const full = await app.request(`http://localhost/api/companions/${created.value.id}/states/idle/${take.id}/clip.h264.mp4`, { headers: { cookie: `session=${adult}` } });
+    expect(full.status).toBe(200); expect(full.headers.get("accept-ranges")).toBe("bytes");
+    const unknown = await app.request(`http://localhost/api/companions/${created.value.id}/states/idle/${take.id}/manifest.json`, { headers: { cookie: `session=${adult}` } }); expect(unknown.status).toBe(404);
+    expect((await request(`companions/${created.value.id}/states`, other)).status).toBe(403);
+    expect((await request("companions/rivet/states", adult)).status).toBe(403);
   });
 });

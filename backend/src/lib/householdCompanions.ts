@@ -90,3 +90,8 @@ export function setHouseholdCompanionStatus(id: string, status: NonNullable<Comp
   const current = read(id); if (!current?.companion) return { ok: false, error: "That household companion could not be found." };
   return write({ ...current, companion: { ...current.companion, status } });
 }
+export function setHouseholdCompanionAnimation(id: string, animation: Companion["animation"] | null): { ok: true; value: Manifest } | { ok: false; error: string } {
+  const current = read(id); if (!current?.companion) return { ok: false, error: "That household companion could not be found." };
+  const next = { ...current, companion: { ...current.companion, ...(animation === null ? { animation: undefined } : { animation }) } };
+  return write(next);
+}
