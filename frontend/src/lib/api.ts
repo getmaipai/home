@@ -737,6 +737,19 @@ export type StatusHistory = { generated_at: string; days: number; components: St
 
 export type StatusAppsResponse = StatusAppsWire;
 export type AppRow = AppRowWire;
+/** GET /api/media/home: one row of the Media home's shelves (backend/src/routes/mediaHome.ts). */
+export interface MediaHomeRow {
+  id: string;
+  app: "videos" | "shows" | "music" | "podcasts" | "books";
+  kind: string;
+  title: string;
+  subtitle: string | null;
+  artwork_url: string | null;
+  href: string;
+  percent: number | null;
+  at: string;
+}
+export interface MediaHome { continue: MediaHomeRow[]; new: MediaHomeRow[]; recent_music: MediaHomeRow[] }
 export type EngineComputerStatus = { configured: boolean; state: "working" | "connecting" | "slow_to_answer" | "reconnecting" | "not_reachable"; reason: string | null; details?: { path: "home" | "tailnet" | null; lastProbeAt: string | null; contract: string | null } };
 export type StatusApp = StatusAppsResponse[number];
 export type StatusAppNeed = NonNullable<StatusApp["needs"]>[number];
@@ -1304,6 +1317,7 @@ export const api = {
   // APP-KIND-03/04: the package apps this person may open, and one of an app's page documents
   // (a spec `page`, drawn by the kit's SchemaPage). A hidden or unknown app and page are both 404.
   apps: () => request<AppRow[]>("/api/apps"),
+  mediaHome: () => request<MediaHome>("/api/media/home"),
   // MEDIA-VIDEOS-01: one data id of a package app (POST /api/plugins/:id/data/:dataId), and one media item's record (the owning app of a
   // `/media/<id>` link is read from its kind).
   appData: <T>(pkg: string, dataId: string, body: Record<string, unknown> = {}) =>
