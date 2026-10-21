@@ -1,0 +1,80 @@
+{
+ "note": "RECENCY-02: spoken list requests and statements a lively companion should react to. Used with MAIPAI_AB_SPOKEN_PROMPTS.",
+ "items": [
+  {
+   "id": "sp-l01",
+   "prompt": "Name every American holiday.",
+   "kind": "list"
+  },
+  {
+   "id": "sp-l02",
+   "prompt": "List all the planets.",
+   "kind": "list"
+  },
+  {
+   "id": "sp-l03",
+   "prompt": "Name the continents.",
+   "kind": "list"
+  },
+  {
+   "id": "sp-l04",
+   "prompt": "Name some dog breeds.",
+   "kind": "list"
+  },
+  {
+   "id": "sp-l05",
+   "prompt": "What are the days of the week?",
+   "kind": "list"
+  },
+  {
+   "id": "sp-l06",
+   "prompt": "Name every month of the year.",
+   "kind": "list"
+  },
+  {
+   "id": "sp-l07",
+   "prompt": "List the primary colors.",
+   "kind": "list"
+  },
+  {
+   "id": "sp-l08",
+   "prompt": "Name the seven wonders of the ancient world.",
+   "kind": "list"
+  },
+  {
+   "id": "sp-l09",
+   "prompt": "Name all the Great Lakes.",
+   "kind": "list"
+  },
+  {
+   "id": "sp-l10",
+   "prompt": "List the US presidents on Mount Rushmore.",
+   "kind": "list"
+  },
+  {
+   "id": "sp-r01",
+   "prompt": "I just baked cookies!",
+   "kind": "react"
+  },
+  {
+   "id": "sp-r02",
+   "prompt": "We're going to the zoo tomorrow.",
+   "kind": "react"
+  },
+  {
+   "id": "sp-r03",
+   "prompt": "I got a new puppy today.",
+   "kind": "react"
+  },
+  {
+   "id": "sp-r04",
+   "prompt": "I finished my homework.",
+   "kind": "react"
+  },
+  {
+   "id": "sp-r05",
+   "prompt": "I made a paper airplane.",
+   "kind": "react"
+  }
+ ]
+}

@@ -744,9 +744,11 @@ async function main(): Promise<void> {
     }
   }
   if (GROUP === "spoken") {
-    const rows = [...dataset.spoken.general.map((id) => ({ id, searching: false })), ...dataset.spoken.searching.map((x) => ({ id: x.id, searching: true }))];
+    // RECENCY-02: MAIPAI_AB_SPOKEN_PROMPTS names a file of {items:[{id,prompt}]} that replaces the shipped spoken items for this run.
+    const extra = process.env.MAIPAI_AB_SPOKEN_PROMPTS ? (JSON.parse(readFileSync(process.env.MAIPAI_AB_SPOKEN_PROMPTS, "utf-8")) as { items: { id: string; prompt: string }[] }).items : null;
+    const rows = extra ? extra.map((x) => ({ id: x.id, searching: false })) : [...dataset.spoken.general.map((id) => ({ id, searching: false })), ...dataset.spoken.searching.map((x) => ({ id: x.id, searching: true }))];
     for (const row of rows) {
-      const found = dataset.items.find((i) => i.id === row.id) ?? dataset.spoken.searching.find((x) => x.id === row.id);
+      const found = extra?.find((x) => x.id === row.id) ?? dataset.items.find((i) => i.id === row.id) ?? dataset.spoken.searching.find((x) => x.id === row.id);
       if (!found || !wanted(row.id)) continue;
       const category = ("category" in found ? found.category : "world") as Category;
       for (let rep = 1; rep <= (row.searching ? 1 : SINGLE_RUNS); rep++) {
