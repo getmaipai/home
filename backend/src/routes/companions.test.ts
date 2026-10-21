@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, test } from "bun:test";
+import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { OpenAPIHono } from "@hono/zod-openapi";
 import { createHash } from "node:crypto";
 import { join } from "node:path";
@@ -35,6 +35,7 @@ function fixture() {
 }
 
 beforeEach(() => { resetDb(); rmSync(companionRoot, { recursive: true, force: true }); __reloadPersonasForTests(); });
+afterEach(() => { resetDb(); rmSync(companionRoot, { recursive: true, force: true }); __reloadPersonasForTests(); });
 
 describe("household companion routes", () => {
   test("children and teens cannot create; an adult creates a draft", async () => {

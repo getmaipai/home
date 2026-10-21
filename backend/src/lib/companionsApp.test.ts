@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, test } from "bun:test";
+import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { join } from "node:path";
 import { rmSync } from "node:fs";
 import { db } from "@/db";
@@ -15,6 +15,7 @@ function addPerson(id: string, role: string) {
   db.insert(people).values({ id, displayName: id, role, avatarSeed: id, source: "local", createdAt: now, updatedAt: now, hlc: "1:0:test" }).run();
 }
 beforeEach(() => { resetDb(); rmSync(root, { recursive: true, force: true }); __reloadPersonasForTests(); });
+afterEach(() => { resetDb(); rmSync(root, { recursive: true, force: true }); __reloadPersonasForTests(); });
 
 describe("companion app cards", () => {
   test("ready household companions are listed with household status; the author sees their draft", () => {

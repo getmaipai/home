@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, test } from "bun:test";
+import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { loadManifestOnly } from "@/lib/plugins";
@@ -21,6 +21,7 @@ if (!source.ok || !source.value.companion) throw new Error("rivet fixture is una
 const input = source.value.companion;
 
 beforeEach(() => rmSync(companionsRoot, { recursive: true, force: true }));
+afterEach(() => rmSync(companionsRoot, { recursive: true, force: true }));
 
 describe("household companion store", () => {
   test("create writes a valid manifest and returns its id", () => {
