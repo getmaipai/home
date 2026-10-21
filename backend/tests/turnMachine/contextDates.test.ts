@@ -68,6 +68,13 @@ describe("KS-02E: the prefix's three date lines", () => {
     expect(text).not.toContain("The model's training knowledge may be older than today.");
   });
 
+  test("RECENCY-01: a claim about something recent is looked up first, never denied from memory", () => {
+    const text = datesText({ now: new Date("2026-10-10T12:00:00Z"), locale: "en-US", modelCutoff: null, librarySnapshot: null });
+    expect(text).toContain("a recent event you do not recognize is more likely missing from your training than untrue");
+    expect(text).toContain("never tell them they are mistaken without having searched");
+    expect(text.split("\n")).toHaveLength(2);
+  });
+
   test("a null model_cutoff prints no cutoff text", async () => {
     record.model_cutoff = undefined;
     startKiwix();

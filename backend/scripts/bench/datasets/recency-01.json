@@ -1,0 +1,309 @@
+{
+ "note": "RECENCY-01: recency cues, 'I heard' and 'is it true' claims, weather and sports, show-me image requests (acceptable tool show_images) and ten prompts that must not search. Used with MAIPAI_AB_FRESH_DATASET.",
+ "fresh": {
+  "items": [
+   {
+    "id": "fresh-rc-01",
+    "prompt": "i heard a new poster for dune 3 released today",
+    "kind": "time-sensitive",
+    "acceptable_tools": [
+     "websearch"
+    ],
+    "gold": "must",
+    "family": "recency"
+   },
+   {
+    "id": "fresh-rc-02",
+    "prompt": "i think they just released the trailer for the new avatar movie",
+    "kind": "time-sensitive",
+    "acceptable_tools": [
+     "websearch"
+    ],
+    "gold": "must",
+    "family": "recency"
+   },
+   {
+    "id": "fresh-rc-03",
+    "prompt": "is it true that apple announced a new iphone this week",
+    "kind": "time-sensitive",
+    "acceptable_tools": [
+     "websearch"
+    ],
+    "gold": "must",
+    "family": "recency"
+   },
+   {
+    "id": "fresh-rc-04",
+    "prompt": "i saw something about a big earthquake in japan earlier today",
+    "kind": "time-sensitive",
+    "acceptable_tools": [
+     "websearch"
+    ],
+    "gold": "must",
+    "family": "recency"
+   },
+   {
+    "id": "fresh-rc-05",
+    "prompt": "apparently the lakers traded for someone yesterday, is that right",
+    "kind": "time-sensitive",
+    "acceptable_tools": [
+     "websearch"
+    ],
+    "gold": "must",
+    "family": "recency"
+   },
+   {
+    "id": "fresh-rc-06",
+    "prompt": "what's the latest on the government shutdown",
+    "kind": "time-sensitive",
+    "acceptable_tools": [
+     "websearch"
+    ],
+    "gold": "must",
+    "family": "recency"
+   },
+   {
+    "id": "fresh-rc-07",
+    "prompt": "who won the game last night",
+    "kind": "time-sensitive",
+    "acceptable_tools": [
+     "websearch"
+    ],
+    "gold": "must",
+    "family": "recency"
+   },
+   {
+    "id": "fresh-rc-08",
+    "prompt": "what's the weather in Boston tomorrow",
+    "kind": "time-sensitive",
+    "acceptable_tools": [
+     "weather",
+     "websearch"
+    ],
+    "gold": "must",
+    "family": "recency"
+   },
+   {
+    "id": "fresh-rc-09",
+    "prompt": "is it going to rain this weekend in Seattle",
+    "kind": "time-sensitive",
+    "acceptable_tools": [
+     "weather",
+     "websearch"
+    ],
+    "gold": "must",
+    "family": "recency"
+   },
+   {
+    "id": "fresh-rc-10",
+    "prompt": "what's the score of the Yankees game right now",
+    "kind": "time-sensitive",
+    "acceptable_tools": [
+     "websearch"
+    ],
+    "gold": "must",
+    "family": "recency"
+   },
+   {
+    "id": "fresh-rc-11",
+    "prompt": "did the new season of The Bear drop yet",
+    "kind": "time-sensitive",
+    "acceptable_tools": [
+     "websearch"
+    ],
+    "gold": "must",
+    "family": "recency"
+   },
+   {
+    "id": "fresh-rc-12",
+    "prompt": "my friend said tesla stock crashed today, is that true",
+    "kind": "time-sensitive",
+    "acceptable_tools": [
+     "websearch"
+    ],
+    "gold": "must",
+    "family": "recency"
+   },
+   {
+    "id": "fresh-rc-13",
+    "prompt": "any news on the new Taylor Swift album this week",
+    "kind": "time-sensitive",
+    "acceptable_tools": [
+     "websearch"
+    ],
+    "gold": "must",
+    "family": "recency"
+   },
+   {
+    "id": "fresh-rc-14",
+    "prompt": "i heard they found a new species of deep sea fish just now",
+    "kind": "time-sensitive",
+    "acceptable_tools": [
+     "websearch"
+    ],
+    "gold": "must",
+    "family": "recency"
+   },
+   {
+    "id": "fresh-rc-15",
+    "prompt": "just saw that the fed cut rates, what did they say",
+    "kind": "time-sensitive",
+    "acceptable_tools": [
+     "websearch"
+    ],
+    "gold": "must",
+    "family": "recency"
+   },
+   {
+    "id": "fresh-rc-16",
+    "prompt": "what's trending in the news today",
+    "kind": "time-sensitive",
+    "acceptable_tools": [
+     "websearch"
+    ],
+    "gold": "must",
+    "family": "recency"
+   },
+   {
+    "id": "fresh-rc-17",
+    "prompt": "show me the official poster for Dune Part Three",
+    "kind": "time-sensitive",
+    "acceptable_tools": [
+     "show_images"
+    ],
+    "gold": "must",
+    "family": "recency"
+   },
+   {
+    "id": "fresh-rc-18",
+    "prompt": "show me the Golden Gate Bridge",
+    "kind": "time-sensitive",
+    "acceptable_tools": [
+     "show_images"
+    ],
+    "gold": "must",
+    "family": "recency"
+   },
+   {
+    "id": "fresh-rc-19",
+    "prompt": "show me what a pangolin looks like",
+    "kind": "time-sensitive",
+    "acceptable_tools": [
+     "show_images"
+    ],
+    "gold": "must",
+    "family": "recency"
+   },
+   {
+    "id": "fresh-rc-20",
+    "prompt": "show me a picture of the newest iPhone",
+    "kind": "time-sensitive",
+    "acceptable_tools": [
+     "show_images"
+    ],
+    "gold": "must",
+    "family": "recency"
+   },
+   {
+    "id": "fresh-rn-01",
+    "prompt": "what is the capital of Peru",
+    "kind": "timeless",
+    "acceptable_tools": [
+     "websearch"
+    ],
+    "gold": "must_not",
+    "family": "recency-negative"
+   },
+   {
+    "id": "fresh-rn-02",
+    "prompt": "how do you make pancakes",
+    "kind": "timeless",
+    "acceptable_tools": [
+     "websearch"
+    ],
+    "gold": "must_not",
+    "family": "recency-negative"
+   },
+   {
+    "id": "fresh-rn-03",
+    "prompt": "explain how vaccines work",
+    "kind": "timeless",
+    "acceptable_tools": [
+     "websearch"
+    ],
+    "gold": "must_not",
+    "family": "recency-negative"
+   },
+   {
+    "id": "fresh-rn-04",
+    "prompt": "what rhymes with blue",
+    "kind": "timeless",
+    "acceptable_tools": [
+     "websearch"
+    ],
+    "gold": "must_not",
+    "family": "recency-negative"
+   },
+   {
+    "id": "fresh-rn-05",
+    "prompt": "help me write a thank you note to my aunt",
+    "kind": "timeless",
+    "acceptable_tools": [
+     "websearch"
+    ],
+    "gold": "must_not",
+    "family": "recency-negative"
+   },
+   {
+    "id": "fresh-rn-06",
+    "prompt": "what is 18 percent of 250",
+    "kind": "timeless",
+    "acceptable_tools": [
+     "websearch"
+    ],
+    "gold": "must_not",
+    "family": "recency-negative"
+   },
+   {
+    "id": "fresh-rn-07",
+    "prompt": "who wrote Moby Dick",
+    "kind": "timeless",
+    "acceptable_tools": [
+     "websearch"
+    ],
+    "gold": "must_not",
+    "family": "recency-negative"
+   },
+   {
+    "id": "fresh-rn-08",
+    "prompt": "what's the difference between weather and climate",
+    "kind": "timeless",
+    "acceptable_tools": [
+     "websearch"
+    ],
+    "gold": "must_not",
+    "family": "recency-negative"
+   },
+   {
+    "id": "fresh-rn-09",
+    "prompt": "tell me a bedtime story about a dragon",
+    "kind": "timeless",
+    "acceptable_tools": [
+     "websearch"
+    ],
+    "gold": "must_not",
+    "family": "recency-negative"
+   },
+   {
+    "id": "fresh-rn-10",
+    "prompt": "why do cats purr",
+    "kind": "timeless",
+    "acceptable_tools": [
+     "websearch"
+    ],
+    "gold": "must_not",
+    "family": "recency-negative"
+   }
+  ]
+ }
+}

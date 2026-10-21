@@ -7,6 +7,9 @@ checklist (`docs/dev.md`). The first release is 0.1.0.
 
 ## [Unreleased]
 
+### Changed
+- Chat: the date line in the prompt now says the model's training is usually months behind, that a recent event it does not recognize is more likely missing than untrue, and that a claim about something recent ("I heard", "is it true") is looked up first, never denied from memory. Qwen3.6 searched 16 of 28 recency prompts before and 26 of 28 after; Muse searched 28 of 28 both times (RECENCY-01).
+
 ### Added
 - Settings, AI models: a **Chat models** card lists the chat models this computer can run, with **Download**, **Use this model** and **In use**. Qwen3.6 35B A3B is the first optional model beside Muse: it answers voice questions in under a second because its thinking step can be switched off. The choice survives a restart (MODEL-SWITCH-01).
 - Books app for EPUB, PDF, audiobook chapters, linked editions and reading progress; Shows and Films app for local shows, films, seasons, episodes and a personal watchlist.

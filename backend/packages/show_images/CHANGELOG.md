@@ -10,6 +10,8 @@ All notable changes to the Show Pictures package, in [Keep a Changelog](https://
 
 ### Changed
 
+- RECENCY-01: the `subject` description says to call it whenever the person asks to see, show or display a picture, poster, photo or image of something, including something new, and to use it rather than a web search for the picture.
+
 - IMGQ-09: a stronger tool description and four worked examples (three who/what-is calls and one chat mention, plus four requests that never call it) in the `subject` argument. Held-out recall 0.28 to 0.50 and false offers 0.06 to 0.03 from wording alone.
 
 ### Added

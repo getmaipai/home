@@ -239,7 +239,8 @@ if (process.argv.includes("--render")) {
 
 // ==== live run ====
 
-refuseIfGateRunning("chat-ab-01");
+// RECENCY-01: a run that only reads which tool the model chose (no timing claim) may set MAIPAI_AB_IGNORE_GATES=1; its timings are not valid.
+if (process.env.MAIPAI_AB_IGNORE_GATES !== "1") refuseIfGateRunning("chat-ab-01");
 const chatUrl = process.env.MAIPAI_LLAMA_SERVER_URL;
 if (!chatUrl) {
   console.error("chat-ab-01 refused: MAIPAI_LLAMA_SERVER_URL is not set; the bench connects only to an engine already running.");
@@ -247,7 +248,9 @@ if (!chatUrl) {
 }
 const realSearxng = process.env.MAIPAI_BENCH_REAL_SEARXNG_URL;
 const searchMode = process.env.MAIPAI_BENCH_SEARCH;
-const fixtureItems = (dataset.fresh?.items ?? []) as { id: string; prompt: string; kind?: string; acceptable_tools?: string[]; fixture?: { as_of: string; title: string; content: string; url?: string } }[];
+// RECENCY-01: MAIPAI_AB_FRESH_DATASET names a dataset file whose `fresh.items` replace the shipped fresh items for this run.
+const freshDataset = process.env.MAIPAI_AB_FRESH_DATASET ? (JSON.parse(readFileSync(process.env.MAIPAI_AB_FRESH_DATASET, "utf-8")) as typeof dataset) : dataset;
+const fixtureItems = (freshDataset.fresh?.items ?? []) as { id: string; prompt: string; kind?: string; acceptable_tools?: string[]; fixture?: { as_of: string; title: string; content: string; url?: string } }[];
 let fixtureSearch: FixtureSearch | null = null;
 if (searchMode === "fixture" || searchMode === "down") fixtureSearch = startFixtureSearch(fixtureItems, searchMode);
 const selectedSearchFreeItems = GROUP === "adult" && ONLY !== null && ONLY.size > 0 && [...ONLY].every((id) => SEARCH_FREE_ITEMS.has(id));
@@ -317,7 +320,12 @@ const stackStandIn = Bun.serve({
           // not JSON: nothing to capture
         }
       }
-      const upstream = await fetch(`${target.replace(/\/$/, "")}${path}`, { method: "POST", headers: { "content-type": "application/json" }, body: bodyText, signal: req.signal });
+      // RECENCY-01: MAIPAI_AB_MODEL asks the Stack for one installed chat model by id instead of the active one.
+      let sentBody = bodyText;
+      if (path === "/v1/chat/completions" && process.env.MAIPAI_AB_MODEL) {
+        try { sentBody = JSON.stringify({ ...(JSON.parse(bodyText) as Record<string, unknown>), model: process.env.MAIPAI_AB_MODEL }); } catch { /* not JSON: forwarded as is */ }
+      }
+      const upstream = await fetch(`${target.replace(/\/$/, "")}${path}`, { method: "POST", headers: { "content-type": "application/json" }, body: sentBody, signal: req.signal });
       if (process.env.MAIPAI_AB_TRACE === "1") console.log(`[stand-in] ${path} headers after ${Math.round(performance.now() - sentAt)} ms, status ${upstream.status}`);
       return new Response(upstream.body, { status: upstream.status, headers: { "content-type": upstream.headers.get("content-type") ?? "application/json", ...engineHeaders } });
     }
