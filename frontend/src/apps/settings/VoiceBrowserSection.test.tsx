@@ -46,16 +46,7 @@ describe("VoiceBrowserSection", () => {
     spyOn(householdVoicesApi, "list").mockResolvedValue({ voices: [] });
     fireEvent.click(await trigger(view));
     const names = (await view.findAllByRole("option")).map((option) => option.textContent);
-    expect(names).toEqual(["Default voice", "Alba", "Javert", "Mira", "Cloned"]);
-  });
-  test("shows household voices to an owner and hides them from an adult", async () => {
-    spyOn(householdVoicesApi, "list").mockResolvedValue({ voices: [] });
-    const owner = renderPage(three(), ["alba", "javert", "mira"], { role: "owner" });
-    await owner.findByRole("heading", { name: "Voices made at home" });
-    cleanup(); mock.restore();
-    const adult = renderPage(three());
-    await trigger(adult);
-    expect(adult.queryByRole("heading", { name: "Voices made at home" })).toBeNull();
+    expect(names).toEqual(["Built-in voice (Home's default)", "Alba", "Javert", "Mira", "Cloned"]);
   });
   test("the dropdown shows the stored voice", async () => {
     const view = renderPage(three(), ["alba", "javert", "mira"], { voice: "javert" });
@@ -63,14 +54,14 @@ describe("VoiceBrowserSection", () => {
   });
   test("a stored voice the engine does not offer falls back to the default with one plain line, never a dead select", async () => {
     const view = renderPage(three(), ["default", "alba", "javert", "mira"], { voice: "vera" });
-    expect((await trigger(view)).textContent).toBe("Default voice");
+    expect((await trigger(view)).textContent).toBe("Built-in voice (Home's default)");
     view.getByText("Vera is not available with this engine, using the default voice.");
     expect((view.getByRole("button", { name: "Test" }) as HTMLButtonElement).disabled).toBe(false);
   });
   test("one built-in voice (the Chatterbox shape): a saved Javert shows the default voice, the select works, Test plays the engine voice, the stale choice is moved to default once", async () => {
     const view = renderPage([voice("chatterbox-turbo-voice-default", { name: "Chatterbox default", engine: "chatterbox-turbo" })], ["default", "alba", "javert"], { voice: "javert" });
     const box = await trigger(view);
-    expect(box.textContent).toBe("Default voice");
+    expect(box.textContent).toBe("Built-in voice (Home's default)");
     expect(box.hasAttribute("disabled") || box.getAttribute("data-disabled") !== null).toBe(false);
     view.getByText("Javert is not available with this engine, using the default voice.");
     const start = spyOn(voicePreviewPlayer, "start").mockImplementation(async () => {});

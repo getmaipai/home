@@ -52,3 +52,17 @@ median pitch by -0.92 and +2 by +1.98.
 A real render on the Studio's engine (`mlx-community/chatterbox-turbo-fp16`, mlx-audio 0.5.9, the pinned tokenizer): both owner clips
 produced audio (1.3 to 3.9 s for a short sentence, the second request on a clip faster than the first), with temperature 1.05 and a pitch
 of -1. That run found that the decoder needs a file extension and has no ffmpeg here, so a new voice must be WAV, MP3 or FLAC.
+
+## The voice manager and Home's default voice (owner ruling, 2026-10-20)
+
+Jesse: the screen for voices should list them with their source (for example Custom), gender and language, let an admin delete one and set
+the default, and make "add voice" a modal; the first choice in a list must not read "Default voice" but the name of the voice, and a
+default install should bring several voices to choose from.
+
+- Home settings, Voices (owner and admin) is the manager: one row per voice (name, "Home's default" badge, who made it and with which
+  liveliness and pitch, Source, Gender, Language), Test, Set as default, Delete (custom voices only, after a confirmation), and an Add voice
+  dialog. The personal choosers (Account, Voice and the Voices page) stay as the one-dropdown choice for a person.
+- Home's default voice is the household setting `tts.home_voice` (commons `spec-v0.1.200`, admin to write). A person or robot with no choice of
+  their own speaks it; a child or teen never speaks a clip voice, so they get the engine's built-in voice when the default is one.
+- The first choice of every personal list is that default voice shown by its own name with "(Home's default)". The engine's built-in voice has no
+  name of its own yet and reads "Built-in voice"; naming it and installing the starter set stay open under VOICES-09 and VOICES-02.

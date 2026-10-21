@@ -16,6 +16,12 @@ export function voiceFriendlyName(voice: Pick<StackVoice, "id" | "name">): strin
   return titleCase(last.replace(ENGINE_WORDS, "")) || "Default";
 }
 
+/** The name a list shows for a voice. The engine's own built-in voice has no name of its own yet, so it reads "Built-in voice";
+ * a screen never calls a voice "Default voice" (owner ruling, 2026-10-20). */
+export function voiceDisplayName(voice: Pick<StackVoice, "id" | "name">): string {
+  return presetNameForVoice(voice.id, ["default"]) === "default" ? "Built-in voice" : voiceFriendlyName(voice);
+}
+
 /** Only a real descriptor from the catalog; "unknown" and engine talk are dropped. */
 export function voiceDescription(voice: Pick<StackVoice, "description">): string | null {
   return isUnknown(voice.description) || /chatterbox|pocket|orpheus|mlx|\btts\b/i.test(voice.description) ? null : voice.description.trim();
@@ -53,10 +59,12 @@ export interface VoiceChoices { options: VoiceOption[]; selected: VoiceOption; n
  * picked, so the speaking voice is never missing from the list. A saved voice the engine in use does not offer falls
  * back to it with one plain line; the list is never a dead select. Voices of more than one engine are kept together,
  * the engine in use first. `presetOptions` are the saved names the settings registry accepts. */
-export function voiceChoices(voices: readonly StackVoice[], stored: string | null, presetOptions: readonly string[]): VoiceChoices {
+export function voiceChoices(voices: readonly StackVoice[], stored: string | null, presetOptions: readonly string[], homeDefault: string = ENGINE_DEFAULT_VALUE): VoiceChoices {
   const fromEngineDefault = (voice: StackVoice) => presetNameForVoice(voice.id, [ENGINE_DEFAULT_VALUE]) === ENGINE_DEFAULT_VALUE;
-  const defaultVoice = voices.find(fromEngineDefault) ?? null;
-  const first: VoiceOption = { id: ENGINE_DEFAULT_VALUE, value: ENGINE_DEFAULT_VALUE, label: "Default voice", engine: defaultVoice?.engine ?? null, voice: defaultVoice };
+  const engineVoice = voices.find(fromEngineDefault) ?? null;
+  // The first choice is "whatever Home's default voice is", and it carries that voice's own name.
+  const defaultVoice = homeDefault === ENGINE_DEFAULT_VALUE ? engineVoice : voices.find((voice) => voice.id === homeDefault || presetNameForVoice(voice.id, [homeDefault]) === homeDefault) ?? engineVoice;
+  const first: VoiceOption = { id: ENGINE_DEFAULT_VALUE, value: ENGINE_DEFAULT_VALUE, label: `${defaultVoice ? voiceDisplayName(defaultVoice) : "Built-in voice"} (Home's default)`, engine: defaultVoice?.engine ?? null, voice: defaultVoice };
   const others = voices.filter((voice) => !fromEngineDefault(voice)).map<VoiceOption>((voice) => ({
     id: voice.id, value: presetNameForVoice(voice.id, presetOptions.filter((name) => name !== ENGINE_DEFAULT_VALUE)) ?? voice.id, label: voiceFriendlyName(voice), engine: voice.engine ?? null, voice,
   }));

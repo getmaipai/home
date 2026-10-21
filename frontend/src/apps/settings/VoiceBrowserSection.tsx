@@ -7,7 +7,6 @@ import { Button } from "@maipai/ui/src/ui/button";
 import { api, type PersonRosterEntry, type ResolvedSetting, type Roster } from "@/lib/api";
 import { playableVoices, previewIdFor, voiceChoices, voiceTargets } from "@/lib/voice/voiceBrowserRows";
 import { voicePreviewPlayer, type VoicePreviewState } from "@/lib/voice/voicePreviewPlayer";
-import { HouseholdVoicesSection } from "@/apps/settings/HouseholdVoicesSection";
 
 /** "Choose a voice for <who>": ONE dropdown bound to tts.voice_id, a Test button beside it. */
 export function VoiceBrowserSection({ person }: { person: Roster }) {
@@ -55,7 +54,11 @@ export function VoiceBrowserSection({ person }: { person: Roster }) {
   }
 
   // The dropdown always lists the voice in use (VOICE-PICK-01); a saved voice this engine does not offer falls back to the default with one line.
-  const choices = useMemo(() => voiceChoices(voices, stored, voiceOptions), [voices, stored, voiceOptions]);
+  // The first choice is Home's default voice, shown by its own name (owner ruling 2026-10-20).
+  const homeVoiceQuery = useQuery<ResolvedSetting[]>({ queryKey: ["settings-values", "household"], queryFn: () => api.settingsValues("household") });
+  const homeVoice = homeVoiceQuery.data?.find((v) => v.key === "tts.home_voice")?.value;
+  const homeDefault = typeof homeVoice === "string" && homeVoice ? homeVoice : "default";
+  const choices = useMemo(() => voiceChoices(voices, stored, voiceOptions, homeDefault), [voices, stored, voiceOptions, homeDefault]);
   const selectedId = choices.selected.id;
   // A saved voice this engine does not offer is moved to the default voice once, so the page and the spoken voice agree.
   useEffect(() => {
@@ -86,6 +89,5 @@ export function VoiceBrowserSection({ person }: { person: Roster }) {
     {preview.error ? <p role="alert">{preview.error}</p> : null}
     {saveError ? <p role="alert">{saveError}</p> : null}
     <p role="status" className="text-sm text-muted-foreground">{saved ? "Saved." : ""}</p>
-    {isGuardian ? <HouseholdVoicesSection /> : null}
   </>;
 }

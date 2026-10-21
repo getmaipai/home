@@ -29,7 +29,7 @@ describe("voice browser helpers", () => {
   const v = (id: string, name: string, engine = "pocket"): StackVoice => ({ id, name, description: "unknown", language: "en", country: "unknown", gender: "unknown", source: "preset", engine, onDisk: true, licence: null, revision: "" });
   test("voiceChoices: the default voice is always first and the engine default folds into it", () => {
     const c = voiceChoices([v("chatterbox-turbo-voice-default", "Chatterbox default", "chatterbox-turbo")], null, ["default", "alba"]);
-    expect(c.options.map((o) => o.label)).toEqual(["Default voice"]);
+    expect(c.options.map((o) => o.label)).toEqual(["Built-in voice (Home's default)"]);
     expect(c.selected.value).toBe("default");
     expect(c.notice).toBeNull();
     expect(previewIdFor(c.selected, [])).toBe("chatterbox-turbo-voice-default");

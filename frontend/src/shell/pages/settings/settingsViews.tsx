@@ -9,6 +9,7 @@ import { ChatSkillsSection } from "@/shell/pages/settings/ChatSkillsSection";
 import { ChatShortcutsView } from "@/shell/pages/settings/ChatShortcutsView";
 import { DeviceAppearanceControl } from "@/shell/pages/settings/DeviceAppearanceControl";
 import { VoiceBrowserSection } from "@/apps/settings/VoiceBrowserSection";
+import { VoiceManagerSection } from "@/apps/settings/VoiceManagerSection";
 import { EngineLinkCredentialSection } from "@/apps/settings/EngineLinkCredentialSection";
 import { ModelsSection } from "@/apps/settings/ModelsSection";
 import { InstallPlanSection } from "@/apps/settings/InstallPlanSection";
@@ -64,7 +65,7 @@ function DeviceAppearanceSettings() { return <DeviceAppearanceControl />; }
 function ChatSkillsSettings({ person }: SettingsViewProps) { return <ChatSkillsSection person={person} />; }
 function ChatShortcutsSettings() { return <ChatShortcutsView />; }
 function HomeCommandsSettings({ person }: SettingsViewProps) { return <CommandsSection person={person} management />; }
-function HomeVoiceCatalogSettings({ person }: SettingsViewProps) { useTabItem("Voices"); return <VoiceBrowserSection person={person} />; }
+function HomeVoiceCatalogSettings() { useTabItem("Voices"); return <VoiceManagerSection />; }
 
 // ADMIN-HOME-SETTINGS-01: the household admin sections that had no entry.
 // Each is a trail view of its Home settings section (spec/settings/areas.json),
