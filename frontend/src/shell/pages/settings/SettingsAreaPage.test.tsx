@@ -193,10 +193,10 @@ describe("the settings route", () => {
     expect(view.queryByRole("img", { name: /QR code for your Home address/ })).toBeNull();
   });
 
-  test("an admin opens the household voice catalog in Home settings", async () => {
+  test("an admin opens the voice manager in Home settings", async () => {
     const view = open(makePerson("admin"), "/settings/home/voices");
     await waitFor(() => expect(where(view)).toBe("/settings/home/voices"));
-    await waitFor(() => expect(view.getByText("Choose a voice for you")).toBeTruthy());
+    await waitFor(() => expect(view.getByRole("button", { name: "Add voice" })).toBeTruthy());
   });
 
   test("a section the viewer may not see replaces to the first visible one, naming nothing", async () => {
