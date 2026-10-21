@@ -164,11 +164,13 @@ const robotCheckinSchema = z.object({
 const robotCheckinRoute = createRoute({
   method: "put", path: "/me/checkin", tags: ["Devices"], summary: "Report the current StackChan check-in",
   middleware: [requireDeviceSession("robot")] as const,
-  request: { body: { content: { "application/json": { schema: robotCheckinSchema } } } },
+  request: { body: { content: { "application/json": { schema: z.record(z.string(), z.unknown()).openapi({ description: "The body's check-in report; fields are listed in docs/dev/robot-checkin in the bot repository. Unknown or odd readings become null." }) } } } },
   responses: { 204: { description: "Check-in accepted." }, ...errorResponses({ 400: "Malformed check-in", 401: "Not signed in", 403: "Not a robot device" }) },
 });
 devicesRoutes.openapi(robotCheckinRoute, (c) => {
-  const body = c.req.valid("json") as RobotCheckin;
+  const parsed = robotCheckinSchema.safeParse(c.req.valid("json"));
+  if (!parsed.success) return c.json({ error: "The check-in needs a last_seen time. Send an ISO time with it." }, 400);
+  const body = parsed.data as RobotCheckin;
   const device = resolveRequestDevice(c);
   if (!device) return c.json({ error: "Not signed in" }, 401);
   // body.device_id is the unit's MAC; the signed-in robot session decides which device this report belongs to.
