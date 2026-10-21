@@ -176,14 +176,14 @@ describe("DevicesSection", () => {
       expect(view.getByLabelText("Name")).toBeTruthy();
     } finally { restore(); }
   });
-  test("robot Voice row lists mocked voices with Same as its person first", async () => {
+  test("robot Voice row lists mocked voices with the companion's voice first", async () => {
     const restore = settingsFetch(false);
     try {
       const view = renderDetail();
       await view.findByText("Voice");
       fireEvent.click(view.getByRole("combobox", { name: "Voice" }));
       const choices = await view.findAllByRole("option");
-      expect(choices.map((choice) => choice.textContent)).toEqual(["Same as its person", "Alba"]);
+      expect(choices.map((choice) => choice.textContent)).toEqual(["Use the companion's voice", "Alba"]);
     } finally { restore(); }
   });
   test("saving robot name calls the device PATCH route", async () => {

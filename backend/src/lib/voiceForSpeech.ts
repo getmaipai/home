@@ -2,7 +2,7 @@ import type { PersonRow } from "@/types";
 import { getDeviceSettingValue, getHouseholdSettingValue, getPersonSettingValue } from "@/lib/settings";
 import { getDeviceById } from "@/lib/devices";
 import { speakerAgeBand } from "@/lib/ageBand";
-import { robotCompanionBand, stricterBand } from "@/lib/robotCompanion";
+import { robotCompanionBand, robotCompanionOf, stricterBand } from "@/lib/robotCompanion";
 import { VOICE_ENGINE_DEFAULT, VOICE_PRESET_NAMES } from "@/settings/voiceKeys";
 import { voicePresetName } from "@/lib/voiceResolve";
 
@@ -13,9 +13,12 @@ export function isPresetVoice(id: string): boolean {
 export function voiceForSpeech(input: { actor: PersonRow; deviceId?: string; companionVoice?: string }): string {
   const personVoice = String(getPersonSettingValue(input.actor, "tts.voice_id") ?? VOICE_ENGINE_DEFAULT);
   let selected = input.companionVoice ?? personVoice;
-  if (!input.companionVoice && input.deviceId && getDeviceById(input.deviceId)?.kind === "robot") {
+  if (input.deviceId && getDeviceById(input.deviceId)?.kind === "robot") {
+    // The most specific choice wins: the robot's own voice, then its companion's voice, then the person's. No bundled companion names a
+    // voice yet (COMP-04), so a robot with a companion that has no voice of its own speaks Home's default voice, not its person's.
     const robotVoice = getDeviceSettingValue(input.deviceId, "robot.voice.id");
     if (typeof robotVoice === "string" && robotVoice !== VOICE_ENGINE_DEFAULT) selected = robotVoice;
+    else if (!input.companionVoice && robotCompanionOf(input.deviceId)) selected = VOICE_ENGINE_DEFAULT;
   }
   // Nobody (companion, robot or person) chose a voice: Home's default voice, which is the engine's own voice until an admin picks one.
   if (selected === VOICE_ENGINE_DEFAULT) selected = String(getHouseholdSettingValue("tts.home_voice") ?? VOICE_ENGINE_DEFAULT);

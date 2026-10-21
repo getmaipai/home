@@ -130,8 +130,10 @@ Jesse asked to assign a robot things like its name and voice and to see its info
 - **`VoiceBrowserSection.tsx` (the person voice picker):** weighed for `robot.voice.id` and not reused. It is a Home-side picker
   outside the settings shell, which S4 rules out for a device card; its voice list is reused as the one `voices.tts` source.
 - **`lib/robotClips.ts` `adultVoice`:** ROBOT-VOICE-01 routes it and `routes/tts.ts` through one voice-choosing function, so a
-  robot's clips and its live speech use the same voice. Order on a robot session: a turn's companion voice (COMP-04) first, then
-  `robot.voice.id` when not `default`, then the person's `tts.voice_id`; the child floor applies to the result.
+  robot's clips and its live speech use the same voice. Order on a robot session (corrected 2026-10-21, owner: the most specific
+  choice wins): the robot's own `robot.voice.id` when not `default`, then its companion's voice (COMP-04; no bundled companion names one yet,
+  so a robot with a companion speaks Home's default voice), then, for a robot with no companion, the person's `tts.voice_id`. The child floor
+  applies to the result. The Voice row on the robot's page reads "Use the companion's voice" for `default`.
 
 ## Supersedes
 

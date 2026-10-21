@@ -95,7 +95,7 @@ function RobotDetail({ device, onClose }: { device: DeviceInfo; onClose: () => v
   const top = useRef<HTMLDivElement>(null);
   useEffect(() => { top.current?.scrollIntoView?.({ block: "start" }); }, []);
   const installing = hostedInstall && device.lastSeenAt === null;
-  const voiceOptions = [{ value: "default", label: "Same as its person" }, ...playableVoices(robotVoices).map((voice) => ({ value: voice.id, label: voiceFriendlyName(voice) }))];
+  const voiceOptions = [{ value: "default", label: "Use the companion's voice" }, ...playableVoices(robotVoices).map((voice) => ({ value: voice.id, label: voiceFriendlyName(voice) }))];
   const cards = useMemo(() => ((areasFile as { device_cards?: Array<{ device_kind: string; group: string; scope: "device"; label: string; min_role?: string }> }).device_cards ?? []).filter((card) => card.device_kind === "robot" && card.scope === "device" && (!card.min_role || card.min_role === "admin" || card.min_role === "owner")), []);
   const refreshAll = () => { window.dispatchEvent(new Event("devices-updated")); void queryClient.invalidateQueries({ queryKey: ["robot-devices"] }); void queryClient.invalidateQueries({ queryKey: ["robots"] }); };
 

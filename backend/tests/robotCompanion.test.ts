@@ -11,7 +11,7 @@ import { effectiveBand } from "@/lib/turnContext";
 import { robotCompanionBand, robotCompanionOf, companionsForControls } from "@/lib/robotCompanion";
 import { PERSONAS } from "@/lib/persona";
 import { voiceForSpeech } from "@/lib/voiceForSpeech";
-import { setHouseholdSettingValue } from "@/lib/settings";
+import { setHouseholdSettingValue, setValue } from "@/lib/settings";
 import type { PersonRow } from "@/types";
 
 beforeEach(() => resetDb());
@@ -178,5 +178,25 @@ describe("a child or teen companion never speaks a clip voice", () => {
     expect(voiceForSpeech({ actor: row, deviceId })).not.toBe("voice-abcdefghijklmnop");
     await put(owner, scope, "robot.companion.id", "lively-child");
     expect(voiceForSpeech({ actor: row, deviceId })).not.toBe("voice-abcdefghijklmnop");
+  });
+});
+
+describe("a robot's own voice beats its companion's voice", () => {
+  test("robot voice first, then the companion (Home's default), never the person's own voice once a companion is assigned", async () => {
+    const { owner, row, deviceId, scope } = await setup();
+    setHouseholdSettingValue("tts.home_voice", "voice-abcdefghijklmnop");
+    expect(setValue(row, `person:${row.id}`, "tts.voice_id", "voice-zzzzzzzzzzzzzzzz").ok).toBe(true);
+    await put(owner, scope, "robot.controls", "adult");
+    // No companion yet: the person's voice, as before.
+    expect(voiceForSpeech({ actor: row, deviceId })).toBe("voice-zzzzzzzzzzzzzzzz");
+    // A companion with no voice of its own: Home's default voice, not the person's.
+    await put(owner, scope, "robot.companion.id", "lively-adult");
+    expect(voiceForSpeech({ actor: row, deviceId })).toBe("voice-abcdefghijklmnop");
+    // The robot's own voice wins over the companion's.
+    expect(setValue(row, scope, "robot.voice.id", "voice-yyyyyyyyyyyyyyyy").ok).toBe(true);
+    expect(voiceForSpeech({ actor: row, deviceId })).toBe("voice-yyyyyyyyyyyyyyyy");
+    // Back to "use the companion's voice".
+    expect(setValue(row, scope, "robot.voice.id", "default").ok).toBe(true);
+    expect(voiceForSpeech({ actor: row, deviceId })).toBe("voice-abcdefghijklmnop");
   });
 });
