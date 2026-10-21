@@ -65,6 +65,19 @@ describe("VoiceManagerSection", () => {
     await waitFor(() => expect(remove).toHaveBeenCalledWith("voice-cutey1234"));
   });
 
+  test("a custom voice can be renamed; a built-in voice has no Rename", async () => {
+    const view = render([builtIn, cutey], [made("voice-cutey1234", { label: "Cutey" })]);
+    const rename = spyOn(householdVoicesApi, "rename").mockResolvedValue(made("voice-cutey1234", { label: "Bee-Mo" }));
+    await view.findByText("Cutey");
+    expect(within(view.getByText("Built-in voice").closest("li")!).queryByRole("button", { name: "Rename" })).toBeNull();
+    fireEvent.click(within(view.getByText("Cutey").closest("li")!).getByRole("button", { name: "Rename" }));
+    const dialog = await view.findByRole("dialog");
+    fireEvent.change(within(dialog).getByLabelText("Voice name"), { target: { value: "Bee-Mo" } });
+    fireEvent.click(within(dialog).getByRole("button", { name: "Save name" }));
+    await waitFor(() => expect(rename).toHaveBeenCalledWith("voice-cutey1234", "Bee-Mo"));
+    await view.findByText("The voice is now called Bee-Mo.");
+  });
+
   test("Test plays the shared preview player", async () => {
     const start = spyOn(voicePreviewPlayer, "start").mockResolvedValue(undefined as never);
     const view = render([builtIn]);

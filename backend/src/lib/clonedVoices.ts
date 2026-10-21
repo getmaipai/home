@@ -153,6 +153,22 @@ export function saveClonedVoice(
   return { ok: true, value: toInfo(row, creator.displayName) };
 }
 
+const MAX_RENAME_LENGTH = 40;
+
+/** Renames a voice made at home. Owner or admin only; changes the label and nothing else (not the id, the clip, or anyone's choice). */
+export function renameClonedVoice(actor: PersonRow, id: string, label: string): ClonedVoiceOpResult<ClonedVoiceInfo> {
+  if (!isOwnerOrAdmin(actor)) return { ok: false, status: 403, error: "Only an owner or an admin can rename a voice." };
+  const trimmed = label.trim();
+  if (!trimmed) return { ok: false, status: 400, error: "Type a name for the voice." };
+  if (trimmed.length > MAX_RENAME_LENGTH) return { ok: false, status: 400, error: `The name can be ${MAX_RENAME_LENGTH} characters or fewer.` };
+  const row = db.select().from(clonedVoices).where(eq(clonedVoices.id, id)).get();
+  if (!row) return { ok: false, status: 404, error: "cloned voice not found" };
+  db.update(clonedVoices).set({ label: trimmed }).where(eq(clonedVoices.id, id)).run();
+  appendLogLine(`voice.renamed id=${id} by=${actor.id} role=${actor.role}`);
+  const creator = db.select({ name: people.displayName }).from(people).where(eq(people.id, row.creatorId)).get();
+  return { ok: true, value: toInfo({ ...row, label: trimmed }, creator?.name ?? "Someone") };
+}
+
 /** Creator or owner/admin may remove a household recording. */
 export function deleteClonedVoice(actor: PersonRow, id: string): ClonedVoiceOpResult<true> {
   const row = db.select().from(clonedVoices).where(eq(clonedVoices.id, id)).get();

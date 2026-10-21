@@ -32,5 +32,6 @@ export const householdVoicesApi = {
     if (input.pitchSemitones !== undefined) form.append("pitch_semitones", String(input.pitchSemitones));
     return send<HouseholdVoice>("/api/voice/cloned", { method: "POST", body: form });
   },
+  rename: (id: string, label: string) => send<HouseholdVoice>(`/api/voice/cloned/${encodeURIComponent(id)}/rename`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ label }) }),
   remove: (id: string) => send<{ success: true }>(`/api/voice/cloned/${encodeURIComponent(id)}/delete`, { method: "POST" }),
 };

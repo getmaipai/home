@@ -9,6 +9,7 @@ import { householdVoicesApi, type HouseholdVoice } from "@/lib/householdVoicesAp
 import { playableVoices, presetNameForVoice, voiceDisplayName } from "@/lib/voice/voiceBrowserRows";
 import { voicePreviewPlayer, type VoicePreviewState } from "@/lib/voice/voicePreviewPlayer";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@maipai/ui/src/ui/dialog";
+import { Input } from "@maipai/ui/src/ui/input";
 import { AddVoiceForm } from "@/apps/settings/AddVoiceForm";
 
 const GENDER: Record<StackVoice["gender"], string> = { female: "Female", male: "Male", neutral: "Neutral", unknown: "Not stated" };
@@ -33,6 +34,8 @@ export function VoiceManagerSection() {
   const [adding, setAdding] = useState(false);
   const [addBusy, setAddBusy] = useState(false);
   const [removing, setRemoving] = useState<StackVoice | null>(null);
+  const [renaming, setRenaming] = useState<StackVoice | null>(null);
+  const [newName, setNewName] = useState("");
   const [notice, setNotice] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
@@ -56,6 +59,16 @@ export function VoiceManagerSection() {
       queryClient.setQueryData<ResolvedSetting[]>(["settings-values", "household"], (old) => (old ?? []).some((item) => item.key === result.key) ? (old ?? []).map((item) => item.key === result.key ? result : item) : [...(old ?? []), result]);
       setNotice(`${voiceDisplayName(voice)} is now Home's default voice.`);
     } catch (cause) { setError(cause instanceof ApiError ? cause.message : "Could not save Home's default voice. Try again."); }
+    finally { setBusyId(null); }
+  }
+
+  async function rename(voice: StackVoice, label: string) {
+    setRenaming(null); setError(null); setNotice(null); setBusyId(voice.id);
+    try {
+      const result = await householdVoicesApi.rename(voice.id, label);
+      await Promise.all([queryClient.invalidateQueries({ queryKey: ["household-voices"] }), queryClient.invalidateQueries({ queryKey: ["stack-voices"] })]);
+      setNotice(`The voice is now called ${result.label}.`);
+    } catch (cause) { setError(cause instanceof ApiError ? cause.message : "Could not rename this voice. Try again."); }
     finally { setBusyId(null); }
   }
 
@@ -100,6 +113,7 @@ export function VoiceManagerSection() {
               <div className="flex flex-wrap gap-2 md:flex-nowrap md:justify-end">
                 <Button type="button" variant="outline" onClick={() => testing ? voicePreviewPlayer.stop() : void voicePreviewPlayer.start(voice.id)}>{testing && !preview.busy ? "Stop" : "Test"}</Button>
                 {home ? null : <Button type="button" variant="outline" disabled={busyId === voice.id} onClick={() => void setDefault(voice)}>Set as default</Button>}
+                {custom ? <Button type="button" variant="outline" disabled={busyId === voice.id} onClick={() => { setNewName(record?.label ?? voiceDisplayName(voice)); setRenaming(voice); }}>Rename</Button> : null}
                 {custom ? <Button type="button" variant="outline" disabled={busyId === voice.id} onClick={() => setRemoving(voice)}>Delete</Button> : null}
               </div>
             </li>;
@@ -113,6 +127,21 @@ export function VoiceManagerSection() {
           <DialogDescription>Make a voice from a WAV, MP3 or FLAC recording of 6 to 30 seconds. Everyone in the home can pick it, and so can a robot.</DialogDescription>
         </DialogHeader>
         <AddVoiceForm onBusyChange={setAddBusy} onCancel={() => setAdding(false)} onMade={(name) => { setAdding(false); setNotice(`${name} is ready. Test it here, then pick it for a person or a robot.`); }} />
+      </DialogContent>
+    </Dialog>
+    <Dialog open={renaming !== null} onOpenChange={(open) => { if (!open) setRenaming(null); }}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Rename {renaming ? voiceDisplayName(renaming) : "this voice"}</DialogTitle>
+          <DialogDescription>Only the name changes. The recording stays the same, and everyone and every robot using this voice keeps it.</DialogDescription>
+        </DialogHeader>
+        <form className="flex flex-col gap-3" onSubmit={(event) => { event.preventDefault(); if (renaming && newName.trim()) void rename(renaming, newName); }}>
+          <Input aria-label="Voice name" value={newName} maxLength={40} onChange={(event) => setNewName(event.target.value)} />
+          <div className="flex justify-end gap-2">
+            <Button type="button" variant="outline" onClick={() => setRenaming(null)}>Cancel</Button>
+            <Button type="submit" disabled={!newName.trim()}>Save name</Button>
+          </div>
+        </form>
       </DialogContent>
     </Dialog>
     <AlertDialog open={removing !== null} onOpenChange={(open) => { if (!open) setRemoving(null); }}>

@@ -59,6 +59,23 @@ async function makeVoice(client: TestClient, fields: Record<string, string> = {}
   return client.postForm("/api/voice/cloned", form);
 }
 
+describe("renaming a voice", () => {
+  test("an owner or admin renames it (trimmed); the id, clip and choices stay; others are refused", async () => {
+    const h = await household();
+    const made = (await (await makeVoice(h.owner, { label: "Cutey" })).json()) as { id: string };
+    const rename = (client: TestClient, label: string) => client.post(`/api/voice/cloned/${made.id}/rename`, { label });
+    for (const who of [h.adult, h.teen, h.child]) expect((await rename(who.client, "Nope")).status).toBe(403);
+    const res = await rename(h.admin.client, "  Bee-Mo  ");
+    expect(res.status).toBe(200);
+    expect(await res.json()).toMatchObject({ id: made.id, label: "Bee-Mo" });
+    expect((await rename(h.owner, "   ")).status).toBe(400);
+    expect((await rename(h.owner, "x".repeat(41))).status).toBe(400);
+    expect((await h.owner.post("/api/voice/cloned/voice-nosuchone1/rename", { label: "A" })).status).toBe(404);
+    const list = (await (await h.owner.get("/api/voice/cloned")).json()) as { voices: Array<{ id: string; label: string }> };
+    expect(list.voices).toEqual([expect.objectContaining({ id: made.id, label: "Bee-Mo" })]);
+  });
+});
+
 describe("making a voice", () => {
   test("a member, teen and child are refused with 403 and nothing is stored; an admin and the owner can", async () => {
     const h = await household();

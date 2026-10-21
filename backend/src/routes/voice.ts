@@ -25,6 +25,7 @@ import {
   deleteClonedVoice,
   getClonedVoiceFile,
   clonedVoiceExists,
+  renameClonedVoice,
   householdVoiceEntries,
   householdVoiceSpeech,
   MAX_BYTES as MAX_CLONED_VOICE_BYTES,
@@ -613,6 +614,36 @@ voiceRoutes.openapi(clonedDeleteRoute, async (c) => {
   }
   dropHouseholdPreview(id);
   return c.json({ success: true } as { success: true }, 200);
+});
+
+const ClonedVoiceSchema = z.object({
+  id: z.string(), label: z.string(), creatorId: z.string(), creatorName: z.string(), bytes: z.number().int().nonnegative(), createdAt: z.string(),
+  temperature: z.number().optional(), pitchSemitones: z.number().optional(),
+});
+
+const clonedRenameRoute = createRoute({
+  method: "post",
+  path: "/cloned/:id/rename",
+  tags: ["Voice"],
+  summary: "Rename a cloned voice",
+  description: "Changes the name of a voice made at home. Owner or admin only. The voice's id and recording do not change.",
+  middleware: [requireAuth] as const,
+  request: {
+    params: z.object({ id: z.string() }),
+    body: { content: { "application/json": { schema: z.object({ label: z.string() }) } }, required: true },
+  },
+  responses: {
+    200: { content: { "application/json": { schema: ClonedVoiceSchema } }, description: "The renamed voice." },
+    ...errorResponses({ 400: "Empty or too long name", 401: "Not signed in", 403: "Only an owner or an admin can rename", 404: "Cloned voice not found" }),
+  },
+});
+
+voiceRoutes.openapi(clonedRenameRoute, async (c) => {
+  const result = renameClonedVoice(c.get("person"), c.req.valid("param").id, c.req.valid("json").label);
+  if (result.ok) return c.json(result.value, 200);
+  if (result.status === 404) return c.json({ error: result.error }, 404);
+  if (result.status === 400) return c.json({ error: result.error }, 400);
+  return c.json({ error: result.error }, 403);
 });
 
 // Deliberately NOT behind requireAuth: the Stack fetches `voice_url` by plain HTTP
