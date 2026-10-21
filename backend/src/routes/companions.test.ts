@@ -12,6 +12,9 @@ import { loadManifestOnly } from "@/lib/plugins";
 import { __reloadPersonasForTests } from "@/lib/persona";
 import { resetDb } from "../../tests/reset-db";
 import sharp from "sharp";
+import { __setPicturesFetchForTests } from "@/lib/pictures/stack";
+import { __setPictureStatusForTests, readyStatusForTests } from "@/lib/pictures/ready";
+import { __clearCompanionLookJobsForTests } from "@/lib/companionLookJobs";
 
 const app = new OpenAPIHono();
 app.route("/api/companions", companionsRoutes);
@@ -42,8 +45,95 @@ function fixture() {
   return loaded.value.companion;
 }
 
-beforeEach(() => { resetDb(); rmSync(companionRoot, { recursive: true, force: true }); __reloadPersonasForTests(); });
-afterEach(() => { resetDb(); rmSync(companionRoot, { recursive: true, force: true }); __reloadPersonasForTests(); });
+beforeEach(() => { resetDb(); rmSync(companionRoot, { recursive: true, force: true }); __reloadPersonasForTests(); __clearCompanionLookJobsForTests(); __setPicturesFetchForTests(null); __setPictureStatusForTests(undefined); });
+afterEach(() => { resetDb(); rmSync(companionRoot, { recursive: true, force: true }); __reloadPersonasForTests(); __clearCompanionLookJobsForTests(); __setPicturesFetchForTests(null); __setPictureStatusForTests(undefined); });
+
+async function keyedPicture() {
+  const svg = Buffer.from('<svg width="512" height="512"><circle cx="256" cy="256" r="150" fill="red"/></svg>');
+  return new Uint8Array(await sharp({ create: { width: 512, height: 512, channels: 3, background: { r: 0, g: 255, b: 0 } } }).composite([{ input: svg }]).png().toBuffer());
+}
+
+describe("companion look generation jobs", () => {
+  test("requires a prompt, refuses minors, refuses policy prompts, and reports engine readiness", async () => {
+    const adult = addPerson("person-look-gen", "adult"), child = addPerson("person-look-gen-child", "child"), teen = addPerson("person-look-gen-teen", "teen");
+    const created = createHouseholdCompanion({ ...fixture(), display_name: "Look generation", look_prompt: "a red fox" }, { display_name: "Author", person_id: "person-look-gen" });
+    if (!created.ok) throw new Error(created.error);
+    const path = `companions/${created.value.id}/look/generate`;
+    let stackCalls = 0;
+    __setPictureStatusForTests(readyStatusForTests());
+    __setPicturesFetchForTests((async () => { stackCalls++; return Response.json({ job: "look-policy-job" }, { status: 202 }); }) as unknown as typeof fetch);
+    expect((await request(path, adult, "POST", {})).status).toBe(202);
+    const noPrompt = createHouseholdCompanion({ ...fixture(), display_name: "No prompt", look_prompt: undefined }, { display_name: "Author", person_id: "person-look-gen" });
+    if (!noPrompt.ok) throw new Error(noPrompt.error);
+    const missing = await request(`companions/${noPrompt.value.id}/look/generate`, adult, "POST", {});
+    expect(missing.status).toBe(400);
+    const childResult = await request(path, child, "POST", { prompt: "cartoon dragon" }); expect(childResult.status).toBe(403);
+    const teenResult = await request(path, teen, "POST", { prompt: "cartoon dragon" }); expect(teenResult.status).toBe(403);
+    const beforeRefusal = stackCalls;
+    const refused = await request(`companions/${noPrompt.value.id}/look/generate`, adult, "POST", { prompt: "a 12 year old child naked" }); expect(refused.status).toBe(422);
+    expect(((await refused.json()) as { error: string }).error).toContain("I can't make that");
+    expect(stackCalls).toBe(beforeRefusal);
+    __setPictureStatusForTests(null);
+    const unavailableCompanion = createHouseholdCompanion({ ...fixture(), display_name: "No engine", look_prompt: "a red fox" }, { display_name: "Author", person_id: "person-look-gen" });
+    if (!unavailableCompanion.ok) throw new Error(unavailableCompanion.error);
+    const unavailable = await request(`companions/${unavailableCompanion.value.id}/look/generate`, adult, "POST", {});
+    expect(unavailable.status).toBe(503);
+  });
+
+  test("queues, polls and stores four candidates only once, then cancels jobs", async () => {
+    const adult = addPerson("person-look-jobs", "adult");
+    const created = createHouseholdCompanion({ ...fixture(), display_name: "Job character", look_prompt: "a red fox" }, { display_name: "Author", person_id: "person-look-jobs" });
+    if (!created.ok) throw new Error(created.error);
+    __setPictureStatusForTests(readyStatusForTests());
+    const image = await keyedPicture(); let reads = 0;
+    __setPicturesFetchForTests((async (input) => {
+      const url = String(input);
+      if (url.endsWith("/v1/images/generations")) return Response.json({ job: "look-job-1" }, { status: 202 });
+      if (url.endsWith("/look-job-1")) { reads++; return Response.json({ job: "look-job-1", state: reads === 1 ? "queued" : reads === 2 ? "running" : "done", progress: 0.4, data: [] }); }
+      if (/look-job-1\/\d+\.png$/.test(url)) return new Response(image, { headers: { "content-type": "image/png" } });
+      if (url.endsWith("/v1/images/generations/look-job-1")) return new Response(null, { status: 204 });
+      return new Response("Not found", { status: 404 });
+    }) as typeof fetch);
+    const started = await request(`companions/${created.value.id}/look/generate`, adult, "POST", {}); expect(started.status).toBe(202);
+    const { job } = await started.json() as { job: string };
+    expect((await request(`companions/${created.value.id}/look/generate`, adult, "POST", {})).status).toBe(409);
+    const poll = `companions/${created.value.id}/look/jobs/${job}`;
+    expect((await (await request(poll, adult)).json() as { state: string }).state).toBe("queued");
+    expect((await (await request(poll, adult)).json() as { state: string }).state).toBe("running");
+    expect((await (await request(poll, adult)).json() as { state: string; versions: unknown[] }).versions).toHaveLength(4);
+    expect((await (await request(poll, adult)).json() as { state: string; versions: unknown[] }).versions).toHaveLength(4);
+    await expect((await request(`companions/${created.value.id}/look`, adult)).json()).resolves.toMatchObject({ versions: expect.arrayContaining([expect.objectContaining({ source: "generated" })]) });
+    const cancelledStart = await request(`companions/${created.value.id}/look/generate`, adult, "POST", {});
+    const cancelledJob = (await cancelledStart.json() as { job: string }).job;
+    expect((await request(`companions/${created.value.id}/look/jobs/${cancelledJob}`, adult, "DELETE")).status).toBe(204);
+  });
+
+  test("edits a look picture and records its source version", async () => {
+    const adult = addPerson("person-look-edit", "adult");
+    const created = createHouseholdCompanion({ ...fixture(), display_name: "Edit character", look_prompt: "a red fox" }, { display_name: "Author", person_id: "person-look-edit" });
+    if (!created.ok) throw new Error(created.error);
+    const image = await keyedPicture();
+    __setPictureStatusForTests(readyStatusForTests());
+    const started: string[] = [];
+    __setPicturesFetchForTests((async (input, init) => {
+      const url = String(input), method = init?.method ?? "GET";
+      if (url.endsWith("/v1/images/edits") && method === "POST") { started.push("edit"); return Response.json({ job: "look-edit-1" }, { status: 202 }); }
+      if (url.endsWith("/look-edit-1")) return Response.json({ job: "look-edit-1", state: "done", progress: 1, data: [] });
+      if (url.endsWith("/look-edit-1/0.png")) return new Response(image, { headers: { "content-type": "image/png" } });
+      return new Response("Not found", { status: 404 });
+    }) as typeof fetch);
+    const sourceResponse = await upload(`companions/${created.value.id}/look/upload`, adult, await transparentPng(), "true", "false");
+    const { id: sourceId } = await sourceResponse.json() as { id: string };
+    const edit = await request(`companions/${created.value.id}/look/edit`, adult, "POST", { version_id: sourceId, instruction: "Add a blue scarf" });
+    expect(edit.status).toBe(202); expect(started).toEqual(["edit"]);
+    const { job } = await edit.json() as { job: string };
+    const result = await request(`companions/${created.value.id}/look/jobs/${job}`, adult);
+    expect(await result.json()).toMatchObject({ state: "done", versions: [{ label: "Add a blue scarf" }] });
+    const look = await (await request(`companions/${created.value.id}/look`, adult)).json() as { versions: Array<{ id: string; source: string; from: string | null }> };
+    expect(look.versions).toHaveLength(2);
+    expect(look.versions[1]).toMatchObject({ source: "edit", from: sourceId });
+  });
+});
 
 describe("household companion routes", () => {
   test("look upload requires rights confirmation and refuses real people", async () => {

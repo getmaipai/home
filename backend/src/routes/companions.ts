@@ -19,6 +19,7 @@ import { companionFits, robotControlsOf, ROBOT_COMPANION_KEY } from "@/lib/robot
 import { PERSONAS, reloadPersonas } from "@/lib/persona";
 import { createHouseholdCompanion, copyBundledCompanion, copyHouseholdCompanion, getHouseholdCompanion, updateHouseholdCompanion, deleteHouseholdCompanion, setHouseholdCompanionAudience, setHouseholdCompanionStatus, householdCompanionAuthorId } from "@/lib/householdCompanions";
 import { addVersion, deleteVersion, readLook, setRest, versionPath, normalizePicture, uploadLabel } from "@/lib/companionLook";
+import { LOOK_EDIT_PROMPT_LINE, LOOK_JOB_BUSY_LINE, LOOK_PROMPT_REQUIRED_LINE, activeLookJob, canGenerateLook, cancelLookJob, pollLookJob, startLookEdit, startLookGeneration } from "@/lib/companionLookJobs";
 import { fileTypeFromBuffer } from "file-type";
 import { readFileSync } from "node:fs";
 import { editToolsStatus } from "@/lib/imageEdit";
@@ -115,13 +116,56 @@ function lookAccess(actor: import("@/types").PersonRow, id: string): { status: 4
 }
 const lookIdParam = z.object({ id: z.string().min(1).max(80).openapi({ param: { name: "id", in: "path" } }) });
 const lookVersionParam = z.object({ id: z.string().min(1).max(80), versionId: z.string().min(1).max(80).openapi({ param: { name: "versionId", in: "path" } }) });
-const LookResponse = z.object({ versions: z.array(z.object({ id: z.string(), label: z.string(), source: z.enum(["upload", "generated", "edit"]), width: z.number().int(), height: z.number().int(), created_at: z.string(), url: z.string() })), rest: z.string().nullable(), key: z.enum([media.key.default, media.key.alternate]), can_generate: z.boolean() });
+const LookResponse = z.object({ versions: z.array(z.object({ id: z.string(), label: z.string(), source: z.enum(["upload", "generated", "edit"]), width: z.number().int(), height: z.number().int(), created_at: z.string(), from: z.string().nullable(), url: z.string() })), rest: z.string().nullable(), key: z.enum([media.key.default, media.key.alternate]), can_generate: z.boolean(), generate_reason: z.string().optional() });
 const lookRoute = createRoute({ method: "get", path: "/{id}/look", tags: ["Companions"], summary: "Read a household companion's look pictures", middleware: [requireAuth] as const,
   request: { params: lookIdParam }, responses: { 200: { content: { "application/json": { schema: LookResponse } }, description: "Picture versions and the approved starting picture." }, ...errorResponses({ 401: "Not signed in", 403: "Only the author or an admin can read this companion's pictures", 404: "No household companion" }) } });
-companionsRoutes.openapi(lookRoute, (c) => {
+companionsRoutes.openapi(lookRoute, async (c) => {
   const id = c.req.valid("param").id, denied = lookAccess(c.get("person"), id); if (denied) return c.json({ error: denied.error }, denied.status);
   const look = readLook(id);
-  return c.json({ versions: look.versions.map(({ id: versionId, label, source, width, height, created_at }) => ({ id: versionId, label, source, width, height, created_at, url: `/api/companions/${encodeURIComponent(id)}/look/${versionId}/image` })), rest: look.rest, key: look.key, can_generate: false }, 200);
+  const generation = await canGenerateLook(c.get("person"), id);
+  return c.json({ versions: look.versions.map(({ id: versionId, label, source, width, height, created_at, from }) => ({ id: versionId, label, source, width, height, created_at, from: from ?? null, url: `/api/companions/${encodeURIComponent(id)}/look/${versionId}/image` })), rest: look.rest, key: look.key, ...generation }, 200);
+});
+
+const lookGenerateBody = z.object({ prompt: z.string().max(600).optional(), count: z.number().int().min(1).max(4).default(4) });
+const lookJobResponse = z.object({ job: z.string() });
+const lookGenerateRoute = createRoute({ method: "post", path: "/{id}/look/generate", tags: ["Companions"], summary: "Generate companion look picture candidates", middleware: [requireAuth] as const,
+  request: { params: lookIdParam, body: { content: { "application/json": { schema: lookGenerateBody } } } },
+  responses: { 202: { content: { "application/json": { schema: lookJobResponse } }, description: "Picture generation started." }, ...errorResponses({ 400: "Write a look prompt first", 401: "Not signed in", 403: "Only an allowed editor can generate this companion's pictures", 404: "No household companion", 409: "A picture is already being made for this companion", 422: "The prompt cannot be used for a picture", 503: "Picture creation is not set up" }) } });
+companionsRoutes.openapi(lookGenerateRoute, async (c) => {
+  const { id } = c.req.valid("param"), denied = lookAccess(c.get("person"), id); if (denied) return c.json({ error: denied.error }, denied.status);
+  const body = c.req.valid("json"), lookPrompt = getHouseholdCompanion(id)?.companion?.look_prompt?.trim() ?? "";
+  const prompt = body.prompt?.trim() || lookPrompt;
+  if (!prompt) return c.json({ error: LOOK_PROMPT_REQUIRED_LINE }, 400);
+  try { const job = await startLookGeneration({ actor: c.get("person"), companionId: id, lookPrompt, prompt: body.prompt, count: body.count }); return c.json({ job }, 202); }
+  catch (error) { const status = (error as { status?: number }).status ?? 503; return c.json({ error: error instanceof Error ? error.message : "The picture could not be started. Try again." }, status as 400 | 403 | 409 | 422 | 503); }
+});
+
+const lookEditBody = z.object({ version_id: z.string().regex(/^v-[0-9]+$/), instruction: z.string().min(1).max(300) });
+const lookEditRoute = createRoute({ method: "post", path: "/{id}/look/edit", tags: ["Companions"], summary: "Edit a companion look picture with words", middleware: [requireAuth] as const,
+  request: { params: lookIdParam, body: { content: { "application/json": { schema: lookEditBody } } } },
+  responses: { 202: { content: { "application/json": { schema: lookJobResponse } }, description: "Picture edit started." }, ...errorResponses({ 400: "Describe a change in 1 to 300 characters", 401: "Not signed in", 403: "Only an allowed editor can change this companion's pictures", 404: "No household companion or picture", 409: "A picture is already being made for this companion", 422: "The instruction cannot be used to edit this picture", 503: "Picture creation is not set up" }) } });
+companionsRoutes.openapi(lookEditRoute, async (c) => {
+  const { id } = c.req.valid("param"), denied = lookAccess(c.get("person"), id); if (denied) return c.json({ error: denied.error }, denied.status);
+  const body = c.req.valid("json");
+  try { const job = await startLookEdit({ actor: c.get("person"), companionId: id, versionId: body.version_id, instruction: body.instruction }); return c.json({ job }, 202); }
+  catch (error) { const status = (error as { status?: number }).status ?? 503; return c.json({ error: error instanceof Error ? error.message : LOOK_EDIT_PROMPT_LINE }, status as 400 | 403 | 404 | 409 | 422 | 503); }
+});
+
+const lookJobParam = z.object({ id: z.string().min(1).max(80), job: z.string().min(1).max(160).openapi({ param: { name: "job", in: "path" } }) });
+const lookJobState = z.object({ state: z.enum(["queued", "running", "done", "failed", "cancelled"]), percent: z.number().int(), label: z.string(), versions: z.array(z.object({ id: z.string(), url: z.string(), label: z.string() })), error: z.string().nullable() });
+const pollLookRoute = createRoute({ method: "get", path: "/{id}/look/jobs/{job}", tags: ["Companions"], summary: "Read companion look picture job progress", middleware: [requireAuth] as const,
+  request: { params: lookJobParam }, responses: { 200: { content: { "application/json": { schema: lookJobState } }, description: "Job state and any saved look versions." }, ...errorResponses({ 401: "Not signed in", 403: "Only the author or an admin can read this companion's pictures", 404: "No such companion or job" }) } });
+companionsRoutes.openapi(pollLookRoute, async (c) => {
+  const { id, job } = c.req.valid("param"), denied = lookAccess(c.get("person"), id); if (denied) return c.json({ error: denied.error }, denied.status);
+  const result = await pollLookJob(job, c.get("person"), id);
+  return result ? c.json(result, 200) : c.json({ error: "That picture job could not be found. Start it again." }, 404);
+});
+
+const cancelLookRoute = createRoute({ method: "delete", path: "/{id}/look/jobs/{job}", tags: ["Companions"], summary: "Stop companion look picture generation", middleware: [requireAuth] as const,
+  request: { params: lookJobParam }, responses: { 204: { description: "Picture job stopped." }, ...errorResponses({ 401: "Not signed in", 403: "Only the author or an admin can stop this companion's pictures", 404: "No such companion or job" }) } });
+companionsRoutes.openapi(cancelLookRoute, async (c) => {
+  const { id, job } = c.req.valid("param"), denied = lookAccess(c.get("person"), id); if (denied) return c.json({ error: denied.error }, denied.status);
+  return await cancelLookJob(job, c.get("person"), id) ? c.body(null, 204) : c.json({ error: "That picture job could not be found. Start it again." }, 404);
 });
 
 const lookImageRoute = createRoute({ method: "get", path: "/{id}/look/{versionId}/image", tags: ["Companions"], summary: "Read a companion look PNG", middleware: [requireAuth] as const,

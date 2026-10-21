@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { rmSync } from "node:fs";
 import { join } from "node:path";
 import sharp from "sharp";
-import { addVersion, deleteLook, deleteVersion, normalizePicture, readLook, setRest, versionPath, LOOK_LIMIT_LINE, SMALL_PICTURE_LINE } from "@/lib/companionLook";
+import { addVersion, compositeOnKey, deleteLook, deleteVersion, keyOut, lookPromptFor, normalizePicture, readLook, setRest, versionPath, LOOK_LIMIT_LINE, SMALL_PICTURE_LINE } from "@/lib/companionLook";
 import { createHouseholdCompanion, deleteHouseholdCompanion } from "@/lib/householdCompanions";
 import { loadManifestOnly } from "@/lib/plugins";
 
@@ -24,6 +24,35 @@ function create() {
 function item(label = "Picture") { return { source: "upload" as const, label, width: 1024, height: 1024, from: null }; }
 
 describe("companion look store", () => {
+  test("builds a clipped character prompt with the selected key colour", () => {
+    expect(lookPromptFor("  small red fox  ", "#00FF00")).toBe("small red fox. A single character, full body, centred in the frame, standing in a relaxed neutral pose, facing the viewer, mouth closed, arms down. Simple clean cartoon illustration, flat colours. Plain solid green background, no shadow, no ground, no text, no other objects.");
+    expect(lookPromptFor("x".repeat(700), "#FF00FF").startsWith("x".repeat(600) + ". A single character")).toBe(true);
+    expect(lookPromptFor("cat", "#FF00FF")).toContain("solid magenta background");
+  });
+
+  test("keys out green and magenta without tinting antialiased red edges", async () => {
+    for (const key of ["#00FF00", "#FF00FF"]) {
+      const background = key === "#00FF00" ? { r: 0, g: 255, b: 0 } : { r: 255, g: 0, b: 255 };
+      const svg = Buffer.from('<svg width="64" height="64"><circle cx="32" cy="32" r="20" fill="red"/></svg>');
+      const input = new Uint8Array(await sharp({ create: { width: 64, height: 64, channels: 3, background } }).composite([{ input: svg }]).png().toBuffer());
+      const result = await sharp(await keyOut(input, key)).ensureAlpha().raw().toBuffer({ resolveWithObject: true });
+      const center = (32 * 64 + 32) * 4;
+      expect([...result.data.subarray(center, center + 4)]).toEqual([255, 0, 0, 255]);
+      const partial: number[] = [];
+      for (let i = 0; i < result.data.length; i += 4) if (result.data[i + 3]! > 10 && result.data[i + 3]! < 245) partial.push(i);
+      expect(partial.length).toBeGreaterThan(0);
+      const edge = result.data.subarray(partial[Math.floor(partial.length / 2)]!, partial[Math.floor(partial.length / 2)]! + 4);
+      expect(edge[0]).toBeGreaterThan(220); expect(edge[1]).toBeLessThanOrEqual(16); expect(edge[2]).toBeLessThanOrEqual(16);
+    }
+  });
+
+  test("composites a transparent look picture on the chosen key colour", async () => {
+    const input = new Uint8Array(await sharp({ create: { width: 4, height: 4, channels: 4, background: { r: 0, g: 0, b: 0, alpha: 0 } } }).composite([{ input: Buffer.from('<svg width="4" height="4"><rect width="2" height="4" fill="red"/></svg>') }]).png().toBuffer());
+    const output = await sharp(await compositeOnKey(input, "#FF00FF")).ensureAlpha().raw().toBuffer({ resolveWithObject: true });
+    expect([...output.data.subarray(0, 4)]).toEqual([255, 0, 0, 255]);
+    expect([...output.data.subarray(8, 12)]).toEqual([255, 0, 255, 255]);
+  });
+
   test("normalising centres a minimum-size opaque image on a transparent 1024 square within the margins", async () => {
     const input = new Uint8Array(await sharp({ create: { width: 600, height: 512, channels: 3, background: "red" } }).png().toBuffer());
     const output = await normalizePicture(input, { removeBackground: async (bytes) => bytes });

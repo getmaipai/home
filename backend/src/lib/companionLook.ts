@@ -14,6 +14,59 @@ export const EMPTY_LOOK: CompanionLook = { version: 1, versions: [], rest: null,
 export const LOOK_LIMIT_LINE = "This companion already has 60 pictures. Delete some before adding another.";
 export const SMALL_PICTURE_LINE = `Use a picture that is at least ${media.image.min_upload_short_side} pixels on its short side.`;
 
+/** The generated character stays isolated on the companion's chosen key colour until Home removes it. */
+export function lookPromptFor(lookPrompt: string, keyHex: string): string {
+  const keyName = keyHex.toUpperCase() === "#FF00FF" ? "magenta" : "green";
+  const subject = lookPrompt.trim().slice(0, 600);
+  return `${subject}. A single character, full body, centred in the frame, standing in a relaxed neutral pose, facing the viewer, mouth closed, arms down. Simple clean cartoon illustration, flat colours. Plain solid ${keyName} background, no shadow, no ground, no text, no other objects.`;
+}
+
+export const KEY_ALPHA_START = 5;
+export const KEY_ALPHA_END = 245;
+export const KEY_DESPILL_TOLERANCE = 8;
+const KEY_BYTES: Record<string, [number, number, number]> = { "#00FF00": [0, 255, 0], "#FF00FF": [255, 0, 255] };
+
+function keyRgb(keyHex: string): [number, number, number] {
+  const rgb = KEY_BYTES[keyHex.toUpperCase()];
+  if (!rgb) throw new Error("Choose green or magenta as the background key.");
+  return rgb;
+}
+
+/** Replaces key-colour pixels with transparency and removes the key tint from antialiased edges. */
+export async function keyOut(png: Uint8Array, keyHex: string): Promise<Uint8Array> {
+  const key = keyRgb(keyHex);
+  const decoded = await sharp(png, { limitInputPixels: 40_000_000, failOn: "error" }).ensureAlpha().raw().toBuffer({ resolveWithObject: true });
+  const pixels = decoded.data;
+  for (let offset = 0; offset < pixels.length; offset += 4) {
+    const channels = [pixels[offset]!, pixels[offset + 1]!, pixels[offset + 2]!];
+    // Estimate how much of the key is present in the pixel. The overlap of key-channel
+    // intensity with the inverse foreground channels remains linear at antialiased edges.
+    const keyCoverage = key[1] === 255
+      ? Math.min(channels[1]!, 255 - channels[0]!, 255 - channels[2]!) / 255
+      : Math.min(channels[0]!, channels[2]!, 255 - channels[1]!) / 255;
+    const rawAlpha = Math.max(0, Math.min(1, 1 - keyCoverage)) * 255;
+    const alpha = Math.round(Math.max(0, Math.min(1, (rawAlpha - KEY_ALPHA_START) / (KEY_ALPHA_END - KEY_ALPHA_START))) * 255);
+    pixels[offset + 3] = Math.min(pixels[offset + 3]!, alpha);
+    if (alpha > 0 && alpha < 255) {
+      const coverage = alpha / 255;
+      for (let channel = 0; channel < 3; channel++) {
+        const foreground = (channels[channel]! - key[channel]! * (1 - coverage)) / coverage;
+        pixels[offset + channel] = Math.max(0, Math.min(255, Math.round(foreground)));
+      }
+      // A final small clamp stops quantisation from leaving a green fringe. It is only for the green key: a magenta key must
+      // never clamp red or blue, which are real colours of the character (a red fox on magenta), and the unmixing above already removes it.
+      if (key[1] === 255) pixels[offset + 1] = Math.min(pixels[offset + 1]!, Math.max(pixels[offset]!, pixels[offset + 2]!) + KEY_DESPILL_TOLERANCE);
+    }
+  }
+  return new Uint8Array(await sharp(pixels, { raw: decoded.info }).png().toBuffer());
+}
+
+/** Makes a transparent look picture opaque on the selected key for a reference edit. */
+export async function compositeOnKey(png: Uint8Array, keyHex: string): Promise<Uint8Array> {
+  const [r, g, b] = keyRgb(keyHex);
+  return new Uint8Array(await sharp(png, { limitInputPixels: 40_000_000, failOn: "error" }).flatten({ background: { r, g, b } }).png().toBuffer());
+}
+
 function lookFolder(id: string): string | null {
   const folder = householdCompanionFolder(id);
   return folder ? join(folder, "look") : null;
