@@ -6,7 +6,7 @@ import { db } from "@/db";
 import { people } from "@/db/schema";
 import { issueDeviceToken } from "@/lib/deviceTokens";
 import { storeRobotCredential } from "@/lib/robotCredentials";
-import { setHouseholdSettingValue, setValue } from "@/lib/settings";
+import { getDeviceSettingValue, setHouseholdSettingValue, setValue } from "@/lib/settings";
 import {
   SCENE_TTL_MS, MIN_FRAME_INTERVAL_MS, __resetRobotVisionForTests, __setCaptionForTests, acceptFrame, cleanCaption, robotVisionMode, sceneContextLine, sceneFor,
 } from "@/lib/robotVision";
@@ -43,6 +43,21 @@ describe("robot.vision setting", () => {
     expect(robotVisionMode(deviceId)).toBe("on_demand");
     setVision(ownerRow, deviceId, "none");
     expect(robotVisionMode(deviceId)).toBe("none");
+  });
+});
+
+describe("robot.volume and robot.brightness", () => {
+  test("defaults are 70 and 100 per robot, set by an admin, and refuse values outside the range", async () => {
+    const { ownerRow, deviceId } = await household();
+    const read = (key: string) => getDeviceSettingValue(deviceId, key);
+    expect(read("robot.volume")).toBe(70);
+    expect(read("robot.brightness")).toBe(100);
+    expect(setValue(ownerRow, `device:${deviceId}`, "robot.volume", 55).ok).toBe(true);
+    expect(setValue(ownerRow, `device:${deviceId}`, "robot.brightness", 40).ok).toBe(true);
+    expect(read("robot.volume")).toBe(55);
+    expect(read("robot.brightness")).toBe(40);
+    expect(setValue(ownerRow, `device:${deviceId}`, "robot.volume", 5).ok).toBe(false);
+    expect(setValue(ownerRow, `device:${deviceId}`, "robot.brightness", 101).ok).toBe(false);
   });
 });
 

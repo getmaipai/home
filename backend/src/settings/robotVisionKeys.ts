@@ -32,3 +32,33 @@ export const ROBOT_VISION_SETTINGS_KEYS: SettingsKey[] = [
     honoured_by: ["home", "bot"],
   }),
 ];
+
+// ROBOT-LEVELS-01 (owner request, 2026-10-21): the robot's default volume and screen brightness, set per robot in Settings, Devices.
+// The bot stores each as the robot's owner level and applies it by day; a change by voice afterwards still updates the stored level, and
+// night keeps its own dimmed levels and restores the day level exactly.
+export const ROBOT_LEVELS_SETTINGS_KEYS: SettingsKey[] = [
+  SettingsKey.parse({
+    key: "robot.volume",
+    scope: "device",
+    selector: "number",
+    range: { min: 20, max: 100, step: 5 },
+    default: 70,
+    label: "Robot volume",
+    help: "How loud this robot speaks by default, from 20 to 100 percent. You can also tell it 'volume to 60'. At night it plays quieter and goes back to this level in the morning.",
+    level: "basic",
+    lives_in: "robot.hello",
+    honoured_by: ["home", "bot"],
+  }),
+  SettingsKey.parse({
+    key: "robot.brightness",
+    scope: "device",
+    selector: "number",
+    range: { min: 10, max: 100, step: 5 },
+    default: 100,
+    label: "Robot screen brightness",
+    help: "How bright this robot's screen is by default, from 10 to 100 percent. You can also tell it 'brightness to 50'. At night it dims and goes back to this level in the morning.",
+    level: "basic",
+    lives_in: "robot.hello",
+    honoured_by: ["home", "bot"],
+  }),
+];
