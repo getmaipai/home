@@ -28,7 +28,7 @@ import { resolveOrCreateConversation, resolveSupersedes, getPendingAsk, setPendi
 import { classifyTurnSignal } from "@/lib/turnSignal";
 import { speakerIsAnonymous, turnAgeBand } from "./speaker";
 import { carriesCrisisSignal } from "@/lib/safety";
-import { resolvePersona, DEFAULT_PERSONA, type Persona } from "@/lib/persona";
+import { resolvePersona, adaptPersonaToBand, DEFAULT_PERSONA, type Persona } from "@/lib/persona";
 import { companionsAllowed } from "@/lib/companions";
 import { companionFits, robotCompanionOf } from "@/lib/robotCompanion";
 import { isOwnerOrAdmin } from "@/lib/access";
@@ -528,7 +528,8 @@ async function beginTurn(actor: PersonRow, surface: Surface, text: string, opts:
   // ROBOT-COMPANION-01: a robot with a companion assigned talks as that companion, whoever is signed in; the person's own pick and the household
   // companions switch are theirs, not the robot's (an admin chose this robot's companion).
   const robotCompanion = surface === "robot" && opts.deviceId && !bare ? resolveRobotPersona(opts.deviceId) : null;
-  const persona = robotCompanion ?? (temporary || bare || !companionsAllowed(actor.id) ? DEFAULT_PERSONA : ownPersona(actor));
+  // DYNAMIC-COMPANION-01: whichever companion speaks, it speaks at this turn's band (its band lines first, its vocabulary clamped).
+  const persona = adaptPersonaToBand(robotCompanion ?? (temporary || bare || !companionsAllowed(actor.id) ? DEFAULT_PERSONA : ownPersona(actor)), band);
   // U4/RESP-01: computed once, the register's only length authority -
   // never recomputed by a later node, the same "decided once" shape
   // `reasoning.emit` already follows in `context`. U4c: everything
@@ -917,7 +918,7 @@ export type TurnImmediateResult = TurnFailure | Extract<TurnStreamResult, { kind
 // COMPANIONS-APP-01: the person's own pick, unless its type is above theirs (a stale or hand-written value): then the plain default.
 function ownPersona(actor: PersonRow): Persona {
   const picked = resolvePersona(getPersonSettingValue(actor, "persona.active_id"));
-  return companionFits(speakerAgeBand(actor, new Date()), picked.controls) ? picked : DEFAULT_PERSONA;
+  return companionFits(speakerAgeBand(actor, new Date()), picked.floor) ? picked : DEFAULT_PERSONA;
 }
 
 // ROBOT-COMPANION-01: the persona of the companion assigned to this robot, or null.

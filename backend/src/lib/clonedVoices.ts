@@ -18,6 +18,7 @@ import { selfBaseUrl } from "@/lib/selfUrl";
 import { isRemoteStackSelected } from "@/lib/stackEngine";
 import { isOwnerOrAdmin } from "@/lib/access";
 import { clearMatchingValues } from "@/lib/settings";
+import { companionVoiceSettingsKeys } from "@/settings/companionVoiceKeys";
 import type { PersonRow } from "@/types";
 import type { ClonedVoiceInfo } from "@/wire";
 import type { StackVoice } from "@/lib/stack/types";
@@ -199,6 +200,8 @@ export function deleteClonedVoice(actor: PersonRow, id: string): ClonedVoiceOpRe
   // The plain-token form (a person's tts.voice_id, a robot's robot.voice.id) holds the bare id.
   clearMatchingValues("tts.voice_id", id);
   clearMatchingValues("robot.voice.id", id);
+  clearMatchingValues("tts.home_voice", id);
+  for (const key of companionVoiceSettingsKeys()) clearMatchingValues(key.key, id);
   appendLogLine(`voice.deleted id=${id} by=${actor.id} role=${actor.role}`);
   const filePath = join(clonedVoicesDir, row.fileName);
   try {

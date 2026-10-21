@@ -35,9 +35,10 @@ const FILLER: Record<Persona["filler_density"], string> = {
   frequent: "Lots of casual chatter.",
 };
 
-const TYPE_LABEL: Record<AgeBand, string> = { child: "Child", teen: "Teen", adult: "Adult" };
+// DYNAMIC-COMPANION-01: an "all" companion adapts to whoever it speaks to; only a teen or adult companion is a type of its own.
+const TYPE_LABEL: Record<Persona["audience"], string> = { all: "Companion for everyone", teen: "Teen companion", adult: "Adult companion" };
 const WHO_CAN_USE: Record<AgeBand, string> = {
-  child: "Anyone in the family, including kids.",
+  child: "Anyone in the family, including kids. It adapts to their age.",
   teen: "Teens and adults.",
   adult: "Adults only.",
 };
@@ -84,12 +85,12 @@ function manifestOf(id: string) {
 export function currentCompanionId(person: PersonRow): string {
   const band = speakerAgeBand(person, new Date());
   const picked = resolvePersona(getPersonSettingValue(person, "persona.active_id"));
-  return companionFits(band, picked.controls) ? picked.id : "default";
+  return companionFits(band, picked.floor) ? picked.id : "default";
 }
 
 /** Whether this person may see and pick this companion. */
 export function mayUseCompanion(person: PersonRow, persona: Persona): boolean {
-  return companionAreaOn(person) && companionFits(speakerAgeBand(person, new Date()), persona.controls);
+  return companionAreaOn(person) && companionFits(speakerAgeBand(person, new Date()), persona.floor);
 }
 
 /** The household switch that turns companions off for a person (`companions.allowed`). */
@@ -108,10 +109,10 @@ export function cardOf(person: PersonRow, persona: Persona): CompanionCard {
   return {
     id: persona.id,
     name: persona.display_name,
-    type: persona.controls,
-    type_label: `${TYPE_LABEL[persona.controls]} companion`,
+    type: persona.floor,
+    type_label: TYPE_LABEL[persona.audience],
     tagline: manifest?.companion?.tagline ?? manifest?.description ?? "",
-    who_can_use: WHO_CAN_USE[persona.controls],
+    who_can_use: WHO_CAN_USE[persona.floor],
     dials: dialsOf(persona),
     voice: voiceLabel(manifest?.companion?.voice_id ?? "", own),
     is_default: currentCompanionId(person) === persona.id,
@@ -158,8 +159,8 @@ export function robotAssignments(): Array<{ id: string; name: string; controls: 
 /** A plain refusal when this person may not pick this companion, else null. */
 export function pickRefusal(person: PersonRow, persona: Persona): string | null {
   if (!companionAreaOn(person)) return "Companions are turned off for you. Ask an owner or admin to turn them on.";
-  if (!companionFits(speakerAgeBand(person, new Date()), persona.controls)) {
-    return `${persona.display_name} is a ${persona.controls} companion and is not one you can pick. Choose one from your list.`;
+  if (!companionFits(speakerAgeBand(person, new Date()), persona.floor)) {
+    return `${persona.display_name} is a ${persona.audience} companion and is not one you can pick. Choose one from your list.`;
   }
   return null;
 }
@@ -172,5 +173,5 @@ export function personaWriteRefusal(scope: string, value: unknown): string | nul
   const persona = PERSONAS.find((candidate) => candidate.id === value);
   const target = db.select().from(people).where(eq(people.id, match[1]!)).get() as PersonRow | undefined;
   if (!persona || !target) return null;
-  return companionFits(speakerAgeBand(target, new Date()), persona.controls) ? null : pickRefusal(target, persona);
+  return companionFits(speakerAgeBand(target, new Date()), persona.floor) ? null : pickRefusal(target, persona);
 }

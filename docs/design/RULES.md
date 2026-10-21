@@ -45,11 +45,13 @@ with or of any household member, as a household option that is on by default. Th
 finished-item check (nothing nude or sexual for a teen or a child whoever is in it, a cartoon and child-safe for a child, a check
 that cannot run withholds), the absolute lines (nothing sexual involving a minor, no real person outside the household, no public
 figure) and the surface gate stay fixed, and no setting, including `generation.people_prompts`, reaches them.
-A robot's companion sets the band for its unknown speaker (owner's ruling, 2026-10-21; [record](robot-companions-2026-10-21.md)): a
-robot with a companion assigned takes the companion's type (child, teen or adult), which an admin may choose only within the controls
-the admin assigned that robot; a robot with no companion, and every other unknown speaker on a shared surface, gets the child
-result. Speaker evidence alone decides memory access and acting on the signed-in account: an unknown speaker is judged at the child
-band for every effect and reaches none of that person's memories, whatever the companion.
+A robot's controls set the band for its unknown speaker, never its companion (owner's ruling, 2026-10-21; [record](dynamic-companions-2026-10-21.md)):
+a robot with a companion assigned takes the controls level the admin set (child, teen or adult), a robot with no companion, and every
+other unknown speaker on a shared surface, gets the child result. A companion declares an audience: `all` (dynamic, adapts to the
+band, usable on any robot) or `teen` or `adult` (explicit, usable only on a robot whose controls are at or above it, refused in the
+backend otherwise); a companion never loosens a filter. Speaker evidence alone decides memory access and acting on the signed-in
+account: an unknown speaker is judged at the child band for every effect and reaches none of that person's memories, whatever the
+companion. Owner-approved: 2026-10-21 (chat).
 
 1. **The model decides, not a word rule.** No regex, word list or
    classifier reads open-ended wording to decide whether a message needs

@@ -1,5 +1,9 @@
 # A robot's companion sets its controls (2026-10-21)
 
+> **Superseded in part (2026-10-21, later):** decisions 2 and 3 (the companion's type, from `min_role`, sets the band) are replaced by
+> [dynamic-companions-2026-10-21.md](dynamic-companions-2026-10-21.md): the band is the robot's controls level and a companion declares an
+> audience floor. The rest stands.
+
 Owner ruling, chat, 2026-10-21 (Jesse): a robot's companion decides how the robot answers and which controls (child, teen or adult)
 apply to it. The fix for a flat, terse robot is not speaker identification. Rules in [RULES.md](RULES.md) govern; one edit to rule 0
 is made here under `Owner-approved: 2026-10-21 (chat)`.

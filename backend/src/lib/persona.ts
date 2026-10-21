@@ -52,15 +52,18 @@
 // invariants section, and needs its own explicit reconciliation rule,
 // not a value dropped in beside three harmless ones).
 import { listPackageIds, loadManifestOnly } from "@/lib/plugins";
-import { companionTypeOf } from "@/lib/robotCompanion";
+import { companionAudienceOf, companionFloor, type CompanionAudience } from "@/lib/robotCompanion";
+import type { AgeBand } from "@/lib/ageBand";
 import type { SurfaceClass } from "@/lib/surfaceClass";
 
 export interface Persona {
   id: string;
   display_name: string;
-  /** ROBOT-COMPANION-01: the companion's type, from its manifest `min_role` (child or guest: child, teen: teen, anything
-   * higher: adult). A robot's controls bound which types it may use; the companion's type sets that robot's turn band. */
-  controls: "child" | "teen" | "adult";
+  /** DYNAMIC-COMPANION-01: who the companion is for. `all` is dynamic (adapts to the turn's band, any robot may use it); `teen` and
+   * `adult` are explicit (a robot needs those controls). From the manifest's `companion.audience`, else its `min_role`. */
+  audience: CompanionAudience;
+  /** The lowest controls level a robot needs to use this companion (`all` is child). */
+  floor: AgeBand;
   formality: "casual" | "neutral" | "formal";
   complexity: "simple" | "standard" | "advanced";
   /** How much a persona probes vs. lets something go (Jesse's own
@@ -85,6 +88,10 @@ export interface Persona {
    * because Zod's `.optional()` on the generated companion schema allows
    * it; every bundled companion package actually sets it. */
   examples?: readonly string[];
+  /** DYNAMIC-COMPANION-01: few-shot lines for one band, used first when the turn is at that band (see `adaptPersonaToBand`). */
+  examples_by_band?: Partial<Record<AgeBand, readonly string[]>>;
+  /** DYNAMIC-COMPANION-01: short style rules for what the dials cannot say, composed after them. */
+  behavior?: readonly string[];
   /** STATUS-PHRASES-01: this companion's own waiting-line phrases
    * (manifest.schema.json's own `companion.status_phrases`), one moment
    * at a time - `statusPhrases.ts`'s `pickStatusPhrase()` falls back to
@@ -112,12 +119,15 @@ function loadPersonaCatalog(): Persona[] {
     out.push({
       id,
       display_name: c.display_name,
-      controls: companionTypeOf(loaded.value.min_role),
+      audience: companionAudienceOf(c.audience, loaded.value.min_role),
+      floor: companionFloor(companionAudienceOf(c.audience, loaded.value.min_role)),
       formality: c.formality,
       complexity: c.complexity,
       engagement: c.engagement,
       filler_density: c.filler_density,
       examples: c.examples,
+      examples_by_band: { ...(c.examples_child ? { child: c.examples_child } : {}), ...(c.examples_teen ? { teen: c.examples_teen } : {}), ...(c.examples_adult ? { adult: c.examples_adult } : {}) },
+      behavior: c.behavior,
       status_phrases: c.status_phrases,
     });
   }
@@ -403,6 +413,22 @@ export const FILLER_FRAGMENT_WRITTEN: Record<Persona["filler_density"], string> 
 // inside double quotes, the model's own closing quote and a reply that
 // restated itself inside quotation marks were the prompt's format
 // echoed back (the design pass, finding 17).
+const MAX_EXAMPLES = 4;
+
+/** DYNAMIC-COMPANION-01: the persona as it speaks at one age band. The band's own few-shot lines come first, topped up from the shared
+ * ones (four at most), and the vocabulary dial is clamped (child: simple; teen: at most standard; adult: as declared). Only ever stricter
+ * than the declared persona; the band itself (filters, plan, content ceiling) is decided elsewhere and is never read from the persona. */
+export function adaptPersonaToBand(persona: Persona, band: AgeBand): Persona {
+  const own = persona.examples_by_band?.[band] ?? [];
+  const merged = [...new Set([...own, ...(persona.examples ?? [])])].slice(0, MAX_EXAMPLES);
+  const complexity = band === "child" ? "simple" : band === "teen" && persona.complexity === "advanced" ? "standard" : persona.complexity;
+  return { ...persona, complexity, examples: merged.length > 0 ? merged : persona.examples };
+}
+
+function behaviorBlock(behavior: readonly string[] | undefined): string {
+  return behavior && behavior.length > 0 ? ` How you act: ${behavior.join(" ")}` : "";
+}
+
 function examplesBlock(examples: readonly string[] | undefined): string {
   if (!examples || examples.length === 0) return "";
   const lines = examples.map((e) => `- ${e}`).join("\n");
@@ -456,7 +482,7 @@ export function composePersonaPrompt(persona: Persona, surfaceClass: SurfaceClas
   const complexity = written ? COMPLEXITY_FRAGMENT_WRITTEN[persona.complexity] : COMPLEXITY_FRAGMENT[persona.complexity];
   const engagement = written ? ENGAGEMENT_FRAGMENT_WRITTEN[persona.engagement] : ENGAGEMENT_FRAGMENT[persona.engagement];
   const filler = written ? FILLER_FRAGMENT_WRITTEN[persona.filler_density] : FILLER_FRAGMENT[persona.filler_density];
-  const examples = written ? "" : examplesBlock(persona.examples);
+  const examples = written ? "" : behaviorBlock(persona.behavior) + examplesBlock(persona.examples);
   const voice = [formality, complexity, engagement, filler].join(" ") + examples;
   if (!written) return voice;
   return [voice, INFORMATION_HANDLING_POLICY_WRITTEN, WRITTEN_VOICE_POLICY].join(" ");

@@ -26,8 +26,9 @@ import { readRobotClipBundle, readVerifiedRobotClipAsset, robotClipAssetForDevic
 import { closeDeviceCommandChannel, deviceCommandWebSocket, issueDeviceCommand } from "@/lib/deviceCommands";
 import { listHubEndpoints } from "@/lib/hubEndpoints";
 import { getHubInstanceId } from "@/lib/hubIdentity";
-import { getHouseholdSettingValue } from "@/lib/settings";
+import { getDeviceSettingValue, getHouseholdSettingValue } from "@/lib/settings";
 import { companionsForControls, robotCompanionOf, robotControlsOf } from "@/lib/robotCompanion";
+import { companionVoiceKey } from "@/settings/companionVoiceKeys";
 import { listRobotPeople } from "@/lib/robotPeople";
 import { acceptRobotSelfTestResult, startRobotSelfTest } from "@/lib/robotSelfTestRuns";
 import { robotSelfTestPartsFor } from "@/wire";
@@ -234,9 +235,10 @@ const robotCompanionRoute = createRoute({
     200: { content: { "application/json": { schema: z.object({
       controls: z.enum(["child", "teen", "adult"]),
       companion_id: z.string(),
-      companions: z.array(z.object({ id: z.string(), name: z.string(), type: z.enum(["child", "teen", "adult"]), tagline: z.string().optional() })),
+      companions: z.array(z.object({ id: z.string(), name: z.string(), type: z.enum(["child", "teen", "adult"]), audience: z.enum(["all", "teen", "adult"]), tagline: z.string().optional() })),
       home_location_set: z.boolean(),
-    }) } }, description: "The robot's assignment and its allowed companions." },
+      speaking: z.object({ voice_id: z.string(), source: z.enum(["robot", "companion", "home"]), companion_name: z.string().optional() }),
+    }) } }, description: "The robot's assignment, its allowed companions and the voice it speaks in (a voice id, or \"default\" for the built-in one)." },
     ...errorResponses({ 403: "Admin only", 404: "No such robot" }),
   },
 });
@@ -244,10 +246,18 @@ devicesRoutes.openapi(robotCompanionRoute, (c) => {
   const device = getDeviceById(c.req.valid("param").id);
   if (!device || device.kind !== "robot") return c.json({ error: "No such robot" }, 404);
   const controls = robotControlsOf(device.id);
+  const companion = robotCompanionOf(device.id);
+  const named = (value: unknown): string | null => (typeof value === "string" && value && value !== "default" ? value : null);
+  const own = named(getDeviceSettingValue(device.id, "robot.voice.id"));
+  const theirs = companion ? named(getHouseholdSettingValue(companionVoiceKey(companion.id))) : null;
+  const speaking = own ? { voice_id: own, source: "robot" as const }
+    : theirs ? { voice_id: theirs, source: "companion" as const, companion_name: companion!.name }
+    : { voice_id: named(getHouseholdSettingValue("tts.home_voice")) ?? "default", source: "home" as const };
   return c.json({
     controls,
-    companion_id: robotCompanionOf(device.id)?.id ?? "",
-    companions: companionsForControls(controls).map((persona) => ({ id: persona.id, name: persona.name, type: persona.controls })),
+    speaking,
+    companion_id: companion?.id ?? "",
+    companions: companionsForControls(controls).map((persona) => ({ id: persona.id, name: persona.name, type: persona.floor, audience: persona.audience })),
     home_location_set: typeof getHouseholdSettingValue("household.home") === "string",
   }, 200);
 });

@@ -276,7 +276,7 @@ export const MAX_NATURALNESS_SECTION_CHARS = 500;
 // constant. 1200 gives real headroom above that, matching
 // MAX_SKILLS_SECTION_CHARS's own budget for the section most likely to
 // grow with real content.
-export const MAX_COMPANION_SECTION_CHARS = 1200;
+export const MAX_COMPANION_SECTION_CHARS = 1500;
 
 // PREFIX-CLASS-01: the written class's own composePersonaPrompt() output
 // now folds what used to be three separate capped sections (companion,

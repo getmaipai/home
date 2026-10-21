@@ -301,8 +301,11 @@ export interface DeviceInfo {
 export interface RobotCompanionInfo {
   controls: "child" | "teen" | "adult";
   companion_id: string;
-  companions: Array<{ id: string; name: string; type: "child" | "teen" | "adult" }>;
+  /** `audience` is who the companion is for: all (dynamic, any robot), teen or adult (explicit). `type` is the lowest controls level that may use it. */
+  companions: Array<{ id: string; name: string; type: "child" | "teen" | "adult"; audience: "all" | "teen" | "adult" }>;
   home_location_set: boolean;
+  /** The voice the robot speaks in and where it comes from: its own setting, its companion's voice, or Home's default. "default" is the built-in voice. */
+  speaking: { voice_id: string; source: "robot" | "companion" | "home"; companion_name?: string };
 }
 
 /** COMPANIONS-APP-01: GET /api/companions and /api/companions/{id} (backend/src/routes/companions.ts). */

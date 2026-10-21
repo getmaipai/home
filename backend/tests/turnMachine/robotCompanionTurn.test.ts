@@ -1,5 +1,5 @@
-// ROBOT-COMPANION-01 and WEATHER-KID-01: real robot turns through the machine. The companion assigned to a robot sets the plan's band and the
-// reply's voice; an unassigned robot keeps the child result; a child can ask the weather and gets a forecast from the household home.
+// ROBOT-COMPANION-01, DYNAMIC-COMPANION-01 and WEATHER-KID-01: real robot turns through the machine. The robot's controls set the plan's band and
+// the companion the reply's voice; an unassigned robot keeps the child result; a child can ask the weather and gets a forecast from the household home.
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { eq } from "drizzle-orm";
 import { resetDb } from "../reset-db";
@@ -84,7 +84,8 @@ describe("the companion governs the plan of a robot turn", () => {
     console.log("unassigned plan", JSON.stringify({ age_band: plan.age_band, moves: MOVES(plan), max_words: plan.max_words, vocabulary: plan.vocabulary_level }));
   });
 
-  for (const [controls, companion, band] of [["child", "lively-child", "child"], ["teen", "lively-teen", "teen"], ["adult", "lively-adult", "adult"]] as const) {
+  for (const [controls, companion, band] of [["child", "lively-child", "child"], ["teen", "lively-teen", "teen"], ["adult", "lively-adult", "adult"], ["adult", "rivet", "adult"]] as const) {
+    const speaker = { "lively-child": "Sprout", "lively-teen": "Riff", "lively-adult": "Nova", rivet: "Rivet" }[companion];
     test(`${companion} on a ${controls}-controls robot plans a ${band} turn, lively, and speaks as that companion`, async () => {
       await assign(controls, companion);
       const { plan, seen } = await robotTurn("I'm making slushies today");
@@ -93,15 +94,39 @@ describe("the companion governs the plan of a robot turn", () => {
       expect(plan.moves.ask_back).not.toBe("forbidden");
       expect(plan.vocabulary_level).toBe(band === "child" ? "simple" : "standard");
       const system = JSON.stringify(seen[0]!.messages.filter((m) => m.role === "system"));
-      expect(system).toContain("slushies");
+      expect(system).toContain(`You are ${speaker}`);
       console.log(`${companion} plan`, JSON.stringify({ age_band: plan.age_band, moves: MOVES(plan), max_words: plan.max_words, vocabulary: plan.vocabulary_level }));
     });
   }
 
-  test("a child companion on an adult's robot keeps the child result even though the signed-in owner is an adult", async () => {
+  test("the same dynamic companion on a child robot plans a child turn with the child lines, and on an adult robot an adult turn with the adult lines", async () => {
+    await assign("child", "lively-adult");
+    const child = await robotTurn("I'm making slushies today");
+    expect(child.plan.age_band).toBe("child");
+    expect(child.plan.moves.ask_back).not.toBe("forbidden");
+    const childSystem = JSON.stringify(child.seen[0]!.messages.filter((m) => m.role === "system"));
+    expect(childSystem).toContain("Yum! Which flavor is your favorite?");
+    expect(childSystem).not.toContain("That sounds like a great plan. When are you starting?");
+    await assign("adult", "lively-adult");
+    const adult = await robotTurn("I'm making slushies today");
+    expect(adult.plan.age_band).toBe("adult");
+    expect(adult.plan.moves.react).not.toBe("forbidden");
+    expect(adult.plan.moves.ask_back).not.toBe("forbidden");
+    expect(JSON.stringify(adult.seen[0]!.messages.filter((m) => m.role === "system"))).toContain("Ooh, slushies, nice. What flavor are you making?");
+  });
+
+  test("a child-named dynamic companion on an adult's robot takes the robot's controls (adult), not its own name; a child robot never loosens", async () => {
     await assign("adult", "lively-child");
-    const { plan } = await robotTurn("hi there");
-    expect(plan.age_band).toBe("child");
+    expect((await robotTurn("hi there")).plan.age_band).toBe("adult");
+    await assign("child", "lively-adult");
+    expect((await robotTurn("hi there")).plan.age_band).toBe("child");
+  });
+
+  test("lowering the controls falls back safely: a robot at child with no companion is the strictest turn", async () => {
+    await assign("adult", "lively-adult");
+    expect((await robotTurn("hi there")).plan.age_band).toBe("adult");
+    expect((await setValue(people.owner, `device:${deviceId}`, "robot.companion.id", "")).ok).toBe(true);
+    expect((await robotTurn("hi there")).plan.age_band).toBe("child");
   });
 });
 
