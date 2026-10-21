@@ -36,6 +36,12 @@ test("the Media home is active and records the flag", async () => {
   expect(sessionStorage.getItem("maipai.media-hub")).toBe("1");
 });
 
+test("Media search is active and records the flag", async () => {
+  const view = renderAt("/media/search?q=moon");
+  await waitFor(() => expect(view.getByTestId("flag").textContent).toBe("true"));
+  expect(sessionStorage.getItem("maipai.media-hub")).toBe("1");
+});
+
 test("after the Media home, a media app page still shows the flag", async () => {
   const view = renderAt("/media", <GoTo to="/apps/music" />);
   await waitFor(() => expect(view.getByTestId("flag").textContent).toBe("true"));

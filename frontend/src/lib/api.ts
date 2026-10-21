@@ -760,6 +760,9 @@ export interface MediaHomeRow {
   at: string;
 }
 export interface MediaHome { continue: MediaHomeRow[]; new: MediaHomeRow[]; recent_music: MediaHomeRow[] }
+export type MediaSearchRow = MediaHomeRow;
+export interface MediaSearchGroup { app: MediaSearchRow["app"]; heading: string; rows: MediaSearchRow[] }
+export interface MediaSearch { groups: MediaSearchGroup[] }
 export type EngineComputerStatus = { configured: boolean; state: "working" | "connecting" | "slow_to_answer" | "reconnecting" | "not_reachable"; reason: string | null; details?: { path: "home" | "tailnet" | null; lastProbeAt: string | null; contract: string | null } };
 export type StatusApp = StatusAppsResponse[number];
 export type StatusAppNeed = NonNullable<StatusApp["needs"]>[number];
@@ -1329,6 +1332,7 @@ export const api = {
   // (a spec `page`, drawn by the kit's SchemaPage). A hidden or unknown app and page are both 404.
   apps: () => request<AppRow[]>("/api/apps"),
   mediaHome: () => request<MediaHome>("/api/media/home"),
+  mediaSearch: (q: string) => request<MediaSearch>(`/api/media/search?q=${encodeURIComponent(q)}`),
   // MEDIA-VIDEOS-01: one data id of a package app (POST /api/plugins/:id/data/:dataId), and one media item's record (the owning app of a
   // `/media/<id>` link is read from its kind).
   appData: <T>(pkg: string, dataId: string, body: Record<string, unknown> = {}) =>

@@ -11,7 +11,7 @@ import { MediaHubFrame } from "@/shell/MediaHubFrame";
 const originals = api.apps;
 afterEach(() => { cleanup(); api.apps = originals; });
 
-function Where() { return <p data-testid="where">{useLocation().pathname}</p>; }
+function Where() { const location = useLocation(); return <p data-testid="where">{location.pathname}{location.search}</p>; }
 
 const labels: Record<string, string> = { videos: "Videos", shows: "Shows", music: "Music", podcasts: "Podcasts", books: "Books" };
 const ids = ["videos", "shows", "music", "podcasts", "books"];
@@ -74,6 +74,14 @@ test("clicking Home navigates to the media hub's own route", async () => {
   const home = (await links(view)).find((row) => row.textContent === "Home") as HTMLElement;
   fireEvent.click(home);
   await waitFor(() => expect(view.getByTestId("where").textContent).toBe("/media"));
+});
+
+test("typing in the column search and pressing Enter opens Media search", async () => {
+  const view = open("search");
+  const field = await view.findByLabelText("Search Media");
+  fireEvent.change(field, { target: { value: "Garden Road" } });
+  fireEvent.keyDown(field, { key: "Enter", code: "Enter" });
+  await waitFor(() => expect(view.getByTestId("where").textContent).toBe("/media/search?q=Garden%20Road"));
 });
 
 test("the children render beside the column", async () => {

@@ -11,6 +11,8 @@ You see a **Media** column next to your page. It has **Home** and each app you c
 
 **Home** shows where you left off in each app, what's new across them, and the songs you played lately.
 
+Use **Search Media** in the Media column to find titles across Videos, Shows and Films, Music, Podcasts and Books. It also finds songs and clips made at home. You only see items you can open.
+
 Each app also works on its own. Pin it to the rail and open it from there, with no Media column.
 
 You only see the apps you're allowed to use. Kids see only what a grown-up allowed.

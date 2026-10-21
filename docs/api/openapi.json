@@ -52292,6 +52292,144 @@
         }
       }
     },
+    "/api/media/search": {
+      "get": {
+        "tags": [
+          "Media"
+        ],
+        "summary": "Search readable media titles and made-at-home songs and clips",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            },
+            "required": true,
+            "name": "q",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Matching readable titles, grouped by app.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "groups": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "app": {
+                            "type": "string",
+                            "enum": [
+                              "videos",
+                              "shows",
+                              "music",
+                              "podcasts",
+                              "books"
+                            ]
+                          },
+                          "heading": {
+                            "type": "string"
+                          },
+                          "rows": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "id": {
+                                  "type": "string"
+                                },
+                                "app": {
+                                  "type": "string",
+                                  "enum": [
+                                    "videos",
+                                    "shows",
+                                    "music",
+                                    "podcasts",
+                                    "books"
+                                  ]
+                                },
+                                "kind": {
+                                  "type": "string"
+                                },
+                                "title": {
+                                  "type": "string"
+                                },
+                                "subtitle": {
+                                  "type": "string",
+                                  "nullable": true
+                                },
+                                "artwork_url": {
+                                  "type": "string",
+                                  "nullable": true
+                                },
+                                "href": {
+                                  "type": "string"
+                                },
+                                "percent": {
+                                  "type": "number",
+                                  "nullable": true
+                                },
+                                "at": {
+                                  "type": "string"
+                                }
+                              },
+                              "required": [
+                                "id",
+                                "app",
+                                "kind",
+                                "title",
+                                "subtitle",
+                                "artwork_url",
+                                "href",
+                                "percent",
+                                "at"
+                              ]
+                            }
+                          }
+                        },
+                        "required": [
+                          "app",
+                          "heading",
+                          "rows"
+                        ]
+                      }
+                    }
+                  },
+                  "required": [
+                    "groups"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Missing or empty q",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/media/offline/manifest": {
       "get": {
         "tags": [

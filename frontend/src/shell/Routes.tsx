@@ -65,6 +65,7 @@ const FilesPage = lazyNamed(() => import("@/shell/pages/FilesPage"), "FilesPage"
 const ReferencePage = lazyNamed(() => import("@/shell/pages/ReferencePage"), "ReferencePage");
 const PackageAppPage = lazyNamed(() => import("@/shell/pages/PackageAppPage"), "PackageAppPage");
 const MediaHomePage = lazyNamed(() => import("@/shell/pages/MediaHomePage"), "MediaHomePage");
+const MediaSearchPage = lazyNamed(() => import("@/shell/pages/MediaSearchPage"), "MediaSearchPage");
 const AllAppsPage = lazyNamed(() => import("@/shell/pages/AllAppsPage"), "AllAppsPage");
 const MicTestPage = lazyNamed(() => import("@/shell/pages/MicTestPage"), "MicTestPage");
 const SettingsAreaPage = lazyNamed(() => import("@/shell/pages/settings/SettingsAreaPage"), "SettingsAreaPage");
@@ -260,6 +261,7 @@ function RoutesWithIncognito({ person, onPersonChange, onSignedOut }: { person: 
           {/* Like Chat, Library owns its page header and leaves FullLayout's phone menu clearance intact. */}
           <Route path="files" element={<FilesPage person={person} />} />
           <Route path="media" element={<MediaHomePage />} />
+          <Route path="media/search" element={<MediaSearchPage />} />
           {/* APP-SET-02 (RULES S4): the settings areas draw no slim title bar,
               like ChatGPT's own settings page: the column title is the page's
               heading, so these routes sit beside chat, outside

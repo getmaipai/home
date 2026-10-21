@@ -1,5 +1,5 @@
-import type { MouseEvent, ReactNode } from "react";
-import { useNavigate } from "react-router-dom";
+import { useEffect, useState, type MouseEvent, type ReactNode } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
 import { SectionSidebar, type SectionSidebarItem } from "@maipai/ui/src/primitives/SectionSidebar";
 import { useAppRows } from "@/shell/useAppCatalog";
 import { mediaNav } from "@/shell/mediaNav";
@@ -10,6 +10,10 @@ import { enterMediaHub } from "@/shell/mediaHubSession";
 export function MediaHubFrame({ packageId, children }: { packageId: string; children: ReactNode }) {
   const rows = useAppRows();
   const navigate = useNavigate();
+  const location = useLocation();
+  const urlQuery = new URLSearchParams(location.search).get("q") ?? "";
+  const [draft, setDraft] = useState(urlQuery);
+  useEffect(() => setDraft(urlQuery), [urlQuery]);
   const open = (to: string) => (event: MouseEvent) => {
     if (event.button === 0 && !event.metaKey && !event.ctrlKey && !event.shiftKey && !event.altKey) {
       event.preventDefault();
@@ -28,9 +32,15 @@ export function MediaHubFrame({ packageId, children }: { packageId: string; chil
       onClick: open(app.to),
     })),
   ];
+  const submitSearch = () => {
+    const q = draft.trim();
+    if (!q) return;
+    enterMediaHub();
+    navigate(`/media/search?q=${encodeURIComponent(q)}`);
+  };
   return (
     <div className="flex min-h-0 flex-1" data-workspace-fill="" data-slot="media-hub-frame" data-testid="media-hub-frame">
-      <SectionSidebar standalone density="compact" title="Media" groups={[{ id: "media-apps", items }]} />
+      <SectionSidebar standalone density="compact" title="Media" search={{ value: draft, onChange: setDraft, label: "Search Media", onSubmit: submitSearch }} groups={[{ id: "media-apps", items }]} />
       {children}
     </div>
   );

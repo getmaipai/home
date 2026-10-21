@@ -34,12 +34,13 @@ export function useMediaHubActive(): boolean {
   const { pathname } = useLocation();
   const mediaAppMatch = /^\/apps\/([a-z][a-z0-9-]*)/.exec(pathname);
   const inMediaApp = Boolean(mediaAppMatch && isMediaApp(mediaAppMatch[1] ?? ""));
-  const active = pathname === "/media" || (inMediaApp && readFlag());
+  const inHub = pathname === "/media" || pathname === "/media/search";
+  const active = inHub || (inMediaApp && readFlag());
 
   useEffect(() => {
-    if (pathname === "/media") writeFlag(true);
+    if (inHub) writeFlag(true);
     else if (!inMediaApp) writeFlag(false);
-  }, [pathname, inMediaApp]);
+  }, [pathname, inMediaApp, inHub]);
 
   return active;
 }
