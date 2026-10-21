@@ -68890,6 +68890,32 @@
                       "type": "string",
                       "nullable": true
                     },
+                    "stages": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string"
+                          },
+                          "label": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "label"
+                        ]
+                      }
+                    },
+                    "stage_index": {
+                      "type": "integer",
+                      "minimum": 0
+                    },
+                    "started_at": {
+                      "type": "string",
+                      "nullable": true
+                    },
                     "cover_pending": {
                       "type": "boolean"
                     },
@@ -68987,9 +69013,6 @@
                     "duration_s": {
                       "type": "number",
                       "nullable": true
-                    },
-                    "started_at": {
-                      "type": "number"
                     }
                   },
                   "required": [
@@ -69003,6 +69026,9 @@
                     "eta_seconds",
                     "position",
                     "error_line",
+                    "stages",
+                    "stage_index",
+                    "started_at",
                     "cover_pending",
                     "cover_url",
                     "cover_versions",
@@ -69013,8 +69039,7 @@
                     "title",
                     "description",
                     "lyrics",
-                    "duration_s",
-                    "started_at"
+                    "duration_s"
                   ]
                 }
               }
@@ -69135,6 +69160,32 @@
                       "type": "string",
                       "nullable": true
                     },
+                    "stages": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string"
+                          },
+                          "label": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "label"
+                        ]
+                      }
+                    },
+                    "stage_index": {
+                      "type": "integer",
+                      "minimum": 0
+                    },
+                    "started_at": {
+                      "type": "string",
+                      "nullable": true
+                    },
                     "cover_pending": {
                       "type": "boolean"
                     },
@@ -69232,9 +69283,6 @@
                     "duration_s": {
                       "type": "number",
                       "nullable": true
-                    },
-                    "started_at": {
-                      "type": "number"
                     }
                   },
                   "required": [
@@ -69248,6 +69296,9 @@
                     "eta_seconds",
                     "position",
                     "error_line",
+                    "stages",
+                    "stage_index",
+                    "started_at",
                     "cover_pending",
                     "cover_url",
                     "cover_versions",
@@ -69258,8 +69309,7 @@
                     "title",
                     "description",
                     "lyrics",
-                    "duration_s",
-                    "started_at"
+                    "duration_s"
                   ]
                 }
               }
@@ -69398,6 +69448,32 @@
                       "type": "string",
                       "nullable": true
                     },
+                    "stages": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string"
+                          },
+                          "label": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "label"
+                        ]
+                      }
+                    },
+                    "stage_index": {
+                      "type": "integer",
+                      "minimum": 0
+                    },
+                    "started_at": {
+                      "type": "string",
+                      "nullable": true
+                    },
                     "cover_pending": {
                       "type": "boolean"
                     },
@@ -69495,9 +69571,6 @@
                     "duration_s": {
                       "type": "number",
                       "nullable": true
-                    },
-                    "started_at": {
-                      "type": "number"
                     }
                   },
                   "required": [
@@ -69511,6 +69584,9 @@
                     "eta_seconds",
                     "position",
                     "error_line",
+                    "stages",
+                    "stage_index",
+                    "started_at",
                     "cover_pending",
                     "cover_url",
                     "cover_versions",
@@ -69521,8 +69597,7 @@
                     "title",
                     "description",
                     "lyrics",
-                    "duration_s",
-                    "started_at"
+                    "duration_s"
                   ]
                 }
               }
@@ -69669,6 +69744,32 @@
                       "type": "string",
                       "nullable": true
                     },
+                    "stages": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string"
+                          },
+                          "label": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "label"
+                        ]
+                      }
+                    },
+                    "stage_index": {
+                      "type": "integer",
+                      "minimum": 0
+                    },
+                    "started_at": {
+                      "type": "string",
+                      "nullable": true
+                    },
                     "cover_pending": {
                       "type": "boolean"
                     },
@@ -69766,9 +69867,6 @@
                     "duration_s": {
                       "type": "number",
                       "nullable": true
-                    },
-                    "started_at": {
-                      "type": "number"
                     }
                   },
                   "required": [
@@ -69782,6 +69880,9 @@
                     "eta_seconds",
                     "position",
                     "error_line",
+                    "stages",
+                    "stage_index",
+                    "started_at",
                     "cover_pending",
                     "cover_url",
                     "cover_versions",
@@ -69792,8 +69893,7 @@
                     "title",
                     "description",
                     "lyrics",
-                    "duration_s",
-                    "started_at"
+                    "duration_s"
                   ]
                 }
               }
@@ -69938,6 +70038,32 @@
                       "type": "string",
                       "nullable": true
                     },
+                    "stages": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string"
+                          },
+                          "label": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "label"
+                        ]
+                      }
+                    },
+                    "stage_index": {
+                      "type": "integer",
+                      "minimum": 0
+                    },
+                    "started_at": {
+                      "type": "string",
+                      "nullable": true
+                    },
                     "cover_pending": {
                       "type": "boolean"
                     },
@@ -70035,9 +70161,6 @@
                     "duration_s": {
                       "type": "number",
                       "nullable": true
-                    },
-                    "started_at": {
-                      "type": "number"
                     }
                   },
                   "required": [
@@ -70051,6 +70174,9 @@
                     "eta_seconds",
                     "position",
                     "error_line",
+                    "stages",
+                    "stage_index",
+                    "started_at",
                     "cover_pending",
                     "cover_url",
                     "cover_versions",
@@ -70061,8 +70187,7 @@
                     "title",
                     "description",
                     "lyrics",
-                    "duration_s",
-                    "started_at"
+                    "duration_s"
                   ]
                 }
               }
@@ -70211,6 +70336,32 @@
                       "type": "string",
                       "nullable": true
                     },
+                    "stages": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string"
+                          },
+                          "label": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "label"
+                        ]
+                      }
+                    },
+                    "stage_index": {
+                      "type": "integer",
+                      "minimum": 0
+                    },
+                    "started_at": {
+                      "type": "string",
+                      "nullable": true
+                    },
                     "cover_pending": {
                       "type": "boolean"
                     },
@@ -70308,9 +70459,6 @@
                     "duration_s": {
                       "type": "number",
                       "nullable": true
-                    },
-                    "started_at": {
-                      "type": "number"
                     }
                   },
                   "required": [
@@ -70324,6 +70472,9 @@
                     "eta_seconds",
                     "position",
                     "error_line",
+                    "stages",
+                    "stage_index",
+                    "started_at",
                     "cover_pending",
                     "cover_url",
                     "cover_versions",
@@ -70334,8 +70485,7 @@
                     "title",
                     "description",
                     "lyrics",
-                    "duration_s",
-                    "started_at"
+                    "duration_s"
                   ]
                 }
               }

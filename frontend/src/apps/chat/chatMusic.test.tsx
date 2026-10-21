@@ -7,7 +7,6 @@ import { MemoryRouter } from "react-router-dom";
 import { cleanup, fireEvent, render, waitFor } from "@testing-library/react";
 import { MusicTrack } from "@maipai/ui/src/elements/music-track";
 import { MusicToolRender, musicFileName, musicHint } from "@/apps/chat/chatToolUis";
-import { musicEtaLabel } from "@/apps/chat/MusicCardView";
 import { TOOL_BINDINGS } from "@/apps/chat/elementBindings";
 import type { MusicCard } from "@/lib/musicApi";
 
@@ -19,8 +18,8 @@ let card: MusicCard;
 const V1 = { id: "file-one", label: "Version 1", url: "/api/music/jobs/mus-1/files/file-one" };
 const V2 = { id: "file-two", label: "Version 2", url: "/api/music/jobs/mus-2/files/file-two" };
 function make(over: Partial<MusicCard>): MusicCard {
-  return { id: "mus-1", state: "running", stage: "planning", stage_label: "Planning the song", progress: 0.25, eta_seconds: 40, position: null, error_line: null, cover_url: null, cover_versions: [], cover_pending: false, versions: [], current_id: null, length: "quick", cut: null, max_seconds: 240,
-    title: "Pancakes", description: "a gentle folk song with an original voice", lyrics: "[Verse]\nMorning light\n[Chorus]\nPancakes rise", duration_s: 60, timed_lyrics: null, started_at: Date.now() - 30_000, ...over };
+  return { id: "mus-1", state: "running", stage: "planning", stage_label: "Planning the song", stages: [{ id: "queued", label: "Queued" }, { id: "model", label: "Getting the model ready" }, { id: "planning", label: "Planning" }, { id: "making", label: "Making the music" }, { id: "mixing", label: "Mixing" }, { id: "finishing", label: "Finishing" }], stage_index: 2, progress: 0.25, eta_seconds: 40, position: null, error_line: null, cover_url: null, cover_versions: [], cover_pending: false, versions: [], current_id: null, length: "quick", cut: null, max_seconds: 240,
+    title: "Pancakes", description: "a gentle folk song with an original voice", lyrics: "[Verse]\nMorning light\n[Chorus]\nPancakes rise", duration_s: 60, timed_lyrics: null, started_at: new Date(Date.now() - 30_000).toISOString(), ...over };
 }
 const done = (over: Partial<MusicCard> = {}): MusicCard => make({ state: "done", stage: "ready", stage_label: "", progress: 1, eta_seconds: 0, versions: [V1], current_id: V1.id, ...over });
 beforeEach(() => {
@@ -42,15 +41,6 @@ function mount() {
 const cardOf = (view: ReturnType<typeof mount>) => view.container.querySelector("[data-slot=music-track]");
 
 describe("MusicToolRender", () => {
-  test("music ETA is withheld until progress and elapsed time support an estimate", () => {
-    const startedAt = 1_000_000;
-    expect(musicEtaLabel(make({ progress: 0.02, started_at: startedAt }), startedAt + 27_000)).toBeUndefined();
-    expect(musicEtaLabel(make({ progress: 0.5, started_at: startedAt }), startedAt + 60_000)).toBe("about 1 minute left");
-    expect(musicEtaLabel(make({ state: "queued", progress: 0.5, started_at: startedAt }), startedAt + 60_000)).toBeUndefined();
-    expect(musicEtaLabel(make({ stage: "waiting_memory", progress: 0.5, started_at: startedAt }), startedAt + 60_000)).toBeUndefined();
-    expect(musicEtaLabel(make({ progress: 0.9, started_at: startedAt }), startedAt + 10_000)).toBe("about 5 seconds left");
-  });
-
   test("a pending first fetch shows the queued song card without progress", () => {
     globalThis.fetch = (() => new Promise<Response>(() => {})) as unknown as typeof fetch;
     const view = mount();
@@ -58,7 +48,7 @@ describe("MusicToolRender", () => {
     expect(view.getByRole("status").textContent).toContain("Waiting its turn");
     expect(view.container.textContent).toContain("Your song");
     expect(view.getByRole("progressbar").hasAttribute("aria-valuenow")).toBe(false);
-    expect(view.container.textContent).not.toContain("%");
+    expect(view.container.textContent).not.toContain("25%");
   });
 
   test("the song part is bound once to the kit song card, beside the music-lookup spec sheet", () => {
@@ -71,7 +61,8 @@ describe("MusicToolRender", () => {
   test("queued shows the busy line's place in line and the title", async () => {
     card = make({ state: "queued", stage_label: "Home is busy making another picture, video or song. It will start in a minute.", position: 2 });
     const view = mount();
-    await waitFor(() => expect(view.getByRole("status").textContent).toContain("Place in line: 2"));
+    await waitFor(() => expect(view.getByRole("status").textContent).toContain("Home is busy"));
+    expect(view.container.textContent).toContain("Place in line: 2");
     expect(cardOf(view)?.getAttribute("data-status")).toBe("queued");
     expect(view.container.textContent).toContain("Pancakes");
   });
@@ -86,10 +77,28 @@ describe("MusicToolRender", () => {
     const view = mount();
     await waitFor(() => expect(view.getByRole("status").textContent).toContain("Planning the song"));
     expect(cardOf(view)?.getAttribute("data-status")).toBe("generating");
-    expect(view.container.textContent).toMatch(/0:3\d · 25% · about 2 minutes left/);
+    expect(view.container.textContent).toMatch(/25% · 0:3\d · about 40 seconds left/);
     expect(view.container.textContent).toContain("a gentle folk song with an original voice, 1:00");
+    expect(view.container.textContent).toContain("Planning");
     fireEvent.click(view.getByRole("button", { name: "Stop" }));
     await waitFor(() => expect(calls.some((c) => c.method === "DELETE" && c.url === "/api/music/jobs/mus-1")).toBe(true));
+  });
+
+  test("generating card marks the current stage and hides time left when ETA is unknown", async () => {
+    card = make({ stage_index: 3, stage: "making", stage_label: "Making the music", eta_seconds: null });
+    const view = mount();
+    await waitFor(() => expect(view.getByRole("status").textContent).toContain("Making the music"));
+    expect(view.container.querySelector('[aria-current="step"]')?.textContent).toContain("Making the music");
+    expect(view.container.textContent).not.toContain("seconds left");
+    expect(view.container.textContent).not.toContain("minute left");
+  });
+
+  test("waiting for memory keeps the calm kit status and never shows an error", async () => {
+    card = make({ state: "queued", stage: "queued", stage_label: "Waiting for memory, your song starts when there is room", progress: 0, eta_seconds: null });
+    const view = mount();
+    await waitFor(() => expect(view.getByRole("status").textContent).toBe("Waiting for memory, your song starts when there is room"));
+    expect(view.queryByRole("alert")).toBeNull();
+    expect(cardOf(view)?.getAttribute("data-status")).toBe("queued");
   });
 
   test("a finished song plays in the kit player (audio layout) with its title, lyrics behind a disclosure, Download named from the title, and no Save to Music or Make another", async () => {
@@ -116,18 +125,31 @@ describe("MusicToolRender", () => {
     expect(poster.getAttribute("src")).toBe(card.cover_url);
   });
 
+  test("a finished song with no cover URL uses the kit's music fallback tile", async () => {
+    card = done({ cover_url: null, cover_versions: [], cover_pending: false });
+    const view = mount();
+    await waitFor(() => expect(view.container.querySelector("audio")).not.toBeNull());
+    expect(view.container.querySelector('[data-slot="safe-image-fallback"][data-kind="music"]')).toBeTruthy();
+    expect(view.container.querySelector("img")).toBeNull();
+  });
+
   test("Edit opens the three song actions and sends the typed song and cover prompts", async () => {
     card = done({ length: "quick" });
     const view = mount();
     await waitFor(() => expect(view.container.querySelector("audio")).not.toBeNull());
     fireEvent.click(view.getByRole("button", { name: "Edit" }));
-    expect(view.getByRole("region", { name: "Edit song" })).toBeTruthy();
-    expect(view.getByRole("button", { name: "Make it full" })).toBeTruthy();
+    expect(view.getByRole("dialog", { name: "Edit song" })).toBeTruthy();
+    for (const label of ["Change the song", "New cover", "Make it full"]) expect(view.getByRole("tab", { name: label })).toBeTruthy();
     fireEvent.change(view.getByLabelText("How should it change? For example: make it heavy metal"), { target: { value: "make it heavy metal" } });
     fireEvent.click(view.getAllByRole("button", { name: "Make" })[0]!);
     await waitFor(() => expect(calls.some((call) => call.url.endsWith("/revise") && call.body === JSON.stringify({ change: "make it heavy metal", file_id: V1.id }))).toBe(true));
+    const editButton = view.getByRole("button", { name: "Edit" });
+    if (editButton.getAttribute("aria-expanded") !== "true") fireEvent.click(editButton);
+    fireEvent.keyDown(view.getByRole("tab", { name: "Change the song" }), { key: "ArrowRight" });
+    await waitFor(() => expect(view.getByRole("tab", { name: "New cover" }).getAttribute("aria-selected")).toBe("true"));
+    await waitFor(() => expect(view.getByLabelText("Describe the new cover")).toBeTruthy());
     fireEvent.change(view.getByLabelText("Describe the new cover"), { target: { value: "a red guitar under stage lights" } });
-    fireEvent.click(view.getAllByRole("button", { name: "Make" })[1]!);
+    fireEvent.click(view.getByRole("button", { name: "Make" }));
     await waitFor(() => expect(calls.some((call) => call.url.endsWith("/cover") && call.body === JSON.stringify({ prompt: "a red guitar under stage lights" }))).toBe(true));
   });
 
@@ -168,6 +190,7 @@ describe("MusicToolRender", () => {
     ] });
     const view = mount();
     await waitFor(() => expect(view.container.querySelector("audio")).not.toBeNull());
+    Object.defineProperty(view.container.querySelector("audio"), "duration", { configurable: true, value: 10 });
     fireEvent.click(view.getByRole("button", { name: "Lyrics" }));
     expect(await view.findByRole("button", { name: "Morning light" })).toBeTruthy();
     fireEvent.click(view.getByRole("button", { name: "Pancakes rise" }));
@@ -264,6 +287,10 @@ describe("Quick and Full songs on the card", () => {
     const view = mount();
     expect(await view.findByText(/Quick song/)).toBeTruthy();
     fireEvent.click(await view.findByRole("button", { name: "Edit" }));
+    fireEvent.keyDown(view.getByRole("tab", { name: "Change the song" }), { key: "ArrowRight" });
+    fireEvent.keyDown(view.getByRole("tab", { name: "New cover" }), { key: "ArrowRight" });
+    await waitFor(() => expect(view.getByRole("tab", { name: "Make it full" }).getAttribute("aria-selected")).toBe("true"));
+    await waitFor(() => expect(view.getByRole("button", { name: "Make it full" })).toBeTruthy());
     const button = await view.findByRole("button", { name: "Make it full" });
     fireEvent.click(button);
     await waitFor(() => expect(calls.some((c) => c.url === "/api/music/jobs/mus-1/length" && c.method === "POST" && c.body?.includes('"full"'))).toBe(true));

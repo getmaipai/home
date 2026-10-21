@@ -45,13 +45,16 @@ const viewMiddleware = [requireAuth, viewGate] as [typeof requireAuth, typeof vi
 const refusals = errorResponses({ 401: "Not signed in", 403: "Music is off for this profile", 404: "No such song", 409: "Commercial export not allowed" });
 const params = z.object({ id: z.string().min(1).max(80) });
 const versionSchema = z.object({ id: z.string(), label: z.string(), url: z.string() });
+const stages = ["Queued", "Getting the model ready", "Planning", "Making the music", "Mixing", "Finishing"] as const;
+const musicStagesSchema = z.array(z.object({ id: z.string(), label: z.string() }));
 const cardSchema = z.object({
   id: z.string(), state: z.enum(["queued", "running", "done", "failed", "cancelled"]), stage: z.string().nullable(), stage_label: z.string(),
   cut: z.enum(["asked", "ceiling"]).nullable(), max_seconds: z.number().nullable(),
   progress: z.number(), eta_seconds: z.number().nullable(), position: z.number().nullable(), error_line: z.string().nullable(),
+  stages: musicStagesSchema, stage_index: z.number().int().min(0), started_at: z.string().nullable(),
   cover_pending: z.boolean(), cover_url: z.string().nullable(), cover_versions: z.array(z.object({ id: z.string(), url: z.string() })),
   timed_lyrics: z.array(z.object({ t: z.number(), line: z.string(), section: z.string().nullable() })).nullable(),
-  versions: z.array(versionSchema), current_id: z.string().nullable(), length: z.enum(["quick", "full"]), title: z.string().nullable(), description: z.string().nullable(), lyrics: z.string().nullable(), duration_s: z.number().nullable(), started_at: z.number(),
+  versions: z.array(versionSchema), current_id: z.string().nullable(), length: z.enum(["quick", "full"]), title: z.string().nullable(), description: z.string().nullable(), lyrics: z.string().nullable(), duration_s: z.number().nullable(),
 });
 export function musicFileUrl(job: MusicJob): string { return `/api/music/jobs/${encodeURIComponent(job.id)}/files/${encodeURIComponent(job.fileId!)}`; }
 const MUSIC_STAGE_LABELS: Record<string, string> = {
@@ -61,6 +64,24 @@ const MUSIC_STAGE_LABELS: Record<string, string> = {
   vae: "Mixing", decoding: "Mixing", mixing: "Finishing", encoding: "Finishing", saving: "Finishing",
   paused: "Paused while chat is working",
 };
+const MUSIC_STAGE_INDEX: Record<string, number> = {
+  loading: 1, starting: 1, planning: 2, lm: 2,
+  dit: 3, making: 3, music: 3, generating: 3,
+  vae: 4, decoding: 4, mixing: 5, encoding: 5, saving: 5,
+};
+const lastKnownMusicStage = new Map<string, number>();
+export function musicStageIndex(job: MusicJob): number {
+  if (job.state === "queued" || job.stage === "queued") { lastKnownMusicStage.set(job.id, 0); return 0; }
+  if (job.state === "done") { lastKnownMusicStage.set(job.id, stages.length - 1); return stages.length - 1; }
+  const known = job.stage ? MUSIC_STAGE_INDEX[job.stage] : undefined;
+  if (known !== undefined) {
+    const index = Math.max(lastKnownMusicStage.get(job.id) ?? 0, known);
+    lastKnownMusicStage.set(job.id, index);
+    if (lastKnownMusicStage.size > 500) lastKnownMusicStage.delete(lastKnownMusicStage.keys().next().value!);
+    return index;
+  }
+  return lastKnownMusicStage.get(job.id) ?? 0;
+}
 const warnedMusicStages = new Set<string>();
 export function musicStageLabel(job: MusicJob): string {
   if (job.stage == null || job.stage === "") return "";
@@ -99,6 +120,8 @@ export async function musicCardView(actor: PersonRow, input: Omit<MusicJob, "cov
       : Date.now() - Date.parse(shown.updatedAt) < 30_000;
   }
   return {
+    stages: stages.map((label, index) => ({ id: ["queued", "model", "planning", "making", "mixing", "finishing"][index]!, label })),
+    stage_index: musicStageIndex(root), started_at: Number.isFinite(Date.parse(root.createdAt)) ? root.createdAt : null,
     cover_pending: coverPending,
     cover_url: covers.at(-1)?.url ?? null, cover_versions: covers,
     id: root.id, state: root.state, stage: root.stage, stage_label: musicStageLabel(root), progress: root.progress,
@@ -106,7 +129,7 @@ export async function musicCardView(actor: PersonRow, input: Omit<MusicJob, "cov
     eta_seconds: root.etaSeconds, position: root.position, error_line: root.errorLine,
     versions: versions.map((job, index) => ({ id: job.fileId!, label: `Version ${index + 1}`, url: musicFileUrl(job) })),
     current_id: current?.fileId ?? null, length: lengthOf((current ?? root).request, (current ?? root).durationS), title: current?.request.title ?? root.request.title ?? null,
-    description: current?.request.description ?? root.request.description ?? null, started_at: Date.parse(root.createdAt),
+    description: current?.request.description ?? root.request.description ?? null,
     timed_lyrics: shown.lrc && !shown.request.instrumental ? sungLyricsFromLrc(shown.lrc, shown.durationS).map(({ t, line, section }) => ({ t, line, section })) : null,
     lyrics: cardLyricsOf(shown), duration_s: current?.durationS ?? root.durationS,
   };

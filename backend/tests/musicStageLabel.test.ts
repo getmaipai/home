@@ -1,7 +1,7 @@
 // ISOLATION-01: the Stack reports stage "paused" for a song whose worker is stopped while chat is working;
 // the song card says so through its existing stage line (rule S6, no new surface).
 import { expect, test } from "bun:test";
-import { musicStageLabel } from "@/routes/music";
+import { musicStageIndex, musicStageLabel } from "@/routes/music";
 import type { MusicJob } from "@/lib/music/types";
 
 const job = (patch: Partial<MusicJob>): MusicJob => ({ state: "running", stage: "planning", position: null, ...patch }) as MusicJob;
@@ -35,4 +35,15 @@ test("unknown, missing and completed stages do not show a fallback label", () =>
     expect(musicStageLabel(job({ state: "done", stage: "ready" }))).toBe("");
     expect(warnings.filter((line) => line.includes("plan"))).toHaveLength(1);
   } finally { console.warn = warn; }
+});
+
+test("music card stage indexes cover Stack aliases, queued and done, and unknown stages keep their last index", () => {
+  const aliases: Array<[string, number]> = [
+    ["loading", 1], ["starting", 1], ["lm", 2], ["planning", 2], ["dit", 3], ["making", 3], ["music", 3], ["generating", 3], ["vae", 4], ["decoding", 4], ["mixing", 5], ["encoding", 5], ["saving", 5],
+  ];
+  expect(musicStageIndex(job({ id: "queued", state: "queued", stage: "queued" }))).toBe(0);
+  for (const [stage, index] of aliases) expect(musicStageIndex(job({ id: `stage-${stage}`, stage }))).toBe(index);
+  expect(musicStageIndex(job({ id: "unknown-stage", stage: "making" }))).toBe(3);
+  expect(musicStageIndex(job({ id: "unknown-stage", stage: "new-stack-stage" }))).toBe(3);
+  expect(musicStageIndex(job({ id: "done-stage", state: "done", stage: "ready" }))).toBe(5);
 });

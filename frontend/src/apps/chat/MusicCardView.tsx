@@ -1,4 +1,4 @@
-import { useState, type ComponentProps } from "react";
+import { useEffect, useState, type ComponentProps } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Alert, AlertDescription } from "@maipai/ui/src/ui/alert";
 import { Button } from "@maipai/ui/src/ui/button";
@@ -7,7 +7,6 @@ import { MusicTrack } from "@maipai/ui/src/elements/music-track";
 import type { MusicTrackStatus } from "@maipai/ui/src/elements/music-track";
 import { musicApi, type MusicCard } from "@/lib/musicApi";
 import { prepareClip, shareClip } from "@/lib/shareClip";
-import { etaLabel } from "@/lib/etaLabel";
 export function musicFileName(title: string | null | undefined): string {
   const base = (title ?? "").replace(/[^\p{L}\p{N} _-]+/gu, " ").replace(/\s+/g, " ").trim().slice(0, 80).trim();
   return `${base || "song"}.m4a`;
@@ -17,14 +16,6 @@ export function musicHint(length: "quick" | "full", cut: MusicCard["cut"] = null
   return length === "full" ? "Full: every part of the song." : "Quick: the hook. Make it full to sing every part.";
 }
 
-export function musicEtaLabel(card: Pick<MusicCard, "state" | "stage" | "progress" | "started_at">, now = Date.now()): string | undefined {
-  if (card.state !== "running" || card.stage === "queued" || /memory/i.test(card.stage ?? "")) return undefined;
-  const progress = card.progress;
-  const elapsed = Math.max(0, (now - card.started_at) / 1000);
-  if (!Number.isFinite(progress) || progress <= 0.05 || elapsed < 10) return undefined;
-  const remaining = Math.max(5, elapsed * (1 - progress) / progress);
-  return etaLabel(remaining);
-}
 const descriptionOf = (card: MusicCard) => {
   const caption = (card.description ?? "").replace(/\s+/g, " ").trim();
   const style = caption.length > 70 ? `${caption.slice(0, 67).trimEnd()}...` : caption;
@@ -34,6 +25,14 @@ const descriptionOf = (card: MusicCard) => {
 
 /** The one rendering of Home's song player, shared by chat and the Library viewer. */
 export function useMusicTrackProps({ card, owner = true, onRefresh, onStop, onShare, navigate }: { card: MusicCard; owner?: boolean; onRefresh?: () => void; onStop?: () => void; onShare?: () => void; navigate?: (path: string) => void }): ComponentProps<typeof MusicTrack> {
+  const [now, setNow] = useState(() => Date.now());
+  const generating = card.state === "running";
+  useEffect(() => {
+    if (!generating) return;
+    setNow(Date.now());
+    const timer = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(timer);
+  }, [generating]);
   const [picked, setPicked] = useState<{ base: string | null; id: string } | null>(null);
   const [songChange, setSongChange] = useState("");
   const [coverChange, setCoverChange] = useState("");
@@ -47,20 +46,22 @@ export function useMusicTrackProps({ card, owner = true, onRefresh, onStop, onSh
   const prepared = useQuery({ queryKey: ["music-share", shown?.url], queryFn: ({ signal }) => prepareClip(shown!.url, signal, { type: "audio/mp4", name: musicFileName(title) }), enabled: ready && !onShare, staleTime: Infinity, gcTime: 10 * 60_000, retry: false });
   const refresh = () => onRefresh?.();
   const editErrorText = (error: unknown) => `${error instanceof Error ? error.message : "Home could not make that change."} Check the request and try again.`;
-  const editContent = owner && ready ? <>
-    {card.length !== "full" ? <Button type="button" variant="outline" onClick={() => { setEditing(true); setEditError(""); void musicApi.setLength(card.id, "full", shown?.id).then(refresh).catch(error => setEditError(editErrorText(error))).finally(() => setEditing(false)); }} disabled={editing}>Make it full</Button> : null}
-    <Input aria-label="How should it change? For example: make it heavy metal" placeholder="How should it change? For example: make it heavy metal" value={songChange} onChange={event => setSongChange(event.currentTarget.value)} maxLength={500} disabled={editing} />
-    <Button type="button" variant="outline" disabled={editing || !songChange.trim()} onClick={() => { const change = songChange.trim(); if (!change || editing) return; setEditing(true); setEditError(""); void musicApi.revise(card.id, change, shown?.id).then(() => { setSongChange(""); refresh(); }).catch(error => setEditError(editErrorText(error))).finally(() => setEditing(false)); }}>Make</Button>
-    <Input aria-label="Describe the new cover" placeholder="Describe the new cover" value={coverChange} onChange={event => setCoverChange(event.currentTarget.value)} maxLength={500} disabled={editing} />
-    <Button type="button" variant="outline" disabled={editing || !coverChange.trim()} onClick={() => { const prompt = coverChange.trim(); if (!prompt || editing) return; setEditing(true); setEditError(""); void musicApi.newCover(card.id, prompt).then(() => { setCoverChange(""); refresh(); }).catch(error => setEditError(editErrorText(error))).finally(() => setEditing(false)); }}>Make</Button>
-    {editError ? <Alert variant="destructive"><AlertDescription>{editError}</AlertDescription></Alert> : null}
-  </> : undefined;
+  const makeFull = () => { if (editing) return; setEditing(true); setEditError(""); void musicApi.setLength(card.id, "full", shown?.id).then(refresh).catch(error => setEditError(editErrorText(error))).finally(() => setEditing(false)); };
+  const makeChange = () => { const change = songChange.trim(); if (!change || editing) return; setEditing(true); setEditError(""); void musicApi.revise(card.id, change, shown?.id).then(() => { setSongChange(""); refresh(); }).catch(error => setEditError(editErrorText(error))).finally(() => setEditing(false)); };
+  const makeCover = () => { const prompt = coverChange.trim(); if (!prompt || editing) return; setEditing(true); setEditError(""); void musicApi.newCover(card.id, prompt).then(() => { setCoverChange(""); refresh(); }).catch(error => setEditError(editErrorText(error))).finally(() => setEditing(false)); };
+  const editModes = owner && ready ? [
+    { id: "song", label: "Change the song", content: <><div className="grid gap-2"><Input aria-label="How should it change? For example: make it heavy metal" placeholder="How should it change? For example: make it heavy metal" value={songChange} onChange={event => setSongChange(event.currentTarget.value)} maxLength={500} disabled={editing} /><Button type="button" variant="outline" disabled={editing || !songChange.trim()} onClick={makeChange}>Make</Button></div>{editError ? <Alert variant="destructive"><AlertDescription>{editError}</AlertDescription></Alert> : null}</> },
+    { id: "cover", label: "New cover", content: <><div className="grid gap-2"><Input aria-label="Describe the new cover" placeholder="Describe the new cover" value={coverChange} onChange={event => setCoverChange(event.currentTarget.value)} maxLength={500} disabled={editing} /><Button type="button" variant="outline" disabled={editing || !coverChange.trim()} onClick={makeCover}>Make</Button></div>{editError ? <Alert variant="destructive"><AlertDescription>{editError}</AlertDescription></Alert> : null}</> },
+    { id: "full", label: "Make it full", content: <>{card.length !== "full" ? <Button type="button" variant="outline" onClick={makeFull} disabled={editing}>Make it full</Button> : <p>This is already a full song.</p>}{editError ? <Alert variant="destructive"><AlertDescription>{editError}</AlertDescription></Alert> : null}</> },
+  ] : undefined;
+  const cardStarted = card.started_at ? Date.parse(card.started_at) : NaN;
+  const elapsedSeconds = Number.isFinite(cardStarted) ? Math.max(0, Math.floor((now - cardStarted) / 1000)) : undefined;
   const lyrics = card.lyrics?.trim() === "[Instrumental]" ? undefined : card.lyrics ?? undefined;
-  const eta = musicEtaLabel(card);
-  return { status, width: "full", ...(editContent ? { editContent, editLabel: "Edit", editPanelLabel: "Edit song" } : {}), title,
+  return { status, width: "full", ...(editModes ? { editModes, editLabel: "Edit", editPanelLabel: "Edit song" } : {}), title,
     ...(card.cover_url ? { cover: card.cover_url, coverAlt: `Cover art for ${title}` } : {}), ...(descriptionOf(card) ? { description: descriptionOf(card) } : {}), ...(ready ? { src: shown.url } : {}),
-    progress: Math.round(card.progress * 100), ...(card.stage_label && card.state !== "queued" ? { phaseLabel: card.stage_label } : {}), ...(eta ? { etaLabel: eta } : {}),
-    queuePosition: card.position, startedAt: card.started_at, ...(card.error_line ? { error: card.error_line } : {}), downloadName: musicFileName(title), timedLyrics: card.timed_lyrics ?? undefined,
+    stages: card.stages, currentStage: card.stage_index, progress: card.progress, ...(generating && elapsedSeconds !== undefined ? { elapsedSeconds } : {}), ...(card.eta_seconds !== null ? { etaSeconds: card.eta_seconds } : {}),
+    ...(card.stage_label ? { phaseLabel: card.stage_label } : {}), waitingForMemory: card.state === "queued" && /memory/i.test(card.stage_label),
+    queuePosition: card.position, ...(card.error_line ? { error: card.error_line } : {}), downloadName: musicFileName(title), timedLyrics: card.timed_lyrics ?? undefined,
     ...(ready && lyrics ? { lyrics } : {}), ...(ready ? { versions: card.versions.map(version => ({ id: version.id, label: version.label })), ...(shownId ? { currentId: shownId } : {}) } : {}),
     onSelectVersion: id => setPicked({ base: card.current_id, id }), ...(owner ? { onUseVersion: (id: string) => { void musicApi.useVersion(card.id, id).then(refresh).catch(refresh); } } : {}), onStop,
     hint: musicHint(card.length, card.cut, card.max_seconds), ...(card.state === "queued" && card.stage === "longer" ? { copy: { queued: card.stage_label } } : {}),

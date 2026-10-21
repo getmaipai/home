@@ -10,6 +10,8 @@ export interface MusicCard {
   stage: string | null;
   /** The plain stage line: "Planning the song", "Making the music", "Mixing it down", or the shared busy line while queued. */
   stage_label: string;
+  stages: Array<{ id: string; label: string }>;
+  stage_index: number;
   /** 0 to 1. */
   progress: number;
   eta_seconds: number | null;
@@ -31,8 +33,8 @@ export interface MusicCard {
   lyrics: string | null;
   timed_lyrics: { t: number; line: string; section: string | null }[] | null;
   duration_s: number | null;
-  /** Epoch milliseconds the song was asked for. */
-  started_at: number;
+  /** ISO time the song was asked for. */
+  started_at: string | null;
 }
 export interface MusicStatus { can_make: boolean; engine_ready: boolean; limits: { min_seconds: number; max_seconds: number } | null }
 
