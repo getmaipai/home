@@ -247,21 +247,6 @@
           "min_role": "admin"
         }
       ]
-    },
-    "sidebar": {
-      "groups": [
-        {
-          "id": "library",
-          "pages": [
-            "index",
-            "albums",
-            "artists",
-            "songs",
-            "playlists",
-            "liked"
-          ]
-        }
-      ]
     }
   },
   "min_app": "0.1.0",

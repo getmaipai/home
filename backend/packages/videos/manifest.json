@@ -190,19 +190,6 @@
           ]
         }
       ]
-    },
-    "sidebar": {
-      "groups": [
-        {
-          "id": "library",
-          "pages": [
-            "index",
-            "library",
-            "watch-later",
-            "history"
-          ]
-        }
-      ]
     }
   },
   "min_app": "0.1.0",

@@ -177,20 +177,6 @@
           ]
         }
       ]
-    },
-    "sidebar": {
-      "groups": [
-        {
-          "id": "library",
-          "pages": [
-            "index",
-            "shows",
-            "episodes",
-            "queue",
-            "saved"
-          ]
-        }
-      ]
     }
   },
   "min_app": "0.1.0",
