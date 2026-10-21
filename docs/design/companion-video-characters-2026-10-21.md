@@ -39,7 +39,7 @@ outside the shipped column is refused by the package validator, never repaired s
 |---|---|---|---|---|
 | Canvas | 1024 x 1024 PNG, sRGB, character centred, 12 percent margin on every side | 832 x 480 (the measured, in-budget Wan size) with the character in the centre 480 x 480 | **480 x 480 colour plus 480 x 480 matte stacked = 480 x 960** | The tool's measured size is 832 x 480; the square crop keeps the character, fits a 240 px avatar at 2x, and the large launcher at about 1.5x. A 720p render is not offered (308 s, 53.9 GB) |
 | Frame rate | n/a | 24 fps (the model's native rate) | **24 fps constant** | No retime, so no blended frames |
-| Length | n/a | 121 frames (5.04 s) | Loops: trimmed to a seamless loop between 2.0 and 4.0 s; one-shots: 1.5 to 4.0 s | Whole-second variety is not needed; short files are small |
+| Length | n/a | 121 frames (5.04 s) | Loops: trimmed to a clean loop between 2.0 and 4.0 s; one-shots: 1.5 to 4.0 s | Whole-second variety is not needed; short files are small |
 | Background | Flat key colour, **#00FF00 by default**, replaced by **#FF00FF** when the character's palette contains green (decided at sheet approval, recorded on the character) | same | Removed; the matte holds the shape | A flat known colour keys cleanly and is stable frame to frame |
 | Framing | One fixed camera, no zoom, no pan, no cut | same | same | A moving camera breaks every state switch |
 | Pose | Rest pose: standing or sitting, facing the viewer, mouth closed, arms down | Frame 0 is the rest picture; the last frame returns to the rest pose | same | Every state can follow every other through the rest pose (section 6) |
