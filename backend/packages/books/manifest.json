@@ -194,6 +194,19 @@
           ]
         }
       ]
+    },
+    "sidebar": {
+      "groups": [
+        {
+          "id": "library",
+          "pages": [
+            "index",
+            "books",
+            "audiobooks",
+            "series"
+          ]
+        }
+      ]
     }
   },
   "min_app": "0.1.0",

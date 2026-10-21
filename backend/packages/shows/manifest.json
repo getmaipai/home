@@ -194,6 +194,19 @@
           ]
         }
       ]
+    },
+    "sidebar": {
+      "groups": [
+        {
+          "id": "library",
+          "pages": [
+            "index",
+            "shows",
+            "films",
+            "watchlist"
+          ]
+        }
+      ]
     }
   },
   "min_app": "0.1.0",
