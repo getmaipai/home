@@ -8,7 +8,7 @@ import type { PersonRow } from "@/types";
 import { mediaContinueRows } from "@/lib/continue/providers";
 import { readableItem } from "@/lib/media/access";
 import { recentProgress } from "@/lib/media/progress";
-import { MEDIA_APPS, MEDIA_APP_IDS, queryItems, type MediaAppId } from "@/lib/media/appHost";
+import { madeFiles, MEDIA_APPS, MEDIA_APP_IDS, queryItems, type MediaAppId } from "@/lib/media/appHost";
 
 export const mediaHomeRoutes = apiRouter();
 
@@ -55,7 +55,7 @@ export function safely<T>(label: string, build: () => T[]): T[] {
   }
 }
 
-function homeFor(person: PersonRow): { continue: Row[]; new: Row[]; recent_music: Row[] } {
+function homeFor(person: PersonRow): { continue: Row[]; new: Row[]; recent_music: Row[]; made_at_home: Row[] } {
   // Continue: the Pick up logic, minus the shelf's budget, mapped onto an app.
   const continueRows = safely("continue", () =>
     mediaContinueRows(person, 12)
@@ -104,7 +104,23 @@ function homeFor(person: PersonRow): { continue: Row[]; new: Row[]; recent_music
     return rows;
   });
 
-  return { continue: continueRows, new: fresh, recent_music: music };
+  // Made at home: Library files created in chat, kept separate from scanned media roots.
+  const madeAtHome = safely("made_at_home", () => {
+    const rows: Row[] = [];
+    for (const [app, kind] of [["music", "track"], ["videos", "video"]] as const) {
+      for (const file of madeFiles(person, app).slice(0, 8)) {
+        rows.push({
+          id: file.id, app, kind, title: file.name, subtitle: null, artwork_url: file.thumb_url ?? null,
+          href: `/apps/${app}/${app === "music" ? "play" : "watch"}?id=${encodeURIComponent(file.id)}`,
+          percent: null, at: file.created_at,
+        });
+      }
+    }
+    rows.sort((a, b) => b.at.localeCompare(a.at));
+    return rows.slice(0, 12);
+  });
+
+  return { continue: continueRows, new: fresh, recent_music: music, made_at_home: madeAtHome };
 }
 
 const route = createRoute({
@@ -114,7 +130,7 @@ const route = createRoute({
   summary: "The media home: my unfinished titles, the newest additions of every app, and my recent songs",
   middleware: [requireAuth] as const,
   responses: {
-    200: { content: { "application/json": { schema: z.object({ continue: z.array(RowSchema), new: z.array(RowSchema), recent_music: z.array(RowSchema) }) } }, description: "My shelves. A guest gets none." },
+    200: { content: { "application/json": { schema: z.object({ continue: z.array(RowSchema), new: z.array(RowSchema), recent_music: z.array(RowSchema), made_at_home: z.array(RowSchema) }) } }, description: "My shelves. A guest gets none." },
     ...errorResponses({ 401: "Not signed in" }),
   },
 });

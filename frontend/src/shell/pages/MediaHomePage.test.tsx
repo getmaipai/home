@@ -26,6 +26,7 @@ test("the shelves draw with their headings and row titles", async () => {
     continue: [row({ percent: 42 })],
     new: [row({ id: "new-1", title: "Fresh" })],
     recent_music: [row({ id: "music-1", app: "music", title: "Played" })],
+    made_at_home: [],
   }));
   await waitFor(() => expect(view.getByText("Pick up where you left off")).toBeTruthy());
   expect(view.getByText("New in your media")).toBeTruthy();
@@ -34,18 +35,26 @@ test("the shelves draw with their headings and row titles", async () => {
 });
 
 test("clicking a continue row opens its href", async () => {
-  const view = open(async () => ({ continue: [row({ percent: 42 })], new: [], recent_music: [] }));
+  const view = open(async () => ({ continue: [row({ percent: 42 })], new: [], recent_music: [], made_at_home: [] }));
   const tile = await view.findByRole("button", { name: "A Title" });
   fireEvent.click(tile);
   await waitFor(() => expect(view.getByTestId("where").textContent).toBe("/media/media-abc123"));
 });
 
 test("with nothing in the library the empty state shows instead of the shelves", async () => {
-  const view = open(async () => ({ continue: [], new: [], recent_music: [] }));
+  const view = open(async () => ({ continue: [], new: [], recent_music: [], made_at_home: [] }));
   await waitFor(() => expect(view.getByText("Nothing here yet. Add music, videos, shows, podcasts or books to your library and they show up here.")).toBeTruthy());
   expect(view.queryByText("Pick up where you left off")).toBeNull();
   expect(view.queryByText("New in your media")).toBeNull();
   expect(view.queryByText("Recently played")).toBeNull();
+});
+
+test("made at home rows show their shelf and navigate to the app href", async () => {
+  const view = open(async () => ({ continue: [], new: [], recent_music: [], made_at_home: [row({ id: "made-1", app: "music", title: "Made Song", href: "/apps/music/play?id=made-1" })] }));
+  expect(await view.findByText("Made at home")).toBeTruthy();
+  expect(view.queryByText("Nothing here yet. Add music, videos, shows, podcasts or books to your library and they show up here.")).toBeNull();
+  fireEvent.click(await view.findByRole("button", { name: "Made Song" }));
+  await waitFor(() => expect(view.getByTestId("where").textContent).toBe("/apps/music/play"));
 });
 
 test("a failed load shows the retry message", async () => {
@@ -55,7 +64,7 @@ test("a failed load shows the retry message", async () => {
 });
 
 test("the hub column is drawn with Home as its active row", async () => {
-  const view = open(async () => ({ continue: [], new: [], recent_music: [] }));
+  const view = open(async () => ({ continue: [], new: [], recent_music: [], made_at_home: [] }));
   const frame = await view.findByTestId("media-hub-frame");
   expect(frame).toBeTruthy();
   const home = view.getByRole("link", { name: "Home" });

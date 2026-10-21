@@ -38,6 +38,7 @@ export function MediaHomePage() {
         >
           {(data: MediaHome) => {
             const shelves = [
+              { heading: "Made at home", items: data.made_at_home, aspect: "square" as const, getProgress: undefined },
               {
                 heading: "Pick up where you left off",
                 items: data.continue,
@@ -47,7 +48,7 @@ export function MediaHomePage() {
               { heading: "New in your media", items: data.new, aspect: "square" as const, getProgress: undefined },
               { heading: "Recently played", items: data.recent_music, aspect: "square" as const, getProgress: undefined },
             ].filter((shelf) => shelf.items.length > 0);
-            if (shelves.length === 0) {
+            if (shelves.length === 0 && data.made_at_home.length === 0) {
               return <EmptyState icon="film" text="Nothing here yet. Add music, videos, shows, podcasts or books to your library and they show up here." />;
             }
             return shelves.map((shelf) => (

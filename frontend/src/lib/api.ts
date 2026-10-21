@@ -777,7 +777,7 @@ export interface MediaHomeRow {
   percent: number | null;
   at: string;
 }
-export interface MediaHome { continue: MediaHomeRow[]; new: MediaHomeRow[]; recent_music: MediaHomeRow[] }
+export interface MediaHome { continue: MediaHomeRow[]; new: MediaHomeRow[]; recent_music: MediaHomeRow[]; made_at_home: MediaHomeRow[] }
 export type MediaSearchRow = MediaHomeRow;
 export interface MediaSearchGroup { app: MediaSearchRow["app"]; heading: string; rows: MediaSearchRow[] }
 export interface MediaSearch { groups: MediaSearchGroup[] }

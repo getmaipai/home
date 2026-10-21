@@ -52425,12 +52425,72 @@
                           "at"
                         ]
                       }
+                    },
+                    "made_at_home": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string"
+                          },
+                          "app": {
+                            "type": "string",
+                            "enum": [
+                              "videos",
+                              "shows",
+                              "music",
+                              "podcasts",
+                              "books"
+                            ]
+                          },
+                          "kind": {
+                            "type": "string"
+                          },
+                          "title": {
+                            "type": "string"
+                          },
+                          "subtitle": {
+                            "type": "string",
+                            "nullable": true
+                          },
+                          "artwork_url": {
+                            "type": "string",
+                            "nullable": true
+                          },
+                          "href": {
+                            "type": "string",
+                            "description": "Where the row leads; the media shell resolves it to the app that opens it."
+                          },
+                          "percent": {
+                            "type": "number",
+                            "nullable": true,
+                            "description": "Continue rows: how far along, 0 to 100, when known."
+                          },
+                          "at": {
+                            "type": "string",
+                            "description": "When the person last touched it (continue, recent music) or when it was added (new), ISO."
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "app",
+                          "kind",
+                          "title",
+                          "subtitle",
+                          "artwork_url",
+                          "href",
+                          "percent",
+                          "at"
+                        ]
+                      }
                     }
                   },
                   "required": [
                     "continue",
                     "new",
-                    "recent_music"
+                    "recent_music",
+                    "made_at_home"
                   ]
                 }
               }

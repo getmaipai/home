@@ -8,8 +8,10 @@ import { scanRoot } from "@/lib/media/scan";
 import { __resetProgressForTests, flushProgress } from "@/lib/media/progress";
 import { buildMediaTree } from "./support/mediaTree";
 import { safely } from "@/routes/mediaHome";
+import { storeFile } from "@/lib/attachments";
 import { db } from "@/db";
-import { mediaItems } from "@/db/schema";
+import { mediaItems, people } from "@/db/schema";
+import type { PersonRow } from "@/types";
 import { eq } from "drizzle-orm";
 
 beforeEach(() => {
@@ -21,7 +23,7 @@ interface Row {
   id: string; app: string; kind: string; title: string; subtitle: string | null; artwork_url: string | null;
   href: string; percent: number | null; at: string;
 }
-interface Home { continue: Row[]; new: Row[]; recent_music: Row[] }
+interface Home { continue: Row[]; new: Row[]; recent_music: Row[]; made_at_home: Row[] }
 
 async function setup() {
   const owner = new TestClient();
@@ -43,7 +45,8 @@ async function setup() {
   const find = async (client: TestClient, query: string) => ((await (await client.get(`/api/media/items?${query}`)).json()) as { items: Array<{ id: string; title: string }> }).items[0]!.id;
   const home = async (client: TestClient) => (await client.get("/api/media/home")).json() as Promise<Home>;
   const play = (client: TestClient, id: string, seconds: number) => client.request(`/api/media/progress/${id}`, { method: "PUT", body: { immediate: true, position: { seconds }, duration_s: 100, device_id: null, event: "play" } });
-  return { owner, adult, child, find, home, play };
+  const adultPerson = db.select().from(people).where(eq(people.displayName, "Marlow")).get() as PersonRow;
+  return { owner, adult, child, adultPerson, find, home, play };
 }
 
 describe("media home", () => {
@@ -91,6 +94,15 @@ describe("media home", () => {
       expect(row.at).not.toHaveLength(0);
       if (index > 0) expect(row.at.localeCompare(shelf[index - 1]!.at)).toBeLessThanOrEqual(0);
     }
+  });
+
+  test("made at home: the owner sees a song created in chat and a child has no made files", async () => {
+    const { adult, child, adultPerson, home } = await setup();
+    const made = storeFile(adultPerson, { conversationId: null, turnId: null, mediaType: "audio/mp4", bytes: new Uint8Array([1, 2, 3]), provenance: 'music-gen:{"title":"Made at home","duration_seconds":31}', deduplicate: false });
+    if (!made.ok) throw new Error(made.error);
+    const rows = (await home(adult.client)).made_at_home;
+    expect(rows).toContainEqual(expect.objectContaining({ id: made.value.id, app: "music", href: expect.stringMatching(/^\/apps\/music\/play\?id=/) }));
+    expect((await home(child.client)).made_at_home).toEqual([]);
   });
 
   test("continue: saving a place in a book puts it on the home with its percent", async () => {
