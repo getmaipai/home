@@ -349,7 +349,7 @@ function ChatModelChoices({ fits, selectedModelId, installedIds, downloading, on
           const busy = working !== null;
           return (
             <li key={model.id} className="flex flex-col gap-1 rounded-md border border-[var(--border)] p-3">
-              <div className="flex items-center justify-between gap-2">
+              <div className="flex flex-wrap items-center justify-between gap-2">
                 <span className="text-base font-medium">{model.label}</span>
                 {inUse ? <Badge variant="secondary" tone="success">In use</Badge> : installed ? (
                   <Button type="button" disabled={busy || downloading} onClick={() => void choose(fit)}>Use this model</Button>
