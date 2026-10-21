@@ -1423,6 +1423,27 @@ describe("ACT-01: the judge's queue is keyed on the stored signal", () => {
     expect(recalled.some((m) => m.record.text.includes("Dan Campos"))).toBe(true);
   });
 
+  test("coreference holds on every surface: chat, robot, tv and phone keep the same facts (no surface decides grounding)", async () => {
+    const { actor } = await owner();
+    for (const surface of ["chat", "robot", "tv", "phone"] as const) {
+      const conv = resolveOrCreateConversation(actor, surface);
+      if (!conv.ok) throw new Error("setup failed");
+      const turnId = `turn-${Math.random().toString(36).slice(2, 12)}`;
+      const signal = classifyTurnSignal({ text: DAN_TURN, ageBand: "adult" });
+      const value: TurnValue = { reply: { text: "Tell me about Dan." }, source: "model", safety: SAFE, conversation_id: conv.value.id, turn_id: turnId };
+      logTurn(actor, surface, DAN_TURN, value, { signal, judgeStatus: judgeStatusAtInsert(value, signal) });
+      const turn = db.select().from(conversationTurns).where(eq(conversationTurns.id, turnId)).get()!;
+      const result = await withScriptedJudge(
+        () => ({ facts: [danFact("Dan Campos plays drums", { name: "Dan Campos", kind: "person" }), danFact("Marlow plays guitar")] }),
+        async () => judgeTurn(turn),
+      );
+      expect(result.ok).toBe(true);
+      const texts = db.select().from(memoryRecords).where(eq(memoryRecords.source, turn.id)).all().map((r) => r.text).sort();
+      expect({ surface, texts }).toEqual({ surface, texts: ["Dan Campos plays drums", "Marlow plays guitar"] });
+      db.update(memoryRecords).set({ status: "archived" }).run();
+    }
+  });
+
   test("coreference does not widen the guard: a name said nowhere, a name more than two clauses back, no pronoun, or a hypothetical/quoted clause still drops", async () => {
     const { citeClause, turnDateFor } = await import("@/lib/memoryJudge");
     const date = turnDateFor(new Date(2026, 9, 21, 12).toISOString());
