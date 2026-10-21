@@ -2,6 +2,7 @@
 import { listConversations } from "@/lib/conversationHistory";
 import { readableItem } from "@/lib/media/access";
 import { recentProgress, percentOf } from "@/lib/media/progress";
+import type { PersonRow } from "@/types";
 import { registerContinueProvider, type ContinueRow } from "./registry";
 
 /** The person's own last chats. */
@@ -18,7 +19,7 @@ registerContinueProvider("chat", (actor, limit) =>
 
 /** The person's own unfinished titles, newest first. A part of a folder audiobook shows as the book. A track is not "picked up", and a
  * finished title is done. A title the person may no longer read (the band, a removed folder) is left out. */
-registerContinueProvider("media", (actor, limit) => {
+export function mediaContinueRows(actor: PersonRow, limit: number): ContinueRow[] {
   const rows: ContinueRow[] = [];
   const seen = new Set<string>();
   for (const progress of recentProgress(actor.id, limit * 6 + 6)) {
@@ -39,4 +40,6 @@ registerContinueProvider("media", (actor, limit) => {
     if (rows.length >= limit) break;
   }
   return rows;
-});
+}
+
+registerContinueProvider("media", mediaContinueRows);
