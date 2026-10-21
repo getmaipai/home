@@ -23,7 +23,7 @@ const CLAIMS = [
   // "Here's your picture", "here is the video"
   new RegExp(`\\b(?:here(?:'s| is| are)|there(?:'s| is))\\b[^.!?\\n]{0,30}\\b${MEDIA_NOUN}\\b`),
   // "I've made a picture", "I'm creating the video", "I'll generate it"
-  new RegExp(`\\bi(?:'ve| have|'m| am|'ll| will)?\\s+(?:just\\s+|now\\s+)?(?:made|created|generated|rendered|drawn|painted|started|making|creating|generating|rendering|drawing|painting|animating|working on)\\b[^.!?\\n]{0,60}\\b(?:${MEDIA_NOUN}|it|that|one)\\b`),
+  new RegExp(`\\bi(?:'ve| have|'m| am|'ll| will)?\\s+(?:just\\s+|now\\s+)?(?:made|created|generated|rendered|drawn|painted|started|making|creating|generating|rendering|drawing|painting|animating|working on)\\b[^.!?\\n]{0,110}\\b(?:${MEDIA_NOUN}|it|that|one)\\b`),
   // "your picture is being made", "the video is ready", "the picture has been created"
   new RegExp(`\\b${MEDIA_NOUN}\\b[^.!?\\n]{0,40}\\b(?:is|are|was|were|has been|have been|should be|will be|being)\\b[^.!?\\n]{0,30}\\b(?:made|created|generated|rendered|drawn|ready|done|finished|on its way|on the way|coming|below|underway|in progress|started|appear|show up)`),
   // "on its way", "it will appear below", "right below when it is ready"

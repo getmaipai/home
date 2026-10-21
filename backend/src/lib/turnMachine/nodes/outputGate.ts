@@ -34,6 +34,7 @@ import { REFUSAL_FIRST } from "@/lib/replyVariation";
 import { PROMPT_REFUSAL_LINE } from "@/lib/pictures/policy";
 import { VIDEO_REFUSAL_LINE } from "@/lib/videos/policy";
 import { envelopeToolCall } from "@/lib/llm";
+import { markerPrefixTail, stripToolMarkup, toolMarkupStart } from "@/lib/toolMarkup";
 import { failureLine } from "@/lib/generationFailure";
 import { notifyOncePerTurn } from "@/lib/turnShared";
 import type { PersonRow } from "@/lib/memoryIngestion";
@@ -61,6 +62,8 @@ export interface StreamGateResult {
    * this to fall back to its ordinary whole-reply path when true,
    * exactly as an immediate turn already does. */
   heldAsEnvelope: boolean;
+  /** RECENCY-02: tool-call markup the model wrote as text, cut off and never released (empty when none). */
+  toolMarkup: string;
   /** True once finish() has run (whether or not it releases anything) -
    * the signal output_gate's own node uses to tell "this reply was
    * actually streamed" apart from every other AnswerInput kind, which
@@ -224,6 +227,9 @@ export class StreamGate {
   private lastFlagged: SafetyResult | undefined;
   private envelopeDecided = false;
   private heldAsEnvelope = false;
+  /** RECENCY-02: tool-call markup written as text. Everything from its opening on is swallowed here and never released. */
+  private swallowing = false;
+  private markupText = "";
   private done = false;
   private readonly reasoningLane: ReasoningLane | undefined;
 
@@ -275,6 +281,8 @@ export class StreamGate {
     this.isFirstChunk = true;
     this.envelopeDecided = false;
     this.heldAsEnvelope = false;
+    this.swallowing = false;
+    this.markupText = "";
     // Per sentence, an abandoned round released nothing, so the record
     // starts clean. As it arrives, what the round showed stays shown and
     // stays in the record; the next round continues after it.
@@ -332,7 +340,16 @@ export class StreamGate {
 
   push(delta: string): void {
     if (this.refused || this.done || !delta) return;
+    if (this.swallowing) { this.markupText += delta; return; }
     this.pending += delta;
+    // RECENCY-02: a tool call written as text after prose is cut off where it starts; the prose before it carries on.
+    const markupAt = toolMarkupStart(this.pending);
+    if (markupAt >= 0 && markupAt >= this.pendingReleased) {
+      this.markupText = this.pending.slice(markupAt);
+      this.pending = this.pending.slice(0, markupAt);
+      this.swallowing = true;
+      if (!this.pending.trim()) return;
+    }
     if (!this.envelopeDecided) {
       const trimmedStart = this.pending.trimStart();
       if (trimmedStart.length === 0) return; // still nothing but whitespace so far
@@ -409,7 +426,9 @@ export class StreamGate {
         return;
       }
     }
-    const fresh = this.pending.slice(this.pendingReleased);
+    // RECENCY-02: the end of the text that could be the start of tool-call markup ("<tool_c") waits for the next piece.
+    const releasable = this.pending.length - (this.swallowing ? 0 : markerPrefixTail(this.pending));
+    const fresh = this.pending.slice(this.pendingReleased, Math.max(this.pendingReleased, releasable));
     if (fresh) {
       const out = this.joinNext && fresh.trim() ? `\n\n${fresh}` : fresh;
       if (fresh.trim()) this.joinNext = false;
@@ -417,7 +436,7 @@ export class StreamGate {
       // so a later whole-reply check never reads two rounds glued together.
       if (out !== fresh) this.checked += "\n\n";
       this.delivered += out;
-      this.pendingReleased = this.pending.length;
+      this.pendingReleased += fresh.length;
       this.release(out);
     }
     for (;;) {
@@ -488,6 +507,12 @@ export class StreamGate {
         // The tail already went out as it arrived; only what repair
         // would ADD (a closing stop) can still be released. Anything the
         // repair would take away cannot be taken back.
+        const heldBack = this.pending.slice(this.pendingReleased);
+        if (heldBack) {
+          this.delivered += heldBack;
+          this.pendingReleased = this.pending.length;
+          this.release(heldBack);
+        }
         const repairedTail = repairTail(this.checked, this.pending);
         if (repairedTail.startsWith(this.pending) && repairedTail.length > this.pending.length) {
           const suffix = repairedTail.slice(this.pending.length);
@@ -509,7 +534,7 @@ export class StreamGate {
 
   result(): StreamGateResult {
     const lane = this.reasoningLane?.result();
-    return { text: this.delivered, refused: this.refused, lastFlagged: this.lastFlagged, heldAsEnvelope: this.heldAsEnvelope, done: this.done, reasoning: lane?.text ?? "", reasoningRefused: lane?.refused ?? false };
+    return { text: this.delivered, refused: this.refused, lastFlagged: this.lastFlagged, heldAsEnvelope: this.heldAsEnvelope, toolMarkup: this.markupText, done: this.done, reasoning: lane?.text ?? "", reasoningRefused: lane?.refused ?? false };
   }
 }
 
@@ -568,7 +593,13 @@ export const outputGateNode: Node<OutputGateInput, OutputGateOutput> = async (st
   // DEADLINE-01's own model_failed already uses one node up (answer.ts's
   // COMPOSE_FAILURE_LINE), not the "refused" branch machine.ts reserves
   // for a real safety decision.
-  if (envelopeToolCall(input.reply.text) !== undefined) {
+  // RECENCY-02: tool-call markup written as text is never shown. A reply that is nothing but markup takes the honest failure
+  // line below; markup after prose is cut off and the prose is the reply.
+  const markupStripped = stripToolMarkup(input.reply.text);
+  if (markupStripped.markup && markupStripped.text.trim()) {
+    input = { ...input, reply: { ...input.reply, text: markupStripped.text, ...(input.reply.speech !== undefined ? { speech: stripToolMarkup(input.reply.speech).text } : {}) } };
+  }
+  if (envelopeToolCall(input.reply.text) !== undefined || (markupStripped.markup && !markupStripped.text.trim())) {
     // A review caught the first cut hardcoding `withheld_for: null` here,
     // exactly the bug the safety-refusal branch below is already careful
     // to avoid (its own comment: a benign span's real reason must never

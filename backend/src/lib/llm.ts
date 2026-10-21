@@ -281,9 +281,29 @@ function markupToolCall(trimmed: string): ToolCall | undefined {
   return toolCallFromWire({ id: "", type: "function", function: { name, arguments: JSON.stringify(args) } });
 }
 
+// RECENCY-02: Qwen's own XML call, `<tool_call><function=name><parameter=key>value</parameter></function></tool_call>`, as the
+// whole reply. Prose beside it is never a call (toolMarkup.ts cuts that text off instead).
+const QWEN_XML_FUNCTION_RE = /^(?:<tool_call>\s*)?<function=([\w.-]+)>([\s\S]*?)<\/function>\s*(?:<\/tool_call>)?$/i;
+const QWEN_XML_PARAM_RE = /<parameter=([\w.-]+)>\s*([\s\S]*?)\s*<\/parameter>/gi;
+function qwenXmlToolCall(trimmed: string): ToolCall | undefined {
+  if (!trimmed.startsWith("<")) return undefined;
+  const whole = trimmed.match(QWEN_XML_FUNCTION_RE);
+  if (!whole) return undefined;
+  const args: Record<string, string> = {};
+  let leftover = whole[2]!;
+  for (const m of whole[2]!.matchAll(QWEN_XML_PARAM_RE)) {
+    args[m[1]!] = m[2]!;
+    leftover = leftover.replace(m[0], "");
+  }
+  if (leftover.trim().length > 0) return undefined;
+  return toolCallFromWire({ id: "", type: "function", function: { name: whole[1]!, arguments: JSON.stringify(args) } });
+}
+
 export function envelopeToolCall(text: string): ToolCall | undefined {
   const trimmed = text.trim();
   if (!trimmed) return undefined;
+  const qwenXml = qwenXmlToolCall(trimmed);
+  if (qwenXml) return qwenXml;
   const markup = markupToolCall(trimmed);
   if (markup) return markup;
   const tagged = trimmed.match(ENVELOPE_TAG_RE);

@@ -4,7 +4,7 @@
   "kind": "plugin",
   "category": "Media",
   "display": "Make or Change a Picture",
-  "description": "Make a new picture, or change one the person has, and call it before you say so.",
+  "description": "Make a new picture or change one the person has, never to show a real poster or photo.",
   "offer": {
     "mode": "conditional",
     "gate": "picturesAllowed",
@@ -36,7 +36,7 @@
         "minLength": 3,
         "maxLength": 1200,
         "grounded": false,
-        "description": "What to draw, written as a full description in plain English: the subject, the setting, the style and the light or mood, built from what the person asked for. Keep their own words for names and for any text that must appear in the picture. Do not add people, objects or themes they did not ask for. When they ask for another one, one more or the same again, call this tool again with a fresh description of the same subject; never say a picture is coming, ready or on its way without calling it in this reply, and never describe a picture you did not make. When `change` is set, `prompt` is the instruction for the change instead, in plain English and in the person's own words (for example \"remove the man in the red jacket\" or \"make the sky clear blue with no clouds\"); say what to keep if it matters."
+        "description": "Only for a picture the person asks you to make, draw or design: for a real poster, photo, film, product or person use show_images instead, never this. What to draw, written as a full description in plain English: the subject, the setting, the style and the light or mood, built from what the person asked for. Keep their own words for names and for any text that must appear in the picture. Do not add people, objects or themes they did not ask for. When they ask for another one, one more or the same again, call this tool again with a fresh description of the same subject; never say a picture is coming, ready or on its way without calling it in this reply, and never describe a picture you did not make. When `change` is set, `prompt` is the instruction for the change instead, in plain English and in the person's own words (for example \"remove the man in the red jacket\" or \"make the sky clear blue with no clouds\"); say what to keep if it matters."
       },
       "size": {
         "type": "string",

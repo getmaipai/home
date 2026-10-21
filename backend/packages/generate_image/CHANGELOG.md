@@ -2,6 +2,12 @@
 
 All notable changes to the Make a Picture package, in [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) format.
 
+## [Unreleased]
+
+### Changed
+
+- RECENCY-02: the description says the tool is never used to show something real that already exists (a poster, photo, film, person); that is `show_images`.
+
 ## [0.2.0] - 2026-10-17
 
 ### Added
