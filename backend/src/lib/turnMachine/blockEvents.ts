@@ -22,7 +22,7 @@ export function acceptPackageBlocks(state: TurnState, packageId: string, raw: un
       raw,
       packageId,
       allowedKinds,
-      turnAgeBand(state.surface, state.actor, state.speakerEvidence, new Date()),
+      turnAgeBand(state.surface, state.actor, state.speakerEvidence, new Date(), state.deviceId),
       state.actor,
       seenIds,
       (safety) => {

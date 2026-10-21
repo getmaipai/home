@@ -51,11 +51,11 @@ function sameSpace(manifest: LoadedWeights, stackModel: string, v: { dims: numbe
 }
 
 /** `recallVector` is the raw recall embedding when the turn made one. */
-export async function runSearchAssistShadow(state: EligibilityState & Pick<TurnState, "surface" | "actor" | "speakerEvidence">, utterance: string, recallVector: QueryVector | undefined, minorGate?: Omit<MinorEligibility, "recallVector">): Promise<SearchAssistStats> {
+export async function runSearchAssistShadow(state: EligibilityState & Pick<TurnState, "surface" | "actor" | "speakerEvidence" | "deviceId">, utterance: string, recallVector: QueryVector | undefined, minorGate?: Omit<MinorEligibility, "recallVector">): Promise<SearchAssistStats> {
   let mode: SearchAssistMode = "shadow";
   let eligible = false;
   try {
-    const band = turnAgeBand(state.surface, state.actor, state.speakerEvidence, new Date());
+    const band = turnAgeBand(state.surface, state.actor, state.speakerEvidence, new Date(), state.deviceId);
     const minor = band !== "adult";
     const bandKey = minor ? band : undefined;
     mode = cappedSearchAssistMode(band, readMode());

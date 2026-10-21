@@ -27,6 +27,7 @@ import { nextHlc } from "@/lib/hlc";
 import type { SpeakerEvidence, PresentPerson } from "@/lib/turnShared";
 import type { PersonRow } from "@/types";
 import { speakerAgeBand, type AgeBand } from "@/lib/ageBand";
+import { robotCompanionBand, stricterBand } from "@/lib/robotCompanion";
 import type { SafetyResult } from "@maipai/spec/gen/ts/safety-result.js";
 
 /** AGE-02(b): the child-band conversation floor. Subjects may carry the
@@ -42,9 +43,15 @@ export function worryingConversation(signal: TurnSignal, subjects: readonly (Sub
 }
 
 
-export function effectiveBand(surface: Surface, actor: PersonRow, speakerEvidence: SpeakerEvidence | null | undefined, now: Date): { band: AgeBand; basis: "identified_profile" | "unknown_speaker_default" } {
+export function effectiveBand(surface: Surface, actor: PersonRow, speakerEvidence: SpeakerEvidence | null | undefined, now: Date, deviceId?: string): { band: AgeBand; basis: "identified_profile" | "unknown_speaker_default" } {
   const unknownRobot = surface === "robot" && (!speakerEvidence || speakerEvidence.level === "unknown" || speakerEvidence.person !== actor.id);
-  return unknownRobot ? { band: "child", basis: "unknown_speaker_default" } : { band: speakerAgeBand(actor, now), basis: "identified_profile" };
+  // ROBOT-COMPANION-01 (owner's ruling, 2026-10-21): a robot with a companion assigned takes the companion's type for an unknown speaker; a
+  // robot with none keeps the child result. A speaker the robot names gets the stricter of their own band and the companion's type.
+  // Anonymity (the basis) is unchanged, so memory access stays closed to an unknown speaker.
+  const companion = surface === "robot" ? robotCompanionBand(deviceId) : null;
+  if (unknownRobot) return { band: companion ?? "child", basis: "unknown_speaker_default" };
+  const own = speakerAgeBand(actor, now);
+  return { band: companion ? stricterBand(own, companion) : own, basis: "identified_profile" };
 }
 
 /** Section 6: sensitive records are allowed on the robot only when the

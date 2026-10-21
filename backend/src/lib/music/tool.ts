@@ -13,9 +13,9 @@ import type { MusicJob, MusicRequest, MusicTask, SongLength } from "./types";
 import { householdSongLength } from "./policy";
 export const GENERATE_MUSIC_TOOL_ID = "generate_music";
 export const EDIT_MUSIC_TOOL_ID = "edit_music";
-export function musicAudienceOf(state: Pick<TurnState, "actor" | "surface" | "speakerEvidence" | "planBasis" | "plan">, spoken: boolean): MusicAudience {
+export function musicAudienceOf(state: Pick<TurnState, "actor" | "surface" | "speakerEvidence" | "deviceId" | "planBasis" | "plan">, spoken: boolean): MusicAudience {
   const surfaceClass = state.planBasis?.surfaceClass ?? "spoken";
-  return { actor: state.actor, band: turnAgeBand(state.surface, state.actor, state.speakerEvidence, new Date()), surface: state.surface, surfaceClass, spoken: spoken || surfaceClass !== "written" };
+  return { actor: state.actor, band: turnAgeBand(state.surface, state.actor, state.speakerEvidence, new Date(), state.deviceId), surface: state.surface, surfaceClass, spoken: spoken || surfaceClass !== "written" };
 }
 const common = {
   description: z.string().trim().min(3).max(1200).optional(), lyrics: z.string().max(4000).optional(),
@@ -37,7 +37,7 @@ export function musicRefusalFor(audience: MusicAudience, args: Record<string, un
   return refusal ? { kind: "prompt" as const, why: refusal, line: MUSIC_REFUSAL_LINE[refusal] } : null;
 }
 export type MusicToolInput = {
-  state: Pick<TurnState, "actor" | "surface" | "speakerEvidence" | "planBasis" | "plan" | "conversationId" | "turnId" | "temporary" | "ephemeral">;
+  state: Pick<TurnState, "actor" | "surface" | "speakerEvidence" | "deviceId" | "planBasis" | "plan" | "conversationId" | "turnId" | "temporary" | "ephemeral">;
   args: Record<string, unknown>; callId: string; spoken: boolean;
 };
 const newSeed = (prior?: number | null): number => { const seed = Math.floor(Math.random() * 2_147_483_646) + 1; return seed === prior ? seed + 1 : seed; };

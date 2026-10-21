@@ -14,6 +14,7 @@ import { START_PROJECT_TOOL_ID, runStartProjectTool, type StartProjectArgs } fro
 import { SHOW_IMAGES_TOOL_ID, SHOW_IMAGES_UNAVAILABLE_LINE, answerImageFailureKind, showImagesEmptyResultLine, showImagesMultiResultLine, showImagesNames, showImagesPendingResultLine, showImagesResultLine, startAnswerImages } from "@/lib/answerImages/turn";
 import { GENERATE_IMAGE_TOOL_ID, runGenerateImage } from "@/lib/pictures/tool";
 import { GENERATE_VIDEO_TOOL_ID, runGenerateVideo } from "@/lib/videos/tool";
+import { speakerIsAnonymous, turnAgeBand } from "../speaker";
 import type { Node, ActionProposal, ToolExecutionOutcome } from "../contract";
 import { TOOL_RESULT_SITES_MAX, type TurnStreamEvent as ToolStreamEvent } from "@maipai/spec/stack/ts/turn-stream-event.js";
 
@@ -266,14 +267,15 @@ export const toolNode: Node<ToolInput, ToolOutput> = async (state, input, signal
     let uncached = false;
     let weatherArgs: Record<string, unknown> | undefined;
     if (tool === "weather") {
-      const weatherPlace = await resolveWeatherPlace({ person: state.actor, named: (args as Record<string, unknown>).place, current: state.currentLocation });
+      // WEATHER-KID-01: an unknown robot speaker is not the signed-in person, so the place is the household home, never that person's own saved place.
+      const weatherPlace = await resolveWeatherPlace({ person: speakerIsAnonymous(state) ? null : state.actor, ...(speakerIsAnonymous(state) ? { band: turnAgeBand(state.surface, state.actor, state.speakerEvidence, new Date(), state.deviceId) } : {}), named: (args as Record<string, unknown>).place, current: state.currentLocation });
       if (weatherPlace) {
         weatherArgs = { ...(args as Record<string, unknown>), place: weatherPlace.place };
         hostInputs = weatherPlace.hostInputs;
         uncached = weatherPlace.uncached;
       }
     }
-    const raced = await withDeadline(runPlugin(tool, state.actor, weatherArgs ?? runArgs, { id: state.turnId, conversationId: state.conversationId }, { signal, deadlineAt: input.deadlineAt, spoken: (state.planBasis?.surfaceClass ?? "spoken") !== "written", ...(hostInputs ? { hostInputs, uncached } : {}) }), signal);
+    const raced = await withDeadline(runPlugin(tool, state.actor, weatherArgs ?? runArgs, { id: state.turnId, conversationId: state.conversationId }, { signal, deadlineAt: input.deadlineAt, spoken: (state.planBasis?.surfaceClass ?? "spoken") !== "written", band: turnAgeBand(state.surface, state.actor, state.speakerEvidence, new Date(), state.deviceId), ...(hostInputs ? { hostInputs, uncached } : {}) }), signal);
     const durationMs = Date.now() - startedAt;
     if (raced === "deadline") {
       const outcome = outcomeOf({ callId, packageId: tool, status: "failed", via: "tool_call", args, errorCode: "deadline_exceeded", durationMs, failureKind: "timed_out", detail: "the tool deadline passed before the call returned" });

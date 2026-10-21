@@ -52,11 +52,15 @@
 // invariants section, and needs its own explicit reconciliation rule,
 // not a value dropped in beside three harmless ones).
 import { listPackageIds, loadManifestOnly } from "@/lib/plugins";
+import { companionTypeOf } from "@/lib/robotCompanion";
 import type { SurfaceClass } from "@/lib/surfaceClass";
 
 export interface Persona {
   id: string;
   display_name: string;
+  /** ROBOT-COMPANION-01: the companion's type, from its manifest `min_role` (child or guest: child, teen: teen, anything
+   * higher: adult). A robot's controls bound which types it may use; the companion's type sets that robot's turn band. */
+  controls: "child" | "teen" | "adult";
   formality: "casual" | "neutral" | "formal";
   complexity: "simple" | "standard" | "advanced";
   /** How much a persona probes vs. lets something go (Jesse's own
@@ -108,6 +112,7 @@ function loadPersonaCatalog(): Persona[] {
     out.push({
       id,
       display_name: c.display_name,
+      controls: companionTypeOf(loaded.value.min_role),
       formality: c.formality,
       complexity: c.complexity,
       engagement: c.engagement,

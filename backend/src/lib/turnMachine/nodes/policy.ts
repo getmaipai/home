@@ -301,7 +301,7 @@ export const policyNode: Node<PolicyInput, PolicyOutput> = async (state, input) 
       }
       const args = (call.args ?? {}) as Record<string, unknown>;
       const proposal: ActionProposal = { kind: projectType.consequential ? "side_effecting" : "read_only", request: { tool: call.tool, args, callId: call.id ?? call.tool } };
-      const gate = decide({ who: { personId: state.actor.id, role: state.actor.role as Role, band: turnAgeBand(state.surface, state.actor, state.speakerEvidence, new Date()), anonymous: speakerIsAnonymous(state) }, what: { capabilities: ["artifact:write"], consequential: projectType.consequential, minRole: projectType.minRole }, context: { crisis: state.crisis, temporary: state.temporary } });
+      const gate = decide({ who: { personId: state.actor.id, role: state.actor.role as Role, band: turnAgeBand(state.surface, state.actor, state.speakerEvidence, new Date(), state.deviceId), anonymous: speakerIsAnonymous(state) }, what: { capabilities: ["artifact:write"], consequential: projectType.consequential, minRole: projectType.minRole }, context: { crisis: state.crisis, temporary: state.temporary } });
       if (gate.kind === "deny") {
         const reason = gateRefusalReason(gate.reason);
         noteRefusal(reason);
@@ -425,7 +425,7 @@ export const policyNode: Node<PolicyInput, PolicyOutput> = async (state, input) 
     const isPreConfirmed = input.preConfirmed?.request.tool === call.tool && JSON.stringify(input.preConfirmed.request.args) === JSON.stringify(args);
     if (!isPreConfirmed) {
       const householdSubject = call.tool === "websearch" && roster.length > 0 && speakerNamedAny(JSON.stringify(args), roster);
-      const gate = decide({ who: { personId: state.actor.id, role: state.actor.role as Role, band: turnAgeBand(state.surface, state.actor, state.speakerEvidence, new Date()), anonymous: speakerIsAnonymous(state) }, what: { capabilities: householdSubject ? ["search.household_subject"] : manifest.permissions ?? [], summary: "Search the web for this request.", consequential: manifest.consequential, minRole: manifest.min_role }, context: { crisis: state.crisis, temporary: state.temporary } });
+      const gate = decide({ who: { personId: state.actor.id, role: state.actor.role as Role, band: turnAgeBand(state.surface, state.actor, state.speakerEvidence, new Date(), state.deviceId), anonymous: speakerIsAnonymous(state) }, what: { capabilities: householdSubject ? ["search.household_subject"] : manifest.permissions ?? [], summary: "Search the web for this request.", consequential: manifest.consequential, minRole: manifest.min_role }, context: { crisis: state.crisis, temporary: state.temporary } });
       if (gate.kind === "deny") {
         // MINOR-SEARCH-01b: a child naming a household member in a web search
         // is never allowed; it gets its own line, not the role-floor one.

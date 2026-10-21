@@ -8,12 +8,12 @@ import type { Role } from "@/middleware/auth";
 import type { TurnState } from "@/lib/turnMachine/contract";
 import { speakerIsAnonymous, turnAgeBand } from "@/lib/turnMachine/speaker";
 
-type GateState = Pick<TurnState, "surface" | "actor" | "speakerEvidence" | "crisis">;
+type GateState = Pick<TurnState, "surface" | "actor" | "speakerEvidence" | "crisis" | "deviceId">;
 
 /** Fails closed: any throw, missing manifest or non-allow means false. */
 export function minorSearchGate(state: GateState, temporary: boolean): { gateAllows: boolean; webOn: boolean } {
   try {
-    const band = turnAgeBand(state.surface, state.actor, state.speakerEvidence, new Date());
+    const band = turnAgeBand(state.surface, state.actor, state.speakerEvidence, new Date(), state.deviceId);
     if (band === "adult") return { gateAllows: false, webOn: false };
     const loaded = loadManifestOnly("websearch");
     if (!loaded.ok) return { gateAllows: false, webOn: false };

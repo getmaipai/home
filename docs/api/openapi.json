@@ -28647,6 +28647,109 @@
         }
       }
     },
+    "/api/devices/{id}/companion": {
+      "get": {
+        "tags": [
+          "Devices"
+        ],
+        "summary": "A robot's controls, its companion and the companions its controls allow",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "device-a1b2c3"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The robot's assignment and its allowed companions.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "controls": {
+                      "type": "string",
+                      "enum": [
+                        "child",
+                        "teen",
+                        "adult"
+                      ]
+                    },
+                    "companion_id": {
+                      "type": "string"
+                    },
+                    "companions": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string"
+                          },
+                          "name": {
+                            "type": "string"
+                          },
+                          "type": {
+                            "type": "string",
+                            "enum": [
+                              "child",
+                              "teen",
+                              "adult"
+                            ]
+                          },
+                          "tagline": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "name",
+                          "type"
+                        ]
+                      }
+                    },
+                    "home_location_set": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "controls",
+                    "companion_id",
+                    "companions",
+                    "home_location_set"
+                  ]
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Admin only",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such robot",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/devices/me/hub-endpoints": {
       "get": {
         "tags": [

@@ -15,6 +15,7 @@ import { SettingsKey } from "@maipai/spec/gen/ts/settings-key.js";
 import { closeRobotDeviceCommandChannels, listRobotsPairedUnderPerson, publishSettingsChanged } from "@/lib/deviceCommands";
 import { listDevicesByKind } from "@/lib/devices";
 import { renderClipBundle } from "@/lib/robotClips";
+import { ROBOT_COMPANION_KEY, ROBOT_CONTROLS_KEY, robotAssignmentRefusal } from "@/lib/robotCompanion";
 import { refreshHomeAssistantEvents } from "@/lib/integrations/homeAssistant";
 import { refreshSafetyAlarmSensors } from "@/lib/safetyAlarm";
 import { validateWebSources } from "@/lib/retrieval/webSources";
@@ -169,6 +170,12 @@ settingsRoutes.openapi(putRoute, async (c) => {
   const roleOff = body.scope === "household" && body.value === "off" ? /^engines\.([a-z]+)\.choice$/.exec(body.key)?.[1] : undefined;
   const warning = roleOff ? removalConfirmation(packagesLosingCapability([roleOff])) : null;
   if (warning && body.confirmRemoval !== true) return c.json({ error: warning }, 400);
+  // ROBOT-COMPANION-01: a robot's controls and companion must agree; only an admin reaches this (anyone else gets setValue's 403 below).
+  const assignScope = /^device:([a-z0-9-]+)$/.exec(body.scope);
+  if (assignScope && (body.key === ROBOT_CONTROLS_KEY || body.key === ROBOT_COMPANION_KEY) && isOwnerOrAdminActor(actor)) {
+    const refusal = robotAssignmentRefusal(assignScope[1]!, body.key, body.value);
+    if (refusal) return c.json({ error: refusal }, 400);
+  }
   const result = await setValue(actor, body.scope, body.key, body.value);
   if (!result.ok) {
     return result.status === 400 ? c.json({ error: result.error }, 400) : c.json({ error: result.error }, 403);
@@ -195,7 +202,7 @@ settingsRoutes.openapi(putRoute, async (c) => {
   const personScope = /^person:([a-z0-9-]+)$/.exec(body.scope);
   if (personScope && body.key === "tts.voice_id") refreshRobotClips(listRobotsPairedUnderPerson(personScope[1]!));
   const robotVoiceScope = /^device:([a-z0-9-]+)$/.exec(body.scope);
-  if (robotVoiceScope && body.key === "robot.voice.id") refreshRobotClips([robotVoiceScope[1]!]);
+  if (robotVoiceScope && (body.key === "robot.voice.id" || body.key === ROBOT_CONTROLS_KEY || body.key === ROBOT_COMPANION_KEY)) refreshRobotClips([robotVoiceScope[1]!]);
   if (body.scope === "household" && ["home.base_url", "home.access_token"].includes(body.key)) refreshHomeAssistantEvents();
   if (body.scope === "household" && body.key === "safety.alarm.sensors") {
     refreshSafetyAlarmSensors();
@@ -238,6 +245,11 @@ settingsRoutes.openapi(resetRoute, async (c) => {
       return c.json({ error: HUB_PORT_IN_USE_MESSAGE }, 400);
     }
   }
+  const resetAssignScope = /^device:([a-z0-9-]+)$/.exec(body.scope);
+  if (resetAssignScope && body.key === ROBOT_CONTROLS_KEY && isOwnerOrAdminActor(actor)) {
+    const refusal = robotAssignmentRefusal(resetAssignScope[1]!, body.key, "child");
+    if (refusal) return c.json({ error: refusal }, 400);
+  }
   const result = resetValue(actor, body.scope, body.key);
   if (!result.ok) {
     return result.status === 400 ? c.json({ error: result.error }, 400) : c.json({ error: result.error }, 403);
@@ -251,7 +263,7 @@ settingsRoutes.openapi(resetRoute, async (c) => {
   publishSettingsChanged(body.scope, body.key, result.value.value);
   if (body.scope === "household" && isCodingStackKey(body.key)) await pushCodingSettings([body.key]);
   const resetRobotVoiceScope = /^device:([a-z0-9-]+)$/.exec(body.scope);
-  if (resetRobotVoiceScope && body.key === "robot.voice.id") refreshRobotClips([resetRobotVoiceScope[1]!]);
+  if (resetRobotVoiceScope && (body.key === "robot.voice.id" || body.key === ROBOT_CONTROLS_KEY || body.key === ROBOT_COMPANION_KEY)) refreshRobotClips([resetRobotVoiceScope[1]!]);
   if (body.scope === "household" && ["home.base_url", "home.access_token"].includes(body.key)) refreshHomeAssistantEvents();
   if (body.scope === "household" && body.key === "safety.alarm.sensors") refreshSafetyAlarmSensors();
   if (body.scope === "household" && ["network.lan_exposure", "network.hub_port"].includes(body.key)) scheduleHubRestart();
@@ -417,3 +429,7 @@ settingsRoutes.openapi(createRoute({
   for (const id of ids) revokeApiKey(personId, id);
   return c.json({ revoked: ids.length }, 200);
 });
+
+function isOwnerOrAdminActor(actor: { role: string }): boolean {
+  return actor.role === "owner" || actor.role === "admin";
+}

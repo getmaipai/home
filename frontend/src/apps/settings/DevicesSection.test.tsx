@@ -10,7 +10,7 @@ import { renderWithQueryClient } from "../../../tests/renderWithQueryClient";
 import { ApiError, type DeviceInfo, type SessionInfo } from "@/lib/api";
 import { MemoryRouter } from "react-router-dom";
 
-function settingsFetch(extra: boolean, patchCalls: unknown[] = [], patchError?: string, spy: { deletes?: string[]; cancels?: string[]; installing?: boolean; robot?: Partial<DeviceInfo> } = {}) {
+function settingsFetch(extra: boolean, patchCalls: unknown[] = [], patchError?: string, spy: { deletes?: string[]; cancels?: string[]; installing?: boolean; homeSet?: boolean; robot?: Partial<DeviceInfo> } = {}) {
   const original = globalThis.fetch;
   const baseRegistry = ["robot.barge_in.open_mic", "robot.camera.watch_level", "robot.follow_up.seconds", "robot.gestures.enabled", "robot.idle.level", "robot.initiative.allowed_here", "robot.face.color", "robot.night.mode"].map((key) => ({ key, scope: "device", selector: key.endsWith("seconds") ? "number" : key.endsWith("level") || key === "robot.face.color" ? "select" : "boolean", default: key.endsWith("seconds") ? 10 : key === "robot.face.color" ? "mint" : key === "robot.night.mode", range: key === "robot.face.color" ? { options: ["mint", "sky", "peach", "lavender", "lemon", "rose", "cloud"] } : undefined, label: key === "robot.face.color" ? "Face color" : key === "robot.night.mode" ? "Night mode" : key, help: "Registry-provided help.", level: "basic", secret: false, lives_in: "robot.hello", honoured_by: ["home"] }));
   baseRegistry.push({ key: "robot.voice.id", scope: "device", selector: "select", range: { options_from: "voices.tts" }, default: "default", label: "Voice", help: "Robot voice.", level: "basic", secret: false, lives_in: "robot.hello", honoured_by: ["home"] } as never);
@@ -21,6 +21,7 @@ function settingsFetch(extra: boolean, patchCalls: unknown[] = [], patchError?: 
     if (url.endsWith("/api/devices/robot-1") && init?.method === "DELETE") { spy.deletes?.push(new URL(url, "http://x").pathname); return Promise.resolve(Response.json({ success: true })); }
     if (url.endsWith("/api/robots/hosts/robot-1/cancel-install") && init?.method === "POST") { spy.cancels?.push(url); return Promise.resolve(Response.json({ removed: true })); }
     if (url.endsWith("/api/robots/hosts/robot-1/install-status")) return Promise.resolve(spy.installing ? Response.json({ hosted: true, enrollment_pending: true }) : Response.json({ error: "No install" }, { status: 404 }));
+    if (url.endsWith("/api/devices/robot-1/companion")) return Promise.resolve(Response.json({ controls: "child", companion_id: "", companions: [{ id: "lively-child", name: "Sprout", type: "child" }], home_location_set: spy.homeSet !== false }));
     if (url.endsWith("/api/settings/registry")) return Promise.resolve(Response.json(registry));
     if (url.endsWith("/api/voice/voices")) return Promise.resolve(Response.json({ voices: [{ id: "pocket-tts-voice-alba", name: "Alba", description: "", language: "en", country: "", gender: "", source: "preset", engine: "pocket", onDisk: true, licence: null, revision: "test" }, { id: "community-test", name: "Community", description: "", language: "en", country: "", gender: "", source: "community", engine: "pocket", onDisk: true, licence: null, revision: "test" }] }));
     if (url.includes("/api/settings?scope=device%3Arobot-1")) return Promise.resolve(Response.json(registry.map((row) => ({ key: row.key, value: row.default, source: "default", label: row.label, help: row.help, level: row.level, secret: false }))));
@@ -193,6 +194,15 @@ describe("DevicesSection", () => {
       fireEvent.change(await view.findByLabelText("Name"), { target: { value: "Riff Two" } });
       fireEvent.click(view.getByRole("button", { name: "Save name and area" }));
       await waitFor(() => expect(calls).toContainEqual({ name: "Riff Two", area: null }));
+    } finally { restore(); }
+  });
+  test("shows the robot's controls and companion, and points to the Home location when none is set (ROBOT-COMPANION-01)", async () => {
+    const restore = settingsFetch(false, [], undefined, { homeSet: false });
+    try {
+      const view = renderDetail();
+      expect(await view.findByRole("combobox", { name: "Controls" })).toHaveTextContent("Child controls");
+      expect(view.getByRole("combobox", { name: "Companion" })).toHaveTextContent("None (child controls)");
+      expect(await view.findByRole("link", { name: "Set it in Settings, Home, General." })).toHaveAttribute("href", "/settings/home/general");
     } finally { restore(); }
   });
   test("shows the duplicate robot name response under the name field", async () => {

@@ -24,7 +24,7 @@ export interface SafetyOutput {
 
 export const safetyNode: Node<SafetyInput, SafetyOutput> = async (state, input) => {
   // THIN-0N: the speaker's effective band, as the old path's prepareTurn().
-  const band = turnAgeBand(state.surface, state.actor, state.speakerEvidence, new Date());
+  const band = turnAgeBand(state.surface, state.actor, state.speakerEvidence, new Date(), state.deviceId);
   const safety = evaluateSafety(input.utterance, band, "message");
   // SAFETY-NOTIFY-NEXT-01: the identical input-side call the old engine file's
   // own prepareTurn() makes (CHAT-02: "the input side shares the per-turn

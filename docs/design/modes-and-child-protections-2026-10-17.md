@@ -43,7 +43,7 @@ The job in one sentence: an admin picks, per account, which set of protections H
 | Teen (teen controls) | "Teen controls" on their Account page, with the one line that an admin set it | Any loosening; their own settings stay private from admins (ruling 2026-09-30) |
 | Child (child controls) | Nothing about controls at all | The word "controls", the Limits tab, anyone else's settings |
 | Guest | Nothing | Anything but the guest surfaces their controls allow |
-| Robot and TV | The controls value on the roster they already read (renamed field, same three values) | Any text; an unknown speaker on a shared surface still gets the child result |
+| Robot and TV | The controls value on the roster they already read (renamed field, same three values) | Any text; an unknown speaker on a shared surface still gets the child result (amended 2026-10-21: a robot with a companion assigned takes the companion's type, see [robot-companions-2026-10-21.md](robot-companions-2026-10-21.md)) |
 
 Rule 0 holds for every slice except MODE-BIRTHDATE-01, which waits on the owner's edit (section 7): every reader keeps the same
 three values and the same branches, the migration keeps each person's current result, and only an admin's confirmed choice can

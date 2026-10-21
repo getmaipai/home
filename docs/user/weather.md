@@ -58,3 +58,8 @@ Weather asks one outside service, Open-Meteo, a free public weather service. It 
 | Chat says it has no place | You named none and have no default | Name a place, or set a default place in the Weather settings |
 | Wrong unit | The unit is per person | Change **Temperature unit** in the Weather settings |
 | A city is not found | Home looks up cities in a built-in list. ZIP codes do not work yet | Type the city and state |
+
+## Ask a robot about the weather
+
+A robot does not know who is talking, so it answers with the household's home place, never one person's saved place. Anyone can ask a robot, a child too, and a child gets the same forecast with the spot rounded to about 10 km. If the robot says it does not know where you are, an owner or admin sets the home place in **Settings, Home, General**.
+

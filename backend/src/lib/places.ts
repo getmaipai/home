@@ -6,6 +6,7 @@ import { getHouseholdSettingValue, getPersonSettingValue } from "@/lib/settings"
 import { HOME_USER_AGENT } from "@/lib/outbound";
 import { getEntity, listEntities } from "@/lib/entities";
 import type { PersonRow } from "@/types";
+import type { AgeBand } from "@/lib/ageBand";
 import { childSafeAreaLabel } from "@/lib/placePrivacy";
 
 export type PlaceSurface = "weather" | "maps";
@@ -21,8 +22,8 @@ export interface ResolvedPlace {
 
 const emptyPlace = (): ResolvedPlace => ({ label: "", area: null, lat: null, lon: null, precision: null, from: "none" });
 
-function childSafe(value: ResolvedPlace, person: PersonRow | null): ResolvedPlace {
-  if (person?.role !== "child" || value.lat === null || value.lon === null) return value;
+function childSafe(value: ResolvedPlace, person: PersonRow | null, band?: AgeBand): ResolvedPlace {
+  if ((person?.role !== "child" && band !== "child") || value.lat === null || value.lon === null) return value;
   const area = childSafeAreaLabel(value.area);
   return { ...value, area, lat: Number(value.lat.toFixed(1)), lon: Number(value.lon.toFixed(1)), precision: "area", label: area };
 }
@@ -97,6 +98,9 @@ export async function resolvePlace(input: {
    * `current` is then used ahead of their saved default. Without it, `current` only stands in when the
    * default place is Current location. */
   preferCurrent?: boolean;
+  /** WEATHER-KID-01: the turn's band when the speaker is not the signed-in person (an unknown robot speaker). With no person it makes the
+   * household home answer with its saved coordinates, rounded for a child, instead of a bare name. */
+  band?: AgeBand;
 }): Promise<ResolvedPlace> {
   const { person, surface } = input;
   const visible = person ? listEntities(person, "place") : db.select().from(entities).where(and(eq(entities.kind, "place"), eq(entities.scope, "household"), isNull(entities.deletedAt))).all().map((row) => {
@@ -126,7 +130,10 @@ export async function resolvePlace(input: {
     }
   }
 
-  if (!person) {
+  if (!person && input.band) {
+    const home = householdHomeEntity();
+    if (home) return childSafe(await withGeocode(entityResult(home, "household"), home.name), null, input.band);
+  } else if (!person) {
     // Background callers use the household name as-is, without geocoding or a child-safe label.
     const homeName = householdHomePlaceName();
     if (homeName) return { ...emptyPlace(), label: homeName, from: "household" };
@@ -185,9 +192,10 @@ export async function resolveWeatherPlace(input: {
   named?: unknown;
   current?: CurrentCoordinates | null;
   preferCurrent?: boolean;
+  band?: AgeBand;
 }): Promise<{ place: string; hostInputs: { latitude?: number; longitude?: number; unit?: "celsius" }; uncached: boolean } | null> {
   const named = typeof input.named === "string" && input.named.trim() ? input.named.trim() : null;
-  const resolved = await resolvePlace({ person: input.person, surface: "weather", named, current: input.current, geocodeNamed: false, preferCurrent: input.preferCurrent });
+  const resolved = await resolvePlace({ person: input.person, surface: "weather", named, current: input.current, geocodeNamed: false, preferCurrent: input.preferCurrent, ...(input.band ? { band: input.band } : {}) });
   // The spoken name wins. A saved or household place is labelled by its own name (never its
   // stored area, which may be address-like); Current location by a broad area, if any.
   const currentArea = resolved.area ? childSafeAreaLabel(resolved.area) : null;
@@ -198,7 +206,7 @@ export async function resolveWeatherPlace(input: {
   // only Celsius is sent.
   const unit = input.person && getPersonSettingValue(input.person, "weather.unit") === "celsius" ? { unit: "celsius" as const } : {};
   if (resolved.lat === null || resolved.lon === null) return { place, hostInputs: { ...unit }, uncached: false };
-  const decimals = input.person?.role === "child" ? 1 : 2;
+  const decimals = input.person?.role === "child" || input.band === "child" ? 1 : 2;
   const round = (value: number) => Number(value.toFixed(decimals));
   return { place, hostInputs: { latitude: round(resolved.lat), longitude: round(resolved.lon), ...unit }, uncached: resolved.from === "current" };
 }

@@ -2,6 +2,7 @@ import type { PersonRow } from "@/types";
 import { getDeviceSettingValue, getHouseholdSettingValue, getPersonSettingValue } from "@/lib/settings";
 import { getDeviceById } from "@/lib/devices";
 import { speakerAgeBand } from "@/lib/ageBand";
+import { robotCompanionBand, stricterBand } from "@/lib/robotCompanion";
 import { VOICE_ENGINE_DEFAULT, VOICE_PRESET_NAMES } from "@/settings/voiceKeys";
 import { voicePresetName } from "@/lib/voiceResolve";
 
@@ -19,6 +20,9 @@ export function voiceForSpeech(input: { actor: PersonRow; deviceId?: string; com
   // Nobody (companion, robot or person) chose a voice: Home's default voice, which is the engine's own voice until an admin picks one.
   if (selected === VOICE_ENGINE_DEFAULT) selected = String(getHouseholdSettingValue("tts.home_voice") ?? VOICE_ENGINE_DEFAULT);
   // A child or teen never speaks in a voice made from a clip (VOICES-04), whoever chose it: only a preset or the engine default.
-  if (speakerAgeBand(input.actor, new Date()) !== "adult" && !isPresetVoice(selected)) return isPresetVoice(personVoice) ? personVoice : VOICE_ENGINE_DEFAULT;
+  // ROBOT-COMPANION-01: a robot's companion type counts too, so a child or teen companion on an adult's robot never speaks a clip voice.
+  const companionBand = input.deviceId ? robotCompanionBand(input.deviceId) : null;
+  const voiceBand = companionBand ? stricterBand(speakerAgeBand(input.actor, new Date()), companionBand) : speakerAgeBand(input.actor, new Date());
+  if (voiceBand !== "adult" && !isPresetVoice(selected)) return isPresetVoice(personVoice) ? personVoice : VOICE_ENGINE_DEFAULT;
   return selected;
 }

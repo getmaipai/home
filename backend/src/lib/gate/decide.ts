@@ -112,7 +112,11 @@ export function decide(request: GateRequest): GateDecision {
   if (what.minRole && !roleMeetsFloor(who.role, what.minRole)) return deny("min_band");
   if (what.denied) return deny("grant_denied");
 
-  const decisions = what.capabilities.map((id) => ({ id, policy: capabilityPolicy(id), approver: approverFor(id, who.band, what.parameters?.[id]) }));
+  // ROBOT-COMPANION-01 (architect verdict): an unknown speaker is not the signed-in account, so a companion's type (which sets the content band
+  // of a robot turn) never loosens who may approve anything. An anonymous speaker is judged at the child band for every capability, exactly
+  // as before a robot could have a companion (an unknown robot speaker was always the child band).
+  const effectBand: Band = who.anonymous ? "child" : who.band;
+  const decisions = what.capabilities.map((id) => ({ id, policy: capabilityPolicy(id), approver: approverFor(id, effectBand, what.parameters?.[id]) }));
   if (decisions.some(({ approver }) => approver === "never")) return deny("never_for_band");
 
   if (provenance === "untrusted") {

@@ -66,9 +66,9 @@ export const TOOL_ROUND_SHARE = 0.25;
  * Presence is left out on purpose: no presence signal exists on the
  * hub yet (this file's own header note), so `"presence"` is never
  * produced until one is built. */
-export function decideReasoning(state: Pick<TurnState, "actor" | "surface" | "spoken" | "speakerEvidence">): TurnState["reasoning"] {
+export function decideReasoning(state: Pick<TurnState, "actor" | "surface" | "spoken" | "speakerEvidence" | "deviceId">): TurnState["reasoning"] {
   // THIN-0N: the speaker's effective band, as the old path derives it.
-  const band = turnAgeBand(state.surface, state.actor, state.speakerEvidence, new Date());
+  const band = turnAgeBand(state.surface, state.actor, state.speakerEvidence, new Date(), state.deviceId);
   if (band === "child" || band === "teen") return { emit: false, withheld_for: "minor" };
   if (state.surface !== "chat" || state.spoken) return { emit: false, withheld_for: "surface" };
   return { emit: true, withheld_for: null };
@@ -168,7 +168,7 @@ export const contextNode: Node<ContextInput, ContextOutput> = async (state, inpu
   let pictureParts: LlmImagePart[] = [];
   if (state.images?.length && !state.bare) {
     const capability = await chatModelReadsPictures();
-    if (picturePartsAllowed(capability, state.actor, { band: turnAgeBand(state.surface, state.actor, state.speakerEvidence, new Date()), anonymous: speakerIsAnonymous(state) })) {
+    if (picturePartsAllowed(capability, state.actor, { band: turnAgeBand(state.surface, state.actor, state.speakerEvidence, new Date(), state.deviceId), anonymous: speakerIsAnonymous(state) })) {
       const loaded = loadPictureParts(state.actor, conversation.id, temporary, state.images, capability.pictureTokensMax!);
       pictureParts = loaded.parts;
       if (loaded.unread.length > 0) items.push({ id: "attachment-pictures", text: picturesNotReadNote(loaded.unread, "the stored picture could not be opened"), source: "attachment", subjects: [], disclosure: "child_ok" });
@@ -392,7 +392,7 @@ export const contextNode: Node<ContextInput, ContextOutput> = async (state, inpu
   // DESIGN 3.2), data only: no answer-length text, no voice text. The cutoff
   // and the snapshot print nothing when unknown. Replaces the one sentence
   // that stood here: "The model's training knowledge may be older than today."
-  const snapshot = await librarySnapshotDate(turnAgeBand(state.surface, state.actor, state.speakerEvidence, now));
+  const snapshot = await librarySnapshotDate(turnAgeBand(state.surface, state.actor, state.speakerEvidence, now, state.deviceId));
   items.push({ id: "clock", text: datesText({ now, locale, modelCutoff: chatModelCutoff(), librarySnapshot: snapshot }), source: "clock", subjects: [], disclosure: "child_ok" });
 
   // The roster: who this household has, so "he"/"she"/a name resolves
@@ -416,7 +416,7 @@ export const contextNode: Node<ContextInput, ContextOutput> = async (state, inpu
       .where(and(eq(chatFolders.id, conversation.folder_id), eq(chatFolders.personId, state.actor.id), isNull(chatFolders.deletedAt)))
       .get();
     const instructions = folder?.instructions.slice(0, 1500) ?? "";
-    const band = turnAgeBand(state.surface, state.actor, state.speakerEvidence, new Date());
+    const band = turnAgeBand(state.surface, state.actor, state.speakerEvidence, new Date(), state.deviceId);
     if (folder && instructions.trim() !== "" && (band === "adult" || !evaluateSafety(instructions, band).flagged)) {
       const name = sanitizeForPrompt(folder.name).slice(0, 80);
       const safeInstructions = sanitizeForPrompt(instructions);

@@ -93,6 +93,7 @@ const IDENTITY_ONLY = "You are Buddy, this household's AI assistant. Speak in th
 const BUDDY = {
   id: "buddy",
   display_name: "Buddy",
+  controls: "child" as const,
   formality: "casual" as const,
   complexity: "simple" as const,
   engagement: "curious" as const,

@@ -27,6 +27,7 @@ import { closeDeviceCommandChannel, deviceCommandWebSocket, issueDeviceCommand }
 import { listHubEndpoints } from "@/lib/hubEndpoints";
 import { getHubInstanceId } from "@/lib/hubIdentity";
 import { getHouseholdSettingValue } from "@/lib/settings";
+import { companionsForControls, robotCompanionOf, robotControlsOf } from "@/lib/robotCompanion";
 import { listRobotPeople } from "@/lib/robotPeople";
 import { acceptRobotSelfTestResult, startRobotSelfTest } from "@/lib/robotSelfTestRuns";
 import { robotSelfTestPartsFor } from "@/wire";
@@ -220,6 +221,35 @@ devicesRoutes.openapi(patchDeviceRoute, (c) => {
   if (!result.ok) return c.json({ error: "No such device" }, 404);
   const updated = result.device;
   return c.json({ id: updated.id, kind: updated.kind, name: updated.name, area: updated.area, lastSeenAt: updated.lastSeenAt, createdAt: updated.createdAt, capabilities: updated.capabilities, offlineScope: updated.offlineScope as Array<"media.offline" | "offline.records">, state: updated.kind === "robot" ? stateForViewer(getDeviceState(id), c.get("person")) : null }, 200);
+});
+
+// ROBOT-COMPANION-01: what the robot page needs to draw the Controls and Companion choices. Admin only. The list holds only the
+// companions this robot's controls allow, so the page can show nothing else; the hub refuses the rest on write.
+const robotCompanionRoute = createRoute({
+  method: "get", path: "/{id}/companion", tags: ["Devices"],
+  summary: "A robot's controls, its companion and the companions its controls allow",
+  middleware: [requireRole("owner", "admin")] as const,
+  request: { params: idParamSchema("id", "device-a1b2c3") },
+  responses: {
+    200: { content: { "application/json": { schema: z.object({
+      controls: z.enum(["child", "teen", "adult"]),
+      companion_id: z.string(),
+      companions: z.array(z.object({ id: z.string(), name: z.string(), type: z.enum(["child", "teen", "adult"]), tagline: z.string().optional() })),
+      home_location_set: z.boolean(),
+    }) } }, description: "The robot's assignment and its allowed companions." },
+    ...errorResponses({ 403: "Admin only", 404: "No such robot" }),
+  },
+});
+devicesRoutes.openapi(robotCompanionRoute, (c) => {
+  const device = getDeviceById(c.req.valid("param").id);
+  if (!device || device.kind !== "robot") return c.json({ error: "No such robot" }, 404);
+  const controls = robotControlsOf(device.id);
+  return c.json({
+    controls,
+    companion_id: robotCompanionOf(device.id)?.id ?? "",
+    companions: companionsForControls(controls).map((persona) => ({ id: persona.id, name: persona.name, type: persona.controls })),
+    home_location_set: typeof getHouseholdSettingValue("household.home") === "string",
+  }, 200);
 });
 
 const HubEndpointsSchema = z.array(z.object({

@@ -1,0 +1,66 @@
+import { useCallback, useEffect, useState } from "react";
+import { Link } from "react-router-dom";
+import { Alert, AlertDescription } from "@maipai/ui/src/ui/alert";
+import { Field, FieldDescription, FieldGroup, FieldLabel } from "@maipai/ui/src/dashboard/components/ui/field";
+import { Select } from "@maipai/ui/src/primitives/Select";
+import { Section } from "@maipai/ui/src/primitives/Section";
+import { api, ApiError, type RobotCompanionInfo } from "@/lib/api";
+
+const NONE = "none";
+const CONTROLS = ["child", "teen", "adult"] as const;
+const CONTROLS_LABEL: Record<string, string> = { child: "Child controls", teen: "Teen controls", adult: "Adult controls" };
+const CONTROLS_NOTE: Record<string, string> = {
+  child: "Child companions only. The robot answers with every child protection.",
+  teen: "Child and teen companions. Frank answers on most subjects, still no adult content.",
+  adult: "Any companion. The robot answers like an adult companion would.",
+};
+
+/** ROBOT-COMPANION-01: an admin picks a robot's controls and its companion. The companion's type (child, teen or adult) sets how the
+ * robot answers; with none chosen it answers with child controls. Only the companions the controls allow are listed, and the hub
+ * refuses the rest with a sentence that says what to do (shown here as the destructive Alert). */
+export function RobotCompanionChoices({ deviceId }: { deviceId: string }) {
+  const [info, setInfo] = useState<RobotCompanionInfo | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  const load = useCallback(async () => {
+    try { setInfo(await api.robotCompanion(deviceId)); }
+    catch (failure) { setError(failure instanceof ApiError ? failure.message : "Could not load this robot's companion. Check the connection and try again."); }
+  }, [deviceId]);
+  useEffect(() => { void load(); }, [load]);
+
+  async function save(key: "robot.controls" | "robot.companion.id", value: string): Promise<void> {
+    setBusy(true);
+    setError(null);
+    try { await api.setSetting(`device:${deviceId}`, key, value); await load(); }
+    catch (failure) { setError(failure instanceof ApiError ? failure.message : "Could not save this. Check the connection and try again."); }
+    finally { setBusy(false); }
+  }
+
+  return (
+    <Section heading="Companion and controls">
+      {!info ? (error ? <Alert variant="destructive"><AlertDescription>{error}</AlertDescription></Alert> : null) : <FieldGroup>
+        <Field>
+          <FieldLabel htmlFor={`robot-controls-${deviceId}`}>Controls</FieldLabel>
+          <Select aria-label="Controls" value={info.controls} options={[...CONTROLS]} getLabel={(value) => CONTROLS_LABEL[value] ?? value} disabled={busy} onValueChange={(value) => void save("robot.controls", value)} />
+          <FieldDescription>{CONTROLS_NOTE[info.controls]}</FieldDescription>
+        </Field>
+        <Field>
+          <FieldLabel htmlFor={`robot-companion-${deviceId}`}>Companion</FieldLabel>
+          <Select
+            aria-label="Companion"
+            value={info.companion_id || NONE}
+            options={[NONE, ...info.companions.map((companion) => companion.id)]}
+            getLabel={(value) => value === NONE ? "None (child controls)" : (() => { const companion = info.companions.find((entry) => entry.id === value); return companion ? `${companion.name} (${companion.type})` : value; })()}
+            disabled={busy}
+            onValueChange={(value) => void save("robot.companion.id", value === NONE ? "" : value)}
+          />
+          <FieldDescription>The companion sets how this robot talks and which protections apply. Who is speaking does not change it.</FieldDescription>
+        </Field>
+        {!info.home_location_set ? (
+          <Alert><AlertDescription>The weather needs a Home location. <Link to="/settings/home/general">Set it in Settings, Home, General.</Link></AlertDescription></Alert>
+        ) : null}
+        {error ? <Alert variant="destructive"><AlertDescription>{error}</AlertDescription></Alert> : null}
+      </FieldGroup>}
+    </Section>
+  );
+}

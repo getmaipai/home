@@ -593,7 +593,7 @@ export const outputGateNode: Node<OutputGateInput, OutputGateOutput> = async (st
   }
 
   // THIN-0N: the speaker's effective band, as the old path's prepareTurn().
-  const band = turnAgeBand(state.surface, state.actor, state.speakerEvidence, new Date());
+  const band = turnAgeBand(state.surface, state.actor, state.speakerEvidence, new Date(), state.deviceId);
 
   // STREAM-NEXT-01 (b), ruling point 1: on a streamed turn output_gate
   // IS the per-sentence gate - nodes/model.ts's own runOneGeneration()

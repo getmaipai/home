@@ -34,11 +34,11 @@ export const GENERATE_VIDEO_TOOL_ID = "generate_video";
 export const VIDEO_SIZES: Record<string, string> = { landscape: "832x480", portrait: "480x832" };
 
 /** The audience a turn presents to the video policy. */
-export function videoAudienceOf(state: Pick<TurnState, "actor" | "surface" | "speakerEvidence" | "planBasis" | "plan">, spoken: boolean): VideoAudience {
+export function videoAudienceOf(state: Pick<TurnState, "actor" | "surface" | "speakerEvidence" | "deviceId" | "planBasis" | "plan">, spoken: boolean): VideoAudience {
   const surfaceClass = state.planBasis?.surfaceClass ?? "spoken";
   return {
     actor: state.actor,
-    band: turnAgeBand(state.surface, state.actor, state.speakerEvidence, new Date()),
+    band: turnAgeBand(state.surface, state.actor, state.speakerEvidence, new Date(), state.deviceId),
     surface: state.surface,
     surfaceClass,
     spoken: spoken || surfaceClass !== "written",
@@ -73,7 +73,7 @@ export function latestGeneratedPictureId(actor: PersonRow, conversationId: strin
 }
 
 export interface RunGenerateVideoInput {
-  state: Pick<TurnState, "actor" | "surface" | "speakerEvidence" | "planBasis" | "plan" | "conversationId" | "turnId" | "temporary" | "ephemeral" | "images"> & Partial<Pick<TurnState, "utterance">>;
+  state: Pick<TurnState, "actor" | "surface" | "speakerEvidence" | "deviceId" | "planBasis" | "plan" | "conversationId" | "turnId" | "temporary" | "ephemeral" | "images"> & Partial<Pick<TurnState, "utterance">>;
   args: Record<string, unknown>;
   callId: string;
   spoken: boolean;

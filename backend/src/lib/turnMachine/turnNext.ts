@@ -30,6 +30,7 @@ import { speakerIsAnonymous, turnAgeBand } from "./speaker";
 import { carriesCrisisSignal } from "@/lib/safety";
 import { resolvePersona, DEFAULT_PERSONA } from "@/lib/persona";
 import { companionsAllowed } from "@/lib/companions";
+import { robotCompanionOf } from "@/lib/robotCompanion";
 import { isOwnerOrAdmin } from "@/lib/access";
 import { speakerAgeBand } from "@/lib/ageBand";
 import { sourcesForChild, structuredPartForBand } from "@/lib/childLinks";
@@ -175,7 +176,7 @@ function buildTurnValue(state: TurnState, startedAt: number, source: TurnValue["
       }
     : outputFlag ?? state.blockSafety;
   const crisisResources = safety ? (deriveCrisisResources(safety) ?? inputCrisisLine) : inputCrisisLine;
-  const valueBand = turnAgeBand(state.surface, state.actor, state.speakerEvidence, new Date());
+  const valueBand = turnAgeBand(state.surface, state.actor, state.speakerEvidence, new Date(), state.deviceId);
   return {
     reply: { text, speech },
     source,
@@ -461,7 +462,7 @@ async function beginTurn(actor: PersonRow, surface: Surface, text: string, opts:
   // stored, so a refused request leaves no provisional row or file behind.
   // THIN-7C: an edit never resumes an ask (the old path cleared it first).
   const pendingAsk = temporary || opts.bare === true || supersedes || continuation || opts.ephemeral === true ? null : getPendingAsk(conversation.id);
-  const band = turnAgeBand(surface, actor, opts.speakerEvidence, new Date());
+  const band = turnAgeBand(surface, actor, opts.speakerEvidence, new Date(), opts.deviceId);
   const speaker = { surface, actor, speakerEvidence: opts.speakerEvidence ?? null };
   const pendingAskDecision = pendingAsk?.kind === "confirm" ? decidePendingAsk(pendingAsk, actor, { band, anonymous: speakerIsAnonymous(speaker) }) : null;
   // INITIATIVE-01: an `ask_answer {offer_id, approved}` answers a robot offer, not a pending ask. Robot surface only;
@@ -524,7 +525,10 @@ async function beginTurn(actor: PersonRow, surface: Surface, text: string, opts:
   const loaded = loadAllManifests();
   const signal = classifyTurnSignal({ text, ageBand: band, commandOpeners: commandOpeners(loaded), computedPatternMatch: (t) => computedPatternMatch(loaded, t) });
   const bare = opts.bare === true;
-  const persona = temporary || bare || !companionsAllowed(actor.id) ? DEFAULT_PERSONA : resolvePersona(getPersonSettingValue(actor, "persona.active_id"));
+  // ROBOT-COMPANION-01: a robot with a companion assigned talks as that companion, whoever is signed in; the person's own pick and the household
+  // companions switch are theirs, not the robot's (an admin chose this robot's companion).
+  const robotCompanion = surface === "robot" && opts.deviceId && !bare ? resolveRobotPersona(opts.deviceId) : null;
+  const persona = robotCompanion ?? (temporary || bare || !companionsAllowed(actor.id) ? DEFAULT_PERSONA : resolvePersona(getPersonSettingValue(actor, "persona.active_id")));
   // U4/RESP-01: computed once, the register's only length authority -
   // never recomputed by a later node, the same "decided once" shape
   // `reasoning.emit` already follows in `context`. U4c: everything
@@ -538,7 +542,8 @@ async function beginTurn(actor: PersonRow, surface: Surface, text: string, opts:
     surface,
     surfaceClass,
     brevity: false,
-    companion: { directness: "direct" as const, engagement: persona.engagement, complexity: persona.complexity },
+    // ROBOT-COMPANION-01: every turn planned "direct" (no react, no question back); a robot with a companion assigned is not, so its dials decide.
+    companion: { directness: robotCompanion ? "diplomatic" as const : "direct" as const, engagement: persona.engagement, complexity: persona.complexity },
     band,
     deferred: false,
     disclosureWithheld: false,
@@ -909,6 +914,13 @@ function engineUnavailableLine(state: Pick<TurnState, "spoken" | "surface" | "ac
 /** runTurnNext() always resolves the whole reply: a failure or an "immediate" value, never a stream. */
 export type TurnImmediateResult = TurnFailure | Extract<TurnStreamResult, { kind: "immediate" }>;
 
+// ROBOT-COMPANION-01: the persona of the companion assigned to this robot, or null.
+function resolveRobotPersona(deviceId: string) {
+  const companion = robotCompanionOf(deviceId);
+  return companion ? resolvePersona(companion.id) : null;
+}
+
+
 export async function runTurnNext(actor: PersonRow, surface: Surface, text: string, opts: RunTurnNextOpts = {}): Promise<TurnImmediateResult> {
   const begun = await beginTurn(actor, surface, text, opts);
   if (!begun.ok) return begun.result;
@@ -1016,7 +1028,7 @@ function startStream(actor: PersonRow, surface: Surface, text: string, begunValu
   status.emit({ type: "status", text: pickStatusPhrase(state.conversationId, "thinking", state.persona), stage: "thinking" });
 
   const queue = new StatusChannel<string>();
-  const band = turnAgeBand(surface, actor, state.speakerEvidence, new Date()); // THIN-0N
+  const band = turnAgeBand(surface, actor, state.speakerEvidence, new Date(), state.deviceId); // THIN-0N
   // ANSWER-IMG-02: released text passes the picture placer on its way out,
   // which marks the paragraph boundary the picture set goes after.
   const placer = new AnswerImagePlacer(state, (text) => queue.emit(text));

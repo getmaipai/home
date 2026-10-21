@@ -76,6 +76,7 @@ import { fetchCacheKey } from "@/lib/retrieval/fetchCache";
 import { waybackCopy } from "@/lib/retrieval/wayback";
 import { federatedLookup, parseScope } from "@/lib/retrieval/lookup";
 import { ddgsSetupNote } from "@/lib/retrieval/ddgsConfig";
+import { stricterBand } from "@/lib/robotCompanion";
 import { NO_SOURCE_FOR_BAND_TEXT, webSourcesFor, webSourceSearch, runWebSources, type WebRows, type WebSourceId } from "@/lib/retrieval/webSources";
 import { MINOR_QUERY_PERSONAL_NOTE, closedFormatHit, minorQueryHit } from "@/lib/retrieval/minorQueryCheck";
 import { minorRowAllowed, minorRowTrips } from "@/lib/retrieval/minorRowFloor";
@@ -1967,7 +1968,7 @@ function mapWriteFailure(status: number, error: string): never {
  * together in scope (the conversation a turn belongs to), so building
  * one object at the call site is the natural shape, not friction added
  * for its own sake. */
-export function createHost(actor: PersonRow, manifest: PackageManifest, secrets: readonly string[] = [], turn?: { id: string; conversationId?: string }, runtime: { signal?: AbortSignal; deadlineAt?: number; capture?: BlockCapture; spoken?: boolean } = {}): Host {
+export function createHost(actor: PersonRow, manifest: PackageManifest, secrets: readonly string[] = [], turn?: { id: string; conversationId?: string }, runtime: { signal?: AbortSignal; deadlineAt?: number; capture?: BlockCapture; spoken?: boolean; band?: AgeBand } = {}): Host {
   const hasPermission = (perm: string) => manifest.permissions?.includes(perm) ?? false;
 
   function requirePermission(perm: string): void {
@@ -2365,7 +2366,9 @@ export function createHost(actor: PersonRow, manifest: PackageManifest, secrets:
           // actually asking, never a package argument. getPersonSettingValue
           // reads the actor's OWN setting only (safe by construction), the
           // exact one this call needs - actor here always is the speaker.
-          const band = speakerAgeBand(actor, new Date());
+          // ROBOT-COMPANION-01: the turn's own band (a robot's companion type, or child for an unknown speaker) can only tighten it.
+          const actorBand = speakerAgeBand(actor, new Date());
+          const band = runtime.band ? stricterBand(actorBand, runtime.band) : actorBand;
           const safeSearchLevel = resolveSafeSearchLevel(getPersonSettingValue(actor, "search.safe_search"), band);
           // THIN-4H: an adult's query goes to the optional hosted provider when a key is set; null means SearXNG.
           const input = args as { query?: unknown; category?: unknown } | undefined;

@@ -32,11 +32,11 @@ export const PICTURE_SIZES: Record<string, string> = {
 };
 
 /** The audience a turn presents to the picture policy. */
-export function audienceOf(state: Pick<TurnState, "actor" | "surface" | "speakerEvidence" | "planBasis" | "plan">, spoken: boolean): PictureAudience {
+export function audienceOf(state: Pick<TurnState, "actor" | "surface" | "speakerEvidence" | "deviceId" | "planBasis" | "plan">, spoken: boolean): PictureAudience {
   const surfaceClass = state.planBasis?.surfaceClass ?? "spoken";
   return {
     actor: state.actor,
-    band: turnAgeBand(state.surface, state.actor, state.speakerEvidence, new Date()),
+    band: turnAgeBand(state.surface, state.actor, state.speakerEvidence, new Date(), state.deviceId),
     surface: state.surface,
     surfaceClass,
     spoken: spoken || surfaceClass !== "written",
@@ -64,7 +64,7 @@ function clampCount(value: unknown, max: number): number {
 }
 
 export interface RunGenerateImageInput {
-  state: Pick<TurnState, "actor" | "surface" | "speakerEvidence" | "planBasis" | "plan" | "conversationId" | "turnId" | "temporary" | "ephemeral">;
+  state: Pick<TurnState, "actor" | "surface" | "speakerEvidence" | "deviceId" | "planBasis" | "plan" | "conversationId" | "turnId" | "temporary" | "ephemeral">;
   args: Record<string, unknown>;
   callId: string;
   spoken: boolean;

@@ -12,7 +12,7 @@ export type SearchAssistMode = "off" | "shadow" | "rescue";
 
 export type EligibilityState = Pick<
   TurnState,
-  "surface" | "actor" | "speakerEvidence" | "spoken" | "bare" | "crisis" | "continuation" | "promptLimit" | "budget" | "planBasis" | "outcomes"
+  "surface" | "actor" | "speakerEvidence" | "deviceId" | "spoken" | "bare" | "crisis" | "continuation" | "promptLimit" | "budget" | "planBasis" | "outcomes"
 >;
 
 /** MINOR-SEARCH-01i: the one switch for rescuing a minor's turn. Stays false
@@ -59,7 +59,7 @@ const NOT_SCORED = (off_reason: OffReason): Eligibility => ({ scored: false, res
 export function searchAssistEligibility(state: EligibilityState, mode: SearchAssistMode, ctx: EligibilityContext = {}): Eligibility {
   if (mode === "off") return NOT_SCORED("mode_off");
   if (speakerIsAnonymous(state)) return NOT_SCORED("anonymous");
-  const band = turnAgeBand(state.surface, state.actor, state.speakerEvidence, ctx.now ?? new Date());
+  const band = turnAgeBand(state.surface, state.actor, state.speakerEvidence, ctx.now ?? new Date(), state.deviceId);
   const minor = band !== "adult";
   if (!state.budget.tools_offered.includes("websearch")) return NOT_SCORED("no_websearch");
   if (noToolsTurn(state)) return NOT_SCORED("no_tools_turn");

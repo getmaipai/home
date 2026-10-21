@@ -1196,7 +1196,7 @@ const modelRound: Node<ModelInput, ModelOutput> = async (state, input, signal) =
 export function searchAssistMayHold(state: TurnState, tools: readonly ToolSpec[]): boolean {
   try {
     // MINOR-SEARCH-01i: a child or teen never reaches the rescue branch (checked here, before the shadow record is read).
-    const minor = turnAgeBand(state.surface, state.actor, state.speakerEvidence, new Date()) !== "adult";
+    const minor = turnAgeBand(state.surface, state.actor, state.speakerEvidence, new Date(), state.deviceId) !== "adult";
     if (minor && !MINOR_RESCUE_ENABLED) return false;
     const sa = state.searchAssist;
     if (!sa || sa.mode !== "rescue" || sa.bucket !== "over" || !sa.eligible) return false;

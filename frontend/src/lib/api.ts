@@ -297,6 +297,14 @@ export interface DeviceInfo {
   state?: RobotDeviceState | null;
 }
 
+/** ROBOT-COMPANION-01: GET /api/devices/{id}/companion (admin). `companions` lists only those the robot's controls allow. */
+export interface RobotCompanionInfo {
+  controls: "child" | "teen" | "adult";
+  companion_id: string;
+  companions: Array<{ id: string; name: string; type: "child" | "teen" | "adult" }>;
+  home_location_set: boolean;
+}
+
 export type MemoryRecordWithDevice = MemoryRecord & { device_name?: string };
 // ROBOT-CARD-01: the robot's last reported frame plus the hub's derived
 // reachability, hand-typed to match backend/src/routes/devices.ts's
@@ -915,6 +923,7 @@ export const api = {
   // device under whichever admin approved the pairing, so a different
   // admin still needs to find it here to rotate its password.
   robotDevices: () => request<DeviceInfo[]>("/api/devices/robots"),
+  robotCompanion: (id: string) => request<RobotCompanionInfo>(`/api/devices/${encodeURIComponent(id)}/companion`),
   robotInstallStatus: (deviceId: string) => request<{ hosted: true; enrollment_pending: boolean }>(`/api/robots/hosts/${encodeURIComponent(deviceId)}/install-status`),
   cancelRobotInstall: (deviceId: string) => request<{ removed: true }>(`/api/robots/hosts/${encodeURIComponent(deviceId)}/cancel-install`, { method: "POST" }),
   setRobotMuted: (id: string, muted: boolean) =>
