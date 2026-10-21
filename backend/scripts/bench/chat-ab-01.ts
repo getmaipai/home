@@ -290,7 +290,7 @@ if (!probe.ok) {
 }
 const engineHeaders = { "x-maipai-engine": probe.headers.get("x-maipai-engine") ?? "unknown", "x-maipai-model": probe.headers.get("x-maipai-model") ?? "unknown" };
 await probe.text();
-const roleRow = (id: string, wire: string) => ({ id, label: id, wire, residency: "resident", endpoints: [], quality: ["everyday"], sharesModelWith: null, state: { state: "ready", reason: null }, reason: null, model: null, check: { state: "passed", at: null, reason: null, stale: false } });
+const roleRow = (id: string, wire: string) => ({ id, label: id, wire, residency: "resident", endpoints: [], quality: ["everyday"], sharesModelWith: null, state: { state: "ready", reason: null }, reason: null, model: null, ...(id === "embed" && process.env.MAIPAI_AB_EMBED_FILE ? { identity: { ok: true, expected: null, actual: process.env.MAIPAI_AB_EMBED_FILE, reason: null } } : {}), check: { state: "passed", at: null, reason: null, stale: false } });
 // The persona/clock system lines and the tools block of a real B request,
 // frozen by the first one that carries tools (arms AP, AT, APT replay them).
 const captured: { system: { role: string; content: string }[]; tools: unknown[]; toolChoice: unknown } = { system: [], tools: [], toolChoice: undefined };
@@ -666,6 +666,19 @@ async function environment(): Promise<Record<string, unknown>> {
 async function main(): Promise<void> {
   await startBench();
   setHouseholdSettingValue("chat.model_id", process.env.MAIPAI_REPLAY_MODEL_ID ?? "qwen3-8b-instruct-q4-k-m");
+  // RECENCY-02: MAIPAI_AB_HOME names a household home place, created and set before the run, for weather with no place named.
+  if (process.env.MAIPAI_AB_HOME) {
+    const { createEntity } = await import("@/lib/entities");
+    const home = createEntity({ id: people.owner.id, role: "owner" }, { kind: "place", place_kind: "map", name: process.env.MAIPAI_AB_HOME, scope: "household", geo: { lat: 41.9, lon: -87.6, precision: "area", area: process.env.MAIPAI_AB_HOME, from: "search" } } as never);
+    if (!home.ok) throw new Error(`could not create the household home: ${home.error}`);
+    const set = setHouseholdSettingValue("household.home", (home.value as { id: string }).id);
+    if (!set.ok) throw new Error(`could not set household.home: ${set.error}`);
+  }
+  // RECENCY-02: MAIPAI_AB_SETTINGS sets household settings for this run, for example {"chat.search_assist":"rescue"}.
+  for (const [key, value] of Object.entries(process.env.MAIPAI_AB_SETTINGS ? (JSON.parse(process.env.MAIPAI_AB_SETTINGS) as Record<string, unknown>) : {})) {
+    const applied = setHouseholdSettingValue(key, value as never);
+    if (!applied.ok) throw new Error(`could not set ${key}: ${applied.error}`);
+  }
   const set = setHouseholdSettingValue("search.searxng_url", teeUrl);
   if (!set.ok) throw new Error(`could not point search at the tee: ${set.error}`);
 

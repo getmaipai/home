@@ -75,6 +75,16 @@ describe("KS-02E: the prefix's three date lines", () => {
     expect(text.split("\n")).toHaveLength(2);
   });
 
+  test("RECENCY-02: a set household home adds one plain line with the place name; no home adds nothing", () => {
+    const base = { now: new Date("2026-10-10T12:00:00Z"), locale: "en-US", modelCutoff: null, librarySnapshot: null };
+    const withHome = datesText({ ...base, homePlace: "Springfield" });
+    expect(withHome).toContain("The household home is Springfield. For weather, or \"near me\", with no place named, use it, and do not mention it unless the person asks.");
+    expect(withHome.split("\n")).toHaveLength(3);
+    expect(withHome).not.toMatch(/\b(brief|briefly|concise|short|shorter|sentences?|words|voice|speak|say|tone|persona)\b/i);
+    expect(datesText({ ...base, homePlace: null })).toBe(datesText(base));
+    expect(datesText({ ...base, homePlace: "  " })).toBe(datesText(base));
+  });
+
   test("a null model_cutoff prints no cutoff text", async () => {
     record.model_cutoff = undefined;
     startKiwix();

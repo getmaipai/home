@@ -1,0 +1,87 @@
+{
+ "note": "RECENCY-02: weather questions with no place named, run with the household home set (MAIPAI_AB_HOME). Used with MAIPAI_AB_FRESH_DATASET.",
+ "fresh": {
+  "items": [
+   {
+    "id": "fresh-rw-01",
+    "prompt": "Is it going to rain?",
+    "kind": "time-sensitive",
+    "acceptable_tools": [
+     "weather"
+    ],
+    "gold": "must",
+    "family": "weather-home"
+   },
+   {
+    "id": "fresh-rw-02",
+    "prompt": "will it rain tomorrow",
+    "kind": "time-sensitive",
+    "acceptable_tools": [
+     "weather"
+    ],
+    "gold": "must",
+    "family": "weather-home"
+   },
+   {
+    "id": "fresh-rw-03",
+    "prompt": "what's it like outside",
+    "kind": "time-sensitive",
+    "acceptable_tools": [
+     "weather"
+    ],
+    "gold": "must",
+    "family": "weather-home"
+   },
+   {
+    "id": "fresh-rw-04",
+    "prompt": "do I need a jacket",
+    "kind": "time-sensitive",
+    "acceptable_tools": [
+     "weather"
+    ],
+    "gold": "must",
+    "family": "weather-home"
+   },
+   {
+    "id": "fresh-rw-05",
+    "prompt": "what's the weather",
+    "kind": "time-sensitive",
+    "acceptable_tools": [
+     "weather"
+    ],
+    "gold": "must",
+    "family": "weather-home"
+   },
+   {
+    "id": "fresh-rw-06",
+    "prompt": "is it cold out right now",
+    "kind": "time-sensitive",
+    "acceptable_tools": [
+     "weather"
+    ],
+    "gold": "must",
+    "family": "weather-home"
+   },
+   {
+    "id": "fresh-rw-07",
+    "prompt": "should I bring an umbrella today",
+    "kind": "time-sensitive",
+    "acceptable_tools": [
+     "weather"
+    ],
+    "gold": "must",
+    "family": "weather-home"
+   },
+   {
+    "id": "fresh-rw-08",
+    "prompt": "how hot is it right now",
+    "kind": "time-sensitive",
+    "acceptable_tools": [
+     "weather"
+    ],
+    "gold": "must",
+    "family": "weather-home"
+   }
+  ]
+ }
+}

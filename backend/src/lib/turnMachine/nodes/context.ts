@@ -10,6 +10,7 @@
 // stay in memory.ts's own canRead() (RULES-AND-LEARNED-COMPONENTS.md,
 // "household privacy and disclosure ... filtered before the prompt,
 // never left to the model").
+import { householdHomePlaceName } from "@/lib/places";
 import { minorSearchGate } from "@/lib/searchAssist/minorGate";
 import { resolveOrCreateConversation, buildConversationWindow, isTemporaryConversation, windowPreview, type ConversationWindow } from "@/lib/conversationHistory";
 import { and, eq, isNull } from "drizzle-orm";
@@ -124,7 +125,7 @@ export function chatModelCutoff(): string | null {
 
 /** KS-02E (KNOWLEDGE-SEARCH-DESIGN 3.2): the prefix's date lines. Facts plus
  * one guidance sentence; an unknown cutoff or snapshot prints nothing. */
-export function datesText(input: { now: Date; locale: string; modelCutoff: string | null; librarySnapshot: string | null }): string {
+export function datesText(input: { now: Date; locale: string; modelCutoff: string | null; librarySnapshot: string | null; homePlace?: string | null }): string {
   const fmt = (iso: string): string | null => {
     const d = new Date(`${iso.slice(0, 10)}T00:00:00Z`);
     return Number.isNaN(d.getTime()) ? null : d.toLocaleDateString(input.locale, { dateStyle: "long", timeZone: "UTC" });
@@ -134,7 +135,10 @@ export function datesText(input: { now: Date; locale: string; modelCutoff: strin
   if (cutoff) facts.push(`Your training ends around ${cutoff}.`);
   const snapshot = input.librarySnapshot ? fmt(input.librarySnapshot) : null;
   if (snapshot) facts.push(`The home library's Wikipedia snapshot is ${snapshot}.`);
-  return `${facts.join(" ")}\nYour own knowledge is reliable for well-known, stable facts; the reference library confirms specifics; the web is for anything that may have changed since your training. Anything happening now or that keeps changing (news, scores, prices, outages, whether a service is up, who holds an office) is looked up with the search tool before you answer, never answered from memory. Your training is usually months or more behind today's date, so a recent event you do not recognize is more likely missing from your training than untrue. When the person mentions something recent or asks whether it is true (\"I heard\", \"just released\", \"is it true\", \"today\"), look it up first, and never tell them they are mistaken without having searched. The date and time are for your reference only: do not state them unless the person asks.`;
+  const text = `${facts.join(" ")}\nYour own knowledge is reliable for well-known, stable facts; the reference library confirms specifics; the web is for anything that may have changed since your training. Anything happening now or that keeps changing (news, scores, prices, outages, whether a service is up, who holds an office) is looked up with the search tool before you answer, never answered from memory. Your training is usually months or more behind today's date, so a recent event you do not recognize is more likely missing from your training than untrue. When the person mentions something recent or asks whether it is true (\"I heard\", \"just released\", \"is it true\", \"today\"), look it up first, and never tell them they are mistaken without having searched. The date and time are for your reference only: do not state them unless the person asks.`;
+  // RECENCY-02: weather or "near me" with no place named means the household home. Only the place name rides here, nothing finer.
+  const home = input.homePlace?.trim();
+  return home ? `${text}\nThe household home is ${home}. For weather, or "near me", with no place named, use it, and do not mention it unless the person asks.` : text;
 }
 
 let windowItemSeq = 0;
@@ -393,7 +397,7 @@ export const contextNode: Node<ContextInput, ContextOutput> = async (state, inpu
   // and the snapshot print nothing when unknown. Replaces the one sentence
   // that stood here: "The model's training knowledge may be older than today."
   const snapshot = await librarySnapshotDate(turnAgeBand(state.surface, state.actor, state.speakerEvidence, now, state.deviceId));
-  items.push({ id: "clock", text: datesText({ now, locale, modelCutoff: chatModelCutoff(), librarySnapshot: snapshot }), source: "clock", subjects: [], disclosure: "child_ok" });
+  items.push({ id: "clock", text: datesText({ now, locale, modelCutoff: chatModelCutoff(), librarySnapshot: snapshot, homePlace: householdHomePlaceName() }), source: "clock", subjects: [], disclosure: "child_ok" });
 
   // The roster: who this household has, so "he"/"she"/a name resolves
   // against real people without a pronoun-guessing rule. One item per

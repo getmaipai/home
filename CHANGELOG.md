@@ -11,6 +11,7 @@ checklist (`docs/dev.md`). The first release is 0.1.0.
 - Companions app: browse the companions you may use, read about each one, play its voice and set your default; admins also see which companion each robot has (COMPANIONS-APP-01).
 
 ### Fixed
+- Chat: when a household home is set, the prompt names it, so "Is it going to rain?" with no place named uses it (weather tool calls on that case went from 27 of 40 to 32 of 40 in the bench) (RECENCY-02).
 - Chat: a model's own tool call written as text (`<tool_call>`, `<function=...>`, `[TOOL_CALLS]`, a JSON call after prose) is never shown; and "I have generated an interpretation of that poster" with nothing generated is caught like any other claim of a made picture (TOOL-MARKUP-01).
 
 ### Changed
