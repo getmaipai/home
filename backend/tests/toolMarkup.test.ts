@@ -32,6 +32,11 @@ describe("stripToolMarkup", () => {
     ["Sure. <function_call>{\"name\":\"websearch\"}</function_call>", "Sure."],
     ["Checking now. {\"name\": \"websearch\", \"arguments\": {\"expression\": \"dune\"}}", "Checking now."],
   ])("%s", (input, text) => expect(stripToolMarkup(input).text).toBe(text));
+  test("tool syntax shown inside a code block or code span is part of the answer, not a call", () => {
+    for (const text of ["Use this format:\n```\n<tool_call>\n<function=search>\n</function>\n</tool_call>\n```\nThen send it.", "Write `<tool_call>` to open a call, then close it."]) expect(stripToolMarkup(text)).toEqual({ text, markup: "" });
+    expect(stripToolMarkup("Here it is: ```json\n{\"name\": \"x\", \"arguments\": {}}\n``` ok").markup).toBe("");
+    expect(stripToolMarkup("Done. ```ok``` <tool_call><function=x></function></tool_call>").text).toBe("Done. ```ok```");
+  });
   test("ordinary text, maths and a stray angle bracket are untouched", () => {
     for (const text of ["Use a < b and c > d.", "The function f(x) = x*2 is linear.", "Say <hello> to the tag.", "[1] is a source."]) expect(stripToolMarkup(text)).toEqual({ text, markup: "" });
   });
@@ -56,7 +61,8 @@ describe("the stream gate", () => {
   test("a reply that is only a tool call releases nothing", () => {
     const { released, result } = stream("adult", chunks("<tool_call><function=websearch><parameter=expression>dune</parameter></function></tool_call>", 5));
     expect(released).toBe("");
-    expect(result.toolMarkup).toContain("websearch");
+    // A reply that begins with the call is held whole, for the caller to turn into a real call (llm.ts envelopeToolCall).
+    expect(result.heldAsEnvelope).toBe(true);
   });
   test("a reply with a harmless angle bracket is released whole", () => {
     const { result } = stream("adult", chunks("Anything under 5 < 10 counts. Then <b> is bold.", 4));

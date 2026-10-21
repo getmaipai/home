@@ -1,0 +1,367 @@
+{
+ "note": "RECENCY-02: weather phrasings that are NOT in the detector's training corpus, plus twelve that must not call weather. Run with MAIPAI_AB_HOME set.",
+ "fresh": {
+  "items": [
+   {
+    "id": "fresh-rw-01",
+    "prompt": "will it be wet later",
+    "kind": "time-sensitive",
+    "acceptable_tools": [
+     "weather"
+    ],
+    "gold": "must",
+    "family": "weather-home"
+   },
+   {
+    "id": "fresh-rw-02",
+    "prompt": "is it okay to hang laundry outside",
+    "kind": "time-sensitive",
+    "acceptable_tools": [
+     "weather"
+    ],
+    "gold": "must",
+    "family": "weather-home"
+   },
+   {
+    "id": "fresh-rw-03",
+    "prompt": "do I need to take a coat to school",
+    "kind": "time-sensitive",
+    "acceptable_tools": [
+     "weather"
+    ],
+    "gold": "must",
+    "family": "weather-home"
+   },
+   {
+    "id": "fresh-rw-04",
+    "prompt": "gonna be a nice weekend",
+    "kind": "time-sensitive",
+    "acceptable_tools": [
+     "weather"
+    ],
+    "gold": "must",
+    "family": "weather-home"
+   },
+   {
+    "id": "fresh-rw-05",
+    "prompt": "how bad is the weather out there",
+    "kind": "time-sensitive",
+    "acceptable_tools": [
+     "weather"
+    ],
+    "gold": "must",
+    "family": "weather-home"
+   },
+   {
+    "id": "fresh-rw-06",
+    "prompt": "is the weather any good today",
+    "kind": "time-sensitive",
+    "acceptable_tools": [
+     "weather"
+    ],
+    "gold": "must",
+    "family": "weather-home"
+   },
+   {
+    "id": "fresh-rw-07",
+    "prompt": "are we supposed to get a storm",
+    "kind": "time-sensitive",
+    "acceptable_tools": [
+     "weather"
+    ],
+    "gold": "must",
+    "family": "weather-home"
+   },
+   {
+    "id": "fresh-rw-08",
+    "prompt": "think it'll snow tonight",
+    "kind": "time-sensitive",
+    "acceptable_tools": [
+     "weather"
+    ],
+    "gold": "must",
+    "family": "weather-home"
+   },
+   {
+    "id": "fresh-rw-09",
+    "prompt": "will the sun come out today",
+    "kind": "time-sensitive",
+    "acceptable_tools": [
+     "weather"
+    ],
+    "gold": "must",
+    "family": "weather-home"
+   },
+   {
+    "id": "fresh-rw-10",
+    "prompt": "how cold will it be tomorrow morning",
+    "kind": "time-sensitive",
+    "acceptable_tools": [
+     "weather"
+    ],
+    "gold": "must",
+    "family": "weather-home"
+   },
+   {
+    "id": "fresh-rw-11",
+    "prompt": "should I wear boots to school",
+    "kind": "time-sensitive",
+    "acceptable_tools": [
+     "weather"
+    ],
+    "gold": "must",
+    "family": "weather-home"
+   },
+   {
+    "id": "fresh-rw-12",
+    "prompt": "what's the high today",
+    "kind": "time-sensitive",
+    "acceptable_tools": [
+     "weather"
+    ],
+    "gold": "must",
+    "family": "weather-home"
+   },
+   {
+    "id": "fresh-rw-13",
+    "prompt": "is it humid out",
+    "kind": "time-sensitive",
+    "acceptable_tools": [
+     "weather"
+    ],
+    "gold": "must",
+    "family": "weather-home"
+   },
+   {
+    "id": "fresh-rw-14",
+    "prompt": "can I wear shorts tomorrow",
+    "kind": "time-sensitive",
+    "acceptable_tools": [
+     "weather"
+    ],
+    "gold": "must",
+    "family": "weather-home"
+   },
+   {
+    "id": "fresh-rw-15",
+    "prompt": "will it be windy at the game tonight",
+    "kind": "time-sensitive",
+    "acceptable_tools": [
+     "weather"
+    ],
+    "gold": "must",
+    "family": "weather-home"
+   },
+   {
+    "id": "fresh-rw-16",
+    "prompt": "how's the weather in Denver",
+    "kind": "time-sensitive",
+    "acceptable_tools": [
+     "weather"
+    ],
+    "gold": "must",
+    "family": "weather-home"
+   },
+   {
+    "id": "fresh-rw-17",
+    "prompt": "is it going to rain in Boston tomorrow",
+    "kind": "time-sensitive",
+    "acceptable_tools": [
+     "weather"
+    ],
+    "gold": "must",
+    "family": "weather-home"
+   },
+   {
+    "id": "fresh-rw-18",
+    "prompt": "what's it going to be like on saturday",
+    "kind": "time-sensitive",
+    "acceptable_tools": [
+     "weather"
+    ],
+    "gold": "must",
+    "family": "weather-home"
+   },
+   {
+    "id": "fresh-rw-19",
+    "prompt": "I wonder if it's freezing outside",
+    "kind": "time-sensitive",
+    "acceptable_tools": [
+     "weather"
+    ],
+    "gold": "must",
+    "family": "weather-home"
+   },
+   {
+    "id": "fresh-rw-20",
+    "prompt": "tell me if I should grab an umbrella",
+    "kind": "time-sensitive",
+    "acceptable_tools": [
+     "weather"
+    ],
+    "gold": "must",
+    "family": "weather-home"
+   },
+   {
+    "id": "fresh-rw-21",
+    "prompt": "what's the low tonight",
+    "kind": "time-sensitive",
+    "acceptable_tools": [
+     "weather"
+    ],
+    "gold": "must",
+    "family": "weather-home"
+   },
+   {
+    "id": "fresh-rw-22",
+    "prompt": "is there any chance of thunderstorms",
+    "kind": "time-sensitive",
+    "acceptable_tools": [
+     "weather"
+    ],
+    "gold": "must",
+    "family": "weather-home"
+   },
+   {
+    "id": "fresh-rw-23",
+    "prompt": "do kids need rain jackets today",
+    "kind": "time-sensitive",
+    "acceptable_tools": [
+     "weather"
+    ],
+    "gold": "must",
+    "family": "weather-home"
+   },
+   {
+    "id": "fresh-rw-24",
+    "prompt": "is it a good day for the pool",
+    "kind": "time-sensitive",
+    "acceptable_tools": [
+     "weather"
+    ],
+    "gold": "must",
+    "family": "weather-home"
+   },
+   {
+    "id": "fresh-rn-01",
+    "prompt": "she's under the weather today",
+    "kind": "timeless",
+    "acceptable_tools": [
+     "weather"
+    ],
+    "gold": "must_not",
+    "family": "weather-negative"
+   },
+   {
+    "id": "fresh-rn-02",
+    "prompt": "what causes tornadoes",
+    "kind": "timeless",
+    "acceptable_tools": [
+     "weather"
+    ],
+    "gold": "must_not",
+    "family": "weather-negative"
+   },
+   {
+    "id": "fresh-rn-03",
+    "prompt": "write a poem about the storm",
+    "kind": "timeless",
+    "acceptable_tools": [
+     "weather"
+    ],
+    "gold": "must_not",
+    "family": "weather-negative"
+   },
+   {
+    "id": "fresh-rn-04",
+    "prompt": "set a timer for five minutes",
+    "kind": "timeless",
+    "acceptable_tools": [
+     "weather"
+    ],
+    "gold": "must_not",
+    "family": "weather-negative"
+   },
+   {
+    "id": "fresh-rn-05",
+    "prompt": "what's the capital of canada",
+    "kind": "timeless",
+    "acceptable_tools": [
+     "weather"
+    ],
+    "gold": "must_not",
+    "family": "weather-negative"
+   },
+   {
+    "id": "fresh-rn-06",
+    "prompt": "tell me a joke about snowmen",
+    "kind": "timeless",
+    "acceptable_tools": [
+     "weather"
+    ],
+    "gold": "must_not",
+    "family": "weather-negative"
+   },
+   {
+    "id": "fresh-rn-07",
+    "prompt": "why is the ocean salty",
+    "kind": "timeless",
+    "acceptable_tools": [
+     "weather"
+    ],
+    "gold": "must_not",
+    "family": "weather-negative"
+   },
+   {
+    "id": "fresh-rn-08",
+    "prompt": "how do I make hot chocolate",
+    "kind": "timeless",
+    "acceptable_tools": [
+     "weather"
+    ],
+    "gold": "must_not",
+    "family": "weather-negative"
+   },
+   {
+    "id": "fresh-rn-09",
+    "prompt": "can you read me a bedtime story",
+    "kind": "timeless",
+    "acceptable_tools": [
+     "weather"
+    ],
+    "gold": "must_not",
+    "family": "weather-negative"
+   },
+   {
+    "id": "fresh-rn-10",
+    "prompt": "what's twelve plus nine",
+    "kind": "timeless",
+    "acceptable_tools": [
+     "weather"
+    ],
+    "gold": "must_not",
+    "family": "weather-negative"
+   },
+   {
+    "id": "fresh-rn-11",
+    "prompt": "my umbrella broke yesterday",
+    "kind": "timeless",
+    "acceptable_tools": [
+     "weather"
+    ],
+    "gold": "must_not",
+    "family": "weather-negative"
+   },
+   {
+    "id": "fresh-rn-12",
+    "prompt": "remind me to pack a jacket on friday",
+    "kind": "timeless",
+    "acceptable_tools": [
+     "weather"
+    ],
+    "gold": "must_not",
+    "family": "weather-negative"
+   }
+  ]
+ }
+}

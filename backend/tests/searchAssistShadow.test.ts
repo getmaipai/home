@@ -189,7 +189,7 @@ describe("runSearchAssistShadow", () => {
   });
 
   test("the counter names are a closed list and the rule is named", () => {
-    expect([...SEARCH_ASSIST_COUNTER_NAMES]).toEqual(["scored", "over_threshold", "rescued", "rescued_at_budget", "skipped_band", "skipped_surface", "off", "weights_missing", "embed_mismatch", "error"]);
+    expect([...SEARCH_ASSIST_COUNTER_NAMES]).toEqual(["scored", "over_threshold", "rescued", "rescued_at_budget", "skipped_band", "skipped_surface", "off", "weights_missing", "embed_mismatch", "error", "weather_scored", "weather_over_threshold", "weather_rescued", "weather_rescued_at_budget"]);
     expect(RULES["search_assist.scored"]).toBeTruthy();
   });
 });

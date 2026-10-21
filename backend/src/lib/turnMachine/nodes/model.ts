@@ -41,6 +41,7 @@ import { turnAgeBand } from "../speaker";
 import { searchAssistEligibility, MINOR_RESCUE_ENABLED } from "@/lib/searchAssist/eligible";
 import { bumpSearchAssistCounter } from "@/lib/searchAssist/counters";
 import { minorSearchGate } from "@/lib/searchAssist/minorGate";
+import { weatherAssistEligibility, WEATHER_TOOL } from "@/lib/searchAssist/weatherAssist";
 
 /** STREAM-PARTIAL-01: `!attempt.ok` covers two different failures this
  * function can't tell apart by its own outcome code alone - a pre-stream
@@ -968,7 +969,7 @@ const modelRound: Node<ModelInput, ModelOutput> = async (state, input, signal) =
   const mediaOffered = tools.some((t) => t.id === "generate_image" || t.id === "generate_video" || t.id === "generate_music" || t.id === "edit_music");
   const successfulMusicStart = musicForOutcomes(state.outcomes) !== null;
   const holdMedia = !input.retry && !noToolsTurn(state) && (successfulMusicStart || (!isPhrasingRound && asksForMedia(input.utterance)));
-  let attempt = await runOneGeneration(state, messages, tools, tool_choice, thinkingOn, maxTokens, isPhrasingRound ? "phrasing" : input.retry ? "tool_retry" : "model", signal, holdMedia ? "media" : !isPhrasingRound && !input.retry && toolsAllowed && searchAssistMayHold(state, tools));
+  let attempt = await runOneGeneration(state, messages, tools, tool_choice, thinkingOn, maxTokens, isPhrasingRound ? "phrasing" : input.retry ? "tool_retry" : "model", signal, holdMedia ? "media" : !isPhrasingRound && !input.retry && toolsAllowed && (searchAssistMayHold(state, tools) || weatherAssistMayHold(state, tools)));
   // THIN-GROUND-01: llama-server reports the rendered prompt size in its
   // 400 body. Use that measurement to choose the first evidence cut, then
   // keep cutting until the request fits or the prompt carries no search
@@ -1046,9 +1047,12 @@ const modelRound: Node<ModelInput, ModelOutput> = async (state, input, signal) =
   }
 
   // ROUTER-BUILD-01e: an armed round ended; record it on the turn's stats.
-  if (attempt.hold === "rescue") return rescueSearch(state, messages, input.utterance, state.reasoning.emit ? attempt.reasoning : undefined, signal, attempt.holdAtBudget === true);
+  // RECENCY-02: a weather question the detector is sure of is rescued with the weather tool, ahead of a search.
+  if (attempt.hold === "rescue") return weatherAssistMayHold(state, state.lastTools) ? rescueWeather(state, messages, state.reasoning.emit ? attempt.reasoning : undefined, signal, attempt.holdAtBudget === true) : rescueSearch(state, messages, input.utterance, state.reasoning.emit ? attempt.reasoning : undefined, signal, attempt.holdAtBudget === true);
   if (attempt.hold === "tool_call" || attempt.hold === "text_kept") {
-    if (state.searchAssist) state.searchAssist = { ...state.searchAssist, action: attempt.hold === "tool_call" ? "declined_tool_call" : "declined_text_kept" };
+    const action = attempt.hold === "tool_call" ? "declined_tool_call" as const : "declined_text_kept" as const;
+    if (state.searchAssist) state.searchAssist = { ...state.searchAssist, action };
+    if (state.weatherAssist?.mode === "rescue" && state.weatherAssist.bucket === "over") state.weatherAssist = { ...state.weatherAssist, action };
   }
 
   // State table, `model`'s own exits: "no visible text: one
@@ -1230,6 +1234,79 @@ async function rescueSearch(state: TurnState, messages: LlmMessage[], utterance:
   }
   if (state.searchAssist) state.searchAssist = { ...state.searchAssist, action: "rescued" };
   return { outcome: signal.aborted ? recovered.outcome : { ok: true }, output: { ...recovered.output, searchAssistRescued: true } };
+}
+
+/** RECENCY-02: whether this round may hold for a weather rescue. The detector's record is over its threshold in rescue
+ * mode, the weather tool is offered, a household home is set and nothing has been called yet. No band or surface
+ * condition (weatherAssist.ts says why). Fails closed. */
+export function weatherAssistMayHold(state: TurnState, tools: readonly ToolSpec[]): boolean {
+  try {
+    const wa = state.weatherAssist;
+    if (!wa || wa.mode !== "rescue" || wa.bucket !== "over" || !wa.eligible) return false;
+    if (!tools.some((t) => t.id === WEATHER_TOOL)) return false;
+    return weatherAssistEligibility(state, "rescue", { modelToolCalls: 0 }).rescuable;
+  } catch {
+    return false;
+  }
+}
+
+const PLACE_WRITER_SCHEMA = {
+  name: "place_writer",
+  schema: { type: "object", properties: { place: { type: ["string", "null"] } }, required: ["place"] },
+} as const;
+const PLACE_WRITER_INSTRUCTION = "The person asked about the weather. If their message names a place, give that place exactly as they wrote it; if it names none, give null. Never guess or add a place they did not write.";
+const PLACE_WRITER_MAX_TOKENS = 32;
+
+/** One grammar-constrained generation reading the place a weather question names (null: none, so the tool uses the
+ * household home). A failed or malformed answer is no place named. */
+async function runPlaceWriter(messages: LlmMessage[], nodeAbort: AbortSignal, modelId: string | undefined, deadlines: TurnState["budget"]["deadlines_ms"]): Promise<{ ok: true; place: string | null } | { ok: false; code: string; message: string | undefined }> {
+  const watchdog = streamWatchdog(nodeAbort, deadlines.first_token_ms, deadlines.stall_ms);
+  try {
+    const started = await startCompleteStreamPieces(
+      "chat",
+      [...messages, { role: "user", content: PLACE_WRITER_INSTRUCTION }],
+      { model: modelId, response_format: { type: "json_schema", json_schema: PLACE_WRITER_SCHEMA }, thinking: false, dropReasoning: true, max_tokens: PLACE_WRITER_MAX_TOKENS },
+      watchdog.signal,
+    );
+    if (!started.ok) return { ok: false, code: started.code, message: boundedGenerationError(started.error) };
+    let text = "";
+    try {
+      for (;;) {
+        const step = await started.pieces.next();
+        if (step.done) break;
+        watchdog.beat();
+        if (step.value.channel === "text") text += step.value.text;
+      }
+    } catch (err) {
+      return { ok: false, code: "generation_failed", message: boundedGenerationError(err instanceof Error ? err.message : String(err)) };
+    }
+    try {
+      const place = (JSON.parse(text) as { place?: unknown }).place;
+      return { ok: true, place: typeof place === "string" && place.trim().length > 0 ? place.trim() : null };
+    } catch {
+      return { ok: true, place: null };
+    }
+  } finally {
+    watchdog.clear();
+  }
+}
+
+/** RECENCY-02: round 1 answered in plain text on a turn the weather detector is sure is a weather question and nothing
+ * reached the person: the place writer reads the place (if any), the weather tool is called, the model phrases the result. */
+async function rescueWeather(state: TurnState, messages: LlmMessage[], reasoning: string | undefined, signal: AbortSignal, atBudget = false): Promise<{ outcome: NodeOutcome; output: ModelOutput }> {
+  state.streamGate?.reset();
+  const written = await runPlaceWriter(messages, signal, state.modelId, state.budget.deadlines_ms);
+  // A failed writer still rescues: the place is then unknown, which is the household home.
+  const place = written.ok ? written.place : null;
+  const call: ToolCall = { tool: WEATHER_TOOL, args: place ? { place } : {}, id: "weather-assist" };
+  try {
+    bumpSearchAssistCounter("weather_rescued", turnAgeBand(state.surface, state.actor, state.speakerEvidence, new Date(), state.deviceId));
+    if (atBudget) bumpSearchAssistCounter("weather_rescued_at_budget");
+  } catch {
+    // counters never fail a turn
+  }
+  if (state.weatherAssist) state.weatherAssist = { ...state.weatherAssist, action: "rescued" };
+  return { outcome: { ok: true }, output: { kind: "tool_calls", calls: [call], reasoning } };
 }
 
 /** VISION-02c: whether a failure may be the picture's: not an engine

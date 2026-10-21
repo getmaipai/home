@@ -37,7 +37,7 @@ export function __setSearchAssistLoaderForTests(fn: typeof loadSearchAssistWeigh
   __setStackEmbedModelReaderForTests(null);
 }
 
-function readMode(): SearchAssistMode {
+export function readSearchAssistMode(): SearchAssistMode {
   const value = getHouseholdSettingValue("chat.search_assist");
   return value === "off" || value === "rescue" ? value : "shadow";
 }
@@ -58,7 +58,7 @@ export async function runSearchAssistShadow(state: EligibilityState & Pick<TurnS
     const band = turnAgeBand(state.surface, state.actor, state.speakerEvidence, new Date(), state.deviceId);
     const minor = band !== "adult";
     const bandKey = minor ? band : undefined;
-    mode = cappedSearchAssistMode(band, readMode());
+    mode = cappedSearchAssistMode(band, readSearchAssistMode());
     const eligibility = searchAssistEligibility(state, mode, minor ? { minor: { gateAllows: minorGate?.gateAllows === true, webOn: minorGate?.webOn === true, recallVector: recallVector !== undefined } } : {});
     if (!eligibility.scored) {
       const reason = eligibility.off_reason;

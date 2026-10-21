@@ -21,6 +21,7 @@ import { contextToMessages } from "../messages";
 import { toolSpecFor, replyMaxTokensFor } from "./model";
 import { laneOfPerson } from "@/lib/pictures/laneGate";
 import { runSearchAssistShadow } from "@/lib/searchAssist/shadow";
+import { runWeatherAssistShadow } from "@/lib/searchAssist/weatherAssist";
 import { recall, getProfileParagraph, embedQueryForRecall, bumpUsage } from "@/lib/memory";
 import { subjectRosterFor } from "@/lib/subjects";
 import { subjectsForTurn } from "@/lib/askNames";
@@ -107,6 +108,7 @@ export interface ContextOutput {
   pictureParts?: LlmImagePart[];
   /** ROUTER-BUILD-01d: the search assist's shadow record (numbers and closed names only). */
   searchAssist?: import("@/wire").SearchAssistStats;
+  weatherAssist?: import("@/wire").SearchAssistStats;
 }
 
 /** KS-02E: the household's chat model's `model_cutoff` from its catalog
@@ -531,8 +533,14 @@ export const contextNode: Node<ContextInput, ContextOutput> = async (state, inpu
     recallVector,
     minorSearchGate(state, temporary),
   );
+  // RECENCY-02: the weather detector's record, the same way: fails open, never changes what the model is sent.
+  const weatherAssist = await runWeatherAssistShadow(
+    { surface: state.surface, actor: state.actor, speakerEvidence: state.speakerEvidence, spoken: state.spoken, bare: state.bare, crisis: state.crisis, continuation: state.continuation, promptLimit: promptLimit ?? state.promptLimit, budget: state.budget, planBasis: state.planBasis, outcomes: state.outcomes, deviceId: state.deviceId },
+    input.utterance,
+    recallVector,
+  );
 
-  return { outcome: { ok: true }, output: { conversationId: conversation.id, ...(conversation.device_id ? { deviceId: conversation.device_id } : {}), temporary, items, reasoning, disclosureWithheld, searchAssist, subjects: resolvedSubjects.subjects, unknownAsk: resolvedSubjects.unknownAsk, ...(promptLimit ? { promptLimit } : {}), ...(pictureParts.length > 0 ? { pictureParts } : {}) } };
+  return { outcome: { ok: true }, output: { conversationId: conversation.id, ...(conversation.device_id ? { deviceId: conversation.device_id } : {}), temporary, items, reasoning, disclosureWithheld, searchAssist, weatherAssist, subjects: resolvedSubjects.subjects, unknownAsk: resolvedSubjects.unknownAsk, ...(promptLimit ? { promptLimit } : {}), ...(pictureParts.length > 0 ? { pictureParts } : {}) } };
 };
 
 /** Applies the node's output onto TurnState, the same small
@@ -550,6 +558,7 @@ export function applyContext(state: import("../contract").TurnState, output: Con
   if (output.promptLimit) state.promptLimit = output.promptLimit;
   state.pictureParts = output.pictureParts;
   if (output.searchAssist) state.searchAssist = output.searchAssist;
+  if (output.weatherAssist) state.weatherAssist = output.weatherAssist;
   if (output.disclosureWithheld) {
     // THIN-0B: the plan's inputs, recomputed once with the withheld flag,
     // and the trusted-adult move when a child or teen asked a question

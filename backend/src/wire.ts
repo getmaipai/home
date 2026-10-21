@@ -151,6 +151,8 @@ export interface TurnStats {
   nodes?: TurnNodeExecution[];
   /** ROUTER-BUILD-01d: present on a turn the new path ran with the search assist known. */
   search_assist?: SearchAssistStats;
+  /** RECENCY-02: the weather detector's record on the same turn (same shape: numbers and closed names only). */
+  weather_assist?: SearchAssistStats;
 }
 
 /** Shared vocabulary for measured turn context segments. */

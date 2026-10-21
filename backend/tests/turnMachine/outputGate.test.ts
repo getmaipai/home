@@ -230,8 +230,9 @@ describe("StreamGate (STREAM-NEXT-01 (b)): the per-sentence gate a streamed turn
     gate.finish();
     expect(released).toEqual([]);
     const result = gate.result();
-    // RECENCY-02 (TOOL-MARKUP-01): tag-wrapped markup is now swallowed as tool markup, never released, and the turn node tells the honest failure.
-    expect(result.toolMarkup).toContain("<function_call>");
+    // RECENCY-02: a reply that BEGINS with the call is still held whole as an envelope (the caller parses it into a real call);
+    // only markup after prose is swallowed (tests/toolMarkup.test.ts).
+    expect(result.heldAsEnvelope).toBe(true);
     expect(result.text).toBe("");
     expect(doneCount.count).toBe(1);
   });

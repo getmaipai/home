@@ -69,7 +69,15 @@ companion. Owner-approved: 2026-10-21 (chat).
    checks as a model call. It never cancels a model call. For a child or a teen it applies only when web search is
    on for their controls, takes that person's own search path and protections, and a refused rescued call is
    dropped without a reply. It never applies to a spoken turn or the safety, consent, privacy or credentials paths,
-   and an admin setting can switch it off. What stays deterministic: the safety
+   and an admin setting can switch it off.
+   One scoped exception, weather only (owner, 2026-10-21, chat: "this is not about where input comes from (chat or voice),
+   this is about the brain / intelligence"; every age band as relayed from his "kids can ask about weather and should get
+   results", WEATHER-KID-01): a second small learned head on the same embedding (`weather-head.json`, trained by
+   `scripts/train/weatherHead.ts`, no word list) runs the same way. When the model returns text with no call, the weather
+   tool is offered, a household home is set and the score is over its recorded threshold, the weather tool is called for the
+   place the person named (none means the household home) and the model phrases the result. It applies to spoken turns, to an
+   unidentified speaker and to every band; the reply still passes the band's output gate, and `chat.search_assist` off or
+   shadow switches it off or to scoring only. The search rescue keeps every limit above. What stays deterministic: the safety
    floor on input and output, the credential catch, consent words, the
    household-name gate on search arguments, the crisis, temporary-mode
    and grounding refusals, and exact commands, forget among them. The

@@ -171,6 +171,8 @@ export interface TurnState {
   utterance: string;
   /** ROUTER-BUILD-01d: the search assist's shadow record (set by applyContext). */
   searchAssist?: import("@/wire").SearchAssistStats;
+  /** RECENCY-02: the weather detector's record. */
+  weatherAssist?: import("@/wire").SearchAssistStats;
   images?: import("@/wire").ChatImagePart[];
   /** VISION-02c: the turn's pictures as picture parts for a chat model
    * that reads them (the context node decides, from the Stack's chat row

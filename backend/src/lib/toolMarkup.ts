@@ -11,9 +11,21 @@ const JSON_ENVELOPE_START = /\{\s*"name"\s*:\s*"[\w.-]+"\s*,\s*"arguments"\s*:/;
 
 const MARKERS = ["<tool_call", "<function=", "<function_call", "<parameter=", "<|tool_call", "<|python_tag|>", "[tool_calls]"];
 
-/** Where tool-call markup starts in a stream so far, or -1. */
+/** Whether `index` sits inside a fenced code block or an inline code span of `text` (an answer that SHOWS tool-call syntax
+ * is an answer, not a call). An unclosed fence counts as open: the stream has not reached its end yet. */
+function insideCode(text: string, index: number): boolean {
+  const before = text.slice(0, index);
+  const fences = (before.match(/```/g) ?? []).length;
+  if (fences % 2 === 1) return true;
+  const lineStart = before.lastIndexOf("\n") + 1;
+  return (before.slice(lineStart).match(/`/g) ?? []).length % 2 === 1;
+}
+
+/** Where tool-call markup starts in a stream so far, or -1. Markup inside code is not markup. */
 export function toolMarkupStart(text: string): number {
-  return text.search(MARKUP_START);
+  const all = new RegExp(MARKUP_START.source, "gi");
+  for (let m = all.exec(text); m; m = all.exec(text)) if (!insideCode(text, m.index)) return m.index;
+  return -1;
 }
 
 /** How many characters at the end of `text` could be the beginning of a marker that has not fully arrived ("<tool_c").
@@ -40,7 +52,8 @@ export interface StrippedMarkup {
 /** The reply with any tool-call markup removed from the first opening to the end. */
 export function stripToolMarkup(text: string): StrippedMarkup {
   const tag = toolMarkupStart(text);
-  const json = text.search(JSON_ENVELOPE_START);
+  const jsonAt = text.search(JSON_ENVELOPE_START);
+  const json = jsonAt >= 0 && !insideCode(text, jsonAt) ? jsonAt : -1;
   const starts = [tag, json].filter((index) => index >= 0);
   if (starts.length === 0) return { text, markup: "" };
   const at = Math.min(...starts);

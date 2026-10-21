@@ -344,11 +344,11 @@ export class StreamGate {
     this.pending += delta;
     // RECENCY-02: a tool call written as text after prose is cut off where it starts; the prose before it carries on.
     const markupAt = toolMarkupStart(this.pending);
-    if (markupAt >= 0 && markupAt >= this.pendingReleased) {
+    // A reply that BEGINS with the call is the envelope case below (held whole, parsed into a real call by the caller).
+    if (markupAt >= 0 && markupAt >= this.pendingReleased && (this.delivered.trim().length > 0 || this.pending.slice(0, markupAt).trim().length > 0)) {
       this.markupText = this.pending.slice(markupAt);
       this.pending = this.pending.slice(0, markupAt);
       this.swallowing = true;
-      if (!this.pending.trim()) return;
     }
     if (!this.envelopeDecided) {
       const trimmedStart = this.pending.trimStart();

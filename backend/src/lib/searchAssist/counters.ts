@@ -16,6 +16,11 @@ export const SEARCH_ASSIST_COUNTER_NAMES = [
   "weights_missing",
   "embed_mismatch",
   "error",
+  // RECENCY-02: the weather sibling of the assist (same closed list, no text, at most an age band).
+  "weather_scored",
+  "weather_over_threshold",
+  "weather_rescued",
+  "weather_rescued_at_budget",
 ] as const;
 
 export type SearchAssistCounterName = (typeof SEARCH_ASSIST_COUNTER_NAMES)[number];

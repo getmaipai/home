@@ -196,7 +196,7 @@ function buildTurnValue(state: TurnState, startedAt: number, source: TurnValue["
     // "One trace, not a second log" (section 11): every node this turn
     // ran or skipped, beside the generations buildTurnStats() already
     // projects above.
-    stats: { ...stats, nodes: state.nodes, ...(state.searchAssist ? { search_assist: state.searchAssist } : {}) },
+    stats: { ...stats, nodes: state.nodes, ...(state.searchAssist ? { search_assist: state.searchAssist } : {}), ...(state.weatherAssist ? { weather_assist: state.weatherAssist } : {}) },
     // REASONING-02's own field, populated only when `context` allowed
     // emitting this turn AND output_gate's own safety pass over the
     // span didn't refuse it - the gated span itself, never the raw one.
