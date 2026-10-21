@@ -1,12 +1,16 @@
 ---
 title: Media
-description: Open your videos, shows, music, podcasts and books from one place.
+description: Jump between your videos, shows, music, podcasts and books, and pick up where you left off.
 ---
 
 # Media
 
 Tap **Media** in the left rail. It sits right under Chat.
 
-You'll see a tab for each media app you can use: Videos, Shows and Films, Music, Podcasts and Books. Tap a tab to open that app.
+You see a **Media** column next to your page. It has **Home** and each app you can use: Videos, Shows and Films, Music, Podcasts and Books. Tap one to open that app right there.
 
-You only see the tabs you're allowed to use. Each app keeps its own library. Kids see only what a grown-up allowed.
+**Home** shows where you left off in each app, what's new across them, and the songs you played lately.
+
+Each app also works on its own. Pin it to the rail and open it from there, with no Media column.
+
+You only see the apps you're allowed to use. Kids see only what a grown-up allowed.
