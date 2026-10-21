@@ -193,7 +193,15 @@ describe("a package app at /apps/<id>", () => {
 });
 
 describe("a media app is drawn inside the Media hub", () => {
-  test("a media app at /apps/music has the media hub frame and its column lists Music", async () => {
+  beforeEach(() => {
+    sessionStorage.clear();
+  });
+  afterEach(() => {
+    sessionStorage.clear();
+  });
+
+  test("a media app at /apps/music has the media hub frame and its column lists Music when the person came in through Media", async () => {
+    sessionStorage.setItem("maipai.media-hub", "1");
     rows = [musicRow];
     const view = open("/apps/music");
     const frame = await view.findByTestId("media-hub-frame");
@@ -203,7 +211,15 @@ describe("a media app is drawn inside the Media hub", () => {
     });
   });
 
-  test("a non-media app at /apps/demo has no media hub frame", async () => {
+  test("a media app at /apps/music is standalone, with no media hub frame, when the person did not come in through Media", async () => {
+    rows = [musicRow];
+    const view = open("/apps/music");
+    await view.findByText("No music yet.");
+    expect(view.queryByTestId("media-hub-frame")).toBeNull();
+  });
+
+  test("a non-media app at /apps/demo has no media hub frame even when the flag is set", async () => {
+    sessionStorage.setItem("maipai.media-hub", "1");
     const view = open("/apps/demo");
     await waitFor(() => expect(view.container.querySelector('[data-slot="weather-card"]')).not.toBeNull());
     expect(view.queryByTestId("media-hub-frame")).toBeNull();

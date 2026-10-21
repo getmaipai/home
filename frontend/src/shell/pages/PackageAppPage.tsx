@@ -19,6 +19,7 @@ import { useMediaDock } from "@/shell/mediaHost";
 import { SectionSidebar } from "@maipai/ui/src/primitives/SectionSidebar";
 import { useAppSidebar } from "@/shell/useAppSidebar";
 import { MediaHubFrame } from "@/shell/MediaHubFrame";
+import { useMediaHubActive } from "@/shell/mediaHubSession";
 
 const PAGE_FRESH_MS = 5 * 60_000;
 
@@ -97,6 +98,7 @@ export function PackageAppPage({ person }: { person: Roster }) {
   const location = useLocation();
   const navigate = useNavigate();
   const media = isMediaApp(packageId);
+  const hubActive = useMediaHubActive();
   const familyHeader = usesFamilyHeader(packageId);
   // Only a media app reads its query as state: News and others mirror a tab in the query themselves.
   const queryState = useMemo<Record<string, string>>(() => (media ? Object.fromEntries(new URLSearchParams(location.search)) : {}), [media, location.search]);
@@ -175,7 +177,7 @@ export function PackageAppPage({ person }: { person: Roster }) {
       {content}
     </div>
   ) : content;
-  return media ? <MediaHubFrame packageId={packageId}>{framed}</MediaHubFrame> : framed;
+  return media && hubActive ? <MediaHubFrame packageId={packageId}>{framed}</MediaHubFrame> : framed;
 }
 
 /** COLUMN-UNIFY-01 (owner, 2026-10-19): the app's settings and favorite controls sit in the column's header, after its title, the way
