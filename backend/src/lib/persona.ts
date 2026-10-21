@@ -52,6 +52,7 @@
 // invariants section, and needs its own explicit reconciliation rule,
 // not a value dropped in beside three harmless ones).
 import { listPackageIds, loadManifestOnly } from "@/lib/plugins";
+import { LIVE_PERSONA_IDS } from "@/lib/personaIds";
 import { listHouseholdCompanionIds, getHouseholdCompanion } from "@/lib/householdCompanions";
 import { companionAudienceOf, companionFloor, type CompanionAudience } from "@/lib/robotCompanion";
 import type { AgeBand } from "@/lib/ageBand";
@@ -163,7 +164,8 @@ if (PERSONAS.length === 0) {
 }
 
 export const PERSONA_IDS: string[] = PERSONAS.map((p) => p.id);
-const refreshPersonaIds = (): void => { PERSONA_IDS.splice(0, PERSONA_IDS.length, ...PERSONAS.map((p) => p.id)); };
+const refreshPersonaIds = (): void => { PERSONA_IDS.splice(0, PERSONA_IDS.length, ...PERSONAS.map((p) => p.id)); LIVE_PERSONA_IDS.clear(); for (const id of PERSONA_IDS) LIVE_PERSONA_IDS.add(id); };
+refreshPersonaIds();
 export const DEFAULT_PERSONA_ID = "default";
 // Falls back to whatever loaded first when "default" itself is missing
 // for some reason - PERSONAS is guaranteed non-empty by the guard above,

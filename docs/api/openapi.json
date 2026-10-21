@@ -52578,6 +52578,12 @@
                           },
                           "is_default": {
                             "type": "boolean"
+                          },
+                          "is_household": {
+                            "type": "boolean"
+                          },
+                          "status": {
+                            "type": "string"
                           }
                         },
                         "required": [
@@ -52589,7 +52595,9 @@
                           "who_can_use",
                           "dials",
                           "voice",
-                          "is_default"
+                          "is_default",
+                          "is_household",
+                          "status"
                         ]
                       }
                     },
@@ -52642,6 +52650,165 @@
           },
           "401": {
             "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Companions"
+        ],
+        "summary": "Create a household companion draft",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "display_name": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "pronouns": {
+                    "type": "string",
+                    "nullable": true
+                  },
+                  "tagline": {
+                    "type": "string"
+                  },
+                  "backstory": {
+                    "type": "string"
+                  },
+                  "interests": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "formality": {
+                    "type": "string",
+                    "enum": [
+                      "casual",
+                      "neutral",
+                      "formal"
+                    ]
+                  },
+                  "complexity": {
+                    "type": "string",
+                    "enum": [
+                      "simple",
+                      "standard",
+                      "advanced"
+                    ]
+                  },
+                  "engagement": {
+                    "type": "string",
+                    "enum": [
+                      "brief",
+                      "balanced",
+                      "curious"
+                    ]
+                  },
+                  "filler_density": {
+                    "type": "string",
+                    "enum": [
+                      "none",
+                      "light",
+                      "frequent"
+                    ]
+                  },
+                  "behavior": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "examples": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "examples_child": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "examples_teen": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "examples_adult": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "voice_id": {
+                    "type": "string"
+                  },
+                  "look_prompt": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Draft created.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "id"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid companion fields",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Only adults can make a companion.",
             "content": {
               "application/json": {
                 "schema": {
@@ -52724,6 +52891,12 @@
                     },
                     "is_default": {
                       "type": "boolean"
+                    },
+                    "is_household": {
+                      "type": "boolean"
+                    },
+                    "status": {
+                      "type": "string"
                     },
                     "about": {
                       "type": "string"
@@ -52812,6 +52985,8 @@
                     "dials",
                     "voice",
                     "is_default",
+                    "is_household",
+                    "status",
                     "about",
                     "pronouns",
                     "interests",
@@ -52837,6 +53012,238 @@
           },
           "404": {
             "description": "No such companion for this person",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "Companions"
+        ],
+        "summary": "Edit a household companion",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "hc-companion"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "display_name": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "pronouns": {
+                    "type": "string",
+                    "nullable": true
+                  },
+                  "tagline": {
+                    "type": "string"
+                  },
+                  "backstory": {
+                    "type": "string"
+                  },
+                  "interests": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "formality": {
+                    "type": "string",
+                    "enum": [
+                      "casual",
+                      "neutral",
+                      "formal"
+                    ]
+                  },
+                  "complexity": {
+                    "type": "string",
+                    "enum": [
+                      "simple",
+                      "standard",
+                      "advanced"
+                    ]
+                  },
+                  "engagement": {
+                    "type": "string",
+                    "enum": [
+                      "brief",
+                      "balanced",
+                      "curious"
+                    ]
+                  },
+                  "filler_density": {
+                    "type": "string",
+                    "enum": [
+                      "none",
+                      "light",
+                      "frequent"
+                    ]
+                  },
+                  "behavior": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "examples": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "examples_child": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "examples_teen": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "examples_adult": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "voice_id": {
+                    "type": "string"
+                  },
+                  "look_prompt": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Saved.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "id"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid companion fields",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not allowed to edit this companion",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such companion",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Companions"
+        ],
+        "summary": "Delete a household companion",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "hc-companion"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Deleted."
+          },
+          "403": {
+            "description": "Only the author or an admin can delete this companion",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such household companion",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Companion is in use",
             "content": {
               "application/json": {
                 "schema": {
@@ -52906,6 +53313,320 @@
           },
           "404": {
             "description": "No such companion",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/companions/{id}/copy": {
+      "post": {
+        "tags": [
+          "Companions"
+        ],
+        "summary": "Copy a companion into a household draft",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "hc-companion"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Draft copied.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "id"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Only adults can make a companion.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such companion",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/companions/{id}/edit": {
+      "get": {
+        "tags": [
+          "Companions"
+        ],
+        "summary": "Read an editable household companion",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "hc-companion"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Editable companion.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "nullable": true
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No companion you can edit",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/companions/{id}/audience": {
+      "put": {
+        "tags": [
+          "Companions"
+        ],
+        "summary": "Set companion audience",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "hc-companion"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "audience": {
+                    "type": "string",
+                    "enum": [
+                      "adult",
+                      "teen",
+                      "all"
+                    ]
+                  },
+                  "confirmed": {
+                    "type": "boolean"
+                  }
+                },
+                "required": [
+                  "audience"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Audience saved.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "id"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Review confirmation required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Admin only",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such household companion",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Companion is in use",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/companions/{id}/status": {
+      "put": {
+        "tags": [
+          "Companions"
+        ],
+        "summary": "Set companion status",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "hc-companion"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "status": {
+                    "type": "string",
+                    "enum": [
+                      "draft",
+                      "ready"
+                    ]
+                  }
+                },
+                "required": [
+                  "status"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Status saved.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "id"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Identity or Voice fields are missing",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Only the author or an admin can change status",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such household companion",
             "content": {
               "application/json": {
                 "schema": {
