@@ -199,3 +199,27 @@ describe("a robot's voice (robot.voice.id)", () => {
     expect(voiceForSpeech({ actor: poppy })).toBe("default");
   });
 });
+
+describe("Home's default voice (tts.home_voice)", () => {
+  test("only an admin sets it; a person with no voice of their own, and a robot with none, speak it; a child never gets a clip voice from it", async () => {
+    const h = await household();
+    const made = (await (await makeVoice(h.owner, { label: "Cutey", temperature: "1.05" })).json()) as { id: string };
+    expect((await h.adult.client.put("/api/settings", { scope: "household", key: "tts.home_voice", value: made.id })).status).toBe(403);
+    expect((await h.admin.client.put("/api/settings", { scope: "household", key: "tts.home_voice", value: made.id })).status).toBe(200);
+    const adult = db.select().from(people).where(eq(people.id, h.adult.id)).get()!;
+    expect(voiceForSpeech({ actor: adult })).toBe(made.id);
+    const child = db.select().from(people).where(eq(people.id, h.child.id)).get()!;
+    expect(voiceForSpeech({ actor: child })).toBe("default");
+    // A person's own choice still wins over the home default.
+    const { setPersonTtsVoiceUnchecked } = await import("@/lib/settings");
+    setPersonTtsVoiceUnchecked(adult, "vera");
+    expect(voiceForSpeech({ actor: adult })).toBe("vera");
+  });
+
+  test("the engine's built-in voice can be the home default; a child speaks the engine default", async () => {
+    const h = await household();
+    expect((await h.owner.put("/api/settings", { scope: "household", key: "tts.home_voice", value: "chatterbox-turbo-voice-default" })).status).toBe(200);
+    const child = db.select().from(people).where(eq(people.id, h.child.id)).get()!;
+    expect(voiceForSpeech({ actor: child })).toBe("default");
+  });
+});
