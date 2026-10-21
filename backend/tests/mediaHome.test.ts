@@ -7,6 +7,10 @@ import { resetDb } from "./reset-db";
 import { scanRoot } from "@/lib/media/scan";
 import { __resetProgressForTests, flushProgress } from "@/lib/media/progress";
 import { buildMediaTree } from "./support/mediaTree";
+import { safely } from "@/routes/mediaHome";
+import { db } from "@/db";
+import { mediaItems } from "@/db/schema";
+import { eq } from "drizzle-orm";
 
 beforeEach(() => {
   resetDb();
@@ -46,6 +50,33 @@ describe("media home", () => {
   test("a signed-out visitor is refused", async () => {
     await setup();
     expect((await new TestClient().get("/api/media/home")).status).toBe(401);
+  });
+
+  test("safely: the list when the builder answers, and [] (with a warning) when it throws", () => {
+    const warnings: string[][] = [];
+    const originalWarn = console.warn;
+    console.warn = (...args: unknown[]) => warnings.push(args.map(String));
+    try {
+      expect(safely<number>("ok", () => [1, 2, 3])).toEqual([1, 2, 3]);
+      expect(safely("continue", () => { throw new Error("a broken row"); })).toEqual([]);
+      expect(warnings).toEqual([["[media.home] shelf failed:", "continue", "a broken row"]]);
+    } finally {
+      console.warn = originalWarn;
+    }
+  });
+
+  test("a row that no longer parses is left out and the page still answers with the rest", async () => {
+    const { owner, find } = await setup();
+    const film = await find(owner, "kind=film&q=moon");
+    db.update(mediaItems).set({ locatorKind: "not-a-kind" }).where(eq(mediaItems.id, film)).run();
+    const res = await owner.get("/api/media/home");
+    expect(res.status).toBe(200);
+    const shelves = (await res.json()) as Home;
+    expect(shelves.continue).toEqual([]);
+    expect(shelves.recent_music).toEqual([]);
+    expect(shelves.new.length).toBeGreaterThan(0);
+    expect(shelves.new.map((row) => row.id)).not.toContain(film);
+    expect(new Set(shelves.new.map((row) => row.app)).size).toBeGreaterThanOrEqual(2);
   });
 
   test("new: the owner sees additions from at least two apps, newest first", async () => {

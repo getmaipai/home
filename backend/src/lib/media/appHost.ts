@@ -144,7 +144,14 @@ export function queryItems(person: PersonRow, appId: MediaAppId, filter: ItemFil
   const rows = db.select().from(mediaItems).where(and(...conditions)).orderBy(...(filter.order ?? [desc(mediaItems.addedAt)])).limit(filter.all ? -1 : limit * 2 + 2).all();
   const items: MediaItem[] = [];
   for (const row of rows) {
-    const item = itemFromRow(row);
+    // A stored row that no longer parses is left out and logged: one bad row never fails every shelf of every media app.
+    let item: MediaItem;
+    try {
+      item = itemFromRow(row);
+    } catch (error) {
+      console.warn("[media] skipped a row that no longer parses:", row.id, error instanceof Error ? error.message.slice(0, 200) : String(error));
+      continue;
+    }
     if (bandAllows(person, item) && (appId !== "shows" || showWordsAllowed(person, item))) items.push(item);
     if (!filter.all && items.length >= limit) break;
   }

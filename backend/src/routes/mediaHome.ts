@@ -45,48 +45,66 @@ const RowSchema = z.object({
   at: z.string().describe("When the person last touched it (continue, recent music) or when it was added (new), ISO."),
 });
 
+/** A shelf builds alone: a thrown error hides the shelf (and logs a warning) and never fails the page. */
+export function safely<T>(label: string, build: () => T[]): T[] {
+  try {
+    return build();
+  } catch (error) {
+    console.warn("[media.home] shelf failed:", label, error instanceof Error ? error.message : String(error));
+    return [];
+  }
+}
+
 function homeFor(person: PersonRow): { continue: Row[]; new: Row[]; recent_music: Row[] } {
   // Continue: the Pick up logic, minus the shelf's budget, mapped onto an app.
-  const continueRows = mediaContinueRows(person, 12)
-    .map((row): Row | null => {
-      const app = appForKind(row.media_kind);
-      if (!app) return null;
-      return {
-        id: row.id, app, kind: row.media_kind ?? "media", title: row.title, subtitle: row.subtitle,
-        artwork_url: row.artwork_url, href: row.href, percent: row.percent, at: row.at,
-      };
-    })
-    .filter((row): row is Row => row !== null);
+  const continueRows = safely("continue", () =>
+    mediaContinueRows(person, 12)
+      .map((row): Row | null => {
+        const app = appForKind(row.media_kind);
+        if (!app) return null;
+        return {
+          id: row.id, app, kind: row.media_kind ?? "media", title: row.title, subtitle: row.subtitle,
+          artwork_url: row.artwork_url, href: row.href, percent: row.percent, at: row.at,
+        };
+      })
+      .filter((row): row is Row => row !== null),
+  );
 
   // New: a handful per app, merged and ordered by when the item joined the library.
-  const fresh: Row[] = [];
-  for (const appId of MEDIA_APP_IDS) {
-    for (const item of queryItems(person, appId, { limit: 6 })) {
-      fresh.push({
-        id: item.id, app: appId, kind: item.kind, title: item.title, subtitle: item.subtitle ?? null,
-        artwork_url: item.artwork ? `/api/media/items/${encodeURIComponent(item.id)}/artwork` : null, href: `/media/${encodeURIComponent(item.id)}`,
-        percent: null, at: item.added_at,
-      });
+  const fresh = safely("new", () => {
+    const rows: Row[] = [];
+    for (const appId of MEDIA_APP_IDS) {
+      for (const item of safely(`new:${appId}`, () => queryItems(person, appId, { limit: 6 }))) {
+        rows.push({
+          id: item.id, app: appId, kind: item.kind, title: item.title, subtitle: item.subtitle ?? null,
+          artwork_url: item.artwork ? `/api/media/items/${encodeURIComponent(item.id)}/artwork` : null, href: `/media/${encodeURIComponent(item.id)}`,
+          percent: null, at: item.added_at,
+        });
+      }
     }
-  }
-  fresh.sort((a, b) => b.at.localeCompare(a.at));
+    rows.sort((a, b) => b.at.localeCompare(a.at));
+    return rows.slice(0, 12);
+  });
 
   // Recent music: songs the person played lately, newest first, each once.
-  const seen = new Set<string>();
-  const music: Row[] = [];
-  for (const progress of recentProgress(person.id, 100)) {
-    const item = readableItem(person, progress.media_id);
-    if (!item || item.kind !== "track" || seen.has(item.id)) continue;
-    seen.add(item.id);
-    music.push({
-      id: item.id, app: "music", kind: "track", title: item.title, subtitle: item.subtitle ?? null,
-      artwork_url: item.artwork ? `/api/media/items/${encodeURIComponent(item.id)}/artwork` : null, href: `/media/${encodeURIComponent(item.id)}`,
-      percent: null, at: progress.updated_at,
-    });
-    if (music.length >= 8) break;
-  }
+  const music = safely("recent_music", () => {
+    const seen = new Set<string>();
+    const rows: Row[] = [];
+    for (const progress of recentProgress(person.id, 100)) {
+      const item = readableItem(person, progress.media_id);
+      if (!item || item.kind !== "track" || seen.has(item.id)) continue;
+      seen.add(item.id);
+      rows.push({
+        id: item.id, app: "music", kind: "track", title: item.title, subtitle: item.subtitle ?? null,
+        artwork_url: item.artwork ? `/api/media/items/${encodeURIComponent(item.id)}/artwork` : null, href: `/media/${encodeURIComponent(item.id)}`,
+        percent: null, at: progress.updated_at,
+      });
+      if (rows.length >= 8) break;
+    }
+    return rows;
+  });
 
-  return { continue: continueRows, new: fresh.slice(0, 12), recent_music: music };
+  return { continue: continueRows, new: fresh, recent_music: music };
 }
 
 const route = createRoute({
