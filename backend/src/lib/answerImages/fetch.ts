@@ -4,6 +4,7 @@ import { filterAnswerImages, type QualityResult, type ValidatedAnswerImage } fro
 import { warmGeometry } from "@/lib/imageSimilarity";
 import { ANSWER_IMAGES_MAX_CANDIDATES } from "./gallery";
 import { HOME_USER_AGENT } from "@/lib/outbound";
+import { kiwixBaseUrl } from "@/lib/kiwixSidecar";
 
 const MAX_BYTES = 8 * 1024 * 1024;
 const SET_DEADLINE_MS = 2_500;
@@ -26,6 +27,33 @@ function quiet(host: string, until: number, now: number): void {
 }
 
 export type AnswerImageSource = { id: string; url: string; leadImage?: boolean };
+/** ZIM-IMG-01: the one URL shape for a picture that lives in the household's
+ * installed reference library rather than on the open web. The book is the
+ * ZIM file's own id; imagePath is the picture's path inside the book. */
+export function libraryImageUrl(book: string, imagePath: string): string {
+  return "library:" + encodeURIComponent(book) + "/" + imagePath.split("/").map(encodeURIComponent).join("/");
+}
+/** The inverse of libraryImageUrl: null unless the string really is one -
+ * a non-empty book without a "/", an imagePath whose decoded segments are
+ * all non-empty and none of them "." or "..". */
+export function parseLibraryImageUrl(url: string): { book: string; imagePath: string } | null {
+  if (!url.startsWith("library:")) return null;
+  const rest = url.slice("library:".length);
+  const slash = rest.indexOf("/");
+  if (slash <= 0) return null;
+  let book: string;
+  try { book = decodeURIComponent(rest.slice(0, slash)); } catch { return null; }
+  if (!book || book.includes("/")) return null;
+  const segments: string[] = [];
+  for (const segment of rest.slice(slash + 1).split("/")) {
+    let decoded: string;
+    try { decoded = decodeURIComponent(segment); } catch { return null; }
+    if (!decoded || decoded === ".." || decoded === ".") return null;
+    segments.push(decoded);
+  }
+  if (segments.length === 0) return null;
+  return { book, imagePath: segments.join("/") };
+}
 export type AnswerImageFetchResult = { images: ValidatedAnswerImage[]; originals: Record<string, string>; dropped_by_fetch: Record<string, number>; dropped_by_quality: Record<string, number>; duplicate_check?: QualityResult["duplicates"] };
 /** `deadlineAt` (ms, the same clock as `now`): the caller's own end for the
  * set when it comes before the set's 2.5 s (the turn's picture budget minus
@@ -68,10 +96,49 @@ async function readLimited(response: Response, limit: number, signal: AbortSigna
  * over; any other fetcher, injected or swapped in, is validated per hop. */
 const platformFetch = globalThis.fetch;
 
+/** ZIM-IMG-01: the `library:` leg of fetchOne - one request to the
+ * household's own kiwix-serve (`/raw/<book>/<path>`), nothing more. The
+ * sidecar is loopback and pinned, so this path never re-runs the web
+ * guards (validateUrl, the host limiter, quiet, guardedFetch); a missing
+ * sidecar or any failure drops the picture as library_unavailable. */
+async function fetchLibrary(library: { book: string; imagePath: string }, source: AnswerImageSource, options: Options, deadline: number, dropped: Record<string, number>): Promise<{ id: string; bytes: Uint8Array; contentType: string; host: string } | null> {
+  const fetcher = options.fetch ?? fetch;
+  const now = options.now ?? Date.now;
+  const base = kiwixBaseUrl();
+  if (!base) { dropped.library_unavailable = (dropped.library_unavailable ?? 0) + 1; return null; }
+  const controller = new AbortController();
+  let timedOut = false;
+  const timer = setTimeout(() => { timedOut = true; controller.abort(); }, Math.min(1_200, deadline - now()));
+  try {
+    const url = `${base.replace(/\/+$/, "")}/raw/${encodeURIComponent(library.book)}/${library.imagePath.split("/").map(encodeURIComponent).join("/")}`;
+    const response = await fetcher(url, {
+      method: "GET", redirect: "manual", signal: controller.signal,
+      headers: { "User-Agent": HOME_USER_AGENT, Accept: "image/avif,image/webp,image/jpeg,image/png" },
+      credentials: "omit", referrerPolicy: "no-referrer",
+    });
+    if (response.status !== 200) return null;
+    const contentType = (response.headers.get("content-type") ?? "").split(";")[0]!.trim().toLowerCase();
+    if (!new Set(["image/jpeg", "image/png", "image/webp", "image/avif"]).has(contentType)) return null;
+    const declaredLength = Number(response.headers.get("content-length"));
+    if (Number.isFinite(declaredLength) && declaredLength > MAX_BYTES) { dropped.size_limit = (dropped.size_limit ?? 0) + 1; return null; }
+    const bytes = await readLimited(response, MAX_BYTES, controller.signal);
+    if (!bytes) {
+      if (!timedOut) dropped.size_limit = (dropped.size_limit ?? 0) + 1;
+      return null;
+    }
+    return { id: source.id, bytes, contentType, host: "library" };
+  } catch {
+    dropped.library_unavailable = (dropped.library_unavailable ?? 0) + 1;
+    return null;
+  } finally { clearTimeout(timer); }
+}
+
 async function fetchOne(source: AnswerImageSource, options: Options, deadline: number, dropped: Record<string, number>): Promise<{ id: string; bytes: Uint8Array; contentType: string; host: string } | null> {
   const fetcher = options.fetch ?? fetch;
   const pinned = fetcher === platformFetch;
   const now = options.now ?? Date.now;
+  const library = parseLibraryImageUrl(source.url);
+  if (library) return fetchLibrary(library, source, options, deadline, dropped);
   let original: URL;
   try { original = new URL(source.url); if (!pinned) await validateUrl(original, options.dnsLookup); }
   catch (error) { const key = error instanceof SsrfBlockedError ? "ssrf" : "invalid_url"; dropped[key] = (dropped[key] ?? 0) + 1; return null; }

@@ -23,8 +23,9 @@ type StateFile = { jobs: ReferenceJob[]; order: string[]; selection: Selection; 
 const statePath = () => join(referenceLibraryDir(), ".reference-jobs.json");
 const knownSources = new Set(["vikidia", "wikipedia-simple", "wikipedia-en", "wiktionary-simple", "wiktionary-en", "wikivoyage", "wikibooks", "world-factbook", "medlineplus", "stackexchange"]);
 const sourceMap: Record<string, { book: string; language: string; flavor: string }> = {
-  vikidia: { book: "vikidia", language: "eng", flavor: "nopic" },
-  "wikipedia-simple": { book: "wikipedia", language: "eng", flavor: "nopic" },
+  // ZIM-IMG-01: picture builds, so answers can show the library's own pictures (Vikidia maxi 0.08 GB, Simple Wikipedia maxi 3.1 GB).
+  vikidia: { book: "vikidia", language: "eng", flavor: "maxi" },
+  "wikipedia-simple": { book: "wikipedia", language: "eng", flavor: "maxi" },
   "wikipedia-en": { book: "wikipedia", language: "eng", flavor: "mini" },
   "wiktionary-simple": { book: "wiktionary", language: "eng", flavor: "nopic" },
   "wiktionary-en": { book: "wiktionary", language: "eng", flavor: "maxi" },
