@@ -322,8 +322,33 @@ const stackStandIn = Bun.serve({
       }
       // RECENCY-01: MAIPAI_AB_MODEL asks the Stack for one installed chat model by id instead of the active one.
       let sentBody = bodyText;
-      if (path === "/v1/chat/completions" && process.env.MAIPAI_AB_MODEL) {
-        try { sentBody = JSON.stringify({ ...(JSON.parse(bodyText) as Record<string, unknown>), model: process.env.MAIPAI_AB_MODEL }); } catch { /* not JSON: forwarded as is */ }
+      if (path === "/v1/chat/completions" && (process.env.MAIPAI_AB_MODEL || process.env.MAIPAI_AB_PATCH)) {
+        try {
+          const parsed = JSON.parse(bodyText) as Record<string, unknown> & { messages?: { role: string; content: unknown }[]; chat_template_kwargs?: Record<string, unknown>; stream?: boolean };
+          if (process.env.MAIPAI_AB_MODEL) parsed.model = process.env.MAIPAI_AB_MODEL;
+          // RECENCY-02: MAIPAI_AB_PATCH changes one request lever at a time so a configuration is measured through the real turn path:
+          // body (merged into the request), kwargs (merged into chat_template_kwargs), userSuffix / systemSuffix (text appended to the
+          // last user / first system message), decisionOnly (a round after a tool result gets a canned reply and the first round is capped,
+          // so only the tool decision is read; timings of such a run are not valid).
+          const patch = process.env.MAIPAI_AB_PATCH ? (JSON.parse(process.env.MAIPAI_AB_PATCH) as { body?: Record<string, unknown>; kwargs?: Record<string, unknown>; userSuffix?: string; systemSuffix?: string; decisionOnly?: boolean; capTokens?: number }) : {};
+          if (!parsed.messages?.some((m) => m.role === "tool") || !patch.decisionOnly) {
+            Object.assign(parsed, patch.body ?? {});
+            if (patch.kwargs) parsed.chat_template_kwargs = { ...(parsed.chat_template_kwargs ?? {}), ...patch.kwargs };
+            const messages = parsed.messages ?? [];
+            const lastUser = [...messages].reverse().find((m) => m.role === "user");
+            if (patch.userSuffix && lastUser && typeof lastUser.content === "string") lastUser.content = `${lastUser.content}\n\n${patch.userSuffix}`;
+            const firstSystem = messages.find((m) => m.role === "system");
+            if (patch.systemSuffix && firstSystem && typeof firstSystem.content === "string") firstSystem.content = `${firstSystem.content}\n\n${patch.systemSuffix}`;
+            if (patch.decisionOnly && !parsed.response_format) parsed.max_tokens = Math.min(Number(parsed.max_tokens ?? 400), patch.capTokens ?? 300);
+          } else {
+            const created = Math.floor(Date.now() / 1000);
+            const chunk = (delta: Record<string, unknown>, finish: string | null) => `data: ${JSON.stringify({ id: "decision-only", object: "chat.completion.chunk", created, model: "decision-only", choices: [{ index: 0, delta, finish_reason: finish }] })}\n\n`;
+            const sse = chunk({ role: "assistant", content: "Checked." }, null) + chunk({}, "stop") + `data: ${JSON.stringify({ id: "decision-only", object: "chat.completion.chunk", created, model: "decision-only", choices: [], usage: { prompt_tokens: 1, completion_tokens: 1, total_tokens: 2 } })}\n\ndata: [DONE]\n\n`;
+            if (parsed.stream) return new Response(sse, { headers: { "content-type": "text/event-stream", ...engineHeaders } });
+            return Response.json({ id: "decision-only", object: "chat.completion", created, model: "decision-only", choices: [{ index: 0, message: { role: "assistant", content: "Checked." }, finish_reason: "stop" }], usage: { prompt_tokens: 1, completion_tokens: 1, total_tokens: 2 } }, { headers: engineHeaders });
+          }
+          sentBody = JSON.stringify(parsed);
+        } catch { /* not JSON: forwarded as is */ }
       }
       const upstream = await fetch(`${target.replace(/\/$/, "")}${path}`, { method: "POST", headers: { "content-type": "application/json" }, body: sentBody, signal: req.signal });
       if (process.env.MAIPAI_AB_TRACE === "1") console.log(`[stand-in] ${path} headers after ${Math.round(performance.now() - sentAt)} ms, status ${upstream.status}`);
@@ -503,12 +528,15 @@ async function runPipeline(id: string, prompts: string[]): Promise<{ turns: Omit
       homeAssistant,
       beforeTurn: async () => {
         // A person's pace: at least 30 s between any two turns that searched.
-        const since = Date.now() - tee.lastSearchAt;
-        if (tee.lastSearchAt > 0 && since < SEARCH_PACE_MS) {
-          stamp.waited += SEARCH_PACE_MS - since;
-          await new Promise((r) => setTimeout(r, SEARCH_PACE_MS - since));
+        // RECENCY-02: fixture search has no engine to protect, so no pace and no wait for a quiet hub.
+        if (!fixtureSearch) {
+          const since = Date.now() - tee.lastSearchAt;
+          if (tee.lastSearchAt > 0 && since < SEARCH_PACE_MS) {
+            stamp.waited += SEARCH_PACE_MS - since;
+            await new Promise((r) => setTimeout(r, SEARCH_PACE_MS - since));
+          }
+          await waitForHubQuiet(undefined, (m) => console.log(m));
         }
-        await waitForHubQuiet(undefined, (m) => console.log(m));
         markers.push(tee.queries.length);
       },
     },
@@ -599,6 +627,8 @@ async function streamTurn(actor: { id: string; role?: string }, surface: "chat" 
 }
 
 async function pacedBeforeSearchTurn(): Promise<void> {
+  // RECENCY-02: the pace protects a real search engine from a burst; fixture search has nothing to protect.
+  if (fixtureSearch) return;
   const since = Date.now() - tee.lastSearchAt;
   if (tee.lastSearchAt > 0 && since < SEARCH_PACE_MS) await new Promise((r) => setTimeout(r, SEARCH_PACE_MS - since));
   await waitForHubQuiet(undefined, (m) => console.log(m));

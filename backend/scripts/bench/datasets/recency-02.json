@@ -1,0 +1,649 @@
+{
+ "note": "RECENCY-02: the live phrasing ('i heard ... today', 'is it true that', 'did ... happen'), news-style claims, sports and weather, four show-me prompts and twelve that must not search. Used with MAIPAI_AB_FRESH_DATASET.",
+ "fresh": {
+  "items": [
+   {
+    "id": "fresh-rd-01",
+    "prompt": "i heard a new poster for dune 3 released today",
+    "kind": "time-sensitive",
+    "acceptable_tools": [
+     "websearch"
+    ],
+    "gold": "must",
+    "family": "recency"
+   },
+   {
+    "id": "fresh-rd-02",
+    "prompt": "i heard the new trailer for the next avatar movie dropped today",
+    "kind": "time-sensitive",
+    "acceptable_tools": [
+     "websearch"
+    ],
+    "gold": "must",
+    "family": "recency"
+   },
+   {
+    "id": "fresh-rd-03",
+    "prompt": "i heard apple released a new macbook today",
+    "kind": "time-sensitive",
+    "acceptable_tools": [
+     "websearch"
+    ],
+    "gold": "must",
+    "family": "recency"
+   },
+   {
+    "id": "fresh-rd-04",
+    "prompt": "i heard a new season of stranger things was announced today",
+    "kind": "time-sensitive",
+    "acceptable_tools": [
+     "websearch"
+    ],
+    "gold": "must",
+    "family": "recency"
+   },
+   {
+    "id": "fresh-rd-05",
+    "prompt": "i heard they released a new pokemon game today",
+    "kind": "time-sensitive",
+    "acceptable_tools": [
+     "websearch"
+    ],
+    "gold": "must",
+    "family": "recency"
+   },
+   {
+    "id": "fresh-rd-06",
+    "prompt": "i heard taylor swift announced a tour today",
+    "kind": "time-sensitive",
+    "acceptable_tools": [
+     "websearch"
+    ],
+    "gold": "must",
+    "family": "recency"
+   },
+   {
+    "id": "fresh-rd-07",
+    "prompt": "i heard a new version of ios came out today",
+    "kind": "time-sensitive",
+    "acceptable_tools": [
+     "websearch"
+    ],
+    "gold": "must",
+    "family": "recency"
+   },
+   {
+    "id": "fresh-rd-08",
+    "prompt": "i heard the new batman movie got a release date today",
+    "kind": "time-sensitive",
+    "acceptable_tools": [
+     "websearch"
+    ],
+    "gold": "must",
+    "family": "recency"
+   },
+   {
+    "id": "fresh-rd-09",
+    "prompt": "i think the new star wars trailer just came out",
+    "kind": "time-sensitive",
+    "acceptable_tools": [
+     "websearch"
+    ],
+    "gold": "must",
+    "family": "recency"
+   },
+   {
+    "id": "fresh-rd-10",
+    "prompt": "i think nintendo just announced a new console",
+    "kind": "time-sensitive",
+    "acceptable_tools": [
+     "websearch"
+    ],
+    "gold": "must",
+    "family": "recency"
+   },
+   {
+    "id": "fresh-rd-11",
+    "prompt": "i think spacex launched another rocket today",
+    "kind": "time-sensitive",
+    "acceptable_tools": [
+     "websearch"
+    ],
+    "gold": "must",
+    "family": "recency"
+   },
+   {
+    "id": "fresh-rd-12",
+    "prompt": "i think the fed just changed interest rates",
+    "kind": "time-sensitive",
+    "acceptable_tools": [
+     "websearch"
+    ],
+    "gold": "must",
+    "family": "recency"
+   },
+   {
+    "id": "fresh-rd-13",
+    "prompt": "is it true that apple announced a new iphone this week",
+    "kind": "time-sensitive",
+    "acceptable_tools": [
+     "websearch"
+    ],
+    "gold": "must",
+    "family": "recency"
+   },
+   {
+    "id": "fresh-rd-14",
+    "prompt": "is it true that netflix raised its prices again",
+    "kind": "time-sensitive",
+    "acceptable_tools": [
+     "websearch"
+    ],
+    "gold": "must",
+    "family": "recency"
+   },
+   {
+    "id": "fresh-rd-15",
+    "prompt": "is it true that a big earthquake hit japan today",
+    "kind": "time-sensitive",
+    "acceptable_tools": [
+     "websearch"
+    ],
+    "gold": "must",
+    "family": "recency"
+   },
+   {
+    "id": "fresh-rd-16",
+    "prompt": "is it true that the lakers made a trade yesterday",
+    "kind": "time-sensitive",
+    "acceptable_tools": [
+     "websearch"
+    ],
+    "gold": "must",
+    "family": "recency"
+   },
+   {
+    "id": "fresh-rd-17",
+    "prompt": "is it true that tesla stock crashed today",
+    "kind": "time-sensitive",
+    "acceptable_tools": [
+     "websearch"
+    ],
+    "gold": "must",
+    "family": "recency"
+   },
+   {
+    "id": "fresh-rd-18",
+    "prompt": "is it true that google released a new pixel phone this week",
+    "kind": "time-sensitive",
+    "acceptable_tools": [
+     "websearch"
+    ],
+    "gold": "must",
+    "family": "recency"
+   },
+   {
+    "id": "fresh-rd-19",
+    "prompt": "did the new season of the bear come out yet",
+    "kind": "time-sensitive",
+    "acceptable_tools": [
+     "websearch"
+    ],
+    "gold": "must",
+    "family": "recency"
+   },
+   {
+    "id": "fresh-rd-20",
+    "prompt": "did the yankees win last night",
+    "kind": "time-sensitive",
+    "acceptable_tools": [
+     "websearch"
+    ],
+    "gold": "must",
+    "family": "recency"
+   },
+   {
+    "id": "fresh-rd-21",
+    "prompt": "did anything big happen in the news today",
+    "kind": "time-sensitive",
+    "acceptable_tools": [
+     "websearch"
+    ],
+    "gold": "must",
+    "family": "recency"
+   },
+   {
+    "id": "fresh-rd-22",
+    "prompt": "did openai release a new model this week",
+    "kind": "time-sensitive",
+    "acceptable_tools": [
+     "websearch"
+    ],
+    "gold": "must",
+    "family": "recency"
+   },
+   {
+    "id": "fresh-rd-23",
+    "prompt": "did the new zelda game get a release date",
+    "kind": "time-sensitive",
+    "acceptable_tools": [
+     "websearch"
+    ],
+    "gold": "must",
+    "family": "recency"
+   },
+   {
+    "id": "fresh-rd-24",
+    "prompt": "did the price of gas go up this week",
+    "kind": "time-sensitive",
+    "acceptable_tools": [
+     "websearch"
+    ],
+    "gold": "must",
+    "family": "recency"
+   },
+   {
+    "id": "fresh-rd-25",
+    "prompt": "my friend said a new avengers movie was announced today, is that right",
+    "kind": "time-sensitive",
+    "acceptable_tools": [
+     "websearch"
+    ],
+    "gold": "must",
+    "family": "recency"
+   },
+   {
+    "id": "fresh-rd-26",
+    "prompt": "my brother told me bitcoin hit a record high today",
+    "kind": "time-sensitive",
+    "acceptable_tools": [
+     "websearch"
+    ],
+    "gold": "must",
+    "family": "recency"
+   },
+   {
+    "id": "fresh-rd-27",
+    "prompt": "my coworker says there was a big storm in florida last night",
+    "kind": "time-sensitive",
+    "acceptable_tools": [
+     "websearch"
+    ],
+    "gold": "must",
+    "family": "recency"
+   },
+   {
+    "id": "fresh-rd-28",
+    "prompt": "apparently the government is shutting down again, is that true",
+    "kind": "time-sensitive",
+    "acceptable_tools": [
+     "websearch"
+    ],
+    "gold": "must",
+    "family": "recency"
+   },
+   {
+    "id": "fresh-rd-29",
+    "prompt": "just saw that a new iphone leak went around today",
+    "kind": "time-sensitive",
+    "acceptable_tools": [
+     "websearch"
+    ],
+    "gold": "must",
+    "family": "recency"
+   },
+   {
+    "id": "fresh-rd-30",
+    "prompt": "just read that the new spider-man movie trailer is out",
+    "kind": "time-sensitive",
+    "acceptable_tools": [
+     "websearch"
+    ],
+    "gold": "must",
+    "family": "recency"
+   },
+   {
+    "id": "fresh-rd-31",
+    "prompt": "heard there was a huge sale announced by amazon today",
+    "kind": "time-sensitive",
+    "acceptable_tools": [
+     "websearch"
+    ],
+    "gold": "must",
+    "family": "recency"
+   },
+   {
+    "id": "fresh-rd-32",
+    "prompt": "saw something about a new harry potter series trailer this morning",
+    "kind": "time-sensitive",
+    "acceptable_tools": [
+     "websearch"
+    ],
+    "gold": "must",
+    "family": "recency"
+   },
+   {
+    "id": "fresh-rd-33",
+    "prompt": "the new dune movie poster came out today, right",
+    "kind": "time-sensitive",
+    "acceptable_tools": [
+     "websearch"
+    ],
+    "gold": "must",
+    "family": "recency"
+   },
+   {
+    "id": "fresh-rd-34",
+    "prompt": "new episode of the simpsons aired last night, right",
+    "kind": "time-sensitive",
+    "acceptable_tools": [
+     "websearch"
+    ],
+    "gold": "must",
+    "family": "recency"
+   },
+   {
+    "id": "fresh-rd-35",
+    "prompt": "the new playstation was announced this week, right",
+    "kind": "time-sensitive",
+    "acceptable_tools": [
+     "websearch"
+    ],
+    "gold": "must",
+    "family": "recency"
+   },
+   {
+    "id": "fresh-rd-36",
+    "prompt": "the oscars nominations came out today, right",
+    "kind": "time-sensitive",
+    "acceptable_tools": [
+     "websearch"
+    ],
+    "gold": "must",
+    "family": "recency"
+   },
+   {
+    "id": "fresh-rd-37",
+    "prompt": "what's the latest on the government shutdown",
+    "kind": "time-sensitive",
+    "acceptable_tools": [
+     "websearch"
+    ],
+    "gold": "must",
+    "family": "recency"
+   },
+   {
+    "id": "fresh-rd-38",
+    "prompt": "what's the latest news about spacex",
+    "kind": "time-sensitive",
+    "acceptable_tools": [
+     "websearch"
+    ],
+    "gold": "must",
+    "family": "recency"
+   },
+   {
+    "id": "fresh-rd-39",
+    "prompt": "what's happening in the news today",
+    "kind": "time-sensitive",
+    "acceptable_tools": [
+     "websearch"
+    ],
+    "gold": "must",
+    "family": "recency"
+   },
+   {
+    "id": "fresh-rd-40",
+    "prompt": "what's the score of the yankees game right now",
+    "kind": "time-sensitive",
+    "acceptable_tools": [
+     "websearch"
+    ],
+    "gold": "must",
+    "family": "recency"
+   },
+   {
+    "id": "fresh-rd-41",
+    "prompt": "who won the game last night",
+    "kind": "time-sensitive",
+    "acceptable_tools": [
+     "websearch"
+    ],
+    "gold": "must",
+    "family": "recency"
+   },
+   {
+    "id": "fresh-rd-42",
+    "prompt": "what's the weather in boston tomorrow",
+    "kind": "time-sensitive",
+    "acceptable_tools": [
+     "websearch",
+     "weather"
+    ],
+    "gold": "must",
+    "family": "recency"
+   },
+   {
+    "id": "fresh-rd-43",
+    "prompt": "is it going to rain this weekend in seattle",
+    "kind": "time-sensitive",
+    "acceptable_tools": [
+     "websearch",
+     "weather"
+    ],
+    "gold": "must",
+    "family": "recency"
+   },
+   {
+    "id": "fresh-rd-44",
+    "prompt": "what's the price of bitcoin right now",
+    "kind": "time-sensitive",
+    "acceptable_tools": [
+     "websearch"
+    ],
+    "gold": "must",
+    "family": "recency"
+   },
+   {
+    "id": "fresh-rd-45",
+    "prompt": "any news on the new taylor swift album this week",
+    "kind": "time-sensitive",
+    "acceptable_tools": [
+     "websearch"
+    ],
+    "gold": "must",
+    "family": "recency"
+   },
+   {
+    "id": "fresh-rd-46",
+    "prompt": "has the new season of the bear dropped",
+    "kind": "time-sensitive",
+    "acceptable_tools": [
+     "websearch"
+    ],
+    "gold": "must",
+    "family": "recency"
+   },
+   {
+    "id": "fresh-rd-47",
+    "prompt": "what's trending today",
+    "kind": "time-sensitive",
+    "acceptable_tools": [
+     "websearch"
+    ],
+    "gold": "must",
+    "family": "recency"
+   },
+   {
+    "id": "fresh-rd-48",
+    "prompt": "when does the new zelda game come out",
+    "kind": "time-sensitive",
+    "acceptable_tools": [
+     "websearch"
+    ],
+    "gold": "must",
+    "family": "recency"
+   },
+   {
+    "id": "fresh-rs-01",
+    "prompt": "show me the official poster for Dune Part Three",
+    "kind": "time-sensitive",
+    "acceptable_tools": [
+     "show_images"
+    ],
+    "gold": "must",
+    "family": "show-me"
+   },
+   {
+    "id": "fresh-rs-02",
+    "prompt": "show me the Golden Gate Bridge",
+    "kind": "time-sensitive",
+    "acceptable_tools": [
+     "show_images"
+    ],
+    "gold": "must",
+    "family": "show-me"
+   },
+   {
+    "id": "fresh-rs-03",
+    "prompt": "show me what a pangolin looks like",
+    "kind": "time-sensitive",
+    "acceptable_tools": [
+     "show_images"
+    ],
+    "gold": "must",
+    "family": "show-me"
+   },
+   {
+    "id": "fresh-rs-04",
+    "prompt": "show me a picture of the newest iPhone",
+    "kind": "time-sensitive",
+    "acceptable_tools": [
+     "show_images"
+    ],
+    "gold": "must",
+    "family": "show-me"
+   },
+   {
+    "id": "fresh-rn-01",
+    "prompt": "what is the capital of peru",
+    "kind": "timeless",
+    "acceptable_tools": [
+     "websearch"
+    ],
+    "gold": "must_not",
+    "family": "recency-negative"
+   },
+   {
+    "id": "fresh-rn-02",
+    "prompt": "how do you make pancakes",
+    "kind": "timeless",
+    "acceptable_tools": [
+     "websearch"
+    ],
+    "gold": "must_not",
+    "family": "recency-negative"
+   },
+   {
+    "id": "fresh-rn-03",
+    "prompt": "explain how vaccines work",
+    "kind": "timeless",
+    "acceptable_tools": [
+     "websearch"
+    ],
+    "gold": "must_not",
+    "family": "recency-negative"
+   },
+   {
+    "id": "fresh-rn-04",
+    "prompt": "what rhymes with blue",
+    "kind": "timeless",
+    "acceptable_tools": [
+     "websearch"
+    ],
+    "gold": "must_not",
+    "family": "recency-negative"
+   },
+   {
+    "id": "fresh-rn-05",
+    "prompt": "help me write a thank you note to my aunt",
+    "kind": "timeless",
+    "acceptable_tools": [
+     "websearch"
+    ],
+    "gold": "must_not",
+    "family": "recency-negative"
+   },
+   {
+    "id": "fresh-rn-06",
+    "prompt": "what is 18 percent of 250",
+    "kind": "timeless",
+    "acceptable_tools": [
+     "websearch"
+    ],
+    "gold": "must_not",
+    "family": "recency-negative"
+   },
+   {
+    "id": "fresh-rn-07",
+    "prompt": "who wrote moby dick",
+    "kind": "timeless",
+    "acceptable_tools": [
+     "websearch"
+    ],
+    "gold": "must_not",
+    "family": "recency-negative"
+   },
+   {
+    "id": "fresh-rn-08",
+    "prompt": "what's the difference between weather and climate",
+    "kind": "timeless",
+    "acceptable_tools": [
+     "websearch"
+    ],
+    "gold": "must_not",
+    "family": "recency-negative"
+   },
+   {
+    "id": "fresh-rn-09",
+    "prompt": "tell me a bedtime story about a dragon",
+    "kind": "timeless",
+    "acceptable_tools": [
+     "websearch"
+    ],
+    "gold": "must_not",
+    "family": "recency-negative"
+   },
+   {
+    "id": "fresh-rn-10",
+    "prompt": "why do cats purr",
+    "kind": "timeless",
+    "acceptable_tools": [
+     "websearch"
+    ],
+    "gold": "must_not",
+    "family": "recency-negative"
+   },
+   {
+    "id": "fresh-rn-11",
+    "prompt": "how many legs does a spider have",
+    "kind": "timeless",
+    "acceptable_tools": [
+     "websearch"
+    ],
+    "gold": "must_not",
+    "family": "recency-negative"
+   },
+   {
+    "id": "fresh-rn-12",
+    "prompt": "what does the word ephemeral mean",
+    "kind": "timeless",
+    "acceptable_tools": [
+     "websearch"
+    ],
+    "gold": "must_not",
+    "family": "recency-negative"
+   }
+  ]
+ }
+}
