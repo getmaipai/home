@@ -45,21 +45,10 @@ test("a non-media package is dropped entirely", () => {
   expect(result[0]?.id).toBe("music");
 });
 
-test("section routes point at /media/<app>/<section>, carrying the section's own page, label and icon", () => {
-  const rows = [row({
-    package: "music",
-    label: "Music",
-    sections: [
-      { page: "albums", label: "Albums", icon: "disc" },
-      { page: "playlists", label: "Playlists", icon: null },
-    ],
-  })];
+test("the app route is the row's own to", () => {
+  const rows = [row({ package: "music", label: "Music", to: "/apps/music" })];
   const [app] = mediaNav(rows);
-  expect(app?.to).toBe("/media/music");
-  expect(app?.sections).toEqual([
-    { page: "albums", label: "Albums", icon: "disc", to: "/media/music/albums" },
-    { page: "playlists", label: "Playlists", icon: null, to: "/media/music/playlists" },
-  ]);
+  expect(app?.to).toBe("/apps/music");
 });
 
 test("the input rows and their sections are not mutated", () => {
