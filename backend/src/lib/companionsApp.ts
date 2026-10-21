@@ -10,7 +10,8 @@ import { loadManifestOnly } from "@/lib/plugins";
 import { PERSONAS, resolvePersona, type Persona } from "@/lib/persona";
 import { companionFits, robotCompanionOf, robotControlsOf } from "@/lib/robotCompanion";
 import { companionsAllowed } from "@/lib/companions";
-import { getPersonSettingValue } from "@/lib/settings";
+import { getHouseholdSettingValue, getPersonSettingValue } from "@/lib/settings";
+import { companionVoiceKey } from "@/settings/companionVoiceKeys";
 import { voiceForSpeech } from "@/lib/voiceForSpeech";
 import type { PersonRow } from "@/types";
 
@@ -63,6 +64,8 @@ export interface CompanionDetail extends CompanionCard {
   /** The voice setting the page plays and shows: the companion's own voice, else the one this person hears. */
   voice_value: string;
   voice_is_own: boolean;
+  /** Admins only: the household voice setting for this companion ("default" when none). */
+  voice_setting: string | null;
   /** Admins only: the people and robots using this companion. */
   used_by: { people: Array<{ id: string; name: string }>; robots: Array<{ id: string; name: string }> } | null;
 }
@@ -127,7 +130,9 @@ export function listCompanionCards(person: PersonRow): CompanionCard[] {
 export function companionDetail(person: PersonRow, persona: Persona, admin: boolean): CompanionDetail {
   const manifest = manifestOf(persona.id);
   const spec = manifest?.companion;
-  const ownVoice = spec?.voice_id;
+  const chosen = getHouseholdSettingValue(companionVoiceKey(persona.id));
+  const householdVoice = typeof chosen === "string" && chosen && chosen !== "default" ? chosen : null;
+  const ownVoice = spec?.voice_id ?? householdVoice ?? undefined;
   const voiceValue = voiceForSpeech({ actor: person, ...(ownVoice ? { companionVoice: ownVoice } : {}) });
   return {
     ...cardOf(person, persona),
@@ -137,6 +142,7 @@ export function companionDetail(person: PersonRow, persona: Persona, admin: bool
     examples: [...(persona.examples ?? [])],
     voice_value: voiceValue,
     voice_is_own: Boolean(ownVoice),
+    voice_setting: admin ? householdVoice ?? "default" : null,
     used_by: admin ? usersOf(persona.id) : null,
   };
 }

@@ -98,6 +98,17 @@ describe("one companion in full", () => {
   });
 });
 
+describe("the companion's voice setting", () => {
+  test("an admin sees the household voice setting and the preview follows it; others do not see the setting", async () => {
+    const { owner, adult } = await setup();
+    const before = (await (await owner.get("/api/companions/lively-adult")).json()) as { voice_setting: string | null; voice_is_own: boolean };
+    expect(before.voice_setting).toBe("default");
+    expect(before.voice_is_own).toBe(false);
+    const asAdult = (await (await adult.client.get("/api/companions/lively-adult")).json()) as { voice_setting: string | null };
+    expect(asAdult.voice_setting).toBeNull();
+  });
+});
+
 describe("Set as my default", () => {
   test("saves the person's own persona and the list marks it", async () => {
     const { child, list } = await setup();

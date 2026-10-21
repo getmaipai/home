@@ -9,9 +9,11 @@ import { Card, CardContent } from "@maipai/ui/src/dashboard/components/ui/card";
 import { Badge } from "@maipai/ui/src/dashboard/components/ui/badge";
 import { Alert, AlertDescription } from "@maipai/ui/src/ui/alert";
 import { Button } from "@maipai/ui/src/ui/button";
+import { Select } from "@maipai/ui/src/primitives/Select";
 import { GRID_COLUMNS } from "@maipai/ui/src/responsive";
+import { companionVoiceKey } from "@/lib/companionVoice";
 import { api, ApiError, type CompanionCard, type CompanionDetail, type CompanionList } from "@/lib/api";
-import { previewIdFor, voiceChoices } from "@/lib/voice/voiceBrowserRows";
+import { playableVoices, previewIdFor, voiceChoices } from "@/lib/voice/voiceBrowserRows";
 import { voicePreviewPlayer, type VoicePreviewState } from "@/lib/voice/voicePreviewPlayer";
 import { useTabItem } from "@/shell/tabIdentity";
 
@@ -179,7 +181,13 @@ function VoiceRow({ companion }: { companion: CompanionDetail }) {
     const unsubscribe = voicePreviewPlayer.subscribe(setPreview);
     return () => { unsubscribe(); voicePreviewPlayer.stop(); };
   }, []);
+  const queryClient = useQueryClient();
+  const saveVoice = useMutation({
+    mutationFn: (voiceId: string) => api.setSetting("household", companionVoiceKey(companion.id), voiceId),
+    onSuccess: () => { void queryClient.invalidateQueries({ queryKey: listKey }); },
+  });
   const list = voices.data?.voices ?? [];
+  const picker = companion.voice_setting !== null && list.length ? voiceChoices(playableVoices(list), companion.voice_setting, []) : null;
   const choice = list.length ? voiceChoices(list, companion.voice_value, [companion.voice_value]).selected : null;
   const previewId = choice ? previewIdFor(choice, list) : null;
   const testing = previewId !== null && preview.voiceId === previewId;
@@ -192,6 +200,20 @@ function VoiceRow({ companion }: { companion: CompanionDetail }) {
           {testing && !busy ? "Stop" : "Play a sample"}
         </Button>
       </div>
+      {picker ? (
+        <div className="flex flex-col gap-1">
+          <Select
+            aria-label="Voice for this companion"
+            value={picker.selected.value}
+            options={picker.options.map((option) => option.value)}
+            getLabel={(value) => picker.options.find((option) => option.value === value)?.label ?? value}
+            disabled={saveVoice.isPending}
+            onValueChange={(value) => saveVoice.mutate(value)}
+          />
+          <p className="text-sm text-muted-foreground">Only owners and admins choose this. Everyone hears the companion in this voice, except a child or teen never gets a voice made from a clip.</p>
+          {saveVoice.isError ? <p role="alert">{saveVoice.error instanceof ApiError ? saveVoice.error.message : "Could not save this voice. Check your connection and try again."}</p> : null}
+        </div>
+      ) : null}
       {voices.isError ? <p role="alert">Home can't reach its voice service. Check Repairs, then come back.</p> : null}
       {preview.error ? <p role="alert">{preview.error}</p> : null}
     </div>

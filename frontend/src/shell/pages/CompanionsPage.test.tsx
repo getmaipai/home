@@ -5,7 +5,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { api, ApiError, type CompanionCard, type CompanionDetail, type CompanionList } from "@/lib/api";
 import { CompanionDetailPage, CompanionsPage } from "@/shell/pages/CompanionsPage";
 
-const originals = { companions: api.companions, companion: api.companion, setDefaultCompanion: api.setDefaultCompanion, stackVoices: api.stackVoices };
+const originals = { companions: api.companions, companion: api.companion, setDefaultCompanion: api.setDefaultCompanion, stackVoices: api.stackVoices, setSetting: api.setSetting };
 afterEach(() => { cleanup(); Object.assign(api, originals); });
 
 function card(overrides: Partial<CompanionCard> = {}): CompanionCard {
@@ -16,7 +16,7 @@ function card(overrides: Partial<CompanionCard> = {}): CompanionCard {
   };
 }
 function detail(overrides: Partial<CompanionDetail> = {}): CompanionDetail {
-  return { ...card(), about: "Sprout loves questions.", pronouns: "they/them", interests: ["animals"], examples: ["Wow, a slushie? What flavor?"], voice_value: "default", voice_is_own: false, used_by: null, ...overrides };
+  return { ...card(), about: "Sprout loves questions.", pronouns: "they/them", interests: ["animals"], examples: ["Wow, a slushie? What flavor?"], voice_value: "default", voice_is_own: false, voice_setting: null, used_by: null, ...overrides };
 }
 function open(path: string) {
   api.stackVoices = async () => ({ voices: [] });
@@ -83,4 +83,22 @@ test("a companion that is not on the person's list reads as a plain message", as
   api.companion = async () => { throw new ApiError("No such companion", 404); };
   const view = open("/companions/lively-adult");
   await waitFor(() => expect(view.getByText(/not on your list/)).toBeTruthy());
+});
+
+test("an admin picks the companion's voice and it saves to the household setting", async () => {
+  api.companion = async () => detail({ voice_setting: "default", used_by: { people: [], robots: [] } });
+  api.stackVoices = async () => ({ voices: [{ id: "alba", name: "Alba", source: "preset", onDisk: true } as never] });
+  const saved: Array<[string, string, unknown]> = [];
+  api.setSetting = (async (scope: string, key: string, value: unknown) => { saved.push([scope, key, value]); return {} as never; }) as typeof api.setSetting;
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  const view = render(<QueryClientProvider client={client}><MemoryRouter initialEntries={["/companions/lively-child"]}><Routes><Route path="/companions/:id" element={<CompanionDetailPage />} /></Routes></MemoryRouter></QueryClientProvider>);
+  await waitFor(() => expect(view.getByLabelText("Voice for this companion")).toBeTruthy());
+  expect(saved).toEqual([]);
+});
+
+test("a person who is not an admin gets no voice picker", async () => {
+  api.companion = async () => detail();
+  const view = open("/companions/lively-child");
+  await waitFor(() => expect(view.getByText("Sprout loves questions.")).toBeTruthy());
+  expect(view.queryByLabelText("Voice for this companion")).toBeNull();
 });

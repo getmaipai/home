@@ -52691,6 +52691,10 @@
                     "voice_is_own": {
                       "type": "boolean"
                     },
+                    "voice_setting": {
+                      "type": "string",
+                      "nullable": true
+                    },
                     "used_by": {
                       "type": "object",
                       "nullable": true,
@@ -52754,6 +52758,7 @@
                     "examples",
                     "voice_value",
                     "voice_is_own",
+                    "voice_setting",
                     "used_by"
                   ]
                 }

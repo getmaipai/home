@@ -314,7 +314,7 @@ export interface CompanionCard {
   dials: Array<{ label: string; value: string }>; voice: string; is_default: boolean;
 }
 export interface CompanionDetail extends CompanionCard {
-  about: string; pronouns: string | null; interests: string[]; examples: string[]; voice_value: string; voice_is_own: boolean;
+  about: string; pronouns: string | null; interests: string[]; examples: string[]; voice_value: string; voice_is_own: boolean; voice_setting: string | null;
   used_by: { people: Array<{ id: string; name: string }>; robots: Array<{ id: string; name: string }> } | null;
 }
 export interface CompanionList {
