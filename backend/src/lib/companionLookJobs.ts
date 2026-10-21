@@ -9,11 +9,17 @@ import { cancelOrDelete, fetchPicture, getGenerationJob, submitEdit, submitGener
 import { promptRefusalLineFor } from "@/lib/pictures/ageCheck";
 import { readFileSync } from "node:fs";
 import type { PersonRow } from "@/types";
+import { companionHasFinishingJob } from "@/lib/companionStates";
+import { companionHasTakeRun, TAKE_RUN_BUSY_LINE } from "@/lib/companionTakes";
 
 export const LOOK_JOB_BUSY_LINE = "A picture is already being made for this companion. Wait for it or stop it.";
 export const LOOK_PROMPT_REQUIRED_LINE = "Write a look prompt first: say what the character looks like.";
 export const LOOK_EDIT_PROMPT_LINE = "Say what to change, then send it.";
 export const LOOK_ENGINE_NOT_READY_LINE = "Picture creation isn't set up yet. An admin can add a picture model in Settings, Pictures and videos.";
+
+function busyLineFor(companionId: string): string {
+  return companionHasFinishingJob(companionId) || companionHasTakeRun(companionId) ? TAKE_RUN_BUSY_LINE : LOOK_JOB_BUSY_LINE;
+}
 
 export type LookJobState = "queued" | "running" | "done" | "failed" | "cancelled";
 export interface LookJob {
@@ -60,7 +66,7 @@ export async function canGenerateLook(actor: PersonRow, companionId: string): Pr
   const denial = pictureDenial(audience);
   if (denial) return { can_generate: false, generate_reason: PICTURE_DENIAL_LINE[denial] };
   if (!(await pictureEngineReady())) return { can_generate: false, generate_reason: LOOK_ENGINE_NOT_READY_LINE };
-  if (activeLookJob(companionId)) return { can_generate: false, generate_reason: LOOK_JOB_BUSY_LINE };
+  if (activeLookJob(companionId) || companionHasFinishingJob(companionId) || companionHasTakeRun(companionId)) return { can_generate: false, generate_reason: busyLineFor(companionId) };
   return { can_generate: true };
 }
 
@@ -76,7 +82,7 @@ export async function startLookGeneration(input: { actor: PersonRow; companionId
   const denied = lookGenerationGate(input.actor, prompt);
   if (denied) throw Object.assign(new Error(denied.error), { status: denied.status });
   if (!(await pictureEngineReady())) throw Object.assign(new Error(LOOK_ENGINE_NOT_READY_LINE), { status: 503 });
-  if (activeLookJob(input.companionId)) throw Object.assign(new Error(LOOK_JOB_BUSY_LINE), { status: 409 });
+  if (activeLookJob(input.companionId) || companionHasFinishingJob(input.companionId) || companionHasTakeRun(input.companionId)) throw Object.assign(new Error(busyLineFor(input.companionId)), { status: 409 });
   const key = readLook(input.companionId).key;
   startingCompanions.add(input.companionId);
   try {
@@ -92,7 +98,7 @@ export async function startLookEdit(input: { actor: PersonRow; companionId: stri
   const denied = lookGenerationGate(input.actor, instruction);
   if (denied) throw Object.assign(new Error(denied.error), { status: denied.status });
   if (!(await pictureEngineReady())) throw Object.assign(new Error(LOOK_ENGINE_NOT_READY_LINE), { status: 503 });
-  if (activeLookJob(input.companionId)) throw Object.assign(new Error(LOOK_JOB_BUSY_LINE), { status: 409 });
+  if (activeLookJob(input.companionId) || companionHasFinishingJob(input.companionId) || companionHasTakeRun(input.companionId)) throw Object.assign(new Error(busyLineFor(input.companionId)), { status: 409 });
   startingCompanions.add(input.companionId);
   try {
     const look = readLook(input.companionId), version = look.versions.find((item) => item.id === input.versionId), path = versionPath(input.companionId, input.versionId);
@@ -119,7 +125,7 @@ function editForm(keyed: Uint8Array, instruction: string): FormData {
 export async function startLookSheet(input: { actor: PersonRow; companionId: string; lookPrompt: string }): Promise<{ job: string; card_source: "model" | "look_prompt" }> {
   const gate = lookGenerationGate(input.actor, "Create a consistent character reference picture.");
   if (gate) throw Object.assign(new Error(gate.error), { status: gate.status });
-  if (activeLookJob(input.companionId)) throw Object.assign(new Error(LOOK_JOB_BUSY_LINE), { status: 409 });
+  if (activeLookJob(input.companionId) || companionHasFinishingJob(input.companionId) || companionHasTakeRun(input.companionId)) throw Object.assign(new Error(busyLineFor(input.companionId)), { status: 409 });
   startingCompanions.add(input.companionId);
   try {
     if (!(await pictureEngineReady())) throw Object.assign(new Error(LOOK_ENGINE_NOT_READY_LINE), { status: 503 });

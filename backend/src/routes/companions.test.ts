@@ -16,10 +16,13 @@ import { __setPicturesFetchForTests } from "@/lib/pictures/stack";
 import { __setPictureStatusForTests, readyStatusForTests } from "@/lib/pictures/ready";
 import { __clearCompanionLookJobsForTests } from "@/lib/companionLookJobs";
 import { __setCharacterPictureCapabilityForTests } from "@/lib/companionLook";
-import { addTake, takePath, saveStates, readStates, __resetCompanionStatesForTests } from "@/lib/companionStates";
+import { addTake, takePath, saveStates, readStates, bestTake, __resetCompanionStatesForTests } from "@/lib/companionStates";
 import { __setStackClientForTests } from "@/lib/stackEngine";
 import { addVersion, approveSheet, setRest, updateSheet } from "@/lib/companionLook";
 import { getHouseholdCompanion } from "@/lib/householdCompanions";
+import { __setVideosFetchForTests } from "@/lib/videos/stack";
+import { __setVideoStatusForTests, readyVideoStatusForTests } from "@/lib/videos/ready";
+import { __clearCompanionTakeRunsForTests } from "@/lib/companionTakes";
 import media from "@maipai/spec/vocab/companion-media.json";
 
 const app = new OpenAPIHono();
@@ -51,8 +54,8 @@ function fixture() {
   return loaded.value.companion;
 }
 
-beforeEach(() => { resetDb(); rmSync(companionRoot, { recursive: true, force: true }); __reloadPersonasForTests(); __clearCompanionLookJobsForTests(); __resetCompanionStatesForTests(); __setPicturesFetchForTests(null); __setPictureStatusForTests(undefined); __setCharacterPictureCapabilityForTests(null); __setStackClientForTests(null); });
-afterEach(() => { resetDb(); rmSync(companionRoot, { recursive: true, force: true }); __reloadPersonasForTests(); __clearCompanionLookJobsForTests(); __resetCompanionStatesForTests(); __setPicturesFetchForTests(null); __setPictureStatusForTests(undefined); __setCharacterPictureCapabilityForTests(null); __setStackClientForTests(null); });
+beforeEach(() => { resetDb(); rmSync(companionRoot, { recursive: true, force: true }); __reloadPersonasForTests(); __clearCompanionLookJobsForTests(); __clearCompanionTakeRunsForTests(); __resetCompanionStatesForTests(); __setPicturesFetchForTests(null); __setVideoStatusForTests(undefined); __setVideosFetchForTests(null); __setPictureStatusForTests(undefined); __setCharacterPictureCapabilityForTests(null); __setStackClientForTests(null); });
+afterEach(() => { resetDb(); rmSync(companionRoot, { recursive: true, force: true }); __reloadPersonasForTests(); __clearCompanionLookJobsForTests(); __clearCompanionTakeRunsForTests(); __resetCompanionStatesForTests(); __setPicturesFetchForTests(null); __setVideoStatusForTests(undefined); __setVideosFetchForTests(null); __setPictureStatusForTests(undefined); __setCharacterPictureCapabilityForTests(null); __setStackClientForTests(null); });
 
 async function keyedPicture() {
   const svg = Buffer.from('<svg width="512" height="512"><circle cx="256" cy="256" r="150" fill="red"/></svg>');
@@ -358,6 +361,60 @@ describe("household companion routes", () => {
     const form = new FormData(); form.append("video", new File([new Uint8Array([0, 0, 0, 24, 102, 116, 121, 112, 105, 115, 111, 109, 0, 0, 0, 0])], "clip.mp4", { type: "video/mp4" })); form.append("rights_confirmed", "true"); form.append("shows_real_person", "false");
     const response = await app.request(`http://localhost/api/companions/${created.value.id}/states/idle/upload`, { method: "POST", headers: { cookie: `session=${adult}` }, body: form });
     expect(response.status).toBe(409); expect(await response.json()).toEqual({ error: "Approve the character sheet first, so every clip starts from the same character." });
+  });
+
+  test("generates two candidates in sequence, finishes them, stores reports and deletes Stack jobs", async () => {
+    const adult = addPerson("person-state-generate", "adult"), created = createHouseholdCompanion({ ...fixture(), display_name: "Generated character" }, { display_name: "Author", person_id: "person-state-generate" }); if (!created.ok) throw new Error(created.error); const id = created.value.id;
+    const rest = addVersion(id, await transparentPng(), { source: "upload", label: "rest", width: 1024, height: 1024, from: null }); setRest(id, rest.id); updateSheet(id, { views: { left: null, right: null, mouth: null }, card: { text: "A red fox with white paws", species: "fox", colours: ["#CC3322"] }, key: "#FF00FF", state: "needs_review", approved_by: null, approved_at: null }); approveSheet(id, "Author");
+    __setVideoStatusForTests(readyVideoStatusForTests());
+    const submitted: Array<Record<string, unknown>> = [], deleted: string[] = [], fetched: string[] = [];
+    __setVideosFetchForTests((async (input, init) => {
+      const url = new URL(String(input)), method = init?.method ?? "GET";
+      if (url.pathname === "/v1/videos/generations" && method === "POST") { submitted.push(JSON.parse(String(init?.body)) as Record<string, unknown>); return Response.json({ job: `video-${submitted.length}` }, { status: 202 }); }
+      const jobMatch = /^\/v1\/videos\/generations\/(video-\d+)$/.exec(url.pathname);
+      if (jobMatch && method === "GET") return Response.json({ job: jobMatch[1], state: "done", progress: 100, data: [{ seed: submitted[Number(jobMatch[1]!.slice(6)) - 1]?.seed }] });
+      const clipMatch = /^\/v1\/videos\/generations\/(video-\d+)\/video\.mp4$/.exec(url.pathname);
+      if (clipMatch && method === "GET") { fetched.push(clipMatch[1]!); return new Response(new Uint8Array([0, 0, 0, 24, 102, 116, 121, 112])); }
+      if (jobMatch && method === "DELETE") { deleted.push(jobMatch[1]!); return new Response(null, { status: 204 }); }
+      return new Response("Not found", { status: 404 });
+    }) as typeof fetch);
+    let finished = 0;
+    __setStackClientForTests({ mediaRoots: async () => ({ read: [companionRoot], write: [companionRoot] }), setMediaRoots: async () => ({ read: [companionRoot], write: [companionRoot] }), submitJob: async (request: any) => { finished++; expect(request.kind).toBe("media.companion_clip"); expect(request.input.key).toBe("#FF00FF"); const distance = request.input.output_dir.endsWith("take-2") ? 1 : 4; return { id: `media-${finished}`, state: "done", result: { ok: true, reasons: [], seconds: 3, files: [{ name: "clip.h264.mp4", bytes: 123 }], av1: false, colour_distance: distance, area_ratio: 1, loop_gap: 0, opaque_share: { min: .5, max: .8 } } }; }, job: async () => { throw Error("unexpected poll"); } } as never);
+    const started = await request(`companions/${id}/states/idle/generate`, adult, "POST", { count: 2 }); expect(started.status).toBe(202); const { job } = await started.json() as { job: string };
+    let progress: any;
+    for (let attempt = 0; attempt < 100; attempt++) { const response = await request(`companions/${id}/states/jobs/run/${job}`, adult); progress = await response.json(); if (progress.state === "done" || progress.state === "failed") break; await new Promise((resolve) => setTimeout(resolve, 5)); }
+    expect(progress).toMatchObject({ state: "done", percent: 100, takes_made: 2 }); expect(progress.label).toContain("take 2 of 2");
+    expect(submitted).toHaveLength(2); expect(submitted[0]?.seed).not.toBe(submitted[1]?.seed); expect(submitted[0]).toMatchObject({ size: "832x480", seconds: 5, image_source: "generated", audience: "all-ages", timeout_ms: 1 }); expect(submitted[0]).not.toHaveProperty("model");
+    const startImage = await sharp(Buffer.from(String(submitted[0]?.image), "base64")).raw().toBuffer({ resolveWithObject: true }); expect(startImage.info.width).toBe(832); expect(startImage.info.height).toBe(480); expect([...startImage.data.subarray(0, 3)]).toEqual([255, 0, 255]);
+    expect(fetched).toEqual(["video-1", "video-2"]); expect(deleted).toEqual(["video-1", "video-2"]); expect(finished).toBe(2);
+    const takes = readStates(id).states.idle!.takes; expect(takes).toHaveLength(2); expect(takes.every((take) => take.report?.ok)).toBe(true); expect(bestTake(takes)?.id).toBe("take-2");
+  });
+
+  test("refuses minor, unapproved sheet and unavailable video engine before submitting", async () => {
+    const adult = addPerson("person-state-gate", "adult"), child = addPerson("person-state-gate-child", "child"), created = createHouseholdCompanion({ ...fixture(), display_name: "Generation gates" }, { display_name: "Author", person_id: "person-state-gate" }); if (!created.ok) throw new Error(created.error); const id = created.value.id;
+    __setVideoStatusForTests(readyVideoStatusForTests()); let calls = 0; __setVideosFetchForTests((async () => { calls++; return new Response("unexpected", { status: 500 }); }) as unknown as typeof fetch);
+    expect((await request(`companions/${id}/states/idle/generate`, child, "POST", { count: 1 })).status).toBe(403);
+    expect((await request(`companions/${id}/states/idle/generate`, adult, "POST", { count: 1 })).status).toBe(409);
+    __setVideoStatusForTests(null);
+    const rest = addVersion(id, await transparentPng(), { source: "upload", label: "rest", width: 1024, height: 1024, from: null }); setRest(id, rest.id); updateSheet(id, { views: { left: null, right: null, mouth: null }, card: { text: "A red fox", species: "fox", colours: ["#CC3322"] }, key: "#00FF00", state: "needs_review", approved_by: null, approved_at: null }); approveSheet(id, "Author");
+    expect((await request(`companions/${id}/states/idle/generate`, adult, "POST", { count: 1 })).status).toBe(503); expect(calls).toBe(0);
+    __setVideoStatusForTests(readyVideoStatusForTests()); updateSheet(id, { views: { left: null, right: null, mouth: null }, card: { text: "a naked child character", species: "fox", colours: ["#CC3322"] }, key: "#00FF00", state: "approved", approved_by: "Author", approved_at: now });
+    const refused = await request(`companions/${id}/states/idle/generate`, adult, "POST", { count: 1 }); expect(refused.status).toBe(422); expect((await refused.json() as { error: string }).error).toContain("never allowed"); expect(calls).toBe(0);
+    updateSheet(id, { views: { left: null, right: null, mouth: null }, card: { text: "A red fox", species: "fox", colours: ["#CC3322"] }, key: "#00FF00", state: "approved", approved_by: "Author", approved_at: now });
+    __setVideoStatusForTests(readyVideoStatusForTests({ quickMissing: true }));
+    const quickMissing = await request(`companions/${id}/states/idle/generate`, adult, "POST", { count: 1 }); expect(quickMissing.status).toBe(503); expect((await quickMissing.json() as { error: string }).error).toContain("standard video model"); expect(calls).toBe(0);
+  });
+
+  test("keeps one companion run active and cancels its live Stack video job", async () => {
+    const adult = addPerson("person-state-cancel", "adult"), created = createHouseholdCompanion({ ...fixture(), display_name: "Cancelable character" }, { display_name: "Author", person_id: "person-state-cancel" }); if (!created.ok) throw new Error(created.error); const id = created.value.id;
+    const rest = addVersion(id, await transparentPng(), { source: "upload", label: "rest", width: 1024, height: 1024, from: null }); setRest(id, rest.id); updateSheet(id, { views: { left: null, right: null, mouth: null }, card: { text: "A red fox", species: "fox", colours: ["#CC3322"] }, key: "#00FF00", state: "needs_review", approved_by: null, approved_at: null }); approveSheet(id, "Author");
+    __setVideoStatusForTests(readyVideoStatusForTests()); let sawPoll!: () => void; const pollStarted = new Promise<void>((resolve) => { sawPoll = resolve; }); let cancelled = 0;
+    __setVideosFetchForTests((async (input: string | URL | Request, init?: RequestInit) => { const url = new URL(String(input)), method = init?.method ?? "GET"; if (url.pathname === "/v1/videos/generations" && method === "POST") return Response.json({ job: "video-live" }, { status: 202 }); if (url.pathname.endsWith("/video-live") && method === "GET") { sawPoll(); return Response.json({ job: "video-live", state: "running", progress: 20, data: [] }); } if (url.pathname.endsWith("/video-live") && method === "DELETE") { cancelled++; return new Response(null, { status: 204 }); } return new Response("Not found", { status: 404 }); }) as unknown as typeof fetch);
+    const started = await request(`companions/${id}/states/idle/generate`, adult, "POST", { count: 1 }); expect(started.status).toBe(202); const { job } = await started.json() as { job: string }; await pollStarted;
+    expect((await request(`companions/${id}/states/idle/generate`, adult, "POST", { count: 1 })).status).toBe(409);
+    const states = await (await request(`companions/${id}/states`, adult)).json() as any; expect(states.run.job).toBe(job); expect(states.states.find((row: any) => row.id === "idle").busy).toBe(true);
+    expect((await request(`companions/${id}/states/jobs/run/${job}`, adult, "DELETE")).status).toBe(204); expect(cancelled).toBe(1);
+    expect((await (await request(`companions/${id}/states/jobs/run/${job}`, adult)).json() as { state: string }).state).toBe("cancelled");
   });
 
   test("approval requires force, requires idle first, adds states, and idle removal clears every approval", async () => {

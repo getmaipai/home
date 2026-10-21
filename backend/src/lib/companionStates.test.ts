@@ -7,6 +7,8 @@ import { addTake, bestTake, deleteStates, deleteTake, readStates, setMotion, tak
 import { __setStackClientForTests } from "@/lib/stackEngine";
 import { addVersion, approveSheet, setRest, updateSheet } from "@/lib/companionLook";
 import media from "@maipai/spec/vocab/companion-media.json";
+import sharp from "sharp";
+import { compositeTakeStartPicture, takePrompt } from "@/lib/companionTakes";
 
 const dataRoot = process.env.MAIPAI_DATA_DIR!;
 const root = join(dataRoot, "companions");
@@ -20,6 +22,14 @@ afterEach(() => { rmSync(root, { recursive: true, force: true }); __resetCompani
 function companion() { const result = createHouseholdCompanion({ ...sourceCompanion, display_name: "State fixture" }, { display_name: "Author", person_id: "state-test" }); if (!result.ok) throw new Error(result.error); return result.value.id; }
 
 describe("companion states store", () => {
+  test("builds the take prompt and a centred 832 by 480 key-colour start frame", async () => {
+    expect(takePrompt({ text: "A red fox." }, "waves once", "magenta")).toBe("A red fox.. waves once. Locked camera, no zoom, no pan, the character stays in the centre of the frame and keeps the same size. Plain solid magenta background, no shadows, no ground, no text, no other objects. Smooth natural motion.");
+    const rest = new Uint8Array(await sharp({ create: { width: 1024, height: 1024, channels: 4, background: { r: 0, g: 0, b: 0, alpha: 0 } } }).composite([{ input: await sharp({ create: { width: 300, height: 300, channels: 4, background: { r: 220, g: 30, b: 20, alpha: 1 } } }).png().toBuffer(), left: 362, top: 362 }]).png().toBuffer());
+    const result = await compositeTakeStartPicture(rest, "#00FF00"), decoded = await sharp(result).raw().toBuffer({ resolveWithObject: true });
+    expect(decoded.info.width).toBe(832); expect(decoded.info.height).toBe(480); expect([...decoded.data.subarray(0, 3)]).toEqual([0, 255, 0]);
+    const centerOffset = (240 * 832 + 416) * 3; expect([...decoded.data.subarray(centerOffset, centerOffset + 3)]).toEqual([220, 30, 20]);
+    const topOffset = (20 * 832 + 416) * 3; expect([...decoded.data.subarray(topOffset, topOffset + 3)]).toEqual([0, 255, 0]);
+  });
   test("only vocabulary states are accepted, and the state is persisted", () => {
     const id = companion();
     const take = addTake(id, "idle", { source: "upload", label: "first" });

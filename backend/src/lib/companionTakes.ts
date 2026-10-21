@@ -1,0 +1,183 @@
+import { readFileSync, writeFileSync } from "node:fs";
+import { join } from "node:path";
+import sharp from "sharp";
+import media from "@maipai/spec/vocab/companion-media.json";
+import type { PersonRow } from "@/types";
+import { readLook, versionPath } from "@/lib/companionLook";
+import { addTake, companionHasFinishingJob, finishTake, readStates, recordTakeFailure, setMotion, takePath, TAKE_LIMIT_LINE } from "@/lib/companionStates";
+import { routeAudience } from "@/lib/pictures/audience";
+import { videoDenial, VIDEO_DENIAL_LINE, VIDEO_NOT_HERE_LINE, refuseVideoPrompt, VIDEO_REFUSAL_LINE } from "@/lib/videos/policy";
+import { videoEngineReady, videoEngineStatus } from "@/lib/videos/ready";
+import { quickVideoReady } from "@/lib/videos/quality";
+import { cancelOrDeleteVideo, fetchClip, getVideoJob, StackVideoError, submitVideo } from "@/lib/videos/stack";
+import { activeLookJob } from "@/lib/companionLookJobs";
+import type { CompanionTake } from "@/lib/companionStates";
+
+export const TAKE_RUN_BUSY_LINE = "A clip is already being made for this companion. Wait for it or stop it.";
+export const TAKE_QUICK_NOT_READY_LINE = "Making a character's clips needs the standard video model. An admin can install it in Settings, Pictures and videos.";
+export const TAKE_RUN_NOT_FOUND_LINE = "That clip run could not be found. Start it again.";
+export const TAKE_RUN_TIMEOUT_LINE = "The video engine took too long. Try again.";
+export const TAKE_NEGATIVE_PROMPT = "different character, changed colours, changed face, extra limbs, text, watermark, camera movement, background change, shadows";
+
+export type TakeRunState = "queued" | "running" | "done" | "failed" | "cancelled";
+export interface TakeRun {
+  id: string; companionId: string; personId: string; states: string[];
+  current: { state: string; take: number; index: number; of: number } | null;
+  state: TakeRunState; phase: string; percent: number; label: string;
+  cancelled: boolean; error: string | null; takesMade: number; stackJob: string | null;
+}
+const runs = new Map<string, TakeRun>();
+const activeByCompanion = new Map<string, string>();
+const starting = new Set<string>();
+
+const stateRows = media.states as Array<{ id: string; motion: string }>;
+
+export function takePrompt(card: { text: string }, motion: string, keyName: "green" | "magenta"): string {
+  return `${card.text.slice(0, 600)}. ${motion}. Locked camera, no zoom, no pan, the character stays in the centre of the frame and keeps the same size. Plain solid ${keyName} background, no shadows, no ground, no text, no other objects. Smooth natural motion.`;
+}
+
+/** Composites the approved transparent square rest image into the fixed 832 by 480 key-colour frame. */
+export async function compositeTakeStartPicture(png: Uint8Array, key: "#00FF00" | "#FF00FF"): Promise<Uint8Array> {
+  const [r, g, b] = key === "#FF00FF" ? [255, 0, 255] : [0, 255, 0];
+  const character = await sharp(png, { failOn: "error", limitInputPixels: 40_000_000 }).resize({ height: 440, fit: "inside", withoutEnlargement: false }).png().toBuffer();
+  const overlay = await sharp(character).metadata();
+  const left = Math.round((832 - (overlay.width ?? 440)) / 2), top = Math.round((480 - (overlay.height ?? 440)) / 2);
+  return new Uint8Array(await sharp({ create: { width: 832, height: 480, channels: 3, background: { r, g, b } } }).composite([{ input: character, left, top }]).removeAlpha().png().toBuffer());
+}
+
+export function activeTakeRun(companionId: string): TakeRun | null {
+  const id = activeByCompanion.get(companionId), run = id ? runs.get(id) : null;
+  return run && (run.state === "queued" || run.state === "running") ? run : null;
+}
+export function companionHasTakeRun(companionId: string): boolean { const id = activeByCompanion.get(companionId), run = id ? runs.get(id) : null; return starting.has(companionId) || Boolean(run && ["queued", "running", "cancelled"].includes(run.state)); }
+export function __clearCompanionTakeRunsForTests(): void { runs.clear(); activeByCompanion.clear(); starting.clear(); }
+export function takeRunFor(id: string, actor: PersonRow, companionId: string): TakeRun | null { const run = runs.get(id); return run?.personId === actor.id && run.companionId === companionId ? run : null; }
+
+function readySheet(companionId: string): { look: ReturnType<typeof readLook>; restPath: string; card: NonNullable<NonNullable<ReturnType<typeof readLook>["sheet"]>["card"]> } {
+  const look = readLook(companionId), restPath = look.rest ? versionPath(companionId, look.rest) : null;
+  if (look.sheet?.state !== "approved" || !restPath || !look.sheet.card) throw Object.assign(new Error("Approve the character sheet first, so every clip starts from the same character."), { status: 409 });
+  return { look, restPath, card: look.sheet.card };
+}
+
+function errorCode(error: unknown): string | null { return error instanceof StackVideoError ? error.code : null; }
+function engineShouldStop(error: unknown): boolean {
+  const code = errorCode(error);
+  return ["not_installed", "model_missing", "setup_failed", "unsupported", "not_available_on_this_computer", "unreachable", "no_stack", "no_memory", "out_of_memory"].includes(code ?? "") || /not installed|out[_ ]of[_ ]memory|no[_ ]memory|low on memory|isn't answering/i.test(error instanceof Error ? error.message : "");
+}
+function isEngineFailure(error: unknown): boolean { return error instanceof StackVideoError && (error.status >= 500 || ["generation_failed", "engine_error"].includes(error.code)); }
+
+async function runTakes(run: TakeRun, count: number, motionOverride?: string): Promise<void> {
+  run.state = "running";
+  let consecutiveEngineFailures = 0;
+  const look = readLook(run.companionId), sheet = readySheet(run.companionId), keyName = sheet.look.sheet!.key === "#FF00FF" ? "magenta" : "green";
+  const pictureB64 = Buffer.from(await compositeTakeStartPicture(new Uint8Array(readFileSync(sheet.restPath)), sheet.look.sheet!.key as "#00FF00" | "#FF00FF")).toString("base64");
+  try {
+    for (let stateIndex = 0; stateIndex < run.states.length; stateIndex++) {
+      const state = run.states[stateIndex]!;
+      if (run.cancelled) break;
+      if (motionOverride !== undefined && run.states.length === 1) setMotion(run.companionId, state, motionOverride);
+      const stored = readStates(run.companionId).states[state];
+      const motion = stored?.motion ?? stateRows.find((row) => row.id === state)!.motion;
+      const prompt = takePrompt(sheet.card, motion, keyName);
+      for (let index = 1; index <= count; index++) {
+        if (run.cancelled) break;
+        run.current = { state, take: index, index: stateIndex + 1, of: run.states.length };
+        run.phase = "generating"; run.percent = Math.round(((run.takesMade) / (run.states.length * count)) * 100);
+        run.label = `Making take ${index} of ${count} for ${stateLabel(state)}`;
+        let take: CompanionTake | null = null;
+        let stackJob: string | null = null;
+        let engineFailure = false;
+        try {
+          const seed = Math.floor(Math.random() * 2_147_483_647);
+          take = addTake(run.companionId, state, { source: "generated", seed, label: `Candidate ${index}` });
+          const submitted = await submitVideo({ prompt, negative_prompt: TAKE_NEGATIVE_PROMPT, size: "832x480", seconds: 5, seed, image: pictureB64, image_source: "generated", audience: "all-ages", timeout_ms: 1 });
+          stackJob = submitted.job; run.stackJob = stackJob;
+          let done = submitted.done;
+          const deadline = Date.now() + 15 * 60_000;
+          while (!done) {
+            if (run.cancelled) break;
+            if (Date.now() > deadline) throw new Error(TAKE_RUN_TIMEOUT_LINE);
+            const status = await getVideoJob(stackJob);
+            if (status.state === "failed") throw new StackVideoError(500, status.code ?? "video_failed", status.error ?? "The video engine could not make this clip. Try again.", stackJob);
+            if (status.state === "cancelled") throw Object.assign(new Error("The video engine stopped this clip. Try again."), { cancelled: true });
+            if (status.state === "done") done = status.data;
+            else { const progress = Math.max(0, Math.min(99, status.progress)); run.percent = Math.min(79, Math.round((run.takesMade / (run.states.length * count)) * 100 + progress / (run.states.length * count))); }
+            if (!done) await new Promise((resolve) => setTimeout(resolve, 2_000));
+          }
+          if (run.cancelled) break;
+          run.phase = "finishing"; run.label = `Finishing take ${index} of ${count} for ${stateLabel(state)}`; run.percent = Math.min(99, run.percent + 1);
+          const clip = await fetchClip(stackJob);
+          if (run.cancelled) { await cancelOrDeleteVideo(stackJob); break; }
+          const sourcePath = takePath(run.companionId, state, take.id, "source.mp4")!;
+          writeFileSync(sourcePath, clip);
+          await cancelOrDeleteVideo(stackJob); run.stackJob = null; stackJob = null;
+          await finishTake(run.companionId, state, take.id, { alpha: false });
+          consecutiveEngineFailures = 0;
+        } catch (error) {
+          if (stackJob && !run.cancelled) await cancelOrDeleteVideo(stackJob);
+          run.stackJob = null;
+          if (take) recordTakeFailure(run.companionId, state, take.id, error instanceof Error ? error.message : "This clip could not be made. Try again.");
+          engineFailure = isEngineFailure(error);
+          if (engineFailure) consecutiveEngineFailures++; else consecutiveEngineFailures = 0;
+          if (run.cancelled) break;
+          if (engineShouldStop(error) || consecutiveEngineFailures >= 2) {
+            run.error = error instanceof Error ? error.message : "The video engine could not continue. Check it, then try again.";
+            run.state = "failed"; break;
+          }
+        }
+        run.takesMade++;
+      }
+      if (run.state === "failed" || run.cancelled) break;
+    }
+  } catch (error) {
+    run.error = error instanceof Error ? error.message : "The clip run could not finish. Try again.";
+    run.state = "failed";
+  } finally {
+    if (run.cancelled) run.state = "cancelled";
+    else if (run.state !== "failed") { run.state = "done"; run.percent = 100; }
+    run.phase = run.state;
+    if (activeByCompanion.get(run.companionId) === run.id) activeByCompanion.delete(run.companionId);
+    run.stackJob = null;
+  }
+}
+
+function stateLabel(state: string): string { return state.split("_").map((part) => part[0]!.toUpperCase() + part.slice(1)).join(" "); }
+
+export async function startStateTakes(input: { actor: PersonRow; companionId: string; states: string[]; count: number; motion?: string }): Promise<string> {
+  const promptText = input.states.map((state) => {
+    const current = readStates(input.companionId).states[state], motion = input.motion ?? current?.motion ?? stateRows.find((row) => row.id === state)?.motion ?? "";
+    const card = readLook(input.companionId).sheet?.card;
+    return takePrompt(card ?? { text: "" }, motion, readLook(input.companionId).sheet?.key === "#FF00FF" ? "magenta" : "green");
+  }).join(" ");
+  const audience = routeAudience(input.actor), denial = videoDenial(audience);
+  if (denial) throw Object.assign(new Error(VIDEO_DENIAL_LINE[denial]), { status: 403 });
+  const refused = refuseVideoPrompt(promptText, { lane: "adult" });
+  if (refused) throw Object.assign(new Error(VIDEO_REFUSAL_LINE[refused]), { status: 422 });
+  const engineReady = await videoEngineReady(), engineStatus = await videoEngineStatus();
+  if (!engineReady && (!engineStatus || engineStatus.available === false || engineStatus.state === "unsupported" || engineStatus.state === "off")) throw Object.assign(new Error(VIDEO_NOT_HERE_LINE), { status: 503 });
+  readySheet(input.companionId);
+  if (companionHasTakeRun(input.companionId) || companionHasFinishingJob(input.companionId) || activeLookJob(input.companionId)) throw Object.assign(new Error(TAKE_RUN_BUSY_LINE), { status: 409 });
+  const states = readStates(input.companionId);
+  if (input.states.some((state) => (states.states[state]?.takes.length ?? 0) + input.count > 12)) throw Object.assign(new Error(TAKE_LIMIT_LINE), { status: 409 });
+  starting.add(input.companionId);
+  try {
+    if (!quickVideoReady(engineStatus)) throw Object.assign(new Error(TAKE_QUICK_NOT_READY_LINE), { status: 503 });
+    const id = crypto.randomUUID();
+    const run: TakeRun = { id, companionId: input.companionId, personId: input.actor.id, states: input.states, current: null, state: "queued", phase: "queued", percent: 0, label: "Waiting to make clips", cancelled: false, error: null, takesMade: 0, stackJob: null };
+    runs.set(id, run); activeByCompanion.set(input.companionId, id);
+    void runTakes(run, input.count, input.motion).catch(() => undefined);
+    return id;
+  } finally { starting.delete(input.companionId); }
+}
+
+export async function cancelTakeRun(id: string, actor: PersonRow, companionId: string): Promise<boolean> {
+  const run = takeRunFor(id, actor, companionId);
+  if (!run) return false;
+  if (run.state === "queued" || run.state === "running") {
+    run.cancelled = true; run.state = "cancelled"; run.error = null; run.label = "Stopping clip making";
+    if (run.stackJob) { await cancelOrDeleteVideo(run.stackJob); run.stackJob = null; }
+  }
+  return true;
+}
+
+export function publicTakeRun(run: TakeRun) { return { state: run.state, label: run.label, percent: run.percent, current: run.current, takes_made: run.takesMade, error: run.error }; }
