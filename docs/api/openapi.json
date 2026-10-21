@@ -28790,7 +28790,7 @@
         ],
         "responses": {
           "200": {
-            "description": "The robot's assignment and its allowed companions.",
+            "description": "The robot's assignment, its allowed companions and the voice it speaks in (a voice id, or \"default\" for the built-in one).",
             "content": {
               "application/json": {
                 "schema": {
@@ -28826,6 +28826,14 @@
                               "adult"
                             ]
                           },
+                          "audience": {
+                            "type": "string",
+                            "enum": [
+                              "all",
+                              "teen",
+                              "adult"
+                            ]
+                          },
                           "tagline": {
                             "type": "string"
                           }
@@ -28833,19 +28841,44 @@
                         "required": [
                           "id",
                           "name",
-                          "type"
+                          "type",
+                          "audience"
                         ]
                       }
                     },
                     "home_location_set": {
                       "type": "boolean"
+                    },
+                    "speaking": {
+                      "type": "object",
+                      "properties": {
+                        "voice_id": {
+                          "type": "string"
+                        },
+                        "source": {
+                          "type": "string",
+                          "enum": [
+                            "robot",
+                            "companion",
+                            "home"
+                          ]
+                        },
+                        "companion_name": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "voice_id",
+                        "source"
+                      ]
                     }
                   },
                   "required": [
                     "controls",
                     "companion_id",
                     "companions",
-                    "home_location_set"
+                    "home_location_set",
+                    "speaking"
                   ]
                 }
               }
