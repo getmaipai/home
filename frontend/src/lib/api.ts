@@ -321,7 +321,7 @@ export type CompanionStatus = "draft" | "ready" | "rendering" | "needs_review";
 export interface CompanionEditable {
   id: string; name: string; pronouns: string | null; tagline: string; backstory: string; interests: string[];
   formality: "casual" | "neutral" | "formal"; complexity: "simple" | "standard" | "advanced"; engagement: "brief" | "balanced" | "curious"; filler_density: "none" | "light" | "frequent";
-  behavior: string[]; examples: string[]; examples_child: string[]; examples_teen: string[]; examples_adult: string[]; voice_id: string; audience: "adult" | "teen" | "all"; status: CompanionStatus; review: unknown; can_edit: boolean; can_copy: boolean; can_set_audience: boolean;
+  behavior: string[]; examples: string[]; examples_child: string[]; examples_teen: string[]; examples_adult: string[]; voice_id: string; look_prompt: string; audience: "adult" | "teen" | "all"; status: CompanionStatus; review: unknown; can_edit: boolean; can_copy: boolean; can_set_audience: boolean;
 }
 export type CompanionFields = Partial<Omit<CompanionEditable, "id" | "status" | "review" | "can_edit" | "can_set_audience">>;
 export interface CompanionList {
@@ -329,6 +329,13 @@ export interface CompanionList {
   companions: CompanionCard[];
   robots: Array<{ id: string; name: string; controls: "child" | "teen" | "adult"; companion_id: string; companion_name: string | null }> | null;
 }
+
+export interface CompanionLookVersion { id: string; label: string; source: "upload" | "generated" | "edit"; width: number; height: number; created_at: string; from: string | null; url: string }
+export interface CompanionLookView { version_id: string; url: string }
+type CompanionLookKey = `#${"00FF00" | "FF00FF"}`;
+export interface CompanionLookSheet { views: { left: CompanionLookView | null; right: CompanionLookView | null; mouth: CompanionLookView | null }; card: { text: string; colours: string[]; species: string } | null; key: CompanionLookKey; state: "empty" | "making" | "needs_review" | "approved"; approved_by: string | null; approved_at: string | null }
+export interface CompanionLook { versions: CompanionLookVersion[]; rest: string | null; key: CompanionLookKey; sheet: CompanionLookSheet | null; ready_for_video: boolean; can_generate: boolean; generate_reason?: string }
+export interface CompanionLookJob { state: "queued" | "running" | "done" | "failed" | "cancelled"; percent: number; label: string; versions: Array<{ id: string; url: string; label: string }>; error: string | null }
 
 export type MemoryRecordWithDevice = MemoryRecord & { device_name?: string };
 // ROBOT-CARD-01: the robot's last reported frame plus the hub's derived
@@ -654,7 +661,7 @@ export async function request<T>(path: string, init?: RequestInit & { timeoutMs?
     const res = await fetch(path, {
       ...rest,
       credentials: "include",
-      headers: { "Content-Type": "application/json", ...rest.headers },
+      headers: rest.body instanceof FormData ? rest.headers : { "Content-Type": "application/json", ...rest.headers },
       // A code review (2026-09-04) found this unconditionally overwrote
       // whatever `signal` a caller passed via `init` - harmless today
       // (no call site passes its own signal), but silently discarding a
@@ -1368,6 +1375,20 @@ export const api = {
   createCompanion: (fields: CompanionFields) => request<{ id: string }>("/api/companions", { method: "POST", body: JSON.stringify(fields) }),
   copyCompanion: (id: string) => request<{ id: string }>(`/api/companions/${encodeURIComponent(id)}/copy`, { method: "POST", body: "{}" }),
   editCompanion: (id: string) => request<CompanionEditable>(`/api/companions/${encodeURIComponent(id)}/edit`),
+  companionLook: (id: string) => request<CompanionLook>(`/api/companions/${encodeURIComponent(id)}/look`),
+  companionLookImage: (id: string, versionId: string) => `/api/companions/${encodeURIComponent(id)}/look/${encodeURIComponent(versionId)}/image`,
+  uploadCompanionLook: (id: string, form: FormData) => request<{ id: string }>(`/api/companions/${encodeURIComponent(id)}/look/upload`, { method: "POST", body: form }),
+  setCompanionLookRest: (id: string, version_id: string) => request<{ rest: string; sheet_reset: boolean }>(`/api/companions/${encodeURIComponent(id)}/look/rest`, { method: "PUT", body: JSON.stringify({ version_id }) }),
+  deleteCompanionLookVersion: (id: string, versionId: string) => request<void>(`/api/companions/${encodeURIComponent(id)}/look/${encodeURIComponent(versionId)}`, { method: "DELETE" }),
+  generateCompanionLook: (id: string, body: { prompt?: string; count?: number } = {}) => request<{ job: string }>(`/api/companions/${encodeURIComponent(id)}/look/generate`, { method: "POST", body: JSON.stringify(body) }),
+  companionLookJob: (id: string, job: string) => request<CompanionLookJob>(`/api/companions/${encodeURIComponent(id)}/look/jobs/${encodeURIComponent(job)}`),
+  cancelCompanionLookJob: (id: string, job: string) => request<void>(`/api/companions/${encodeURIComponent(id)}/look/jobs/${encodeURIComponent(job)}`, { method: "DELETE" }),
+  editCompanionLook: (id: string, body: { version_id: string; instruction: string }) => request<{ job: string }>(`/api/companions/${encodeURIComponent(id)}/look/edit`, { method: "POST", body: JSON.stringify(body) }),
+  makeCompanionLookSheet: (id: string) => request<{ job: string; card_source: "model" | "look_prompt" }>(`/api/companions/${encodeURIComponent(id)}/look/sheet`, { method: "POST" }),
+  saveCompanionLookCard: (id: string, body: { text: string; species?: string }) => request<{ card: CompanionLookSheet["card"] }>(`/api/companions/${encodeURIComponent(id)}/look/sheet/card`, { method: "PUT", body: JSON.stringify(body) }),
+  setCompanionLookKey: (id: string, key: CompanionLookKey) => request<{ key: CompanionLookKey }>(`/api/companions/${encodeURIComponent(id)}/look/sheet/key`, { method: "PUT", body: JSON.stringify({ key }) }),
+  approveCompanionLookSheet: (id: string) => request<{ sheet: CompanionLookSheet }>(`/api/companions/${encodeURIComponent(id)}/look/sheet/approve`, { method: "POST" }),
+  unapproveCompanionLookSheet: (id: string) => request<{ sheet: CompanionLookSheet }>(`/api/companions/${encodeURIComponent(id)}/look/sheet/unapprove`, { method: "POST" }),
   updateCompanion: (id: string, fields: CompanionFields) => request<{ id: string }>(`/api/companions/${encodeURIComponent(id)}`, { method: "PUT", body: JSON.stringify(fields) }),
   setCompanionStatus: (id: string, status: "draft" | "ready") => request<{ id: string }>(`/api/companions/${encodeURIComponent(id)}/status`, { method: "PUT", body: JSON.stringify({ status }) }),
   deleteCompanion: (id: string) => request<void>(`/api/companions/${encodeURIComponent(id)}`, { method: "DELETE" }),

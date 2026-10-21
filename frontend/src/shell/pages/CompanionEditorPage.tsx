@@ -14,13 +14,14 @@ import { Label } from "@maipai/ui/src/ui/label";
 import { Select } from "@maipai/ui/src/primitives/Select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@maipai/ui/src/ui/tabs";
 import { api, ApiError, type CompanionEditable, type CompanionFields } from "@/lib/api";
+import { CompanionLookTab } from "@/shell/pages/CompanionLookTab";
 import { playableVoices, previewIdFor, voiceChoices } from "@/lib/voice/voiceBrowserRows";
 import { voicePreviewPlayer, type VoicePreviewState } from "@/lib/voice/voicePreviewPlayer";
 import { useTabItem } from "@/shell/tabIdentity";
 
 const key = ["companions"] as const;
 type Form = CompanionFields & Pick<CompanionEditable, "name" | "audience">;
-const blank: Form = { name: "", pronouns: "", tagline: "", backstory: "", interests: [], formality: "neutral", complexity: "standard", engagement: "balanced", filler_density: "light", behavior: [], examples: [], examples_child: [], examples_teen: [], examples_adult: [], voice_id: "default", audience: "adult" };
+const blank: Form = { name: "", pronouns: "", tagline: "", backstory: "", interests: [], formality: "neutral", complexity: "standard", engagement: "balanced", filler_density: "light", behavior: [], examples: [], examples_child: [], examples_teen: [], examples_adult: [], voice_id: "default", look_prompt: "", audience: "adult" };
 const dialOptions = {
   formality: { label: "Formality", options: ["casual", "neutral", "formal"], words: ["Talks like a friend", "Plain and polite", "Careful and proper"] },
   complexity: { label: "Word choice", options: ["simple", "standard", "advanced"], words: ["Short, simple words", "Everyday words", "Rich, detailed words"] },
@@ -43,7 +44,7 @@ export function CompanionEditorPage() {
   const [error, setError] = useState("");
   const [tab, setTab] = useState("identity");
   const dirty = isNew ? JSON.stringify(form) !== JSON.stringify(blank) : JSON.stringify(form) !== initial;
-  useEffect(() => { if (query.data) { const data = query.data; const next: Form = { ...blank, name: data.name, pronouns: data.pronouns, tagline: data.tagline, backstory: data.backstory, interests: data.interests, formality: data.formality, complexity: data.complexity, engagement: data.engagement, filler_density: data.filler_density, behavior: data.behavior, examples: data.examples, examples_child: data.examples_child, examples_teen: data.examples_teen, examples_adult: data.examples_adult, voice_id: data.voice_id, audience: data.audience }; setForm(next); setInitial(JSON.stringify(next)); } }, [query.data]);
+  useEffect(() => { if (query.data) { const data = query.data; const next: Form = { ...blank, name: data.name, pronouns: data.pronouns, tagline: data.tagline, backstory: data.backstory, interests: data.interests, formality: data.formality, complexity: data.complexity, engagement: data.engagement, filler_density: data.filler_density, behavior: data.behavior, examples: data.examples, examples_child: data.examples_child, examples_teen: data.examples_teen, examples_adult: data.examples_adult, voice_id: data.voice_id, look_prompt: data.look_prompt ?? "", audience: data.audience }; setForm(next); setInitial(JSON.stringify(next)); } }, [query.data]);
   useTabItem(form.name || "New companion");
   const save = useMutation({ mutationFn: (fields: CompanionFields) => isNew ? api.createCompanion(fields) : api.updateCompanion(id!, fields), onSuccess: (result) => { setError(""); setForm((old) => ({ ...old })); if (isNew) navigate(`/companions/${encodeURIComponent(result.id)}/edit`); else { setInitial(JSON.stringify(form)); setSavedFlash(true); setTimeout(() => setSavedFlash(false), 1800); void queryClient.invalidateQueries({ queryKey: [...key, "edit", id] }); void queryClient.invalidateQueries({ queryKey: key }); } } });
   const status = useMutation({ mutationFn: (next: "draft" | "ready") => api.setCompanionStatus(id!, next), onSuccess: () => { setError(""); void queryClient.invalidateQueries({ queryKey: [...key, "edit", id] }); void query.refetch(); } });
@@ -65,7 +66,7 @@ export function CompanionEditorPage() {
         {companion?.status === "ready" ? <Alert><AlertDescription>People can pick this companion now. Changes you save apply right away.</AlertDescription></Alert> : null}
         {dirty ? <Alert><AlertDescription>You have changes that are not saved</AlertDescription></Alert> : null}
         {mutationError ? <Alert variant="destructive"><AlertDescription>{mutationError}</AlertDescription></Alert> : null}
-        <Tabs value={tab} onValueChange={setTab}><TabsList><TabsTrigger value="identity">Identity</TabsTrigger><TabsTrigger value="voice">Voice and style</TabsTrigger></TabsList>
+        <Tabs value={tab} onValueChange={setTab}><TabsList><TabsTrigger value="identity">Identity</TabsTrigger><TabsTrigger value="voice">Voice and style</TabsTrigger><TabsTrigger value="look">Look</TabsTrigger></TabsList>
           <TabsContent value="identity"><div className="flex flex-col gap-4"><Section heading="Identity">
             <div className="flex flex-col gap-2"><Label htmlFor="companion-name">Name</Label><Input id="companion-name" aria-label="Name" value={form.name} onChange={(e) => update("name", e.target.value)} /></div>
             <div className="flex flex-col gap-2"><Label htmlFor="companion-pronouns">Pronouns</Label><Input id="companion-pronouns" aria-label="Pronouns" value={form.pronouns ?? ""} onChange={(e) => update("pronouns", e.target.value)} /></div>
@@ -80,6 +81,7 @@ export function CompanionEditorPage() {
             {(["child", "teen", "adult"] as const).map((band) => <details key={band}><summary className="cursor-pointer font-medium">{band[0]!.toUpperCase() + band.slice(1)} examples</summary><p className="text-sm text-muted-foreground">Used when this companion talks to a {band}</p><StringRows label={`${band} examples`} values={form[`examples_${band}`] ?? []} max={4} onChange={(values) => update(`examples_${band}`, values)} /></details>)}
             <VoicePicker value={form.voice_id ?? "default"} onChange={(value) => update("voice_id", value)} />
           </Section></div></TabsContent>
+          <TabsContent value="look">{isNew ? <EmptyState icon="user" text="Save the companion first, then add its look." /> : <CompanionLookTab id={id!} prompt={form.look_prompt ?? ""} onPromptChange={(value) => update("look_prompt", value)} active={tab === "look"} />}</TabsContent>
         </Tabs>
         <footer className="flex flex-wrap gap-2"><Button disabled={!dirty || save.isPending} onClick={() => { setError(""); const fields = Object.fromEntries(Object.entries(form).filter(([field]) => field !== "audience")) as CompanionFields; save.mutate(fields); }}>{savedFlash ? "Saved" : save.isPending ? "Saving" : "Save"}</Button>
           {!isNew && companion?.can_edit ? <Button variant="destructive" onClick={() => setConfirmDelete(true)}>Delete</Button> : null}</footer>
