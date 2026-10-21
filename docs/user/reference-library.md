@@ -25,6 +25,14 @@ While a book downloads, Home shows its progress. Choose **Pause** to stop for no
 
 Custom is only the list you edit. Home does not save it as another named preset.
 
+## Pictures in answers
+
+When you ask chat to show you something, Home looks in your offline books first. If a book has a page about it with pictures, those pictures come from your own computer and nothing goes online. Home checks every book you can read, not only Wikipedia.
+
+Not every set has pictures. Vikidia and Simple Wikipedia now install with pictures, which adds about 3 GB. English Wikipedia is the exception: the small set has no pictures, and the full set with pictures is about 127 GB. Choose it only if you have the space. A book you installed earlier without pictures still works for text. Install the picture version to get its pictures.
+
+Children see pictures only from the kids' books. Teens and adults see them from every book they can read. If the books have too few pictures, Home fills the rest from the internet as before.
+
 ## If something goes wrong
 
 If Home cannot check the catalogue or drive space, check that Home is online and try again. If a download fails, open this page again to check its state. Ask the owner or admin to check the drive if there is not enough space.
