@@ -416,6 +416,12 @@ export function getSidecar(
   return { status: entry.status, baseUrl: baseUrlFor(entry.config) };
 }
 
+/** The registered launch command, available for identifying the release a running sidecar uses. */
+export function getSidecarCommand(id: string): string[] | undefined {
+  const entry = registry.get(id);
+  return entry ? [...entry.config.command] : undefined;
+}
+
 /** Remove a declaration and its restart handler after its owner forgets it. */
 export function unregisterSidecar(id: string): void {
   const entry = registry.get(id);

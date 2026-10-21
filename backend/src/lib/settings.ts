@@ -28,6 +28,7 @@ import { assertCanWriteSelfService, isLayeredScalar, isSelfService, resolveLayer
 import { LIVE_PERSONA_IDS } from "@/lib/personaIds";
 
 const HOUSEHOLD_HOME_KEY = "household.home";
+const ROBOT_FIRMWARE_INSTALLED_KEY = "robot.firmware.installed";
 const COMPANIONS_ALLOWED_KEY = "companions.allowed";
 const COMPANIONS_PERMISSION_ERROR = "Only a household owner or admin chooses who can use AI companions. Ask one of them.";
 
@@ -704,6 +705,7 @@ export function setValue(
 
   const keyDef = getRegistryKey(key);
   if (!keyDef) return { ok: false, status: 400, error: `unknown settings key: ${key}` };
+  if (key === ROBOT_FIRMWARE_INSTALLED_KEY) return { ok: false, status: 403, error: "Home records installed robot firmware after a successful flash." };
   const companionsLayer = key === COMPANIONS_ALLOWED_KEY && isLayeredScalar(keyDef)
     && (parsed.kind === "household" || parsed.kind === "person") && keyDef.layers?.includes(parsed.kind);
   if (keyDef.scope !== parsed.kind && !companionsLayer) {
@@ -793,6 +795,13 @@ export function setHouseholdSettingValue(key: string, value: unknown): SettingsO
   if (!keyDef) return { ok: false, status: 400, error: `unknown settings key: ${key}` };
   if (keyDef.scope !== "household") return { ok: false, status: 400, error: `${key} is a ${keyDef.scope}-scope key, not household` };
   return writeValue("household", keyDef, value);
+}
+
+/** Internal device value written only by the owner/admin firmware record route. */
+export function setRobotFirmwareInstalled(deviceId: string, value: { version: string; at: string }, setBy: string): SettingsOpResult<ResolvedSetting> {
+  const keyDef = getRegistryKey(ROBOT_FIRMWARE_INSTALLED_KEY);
+  if (!keyDef || keyDef.scope !== "device") return { ok: false, status: 400, error: "robot firmware setting is unavailable" };
+  return writeValue(`device:${deviceId}`, keyDef, value, { skipValidation: true, setBy });
 }
 
 /** A household setting's resolved value with no actor gate: for core
@@ -972,6 +981,7 @@ export function resetValue(actor: PersonRow, scope: string, key: string): Settin
   if (!parsed) return { ok: false, status: 400, error: `invalid scope: ${scope}` };
   const keyDef = getRegistryKey(key);
   if (!keyDef) return { ok: false, status: 400, error: `unknown settings key: ${key}` };
+  if (key === ROBOT_FIRMWARE_INSTALLED_KEY) return { ok: false, status: 403, error: "Home records installed robot firmware after a successful flash." };
   const companionsLayer = key === COMPANIONS_ALLOWED_KEY && isLayeredScalar(keyDef)
     && (parsed.kind === "household" || parsed.kind === "person") && keyDef.layers?.includes(parsed.kind);
   if (keyDef.scope !== parsed.kind && !companionsLayer) return { ok: false, status: 400, error: `${key} is a ${keyDef.scope}-scope key, not ${parsed.kind}` };

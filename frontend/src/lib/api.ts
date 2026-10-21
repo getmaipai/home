@@ -953,6 +953,11 @@ export const api = {
   robotDevices: () => request<DeviceInfo[]>("/api/devices/robots"),
   robotCompanion: (id: string) => request<RobotCompanionInfo>(`/api/devices/${encodeURIComponent(id)}/companion`),
   robotInstallStatus: (deviceId: string) => request<{ hosted: true; enrollment_pending: boolean }>(`/api/robots/hosts/${encodeURIComponent(deviceId)}/install-status`),
+  robotSoftware: (deviceId: string) => request<{ firmware: { installed: { version: string; at: string } | null; available: string; status: "up_to_date" | "update_available" | "unknown" }; bot: { running: string | null; available: string; status: "up_to_date" | "restart_needed" | "unknown" } }>(`/api/robots/hosts/${encodeURIComponent(deviceId)}/software`),
+  recordRobotFirmwareInstalled: async (deviceId: string) => {
+    const software = await api.robotSoftware(deviceId);
+    return request<{ recorded: true }>(`/api/robots/hosts/${encodeURIComponent(deviceId)}/firmware-installed`, { method: "POST", body: JSON.stringify({ version: software.firmware.available }) });
+  },
   cancelRobotInstall: (deviceId: string) => request<{ removed: true }>(`/api/robots/hosts/${encodeURIComponent(deviceId)}/cancel-install`, { method: "POST" }),
   setRobotMuted: (id: string, muted: boolean) =>
     request<{ id: string }>(`/api/devices/${encodeURIComponent(id)}/commands`, {

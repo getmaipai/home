@@ -80,6 +80,7 @@ function RobotDetail({ device, onClose }: { device: DeviceInfo; onClose: () => v
   const [lifecycleBusy, setLifecycleBusy] = useState(false);
   const [lifecycleError, setLifecycleError] = useState<string | null>(null);
   const [hostedInstall, setHostedInstall] = useState(false);
+  const softwareQuery = useQuery({ queryKey: ["robot-software", device.id], queryFn: () => api.robotSoftware(device.id), enabled: hostedInstall });
   const [robotVoices, setRobotVoices] = useState<Awaited<ReturnType<typeof api.stackVoices>>["voices"]>([]);
   useEffect(() => {
     let active = true;
@@ -127,7 +128,7 @@ function RobotDetail({ device, onClose }: { device: DeviceInfo; onClose: () => v
       subtitle={device.area ?? "Robot"}
       onClose={onClose}
       closeLabel="Back to robots"
-      actions={confirming ? null : <>{hostedInstall && !installing ? <StackChanInstallDialog updateOf={device.id} /> : null}<Button variant="destructive" onClick={() => setConfirming(true)}>{installing ? "Cancel install" : "Forget this robot"}</Button></>}
+      actions={confirming ? null : <Button variant="destructive" onClick={() => setConfirming(true)}>{installing ? "Cancel install" : "Forget this robot"}</Button>}
     >
       <div className="flex flex-col gap-4">
         {confirming ? (
@@ -145,6 +146,27 @@ function RobotDetail({ device, onClose }: { device: DeviceInfo; onClose: () => v
         {lifecycleError ? <Alert variant="destructive"><AlertDescription>{lifecycleError}</AlertDescription></Alert> : null}
         <p className="text-base"><Badge variant="secondary">{statusText(device)}</Badge>{device.ipAddress ? <> IP address {device.ipAddress}</> : null}</p>
         <RobotSelfTests device={device} />
+        {hostedInstall && softwareQuery.data ? <Section heading="Software">
+          <ItemGroup variant="card" aria-label="Robot software">
+            <Item size="setting">
+              <ItemContent>
+                <ItemTitle>Robot firmware</ItemTitle>
+                <ItemDescription>{softwareQuery.data.firmware.installed
+                  ? `Installed ${softwareQuery.data.firmware.installed.version}, recorded ${new Intl.DateTimeFormat(undefined, { month: "short", day: "numeric" }).format(new Date(softwareQuery.data.firmware.installed.at))}. Ready to install: ${softwareQuery.data.firmware.available}.`
+                  : `Not recorded. Ready to install: ${softwareQuery.data.firmware.available}. Install the update from here to keep track.`}</ItemDescription>
+              </ItemContent>
+              <Badge variant="secondary">{softwareQuery.data.firmware.status === "up_to_date" ? "Up to date" : softwareQuery.data.firmware.status === "update_available" ? "Update available" : "Unknown"}</Badge>
+            </Item>
+            <Item size="setting">
+              <ItemContent>
+                <ItemTitle>Bot software on this computer</ItemTitle>
+                <ItemDescription>{softwareQuery.data.bot.running ? `${softwareQuery.data.bot.running}. Ready: ${softwareQuery.data.bot.available}.` : `Not running. Ready: ${softwareQuery.data.bot.available}.`}</ItemDescription>
+              </ItemContent>
+              <Badge variant="secondary">{softwareQuery.data.bot.status === "up_to_date" ? "Up to date" : softwareQuery.data.bot.status === "restart_needed" ? "Restart needed" : softwareQuery.data.bot.running ? "Unknown" : "Not running"}</Badge>
+            </Item>
+          </ItemGroup>
+          <StackChanInstallDialog updateOf={device.id} showButton={softwareQuery.data.firmware.status === "update_available"} onInstalled={() => void queryClient.invalidateQueries({ queryKey: ["robot-software", device.id] })} />
+        </Section> : null}
         <RobotCompanionChoices deviceId={device.id} />
         <div className="flex flex-col gap-3">
           <Label htmlFor={`robot-name-${device.id}`}>Name</Label>

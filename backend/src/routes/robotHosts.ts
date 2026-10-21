@@ -6,8 +6,45 @@ import { getDeviceById, deleteDevice } from "@/lib/devices";
 import { FirmwareFlashManifest } from "@maipai/spec/gen/ts/firmware-flash-manifest.js";
 import { makeEnrollImage, revokeEnrollment, saveEncryptedFlashBackup, verifiedFlashPart, verifiedStackChanManifest } from "@/lib/stackchanInstall";
 import { robotsEnabled, ROBOTS_OFF_MESSAGE } from "@/lib/robots";
+import { getRobotSoftware } from "@/lib/robotSoftware";
+import { botReleaseVersion } from "@/lib/botRelease";
+import { setRobotFirmwareInstalled } from "@/lib/settings";
 
 export const robotHostRoutes = apiRouter();
+const softwareShape = z.object({
+  firmware: z.object({ installed: z.object({ version: z.string(), at: z.string() }).nullable(), available: z.string(), status: z.enum(["up_to_date", "update_available", "unknown"]) }),
+  bot: z.object({ running: z.string().nullable(), available: z.string(), status: z.enum(["up_to_date", "restart_needed", "unknown"]) }),
+});
+const softwareRoute = createRoute({
+  method: "get", path: "/hosts/{deviceId}/software", tags: ["Robots"], summary: "Get the software status for a hosted robot",
+  middleware: [requireRole("owner", "admin")] as const,
+  request: { params: z.object({ deviceId: z.string() }) },
+  responses: { 200: { content: { "application/json": { schema: softwareShape } }, description: "Robot software status." }, ...errorResponses({ 403: "Admin access is required", 404: "Hosted robot not found" }) },
+});
+robotHostRoutes.openapi(softwareRoute, (c) => {
+  if (!robotsEnabled()) return c.json({ error: ROBOTS_OFF_MESSAGE }, 403);
+  const { deviceId } = c.req.valid("param");
+  if (!getRobotHostRecord(deviceId) || getDeviceById(deviceId)?.kind !== "robot") return c.json({ error: "That hosted robot could not be found." }, 404);
+  return c.json(getRobotSoftware(deviceId), 200);
+});
+
+const firmwareInstalledRoute = createRoute({
+  method: "post", path: "/hosts/{deviceId}/firmware-installed", tags: ["Robots"], summary: "Record firmware written by Home",
+  middleware: [requireRole("owner", "admin")] as const,
+  request: { params: z.object({ deviceId: z.string() }), body: { content: { "application/json": { schema: z.object({ version: z.string().min(1).max(64) }) } } } },
+  responses: { 200: { content: { "application/json": { schema: z.object({ recorded: z.literal(true) }) } }, description: "Firmware install recorded." }, ...errorResponses({ 400: "Version is not served by Home", 403: "Admin access is required", 404: "Hosted robot not found" }) },
+});
+robotHostRoutes.openapi(firmwareInstalledRoute, (c) => {
+  if (!robotsEnabled()) return c.json({ error: ROBOTS_OFF_MESSAGE }, 403);
+  const { deviceId } = c.req.valid("param");
+  if (!getRobotHostRecord(deviceId) || getDeviceById(deviceId)?.kind !== "robot") return c.json({ error: "That hosted robot could not be found." }, 404);
+  const { version } = c.req.valid("json");
+  if (version !== botReleaseVersion()) return c.json({ error: "Home did not serve that firmware version. Update Home, then try again." }, 400);
+  const result = setRobotFirmwareInstalled(deviceId, { version, at: new Date().toISOString() }, c.get("person").id);
+  if (!result.ok) return c.json({ error: result.error }, result.status);
+  return c.json({ recorded: true as const }, 200);
+});
+
 const createRouteDef = createRoute({
   method: "post", path: "/hosts", tags: ["Robots"], summary: "Start a Bot app on Home for a StackChan",
   middleware: [requireRole("owner", "admin")] as const,

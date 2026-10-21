@@ -9,7 +9,7 @@ import { dataDir } from "@/lib/paths";
 import { createHostedRobot, deleteDevice, getDeviceById, listDevicesByKind } from "@/lib/devices";
 import { deviceHasToken } from "@/lib/deviceTokens";
 import { ensureBotRelease } from "@/lib/botRelease";
-import { getSidecar, registerSidecar, startSidecar, stopSidecar, unregisterSidecar } from "@/lib/sidecars";
+import { getSidecar, getSidecarCommand, registerSidecar, startSidecar, stopSidecar, unregisterSidecar } from "@/lib/sidecars";
 import { robotsEnabled } from "@/lib/robots";
 import { homePort } from "@/lib/ports";
 import { raiseIssue, resolveIssue } from "@/lib/issues";
@@ -28,6 +28,14 @@ let releaseForTests: (() => Promise<{ dir: string }>) | null = null;
 export function __setRobotHostReleaseForTests(fn: (() => Promise<{ dir: string }>) | null): void { releaseForTests = fn; }
 /** The installed Bot app release every host launch and provision command runs from. */
 export function robotHostRelease(): Promise<{ dir: string }> { return (releaseForTests ?? ensureBotRelease)(); }
+/** The running process was launched from this exact release path; stopped hosts have no running version. */
+export function robotHostRunningVersion(deviceId: string): string | null {
+  const id = sidecarId(deviceId);
+  if (getSidecar(id)?.status !== "running") return null;
+  const executable = getSidecarCommand(id)?.[0];
+  const match = executable?.match(/[\\/]releases[\\/]([^/\\]+?)-(?:darwin|linux|win32)-[^/\\]+[\\/]bot[\\/]bin[\\/]maipai-bot-host$/);
+  return match?.[1] ?? null;
+}
 /** Test-only: forgets the in-memory host map, as a fresh process would. */
 export function __resetRobotHostsForTests(): void { configs.clear(); }
 

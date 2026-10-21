@@ -12,7 +12,7 @@ const ONLINE_MESSAGE = "The robot did not reach Home. Check it joined the same W
 
 /** With `updateOf` it updates the firmware of a robot Home already knows (no new entry, no backup, the robot keeps its
  * name, Wi-Fi and pairing); without it, it adds a new StackChan. */
-export function StackChanInstallDialog({ updateOf }: { updateOf?: string } = {}) {
+export function StackChanInstallDialog({ updateOf, install = installStackChan, recordInstalled = api.recordRobotFirmwareInstalled, onInstalled, showButton = true }: { updateOf?: string; install?: typeof installStackChan; recordInstalled?: (deviceId: string) => Promise<unknown>; onInstalled?: () => void; showButton?: boolean } = {}) {
   const updating = updateOf !== undefined;
   const [updateDone, setUpdateDone] = useState(false);
   const [open, setOpen] = useState(false);
@@ -63,15 +63,19 @@ export function StackChanInstallDialog({ updateOf }: { updateOf?: string } = {})
     }
     setWorking(true);
     let hostCreated = false;
+    let flashComplete = false;
     try {
       const port = await (navigator as Navigator & { serial: { requestPort(): Promise<unknown> } }).serial.requestPort();
       const transport = createBrowserSerialTransport(port, (line) => setLines((previous) => addLogLine(previous, line)));
       transportRef.current = transport;
-      const result = await installStackChan(transport, { onStage: (next, completed, total) => {
+      const result = await install(transport, { onStage: (next, completed, total) => {
         setStage(next);
         setCompleted(completed ?? 0);
         setProgress(total && completed !== undefined ? Math.min(100, Math.round(completed / total * 100)) : 0);
       }, onHostCreated: (id) => { hostCreated = true; setDeviceId(id); } }, { skipBackup, existingDeviceId: updateOf });
+      flashComplete = true;
+      await recordInstalled(result.deviceId);
+      onInstalled?.();
       if (updating) setUpdateDone(true);
       else setDeviceId(result.deviceId);
       setInstallFinished(true);
@@ -79,7 +83,7 @@ export function StackChanInstallDialog({ updateOf }: { updateOf?: string } = {})
     } catch (error) {
       setStalledInBackup(error instanceof Error && error.message === STALL_TIMEOUT_MESSAGE);
       const detail = error instanceof ApiError ? error.message : error instanceof Error ? error.message : "The StackChan install stopped.";
-      setMessage(hostCreated ? `${detail} Use Cancel install on the robot card before starting again.` : `${detail} Check the USB cable and try again.`);
+      setMessage(flashComplete ? `Firmware was written, but Home could not record its version. ${detail}` : hostCreated ? `${detail} Use Cancel install on the robot card before starting again.` : `${detail} Check the USB cable and try again.`);
     } finally { transportRef.current = null; setWorking(false); }
   }
 
@@ -99,7 +103,7 @@ export function StackChanInstallDialog({ updateOf }: { updateOf?: string } = {})
 
   return (
     <>
-      <Button onClick={openDialog}>{updating ? "Update firmware" : "Add a StackChan"}</Button>
+      {showButton ? <Button onClick={openDialog}>{updating ? "Update firmware" : "Add a StackChan"}</Button> : null}
       <Dialog open={open} onOpenChange={(next) => { if (!working) setOpen(next); }}>
         <DialogContent scroll="viewport">
           <DialogHeader>

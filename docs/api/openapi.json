@@ -30327,6 +30327,214 @@
         }
       }
     },
+    "/api/robots/hosts/{deviceId}/software": {
+      "get": {
+        "tags": [
+          "Robots"
+        ],
+        "summary": "Get the software status for a hosted robot",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "deviceId",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Robot software status.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "firmware": {
+                      "type": "object",
+                      "properties": {
+                        "installed": {
+                          "type": "object",
+                          "nullable": true,
+                          "properties": {
+                            "version": {
+                              "type": "string"
+                            },
+                            "at": {
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "version",
+                            "at"
+                          ]
+                        },
+                        "available": {
+                          "type": "string"
+                        },
+                        "status": {
+                          "type": "string",
+                          "enum": [
+                            "up_to_date",
+                            "update_available",
+                            "unknown"
+                          ]
+                        }
+                      },
+                      "required": [
+                        "installed",
+                        "available",
+                        "status"
+                      ]
+                    },
+                    "bot": {
+                      "type": "object",
+                      "properties": {
+                        "running": {
+                          "type": "string",
+                          "nullable": true
+                        },
+                        "available": {
+                          "type": "string"
+                        },
+                        "status": {
+                          "type": "string",
+                          "enum": [
+                            "up_to_date",
+                            "restart_needed",
+                            "unknown"
+                          ]
+                        }
+                      },
+                      "required": [
+                        "running",
+                        "available",
+                        "status"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "firmware",
+                    "bot"
+                  ]
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Admin access is required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Hosted robot not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/robots/hosts/{deviceId}/firmware-installed": {
+      "post": {
+        "tags": [
+          "Robots"
+        ],
+        "summary": "Record firmware written by Home",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "deviceId",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "version": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 64
+                  }
+                },
+                "required": [
+                  "version"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Firmware install recorded.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "recorded": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    }
+                  },
+                  "required": [
+                    "recorded"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Version is not served by Home",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Admin access is required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Hosted robot not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/robots/hosts": {
       "post": {
         "tags": [

@@ -48,6 +48,8 @@ export function hasBotReleaseAssets(): boolean {
   const selected = pinOverride ?? (pin as BotReleasePin);
   return Object.values(selected.assets ?? {}).some(Boolean);
 }
+/** The release Home ships; kept as the single source for software status and install validation. */
+export function botReleaseVersion(): string { return (pinOverride ?? (pin as BotReleasePin)).version; }
 /** The keys a release's SHA256SUMS and the StackChan flash manifest must be signed by. */
 export function botReleaseSigningKeys(): string[] {
   return (pinOverride ?? (pin as BotReleasePin)).signing_keys ?? [];

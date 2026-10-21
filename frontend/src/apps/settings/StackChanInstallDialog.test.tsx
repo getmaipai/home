@@ -75,4 +75,27 @@ describe("StackChan install browser check", () => {
     fireEvent.click(buttons[buttons.length - 1]!);
     await waitFor(() => expect(asked).toBe(1));
   });
+
+  test("records firmware only after a successful flash", async () => {
+    Object.defineProperty(navigator, "serial", { configurable: true, value: { requestPort: async () => ({}) } });
+    Object.defineProperty(window, "isSecureContext", { configurable: true, value: true });
+    const recorded: string[] = [];
+    const view = render(<StackChanInstallDialog updateOf="device-known" install={async () => ({ deviceId: "device-known" })} recordInstalled={async (id) => { recorded.push(id); }} />);
+    fireEvent.click(view.getByRole("button", { name: "Update firmware" }));
+    const buttons = view.getAllByRole("button", { name: "Update firmware" });
+    fireEvent.click(buttons[buttons.length - 1]!);
+    await waitFor(() => expect(recorded).toEqual(["device-known"]));
+  });
+
+  test("does not record firmware when flashing fails", async () => {
+    Object.defineProperty(navigator, "serial", { configurable: true, value: { requestPort: async () => ({}) } });
+    Object.defineProperty(window, "isSecureContext", { configurable: true, value: true });
+    const recorded: string[] = [];
+    const view = render(<StackChanInstallDialog updateOf="device-known" install={async () => { throw new Error("flash failed"); }} recordInstalled={async (id) => { recorded.push(id); }} />);
+    fireEvent.click(view.getByRole("button", { name: "Update firmware" }));
+    const buttons = view.getAllByRole("button", { name: "Update firmware" });
+    fireEvent.click(buttons[buttons.length - 1]!);
+    await waitFor(() => expect(view.getByText(/flash failed/)).toBeTruthy());
+    expect(recorded).toEqual([]);
+  });
 });

@@ -25,6 +25,12 @@ When a newer version is ready, open the robot in **Settings, Home, Devices** and
 
 Most improvements come with a Home update. They need no new robot software. Update the firmware only when Home says so.
 
+## See which software a robot has
+
+Open the robot in **Settings, Home, Devices** and look under **Software**. Home shows the firmware version it last wrote, the version ready to install, and whether an update is ready. It also shows the Bot software running on this computer and whether it needs a restart.
+
+Home records firmware after a successful install from this page. If it says the version is not recorded, install the update from here to start tracking it. The robot does not report its own firmware version yet, so Home cannot check changes made outside this page.
+
 ## A robot's settings
 
 Open the robot from **Settings, Home, Devices**. The **This robot** card holds its name, voice, face color and night mode. It also sets how long the robot listens for a follow-up and how much its camera watches. The **Companion and controls** card sets how it talks and what it may say.
