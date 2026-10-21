@@ -1101,6 +1101,7 @@ commons_archive_sha256() {
     ui-v0.5.304) printf '%s\n' "c2fe2f48fd1ab05c5bd5eacc22237f6a958ea6fd6b041c9a684e5bec4b093f10" ;;
     ui-v0.5.305) printf '%s\n' "8c1cbb38163a7ad6d47b106638ca1058188cb023f86cf85960f93bf496ee83f1" ;;
     ui-v0.5.307) printf '%s\n' "e03105e3cc51288f36081f707d1c8cde95b2b8f953bde2ee9d18b76098007542" ;;
+    spec-v0.1.203) printf '%s\n' "78d0d5663a19dc8274c6d222be142251de70aa3e937ecee78e34c097c320ea71" ;;
     *) return 1 ;;
   esac
 }
