@@ -214,6 +214,8 @@ const ROBOT_SESSION_ROUTES: ReadonlyArray<readonly [string, RegExp]> = [
   ["GET", /^\/api\/biometric-prints\/sync\/?$/],
   // LIVE-VIEW-01: the robot posts JPEG frames of an open live view.
   ["POST", /^\/api\/devices\/me\/stream\/[^/]+\/?$/],
+  // ROBOT-VISION-01: the robot posts one JPEG camera picture for its short-lived scene description (lib/robotVision.ts).
+  ["POST", /^\/api\/devices\/me\/vision\/?$/],
   // ROBOT-TEST-01: the robot returns one part self-test result to the waiting admin request.
   ["POST", /^\/api\/devices\/me\/self-test\/[^/]+\/?$/],
 ];

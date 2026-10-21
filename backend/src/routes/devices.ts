@@ -11,6 +11,7 @@ import { db } from "@/db";
 import { people } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import { apiRouter, errorResponses, idParamSchema } from "@/lib/openapi";
+import { acceptFrame, MAX_FRAME_BYTES } from "@/lib/robotVision";
 import { LIVE_VIEW_CONTENT_TYPE, getLiveView, liveViewAdmits, liveViewStream, pushLiveFrame, startLiveView, stopLiveView } from "@/lib/liveView";
 import { requireAuth, requireRole, requireDeviceSession, resolveHumanSession } from "@/middleware/auth";
 import { mediaBandOf } from "@/lib/media/band";
@@ -551,6 +552,36 @@ devicesRoutes.openapi(streamFrameRoute, async (c) => {
   if (outcome === "unknown_view") return c.json({ error: "No live view is open for this robot. Stop streaming." }, 404);
   if (outcome === "bad_frame") return c.json({ error: "A live view frame must be a JPEG under 512 KB." }, 400);
   return c.body(null, 204);
+});
+
+// ROBOT-VISION-01: the robot's one camera picture for its short-lived scene description. The picture is described once by the local
+// chat model and dropped; nothing is stored or returned (lib/robotVision.ts, docs/design/robot-vision-2026-10-21.md).
+const visionFrameRoute = createRoute({
+  method: "post",
+  path: "/me/vision",
+  tags: ["Devices"],
+  summary: "The robot posts one JPEG camera picture for its scene description",
+  middleware: [requireDeviceSession("robot")] as const,
+  request: {
+    query: z.object({
+      purpose: z.enum(["scene", "ask"]).default("scene"),
+      people: z.coerce.number().int().min(0).max(20).optional(),
+      light: z.enum(["dark", "dim", "bright"]).optional(),
+    }),
+  },
+  responses: {
+    200: { content: { "application/json": { schema: z.object({ ok: z.literal(true), expires_in_s: z.number() }) } }, description: "The picture was described and dropped; the description lasts about a minute." },
+    ...errorResponses({ 400: "Not a picture", 401: "Not signed in", 403: "Robot vision is off for this robot", 413: "Too large", 415: "Not a JPEG", 429: "Too fast", 503: "The chat model is not reading pictures" }),
+  },
+});
+devicesRoutes.openapi(visionFrameRoute, async (c) => {
+  const declared = Number(c.req.header("content-length") ?? "0");
+  if (declared > MAX_FRAME_BYTES) return c.json({ error: "A camera picture must be under 512 KB. Send a smaller one." }, 413);
+  const bytes = new Uint8Array(await c.req.arrayBuffer());
+  const query = c.req.valid("query");
+  const outcome = await acceptFrame({ deviceId: c.get("deviceId"), bytes, people: query.people ?? null, brightness: query.light ?? "unknown", purpose: query.purpose });
+  if (!outcome.ok) return c.json({ error: outcome.error, code: outcome.code }, outcome.status);
+  return c.json({ ok: true as const, expires_in_s: Math.round((outcome.scene.expiresAt - outcome.scene.at) / 1000) }, 200);
 });
 
 const deleteRoute = createRoute({

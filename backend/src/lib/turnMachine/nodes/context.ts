@@ -42,6 +42,7 @@ import { picturesAttachedNote, picturesNotReadNote } from "@/lib/chatImageNote";
 import { chatModelReadsPictures, loadPictureParts, picturePartsAllowed } from "@/lib/chatPictures";
 import type { LlmImagePart } from "@/lib/llm";
 import { chatCatalogEntry } from "@/lib/modelCatalog";
+import { sceneContextLine } from "@/lib/robotVision";
 import { librarySnapshotDate } from "@/lib/retrieval/referenceReader";
 
 /** MEMORY-FLOOR-01: the floor on recall()'s own composite `score`
@@ -400,6 +401,13 @@ export const contextNode: Node<ContextInput, ContextOutput> = async (state, inpu
   // that stood here: "The model's training knowledge may be older than today."
   const snapshot = await librarySnapshotDate(turnAgeBand(state.surface, state.actor, state.speakerEvidence, now, state.deviceId));
   items.push({ id: "clock", text: datesText({ now, locale, modelCutoff: chatModelCutoff(), librarySnapshot: snapshot, homePlace: householdHomePlaceName() }), source: "clock", subjects: [], disclosure: "child_ok" });
+
+  // ROBOT-VISION-01: a robot's short-lived idea of what its camera sees. One labelled line, only for a robot-surface turn whose robot has
+  // vision on and a description that has not expired (lib/robotVision.ts); it rides with the volatile data, never the cached prefix.
+  if (state.surface === "robot" && state.deviceId) {
+    const scene = sceneContextLine(state.deviceId);
+    if (scene) items.push({ id: "robot-scene", text: scene, source: "camera", subjects: [], disclosure: "child_ok" });
+  }
 
   // The roster: who this household has, so "he"/"she"/a name resolves
   // against real people without a pronoun-guessing rule. One item per

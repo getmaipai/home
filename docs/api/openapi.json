@@ -30787,6 +30787,150 @@
         }
       }
     },
+    "/api/devices/me/vision": {
+      "post": {
+        "tags": [
+          "Devices"
+        ],
+        "summary": "The robot posts one JPEG camera picture for its scene description",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "enum": [
+                "scene",
+                "ask"
+              ],
+              "default": "scene"
+            },
+            "required": false,
+            "name": "purpose",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "integer",
+              "nullable": true,
+              "minimum": 0,
+              "maximum": 20
+            },
+            "required": false,
+            "name": "people",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "enum": [
+                "dark",
+                "dim",
+                "bright"
+              ]
+            },
+            "required": false,
+            "name": "light",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The picture was described and dropped; the description lasts about a minute.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    },
+                    "expires_in_s": {
+                      "type": "number"
+                    }
+                  },
+                  "required": [
+                    "ok",
+                    "expires_in_s"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Not a picture",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Robot vision is off for this robot",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "Too large",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "Not a JPEG",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too fast",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "The chat model is not reading pictures",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/devices/discover-robots": {
       "get": {
         "tags": [

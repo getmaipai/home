@@ -488,3 +488,27 @@ V1. **No request to a live video service without Jesse's approval in the
     approval covers only the requests it names; approving a design is not
     approving a request. Tests use hand-written fixtures, never a capture
     from the live service. Reason: the household's one IP gets blocked.
+
+## Robot vision
+
+Record: [robot vision](robot-vision-2026-10-21.md). Owner-approved 2026-10-21 (chat): Jesse ruled that a robot keeps a constant,
+short-lived idea of what its camera sees, that this is not an age question, that the protection is the data's handling, and that an
+admin picks per robot between always watching (the default), only when asked, and camera off.
+Owner-approved: 2026-10-21
+
+Governs: backend/src/lib/robotVision.ts, backend/src/routes/devices.ts (`/me/vision`), backend/src/lib/turnMachine/**, frontend/src/apps/settings/**
+
+R1. **A picture from a robot is described once and dropped.** The robot posts one JPEG to `/api/devices/me/vision`. Home hands it once to
+    the local chat model, keeps one short sentence per robot in this process's memory for about 90 seconds, and drops the picture. No
+    picture and no description is ever written to disk, a stored turn, memory, the library, a backup, a log, a stat, telemetry or a
+    queue; no route returns either; no person, admin included, can read a picture or the history of descriptions (there is none).
+    Logs carry counts and timings only.
+R2. **Only the robot's own session reaches it, and the setting decides.** The route is in the robot-session allow-list and nowhere else;
+    it needs a robot device session. `robot.vision` is per robot and admin-set: `continual` (default), `on_demand` (a picture only for
+    an ask) or `none` (every picture refused, nothing kept). Pictures are rate limited, size limited and must be JPEG.
+R3. **The look is context, never a claim.** A live description rides into that robot's turns as labelled background data with its age;
+    the guidance next to it says to state only what it says, never to name or identify anyone from how they look, and to say plainly
+    when it cannot see. It applies to every age band; a child's or teen's robot gets the same data protections and the usual output gate.
+R4. **A robot turn still carries no picture.** The turn route's rule that pictures ride only on written chat turns is unchanged; the
+    robot's look reaches the model only as the description above.
+
