@@ -74,6 +74,13 @@ if command -v launchctl >/dev/null 2>&1; then
   fi
 fi
 
+# The maipai start/stop command install.sh adds (MAIPAI-CLI-01).
+if [ -f /usr/local/bin/maipai ]; then
+  echo "== Found the maipai command: /usr/local/bin/maipai"
+  sudo rm -f /usr/local/bin/maipai
+  echo "   Removed."
+fi
+
 if ! $removed_service; then
   echo "== No registered service found (systemd/launchd) - nothing to unregister."
   echo "   On Windows, run: winsw.exe uninstall \"<install dir>\\maipai-home-service.xml\" from an elevated prompt."

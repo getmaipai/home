@@ -14,6 +14,7 @@ day the hub arrives; the rest are for when you need them.
 - [Chat and talking to MaiPai](chat.md): how to send a message, use voice input, and manage your conversations.
 - [Talking to Home](voice.md): allow the microphone, pick a voice, and turn natural speech sounds on or off.
 - [Weather](weather.md): ask in chat, open the Weather app, and set your places and units.
+- [Turn Home off and on](maipai-command.md): stop Home to free the computer's memory, start it again, and check it is running.
 - [All apps](all-apps.md): find any app, and choose which ones sit in the left rail.
 - [Media](media.md): open the Videos, Shows and Films, Music, Podcasts and Books apps from one place.
 - [The Library](library.md): find, look at, add, share, keep and delete the pictures, videos, songs and files in your home.

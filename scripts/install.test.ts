@@ -3,7 +3,7 @@ import { describe, test, expect, setDefaultTimeout } from "bun:test";
 // These tests run the real installer script in a sandbox: one takes about 5 s, which is bun's default limit, so a loaded machine
 // failed it. The gate uses 20 s for the full run; a single-file run needs the same.
 setDefaultTimeout(30_000);
-import { existsSync, readdirSync, readFileSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -1743,5 +1743,31 @@ there'`);
     const text = readFileSync(join(import.meta.dir, "uninstall.sh"), "utf8");
     expect(text).toContain("STACK_STEP_UNIT");
     expect(text).toContain("/etc/sudoers.d/maipai-home");
+  });
+});
+
+describe("install_maipai_command (MAIPAI-CLI-01)", () => {
+  test("copies scripts/maipai to the destination as an executable and records success", () => {
+    const root = mkdtempSync(join(tmpdir(), "maipai-cli-install-"));
+    try {
+      mkdirSync(join(root, "scripts"));
+      writeFileSync(join(root, "scripts", "maipai"), "#!/bin/bash\necho hi\n");
+      const dest = join(root, "bin", "maipai");
+      const result = Bun.spawnSync(["bash", "-c", `source "${INSTALL_SH}"; install_maipai_command "${root}"; echo "$MAIPAI_COMMAND_INSTALLED"`], { env: { ...process.env, MAIPAI_COMMAND_DEST: dest } });
+      expect(result.stdout.toString().trim().split("\n").pop()).toBe("yes");
+      expect(readFileSync(dest, "utf8")).toContain("echo hi");
+      expect(statSync(dest).mode & 0o111).not.toBe(0);
+    } finally { rmSync(root, { recursive: true, force: true }); }
+  });
+
+  test("a missing source or an unwritable destination does not fail the install and says what to do", () => {
+    const root = mkdtempSync(join(tmpdir(), "maipai-cli-install-"));
+    try {
+      const result = Bun.spawnSync(["bash", "-c", `source "${INSTALL_SH}"; install_maipai_command "${root}"; echo "status=$?"; echo "$MAIPAI_COMMAND_INSTALLED"`], { env: { ...process.env, MAIPAI_COMMAND_DEST: join(root, "bin", "maipai") } });
+      const out = result.stdout.toString();
+      expect(out).toContain("status=0");
+      expect(out).toContain("Could not install the maipai command");
+      expect(out.trim().split("\n").pop()).toBe("no");
+    } finally { rmSync(root, { recursive: true, force: true }); }
   });
 });

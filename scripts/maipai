@@ -1,0 +1,132 @@
+#!/usr/bin/env bash
+# maipai: start, stop, restart or check MaiPai Home and its AI engine (the Stack) on this computer.
+# Installed to /usr/local/bin/maipai by install.sh. macOS and Linux. Design: docs/design/maipai-control-cli-2026-10-21.md.
+#
+# Test seams (the tests put stubs for launchctl, systemctl, sudo, curl, pgrep and ps first on PATH):
+#   MAIPAI_OS, MAIPAI_ROOT, MAIPAI_PORT, MAIPAI_HOME_PLIST, MAIPAI_CONSOLE_USER, MAIPAI_WAIT, MAIPAI_START_WAIT
+set -u
+
+os="${MAIPAI_OS:-$(uname -s | tr '[:upper:]' '[:lower:]')}"
+port="${MAIPAI_PORT:-3000}"
+wait_stop="${MAIPAI_WAIT:-30}"
+wait_start="${MAIPAI_START_WAIT:-120}"
+case "$os" in
+  darwin) root="${MAIPAI_ROOT:-/usr/local/maipai-home}" ;;
+  linux) root="${MAIPAI_ROOT:-/opt/maipai-home}" ;;
+  *) echo "maipai: this command supports macOS and Linux. On Windows, use the Services app to stop or start MaiPai Home." >&2; exit 2 ;;
+esac
+home_plist="${MAIPAI_HOME_PLIST:-/Library/LaunchDaemons/com.maipai.home.plist}"
+home_unit="maipai-home.service"
+stack_unit="maipai-stack.service"
+
+say() { printf '%s\n' "$*"; }
+die() { printf 'maipai: %s\n' "$*" >&2; exit 1; }
+
+console_user() {
+  if [ -n "${MAIPAI_CONSOLE_USER:-}" ]; then say "$MAIPAI_CONSOLE_USER"; return; fi
+  if [ "$os" = "darwin" ]; then
+    stat -f%Su /dev/console
+  elif [ -f "$root/.install-user" ]; then
+    tr -d '[:space:]' < "$root/.install-user"
+  else
+    logname 2>/dev/null || say "${SUDO_USER:-$USER}"
+  fi
+}
+
+# The Stack runs as this account, so its service is looked up under this account.
+stack_user="$(console_user)"
+stack_uid="$(id -u "$stack_user" 2>/dev/null || true)"
+stack_plist="/Users/${stack_user}/Library/LaunchAgents/com.maipai.stack.plist"
+
+installing() {
+  pgrep -f '(^|/)(maipai-install|install\.sh)( |$)' >/dev/null 2>&1
+}
+
+engine_pids() {
+  pgrep -f "$root/stack/" 2>/dev/null || true
+}
+
+engine_running() { [ -n "$(engine_pids)" ]; }
+
+stack_ctl() { # start|stop, as the account that owns the Stack
+  local action="$1"
+  if [ "$os" = "darwin" ]; then
+    if [ "$action" = "stop" ]; then launchctl bootout "gui/$stack_uid/com.maipai.stack" 2>&1 | grep -v -i 'no such process\|not found' || true
+    else launchctl bootstrap "gui/$stack_uid" "$stack_plist" 2>&1 | grep -v -i 'already\|in progress' || true
+    fi
+  else
+    sudo -u "$stack_user" env "XDG_RUNTIME_DIR=/run/user/$stack_uid" systemctl --user "$action" "$stack_unit" 2>&1 || true
+  fi
+}
+
+home_ctl() { # start|stop
+  local action="$1"
+  if [ "$os" = "darwin" ]; then
+    if [ "$action" = "stop" ]; then sudo launchctl bootout system "$home_plist" 2>&1 | grep -v -i 'no such process\|not found' || true
+    else sudo launchctl bootstrap system "$home_plist" 2>&1 | grep -v -i 'already\|in progress' || true
+    fi
+  else
+    sudo systemctl "$action" "$home_unit" 2>&1 || true
+  fi
+}
+
+home_answers() {
+  [ "$(curl -s -m 2 -o /dev/null -w '%{http_code}' "http://localhost:${port}/healthz" 2>/dev/null)" = "200" ]
+}
+
+refuse_during_install() {
+  if installing; then
+    die "an install or upgrade is running right now. Wait for it to finish, then run 'maipai $1' again."
+  fi
+}
+
+do_stop() {
+  refuse_during_install stop
+  say "Stopping Home (you may be asked for your password)..."
+  home_ctl stop
+  say "Stopping the AI engine..."
+  stack_ctl stop
+  local i=0
+  while engine_running && [ "$i" -lt "$wait_stop" ]; do sleep 1; i=$((i + 1)); done
+  if engine_running; then
+    say "These AI engine processes are still running:" >&2
+    engine_pids | tr '\n' ' ' >&2; echo >&2
+    die "the AI engine did not stop within ${wait_stop} seconds. Wait a moment and run 'maipai stop' again, or run 'maipai status'."
+  fi
+  say "Stopped. Home and the AI engine are off, and their memory is free."
+}
+
+do_start() {
+  refuse_during_install start
+  if [ "$os" = "darwin" ]; then [ -f "$home_plist" ] || die "MaiPai Home is not installed on this Mac ($home_plist is missing). Run the installer first."
+  else systemctl cat "$home_unit" >/dev/null 2>&1 || die "MaiPai Home is not installed on this computer ($home_unit is missing). Run the installer first."
+  fi
+  [ -n "$stack_uid" ] || die "no signed-in account was found to run the AI engine as. Sign in on this computer, then run 'maipai start' again."
+  say "Starting the AI engine..."
+  stack_ctl start
+  say "Starting Home (you may be asked for your password)..."
+  home_ctl start
+  local i=0
+  while ! home_answers && [ "$i" -lt "$wait_start" ]; do sleep 1; i=$((i + 1)); done
+  if home_answers; then say "Home is up: http://localhost:${port}"; return 0; fi
+  die "Home did not answer within ${wait_start} seconds. Look at $root/data/logs/launchd.err.log (macOS) or run 'journalctl -u $home_unit' (Linux), or run 'maipai status'."
+}
+
+do_status() {
+  local home_state engine_state mem_kb
+  if home_answers; then home_state="running, answering on port ${port}"; else home_state="stopped, or not answering on port ${port}"; fi
+  if engine_running; then engine_state="running"; else engine_state="stopped"; fi
+  say "Home:      $home_state"
+  say "AI engine: $engine_state"
+  mem_kb="$(ps -axo rss=,command= 2>/dev/null | awk -v p="$root/stack/" 'index($0,p){s+=$1} END{print s+0}')"
+  say "AI engine memory: $((mem_kb / 1024 / 1024)) GB"
+  if installing; then say "An install or upgrade is running right now."; fi
+}
+
+case "${1:-}" in
+  start) do_start ;;
+  stop) do_stop ;;
+  restart) do_stop && do_start ;;
+  status) do_status ;;
+  *) say "usage: maipai start | stop | restart | status"; [ -z "${1:-}" ] && exit 0 || exit 64 ;;
+esac

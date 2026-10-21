@@ -1570,6 +1570,17 @@ INSTALL_STAGE=""
 INSTALL_ROOT_FOR_TRAP=""
 INSTALL_OS_FOR_TRAP=""
 
+# MAIPAI-CLI-01: the `maipai start|stop|restart|status` command. Best effort: a failure here never fails the install.
+install_maipai_command() {
+  local root="$1" dest="${MAIPAI_COMMAND_DEST:-/usr/local/bin/maipai}"
+  if [ -f "${root}/scripts/maipai" ] && mkdir -p "$(dirname "$dest")" 2>/dev/null && install -m 0755 "${root}/scripts/maipai" "$dest" 2>/dev/null; then
+    MAIPAI_COMMAND_INSTALLED="yes"
+  else
+    MAIPAI_COMMAND_INSTALLED="no"
+    log "Could not install the maipai command (stop and start still work through the service manager). Run the installer again to retry."
+  fi
+}
+
 restart_home_service() {
   local os="$1"
   if [ "$os" = "linux" ]; then
@@ -1878,6 +1889,8 @@ main() {
       || log "The Stack is not answering yet. Home will keep retrying; its log: ${install_root}/stack/data/logs/stack.error.log"
   fi
 
+  install_maipai_command "$install_root"
+
   # Markers last, so an install that died earlier is still seen as
   # unfinished by the next run.
   if [ "$rollback" = "yes" ]; then
@@ -1892,6 +1905,7 @@ main() {
 
   log ""
   log "MaiPai Home ${tag} is installed and running at http://localhost:${port}"
+  [ "${MAIPAI_COMMAND_INSTALLED:-no}" != "yes" ] || log "Stop or start Home any time with: maipai stop, maipai start, maipai status"
   if [ "$os" = "darwin" ]; then
     local lan_name
     lan_name=$(scutil --get LocalHostName 2>/dev/null || true)
