@@ -352,3 +352,40 @@ This is the design pass that COMPANIONS-STUDIO-01 was waiting for; it replaces t
 | **CMEDIA-EDITOR-05** | Audience review and the `all` checklist | EDITOR-02 |
 
 Replaces COMPANIONS-STUDIO-01. The editor can ship in slices: Identity and Voice first (no video needed), then pictures, then states.
+
+## 13. The states grid and the finishing step (2026-10-21, decisions for the build)
+
+Owner ask (Jesse, 2026-10-21): build the editor's states grid next: generate, upload, redo and approve a clip per state.
+
+**Correction to section 8.** "ffmpeg is not installed on this Mac" is true of this Mac's PATH and beside the point: the Stack already carries ffmpeg
+(the video environment bundles `imageio-ffmpeg`; the media service pins jellyfin-ffmpeg), and Home has no frame pipeline of its own (it uses `sharp` for
+pictures only). The engine computer can also be another machine than the hub, so Home must not assume a local ffmpeg.
+
+**Decision: the finishing step is a Stack job.** A new job kind `video.companion_clip` (Stack repo, in the video environment, no new dependency) takes a
+finished clip and returns the shipped files. Home never decodes or encodes video.
+
+| | Contract |
+|---|---|
+| Input | a source: a finished video job id of the Stack's own (`/v1/videos/generations/{job}`) or an uploaded file (mp4, mov or webm, at most 30 MB, at most 10 s); `key` (the character's key colour, or `none` for a clip that already has alpha); `kind` (`loop` or `oneshot`); `min_seconds` and `max_seconds` from the vocab; the rest picture's character colours (hex list) for the checks |
+| Steps | decode frames; cut the background (the same unmixing as `keyOut` in Home's `companionLook.ts`, ported once into the Stack and held equal by a shared fixture test; a clip with alpha skips it); smooth the matte over time (3-frame median on alpha); crop the character's box centred into 480 x 480 (fixed scale for the whole clip, never per frame); 24 fps; loop fit (find the best start and end frame pair within the allowed window and cross-fade the join over 4 frames; a one-shot blends its last 6 frames toward its first); stack colour over matte; encode H.264 (required) and AV1 (when the encoder exists) at the vocab's size budget; write the rest frame as a transparent PNG |
+| Output | `clip.h264.mp4`, `clip.av1.mp4` (optional), `still.png`, `report.json` with the measured numbers: seconds, frames, bytes per file, mean colour distance of the character to the given colours, character box area drift (largest and smallest over the clip, as a ratio), first-to-last frame difference, share of opaque pixels per frame (min and max), and `ok` plus `reasons` against the vocab's limits |
+| Job | an idle-priority job on the media queue (it is CPU work, not the graphics queue); progress by frame; cancel; results fetched by `GET /v1/videos/companion-clips/{job}/{file}` and kept until Home deletes them or seven days pass |
+| Not in the Stack job | choosing the best of four takes (Home reads the four reports), prompts, the character card, approval |
+
+**Home's part.** For one state: the editor submits up to four takes through the existing video submit (image to video from the rest picture composited on the key
+colour, prompt = the description card verbatim + the state's motion sentence, seed varied, `quality: quick`), one take at a time because a clip holds 44 GB;
+each finished take goes through the finishing job; Home keeps the report and the files of each take; the best is the `ok` take with the smallest colour distance
+(ties: smallest area drift); the rest are "Other takes". Redo makes up to four more. An **uploaded clip** goes through the same job (key colour from the sheet, or `none` for a transparent WebM).
+Approve stores the chosen take as the state's clip in the companion's `animation` block (`h264`, `av1`, `still`, `loop`), with provenance (take seed, model, prompt hash, approver, time).
+A state's files live in `<companion folder>/states/<state>/`.
+
+**The grid.** Twelve cards in the vocab's order, required ones marked. Each card: the state's name and the plain "when it plays" line, the motion sentence (editable), the approved clip looping
+over a checkerboard with a light and dark toggle, and buttons Generate (or Redo), Upload clip, Approve, Remove. While a state is rendering its card shows the take being made and
+the position ("take 2 of 4"). Generate all queues the missing states, one at a time. The page says "7 of 12 ready" and which required states are missing.
+A companion can be marked ready only when every required state has an approved clip (the status route adds that rule once the grid ships; until the grid exists the existing rule stands).
+Playback in the grid is the real player (CMEDIA-PLAYER-01): until it ships, the grid draws the H.264 stacked file in a `<video>` with the matte applied by a small canvas shader.
+
+**Build order (each its own gated slice):** (1) Stack: `video.companion_clip` and its route, tested with a synthetic clip; (2) Stack release and the pin in Home (the installer digest table);
+(3) Home: states store, take orchestration, routes; (4) Home: the grid page and the preview shader; (5) a real run on the Studio, which is also CMEDIA-BENCH-01's first data.
+The key-colour bench is still owed and is now cheaper: the finishing job's `report.json` is its measurement. If the bench shows FastWan does not hold a flat background, the finishing job's
+cut-out is replaced by a per-frame segmentation fallback, and nothing else in this section changes.
