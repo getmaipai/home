@@ -10,7 +10,7 @@ import { mediaSources, nasMounts } from "@/db/schema";
 import { nextHlc } from "@/lib/hlc";
 import { newMediaSourceId } from "@/lib/id";
 import type { PersonRow } from "@/types";
-import { sourceFromRow, type MediaSource } from "./model";
+import { sourceFromRow, sourcesFromRows, type MediaSource } from "./model";
 
 export const ROOT_KINDS = ["video", "episode", "film", "track", "book", "audiobook"] as const;
 export type RootKind = (typeof ROOT_KINDS)[number];
@@ -38,7 +38,7 @@ export function pathsOverlap(a: string, b: string): boolean {
 }
 
 export function liveRoots(): MediaSource[] {
-  return db.select().from(mediaSources).where(and(eq(mediaSources.kind, "root"), isNull(mediaSources.deletedAt))).all().map(sourceFromRow);
+  return sourcesFromRows(db.select().from(mediaSources).where(and(eq(mediaSources.kind, "root"), isNull(mediaSources.deletedAt))).all());
 }
 
 export function createRootSource(actor: PersonRow, input: RootInput): SourceResult {
@@ -93,7 +93,7 @@ export function removeSource(id: string): SourceResult {
 }
 
 export function listSourcesFor(visible: (source: MediaSource) => boolean): MediaSource[] {
-  return db.select().from(mediaSources).where(isNull(mediaSources.deletedAt)).all().map(sourceFromRow).filter(visible);
+  return sourcesFromRows(db.select().from(mediaSources).where(isNull(mediaSources.deletedAt)).all()).filter(visible);
 }
 
 /** "Deleted stays gone": remember a path a person deleted so a re-scan never brings it back. */

@@ -17,7 +17,7 @@ import { listLibrary } from "@/lib/library";
 import { noDiscovery, readableItem, sourceVisibleTo } from "./access";
 import { allowedBandsFor, bandAllows, mediaBandOf, trips } from "./band";
 import { addItem, createCollection, removeItemFrom, resolveCollection, listCollections, setItems, setPointer } from "./collections";
-import { itemFromRow, sourceFromRow, type MediaCollection, type MediaItem, type MediaSource } from "./model";
+import { itemFromRow, madeSourceId, sourcesFromRows, type MediaCollection, type MediaItem, type MediaSource } from "./model";
 import { correctedStamp, getProgress, getProgressMany, percentOf, recentProgress, writeProgress } from "./progress";
 import { nextHlc } from "@/lib/hlc";
 
@@ -99,7 +99,7 @@ export function allowlistOnly(person: PersonRow): boolean {
 export { noDiscovery };
 
 export function allowedSources(person: PersonRow): MediaSource[] {
-  const live = db.select().from(mediaSources).where(isNull(mediaSources.deletedAt)).all().map(sourceFromRow).filter((source) => sourceVisibleTo(source, person));
+  const live = sourcesFromRows(db.select().from(mediaSources).where(isNull(mediaSources.deletedAt)).all()).filter((source) => sourceVisibleTo(source, person));
   if (!allowlistOnly(person)) return live;
   // Allowlist: the household library roots, and any channel, feed or link an adult named this child for (an explicit `visible_to`).
   return live.filter((source) => source.kind === "root" || (Array.isArray(source.visible_to) && source.visible_to.includes(person.id)));
@@ -692,11 +692,12 @@ function promoteMadeMusicFile(person: PersonRow, fileId: string): MediaItem | nu
   if (!source) {
     // Generated Library files exist before a household has configured any scanned media roots.
     // Give this person's generated tracks a normal, private root so all later reads use the same gate.
-    const sourceId = `msrc-made-${person.id}`;
+    const sourceId = madeSourceId(person.id);
     const now = new Date().toISOString();
     db.insert(mediaSources).values({
       id: sourceId, kind: "root", scope: "person", ownerPersonId: person.id,
-      label: "Created by you", visibleTo: JSON.stringify([person.id]), createdAt: now,
+      label: "Created by you", rootPath: "made-at-home", rootKinds: JSON.stringify(["track"]), paused: true,
+      visibleTo: JSON.stringify([person.id]), createdAt: now,
       hlc: nextHlc(), provenance: "music:generated-library",
     }).run();
     source = allowedSources(person).find((candidate) => candidate.id === sourceId);

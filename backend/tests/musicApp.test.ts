@@ -8,7 +8,7 @@ import { resolveCollection } from "@/lib/media/collections";
 import { resetDb } from "./reset-db";
 import { __resetProgressForTests } from "@/lib/media/progress";
 import { albumKey } from "@/lib/media/music";
-import { itemFromRow } from "@/lib/media/model";
+import { itemFromRow, sourceFromRow } from "@/lib/media/model";
 import { storeFile } from "@/lib/attachments";
 let atlas: PersonRow, sprout: PersonRow;
 const id = (n: number) => `media-song00000${n}`;
@@ -149,6 +149,9 @@ test("playing a visible made Library song promotes it into the shared media queu
   const queue = resolveCollection(atlas.id, "queue")!;
   expect(queue.items).toHaveLength(1);
   expect(queue.items[0]!.media_id).not.toBe(made.value.id);
+  // The private root that holds the saved song is a valid source (a folderless or hyphenated one broke every shelf of every media app).
+  for (const row of db.select().from(mediaSources).all()) expect(() => sourceFromRow(row)).not.toThrow();
+  for (const row of db.select().from(mediaItems).all()) expect(() => itemFromRow(row)).not.toThrow();
   expect(mediaAppData(atlas, "music", "item", { id: queue.items[0]!.media_id })).toMatchObject({ src: `/api/media/items/${queue.items[0]!.media_id}/content` });
   expect(startMusicQueue(atlas, { mode: "track", id: made.value.id }).ok).toBe(true);
   expect(db.select().from(mediaItems).where(eq(mediaItems.locFileId, made.value.id)).all()).toHaveLength(1);

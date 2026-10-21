@@ -8,7 +8,7 @@ import { nextHlc } from "@/lib/hlc";
 import type { PersonRow } from "@/types";
 import { allowedBandsFor, bandAllows } from "./band";
 import { readableItem, sourceVisibleTo } from "./access";
-import { itemFromRow, sourceFromRow, type MediaItem, type MediaItemRow } from "./model";
+import { itemFromRow, sourcesFromRows, type MediaItem, type MediaItemRow } from "./model";
 import { matchKey } from "./parsers/text";
 import { archivePath, TRASH_DAYS } from "./sources";
 
@@ -16,12 +16,7 @@ export const KINDS: readonly MediaItem["kind"][] = ["video", "episode", "film", 
 
 /** The ids of the live sources `actor` may see. */
 export function visibleSourceIds(actor: PersonRow): string[] {
-  return db
-    .select()
-    .from(mediaSources)
-    .where(isNull(mediaSources.deletedAt))
-    .all()
-    .map(sourceFromRow)
+  return sourcesFromRows(db.select().from(mediaSources).where(isNull(mediaSources.deletedAt)).all())
     .filter((source) => sourceVisibleTo(source, actor))
     .map((source) => source.id);
 }

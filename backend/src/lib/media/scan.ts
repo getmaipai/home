@@ -15,6 +15,7 @@ import { trackBackgroundWork } from "@/lib/backgroundWork";
 import { bandOkAtIngest } from "./band";
 import { draftsForDirectory, type Draft, type DirListing, type FileEntry, type IngestContext } from "./ingest";
 import { decidePlayable } from "./kinds";
+import { healMadeSources } from "./heal";
 import { itemToRow, MediaItem, sourceFromRow, type MediaItemRow, type MediaSource } from "./model";
 import { createStackProber, type Prober } from "./prober";
 import { extensionOf } from "./parsers/text";
@@ -384,6 +385,7 @@ export function stopMediaScanner(): void {
 
 /** Boot: one interval per root, and a first pass a minute later for any root not scanned within its own interval. */
 export function startMediaScanner(deps: ScanDeps = {}): void {
+  healMadeSources();
   syncMediaScanner(deps);
   const first = setTimeout(() => {
     const now = Date.now();

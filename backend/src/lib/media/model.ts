@@ -67,6 +67,12 @@ export function itemToRow(item: MediaItem, scan: ItemExtras = { lastSeenScan: nu
 /** The spec's defaults for a source's `auto` block; the column stores only what was changed. */
 const DEFAULT_AUTO = { save: "none", keep_latest: null, remove_watched: false, max_per_check: 2, max_duration_s: null, min_duration_s: null, skip_shorts: true, cutoff_date: null, quality_max_height: null };
 
+/** The private "Created by you" root that saves a song made at home. It is not a scanned folder: it is paused and its folder name is fixed.
+ * The id is `msrc-made` plus the person's id without punctuation, because the spec's source id is `msrc-` and letters and digits only. */
+export const MADE_SOURCE_PREFIX = "msrc-made";
+export const LEGACY_MADE_SOURCE_PREFIX = "msrc-made-";
+export const madeSourceId = (personId: string): string => `${MADE_SOURCE_PREFIX}${personId.replace(/[^a-z0-9]/gi, "").toLowerCase()}`;
+
 export function sourceFromRow(row: MediaSourceRow): MediaSource {
   return MediaSource.parse({
     id: row.id, kind: row.kind, scope: row.scope, owner_person_id: row.ownerPersonId, label: row.label,
@@ -76,6 +82,19 @@ export function sourceFromRow(row: MediaSourceRow): MediaSource {
     visible_to: json(row.visibleTo, "household"), archive: json(row.archive, []), deleted_at: row.deletedAt, trash_until: row.trashUntil,
     created_at: row.createdAt, hlc: row.hlc, provenance: row.provenance,
   });
+}
+
+/** Every source row that parses. A row that no longer parses is left out and logged, so one bad source never fails every shelf of every media app. */
+export function sourcesFromRows(rows: readonly MediaSourceRow[]): MediaSource[] {
+  const out: MediaSource[] = [];
+  for (const row of rows) {
+    try {
+      out.push(sourceFromRow(row));
+    } catch (error) {
+      console.warn("[media] skipped a source that no longer parses:", row.id, error instanceof Error ? error.message.slice(0, 200) : String(error));
+    }
+  }
+  return out;
 }
 
 export function progressFromRow(row: MediaProgressRow): MediaProgress {
