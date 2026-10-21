@@ -54,6 +54,11 @@ account.
    location card). That line sits on the robot's own page as a form `Alert` (S6: it is a fact about this setup, not a service state,
    so it feeds no Repairs row).
 
+## Spec
+
+The two robot keys need no spec change: they ride in Home's registry (ROBOT-COMPANION-04 moves them later). The three bundled
+companions do change a shared list: `persona.active_id`'s options in the commons registry, tagged `spec-v0.1.201` and pinned here.
+
 ## Where the code goes
 
 `backend/src/lib/robotCompanion.ts` (the one definition: controls, companion, band), `settings/robotCompanionKeys.ts` (the two keys,
