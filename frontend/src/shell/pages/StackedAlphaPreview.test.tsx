@@ -1,5 +1,5 @@
 import { afterEach, expect, test } from "bun:test";
-import { cleanup, render, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, render, waitFor } from "@testing-library/react";
 import { StackedAlphaPreview, STACKED_ALPHA_FRAGMENT_SHADER, unpremultiply } from "@/shell/pages/StackedAlphaPreview";
 
 afterEach(cleanup);
@@ -32,5 +32,23 @@ test("falls back to the still when WebGL cannot create a context", async () => {
   globalThis.IntersectionObserver = class { constructor(private callback: IntersectionObserverCallback) {} observe(target: Element) { this.callback([{ isIntersecting: true, target } as IntersectionObserverEntry], this as unknown as IntersectionObserver); } disconnect() {} unobserve() {} } as unknown as typeof IntersectionObserver;
   const view = render(<StackedAlphaPreview urls={{ h264: "h264.mp4", av1: "av1.mp4", still: "still.png" }} label="Idle" priority />);
   expect(await view.findByText("Preview not available in this browser.")).toBeTruthy(); expect(view.getByAltText("Idle clip still")).toBeTruthy();
+  HTMLCanvasElement.prototype.getContext = oldContext; globalThis.IntersectionObserver = old;
+});
+test("an AV1 file that fails to load falls back to the H.264 file before giving up", async () => {
+  Object.defineProperty(window, "matchMedia", { configurable: true, value: () => ({ matches: false, addEventListener() {}, removeEventListener() {} }) });
+  Object.defineProperty(HTMLMediaElement.prototype, "canPlayType", { configurable: true, value: () => "probably" });
+  Object.defineProperty(HTMLMediaElement.prototype, "play", { configurable: true, value: () => Promise.resolve() });
+  const oldContext = HTMLCanvasElement.prototype.getContext;
+  const fakeGl = new Proxy({}, { get: (_target, key) => (key === "getShaderParameter" || key === "getProgramParameter" ? () => true : () => ({})) });
+  HTMLCanvasElement.prototype.getContext = (() => fakeGl) as unknown as typeof HTMLCanvasElement.prototype.getContext;
+  const old = globalThis.IntersectionObserver;
+  globalThis.IntersectionObserver = class { constructor(private callback: IntersectionObserverCallback) {} observe(target: Element) { this.callback([{ isIntersecting: true, target } as IntersectionObserverEntry], this as unknown as IntersectionObserver); } disconnect() {} unobserve() {} } as unknown as typeof IntersectionObserver;
+  const view = render(<StackedAlphaPreview urls={{ h264: "h264.mp4", av1: "av1.mp4", still: "still.png" }} label="Idle" priority />);
+  const video = view.container.querySelector("video") as HTMLVideoElement;
+  await waitFor(() => expect(video.getAttribute("src")).toBe("av1.mp4"));
+  fireEvent.error(video);
+  await waitFor(() => expect(video.getAttribute("src")).toBe("h264.mp4"));
+  fireEvent.error(video);
+  expect(await view.findByText("Preview not available in this browser.")).toBeTruthy();
   HTMLCanvasElement.prototype.getContext = oldContext; globalThis.IntersectionObserver = old;
 });

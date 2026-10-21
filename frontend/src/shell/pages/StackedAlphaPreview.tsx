@@ -35,6 +35,7 @@ export function StackedAlphaPreview({ urls, label, priority = false }: Props) {
     const av1 = video.canPlayType('video/mp4; codecs="av01.0.05M.08"');
     setSource(av1 === "probably" ? urls.av1 : urls.h264);
   }, [urls.av1, urls.h264]);
+  useEffect(() => { setFailed(false); }, [source]);
   useEffect(() => {
     const query = window.matchMedia("(prefers-reduced-motion: reduce)");
     const update = () => setReduced(query.matches);
@@ -79,13 +80,13 @@ export function StackedAlphaPreview({ urls, label, priority = false }: Props) {
     const next = () => { if (!alive) return; draw(); if ("requestVideoFrameCallback" in video) frame = video.requestVideoFrameCallback(next); else raf = requestAnimationFrame(next); };
     const onVisibility = () => { if (document.hidden) { video.pause(); } else if (visible && !reduced && (priority || playing)) void video.play().catch(() => setFailed(true)); };
     document.addEventListener("visibilitychange", onVisibility);
-    video.addEventListener("loadeddata", next); video.addEventListener("error", () => setFailed(true));
-    void video.play().then(() => setFailed(false)).catch(() => setFailed(true));
+    video.addEventListener("loadeddata", next);
+    void video.play().then(() => setFailed(false)).catch((error: unknown) => { if ((error as { name?: string } | null)?.name !== "AbortError") setFailed(true); });
     return () => { activePreviewTokens.delete(token); alive = false; cancelAnimationFrame(raf); if ("cancelVideoFrameCallback" in video && frame) video.cancelVideoFrameCallback(frame); document.removeEventListener("visibilitychange", onVisibility); video.removeEventListener("loadeddata", next); video.pause(); gl.deleteTexture(texture); gl.deleteBuffer(buffer); gl.deleteProgram(program); gl.deleteShader(vertex); gl.deleteShader(fragment); };
-  }, [visible, documentVisible, priority, playing, reduced, source]);
+  }, [visible, documentVisible, priority, playing, reduced, source, failed]);
   const canPlay = visible && (priority || playing) && !reduced && !failed;
   return <div className="flex flex-col gap-2"><div ref={hostRef} className={`companion-alpha-frame ${dark ? "companion-alpha-frame-dark" : ""}`}>
-    <video ref={videoRef} aria-hidden="true" muted loop playsInline autoPlay preload="metadata" src={source} className="hidden" />
+    <video ref={videoRef} aria-hidden="true" muted loop playsInline autoPlay preload="metadata" src={source} className="hidden" onError={() => { if (source === urls.av1 && urls.av1 !== urls.h264) setSource(urls.h264); else setFailed(true); }} />
     {canPlay ? <canvas ref={canvasRef} aria-label={`${label} transparent clip preview`} className="absolute inset-0 h-full w-full object-contain" /> : <img src={urls.still} alt={`${label} clip still`} className="absolute inset-0 h-full w-full object-contain" onError={() => setFailed(true)} />}
     {failed ? <p className="absolute inset-x-2 bottom-2 rounded bg-background/80 p-1 text-center text-xs text-muted-foreground">Preview not available in this browser.</p> : null}
   </div><div className="flex flex-wrap gap-2">{reduced || (!priority && !playing) ? <Button type="button" variant="outline" onClick={() => { setReduced(false); setPlaying(true); }}>Play</Button> : null}<Button type="button" variant="outline" onClick={() => setDark((value) => !value)}>{dark ? "Light" : "Dark"}</Button></div></div>;
