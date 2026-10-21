@@ -14,12 +14,12 @@ import { answerImageSearch, type SearxngImageRow } from "@/lib/packageHost";
 import type { AgeBand } from "@/lib/ageBand";
 import type { PersonRow } from "@/types";
 import type { AnswerImageItem, AnswerImageSet } from "@/wire";
-import { fetchAnswerImages, type AnswerImageSource } from "./fetch";
+import { fetchAnswerImages, libraryImageUrl, type AnswerImageSource } from "./fetch";
 import { putAnswerImage } from "./cache";
 import { ANSWER_IMAGES_MAX_CANDIDATES, GALLERY_VISIBLE, type ShownPictures } from "./gallery";
 import { warmGeometry } from "@/lib/imageSimilarity";
 import { isWeakEvidence, judgeRelevance, searchScore, subjectNames, type RelevanceDrop } from "./relevance";
-import { resolveReferenceTitle } from "@/lib/retrieval/referenceReader";
+import { libraryArticleImages, resolveReferenceTitle, type LibraryImage } from "@/lib/retrieval/referenceReader";
 import { isNonPhotoFile, isUnder18, resolveWikimediaSubject, wikimediaCandidates, wikimediaDepicts, wikimediaFetchJson, type FetchJson, type LibraryPage, type WikimediaEntity } from "./wikimedia";
 
 /** Kinds the model uses for a person (its own `kind` argument, never the
@@ -35,6 +35,8 @@ export type AnswerImageDeps = {
   /** Tests script the library (a fakeKiwix) instead of the Home sidecar. */
   library?: (subject: string, band: AgeBand) => Promise<LibraryPage | null>;
   imageSearch?: (query: string, actor: PersonRow, band: AgeBand) => Promise<SearxngImageRow[]>;
+  /** ZIM-IMG-01: pictures from the matching article of every readable library book. */
+  libraryImages?: (title: string, band: AgeBand, leadOnly: boolean) => Promise<LibraryImage[]>;
   fetchOptions?: Parameters<typeof fetchAnswerImages>[1];
   now?: () => Date;
 };
@@ -55,7 +57,7 @@ export type AnswerImageTrace = {
   /** "search" when the open web leads (a film, show, game or character). */
   leading_source?: "search";
   skipped?: AnswerImageSkip;
-  sources?: { wikimedia: number; searxng: number };
+  sources?: { wikimedia: number; searxng: number; library?: number };
   dropped_by_floor?: number;
   /** IMGQ-07 A4: pictures after the first three left out for thin evidence (the five tiles are a ceiling). */
   dropped_weak?: number;
@@ -91,7 +93,9 @@ type Candidate = {
   description: string;
   license?: AnswerImageItem["license"];
   lead: boolean;
-  source: "wikimedia" | "search";
+  source: "wikimedia" | "search" | "library";
+  /** ZIM-IMG-01: a library picture's site line, the book and "(offline library)". */
+  siteLabel?: string;
   objectName?: string;
   categories?: string[];
   restrictions?: string[];
@@ -242,11 +246,28 @@ export async function selectAnswerImages(input: { subject: string; kind?: string
         return { url: row.image, page: row.url, title: row.title, description: "", lead: false, source: "search", ...(size ? { width: size.width, shortSide: Math.min(size.width, size.height) } : {}), ...(row.format ? { format: row.format } : {}), ...(row.engines ? { engines: row.engines } : {}) };
       });
     };
-    const [wikimediaFound, searchFound] = await Promise.all([fromWikimedia(), fromSearch()]);
-    const candidates: Candidate[] = [...wikimediaFound, ...searchFound];
-    const wikimedia = wikimediaFound.length, searxng = searchFound.length;
+    // ZIM-IMG-01: the household's own library leads. Pictures embedded in the matching article of every readable
+    // book come from the loopback sidecar, so nothing leaves the house for them. A person gets the lead picture only.
+    const fromLibrary = async (): Promise<Candidate[]> => {
+      const title = (entity.wikipediaTitle || entity.queryTitle || subject).trim();
+      if (!title) return [];
+      const libraryImages = deps.libraryImages ?? ((t: string, band: AgeBand, leadOnly: boolean) => libraryArticleImages({ title: t, band, leadOnly }));
+      const found = await libraryImages(title, input.band, entity.human).catch((): LibraryImage[] => []);
+      return found.map((image): Candidate => ({
+        url: libraryImageUrl(image.book, image.imagePath),
+        page: `/api/reference/${encodeURIComponent(image.book)}/${encodeURIComponent(image.articlePath)}`,
+        title: image.articleTitle,
+        description: image.caption || image.alt,
+        lead: image.lead,
+        source: "library",
+        siteLabel: `${image.sourceLabel} (offline library)`,
+      }));
+    };
+    const [wikimediaFound, searchFound, libraryFound] = await Promise.all([fromWikimedia(), fromSearch(), fromLibrary()]);
+    const candidates: Candidate[] = [...libraryFound, ...wikimediaFound, ...searchFound];
+    const wikimedia = wikimediaFound.length, searxng = searchFound.length, libraryCount = libraryFound.length;
     // Source 3 (cited pages' og:image) is not built: no page read keeps it yet.
-    trace.sources = { wikimedia, searxng };
+    trace.sources = { wikimedia, searxng, ...(libraryCount > 0 ? { library: libraryCount } : {}) };
 
     // Rule 10: captions and alt text are text and pass the person's floor.
     // ANSWER-IMG-05b: then a picture must be of the subject and a media
@@ -260,7 +281,7 @@ export async function selectAnswerImages(input: { subject: string; kind?: string
     const droppedByRelevance: Record<RelevanceDrop, number> = {};
     const seen = new Set<string>();
     const kept: Candidate[] = [];
-    const perSource = { wikimedia: 0, search: 0 };
+    const perSource = { wikimedia: 0, search: 0, library: 0 };
     // Commons candidates first: when enough pass the rules to fill the row
     // twice over, the open web's pictures are never fetched (no request to
     // a third-party picture host that would only be thrown away); otherwise
@@ -286,16 +307,20 @@ export async function selectAnswerImages(input: { subject: string; kind?: string
     const articleLead = candidates.filter((c) => c.source === "wikimedia" && c.lead);
     const ordinary = lead === "wikimedia" ? [...commonsRows, ...searchRanked] : [...searchRanked, ...commonsRows];
     const articleLeadUrls = new Set(articleLead.map((c) => c.url));
-    const byLead = [...articleLead, ...ordinary.filter((c) => !articleLeadUrls.has(c.url))];
+    const libraryRows = candidates.filter((c) => c.source === "library");
+    const byLead = [...libraryRows, ...articleLead, ...ordinary.filter((c) => !articleLeadUrls.has(c.url))];
     for (const c of byLead) {
+      // ZIM-IMG-01: with the library's own pictures in hand, no request goes to Wikimedia or an open-web host.
+      if (c.source !== "library" && perSource.library >= COMMONS_ENOUGH + 2) { searchSkipped++; continue; }
       if (c.source === follow && perSource[lead] >= COMMONS_ENOUGH * 2) { searchSkipped++; continue; }
       if (hasShown && c.page && shown!.sources.has(c.page)) { excludedShown++; continue; }
       if (seen.has(c.url)) continue;
       seen.add(c.url);
       if (trips(`${c.title}. ${c.description}`, input.band)) { droppedByFloor++; continue; }
       // MINOR-SEARCH-01e-5: a picture hosted on, or taken from a page on, a blocked site is never shown.
-      if (!urlAllowedFor(input.band, c.url, input.actor.id) || (c.page && !urlAllowedFor(input.band, c.page, input.actor.id))) { droppedByBlocklist++; continue; }
-      const off = judgeRelevance({ source: c.source, lead: c.lead, title: c.title, description: c.description, page: c.page, image: c.url, ...(c.objectName ? { objectName: c.objectName } : {}), ...(c.categories ? { categories: c.categories } : {}), ...(c.restrictions ? { restrictions: c.restrictions } : {}), ...(c.width !== undefined ? { width: c.width } : {}), ...(c.format ? { format: c.format } : {}), ...(c.nonPhoto ? { nonPhoto: true } : {}), ...(c.depicts ? { depicts: true } : {}), ...(c.engines ? { engines: c.engines } : {}) }, context);
+      // ZIM-IMG-01: a library picture has no web host; it sits on the subject's own article in an installed book.
+      if (c.source !== "library" && (!urlAllowedFor(input.band, c.url, input.actor.id) || (c.page && !urlAllowedFor(input.band, c.page, input.actor.id)))) { droppedByBlocklist++; continue; }
+      const off = c.source === "library" ? null : judgeRelevance({ source: c.source, lead: c.lead, title: c.title, description: c.description, page: c.page, image: c.url, ...(c.objectName ? { objectName: c.objectName } : {}), ...(c.categories ? { categories: c.categories } : {}), ...(c.restrictions ? { restrictions: c.restrictions } : {}), ...(c.width !== undefined ? { width: c.width } : {}), ...(c.format ? { format: c.format } : {}), ...(c.nonPhoto ? { nonPhoto: true } : {}), ...(c.depicts ? { depicts: true } : {}), ...(c.engines ? { engines: c.engines } : {}) }, context);
       if (off) { droppedByRelevance[off] = (droppedByRelevance[off] ?? 0) + 1; continue; }
       if (perSource[c.source] >= PER_SOURCE_SLOTS) continue;
       perSource[c.source]++;
@@ -317,7 +342,11 @@ export async function selectAnswerImages(input: { subject: string; kind?: string
     if (fetched.duplicate_check && fetched.duplicate_check.pairs > 0) trace.duplicate_check = fetched.duplicate_check;
     // The filter keeps the best of each near-duplicate group; the row keeps
     // the sources' own priority order (lead, Commons, search rank).
-    let validated = [...fetched.images].sort((a, b) => Number(a.id.slice(1)) - Number(b.id.slice(1)));
+    const allValidated = [...fetched.images].sort((a, b) => Number(a.id.slice(1)) - Number(b.id.slice(1)));
+    // ZIM-IMG-01: the library's pictures lead the row. With enough of them, Wikimedia and open-web pictures are not
+    // used; with fewer, they fill what the library could not.
+    const libraryValidated = allValidated.filter((image) => kept[Number(image.id.slice(1))]!.source === "library");
+    let validated = allValidated.filter((image) => kept[Number(image.id.slice(1))]!.source !== "library");
     // The following source only fills a row the leading one cannot (see
     // COMMONS_ENOUGH).
     const fromLead = validated.filter((image) => kept[Number(image.id.slice(1))]!.source === lead);
@@ -328,6 +357,12 @@ export async function selectAnswerImages(input: { subject: string; kind?: string
       const articleLeads = validated.filter((image) => kept[Number(image.id.slice(1))]!.lead);
       validated = [...articleLeads, ...fromLead];
     }
+    if (libraryValidated.length >= COMMONS_ENOUGH) {
+      if (validated.length > 0) trace.search_not_needed = (trace.search_not_needed ?? 0) + validated.length;
+      validated = libraryValidated;
+    } else {
+      validated = [...libraryValidated, ...validated];
+    }
     const items: AnswerImageItem[] = [];
     const weakIds = new Set<string>();
     const ids = new Set<string>();
@@ -337,9 +372,9 @@ export async function selectAnswerImages(input: { subject: string; kind?: string
       if (ids.has(id)) continue;
       ids.add(id);
       if (hasShown && shown!.ids.has(id)) { excludedShown++; continue; }
-      if (isWeakEvidence(c, context)) weakIds.add(id);
+      if (c.source !== "library" && isWeakEvidence({ source: c.source, lead: c.lead, description: c.description }, context)) weakIds.add(id);
       const size = await sharp(image.full).metadata();
-      const site = hostOf(c.page);
+      const site = c.siteLabel ?? hostOf(c.page);
       const caption = clip(c.description || c.title, CAPTION_MAX);
       items.push({
         id,
