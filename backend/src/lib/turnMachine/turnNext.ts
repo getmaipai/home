@@ -28,9 +28,9 @@ import { resolveOrCreateConversation, resolveSupersedes, getPendingAsk, setPendi
 import { classifyTurnSignal } from "@/lib/turnSignal";
 import { speakerIsAnonymous, turnAgeBand } from "./speaker";
 import { carriesCrisisSignal } from "@/lib/safety";
-import { resolvePersona, DEFAULT_PERSONA } from "@/lib/persona";
+import { resolvePersona, DEFAULT_PERSONA, type Persona } from "@/lib/persona";
 import { companionsAllowed } from "@/lib/companions";
-import { robotCompanionOf } from "@/lib/robotCompanion";
+import { companionFits, robotCompanionOf } from "@/lib/robotCompanion";
 import { isOwnerOrAdmin } from "@/lib/access";
 import { speakerAgeBand } from "@/lib/ageBand";
 import { sourcesForChild, structuredPartForBand } from "@/lib/childLinks";
@@ -528,7 +528,7 @@ async function beginTurn(actor: PersonRow, surface: Surface, text: string, opts:
   // ROBOT-COMPANION-01: a robot with a companion assigned talks as that companion, whoever is signed in; the person's own pick and the household
   // companions switch are theirs, not the robot's (an admin chose this robot's companion).
   const robotCompanion = surface === "robot" && opts.deviceId && !bare ? resolveRobotPersona(opts.deviceId) : null;
-  const persona = robotCompanion ?? (temporary || bare || !companionsAllowed(actor.id) ? DEFAULT_PERSONA : resolvePersona(getPersonSettingValue(actor, "persona.active_id")));
+  const persona = robotCompanion ?? (temporary || bare || !companionsAllowed(actor.id) ? DEFAULT_PERSONA : ownPersona(actor));
   // U4/RESP-01: computed once, the register's only length authority -
   // never recomputed by a later node, the same "decided once" shape
   // `reasoning.emit` already follows in `context`. U4c: everything
@@ -913,6 +913,12 @@ function engineUnavailableLine(state: Pick<TurnState, "spoken" | "surface" | "ac
 
 /** runTurnNext() always resolves the whole reply: a failure or an "immediate" value, never a stream. */
 export type TurnImmediateResult = TurnFailure | Extract<TurnStreamResult, { kind: "immediate" }>;
+
+// COMPANIONS-APP-01: the person's own pick, unless its type is above theirs (a stale or hand-written value): then the plain default.
+function ownPersona(actor: PersonRow): Persona {
+  const picked = resolvePersona(getPersonSettingValue(actor, "persona.active_id"));
+  return companionFits(speakerAgeBand(actor, new Date()), picked.controls) ? picked : DEFAULT_PERSONA;
+}
 
 // ROBOT-COMPANION-01: the persona of the companion assigned to this robot, or null.
 function resolveRobotPersona(deviceId: string) {

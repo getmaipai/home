@@ -47,6 +47,8 @@ import { useTourRunner } from "@/shell/useTourRunner";
 // with the shell. The shell chunk had grown to 3.84 MB against the 4 MiB PWA precache ceiling; the pages below hold
 // charts, the media player, the settings libraries and the profile editors, which most visits never open.
 const FamilyPage = lazyNamed(() => import("@/shell/pages/FamilyPage"), "FamilyPage");
+const CompanionsPage = lazyNamed(() => import("@/shell/pages/CompanionsPage"), "CompanionsPage");
+const CompanionDetailPage = lazyNamed(() => import("@/shell/pages/CompanionsPage"), "CompanionDetailPage");
 const ProjectsPage = lazyNamed(() => import("@/shell/pages/ProjectsPage"), "ProjectsPage");
 const PersonProfilePage = lazyNamed(() => import("@/shell/pages/PersonProfilePage"), "PersonProfilePage");
 const StoragePage = lazyNamed(() => import("@/shell/pages/StoragePage"), "StoragePage");
@@ -281,6 +283,8 @@ function RoutesWithIncognito({ person, onPersonChange, onSignedOut }: { person: 
           <Route path="apps/*" element={<Suspense fallback={null}><PackageAppPage person={person} /></Suspense>} />
           <Route element={<PageHeaderLayout />}>
             <Route index element={<DashboardPage person={person} />} />
+            <Route path="companions" element={<CompanionsPage />} />
+            <Route path="companions/:id" element={<CompanionDetailPage />} />
             <Route path="people" element={<FamilyPage person={person} />} />
             <Route path="people/:id" element={<PersonProfilePage person={person} onPersonChange={onPersonChange} />} />
             <Route path="storage" element={<StoragePage person={person} />} />

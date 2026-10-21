@@ -305,6 +305,21 @@ export interface RobotCompanionInfo {
   home_location_set: boolean;
 }
 
+/** COMPANIONS-APP-01: GET /api/companions and /api/companions/{id} (backend/src/routes/companions.ts). */
+export interface CompanionCard {
+  id: string; name: string; type: "child" | "teen" | "adult"; type_label: string; tagline: string; who_can_use: string;
+  dials: Array<{ label: string; value: string }>; voice: string; is_default: boolean;
+}
+export interface CompanionDetail extends CompanionCard {
+  about: string; pronouns: string | null; interests: string[]; examples: string[]; voice_value: string; voice_is_own: boolean;
+  used_by: { people: Array<{ id: string; name: string }>; robots: Array<{ id: string; name: string }> } | null;
+}
+export interface CompanionList {
+  allowed: boolean;
+  companions: CompanionCard[];
+  robots: Array<{ id: string; name: string; controls: "child" | "teen" | "adult"; companion_id: string; companion_name: string | null }> | null;
+}
+
 export type MemoryRecordWithDevice = MemoryRecord & { device_name?: string };
 // ROBOT-CARD-01: the robot's last reported frame plus the hub's derived
 // reachability, hand-typed to match backend/src/routes/devices.ts's
@@ -1332,6 +1347,9 @@ export const api = {
   // (a spec `page`, drawn by the kit's SchemaPage). A hidden or unknown app and page are both 404.
   apps: () => request<AppRow[]>("/api/apps"),
   mediaHome: () => request<MediaHome>("/api/media/home"),
+  companions: () => request<CompanionList>("/api/companions"),
+  companion: (id: string) => request<CompanionDetail>(`/api/companions/${encodeURIComponent(id)}`),
+  setDefaultCompanion: (id: string) => request<{ default_id: string }>(`/api/companions/${encodeURIComponent(id)}/default`, { method: "PUT" }),
   mediaSearch: (q: string) => request<MediaSearch>(`/api/media/search?q=${encodeURIComponent(q)}`),
   // MEDIA-VIDEOS-01: one data id of a package app (POST /api/plugins/:id/data/:dataId), and one media item's record (the owning app of a
   // `/media/<id>` link is read from its kind).

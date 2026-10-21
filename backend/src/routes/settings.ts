@@ -15,6 +15,7 @@ import { SettingsKey } from "@maipai/spec/gen/ts/settings-key.js";
 import { closeRobotDeviceCommandChannels, listRobotsPairedUnderPerson, publishSettingsChanged } from "@/lib/deviceCommands";
 import { listDevicesByKind } from "@/lib/devices";
 import { renderClipBundle } from "@/lib/robotClips";
+import { personaWriteRefusal } from "@/lib/companionsApp";
 import { ROBOT_COMPANION_KEY, ROBOT_CONTROLS_KEY, robotAssignmentRefusal } from "@/lib/robotCompanion";
 import { refreshHomeAssistantEvents } from "@/lib/integrations/homeAssistant";
 import { refreshSafetyAlarmSensors } from "@/lib/safetyAlarm";
@@ -175,6 +176,11 @@ settingsRoutes.openapi(putRoute, async (c) => {
   if (assignScope && (body.key === ROBOT_CONTROLS_KEY || body.key === ROBOT_COMPANION_KEY) && isOwnerOrAdminActor(actor)) {
     const refusal = robotAssignmentRefusal(assignScope[1]!, body.key, body.value);
     if (refusal) return c.json({ error: refusal }, 400);
+  }
+  // COMPANIONS-APP-01: a person's companion must fit their own type (a child's list holds child companions only).
+  if (body.key === "persona.active_id") {
+    const personaRefusal = personaWriteRefusal(body.scope, body.value);
+    if (personaRefusal) return c.json({ error: personaRefusal }, 400);
   }
   const result = await setValue(actor, body.scope, body.key, body.value);
   if (!result.ok) {

@@ -52416,6 +52416,409 @@
         }
       }
     },
+    "/api/companions": {
+      "get": {
+        "tags": [
+          "Companions"
+        ],
+        "summary": "The companions I may use, and for an admin which companion each robot has",
+        "responses": {
+          "200": {
+            "description": "My companions. The robots list is for owners and admins only.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "allowed": {
+                      "type": "boolean",
+                      "description": "False when an owner or admin turned companions off for this person."
+                    },
+                    "companions": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string"
+                          },
+                          "name": {
+                            "type": "string"
+                          },
+                          "type": {
+                            "type": "string",
+                            "enum": [
+                              "child",
+                              "teen",
+                              "adult"
+                            ]
+                          },
+                          "type_label": {
+                            "type": "string"
+                          },
+                          "tagline": {
+                            "type": "string"
+                          },
+                          "who_can_use": {
+                            "type": "string"
+                          },
+                          "dials": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "label": {
+                                  "type": "string"
+                                },
+                                "value": {
+                                  "type": "string"
+                                }
+                              },
+                              "required": [
+                                "label",
+                                "value"
+                              ]
+                            }
+                          },
+                          "voice": {
+                            "type": "string"
+                          },
+                          "is_default": {
+                            "type": "boolean"
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "name",
+                          "type",
+                          "type_label",
+                          "tagline",
+                          "who_can_use",
+                          "dials",
+                          "voice",
+                          "is_default"
+                        ]
+                      }
+                    },
+                    "robots": {
+                      "type": "array",
+                      "nullable": true,
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string"
+                          },
+                          "name": {
+                            "type": "string"
+                          },
+                          "controls": {
+                            "type": "string",
+                            "enum": [
+                              "child",
+                              "teen",
+                              "adult"
+                            ]
+                          },
+                          "companion_id": {
+                            "type": "string"
+                          },
+                          "companion_name": {
+                            "type": "string",
+                            "nullable": true
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "name",
+                          "controls",
+                          "companion_id",
+                          "companion_name"
+                        ]
+                      }
+                    }
+                  },
+                  "required": [
+                    "allowed",
+                    "companions",
+                    "robots"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/companions/{id}": {
+      "get": {
+        "tags": [
+          "Companions"
+        ],
+        "summary": "One companion in full",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "lively-teen"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The companion.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    },
+                    "name": {
+                      "type": "string"
+                    },
+                    "type": {
+                      "type": "string",
+                      "enum": [
+                        "child",
+                        "teen",
+                        "adult"
+                      ]
+                    },
+                    "type_label": {
+                      "type": "string"
+                    },
+                    "tagline": {
+                      "type": "string"
+                    },
+                    "who_can_use": {
+                      "type": "string"
+                    },
+                    "dials": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "label": {
+                            "type": "string"
+                          },
+                          "value": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "label",
+                          "value"
+                        ]
+                      }
+                    },
+                    "voice": {
+                      "type": "string"
+                    },
+                    "is_default": {
+                      "type": "boolean"
+                    },
+                    "about": {
+                      "type": "string"
+                    },
+                    "pronouns": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "interests": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "examples": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "voice_value": {
+                      "type": "string",
+                      "description": "The voice id the page previews through /api/voice/voices/{id}/preview."
+                    },
+                    "voice_is_own": {
+                      "type": "boolean"
+                    },
+                    "used_by": {
+                      "type": "object",
+                      "nullable": true,
+                      "properties": {
+                        "people": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "id": {
+                                "type": "string"
+                              },
+                              "name": {
+                                "type": "string"
+                              }
+                            },
+                            "required": [
+                              "id",
+                              "name"
+                            ]
+                          }
+                        },
+                        "robots": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "id": {
+                                "type": "string"
+                              },
+                              "name": {
+                                "type": "string"
+                              }
+                            },
+                            "required": [
+                              "id",
+                              "name"
+                            ]
+                          }
+                        }
+                      },
+                      "required": [
+                        "people",
+                        "robots"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "name",
+                    "type",
+                    "type_label",
+                    "tagline",
+                    "who_can_use",
+                    "dials",
+                    "voice",
+                    "is_default",
+                    "about",
+                    "pronouns",
+                    "interests",
+                    "examples",
+                    "voice_value",
+                    "voice_is_own",
+                    "used_by"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such companion for this person",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/companions/{id}/default": {
+      "put": {
+        "tags": [
+          "Companions"
+        ],
+        "summary": "Set this companion as my default",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "lively-teen"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Saved.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "default_id": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "default_id"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Companions are off, or this one is not for this person",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such companion",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/media/search": {
       "get": {
         "tags": [

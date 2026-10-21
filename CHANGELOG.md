@@ -7,6 +7,9 @@ checklist (`docs/dev.md`). The first release is 0.1.0.
 
 ## [Unreleased]
 
+### Added
+- Companions app: browse the companions you may use, read about each one, play its voice and set your default; admins also see which companion each robot has (COMPANIONS-APP-01).
+
 ### Changed
 - Chat: the date line in the prompt now says the model's training is usually months behind, that a recent event it does not recognize is more likely missing than untrue, and that a claim about something recent ("I heard", "is it true") is looked up first, never denied from memory. Qwen3.6 searched 16 of 28 recency prompts before and 26 of 28 after; Muse searched 28 of 28 both times (RECENCY-01).
 
