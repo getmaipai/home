@@ -28,9 +28,12 @@ const CLAIMS = [
   new RegExp(`\\b${MEDIA_NOUN}\\b[^.!?\\n]{0,40}\\b(?:is|are|was|were|has been|have been|should be|will be|being)\\b[^.!?\\n]{0,30}\\b(?:made|created|generated|rendered|drawn|ready|done|finished|on its way|on the way|coming|below|underway|in progress|started|appear|show up)`),
   // "on its way", "it will appear below", "right below when it is ready"
   /\b(?:on its way|on the way|coming right up|(?:will )?(?:appear|show up)s? (?:right )?below|right below when)\b/,
+  // Common premature music claims after the start tool has already returned.
+  /\bhere it is\b/,
+  /\bshould\s+appear\b/,
 ];
 
-/** Whether a reply says a picture or video is made, being made, ready or on its way. */
+/** Whether a reply claims a picture, video or song is made, being made, ready or on its way. */
 export function claimsMedia(reply: string): boolean {
   const text = reply.toLowerCase().replace(/[‘’]/g, "'");
   return CLAIMS.some((re) => re.test(text));
@@ -38,6 +41,7 @@ export function claimsMedia(reply: string): boolean {
 
 /** The reply that stands in for a claim when no tool ran, even after the re-ask. Says what happened and what to do. */
 export const MEDIA_NOT_STARTED_LINE = "I didn't start that picture, video or song, so nothing is being made. Send the request once more and I'll try again.";
+export const MUSIC_STARTED_LINE = "I've started your song. It will show below when it's finished.";
 
 /** The one re-ask: the held reply claimed a result and no tool ran. */
 export const MEDIA_REASK_INSTRUCTION = "You wrote that a picture, video or song is made or on its way, but you did not call the Make a Picture, Make a Video or Make a Song tool, so nothing was made. If the person asked for one, call the tool now with their request. If you cannot make it, say so plainly in one sentence. Do not say anything is being made unless you call the tool in this reply.";

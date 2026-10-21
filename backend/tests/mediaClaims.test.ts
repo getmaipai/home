@@ -15,6 +15,7 @@ describe("claimsMedia", () => {
   test.each([
     "Your picture is being made. It will show up right below when it is ready.", "Here's your picture of a lighthouse!", "I've made a picture of the fox.", "I'm creating the video now, it takes about two minutes.",
     "The video is ready below.", "Sure, on its way!", "I made a short clip of a lantern floating up.", "Your image has been generated.", "It will appear below in a moment.",
+    "The song is ready.", "The song is done.", "The song is finished.", "Here it is.", "The player should appear shortly.",
   ])("claim: %s", (r) => expect(claimsMedia(r)).toBe(true));
   test.each([
     "I can't make videos here.", "I couldn't make that picture. Try again.", "What size would you like, square or wide?", "A lighthouse at dusk usually has a warm light.", "Pictures can only be made in a written chat on your own screen.",

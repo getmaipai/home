@@ -41,7 +41,7 @@ export async function startSongCover(actor: PersonRow, job: MusicJob, options: {
   starting.add(job.id);
   try {
     const audience = routeAudience(actor);
-    if (job.personId !== actor.id || job.state !== "done" || job.temporary || !job.conversationId || !job.turnId || musicViewDenial(audience) || pictureDenial(audience)) return;
+    if (job.personId !== actor.id || !["queued", "running", "done"].includes(job.state) || job.temporary || !job.conversationId || !job.turnId || musicViewDenial(audience) || pictureDenial(audience)) return;
     const prompt = options.prompt?.trim() || coverPromptFor(job.request);
     if (refusePrompt(prompt, { lane: laneOf(audience), depictsRealPerson: job.request.imitates_real_voice === true }) || !(await pictureEngineReady())) return;
     const current = getMusicJobFor(actor, job.id);

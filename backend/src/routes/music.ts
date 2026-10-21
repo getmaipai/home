@@ -54,19 +54,25 @@ const cardSchema = z.object({
   versions: z.array(versionSchema), current_id: z.string().nullable(), length: z.enum(["quick", "full"]), title: z.string().nullable(), description: z.string().nullable(), lyrics: z.string().nullable(), duration_s: z.number().nullable(), started_at: z.number(),
 });
 export function musicFileUrl(job: MusicJob): string { return `/api/music/jobs/${encodeURIComponent(job.id)}/files/${encodeURIComponent(job.fileId!)}`; }
+const MUSIC_STAGE_LABELS: Record<string, string> = {
+  loading: "Getting the model ready", starting: "Getting the model ready",
+  planning: "Planning the song", lm: "Planning the song",
+  making: "Making the music", dit: "Making the music", music: "Making the music", generating: "Making the music",
+  vae: "Mixing", decoding: "Mixing", mixing: "Finishing", encoding: "Finishing", saving: "Finishing",
+  paused: "Paused while chat is working",
+};
+const warnedMusicStages = new Set<string>();
 export function musicStageLabel(job: MusicJob): string {
-  if (job.stage === "longer" && ["queued", "running"].includes(job.state)) return "Making it longer so every line fits";
-  if (job.state === "queued") return busyLine(job.position);
-  if (job.state !== "running") return "";
-  switch (job.stage) {
-    case "planning": case "lm": return "Planning the song";
-    case "making": case "dit": case "music": case "generating": return "Making the music";
-    case "mixing": case "vae": case "decoding": case "encoding": return "Mixing it down";
-    case "loading": case "starting": return "Getting the music model ready";
-    // ISOLATION-01: the Stack stops the music worker while a chat or voice request runs; the existing stage string says so.
-    case "paused": return "Paused while chat is working";
-    default: return "Making the song";
+  if (job.stage == null || job.stage === "") return "";
+  if (job.state === "queued" && job.stage === "queued") return busyLine(job.position);
+  if (job.stage === "longer") return ["queued", "running"].includes(job.state) ? "Making it longer so every line fits" : "";
+  const label = MUSIC_STAGE_LABELS[job.stage];
+  if (!label && !warnedMusicStages.has(job.stage)) {
+    warnedMusicStages.add(job.stage);
+    console.warn(`[music] unknown Stack stage: ${job.stage}`);
   }
+  if (!label || job.state !== "running") return "";
+  return label;
 }
 /** MUSIC-GEN-17: the card shows the words the engine sang (its own `lrc`, squeezed lines left out), else the words sent. */
 function cardLyricsOf(job: MusicJob): string | null {

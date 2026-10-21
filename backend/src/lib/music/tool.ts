@@ -3,6 +3,7 @@ import { z } from "zod";
 import type { PersonRow } from "@/types";
 import type { TurnState, ToolExecutionOutcome } from "@/lib/turnMachine/contract";
 import { outcomeOf } from "@/lib/turnContext";
+import { MUSIC_STARTED_LINE } from "@/lib/mediaClaims";
 import { turnAgeBand } from "@/lib/turnMachine/speaker";
 import { musicDenial, MUSIC_DENIAL_LINE, MUSIC_REFUSAL_LINE, refuseMusicPrompt, type MusicAudience } from "./policy";
 import { musicEngineStatus, musicStatusReady } from "./ready";
@@ -76,16 +77,17 @@ export function spokenLength(seconds: number): string {
   const halves = Math.round(seconds / 30); const whole = Math.floor(halves / 2);
   return halves % 2 ? `${whole} and a half minutes` : `${whole} minutes`;
 }
-/** The line the model relays when a song starts: which kind, how long, about how long it takes (measured, design note section 16). */
+/** What the model is told when the Stack has accepted a song job. It says the song STARTED (never "ready"): the person has not heard it
+ * yet, and a reply that claims it is done is held and replaced by MUSIC_STARTED_LINE (lib/mediaClaims.ts). */
 export function songOnItsWay(request: MusicRequest): string {
   const length = lengthOf(request, null);
   const duration = spokenLength(request.seconds);
-  const kind = `A ${length} song of about ${duration}${length === "quick" && !request.instrumental ? ": the hook, the first verse and chorus" : ""}`;
+  const kind = `a ${length} song of about ${duration}${length === "quick" && !request.instrumental ? ": the hook, the first verse and chorus" : ""}`;
   const wait = request.seconds >= 150 ? "about a minute or two" : "under a minute";
   const note = request.cut === "asked" ? " The words are longer than the length asked for, so it sings the first parts that fit."
     : request.cut === "ceiling" ? ` The words are longer than the longest song this computer makes (${spokenLength(request.max_seconds ?? request.seconds)}), so it sings the first parts that fit.` : "";
   const title = request.title ? ` called "${request.title}"` : "";
-  return `${kind}${title} is on its way. It takes ${wait} and the player appears below your reply when it is ready. Reply in one or two short sentences: say the song is on its way and about how long it takes. Do not say it is ready, do not describe it, and do not repeat the lyrics, style or tempo: the player shows the words and the person has not heard it yet.${note}`;
+  return `${MUSIC_STARTED_LINE} It is ${kind}${title}, and it takes ${wait}. Reply in one or two short sentences: say you have started it and about how long it takes. Never say it is ready, done or finished (the person has not heard it yet), do not describe it, and do not repeat the lyrics, style or tempo.${note}`;
 }
 export const SECTION_LINE = "Which part should I change? Give its start and end in seconds.";
 export const WHICH_PART_LINE = "Tell me which part the new words replace, for example the chorus or verse 2.";

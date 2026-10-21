@@ -40,6 +40,18 @@ async function covered(actor: PersonRow, id: string) {
   return getMusicJobFor(actor, id)!;
 }
 describe("song covers", () => {
+  test("the Quick cover starts while the accepted song is still generating", async () => {
+    const { actor } = await owner(); music.pollsToFinish = 1000; pictures.pollsToFinish = 1000;
+    const outcome = await runGenerateMusic({ state: musicState(actor), args: { description: "an original folk song", lyrics: LYRICS, title: "Pancakes" }, callId: "g", spoken: false });
+    const id = musicForOutcomes([outcome])!.id;
+    await until(() => Boolean(getMusicJobFor(actor, id)?.coverJobId));
+    expect(getMusicJobFor(actor, id)?.state).not.toBe("done");
+    expect(pictures.submitted).toHaveLength(1);
+    const coverJob = getPictureJob(actor, getMusicJobFor(actor, id)!.coverJobId!);
+    expect(coverJob).toMatchObject({ purpose: "cover" });
+    expect(coverJob?.state === "queued" || coverJob?.state === "running").toBe(true);
+  });
+
   test("a finished song starts one Quick cover and its stored image appears on the card", async () => {
     const { actor, client } = await owner(); const job = await song(actor);
     const done = await covered(actor, job.id);

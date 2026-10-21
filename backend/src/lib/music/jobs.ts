@@ -79,6 +79,8 @@ export async function startMusicJob(input: StartMusicInput): Promise<MusicJob> {
     try { saveMusicJob(job); } catch (error) { void cancelOrDeleteMusic(submitted.job); throw error; }
     if (stopped(job)) { void cancelOrDeleteMusic(submitted.job); throw new StackMusicError(409, "cancelled"); }
     void watch(job, input.actor, submitted.done);
+    // The picture job takes its normal governor/admission path and remains optional to the song.
+    void startSongCover(input.actor, job).catch(() => {});
     return job;
   } catch (error) { liveJobs.delete(job.id); forgetRemovedMusicJob(job.id); throw error; }
   finally { starting.delete(input.actor.id); }

@@ -16,7 +16,7 @@ import { installFakeImageStack, until } from "./pictureFixture";
 import { listConversationTurns } from "@/lib/conversationHistory";
 import { getMusicJobFor } from "@/lib/music/jobs";
 import { householdAllowsMusic } from "@/lib/music/policy";
-import { MEDIA_NOT_STARTED_LINE, SONG_LYRICS_ONLY_NOTE, SONG_LYRICS_REASK_INSTRUCTION } from "@/lib/mediaClaims";
+import { MEDIA_NOT_STARTED_LINE, MUSIC_STARTED_LINE, SONG_LYRICS_ONLY_NOTE, SONG_LYRICS_REASK_INSTRUCTION } from "@/lib/mediaClaims";
 import { getRegistryKey } from "@/lib/settingsRegistry";
 import type { ChatCompletionRequest } from "@maipai/spec/llm/ts/types.js";
 let people: ReturnType<typeof createBenchPeople>;
@@ -34,6 +34,7 @@ test("an adult's first turn earns generation; a made-here song earns editing on 
   await withStub({ calls: (r) => r.tool_choice === "none" || isPhrasing(r) ? undefined : [call], reply: () => "Your song is on its way." }, async (seen) => {
     const result = await runTurnNext(people.owner, "chat", "make a folk song about pancakes");
     if (!result.ok) throw new Error("turn failed");
+    expect(result.value.reply.text).toBe(MUSIC_STARTED_LINE);
     expect(names(seen.find((r) => (r.tools?.length ?? 0) > 0))).toContain("generate_music");
     expect(names(seen.find((r) => (r.tools?.length ?? 0) > 0))).not.toContain("edit_music");
     const id = result.value.music?.id; expect(id).toBeDefined();
@@ -51,6 +52,20 @@ test("an adult's first turn earns generation; a made-here song earns editing on 
       expect(names(nextSeen.find((r) => (r.tools?.length ?? 0) > 0))).toContain("edit_music");
     });
   });
+});
+
+test("a successful music start replaces completion claims with only the started message", async () => {
+  const call = { id: "songcall", name: "generate_music", args: JSON.stringify({ description: "a folk song", lyrics: "[Verse]\nMorning light\n[Chorus]\nPancakes rise" }) };
+  for (const claim of ["The song is ready.", "The song is done.", "The song is finished.", "Here it is.", "The player should appear shortly."]) {
+    await withStub({ calls: (r) => r.tool_choice === "none" || isPhrasing(r) ? undefined : [call], reply: () => claim }, async () => {
+      const result = await runTurnNext(people.owner, "chat", "Make a spanish acoustic guitar funny");
+      if (!result.ok) throw new Error("turn failed");
+      expect(result.value.reply.text).toBe(MUSIC_STARTED_LINE);
+      const id = result.value.music?.id;
+      expect(id).toBeDefined();
+      await waitForMusic(() => getMusicJobFor(people.owner, id!)?.state === "done");
+    });
+  }
 });
 test("children, teens, guests, spoken turns, glance screens and TVs never earn the music offer", async () => {
   await withStub({ calls: () => undefined, reply: () => "Hello." }, async (seen) => {

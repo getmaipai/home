@@ -14,7 +14,7 @@ import { loadManifestOnly } from "@/lib/plugins";
 import { VIRTUAL_TOOL_REGISTRY } from "@/lib/projects/tool";
 import { isBarePronoun, ownWordsQuery } from "@/lib/text";
 import { detectCsam } from "@maipai/spec/safety/ts/signals.js";
-import { asksForMedia, asksForSong, claimsMedia, lyricsInsteadOfSong, MEDIA_NOT_STARTED_LINE, MEDIA_REASK_INSTRUCTION, SONG_LYRICS_ONLY_NOTE, SONG_LYRICS_REASK_INSTRUCTION } from "@/lib/mediaClaims";
+import { asksForMedia, asksForSong, claimsMedia, lyricsInsteadOfSong, MEDIA_NOT_STARTED_LINE, MEDIA_REASK_INSTRUCTION, MUSIC_STARTED_LINE, SONG_LYRICS_ONLY_NOTE, SONG_LYRICS_REASK_INSTRUCTION } from "@/lib/mediaClaims";
 import { peopleGuidanceSuffix, PICTURE_NOT_HERE_LINE } from "@/lib/pictures/policy";
 import { laneOfPerson } from "@/lib/pictures/laneGate";
 import type { Lane } from "@/lib/pictures/lane";
@@ -24,7 +24,7 @@ import { streamWatchdog, replyIsUncapped } from "../deadline";
 import type { StackFailureFacts } from "@/lib/stackEngine";
 import { classifyGenerationFailure, engineComputerAwayFromHome, partialReplyNote, RETRY_BACKOFF_MS, stackRefusalKind, type FailureKind } from "@/lib/generationFailure";
 import { isWrittenAdultTurn, promptSurfaceClassFor, type SurfaceClass } from "@/lib/surfaceClass";
-import { toolCallAssistantMessage, toolResultMessages, phrasingInstruction, picturesOnlyInstruction, searchEvidenceMaxChars } from "@/lib/composer";
+import { toolCallAssistantMessage, toolResultMessages, phrasingInstruction, picturesOnlyInstruction, searchEvidenceMaxChars, musicForOutcomes } from "@/lib/composer";
 import { SHOW_IMAGES_TOOL_ID } from "@/lib/answerImages/turn";
 import { planLineForTurnMachine } from "@/lib/register";
 import { askAppendFor, NO_ASK_APPEND } from "@/lib/askNames";
@@ -963,10 +963,11 @@ const modelRound: Node<ModelInput, ModelOutput> = async (state, input, signal) =
   // record and the empty-reply retry all see the effective flag.
   const thinkingOn = state.budget.thinking_budget_tokens > 0 && !minorThinkingOff && state.reasoning.emit;
   const maxTokens = replyMaxTokensFor(state, thinkingOn);
-  // A turn that plainly asks for a picture or video holds its first round's text until it is known whether the tool
-  // was called: a reply that says a picture is on its way with no job is never shown (mediaClaims.ts).
+  // Hold a plain media request until its tool call is known; also hold the follow-up after a successful music start,
+  // even when the person's wording did not plainly name a song.
   const mediaOffered = tools.some((t) => t.id === "generate_image" || t.id === "generate_video" || t.id === "generate_music" || t.id === "edit_music");
-  const holdMedia = !isPhrasingRound && !input.retry && !noToolsTurn(state) && asksForMedia(input.utterance);
+  const successfulMusicStart = musicForOutcomes(state.outcomes) !== null;
+  const holdMedia = !input.retry && !noToolsTurn(state) && (successfulMusicStart || (!isPhrasingRound && asksForMedia(input.utterance)));
   let attempt = await runOneGeneration(state, messages, tools, tool_choice, thinkingOn, maxTokens, isPhrasingRound ? "phrasing" : input.retry ? "tool_retry" : "model", signal, holdMedia ? "media" : !isPhrasingRound && !input.retry && toolsAllowed && searchAssistMayHold(state, tools));
   // THIN-GROUND-01: llama-server reports the rendered prompt size in its
   // 400 body. Use that measurement to choose the first evidence cut, then
@@ -1082,10 +1083,12 @@ const modelRound: Node<ModelInput, ModelOutput> = async (state, input, signal) =
     if (isPhrasingRound && attempt.toolCalls && attempt.toolCalls.length > 0) attempt = { ...attempt, toolCalls: undefined };
   }
 
-  // A held first round (holdMedia): a claim of a picture or video with no tool call gets ONE guarded re-ask; a claim
-  // that still stands without a job is replaced by an honest line. Text that makes no claim is released as written.
+  // A held media reply without a tool call gets ONE guarded re-ask when it claims a result. After a successful music
+  // start, the person gets only the started line, however the model phrases its follow-up.
   if (attempt.heldBack && (!attempt.toolCalls || attempt.toolCalls.length === 0)) {
-    if (claimsMedia(attempt.text)) {
+    if (musicForOutcomes(state.outcomes)) {
+      attempt = { ...attempt, text: MUSIC_STARTED_LINE };
+    } else if (claimsMedia(attempt.text)) {
       let second: GenerationResult | undefined;
       if (mediaOffered && !signal.aborted) {
         console.error("[model] the reply claimed a picture, video or song with no tool call; asking once more");

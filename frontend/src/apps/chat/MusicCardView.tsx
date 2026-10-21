@@ -7,6 +7,7 @@ import { MusicTrack } from "@maipai/ui/src/elements/music-track";
 import type { MusicTrackStatus } from "@maipai/ui/src/elements/music-track";
 import { musicApi, type MusicCard } from "@/lib/musicApi";
 import { prepareClip, shareClip } from "@/lib/shareClip";
+import { etaLabel } from "@/lib/etaLabel";
 export function musicFileName(title: string | null | undefined): string {
   const base = (title ?? "").replace(/[^\p{L}\p{N} _-]+/gu, " ").replace(/\s+/g, " ").trim().slice(0, 80).trim();
   return `${base || "song"}.m4a`;
@@ -16,7 +17,14 @@ export function musicHint(length: "quick" | "full", cut: MusicCard["cut"] = null
   return length === "full" ? "Full: every part of the song." : "Quick: the hook. Make it full to sing every part.";
 }
 
-const etaLabel = (seconds: number | null) => seconds === null ? undefined : `about ${Math.max(1, Math.round(seconds))} seconds left`;
+export function musicEtaLabel(card: Pick<MusicCard, "state" | "stage" | "progress" | "started_at">, now = Date.now()): string | undefined {
+  if (card.state !== "running" || card.stage === "queued" || /memory/i.test(card.stage ?? "")) return undefined;
+  const progress = card.progress;
+  const elapsed = Math.max(0, (now - card.started_at) / 1000);
+  if (!Number.isFinite(progress) || progress <= 0.05 || elapsed < 10) return undefined;
+  const remaining = Math.max(5, elapsed * (1 - progress) / progress);
+  return etaLabel(remaining);
+}
 const descriptionOf = (card: MusicCard) => {
   const caption = (card.description ?? "").replace(/\s+/g, " ").trim();
   const style = caption.length > 70 ? `${caption.slice(0, 67).trimEnd()}...` : caption;
@@ -48,9 +56,10 @@ export function useMusicTrackProps({ card, owner = true, onRefresh, onStop, onSh
     {editError ? <Alert variant="destructive"><AlertDescription>{editError}</AlertDescription></Alert> : null}
   </> : undefined;
   const lyrics = card.lyrics?.trim() === "[Instrumental]" ? undefined : card.lyrics ?? undefined;
+  const eta = musicEtaLabel(card);
   return { status, width: "full", ...(editContent ? { editContent, editLabel: "Edit", editPanelLabel: "Edit song" } : {}), title,
     ...(card.cover_url ? { cover: card.cover_url, coverAlt: `Cover art for ${title}` } : {}), ...(descriptionOf(card) ? { description: descriptionOf(card) } : {}), ...(ready ? { src: shown.url } : {}),
-    progress: Math.round(card.progress * 100), ...(card.stage_label && card.state !== "queued" ? { phaseLabel: card.stage_label } : {}), ...(etaLabel(card.eta_seconds) ? { etaLabel: etaLabel(card.eta_seconds)! } : {}),
+    progress: Math.round(card.progress * 100), ...(card.stage_label && card.state !== "queued" ? { phaseLabel: card.stage_label } : {}), ...(eta ? { etaLabel: eta } : {}),
     queuePosition: card.position, startedAt: card.started_at, ...(card.error_line ? { error: card.error_line } : {}), downloadName: musicFileName(title), timedLyrics: card.timed_lyrics ?? undefined,
     ...(ready && lyrics ? { lyrics } : {}), ...(ready ? { versions: card.versions.map(version => ({ id: version.id, label: version.label })), ...(shownId ? { currentId: shownId } : {}) } : {}),
     onSelectVersion: id => setPicked({ base: card.current_id, id }), ...(owner ? { onUseVersion: (id: string) => { void musicApi.useVersion(card.id, id).then(refresh).catch(refresh); } } : {}), onStop,

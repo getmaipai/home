@@ -7,6 +7,7 @@ import { MemoryRouter } from "react-router-dom";
 import { cleanup, fireEvent, render, waitFor } from "@testing-library/react";
 import { MusicTrack } from "@maipai/ui/src/elements/music-track";
 import { MusicToolRender, musicFileName, musicHint } from "@/apps/chat/chatToolUis";
+import { musicEtaLabel } from "@/apps/chat/MusicCardView";
 import { TOOL_BINDINGS } from "@/apps/chat/elementBindings";
 import type { MusicCard } from "@/lib/musicApi";
 
@@ -41,6 +42,15 @@ function mount() {
 const cardOf = (view: ReturnType<typeof mount>) => view.container.querySelector("[data-slot=music-track]");
 
 describe("MusicToolRender", () => {
+  test("music ETA is withheld until progress and elapsed time support an estimate", () => {
+    const startedAt = 1_000_000;
+    expect(musicEtaLabel(make({ progress: 0.02, started_at: startedAt }), startedAt + 27_000)).toBeUndefined();
+    expect(musicEtaLabel(make({ progress: 0.5, started_at: startedAt }), startedAt + 60_000)).toBe("about 1 minute left");
+    expect(musicEtaLabel(make({ state: "queued", progress: 0.5, started_at: startedAt }), startedAt + 60_000)).toBeUndefined();
+    expect(musicEtaLabel(make({ stage: "waiting_memory", progress: 0.5, started_at: startedAt }), startedAt + 60_000)).toBeUndefined();
+    expect(musicEtaLabel(make({ progress: 0.9, started_at: startedAt }), startedAt + 10_000)).toBe("about 5 seconds left");
+  });
+
   test("a pending first fetch shows the queued song card without progress", () => {
     globalThis.fetch = (() => new Promise<Response>(() => {})) as unknown as typeof fetch;
     const view = mount();
@@ -76,7 +86,7 @@ describe("MusicToolRender", () => {
     const view = mount();
     await waitFor(() => expect(view.getByRole("status").textContent).toContain("Planning the song"));
     expect(cardOf(view)?.getAttribute("data-status")).toBe("generating");
-    expect(view.container.textContent).toMatch(/0:3\d · 25% · about 40 seconds left/);
+    expect(view.container.textContent).toMatch(/0:3\d · 25% · about 2 minutes left/);
     expect(view.container.textContent).toContain("a gentle folk song with an original voice, 1:00");
     fireEvent.click(view.getByRole("button", { name: "Stop" }));
     await waitFor(() => expect(calls.some((c) => c.method === "DELETE" && c.url === "/api/music/jobs/mus-1")).toBe(true));

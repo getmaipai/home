@@ -28,6 +28,7 @@ const ARGS = { description: "a gentle folk song with an original voice", lyrics:
 async function generate(state = musicState(people.owner), args: Record<string, unknown> = ARGS): Promise<MusicJob> {
   const outcome = await runGenerateMusic({ state, args, callId: "g", spoken: false });
   expect(outcome.status).toBe("succeeded");
+  expect(outcome.result?.reply?.text).toStartWith("I've started your song. It will show below when it's finished.");
   const id = musicForOutcomes([outcome])?.id;
   expect(id).toBeDefined();
   await waitForMusic(() => getMusicJobFor(people.owner, id!)?.state === "done");
@@ -36,6 +37,7 @@ async function generate(state = musicState(people.owner), args: Record<string, u
 async function edit(state: TurnState, change: string, args: Record<string, unknown> = {}): Promise<MusicJob> {
   const outcome = await runEditMusic({ state, args: { track: "latest", change, ...args }, callId: "e", spoken: false });
   expect(outcome.status).toBe("succeeded");
+  expect(outcome.result?.reply?.text).toStartWith("I've started your song. It will show below when it's finished.");
   const id = musicForOutcomes([outcome])?.id; expect(id).toBeDefined();
   await waitForMusic(() => getMusicJobFor(people.owner, id!)?.state === "done");
   return getMusicJobFor(people.owner, id!)!;
@@ -48,7 +50,7 @@ describe("music jobs and their private files", () => {
     const id = musicForOutcomes(result.output.outcomes)!.id;
     const part = result.output.toolEvents.find((e) => e.t === "tool_result");
     expect(part && "outcome" in part && part.outcome).toMatchObject({ musicJobId: id });
-    expect(result.output.outcomes[0]?.result?.reply?.text).toContain("do not repeat the lyrics, style or tempo");
+    expect(result.output.outcomes[0]?.result?.reply?.text).toStartWith("I've started your song. It will show below when it's finished.");
     expect(getMusicJobFor(people.owner, id)?.state).not.toBe("done");
     expect(fake.submitted[0]).toMatchObject({ task: "text2music", caption: ARGS.description, lyrics: LYRICS, duration_s: 60, timeout_ms: 1, bpm: 100, key: "C major", language: "en" });
     expect(fake.submitted[0]).not.toHaveProperty("title");
