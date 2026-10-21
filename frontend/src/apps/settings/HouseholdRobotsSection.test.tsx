@@ -39,10 +39,10 @@ describe("robot software details", () => {
     expect(view.getByRole("button", { name: "Update firmware" })).toBeTruthy();
   });
 
-  test("does not show Update firmware when firmware is current or unknown", async () => {
+  test("offers Update firmware when the firmware is not recorded, so a flash can be started and recorded", async () => {
     const view = renderRobot({ firmware: { installed: null, available: "0.2.24", status: "unknown" }, bot: { running: null, available: "0.2.24", status: "unknown" } });
     await waitFor(() => expect(view.getByText(/Not recorded\. Ready to install/)).toBeTruthy());
-    expect(view.queryByRole("button", { name: "Update firmware" })).toBeNull();
+    expect(view.getByRole("button", { name: "Update firmware" })).toBeTruthy();
     expect(view.getByText("Not running. Ready: 0.2.24.")).toBeTruthy();
   });
 });

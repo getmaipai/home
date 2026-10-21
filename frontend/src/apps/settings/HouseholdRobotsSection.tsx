@@ -165,7 +165,7 @@ function RobotDetail({ device, onClose }: { device: DeviceInfo; onClose: () => v
               <Badge variant="secondary">{softwareQuery.data.bot.status === "up_to_date" ? "Up to date" : softwareQuery.data.bot.status === "restart_needed" ? "Restart needed" : softwareQuery.data.bot.running ? "Unknown" : "Not running"}</Badge>
             </Item>
           </ItemGroup>
-          <StackChanInstallDialog updateOf={device.id} showButton={softwareQuery.data.firmware.status === "update_available"} onInstalled={() => void queryClient.invalidateQueries({ queryKey: ["robot-software", device.id] })} />
+          <StackChanInstallDialog updateOf={device.id} showButton={softwareQuery.data.firmware.status !== "up_to_date"} onInstalled={() => void queryClient.invalidateQueries({ queryKey: ["robot-software", device.id] })} />
         </Section> : null}
         <RobotCompanionChoices deviceId={device.id} />
         <div className="flex flex-col gap-3">
