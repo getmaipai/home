@@ -1,7 +1,11 @@
 import { describe, expect, test } from "bun:test";
+import { rmSync } from "node:fs";
+import { join } from "node:path";
+import { createHouseholdCompanion, deleteHouseholdCompanion, setHouseholdCompanionStatus, updateHouseholdCompanion } from "@/lib/householdCompanions";
 import {
   PERSONAS,
   PERSONA_IDS,
+  reloadPersonas,
   DEFAULT_PERSONA,
   DEFAULT_PERSONA_ID,
   resolvePersona,
@@ -15,6 +19,11 @@ import {
   ENGAGEMENT_FRAGMENT_WRITTEN,
   FILLER_FRAGMENT_WRITTEN,
 } from "@/lib/persona";
+import { loadManifestOnly } from "@/lib/plugins";
+
+const companionRoot = join(process.env.MAIPAI_DATA_DIR!, "companions");
+const rivetManifest = loadManifestOnly("rivet");
+if (!rivetManifest.ok || !rivetManifest.value.companion) throw new Error("rivet fixture is unavailable");
 
 describe("the persona catalog", () => {
   test("every persona has a unique id, and the default id resolves to a real entry", () => {
@@ -22,6 +31,37 @@ describe("the persona catalog", () => {
     expect(new Set(ids).size).toBe(ids.length);
     expect(PERSONA_IDS).toEqual(ids);
     expect(PERSONAS.find((p) => p.id === DEFAULT_PERSONA_ID)).toBe(DEFAULT_PERSONA);
+  });
+
+  test("drafts stay out, ready companions reload in place with fresh fields, and deletion removes them", () => {
+    rmSync(companionRoot, { recursive: true, force: true });
+    const created = createHouseholdCompanion(rivetManifest.value.companion!, { display_name: "Jesse" });
+    expect(created.ok).toBe(true);
+    if (!created.ok) return;
+    reloadPersonas();
+    expect(PERSONAS.some((persona) => persona.id === created.value.id)).toBe(false);
+
+    const ready = setHouseholdCompanionStatus(created.value.id, "ready");
+    expect(ready.ok).toBe(true);
+    reloadPersonas();
+    const persona = PERSONAS.find((entry) => entry.id === created.value.id);
+    expect(persona).toBeDefined();
+    expect(PERSONA_IDS).toContain(created.value.id);
+    if (!persona) return;
+
+    const edit = updateHouseholdCompanion(created.value.id, { tagline: "A changed line", formality: "formal" });
+    expect(edit.ok).toBe(true);
+    reloadPersonas();
+    expect(PERSONAS.find((entry) => entry.id === created.value.id)).toBe(persona);
+    expect(persona.tagline).toBe("A changed line");
+    expect(persona.formality).toBe("formal");
+
+    expect(deleteHouseholdCompanion(created.value.id)).toBe(true);
+    reloadPersonas();
+    expect(PERSONAS.some((entry) => entry.id === created.value.id)).toBe(false);
+    expect(PERSONA_IDS).not.toContain(created.value.id);
+    rmSync(companionRoot, { recursive: true, force: true });
+    reloadPersonas();
   });
 });
 

@@ -52,6 +52,7 @@
 // invariants section, and needs its own explicit reconciliation rule,
 // not a value dropped in beside three harmless ones).
 import { listPackageIds, loadManifestOnly } from "@/lib/plugins";
+import { listHouseholdCompanionIds, getHouseholdCompanion } from "@/lib/householdCompanions";
 import { companionAudienceOf, companionFloor, type CompanionAudience } from "@/lib/robotCompanion";
 import type { AgeBand } from "@/lib/ageBand";
 import type { SurfaceClass } from "@/lib/surfaceClass";
@@ -59,6 +60,7 @@ import type { SurfaceClass } from "@/lib/surfaceClass";
 export interface Persona {
   id: string;
   display_name: string;
+  tagline?: string;
   /** DYNAMIC-COMPANION-01: who the companion is for. `all` is dynamic (adapts to the turn's band, any robot may use it); `teen` and
    * `adult` are explicit (a robot needs those controls). From the manifest's `companion.audience`, else its `min_role`. */
   audience: CompanionAudience;
@@ -110,37 +112,42 @@ export interface Persona {
 // Skips (rather than throws on) a package that fails to load or isn't
 // `kind: "companion"`: this file has no business refusing to boot the
 // whole hub because one unrelated bundled package is malformed.
+function personaFromManifest(id: string, manifest: import("@maipai/spec/gen/ts/manifest.js").PackageManifest): Persona | null {
+  if (manifest.kind !== "companion" || !manifest.companion || (manifest.companion.status && manifest.companion.status !== "ready")) return null;
+  const c = manifest.companion;
+  const audience = companionAudienceOf(c.audience, manifest.min_role);
+  return { id, display_name: c.display_name, ...(c.tagline !== undefined ? { tagline: c.tagline } : {}), audience, floor: companionFloor(audience), formality: c.formality, complexity: c.complexity, engagement: c.engagement, filler_density: c.filler_density, examples: c.examples, examples_by_band: { ...(c.examples_child ? { child: c.examples_child } : {}), ...(c.examples_teen ? { teen: c.examples_teen } : {}), ...(c.examples_adult ? { adult: c.examples_adult } : {}) }, behavior: c.behavior, status_phrases: c.status_phrases };
+}
 function loadPersonaCatalog(): Persona[] {
   const out: Persona[] = [];
   for (const id of [...listPackageIds()].sort()) {
     const loaded = loadManifestOnly(id);
-    if (!loaded.ok || loaded.value.kind !== "companion" || !loaded.value.companion) continue;
-    const c = loaded.value.companion;
-    out.push({
-      id,
-      display_name: c.display_name,
-      audience: companionAudienceOf(c.audience, loaded.value.min_role),
-      floor: companionFloor(companionAudienceOf(c.audience, loaded.value.min_role)),
-      formality: c.formality,
-      complexity: c.complexity,
-      engagement: c.engagement,
-      filler_density: c.filler_density,
-      examples: c.examples,
-      examples_by_band: { ...(c.examples_child ? { child: c.examples_child } : {}), ...(c.examples_teen ? { teen: c.examples_teen } : {}), ...(c.examples_adult ? { adult: c.examples_adult } : {}) },
-      behavior: c.behavior,
-      status_phrases: c.status_phrases,
-    });
+    if (loaded.ok) { const persona = personaFromManifest(id, loaded.value); if (persona) out.push(persona); }
   }
+  const bundledIds = new Set(listPackageIds());
+  for (const id of listHouseholdCompanionIds()) if (!bundledIds.has(id)) { const manifest = getHouseholdCompanion(id); if (manifest) { const persona = personaFromManifest(id, manifest); if (persona) out.push(persona); } }
   return out;
 }
 
 export const PERSONAS: readonly Persona[] = loadPersonaCatalog();
 
 /** Tests that add or remove a companion package re-read the catalog in place (the array every importer already holds). */
-export function __reloadPersonasForTests(): void {
+export function reloadPersonas(): void {
   // An id already loaded keeps its object, so DEFAULT_PERSONA and anything else holding one stays the catalog's entry.
-  (PERSONAS as Persona[]).splice(0, PERSONAS.length, ...loadPersonaCatalog().map((fresh) => PERSONAS.find((known) => known.id === fresh.id) ?? fresh));
+  const existing = new Map(PERSONAS.map((persona) => [persona.id, persona]));
+  const refreshed = loadPersonaCatalog().map((fresh) => {
+    const known = existing.get(fresh.id);
+    if (!known) return fresh;
+    for (const key of Object.keys(known) as (keyof Persona)[]) {
+      if (!Object.hasOwn(fresh, key)) delete (known as Partial<Persona>)[key];
+    }
+    Object.assign(known, fresh);
+    return known;
+  });
+  (PERSONAS as Persona[]).splice(0, PERSONAS.length, ...refreshed);
+  refreshPersonaIds();
 }
+export function __reloadPersonasForTests(): void { reloadPersonas(); }
 
 // Fails loudly, right here, rather than letting a `!`-asserted
 // DEFAULT_PERSONA silently be `undefined` and crash with a confusing
@@ -155,7 +162,8 @@ if (PERSONAS.length === 0) {
   throw new Error('persona.ts: no bundled kind:"companion" package found under backend/packages/ - at least one is required to boot');
 }
 
-export const PERSONA_IDS = PERSONAS.map((p) => p.id);
+export const PERSONA_IDS: string[] = PERSONAS.map((p) => p.id);
+const refreshPersonaIds = (): void => { PERSONA_IDS.splice(0, PERSONA_IDS.length, ...PERSONAS.map((p) => p.id)); };
 export const DEFAULT_PERSONA_ID = "default";
 // Falls back to whatever loaded first when "default" itself is missing
 // for some reason - PERSONAS is guaranteed non-empty by the guard above,
