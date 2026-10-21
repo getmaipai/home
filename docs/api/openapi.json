@@ -54405,6 +54405,165 @@
         }
       }
     },
+    "/api/companions/avatar": {
+      "get": {
+        "tags": [
+          "Companions"
+        ],
+        "summary": "Read the signed-in person's active video avatar",
+        "responses": {
+          "200": {
+            "description": "The usable active companion's approved animation, or null when it has none.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "avatar": {
+                      "type": "object",
+                      "nullable": true,
+                      "properties": {
+                        "id": {
+                          "type": "string"
+                        },
+                        "name": {
+                          "type": "string"
+                        },
+                        "key": {
+                          "type": "string"
+                        },
+                        "version": {
+                          "type": "string"
+                        },
+                        "states": {
+                          "type": "object",
+                          "additionalProperties": {
+                            "type": "object",
+                            "properties": {
+                              "loop": {
+                                "type": "boolean"
+                              },
+                              "urls": {
+                                "type": "object",
+                                "properties": {
+                                  "h264": {
+                                    "type": "string"
+                                  },
+                                  "av1": {
+                                    "type": "string",
+                                    "nullable": true
+                                  },
+                                  "still": {
+                                    "type": "string"
+                                  }
+                                },
+                                "required": [
+                                  "h264",
+                                  "av1",
+                                  "still"
+                                ]
+                              }
+                            },
+                            "required": [
+                              "loop",
+                              "urls"
+                            ]
+                          }
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "name",
+                        "key",
+                        "version",
+                        "states"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "avatar"
+                  ]
+                }
+              }
+            }
+          },
+          "304": {
+            "description": "The animation has not changed."
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/companions/{id}/animation/{file}": {
+      "get": {
+        "tags": [
+          "Companions"
+        ],
+        "summary": "Read an approved companion animation file",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 80
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 80
+            },
+            "required": true,
+            "name": "file",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Animation file."
+          },
+          "206": {
+            "description": "Requested byte range."
+          },
+          "304": {
+            "description": "The animation file has not changed."
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "That animation file could not be found for this person. Check the companion and file name.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/companions/{id}": {
       "get": {
         "tags": [
@@ -57234,6 +57393,9 @@
         "responses": {
           "200": {
             "description": "Clip file."
+          },
+          "206": {
+            "description": "Requested byte range."
           },
           "401": {
             "description": "Not signed in",

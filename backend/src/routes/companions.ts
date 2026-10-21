@@ -3,12 +3,14 @@
 // settings writer). A companion above the person's type is a 404, so its existence does not leak. Admins also get who uses each
 // companion and which companion each robot has.
 import { createRoute, z } from "@hono/zod-openapi";
+import { createHash } from "node:crypto";
+import { statSync } from "node:fs";
 import { apiRouter, errorResponses, idParamSchema } from "@/lib/openapi";
 import { requireAuth } from "@/middleware/auth";
 import { isOwnerOrAdmin } from "@/lib/access";
 import { companionDetail, companionAreaOn, canCreateCompanion, listCompanionCards, mayUseCompanion, pickRefusal, robotAssignments } from "@/lib/companionsApp";
 import { publishSettingsChanged } from "@/lib/deviceCommands";
-import { setValue } from "@/lib/settings";
+import { getPersonSettingValue, setValue } from "@/lib/settings";
 import { speakerAgeBand } from "@/lib/ageBand";
 import { db } from "@/db";
 import { people, settingsValues } from "@/db/schema";
@@ -16,7 +18,9 @@ import { isNull, eq, and } from "drizzle-orm";
 import { listDevicesByKind } from "@/lib/devices";
 import { getDeviceSettingValue } from "@/lib/settings";
 import { companionFits, robotControlsOf, ROBOT_COMPANION_KEY } from "@/lib/robotCompanion";
-import { PERSONAS, reloadPersonas } from "@/lib/persona";
+import { PERSONAS, reloadPersonas, resolvePersona } from "@/lib/persona";
+import { loadManifestOnly } from "@/lib/plugins";
+import { resolvePackageDir } from "@/lib/packageResolve";
 import { createHouseholdCompanion, copyBundledCompanion, copyHouseholdCompanion, getHouseholdCompanion, updateHouseholdCompanion, deleteHouseholdCompanion, setHouseholdCompanionAudience, setHouseholdCompanionStatus, householdCompanionAuthorId } from "@/lib/householdCompanions";
 import { addVersion, approveSheet, deleteVersion, readLook, setRest, setSheetCard, setSheetKey, unapproveSheet, versionOriginalPath, versionPath, normalizePicture, uploadLabel } from "@/lib/companionLook";
 import { LOOK_EDIT_PROMPT_LINE, LOOK_JOB_BUSY_LINE, LOOK_PROMPT_REQUIRED_LINE, activeLookJob, canGenerateLook, cancelLookJob, pollLookJob, startLookEdit, startLookGeneration, startLookSheet } from "@/lib/companionLookJobs";
@@ -61,6 +65,66 @@ companionsRoutes.openapi(listRoute, (c) => {
   const person = c.get("person");
   const admin = isOwnerOrAdmin(person);
   return c.json({ allowed: companionAreaOn(person), can_create: canCreateCompanion(person, admin), companions: listCompanionCards(person, admin).map((card) => ({ ...card, can_edit: card.is_household && mayEdit(person, card.id), can_copy: canCreateCompanion(person, admin) })), robots: admin ? robotAssignments() : null }, 200);
+});
+
+const AvatarState = z.object({ loop: z.boolean(), urls: z.object({ h264: z.string(), av1: z.string().nullable(), still: z.string() }) });
+const avatarRoute = createRoute({
+  method: "get", path: "/avatar", tags: ["Companions"], summary: "Read the signed-in person's active video avatar",
+  middleware: [requireAuth] as const,
+  responses: {
+    200: { content: { "application/json": { schema: z.object({ avatar: z.object({ id: z.string(), name: z.string(), key: z.string(), version: z.string(), states: z.record(z.string(), AvatarState) }).nullable() }) } }, description: "The usable active companion's approved animation, or null when it has none." },
+    304: { description: "The animation has not changed." },
+    ...errorResponses({ 401: "Not signed in" }),
+  },
+});
+companionsRoutes.openapi(avatarRoute, (c) => {
+  const person = c.get("person"), persona = resolvePersona(getPersonSettingValue(person, "persona.active_id"));
+  if (!mayUseCompanion(person, persona)) return c.json({ avatar: null }, 200);
+  const household = getHouseholdCompanion(persona.id), loaded = household ? null : loadManifestOnly(persona.id), manifest = household ?? (loaded?.ok ? loaded.value : null);
+  const animation = manifest?.companion?.animation;
+  if (!animation || (manifest.companion?.status && manifest.companion.status !== "ready") || !animation.states.idle) return c.json({ avatar: null }, 200);
+  const version = createHash("sha256").update(JSON.stringify(animation)).digest("hex").slice(0, 12);
+  const etag = `"${version}"`;
+  const headers = { "cache-control": "private, max-age=0, must-revalidate", etag };
+  if (matchesEtag(c.req.header("if-none-match"), etag)) return new Response(null, { status: 304, headers });
+  const folder = householdCompanionFolder(persona.id) ?? resolvePackageDir(persona.id);
+  const states = Object.fromEntries((Object.entries(animation.states) as Array<[string, { h264: string; av1?: string; still: string; loop: boolean }]>).map(([state, files]) => [state, {
+    loop: files.loop,
+    urls: {
+      h264: `/api/companions/${encodeURIComponent(persona.id)}/animation/${encodeURIComponent(files.h264)}`,
+      av1: files.av1 ? `/api/companions/${encodeURIComponent(persona.id)}/animation/${encodeURIComponent(files.av1)}` : null,
+      still: `/api/companions/${encodeURIComponent(persona.id)}/animation/${encodeURIComponent(files.still)}`,
+    },
+  }]));
+  return c.json({ avatar: { id: persona.id, name: manifest?.companion?.display_name ?? persona.display_name, key: animation.key, version, states } }, 200, headers);
+});
+
+const animationParams = z.object({ id: z.string().min(1).max(80), file: z.string().min(1).max(80) });
+const animationFileRoute = createRoute({
+  method: "get", path: "/{id}/animation/{file}", tags: ["Companions"], summary: "Read an approved companion animation file",
+  middleware: [requireAuth] as const,
+  request: { params: animationParams },
+  responses: {
+    200: { description: "Animation file." }, 206: { description: "Requested byte range." }, 304: { description: "The animation file has not changed." },
+    ...errorResponses({ 401: "Not signed in", 404: "That animation file could not be found for this person. Check the companion and file name." }),
+  },
+});
+companionsRoutes.openapi(animationFileRoute, (c) => {
+  const { id, file } = c.req.valid("param"), actor = c.get("person"), household = getHouseholdCompanion(id), loaded = household ? null : loadManifestOnly(id), manifest = household ?? (loaded?.ok ? loaded.value : null), animation = manifest?.companion?.animation;
+  const persona = PERSONAS.find((candidate) => candidate.id === id);
+  const editor = Boolean(manifest?.companion && (isOwnerOrAdmin(actor) || householdCompanionAuthorId(id) === actor.id));
+  const ready = !manifest?.companion?.status || manifest.companion.status === "ready";
+  if (!animation || (!editor && (!persona || !ready || !mayUseCompanion(actor, persona)))) return c.json({ error: "That animation file could not be found for this person. Check the companion and file name." }, 404);
+  const validFile = /^(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9._-]{0,63}(?:\.mp4|\.png)$/.test(file);
+  const listed = [animation.sheet?.rest, ...Object.values(animation.states).flatMap((state) => [state.h264, state.av1, state.still])].filter((name): name is string => typeof name === "string");
+  if (!validFile || !listed.includes(file)) return c.json({ error: "That animation file could not be found for this person. Check the companion and file name." }, 404);
+  const root = householdCompanionFolder(id) ?? (loaded?.ok ? resolvePackageDir(id) : null);
+  if (!root) return c.json({ error: "That animation file could not be found for this person. Check the companion and file name." }, 404);
+  const path = join(root, "animation", file);
+  if (!existsSync(path)) return c.json({ error: "That animation file could not be found for this person. Check the companion and file name." }, 404);
+  const metadata = statSync(path), bytes = readFileSync(path), etag = `"${metadata.size}-${metadata.mtimeMs}"`;
+  if (matchesEtag(c.req.header("if-none-match"), etag)) return new Response(null, { status: 304, headers: { etag, "cache-control": "private, max-age=0, must-revalidate" } });
+  return rangeResponse(bytes, file.endsWith(".png") ? "image/png" : "video/mp4", c.req.header("range"), { etag, cacheControl: "private, max-age=0, must-revalidate" });
 });
 
 const detailRoute = createRoute({
@@ -325,6 +389,27 @@ function inUseSentence(kind: "robots" | "people", count: number): string { retur
 function clearStateApprovals(id: string): void { clearApprovedStates(id); const root = householdCompanionFolder(id); if (root) rmSync(join(root, "animation"), { recursive: true, force: true }); setHouseholdCompanionAnimation(id, null); }
 const CompanionStateId = z.enum(media.states.map((row) => row.id) as [string, ...string[]]);
 const statesParams = z.object({ id: z.string().min(1).max(80), state: CompanionStateId.optional(), take: z.string().min(1).max(80).optional(), file: z.string().min(1).max(80).optional() });
+function rangeResponse(bytes: Uint8Array, type: string, range?: string, options: { etag?: string; cacheControl?: string } = {}): Response {
+  const size = bytes.length;
+  let start = 0, end = size - 1, status: 200 | 206 = 200;
+  if (range) {
+    const match = /^bytes=(\d*)-(\d*)$/.exec(range);
+    if (!match) return new Response(null, { status: 416, headers: { "content-range": `bytes */${size}` } });
+    if (match[1]) start = Number(match[1]);
+    if (match[2]) end = Number(match[2]);
+    if (start > end || start >= size) return new Response(null, { status: 416, headers: { "content-range": `bytes */${size}` } });
+    end = Math.min(end, size - 1);
+    status = 206;
+  }
+  return new Response(bytes.subarray(start, end + 1), { status, headers: {
+    "content-type": type, "accept-ranges": "bytes", "cache-control": options.cacheControl ?? "private, max-age=0, must-revalidate",
+    ...(options.etag ? { etag: options.etag } : {}),
+    ...(status === 206 ? { "content-range": `bytes ${start}-${end}/${size}` } : {}),
+  } });
+}
+function matchesEtag(header: string | undefined, etag: string): boolean {
+  return Boolean(header?.split(/\s*,\s*/).some((value) => value === "*" || value.replace(/^W\//, "") === etag));
+}
 function statesAccess(actor: import("@/types").PersonRow, id: string) { return lookAccess(actor, id); }
 const statesRoute = createRoute({ method: "get", path: "/{id}/states", tags: ["Companions"], summary: "Read companion video states", middleware: [requireAuth] as const, request: { params: statesParams }, responses: { 200: { content: { "application/json": { schema: z.any() } }, description: "State, take and approval data." }, ...errorResponses({ 401: "Not signed in", 403: "Only the author or an admin can read this companion", 404: "No household companion" }) } });
 companionsRoutes.openapi(statesRoute, (c) => { const { id } = c.req.valid("param"), denied = statesAccess(c.get("person"), id); if (denied) return c.json({ error: denied.error }, denied.status); const stored = readStates(id), look = readLook(id), startReady = Boolean(look.rest && versionOriginalPath(id, look.rest)), run = activeTakeRun(id), states = media.states.map((v) => { const row = stored.states[v.id], takes = row?.takes ?? [], best = bestTake(takes), urls = (take: string) => ({ h264: `/api/companions/${encodeURIComponent(id)}/states/${v.id}/${take}/clip.h264.mp4`, av1: `/api/companions/${encodeURIComponent(id)}/states/${v.id}/${take}/clip.av1.mp4`, still: `/api/companions/${encodeURIComponent(id)}/states/${v.id}/${take}/still.png` }); const approved = row?.approved ? takes.find((t) => t.id === row.approved) : null; return { id: v.id, label: v.id.split("_").map((x) => x[0]!.toUpperCase() + x.slice(1)).join(" "), kind: v.kind, required: v.required, when_it_plays: v.driven_by, default_motion: v.motion, motion: row?.motion ?? v.motion, approved: approved ? { take_id: approved.id, approved_by: row?.approved_by, approved_at: row?.approved_at, urls: urls(approved.id) } : null, takes: takes.map((t) => ({ id: t.id, label: t.label, source: t.source, created_at: t.created_at, ok: t.report?.ok ?? null, reasons: t.report?.reasons ?? [], seconds: t.report?.seconds ?? null, bytes: t.report?.bytes ?? null, colour_distance: t.report?.colour_distance ?? null, area_ratio: t.report?.area_ratio ?? null, ...(t.report?.colour_match ? { colour_match: t.report.colour_match } : {}), ...(t.report?.settle_skipped_frames !== undefined ? { settle_skipped_frames: t.report.settle_skipped_frames } : {}), urls: urls(t.id), is_best: best?.id === t.id })), busy: run?.states.includes(v.id) === true || takes.some((t) => companionStateJob(id, t.id)?.state === "running") }; }); const approved = states.filter((v) => v.approved).length; return c.json({ sheet_ready: look.sheet?.state === "approved", start_ready: startReady, ...(!startReady ? { start_reason: TAKE_NO_ORIGINAL_LINE } : {}), key: look.sheet?.key ?? look.key, states, run: run ? { job: run.id, label: run.label, percent: run.percent } : null, counts: { approved, total: 12, required_missing: states.filter((v) => v.required && !v.approved).map((v) => v.id) } }, 200); });
@@ -346,8 +431,8 @@ const pollRunRoute = createRoute({ method: "get", path: "/{id}/states/jobs/run/{
 companionsRoutes.openapi(pollRunRoute, (c) => { const p = c.req.valid("param"), denied = statesAccess(c.get("person"), p.id); if (denied) return c.json({ error: denied.error }, denied.status); const run = takeRunFor(p.job, c.get("person"), p.id); return run ? c.json(publicTakeRun(run), 200) : c.json({ error: "That clip run could not be found. Start it again." }, 404); });
 const cancelRunRoute = createRoute({ method: "delete", path: "/{id}/states/jobs/run/{job}", tags: ["Companions"], summary: "Stop companion clip generation", middleware: [requireAuth] as const, request: { params: runJobParams }, responses: { 204: { description: "Clip run stopped." }, ...errorResponses({ 403: "Only the author or an admin can stop this companion", 404: "No such clip run" }) } });
 companionsRoutes.openapi(cancelRunRoute, async (c) => { const p = c.req.valid("param"), denied = statesAccess(c.get("person"), p.id); if (denied) return c.json({ error: denied.error }, denied.status); return await cancelTakeRun(p.job, c.get("person"), p.id) ? c.body(null, 204) : c.json({ error: "That clip run could not be found. Start it again." }, 404); });
-const stateFileRoute = createRoute({ method: "get", path: "/{id}/states/{state}/{take}/{file}", tags: ["Companions"], summary: "Read a companion clip file", middleware: [requireAuth] as const, request: { params: statesParams.extend({ state: CompanionStateId, take: z.string(), file: z.string() }) }, responses: { 200: { description: "Clip file." }, ...errorResponses({ 401: "Not signed in", 403: "Only the author or an admin can read this companion", 404: "No such clip file" }) } });
-companionsRoutes.openapi(stateFileRoute, (c) => { const p = c.req.valid("param"), denied = statesAccess(c.get("person"), p.id); if (denied) return c.json({ error: denied.error }, denied.status); const path = takePath(p.id, p.state, p.take, p.file); if (!path || !existsSync(path)) return c.json({ error: "That clip file could not be found." }, 404); const bytes = readFileSync(path), size = bytes.length, range = c.req.header("range"); let start = 0, end = size - 1, status: 200 | 206 = 200; if (range) { const m = /^bytes=(\d*)-(\d*)$/.exec(range); if (!m) return new Response(null, { status: 416, headers: { "content-range": `bytes */${size}` } }); if (m[1]) start = Number(m[1]); if (m[2]) end = Number(m[2]); if (start > end || start >= size) return new Response(null, { status: 416, headers: { "content-range": `bytes */${size}` } }); end = Math.min(end, size - 1); status = 206; } const type = p.file.endsWith(".png") ? "image/png" : p.file.endsWith(".json") ? "application/json" : p.file === "source.mov" ? "video/quicktime" : p.file === "source.webm" ? "video/webm" : "video/mp4"; return new Response(bytes.subarray(start, end + 1), { status, headers: { "content-type": type, "accept-ranges": "bytes", "cache-control": "private, max-age=0, must-revalidate", ...(status === 206 ? { "content-range": `bytes ${start}-${end}/${size}` } : {}) } }); });
+const stateFileRoute = createRoute({ method: "get", path: "/{id}/states/{state}/{take}/{file}", tags: ["Companions"], summary: "Read a companion clip file", middleware: [requireAuth] as const, request: { params: statesParams.extend({ state: CompanionStateId, take: z.string(), file: z.string() }) }, responses: { 200: { description: "Clip file." }, 206: { description: "Requested byte range." }, ...errorResponses({ 401: "Not signed in", 403: "Only the author or an admin can read this companion", 404: "No such clip file" }) } });
+companionsRoutes.openapi(stateFileRoute, (c) => { const p = c.req.valid("param"), denied = statesAccess(c.get("person"), p.id); if (denied) return c.json({ error: denied.error }, denied.status); const path = takePath(p.id, p.state, p.take, p.file); if (!path || !existsSync(path)) return c.json({ error: "That clip file could not be found." }, 404); const type = p.file.endsWith(".png") ? "image/png" : p.file.endsWith(".json") ? "application/json" : p.file === "source.mov" ? "video/quicktime" : p.file === "source.webm" ? "video/webm" : "video/mp4"; return rangeResponse(readFileSync(path), type, c.req.header("range")); });
 const motionRoute = createRoute({ method: "put", path: "/{id}/states/{state}/motion", tags: ["Companions"], summary: "Set a state motion sentence", middleware: [requireAuth] as const, request: { params: statesParams, body: { content: { "application/json": { schema: z.object({ motion: z.string().min(1).max(200).nullable() }) } } } }, responses: { 200: { content: { "application/json": { schema: z.object({ ok: z.boolean() }) } }, description: "Motion saved." }, ...errorResponses({ 400: "Invalid state or motion", 403: "Only the author or an admin can edit this companion", 404: "No household companion" }) } });
 companionsRoutes.openapi(motionRoute, (c) => { const p = c.req.valid("param"), denied = statesAccess(c.get("person"), p.id); if (denied) return c.json({ error: denied.error }, denied.status); try { setMotion(p.id, p.state!, c.req.valid("json").motion); return c.json({ ok: true }, 200); } catch (e) { return c.json({ error: e instanceof Error ? e.message : "The motion could not be saved." }, 400); } });
 const uploadStateRoute = createRoute({ method: "post", path: "/{id}/states/{state}/upload", tags: ["Companions"], summary: "Upload a clip for a companion state", middleware: [requireAuth] as const, request: { params: statesParams, body: { content: { "multipart/form-data": { schema: z.any() } } } }, responses: { 202: { content: { "application/json": { schema: z.object({ take_id: z.string() }) } }, description: "Clip finishing started." }, ...errorResponses({ 400: "Invalid video or confirmation", 403: "Only the author or an admin can edit this companion", 404: "No household companion", 409: "A clip is already being made or finished", 413: "Video is over the upload size limit" }) } });

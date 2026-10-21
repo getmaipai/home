@@ -4,12 +4,14 @@ import { createHash } from "node:crypto";
 import { join } from "node:path";
 import { rmSync, mkdirSync, writeFileSync } from "node:fs";
 import { db } from "@/db";
+import { and, eq } from "drizzle-orm";
 import { devices, people, sessions, settingsValues } from "@/db/schema";
 import { companionsRoutes } from "@/routes/companions";
 import { settingsRoutes } from "@/routes/settings";
-import { createHouseholdCompanion } from "@/lib/householdCompanions";
+import { createHouseholdCompanion, householdCompanionFolder, setHouseholdCompanionAnimation, setHouseholdCompanionAudience, setHouseholdCompanionStatus } from "@/lib/householdCompanions";
 import { loadManifestOnly } from "@/lib/plugins";
 import { __reloadPersonasForTests } from "@/lib/persona";
+import { __resetSettingsCacheForTests } from "@/lib/settings";
 import { resetDb } from "../../tests/reset-db";
 import sharp from "sharp";
 import { __setPicturesFetchForTests } from "@/lib/pictures/stack";
@@ -541,5 +543,63 @@ describe("household companion routes", () => {
     }
     expect((await request("companions/rivet/look/prompt", author)).status).toBe(403);
     expect((await request(`companions/${created.value.id}/states/dancing/prompt`, author)).status).toBe(404);
+
+  test("avatar returns only ready usable active animation and caches its manifest version", async () => {
+    const adult = addPerson("person-avatar-adult", "adult"), child = addPerson("person-avatar-child", "child"), admin = addPerson("person-avatar-admin", "admin");
+    const animation = { kind: "video" as const, spec_version: 1, key: "#00FF00", states: { idle: { h264: "idle.h264.mp4", still: "idle.png", loop: true }, listening: { h264: "listening.h264.mp4", av1: "listening.av1.mp4", still: "listening.png", loop: false } } };
+    const ready = createHouseholdCompanion({ ...fixture(), display_name: "Avatar fox" }, { display_name: "Author", person_id: "person-avatar-adult" }); if (!ready.ok) throw new Error(ready.error);
+    setHouseholdCompanionAudience(ready.value.id, "all", { display_name: "Admin" }); setHouseholdCompanionStatus(ready.value.id, "ready"); setHouseholdCompanionAnimation(ready.value.id, animation); __reloadPersonasForTests();
+    const animationFolder = join(householdCompanionFolder(ready.value.id)!, "animation"); mkdirSync(animationFolder, { recursive: true });
+    writeFileSync(join(animationFolder, "idle.h264.mp4"), "0123456789"); writeFileSync(join(animationFolder, "idle.png"), "png");
+    const picked = await request(`companions/${ready.value.id}/default`, adult, "PUT"); expect(picked.status).toBe(200);
+    const response = await request("companions/avatar", adult); expect(response.status).toBe(200);
+    const body = await response.json() as { avatar: { id: string; name: string; key: string; version: string; states: Record<string, { loop: boolean; urls: { h264: string; av1: string | null; still: string } }> } | null };
+    expect(body.avatar).toMatchObject({ id: ready.value.id, name: "Avatar fox", key: "#00FF00", version: expect.stringMatching(/^[a-f0-9]{12}$/) });
+    expect(body.avatar?.states.idle?.urls.av1).toBeNull();
+    expect(body.avatar?.states.listening?.urls.av1).toBe(`/api/companions/${ready.value.id}/animation/listening.av1.mp4`);
+    const etag = response.headers.get("etag")!;
+    expect(response.headers.get("cache-control")).toBe("private, max-age=0, must-revalidate");
+    const cached = await app.request("http://localhost/api/companions/avatar", { headers: { cookie: `session=${adult}`, "if-none-match": etag } }); expect(cached.status).toBe(304);
+    const childPick = await request(`companions/${ready.value.id}/default`, child, "PUT"); expect(childPick.status).toBe(200);
+    const childAvatar = await request("companions/avatar", child); expect((await childAvatar.json() as { avatar: { id: string } | null }).avatar?.id).toBe(ready.value.id);
+
+    const adultOnly = createHouseholdCompanion({ ...fixture(), display_name: "Adult avatar" }, { display_name: "Author", person_id: "person-avatar-adult" }); if (!adultOnly.ok) throw new Error(adultOnly.error);
+    setHouseholdCompanionStatus(adultOnly.value.id, "ready"); setHouseholdCompanionAnimation(adultOnly.value.id, animation); __reloadPersonasForTests();
+    db.delete(settingsValues).where(and(eq(settingsValues.scope, "person:person-avatar-child"), eq(settingsValues.key, "persona.active_id"))).run();
+    db.insert(settingsValues).values({ scope: "person:person-avatar-child", key: "persona.active_id", value: JSON.stringify(adultOnly.value.id), hlc: "3:0:test", source: "user", updatedAt: now }).run(); __resetSettingsCacheForTests();
+    expect((await (await request("companions/avatar", child)).json() as { avatar: unknown }).avatar).toBeNull();
+
+    const draft = createHouseholdCompanion({ ...fixture(), display_name: "Draft avatar" }, { display_name: "Author", person_id: "person-avatar-adult" }); if (!draft.ok) throw new Error(draft.error);
+    setHouseholdCompanionAnimation(draft.value.id, animation);
+    db.delete(settingsValues).where(and(eq(settingsValues.scope, "person:person-avatar-adult"), eq(settingsValues.key, "persona.active_id"))).run();
+    db.insert(settingsValues).values({ scope: "person:person-avatar-adult", key: "persona.active_id", value: JSON.stringify(draft.value.id), hlc: "2:0:test", source: "user", updatedAt: now }).run();
+    expect((await (await request("companions/avatar", adult)).json() as { avatar: unknown }).avatar).toBeNull();
+    const bundled = await request("companions/avatar", admin); expect((await bundled.json() as { avatar: unknown }).avatar).toBeNull();
+  });
+
+  test("animation files use companion access, manifest allowlists, validators and byte ranges", async () => {
+    const author = addPerson("person-animation-author", "adult"), other = addPerson("person-animation-other", "adult"), child = addPerson("person-animation-child", "child");
+    const animation = { kind: "video" as const, spec_version: 1, key: "#00FF00", states: { idle: { h264: "idle.h264.mp4", still: "idle.png", loop: true } } };
+    const created = createHouseholdCompanion({ ...fixture(), display_name: "Animation access" }, { display_name: "Author", person_id: "person-animation-author" }); if (!created.ok) throw new Error(created.error);
+    setHouseholdCompanionAnimation(created.value.id, animation);
+    const folder = join(householdCompanionFolder(created.value.id)!, "animation"); mkdirSync(folder, { recursive: true }); writeFileSync(join(folder, "idle.h264.mp4"), "0123456789");
+    const url = `companions/${created.value.id}/animation/idle.h264.mp4`;
+    expect((await request(url, other)).status).toBe(404);
+    expect((await request(url, child)).status).toBe(404);
+    const editorRead = await request(url, author); expect(editorRead.status).toBe(200); expect(await editorRead.text()).toBe("0123456789");
+    expect(editorRead.headers.get("cache-control")).toBe("private, max-age=0, must-revalidate");
+    const etag = editorRead.headers.get("etag")!;
+    const partial = await app.request(`http://localhost/api/${url}`, { headers: { cookie: `session=${author}`, range: "bytes=2-5" } });
+    expect(partial.status).toBe(206); expect(await partial.text()).toBe("2345"); expect(partial.headers.get("content-range")).toBe("bytes 2-5/10"); expect(partial.headers.get("accept-ranges")).toBe("bytes");
+    const unchanged = await app.request(`http://localhost/api/${url}`, { headers: { cookie: `session=${author}`, "if-none-match": etag } }); expect(unchanged.status).toBe(304);
+    expect((await request(`companions/${created.value.id}/animation/unknown.h264.mp4`, author)).status).toBe(404);
+    expect((await request(`companions/${created.value.id}/animation/..`, author)).status).toBe(404);
+
+    const ready = createHouseholdCompanion({ ...fixture(), display_name: "Ready animation" }, { display_name: "Author", person_id: "person-animation-author" }); if (!ready.ok) throw new Error(ready.error);
+    setHouseholdCompanionStatus(ready.value.id, "ready"); setHouseholdCompanionAnimation(ready.value.id, animation); __reloadPersonasForTests();
+    const readyFolder = join(householdCompanionFolder(ready.value.id)!, "animation"); mkdirSync(readyFolder, { recursive: true }); writeFileSync(join(readyFolder, "idle.h264.mp4"), "abcdefghij");
+    const readyUrl = `companions/${ready.value.id}/animation/idle.h264.mp4`;
+    expect((await request(readyUrl, other)).status).toBe(200);
+    expect((await request(readyUrl, child)).status).toBe(404);
   });
 });
