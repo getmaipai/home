@@ -230,7 +230,8 @@ describe("StreamGate (STREAM-NEXT-01 (b)): the per-sentence gate a streamed turn
     gate.finish();
     expect(released).toEqual([]);
     const result = gate.result();
-    expect(result.heldAsEnvelope).toBe(true);
+    // RECENCY-02 (TOOL-MARKUP-01): tag-wrapped markup is now swallowed as tool markup, never released, and the turn node tells the honest failure.
+    expect(result.toolMarkup).toContain("<function_call>");
     expect(result.text).toBe("");
     expect(doneCount.count).toBe(1);
   });
