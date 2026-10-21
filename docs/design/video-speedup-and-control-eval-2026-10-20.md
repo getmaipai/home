@@ -5,7 +5,7 @@ order, and what result would change the shipped design. It follows [video-genera
 (the shipped Quick and Detailed kinds) and does not change it. The architect has not ruled. Owner approval is needed before any
 row below starts, and before any download.
 
-Source: a research pass written by ChatGPT (pasted by Jesse, 2026-10-20) about the `dgrauet/ltx-2-mlx` project, TAEW2.2 and LightVAE
+Source: two research passes written by ChatGPT (pasted by Jesse, 2026-10-20) about the `dgrauet/ltx-2-mlx` project, TAEW2.2 and LightVAE
 decoders, LTX-2.3 extend and keyframe operations, and Wan2.2 image conditioning. Section 1 is the review of that pass against what
 Home already has. Sections 2 to 5 are the plan.
 
@@ -50,8 +50,8 @@ Home already has. Sections 2 to 5 are the plan.
    Seams and anchor indices must be checked against the real frame count, not the requested one.
 8. **Not evidence:** the pasted example photos (film stills and stock-site images) illustrate nothing about our models. The shell
    commands are the pass's own illustration; flags are unverified until `--help` of the pinned revision is read.
-9. **RIFE-MLX is unverified.** An earlier search in this session found no MLX frame-interpolation tool. Treat 48 fps output as a
-   research row, not a plan.
+9. **RIFE-MLX exists** (`xocialize/rife-mlx`, found by the second pass and read 2026-10-20; an earlier search in this session had
+   missed it). It is a three-star, six-commit single-maintainer project, so its numbers are claims until measured here (E6).
 
 ## 2. Questions, in the order to ask them
 
@@ -62,7 +62,11 @@ Home already has. Sections 2 to 5 are the plan.
 | E3 | Do anchors at later frames on Detailed hold identity and composition? | Uses the shipped model; no new download |
 | E4 | Is extend a better way to a 10 to 15 s clip than a direct 10 s clip? | Needs E3's method; decides "longer" |
 | E5 | Is the dev-model keyframe pipeline affordable? | Needs new weights; only if E3 and E4 leave a gap |
-| E6 | Does an MLX frame interpolator exist that is licensed for us? | Research only |
+| E6 | Does RIFE-MLX double the frame rate cheaply and cleanly? | Candidate found 2026-10-20; cheap to try |
+
+Watchlist, not experiments: Kandinsky 6.0 Video and its super-resolution repo (`kandinskylab/kandinsky-6`, `-sr`) advertise synced
+audio, but the pass says the published quick start needs an NVIDIA GPU (unverified by us; the 2026-10-17 note found no MLX port and
+VIDEO-GEN-10 owns it).
 
 Out of scope on purpose: LTX-2.5 (VIDEO-LTX-05 owns it), Wan2.2 A14B and Lightning LoRAs (VIDEO-GEN-10 owns them; revisit only if E1
 makes a 14B profile worth timing), Kandinsky (no MLX port found).
@@ -87,8 +91,14 @@ makes a 14B profile worth timing), Kandinsky (no MLX port found).
 
 ### E1. Tiny decoder for Wan2.2 (the first run)
 
-- **Candidates:** the original Wan2.2 VAE (baseline), TAEW2.2, its "super" variant (`madebyollin/taehv`), and LightTAE or LightVAE from
-  the LightX2V checkpoints if the latent interface matches.
+- **Candidates:** the original Wan2.2 VAE (baseline), `taew2_2` and its "super" variant (`madebyollin/taehv`), and `lighttaew2_2`
+  (LightTAE, distilled from `taew2_2`) from `lightx2v/Autoencoders`. That page (read 2026-10-20) lists Apache-2.0, all three Wan2.2
+  files as Conv2D (except the official Causal Conv3D VAE), names Wan2.2-TI2V-5B as the backbone it was tested on, and gives decode
+  times on an NVIDIA H100 for 81 frames: 3.13 s official against 0.089 s for either tiny decoder (about 35x), memory 12.3 GB against
+  0.41 GB. Those are NVIDIA numbers only and prove nothing for Apple Silicon. The page gives no numeric quality score ("Close to
+  Official" for LightTAE, "Average" for `taew2_2` are its words). It does not state the 48-channel latent of the 5B VAE, so confirm
+  the latent shape matches FastWan's before any run. `lightvaew2_1` is Wan2.1 only and is not a candidate. Conv2D layers make an
+  MLX port simpler than a 3D-convolution decoder would be.
 - **Method:** save one denoised latent per prompt from the shipped FastWan 3-step run, then decode the same tensor with each
   candidate. Candidates are PyTorch today; bench them on MPS in the scratch environment first. The shipped Stack environment carries
   no torch (video note, section 3), so a winner needs an MLX port of the decoder (an 11M-parameter causal convolution network;
@@ -103,7 +113,11 @@ makes a 14B profile worth timing), Kandinsky (no MLX port found).
 ### E2. Built-in 2x upscale on a finished Quick clip
 
 - **Method:** run the pinned `mlx-video` upscale command (verify it exists at the pinned commit first) on the five Quick clips, with
-  and without its optional refine pass.
+  and without its optional refine pass. Second candidate: `xocialize/realesrgan-mlx` (BSD-3-Clause, MLX native, fp16, no torch at
+  run time, tile flag to cap memory, an anime-video variant). Its page gives no speed numbers and shows 6 stars and 7 commits from one
+  maintainer; the weights are the upstream Real-ESRGAN checkpoints, so read the upstream weight licence. It works on frames, so time
+  the whole path: extract 121 frames, upscale each, re-encode, copy the audio. Weights load from a local folder
+  (`--weights_dir`), not the hub, in the bench.
 - **Measure:** added seconds, peak memory, opened keyframes against the 480p original and against the 720p direct clip.
 - **Pass:** 40 s or less added, visibly sharper, no new identity drift. **Kill:** needs a prompt-driven refine that changes content.
 
@@ -138,10 +152,22 @@ makes a 14B profile worth timing), Kandinsky (no MLX port found).
 - **Pass:** 5 s clip in 180 s or less with identity held and the end picture reached. **Kill:** above 5 minutes, or a download the
   owner will not accept beside the 74 GB Detailed set (this one is a second LTX file set, so licence text is re-read).
 
-### E6. Frame interpolation (research only)
+### E6. Frame interpolation with RIFE-MLX
 
-Find any MLX or Apple Silicon interpolator (RIFE class) with a licence we can ship and a measured speed. Output: a one-page note,
-no bench until a candidate exists. 48 fps is not a goal until it is cheap.
+- **Candidate:** `xocialize/rife-mlx` (read 2026-10-20). MIT, inherited from Practical-RIFE; weights are RIFE 4.25 converted to
+  safetensors (22.7 MB, fp32) and hosted at `mlx-community/RIFE-4.25`, with no separate weight licence stated (read upstream's).
+  MLX native, no torch at run time. The page reports, on an M5 Max, 168 ms per inserted frame at 480p and 260 ms at 720p. A 121
+  frame clip needs 120 inserted frames to reach 48 fps, so the model time is about 20 s at 480p and 31 s at 720p, before decoding
+  and encoding the video. That is arithmetic from the page's number, not a measurement of ours. CLI: `rife-mlx -i in.mp4 -o out.mp4
+  --multi 2`, described as keeping the audio. Weights download from the hub by default; the bench uses `--weights_dir`.
+- **Maturity:** 3 stars, 6 commits, one maintainer, no last-commit date shown. Plan on owning a copy of the small model code if it
+  passes.
+- **Method:** double the five Quick clips and two Detailed clips (one with speech). Measure total seconds, peak memory, audio
+  sync and level, and open the frames at fast motion (the dog's legs, the robot's hand) and at scene changes to see ghosting.
+- **Pass:** 30 s or less added for a 5 s clip, no ghosting an observer notices at normal speed, audio untouched (same bytes or
+  same samples). **Kill:** smeared fast motion, audio drift, or a 48 fps file the player and the messaging copy path cannot handle.
+- **Open question for the owner, not for the bench:** whether 48 fps is wanted at all. Wan and LTX both make 24 fps; the gain is
+  smoothness of pans and fast action.
 
 ## 5. If an experiment passes: the shape to build
 
