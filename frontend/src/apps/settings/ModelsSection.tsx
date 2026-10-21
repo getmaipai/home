@@ -8,7 +8,7 @@ import { Textarea } from "@maipai/ui/src/ui/textarea";
 import { getIcon } from "@maipai/ui/src/icons";
 import { IconTile } from "@maipai/ui/src/primitives/IconTile";
 import { ComparisonCard } from "@maipai/ui/src/elements/comparison-card";
-import { api, ApiError, type HardwareInfo, type ModelFit } from "@/lib/api";
+import { api, ApiError, type ChatModelChoice, type HardwareInfo, type ModelFit } from "@/lib/api";
 import { formatBytes } from "@/apps/settings/formatBytes";
 import { useFitPlan } from "@/lib/useFitPlan";
 import { modelLinkName, parseModelLink } from "@/lib/modelLink";
@@ -41,6 +41,7 @@ export function ModelsSection() {
   const [videoFits, setVideoFits] = useState<ModelFit[] | null>(null);
   const [selectedModelId, setSelectedModelId] = useState<string | null>(null);
   const [stackChat, setStackChat] = useState<{ name: string | null; state: string }>({ name: null, state: "offline" });
+  const [installedIds, setInstalledIds] = useState<string[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [checked, setChecked] = useState<Array<{ name: string; response: FitPlanResponse }>>([]);
 
@@ -54,6 +55,7 @@ export function ModelsSection() {
         setVideoFits(video);
         setSelectedModelId(selection.modelId);
         setStackChat({ name: selection.name, state: selection.state });
+        setInstalledIds(selection.installed ?? []);
       })
       .catch((e: unknown) => setError(e instanceof ApiError ? e.message : "Could not load this computer's information."));
   }, []);
@@ -88,6 +90,7 @@ export function ModelsSection() {
               stackState={stackChat.state}
               fitPlan={recommendedFit}
             />
+            <ChatModelChoices fits={chatFits} selectedModelId={selectedModelId} installedIds={installedIds} downloading={downloads.some((job) => isVisibleModelDownload(job) && (job.state === "queued" || job.state === "running" || job.state === "paused" || job.state === "stalled"))} onChanged={load} />
             <CheckModelCard onChecked={(name, response) => setChecked((items) => [{ name, response }, ...items.filter((item) => item.name !== name)].slice(0, 3))} />
             {recommended ? <ModelComparison recommended={{ name: recommended.model.label, response: recommendedFit.response?.plan ? recommendedFit.response : null }} checked={checked} hardware={hardware} /> : null}
             <PlannedRoleCard title="Image generation" fits={imageFits} />
@@ -296,6 +299,74 @@ function ComputerMemory({ response }: { response: ComputerMemoryResponse }) {
         {memory.loaded.length ? <SpecSheet title="Models using memory" rows={memory.loaded.map((item) => ({ label: item.label, value: `${item.gb} GB` }))} visibleCount={memory.loaded.length} /> : <p className="text-base text-[var(--muted-foreground)]">{memory.homeOwnedRoles.length ? "The Stack has nothing loaded." : "Nothing is loaded right now."}</p>}
         {memory.homeOwnedRoles.length ? <p className="text-sm text-[var(--muted-foreground)]">This counts only what the Stack has loaded. Home&apos;s own engines still run: {describeHomeOwnedRoles(memory.homeOwnedRoles)}.</p> : null}
       </div>
+    </RoleCardShell>
+  );
+}
+
+/** MODEL-SWITCH-01: the chat models this computer can run, so an admin can download one and choose which one answers. */
+function ChatModelChoices({ fits, selectedModelId, installedIds, downloading, onChanged }: { fits: ModelFit[] | null; selectedModelId: string | null; installedIds: string[]; downloading: boolean; onChanged: () => void }) {
+  const [working, setWorking] = useState<{ id: string; text: string } | null>(null);
+  const [message, setMessage] = useState<string | null>(null);
+  const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => () => { if (timer.current) clearTimeout(timer.current); }, []);
+  const choices = fits?.filter((fit) => fit.model.implemented && fit.model.download && fit.fits) ?? [];
+  // Downloads finish on their own; look again once they stop so the button changes from Download to Use.
+  const wasDownloading = useRef(false);
+  useEffect(() => { if (wasDownloading.current && !downloading) onChanged(); wasDownloading.current = downloading; }, [downloading, onChanged]);
+  if (choices.length < 2) return null;
+
+  function watch(id: string) {
+    api.chatModelChoice(id).then((choice: ChatModelChoice) => {
+      if (choice.status === "ready") { setWorking(null); onChanged(); return; }
+      if (choice.status === "failed") { setWorking(null); setMessage(choice.reason ?? "The model did not start. Your previous model is still the one answering."); onChanged(); return; }
+      timer.current = setTimeout(() => watch(id), 2000);
+    }).catch(() => { timer.current = setTimeout(() => watch(id), 4000); });
+  }
+
+  async function choose(fit: ModelFit) {
+    setMessage(null);
+    const id = fit.model.id;
+    setWorking({ id, text: `Starting ${fit.model.label}. This takes about a minute.` });
+    try {
+      const choice = await api.chooseChatModel(id);
+      if (choice.status === "downloading") { setWorking(null); onChanged(); return; }
+      if (choice.status === "ready") { setWorking(null); onChanged(); return; }
+      watch(id);
+    } catch (e) {
+      setWorking(null);
+      setMessage(e instanceof ApiError ? e.message : "Could not change the chat model. Try again.");
+    }
+  }
+
+  return (
+    <RoleCardShell title="Chat models">
+      <p className="mb-3 text-base text-[var(--muted-foreground)]">Pick which model answers chat. The household keeps working while a new one downloads, and your choice stays after a restart.</p>
+      <ul className="flex flex-col gap-3">
+        {choices.map((fit) => {
+          const model = fit.model;
+          const inUse = model.id === selectedModelId;
+          const installed = installedIds.includes(model.id);
+          const busy = working !== null;
+          return (
+            <li key={model.id} className="flex flex-col gap-1 rounded-md border border-[var(--border)] p-3">
+              <div className="flex items-center justify-between gap-2">
+                <span className="text-base font-medium">{model.label}</span>
+                {inUse ? <Badge variant="secondary" tone="success">In use</Badge> : installed ? (
+                  <Button type="button" disabled={busy || downloading} onClick={() => void choose(fit)}>Use this model</Button>
+                ) : (
+                  <Button type="button" variant="outline" disabled={busy || downloading} onClick={() => void choose(fit)}>Download ({formatBytes(model.download!.approx_bytes)})</Button>
+                )}
+              </div>
+              <ul className="list-disc pl-5 text-base text-[var(--muted-foreground)]">
+                {(model.pros ?? []).map((line) => <li key={line}>{line}</li>)}
+                {(model.cons ?? []).map((line) => <li key={line}>{line}</li>)}
+              </ul>
+              {working?.id === model.id ? <Progress mode="spinner" label={working.text} /> : null}
+            </li>
+          );
+        })}
+      </ul>
+      {message ? <p className="mt-2 text-base text-[var(--destructive)]">{message}</p> : null}
     </RoleCardShell>
   );
 }

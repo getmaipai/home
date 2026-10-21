@@ -54,6 +54,12 @@ Press **Install** to download a part. A bar shows how far it has got, and you ca
 
 If a download stops, the row says why and offers **Try again**. The same item is also in **Repairs**.
 
+### Choosing which chat model answers
+
+An owner or admin can pick the chat model. Open **Settings**, then **AI models**, and look at the **Chat models** card. Each model lists what it is good at and what it costs, plus its size. The one answering now says **In use**. For another model, press **Download** and wait: the progress bar at the top shows it, and the family keeps chatting while it downloads. When it finishes, the button changes to **Use this model**. Press it and Home switches in about a minute. If the model cannot start, the card says why and the old model keeps answering. Your choice stays after a restart. To go back, press **Use this model** on the earlier one.
+
+Qwen3.6 35B A3B is the first model offered beside the default. It starts answering almost at once, because it can skip the thinking step, and it reads the pictures you send. It is a big download (about 22 GB) and is meant for a computer with 64 GB of memory or more.
+
 ## Pictures, videos and music
 
 An owner or admin opens **Settings**, **Home settings**, **Pictures, videos and music**. It has the picture model (install or see it), who can make pictures, the style library, and the same for videos. Children can make cartoons by default. See [cartoon controls](people.md#cartoon-pictures-and-videos) to change this. See [Pictures](pictures.md) and [Videos](videos.md).

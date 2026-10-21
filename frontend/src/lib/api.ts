@@ -220,6 +220,8 @@ export type ProjectView = Project & { posted_artifact: { id: string; version: nu
 // re-export the types here so the rest of the frontend imports from one
 // place.
 export type { TurnErrorDetail };
+/** MODEL-SWITCH-01: where the choice of one catalog chat model stands. */
+export type ChatModelChoice = { modelId: string; status: "none" | "downloading" | "loading" | "ready" | "failed"; reason?: string; jobs?: string[] };
 export type { Roster, TurnValue, Media, TurnStreamEvent, StructuredPart, ConversationTurnRow, ConversationTurnWithMemoryIds, ConversationSummary, ResolvedSetting, BackupInfo, HardwareInfo, ModelFit, ChatModelOption, ChatModelsResponse, ChatCapabilities, EngineStatus, EngineStatsSample, StackVoice, RoutingStats, PrivacyConnection, PendingRestore, CommandRow, CommandAction, NotificationDeliveryView, HealthStatus, EngineHealthEntry, Dashboard, SetupChecklistItem, DashboardActivityRow, DashboardTurnsPerDay, DashboardEngineCounts, StackRoleId, StackRoleInfo, StackEngineInfo, StackBudget, StackHealthItem, EnginesOverview, EnginesHealth, BareCompareEvent, BareCompareTrace, TurnStats, Performance, PerformanceTurnDayStats, PerformanceEngineStats, PerformanceQueues, PerformanceLabels, PerformanceLayers, PerformanceLayerStats, PerformanceEngines, PerformanceHardware, PerformanceDisk, PersonStorageRow, StorageUsageOverview };
 export type { ReplyFeedback };
 export type { MemoryRecord };
@@ -1473,7 +1475,10 @@ export const api = {
   fitPlan: (body: { source: { url: string } | { path: string } | { repo: string; revision?: string }; context_tokens?: number; kv_cache_type?: "f16" | "q8_0" | "q4_0" }) => request<FitPlanResponse>("/api/fit-plan", { method: "POST", body: JSON.stringify(body) }),
   chatModels: () => request<ChatModelsResponse>("/api/host/chat-models"),
   chatCapabilities: () => request<ChatCapabilities>("/api/host/chat-capabilities"),
-  modelSelection: () => request<{ modelId: string | null; name: string | null; state: string }>("/api/host/models/selection"),
+  modelSelection: () => request<{ modelId: string | null; name: string | null; state: string; installed?: string[] }>("/api/host/models/selection"),
+  /** MODEL-SWITCH-01: download (when the Stack lacks it) or load one catalog chat model. */
+  chooseChatModel: (id: string) => request<ChatModelChoice>(`/api/host/models/${encodeURIComponent(id)}/select`, { method: "POST", body: JSON.stringify({}) }),
+  chatModelChoice: (id: string) => request<ChatModelChoice>(`/api/host/models/${encodeURIComponent(id)}/select-status`),
   senses: () => request<{ brain: string; voice: string }>("/api/health", { timeoutMs: 8_000 }),
   // The fuller shape of the same /api/health response, for Settings ->
   // Household -> Health (HealthSection.tsx) - senses() above stays

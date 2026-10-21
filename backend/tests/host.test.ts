@@ -159,12 +159,74 @@ describe("GET /api/host/chat-capabilities (VISION-02c, 02d)", () => {
   });
 });
 
-describe("POST /api/host/models/:id/select", () => {
-  test("returns 409 because model changes belong to the MaiPai Stack", async () => {
+describe("POST /api/host/models/:id/select (MODEL-SWITCH-01)", () => {
+  const QWEN = "qwen3-6-35b-a3b-ud-q4-k-xl";
+  const pin = (id: string, extra: Record<string, unknown> = {}) => ({ id, role: "chat", repo: "o/r", license: "Apache-2.0", revision: "r".repeat(40), engine: "llama-server", download: { url: `https://huggingface.co/o/r/resolve/${"r".repeat(40)}/${id}.gguf`, sha256: "a".repeat(64), approx_bytes: 10 }, ...extra });
+  const chatRole = (model: string, installed: string[], state = "ready") => ({ roles: [{ id: "chat", state: { state, since: "" }, model: { id: model }, models: installed.map((id) => ({ id, name: id })) }] });
+  const withStack = async (client: Record<string, unknown>, run: () => Promise<void>) => {
+    const { __resetChatSwitchForTests } = await import("@/lib/chatModelSwitch");
+    setHouseholdSettingValue("engines.stack.url", "http://127.0.0.1:8770");
+    __setStackClientForTests(client as never);
+    try { await run(); } finally { __resetStackEngineForTests(); __resetChatSwitchForTests(); setHouseholdSettingValue("engines.stack.url", ""); }
+  };
+
+  test("requires an owner or admin", async () => {
+    expect((await new TestClient().post(`/api/host/models/${QWEN}/select`, {})).status).toBe(401);
+  });
+
+  test("a model that is not in the catalog is refused and nothing is pulled", async () => {
+    const owner = await ownerClient();
+    const pulled: unknown[] = [];
+    await withStack({ roles: async () => chatRole("m", ["m"]), pullModel: async (b: unknown) => { pulled.push(b); return { job: "j" }; } }, async () => {
+      const res = await owner.post("/api/host/models/not-a-model/select", {});
+      expect(res.status).toBe(404);
+    });
+    expect(pulled).toEqual([]);
+  });
+
+  test("a model the Stack has not installed is pulled with its picture file first, from the Stack's own pin", async () => {
+    const owner = await ownerClient();
+    const pulled: Array<{ id: string; component?: string }> = [];
+    const catalog = { models: [pin(QWEN, { imageInput: { projector: "proj-id" } }), pin("proj-id", { component: "projector" })] };
+    await withStack({ roles: async () => chatRole("muse-glimmer-30b-q4-k-xl", ["muse-glimmer-30b-q4-k-xl"]), modelCatalog: async () => catalog, pullModel: async (b: { id: string; component?: string }) => { pulled.push(b); return { job: `job-${b.id}` }; } }, async () => {
+      const res = await owner.post(`/api/host/models/${QWEN}/select`, {});
+      expect(res.status).toBe(202);
+      expect(await res.json()).toEqual({ modelId: QWEN, status: "downloading", jobs: ["job-proj-id", `job-${QWEN}`] });
+    });
+    expect(pulled.map((b) => b.id)).toEqual(["proj-id", QWEN]);
+    expect(pulled[0]!.component).toBe("projector");
+  });
+
+  test("an installed model is loaded by the Stack, and the status reads ready once the chat role runs it", async () => {
+    const owner = await ownerClient();
+    const loaded: string[] = [];
+    let running = "muse-glimmer-30b-q4-k-xl";
+    await withStack({ roles: async () => chatRole(running, [running, QWEN]), modelAction: async (id: string, action: string) => { loaded.push(`${action}:${id}`); running = id; return { modelId: id, ok: true }; } }, async () => {
+      const res = await owner.post(`/api/host/models/${QWEN}/select`, {});
+      expect(res.status).toBe(202);
+      expect(((await res.json()) as { status: string }).status).toBe("loading");
+      await new Promise((resolve) => setTimeout(resolve, 20));
+      const status = await (await owner.get(`/api/host/models/${QWEN}/select-status`)).json();
+      expect(status).toEqual({ modelId: QWEN, status: "ready" });
+      const again = await owner.post(`/api/host/models/${QWEN}/select`, {});
+      expect(again.status).toBe(200);
+    });
+    expect(loaded).toEqual([`load:${QWEN}`]);
+  });
+
+  test("a load the Stack refuses reads failed with the Stack's reason", async () => {
+    const owner = await ownerClient();
+    await withStack({ roles: async () => chatRole("muse-glimmer-30b-q4-k-xl", ["muse-glimmer-30b-q4-k-xl", QWEN]), modelAction: async (id: string) => ({ modelId: id, ok: false, reason: "Not enough free memory to load it." }) }, async () => {
+      await owner.post(`/api/host/models/${QWEN}/select`, {});
+      await new Promise((resolve) => setTimeout(resolve, 20));
+      expect(await (await owner.get(`/api/host/models/${QWEN}/select-status`)).json()).toEqual({ modelId: QWEN, status: "failed", reason: "Not enough free memory to load it." });
+    });
+  });
+
+  test("with no Stack set up it says so and changes nothing", async () => {
     const owner = await ownerClient();
     const res = await owner.post("/api/host/models/qwen3-8b-instruct-q4-k-m/select", {});
     expect(res.status).toBe(409);
-    expect(await res.json()).toEqual({ error: "Model changes are made through the MaiPai Stack." });
     expect(getHouseholdSettingValue("chat.model_id")).toBe("");
   });
 });

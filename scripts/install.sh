@@ -44,10 +44,10 @@ STACK_REPO="getmaipai/stack"
 # on top of vision URL binding and the embed role on the processor, and
 # carries the Muse projector pin (VISION-03a), keep-warm (STACK-WARM-01),
 # the Instant judge role (INSTANT-02), the Pocket TTS requirements fix and
-# the Chatterbox Turbo voice engine (VOICE-STUDIO-01) and, from 2026-10-20, voices made from a clip with their own temperature and pitch (VOICES-02). A bump to this line
+# the Chatterbox Turbo voice engine (VOICE-STUDIO-01), voices made from a clip with their own temperature and pitch (VOICES-02) and, from 2026-10-21, the optional Qwen3.6-35B-A3B chat model and a chat-model choice that survives a restart (MODEL-SWITCH-01). A bump to this line
 # must be checked against every one of those: an old value silently rebuilds
 # the Stack without them.
-STACK_TAG="254467f202697f28d7fa85bf649ab3dbf49b624a"
+STACK_TAG="7f1414bad1b25f9a675be49662337b6088a67038"
 # The Stack at STACK_TAG names its Commons packages in backend/package.json as
 # file:../../commons-tags/<package>-<tag>/<package> (core-v0.1.0 and spec-v0.1.136 today). Those
 # names are read from that file after the Stack is fetched (stack_commons_deps), so they cannot

@@ -8,6 +8,7 @@ checklist (`docs/dev.md`). The first release is 0.1.0.
 ## [Unreleased]
 
 ### Added
+- Settings, AI models: a **Chat models** card lists the chat models this computer can run, with **Download**, **Use this model** and **In use**. Qwen3.6 35B A3B is the first optional model beside Muse: it answers voice questions in under a second because its thinking step can be switched off. The choice survives a restart (MODEL-SWITCH-01).
 - Books app for EPUB, PDF, audiobook chapters, linked editions and reading progress; Shows and Films app for local shows, films, seasons, episodes and a personal watchlist.
 - Playing a song from Music's Created by you shelf now promotes its visible Library audio file to the shared media record and queues it through the normal Music path.
 - Each robot keeps its own memories with the people it talks to, no other robot or chat reads them, and Forget removes them.

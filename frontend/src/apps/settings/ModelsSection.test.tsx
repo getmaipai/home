@@ -555,3 +555,47 @@ describe("ModelsSection", () => {
   });
 
 });
+
+describe("ModelsSection chat model choices (MODEL-SWITCH-01)", () => {
+  const second = () => { const fit = chatFit(); return { ...fit, model: { ...fit.model, id: "qwen3-6-35b-a3b-ud-q4-k-xl", label: "Qwen3.6 35B A3B (Q4_K_XL)", pros: ["Thinking can be switched off, so short questions get quick answers"], cons: ["A big download, so the first install takes a while"], download: { url: "https://huggingface.co/unsloth/x.gguf", sha256: "a".repeat(64), approx_bytes: 22_360_456_160 } } }; };
+  const first = () => { const fit = chatFit(); return { ...fit, model: { ...fit.model, id: "muse-glimmer-30b-q4-k-xl", label: "Muse Glimmer 30B (Q4_K_XL)", download: { url: "https://huggingface.co/m/x.gguf", sha256: "b".repeat(64), approx_bytes: 19_653_960_832 } } }; };
+
+  test("lists each model with its honest lines, the one in use, and a Download button for one the Stack lacks", async () => {
+    const restore = stubFetch({
+      "/api/host/hardware": HARDWARE, "role=chat": [first(), second()], "role=image": [], "role=video": [], "/api/jobs": [],
+      "/models/selection": { modelId: "muse-glimmer-30b-q4-k-xl", name: "muse", state: "ready", installed: ["muse-glimmer-30b-q4-k-xl"] }, "/engine/status": NO_ENGINE,
+    });
+    try {
+      const { findByText, getByRole } = render(<ModelsSection />);
+      await findByText("Chat models");
+      expect(await findByText("In use")).toBeTruthy();
+      expect(await findByText("Thinking can be switched off, so short questions get quick answers")).toBeTruthy();
+      expect(getByRole("button", { name: /Download \(21 GB\)/ })).toBeTruthy();
+    } finally { restore(); }
+  });
+
+  test("an installed model offers Use this model, and choosing it asks the hub to load it", async () => {
+    const calls: string[] = [];
+    const original = globalThis.fetch;
+    const responses: Record<string, unknown> = {
+      "/api/host/hardware": HARDWARE, "role=chat": [first(), second()], "role=image": [], "role=video": [], "/api/jobs": [],
+      "/models/selection": { modelId: "muse-glimmer-30b-q4-k-xl", name: "muse", state: "ready", installed: ["muse-glimmer-30b-q4-k-xl", "qwen3-6-35b-a3b-ud-q4-k-xl"] }, "/engine/status": NO_ENGINE,
+      "/select-status": { modelId: "qwen3-6-35b-a3b-ud-q4-k-xl", status: "ready" },
+    };
+    globalThis.fetch = mock((input: RequestInfo | URL, init?: RequestInit) => {
+      const url = typeof input === "string" ? input : input.toString();
+      calls.push(`${init?.method ?? "GET"} ${url}`);
+      if (url.endsWith("/select") && init?.method === "POST") return Promise.resolve(new Response(JSON.stringify({ modelId: "qwen3-6-35b-a3b-ud-q4-k-xl", status: "loading" }), { status: 202 }));
+      const match = Object.entries(responses).find(([path]) => url.includes(path));
+      if (!match) throw new Error(`unstubbed fetch: ${url}`);
+      return Promise.resolve(jsonResponse(match[1]));
+    }) as unknown as typeof fetch;
+    try {
+      const { findByRole } = render(<ModelsSection />);
+      const button = await findByRole("button", { name: "Use this model" });
+      await act(async () => { fireEvent.click(button); });
+      await new Promise((resolve) => setTimeout(resolve, 50));
+      expect(calls).toContain("POST /api/host/models/qwen3-6-35b-a3b-ud-q4-k-xl/select");
+    } finally { globalThis.fetch = original; }
+  });
+});

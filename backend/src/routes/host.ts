@@ -11,6 +11,7 @@ import type { ChatCapabilities } from "@/wire";
 import { chatModelReadsPictures, picturePartsAllowed } from "@/lib/chatPictures";
 import { speakerAgeBand } from "@/lib/ageBand";
 import { getHouseholdSettingValue } from "@/lib/settings";
+import { startChatModelChoice, chatModelChoiceState } from "@/lib/chatModelSwitch";
 import { HUB_RESTART_EXIT_CODE, scheduleHubRestart } from "@/lib/hubRestart";
 
 export const hostRoutes = new Hono<AppEnv>();
@@ -69,7 +70,7 @@ hostRoutes.get("/chat-capabilities", requireAuth, async (c) => {
 // Additive Stack chat selection and state for Home settings surfaces.
 hostRoutes.get("/models/selection", requireRole("owner", "admin"), async (c) => {
   const chat = await readStackChatRole();
-  return c.json({ modelId: chat?.model?.id ?? null, name: chat?.models?.find((m) => m.id === chat.model?.id)?.name ?? null, state: chat?.state?.state ?? "offline" });
+  return c.json({ modelId: chat?.model?.id ?? null, name: chat?.models?.find((m) => m.id === chat.model?.id)?.name ?? null, state: chat?.state?.state ?? "offline", installed: chat?.models?.map((m) => m.id) ?? [] });
 });
 
 async function readStackChatRole() {
@@ -78,15 +79,16 @@ async function readStackChatRole() {
   catch { return null; }
 }
 
-// Home no longer starts chat model downloads.
+// MODEL-SWITCH-01: an admin chooses the household's chat model. The Stack
+// installs and loads it (lib/chatModelSwitch.ts); a download rides the
+// existing job feed, a load is read back from GET .../select-status.
 hostRoutes.post("/models/:id/select", requireRole("owner", "admin"), async (c) => {
-  return c.json({ error: "Model changes are made through the MaiPai Stack." }, 409);
+  const result = await startChatModelChoice(c.req.param("id"));
+  if ("error" in result) return c.json({ error: result.error }, result.status);
+  return c.json(result, result.status === "ready" ? 200 : 202);
 });
 
-hostRoutes.get("/models/:id/select-status", requireRole("owner", "admin"), async (c) => {
-  const id = c.req.param("id");
-  return c.json({ modelId: id, status: "none" });
-});
+hostRoutes.get("/models/:id/select-status", requireRole("owner", "admin"), async (c) => c.json(await chatModelChoiceState(c.req.param("id"))));
 
 // Engine control ("do we need ways to see if llama and everything is
 // running, pause or stop it, restart" - Jesse, 2026-09-04) and the

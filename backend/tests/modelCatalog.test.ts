@@ -190,3 +190,33 @@ describe("Muse Glimmer 30B reads pictures (VISION-03a)", () => {
     }
   });
 });
+
+// MODEL-SWITCH-01: Qwen3.6-35B-A3B mirrors the Stack's optional pin.
+describe("Qwen3.6 35B A3B (MODEL-SWITCH-01)", () => {
+  const id = "qwen3-6-35b-a3b-ud-q4-k-xl";
+  const sha256 = "707a55a8a4397ecde44de0c499d3e68c1ad1d240d1da65826b4949d1043f4450";
+
+  test("it is catalogued with the Stack's revision, sha256, bytes and projector", () => {
+    const model = CATALOG.find((m) => m.id === id)!;
+    expect(model.role).toBe("chat");
+    expect(model.download).toEqual({
+      url: "https://huggingface.co/unsloth/Qwen3.6-35B-A3B-GGUF/resolve/a483e9e6cbd595906af30beda3187c2663a1118c/Qwen3.6-35B-A3B-UD-Q4_K_XL.gguf",
+      sha256,
+      approx_bytes: 22_360_456_160,
+    });
+    expect(model.image_input?.projector.download.sha256).toBe("8971ee4f331ff0a4c609374f32984b3d4e6dc086c0aa35f1d637fad1829e887f");
+    expect(model.image_input?.projector.download.url).toContain("/resolve/a483e9e6cbd595906af30beda3187c2663a1118c/");
+    expect(Math.abs(weightsBytes(model.sizing as never) - 22_360_456_160) / 22_360_456_160).toBeLessThan(0.01);
+  });
+
+  test("thinking can be switched off: the mode is 'switchable' and a minor's budget keeps thinking off", () => {
+    expect(thinkingModeFor(id)).toBe("switchable");
+    expect(resolveTurnBudget(id, "adult").thinking_budget_tokens).toBe(0);
+    expect(resolveTurnBudget(id, "child").thinking_for_minors).toBe(false);
+  });
+
+  test("it is a choice, never the first recommendation on the Studio", () => {
+    const studio = recommend("chat", hw({ isAppleSilicon: true, unifiedMemoryGb: 128 }));
+    expect(studio.find((f) => f.model.id === id)?.fits).toBe(true);
+  });
+});
