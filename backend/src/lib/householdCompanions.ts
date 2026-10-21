@@ -3,6 +3,7 @@ import { join } from "node:path";
 import { PackageManifest, type PackageManifest as Manifest } from "@maipai/spec/gen/ts/manifest.js";
 import { dataDir } from "@/lib/paths";
 import { listPackageIds, loadManifestOnly } from "@/lib/plugins";
+import { deleteLook } from "@/lib/companionLook";
 
 function root(): string { return join(process.env.MAIPAI_DATA_DIR || dataDir, "companions"); }
 type Companion = NonNullable<Manifest["companion"]>;
@@ -10,6 +11,8 @@ export type CompanionAuthor = { display_name: string; person_id?: string };
 const ID_PATTERN = /^hc-[a-z0-9]+(?:-[a-z0-9]+)*$/;
 function validId(id: string): boolean { return ID_PATTERN.test(id) && id.length <= 40; }
 function folder(id: string): string | null { return validId(id) ? join(root(), id) : null; }
+/** The on-disk directory for a valid household companion. Bundled companions have no such directory. */
+export function householdCompanionFolder(id: string): string | null { return folder(id); }
 function read(id: string): Manifest | null {
   const dir = folder(id); if (!dir) return null;
   try {
@@ -64,7 +67,7 @@ export function updateHouseholdCompanion(id: string, patch: Partial<Companion>):
 }
 export function deleteHouseholdCompanion(id: string): boolean {
   const dir = folder(id); if (!dir || !read(id)) return false;
-  try { rmSync(dir, { recursive: true, force: true }); return true; } catch { return false; }
+  try { deleteLook(id); rmSync(dir, { recursive: true, force: true }); return true; } catch { return false; }
 }
 export function copyBundledCompanion(bundledId: string, author: CompanionAuthor): { ok: true; value: Manifest } | { ok: false; error: string } {
   const loaded = loadManifestOnly(bundledId);

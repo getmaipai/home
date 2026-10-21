@@ -18,6 +18,13 @@ import { getDeviceSettingValue } from "@/lib/settings";
 import { companionFits, robotControlsOf, ROBOT_COMPANION_KEY } from "@/lib/robotCompanion";
 import { PERSONAS, reloadPersonas } from "@/lib/persona";
 import { createHouseholdCompanion, copyBundledCompanion, copyHouseholdCompanion, getHouseholdCompanion, updateHouseholdCompanion, deleteHouseholdCompanion, setHouseholdCompanionAudience, setHouseholdCompanionStatus, householdCompanionAuthorId } from "@/lib/householdCompanions";
+import { addVersion, deleteVersion, readLook, setRest, versionPath, normalizePicture, uploadLabel } from "@/lib/companionLook";
+import { fileTypeFromBuffer } from "file-type";
+import { readFileSync } from "node:fs";
+import { editToolsStatus } from "@/lib/imageEdit";
+import { getStackClient } from "@/lib/stackEngine";
+import { StackError } from "@/lib/stack/errors";
+import media from "@maipai/spec/vocab/companion-media.json";
 
 export const companionsRoutes = apiRouter();
 
@@ -97,6 +104,98 @@ function normalizedFields(value: z.infer<typeof fields>) { const { name, ...rest
 const idPath = idParamSchema("id", "hc-companion");
 const fieldsJson = { content: { "application/json": { schema: fields } } };
 function mayEdit(actor: import("@/types").PersonRow, id: string): boolean { return isOwnerOrAdmin(actor) || householdCompanionAuthorId(id) === actor.id; }
+const bundledLookLine = "A bundled companion can't be changed. Make a copy to edit it.";
+function lookAccess(actor: import("@/types").PersonRow, id: string): { status: 403 | 404; error: string } | null {
+  if (!getHouseholdCompanion(id)) {
+    if (PERSONAS.some((persona) => persona.id === id)) return { status: 403, error: bundledLookLine };
+    return { status: 404, error: "That household companion could not be found." };
+  }
+  if (!mayEdit(actor, id)) return { status: 403, error: "Only the author or an admin can change this companion's pictures." };
+  return null;
+}
+const lookIdParam = z.object({ id: z.string().min(1).max(80).openapi({ param: { name: "id", in: "path" } }) });
+const lookVersionParam = z.object({ id: z.string().min(1).max(80), versionId: z.string().min(1).max(80).openapi({ param: { name: "versionId", in: "path" } }) });
+const LookResponse = z.object({ versions: z.array(z.object({ id: z.string(), label: z.string(), source: z.enum(["upload", "generated", "edit"]), width: z.number().int(), height: z.number().int(), created_at: z.string(), url: z.string() })), rest: z.string().nullable(), key: z.enum([media.key.default, media.key.alternate]), can_generate: z.boolean() });
+const lookRoute = createRoute({ method: "get", path: "/{id}/look", tags: ["Companions"], summary: "Read a household companion's look pictures", middleware: [requireAuth] as const,
+  request: { params: lookIdParam }, responses: { 200: { content: { "application/json": { schema: LookResponse } }, description: "Picture versions and the approved starting picture." }, ...errorResponses({ 401: "Not signed in", 403: "Only the author or an admin can read this companion's pictures", 404: "No household companion" }) } });
+companionsRoutes.openapi(lookRoute, (c) => {
+  const id = c.req.valid("param").id, denied = lookAccess(c.get("person"), id); if (denied) return c.json({ error: denied.error }, denied.status);
+  const look = readLook(id);
+  return c.json({ versions: look.versions.map(({ id: versionId, label, source, width, height, created_at }) => ({ id: versionId, label, source, width, height, created_at, url: `/api/companions/${encodeURIComponent(id)}/look/${versionId}/image` })), rest: look.rest, key: look.key, can_generate: false }, 200);
+});
+
+const lookImageRoute = createRoute({ method: "get", path: "/{id}/look/{versionId}/image", tags: ["Companions"], summary: "Read a companion look PNG", middleware: [requireAuth] as const,
+  request: { params: lookVersionParam }, responses: { 200: { content: { "image/png": { schema: z.string().openapi({ format: "binary" }) } }, description: "The PNG picture." }, ...errorResponses({ 401: "Not signed in", 403: "Only the author or an admin can read this companion's pictures", 404: "No such picture" }) } });
+companionsRoutes.openapi(lookImageRoute, (c) => {
+  const { id, versionId } = c.req.valid("param"), denied = lookAccess(c.get("person"), id); if (denied) return c.json({ error: denied.error }, denied.status);
+  const path = versionPath(id, versionId);
+  if (!path || !readLook(id).versions.some((item) => item.id === versionId)) return c.json({ error: "That picture could not be found." }, 404);
+  try { return new Response(readFileSync(path), { headers: { "content-type": "image/png", "cache-control": "private, max-age=0, must-revalidate" } }); }
+  catch { return c.json({ error: "That picture could not be found." }, 404); }
+});
+
+async function removePictureBackground(actor: import("@/types").PersonRow, bytes: Uint8Array): Promise<Uint8Array> {
+  const status = await editToolsStatus(actor);
+  if (!status.tools.remove_background.enabled) throw new Error(status.tools.remove_background.reason ?? status.note ?? "The background remover isn't available yet. Check the editing tools, then try again.");
+  const form = new FormData(); form.append("image", new File([new Uint8Array(bytes)], "picture", { type: (await fileTypeFromBuffer(bytes))?.mime ?? "image/png" })); form.append("operation", "remove_background"); form.append("timeout_ms", "2500");
+  try {
+    const reply = await getStackClient().imageEdit(form);
+    if (reply.kind === "done") return new Uint8Array(Buffer.from(reply.item.b64_json, "base64"));
+    const until = Date.now() + 60_000;
+    while (Date.now() < until) {
+      await new Promise((resolve) => setTimeout(resolve, 500));
+      const job = await getStackClient().job(reply.job);
+      if (job.state === "failed") throw new Error(job.reason ?? "The background remover could not finish. Try another picture.");
+      if (job.state === "cancelled") throw new Error("The background removal was cancelled. Add the picture again to retry.");
+      if (job.state === "done") return await getStackClient().imageEditResult(reply.job);
+    }
+    throw new Error("The background remover took too long. Try a smaller picture.");
+  } catch (error) {
+    if (error instanceof Error && !(error instanceof StackError)) throw error;
+    if (error instanceof StackError && (error.kind === "unreachable" || error.kind === "offline")) throw new Error("The editing tools aren't running. Check that the engine on this computer is running, then try again.");
+    if (error instanceof StackError && error.kind === "timeout") throw new Error("The background remover took too long. Try a smaller picture.");
+    throw new Error("The background remover could not finish. Check the editing tools and try again.");
+  }
+}
+const uploadRoute = createRoute({ method: "post", path: "/{id}/look/upload", tags: ["Companions"], summary: "Add a look picture by upload", middleware: [requireAuth] as const,
+  request: { params: lookIdParam, body: { content: { "multipart/form-data": { schema: z.object({ image: z.any(), rights_confirmed: z.string(), shows_real_person: z.string() }) } } } },
+  responses: { 201: { content: { "application/json": { schema: z.object({ id: z.string() }) } }, description: "Picture added." }, ...errorResponses({ 400: "Picture or required confirmations are invalid", 401: "Not signed in", 403: "Only the author or an admin can change this companion's pictures", 404: "No household companion", 413: "Picture exceeds the upload size limit", 503: "Background removal is unavailable" }) } });
+companionsRoutes.openapi(uploadRoute, async (c) => {
+  const { id } = c.req.valid("param"), denied = lookAccess(c.get("person"), id); if (denied) return c.json({ error: denied.error }, denied.status);
+  try {
+    const form = await c.req.parseBody(), file = form.image;
+    if (!(file instanceof File)) return c.json({ error: "Choose a PNG, JPEG or WebP picture to upload." }, 400);
+    if (form.rights_confirmed !== "true") return c.json({ error: "Tick the box to say you made this picture or have the right to use it." }, 400);
+    if (form.shows_real_person !== "true" && form.shows_real_person !== "false") return c.json({ error: "Say whether this picture shows a real person." }, 400);
+    if (form.shows_real_person === "true") return c.json({ error: "Pictures of real people are not supported here yet. Use a drawing or a character instead." }, 400);
+    if (file.size > media.image.max_upload_bytes) return c.json({ error: "That picture is over 20 MB. Choose a smaller PNG, JPEG or WebP picture." }, 413);
+    const bytes = new Uint8Array(await file.arrayBuffer()), detected = await fileTypeFromBuffer(bytes);
+    if (!detected || !["image/png", "image/jpeg", "image/webp"].includes(detected.mime)) return c.json({ error: "Use a PNG, JPEG or WebP picture." }, 400);
+    const png = await normalizePicture(bytes, { removeBackground: (image) => removePictureBackground(c.get("person"), image) });
+    const version = addVersion(id, png, { source: "upload", label: uploadLabel(file.name), width: media.image.size, height: media.image.size, from: null });
+    return c.json({ id: version.id }, 201);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "That picture could not be added. Try again.";
+    return c.json({ error: message }, /background remover|editing tools/i.test(message) ? 503 : 400);
+  }
+});
+
+const restRoute = createRoute({ method: "put", path: "/{id}/look/rest", tags: ["Companions"], summary: "Set the approved starting picture", middleware: [requireAuth] as const,
+  request: { params: lookIdParam, body: { content: { "application/json": { schema: z.object({ version_id: z.string() }) } } } }, responses: { 200: { content: { "application/json": { schema: z.object({ rest: z.string() }) } }, description: "Starting picture saved." }, ...errorResponses({ 400: "Invalid version", 401: "Not signed in", 403: "Only the author or an admin can change this companion's pictures", 404: "No such picture" }) } });
+companionsRoutes.openapi(restRoute, (c) => {
+  const { id } = c.req.valid("param"), denied = lookAccess(c.get("person"), id); if (denied) return c.json({ error: denied.error }, denied.status);
+  const versionId = c.req.valid("json").version_id;
+  if (!setRest(id, versionId)) return c.json({ error: "That picture could not be found. Choose one of this companion's pictures." }, 404);
+  return c.json({ rest: versionId }, 200);
+});
+
+const deleteLookVersionRoute = createRoute({ method: "delete", path: "/{id}/look/{versionId}", tags: ["Companions"], summary: "Delete a look picture", middleware: [requireAuth] as const,
+  request: { params: lookVersionParam }, responses: { 204: { description: "Picture deleted." }, ...errorResponses({ 401: "Not signed in", 403: "Only the author or an admin can change this companion's pictures", 404: "No such picture", 409: "Choose another approved starting picture first" }) } });
+companionsRoutes.openapi(deleteLookVersionRoute, (c) => {
+  const { id, versionId } = c.req.valid("param"), denied = lookAccess(c.get("person"), id); if (denied) return c.json({ error: denied.error }, denied.status);
+  try { if (!deleteVersion(id, versionId)) return c.json({ error: "That picture could not be found." }, 404); return c.body(null, 204); }
+  catch (error) { if (error instanceof Error && error.message === "That picture is the approved starting picture. Pick another one first.") return c.json({ error: error.message }, 409); return c.json({ error: "That picture could not be deleted. Try again." }, 400); }
+});
 function liveUseCounts(id: string, targetAudience: "adult" | "teen" | "all") {
   const floor = targetAudience === "adult" ? "adult" : targetAudience === "teen" ? "teen" : "child";
   const robots = listDevicesByKind("robot").filter((device) => getDeviceSettingValue(device.id, ROBOT_COMPANION_KEY) === id && !companionFits(robotControlsOf(device.id), floor as "child" | "teen" | "adult")).length;
@@ -141,11 +240,12 @@ companionsRoutes.openapi(copyRoute, (c) => {
 });
 
 const editRoute = createRoute({ method: "get", path: "/{id}/edit", tags: ["Companions"], summary: "Read an editable household companion", middleware: [requireAuth] as const,
-  request: { params: idPath }, responses: { 200: { content: { "application/json": { schema: z.any() } }, description: "Editable companion." }, ...errorResponses({ 401: "Not signed in", 404: "No companion you can edit" }) } });
+  request: { params: idPath }, responses: { 200: { content: { "application/json": { schema: z.object({ look: z.object({ versions: z.number().int(), rest: z.string().nullable() }) }).passthrough() } }, description: "Editable companion, including its picture count and approved starting picture." }, ...errorResponses({ 401: "Not signed in", 404: "No companion you can edit" }) } });
 companionsRoutes.openapi(editRoute, (c) => {
   const actor = c.get("person"), id = c.req.valid("param").id, manifest = getHouseholdCompanion(id);
   if (!manifest?.companion || !mayEdit(actor, id)) return c.json({ error: "No companion you can edit." }, 404);
-  return c.json({ id, ...manifest.companion, name: manifest.companion.display_name, audience: manifest.companion.audience ?? "adult", status: manifest.companion.status ?? "ready", review: manifest.companion.review ?? null, can_edit: true, can_copy: speakerAgeBand(actor, new Date()) === "adult" || isOwnerOrAdmin(actor), can_set_audience: isOwnerOrAdmin(actor) }, 200);
+  const look = readLook(id);
+  return c.json({ id, ...manifest.companion, name: manifest.companion.display_name, audience: manifest.companion.audience ?? "adult", status: manifest.companion.status ?? "ready", review: manifest.companion.review ?? null, can_edit: true, can_copy: speakerAgeBand(actor, new Date()) === "adult" || isOwnerOrAdmin(actor), can_set_audience: isOwnerOrAdmin(actor), look: { versions: look.versions.length, rest: look.rest } }, 200);
 });
 
 const updateRoute = createRoute({ method: "put", path: "/{id}", tags: ["Companions"], summary: "Edit a household companion", middleware: [requireAuth] as const,

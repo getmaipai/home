@@ -11,6 +11,7 @@ import { createHouseholdCompanion } from "@/lib/householdCompanions";
 import { loadManifestOnly } from "@/lib/plugins";
 import { __reloadPersonasForTests } from "@/lib/persona";
 import { resetDb } from "../../tests/reset-db";
+import sharp from "sharp";
 
 const app = new OpenAPIHono();
 app.route("/api/companions", companionsRoutes);
@@ -29,6 +30,13 @@ function headers(token: string) { return { "content-type": "application/json", c
 async function request(path: string, token: string, method = "GET", body?: unknown) {
   return app.request(`http://localhost/api/${path}`, { method, headers: headers(token), ...(body === undefined ? {} : { body: JSON.stringify(body) }) });
 }
+async function upload(path: string, token: string, png: Uint8Array, rights: string, realPerson: string) {
+  const form = new FormData(); form.append("image", new File([new Uint8Array(png)], "Mascot.png", { type: "image/png" })); form.append("rights_confirmed", rights); form.append("shows_real_person", realPerson);
+  return app.request(`http://localhost/api/${path}`, { method: "POST", headers: { cookie: `session=${token}` }, body: form });
+}
+async function transparentPng() {
+  return new Uint8Array(await sharp({ create: { width: 512, height: 512, channels: 4, background: { r: 0, g: 0, b: 0, alpha: 0 } } }).composite([{ input: await sharp({ create: { width: 180, height: 180, channels: 4, background: { r: 0, g: 255, b: 0, alpha: 1 } } }).png().toBuffer(), left: 166, top: 166 }]).png().toBuffer());
+}
 function fixture() {
   const loaded = loadManifestOnly("rivet"); if (!loaded.ok || !loaded.value.companion) throw new Error("rivet fixture is unavailable");
   return loaded.value.companion;
@@ -38,6 +46,45 @@ beforeEach(() => { resetDb(); rmSync(companionRoot, { recursive: true, force: tr
 afterEach(() => { resetDb(); rmSync(companionRoot, { recursive: true, force: true }); __reloadPersonasForTests(); });
 
 describe("household companion routes", () => {
+  test("look upload requires rights confirmation and refuses real people", async () => {
+    const adult = addPerson("person-look-adult", "adult");
+    const created = createHouseholdCompanion({ ...fixture(), display_name: "Look upload" }, { display_name: "Author", person_id: "person-look-adult" });
+    if (!created.ok) throw new Error(created.error);
+    const png = await transparentPng();
+    const missingRights = await upload(`companions/${created.value.id}/look/upload`, adult, png, "false", "false");
+    expect(missingRights.status).toBe(400); expect((await missingRights.json() as { error: string }).error).toBe("Tick the box to say you made this picture or have the right to use it.");
+    const real = await upload(`companions/${created.value.id}/look/upload`, adult, png, "true", "true");
+    expect(real.status).toBe(400); expect((await real.json() as { error: string }).error).toBe("Pictures of real people are not supported here yet. Use a drawing or a character instead.");
+  });
+
+  test("look upload, GET image and rest management are limited to the author or an admin", async () => {
+    const author = addPerson("person-look-owner", "adult"), other = addPerson("person-look-other", "adult"), child = addPerson("person-look-child", "child"), teen = addPerson("person-look-teen", "teen"), admin = addPerson("person-look-admin", "admin");
+    const created = createHouseholdCompanion({ ...fixture(), display_name: "Look owner" }, { display_name: "Author", person_id: "person-look-owner" });
+    if (!created.ok) throw new Error(created.error);
+    const path = `companions/${created.value.id}/look/upload`, png = await transparentPng();
+    for (const token of [other, child, teen]) expect((await upload(path, token, png, "true", "false")).status).toBe(403);
+    const added = await upload(path, author, png, "true", "false"); expect(added.status).toBe(201);
+    const { id: version } = await added.json() as { id: string }; expect(version).toBe("v-1");
+    const look = await request(`companions/${created.value.id}/look`, author);
+    expect(await look.json()).toMatchObject({ rest: version, can_generate: false, versions: [{ id: version, label: "Mascot", source: "upload" }] });
+    const image = await request(`companions/${created.value.id}/look/${version}/image`, author);
+    expect(image.status).toBe(200); expect(image.headers.get("content-type")).toBe("image/png"); expect(image.headers.get("cache-control")).toBe("private, max-age=0, must-revalidate");
+    expect(new Uint8Array(await image.arrayBuffer()).byteLength).toBeGreaterThan(100);
+    expect((await request(`companions/${created.value.id}/look/${version}/image`, admin)).status).toBe(200);
+    expect((await request(`companions/${created.value.id}/look/${version}/image`, other)).status).toBe(403);
+    const second = await upload(path, author, png, "true", "false"); const secondId = (await second.json() as { id: string }).id;
+    const set = await request(`companions/${created.value.id}/look/rest`, author, "PUT", { version_id: secondId }); expect(set.status).toBe(200);
+    const refused = await request(`companions/${created.value.id}/look/${secondId}`, author, "DELETE"); expect(refused.status).toBe(409);
+    const removed = await request(`companions/${created.value.id}/look/${version}`, author, "DELETE"); expect(removed.status).toBe(204);
+    const edit = await request(`companions/${created.value.id}/edit`, author); expect((await edit.json() as { look: { versions: number; rest: string } }).look).toEqual({ versions: 1, rest: secondId });
+  });
+
+  test("bundled companions have no editable look store", async () => {
+    const adult = addPerson("person-look-bundle", "adult");
+    const response = await app.request("http://localhost/api/companions/rivet/look", { headers: headers(adult) });
+    expect(response.status).toBe(403); expect((await response.json() as { error: string }).error).toBe("A bundled companion can't be changed. Make a copy to edit it.");
+  });
+
   test("children and teens cannot create; an adult creates a draft", async () => {
     const child = addPerson("person-child01", "child"), teen = addPerson("person-teen001", "teen"), adult = addPerson("person-adult01", "adult");
     for (const token of [child, teen]) {
