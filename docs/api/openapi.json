@@ -28129,6 +28129,164 @@
         }
       }
     },
+    "/api/devices/me/checkin": {
+      "put": {
+        "tags": [
+          "Devices"
+        ],
+        "summary": "Report the current StackChan check-in",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "device_id": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 128
+                  },
+                  "board": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 64
+                  },
+                  "online": {
+                    "type": "boolean"
+                  },
+                  "last_seen": {
+                    "type": "string",
+                    "format": "date-time"
+                  },
+                  "connected_since": {
+                    "type": "string",
+                    "nullable": true,
+                    "format": "date-time"
+                  },
+                  "ip": {
+                    "type": "string",
+                    "nullable": true,
+                    "maxLength": 64
+                  },
+                  "firmware_version": {
+                    "type": "string",
+                    "nullable": true,
+                    "maxLength": 64
+                  },
+                  "bot_version": {
+                    "type": "string",
+                    "nullable": true,
+                    "maxLength": 64
+                  },
+                  "rssi": {
+                    "type": "integer",
+                    "nullable": true
+                  },
+                  "signal": {
+                    "type": "string",
+                    "nullable": true,
+                    "enum": [
+                      "strong",
+                      "medium",
+                      "weak",
+                      null
+                    ]
+                  },
+                  "free_heap_internal": {
+                    "type": "integer",
+                    "nullable": true,
+                    "minimum": 0
+                  },
+                  "free_heap_min": {
+                    "type": "integer",
+                    "nullable": true,
+                    "minimum": 0
+                  },
+                  "psram_free": {
+                    "type": "integer",
+                    "nullable": true,
+                    "minimum": 0
+                  },
+                  "boot_reason": {
+                    "type": "integer",
+                    "nullable": true
+                  },
+                  "crash_resets": {
+                    "type": "integer",
+                    "nullable": true,
+                    "minimum": 0
+                  },
+                  "battery_level": {
+                    "type": "integer",
+                    "nullable": true,
+                    "minimum": 0,
+                    "maximum": 100
+                  },
+                  "charging": {
+                    "type": "boolean",
+                    "nullable": true
+                  }
+                },
+                "required": [
+                  "device_id",
+                  "board",
+                  "online",
+                  "last_seen",
+                  "connected_since",
+                  "ip",
+                  "firmware_version",
+                  "bot_version",
+                  "rssi",
+                  "signal",
+                  "free_heap_internal",
+                  "free_heap_min",
+                  "psram_free",
+                  "boot_reason",
+                  "crash_resets",
+                  "battery_level",
+                  "charging"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "204": {
+            "description": "Check-in accepted."
+          },
+          "400": {
+            "description": "Malformed check-in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not a robot device",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/devices/me/self-test/{run_id}": {
       "post": {
         "tags": [
@@ -30416,11 +30574,100 @@
                         "available",
                         "status"
                       ]
+                    },
+                    "checkin": {
+                      "type": "object",
+                      "nullable": true,
+                      "properties": {
+                        "online": {
+                          "type": "boolean"
+                        },
+                        "lastSeen": {
+                          "type": "string"
+                        },
+                        "ip": {
+                          "type": "string",
+                          "nullable": true
+                        },
+                        "rssi": {
+                          "type": "integer",
+                          "nullable": true
+                        },
+                        "signal": {
+                          "type": "string",
+                          "nullable": true,
+                          "enum": [
+                            "strong",
+                            "medium",
+                            "weak",
+                            null
+                          ]
+                        },
+                        "battery": {
+                          "type": "object",
+                          "properties": {
+                            "level": {
+                              "type": "integer",
+                              "nullable": true
+                            },
+                            "charging": {
+                              "type": "boolean",
+                              "nullable": true
+                            }
+                          },
+                          "required": [
+                            "level",
+                            "charging"
+                          ]
+                        },
+                        "boot_reason": {
+                          "type": "integer",
+                          "nullable": true
+                        },
+                        "crash_resets": {
+                          "type": "integer",
+                          "nullable": true
+                        },
+                        "heap": {
+                          "type": "object",
+                          "properties": {
+                            "internal": {
+                              "type": "integer",
+                              "nullable": true
+                            },
+                            "minimum": {
+                              "type": "integer",
+                              "nullable": true
+                            },
+                            "psram": {
+                              "type": "integer",
+                              "nullable": true
+                            }
+                          },
+                          "required": [
+                            "internal",
+                            "minimum",
+                            "psram"
+                          ]
+                        }
+                      },
+                      "required": [
+                        "online",
+                        "lastSeen",
+                        "ip",
+                        "rssi",
+                        "signal",
+                        "battery",
+                        "boot_reason",
+                        "crash_resets",
+                        "heap"
+                      ]
                     }
                   },
                   "required": [
                     "firmware",
-                    "bot"
+                    "bot",
+                    "checkin"
                   ]
                 }
               }

@@ -144,10 +144,18 @@ function RobotDetail({ device, onClose }: { device: DeviceInfo; onClose: () => v
           />
         ) : null}
         {lifecycleError ? <Alert variant="destructive"><AlertDescription>{lifecycleError}</AlertDescription></Alert> : null}
-        <p className="text-base"><Badge variant="secondary">{statusText(device)}</Badge>{device.ipAddress ? <> IP address {device.ipAddress}</> : null}</p>
+        <p className="text-base"><Badge variant="secondary">{softwareQuery.data?.checkin?.online ? "Online" : "Offline"}</Badge>{softwareQuery.data?.checkin ? <> Last seen {new Intl.DateTimeFormat(undefined, { dateStyle: "medium", timeStyle: "short" }).format(new Date(softwareQuery.data.checkin.lastSeen))}{softwareQuery.data.checkin.ip ? ` · IP address ${softwareQuery.data.checkin.ip}` : ""}</> : null}</p>
         <RobotSelfTests device={device} />
         {hostedInstall && softwareQuery.data ? <Section heading="Software">
           <ItemGroup variant="card" aria-label="Robot software">
+            <Item size="setting">
+              <ItemContent><ItemTitle>Connection</ItemTitle><ItemDescription>{softwareQuery.data.checkin
+                ? [softwareQuery.data.checkin.signal ? `Wi-Fi ${softwareQuery.data.checkin.signal}` : null,
+                  softwareQuery.data.checkin.battery.level !== null ? `Battery ${softwareQuery.data.checkin.battery.level}%${softwareQuery.data.checkin.battery.charging ? ", charging" : ""}` : null,
+                  softwareQuery.data.checkin.ip ? `IP address ${softwareQuery.data.checkin.ip}` : null].filter(Boolean).join(" · ") || "No connection details reported."
+                : "Waiting for the robot to check in."}</ItemDescription></ItemContent>
+              <Badge variant="secondary">{softwareQuery.data.checkin?.online ? "Online" : "Offline"}</Badge>
+            </Item>
             <Item size="setting">
               <ItemContent>
                 <ItemTitle>Robot firmware</ItemTitle>

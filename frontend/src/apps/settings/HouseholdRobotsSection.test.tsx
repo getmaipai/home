@@ -24,10 +24,13 @@ function renderRobot(software: unknown) {
 
 describe("robot software details", () => {
   test("shows recorded firmware and running Bot versions with their current badges", async () => {
-    const view = renderRobot({ firmware: { installed: { version: "0.2.24", at: "2026-10-21T12:00:00.000Z" }, available: "0.2.24", status: "up_to_date" }, bot: { running: "0.2.24", available: "0.2.24", status: "up_to_date" } });
+    const view = renderRobot({ firmware: { installed: { version: "0.2.24", at: "2026-10-21T12:00:00.000Z" }, available: "0.2.24", status: "up_to_date" }, bot: { running: "0.2.24", available: "0.2.24", status: "up_to_date" }, checkin: { online: true, lastSeen: "2026-10-21T12:00:00.000Z", ip: "192.168.1.8", rssi: -48, signal: "strong", battery: { level: 87, charging: false }, boot_reason: 1, crash_resets: 0, heap: { internal: 10000, minimum: 9000, psram: 20000 } } });
     await waitFor(() => expect(view.getAllByText("Up to date")).toHaveLength(2));
     expect(view.getByText(/Installed 0\.2\.24, recorded/)).toBeTruthy();
     expect(view.getByText("0.2.24. Ready: 0.2.24.")).toBeTruthy();
+    expect(view.getAllByText("Online").length).toBeGreaterThan(0);
+    expect(view.getAllByText(/192\.168\.1\.8/)).toHaveLength(2);
+    expect(view.getByText(/Wi-Fi strong.*Battery 87%/)).toBeTruthy();
     expect(view.queryByRole("button", { name: "Update firmware" })).toBeNull();
   });
 
@@ -40,7 +43,7 @@ describe("robot software details", () => {
   });
 
   test("offers Update firmware when the firmware is not recorded, so a flash can be started and recorded", async () => {
-    const view = renderRobot({ firmware: { installed: null, available: "0.2.24", status: "unknown" }, bot: { running: null, available: "0.2.24", status: "unknown" } });
+    const view = renderRobot({ firmware: { installed: null, available: "0.2.24", status: "unknown" }, bot: { running: null, available: "0.2.24", status: "unknown" }, checkin: null });
     await waitFor(() => expect(view.getByText(/Not recorded\. Ready to install/)).toBeTruthy());
     expect(view.getByRole("button", { name: "Update firmware" })).toBeTruthy();
     expect(view.getByText("Not running. Ready: 0.2.24.")).toBeTruthy();

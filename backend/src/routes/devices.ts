@@ -34,6 +34,7 @@ import { acceptRobotSelfTestResult, startRobotSelfTest } from "@/lib/robotSelfTe
 import { robotSelfTestPartsFor } from "@/wire";
 import { RobotSelfTestResult } from "@maipai/spec/gen/ts/robot-self-test-result.js";
 import { forgetRobotHost } from "@/lib/robotHost";
+import { recordRobotCheckin, type RobotCheckin } from "@/lib/robotCheckin";
 
 export const devicesRoutes = apiRouter();
 
@@ -145,6 +146,30 @@ devicesRoutes.openapi(updateMyStateRoute, (c) => {
   if (!device) return c.json({ error: "Not signed in" }, 401);
   recordRobotSocketAddress(c, device.id);
   upsertDeviceState(device.id, c.req.valid("json"));
+  return c.body(null, 204);
+});
+
+const robotCheckinSchema = z.object({
+  device_id: z.string().min(1).max(128), board: z.string().min(1).max(64), online: z.boolean(),
+  last_seen: z.string().datetime({ offset: true }), connected_since: z.string().datetime({ offset: true }).nullable(),
+  ip: z.string().max(64).nullable(), firmware_version: z.string().max(64).nullable(), bot_version: z.string().max(64).nullable(),
+  rssi: z.number().int().nullable(), signal: z.enum(["strong", "medium", "weak"]).nullable(),
+  free_heap_internal: z.number().int().nonnegative().nullable(), free_heap_min: z.number().int().nonnegative().nullable(), psram_free: z.number().int().nonnegative().nullable(),
+  boot_reason: z.number().int().nullable(), crash_resets: z.number().int().nonnegative().nullable(),
+  battery_level: z.number().int().min(0).max(100).nullable(), charging: z.boolean().nullable(),
+});
+const robotCheckinRoute = createRoute({
+  method: "put", path: "/me/checkin", tags: ["Devices"], summary: "Report the current StackChan check-in",
+  middleware: [requireDeviceSession("robot")] as const,
+  request: { body: { content: { "application/json": { schema: robotCheckinSchema } } } },
+  responses: { 204: { description: "Check-in accepted." }, ...errorResponses({ 400: "Malformed check-in", 401: "Not signed in", 403: "Not a robot device" }) },
+});
+devicesRoutes.openapi(robotCheckinRoute, (c) => {
+  const body = c.req.valid("json") as RobotCheckin;
+  const device = resolveRequestDevice(c);
+  if (!device) return c.json({ error: "Not signed in" }, 401);
+  // body.device_id is the unit's MAC; the signed-in robot session decides which device this report belongs to.
+  recordRobotCheckin(device.id, body, device.personId);
   return c.body(null, 204);
 });
 

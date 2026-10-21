@@ -9,11 +9,17 @@ import { robotsEnabled, ROBOTS_OFF_MESSAGE } from "@/lib/robots";
 import { getRobotSoftware } from "@/lib/robotSoftware";
 import { botReleaseVersion } from "@/lib/botRelease";
 import { setRobotFirmwareInstalled } from "@/lib/settings";
+import { getRobotCheckin } from "@/lib/robotCheckin";
 
 export const robotHostRoutes = apiRouter();
 const softwareShape = z.object({
   firmware: z.object({ installed: z.object({ version: z.string(), at: z.string() }).nullable(), available: z.string(), status: z.enum(["up_to_date", "update_available", "unknown"]) }),
   bot: z.object({ running: z.string().nullable(), available: z.string(), status: z.enum(["up_to_date", "restart_needed", "unknown"]) }),
+  checkin: z.object({
+    online: z.boolean(), lastSeen: z.string(), ip: z.string().nullable(), rssi: z.number().int().nullable(), signal: z.enum(["strong", "medium", "weak"]).nullable(),
+    battery: z.object({ level: z.number().int().nullable(), charging: z.boolean().nullable() }), boot_reason: z.number().int().nullable(), crash_resets: z.number().int().nullable(),
+    heap: z.object({ internal: z.number().int().nullable(), minimum: z.number().int().nullable(), psram: z.number().int().nullable() }),
+  }).nullable(),
 });
 const softwareRoute = createRoute({
   method: "get", path: "/hosts/{deviceId}/software", tags: ["Robots"], summary: "Get the software status for a hosted robot",
@@ -25,7 +31,13 @@ robotHostRoutes.openapi(softwareRoute, (c) => {
   if (!robotsEnabled()) return c.json({ error: ROBOTS_OFF_MESSAGE }, 403);
   const { deviceId } = c.req.valid("param");
   if (!getRobotHostRecord(deviceId) || getDeviceById(deviceId)?.kind !== "robot") return c.json({ error: "That hosted robot could not be found." }, 404);
-  return c.json(getRobotSoftware(deviceId), 200);
+  const report = getRobotCheckin(deviceId);
+  const software = getRobotSoftware(deviceId);
+  return c.json({ ...software, checkin: report ? {
+    online: report.online, lastSeen: report.last_seen, ip: report.ip, rssi: report.rssi, signal: report.signal,
+    battery: { level: report.battery_level, charging: report.charging }, boot_reason: report.boot_reason, crash_resets: report.crash_resets,
+    heap: { internal: report.free_heap_internal, minimum: report.free_heap_min, psram: report.psram_free },
+  } : null }, 200);
 });
 
 const firmwareInstalledRoute = createRoute({
