@@ -18,8 +18,8 @@ import { getDeviceSettingValue } from "@/lib/settings";
 import { companionFits, robotControlsOf, ROBOT_COMPANION_KEY } from "@/lib/robotCompanion";
 import { PERSONAS, reloadPersonas } from "@/lib/persona";
 import { createHouseholdCompanion, copyBundledCompanion, copyHouseholdCompanion, getHouseholdCompanion, updateHouseholdCompanion, deleteHouseholdCompanion, setHouseholdCompanionAudience, setHouseholdCompanionStatus, householdCompanionAuthorId } from "@/lib/householdCompanions";
-import { addVersion, deleteVersion, readLook, setRest, versionPath, normalizePicture, uploadLabel } from "@/lib/companionLook";
-import { LOOK_EDIT_PROMPT_LINE, LOOK_JOB_BUSY_LINE, LOOK_PROMPT_REQUIRED_LINE, activeLookJob, canGenerateLook, cancelLookJob, pollLookJob, startLookEdit, startLookGeneration } from "@/lib/companionLookJobs";
+import { addVersion, approveSheet, deleteVersion, readLook, setRest, setSheetCard, setSheetKey, unapproveSheet, versionPath, normalizePicture, uploadLabel } from "@/lib/companionLook";
+import { LOOK_EDIT_PROMPT_LINE, LOOK_JOB_BUSY_LINE, LOOK_PROMPT_REQUIRED_LINE, activeLookJob, canGenerateLook, cancelLookJob, pollLookJob, startLookEdit, startLookGeneration, startLookSheet } from "@/lib/companionLookJobs";
 import { fileTypeFromBuffer } from "file-type";
 import { readFileSync } from "node:fs";
 import { editToolsStatus } from "@/lib/imageEdit";
@@ -116,18 +116,46 @@ function lookAccess(actor: import("@/types").PersonRow, id: string): { status: 4
 }
 const lookIdParam = z.object({ id: z.string().min(1).max(80).openapi({ param: { name: "id", in: "path" } }) });
 const lookVersionParam = z.object({ id: z.string().min(1).max(80), versionId: z.string().min(1).max(80).openapi({ param: { name: "versionId", in: "path" } }) });
-const LookResponse = z.object({ versions: z.array(z.object({ id: z.string(), label: z.string(), source: z.enum(["upload", "generated", "edit"]), width: z.number().int(), height: z.number().int(), created_at: z.string(), from: z.string().nullable(), url: z.string() })), rest: z.string().nullable(), key: z.enum([media.key.default, media.key.alternate]), can_generate: z.boolean(), generate_reason: z.string().optional() });
+const SheetResponse = z.object({ views: z.object({ left: z.object({ version_id: z.string(), url: z.string() }).nullable(), right: z.object({ version_id: z.string(), url: z.string() }).nullable(), mouth: z.object({ version_id: z.string(), url: z.string() }).nullable() }), card: z.object({ text: z.string(), colours: z.array(z.string()), species: z.string() }).nullable(), key: z.enum([media.key.default, media.key.alternate]), state: z.enum(["empty", "making", "needs_review", "approved"]), approved_by: z.string().nullable(), approved_at: z.string().nullable() });
+const LookResponse = z.object({ versions: z.array(z.object({ id: z.string(), label: z.string(), source: z.enum(["upload", "generated", "edit"]), width: z.number().int(), height: z.number().int(), created_at: z.string(), from: z.string().nullable(), url: z.string() })), rest: z.string().nullable(), key: z.enum([media.key.default, media.key.alternate]), sheet: SheetResponse.nullable(), ready_for_video: z.boolean(), can_generate: z.boolean(), generate_reason: z.string().optional() });
 const lookRoute = createRoute({ method: "get", path: "/{id}/look", tags: ["Companions"], summary: "Read a household companion's look pictures", middleware: [requireAuth] as const,
   request: { params: lookIdParam }, responses: { 200: { content: { "application/json": { schema: LookResponse } }, description: "Picture versions and the approved starting picture." }, ...errorResponses({ 401: "Not signed in", 403: "Only the author or an admin can read this companion's pictures", 404: "No household companion" }) } });
 companionsRoutes.openapi(lookRoute, async (c) => {
   const id = c.req.valid("param").id, denied = lookAccess(c.get("person"), id); if (denied) return c.json({ error: denied.error }, denied.status);
   const look = readLook(id);
   const generation = await canGenerateLook(c.get("person"), id);
-  return c.json({ versions: look.versions.map(({ id: versionId, label, source, width, height, created_at, from }) => ({ id: versionId, label, source, width, height, created_at, from: from ?? null, url: `/api/companions/${encodeURIComponent(id)}/look/${versionId}/image` })), rest: look.rest, key: look.key, ...generation }, 200);
+  const viewUrl = (versionId: string | null) => versionId ? { version_id: versionId, url: `/api/companions/${encodeURIComponent(id)}/look/${versionId}/image` } : null;
+  const sheet = look.sheet ? { ...look.sheet, views: { left: viewUrl(look.sheet.views.left), right: viewUrl(look.sheet.views.right), mouth: viewUrl(look.sheet.views.mouth) } } : null;
+  return c.json({ versions: look.versions.map(({ id: versionId, label, source, width, height, created_at, from }) => ({ id: versionId, label, source, width, height, created_at, from: from ?? null, url: `/api/companions/${encodeURIComponent(id)}/look/${versionId}/image` })), rest: look.rest, key: look.key, sheet, ready_for_video: look.sheet?.state === "approved", ...generation }, 200);
 });
 
 const lookGenerateBody = z.object({ prompt: z.string().max(600).optional(), count: z.number().int().min(1).max(4).default(4) });
 const lookJobResponse = z.object({ job: z.string() });
+const sheetStartRoute = createRoute({ method: "post", path: "/{id}/look/sheet", tags: ["Companions"], summary: "Make character sheet references", middleware: [requireAuth] as const,
+  request: { params: lookIdParam }, responses: { 202: { content: { "application/json": { schema: z.object({ job: z.string(), card_source: z.enum(["model", "look_prompt"]) }) } }, description: "Character sheet job started." }, ...errorResponses({ 400: "Choose a rest picture and write a look prompt first", 403: "Only an allowed editor can make this sheet", 404: "No household companion", 409: "A picture is already being made for this companion", 422: "The picture request cannot be used", 503: "Picture creation is not set up" }) } });
+companionsRoutes.openapi(sheetStartRoute, async (c) => {
+  const { id } = c.req.valid("param"), actor = c.get("person"), denied = lookAccess(actor, id); if (denied) return c.json({ error: denied.error }, denied.status);
+  try { const result = await startLookSheet({ actor, companionId: id, lookPrompt: getHouseholdCompanion(id)?.companion?.look_prompt ?? "" }); return c.json(result, 202); }
+  catch (error) { const status = (error as { status?: number }).status ?? 503; return c.json({ error: error instanceof Error ? error.message : "The character sheet could not be started. Try again." }, status as 400 | 403 | 409 | 422 | 503); }
+});
+const sheetCardRoute = createRoute({ method: "put", path: "/{id}/look/sheet/card", tags: ["Companions"], summary: "Edit character description card", middleware: [requireAuth] as const,
+  request: {
+    params: lookIdParam,
+    body: { content: { "application/json": { schema: z.object({ text: z.string().min(20, "Describe the character in a sentence or two so every video starts from the same words.").max(600, "Keep the description to 600 characters or fewer."), species: z.string().max(60, "Keep the species name to 60 characters or fewer.").optional() }) } } },
+  },
+  responses: { 200: { content: { "application/json": { schema: z.object({ card: z.any() }) } }, description: "Card saved." }, ...errorResponses({ 400: "Write a description of at least 20 characters", 403: "Only the author or an admin can edit this companion's card", 404: "No household companion or sheet" }) } });
+companionsRoutes.openapi(sheetCardRoute, (c) => { const { id } = c.req.valid("param"), denied = lookAccess(c.get("person"), id); if (denied) return c.json({ error: denied.error }, denied.status); const body = c.req.valid("json"); try { setSheetCard(id, body); return c.json({ card: readLook(id).sheet?.card }, 200); } catch (error) { return c.json({ error: error instanceof Error ? error.message : "The card could not be saved. Try again." }, 400); } });
+const sheetKeyRoute = createRoute({ method: "put", path: "/{id}/look/sheet/key", tags: ["Companions"], summary: "Set character sheet key colour", middleware: [requireAuth] as const,
+  request: {
+    params: lookIdParam,
+    body: { content: { "application/json": { schema: z.object({ key: z.enum([media.key.default, media.key.alternate], { error: "Choose #00FF00 or #FF00FF as the key colour." }) }) } } },
+  },
+  responses: { 200: { content: { "application/json": { schema: z.object({ key: z.string() }) } }, description: "Key colour saved." }, ...errorResponses({ 400: "Choose one of the two key colours", 403: "Only the author or an admin can edit this companion's key", 404: "No household companion or sheet" }) } });
+companionsRoutes.openapi(sheetKeyRoute, (c) => { const { id } = c.req.valid("param"), denied = lookAccess(c.get("person"), id); if (denied) return c.json({ error: denied.error }, denied.status); try { const key = c.req.valid("json").key as "#00FF00" | "#FF00FF"; setSheetKey(id, key); return c.json({ key }, 200); } catch (error) { return c.json({ error: error instanceof Error ? error.message : "The key colour could not be saved. Try again." }, 400); } });
+const sheetApprovalRoute = createRoute({ method: "post", path: "/{id}/look/sheet/approve", tags: ["Companions"], summary: "Approve character sheet", middleware: [requireAuth] as const, request: { params: lookIdParam }, responses: { 200: { content: { "application/json": { schema: z.object({ sheet: z.any() }) } }, description: "Sheet approved." }, ...errorResponses({ 400: "A rest picture and description card are required", 403: "Only the author or an admin can approve this sheet", 404: "No household companion" }) } });
+companionsRoutes.openapi(sheetApprovalRoute, (c) => { const { id } = c.req.valid("param"), actor = c.get("person"), denied = lookAccess(actor, id); if (denied) return c.json({ error: denied.error }, denied.status); try { return c.json({ sheet: approveSheet(id, actor.displayName) }, 200); } catch (error) { return c.json({ error: error instanceof Error ? error.message : "The sheet could not be approved. Add the missing details and try again." }, 400); } });
+const sheetUnapproveRoute = createRoute({ method: "post", path: "/{id}/look/sheet/unapprove", tags: ["Companions"], summary: "Return character sheet to review", middleware: [requireAuth] as const, request: { params: lookIdParam }, responses: { 200: { content: { "application/json": { schema: z.object({ sheet: z.any() }) } }, description: "Sheet returned to review." }, ...errorResponses({ 400: "No character sheet to review", 403: "Only the author or an admin can edit this sheet", 404: "No household companion" }) } });
+companionsRoutes.openapi(sheetUnapproveRoute, (c) => { const { id } = c.req.valid("param"), denied = lookAccess(c.get("person"), id); if (denied) return c.json({ error: denied.error }, denied.status); try { return c.json({ sheet: unapproveSheet(id) }, 200); } catch (error) { return c.json({ error: error instanceof Error ? error.message : "The sheet could not be returned to review. Try again." }, 400); } });
 const lookGenerateRoute = createRoute({ method: "post", path: "/{id}/look/generate", tags: ["Companions"], summary: "Generate companion look picture candidates", middleware: [requireAuth] as const,
   request: { params: lookIdParam, body: { content: { "application/json": { schema: lookGenerateBody } } } },
   responses: { 202: { content: { "application/json": { schema: lookJobResponse } }, description: "Picture generation started." }, ...errorResponses({ 400: "Write a look prompt first", 401: "Not signed in", 403: "Only an allowed editor can generate this companion's pictures", 404: "No household companion", 409: "A picture is already being made for this companion", 422: "The prompt cannot be used for a picture", 503: "Picture creation is not set up" }) } });
@@ -225,12 +253,13 @@ companionsRoutes.openapi(uploadRoute, async (c) => {
 });
 
 const restRoute = createRoute({ method: "put", path: "/{id}/look/rest", tags: ["Companions"], summary: "Set the approved starting picture", middleware: [requireAuth] as const,
-  request: { params: lookIdParam, body: { content: { "application/json": { schema: z.object({ version_id: z.string() }) } } } }, responses: { 200: { content: { "application/json": { schema: z.object({ rest: z.string() }) } }, description: "Starting picture saved." }, ...errorResponses({ 400: "Invalid version", 401: "Not signed in", 403: "Only the author or an admin can change this companion's pictures", 404: "No such picture" }) } });
+  request: { params: lookIdParam, body: { content: { "application/json": { schema: z.object({ version_id: z.string() }) } } } }, responses: { 200: { content: { "application/json": { schema: z.object({ rest: z.string(), sheet_reset: z.boolean() }) } }, description: "Starting picture saved; sheet_reset says whether the previous sheet was cleared." }, ...errorResponses({ 400: "Invalid version", 401: "Not signed in", 403: "Only the author or an admin can change this companion's pictures", 404: "No such picture" }) } });
 companionsRoutes.openapi(restRoute, (c) => {
   const { id } = c.req.valid("param"), denied = lookAccess(c.get("person"), id); if (denied) return c.json({ error: denied.error }, denied.status);
   const versionId = c.req.valid("json").version_id;
+  const prior = readLook(id).rest;
   if (!setRest(id, versionId)) return c.json({ error: "That picture could not be found. Choose one of this companion's pictures." }, 404);
-  return c.json({ rest: versionId }, 200);
+  return c.json({ rest: versionId, sheet_reset: prior !== versionId }, 200);
 });
 
 const deleteLookVersionRoute = createRoute({ method: "delete", path: "/{id}/look/{versionId}", tags: ["Companions"], summary: "Delete a look picture", middleware: [requireAuth] as const,
@@ -284,12 +313,12 @@ companionsRoutes.openapi(copyRoute, (c) => {
 });
 
 const editRoute = createRoute({ method: "get", path: "/{id}/edit", tags: ["Companions"], summary: "Read an editable household companion", middleware: [requireAuth] as const,
-  request: { params: idPath }, responses: { 200: { content: { "application/json": { schema: z.object({ look: z.object({ versions: z.number().int(), rest: z.string().nullable() }) }).passthrough() } }, description: "Editable companion, including its picture count and approved starting picture." }, ...errorResponses({ 401: "Not signed in", 404: "No companion you can edit" }) } });
+  request: { params: idPath }, responses: { 200: { content: { "application/json": { schema: z.object({ look: z.object({ versions: z.number().int(), rest: z.string().nullable(), sheet_state: z.enum(["empty", "making", "needs_review", "approved"]) }) }).passthrough() } }, description: "Editable companion, including its picture count, approved starting picture and sheet state." }, ...errorResponses({ 401: "Not signed in", 404: "No companion you can edit" }) } });
 companionsRoutes.openapi(editRoute, (c) => {
   const actor = c.get("person"), id = c.req.valid("param").id, manifest = getHouseholdCompanion(id);
   if (!manifest?.companion || !mayEdit(actor, id)) return c.json({ error: "No companion you can edit." }, 404);
   const look = readLook(id);
-  return c.json({ id, ...manifest.companion, name: manifest.companion.display_name, audience: manifest.companion.audience ?? "adult", status: manifest.companion.status ?? "ready", review: manifest.companion.review ?? null, can_edit: true, can_copy: speakerAgeBand(actor, new Date()) === "adult" || isOwnerOrAdmin(actor), can_set_audience: isOwnerOrAdmin(actor), look: { versions: look.versions.length, rest: look.rest } }, 200);
+  return c.json({ id, ...manifest.companion, name: manifest.companion.display_name, audience: manifest.companion.audience ?? "adult", status: manifest.companion.status ?? "ready", review: manifest.companion.review ?? null, can_edit: true, can_copy: speakerAgeBand(actor, new Date()) === "adult" || isOwnerOrAdmin(actor), can_set_audience: isOwnerOrAdmin(actor), look: { versions: look.versions.length, rest: look.rest, sheet_state: look.sheet?.state ?? "empty" } }, 200);
 });
 
 const updateRoute = createRoute({ method: "put", path: "/{id}", tags: ["Companions"], summary: "Edit a household companion", middleware: [requireAuth] as const,

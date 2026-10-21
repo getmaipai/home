@@ -53641,6 +53641,128 @@
                         "#FF00FF"
                       ]
                     },
+                    "sheet": {
+                      "type": "object",
+                      "nullable": true,
+                      "properties": {
+                        "views": {
+                          "type": "object",
+                          "properties": {
+                            "left": {
+                              "type": "object",
+                              "nullable": true,
+                              "properties": {
+                                "version_id": {
+                                  "type": "string"
+                                },
+                                "url": {
+                                  "type": "string"
+                                }
+                              },
+                              "required": [
+                                "version_id",
+                                "url"
+                              ]
+                            },
+                            "right": {
+                              "type": "object",
+                              "nullable": true,
+                              "properties": {
+                                "version_id": {
+                                  "type": "string"
+                                },
+                                "url": {
+                                  "type": "string"
+                                }
+                              },
+                              "required": [
+                                "version_id",
+                                "url"
+                              ]
+                            },
+                            "mouth": {
+                              "type": "object",
+                              "nullable": true,
+                              "properties": {
+                                "version_id": {
+                                  "type": "string"
+                                },
+                                "url": {
+                                  "type": "string"
+                                }
+                              },
+                              "required": [
+                                "version_id",
+                                "url"
+                              ]
+                            }
+                          },
+                          "required": [
+                            "left",
+                            "right",
+                            "mouth"
+                          ]
+                        },
+                        "card": {
+                          "type": "object",
+                          "nullable": true,
+                          "properties": {
+                            "text": {
+                              "type": "string"
+                            },
+                            "colours": {
+                              "type": "array",
+                              "items": {
+                                "type": "string"
+                              }
+                            },
+                            "species": {
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "text",
+                            "colours",
+                            "species"
+                          ]
+                        },
+                        "key": {
+                          "type": "string",
+                          "enum": [
+                            "#00FF00",
+                            "#FF00FF"
+                          ]
+                        },
+                        "state": {
+                          "type": "string",
+                          "enum": [
+                            "empty",
+                            "making",
+                            "needs_review",
+                            "approved"
+                          ]
+                        },
+                        "approved_by": {
+                          "type": "string",
+                          "nullable": true
+                        },
+                        "approved_at": {
+                          "type": "string",
+                          "nullable": true
+                        }
+                      },
+                      "required": [
+                        "views",
+                        "card",
+                        "key",
+                        "state",
+                        "approved_by",
+                        "approved_at"
+                      ]
+                    },
+                    "ready_for_video": {
+                      "type": "boolean"
+                    },
                     "can_generate": {
                       "type": "boolean"
                     },
@@ -53652,6 +53774,8 @@
                     "versions",
                     "rest",
                     "key",
+                    "sheet",
+                    "ready_for_video",
                     "can_generate"
                   ]
                 }
@@ -53670,6 +53794,429 @@
           },
           "403": {
             "description": "Only the author or an admin can read this companion's pictures",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No household companion",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/companions/{id}/look/sheet": {
+      "post": {
+        "tags": [
+          "Companions"
+        ],
+        "summary": "Make character sheet references",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 80
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "202": {
+            "description": "Character sheet job started.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "job": {
+                      "type": "string"
+                    },
+                    "card_source": {
+                      "type": "string",
+                      "enum": [
+                        "model",
+                        "look_prompt"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "job",
+                    "card_source"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Choose a rest picture and write a look prompt first",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Only an allowed editor can make this sheet",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No household companion",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "A picture is already being made for this companion",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "The picture request cannot be used",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Picture creation is not set up",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/companions/{id}/look/sheet/card": {
+      "put": {
+        "tags": [
+          "Companions"
+        ],
+        "summary": "Edit character description card",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 80
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "text": {
+                    "type": "string",
+                    "minLength": 20,
+                    "maxLength": 600
+                  },
+                  "species": {
+                    "type": "string",
+                    "maxLength": 60
+                  }
+                },
+                "required": [
+                  "text"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Card saved.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "card": {
+                      "nullable": true
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Write a description of at least 20 characters",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Only the author or an admin can edit this companion's card",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No household companion or sheet",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/companions/{id}/look/sheet/key": {
+      "put": {
+        "tags": [
+          "Companions"
+        ],
+        "summary": "Set character sheet key colour",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 80
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "key": {
+                    "type": "string",
+                    "enum": [
+                      "#00FF00",
+                      "#FF00FF"
+                    ]
+                  }
+                },
+                "required": [
+                  "key"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Key colour saved.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "key": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "key"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Choose one of the two key colours",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Only the author or an admin can edit this companion's key",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No household companion or sheet",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/companions/{id}/look/sheet/approve": {
+      "post": {
+        "tags": [
+          "Companions"
+        ],
+        "summary": "Approve character sheet",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 80
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Sheet approved.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "sheet": {
+                      "nullable": true
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "A rest picture and description card are required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Only the author or an admin can approve this sheet",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No household companion",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/companions/{id}/look/sheet/unapprove": {
+      "post": {
+        "tags": [
+          "Companions"
+        ],
+        "summary": "Return character sheet to review",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 80
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Sheet returned to review.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "sheet": {
+                      "nullable": true
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "No character sheet to review",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Only the author or an admin can edit this sheet",
             "content": {
               "application/json": {
                 "schema": {
@@ -54376,7 +54923,7 @@
         },
         "responses": {
           "200": {
-            "description": "Starting picture saved.",
+            "description": "Starting picture saved; sheet_reset says whether the previous sheet was cleared.",
             "content": {
               "application/json": {
                 "schema": {
@@ -54384,10 +54931,14 @@
                   "properties": {
                     "rest": {
                       "type": "string"
+                    },
+                    "sheet_reset": {
+                      "type": "boolean"
                     }
                   },
                   "required": [
-                    "rest"
+                    "rest",
+                    "sheet_reset"
                   ]
                 }
               }
@@ -54599,7 +55150,7 @@
         ],
         "responses": {
           "200": {
-            "description": "Editable companion, including its picture count and approved starting picture.",
+            "description": "Editable companion, including its picture count, approved starting picture and sheet state.",
             "content": {
               "application/json": {
                 "schema": {
@@ -54614,11 +55165,21 @@
                         "rest": {
                           "type": "string",
                           "nullable": true
+                        },
+                        "sheet_state": {
+                          "type": "string",
+                          "enum": [
+                            "empty",
+                            "making",
+                            "needs_review",
+                            "approved"
+                          ]
                         }
                       },
                       "required": [
                         "versions",
-                        "rest"
+                        "rest",
+                        "sheet_state"
                       ]
                     }
                   },

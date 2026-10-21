@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { rmSync } from "node:fs";
 import { join } from "node:path";
 import sharp from "sharp";
-import { addVersion, compositeOnKey, deleteLook, deleteVersion, keyOut, lookPromptFor, normalizePicture, readLook, setRest, versionPath, LOOK_LIMIT_LINE, SMALL_PICTURE_LINE } from "@/lib/companionLook";
+import { addVersion, approveSheet, chooseKeyColour, compositeOnKey, deleteLook, deleteVersion, describeCharacter, dominantColours, keyOut, lookPromptFor, normalizePicture, readLook, setRest, updateSheet, versionPath, __setCharacterCompletionForTests, __setCharacterPictureCapabilityForTests, LOOK_LIMIT_LINE, SMALL_PICTURE_LINE } from "@/lib/companionLook";
 import { createHouseholdCompanion, deleteHouseholdCompanion } from "@/lib/householdCompanions";
 import { loadManifestOnly } from "@/lib/plugins";
 
@@ -13,8 +13,8 @@ if (!source.ok || !source.value.companion) throw new Error("rivet fixture is una
 const companion = source.value.companion;
 const png = new Uint8Array([1, 2, 3]);
 
-beforeEach(() => rmSync(companionsRoot, { recursive: true, force: true }));
-afterEach(() => rmSync(companionsRoot, { recursive: true, force: true }));
+beforeEach(() => { rmSync(companionsRoot, { recursive: true, force: true }); __setCharacterCompletionForTests(undefined); __setCharacterPictureCapabilityForTests(null); });
+afterEach(() => { rmSync(companionsRoot, { recursive: true, force: true }); __setCharacterCompletionForTests(undefined); __setCharacterPictureCapabilityForTests(null); });
 
 function create() {
   const result = createHouseholdCompanion({ ...companion, display_name: "Look test" }, { display_name: "Author" });
@@ -24,6 +24,36 @@ function create() {
 function item(label = "Picture") { return { source: "upload" as const, label, width: 1024, height: 1024, from: null }; }
 
 describe("companion look store", () => {
+  test("chooses magenta for a green frog and green for a red fox or magenta cat", async () => {
+    const character = async (colour: string) => {
+      const svg = Buffer.from(`<svg width="64" height="64"><ellipse cx="32" cy="38" rx="22" ry="20" fill="${colour}"/><circle cx="22" cy="19" r="7" fill="${colour}"/><circle cx="42" cy="19" r="7" fill="${colour}"/></svg>`);
+      return new Uint8Array(await sharp({ create: { width: 64, height: 64, channels: 4, background: { r: 0, g: 0, b: 0, alpha: 0 } } }).composite([{ input: svg }]).png().toBuffer());
+    };
+    expect(await chooseKeyColour(await character("#00ff00"))).toBe("#FF00FF");
+    expect(await chooseKeyColour(await character("#ff0000"))).toBe("#00FF00");
+    expect(await chooseKeyColour(await character("#ff00ff"))).toBe("#00FF00");
+  });
+
+  test("returns dominant quantised colours from a two-colour picture", async () => {
+    const png = new Uint8Array(await sharp({ create: { width: 20, height: 10, channels: 3, background: "#ff0000" } }).composite([{ input: await sharp({ create: { width: 10, height: 10, channels: 3, background: "#0000ff" } }).png().toBuffer(), left: 10, top: 0 }]).png().toBuffer());
+    expect(await dominantColours(png)).toEqual(["#F00000", "#0000F0"]);
+  });
+
+  test("asks the picture-reading chat model for the factual card and keeps palette colours local", async () => {
+    const image = new Uint8Array(await sharp({ create: { width: 20, height: 20, channels: 3, background: "#cc3322" } }).png().toBuffer());
+    let call: { role?: string; messages?: Array<{ content: string; images?: Array<{ url: string }> }>; options?: { response_format?: { type: string; json_schema: { strict: boolean } } } } = {};
+    __setCharacterPictureCapabilityForTests({ imageParts: true, pictureTokensMax: 512 });
+    __setCharacterCompletionForTests((async (role: string, messages: Array<{ content: string; images?: Array<{ url: string }> }>, options: { response_format?: { type: string; json_schema: { strict: boolean } } }) => {
+      call = { role, messages, options };
+      return { ok: true, value: { text: JSON.stringify({ species: "fox", description: "A small red fox with a narrow face and black nose." }) } } as never;
+    }) as never);
+    const described = await describeCharacter(image, "red fox");
+    expect(described).toMatchObject({ card: { species: "fox", text: "A small red fox with a narrow face and black nose." }, card_source: "model" });
+    expect(described.card.colours).toEqual(["#C03020"]);
+    expect(call.role).toBe("chat"); expect(call.messages?.[0]?.images?.[0]?.url).toStartWith("data:image/jpeg;base64,");
+    expect(call.messages?.[0]?.content).toContain("Say nothing about mood"); expect(call.options?.response_format).toMatchObject({ type: "json_schema", json_schema: { strict: true } });
+  });
+
   test("builds a clipped character prompt with the selected key colour", () => {
     expect(lookPromptFor("  small red fox  ", "#00FF00")).toBe("small red fox. A single character, full body, centred in the frame, standing in a relaxed neutral pose, facing the viewer, mouth closed, arms down. Simple clean cartoon illustration, flat colours. Plain solid green background, no shadow, no ground, no text, no other objects.");
     expect(lookPromptFor("x".repeat(700), "#FF00FF").startsWith("x".repeat(600) + ". A single character")).toBe(true);
@@ -103,5 +133,14 @@ describe("companion look store", () => {
     expect(deleteHouseholdCompanion(id)).toBe(true);
     expect(readLook(id).versions).toEqual([]);
     deleteLook(id);
+  });
+
+  test("approval names the missing card and deleting an approved view requires review", () => {
+    const id = create(), rest = addVersion(id, png, item("Rest")), view = addVersion(id, png, { ...item("Side"), source: "edit", from: rest.id });
+    updateSheet(id, { views: { left: view.id, right: null, mouth: null }, card: null, key: "#00FF00", state: "needs_review", approved_by: null, approved_at: null });
+    expect(() => approveSheet(id, "Reviewer")).toThrow("Add a description card before approving the character sheet. Make the sheet or write the card first.");
+    updateSheet(id, { views: { left: view.id, right: null, mouth: null }, card: { text: "A character description with enough words.", colours: [], species: "fox" }, key: "#00FF00", state: "approved", approved_by: "Reviewer", approved_at: new Date().toISOString() });
+    expect(deleteVersion(id, view.id)).toBe(true);
+    expect(readLook(id).sheet).toMatchObject({ views: { left: null }, state: "needs_review", approved_by: null });
   });
 });

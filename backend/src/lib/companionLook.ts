@@ -4,13 +4,17 @@ import sharp, { type Metadata } from "sharp";
 import { z } from "zod";
 import media from "@maipai/spec/vocab/companion-media.json";
 import { householdCompanionFolder } from "@/lib/householdCompanions";
+import { chatModelReadsPictures } from "@/lib/chatPictures";
+import { complete } from "@/lib/llm";
 
 const Source = z.enum(["upload", "generated", "edit"]);
 const Version = z.object({ id: z.string().regex(/^v-[0-9]+$/), created_at: z.string().datetime(), source: Source, label: z.string().max(80), width: z.number().int().positive(), height: z.number().int().positive(), from: z.string().nullable() });
-export const LookSchema = z.object({ version: z.literal(1), versions: z.array(Version), rest: z.string().nullable(), key: z.enum([media.key.default, media.key.alternate]) });
+const Sheet = z.object({ views: z.object({ left: z.string().nullable(), right: z.string().nullable(), mouth: z.string().nullable() }), card: z.object({ text: z.string().max(600), colours: z.array(z.string().regex(/^#[0-9A-F]{6}$/)).max(8), species: z.string().max(60) }).nullable(), key: z.enum([media.key.default, media.key.alternate]), state: z.enum(["empty", "making", "needs_review", "approved"]), approved_by: z.string().nullable(), approved_at: z.string().datetime().nullable() });
+export const LookSchema = z.object({ version: z.literal(1), versions: z.array(Version), rest: z.string().nullable(), key: z.enum([media.key.default, media.key.alternate]), sheet: Sheet.nullable().optional() });
 export type LookVersion = z.infer<typeof Version>;
 export type CompanionLook = z.infer<typeof LookSchema>;
-export const EMPTY_LOOK: CompanionLook = { version: 1, versions: [], rest: null, key: media.key.default };
+export type CompanionSheet = z.infer<typeof Sheet>;
+export const EMPTY_LOOK: CompanionLook = { version: 1, versions: [], rest: null, key: media.key.default, sheet: null };
 export const LOOK_LIMIT_LINE = "This companion already has 60 pictures. Delete some before adding another.";
 export const SMALL_PICTURE_LINE = `Use a picture that is at least ${media.image.min_upload_short_side} pixels on its short side.`;
 
@@ -25,6 +29,84 @@ export const KEY_ALPHA_START = 5;
 export const KEY_ALPHA_END = 245;
 export const KEY_DESPILL_TOLERANCE = 8;
 const KEY_BYTES: Record<string, [number, number, number]> = { "#00FF00": [0, 255, 0], "#FF00FF": [255, 0, 255] };
+
+export const GREEN_HUE_MIN = 70;
+export const GREEN_HUE_MAX = 170;
+export const GREEN_SATURATION_MIN = 0.25;
+export const GREEN_VALUE_MIN = 0.2;
+export const GREEN_PIXEL_FRACTION_MIN = 0.03;
+
+export async function chooseKeyColour(png: Uint8Array): Promise<"#00FF00" | "#FF00FF"> {
+  const { data } = await sharp(png, { failOn: "error", limitInputPixels: 40_000_000 }).ensureAlpha().raw().toBuffer({ resolveWithObject: true });
+  let opaque = 0, green = 0;
+  for (let i = 0; i < data.length; i += 4) {
+    if (data[i + 3]! !== 255) continue;
+    opaque++;
+    const r = data[i]! / 255, g = data[i + 1]! / 255, b = data[i + 2]! / 255;
+    const hi = Math.max(r, g, b), lo = Math.min(r, g, b), d = hi - lo;
+    let hue = 0;
+    if (d) hue = hi === r ? 60 * (((g - b) / d) % 6) : hi === g ? 60 * ((b - r) / d + 2) : 60 * ((r - g) / d + 4);
+    if (hue < 0) hue += 360;
+    const saturation = hi === 0 ? 0 : d / hi;
+    if (hue >= GREEN_HUE_MIN && hue <= GREEN_HUE_MAX && saturation > GREEN_SATURATION_MIN && hi > GREEN_VALUE_MIN) green++;
+  }
+  return opaque && green / opaque > GREEN_PIXEL_FRACTION_MIN ? "#FF00FF" : "#00FF00";
+}
+
+export async function dominantColours(png: Uint8Array, max = 6): Promise<string[]> {
+  const { data } = await sharp(png, { failOn: "error", limitInputPixels: 40_000_000 }).ensureAlpha().raw().toBuffer({ resolveWithObject: true });
+  const counts = new Map<string, number>(); let opaque = 0;
+  for (let i = 0; i < data.length; i += 4) {
+    if (data[i + 3]! !== 255) continue;
+    opaque++;
+    const rgb = [data[i]!, data[i + 1]!, data[i + 2]!].map((v) => Math.min(255, Math.floor(v / 16) * 16));
+    const key = `#${rgb.map((v) => v.toString(16).padStart(2, "0")).join("").toUpperCase()}`;
+    counts.set(key, (counts.get(key) ?? 0) + 1);
+  }
+  return [...counts.entries()].filter(([colour, count]) => {
+    const [r, g, b] = [1, 3, 5].map((offset) => Number.parseInt(colour.slice(offset, offset + 2), 16));
+    const nearWhiteOrBlack = (r! >= 240 && g! >= 240 && b! >= 240) || (r! < 32 && g! < 32 && b! < 32);
+    return !nearWhiteOrBlack || count / Math.max(opaque, 1) >= 0.02;
+  }).sort((a, b) => b[1] - a[1]).slice(0, Math.max(0, max)).map(([colour]) => colour);
+}
+
+let characterCompletion = complete;
+export function __setCharacterCompletionForTests(fn: typeof complete | undefined): void { characterCompletion = fn ?? complete; }
+export function __setCharacterPictureCapabilityForTests(value: { imageParts: boolean; pictureTokensMax: number | null } | null): void { characterCapabilityOverride = value; }
+let characterCapabilityOverride: { imageParts: boolean; pictureTokensMax: number | null } | null = null;
+export async function describeCharacter(png: Uint8Array, lookPrompt: string): Promise<{ card: { text: string; colours: string[]; species: string }; card_source: "model" | "look_prompt" }> {
+  const colours = await dominantColours(png);
+  try {
+    const capability = characterCapabilityOverride ?? await chatModelReadsPictures();
+    if (!capability.imageParts || !capability.pictureTokensMax) throw new Error("Picture reading is unavailable.");
+    const jpeg = await sharp(png, { failOn: "error", limitInputPixels: 40_000_000 }).flatten({ background: "white" }).resize({ width: 1280, height: 1280, fit: "inside", withoutEnlargement: true }).jpeg({ quality: 88 }).toBuffer();
+    const schema = { name: "character_description", strict: true, schema: { type: "object", additionalProperties: false, required: ["species", "description"], properties: { species: { type: "string" }, description: { type: "string" } } } } as const;
+    const prompt = "Describe only what is visible; do not name a real person. Write one factual paragraph of at most 90 words naming the species, body build, face and nose, fur or skin colours, clothing and accessories. Say nothing about mood.";
+    const result = await characterCompletion("chat", [{ role: "user", content: prompt, images: [{ id: "companion-look", name: "character picture", url: `data:image/jpeg;base64,${jpeg.toString("base64")}`, reservedTokens: capability.pictureTokensMax }] }], { temperature: 0, max_tokens: 180, thinking: false, dropReasoning: true, response_format: { type: "json_schema", json_schema: schema } });
+    if (!result.ok) throw new Error("The picture description could not be read.");
+    const parsed = JSON.parse(result.value.text) as { species?: unknown; description?: unknown };
+    if (typeof parsed.species !== "string" || typeof parsed.description !== "string" || !parsed.description.trim()) throw new Error("The picture description was incomplete.");
+    return { card: { text: parsed.description.trim().slice(0, 600), colours, species: parsed.species.trim().slice(0, 60) }, card_source: "model" };
+  } catch {
+    return { card: { text: lookPrompt.trim().slice(0, 600), colours, species: "" }, card_source: "look_prompt" };
+  }
+}
+
+function saveLook(id: string, look: CompanionLook): void { const path = manifestPath(id); if (!path) throw new Error("That household companion could not be found."); const dir = lookFolder(id)!; mkdirSync(dir, { recursive: true }); atomicJson(path, look); }
+export function updateSheet(id: string, sheet: CompanionSheet | null): void { saveLook(id, { ...readLook(id), ...(sheet ? { key: sheet.key } : {}), sheet }); }
+export function setSheetCard(id: string, card: { text: string; species?: string }): void { const look = readLook(id); if (!look.sheet) throw new Error("Make the character sheet before editing its card. Start the sheet job, then try again."); const nextCard = { text: card.text, species: card.species ?? look.sheet.card?.species ?? "", colours: look.sheet.card?.colours ?? [] }; saveLook(id, { ...look, sheet: { ...look.sheet, card: nextCard, state: "needs_review", approved_by: null, approved_at: null } }); }
+export function setSheetKey(id: string, key: "#00FF00" | "#FF00FF"): void { const look = readLook(id); if (!look.sheet) throw new Error("Make the character sheet before changing its key colour. Start the sheet job, then try again."); saveLook(id, { ...look, key, sheet: { ...look.sheet, key, state: "needs_review", approved_by: null, approved_at: null } }); }
+export function approveSheet(id: string, displayName: string): CompanionSheet {
+  const look = readLook(id), sheet = look.sheet;
+  if (!look.rest) throw new Error("Choose a rest picture before approving the character sheet.");
+  if (!sheet?.card) throw new Error("Add a description card before approving the character sheet. Make the sheet or write the card first.");
+  const approved = { ...sheet, state: "approved" as const, approved_by: displayName, approved_at: new Date().toISOString() };
+  saveLook(id, { ...look, sheet: approved }); return approved;
+}
+export function unapproveSheet(id: string): CompanionSheet {
+  const look = readLook(id); if (!look.sheet) throw new Error("Make the character sheet before asking for another review.");
+  const sheet = { ...look.sheet, state: "needs_review" as const, approved_by: null, approved_at: null }; saveLook(id, { ...look, sheet }); return sheet;
+}
 
 function keyRgb(keyHex: string): [number, number, number] {
   const rgb = KEY_BYTES[keyHex.toUpperCase()];
@@ -119,7 +201,8 @@ export function deleteVersion(id: string, versionId: string): boolean {
   const look = readLook(id);
   if (look.rest === versionId) throw new Error("That picture is the approved starting picture. Pick another one first.");
   if (!look.versions.some((item) => item.id === versionId)) return false;
-  const next = { ...look, versions: look.versions.filter((item) => item.id !== versionId) };
+  const sheet = look.sheet ? { ...look.sheet, views: { left: look.sheet.views.left === versionId ? null : look.sheet.views.left, right: look.sheet.views.right === versionId ? null : look.sheet.views.right, mouth: look.sheet.views.mouth === versionId ? null : look.sheet.views.mouth }, ...(look.sheet.state === "approved" && Object.values(look.sheet.views).includes(versionId) ? { state: "needs_review" as const, approved_by: null, approved_at: null } : {}) } : null;
+  const next = { ...look, versions: look.versions.filter((item) => item.id !== versionId), sheet };
   atomicJson(path, next);
   rmSync(image, { force: true });
   return true;
@@ -129,7 +212,7 @@ export function setRest(id: string, versionId: string): boolean {
   if (!path) throw new Error("That household companion could not be found.");
   const look = readLook(id);
   if (!look.versions.some((item) => item.id === versionId)) return false;
-  atomicJson(path, { ...look, rest: versionId });
+  atomicJson(path, { ...look, rest: versionId, ...(look.rest !== versionId ? { sheet: null } : {}) });
   return true;
 }
 export function deleteLook(id: string): void { const dir = lookFolder(id); if (dir) rmSync(dir, { recursive: true, force: true }); }

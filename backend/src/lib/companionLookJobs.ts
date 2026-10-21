@@ -1,5 +1,5 @@
 import sharp from "sharp";
-import { addVersion, compositeOnKey, keyOut, lookPromptFor, normalizePicture, readLook, versionPath } from "@/lib/companionLook";
+import { addVersion, chooseKeyColour, compositeOnKey, describeCharacter, keyOut, lookPromptFor, normalizePicture, readLook, updateSheet, versionPath } from "@/lib/companionLook";
 import { routeAudience } from "@/lib/pictures/audience";
 import { laneOf } from "@/lib/pictures/lane";
 import { pictureDenial, PICTURE_DENIAL_LINE, PROMPT_REFUSAL_LINE, refusePrompt } from "@/lib/pictures/policy";
@@ -32,11 +32,18 @@ export interface LookJob {
 const jobs = new Map<string, LookJob>();
 const activeByCompanion = new Map<string, string>();
 const startingCompanions = new Set<string>();
+const SHEET_VIEWS = [
+  { slot: "left" as const, label: "Turned left", prompt: "Turn the character to face three quarters to its left. Keep the exact same character: same colours, same face, same nose, same clothes, same proportions. Keep the plain solid <key> background." },
+  { slot: "right" as const, label: "Turned right", prompt: "Turn the character to face three quarters to its right. Keep the exact same character: same colours, same face, same nose, same clothes, same proportions. Keep the plain solid <key> background." },
+  { slot: "mouth" as const, label: "Mouth open", prompt: "Keep the exact same character and pose, but open the mouth as if speaking. Same colours, same face, same nose, same clothes. Keep the plain solid <key> background." },
+];
+interface SheetJob { companionId: string; personId: string; state: LookJobState; percent: number; versions: string[]; error: string | null; stackJob: string; index: number; finalising?: Promise<void> }
+const sheetJobs = new Map<string, SheetJob>();
 
-export function __clearCompanionLookJobsForTests(): void { jobs.clear(); activeByCompanion.clear(); startingCompanions.clear(); }
+export function __clearCompanionLookJobsForTests(): void { jobs.clear(); sheetJobs.clear(); activeByCompanion.clear(); startingCompanions.clear(); }
 export function activeLookJob(companionId: string): boolean {
-  const id = activeByCompanion.get(companionId), job = id ? jobs.get(id) : null;
-  return startingCompanions.has(companionId) || Boolean(job && (job.state === "queued" || job.state === "running"));
+  const id = activeByCompanion.get(companionId), job = id ? jobs.get(id) : null, sheetJob = id ? sheetJobs.get(id) : null;
+  return startingCompanions.has(companionId) || Boolean((job && (job.state === "queued" || job.state === "running")) || (sheetJob && (sheetJob.state === "queued" || sheetJob.state === "running")));
 }
 
 export function lookGenerationGate(actor: PersonRow, prompt: string): { status: 403 | 422; error: string } | null {
@@ -105,6 +112,36 @@ export async function startLookEdit(input: { actor: PersonRow; companionId: stri
   } finally { startingCompanions.delete(input.companionId); }
 }
 
+function editForm(keyed: Uint8Array, instruction: string): FormData {
+  const form = new FormData(); form.append("image", new File([new Uint8Array(keyed)], "picture.png", { type: "image/png" })); form.append("operation", "edit"); form.append("instruction", instruction); form.append("image_source", "uploaded"); form.append("audience", "all-ages"); form.append("timeout_ms", "1"); return form;
+}
+
+export async function startLookSheet(input: { actor: PersonRow; companionId: string; lookPrompt: string }): Promise<{ job: string; card_source: "model" | "look_prompt" }> {
+  const gate = lookGenerationGate(input.actor, "Create a consistent character reference picture.");
+  if (gate) throw Object.assign(new Error(gate.error), { status: gate.status });
+  if (activeLookJob(input.companionId)) throw Object.assign(new Error(LOOK_JOB_BUSY_LINE), { status: 409 });
+  startingCompanions.add(input.companionId);
+  try {
+    if (!(await pictureEngineReady())) throw Object.assign(new Error(LOOK_ENGINE_NOT_READY_LINE), { status: 503 });
+    const look = readLook(input.companionId), version = look.versions.find((item) => item.id === look.rest), path = look.rest ? versionPath(input.companionId, look.rest) : null;
+    if (!version || !path) throw Object.assign(new Error("Choose a rest picture before making the character sheet."), { status: 400 });
+    if (!input.lookPrompt.trim()) throw Object.assign(new Error(LOOK_PROMPT_REQUIRED_LINE), { status: 400 });
+    const png = new Uint8Array(readFileSync(path)), key = await chooseKeyColour(png), described = await describeCharacter(png, input.lookPrompt);
+    const sheet = { views: { left: null, right: null, mouth: null }, card: described.card, key, state: "making" as const, approved_by: null, approved_at: null };
+    updateSheet(input.companionId, sheet);
+    const keyed = await compositeOnKey(png, key), instruction = SHEET_VIEWS[0]!.prompt.replaceAll("<key>", key);
+    const submitted = await submitEdit(editForm(keyed, instruction));
+    const job = crypto.randomUUID();
+    sheetJobs.set(job, { companionId: input.companionId, personId: input.actor.id, state: "queued", percent: 0, versions: [], error: null, stackJob: submitted.job, index: 0 });
+    activeByCompanion.set(input.companionId, job);
+    return { job, card_source: described.card_source };
+  } catch (error) {
+    const look = readLook(input.companionId);
+    if (look.sheet?.state === "making") updateSheet(input.companionId, { ...look.sheet, state: "needs_review" });
+    throw error;
+  } finally { startingCompanions.delete(input.companionId); }
+}
+
 export function lookJobFor(id: string, actor: PersonRow, companionId: string): LookJob | null {
   const job = jobs.get(id);
   return job?.personId === actor.id && job.companionId === companionId ? job : null;
@@ -117,6 +154,8 @@ function publicJob(job: LookJob) {
 }
 
 export async function pollLookJob(id: string, actor: PersonRow, companionId: string) {
+  const sheetJob = sheetJobs.get(id);
+  if (sheetJob) return pollSheetJob(id, sheetJob, actor, companionId);
   const job = lookJobFor(id, actor, companionId);
   if (!job) return null;
   if (job.state === "done" || job.state === "failed" || job.state === "cancelled") return publicJob(job);
@@ -167,7 +206,39 @@ export async function pollLookJob(id: string, actor: PersonRow, companionId: str
   return publicJob(job);
 }
 
+async function pollSheetJob(id: string, job: SheetJob, actor: PersonRow, companionId: string) {
+  if (job.personId !== actor.id || job.companionId !== companionId) return null;
+  const publicState = () => { const look = readLook(companionId); return { state: job.state, percent: job.percent, label: job.state === "done" ? "Character sheet ready" : job.state === "failed" ? "Character sheet needs attention" : "Making character sheet", versions: job.versions.map((versionId) => ({ id: versionId, url: `/api/companions/${encodeURIComponent(companionId)}/look/${versionId}/image`, label: look.versions.find((v) => v.id === versionId)?.label ?? "Picture" })), error: job.error }; };
+  if (["done", "failed", "cancelled"].includes(job.state)) return publicState();
+  try {
+    const current = await getGenerationJob(job.stackJob);
+    if (current.state === "queued") job.state = "queued";
+    else if (current.state === "running") { job.state = "running"; job.percent = Math.min(95, Math.round(((job.index + current.progress / 100) / 3) * 100)); }
+    else if (current.state === "failed" || current.state === "cancelled") {
+      const view = SHEET_VIEWS[job.index]!; job.state = "failed"; job.error = `The ${view.slot === "left" || view.slot === "right" ? "side" : "mouth-open"} view did not work. Try again.`;
+      const look = readLook(companionId); if (look.sheet) updateSheet(companionId, { ...look.sheet, state: "needs_review" }); activeByCompanion.delete(companionId);
+    } else if (!job.finalising) job.finalising = (async () => {
+      const view = SHEET_VIEWS[job.index]!, image = await fetchPicture(job.stackJob, 0), look = readLook(companionId), key = look.sheet?.key ?? look.key;
+      let keyedOut = await keyOut(image, key); keyedOut = await normalizePicture(keyedOut, { removeBackground: async (bytes) => bytes });
+      const saved = addVersion(companionId, keyedOut, { source: "edit", label: view.label, width: 1024, height: 1024, from: look.rest });
+      job.versions.push(saved.id);
+      const updated = readLook(companionId), sheet = updated.sheet;
+      if (sheet) updateSheet(companionId, { ...sheet, views: { ...sheet.views, [view.slot]: saved.id } });
+      job.index++;
+      if (job.index >= SHEET_VIEWS.length) { const doneLook = readLook(companionId); if (doneLook.sheet) updateSheet(companionId, { ...doneLook.sheet, state: "needs_review" }); job.state = "done"; job.percent = 100; activeByCompanion.delete(companionId); return; }
+      const restPath = versionPath(companionId, look.rest!); if (!restPath) throw new Error("The rest picture could not be found. Choose it again and retry the sheet.");
+      const rest = new Uint8Array(readFileSync(restPath)), keyed = await compositeOnKey(rest, key), instruction = SHEET_VIEWS[job.index]!.prompt.replaceAll("<key>", key);
+      job.stackJob = (await submitEdit(editForm(keyed, instruction))).job; job.state = "queued";
+    })();
+    try { await job.finalising; } catch { job.state = "failed"; job.error = `The ${SHEET_VIEWS[job.index]?.slot === "mouth" ? "mouth-open" : "side"} view did not work. Try again.`; const look = readLook(companionId); if (look.sheet) updateSheet(companionId, { ...look.sheet, state: "needs_review" }); activeByCompanion.delete(companionId); }
+    finally { job.finalising = undefined; }
+  } catch { job.state = "failed"; job.error = "The character sheet could not be checked. Try again."; activeByCompanion.delete(companionId); }
+  return publicState();
+}
+
 export async function cancelLookJob(id: string, actor: PersonRow, companionId: string): Promise<boolean> {
+  const sheetJob = sheetJobs.get(id);
+  if (sheetJob) { if (sheetJob.personId !== actor.id || sheetJob.companionId !== companionId) return false; sheetJob.state = "cancelled"; activeByCompanion.delete(companionId); await cancelOrDelete(sheetJob.stackJob); const look = readLook(companionId); if (look.sheet) updateSheet(companionId, { ...look.sheet, state: "needs_review" }); return true; }
   const job = lookJobFor(id, actor, companionId);
   if (!job) return false;
   job.state = "cancelled"; job.error = null; activeByCompanion.delete(companionId);
