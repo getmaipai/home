@@ -31,6 +31,8 @@ Press **Share** on the card. On an iPhone, iPad or Mac in Safari, your device's 
 
 If a video will not send from a file you saved, use **Share** on the card instead of dragging the file into Messages.
 
+To choose who in your home can watch a saved video, open it in the Library and use **Share**. Pick the people who may see it, or **Everyone in the home**. A child cannot share a video. A grown-up can change this later; turning sharing off removes access right away. Videos from a library folder keep the same access as that folder.
+
 ## Make a picture move
 
 After chat has made you a picture, say "animate this picture" or open the **More** menu under the reply and choose **Animate this picture**. Home makes a 5 second video that starts from that picture.

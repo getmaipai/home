@@ -31,6 +31,7 @@ const shelf = (path: string) => ({
   on_select: { play: { media_id: "{id}" } }, empty_state: { type: "empty_state", icon: "film", text: "Nothing here." },
 });
 const indexPage = { type: "page", id: "index", title: "Videos", body: [shelf("recent")] };
+const madeIndexPage = { type: "page", id: "index", title: "Videos", body: [{ ...shelf("made-at-home"), heading: "Made at home", item_subtitle_field: "{channel}" }] };
 const watchPage = {
   type: "page", id: "watch", title: "Watch",
   body: [{ type: "player", bind: { source: "package", path: "item", params: { id: "$state.id" } }, kind: "video", empty_state: { type: "empty_state", icon: "film", text: "Not on the hub." } }],
@@ -102,6 +103,20 @@ describe("a media app in the shell", () => {
     open("/apps/videos/watch?id=media-aaaaaa");
     await waitFor(() => expect(itemBodies.length).toBeGreaterThan(0));
     expect(itemBodies.every((body) => JSON.parse(body).id === "media-aaaaaa")).toBe(true);
+  });
+
+  test("Made at home renders a creator line without leaking an unresolved template token", async () => {
+    globalThis.fetch = ((input: RequestInfo | URL, init?: RequestInit) => {
+      const url = typeof input === "string" ? input : input.toString();
+      if (url.startsWith("/api/apps")) return Promise.resolve(Response.json([row]));
+      if (url.startsWith("/api/plugins/videos/pages/index")) return Promise.resolve(Response.json(madeIndexPage));
+      if (url.startsWith("/api/plugins/videos/data/made-at-home")) return Promise.resolve(Response.json([{ id: "file-rw9pa63jd4", title: "Paper boat", channel: "Jesse", thumbnail: null }]));
+      return baseFetch(input, init);
+    }) as typeof fetch;
+    const view = open("/apps/videos");
+    expect(await view.findByRole("button", { name: /Paper boat/ })).toBeTruthy();
+    expect(document.body.textContent).toContain("Jesse");
+    expect(document.body.textContent).not.toMatch(/[{}]/);
   });
 
   test("the host's media element is registered with the audio session", async () => {

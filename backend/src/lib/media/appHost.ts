@@ -183,7 +183,7 @@ function madeFileItemView(file: MadeLibraryFile, appId: "music" | "videos"): Med
   const title = file.name;
   const poster = file.thumb_url;
   return {
-    id: file.id, title, channel: null, summary: "", kind, thumbnail: poster, backdrop: poster,
+    id: file.id, title, channel: file.owner.display_name || "Made at home", summary: "", kind, thumbnail: poster, backdrop: poster,
     duration_s: file.duration_seconds, copy_label: "Saved", src: `/api/files/${encodeURIComponent(file.id)}/content`,
     subtitle: null, description: null, poster, chapters: [], captions: [], liked: false, watch_later: false,
   };
@@ -306,7 +306,7 @@ export type ItemViewHook = (person: PersonRow, item: MediaItem, view: MediaItemV
 const itemViewHooks = new Map<MediaAppId, ItemViewHook>();
 export function registerItemView(appId: MediaAppId, hook: ItemViewHook): void { itemViewHooks.set(appId, hook); }
 
-export function mediaAppData(person: PersonRow, appId: MediaAppId, dataId: string, params: DataParams): MediaRow[] | MediaItemView | MediaItemView[] | { as_of: string; rows: Array<{ id: string; label: string }> } | null {
+function mediaAppDataRaw(person: PersonRow, appId: MediaAppId, dataId: string, params: DataParams): MediaRow[] | MediaItemView | MediaItemView[] | { as_of: string; rows: Array<{ id: string; label: string }> } | null {
   const limit = Math.min(Math.max(params.limit ?? 20, 1), 200);
   dataId = dataId.replace(/_/g, "-"); // manifest ids use hyphens; the underscore spelling of a page written earlier still answers
   if (noDiscovery(person) && (DISCOVERY_IDS as readonly string[]).includes(dataId)) return [];
@@ -361,7 +361,7 @@ export function mediaAppData(person: PersonRow, appId: MediaAppId, dataId: strin
   }
   switch (dataId) {
     case "made-at-home":
-      return appId === "videos" ? madeFiles(person, "videos").slice(0, 16).map((file) => ({ id: file.id, title: file.name, channel: null, summary: "", kind: "video", thumbnail: file.thumb_url, backdrop: file.thumb_url, duration_s: file.duration_seconds, copy_label: "Saved" })) : null;
+      return appId === "videos" ? madeFiles(person, "videos").slice(0, 16).map((file) => ({ id: file.id, title: file.name, channel: file.owner.display_name || "Made at home", summary: "", kind: "video", thumbnail: file.thumb_url, backdrop: file.thumb_url, duration_s: file.duration_seconds, copy_label: "Saved" })) : null;
     case "featured": {
       // A billboard wants pictures: the newest items that have one, else the newest.
       const items = queryItems(person, appId, { limit: 12 });
@@ -438,6 +438,23 @@ export function mediaAppData(person: PersonRow, appId: MediaAppId, dataId: strin
     default:
       return (appDataHooks.get(appId)?.(person, dataId, params) as MediaRow[] | null | undefined) ?? null;
   }
+}
+
+/** Page documents use `{field}` as a field lookup. A missing row value must never
+ * leak that template token into a person's screen; empty text is the safe fallback. */
+export function safeTemplateFields<T>(value: T): T {
+  if (Array.isArray(value)) return value.map((row) => safeTemplateFields(row)) as T;
+  if (value && typeof value === "object") {
+    const record = value as Record<string, unknown>;
+    const copy = { ...record };
+    if ("channel" in copy && (copy.channel === null || copy.channel === undefined)) copy.channel = "";
+    return copy as T;
+  }
+  return value;
+}
+
+export function mediaAppData(person: PersonRow, appId: MediaAppId, dataId: string, params: DataParams): ReturnType<typeof mediaAppDataRaw> {
+  return safeTemplateFields(mediaAppDataRaw(person, appId, dataId, params));
 }
 
 /** What to play after `item`: the person's watch-later queue first, then the rest of the channel in order, then the newest others. */
