@@ -271,3 +271,84 @@ rendered once by us and ship as files, so a Mac that cannot generate video still
 Sources: [Rotato](https://rotato.app/read/transparent-videos-for-the-web), [Archibald](https://jakearchibald.com/2024/video-with-transparency/),
 [Wan-Alpha](https://huggingface.co/htdong/Wan-Alpha/blob/main/README.md), [Figma](https://www.figma.com/resource-library/ai-character-consistency/),
 [Scenario](https://www.scenario.com/blog/ai-sprite-generator).
+
+## 12. The companion editor (owner ask, 2026-10-21)
+
+Owner ask (Jesse): an editor where he sets the name, description and prompt, and either uploads images or videos or has them generated.
+This is the design pass that COMPANIONS-STUDIO-01 was waiting for; it replaces that row with the slices in section 12.6.
+
+### 12.1 Where it lives and who may use it
+
+- **Entry:** a "New companion" button and an "Edit" button in the Companions app ([companions-app-2026-10-21.md](companions-app-2026-10-21.md)),
+  route `/companions/:id/edit`. Not a new rail icon.
+- **Who:** an adult or an admin creates and edits a household companion. A child or teen never sees the editor (a teen editor is a
+  later owner question). Editing a bundled companion makes a household copy; the bundled package is never changed.
+- **Storage:** a household companion is stored on the hub as the same manifest shape and the same media files a package has
+  (`companion` block, `animation` block of section 7), in the hub's data folder, and read by the same `loadManifestOnly` path as the
+  bundled ones. One definition, no second store. "Export as a package" (signed) is a later slice and is the route to the catalog.
+- **Status:** `draft`, `rendering`, `needs review`, `ready`. Only `ready` companions can be assigned to a person or robot. The editor
+  autosaves drafts. Render progress rides the existing job status mechanisms (no new status UI).
+
+### 12.2 Three tabs, one record
+
+| Tab | Fields | Notes |
+|---|---|---|
+| **Identity** | name, pronouns, one-line description (`tagline`), about text (`backstory`), interests | Plain text, length caps from the spec |
+| **Voice and style** | personality dials (formality, complexity, engagement, filler density), behavior lines (six at most), example lines (shared plus one set per band), the voice picker | All data in the manifest; the composer orders and clamps it. **There is no free-form system prompt**: a "prompt" the editor writes is data the composer places inside the band rules, never text that can loosen them (RULES.md rule 0, dynamic-companions decision 3) |
+| **Look** | the **look prompt** (the words the image and video tools start from), reference pictures or video, generated candidates, the character sheet, the 12 states | Sections 4 to 6 of this note |
+
+### 12.3 The Look tab: upload or generate, then approve
+
+1. **Start.** Two buttons: **Upload** (pictures, or a short video of the character) and **Generate** (type or edit the look prompt,
+   press Generate, four pictures in about 4 s each). Both can be mixed: upload a sketch, then generate variations from it.
+2. **Edit.** Any picture opens the existing image editor (Comment edit, Remove BG, Erase). Every change is a new version with Undo.
+   "More like this" sends the chosen picture back as the reference for four new ones.
+3. **Approve the sheet** (rest picture, side views, mouth-open view, description card, key colour; section 4). The description card is
+   written from the picture and is editable text; it is the single text every clip prompt starts with.
+4. **States grid.** Twelve cards, one per state (section 6). Each shows its clip looping over a checkerboard, with a toggle for the
+   light and dark theme backgrounds, and its **motion sentence** (editable, defaults from the template). Per card: **Generate**
+   (four takes from the rest picture, best one shown, others under "Other takes"), **Upload clip** (see 12.4), **Redo**, **Approve**.
+   A **Generate all** button queues every state; the editor shows "7 of 12 ready" and never blocks on a render.
+5. **Ready** when the required states (idle, thinking, working, speaking, needs_you) are approved and the Identity and Voice tabs are valid.
+   A missing optional state falls back to idle.
+
+### 12.4 Uploads
+
+- **Pictures:** PNG, JPEG or WebP, at most 20 MB, at least 512 px on the short side. Normalised to the image spec (section 2): background
+  removed with the Stack's IS-Net, composited on the key colour, centred with the margin. The original is kept as a version.
+- **Videos:** MP4, MOV or WebM, at most 30 MB, at most 10 s, no audio kept. A video with an alpha channel (transparent WebM or HEVC
+  with alpha) is used as is; any other video is keyed by the key colour if it has a flat one, else by IS-Net per frame with temporal
+  smoothing (the fallback in section 3). Either way the encoder re-times to 24 fps, crops and scales to the spec's 480 x 480, fits the
+  loop, and stacks the alpha. **The uploaded file is never played as is**, so the spec holds for every clip however it arrived.
+- **Checks:** the same drift checks of section 5 compare an uploaded clip with the approved rest picture. A clip that fails one is
+  shown with the reason ("the colours are far from the approved character; use Generate, or replace the clip") and the person can still
+  override it with a confirm, because they own the character.
+- **Rights and likeness:** an upload carries the line "you made this or have the right to use it". A picture or clip of a real
+  person goes through the likeness consent path ([likeness-consent-2026-10-17.md](likeness-consent-2026-10-17.md)) or is refused with the
+  reason. Nothing is uploaded anywhere outside the hub.
+
+### 12.5 Safety of an authored companion
+
+- **The band comes from the robot's controls, never the companion** (dynamic-companions). An authored companion therefore cannot loosen
+  a child robot, whatever text it holds.
+- **Audience floor:** a new companion is created as `adult` (usable only on adult-controls robots and by adults). Setting it to `teen`
+  or `all` needs an admin, and `all` shows a review checklist (no profanity in examples or behavior lines, no romantic or violent
+  persona, the look is suitable for children) that the admin confirms; the confirmation, who and when are stored with the companion.
+  The word lists and the review live in Home, not in a learned classifier (RULES-AND-LEARNED-COMPONENTS).
+- **Prompts and pictures** pass the content policy and the household-name gate the image and video tools already use before any job
+  is queued; the absolute lines (no sexual content involving a minor or anyone who looks like one, no non-consensual imagery of a real
+  person) are enforced before render. The post-render check gap (VIDEO-GEN-12) stays open and is named on the Look tab's review.
+- **Provenance** (tool, model hash, prompt, seed, who approved, when) is saved with every picture and clip.
+
+### 12.6 Rows (each one to three files per task, spec first)
+
+| Row | What | After |
+|---|---|---|
+| **CMEDIA-SPEC-01** | `CompanionMediaSpec`, manifest `animation`, `companion.status`, authoring limits (commons) | none |
+| **CMEDIA-EDITOR-01** | Household companion store and routes (create, read, update, status, delete, copy a bundled one), same manifest shape | SPEC-01 |
+| **CMEDIA-EDITOR-02** | Identity and Voice and style tabs, kit form pieces only, validation errors in plain sentences | EDITOR-01 |
+| **CMEDIA-EDITOR-03** | Look tab, pictures: upload, generate, edit in the existing editor, sheet approval | EDITOR-01 |
+| **CMEDIA-EDITOR-04** | States grid: generate, upload, redo, approve, preview over checkerboard (a kit video preview prop if the kit lacks one) | EDITOR-03, RENDER-01 |
+| **CMEDIA-EDITOR-05** | Audience review and the `all` checklist | EDITOR-02 |
+
+Replaces COMPANIONS-STUDIO-01. The editor can ship in slices: Identity and Voice first (no video needed), then pictures, then states.
