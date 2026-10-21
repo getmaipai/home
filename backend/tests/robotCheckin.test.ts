@@ -55,4 +55,10 @@ describe("robot check-in", () => {
     expect(getRobotCheckin(deviceId)?.online).toBe(false);
     expect(getRobotCheckin(deviceId, Date.now() + 150_000)?.online).toBe(false);
   });
+
+  test("an offline report with no device id, an unknown signal word or a float reading is still accepted", async () => {
+    const odd = payload({ device_id: null, online: false, signal: "good", rssi: -39.5, battery_level: 101 });
+    expect((await robot.put("/api/devices/me/checkin", odd)).status).toBe(204);
+    expect(getRobotCheckin(deviceId)).toMatchObject({ online: false, signal: null, rssi: null, battery_level: null });
+  });
 });

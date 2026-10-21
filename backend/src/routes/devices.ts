@@ -149,14 +149,17 @@ devicesRoutes.openapi(updateMyStateRoute, (c) => {
   return c.body(null, 204);
 });
 
+// The body's report is telemetry: a field it cannot fill (or fills with a value this schema does not know) becomes null instead of
+// refusing the whole report, so the robot page never loses its status over one odd reading.
+const loose = <T extends z.ZodTypeAny>(schema: T) => schema.nullable().catch(null);
 const robotCheckinSchema = z.object({
-  device_id: z.string().min(1).max(128), board: z.string().min(1).max(64), online: z.boolean(),
-  last_seen: z.string().datetime({ offset: true }), connected_since: z.string().datetime({ offset: true }).nullable(),
-  ip: z.string().max(64).nullable(), firmware_version: z.string().max(64).nullable(), bot_version: z.string().max(64).nullable(),
-  rssi: z.number().int().nullable(), signal: z.enum(["strong", "medium", "weak"]).nullable(),
-  free_heap_internal: z.number().int().nonnegative().nullable(), free_heap_min: z.number().int().nonnegative().nullable(), psram_free: z.number().int().nonnegative().nullable(),
-  boot_reason: z.number().int().nullable(), crash_resets: z.number().int().nonnegative().nullable(),
-  battery_level: z.number().int().min(0).max(100).nullable(), charging: z.boolean().nullable(),
+  device_id: z.string().max(128).nullable().catch(null).transform((v) => v ?? ""), board: z.string().max(64).catch("m5stack-stack-chan"), online: z.boolean().catch(false),
+  last_seen: z.string().datetime({ offset: true }), connected_since: loose(z.string().datetime({ offset: true })),
+  ip: loose(z.string().max(64)), firmware_version: loose(z.string().max(64)), bot_version: loose(z.string().max(64)),
+  rssi: loose(z.number().int()), signal: z.enum(["strong", "medium", "weak"]).nullable().catch(null),
+  free_heap_internal: loose(z.number().int().nonnegative()), free_heap_min: loose(z.number().int().nonnegative()), psram_free: loose(z.number().int().nonnegative()),
+  boot_reason: loose(z.number().int()), crash_resets: loose(z.number().int().nonnegative()),
+  battery_level: loose(z.number().int().min(0).max(100)), charging: loose(z.boolean()),
 });
 const robotCheckinRoute = createRoute({
   method: "put", path: "/me/checkin", tags: ["Devices"], summary: "Report the current StackChan check-in",
