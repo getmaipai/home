@@ -16,7 +16,11 @@ import { __setPicturesFetchForTests } from "@/lib/pictures/stack";
 import { __setPictureStatusForTests, readyStatusForTests } from "@/lib/pictures/ready";
 import { __clearCompanionLookJobsForTests } from "@/lib/companionLookJobs";
 import { __setCharacterPictureCapabilityForTests } from "@/lib/companionLook";
-import { addTake, takePath, __resetCompanionStatesForTests } from "@/lib/companionStates";
+import { addTake, takePath, saveStates, readStates, __resetCompanionStatesForTests } from "@/lib/companionStates";
+import { __setStackClientForTests } from "@/lib/stackEngine";
+import { addVersion, approveSheet, setRest, updateSheet } from "@/lib/companionLook";
+import { getHouseholdCompanion } from "@/lib/householdCompanions";
+import media from "@maipai/spec/vocab/companion-media.json";
 
 const app = new OpenAPIHono();
 app.route("/api/companions", companionsRoutes);
@@ -47,8 +51,8 @@ function fixture() {
   return loaded.value.companion;
 }
 
-beforeEach(() => { resetDb(); rmSync(companionRoot, { recursive: true, force: true }); __reloadPersonasForTests(); __clearCompanionLookJobsForTests(); __resetCompanionStatesForTests(); __setPicturesFetchForTests(null); __setPictureStatusForTests(undefined); __setCharacterPictureCapabilityForTests(null); });
-afterEach(() => { resetDb(); rmSync(companionRoot, { recursive: true, force: true }); __reloadPersonasForTests(); __clearCompanionLookJobsForTests(); __resetCompanionStatesForTests(); __setPicturesFetchForTests(null); __setPictureStatusForTests(undefined); __setCharacterPictureCapabilityForTests(null); });
+beforeEach(() => { resetDb(); rmSync(companionRoot, { recursive: true, force: true }); __reloadPersonasForTests(); __clearCompanionLookJobsForTests(); __resetCompanionStatesForTests(); __setPicturesFetchForTests(null); __setPictureStatusForTests(undefined); __setCharacterPictureCapabilityForTests(null); __setStackClientForTests(null); });
+afterEach(() => { resetDb(); rmSync(companionRoot, { recursive: true, force: true }); __reloadPersonasForTests(); __clearCompanionLookJobsForTests(); __resetCompanionStatesForTests(); __setPicturesFetchForTests(null); __setPictureStatusForTests(undefined); __setCharacterPictureCapabilityForTests(null); __setStackClientForTests(null); });
 
 async function keyedPicture() {
   const svg = Buffer.from('<svg width="512" height="512"><circle cx="256" cy="256" r="150" fill="red"/></svg>');
@@ -328,5 +332,63 @@ describe("household companion routes", () => {
     const unknown = await app.request(`http://localhost/api/companions/${created.value.id}/states/idle/${take.id}/manifest.json`, { headers: { cookie: `session=${adult}` } }); expect(unknown.status).toBe(404);
     expect((await request(`companions/${created.value.id}/states`, other)).status).toBe(403);
     expect((await request("companions/rivet/states", adult)).status).toBe(403);
+  });
+
+  test("state upload checks rights and signature, finishes with the fake Stack, and approval writes validated animation assets", async () => {
+    const adult = addPerson("person-state-upload", "adult"), created = createHouseholdCompanion({ ...fixture(), display_name: "State upload" }, { display_name: "Author", person_id: "person-state-upload" });
+    if (!created.ok) throw new Error(created.error);
+    const companionId = created.value.id;
+    const rest = addVersion(companionId, new Uint8Array([1]), { source: "upload", label: "rest", width: 1024, height: 1024, from: null }); setRest(companionId, rest.id);
+    updateSheet(companionId, { views: { left: null, right: null, mouth: null }, card: { text: "red fox", species: "fox", colours: ["#CC3322"] }, key: "#00FF00", state: "needs_review", approved_by: null, approved_at: null }); approveSheet(companionId, "Author");
+    const videoBytes = new Uint8Array([0, 0, 0, 24, 102, 116, 121, 112, 105, 115, 111, 109, 0, 0, 0, 0]);
+    async function uploadVideo(rights: string, real: string, bytes = videoBytes) { const form = new FormData(); form.append("video", new File([bytes], "clip.mp4", { type: "video/mp4" })); form.append("rights_confirmed", rights); form.append("shows_real_person", real); return app.request(`http://localhost/api/companions/${companionId}/states/idle/upload`, { method: "POST", headers: { cookie: `session=${adult}` }, body: form }); }
+    expect((await uploadVideo("false", "false")).status).toBe(400); expect((await uploadVideo("true", "true")).status).toBe(400); expect((await uploadVideo("true", "false", new Uint8Array([1, 2, 3]))).status).toBe(400);
+    let submitted: any; let waitForFinish: (() => void) | undefined;
+    __setStackClientForTests({ mediaRoots: async () => ({ read: [companionRoot], write: [companionRoot] }), setMediaRoots: async () => ({ read: [], write: [] }), submitJob: async (request: any) => { submitted = request; const out = join(request.input.output_dir, request.input.output_name); mkdirSync(out, { recursive: true }); writeFileSync(join(out, "clip.h264.mp4"), "h264"); writeFileSync(join(out, "still.png"), "png"); waitForFinish?.(); return { id: "state-job", state: "done", result: { ok: true, reasons: [], seconds: 3, files: [{ name: "clip.h264.mp4", bytes: 4 }], av1: false, colour_distance: 1, area_ratio: 1, loop_gap: 0, opaque_share: { min: .5, max: .8 } } }; }, job: async () => { throw Error("unexpected poll"); } } as never);
+    const uploaded = await uploadVideo("true", "false"); expect(uploaded.status).toBe(202); const { take_id } = await uploaded.json() as { take_id: string };
+    await new Promise<void>((resolve) => { waitForFinish = resolve; setTimeout(resolve, 20); });
+    expect(submitted.input).toMatchObject({ key: "#00FF00", output_name: "finished", max_bytes: media.ship.max_bytes_per_clip });
+    const approval = await request(`companions/${companionId}/states/idle/approve`, adult, "PUT", { take_id }); expect(approval.status).toBe(200);
+    expect(getHouseholdCompanion(companionId)?.companion?.animation).toMatchObject({ kind: "video", states: { idle: { h264: "idle.h264.mp4", still: "idle.png", loop: true } }, sheet: { rest: "rest.png", card: "card.json" } });
+    expect((await request(`companions/${companionId}/states/idle/${take_id}/source.mp4`, adult)).status).toBe(200);
+  });
+
+  test("state upload asks for an approved character sheet before accepting a clip", async () => {
+    const adult = addPerson("person-state-no-sheet", "adult"), created = createHouseholdCompanion({ ...fixture(), display_name: "No state sheet" }, { display_name: "Author", person_id: "person-state-no-sheet" }); if (!created.ok) throw new Error(created.error);
+    const form = new FormData(); form.append("video", new File([new Uint8Array([0, 0, 0, 24, 102, 116, 121, 112, 105, 115, 111, 109, 0, 0, 0, 0])], "clip.mp4", { type: "video/mp4" })); form.append("rights_confirmed", "true"); form.append("shows_real_person", "false");
+    const response = await app.request(`http://localhost/api/companions/${created.value.id}/states/idle/upload`, { method: "POST", headers: { cookie: `session=${adult}` }, body: form });
+    expect(response.status).toBe(409); expect(await response.json()).toEqual({ error: "Approve the character sheet first, so every clip starts from the same character." });
+  });
+
+  test("approval requires force, requires idle first, adds states, and idle removal clears every approval", async () => {
+    const adult = addPerson("person-state-approve", "adult"), created = createHouseholdCompanion({ ...fixture(), display_name: "Approval flow" }, { display_name: "Author", person_id: "person-state-approve" }); if (!created.ok) throw new Error(created.error); const id = created.value.id;
+    const rest = addVersion(id, new Uint8Array([1]), { source: "upload", label: "rest", width: 1024, height: 1024, from: null }); setRest(id, rest.id); updateSheet(id, { views: { left: null, right: null, mouth: null }, card: { text: "fox", species: "fox", colours: ["#CC3322"] }, key: "#00FF00", state: "needs_review", approved_by: null, approved_at: null }); approveSheet(id, "Author");
+    const idle = addTake(id, "idle", { source: "upload", label: "idle" }), thinking = addTake(id, "thinking", { source: "upload", label: "thinking" });
+    const report = (ok: boolean, reasons: string[]) => ({ ok, reasons, seconds: 3, bytes: { h264: 4, av1: null }, colour_distance: 1, area_ratio: 1, loop_gap: 0, opaque_share: { min: .5, max: .8 } });
+    const all = readStates(id); all.states.idle!.takes[0]!.report = report(false, ["The loop does not close cleanly."]); all.states.thinking!.takes[0]!.report = report(true, []); saveStates(id, all);
+    for (const [state, take] of [["idle", idle], ["thinking", thinking]] as const) { const h264 = takePath(id, state, take.id, "clip.h264.mp4")!, still = takePath(id, state, take.id, "still.png")!; mkdirSync(join(h264, ".."), { recursive: true }); writeFileSync(h264, "h264"); writeFileSync(still, "png"); }
+    const idlePath = `companions/${id}/states/idle/approve`;
+    const needsForce = await request(idlePath, adult, "PUT", { take_id: idle.id }); expect(needsForce.status).toBe(409); expect(await needsForce.json()).toMatchObject({ code: "needs_force", error: "This clip missed a quality check: The loop does not close cleanly. Approve it anyway?" });
+    const beforeIdle = await request(`companions/${id}/states/thinking/approve`, adult, "PUT", { take_id: thinking.id }); expect(beforeIdle.status).toBe(409); expect((await beforeIdle.json() as { error: string }).error).toBe("Approve the idle clip first.");
+    expect((await request(idlePath, adult, "PUT", { take_id: idle.id, force: true })).status).toBe(200);
+    expect((await request(`companions/${id}/states/thinking/approve`, adult, "PUT", { take_id: thinking.id })).status).toBe(200);
+    expect(getHouseholdCompanion(id)?.companion?.animation?.states).toHaveProperty("thinking");
+    expect((await request(`companions/${id}/states/thinking/approve`, adult, "DELETE")).status).toBe(200);
+    expect(getHouseholdCompanion(id)?.companion?.animation?.states).not.toHaveProperty("thinking");
+    const removedIdle = await request(idlePath, adult, "DELETE"); expect(removedIdle.status).toBe(200); expect(await removedIdle.json()).toMatchObject({ note: "Without the idle clip the others cannot play, so their approvals were removed too." });
+    expect(getHouseholdCompanion(id)?.companion?.animation).toBeUndefined(); expect(Object.values(readStates(id).states).every((state) => !state?.approved)).toBe(true);
+  });
+
+  test("children, teens, non-author adults and bundled companions cannot use state routes", async () => {
+    const author = addPerson("person-state-owner", "adult"), other = addPerson("person-state-other", "adult"), child = addPerson("person-state-child", "child"), teen = addPerson("person-state-teen", "teen");
+    const created = createHouseholdCompanion({ ...fixture(), display_name: "State access" }, { display_name: "Author", person_id: "person-state-owner" }); if (!created.ok) throw new Error(created.error);
+    for (const token of [other, child, teen]) {
+      for (const [path, method, body] of [[`companions/${created.value.id}/states`, "GET", undefined], [`companions/${created.value.id}/states/idle/motion`, "PUT", { motion: "wave" }], [`companions/${created.value.id}/states/idle/approve`, "PUT", { take_id: "take-1" }], [`companions/${created.value.id}/states/idle/take-1`, "DELETE", undefined], [`companions/${created.value.id}/states/idle/take-1/clip.h264.mp4`, "GET", undefined]] as const) expect((await request(path, token, method, body)).status).toBe(403);
+    }
+    for (const token of [other, child, teen]) {
+      const form = new FormData(); form.append("video", new File([new Uint8Array([0, 0, 0, 24])], "clip.mp4", { type: "video/mp4" })); form.append("rights_confirmed", "true"); form.append("shows_real_person", "false");
+      expect((await app.request(`http://localhost/api/companions/${created.value.id}/states/idle/upload`, { method: "POST", headers: { cookie: `session=${token}` }, body: form })).status).toBe(403);
+    }
+    expect((await request("companions/rivet/states", author)).status).toBe(403);
   });
 });

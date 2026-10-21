@@ -3,7 +3,10 @@ import { rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { loadManifestOnly } from "@/lib/plugins";
 import { createHouseholdCompanion } from "@/lib/householdCompanions";
-import { addTake, bestTake, deleteStates, deleteTake, readStates, setMotion, takePath, __resetCompanionStatesForTests } from "@/lib/companionStates";
+import { addTake, bestTake, deleteStates, deleteTake, readStates, setMotion, takePath, __resetCompanionStatesForTests, finishTake } from "@/lib/companionStates";
+import { __setStackClientForTests } from "@/lib/stackEngine";
+import { addVersion, approveSheet, setRest, updateSheet } from "@/lib/companionLook";
+import media from "@maipai/spec/vocab/companion-media.json";
 
 const dataRoot = process.env.MAIPAI_DATA_DIR!;
 const root = join(dataRoot, "companions");
@@ -12,7 +15,7 @@ if (!source.ok || !source.value.companion) throw new Error("rivet fixture is una
 const sourceCompanion = source.value.companion;
 
 beforeEach(() => { rmSync(root, { recursive: true, force: true }); __resetCompanionStatesForTests(); });
-afterEach(() => { rmSync(root, { recursive: true, force: true }); __resetCompanionStatesForTests(); });
+afterEach(() => { rmSync(root, { recursive: true, force: true }); __resetCompanionStatesForTests(); __setStackClientForTests(null); });
 
 function companion() { const result = createHouseholdCompanion({ ...sourceCompanion, display_name: "State fixture" }, { display_name: "Author", person_id: "state-test" }); if (!result.ok) throw new Error(result.error); return result.value.id; }
 
@@ -66,5 +69,40 @@ describe("companion states store", () => {
     setMotion(id, "idle", null); expect(readStates(id).states.idle?.motion).toBeNull();
     addTake(id, "idle", { source: "upload", label: "clip" }); deleteStates(id);
     expect(readStates(id).states).toEqual({});
+  });
+
+  test("declares the companion media root once, preserves other roots, and retries a failed put", async () => {
+    const { ensureCompanionMediaRoot } = await import("@/lib/companionStates");
+    const expected = join(dataRoot, "companions"); let reads = 0, writes = 0; let fail = true;
+    __setStackClientForTests({ mediaRoots: async () => { reads++; return { read: ["/other/read"], write: ["/other/write"] }; }, setMediaRoots: async (roots: { read: string[]; write: string[] }) => { writes++; expect(roots.read).toContain("/other/read"); expect(roots.write).toContain("/other/write"); expect(roots.read).toContain(expected); expect(roots.write).toContain(expected); if (fail) throw Error("offline"); return roots; } } as never);
+    expect((await ensureCompanionMediaRoot()).ok).toBe(false); fail = false;
+    expect(await ensureCompanionMediaRoot()).toEqual({ ok: true }); expect(await ensureCompanionMediaRoot()).toEqual({ ok: true });
+    expect(reads).toBe(2); expect(writes).toBe(2);
+  });
+
+  test("finishes a clip through Stack with the state vocabulary and stores its report", async () => {
+    const { finishTake } = await import("@/lib/companionStates"), id = companion();
+    const rest = addVersion(id, new Uint8Array([1]), { source: "upload", label: "rest", width: 1024, height: 1024, from: null }); setRest(id, rest.id);
+    updateSheet(id, { views: { left: null, right: null, mouth: null }, card: { text: "red fox", species: "fox", colours: ["#CC3322"] }, key: "#FF00FF", state: "needs_review", approved_by: null, approved_at: null }); approveSheet(id, "Author");
+    const take = addTake(id, "idle", { source: "upload", label: "idle" }); writeFileSync(takePath(id, "idle", take.id, "source.mp4")!, "source");
+    let submitted: any; let roots = 0;
+    __setStackClientForTests({ mediaRoots: async () => ({ read: [join(dataRoot, "companions")], write: [join(dataRoot, "companions")] }), setMediaRoots: async () => { roots++; return { read: [], write: [] }; }, submitJob: async (job: any) => { submitted = job; return { id: "job-1", state: "done", result: { ok: true, reasons: [], seconds: 3, files: [{ name: "clip.h264.mp4", bytes: 123 }], av1: false, colour_distance: 2, area_ratio: 1, loop_gap: 0, opaque_share: { min: .5, max: .8 } } }; }, job: async () => { throw Error("unexpected poll"); } } as never);
+    await finishTake(id, "idle", take.id, { alpha: false });
+    expect(submitted.kind).toBe("media.companion_clip"); expect(submitted.input).toMatchObject({ output_dir: join(dataRoot, "companions", id, "states", "idle", take.id), output_name: "finished", key: "#FF00FF", kind: "loop", min_seconds: media.states[0]!.min_seconds, max_seconds: media.states[0]!.max_seconds, colours: ["#CC3322"], max_bytes: media.ship.max_bytes_per_clip });
+    expect(readStates(id).states.idle?.takes[0]?.report).toMatchObject({ ok: true, seconds: 3, bytes: { h264: 123 } }); expect(roots).toBe(0);
+  });
+
+  test("finish requires an approved sheet and keeps the Stack failure message on the take", async () => {
+    const id = companion(), take = addTake(id, "thinking", { source: "upload", label: "thinking" });
+    writeFileSync(takePath(id, "thinking", take.id, "source.mp4")!, "source");
+    const { readLook } = await import("@/lib/companionLook");
+    expect(readLook(id).sheet).toBeNull();
+    await expect(finishTake(id, "thinking", take.id, { alpha: false })).rejects.toMatchObject({ status: 409, message: "Approve the character sheet first, so every clip starts from the same character." });
+    const rest = addVersion(id, new Uint8Array([1]), { source: "upload", label: "rest", width: 1024, height: 1024, from: null }); setRest(id, rest.id);
+    updateSheet(id, { views: { left: null, right: null, mouth: null }, card: { text: "fox", species: "fox", colours: ["#CC3322"] }, key: "#00FF00", state: "needs_review", approved_by: null, approved_at: null }); approveSheet(id, "Author");
+    __setStackClientForTests({ mediaRoots: async () => ({ read: [root], write: [root] }), setMediaRoots: async () => ({ read: [root], write: [root] }), submitJob: async (request: any) => { expect(request.input.key).toBe("none"); return { id: "failed-job", state: "failed", code: "too_short", message: "The clip is too short. Use a longer video." }; } } as never);
+    await expect(finishTake(id, "thinking", take.id, { alpha: true })).rejects.toThrow("too_short: The clip is too short. Use a longer video.");
+    expect(readStates(id).states.thinking?.takes[0]?.failure).toContain("The clip is too short. Use a longer video.");
+    expect(readStates(id).states.thinking?.takes[0]?.report).toBeNull();
   });
 });
