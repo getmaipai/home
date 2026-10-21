@@ -321,9 +321,9 @@ export type CompanionStatus = "draft" | "ready" | "rendering" | "needs_review";
 export interface CompanionEditable {
   id: string; name: string; pronouns: string | null; tagline: string; backstory: string; interests: string[];
   formality: "casual" | "neutral" | "formal"; complexity: "simple" | "standard" | "advanced"; engagement: "brief" | "balanced" | "curious"; filler_density: "none" | "light" | "frequent";
-  behavior: string[]; examples: string[]; examples_child: string[]; examples_teen: string[]; examples_adult: string[]; voice_id: string; look_prompt: string; audience: "adult" | "teen" | "all"; status: CompanionStatus; review: unknown; can_edit: boolean; can_copy: boolean; can_set_audience: boolean;
+  behavior: string[]; examples: string[]; examples_child: string[]; examples_teen: string[]; examples_adult: string[]; voice_id: string; look_prompt: string; audience: "adult" | "teen" | "all"; status: CompanionStatus; review: unknown; can_edit: boolean; can_copy: boolean; can_set_audience: boolean; look: { versions: number; rest: string | null; sheet_state: "empty" | "making" | "needs_review" | "approved" }; states: { approved: number; total: number };
 }
-export type CompanionFields = Partial<Omit<CompanionEditable, "id" | "status" | "review" | "can_edit" | "can_set_audience">>;
+export type CompanionFields = Partial<Omit<CompanionEditable, "id" | "status" | "review" | "can_edit" | "can_set_audience" | "look" | "states">>;
 export interface CompanionList {
   allowed: boolean; can_create: boolean;
   companions: CompanionCard[];
@@ -336,6 +336,23 @@ type CompanionLookKey = `#${"00FF00" | "FF00FF"}`;
 export interface CompanionLookSheet { views: { left: CompanionLookView | null; right: CompanionLookView | null; mouth: CompanionLookView | null }; card: { text: string; colours: string[]; species: string } | null; key: CompanionLookKey; state: "empty" | "making" | "needs_review" | "approved"; approved_by: string | null; approved_at: string | null }
 export interface CompanionLook { versions: CompanionLookVersion[]; rest: string | null; key: CompanionLookKey; sheet: CompanionLookSheet | null; ready_for_video: boolean; can_generate: boolean; generate_reason?: string }
 export interface CompanionLookJob { state: "queued" | "running" | "done" | "failed" | "cancelled"; percent: number; label: string; versions: Array<{ id: string; url: string; label: string }>; error: string | null }
+export interface CompanionStateUrls { h264: string; av1: string; still: string }
+export interface CompanionStateTake {
+  id: string; label: string; source: "generated" | "upload"; created_at: string; ok: boolean | null; reasons: string[];
+  seconds: number | null; bytes: { h264: number; av1: number | null } | null; colour_distance: number | null; area_ratio: number | null;
+  urls: CompanionStateUrls; is_best: boolean;
+}
+export interface CompanionStateRow {
+  id: string; label: string; kind: "loop" | "oneshot"; required: boolean; when_it_plays: string; default_motion: string; motion: string;
+  approved: { take_id: string; approved_by: string | null; approved_at: string | null; urls: CompanionStateUrls } | null;
+  takes: CompanionStateTake[]; busy: boolean;
+}
+export interface CompanionStates {
+  sheet_ready: boolean; key: string; states: CompanionStateRow[]; run: { job: string; label: string; percent: number } | null;
+  counts: { approved: number; total: number; required_missing: string[] };
+}
+export interface CompanionStateRun { state: "queued" | "running" | "done" | "failed" | "cancelled"; label: string; percent: number; current: { state: string; take: number; index: number; of: number } | null; takes_made: number; error: string | null }
+export interface CompanionStateJob { state: "running" | "done" | "failed"; label: string; report?: { ok: boolean; reasons: string[]; seconds: number; bytes: { h264: number; av1: number | null }; colour_distance: number | null; area_ratio: number; loop_gap: number; opaque_share: { min: number; max: number } }; failure?: string }
 
 export type MemoryRecordWithDevice = MemoryRecord & { device_name?: string };
 // ROBOT-CARD-01: the robot's last reported frame plus the hub's derived
@@ -1376,6 +1393,18 @@ export const api = {
   copyCompanion: (id: string) => request<{ id: string }>(`/api/companions/${encodeURIComponent(id)}/copy`, { method: "POST", body: "{}" }),
   editCompanion: (id: string) => request<CompanionEditable>(`/api/companions/${encodeURIComponent(id)}/edit`),
   companionLook: (id: string) => request<CompanionLook>(`/api/companions/${encodeURIComponent(id)}/look`),
+  companionStates: (id: string) => request<CompanionStates>(`/api/companions/${encodeURIComponent(id)}/states`),
+  companionStateFile: (id: string, state: string, take: string, file: string) => `/api/companions/${encodeURIComponent(id)}/states/${encodeURIComponent(state)}/${encodeURIComponent(take)}/${encodeURIComponent(file)}`,
+  setCompanionStateMotion: (id: string, state: string, motion: string | null) => request<{ ok: boolean }>(`/api/companions/${encodeURIComponent(id)}/states/${encodeURIComponent(state)}/motion`, { method: "PUT", body: JSON.stringify({ motion }) }),
+  uploadCompanionState: (id: string, state: string, form: FormData) => request<{ take_id: string }>(`/api/companions/${encodeURIComponent(id)}/states/${encodeURIComponent(state)}/upload`, { method: "POST", body: form }),
+  companionStateJob: (id: string, take: string) => request<CompanionStateJob>(`/api/companions/${encodeURIComponent(id)}/states/jobs/${encodeURIComponent(take)}`),
+  generateCompanionState: (id: string, state: string, body: { count: number; motion?: string }) => request<{ job: string }>(`/api/companions/${encodeURIComponent(id)}/states/${encodeURIComponent(state)}/generate`, { method: "POST", body: JSON.stringify(body) }),
+  generateCompanionStates: (id: string, body: { required_only: boolean; count?: number }) => request<{ job: string }>(`/api/companions/${encodeURIComponent(id)}/states/generate`, { method: "POST", body: JSON.stringify(body) }),
+  companionStateRun: (id: string, job: string) => request<CompanionStateRun>(`/api/companions/${encodeURIComponent(id)}/states/jobs/run/${encodeURIComponent(job)}`),
+  stopCompanionStateRun: (id: string, job: string) => request<void>(`/api/companions/${encodeURIComponent(id)}/states/jobs/run/${encodeURIComponent(job)}`, { method: "DELETE" }),
+  approveCompanionState: (id: string, state: string, take_id: string, force?: boolean) => request<{ approved: string }>(`/api/companions/${encodeURIComponent(id)}/states/${encodeURIComponent(state)}/approve`, { method: "PUT", body: JSON.stringify({ take_id, ...(force ? { force: true } : {}) }) }),
+  removeCompanionStateApproval: (id: string, state: string) => request<{ ok: boolean; note?: string }>(`/api/companions/${encodeURIComponent(id)}/states/${encodeURIComponent(state)}/approve`, { method: "DELETE" }),
+  deleteCompanionStateTake: (id: string, state: string, take: string) => request<void>(`/api/companions/${encodeURIComponent(id)}/states/${encodeURIComponent(state)}/${encodeURIComponent(take)}`, { method: "DELETE" }),
   companionLookImage: (id: string, versionId: string) => `/api/companions/${encodeURIComponent(id)}/look/${encodeURIComponent(versionId)}/image`,
   uploadCompanionLook: (id: string, form: FormData) => request<{ id: string }>(`/api/companions/${encodeURIComponent(id)}/look/upload`, { method: "POST", body: form }),
   setCompanionLookRest: (id: string, version_id: string) => request<{ rest: string; sheet_reset: boolean }>(`/api/companions/${encodeURIComponent(id)}/look/rest`, { method: "PUT", body: JSON.stringify({ version_id }) }),

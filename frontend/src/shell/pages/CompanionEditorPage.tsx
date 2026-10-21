@@ -15,6 +15,7 @@ import { Select } from "@maipai/ui/src/primitives/Select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@maipai/ui/src/ui/tabs";
 import { api, ApiError, type CompanionEditable, type CompanionFields } from "@/lib/api";
 import { CompanionLookTab } from "@/shell/pages/CompanionLookTab";
+import { CompanionStatesTab } from "@/shell/pages/CompanionStatesTab";
 import { playableVoices, previewIdFor, voiceChoices } from "@/lib/voice/voiceBrowserRows";
 import { voicePreviewPlayer, type VoicePreviewState } from "@/lib/voice/voicePreviewPlayer";
 import { useTabItem } from "@/shell/tabIdentity";
@@ -58,7 +59,7 @@ export function CompanionEditorPage() {
     <Link to="/companions" className="text-sm underline">All companions</Link>
     <AsyncState data={isNew ? true : query.isError ? null : companion} error={!isNew && query.isError} isFetching={query.isFetching} onRetry={() => query.refetch()} errorMessage={query.error instanceof ApiError ? query.error.message : "Could not reach Home. Check your connection and try again."} loadingLabel="Loading companion">
       {() => <>
-        <header className="flex flex-wrap items-center gap-3"><h1 className="mr-auto text-2xl font-bold">{form.name || "New companion"}</h1>{companion ? <><Badge>{companion.status === "draft" ? "Draft" : "Ready"}</Badge><Badge>{audienceWords(form.audience)}</Badge></> : null}
+        <header className="flex flex-wrap items-center gap-3"><h1 className="mr-auto text-2xl font-bold">{form.name || "New companion"}</h1>{companion ? <><Badge>{companion.status === "draft" ? "Draft" : "Ready"}</Badge><Badge>{audienceWords(form.audience)}</Badge>{companion.look?.sheet_state === "approved" ? <Badge>Look: Approved</Badge> : null}{companion.states ? <Badge>Clips: {companion.states.approved} of {companion.states.total}</Badge> : null}</> : null}
           {!isNew && companion?.can_copy ? <Button variant="outline" onClick={() => copy.mutate()}>Make a copy</Button> : null}
           {!isNew && companion?.status === "draft" ? <Button onClick={() => status.mutate("ready")}>Mark ready</Button> : null}
           {!isNew && companion?.status === "ready" ? <Button variant="outline" onClick={() => status.mutate("draft")}>Back to draft</Button> : null}
@@ -66,7 +67,7 @@ export function CompanionEditorPage() {
         {companion?.status === "ready" ? <Alert><AlertDescription>People can pick this companion now. Changes you save apply right away.</AlertDescription></Alert> : null}
         {dirty ? <Alert><AlertDescription>You have changes that are not saved</AlertDescription></Alert> : null}
         {mutationError ? <Alert variant="destructive"><AlertDescription>{mutationError}</AlertDescription></Alert> : null}
-        <Tabs value={tab} onValueChange={setTab}><TabsList><TabsTrigger value="identity">Identity</TabsTrigger><TabsTrigger value="voice">Voice and style</TabsTrigger><TabsTrigger value="look">Look</TabsTrigger></TabsList>
+        <Tabs value={tab} onValueChange={setTab}><TabsList><TabsTrigger value="identity">Identity</TabsTrigger><TabsTrigger value="voice">Voice and style</TabsTrigger><TabsTrigger value="look">Look</TabsTrigger><TabsTrigger value="states">States</TabsTrigger></TabsList>
           <TabsContent value="identity"><div className="flex flex-col gap-4"><Section heading="Identity">
             <div className="flex flex-col gap-2"><Label htmlFor="companion-name">Name</Label><Input id="companion-name" aria-label="Name" value={form.name} onChange={(e) => update("name", e.target.value)} /></div>
             <div className="flex flex-col gap-2"><Label htmlFor="companion-pronouns">Pronouns</Label><Input id="companion-pronouns" aria-label="Pronouns" value={form.pronouns ?? ""} onChange={(e) => update("pronouns", e.target.value)} /></div>
@@ -82,6 +83,7 @@ export function CompanionEditorPage() {
             <VoicePicker value={form.voice_id ?? "default"} onChange={(value) => update("voice_id", value)} />
           </Section></div></TabsContent>
           <TabsContent value="look">{isNew ? <EmptyState icon="user" text="Save the companion first, then add its look." /> : <CompanionLookTab id={id!} prompt={form.look_prompt ?? ""} onPromptChange={(value) => update("look_prompt", value)} active={tab === "look"} />}</TabsContent>
+          <TabsContent value="states">{isNew ? <EmptyState icon="inbox" text="Save the companion first, then make its clips." /> : <CompanionStatesTab id={id!} active={tab === "states"} />}</TabsContent>
         </Tabs>
         <footer className="flex flex-wrap gap-2"><Button disabled={!dirty || save.isPending} onClick={() => { setError(""); const fields = Object.fromEntries(Object.entries(form).filter(([field]) => field !== "audience")) as CompanionFields; save.mutate(fields); }}>{savedFlash ? "Saved" : save.isPending ? "Saving" : "Save"}</Button>
           {!isNew && companion?.can_edit ? <Button variant="destructive" onClick={() => setConfirmDelete(true)}>Delete</Button> : null}</footer>
