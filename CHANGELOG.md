@@ -8,6 +8,7 @@ checklist (`docs/dev.md`). The first release is 0.1.0.
 ## [Unreleased]
 
 ### Added
+- Settings, Home, Engines and AI: an Assistant access card. An owner or admin can make a short-lived key that lets an assistant session, such as Claude Code, change a short named list of settings (today: how Home helps the chat remember to search). The key cannot change anything else, ends after 7, 30 or 90 days and can be revoked there (OPS-KEY-01).
 - Companions app: browse the companions you may use, read about each one, play its voice and set your default; admins also see which companion each robot has (COMPANIONS-APP-01).
 
 ### Fixed

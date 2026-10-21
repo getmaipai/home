@@ -121,7 +121,7 @@ export const apiKeys = sqliteTable("api_keys", {
   id: text("id").primaryKey(),
   personId: text("person_id").notNull().references(() => people.id),
   name: text("name").notNull(),
-  scopes: text("scopes", { mode: "json" }).$type<("turn" | "code")[]>().notNull(),
+  scopes: text("scopes", { mode: "json" }).$type<("turn" | "code" | "settings")[]>().notNull(),
   createdAt: text("created_at").notNull(),
   expiresAt: text("expires_at").notNull(),
   revokedAt: text("revoked_at"),

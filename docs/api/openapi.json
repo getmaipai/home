@@ -5558,7 +5558,8 @@
                               "type": "string",
                               "enum": [
                                 "turn",
-                                "code"
+                                "code",
+                                "settings"
                               ]
                             }
                           },
@@ -5692,11 +5693,12 @@
                       "type": "string",
                       "enum": [
                         "turn",
-                        "code"
+                        "code",
+                        "settings"
                       ]
                     },
                     "minItems": 1,
-                    "maxItems": 2
+                    "maxItems": 3
                   },
                   "expires_in_days": {
                     "anyOf": [
@@ -5763,7 +5765,8 @@
                             "type": "string",
                             "enum": [
                               "turn",
-                              "code"
+                              "code",
+                              "settings"
                             ]
                           }
                         },
@@ -6072,7 +6075,8 @@
                               "type": "string",
                               "enum": [
                                 "turn",
-                                "code"
+                                "code",
+                                "settings"
                               ]
                             }
                           },

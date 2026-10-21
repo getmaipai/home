@@ -12,6 +12,7 @@ import { peopleRoutes } from "@/routes/people";
 import { safetyRoutes } from "@/routes/safety";
 import { memoryRoutes } from "@/routes/memory";
 import { settingsRoutes } from "@/routes/settings";
+import { operatorRoutes } from "@/routes/operator";
 import { appsRoutes } from "@/routes/apps";
 import { pluginsRoutes } from "@/routes/plugins";
 import { mediaAppRoutes } from "@/routes/mediaApps";
@@ -199,6 +200,7 @@ app.route("/api/people", peopleRoutes);
 app.route("/api/safety", safetyRoutes);
 app.route("/api/memory", memoryRoutes);
 app.route("/api/settings", settingsRoutes);
+app.route("/api/operator", operatorRoutes);
 app.route("/api/apps", appsRoutes);
 // MEDIA-VIDEOS-01: each media app's own data and action routes come first; any other package falls through to the generic ones.
 for (const { id, routes } of mediaAppRoutes) app.route(`/api/plugins/${id}`, routes);

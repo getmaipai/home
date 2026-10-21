@@ -25,6 +25,7 @@ import { usePackageAreas } from "@/shell/pages/settings/packageAreas";
 import { SettingsSectionContent, beforeSettingChange } from "@/shell/pages/settings/SettingsSectionContent";
 import { SettingsView } from "@/shell/pages/settings/settingsViews";
 import { CodingAdminSettings } from "@/apps/settings/CodingSettings";
+import { AssistantKeysSettings } from "@/apps/settings/AssistantKeysSettings";
 import { baseViewer, packageAreaKeySet, scopeValueFor, visibleRegistry } from "@/shell/pages/settings/settingsViewer";
 import { useSettingsCapabilities } from "@/shell/pages/settings/useSettingsCapabilities";
 import { confirmRouteLeave } from "@/shell/routeLeaveGuard";
@@ -176,7 +177,10 @@ function SettingsAreaBody({ area, packageAreas, person, onPersonChange }: { area
       ? <>{active.view ? <SettingsView view={active.view} person={person} onPersonChange={onPersonChange} /> : null}</>
       : area.id === "home" && active.id === "coding"
         ? <CodingAdminSettings />
-        : <SettingsSectionContent section={active} viewer={viewer} registry={registry} packageKeys={packageKeys} person={person} onPersonChange={onPersonChange} focusKey={focusKey} />;
+        : area.id === "home" && active.id === "ai"
+          // OPS-KEY-01: an owner or admin can make a short-lived key an assistant uses to change a few named settings.
+          ? <><SettingsSectionContent section={active} viewer={viewer} registry={registry} packageKeys={packageKeys} person={person} onPersonChange={onPersonChange} focusKey={focusKey} />{viewer.role === "owner" || viewer.role === "admin" ? <AssistantKeysSettings /> : null}</>
+          : <SettingsSectionContent section={active} viewer={viewer} registry={registry} packageKeys={packageKeys} person={person} onPersonChange={onPersonChange} focusKey={focusKey} />;
   }
 
   const checklistItems = setupChecklist.checklist.data ?? [];

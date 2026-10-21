@@ -54,6 +54,10 @@ Press **Install** to download a part. A bar shows how far it has got, and you ca
 
 If a download stops, the row says why and offers **Try again**. The same item is also in **Repairs**.
 
+### Assistant access
+
+An owner or admin can let an assistant, such as Claude Code, change a few settings for them. Open **Settings**, **Home settings**, **Engines and AI**, and find **Assistant access**. Press **Make an assistant key**, name it, choose how long it lasts (7, 30 or 90 days) and copy the key when Home shows it. Home shows it only once. Give the key to the assistant. It can change only the short list of settings Home allows, today how Home helps the chat remember to search the web, and nothing else: it cannot change people, passwords, safety rules or ages. It stops working on its end date, when you revoke it here, or if the person who made it is no longer an owner or admin.
+
 ### Choosing which chat model answers
 
 An owner or admin can pick the chat model. Open **Settings**, then **AI models**, and look at the **Chat models** card. Each model lists what it is good at and what it costs, plus its size. The one answering now says **In use**. For another model, press **Download** and wait: the progress bar at the top shows it, and the family keeps chatting while it downloads. When it finishes, the button changes to **Use this model**. Press it and Home switches in about a minute. If the model cannot start, the card says why and the old model keeps answering. Your choice stays after a restart. To go back, press **Use this model** on the earlier one.

@@ -324,7 +324,7 @@ settingsRoutes.openapi(apiTokenRevokeRoute, (c) => {
 
 // CODE-KEYS-01: the personal key store (lib/apiKeys.ts). The secret is in the create response only, once.
 const ApiKeySchema = z.object({
-  id: z.string(), person_id: z.string(), name: z.string(), scopes: z.array(z.enum(["turn", "code"])),
+  id: z.string(), person_id: z.string(), name: z.string(), scopes: z.array(z.enum(["turn", "code", "settings"])),
   created_at: z.string(), expires_at: z.string(), revoked_at: z.string().nullable(),
   status: z.enum(["active", "expired", "revoked", "suspended"]),
   suspended_reason: z.string().nullable(),
