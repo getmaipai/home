@@ -59,30 +59,42 @@ export function HouseholdVoicesSection() {
     }
   }
 
-  return <section>
-    <h2 className="text-base font-medium">Voices made at home</h2>
-    <p>Make a voice from a WAV, MP3 or FLAC recording of 6 to 30 seconds. Everyone in the home can pick it, and so can a robot.</p>
-    {voicesQuery.data?.voices.length ? <div className="flex flex-col gap-2">{voicesQuery.data.voices.map((voice) => {
+  const muted = "text-base text-[var(--muted-foreground)]";
+  const field = "flex flex-col gap-1";
+  return <section className="flex flex-col gap-4 border-t border-[var(--border)] pt-6">
+    <div className="flex flex-col gap-1">
+      <h2 className="text-base font-medium">Voices made at home</h2>
+      <p className={muted}>Make a voice from a WAV, MP3 or FLAC recording of 6 to 30 seconds. Everyone in the home can pick it, and so can a robot.</p>
+    </div>
+    {voicesQuery.data?.voices.length ? <ul className="flex flex-col divide-y divide-[var(--border)]">{voicesQuery.data.voices.map((voice) => {
       const testing = preview.voiceId === voice.id;
       const line = settingsLine(voice);
-      return <div key={voice.id} className="flex flex-wrap items-center gap-2">
-        <div><p>{voice.label}</p><p>Made by {voice.creatorName}</p>{line ? <p>{line}</p> : null}</div>
-        <Button type="button" variant="outline" onClick={() => testing ? voicePreviewPlayer.stop() : void voicePreviewPlayer.start(voice.id)}>{testing ? "Stop" : "Test"}</Button>
-        <Button type="button" variant="outline" onClick={() => void deleteVoice(voice.id)}>Delete</Button>
-      </div>;
-    })}</div> : <p>No voices made yet.</p>}
-    {preview.error ? <p role="alert">{preview.error}</p> : null}
-    {error ? <p role="alert">{error}</p> : null}
-    <h3>Make a voice</h3>
-    <form key={fileKey} onSubmit={(event) => void makeVoice(event)}>
-      <div><label htmlFor="household-voice-name">Name</label><Input key={nameKey} id="household-voice-name" maxLength={60} value={name} onChange={(event) => setName(event.target.value)} /></div>
-      <div><label htmlFor="household-voice-recording">Recording</label><Input id="household-voice-recording" type="file" accept=".wav,.mp3,.flac,audio/wav,audio/mpeg,audio/flac" onChange={(event) => setClip(event.target.files?.[0])} /></div>
-      <div><label htmlFor="household-voice-liveliness">Liveliness (optional)</label><Input id="household-voice-liveliness" type="number" min={0.1} max={2} step={0.05} placeholder="Engine default" value={temperature} onChange={(event) => setTemperature(event.target.value)} /><p className="text-sm text-muted-foreground">0.1 to 2. Higher is livelier and also raises the pitch.</p></div>
-      <div><label htmlFor="household-voice-pitch">Pitch (optional)</label><Input id="household-voice-pitch" type="number" min={-12} max={12} step={0.5} placeholder="0" value={pitch} onChange={(event) => setPitch(event.target.value)} /><p className="text-sm text-muted-foreground">Semitones, -12 to 12. A negative number lowers the voice.</p></div>
-      <p>You are responsible for having the right to use this voice.</p>
-      <Button type="submit" disabled={!name.trim() || !clip || busy}>Make voice</Button>
-      {busy ? <><Progress mode="spinner" label="Making the voice" /><p>Making the voice. This can take up to a minute the first time.</p></> : null}
+      return <li key={voice.id} className="flex items-center justify-between gap-3 py-3">
+        <div className="flex min-w-0 flex-1 flex-col">
+          <span className="truncate text-base font-medium">{voice.label}</span>
+          <span className="text-sm text-[var(--muted-foreground)]">Made by {voice.creatorName}{line ? ` · ${line}` : ""}</span>
+        </div>
+        <div className="flex shrink-0 gap-2">
+          <Button type="button" variant="outline" onClick={() => testing ? voicePreviewPlayer.stop() : void voicePreviewPlayer.start(voice.id)}>{testing ? "Stop" : "Test"}</Button>
+          <Button type="button" variant="outline" onClick={() => void deleteVoice(voice.id)}>Delete</Button>
+        </div>
+      </li>;
+    })}</ul> : <p className={muted}>No voices made yet.</p>}
+    {preview.error ? <p role="alert" className="text-base text-[var(--destructive)]">{preview.error}</p> : null}
+    {error ? <p role="alert" className="text-base text-[var(--destructive)]">{error}</p> : null}
+    <form key={fileKey} onSubmit={(event) => void makeVoice(event)} className="flex max-w-sm flex-col gap-4 border-t border-[var(--border)] pt-4">
+      <h3 className="text-base font-medium">Make a voice</h3>
+      <div className={field}><label htmlFor="household-voice-name" className="text-base">Name</label><Input key={nameKey} id="household-voice-name" maxLength={60} value={name} onChange={(event) => setName(event.target.value)} /></div>
+      <div className={field}><label htmlFor="household-voice-recording" className="text-base">Recording</label><Input id="household-voice-recording" type="file" accept=".wav,.mp3,.flac,audio/wav,audio/mpeg,audio/flac" onChange={(event) => setClip(event.target.files?.[0])} /></div>
+      <div className={field}><label htmlFor="household-voice-liveliness" className="text-base">Liveliness (optional)</label><Input id="household-voice-liveliness" type="number" min={0.1} max={2} step={0.05} placeholder="Engine default" value={temperature} onChange={(event) => setTemperature(event.target.value)} /><p className="text-sm text-[var(--muted-foreground)]">0.1 to 2. Higher is livelier and also raises the pitch.</p></div>
+      <div className={field}><label htmlFor="household-voice-pitch" className="text-base">Pitch (optional)</label><Input id="household-voice-pitch" type="number" min={-12} max={12} step={0.5} placeholder="0" value={pitch} onChange={(event) => setPitch(event.target.value)} /><p className="text-sm text-[var(--muted-foreground)]">Semitones, -12 to 12. A negative number lowers the voice.</p></div>
+      <p className={muted}>You are responsible for having the right to use this voice.</p>
+      <div className="flex items-center gap-3">
+        <Button type="submit" disabled={!name.trim() || !clip || busy}>Make voice</Button>
+        {busy ? <Progress mode="spinner" label="Making the voice" /> : null}
+      </div>
+      {busy ? <p className={muted}>Making the voice. This can take up to a minute the first time.</p> : null}
     </form>
-    {status ? <p role="status">{status}</p> : null}
+    {status ? <p role="status" className="text-base text-[var(--primary)]">{status}</p> : null}
   </section>;
 }

@@ -21,12 +21,10 @@ describe("HouseholdVoicesSection", () => {
       voice("voice-two", { label: "Clear voice", creatorName: "Morgan", pitchSemitones: 0 }),
     ]);
     await view.findByText("Warm voice");
-    view.getByText("Made by Taylor");
-    view.getByText("Liveliness 1.2 · Pitch -1 semitones");
+    view.getByText("Made by Taylor · Liveliness 1.2 · Pitch -1 semitones");
     view.getByText("Clear voice");
     view.getByText("Made by Morgan");
     expect(view.queryByText("Pitch 0 semitones")).toBeNull();
-    expect(view.queryByText("Liveliness 1.2 · Pitch -1 semitones")).toBeTruthy();
   });
 
   test("empty list shows its plain empty state", async () => {
