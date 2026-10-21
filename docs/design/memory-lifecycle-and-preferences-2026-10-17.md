@@ -277,3 +277,12 @@ No NEEDS-RULE-CHANGE.
    2026-10-07 ruling). Recommendation: confirm; a parent who needs to see asks the child or uses the child's passcode, as for chats.
 3. The robot pulls the feed per enrolled person with that person's own consent at enrollment, rather than one device-wide
    read of everyone's records. Recommendation: per person.
+
+## 12. Amendment 2026-10-21: coreference in the grounding check (MEM-06-COREF-01)
+
+`citeClause` required every proper noun in a fact to appear in the cited clause. A friend named in a question and then referred to
+by pronoun ("Do you know my friend Dan Campos? ... He plays drums") lost the fact as `unknown_grounding`, and a follow-up question
+found nothing. A noun the cited clause lacks now counts when the clause holds he, she, they, him, her, them, his or their and one of
+the two clauses before it in the same utterance names it. The guard is otherwise unchanged: a name said nowhere is still dropped,
+and the act, stance, subject and number checks, the child-disclosure and sensitivity rules are untouched. The deterministic check
+stays the only gate; no model is in the path. The kept fact is stored as a record about the friend (third-party subject).

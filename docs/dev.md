@@ -17092,7 +17092,10 @@ turns off the 4B.
 
 *Grounding, the clause contract (MEM-06 reads the label).* Every
 proposed fact cites one eligible clause; every proper noun and number
-in it is grounded in that clause (the content-word check stays as the
+in it is grounded in that clause, or, when that clause holds a
+third-person pronoun ("He plays drums"), in either of the two clauses
+just before it in the same utterance (MEM-06-COREF-01, 2026-10-21; a name
+said nowhere never grounds) (the content-word check stays as the
 second gate); the fact's subject matches the clause's `subject`; a
 `reported` clause can produce a record about the named third party or
 a household subject only, never about the speaker, at importance

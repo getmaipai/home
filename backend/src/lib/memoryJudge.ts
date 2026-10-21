@@ -669,6 +669,8 @@ export function rejectPassing(
   return { kept, dropped };
 }
 
+const THIRD_PERSON_RE = /\b(he|she|they|him|her|them|his|their)\b/i;
+
 /** MEM-06 (c): ground each extracted fact in the eligible clause it came
  * from. For every fact, find the eligible clause (inform/commissive with
  * stance asserted or reported) whose text shares the most content words
@@ -717,12 +719,17 @@ export function citeClause(
         continue;
       }
     }
+    const factIsThirdParty = fact.subject !== null && fact.subject.name.toLowerCase() !== speakerName.toLowerCase();
     let bestEligible: { clause: SignalClause; shared: number } | null = null;
     for (const clause of eligible) {
       const clauseText = userText.slice(clause.range.start, clause.range.end);
       const clauseWords = contentWords(clauseText);
       const shared = content.filter((w) => clauseWords.has(w)).length;
-      if (!bestEligible || shared > bestEligible.shared) bestEligible = { clause, shared };
+      // A tie goes to the clause whose subject kind agrees with the fact's
+      // (checked after), so "Jesse plays guitar" cites "I play guitar", not
+      // the equally matching "He plays drums".
+      const agrees = (c: SignalClause) => (c.subject === null || c.subject.kind === "speaker") === !factIsThirdParty;
+      if (!bestEligible || shared > bestEligible.shared || (shared === bestEligible.shared && agrees(clause) && !agrees(bestEligible.clause))) bestEligible = { clause, shared };
     }
     if (!bestEligible || bestEligible.shared === 0) {
       dropped.push({ fact, reason: "ineligible_act" });
@@ -732,14 +739,23 @@ export function citeClause(
     const clauseLower = clauseText.toLowerCase();
     const properNouns = properNounsIn(fact.text).filter((w) => !skip.has(w));
     const numbers = [...fact.text.matchAll(/\d+/g)].map((m) => m[0]!).filter((n) => n !== year);
+    // MEM-06 (c) coreference: "Do you know my friend Dan Campos? ... He
+    // plays drums" grounds "Dan Campos plays drums" in the clause with the
+    // pronoun, which never repeats the name. A proper noun the cited clause
+    // lacks still counts when one of the two clauses just before it (same
+    // utterance only) names it AND the cited clause holds a third-person
+    // pronoun that can point back. A name said nowhere stays ungrounded.
+    const citedAt = signal.clauses.indexOf(bestEligible.clause);
+    const lookBack = THIRD_PERSON_RE.test(clauseText)
+      ? signal.clauses.slice(Math.max(0, citedAt - 2), Math.max(0, citedAt)).map((c) => userText.slice(c.range.start, c.range.end).toLowerCase())
+      : [];
     const allPresent =
-      properNouns.every((w) => clauseLower.includes(w)) &&
+      properNouns.every((w) => clauseLower.includes(w) || lookBack.some((t) => t.includes(w))) &&
       numbers.every((n) => clauseLower.includes(n));
     if (!allPresent) {
       dropped.push({ fact, reason: "unknown_grounding" });
       continue;
     }
-    const factIsThirdParty = fact.subject !== null && fact.subject.name.toLowerCase() !== speakerName.toLowerCase();
     const clauseIsSpeaker = bestEligible.clause.subject?.kind === "speaker" || bestEligible.clause.subject === null;
     if (factIsThirdParty !== !clauseIsSpeaker) {
       dropped.push({ fact, reason: "subject_mismatch" });

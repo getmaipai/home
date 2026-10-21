@@ -1388,6 +1388,80 @@ describe("ACT-01: the judge's queue is keyed on the stored signal", () => {
     expect(db.select().from(memoryRecords).where(eq(memoryRecords.source, turn.id)).all()).toEqual([]);
   });
 
+  const DAN_TURN = "Do you know my friend Dan Campos? I used to work with him and we used to play music together. He plays drums and I play guitar.";
+  const danFact = (text: string, subject: { name: string; kind: "person" } | null = null) => ({ text, category: "fact", scope: "person", importance: 0.5, ...(subject ? { subject } : {}) });
+
+  test("coreference: 'He plays drums' grounds 'Dan Campos plays drums' in the name said one clause earlier; the friend is stored as a third party and recalled", async () => {
+    const { actor } = await owner();
+    const turn = makeSignalledTurn(actor, DAN_TURN, "I don't think I know him yet. Tell me about Dan.", "model");
+    expect(turn.judgeStatus).toBeNull();
+    const dan = { name: "Dan Campos", kind: "person" as const };
+    const result = await withScriptedJudge(
+      () => ({ facts: [
+        danFact("Dan Campos plays drums", dan),
+        danFact("Marlow plays guitar"),
+        danFact("Marlow used to work with Dan Campos", dan),
+        danFact("Marlow and Dan Campos used to play music together", dan),
+      ] }),
+      async () => judgeTurn(turn),
+    );
+    expect(result.ok).toBe(true);
+    const rows = db.select().from(memoryRecords).where(eq(memoryRecords.source, turn.id)).all();
+    expect(rows.map((r) => r.text).sort()).toEqual([
+      "Dan Campos plays drums",
+      "Marlow and Dan Campos used to play music together",
+      "Marlow plays guitar",
+      "Marlow used to work with Dan Campos",
+    ]);
+    // Dan is a third party: his facts hang on his own subject, not on Marlow.
+    const drums = rows.find((r) => r.text === "Dan Campos plays drums")!;
+    const guitar = rows.find((r) => r.text === "Marlow plays guitar")!;
+    expect(drums.subjectId).not.toBeNull();
+    expect(guitar.subjectId).toBeNull();
+    // Recall by the follow-up question finds the friend's record.
+    const recalled = recall(actor, "Tell me about my friend Dan Campos", { bumpUsage: false });
+    expect(recalled.some((m) => m.record.text.includes("Dan Campos"))).toBe(true);
+  });
+
+  test("coreference does not widen the guard: a name said nowhere, a name more than two clauses back, no pronoun, or a hypothetical/quoted clause still drops", async () => {
+    const { citeClause, turnDateFor } = await import("@/lib/memoryJudge");
+    const date = turnDateFor(new Date(2026, 9, 21, 12).toISOString());
+    const f = (text: string, name: string) => ({ text, category: "fact" as const, scope: "person" as const, robot_memory: "shared" as const, importance: 0.5, valid_from: null, valid_to: null, subject: { name, kind: "person" as const }, relation: null });
+    // Hand-built clauses, one per sentence of `text`, with the given act and stance.
+    const signalOf = (text: string, shape: { act: "inform" | "question"; stance: "asserted" | "hypothetical" | "quoted" }[]) => {
+      const parts = text.split(/(?<=[.?]) /);
+      let at = 0;
+      const clauses = parts.map((part, i) => {
+        const range = { start: at, end: at + part.length };
+        at += part.length + 1;
+        return { range, act: shape[i]!.act, stance: shape[i]!.stance, subject: { kind: "household" as const }, emotion: "neutral" as const, emotion_intensity: "none" as const, confidence: 0.9 };
+      });
+      return { ...classifyTurnSignal({ text, ageBand: "adult" }), clauses } as ReturnType<typeof classifyTurnSignal>;
+    };
+    const ask = { act: "question" as const, stance: "asserted" as const };
+    const tell = { act: "inform" as const, stance: "asserted" as const };
+    // A name that appears nowhere in the utterance is dropped.
+    const stranger = citeClause([f("Ruth Lindqvist plays drums", "Ruth Lindqvist")], classifyTurnSignal({ text: DAN_TURN, ageBand: "adult" }), DAN_TURN, "Marlow", date);
+    expect(stranger.kept).toEqual([]);
+    expect(stranger.dropped[0]!.reason).toBe("unknown_grounding");
+    // Two clauses back is inside the window; three is not.
+    const two = "Do you know my friend Dan Campos? Ok. He plays drums.";
+    expect(citeClause([f("Dan Campos plays drums", "Dan Campos")], signalOf(two, [ask, tell, tell]), two, "Marlow", date).kept.length).toBe(1);
+    const three = "Do you know my friend Dan Campos? Ok. Fine. He plays drums.";
+    const far = citeClause([f("Dan Campos plays drums", "Dan Campos")], signalOf(three, [ask, tell, tell, tell]), three, "Marlow", date);
+    expect(far.kept).toEqual([]);
+    expect(far.dropped[0]!.reason).toBe("unknown_grounding");
+    // No third-person pronoun in the cited clause: nothing points back.
+    const plain = "Do you know my friend Dan Campos? The drummer plays drums.";
+    const noPronoun = citeClause([f("Dan Campos plays drums", "Dan Campos")], signalOf(plain, [ask, tell]), plain, "Marlow", date);
+    expect(noPronoun.dropped[0]!.reason).toBe("unknown_grounding");
+    // A hypothetical or quoted pronoun clause still writes nothing (the drop reason is the existing check's).
+    const hyp = "Do you know my friend Dan Campos? If he played drums I would cheer.";
+    expect(citeClause([f("Dan Campos plays drums", "Dan Campos")], signalOf(hyp, [ask, { act: "inform", stance: "hypothetical" }]), hyp, "Marlow", date).kept).toEqual([]);
+    const quo = "Do you know my friend Dan Campos? My sister says he plays drums.";
+    expect(citeClause([f("Dan Campos plays drums", "Dan Campos")], signalOf(quo, [ask, { act: "inform", stance: "quoted" }]), quo, "Marlow", date).kept).toEqual([]);
+  });
+
   test("on read, a signal with no eligible clause skips the turn even if its status was cleared", async () => {
     const { actor } = await owner();
     const closing = makeSignalledTurn(actor, "thanks, that's all for tonight", "Good night.", "model");
