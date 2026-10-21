@@ -5,6 +5,8 @@ import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { resetDb } from "./reset-db";
 import { __resetRateLimiterForTests } from "@/lib/rateLimiter";
 import { __resetAnswerImageFetchForTests, libraryImageUrl } from "@/lib/answerImages/fetch";
+import { answerImagesCacheDir, clearAnswerImageCacheForTests } from "@/lib/answerImages/cache";
+import { rmSync } from "node:fs";
 import { __setAnswerImageDepsForTests, selectAnswerImages } from "@/lib/answerImages/select";
 import type { LibraryImage } from "@/lib/retrieval/referenceReader";
 import type { AgeBand } from "@/lib/ageBand";
@@ -30,6 +32,9 @@ beforeEach(() => {
 });
 afterEach(() => {
   __setAnswerImageDepsForTests(null);
+  clearAnswerImageCacheForTests();
+  // The cache index is persistent and shared by the answer-image tests that assume an empty one.
+  rmSync(answerImagesCacheDir, { recursive: true, force: true });
   unregisterSidecar(KIWIX_SIDECAR_ID);
 });
 
