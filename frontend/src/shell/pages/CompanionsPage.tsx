@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Link, useParams } from "react-router-dom";
+import { Link, useNavigate, useParams } from "react-router-dom";
 import { AsyncState } from "@maipai/ui/src/primitives/AsyncState";
 import { EmptyState } from "@maipai/ui/src/primitives/EmptyState";
 import { Section } from "@maipai/ui/src/primitives/Section";
@@ -32,6 +32,8 @@ function CompanionBody({ card }: { card: CompanionCard }) {
       </div>
       <div className="flex flex-wrap justify-center gap-2">
         <Badge>{card.type_label}</Badge>
+        {card.is_household ? <Badge>Made at home</Badge> : null}
+        {card.status === "draft" ? <Badge>Draft</Badge> : null}
         {card.is_default ? <Badge>Your default</Badge> : null}
       </div>
       <ul className="flex list-none flex-col gap-1 p-0 text-sm text-muted-foreground">
@@ -61,6 +63,7 @@ export function CompanionsPage() {
       >
         {(data: CompanionList) => (
           <>
+            {data.can_create ? <div><Link to="/companions/new"><Button>New companion</Button></Link></div> : null}
             {!data.allowed ? (
               <EmptyState icon="user" text="Companions are turned off for you. Ask an owner or admin to turn them on." />
             ) : data.companions.length === 0 ? (
@@ -127,6 +130,8 @@ export function CompanionDetailPage() {
 
 function DetailBody({ companion }: { companion: CompanionDetail }) {
   const queryClient = useQueryClient();
+  const navigate = useNavigate();
+  const copy = useMutation({ mutationFn: () => api.copyCompanion(companion.id), onSuccess: (result) => { void queryClient.invalidateQueries({ queryKey: listKey }); navigate(`/companions/${encodeURIComponent(result.id)}/edit`); } });
   const save = useMutation({
     mutationFn: () => api.setDefaultCompanion(companion.id),
     onSuccess: () => { void queryClient.invalidateQueries({ queryKey: listKey }); },
@@ -141,9 +146,12 @@ function DetailBody({ companion }: { companion: CompanionDetail }) {
           <p className="text-muted-foreground">{companion.tagline}</p>
           <div className="flex flex-wrap gap-2"><Badge>{companion.type_label}</Badge>{saved ? <Badge>Your default</Badge> : null}</div>
         </div>
+        {companion.can_edit ? <Link to={`/companions/${encodeURIComponent(companion.id)}/edit`}><Button type="button" variant="outline">Edit</Button></Link> : null}
+        {companion.can_copy ? <Button type="button" variant="outline" disabled={copy.isPending} onClick={() => copy.mutate()}>Make a copy</Button> : null}
         <Button type="button" disabled={saved || save.isPending} onClick={() => save.mutate()}>{saved ? "Your default" : "Set as my default"}</Button>
       </div>
       {save.isError ? <Alert variant="destructive"><AlertDescription>{save.error instanceof ApiError ? save.error.message : "Could not save this. Check your connection and try again."}</AlertDescription></Alert> : null}
+      {copy.isError ? <Alert variant="destructive"><AlertDescription>{copy.error instanceof ApiError ? copy.error.message : "Could not reach Home. Check your connection and try again."}</AlertDescription></Alert> : null}
       <Section heading="About">
         <p>{companion.about}</p>
         {companion.pronouns ? <p className="text-sm text-muted-foreground">Pronouns: {companion.pronouns}</p> : null}

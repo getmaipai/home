@@ -12,7 +12,7 @@ function card(overrides: Partial<CompanionCard> = {}): CompanionCard {
   return {
     id: "lively-child", name: "Sprout", type: "child", type_label: "Child companion", tagline: "A cheerful friend.", who_can_use: "Anyone in the family, including kids.",
     dials: [{ label: "How it talks", value: "Talks like a friend." }, { label: "Word choice", value: "Short, simple words." }, { label: "Questions back", value: "Asks you things back and wants to know more." }, { label: "Casual chatter", value: "A few casual words." }],
-    voice: "The voice you chose in Settings", is_default: false, ...overrides,
+    voice: "The voice you chose in Settings", is_default: false, is_household: false, status: "ready", can_edit: false, can_copy: false, ...overrides,
   };
 }
 function detail(overrides: Partial<CompanionDetail> = {}): CompanionDetail {
@@ -24,32 +24,36 @@ function open(path: string) {
   return render(<QueryClientProvider client={client}><MemoryRouter initialEntries={[path]}><Routes><Route path="/companions" element={<CompanionsPage />} /><Route path="/companions/:id" element={<CompanionDetailPage />} /></Routes></MemoryRouter></QueryClientProvider>);
 }
 
-test("the gallery shows each card with its type, line and dials in words", async () => {
-  api.companions = async (): Promise<CompanionList> => ({ allowed: true, companions: [card(), card({ id: "lively-teen", name: "Riff", type: "teen", type_label: "Teen companion", is_default: true })], robots: null });
+test("the gallery shows cards and create and household status badges", async () => {
+  api.companions = async (): Promise<CompanionList> => ({ allowed: true, can_create: true, companions: [card({ is_household: true, status: "draft" }), card({ id: "lively-teen", name: "Riff", type: "teen", type_label: "Teen companion", is_default: true })], robots: null });
   const view = open("/companions");
   await waitFor(() => expect(view.getByText("Sprout")).toBeTruthy());
   expect(view.getByText("Child companion")).toBeTruthy();
   expect(view.getByText("Teen companion")).toBeTruthy();
   expect(view.getAllByText("Short, simple words.").length).toBe(2);
   expect(view.getByText("Your default")).toBeTruthy();
+  expect(view.getByRole("link", { name: "New companion" }).getAttribute("href")).toBe("/companions/new");
+  expect(view.getByText("Made at home")).toBeTruthy();
+  expect(view.getByText("Draft")).toBeTruthy();
   expect(view.queryByText("Robots")).toBeNull();
 });
 
 test("an admin sees which companion each robot has, with a link to its settings", async () => {
-  api.companions = async (): Promise<CompanionList> => ({ allowed: true, companions: [card()], robots: [{ id: "d1", name: "StackChan", controls: "child", companion_id: "lively-child", companion_name: "Sprout" }] });
+  api.companions = async (): Promise<CompanionList> => ({ allowed: true, can_create: false, companions: [card()], robots: [{ id: "d1", name: "StackChan", controls: "child", companion_id: "lively-child", companion_name: "Sprout" }] });
   const view = open("/companions");
   await waitFor(() => expect(view.getByText(/StackChan: Sprout/)).toBeTruthy());
   expect(view.getByRole("link", { name: "Companion settings" }).getAttribute("href")).toBe("/settings/home/robot");
 });
 
 test("when companions are off for the person the page says so", async () => {
-  api.companions = async (): Promise<CompanionList> => ({ allowed: false, companions: [], robots: null });
+  api.companions = async (): Promise<CompanionList> => ({ allowed: false, can_create: false, companions: [], robots: null });
   const view = open("/companions");
   await waitFor(() => expect(view.getByText(/turned off for you/)).toBeTruthy());
 });
 
-test("the detail shows the about text, dials, examples and voice, and Set as my default saves", async () => {
-  api.companion = async () => detail();
+test("the detail shows edit and copy actions where allowed", async () => {
+  api.companion = async () => detail({ can_edit: true, can_copy: true });
+  api.copyCompanion = async () => ({ id: "copy-id" });
   const saved: string[] = [];
   api.setDefaultCompanion = async (id) => { saved.push(id); return { default_id: id }; };
   const view = open("/companions/lively-child");
@@ -57,6 +61,8 @@ test("the detail shows the about text, dials, examples and voice, and Set as my 
   expect(view.getByText("Talks like a friend.")).toBeTruthy();
   expect(view.getByText(/Wow, a slushie/)).toBeTruthy();
   expect(view.getByRole("button", { name: "Play a sample" })).toBeTruthy();
+  expect(view.getByRole("link", { name: "Edit" }).getAttribute("href")).toBe("/companions/lively-child/edit");
+  expect(view.getByRole("button", { name: "Make a copy" })).toBeTruthy();
   expect(view.queryByText("Who uses it")).toBeNull();
   fireEvent.click(view.getByRole("button", { name: "Set as my default" }));
   await waitFor(() => expect(saved).toEqual(["lively-child"]));

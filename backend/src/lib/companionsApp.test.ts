@@ -3,7 +3,7 @@ import { join } from "node:path";
 import { rmSync } from "node:fs";
 import { db } from "@/db";
 import { people } from "@/db/schema";
-import { listCompanionCards } from "@/lib/companionsApp";
+import { canCreateCompanion, listCompanionCards } from "@/lib/companionsApp";
 import { createHouseholdCompanion, setHouseholdCompanionStatus } from "@/lib/householdCompanions";
 import { loadManifestOnly } from "@/lib/plugins";
 import { __reloadPersonasForTests } from "@/lib/persona";
@@ -18,6 +18,14 @@ beforeEach(() => { resetDb(); rmSync(root, { recursive: true, force: true }); __
 afterEach(() => { resetDb(); rmSync(root, { recursive: true, force: true }); __reloadPersonasForTests(); });
 
 describe("companion app cards", () => {
+  test("only adults and admins may create companions", () => {
+    addPerson("person-adult-create", "adult"); addPerson("person-teen-create", "teen"); addPerson("person-child-create", "child"); addPerson("person-admin-create", "admin");
+    const rows = db.select().from(people).all();
+    expect(canCreateCompanion(rows.find((row) => row.id === "person-adult-create")!)).toBe(true);
+    expect(canCreateCompanion(rows.find((row) => row.id === "person-teen-create")!)).toBe(false);
+    expect(canCreateCompanion(rows.find((row) => row.id === "person-child-create")!)).toBe(false);
+    expect(canCreateCompanion(rows.find((row) => row.id === "person-admin-create")!, true)).toBe(true);
+  });
   test("ready household companions are listed with household status; the author sees their draft", () => {
     addPerson("person-adult06", "adult");
     const loaded = loadManifestOnly("rivet"); if (!loaded.ok || !loaded.value.companion) throw new Error("rivet fixture is unavailable");

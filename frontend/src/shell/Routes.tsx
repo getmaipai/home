@@ -49,6 +49,7 @@ import { useTourRunner } from "@/shell/useTourRunner";
 const FamilyPage = lazyNamed(() => import("@/shell/pages/FamilyPage"), "FamilyPage");
 const CompanionsPage = lazyNamed(() => import("@/shell/pages/CompanionsPage"), "CompanionsPage");
 const CompanionDetailPage = lazyNamed(() => import("@/shell/pages/CompanionsPage"), "CompanionDetailPage");
+const CompanionEditorPage = lazyNamed(() => import("@/shell/pages/CompanionEditorPage"), "CompanionEditorPage");
 const ProjectsPage = lazyNamed(() => import("@/shell/pages/ProjectsPage"), "ProjectsPage");
 const PersonProfilePage = lazyNamed(() => import("@/shell/pages/PersonProfilePage"), "PersonProfilePage");
 const StoragePage = lazyNamed(() => import("@/shell/pages/StoragePage"), "StoragePage");
@@ -284,6 +285,8 @@ function RoutesWithIncognito({ person, onPersonChange, onSignedOut }: { person: 
           <Route element={<PageHeaderLayout />}>
             <Route index element={<DashboardPage person={person} />} />
             <Route path="companions" element={<CompanionsPage />} />
+            <Route path="companions/new" element={<CompanionEditorPage />} />
+            <Route path="companions/:id/edit" element={<CompanionEditorPage />} />
             <Route path="companions/:id" element={<CompanionDetailPage />} />
             <Route path="people" element={<FamilyPage person={person} />} />
             <Route path="people/:id" element={<PersonProfilePage person={person} onPersonChange={onPersonChange} />} />

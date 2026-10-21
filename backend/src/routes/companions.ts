@@ -6,7 +6,7 @@ import { createRoute, z } from "@hono/zod-openapi";
 import { apiRouter, errorResponses, idParamSchema } from "@/lib/openapi";
 import { requireAuth } from "@/middleware/auth";
 import { isOwnerOrAdmin } from "@/lib/access";
-import { companionDetail, companionAreaOn, listCompanionCards, mayUseCompanion, pickRefusal, robotAssignments } from "@/lib/companionsApp";
+import { companionDetail, companionAreaOn, canCreateCompanion, listCompanionCards, mayUseCompanion, pickRefusal, robotAssignments } from "@/lib/companionsApp";
 import { publishSettingsChanged } from "@/lib/deviceCommands";
 import { setValue } from "@/lib/settings";
 import { speakerAgeBand } from "@/lib/ageBand";
@@ -24,7 +24,7 @@ export const companionsRoutes = apiRouter();
 const Type = z.enum(["child", "teen", "adult"]);
 const Card = z.object({
   id: z.string(), name: z.string(), type: Type, type_label: z.string(), tagline: z.string(), who_can_use: z.string(),
-  dials: z.array(z.object({ label: z.string(), value: z.string() })), voice: z.string(), is_default: z.boolean(), is_household: z.boolean(), status: z.string(),
+  dials: z.array(z.object({ label: z.string(), value: z.string() })), voice: z.string(), is_default: z.boolean(), is_household: z.boolean(), status: z.string(), can_edit: z.boolean(), can_copy: z.boolean(),
 });
 const Detail = Card.extend({
   about: z.string(), pronouns: z.string().nullable(), interests: z.array(z.string()), examples: z.array(z.string()),
@@ -37,7 +37,7 @@ const listRoute = createRoute({
   middleware: [requireAuth] as const,
   responses: {
     200: { content: { "application/json": { schema: z.object({
-      allowed: z.boolean().describe("False when an owner or admin turned companions off for this person."),
+      allowed: z.boolean().describe("False when an owner or admin turned companions off for this person."), can_create: z.boolean(),
       companions: z.array(Card),
       robots: z.array(z.object({ id: z.string(), name: z.string(), controls: Type, companion_id: z.string(), companion_name: z.string().nullable() })).nullable(),
     }) } }, description: "My companions. The robots list is for owners and admins only." },
@@ -46,7 +46,8 @@ const listRoute = createRoute({
 });
 companionsRoutes.openapi(listRoute, (c) => {
   const person = c.get("person");
-  return c.json({ allowed: companionAreaOn(person), companions: listCompanionCards(person, isOwnerOrAdmin(person)), robots: isOwnerOrAdmin(person) ? robotAssignments() : null }, 200);
+  const admin = isOwnerOrAdmin(person);
+  return c.json({ allowed: companionAreaOn(person), can_create: canCreateCompanion(person, admin), companions: listCompanionCards(person, admin).map((card) => ({ ...card, can_edit: card.is_household && mayEdit(person, card.id), can_copy: canCreateCompanion(person, admin) })), robots: admin ? robotAssignments() : null }, 200);
 });
 
 const detailRoute = createRoute({
@@ -62,7 +63,8 @@ companionsRoutes.openapi(detailRoute, (c) => {
   const person = c.get("person");
   const persona = PERSONAS.find((candidate) => candidate.id === c.req.valid("param").id);
   if (!persona || !mayUseCompanion(person, persona)) return c.json({ error: "No such companion" }, 404);
-  return c.json(companionDetail(person, persona, isOwnerOrAdmin(person)), 200);
+  const detail = companionDetail(person, persona, isOwnerOrAdmin(person));
+  return c.json({ ...detail, can_edit: detail.is_household && mayEdit(person, detail.id), can_copy: speakerAgeBand(person, new Date()) === "adult" || isOwnerOrAdmin(person) }, 200);
 });
 
 const defaultRoute = createRoute({
@@ -143,7 +145,7 @@ const editRoute = createRoute({ method: "get", path: "/{id}/edit", tags: ["Compa
 companionsRoutes.openapi(editRoute, (c) => {
   const actor = c.get("person"), id = c.req.valid("param").id, manifest = getHouseholdCompanion(id);
   if (!manifest?.companion || !mayEdit(actor, id)) return c.json({ error: "No companion you can edit." }, 404);
-  return c.json({ id, ...manifest.companion, name: manifest.companion.display_name, audience: manifest.companion.audience ?? "adult", status: manifest.companion.status ?? "ready", review: manifest.companion.review ?? null, can_edit: true, can_set_audience: isOwnerOrAdmin(actor) }, 200);
+  return c.json({ id, ...manifest.companion, name: manifest.companion.display_name, audience: manifest.companion.audience ?? "adult", status: manifest.companion.status ?? "ready", review: manifest.companion.review ?? null, can_edit: true, can_copy: speakerAgeBand(actor, new Date()) === "adult" || isOwnerOrAdmin(actor), can_set_audience: isOwnerOrAdmin(actor) }, 200);
 });
 
 const updateRoute = createRoute({ method: "put", path: "/{id}", tags: ["Companions"], summary: "Edit a household companion", middleware: [requireAuth] as const,

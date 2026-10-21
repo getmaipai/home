@@ -46,6 +46,7 @@ describe("household companion routes", () => {
     }
     const response = await request("companions", adult, "POST", { ...fixture(), display_name: "New pal" });
     expect(response.status).toBe(201);
+    const list = await request("companions", adult); expect((await list.json() as { can_create: boolean }).can_create).toBe(true);
     const { id } = await response.json() as { id: string };
     const stored = await (await import("@/lib/householdCompanions")).getHouseholdCompanion(id);
     expect(stored?.companion).toMatchObject({ audience: "adult", status: "draft" });

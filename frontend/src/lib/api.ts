@@ -311,14 +311,21 @@ export interface RobotCompanionInfo {
 /** COMPANIONS-APP-01: GET /api/companions and /api/companions/{id} (backend/src/routes/companions.ts). */
 export interface CompanionCard {
   id: string; name: string; type: "child" | "teen" | "adult"; type_label: string; tagline: string; who_can_use: string;
-  dials: Array<{ label: string; value: string }>; voice: string; is_default: boolean;
+  dials: Array<{ label: string; value: string }>; voice: string; is_default: boolean; is_household: boolean; status: string; can_edit: boolean; can_copy: boolean;
 }
 export interface CompanionDetail extends CompanionCard {
   about: string; pronouns: string | null; interests: string[]; examples: string[]; voice_value: string; voice_is_own: boolean; voice_setting: string | null;
   used_by: { people: Array<{ id: string; name: string }>; robots: Array<{ id: string; name: string }> } | null;
 }
+export type CompanionStatus = "draft" | "ready" | "rendering" | "needs_review";
+export interface CompanionEditable {
+  id: string; name: string; pronouns: string | null; tagline: string; backstory: string; interests: string[];
+  formality: "casual" | "neutral" | "formal"; complexity: "simple" | "standard" | "advanced"; engagement: "brief" | "balanced" | "curious"; filler_density: "none" | "light" | "frequent";
+  behavior: string[]; examples: string[]; examples_child: string[]; examples_teen: string[]; examples_adult: string[]; voice_id: string; audience: "adult" | "teen" | "all"; status: CompanionStatus; review: unknown; can_edit: boolean; can_copy: boolean; can_set_audience: boolean;
+}
+export type CompanionFields = Partial<Omit<CompanionEditable, "id" | "status" | "review" | "can_edit" | "can_set_audience">>;
 export interface CompanionList {
-  allowed: boolean;
+  allowed: boolean; can_create: boolean;
   companions: CompanionCard[];
   robots: Array<{ id: string; name: string; controls: "child" | "teen" | "adult"; companion_id: string; companion_name: string | null }> | null;
 }
@@ -1353,6 +1360,12 @@ export const api = {
   companions: () => request<CompanionList>("/api/companions"),
   companion: (id: string) => request<CompanionDetail>(`/api/companions/${encodeURIComponent(id)}`),
   setDefaultCompanion: (id: string) => request<{ default_id: string }>(`/api/companions/${encodeURIComponent(id)}/default`, { method: "PUT" }),
+  createCompanion: (fields: CompanionFields) => request<{ id: string }>("/api/companions", { method: "POST", body: JSON.stringify(fields) }),
+  copyCompanion: (id: string) => request<{ id: string }>(`/api/companions/${encodeURIComponent(id)}/copy`, { method: "POST", body: "{}" }),
+  editCompanion: (id: string) => request<CompanionEditable>(`/api/companions/${encodeURIComponent(id)}/edit`),
+  updateCompanion: (id: string, fields: CompanionFields) => request<{ id: string }>(`/api/companions/${encodeURIComponent(id)}`, { method: "PUT", body: JSON.stringify(fields) }),
+  setCompanionStatus: (id: string, status: "draft" | "ready") => request<{ id: string }>(`/api/companions/${encodeURIComponent(id)}/status`, { method: "PUT", body: JSON.stringify({ status }) }),
+  deleteCompanion: (id: string) => request<void>(`/api/companions/${encodeURIComponent(id)}`, { method: "DELETE" }),
   mediaSearch: (q: string) => request<MediaSearch>(`/api/media/search?q=${encodeURIComponent(q)}`),
   // MEDIA-VIDEOS-01: one data id of a package app (POST /api/plugins/:id/data/:dataId), and one media item's record (the owning app of a
   // `/media/<id>` link is read from its kind).

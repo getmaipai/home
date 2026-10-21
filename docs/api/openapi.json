@@ -52527,6 +52527,9 @@
                       "type": "boolean",
                       "description": "False when an owner or admin turned companions off for this person."
                     },
+                    "can_create": {
+                      "type": "boolean"
+                    },
                     "companions": {
                       "type": "array",
                       "items": {
@@ -52584,6 +52587,12 @@
                           },
                           "status": {
                             "type": "string"
+                          },
+                          "can_edit": {
+                            "type": "boolean"
+                          },
+                          "can_copy": {
+                            "type": "boolean"
                           }
                         },
                         "required": [
@@ -52597,7 +52606,9 @@
                           "voice",
                           "is_default",
                           "is_household",
-                          "status"
+                          "status",
+                          "can_edit",
+                          "can_copy"
                         ]
                       }
                     },
@@ -52641,6 +52652,7 @@
                   },
                   "required": [
                     "allowed",
+                    "can_create",
                     "companions",
                     "robots"
                   ]
@@ -52898,6 +52910,12 @@
                     "status": {
                       "type": "string"
                     },
+                    "can_edit": {
+                      "type": "boolean"
+                    },
+                    "can_copy": {
+                      "type": "boolean"
+                    },
                     "about": {
                       "type": "string"
                     },
@@ -52987,6 +53005,8 @@
                     "is_default",
                     "is_household",
                     "status",
+                    "can_edit",
+                    "can_copy",
                     "about",
                     "pronouns",
                     "interests",
