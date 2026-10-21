@@ -15,6 +15,7 @@
 // reply), never an invented answer.
 import type { AgeBand } from "@/lib/ageBand";
 import { kiwixBaseUrl } from "@/lib/kiwixSidecar";
+import { extractArticleImages } from "@/lib/retrieval/articleImages";
 import { extractArticle } from "@/lib/retrieval/extractArticle";
 import { sharedKnowledgeDb, type KnowledgeDb } from "@/lib/retrieval/knowledgeDb";
 import { articleFloorText, releaseToBand, tripsMinorFloor, type ReferenceRow, type ReleaseCandidate } from "@/lib/retrieval/minorFloor";
@@ -463,5 +464,75 @@ export async function resolveReferenceTitle(input: { title: string; band: AgeBan
   } catch (err) {
     if (err instanceof Unavailable) return null;
     throw err;
+  }
+}
+
+/** ZIM-IMG-01: one picture from the matching article of every readable
+ * library book, for the show_images library leg. */
+export type LibraryImage = {
+  book: string;
+  imagePath: string;
+  articlePath: string;
+  articleTitle: string;
+  sourceId: string;
+  sourceLabel: string;
+  licence: string;
+  alt: string;
+  caption: string;
+  lead: boolean;
+};
+
+/** ZIM-IMG-01: pictures from the article matching `title` in every readable
+ * library book (not only Wikipedia), through the same closed per-band list,
+ * the same extract cache and the one release point as a lookup. Returns `[]`
+ * on any error or when the library is not running. Lead images come first,
+ * then the rest, in book order; the total is capped at `limit ?? 6`. */
+export async function libraryArticleImages(input: { title: string; band: AgeBand; leadOnly?: boolean; limit?: number }, deps: ReferenceReaderDeps = {}): Promise<LibraryImage[]> {
+  const term = input.title.trim();
+  const baseUrl = deps.baseUrl === undefined ? kiwixBaseUrl() : deps.baseUrl;
+  if (!baseUrl || term.length === 0) return [];
+  const ctx: Ctx = { baseUrl: baseUrl.replace(/\/+$/, ""), fetchImpl: deps.fetch ?? fetch, now: deps.now ?? Date.now, signal: AbortSignal.timeout(TOTAL_DEADLINE_MS) };
+  const db = deps.db === undefined ? sharedKnowledgeDb() : deps.db;
+  try {
+    const { books, excluded } = readableBooks(await installedBooks(ctx), input.band);
+    if (excluded > 0) bumpReferenceCounter("source_excluded", input.band, excluded);
+    if (books.length === 0) return [];
+    const { picks } = await pickByTitle(ctx, books, term, { maxRows: books.length, band: input.band, exactOnly: true });
+    const results: LibraryImage[] = [];
+    for (const pick of picks) {
+      try {
+        const candidate = await readArticle(ctx, db, pick.rb, pick.hit);
+        if (!candidate) continue;
+        const rows = releaseToBand([candidate], input.band, 1);
+        const row = rows[0];
+        if (!row || row.disambiguation) continue;
+        const { status, text } = await getText(ctx, `/content/${encodeURIComponent(pick.rb.book)}/${encodePath(pick.hit.path)}`);
+        if (status !== 200) continue;
+        const images = extractArticleImages(text, { book: pick.rb.book, articlePath: pick.hit.path, limit: input.leadOnly ? 1 : 6 });
+        for (const img of images) {
+          if (input.leadOnly && !img.lead) continue;
+          results.push({
+            book: pick.rb.book,
+            imagePath: img.imagePath,
+            articlePath: pick.hit.path,
+            articleTitle: row.title,
+            sourceId: pick.rb.source.id,
+            sourceLabel: pick.rb.source.label,
+            licence: licenceLabel(pick.rb.source.licence),
+            alt: img.alt,
+            caption: img.caption,
+            lead: img.lead,
+          });
+        }
+      } catch {
+        // one unreadable book does not fail the others
+      }
+    }
+    if (results.length > 0) bumpReferenceCounter("image_k_hit", input.band);
+    const lead = results.filter((r) => r.lead);
+    const rest = results.filter((r) => !r.lead);
+    return [...lead, ...rest].slice(0, input.limit ?? 6);
+  } catch {
+    return [];
   }
 }

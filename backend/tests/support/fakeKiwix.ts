@@ -19,6 +19,8 @@ export interface FakeBook {
   searchSnippet?: string;
   /** Articles by path, e.g. "Juniper_Falls". */
   articles: Record<string, FakeArticle>;
+  /** Book-local image files by path, e.g. "I/cat.jpg". */
+  images?: Record<string, { type: string; bytes: Uint8Array }>;
 }
 
 export interface FakeKiwix {
@@ -77,6 +79,13 @@ export function startFakeKiwix(initial: FakeBook[]): FakeKiwix {
       if (raw) {
         const book = books.find((b) => b.id === decodeURIComponent(raw[1]!));
         return book?.date ? new Response(book.date) : new Response("not found", { status: 404 });
+      }
+      const rawImage = /^\/raw\/([^/]+)\/(.+)$/.exec(url.pathname);
+      if (rawImage) {
+        const book = books.find((b) => b.id === decodeURIComponent(rawImage[1]!));
+        const key = decodeURIComponent(rawImage[2]!);
+        const img = book?.images?.[key];
+        return img ? new Response(img.bytes, { headers: { "content-type": img.type } }) : new Response("not found", { status: 404 });
       }
       return new Response("not found", { status: 404 });
     },
