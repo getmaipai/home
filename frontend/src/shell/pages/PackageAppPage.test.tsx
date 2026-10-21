@@ -38,6 +38,19 @@ const indexPage = {
   ],
 };
 const weekPage = { type: "page", id: "week", title: "Week", body: [{ type: "empty_state", icon: "calendar", text: "The week ahead is quiet." }] };
+const musicRow: AppRow = {
+  package: "music",
+  page: "index",
+  label: "Music",
+  icon: "music",
+  description: "A fixture music app.",
+  category: "Media",
+  keywords: [],
+  sections: [],
+  to: "/apps/music",
+  incognito: "unaffected",
+};
+const musicIndexPage = { type: "page", id: "index", title: "Music", body: [{ type: "empty_state", icon: "music", text: "No music yet." }] };
 
 let home: HomeFixture;
 let rows: AppRow[];
@@ -54,6 +67,7 @@ beforeEach(() => {
     if (url.startsWith("/api/apps")) return Promise.resolve(Response.json(rows));
     if (url.startsWith("/api/plugins/demo/pages/index")) return Promise.resolve(rows.length ? Response.json(indexPage) : Response.json({ error: "no such app" }, { status: 404 }));
     if (url.startsWith("/api/plugins/demo/pages/week")) return Promise.resolve(Response.json(weekPage));
+    if (url.startsWith("/api/plugins/music/pages/index")) return Promise.resolve(Response.json(musicIndexPage));
     if (url.startsWith("/api/plugins/other/pages/")) return Promise.resolve(Response.json({ error: "no such app" }, { status: 404 }));
     if (url.startsWith("/api/plugins/demo/pages/")) return Promise.resolve(Response.json({ error: "no such page" }, { status: 404 }));
     if (url.startsWith("/api/plugins/demo/data/places")) return Promise.resolve(Response.json({ as_of: "x", rows: [{ id: "pl1", label: "Cabin" }] }));
@@ -175,5 +189,23 @@ describe("a package app at /apps/<id>", () => {
     await act(async () => { fireEvent.click(button); });
     await waitFor(() => expect(home.puts.some((p) => p.key === "ui.pinned_apps" && p.value === JSON.stringify(["/apps/demo"]))).toBe(true));
     await view.findByRole("button", { name: "Remove from favorites" });
+  });
+});
+
+describe("a media app is drawn inside the Media hub", () => {
+  test("a media app at /apps/music has the media hub frame and its column lists Music", async () => {
+    rows = [musicRow];
+    const view = open("/apps/music");
+    const frame = await view.findByTestId("media-hub-frame");
+    await waitFor(() => {
+      const links = frame.querySelectorAll('[data-slot="section-sidebar"] a[href^="/apps/"]');
+      expect([...links].some((link) => link.textContent === "Music")).toBe(true);
+    });
+  });
+
+  test("a non-media app at /apps/demo has no media hub frame", async () => {
+    const view = open("/apps/demo");
+    await waitFor(() => expect(view.container.querySelector('[data-slot="weather-card"]')).not.toBeNull());
+    expect(view.queryByTestId("media-hub-frame")).toBeNull();
   });
 });

@@ -18,6 +18,7 @@ import { appHomeLabel, isMediaApp, isMediaPlayPage, playPageOf, usesFamilyHeader
 import { useMediaDock } from "@/shell/mediaHost";
 import { SectionSidebar } from "@maipai/ui/src/primitives/SectionSidebar";
 import { useAppSidebar } from "@/shell/useAppSidebar";
+import { MediaHubFrame } from "@/shell/MediaHubFrame";
 
 const PAGE_FRESH_MS = 5 * 60_000;
 
@@ -168,12 +169,13 @@ export function PackageAppPage({ person }: { person: Roster }) {
   );
   // NEWS-SIDEBAR-01: an app that declares a sidebar gets its own column beside the content from wide screens up (the kit's one
   // section sidebar); its section tabs give way to it there, and a phone keeps them.
-  return sidebarProps ? (
+  const framed = sidebarProps ? (
     <div className="flex min-h-0 flex-1" data-workspace-fill="" data-slot="package-app-frame" data-testid="package-app-frame">
       <SectionSidebar standalone density="compact" title={app?.label} headerActions={app ? <AppColumnActions person={person} to={app.to} label={app.label} settingsArea={app.settings_area?.id} /> : undefined} {...sidebarProps} />
       {content}
     </div>
   ) : content;
+  return media ? <MediaHubFrame packageId={packageId}>{framed}</MediaHubFrame> : framed;
 }
 
 /** COLUMN-UNIFY-01 (owner, 2026-10-19): the app's settings and favorite controls sit in the column's header, after its title, the way
