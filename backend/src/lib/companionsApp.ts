@@ -13,6 +13,7 @@ import { companionsAllowed } from "@/lib/companions";
 import { getHouseholdSettingValue, getPersonSettingValue } from "@/lib/settings";
 import { companionVoiceKey } from "@/settings/companionVoiceKeys";
 import { voiceForSpeech } from "@/lib/voiceForSpeech";
+import { getHouseholdCompanion, householdCompanionAuthorId, listHouseholdCompanionIds } from "@/lib/householdCompanions";
 import type { PersonRow } from "@/types";
 
 const FORMALITY: Record<Persona["formality"], string> = {
@@ -55,6 +56,8 @@ export interface CompanionCard {
   dials: Dial[];
   voice: string;
   is_default: boolean;
+  is_household: boolean;
+  status: string;
 }
 export interface CompanionDetail extends CompanionCard {
   about: string;
@@ -81,7 +84,7 @@ function dialsOf(persona: Persona): Dial[] {
 
 function manifestOf(id: string) {
   const loaded = loadManifestOnly(id);
-  return loaded.ok && loaded.value.kind === "companion" ? loaded.value : null;
+  return loaded.ok && loaded.value.kind === "companion" ? loaded.value : getHouseholdCompanion(id);
 }
 
 /** The person's chosen companion id. A choice the person's type no longer allows reads as the plain default, like the turn does. */
@@ -108,6 +111,7 @@ function voiceLabel(value: string, own: boolean): string {
 
 export function cardOf(person: PersonRow, persona: Persona): CompanionCard {
   const manifest = manifestOf(persona.id);
+  const household = Boolean(getHouseholdCompanion(persona.id));
   const own = Boolean(manifest?.companion?.voice_id);
   return {
     id: persona.id,
@@ -119,12 +123,28 @@ export function cardOf(person: PersonRow, persona: Persona): CompanionCard {
     dials: dialsOf(persona),
     voice: voiceLabel(manifest?.companion?.voice_id ?? "", own),
     is_default: currentCompanionId(person) === persona.id,
+    is_household: household,
+    status: manifest?.companion?.status ?? "ready",
   };
 }
 
-export function listCompanionCards(person: PersonRow): CompanionCard[] {
+export function listCompanionCards(person: PersonRow, admin = false): CompanionCard[] {
   if (!companionAreaOn(person)) return [];
-  return PERSONAS.filter((persona) => mayUseCompanion(person, persona)).map((persona) => cardOf(person, persona));
+  const cards = PERSONAS.filter((persona) => mayUseCompanion(person, persona)).map((persona) => cardOf(person, persona));
+  const seen = new Set(cards.map((card) => card.id));
+  if (admin || speakerAgeBand(person, new Date()) === "adult") {
+    for (const id of listHouseholdCompanionIds()) {
+      if (seen.has(id)) continue;
+      const manifest = getHouseholdCompanion(id);
+      if (!manifest?.companion || manifest.companion.status !== "draft") continue;
+      if (!admin && householdCompanionAuthorId(id) !== person.id) continue;
+      const c = manifest.companion;
+      cards.push({ id, name: c.display_name, type: "adult", type_label: TYPE_LABEL.adult, tagline: c.tagline ?? "", who_can_use: WHO_CAN_USE.adult,
+        dials: [{ label: "How it talks", value: FORMALITY[c.formality] }, { label: "Word choice", value: COMPLEXITY[c.complexity] }, { label: "Questions back", value: ENGAGEMENT[c.engagement] }, { label: "Casual chatter", value: FILLER[c.filler_density] }],
+        voice: voiceLabel(c.voice_id ?? "", Boolean(c.voice_id)), is_default: false, is_household: true, status: "draft" });
+    }
+  }
+  return cards;
 }
 
 export function companionDetail(person: PersonRow, persona: Persona, admin: boolean): CompanionDetail {
@@ -132,7 +152,7 @@ export function companionDetail(person: PersonRow, persona: Persona, admin: bool
   const spec = manifest?.companion;
   const chosen = getHouseholdSettingValue(companionVoiceKey(persona.id));
   const householdVoice = typeof chosen === "string" && chosen && chosen !== "default" ? chosen : null;
-  const ownVoice = spec?.voice_id ?? householdVoice ?? undefined;
+  const ownVoice = householdVoice ?? spec?.voice_id ?? undefined;
   const voiceValue = voiceForSpeech({ actor: person, ...(ownVoice ? { companionVoice: ownVoice } : {}) });
   return {
     ...cardOf(person, persona),

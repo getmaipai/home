@@ -25,6 +25,7 @@ import { describeSetting } from "@maipai/spec/interpreters/ts/describeSetting.js
 import type { PersonRow } from "@/types";
 import { newEntityId } from "@/lib/id";
 import { assertCanWriteSelfService, isLayeredScalar, isSelfService, resolveLayeredScalar } from "@/lib/layeredScalar";
+import { PERSONAS } from "@/lib/persona";
 
 const HOUSEHOLD_HOME_KEY = "household.home";
 const COMPANIONS_ALLOWED_KEY = "companions.allowed";
@@ -200,6 +201,10 @@ function validateSelectorValue(keyDef: SettingsKey, value: unknown): SettingsOpR
       break;
     case "select": {
       const options = range?.options as unknown[] | undefined;
+      if (keyDef.key === "persona.active_id") {
+        if (typeof value !== "string" || !PERSONAS.some((persona) => persona.id === value)) return { ok: false, status: 400, error: "Choose a companion that is ready on this Home." };
+        break;
+      }
       // Engine model choices are populated by the Stack's live model
       // inventory, so the shared declaration names an options_from source
       // instead of copying a static enum into Home. "auto" is the stable
