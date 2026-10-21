@@ -138,7 +138,8 @@ export const PERSONAS: readonly Persona[] = loadPersonaCatalog();
 
 /** Tests that add or remove a companion package re-read the catalog in place (the array every importer already holds). */
 export function __reloadPersonasForTests(): void {
-  (PERSONAS as Persona[]).splice(0, PERSONAS.length, ...loadPersonaCatalog());
+  // An id already loaded keeps its object, so DEFAULT_PERSONA and anything else holding one stays the catalog's entry.
+  (PERSONAS as Persona[]).splice(0, PERSONAS.length, ...loadPersonaCatalog().map((fresh) => PERSONAS.find((known) => known.id === fresh.id) ?? fresh));
 }
 
 // Fails loudly, right here, rather than letting a `!`-asserted
