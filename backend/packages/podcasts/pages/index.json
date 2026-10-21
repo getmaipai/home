@@ -80,7 +80,6 @@
           "aspect": "square",
           "variant": "plain",
           "orientation": "vertical",
-          "hide_when_empty": true,
           "see_all": {
             "label": "See all",
             "action": {
@@ -93,6 +92,11 @@
             "play": {
               "media_id": "{id}"
             }
+          },
+          "empty_state": {
+            "type": "empty_state",
+            "icon": "mic",
+            "text": "No new episodes. An admin can add a show with Settings, then Podcasts."
           }
         }
       ],
@@ -130,11 +134,7 @@
               }
             }
           },
-          "empty_state": {
-            "type": "empty_state",
-            "icon": "mic",
-            "text": "No shows yet. An admin can add a show with Settings, then Podcasts."
-          }
+          "hide_when_empty": true
         }
       ]
     }
