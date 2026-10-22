@@ -107,8 +107,11 @@ test("an admin picks the companion's voice and it saves to the household setting
   api.setSetting = (async (scope: string, key: string, value: unknown) => { saved.push([scope, key, value]); return {} as never; }) as typeof api.setSetting;
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   const view = render(<QueryClientProvider client={client}><MemoryRouter initialEntries={["/companions/lively-child"]}><Routes><Route path="/companions/:id" element={<CompanionDetailPage />} /></Routes></MemoryRouter></QueryClientProvider>);
-  await waitFor(() => expect(view.getByLabelText("Voice for this companion")).toBeTruthy());
+  const picker = await view.findByLabelText("Voice for this companion");
   expect(saved).toEqual([]);
+  fireEvent.click(picker);
+  fireEvent.click(await view.findByRole("option", { name: "Alba" }));
+  await waitFor(() => expect(saved).toEqual([["household", "companion.voice.lively_child", "alba"]]));
 });
 
 test("a person who is not an admin gets no voice picker", async () => {
