@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, test } from "bun:test";
 import { app } from "@/app";
-import { codingClientLater, getSetupState, getStorageChoice } from "@/lib/setupState";
+import { codingClientLater, getSetupState, getStorageChoice, setupCodingChoice, SETUP_STEP_IDS } from "@/lib/setupState";
 import { db } from "@/db";
 import { setupState } from "@/db/schema";
 import { mkdtempSync, realpathSync } from "node:fs";
@@ -15,10 +15,13 @@ beforeEach(() => {
   __clearSessionCacheForTests();
 });
 
-test("coding mode setup choice defaults to false and reads the wizard's saved choice", () => {
+test("coding mode setup choice defaults to unset and reads the wizard's saved choice", () => {
   expect(codingClientLater()).toBe(false);
-  db.insert(setupState).values({ slot: 1, value: JSON.stringify({ coding_client_later: true }) }).run();
+  expect(setupCodingChoice()).toBeUndefined();
+  db.insert(setupState).values({ slot: 1, value: JSON.stringify({ coding_choice: "later" }) }).run();
   expect(codingClientLater()).toBe(true);
+  expect(setupCodingChoice()).toBe("later");
+  expect(SETUP_STEP_IDS).toEqual(["welcome","engine_location","storage","checks","plan","away","owner","face","profile","hello","backup_key","done"]);
 });
 
 const result = (status = "done") => ({ status });

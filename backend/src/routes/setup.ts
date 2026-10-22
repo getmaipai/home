@@ -20,10 +20,10 @@ import { setupFolderRoutes } from "@/routes/setupFolders";
 import { setupHostTuneRoutes } from "@/routes/setupHostTune";
 import { getCookie } from "hono/cookie";
 import { SetupState } from "@maipai/spec/gen/ts/setup-state.js";
-import { resolveHumanSession } from "@/middleware/auth";
+import { resolveHumanSession, requireRole } from "@/middleware/auth";
 import { validateProposedPath } from "@/lib/folderBrowse";
 import { checkPlacement } from "@/lib/placement";
-import { getSetupState, PRE_OWNER_STEPS, replaceSetupStep, SETUP_STEP_IDS, type SetupStepId } from "@/lib/setupState";
+import { getSetupState, PRE_OWNER_STEPS, replaceSetupStep, SETUP_STEP_IDS, setSetupCodingChoice, type SetupStepId } from "@/lib/setupState";
 import { db } from "@/db";
 import { people } from "@/db/schema";
 import { runSetupChecks, healthItems, webSearchNeedsSetup } from "@/setup/checks/checks";
@@ -37,6 +37,8 @@ import { adoptLicenceAck } from "@/lib/licenceAcceptance";
 import { acceptLicences, licenceOverview, widenLicenceAck } from "@/lib/licenceFlow";
 import { setHouseholdSettingValue } from "@/lib/settings";
 import { REMOTE_ALLOW_TAILNET_KEY, refreshConfiguredEngineLink, validateRemoteEngineSetting } from "@/lib/remoteStackSettings";
+import { codingModeReadiness } from "@/lib/codingMode";
+import { listCodingPieces, installCodingPiece, type CodingPieceId } from "@/lib/stackCodingPieces";
 
 // A person on the household's own LAN hits this a handful of times while
 // working through the trust step, never dozens of times a second - the
@@ -55,6 +57,56 @@ setupRoutes.use("*", setupLocalOnly);
 setupRoutes.route("/", setupFolderRoutes);
 // HOST-TUNE-01: the Mac tuning step; also before the catch-all.
 setupRoutes.route("/", setupHostTuneRoutes);
+
+const codingChoiceBody = z.object({ choice: z.enum(["set_up", "later"]) }).strict();
+const setupCodingPieceSchema = z.object({ id: z.string(), label: z.string(), size_bytes: z.number().nullable(), state: z.enum(["installed", "installing", "notInstalled", "failed", "unsupported"]) });
+const setupCodingRoute = createRoute({ method:"get", path:"/coding", tags:["Setup"], summary:"The coding screen in the setup wizard", middleware:[requireRole("owner","admin")] as const,
+  responses:{200:{content:{"application/json":{schema:z.object({eligible_mode:z.boolean(),pieces:z.array(setupCodingPieceSchema),total_bytes:z.number(),readiness:z.unknown()})}},description:"Coding setup choices and current readiness."}, ...errorResponses({401:"Not signed in",403:"Admins only"})} });
+setupRoutes.openapi(setupCodingRoute, async c => {
+  const [plan, listed, readiness] = await Promise.all([previewPlan(), listCodingPieces(), codingModeReadiness()]);
+  const eligible = (plan.plan as {tier?:string|null} | null)?.tier === "p128";
+  const byId = new Map(listed.pieces.map(piece => [piece.id, piece]));
+  const ids: CodingPieceId[] = ["engine","model","draft", ...(eligible ? ["heavy_model","heavy_draft"] as const : [])];
+  const pieces = ids.flatMap(id => {
+    const piece = byId.get(id);
+    return piece ? [{id,label:piece.label,size_bytes:piece.size_bytes,state:piece.state}] : [];
+  });
+  return c.json({eligible_mode:eligible,pieces,total_bytes:pieces.reduce((sum,piece) => sum + (piece.state === "installed" ? 0 : piece.size_bytes ?? 0),0),readiness},200);
+});
+
+const setupCodingChoiceRoute = createRoute({ method:"post", path:"/coding", tags:["Setup"], summary:"Choose the recommended coding setup or do it later", middleware:[requireRole("owner","admin")] as const,
+  request:{body:{content:{"application/json":{schema:codingChoiceBody}}}},
+  responses:{200:{content:{"application/json":{schema:z.object({ok:z.literal(true),choice:z.literal("later")})}},description:"The person chose to do this later."},202:{content:{"application/json":{schema:z.object({ok:z.literal(true),choice:z.literal("set_up"),pieces:z.array(z.object({id:z.string(),state:z.string()}))})}},description:"The recommended downloads were started."},409:{content:{"application/json":{schema:z.object({error:z.string()})}},description:"Setup is not available or the disk plan does not fit."},...errorResponses({400:"The setting could not be saved",401:"Not signed in",403:"Admins only"})} });
+setupRoutes.openapi(setupCodingChoiceRoute, async c => {
+  if (!db.select({id:people.id}).from(people).limit(1).get()) return c.json({error:"Create the Home owner first."},409);
+  const {choice} = c.req.valid("json");
+  if (choice === "later") {
+    setSetupCodingChoice("later");
+    return c.json({ok:true as const,choice:"later" as const},200);
+  }
+  const plan = await previewPlan();
+  if (plan.wording.diskLine) return c.json({error:plan.wording.diskLine},409);
+  const saved = setHouseholdSettingValue("coding.enabled",true);
+  if (!saved.ok) return c.json({error:saved.error},saved.status);
+  setSetupCodingChoice("set_up");
+  const eligible = (plan.plan as {tier?:string|null} | null)?.tier === "p128";
+  const listed = await listCodingPieces();
+  const ids: CodingPieceId[] = ["engine","model","draft", ...(eligible ? ["heavy_model","heavy_draft"] as const : [])];
+  const outcomes: Array<{id:CodingPieceId;state:string}> = [];
+  const started = new Set<CodingPieceId>();
+  for (const id of ids) {
+    const piece = listed.pieces.find(candidate => candidate.id === id);
+    if (!piece) continue;
+    let state = piece.state;
+    if (piece.can_install) {
+      try { await installCodingPiece(id); state = "installing"; started.add(id); }
+      catch { /* The Stack's own piece state remains visible for the person to retry. */ }
+    }
+    if (id === "draft" && started.has("model") && state === "notInstalled") state = "installing";
+    outcomes.push({id,state});
+  }
+  return c.json({ok:true as const,choice:"set_up" as const,pieces:outcomes},202);
+});
 
 const checksRoute = createRoute({
   method: "post", path: "/checks/run", tags: ["Setup"], summary: "Run setup checks and persist their health items",

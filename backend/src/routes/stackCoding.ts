@@ -9,7 +9,7 @@ import { CodingPieceError, installCodingPiece, listCodingPieces, removeCodingPie
 
 export const stackCodingRoutes = apiRouter();
 
-const PieceId = z.enum(["engine", "model", "draft"]);
+const PieceId = z.enum(["engine", "model", "draft", "heavy_model", "heavy_draft"]);
 const PieceSchema = z.object({
   id: PieceId, name: z.string().describe("What the Stack runs or stores: splash, llama-server or the model id."), label: z.string(), summary: z.string(),
   state: z.enum(["installed", "installing", "notInstalled", "failed", "unsupported"]),
@@ -66,4 +66,16 @@ stackCodingRoutes.openapi(modeRoute, async c => {
   const readiness = await codingModeReadiness();
   try { const mode = await getStackClient().getCodingMode(); return c.json({ readiness, mode:mode.mode, state:mode.state, reason:mode.reason },200); }
   catch { return c.json({ readiness, mode:null, state:null, reason:"Home could not reach the AI engine." },200); }
+});
+
+const selfTestRoute = createRoute({ method:"post", path:"/mode/self-test", tags:["Coding"], summary:"Ask the AI engine to test the coding model", middleware:[requireRole("owner","admin")] as const,
+  responses:{ 202:{ content:{"application/json":{schema:z.object({accepted:z.literal(true)})}},description:"The Stack accepted the test."}, 409:{content:{"application/json":{schema:z.object({error:z.string()})}},description:"The Stack refused the test in plain words."}, 503:{content:{"application/json":{schema:z.object({error:z.string()})}},description:"The AI engine is not answering."}, ...errorResponses({401:"Not signed in",403:"Admins only"}) } });
+stackCodingRoutes.openapi(selfTestRoute, async c => {
+  try {
+    await getStackClient().runCodingModeSelfTest();
+    return c.json({ accepted:true as const },202);
+  } catch (error) {
+    if (error instanceof Error && "status" in error && (error as {status?:number}).status === 409) return c.json({ error:error.message },409);
+    return c.json({ error:"Home could not reach the AI engine." },503);
+  }
 });

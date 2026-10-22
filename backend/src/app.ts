@@ -252,6 +252,9 @@ app.route("/api/setup", setupRoutes);
 app.route("/api/install", installRoutes);
 app.route("/api/components", componentsRoutes);
 app.route("/api/coding-setup", stackCodingRoutes);
+// Public API name introduced with coding mode. Keep the earlier settings
+// path mounted for clients already using /api/coding-setup.
+app.route("/api/coding", stackCodingRoutes);
 app.route("/api/setup-checklist", setupChecklistRoutes);
 app.route("/api/tailscale", tailscaleRoutes);
 app.route("/api/devices", devicesRoutes);

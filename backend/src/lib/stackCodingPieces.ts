@@ -18,7 +18,7 @@ import { installStackComponent, listStackComponents, StackComponentError, uninst
 import { raiseIssue, registerFixHandler, resolveIssue } from "@/lib/issues";
 import { resetInstallStatusCache } from "@/lib/installStatus";
 
-export type CodingPieceId = "engine" | "model" | "draft";
+export type CodingPieceId = "engine" | "model" | "draft" | "heavy_model" | "heavy_draft";
 export interface CodingPiece {
   id: CodingPieceId;
   /** What the Stack runs or stores: `splash`, `llama-server` or the model id. */
@@ -61,6 +61,7 @@ export interface CodingStack {
   catalog(): Promise<Array<{ id: string; role: string; component?: string; download?: { approx_bytes?: number } }>>;
   jobs(): Promise<StackJob[]>;
   components(): Promise<StackComponent[]>;
+  tier?(): Promise<string | null>;
   installEngine(name: string): Promise<{ job: string | null }>;
   removeEngineBuild(name: string, tag: string): Promise<void>;
   installComponent(id: string): Promise<{ job: string | null }>;
@@ -81,6 +82,7 @@ const realStack: CodingStack = {
   catalog: async () => { const body = await getStackClient().modelCatalog(); return Array.isArray(body.models) ? body.models as never : []; },
   jobs: () => getStackClient().jobs(),
   components: async () => (await listStackComponents()).components,
+  tier: async () => (await listStackComponents()).tier,
   installEngine: async (name) => { const res = await getStackClient().engineAction(name, "install"); return { job: typeof res.job === "string" ? res.job : null }; },
   removeEngineBuild: async (name, tag) => {
     const client = getStackClient();
@@ -102,9 +104,9 @@ function activeJob(jobs: StackJob[], kind: string, matches: (job: StackJob) => b
   return jobs.filter((job) => job.kind === kind && matches(job)).sort((a, b) => b.createdAt.localeCompare(a.createdAt))[0];
 }
 
-/** Everything the three pieces say, read live from the Stack. Throws what the Stack throws. */
+/** Everything the coding pieces say, read live from the Stack. Throws what the Stack throws. */
 async function readPieces(): Promise<{ engine: "splash" | "llama-server"; pieces: CodingPiece[] }> {
-  const [roles, engines, models, catalog, jobs, components] = await Promise.all([stack.roles(), stack.engines(), stack.models(), stack.catalog(), stack.jobs().catch(() => [] as StackJob[]), stack.components()]);
+  const [roles, engines, models, catalog, jobs, components, tier] = await Promise.all([stack.roles(), stack.engines(), stack.models(), stack.catalog(), stack.jobs().catch(() => [] as StackJob[]), stack.components(), stack.tier?.().catch(() => null) ?? Promise.resolve(null)]);
   const coding = roles.find((role) => role.id === "coding")?.coding;
   const splash = engines.find((engine) => engine.name === SPLASH && engine.matchesThisMachine);
   const llama = engines.find((engine) => engine.name === LLAMA && engine.matchesThisMachine) ?? engines.find((engine) => engine.name === LLAMA);
@@ -135,8 +137,8 @@ async function readPieces(): Promise<{ engine: "splash" | "llama-server"; pieces
   }
 
   // The model, with the draft that installs and goes with it.
-  const modelPin = catalog.find((pin) => pin.role === "coding" && !pin.component);
-  const draftPin = catalog.find((pin) => pin.role === "coding" && pin.component === "draft");
+  const modelPin = catalog.find((pin) => pin.role === "coding" && !pin.component && pin.id !== "ornith-1-5-122b-mlx-4bit");
+  const draftPin = catalog.find((pin) => pin.role === "coding" && pin.component === "draft" && pin.id !== "ornith-1-5-122b-dflash2-draft");
   const component = modelPin ? components.find((row) => row.id === modelPin.id) : undefined;
   const record = (id: string | undefined) => (id ? models.find((model) => model.id === id) : undefined);
   const modelRecord = record(modelPin?.id);
@@ -157,16 +159,46 @@ async function readPieces(): Promise<{ engine: "splash" | "llama-server"; pieces
       can_remove: component.can_uninstall && !on, remove_block: on && component.can_uninstall ? CODING_ON_REFUSAL : component.uninstall_block,
     });
   }
-  if (draftPin && wantsSplash && splash) {
+  if (draftPin) {
     const draftRecord = record(draftPin.id);
     const installed = draftRecord?.state === "installed";
     const modelRow = pieces.find((piece) => piece.id === "model")!;
     pieces.push({
       id: "draft", name: draftPin.id, label: "Coding draft for Splash", summary: "A small helper model that lets Splash write faster. It installs and is removed with the coding model.",
-      state: installed ? "installed" : modelRow.state === "installing" ? "installing" : modelRow.state === "unsupported" ? "unsupported" : "notInstalled",
+      state: !wantsSplash || !splash ? "unsupported" : installed ? "installed" : modelRow.state === "installing" ? "installing" : modelRow.state === "unsupported" ? "unsupported" : "notInstalled",
       size_bytes: draftRecord?.sizeBytes ?? draftPin.download?.approx_bytes ?? null, percent: modelRow.state === "installing" ? modelRow.percent : null, failure: null,
-      can_install: false, install_block: "It installs with the coding model.", can_remove: false, remove_block: "It is removed with the coding model.",
+      can_install: false, install_block: !wantsSplash || !splash ? "This computer uses llama-server, which does not use a coding draft." : "It installs with the coding model.", can_remove: false, remove_block: "It is removed with the coding model.",
     });
+  }
+  const heavyAvailable = tier === "p128";
+  if (heavyAvailable) {
+    const heavyModelPin = catalog.find((pin) => pin.id === "ornith-1-5-122b-mlx-4bit");
+    const heavyDraftPin = catalog.find((pin) => pin.id === "ornith-1-5-122b-dflash2-draft");
+    const heavyDraftComponent = heavyDraftPin && components.find((row) => row.id === heavyDraftPin.id);
+    const heavyComponent = heavyModelPin && components.find((row) => row.id === heavyModelPin.id);
+    const heavyRecord = record(heavyModelPin?.id);
+    if (!heavyModelPin || !heavyComponent) {
+      pieces.push({ id: "heavy_model", name: "ornith-1-5-122b-mlx-4bit", label: "Heavy coding model", summary: "The larger model for coding on a 128 GB Home.", state: "unsupported", size_bytes: heavyModelPin?.download?.approx_bytes ?? null, percent: null, failure: null, can_install: false, install_block: "The Stack does not offer this coding model on this computer.", can_remove: false, remove_block: "It is not installed." });
+    } else {
+      const installed = heavyComponent.state === "installed";
+      pieces.push({ id: "heavy_model", name: heavyModelPin.id, label: heavyComponent.label, summary: heavyComponent.summary,
+        state: heavyComponent.requirement === "unsupported" && !installed ? "unsupported" : heavyComponent.state,
+        size_bytes: heavyRecord?.sizeBytes ?? heavyModelPin.download?.approx_bytes ?? heavyComponent.size_bytes ?? heavyComponent.download_bytes ?? null,
+        percent: heavyComponent.state === "installing" ? heavyComponent.percent : null, failure: heavyComponent.state === "failed" ? heavyComponent.failure : null,
+        can_install: heavyComponent.can_install, install_block: heavyComponent.install_block,
+        can_remove: heavyComponent.can_uninstall && !on, remove_block: on && heavyComponent.can_uninstall ? CODING_ON_REFUSAL : heavyComponent.uninstall_block });
+    }
+    if (heavyDraftPin && heavyDraftComponent) {
+      const heavyDraftRecord = record(heavyDraftPin.id);
+      pieces.push({ id: "heavy_draft", name: heavyDraftPin.id, label: "Heavy coding draft", summary: "A small helper model that lets the larger coding model write faster.",
+        state: heavyDraftComponent.requirement === "unsupported" && heavyDraftComponent.state !== "installed" ? "unsupported" : heavyDraftComponent.state,
+        size_bytes: heavyDraftRecord?.sizeBytes ?? heavyDraftPin.download?.approx_bytes ?? heavyDraftComponent.size_bytes ?? heavyDraftComponent.download_bytes ?? null,
+        percent: heavyDraftComponent.state === "installing" ? heavyDraftComponent.percent : null, failure: heavyDraftComponent.state === "failed" ? heavyDraftComponent.failure : null,
+        can_install: heavyDraftComponent.can_install, install_block: heavyDraftComponent.install_block,
+        can_remove: heavyDraftComponent.can_uninstall && !on, remove_block: on && heavyDraftComponent.can_uninstall ? CODING_ON_REFUSAL : heavyDraftComponent.uninstall_block });
+    } else {
+      pieces.push({ id: "heavy_draft", name: "ornith-1-5-122b-dflash2-draft", label: "Heavy coding draft", summary: "A small helper model that lets the larger coding model write faster.", state: "unsupported", size_bytes: heavyDraftPin?.download?.approx_bytes ?? null, percent: null, failure: null, can_install: false, install_block: "The Stack does not offer this coding draft on this computer.", can_remove: false, remove_block: "It is not installed." });
+    }
   }
   return { engine: wantsSplash && splash ? SPLASH : LLAMA, pieces };
 }
@@ -241,7 +273,7 @@ export async function installCodingPiece(id: string): Promise<{ job: string | nu
 }
 
 export async function removeCodingPiece(id: string): Promise<{ piece: CodingPieceId; removed: true }> {
-  if (codingEnabled() && ["engine", "model", "draft"].includes(id)) throw new CodingPieceError(409, "coding_on", CODING_ON_REFUSAL);
+  if (codingEnabled() && ["engine", "model", "draft", "heavy_model", "heavy_draft"].includes(id)) throw new CodingPieceError(409, "coding_on", CODING_ON_REFUSAL);
   const piece = await pieceNamed(id);
   if (!piece.can_remove) throw new CodingPieceError(409, "cannot_remove", piece.remove_block ?? "This piece cannot be removed right now.");
   try {

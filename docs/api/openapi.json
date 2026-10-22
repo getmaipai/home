@@ -23209,6 +23209,249 @@
         }
       }
     },
+    "/api/setup/coding": {
+      "get": {
+        "tags": [
+          "Setup"
+        ],
+        "summary": "The coding screen in the setup wizard",
+        "responses": {
+          "200": {
+            "description": "Coding setup choices and current readiness.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "eligible_mode": {
+                      "type": "boolean"
+                    },
+                    "pieces": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string"
+                          },
+                          "label": {
+                            "type": "string"
+                          },
+                          "size_bytes": {
+                            "type": "number",
+                            "nullable": true
+                          },
+                          "state": {
+                            "type": "string",
+                            "enum": [
+                              "installed",
+                              "installing",
+                              "notInstalled",
+                              "failed",
+                              "unsupported"
+                            ]
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "label",
+                          "size_bytes",
+                          "state"
+                        ]
+                      }
+                    },
+                    "total_bytes": {
+                      "type": "number"
+                    },
+                    "readiness": {
+                      "nullable": true
+                    }
+                  },
+                  "required": [
+                    "eligible_mode",
+                    "pieces",
+                    "total_bytes"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Admins only",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Setup"
+        ],
+        "summary": "Choose the recommended coding setup or do it later",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "choice": {
+                    "type": "string",
+                    "enum": [
+                      "set_up",
+                      "later"
+                    ]
+                  }
+                },
+                "required": [
+                  "choice"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The person chose to do this later.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    },
+                    "choice": {
+                      "type": "string",
+                      "enum": [
+                        "later"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "ok",
+                    "choice"
+                  ]
+                }
+              }
+            }
+          },
+          "202": {
+            "description": "The recommended downloads were started.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    },
+                    "choice": {
+                      "type": "string",
+                      "enum": [
+                        "set_up"
+                      ]
+                    },
+                    "pieces": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string"
+                          },
+                          "state": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "state"
+                        ]
+                      }
+                    }
+                  },
+                  "required": [
+                    "ok",
+                    "choice",
+                    "pieces"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The setting could not be saved",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Admins only",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Setup is not available or the disk plan does not fit.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/setup/checks/run": {
       "post": {
         "tags": [
@@ -26766,7 +27009,9 @@
                             "enum": [
                               "engine",
                               "model",
-                              "draft"
+                              "draft",
+                              "heavy_model",
+                              "heavy_draft"
                             ]
                           },
                           "name": {
@@ -26912,7 +27157,9 @@
               "enum": [
                 "engine",
                 "model",
-                "draft"
+                "draft",
+                "heavy_model",
+                "heavy_draft"
               ]
             },
             "required": true,
@@ -26937,7 +27184,9 @@
                       "enum": [
                         "engine",
                         "model",
-                        "draft"
+                        "draft",
+                        "heavy_model",
+                        "heavy_draft"
                       ]
                     }
                   },
@@ -27015,7 +27264,9 @@
               "enum": [
                 "engine",
                 "model",
-                "draft"
+                "draft",
+                "heavy_model",
+                "heavy_draft"
               ]
             },
             "required": true,
@@ -27036,7 +27287,9 @@
                       "enum": [
                         "engine",
                         "model",
-                        "draft"
+                        "draft",
+                        "heavy_model",
+                        "heavy_draft"
                       ]
                     },
                     "removed": {
@@ -27203,6 +27456,687 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/coding-setup/mode/self-test": {
+      "post": {
+        "tags": [
+          "Coding"
+        ],
+        "summary": "Ask the AI engine to test the coding model",
+        "responses": {
+          "202": {
+            "description": "The Stack accepted the test.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "accepted": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    }
+                  },
+                  "required": [
+                    "accepted"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Admins only",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The Stack refused the test in plain words.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "The AI engine is not answering.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/coding/pieces": {
+      "get": {
+        "tags": [
+          "Coding"
+        ],
+        "summary": "The pieces local coding runs on, with state and disk size",
+        "responses": {
+          "200": {
+            "description": "The engine, the coding model and the Splash draft. With the engine unreachable the list is empty and `message` says what to do.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "stack": {
+                      "type": "string",
+                      "enum": [
+                        "ok",
+                        "unreachable"
+                      ]
+                    },
+                    "message": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "coding_enabled": {
+                      "type": "boolean"
+                    },
+                    "engine": {
+                      "type": "string",
+                      "nullable": true,
+                      "enum": [
+                        "splash",
+                        "llama-server",
+                        null
+                      ],
+                      "description": "The engine the Stack chose for coding on this computer."
+                    },
+                    "missing": {
+                      "type": "string",
+                      "nullable": true,
+                      "description": "The first piece coding cannot run without, as a sentence; null when coding has what it needs. Coding keys show suspended while this is set."
+                    },
+                    "pieces": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "enum": [
+                              "engine",
+                              "model",
+                              "draft",
+                              "heavy_model",
+                              "heavy_draft"
+                            ]
+                          },
+                          "name": {
+                            "type": "string",
+                            "description": "What the Stack runs or stores: splash, llama-server or the model id."
+                          },
+                          "label": {
+                            "type": "string"
+                          },
+                          "summary": {
+                            "type": "string"
+                          },
+                          "state": {
+                            "type": "string",
+                            "enum": [
+                              "installed",
+                              "installing",
+                              "notInstalled",
+                              "failed",
+                              "unsupported"
+                            ]
+                          },
+                          "size_bytes": {
+                            "type": "number",
+                            "nullable": true,
+                            "description": "Bytes on disk when installed, the pinned download size otherwise, null when the Stack states none."
+                          },
+                          "percent": {
+                            "type": "number",
+                            "nullable": true
+                          },
+                          "failure": {
+                            "type": "string",
+                            "nullable": true
+                          },
+                          "can_install": {
+                            "type": "boolean"
+                          },
+                          "install_block": {
+                            "type": "string",
+                            "nullable": true
+                          },
+                          "can_remove": {
+                            "type": "boolean"
+                          },
+                          "remove_block": {
+                            "type": "string",
+                            "nullable": true
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "name",
+                          "label",
+                          "summary",
+                          "state",
+                          "size_bytes",
+                          "percent",
+                          "failure",
+                          "can_install",
+                          "install_block",
+                          "can_remove",
+                          "remove_block"
+                        ]
+                      }
+                    }
+                  },
+                  "required": [
+                    "stack",
+                    "message",
+                    "coding_enabled",
+                    "engine",
+                    "missing",
+                    "pieces"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Admins only",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such piece",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "It cannot be installed or removed right now (the message says why)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "The engine is not answering",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/coding/pieces/{id}/install": {
+      "post": {
+        "tags": [
+          "Coding"
+        ],
+        "summary": "Install one coding piece (progress on the install strip)",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "enum": [
+                "engine",
+                "model",
+                "draft",
+                "heavy_model",
+                "heavy_draft"
+              ]
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "202": {
+            "description": "Started.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "job": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "piece": {
+                      "type": "string",
+                      "enum": [
+                        "engine",
+                        "model",
+                        "draft",
+                        "heavy_model",
+                        "heavy_draft"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "job",
+                    "piece"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Admins only",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such piece",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "It cannot be installed or removed right now (the message says why)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "The engine is not answering",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/coding/pieces/{id}": {
+      "delete": {
+        "tags": [
+          "Coding"
+        ],
+        "summary": "Remove one coding piece and free its space",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "enum": [
+                "engine",
+                "model",
+                "draft",
+                "heavy_model",
+                "heavy_draft"
+              ]
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Removed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "piece": {
+                      "type": "string",
+                      "enum": [
+                        "engine",
+                        "model",
+                        "draft",
+                        "heavy_model",
+                        "heavy_draft"
+                      ]
+                    },
+                    "removed": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    }
+                  },
+                  "required": [
+                    "piece",
+                    "removed"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Admins only",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such piece",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "It cannot be installed or removed right now (the message says why)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "The engine is not answering",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/coding/mode": {
+      "get": {
+        "tags": [
+          "Coding"
+        ],
+        "summary": "Coding mode readiness and current Stack state",
+        "responses": {
+          "200": {
+            "description": "Readiness and mode state.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "readiness": {
+                      "nullable": true
+                    },
+                    "mode": {
+                      "type": "string",
+                      "nullable": true,
+                      "enum": [
+                        "normal",
+                        "coding",
+                        null
+                      ]
+                    },
+                    "state": {
+                      "type": "string",
+                      "nullable": true,
+                      "enum": [
+                        "stable",
+                        "switching",
+                        "failed",
+                        null
+                      ]
+                    },
+                    "reason": {
+                      "type": "string",
+                      "nullable": true
+                    }
+                  },
+                  "required": [
+                    "mode",
+                    "state",
+                    "reason"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Admins only",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such piece",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "It cannot be installed or removed right now (the message says why)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "The engine is not answering",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/coding/mode/self-test": {
+      "post": {
+        "tags": [
+          "Coding"
+        ],
+        "summary": "Ask the AI engine to test the coding model",
+        "responses": {
+          "202": {
+            "description": "The Stack accepted the test.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "accepted": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    }
+                  },
+                  "required": [
+                    "accepted"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Admins only",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The Stack refused the test in plain words.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "The AI engine is not answering.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
                 }
               }
             }

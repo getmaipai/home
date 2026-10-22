@@ -33,22 +33,34 @@ const MEMORY_ANSWER_KEY = "memory_answer_gb";
 /** The disk plan's rows the person left turned on at the plan step (ids such as "pictures"), kept beside the record so a retry,
  * a re-check and the downloads that start after the checks install the same set. Absent until the plan step is used. */
 const INSTALL_SELECTION_KEY = "install_selection";
-const CODING_CLIENT_LATER_KEY = "coding_client_later";
-export function codingClientLater(): boolean {
+const CODING_CHOICE_KEY = "coding_choice";
+export type SetupCodingChoice = "set_up" | "later";
+export function setupCodingChoice(): SetupCodingChoice | undefined {
   const row = db.select().from(setupState).limit(1).get();
-  if (!row) return false;
-  return (JSON.parse(row.value) as Record<string, unknown>)[CODING_CLIENT_LATER_KEY] === true;
+  const choice = row ? (JSON.parse(row.value) as Record<string, unknown>)[CODING_CHOICE_KEY] : undefined;
+  return choice === "set_up" || choice === "later" ? choice : undefined;
+}
+export function setSetupCodingChoice(choice: SetupCodingChoice): void {
+  ensureSetupState();
+  const row = db.select().from(setupState).limit(1).get();
+  if (!row) return;
+  const rest = JSON.parse(row.value) as Record<string, unknown>;
+  db.update(setupState).set({ value: JSON.stringify({ ...rest, [CODING_CHOICE_KEY]: choice }) }).where(eq(setupState.slot, 1)).run();
+}
+export function codingClientLater(): boolean {
+  return setupCodingChoice() === "later";
 }
 /** Compatibility alias for code written against the earlier setup helper name. */
 export const getCodingClientLater = codingClientLater;
 
-function splitRow(value: string): { record: SetupStateRecord; storageChoice: StorageChoice | undefined; memoryAnswerGb: number | undefined; installSelection: string[] | undefined } {
-  const { [STORAGE_CHOICE_KEY]: storageChoice, [MEMORY_ANSWER_KEY]: memoryAnswerGb, [INSTALL_SELECTION_KEY]: installSelection, ...rest } = JSON.parse(value) as Record<string, unknown>;
+function splitRow(value: string): { record: SetupStateRecord; storageChoice: StorageChoice | undefined; memoryAnswerGb: number | undefined; installSelection: string[] | undefined; codingChoice: SetupCodingChoice | undefined } {
+  const { [STORAGE_CHOICE_KEY]: storageChoice, [MEMORY_ANSWER_KEY]: memoryAnswerGb, [INSTALL_SELECTION_KEY]: installSelection, [CODING_CHOICE_KEY]: rawCodingChoice, ...rest } = JSON.parse(value) as Record<string, unknown>;
   return {
     record: SetupState.parse(rest),
     installSelection: Array.isArray(installSelection) && installSelection.every((id) => typeof id === "string") ? installSelection as string[] : undefined,
     storageChoice: storageChoice as StorageChoice | undefined,
     memoryAnswerGb: typeof memoryAnswerGb === "number" && memoryAnswerGb > 0 ? memoryAnswerGb : undefined,
+    codingChoice: rawCodingChoice === "set_up" || rawCodingChoice === "later" ? rawCodingChoice : undefined,
   };
 }
 
@@ -144,6 +156,7 @@ export function replaceSetupStep(
   const storageChoice = result.storageChoice ?? getStorageChoice();
   const memoryAnswerGb = getMemoryAnswerGb();
   const installSelection = getInstallSelection();
+  const codingChoice = setupCodingChoice();
   const at = timestamp();
   const steps = current.steps.map((step) => {
     if (step.id !== stepId) return step;
@@ -161,7 +174,7 @@ export function replaceSetupStep(
     completed_at: result.completed_at ?? (done ? at : current.completed_at),
     hlc: nextHlc(),
   });
-  db.update(setupState).set({ value: JSON.stringify({ ...next, ...(storageChoice ? { [STORAGE_CHOICE_KEY]: storageChoice } : {}), ...(memoryAnswerGb ? { [MEMORY_ANSWER_KEY]: memoryAnswerGb } : {}), ...(installSelection ? { [INSTALL_SELECTION_KEY]: installSelection } : {}) }) }).where(eq(setupState.slot, 1)).run();
+  db.update(setupState).set({ value: JSON.stringify({ ...next, ...(storageChoice ? { [STORAGE_CHOICE_KEY]: storageChoice } : {}), ...(memoryAnswerGb ? { [MEMORY_ANSWER_KEY]: memoryAnswerGb } : {}), ...(installSelection ? { [INSTALL_SELECTION_KEY]: installSelection } : {}), ...(codingChoice ? { [CODING_CHOICE_KEY]: codingChoice } : {}) }) }).where(eq(setupState.slot, 1)).run();
   // The wizard just finished installing: have the models loaded before the first message.
   if (done) void import("@/lib/stackWarmup").then((module) => module.warmStack()).catch(() => {});
   return next;

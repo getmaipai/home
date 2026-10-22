@@ -27,21 +27,22 @@ const component = (over: Partial<StackComponent>): StackComponent => ({
 });
 const job = (over: Partial<StackJob>): StackJob => ({ id: "job-1", kind: "engine.install", role: null, state: "running", percent: 40, completedBytes: 30_000_000, totalBytes: 74_590_927, status: "downloading", position: null, input: { engine: "splash-1.3.2-darwin-arm64" }, result: null, reason: null, createdAt: "2026-10-19T10:00:00.000Z", updatedAt: "2026-10-19T10:00:01.000Z", ...over });
 
-interface World { roles: RoleInfo[]; engines: EngineInfo[]; models: Array<{ id: string; state: string; sizeBytes: number | null }>; components: StackComponent[]; jobs: StackJob[]; down: boolean; refuse: string | null }
+interface World { roles: RoleInfo[]; engines: EngineInfo[]; models: Array<{ id: string; state: string; sizeBytes: number | null }>; components: StackComponent[]; jobs: StackJob[]; down: boolean; refuse: string | null; tier: string | null }
 let world: World;
 let calls: string[];
 const fresh = (): World => ({
   roles: [codingRole({})], engines: [engine({ installed: true, currentTag: "1.3.2" }), engine({ id: "llama-1", name: "llama-server", label: "llama.cpp", installed: true, currentTag: "b10797" })],
   models: [{ id: MODEL, state: "installed", sizeBytes: 16_464_440_224 }, { id: DRAFT, state: "installed", sizeBytes: 3_848_819_135 }],
-  components: [component({})], jobs: [], down: false, refuse: null,
+  components: [component({})], jobs: [], down: false, refuse: null, tier: "p64",
 });
 const fake: CodingStack = {
   roles: async () => { if (world.down) throw new StackComponentError(503, "unreachable", "x"); return world.roles; },
   engines: async () => world.engines,
   models: async () => world.models,
-  catalog: async () => [{ id: MODEL, role: "coding", download: { approx_bytes: 16_464_440_224 } }, { id: DRAFT, role: "coding", component: "draft", download: { approx_bytes: 3_848_819_135 } }, { id: "chat-a", role: "chat" }],
+  catalog: async () => [{ id: MODEL, role: "coding", download: { approx_bytes: 16_464_440_224 } }, { id: DRAFT, role: "coding", component: "draft", download: { approx_bytes: 3_848_819_135 } }, { id: "ornith-1-5-122b-mlx-4bit", role: "coding", download: { approx_bytes: 69_600_000_000 } }, { id: "ornith-1-5-122b-dflash2-draft", role: "coding", component: "draft", download: { approx_bytes: 1_900_000_000 } }, { id: "chat-a", role: "chat" }],
   jobs: async () => world.jobs,
   components: async () => world.components,
+  tier: async () => world.tier,
   installEngine: async (name) => { calls.push(`install-engine:${name}`); if (world.refuse) throw new StackComponentError(409, "refused", world.refuse); return { job: "job-9" }; },
   removeEngineBuild: async (name, tag) => { calls.push(`remove-engine:${name}:${tag}`); if (world.refuse) throw new StackComponentError(409, "refused", world.refuse); },
   installComponent: async (id) => { calls.push(`install-component:${id}`); if (world.refuse) throw new StackComponentError(409, "refused", world.refuse); return { job: "job-8" }; },
@@ -70,13 +71,36 @@ describe("the list", () => {
     expect(body.pieces[1]).toMatchObject({ size_bytes: 16_464_440_224, can_remove: true });
     expect(body.pieces[2]).toMatchObject({ size_bytes: 3_848_819_135, can_install: false, can_remove: false, remove_block: "It is removed with the coding model." });
   });
+  test("the heavy pair is visible only on p128, and each piece uses its Stack component state", async () => {
+    const { client } = await owner();
+    world.tier = "p128";
+    const heavyModel = component({ id: "ornith-1-5-122b-mlx-4bit", label: "Ornith 122B", summary: "The heavy coding model.", state: "notInstalled", size_bytes: null, download_bytes: 69_600_000_000, can_install: true, install_block: null, can_uninstall: false, uninstall_block: "It is not installed." });
+    const heavyDraft = component({ id: "ornith-1-5-122b-dflash2-draft", label: "Ornith draft", summary: "The heavy draft.", state: "notInstalled", size_bytes: null, download_bytes: 1_900_000_000, can_install: true, install_block: null, can_uninstall: true, uninstall_block: null });
+    world.components.push(heavyModel, heavyDraft);
+    world.models.push({ id: heavyModel.id, state: "notInstalled", sizeBytes: null }, { id: heavyDraft.id, state: "notInstalled", sizeBytes: null });
+    const body = await list(client);
+    expect(body.pieces.map(piece => piece.id)).toEqual(["engine","model","draft","heavy_model","heavy_draft"]);
+    expect(body.pieces[3]).toMatchObject({ name: heavyModel.id, state: "notInstalled", size_bytes: 69_600_000_000, can_install: true });
+    expect(body.pieces[4]).toMatchObject({ name: heavyDraft.id, state: "notInstalled", size_bytes: 1_900_000_000, can_install: true });
+    expect((await client.request("/api/coding-setup/pieces/heavy_model/install", {method:"POST"})).status).toBe(202);
+    expect((await client.request("/api/coding-setup/pieces/heavy_draft", {method:"DELETE"})).status).toBe(200);
+    expect(calls).toContain(`install-component:${heavyModel.id}`);
+    expect(calls).toContain(`remove-component:${heavyDraft.id}`);
+  });
+  test("p64 never exposes heavy pieces", async () => {
+    const { client } = await owner();
+    world.tier = "p64";
+    expect((await list(client)).pieces.map(piece => piece.id)).toEqual(["engine","model","draft"]);
+    expect((await client.request("/api/coding-setup/pieces/heavy_model/install", {method:"POST"})).status).toBe(404);
+  });
   test("on a computer that cannot run Splash the engine is the shared llama-server and has no draft", async () => {
     const { client } = await owner();
     world.engines = [engine({ matchesThisMachine: false }), engine({ id: "llama-1", name: "llama-server", installed: true, currentTag: "b10797" })];
     world.roles = [codingRole({ engine: "llama-server" })];
     const body = await list(client);
     expect(body.engine).toBe("llama-server");
-    expect(body.pieces.map((p) => p.id)).toEqual(["engine", "model"]);
+    expect(body.pieces.map((p) => p.id)).toEqual(["engine", "model", "draft"]);
+    expect(body.pieces[2]).toMatchObject({state:"unsupported",can_install:false,can_remove:false});
     expect(body.pieces[0]).toMatchObject({ name: "llama-server", can_remove: false, remove_block: "Chat uses this engine as well, so it stays." });
   });
   test("Splash wanted but not installed: it is the engine piece, installable, and coding is not missing the model", async () => {
