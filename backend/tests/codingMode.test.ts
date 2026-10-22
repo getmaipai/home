@@ -76,3 +76,27 @@ describe("coding mode self-test route", () => {
     expect((await client.post("/api/coding/mode/self-test", {})).status).toBe(403);
   });
 });
+
+describe("saving an unrelated setting", () => {
+  test("leaves Home mode alone and raises no mode failure", async () => {
+    const client = new TestClient(); await client.post("/api/auth/setup", {displayName:"Sage",secret:"correcthorse"});
+    setHouseholdSettingValue("coding.home_mode", "coding");
+    const saved = await client.put("/api/settings", {scope:"household", key:"coding.enabled", value:true});
+    expect(saved.status).toBe(200);
+    expect(getHouseholdSettingValue("coding.home_mode")).toBe("coding");
+  });
+});
+
+describe("choosing the mode the Stack is already in", () => {
+  test("keeps the setting and does not ask the Stack to switch again", async () => {
+    const client = new TestClient(); await client.post("/api/auth/setup", {displayName:"Sage",secret:"correcthorse"});
+    let switches = 0;
+    setHouseholdSettingValue("coding.enabled", true);
+    await client.post("/api/settings/api-keys", {name:"editor", scopes:["code"]});
+    __setStackClientForTests({ getCodingMode: async () => response({ mode: "coding", target: "coding" }), setCodingMode: async () => { switches++; }, roles: async () => ({ roles: [{ id: "coding", state: { state: "installed" } }] }) } as never);
+    const saved = await client.put("/api/settings", {scope:"household", key:"coding.home_mode", value:"coding"});
+    expect(saved.status).toBe(200);
+    expect(switches).toBe(0);
+    expect(getHouseholdSettingValue("coding.home_mode")).toBe("coding");
+  });
+});

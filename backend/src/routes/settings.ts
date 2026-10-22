@@ -54,6 +54,10 @@ async function followCodingMode(target: "normal" | "coding", actor: PersonRow): 
       }
     } catch { /* the Stack can come back during the transaction */ }
   }
+  setValue(actor, "household", "coding.home_mode", "normal");
+  publishSettingsChanged("household", "coding.home_mode", "normal");
+  await raiseModeFailure("The AI did not finish switching modes within 15 minutes.");
+  console.info(JSON.stringify({ event: "coding_mode.switch_timeout" }));
 }
 
 function refreshRobotClips(deviceIds: string[]): void {
@@ -216,22 +220,24 @@ settingsRoutes.openapi(putRoute, async (c) => {
       if (!readiness.ready) return c.json({ error: codingModeReason(readiness.first_unmet ?? "engine"), readiness }, 409);
     }
   }
-  setValue(actor, "household", "coding.home_mode", "normal");
-  publishSettingsChanged("household", "coding.home_mode", "normal");
-  await raiseModeFailure("The AI did not finish switching modes within 15 minutes.");
-  console.info(JSON.stringify({ event: "coding_mode.switch_timeout" }));
   const result = await setValue(actor, body.scope, body.key, body.value);
   if (!result.ok) {
     return result.status === 400 ? c.json({ error: result.error }, 400) : c.json({ error: result.error }, 403);
   }
   if (isHomeMode) {
-    try { await getStackClient().setCodingMode(body.value as "normal" | "coding"); }
-    catch (error) {
-      const reason = error instanceof StackError && error.status === 409 ? error.reason ?? error.message : "Home could not reach the AI engine.";
-      setValue(actor, "household", body.key, previousHomeMode ?? "normal");
-      return c.json({ error: reason, readiness: await codingModeReadiness() }, 409);
+    const target = body.value as "normal" | "coding";
+    // The Stack may already be there (Home restarted, or the setting was lost): that is the answer wanted, not a refusal.
+    const now = await getStackClient().getCodingMode().catch(() => null);
+    const alreadyThere = now?.mode === target && now.state === "stable";
+    if (!alreadyThere) {
+      try { await getStackClient().setCodingMode(target); }
+      catch (error) {
+        const reason = error instanceof StackError && error.status === 409 ? error.reason ?? error.message : "Home could not reach the AI engine.";
+        setValue(actor, "household", body.key, previousHomeMode ?? "normal");
+        return c.json({ error: reason, readiness: await codingModeReadiness() }, 409);
+      }
+      void followCodingMode(target, actor);
     }
-    void followCodingMode(body.value as "normal" | "coding", actor);
   }
   if (warning) await reconcileCapabilities();
   if (body.scope === "household" && body.key === "home.robots.enabled" && body.value === false) {

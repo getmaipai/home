@@ -272,3 +272,16 @@ describe("the key store's view", () => {
     expect(missingCodingPiece()).toContain("not installed");
   });
 });
+
+describe("missingFrom in coding mode", () => {
+  const piece = (id: string, state: string, name = id) => ({ id, name, state }) as never;
+  test("the large model alone is enough, the small one is not required", async () => {
+    const { missingFrom } = await import("@/lib/stackCodingPieces");
+    const { setHouseholdSettingValue } = await import("@/lib/settings");
+    const pieces = [piece("engine", "installed", "splash"), piece("model", "notInstalled"), piece("heavy_model", "installed")];
+    expect(missingFrom(pieces)).toContain("not installed");
+    setHouseholdSettingValue("coding.home_mode", "coding");
+    expect(missingFrom(pieces)).toBeNull();
+    setHouseholdSettingValue("coding.home_mode", "normal");
+  });
+});

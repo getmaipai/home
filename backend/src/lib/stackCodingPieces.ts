@@ -188,7 +188,15 @@ async function readPieces(): Promise<{ engine: "splash" | "llama-server"; pieces
         can_install: heavyComponent.can_install, install_block: heavyComponent.install_block,
         can_remove: heavyComponent.can_uninstall && !on, remove_block: on && heavyComponent.can_uninstall ? CODING_ON_REFUSAL : heavyComponent.uninstall_block });
     }
-    if (heavyDraftPin && heavyDraftComponent) {
+    if (heavyDraftPin && !heavyDraftComponent) {
+      // The Stack installs this draft with the large model, so it has no component row of its own: read its model record.
+      const draftRecord = record(heavyDraftPin.id);
+      const modelRow = pieces.find((piece) => piece.id === "heavy_model")!;
+      pieces.push({ id: "heavy_draft", name: heavyDraftPin.id, label: "Heavy coding draft", summary: "A small helper model that lets the larger coding model write faster. It installs and is removed with the heavy coding model.",
+        state: draftRecord?.state === "installed" ? "installed" : modelRow.state === "installing" ? "installing" : modelRow.state === "unsupported" ? "unsupported" : "notInstalled",
+        size_bytes: draftRecord?.sizeBytes ?? heavyDraftPin.download?.approx_bytes ?? null, percent: modelRow.state === "installing" ? modelRow.percent : null, failure: null,
+        can_install: false, install_block: "It installs with the heavy coding model.", can_remove: false, remove_block: "It is removed with the heavy coding model." });
+    } else if (heavyDraftPin && heavyDraftComponent) {
       const heavyDraftRecord = record(heavyDraftPin.id);
       pieces.push({ id: "heavy_draft", name: heavyDraftPin.id, label: "Heavy coding draft", summary: "A small helper model that lets the larger coding model write faster.",
         state: heavyDraftComponent.requirement === "unsupported" && heavyDraftComponent.state !== "installed" ? "unsupported" : heavyDraftComponent.state,
@@ -207,6 +215,8 @@ async function readPieces(): Promise<{ engine: "splash" | "llama-server"; pieces
 export function missingFrom(pieces: readonly CodingPiece[]): string | null {
   const engine = pieces.find((piece) => piece.id === "engine");
   const model = pieces.find((piece) => piece.id === "model");
+  // In coding mode the large model is the only coding model; the small one need not be there.
+  if (getHouseholdSettingValue("coding.home_mode") === "coding" && pieces.find((piece) => piece.id === "heavy_model")?.state === "installed" && engine?.state === "installed") return null;
   if (model && model.state !== "installed" && model.state !== "installing") return "The coding model is not installed. An admin can install it in Settings, Coding.";
   if (model && model.state === "installing") return "The coding model is still downloading.";
   if (engine && engine.name === LLAMA && engine.state !== "installed") return "The coding engine is not installed. An admin can finish the AI setup in Settings.";
