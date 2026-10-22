@@ -365,7 +365,7 @@ describe("canary in coding mode", () => {
     const { CHECK_BY_ID } = await import("@/lib/canary/checks");
     setHouseholdSettingValue("coding.home_mode", "coding");
     let asked = false;
-    const out = await CHECK_BY_ID.get("image_tiny")!.run({ image: async () => { asked = true; return { ok: false }; } } as never);
+    const out = await CHECK_BY_ID.get("image_tiny")!.run({ image: async () => { asked = true; return { ok: false }; } } as never, {} as never);
     setHouseholdSettingValue("coding.home_mode", "normal");
     expect(out.kind).toBe("skip"); expect(asked).toBe(false);
   });
