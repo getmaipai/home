@@ -495,14 +495,19 @@ Record: [robot vision](robot-vision-2026-10-21.md). Owner-approved 2026-10-21 (c
 short-lived idea of what its camera sees, that this is not an age question, that the protection is the data's handling, and that an
 admin picks per robot between always watching (the default), only when asked, and camera off.
 Owner-approved: 2026-10-21
+Owner-approved: 2026-10-22 (R1 widened to look results, per docs/design/look-component-2026-10-22.md)
 
 Governs: backend/src/lib/robotVision.ts, backend/src/routes/devices.ts (`/me/vision`), backend/src/lib/turnMachine/**, frontend/src/apps/settings/**
 
-R1. **A picture from a robot is described once and dropped.** The robot posts one JPEG to `/api/devices/me/vision`. Home hands it once to
-    the local chat model, keeps one short sentence per robot in this process's memory for about 90 seconds, and drops the picture. No
-    picture and no description is ever written to disk, a stored turn, memory, the library, a backup, a log, a stat, telemetry or a
-    queue; no route returns either; no person, admin included, can read a picture or the history of descriptions (there is none).
-    Logs carry counts and timings only.
+R1. **A picture from a robot is looked at once and dropped.** The robot posts one JPEG to `/api/devices/me/vision`. Home passes it once
+    to the Stack's look capability (object labels with counts, scene tags, light). For a person's ask, or for an object that is new or
+    changed, Home also passes it to the Stack's vision role for one short sentence or per-object details (colour, kind, make, model). No
+    crop of a person is sent for details, and no detail describes a person or a body. Home keeps, per robot and in this process's memory
+    only, the latest sentence, tags and details, each for at most 90 seconds after the object was last seen. It drops the picture and every
+    crop when the call returns. A pending detail request holds its crop in memory only and is dropped when it expires. No picture, crop,
+    sentence, tag or detail is ever written to disk, a stored turn, memory, the library, a backup, a log, a stat, telemetry or a persisted
+    queue. No route returns any of them, and no person, admin included, can read them or their history (there is none). Logs carry counts
+    and timings only, never a label, tag or detail.
 R2. **Only the robot's own session reaches it, and the setting decides.** The route is in the robot-session allow-list and nowhere else;
     it needs a robot device session. `robot.vision` is per robot and admin-set: `continual` (default), `on_demand` (a picture only for
     an ask) or `none` (every picture refused, nothing kept). Pictures are rate limited, size limited and must be JPEG.
