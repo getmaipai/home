@@ -49,6 +49,12 @@ describe("roleHealth", () => {
     expect(await roleHealth("embed")).toMatchObject({ availability: expect.any(String) });
   });
 
+  test("a Stack mode transaction puts chat in the existing starting state", async () => {
+    setHouseholdSettingValue("engines.stack.url", "http://127.0.0.1:8770");
+    __setStackClientForTests({ getCodingMode: async () => ({ state: "switching" }) } as never);
+    expect(await roleHealth("chat")).toMatchObject({ availability: "starting", cause: "mode_change", detail: "Home is switching modes. Chat will be back in a minute." });
+  });
+
   test("live Stack chat health carries reported context and slots", async () => {
     setHouseholdSettingValue("engines.stack.url", "http://127.0.0.1:8770");
     client([{ id: "chat", state: { state: "ready" }, context_length: 40960, slots: 2, context_per_slot: 20480 } as never]);

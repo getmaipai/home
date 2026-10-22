@@ -9,7 +9,7 @@ export type HealthRole = "chat" | "embed" | "background" | "voice";
  * when the Stack itself refused the role (a 503 with its reason), is
  * that reason in the household's wording - the same line the chat reply
  * carries. `reason` stays the short code the consumers switch on. */
-export type RoleHealth = { availability: "ready" | "starting" | "unavailable"; reason: string | null; /** CHAT-PAUSE-01: why it is unavailable, when known. */ cause?: "restarting" | "memory" | "not_installed"; detail?: string; contextLength?: number; slots?: number; contextPerSlot?: number; contextScope?: "total" | "per_slot"; /** VISION-02d: the model the Stack's chat role runs (or would start). */ modelId?: string; pictureTokensMax?: number };
+export type RoleHealth = { availability: "ready" | "starting" | "unavailable"; reason: string | null; /** CHAT-PAUSE-01: why it is unavailable, when known. */ cause?: "restarting" | "memory" | "not_installed" | "mode_change"; detail?: string; contextLength?: number; slots?: number; contextPerSlot?: number; contextScope?: "total" | "per_slot"; /** VISION-02d: the model the Stack's chat role runs (or would start). */ modelId?: string; pictureTokensMax?: number };
 let roleHealthForTests: Partial<Record<HealthRole, RoleHealth>> = {};
 export function __setRoleHealthForTests(value: Partial<Record<HealthRole, RoleHealth>>): void { roleHealthForTests = value; cachedHealth.clear(); }
 
@@ -42,6 +42,12 @@ export async function localRoleHealthEntry(role: HealthRole): Promise<EngineHeal
 export async function roleHealth(role: HealthRole, opts: { live?: boolean } = {}): Promise<RoleHealth> {
   if (roleHealthForTests[role]) return roleHealthForTests[role]!;
   if (!isStackConfigured()) return { availability: "unavailable", reason: "stack_unreachable", cause: "restarting" };
+  if (role === "chat") {
+    try {
+      const mode = await getStackClient().getCodingMode();
+      if (mode.state === "switching") return { availability: "starting", reason: null, cause: "mode_change", detail: "Home is switching modes. Chat will be back in a minute." };
+    } catch { /* Older or unreachable Stack; role health below remains authoritative. */ }
+  }
   // THIN-1C: the Stack's own recent refusal of this role outranks what
   // its role list says - during #203's incident the list still showed
   // chat as installed (ready on demand) while every request was being
@@ -105,6 +111,6 @@ export function roleHealthEntry(role: HealthRole, local: EngineHealthEntry, stat
   // same as before.
   const context = role === "chat" ? { context_length: state.contextLength ?? null, context_slots: state.slots ?? null, context_per_slot: state.contextPerSlot ?? null, context_scope: state.contextScope ?? null } : {};
   if (state.reason === "stack_unreachable" || state.availability === "unavailable") return { ...local, ...context, kind: "failed", alive: false, availability: "unavailable", reason: "failed_start", ...(state.detail !== undefined ? { detail: state.detail } : {}), ...(state.cause ? { cause: state.cause } : {}) };
-  if (state.availability === "starting") return { ...local, ...context, kind: "starting", alive: true, availability: "starting", reason: null };
+  if (state.availability === "starting") return { ...local, ...context, kind: "starting", alive: true, availability: "starting", reason: null, ...(state.cause ? { cause: state.cause } : {}), ...(state.detail ? { detail: state.detail } : {}) };
   return { ...local, ...context, alive: true, availability: "ready", reason: null };
 }

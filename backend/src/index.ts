@@ -278,7 +278,7 @@ void startKiwixSidecar();
 // STACK-DDGS-01: learn the Stack's DuckDuckGo search service address and health (never throws, never blocks boot).
 startDdgsStackSync();
 // CODE-STACK-01 H2: Home's coding settings are the Stack's source; send them at start (never throws; the Stack may not be up yet and gets them on the next change).
-void pushCodingSettings();
+void pushCodingSettings().then(() => import("@/lib/codingMode")).then(({ reconcileCodingModeAtStartup }) => reconcileCodingModeAtStartup()).catch(() => {});
 // ROBOT-HOST-01: hosted StackChan Bot apps register here (never throws; one failing host raises its own Repairs item).
 void startRobotHosts();
 void startAllSidecars();

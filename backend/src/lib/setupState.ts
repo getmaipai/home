@@ -33,6 +33,14 @@ const MEMORY_ANSWER_KEY = "memory_answer_gb";
 /** The disk plan's rows the person left turned on at the plan step (ids such as "pictures"), kept beside the record so a retry,
  * a re-check and the downloads that start after the checks install the same set. Absent until the plan step is used. */
 const INSTALL_SELECTION_KEY = "install_selection";
+const CODING_CLIENT_LATER_KEY = "coding_client_later";
+export function codingClientLater(): boolean {
+  const row = db.select().from(setupState).limit(1).get();
+  if (!row) return false;
+  return (JSON.parse(row.value) as Record<string, unknown>)[CODING_CLIENT_LATER_KEY] === true;
+}
+/** Compatibility alias for code written against the earlier setup helper name. */
+export const getCodingClientLater = codingClientLater;
 
 function splitRow(value: string): { record: SetupStateRecord; storageChoice: StorageChoice | undefined; memoryAnswerGb: number | undefined; installSelection: string[] | undefined } {
   const { [STORAGE_CHOICE_KEY]: storageChoice, [MEMORY_ANSWER_KEY]: memoryAnswerGb, [INSTALL_SELECTION_KEY]: installSelection, ...rest } = JSON.parse(value) as Record<string, unknown>;

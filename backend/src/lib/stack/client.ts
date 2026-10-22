@@ -9,6 +9,7 @@ import { hostLabel, type EngineIdentity } from "../engineIdentity";
 import { StackError, type StackErrorKind } from "./errors";
 import { defaultStackBaseUrl } from "../ports";
 import { StackVoiceSchema, type StackSelfHeal } from "./types";
+import { StackCodingModeSchema } from "./contract";
 import type { DiskPlan } from "../../../../shared/diskPlanMath";
 import type { TokenCountRequest, TokenCountResponse } from "@maipai/spec/stack/ts/token-count.js";
 import type {
@@ -29,6 +30,7 @@ import type {
   FitPlanRequest,
   StackFitPlan,
   StackVoice,
+  StackCodingMode,
 } from "./types";
 
 
@@ -95,8 +97,10 @@ export type CodingWirePath = "/v1/messages" | "/v1/messages/count_tokens" | "/v1
 export interface StackCodingModels { object: "list"; data: Array<{ id: string; role?: string; context_length?: number; thinking_budget_ceiling?: number }> }
 /** `GET /stack/v1/roles` coding entry: only what the gateway reads. */
 export interface StackCodingStatus { state?: string; slots?: number | null; slots_busy?: number }
-
 export interface StackClient {
+  getCodingMode(opts?: { signal?: AbortSignal }): Promise<StackCodingMode>;
+  setCodingMode(mode: "normal" | "coding", opts?: { signal?: AbortSignal }): Promise<void>;
+  runCodingModeSelfTest(opts?: { signal?: AbortSignal }): Promise<void>;
   mediaRoots(opts?: { signal?: AbortSignal }): Promise<{ read: string[]; write: string[] }>;
   setMediaRoots(roots: { read: string[]; write: string[] }, opts?: { signal?: AbortSignal }): Promise<{ read: string[]; write: string[] }>;
   /** CODE-API-01: POST a coding wire request and hand back the engine's reply as the Stack sent it (status, headers, body stream), including a 4xx or 5xx, which the caller maps. Only a Stack that cannot be reached throws. Optional: an older client has no coding wires. */
@@ -448,6 +452,9 @@ export function createStackClient(options: StackClientOptions = {}): StackClient
     jobs: (opts) => call("/stack/v1/jobs", { method: "GET" }, async (res) => { const body = await json<{ jobs: unknown }>(res); return Array.isArray(body.jobs) ? body.jobs.map((job) => StackJobSchema.parse(job)) : []; }, opts),
     cancelJob: (id, opts) => call(`/stack/v1/jobs/${encodeURIComponent(id)}`, { method: "DELETE" }, async (res) => StackJobSchema.parse((await json<{ job: unknown }>(res)).job), opts),
     roles: (opts) => call("/stack/v1/roles", { method: "GET" }, json<RolesListResponse>, opts),
+    getCodingMode: (opts) => call("/stack/v1/coding/mode", { method: "GET" }, async (res) => StackCodingModeSchema.parse(await json<unknown>(res)), opts),
+    setCodingMode: (mode, opts) => call("/stack/v1/coding/mode", jsonInit({ mode }), async (res) => { await json<Record<string, unknown>>(res); }, opts),
+    runCodingModeSelfTest: (opts) => call("/stack/v1/coding/mode/self-test", { method: "POST" }, async (res) => { await json<Record<string, unknown>>(res); }, opts),
     engines: (opts) => call("/stack/v1/engines", { method: "GET" }, json<EnginesListResponse>, opts),
     voices: (opts) => call("/stack/v1/voices", { method: "GET" }, async (res) => {
       const body = await json<{ voices: unknown[] }>(res);

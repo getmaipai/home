@@ -8,6 +8,15 @@ import { z } from "zod";
 export type { StackFitPlan };
 export type { StackJob };
 
+/** GET /stack/v1/coding/mode: Stack-owned coding mode transaction status. */
+export interface StackCodingMode {
+  mode: "normal" | "coding"; target: "normal" | "coding"; state: "stable" | "switching" | "failed";
+  reason: string | null; available: boolean;
+  checks: { engine: boolean; pieces: boolean; hardware: boolean; memory: boolean; bench: boolean };
+  self_test: { passed_at: string | null; stale: boolean };
+  memory: { plan_bytes: number; budget_bytes: number };
+}
+
 export interface StackVoice {
   id: string; name: string; description: string; language: string; country: string;
   gender: "female" | "male" | "neutral" | "unknown";

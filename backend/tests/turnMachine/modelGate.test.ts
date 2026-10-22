@@ -131,4 +131,12 @@ describe("runTurnNext: the model gate on the wire", () => {
     expect(toolCount).toBe(0);
     expect(thinking).toBe(false);
   });
+
+  test("a child's turn on the Home coding model keeps no tools and thinking off", async () => {
+    (await import("@/lib/pictures/ready")).__setPictureStatusForTests(undefined);
+    setHouseholdSettingValue("chat.model_id", "ornith-1-5-122b-mlx-4bit");
+    const { toolCount, thinking } = await seen(people.child, "hi", { thinking: true });
+    expect(toolCount).toBe(0);
+    expect(thinking).toBe(false);
+  });
 });

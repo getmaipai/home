@@ -1,6 +1,8 @@
 import { beforeEach, describe, expect, test } from "bun:test";
 import { app } from "@/app";
-import { getSetupState, getStorageChoice } from "@/lib/setupState";
+import { codingClientLater, getSetupState, getStorageChoice } from "@/lib/setupState";
+import { db } from "@/db";
+import { setupState } from "@/db/schema";
 import { mkdtempSync, realpathSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -11,6 +13,12 @@ import { __clearSessionCacheForTests } from "@/middleware/auth";
 beforeEach(() => {
   resetDb();
   __clearSessionCacheForTests();
+});
+
+test("coding mode setup choice defaults to false and reads the wizard's saved choice", () => {
+  expect(codingClientLater()).toBe(false);
+  db.insert(setupState).values({ slot: 1, value: JSON.stringify({ coding_client_later: true }) }).run();
+  expect(codingClientLater()).toBe(true);
 });
 
 const result = (status = "done") => ({ status });

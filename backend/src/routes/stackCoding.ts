@@ -56,3 +56,14 @@ stackCodingRoutes.openapi(removeRoute, async (c) => {
   try { return c.json(await removeCodingPiece(c.req.valid("param").id), 200); }
   catch (error) { return failure(c, error) as never; }
 });
+
+import { codingModeReadiness } from "@/lib/codingMode";
+import { getHouseholdSettingValue } from "@/lib/settings";
+import { getStackClient } from "@/lib/stackEngine";
+const modeRoute = createRoute({ method:"get", path:"/mode", tags:["Coding"], summary:"Coding mode readiness and current Stack state", middleware:[requireRole("owner","admin")] as const,
+  responses:{ 200:{ content:{"application/json":{schema:z.object({readiness:z.unknown(),mode:z.enum(["normal","coding"]).nullable(),state:z.enum(["stable","switching","failed"]).nullable(),reason:z.string().nullable()})}},description:"Readiness and mode state."}, ...refusals } });
+stackCodingRoutes.openapi(modeRoute, async c => {
+  const readiness = await codingModeReadiness();
+  try { const mode = await getStackClient().getCodingMode(); return c.json({ readiness, mode:mode.mode, state:mode.state, reason:mode.reason },200); }
+  catch { return c.json({ readiness, mode:null, state:null, reason:"Home could not reach the AI engine." },200); }
+});

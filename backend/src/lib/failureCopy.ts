@@ -129,7 +129,7 @@ const COMPOSER_NOTICE: Record<"paused" | "starting", ComposerNotice> = {
 /** CHAT-PAUSE-01: the same composer line, worded for the cause when Home
  * knows it. Every cause reuses the one notice shape (and so the one
  * composer line, Welcome state and Send hold); only the words differ. */
-const CAUSE_NOTICE: Record<"restarting" | "memory" | "not_installed" | "paused_by_admin" | "offline", ComposerNotice> = {
+const CAUSE_NOTICE: Record<"restarting" | "memory" | "not_installed" | "mode_change" | "paused_by_admin" | "offline", ComposerNotice> = {
   restarting: {
     adult: "The AI is restarting. Chat will start again by itself in a minute.",
     teen: "The AI is restarting. Chat will start again by itself in a minute.",
@@ -148,6 +148,7 @@ const CAUSE_NOTICE: Record<"restarting" | "memory" | "not_installed" | "paused_b
     child: "I'm not ready yet. Ask a grown-up.",
     repairs_link: "Open Repairs",
   },
+  mode_change: { adult: "Home is switching modes. Chat will be back in a minute.", teen: "Home is switching modes. Chat will be back in a minute.", child: "I am switching modes. Try again in a minute.", repairs_link: null },
   paused_by_admin: {
     adult: "Chat is paused by an admin until it is turned back on.",
     teen: "Chat is paused by an admin until it is turned back on.",
