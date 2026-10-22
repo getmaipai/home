@@ -5258,6 +5258,27 @@
                 }
               }
             }
+          },
+          "409": {
+            "description": "Coding mode is not ready or the Stack could not start the switch.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "readiness": {
+                      "nullable": true
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
           }
         }
       }
@@ -27028,6 +27049,109 @@
                   "required": [
                     "piece",
                     "removed"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Admins only",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such piece",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "It cannot be installed or removed right now (the message says why)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "The engine is not answering",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/coding-setup/mode": {
+      "get": {
+        "tags": [
+          "Coding"
+        ],
+        "summary": "Coding mode readiness and current Stack state",
+        "responses": {
+          "200": {
+            "description": "Readiness and mode state.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "readiness": {
+                      "nullable": true
+                    },
+                    "mode": {
+                      "type": "string",
+                      "nullable": true,
+                      "enum": [
+                        "normal",
+                        "coding",
+                        null
+                      ]
+                    },
+                    "state": {
+                      "type": "string",
+                      "nullable": true,
+                      "enum": [
+                        "stable",
+                        "switching",
+                        "failed",
+                        null
+                      ]
+                    },
+                    "reason": {
+                      "type": "string",
+                      "nullable": true
+                    }
+                  },
+                  "required": [
+                    "mode",
+                    "state",
+                    "reason"
                   ]
                 }
               }
