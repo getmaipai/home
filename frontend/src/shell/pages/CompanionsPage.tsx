@@ -5,12 +5,11 @@ import { AsyncState } from "@maipai/ui/src/primitives/AsyncState";
 import { EmptyState } from "@maipai/ui/src/primitives/EmptyState";
 import { Section } from "@maipai/ui/src/primitives/Section";
 import { Avatar } from "@maipai/ui/src/primitives/Avatar";
-import { Card, CardContent } from "@maipai/ui/src/dashboard/components/ui/card";
+import { CardGrid } from "@maipai/ui/src/primitives/CardGrid";
 import { Badge } from "@maipai/ui/src/dashboard/components/ui/badge";
 import { Alert, AlertDescription } from "@maipai/ui/src/ui/alert";
 import { Button } from "@maipai/ui/src/ui/button";
 import { Select } from "@maipai/ui/src/primitives/Select";
-import { GRID_COLUMNS } from "@maipai/ui/src/responsive";
 import { companionVoiceKey } from "@/lib/companionVoice";
 import { api, ApiError, type CompanionCard, type CompanionDetail, type CompanionList } from "@/lib/api";
 import { playableVoices, previewIdFor, voiceChoices } from "@/lib/voice/voiceBrowserRows";
@@ -46,6 +45,7 @@ function CompanionBody({ card }: { card: CompanionCard }) {
 /** /companions: the companions this person may use, as a card grid. An owner or admin also sees which companion each robot has. */
 export function CompanionsPage() {
   useTabItem("Companions");
+  const navigate = useNavigate();
   const query = useQuery<CompanionList>({ queryKey: listKey, queryFn: api.companions, retry: false });
   return (
     <div className="flex flex-col gap-6" data-testid="companions">
@@ -69,15 +69,14 @@ export function CompanionsPage() {
             ) : data.companions.length === 0 ? (
               <EmptyState icon="user" text="No companions are installed yet." />
             ) : (
-              <ul aria-label="Companions" className={`grid list-none gap-4 p-0 ${GRID_COLUMNS.default}`}>
-                {data.companions.map((card) => (
-                  <li key={card.id} className="min-w-0">
-                    <Link to={`/companions/${encodeURIComponent(card.id)}`} aria-label={card.name} className="block rounded-xl transition-shadow hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
-                      <Card><CardContent><CompanionBody card={card} /></CardContent></Card>
-                    </Link>
-                  </li>
-                ))}
-              </ul>
+              <CardGrid
+                label="Companions"
+                items={data.companions}
+                getKey={(card) => card.id}
+                getLabel={(card) => card.name}
+                onSelect={(card) => navigate(`/companions/${encodeURIComponent(card.id)}`)}
+                renderItem={(card) => <CompanionBody card={card} />}
+              />
             )}
             {data.robots ? <RobotAssignments robots={data.robots} /> : null}
           </>
@@ -219,12 +218,11 @@ function VoiceRow({ companion }: { companion: CompanionDetail }) {
             disabled={saveVoice.isPending}
             onValueChange={(value) => saveVoice.mutate(value)}
           />
-          <p className="text-sm text-muted-foreground">Only owners and admins choose this. Everyone hears the companion in this voice, except a child or teen never gets a voice made from a clip.</p>
-          {saveVoice.isError ? <p role="alert">{saveVoice.error instanceof ApiError ? saveVoice.error.message : "Could not save this voice. Check your connection and try again."}</p> : null}
+          {saveVoice.isError ? <Alert variant="destructive"><AlertDescription>{saveVoice.error instanceof ApiError ? saveVoice.error.message : "Could not save this voice. Check your connection and try again."}</AlertDescription></Alert> : null}
         </div>
       ) : null}
-      {voices.isError ? <p role="alert">Home can't reach its voice service. Check Repairs, then come back.</p> : null}
-      {preview.error ? <p role="alert">{preview.error}</p> : null}
+      {voices.isError ? <Alert variant="destructive"><AlertDescription>Home can't reach its voice service. Check Repairs, then come back.</AlertDescription></Alert> : null}
+      {preview.error ? <Alert variant="destructive"><AlertDescription>{preview.error}</AlertDescription></Alert> : null}
     </div>
   );
 }
