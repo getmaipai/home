@@ -3,7 +3,7 @@
   "turnContext.ts": 14,
   "guards.ts": 133,
   "unknownNames.ts": 62,
-  "turnSignal.ts": 59,
+  "turnSignal.ts": 58,
   "utteranceShape.ts": 22,
   "routing.ts": 0,
   "replyConstraints.ts": 10,
