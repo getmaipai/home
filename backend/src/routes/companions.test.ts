@@ -22,7 +22,7 @@ import { addVersion, approveSheet, setRest, updateSheet } from "@/lib/companionL
 import { getHouseholdCompanion } from "@/lib/householdCompanions";
 import { __setVideosFetchForTests } from "@/lib/videos/stack";
 import { __setVideoStatusForTests, readyVideoStatusForTests } from "@/lib/videos/ready";
-import { __clearCompanionTakeRunsForTests } from "@/lib/companionTakes";
+import { __clearCompanionTakeRunsForTests, __setTakeRetryWaitMsForTests } from "@/lib/companionTakes";
 import media from "@maipai/spec/vocab/companion-media.json";
 
 const app = new OpenAPIHono();
@@ -403,7 +403,7 @@ describe("household companion routes", () => {
       return new Response("Not found", { status: 404 });
     }) as typeof fetch);
     let finished = 0;
-    __setStackClientForTests({ mediaRoots: async () => ({ read: [companionRoot], write: [companionRoot] }), setMediaRoots: async () => ({ read: [companionRoot], write: [companionRoot] }), submitJob: async (request: any) => { finished++; expect(request.kind).toBe("media.companion_clip"); expect(request.input.key).toBe("#FF00FF"); const distance = request.input.output_dir.endsWith("take-2") ? 1 : 4; return { id: `media-${finished}`, state: "done", result: { ok: true, reasons: [], seconds: 3, files: [{ name: "clip.h264.mp4", bytes: 123 }], av1: false, colour_distance: distance, area_ratio: 1, loop_gap: 0, opaque_share: { min: .5, max: .8 } } }; }, job: async () => { throw Error("unexpected poll"); } } as never);
+    __setStackClientForTests({ mediaRoots: async () => ({ read: [companionRoot], write: [companionRoot] }), setMediaRoots: async () => ({ read: [companionRoot], write: [companionRoot] }), submitJob: async (request: any) => { finished++; expect(request.kind).toBe("media.companion_clip"); expect(request.input.key).toBe("#FF00FF"); const distance = request.input.output_dir.endsWith("take-2") ? 1 : 4; return { id: `media-${finished}`, state: "done", result: { ok: true, reasons: [], seconds: 3, files: [{ name: "clip.h264.mp4", bytes: 123 }], av1: false, colour_distance: distance, area_ratio: 1, loop_gap: 0, opaque_share: { min: .5, max: .8 }, colour_match: { applied: true, strength: .4 }, settle_skipped_frames: 16 } }; }, job: async () => { throw Error("unexpected poll"); } } as never);
     const started = await request(`companions/${id}/states/idle/generate`, adult, "POST", { count: 2 }); expect(started.status).toBe(202); const { job } = await started.json() as { job: string };
     let progress: any;
     for (let attempt = 0; attempt < 100; attempt++) { const response = await request(`companions/${id}/states/jobs/run/${job}`, adult); progress = await response.json(); if (progress.state === "done" || progress.state === "failed") break; await new Promise((resolve) => setTimeout(resolve, 5)); }
@@ -412,6 +412,49 @@ describe("household companion routes", () => {
     expect(submitted[0]?.image).toBe(Buffer.from(stackOriginal).toString("base64"));
     expect(fetched).toEqual(["video-1", "video-2"]); expect(deleted).toEqual(["video-1", "video-2"]); expect(finished).toBe(2);
     const takes = readStates(id).states.idle!.takes; expect(takes).toHaveLength(2); expect(takes.every((take) => take.report?.ok)).toBe(true); expect(bestTake(takes)?.id).toBe("take-2");
+    const statesApi = await (await request(`companions/${id}/states`, adult)).json() as any;
+    expect(statesApi.states.find((state: any) => state.id === "idle").takes[0]).toMatchObject({ colour_match: { applied: true, strength: .4 }, settle_skipped_frames: 16 });
+  });
+
+  test("retries one memory cancellation once with a fresh seed, and Stop during the wait wins", async () => {
+    const adult = addPerson("person-state-retry", "adult"), submitted: Array<Record<string, unknown>> = [];
+    __setVideoStatusForTests(readyVideoStatusForTests()); __setTakeRetryWaitMsForTests(0);
+    const prepare = async (name: string) => {
+      const created = createHouseholdCompanion({ ...fixture(), display_name: name }, { display_name: "Author", person_id: "person-state-retry" }); if (!created.ok) throw new Error(created.error);
+      const id = created.value.id, original = await transparentPng();
+      const rest = addVersion(id, original, { source: "upload", label: "rest", width: 1024, height: 1024, from: null }, original); setRest(id, rest.id);
+      updateSheet(id, { views: { left: null, right: null, mouth: null }, card: { text: "A red fox", species: "fox", colours: ["#CC3322"] }, key: "#00FF00", state: "needs_review", approved_by: null, approved_at: null }); approveSheet(id, "Author");
+      return id;
+    };
+    const runScenario = async (id: string, cancelCount: number, expectedState: "done" | "failed") => {
+      let videoNumber = 0; const sent: Array<Record<string, unknown>> = [];
+      __setVideosFetchForTests((async (input, init) => {
+        const url = new URL(String(input)), method = init?.method ?? "GET";
+        if (url.pathname === "/v1/videos/generations" && method === "POST") { const body = JSON.parse(String(init?.body)) as Record<string, unknown>; sent.push(body); videoNumber++; return Response.json({ job: `retry-${id}-${videoNumber}` }, { status: 202 }); }
+        if (url.pathname.startsWith(`/v1/videos/generations/retry-${id}-`) && method === "GET") { const n = Number(url.pathname.slice(url.pathname.lastIndexOf("-") + 1)); return Response.json({ job: `retry-${id}-${n}`, state: n <= cancelCount ? "cancelled" : "done", progress: 100, data: [{ seed: sent[n - 1]?.seed }] }); }
+        if (url.pathname.endsWith("/video.mp4") && method === "GET") return new Response(new Uint8Array([0, 0, 0, 24, 102, 116, 121, 112]));
+        if (url.pathname.startsWith(`/v1/videos/generations/retry-${id}-`) && method === "DELETE") return new Response(null, { status: 204 });
+        return new Response("Not found", { status: 404 });
+      }) as typeof fetch);
+      __setStackClientForTests({ mediaRoots: async () => ({ read: [companionRoot], write: [companionRoot] }), setMediaRoots: async () => ({ read: [companionRoot], write: [companionRoot] }), submitJob: async (request: any) => { expect(request.kind).toBe("media.companion_clip"); return { id: `finish-${id}`, state: "done", result: { ok: true, reasons: [], seconds: 3, files: [{ name: "clip.h264.mp4", bytes: 10 }], av1: false } }; } } as never);
+      const started = await request(`companions/${id}/states/idle/generate`, adult, "POST", { count: 1 }); expect(started.status).toBe(202); const { job } = await started.json() as { job: string };
+      let progress: any;
+      for (let i = 0; i < 200; i++) { progress = await (await request(`companions/${id}/states/jobs/run/${job}`, adult)).json(); if (progress.state === "done" || progress.state === "failed") break; await new Promise((resolve) => setTimeout(resolve, 5)); }
+      expect(progress.state).toBe(expectedState); expect(sent).toHaveLength(Math.min(cancelCount + 1, 2)); if (cancelCount === 1 && expectedState === "done") expect(sent[0]?.seed).not.toBe(sent[1]?.seed);
+      if (expectedState === "failed") expect(progress.error).toBe("The video engine stopped this clip. Try again.");
+      submitted.push(...sent);
+    };
+    const onceId = await prepare("Retry once"); await runScenario(onceId, 1, "done");
+    const twiceId = await prepare("Retry twice"); await runScenario(twiceId, 2, "failed");
+
+    const stopId = await prepare("Stop during retry wait"); __setTakeRetryWaitMsForTests(30_000); let videoNumber = 0;
+    __setVideosFetchForTests((async (input, init) => { const url = new URL(String(input)), method = init?.method ?? "GET"; if (url.pathname === "/v1/videos/generations" && method === "POST") { videoNumber++; return Response.json({ job: `stop-retry-${videoNumber}` }, { status: 202 }); } if (url.pathname.endsWith("/stop-retry-1") && method === "GET") return Response.json({ job: "stop-retry-1", state: "cancelled", progress: 21, data: [] }); if (url.pathname.endsWith("/stop-retry-1") && method === "DELETE") return new Response(null, { status: 204 }); return new Response("Not found", { status: 404 }); }) as typeof fetch);
+    const started = await request(`companions/${stopId}/states/idle/generate`, adult, "POST", { count: 1 }); const { job } = await started.json() as { job: string };
+    let progress: any;
+    for (let i = 0; i < 100; i++) { progress = await (await request(`companions/${stopId}/states/jobs/run/${job}`, adult)).json(); if (progress.label === "Waiting for memory, then trying again") break; await new Promise((resolve) => setTimeout(resolve, 5)); }
+    expect(progress.label).toBe("Waiting for memory, then trying again"); expect((await request(`companions/${stopId}/states/jobs/run/${job}`, adult, "DELETE")).status).toBe(204);
+    for (let i = 0; i < 100; i++) { progress = await (await request(`companions/${stopId}/states/jobs/run/${job}`, adult)).json(); if (progress.state === "cancelled") break; await new Promise((resolve) => setTimeout(resolve, 5)); }
+    expect(progress.state).toBe("cancelled"); expect(videoNumber).toBe(1); expect(submitted).toHaveLength(4);
   });
 
   test("refuses minor, unapproved sheet and unavailable video engine before submitting", async () => {

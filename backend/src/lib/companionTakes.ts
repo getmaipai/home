@@ -3,7 +3,7 @@ import { join } from "node:path";
 import media from "@maipai/spec/vocab/companion-media.json";
 import type { PersonRow } from "@/types";
 import { readLook, versionOriginalPath, versionPath } from "@/lib/companionLook";
-import { addTake, companionHasFinishingJob, finishTake, readStates, recordTakeFailure, setMotion, takePath, TAKE_LIMIT_LINE } from "@/lib/companionStates";
+import { addTake, companionHasFinishingJob, finishTake, readStates, recordTakeFailure, setMotion, setTakeSeed, takePath, TAKE_LIMIT_LINE } from "@/lib/companionStates";
 import { routeAudience } from "@/lib/pictures/audience";
 import { videoDenial, VIDEO_DENIAL_LINE, VIDEO_NOT_HERE_LINE, refuseVideoPrompt, VIDEO_REFUSAL_LINE } from "@/lib/videos/policy";
 import { videoEngineReady, videoEngineStatus } from "@/lib/videos/ready";
@@ -16,6 +16,7 @@ export const TAKE_RUN_BUSY_LINE = "A clip is already being made for this compani
 export const TAKE_QUICK_NOT_READY_LINE = "Making a character's clips needs the standard video model. An admin can install it in Settings, Pictures and videos.";
 export const TAKE_RUN_NOT_FOUND_LINE = "That clip run could not be found. Start it again.";
 export const TAKE_RUN_TIMEOUT_LINE = "The video engine took too long. Try again.";
+export const TAKE_RETRY_WAIT_MS = 60_000;
 export const TAKE_NEGATIVE_PROMPT = "different character, changed colours, changed face, extra limbs, text, watermark, camera movement, background change, shadows";
 export const TAKE_NO_ORIGINAL_LINE = 'The video model can only start from a picture the picture model made. Use "Change it" on this picture to make a version with the picture model, then pick that one as the starting picture.';
 
@@ -29,6 +30,7 @@ export interface TakeRun {
 const runs = new Map<string, TakeRun>();
 const activeByCompanion = new Map<string, string>();
 const starting = new Set<string>();
+let takeRetryWaitMs = TAKE_RETRY_WAIT_MS;
 
 const stateRows = media.states as Array<{ id: string; motion: string }>;
 
@@ -41,7 +43,8 @@ export function activeTakeRun(companionId: string): TakeRun | null {
   return run && (run.state === "queued" || run.state === "running") ? run : null;
 }
 export function companionHasTakeRun(companionId: string): boolean { const id = activeByCompanion.get(companionId), run = id ? runs.get(id) : null; return starting.has(companionId) || Boolean(run && ["queued", "running", "cancelled"].includes(run.state)); }
-export function __clearCompanionTakeRunsForTests(): void { runs.clear(); activeByCompanion.clear(); starting.clear(); }
+export function __clearCompanionTakeRunsForTests(): void { runs.clear(); activeByCompanion.clear(); starting.clear(); takeRetryWaitMs = TAKE_RETRY_WAIT_MS; }
+export function __setTakeRetryWaitMsForTests(value: number): void { takeRetryWaitMs = value; }
 export function takeRunFor(id: string, actor: PersonRow, companionId: string): TakeRun | null { const run = runs.get(id); return run?.personId === actor.id && run.companionId === companionId ? run : null; }
 
 function readySheet(companionId: string): { look: ReturnType<typeof readLook>; restPath: string; originalPath: string | null; card: NonNullable<NonNullable<ReturnType<typeof readLook>["sheet"]>["card"]> } {
@@ -79,29 +82,45 @@ async function runTakes(run: TakeRun, count: number, motionOverride?: string): P
         let stackJob: string | null = null;
         let engineFailure = false;
         try {
-          const seed = Math.floor(Math.random() * 2_147_483_647);
+          let seed = Math.floor(Math.random() * 2_147_483_647);
           take = addTake(run.companionId, state, { source: "generated", seed, label: `Candidate ${index}` });
-          const submitted = await submitVideo({ prompt, negative_prompt: TAKE_NEGATIVE_PROMPT, size: `${media.generate.width}x${media.generate.height}`, seconds: media.generate.seconds, seed, image: pictureB64, image_source: "generated", audience: "all-ages", timeout_ms: 1 });
-          stackJob = submitted.job; run.stackJob = stackJob;
-          let done = submitted.done;
-          const deadline = Date.now() + 15 * 60_000;
-          while (!done) {
-            if (run.cancelled) break;
-            if (Date.now() > deadline) throw new Error(TAKE_RUN_TIMEOUT_LINE);
-            const status = await getVideoJob(stackJob);
-            if (status.state === "failed") throw new StackVideoError(500, status.code ?? "video_failed", status.error ?? "The video engine could not make this clip. Try again.", stackJob);
-            if (status.state === "cancelled") throw Object.assign(new Error("The video engine stopped this clip. Try again."), { cancelled: true });
-            if (status.state === "done") done = status.data;
-            else { const progress = Math.max(0, Math.min(99, status.progress)); run.percent = Math.min(79, Math.round((run.takesMade / (run.states.length * count)) * 100 + progress / (run.states.length * count))); }
-            if (!done) await new Promise((resolve) => setTimeout(resolve, 2_000));
+          let done: Awaited<ReturnType<typeof submitVideo>>["done"];
+          for (let attempt = 0; attempt < 2; attempt++) {
+            try {
+              const submitted = await submitVideo({ prompt, negative_prompt: TAKE_NEGATIVE_PROMPT, size: `${media.generate.width}x${media.generate.height}`, seconds: media.generate.seconds, seed, image: pictureB64, image_source: "generated", audience: "all-ages", timeout_ms: 1 });
+              stackJob = submitted.job; run.stackJob = stackJob; done = submitted.done;
+              const deadline = Date.now() + 15 * 60_000;
+              while (!done) {
+                if (run.cancelled) break;
+                if (Date.now() > deadline) throw new Error(TAKE_RUN_TIMEOUT_LINE);
+                const status = await getVideoJob(stackJob);
+                if (status.state === "failed") throw new StackVideoError(500, status.code ?? "video_failed", status.error ?? "The video engine could not make this clip. Try again.", stackJob);
+                if (status.state === "cancelled") throw Object.assign(new Error("The video engine stopped this clip. Try again."), { cancelled: true });
+                if (status.state === "done") done = status.data;
+                else { const progress = Math.max(0, Math.min(99, status.progress)); run.percent = Math.min(79, Math.round((run.takesMade / (run.states.length * count)) * 100 + progress / (run.states.length * count))); }
+                if (!done) await new Promise((resolve) => setTimeout(resolve, 2_000));
+              }
+              break;
+            } catch (error) {
+              if (!(error as { cancelled?: boolean })?.cancelled || attempt > 0 || run.cancelled) throw error;
+              if (stackJob) await cancelOrDeleteVideo(stackJob);
+              run.stackJob = null; stackJob = null;
+              run.phase = "waiting"; run.label = "Waiting for memory, then trying again";
+              await new Promise((resolve) => setTimeout(resolve, takeRetryWaitMs));
+              if (run.cancelled) break;
+              const nextSeed = Math.floor(Math.random() * 2_147_483_647);
+              seed = nextSeed === seed ? (seed + 1) % 2_147_483_647 : nextSeed;
+              setTakeSeed(run.companionId, state, take.id, seed);
+            }
           }
           if (run.cancelled) break;
           run.phase = "finishing"; run.label = `Finishing take ${index} of ${count} for ${stateLabel(state)}`; run.percent = Math.min(99, run.percent + 1);
-          const clip = await fetchClip(stackJob);
-          if (run.cancelled) { await cancelOrDeleteVideo(stackJob); break; }
+          const completedStackJob = stackJob!;
+          const clip = await fetchClip(completedStackJob);
+          if (run.cancelled) { await cancelOrDeleteVideo(completedStackJob); break; }
           const sourcePath = takePath(run.companionId, state, take.id, "source.mp4")!;
           writeFileSync(sourcePath, clip);
-          await cancelOrDeleteVideo(stackJob); run.stackJob = null; stackJob = null;
+          await cancelOrDeleteVideo(completedStackJob); run.stackJob = null; stackJob = null;
           await finishTake(run.companionId, state, take.id, { alpha: false });
           consecutiveEngineFailures = 0;
         } catch (error) {
@@ -111,6 +130,7 @@ async function runTakes(run: TakeRun, count: number, motionOverride?: string): P
           engineFailure = isEngineFailure(error);
           if (engineFailure) consecutiveEngineFailures++; else consecutiveEngineFailures = 0;
           if (run.cancelled) break;
+          if ((error as { cancelled?: boolean })?.cancelled) { run.error = error instanceof Error ? error.message : "The video engine stopped this clip. Try again."; run.state = "failed"; break; }
           if (engineShouldStop(error) || consecutiveEngineFailures >= 2) {
             run.error = error instanceof Error ? error.message : "The video engine could not continue. Check it, then try again.";
             run.state = "failed"; break;
