@@ -128,6 +128,28 @@ export interface CodingPiecesView {
   stack: "ok" | "unreachable"; message: string | null; coding_enabled: boolean; engine: "splash" | "llama-server" | null;
   missing: string | null; pieces: CodingPiece[];
 }
+export interface CodingModeReadinessView {
+  ready: boolean;
+  first_unmet: CodingModeReadinessItemId | null;
+  checked_at: string;
+  items: CodingModeReadinessItem[];
+  provenance: string;
+  hlc: string;
+}
+export type CodingModeReadinessItemId = "coding_enabled" | "engine" | "pieces" | "hardware" | "memory" | "self_test" | "client" | "bench";
+export interface CodingModeReadinessItem {
+  id: CodingModeReadinessItemId;
+  state: "done" | "can_do" | "manual";
+  reason_key: CodingModeReadinessItemId;
+  doc_anchor: string;
+}
+export interface CodingModeView { readiness: CodingModeReadinessView; mode: "normal" | "coding"; state: string; reason: string | null }
+export interface SetupCodingView {
+  eligible_mode: boolean;
+  pieces: Array<{ id: CodingPiece["id"]; label: string; size_bytes: number | null; state: CodingPiece["state"] }>;
+  total_bytes: number;
+  readiness: CodingModeReadinessView;
+}
 export interface CodingGrant {
   id: string; person: string; action: string; effect: "allow" | "deny"; valid_from?: string | null; valid_to?: string | null;
   granted_by_person_id: string; created_at: string; deleted_at?: string | null;
@@ -1162,9 +1184,13 @@ export const api = {
   settingsRegistry: () => request<SettingsKey[]>("/api/settings/registry"),
   settingsCapabilities: () => request<{ robotsEnabled: boolean }>("/api/settings/capabilities"),
   codingAccess: () => request<{ allowed: boolean; can_create: boolean }>("/api/settings/coding-access"),
-  codingPieces: () => request<CodingPiecesView>("/api/coding-setup/pieces"),
-  installCodingPiece: (id: CodingPiece["id"]) => request<{ job: string | null; piece: CodingPiece["id"] }>(`/api/coding-setup/pieces/${id}/install`, { method: "POST" }),
-  removeCodingPiece: (id: CodingPiece["id"]) => request<{ piece: CodingPiece["id"]; removed: true }>(`/api/coding-setup/pieces/${id}`, { method: "DELETE" }),
+  codingPieces: () => request<CodingPiecesView>("/api/coding/pieces"),
+  codingMode: () => request<CodingModeView>("/api/coding/mode"),
+  runCodingModeSelfTest: () => request<unknown>("/api/coding/mode/self-test", { method: "POST" }),
+  setupCoding: () => request<SetupCodingView>("/api/setup/coding"),
+  chooseSetupCoding: (choice: "set_up" | "later") => request<SetupCodingView>("/api/setup/coding", { method: "POST", body: JSON.stringify({ choice }) }),
+  installCodingPiece: (id: CodingPiece["id"]) => request<{ job: string | null; piece: CodingPiece["id"] }>(`/api/coding/pieces/${id}/install`, { method: "POST" }),
+  removeCodingPiece: (id: CodingPiece["id"]) => request<{ piece: CodingPiece["id"]; removed: true }>(`/api/coding/pieces/${id}`, { method: "DELETE" }),
   apiKeys: () => request<{ keys: PersonalApiKey[] }>("/api/settings/api-keys"),
   createApiKey: (input: { name: string; scopes: Array<"turn" | "code" | "settings">; expires_in_days: 7 | 30 | 90 | 365 }) =>
     request<{ key: PersonalApiKey; secret: string }>("/api/settings/api-keys", { method: "POST", body: JSON.stringify(input) }),

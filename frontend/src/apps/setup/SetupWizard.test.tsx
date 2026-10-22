@@ -9,10 +9,15 @@ afterEach(cleanup);
 beforeEach(() => { sessionStorage.clear(); });
 
 const IDS = ["welcome", "engine_location", "storage", "checks", "plan", "away", "owner", "face", "profile", "hello", "backup_key", "done"] as const;
+type TestStep = { id: string; status: SetupState["steps"][number]["status"]; at: string };
+function setStepStatus(state: SetupState, id: string, status: SetupState["steps"][number]["status"]) {
+  const steps = state.steps as TestStep[];
+  state.steps = steps.map((step) => step.id === id ? { ...step, status, at: new Date().toISOString() } : step) as SetupState["steps"];
+}
 function freshState(): SetupState {
   sessionStorage.setItem("maipai:setup-before-start-read", "true");
   const now = new Date().toISOString();
-  return { id: "setup-test", source: "wizard", steps: IDS.map((id) => ({ id, status: "pending", at: now })), phase: "computers", engine: { where: "this_computer", hardware: {} }, away: "later", plan: { option: "recommended", tier: "minimal", roles: [] }, checks: [], started_at: now, completed_at: null, hlc: "1790000000000:0:abcdef" };
+  return { id: "setup-test", source: "wizard", steps: [...IDS.slice(0, 7).map((id) => ({ id, status: "pending" as const, at: now })), { id: "coding_mode", status: "pending" as const, at: now }, ...IDS.slice(7).map((id) => ({ id, status: "pending" as const, at: now }))], phase: "computers", engine: { where: "this_computer", hardware: {} }, away: "later", plan: { option: "recommended", tier: "minimal", roles: [] }, checks: [], started_at: now, completed_at: null, hlc: "1790000000000:0:abcdef" } as unknown as SetupState;
 }
 
 const GREEN_ROWS = [{ id: "engine", title: "Engine service", state: "green", text: "Home's AI is answering." }];
@@ -21,9 +26,10 @@ const RECOMMENDED_PLAN = { plan: {}, wording: { level: "recommended", headline: 
 /** `plan` is what GET /api/setup/plan answers: the recommended plan by default, or "unreachable" for an engine that is not answering. */
 let jobRows: unknown[] = [];
 const SILENT_PLAN = { plan: null, wording: { level: "unknown", headline: "Home can't see this computer's AI yet", detail: "The AI engine isn't answering. Wait a minute and press Check again.", gets: [], needsMemoryAnswer: false, sizeLine: null, diskLine: null } };
-function harness(initial = freshState(), checkRows: unknown[] = GREEN_ROWS, plan: "recommended" | "unreachable" | "silent" = "recommended") {
+function harness(initial = freshState(), checkRows: unknown[] = GREEN_ROWS, plan: "recommended" | "unreachable" | "silent" = "recommended", eligibleMode = false, codingPieceState = "notInstalled") {
   const original = globalThis.fetch;
   let state: SetupState | { done: true } = structuredClone(initial);
+  let currentCodingPieceState = codingPieceState;
   const posts: string[] = [];
   const licenceAccepts: string[] = [];
   const bodies: Record<string, { engine?: { where: string } }> = {};
@@ -51,6 +57,16 @@ function harness(initial = freshState(), checkRows: unknown[] = GREEN_ROWS, plan
     if (url.includes("/api/setup/storage/check")) return new Response(JSON.stringify({ rows: [] }), { status: 200 });
     if (url.includes("/api/setup/ca")) return new Response(JSON.stringify({ certificate: "public" }), { status: 200 });
     if (url.includes("/api/backups/emergency-kit")) return new Response(JSON.stringify({ hubName: "Home", hubInstanceId: "hub-1", backupKeyHex: "aabb", generatedAt: new Date().toISOString() }), { status: 200 });
+    if (url.endsWith("/api/setup/coding") && init?.method !== "POST") return new Response(JSON.stringify({ eligible_mode: eligibleMode, pieces: [{ id: "engine", label: "Coding engine", size_bytes: 1024 ** 3, state: currentCodingPieceState }, { id: "model", label: "Coding model", size_bytes: 4 * 1024 ** 3, state: currentCodingPieceState }], total_bytes: 5 * 1024 ** 3, readiness: { ...codingReadiness, ready: false, first_unmet: "pieces" } }), { status: 200 });
+    if (url.endsWith("/api/setup/coding") && init?.method === "POST") {
+      const choice = JSON.parse(String(init.body)) as { choice: "set_up" | "later" };
+      posts.push(`coding:${choice.choice}`);
+      if (choice.choice === "set_up") currentCodingPieceState = "installed";
+      if (choice.choice === "later" && !("done" in state)) setStepStatus(state, "coding_mode", "skipped");
+      return new Response(JSON.stringify({ accepted: true }), { status: 200 });
+    }
+    if (url.endsWith("/api/coding/mode/self-test") && init?.method === "POST") return new Response(JSON.stringify({ accepted: true }), { status: 202 });
+    if (url.endsWith("/api/settings/api-keys") && init?.method === "POST") return new Response(JSON.stringify({ key: { hint: "ABCD" }, secret: "maipai_key_once" }), { status: 201 });
     if (url.includes("/api/auth/setup")) return new Response(JSON.stringify({ person: { id: "owner-1" } }), { status: 201 });
     const match = url.match(/\/api\/setup\/([^/?]+)$/);
     if (match && init?.method === "POST" && !("done" in state)) {
@@ -67,8 +83,10 @@ function harness(initial = freshState(), checkRows: unknown[] = GREEN_ROWS, plan
   return { posts, bodies, licenceAccepts, restore: () => { globalThis.fetch = original; } };
 }
 
-function view(onDone = () => {}) {
-  return render(<QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}><MemoryRouter initialEntries={["/setup"]}><Routes><Route path="/setup" element={<SetupWizard onDone={onDone} />} /><Route path="/sign-in" element={<p>Sign in</p>} /></Routes></MemoryRouter></QueryClientProvider>);
+const codingReadiness = { ready: false, first_unmet: "pieces", checked_at: new Date().toISOString(), items: ["coding_enabled", "engine", "pieces", "hardware", "memory", "self_test", "client", "bench"].map((id) => ({ id, state: "can_do", reason_key: id, doc_anchor: id })), provenance: "test", hlc: "1790000000000:0:abcdef" };
+
+function view(onDone = () => {}, initialScreen?: "coding_mode") {
+  return render(<QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}><MemoryRouter initialEntries={["/setup"]}><Routes><Route path="/setup" element={<SetupWizard onDone={onDone} initialScreen={initialScreen} />} /><Route path="/sign-in" element={<p>Sign in</p>} /></Routes></MemoryRouter></QueryClientProvider>);
 }
 
 async function advanceTo(viewResult: ReturnType<typeof view>, buttonText: string, expected: string) {
@@ -238,7 +256,8 @@ describe("SetupWizard", () => {
       fireEvent.change(rendered.getByLabelText("Name"), { target: { value: "Sage" } });
       fireEvent.change(rendered.getByLabelText("PIN or password"), { target: { value: "2468" } });
       fireEvent.change(rendered.getByLabelText("Confirm passcode"), { target: { value: "2468" } });
-      await advanceTo(rendered, "Create owner account", "Save your backup key");
+      await advanceTo(rendered, "Create owner account", "Coding on this Home");
+      await advanceTo(rendered, "Not now", "Save your backup key");
       const createUrl = URL.createObjectURL; const revoke = URL.revokeObjectURL;
       URL.createObjectURL = () => "blob:test"; URL.revokeObjectURL = () => {};
       const click = HTMLAnchorElement.prototype.click;
@@ -248,7 +267,7 @@ describe("SetupWizard", () => {
         await act(async () => { fireEvent.click(rendered.getByRole("button", { name: "Download" })); });
       } finally { URL.createObjectURL = createUrl; URL.revokeObjectURL = revoke; HTMLAnchorElement.prototype.click = click; }
       await advanceTo(rendered, "Continue", "You're all set");
-      expect(h.posts).toEqual(["welcome", "engine_location", "storage", "checks", "plan", "owner", "backup_key"]);
+      expect(h.posts).toEqual(["welcome", "engine_location", "storage", "checks", "plan", "owner", "coding:later", "backup_key"]);
       await act(async () => { fireEvent.click(rendered.getByRole("button", { name: "Open my Home" })); });
       expect(h.posts.at(-1)).toBe("done");
       await waitFor(() => expect(rendered.container.textContent).toContain("Sign in"));
@@ -279,8 +298,8 @@ describe("SetupWizard", () => {
 
   test("uses the Your Home and Your AI phases and records the backup key acknowledgement", async () => {
     const state = freshState();
-    for (const id of ["welcome", "engine_location", "storage", "checks", "plan", "owner", "face", "profile", "hello"] as const) {
-      state.steps.find((step) => step.id === id)!.status = "done";
+    for (const id of ["welcome", "engine_location", "storage", "checks", "plan", "owner", "coding_mode", "face", "profile", "hello"] as const) {
+      setStepStatus(state, id, "done");
     }
     const h = harness(state);
     try {
@@ -328,6 +347,39 @@ describe("SetupWizard", () => {
       const rendered = view();
       await waitFor(() => expect(rendered.container.textContent).toContain("Save your backup key"));
       expect(rendered.container.textContent).toContain("If this computer breaks, this key restores your Home on a new one.");
+    } finally { h.restore(); }
+  });
+
+  test("resumes at Coding on this Home between the owner and backup steps", async () => {
+    const state = freshState();
+    for (const id of ["welcome", "engine_location", "storage", "checks", "plan", "owner"] as const) state.steps.find((step) => step.id === id)!.status = "done";
+    const h = harness(state);
+    try {
+      const rendered = view();
+      await waitFor(() => expect(rendered.container.textContent).toContain("Coding on this Home"));
+      await advanceTo(rendered, "Not now", "Save your backup key");
+      expect(h.posts).toContain("coding:later");
+    } finally { h.restore(); }
+  });
+
+  test("eligible coding setup starts, runs the test, creates one key, and finishes", async () => {
+    const state = freshState();
+    for (const id of ["welcome", "engine_location", "storage", "checks", "plan", "owner"] as const) state.steps.find((step) => step.id === id)!.status = "done";
+    for (const step of state.steps as TestStep[]) if (step.id !== "coding_mode" && step.id !== "backup_key" && step.id !== "done") step.status = "done";
+    const h = harness(state, GREEN_ROWS, "recommended", true);
+    try {
+      const rendered = view(() => {}, "coding_mode");
+      await waitFor(() => expect(rendered.getByRole("button", { name: "Set up coding" })).toBeTruthy());
+      await act(async () => { fireEvent.click(rendered.getByRole("button", { name: "Set up coding" })); });
+      expect(h.posts).toContain("coding:set_up");
+      expect(await rendered.findByRole("button", { name: "Create my key" })).toBeTruthy();
+      await act(async () => { fireEvent.click(rendered.getByRole("button", { name: "Run the test" })); });
+      await waitFor(() => expect(rendered.getByRole("button", { name: "Run the test" })).toBeTruthy());
+      await act(async () => { fireEvent.click(rendered.getByRole("button", { name: "Create my key" })); });
+      await waitFor(() => expect(rendered.getAllByDisplayValue("maipai_key_once")).toHaveLength(1));
+      fireEvent.click(rendered.getByRole("button", { name: "Setup lines for your tool" }));
+      expect(rendered.getAllByDisplayValue("maipai_key_once")).toHaveLength(1);
+      await advanceTo(rendered, "Finish", "Save your backup key");
     } finally { h.restore(); }
   });
 
@@ -456,11 +508,12 @@ describe("SetupWizard", () => {
 
   test("Back from Face skips the owner form once the owner account exists", async () => {
     const state = freshState();
-    for (const id of ["welcome", "engine_location", "storage", "checks", "plan", "owner"] as const) state.steps.find((step) => step.id === id)!.status = "done";
+    for (const id of ["welcome", "engine_location", "storage", "checks", "plan", "owner", "coding_mode"] as const) setStepStatus(state, id, "done");
     const h = harness(state);
     try {
       const rendered = view();
       await waitFor(() => expect(rendered.container.textContent).toContain("Save your backup key"));
+      await advanceTo(rendered, "Back", "Coding on this Home");
       await advanceTo(rendered, "Back", "Your setup plan");
       await advanceTo(rendered, "Continue", "Save your backup key");
     } finally { h.restore(); }
@@ -468,7 +521,7 @@ describe("SetupWizard", () => {
 
   test("setup screens never show build-state placeholder copy", async () => {
     const state = freshState();
-    for (const id of ["welcome", "engine_location", "storage", "checks", "plan", "owner", "face", "profile"] as const) state.steps.find((step) => step.id === id)!.status = "done";
+    for (const id of ["welcome", "engine_location", "storage", "checks", "plan", "owner", "coding_mode", "face", "profile"] as const) setStepStatus(state, id, "done");
     const h = harness(state);
     try {
       const rendered = view();
@@ -545,7 +598,7 @@ describe("SetupWizard", () => {
     // the backup key buttons off screen, and "Details" led to a settings page that
     // needs a sign-in.
     const state = freshState();
-    for (const id of ["welcome", "engine_location", "storage", "checks", "plan", "owner"] as const) state.steps.find((step) => step.id === id)!.status = "done";
+    for (const id of ["welcome", "engine_location", "storage", "checks", "plan", "owner", "coding_mode"] as const) setStepStatus(state, id, "done");
     jobRows = ["chat-27b", "judge-4b", "stt-w"].map((title, i) => ({ id: `j${i}`, kind: "model_download", state: "running", title, updatedAt: new Date().toISOString(), progress: { completedBytes: 1, totalBytes: 10, percent: 10 }, actions: ["stop"] }));
     const h = harness(state);
     try {

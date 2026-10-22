@@ -1,10 +1,17 @@
 import { useEffect, useRef, useState } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { LICENCE_ACK_SENTENCE } from "../../../../shared/licenceTerms";
 import { getIcon } from "@maipai/ui/src/icons";
 import { Alert, AlertDescription } from "@maipai/ui/src/ui/alert";
 import { useNavigate } from "react-router-dom";
 import { Wizard, type WizardStep } from "@maipai/ui/src/primitives/Wizard";
 import { Button } from "@maipai/ui/src/ui/button";
+import { Badge } from "@maipai/ui/src/ui/badge";
+import { Input } from "@maipai/ui/src/ui/input";
+import { Label } from "@maipai/ui/src/ui/label";
+import { Link } from "react-router-dom";
+import { Item, ItemContent, ItemDescription, ItemGroup, ItemTitle } from "@maipai/ui/src/dashboard/components/ui/item";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@maipai/ui/src/dashboard/components/ui/collapsible";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@maipai/ui/src/dashboard/components/ui/card";
 import { CheckGrid, visibleCheckRows, type CheckGridRow } from "./CheckGrid";
 import { AsyncState } from "@maipai/ui/src/primitives/AsyncState";
@@ -23,6 +30,7 @@ import { WebSearchStep } from "./WebSearchStep";
 import { StorageStep, type StorageChoice } from "./StorageStep";
 import { NewPersonForm } from "@/apps/people/NewPersonForm";
 import { EngineLinkCredentialSection } from "@/apps/settings/EngineLinkCredentialSection";
+import type { SetupCodingView } from "@/lib/api";
 
 const ErrorIcon = getIcon("circle-alert");
 
@@ -38,7 +46,7 @@ const PHASES: WizardStep[] = [
 ];
 // Steps older installs recorded that no screen shows any more.
 const RETIRED_STEPS = new Set<string>(["away", "face", "profile", "hello"]);
-const SCREEN_IDS = ["welcome", "before_start", "engine_location", "storage", "host_tune", "checks", "plan", "web_search", "owner", "backup", "done"] as const;
+const SCREEN_IDS = ["welcome", "before_start", "engine_location", "storage", "host_tune", "checks", "plan", "web_search", "owner", "coding_mode", "backup", "done"] as const;
 type ScreenId = (typeof SCREEN_IDS)[number];
 const SCREEN_TITLE: Record<ScreenId, string> = {
   welcome: "Welcome to MaiPai Home",
@@ -50,6 +58,7 @@ const SCREEN_TITLE: Record<ScreenId, string> = {
   plan: "Your setup plan",
   web_search: "Turn on web search",
   owner: "Create your owner account",
+  coding_mode: "Coding on this Home",
   backup: "Save your backup key",
   done: "You're all set",
 };
@@ -76,6 +85,7 @@ const SCREEN_DESCRIPTION: Record<ScreenId, string> = {
   plan: "Review the steps Home will complete.",
   web_search: "Optional. Skip it any time.",
   owner: "Create the account that manages this Home.",
+  coding_mode: "Choose whether to set up Coding on this computer.",
   backup: "Save this key somewhere other than this computer.",
   done: "Your Home is ready to use.",
 };
@@ -122,10 +132,16 @@ export function renderSetupReviewScreen({ screen, engine = "this_computer", onEn
 
 export function SetupWizard({ onDone, initialScreen }: SetupWizardProps) {
   const ownerFormRef = useRef<HTMLFormElement>(null);
+  const queryClient = useQueryClient();
   const dark = useIsDark();
   const navigate = useNavigate();
   const [state, setState] = useState<SetupState | null>(null);
   const [screen, setScreen] = useState<ScreenId>(initialScreen ?? "welcome");
+  const codingSetup = useQuery({ queryKey: ["setup-coding"], queryFn: api.setupCoding, enabled: screen === "coding_mode", refetchInterval: (query) => query.state.data?.pieces.some((piece) => piece.state === "installing") ? 2000 : false });
+  const [codingBusy, setCodingBusy] = useState<"set_up" | "later" | "test" | "key" | null>(null);
+  const [codingError, setCodingError] = useState<string | null>(null);
+  const [codingKey, setCodingKey] = useState<{ secret: string; hint: string } | null>(null);
+  const [codingKeyCopied, setCodingKeyCopied] = useState(false);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -157,6 +173,27 @@ export function SetupWizard({ onDone, initialScreen }: SetupWizardProps) {
   const [storageBlocked, setStorageBlocked] = useState(false);
   // The optional "This computer" step shows only on a Mac that runs the AI itself.
   const hostTuneShown = useHostTuneSupported(engine === "this_computer");
+  const codingReadyPieces = Boolean(codingSetup.data && codingSetup.data.pieces.length > 0 && codingSetup.data.pieces.every((piece) => piece.state === "installed"));
+  const codingSetupStarted = Boolean(codingBusy === "set_up" || codingSetup.data?.pieces.some((piece) => piece.state === "installing"));
+  const finishCodingChoice = () => setScreen(neighbour("coding_mode", 1) ?? "backup");
+  const chooseCoding = async (choice: "set_up" | "later") => {
+    setCodingBusy(choice); setCodingError(null);
+    try { await api.chooseSetupCoding(choice); sessionStorage.setItem("maipai:setup-coding-mode-choice", choice === "later" ? "later" : "set_up"); await queryClient.invalidateQueries({ queryKey: ["setup-coding"] }); if (choice === "later") finishCodingChoice(); }
+    catch (reason) { setCodingError(reason instanceof ApiError ? reason.message : "Home could not save this choice. Try again."); }
+    finally { setCodingBusy(null); }
+  };
+  const runCodingTest = async () => {
+    setCodingBusy("test"); setCodingError(null);
+    try { await api.runCodingModeSelfTest(); await queryClient.invalidateQueries({ queryKey: ["setup-coding"] }); }
+    catch (reason) { setCodingError(reason instanceof ApiError ? reason.message : "Home could not run the coding test. Try again."); }
+    finally { setCodingBusy(null); }
+  };
+  const createCodingKey = async () => {
+    setCodingBusy("key"); setCodingError(null);
+    try { const result = await api.createApiKey({ name: "My coding tool", scopes: ["code"], expires_in_days: 90 }); setCodingKey({ secret: result.secret, hint: result.key.hint }); }
+    catch (reason) { setCodingError(reason instanceof ApiError ? reason.message : "Home could not create your key. Try again."); }
+    finally { setCodingBusy(null); }
+  };
   const neighbour = (from: ScreenId, step: 1 | -1): ScreenId | undefined => {
     let index = SCREEN_IDS.indexOf(from) + step;
     if (SCREEN_IDS[index] === "host_tune" && !hostTuneShown) index += step;
@@ -185,7 +222,10 @@ export function SetupWizard({ onDone, initialScreen }: SetupWizardProps) {
     // removes screen 9 until it exists, so its server record is not a UI step.
     const ownerDone = stepIsDone(result, "owner");
     const disclosureSeen = sessionStorage.getItem("maipai:setup-before-start-read") === "true";
-    const next = !ownerDone && !disclosureSeen && firstPending !== "welcome" ? "before_start" : firstPending === "backup_key" ? "backup" : firstPending;
+    const codingStepPresent = (result.steps as Array<{ id: string }>).some((step) => step.id === "coding_mode");
+    const savedCodingChoice = sessionStorage.getItem("maipai:setup-coding-mode-choice");
+    const resumeCoding = ownerDone && !codingStepPresent && firstPending === "backup_key" && savedCodingChoice !== "later" && savedCodingChoice !== "done";
+    const next = !ownerDone && !disclosureSeen && firstPending !== "welcome" ? "before_start" : resumeCoding ? "coding_mode" : firstPending === "backup_key" ? "backup" : firstPending;
     if (next && (SCREEN_IDS as readonly string[]).includes(next)) setScreen(next as ScreenId);
     setEngine(result.engine.where);
     return result;
@@ -259,7 +299,7 @@ export function SetupWizard({ onDone, initialScreen }: SetupWizardProps) {
     }
   }
 
-  const phase = screen === "owner" || screen === "backup" || screen === "done" ? "meet" : "computers";
+  const phase = screen === "owner" || screen === "coding_mode" || screen === "backup" || screen === "done" ? "meet" : "computers";
   const completedCount = phase === "meet" ? 1 : 0;
   const thingsLeftLine = openThings === null ? null : setupChecklistCountLine(openThings);
 
@@ -311,7 +351,7 @@ export function SetupWizard({ onDone, initialScreen }: SetupWizardProps) {
     }
     const following = neighbour(screen, 1);
     // Once the owner exists, Back and Continue step over the create form.
-    if (following === "owner" && !("done" in updated) && stepIsDone(updated, "owner")) setScreen("backup");
+    if (following === "owner" && !("done" in updated) && stepIsDone(updated, "owner")) setScreen(stepIsDone(updated, "coding_mode") ? "backup" : "coding_mode");
     else if (following) setScreen(following);
   }
 
@@ -323,7 +363,7 @@ export function SetupWizard({ onDone, initialScreen }: SetupWizardProps) {
       await api.setup(name.trim(), secret);
       const updated = await api.setupStep("owner", { status: "done", phase: "meet" });
       setState(updated);
-      setScreen("backup");
+      setScreen("coding_mode");
     } catch (reason) {
       const already = reason instanceof ApiError && reason.status === 409;
       const message = already ? "Home is already set up. Sign in instead." : reason instanceof Error && reason.message === SECRET_SERVER_TEXT ? SECRET_LENGTH_COPY : reason instanceof Error ? reason.message : "Home couldn't save your account. Check the name and PIN, then press Create owner account again.";
@@ -388,6 +428,24 @@ export function SetupWizard({ onDone, initialScreen }: SetupWizardProps) {
     case "plan": body = <PlanStep onInstalled={() => { planInstalled.current = true; void next(); }} onReady={setPlanBlocksContinue} />; break;
     case "web_search": body = <WebSearchStep candidate={searchCandidate} continueRef={searchContinue} onCanContinue={setSearchCanContinue} onFinished={() => { setScreen(neighbour("web_search", 1) ?? "owner"); }} />; break;
     case "owner": body = <Card><CardContent><p>{OWNER_COPY}</p><NewPersonForm formRef={ownerFormRef} actorRole="owner" fixedRole="owner" onSubmit={async (values) => { await submitOwner(values.displayName, values.secret ?? ""); }} submitLabel="Create owner account" busy={busy} error={error} checkSecret hideSubmit /></CardContent></Card>; break;
+    case "coding_mode": {
+      const coding = codingSetup.data as SetupCodingView | undefined;
+      const codingHome = typeof window === "undefined" ? "https://home.example.com" : window.location.origin.replace(/^http:/i, "https:");
+      body = codingSetup.isPending && !coding ? <p role="status">Loading coding setup…</p> : codingSetup.isError && !coding ? <Card><CardContent><Alert variant="destructive"><AlertDescription>Home could not load coding setup. Refresh this page and try again.</AlertDescription></Alert><Button type="button" variant="outline" size="lg" onClick={() => void codingSetup.refetch()}>Try again</Button></CardContent></Card> : <div className="flex flex-col gap-4">
+        <p className="text-base text-muted-foreground md:text-lg">Normal keeps chat and pictures running as usual.</p>
+        <p className="text-base text-muted-foreground md:text-lg">Coding mode gives most of this computer's memory to one big coding model, which also answers chat, and pictures, videos and songs wait while it is on.</p>
+        {coding ? <><ItemGroup variant="card" aria-label="Coding parts to install">{coding.pieces.map((piece) => <Item key={piece.id}><ItemContent><ItemTitle>{piece.label}</ItemTitle><ItemDescription>{piece.size_bytes == null ? "Size not reported" : `${(piece.size_bytes / 1024 ** 3).toFixed(1)} GB`} · {piece.state === "installed" ? "Installed" : piece.state === "installing" ? "Installing" : piece.state === "failed" ? "Needs attention" : "Not installed"}</ItemDescription></ItemContent><Badge variant={piece.state === "installed" ? "secondary" : "outline"}>{piece.state === "installed" ? "Ready" : piece.state === "installing" ? "Installing" : "To install"}</Badge></Item>)}</ItemGroup>
+          <p>Total: {(coding.total_bytes / 1024 ** 3).toFixed(1)} GB</p>
+          {coding.eligible_mode ? <div className="flex flex-wrap gap-2">{codingReadyPieces ? null : <Button type="button" size="lg" disabled={codingBusy !== null || codingSetupStarted} onClick={() => void chooseCoding("set_up")}>{codingBusy === "set_up" ? "Starting" : codingSetupStarted ? "Installing" : "Set up coding"}</Button>}<Button type="button" variant="outline" size="lg" disabled={codingBusy !== null} onClick={() => void chooseCoding("later")}>{codingBusy === "later" ? "Saving" : "Not now"}</Button></div> : <><p>This computer needs to be a Mac with 128 GB of memory for Coding mode. You can still use the standard coding setup.</p><Button type="button" size="lg" disabled={codingBusy !== null || codingSetupStarted} onClick={() => void chooseCoding("set_up")}>{codingBusy === "set_up" ? "Starting" : codingSetupStarted ? "Installing" : "Set up standard coding"}</Button><Button type="button" variant="outline" size="lg" disabled={codingBusy !== null} onClick={() => void chooseCoding("later")}>Not now</Button></>}
+          {codingReadyPieces ? <div className="flex flex-wrap gap-2"><Button type="button" variant="secondary" size="lg" disabled={codingBusy !== null} onClick={() => void runCodingTest()}>{codingBusy === "test" ? "Running" : "Run the test"}</Button>{codingKey ? null : <Button type="button" variant="outline" size="lg" disabled={codingBusy !== null} onClick={() => void createCodingKey()}>{codingBusy === "key" ? "Creating" : "Create my key"}</Button>}</div> : null}
+          {codingKey ? <div className="flex flex-col gap-3"><Label htmlFor="setup-coding-key">Your key. Save it now; Home will show it only once.</Label><div className="flex flex-wrap gap-2"><Input id="setup-coding-key" readOnly value={codingKey.secret} /><Button type="button" variant="outline" onClick={() => { void navigator.clipboard.writeText(codingKey.secret).then(() => setCodingKeyCopied(true), () => setCodingError("Copy is not available in this browser. Select the key and copy it.")); }}>{codingKeyCopied ? "Copied" : "Copy"}</Button></div><p>Home address: {codingHome}/code/v1</p><Collapsible><CollapsibleTrigger render={<Button type="button" variant="outline" />}>Setup lines for your tool</CollapsibleTrigger><CollapsibleContent><div className="flex flex-col gap-3 pt-3"><div className="flex flex-col gap-1"><Label>OpenCode · same key</Label><Input readOnly value={`OPENAI_BASE_URL=${codingHome}/code/v1 OPENAI_API_KEY=maipai_key_...${codingKey.hint} opencode`} /></div><div className="flex flex-col gap-1"><Label>Claude Code · same key</Label><Input readOnly value={`ANTHROPIC_BASE_URL=${codingHome}/code/v1 ANTHROPIC_API_KEY=maipai_key_...${codingKey.hint} claude`} /></div><div className="flex flex-col gap-1"><Label>OpenAI-compatible · same key</Label><Input readOnly value={`OPENAI_BASE_URL=${codingHome}/code/v1 OPENAI_API_KEY=maipai_key_...${codingKey.hint} MODEL=$(curl -s ${codingHome}/code/v1/models | jq -r '.data[0].id')`} /></div></div></CollapsibleContent></Collapsible></div> : null}
+        </> : null}
+        <ItemGroup variant="card" aria-label="Coding apps you install"><Item><ItemContent><ItemTitle>1. Install OpenCode on your computer</ItemTitle><ItemDescription><Link to="/docs/user/coding-mode#opencode">How</Link></ItemDescription></ItemContent></Item><Item><ItemContent><ItemTitle>2. Install Claude Code on your computer</ItemTitle><ItemDescription><Link to="/docs/user/coding-mode#claude-code">How</Link></ItemDescription></ItemContent></Item></ItemGroup>
+        {codingReadyPieces ? <Button type="button" size="lg" onClick={() => { sessionStorage.setItem("maipai:setup-coding-mode-choice", "done"); finishCodingChoice(); }}>Finish</Button> : null}
+        {codingError ? <Alert variant="destructive"><ErrorIcon /><AlertDescription>{codingError}</AlertDescription></Alert> : null}
+      </div>;
+      break;
+    }
     case "backup": body = <Card><CardContent><p className="text-base text-muted-foreground md:text-lg">If this computer breaks, this key restores your Home on a new one.</p><Button type="button" variant="secondary" size="lg" disabled={!backupKey} onClick={() => void downloadEmergencyKit()}>Download</Button>{backupDownloaded ? null : <p className="text-base text-muted-foreground md:text-lg">Download your backup key to continue.</p>}{backupKeyError ? <Alert variant="destructive"><ErrorIcon /><AlertDescription>Home couldn't make your backup key. Press Download again. If it fails again, Home will show a fix under Home settings, Repairs.</AlertDescription></Alert> : null}{backupSavedError ? <Alert variant="destructive"><ErrorIcon /><AlertDescription>Home couldn't save that choice. Try again. If it fails again, Home will show a fix under Home settings, Repairs.</AlertDescription></Alert> : null}</CardContent></Card>; break;
     case "done": body = <Card><CardContent>{engine === "another_computer" ? <><p>Pair the computer that runs the AI. You can also do this later in Home settings, Engines and AI.</p><EngineLinkCredentialSection /></> : null}<p>You can talk with Home as soon as you open it. Start a chat, add people, or choose apps whenever you're ready. If the AI is still downloading, chat starts answering when the first model finishes. To have Home greet you by face, turn it on in your profile; face data stays on this computer.</p>{thingsLeftLine ? <p>{thingsLeftLine}. You'll find them in Home settings.</p> : null}{certificate === "error" ? <Alert variant="destructive"><ErrorIcon /><AlertDescription>Home couldn't make the certificate for your other devices. Phones and tablets can still use Home from this computer's address for now. Open Home settings, Repairs to fix it.</AlertDescription></Alert> : null}</CardContent></Card>; break;
   }
@@ -399,11 +457,11 @@ export function SetupWizard({ onDone, initialScreen }: SetupWizardProps) {
   const submit = screen === "owner" ? submitOwner : screen === "done" ? finish : next;
   const previewBanner = window.__setupPreview ? <SetupPreviewBar currentScreen={screenIndex + 1} onJump={(index) => setScreen(SCREEN_IDS[Math.max(0, Math.min(SCREEN_IDS.length - 1, index))]!)} /> : undefined;
   const art = SCREEN_ART[screen];
-  return <Wizard steps={PHASES} currentStepId={phaseStep} completedCount={completedCount} onJumpTo={screen === "owner" ? () => ownerFormRef.current?.requestSubmit() : moveToPhase} onBack={screenIndex > 0 ? back : undefined} onNext={() => screen === "owner" ? ownerFormRef.current?.requestSubmit() : screen === "checks" && checkRows?.some((row) => row.state === "red") ? retryChecks() : void submit()} nextLabel={screen === "owner" ? "Create owner account" : screen === "welcome" ? "Set up my Home" : screen === "before_start" ? "I understand" : screen === "done" ? "Open my Home" : screen === "checks" && checkRows?.some((row) => row.state === "red") ? "Try again" : "Continue"} nextDisabled={screen === "owner" ? busy : screen === "storage" ? storageBlocked : screen === "plan" ? planBlocksContinue && !planInstalled.current && !stepIsDone(state, "plan") : screen === "backup" ? !backupDownloaded : screen === "web_search" ? !searchCanContinue : screen === "checks" && checksFetching} busy={busy || (screen === "done" && certificate === "loading")} layout="centered" stepKind="intro" stickyFooter={false} progress={{ current: currentPhaseIndex + 1, total: PHASES.length }} eyebrow={PHASES[currentPhaseIndex]!.title} heading={screen === "checks" ? checksTitle(engine) : SCREEN_TITLE[screen]} description={SCREEN_DESCRIPTION[screen]} header={<img src={dark ? "/brand/maipai-home-logo-dark.png" : "/brand/maipai-home-logo-light.png"} alt="MaiPai Home" width={104} height={39} />} aside={art ? <img src={art} alt="" /> : undefined} banner={previewBanner}>{body}{error && screen !== "owner" ? <Alert variant="destructive"><ErrorIcon /><AlertDescription>{error}</AlertDescription></Alert> : null}</Wizard>;
+  return <Wizard steps={PHASES} currentStepId={phaseStep} completedCount={completedCount} onJumpTo={screen === "owner" ? () => ownerFormRef.current?.requestSubmit() : moveToPhase} onBack={screenIndex > 0 ? back : undefined} onNext={() => screen === "owner" ? ownerFormRef.current?.requestSubmit() : screen === "checks" && checkRows?.some((row) => row.state === "red") ? retryChecks() : void submit()} nextLabel={screen === "owner" ? "Create owner account" : screen === "welcome" ? "Set up my Home" : screen === "before_start" ? "I understand" : screen === "done" ? "Open my Home" : screen === "checks" && checkRows?.some((row) => row.state === "red") ? "Try again" : "Continue"} nextDisabled={screen === "coding_mode" || (screen === "owner" ? busy : screen === "storage" ? storageBlocked : screen === "plan" ? planBlocksContinue && !planInstalled.current && !stepIsDone(state, "plan") : screen === "backup" ? !backupDownloaded : screen === "web_search" ? !searchCanContinue : screen === "checks" && checksFetching)} busy={busy || (screen === "done" && certificate === "loading")} layout="centered" stepKind="intro" stickyFooter={false} progress={{ current: currentPhaseIndex + 1, total: PHASES.length }} eyebrow={PHASES[currentPhaseIndex]!.title} heading={screen === "checks" ? checksTitle(engine) : SCREEN_TITLE[screen]} description={SCREEN_DESCRIPTION[screen]} header={<img src={dark ? "/brand/maipai-home-logo-dark.png" : "/brand/maipai-home-logo-light.png"} alt="MaiPai Home" width={104} height={39} />} aside={art ? <img src={art} alt="" /> : undefined} banner={previewBanner}>{body}{error && screen !== "owner" ? <Alert variant="destructive"><ErrorIcon /><AlertDescription>{error}</AlertDescription></Alert> : null}</Wizard>;
 }
 
 function phaseFor(id: string): SetupState["phase"] {
   if (id === "done") return "done";
-  if (["owner", "backup_key"].includes(id)) return "meet";
+  if (["owner", "coding_mode", "backup_key"].includes(id)) return "meet";
   return "computers";
 }

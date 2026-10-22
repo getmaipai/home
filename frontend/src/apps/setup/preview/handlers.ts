@@ -6,9 +6,13 @@ export function handlersFor(scenario: Scenario) {
   const state = structuredClone(scenario.state);
   let allowedTailnet = false;
   let chosenSearch = false;
+  const coding = { eligible_mode: true, pieces: [{ id: "engine", label: "Coding engine", size_bytes: 12 * 1024 ** 3, state: "notInstalled" }, { id: "model", label: "Coding model", size_bytes: 64 * 1024 ** 3, state: "notInstalled" }, { id: "draft", label: "Draft model", size_bytes: 8 * 1024 ** 3, state: "notInstalled" }], total_bytes: 84 * 1024 ** 3, readiness: { ready: false, first_unmet: "pieces", checked_at: new Date().toISOString(), items: [], provenance: "preview", hlc: "1791979200000:0:abcdef" } };
   return [
     http.get("*/api/setup/state", () => HttpResponse.json(state)),
+    http.get("*/api/setup/coding", () => HttpResponse.json(coding)),
+    http.post("*/api/setup/coding", () => HttpResponse.json({ accepted: true })),
     http.get("*/api/jobs", () => HttpResponse.json(scenario.progress ? [{ id: "preview-download", kind: "model_download", state: scenario.progress.state, title: "Starter model download", progress: { completedBytes: Math.round(10_000_000_000 * scenario.progress.percent / 100), totalBytes: 10_000_000_000, bytesPerSecond: scenario.progress.bytesPerSecond, percent: scenario.progress.percent }, actions: [] }] : [])),
+    http.get("*/api/setup/install", () => HttpResponse.json({ state: "idle", chatReady: false, complete: false, percent: 0, completedBytes: 0, totalBytes: 0, bytesPerSecond: null, etaSeconds: null, problem: null, items: [] })),
     http.post("*/api/setup/checks/run", () => HttpResponse.json({ rows: scenario.checks.map((row) => row.action === "allow_tailnet" && allowedTailnet ? { ...row, state: "green", text: "Allowed." } : row), state, searchCandidate: chosenSearch ? null : scenario.searchCandidate })),
     http.post("*/api/setup/checks/allow-tailnet", () => { allowedTailnet = true; return HttpResponse.json({ enabled: true }); }),
     http.post("*/api/setup/search/use-candidate", () => { chosenSearch = true; return HttpResponse.json({ saved: true }); }),
@@ -37,6 +41,8 @@ export function installFetchHandlers(scenario: Scenario, target: typeof globalTh
     requests.push(`${request.method} ${url.pathname}`);
     const routes = [
       [/^\/api\/setup\/state$/, "GET", () => scenario.state],
+      [/^\/api\/setup\/coding$/, "GET", () => ({ eligible_mode: true, pieces: [{ id: "engine", label: "Coding engine", size_bytes: 12 * 1024 ** 3, state: "notInstalled" }, { id: "model", label: "Coding model", size_bytes: 64 * 1024 ** 3, state: "notInstalled" }, { id: "draft", label: "Draft model", size_bytes: 8 * 1024 ** 3, state: "notInstalled" }], total_bytes: 84 * 1024 ** 3, readiness: { ready: false, first_unmet: "pieces", checked_at: new Date().toISOString(), items: [], provenance: "preview", hlc: "1791979200000:0:abcdef" } })],
+      [/^\/api\/setup\/install$/, "GET", () => ({ state: "idle", chatReady: false, complete: false, percent: 0, completedBytes: 0, totalBytes: 0, bytesPerSecond: null, etaSeconds: null, problem: null, items: [] })],
       [/^\/api\/setup\/checks\/run$/, "POST", () => ({ rows: scenario.checks, state: scenario.state, searchCandidate: scenario.searchCandidate })],
       [/^\/api\/setup\/ca$/, "GET", () => scenario.certificate],
       [/^\/api\/tailscale\/status$/, "GET", () => scenario.tailscale],
@@ -44,6 +50,7 @@ export function installFetchHandlers(scenario: Scenario, target: typeof globalTh
       [/^\/api\/auth\/setup$/, "POST", () => ({ person: { id: "preview-owner" } })],
     ] as const;
     for (const [pattern, method, body] of routes) if (request.method === method && pattern.test(url.pathname)) return Response.json(body());
+    if (request.method === "POST" && url.pathname === "/api/setup/coding") return Response.json({ accepted: true });
     if (request.method === "POST" && /^\/api\/setup\/[\w-]+$/.test(url.pathname)) return Response.json(scenario.state);
     throw new Error(`Unhandled preview request: ${request.method} ${url.pathname}`);
   }) as typeof globalThis.fetch;

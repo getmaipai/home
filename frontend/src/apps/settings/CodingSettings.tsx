@@ -13,13 +13,14 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@maipai/ui/
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@maipai/ui/src/ui/table";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@maipai/ui/src/dashboard/components/ui/alert-dialog";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@maipai/ui/src/dashboard/components/ui/card";
-import { Item, ItemActions, ItemContent, ItemDescription, ItemGroup, ItemTitle } from "@maipai/ui/src/dashboard/components/ui/item";
+import { Item, ItemActions, ItemContent, ItemDescription, ItemGroup, ItemTitle, ItemSeparator } from "@maipai/ui/src/dashboard/components/ui/item";
 import { Progress } from "@maipai/ui/src/dashboard/components/ui/progress";
 import { AsyncState } from "@maipai/ui/src/primitives/AsyncState";
 import { SettingsRenderer } from "@maipai/ui/src/settings/SettingsRenderer";
-import { api, ApiError, type AdminApiKey, type CodingGrant, type CodingPiece, type PersonalApiKey, type PersonRosterEntry, type Roster } from "@/lib/api";
+import { api, ApiError, type AdminApiKey, type CodingGrant, type CodingModeReadinessItemId, type CodingPiece, type PersonalApiKey, type PersonRosterEntry, type Roster } from "@/lib/api";
+import codingModeReasons from "@maipai/spec/vocab/coding-mode-readiness-reasons.json";
 
-const KEYS = ["coding.enabled", "coding.paused", "coding.adults_by_default", "coding.max_streams_per_person", "coding.requests_per_minute_per_key", "coding.daily_tokens_per_person", "coding.keep_warm_minutes", "coding.thinking_budget", "coding.thinking_budget_ceiling", "coding.api.enabled", "coding.api.away"];
+const KEYS = ["coding.enabled", "coding.home_mode", "coding.paused", "coding.adults_by_default", "coding.max_streams_per_person", "coding.requests_per_minute_per_key", "coding.daily_tokens_per_person", "coding.keep_warm_minutes", "coding.thinking_budget", "coding.thinking_budget_ceiling", "coding.api.enabled", "coding.api.away"];
 const codingKeysQuery = (personId?: string) => ["coding-api-keys", personId ?? "self"] as const;
 const messageOf = (error: unknown, fallback: string) => error instanceof ApiError ? error.message : fallback;
 const sizeText = (bytes: number | null) => bytes == null ? "Size not reported" : bytes >= 1024 ** 3 ? `${(bytes / 1024 ** 3).toFixed(1)} GB` : `${Math.ceil(bytes / 1024 ** 2)} MB`;
@@ -34,13 +35,31 @@ export function CodingAdminSettings() {
   const people = useQuery({ queryKey: ["people"], queryFn: () => api.people() });
   const grants = useQuery({ queryKey: ["coding-grants"], queryFn: () => api.grants() });
   const settings = useQuery({ queryKey: ["settings-values", "household"], queryFn: () => api.settingsValues("household") });
+  const mode = useQuery({ queryKey: ["coding-mode"], queryFn: api.codingMode });
   const [pending, setPending] = useState<Record<string, "install" | "remove">>({});
   const pieces = useQuery({ queryKey: ["coding-pieces"], queryFn: api.codingPieces, refetchInterval: (q) => q.state.data?.pieces.some((piece) => piece.state === "installing") || Object.keys(pending).length > 0 ? 2000 : false });
   const [pieceError, setPieceError] = useState<string | null>(null);
+  const [modeActionBusy, setModeActionBusy] = useState<CodingModeReadinessItemId | null>(null);
+  const [modeActionError, setModeActionError] = useState<string | null>(null);
   const [removePiece, setRemovePiece] = useState<CodingPiece | null>(null);
   const [pauseOpen, setPauseOpen] = useState(false);
   const paused = settings.data?.find((setting) => setting.key === "coding.paused")?.value === true;
+  const modeReason = mode.data?.readiness.first_unmet ? codingModeReasons[mode.data.readiness.first_unmet] : undefined;
   const refresh = () => Promise.all([client.invalidateQueries({ queryKey: ["coding-pieces"] }), client.invalidateQueries({ queryKey: ["coding-grants"] }), client.invalidateQueries({ queryKey: ["people"] })]);
+  const refreshModeChecklist = () => Promise.all([mode.refetch(), pieces.refetch(), settings.refetch()]).then(() => undefined);
+  const runModeAction = async (id: CodingModeReadinessItemId) => {
+    setModeActionBusy(id); setModeActionError(null);
+    try {
+      if (id === "pieces") {
+        for (const piece of (pieces.data?.pieces ?? []).filter((item) => item.state !== "installed" && item.can_install)) await api.installCodingPiece(piece.id);
+      } else if (id === "self_test") await api.runCodingModeSelfTest();
+      else if (id === "coding_enabled") await api.setSetting("household", "coding.enabled", true);
+      await refreshModeChecklist();
+    } catch (reason) {
+      setModeActionError(messageOf(reason, id === "self_test" ? "Home could not run the coding test. Try again." : "Home could not update coding mode. Try again."));
+      await refreshModeChecklist().catch(() => undefined);
+    } finally { setModeActionBusy(null); }
+  };
   const saveGrant = async (target: PersonRosterEntry, enabled: boolean) => {
     const existing = (grants.data ?? []).filter((grant) => grant.person === target.id && grant.action === "use:code" && !grant.deleted_at);
     const defaultAllowed = isAdult(target) && settings.data?.find((item) => item.key === "coding.adults_by_default")?.value !== false;
@@ -74,7 +93,21 @@ export function CodingAdminSettings() {
   });
   const enabledValue = grants.data ?? [];
   return <div className="flex flex-col gap-4">
-    <SettingsRenderer scope="household" scopeValue="household" honouredBy="home" only={["household.coding", "household.coding_people", "household.coding_limits"]} includeKeys={KEYS.filter((key) => key !== "coding.paused")} />
+    <SettingsRenderer scope="household" scopeValue="household" honouredBy="home" only={["household.coding"]} includeKeys={["coding.enabled", "coding.home_mode"]} rowExtras={{ "coding.home_mode": { lockedReason: mode.data && !mode.data.readiness.ready ? modeReason : undefined } }} />
+    <Card><CardHeader><CardTitle>Home mode checklist</CardTitle><CardDescription>Finish these steps before you turn on Coding mode.</CardDescription></CardHeader><CardContent>
+      <AsyncState data={mode.data?.readiness.items} error={mode.isError} isFetching={mode.isFetching} onRetry={() => void mode.refetch()} errorMessage="Could not load the Home mode checklist." loadingLabel="Loading Home mode checklist">
+        {(rows) => <ItemGroup variant="card" aria-label="Home mode checklist">{rows.map((item, index) => <Item key={item.id}>
+          <ItemContent><ItemTitle>{MODE_LABELS[item.id]} <Badge variant={item.state === "done" ? "secondary" : "outline"}>{modeActionBusy === item.id && item.id === "self_test" ? "Running" : item.state === "done" ? "Ready" : item.state === "can_do" ? "Needs setup" : "Needs a step from you"}</Badge></ItemTitle>
+            {item.state !== "done" ? <ItemDescription>{codingModeReasons[item.reason_key]}</ItemDescription> : null}
+            {item.state === "manual" ? <ItemDescription><Link to={`/docs/user/coding-mode#${item.doc_anchor}`}>How</Link></ItemDescription> : null}
+          </ItemContent>
+          {item.state === "can_do" ? <ItemActions><Button type="button" variant="outline" disabled={modeActionBusy !== null} onClick={() => void runModeAction(item.id)}>{modeActionBusy === item.id ? item.id === "self_test" ? "Running" : "Working" : item.id === "pieces" ? "Install" : item.id === "self_test" ? "Run the test" : "Turn coding on"}</Button></ItemActions> : null}
+          {index < rows.length - 1 ? <ItemSeparator variant="inset" /> : null}
+        </Item>)}</ItemGroup>}
+      </AsyncState>
+      {modeActionError ? <p role="alert" className="text-sm text-destructive">{modeActionError}</p> : null}
+    </CardContent></Card>
+    <SettingsRenderer scope="household" scopeValue="household" honouredBy="home" only={["household.coding", "household.coding_people", "household.coding_limits"]} includeKeys={KEYS.filter((key) => key !== "coding.paused" && key !== "coding.enabled" && key !== "coding.home_mode")} titleOverrides={{ "household.coding": "More Coding settings" }} />
     <Card><CardHeader><CardTitle>Stop all coding now</CardTitle><CardDescription>Pause coding requests until you resume. This does not delete keys.</CardDescription></CardHeader><CardContent><Button type="button" variant={paused ? "default" : "destructive"} onClick={() => setPauseOpen(true)}>{paused ? "Resume coding" : "Stop all coding now"}</Button>{settings.isError ? <p role="alert" className="text-sm text-destructive">Could not load the pause setting.</p> : null}</CardContent></Card>
     <Card>
       <CardHeader><CardTitle>Who can code</CardTitle><CardDescription>Adults follow the household default. Teens and children need an admin grant.</CardDescription></CardHeader>
@@ -104,6 +137,17 @@ export function CodingAdminSettings() {
     <AlertDialog open={pauseOpen} onOpenChange={setPauseOpen}><AlertDialogContent><AlertDialogHeader><AlertDialogTitle>{paused ? "Resume coding?" : "Stop all coding now?"}</AlertDialogTitle><AlertDialogDescription>{paused ? "People with access can use Coding again." : "Coding requests stop until you resume. Keys stay in place and can be used again later."}</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel>Cancel</AlertDialogCancel><AlertDialogAction variant={paused ? "default" : "destructive"} onClick={() => { const next = !paused; setPauseOpen(false); void api.setSetting("household", "coding.paused", next).then(() => client.invalidateQueries({ queryKey: ["settings-values", "household"] })).catch((error: unknown) => setPieceError(messageOf(error, "Could not change the pause setting."))); }}>{paused ? "Resume coding" : "Stop all coding"}</AlertDialogAction></AlertDialogFooter></AlertDialogContent></AlertDialog>
   </div>;
 }
+
+const MODE_LABELS: Record<CodingModeReadinessItemId, string> = {
+  coding_enabled: "Coding is on",
+  engine: "Coding engine",
+  pieces: "Coding model files",
+  hardware: "Computer hardware",
+  memory: "Free memory",
+  self_test: "Coding test",
+  client: "Coding app",
+  bench: "Speed check",
+};
 
 function PersonGrantRow({ entry, checked, onChange }: { entry: PersonRosterEntry; checked: boolean; onChange: (value: boolean) => void }) {
   const [grantOpen, setGrantOpen] = useState(false);
