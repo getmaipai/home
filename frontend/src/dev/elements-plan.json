@@ -3869,6 +3869,59 @@
       "batch": null,
       "replacesHandBuilt": [],
       "realTurnToday": null
+    },
+    {
+      "file": "companion-avatar.tsx",
+      "name": "companion-avatar",
+      "group": "companion",
+      "verdict": "wire-now",
+      "verdictReason": "Drawn in the chat thread's corner for a person whose companion is ready and animated (CMEDIA-PLAYER-01c); it carries its own placement and hide control, so Home passes props only.",
+      "backendNeeded": null,
+      "effort": null,
+      "specTagNeeded": false,
+      "newDependency": false,
+      "bindings": [
+        "chat companion avatar"
+      ],
+      "size": "M",
+      "showcaseScenario": null,
+      "batch": null,
+      "replacesHandBuilt": [],
+      "realTurnToday": true
+    },
+    {
+      "file": "stacked-alpha-video.tsx",
+      "name": "stacked-alpha-video",
+      "group": "stacked",
+      "verdict": "support",
+      "verdictReason": "The WebGL stacked-alpha clip renderer inside the companion avatar; Home does not draw it on its own. The editor's preview still has its own copy until CMEDIA-PLAYER-02 swaps it for this Element.",
+      "backendNeeded": null,
+      "effort": null,
+      "specTagNeeded": false,
+      "newDependency": false,
+      "bindings": [],
+      "size": "S",
+      "showcaseScenario": null,
+      "batch": null,
+      "replacesHandBuilt": [],
+      "realTurnToday": null
+    },
+    {
+      "file": "companion-avatar-machine.ts",
+      "name": "companion-avatar-machine",
+      "group": "companion",
+      "verdict": "support",
+      "verdictReason": "The pure state machine behind the companion avatar (priorities, loop points, one-shots); not a visible Element and not used by Home directly.",
+      "backendNeeded": null,
+      "effort": null,
+      "specTagNeeded": false,
+      "newDependency": false,
+      "bindings": [],
+      "size": "S",
+      "showcaseScenario": null,
+      "batch": null,
+      "replacesHandBuilt": [],
+      "realTurnToday": null
     }
   ]
 }
