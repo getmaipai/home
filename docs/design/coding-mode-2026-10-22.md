@@ -79,9 +79,11 @@ No new banner, dot, panel or poll is added.
 
 - Catalog: pin the large model (repo, revision, sha256, sampling from its model card with the source named, rule 3) and its draft; Splash's store accepts only an exact pinned
   model and draft, so both are added there.
-- Engine source: Splash 1.3.2 from the vendor refuses this model's shape. Options: (a) wait for the vendor's release that serves it and bump the Stack's pin, (b) the Stack ships a
-  pinned build of a vetted fork as its own component (rule 11: the Stack builds, pins and tests it). This is an owner decision below. Until one exists the mode is unavailable
-  and the switch says why.
+- Engine source (owner's decision, 2026-10-22: "we can't wait for any release or update"): Splash 1.3.2 from the vendor refuses this model's shape, so the Stack ships a pinned
+  build of a vetted fork as its own component (rule 11: the Stack builds, pins and tests it). The fork is the vendor's 1.3.2 plus the Ornith-122B topic branch (about 380 lines of
+  kernel and model-shape code, read before use), built once on a machine with Xcode and its Metal toolchain, packaged in the vendor tarball's layout, hashed, published as a release
+  asset of the org, and installed by the Stack's downloader by sha256 like every engine. No household machine builds anything. A vendor release that serves the model later replaces
+  the pin; nothing else changes. Until the build is pinned and installed, readiness item 2 is false and the switch says why.
 - Mode: a `stack.engines.coding.home_mode` setting. In `coding` mode `processRoleFor` maps chat, judge and router to the coding process; the resident chat model is unloaded first
   and reloaded on any failure or on return; the governor treats that process as the foreground resident (never evicted by a generator) and holds generators with the reason
   `coding_mode`.
@@ -134,15 +136,19 @@ Everything else in that note, the Coding switch, the keys, the gateway and the C
 ## Slices (rows in the backlog)
 
 1. MODE-SPEC-01 (`commons/spec`, first): `coding.home_mode`, the readiness record shape, the area placement, copy, the wizard step copy.
-2. MODE-STACK-01 (`stack`): pins, Splash store entry, the mode binding, the post-load check, the unload-first order and rollback, the memory cap, governor reasons.
-3. MODE-HOME-01 (`home`): the setting's backend gate and `codingModeReadiness`, the Stack sync, status rows, the Repairs items, the settings UI row.
-4. MODE-WIZARD-01 (`home`): the wizard step and its recommended-plan hook, the guided and manual steps with the user page links.
-5. MODE-BENCH-01 (bench, GPU lock, not in the gate): CHAT-AB-01 on the large model, the contention test, memory on a 128 GB machine, the 27B and the large model on the same Splash
+2. MODE-ENGINE-01 (`stack` and release tooling, before MODE-STACK-01): build, package, hash, publish and pin the vetted Splash fork.
+3. MODE-STACK-01 (`stack`): pins, Splash store entry, the mode binding, the post-load check, the unload-first order and rollback, the memory cap, governor reasons.
+4. MODE-HOME-01 (`home`): the setting's backend gate and `codingModeReadiness`, the Stack sync, status rows, the Repairs items, the settings UI row.
+5. MODE-WIZARD-01 (`home`): the wizard step and its recommended-plan hook, the guided and manual steps with the user page links.
+6. MODE-BENCH-01 (bench, GPU lock, not in the gate): CHAT-AB-01 on the large model, the contention test, memory on a 128 GB machine, the 27B and the large model on the same Splash
    settings. It also carries rule 3's tool-decision measurement (evidence recall and false searches on the CHAT-AB-01 fresh set, at least 3 repeats), the repetition measurement on
    spoken companion turns and the companion-voice row. The verdict (offer, offer with limits, do not offer) is readiness item 8.
-6. MODE-DOC-01 (docs): the user and dev pages and the wizard copy, in the same commits as each slice.
+7. MODE-DOC-01 (docs): the user and dev pages and the wizard copy, in the same commits as each slice.
 
-## Open decisions for the owner
+## Decided
 
-1. Minors while the mode is on: keep them chatting with thinking off and no tools until the model is measured, or pause minors' chat for the duration with a plain message.
-2. Engine source for the large model: wait for the vendor, or have the Stack ship a pinned, vetted fork build.
+Engine source: the Stack ships a pinned, vetted build of the fork (owner, 2026-10-22). Slice MODE-ENGINE-01 does it.
+
+## Open decision for the owner
+
+Minors while the mode is on: keep them chatting with thinking off and no tools until the model is measured, or pause minors' chat for the duration with a plain message.
