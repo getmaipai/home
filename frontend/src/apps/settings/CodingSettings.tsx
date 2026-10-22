@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Alert, AlertDescription, AlertTitle } from "@maipai/ui/src/ui/alert";
@@ -17,7 +17,7 @@ import { Item, ItemActions, ItemContent, ItemDescription, ItemGroup, ItemTitle, 
 import { Progress } from "@maipai/ui/src/dashboard/components/ui/progress";
 import { AsyncState } from "@maipai/ui/src/primitives/AsyncState";
 import { SettingsRenderer } from "@maipai/ui/src/settings/SettingsRenderer";
-import { api, ApiError, type AdminApiKey, type CodingGrant, type CodingModeReadinessItemId, type CodingPiece, type PersonalApiKey, type PersonRosterEntry, type Roster } from "@/lib/api";
+import { api, ApiError, type AdminApiKey, type CodingGrant, type CodingModeReadinessItemId, type CodingModeView, type CodingPiece, type PersonalApiKey, type PersonRosterEntry, type Roster } from "@/lib/api";
 import codingModeReasons from "@maipai/spec/vocab/coding-mode-readiness-reasons.json";
 
 const KEYS = ["coding.enabled", "coding.home_mode", "coding.paused", "coding.adults_by_default", "coding.max_streams_per_person", "coding.requests_per_minute_per_key", "coding.daily_tokens_per_person", "coding.keep_warm_minutes", "coding.thinking_budget", "coding.thinking_budget_ceiling", "coding.api.enabled", "coding.api.away"];
@@ -30,14 +30,30 @@ const isAdult = (entry: PersonRosterEntry) => entry.age_band === "adult" || entr
 const isMinor = (entry: PersonRosterEntry) => entry.age_band === "child" || entry.age_band === "teen" || entry.role === "child" || entry.role === "teen";
 
 /** Settings > Household > Coding. The settings rows stay on the shared SettingsRenderer and its spec descriptions. */
+const SELF_TEST_WAIT_MS = 15 * 60_000;
+/** The test is a full switch into Coding mode and back, so it runs for minutes after the request is accepted. */
+export function selfTestState(data: CodingModeView | undefined, startedAt: number | null): { running: boolean; failure: string | null } {
+  if (startedAt === null || !data) return { running: false, failure: null };
+  const done = data.readiness.items.find((item) => item.id === "self_test")?.state === "done";
+  const elapsed = Date.now() - startedAt;
+  if (done) return { running: false, failure: null };
+  if (data.state !== "switching" && data.reason && elapsed > 8_000) return { running: false, failure: data.reason };
+  if (elapsed > SELF_TEST_WAIT_MS) return { running: false, failure: "The coding test is taking longer than expected. Check the Status page, then try again." };
+  return { running: true, failure: null };
+}
+
 export function CodingAdminSettings() {
   const client = useQueryClient();
   const people = useQuery({ queryKey: ["people"], queryFn: () => api.people() });
   const grants = useQuery({ queryKey: ["coding-grants"], queryFn: () => api.grants() });
   const settings = useQuery({ queryKey: ["settings-values", "household"], queryFn: () => api.settingsValues("household") });
   const [pending, setPending] = useState<Record<string, "install" | "remove">>({});
-  const pieces = useQuery({ queryKey: ["coding-pieces"], queryFn: api.codingPieces, refetchInterval: (q) => q.state.data?.pieces.some((piece) => piece.state === "installing") || Object.keys(pending).length > 0 ? 2000 : false });
-  const mode = useQuery({ queryKey: ["coding-mode"], queryFn: api.codingMode, refetchInterval: () => (pieces.data?.pieces.some((piece) => piece.state === "installing") ? 3000 : false) });
+  const pieces = useQuery({ queryKey: ["coding-pieces"], queryFn: api.codingPieces, refetchIntervalInBackground: true, refetchInterval: (q) => q.state.data?.pieces.some((piece) => piece.state === "installing") || Object.keys(pending).length > 0 ? 2000 : false });
+  const [testStartedAt, setTestStartedAt] = useState<number | null>(null);
+  const mode = useQuery({ queryKey: ["coding-mode"], queryFn: api.codingMode, refetchIntervalInBackground: true, refetchInterval: (q) => (pieces.data?.pieces.some((piece) => piece.state === "installing") || selfTestState(q.state.data, testStartedAt).running ? 3000 : false) });
+  const selfTest = selfTestState(mode.data, testStartedAt);
+  // The poll is scheduled from the options of the render that follows the start, so ask once more after that render.
+  useEffect(() => { if (testStartedAt !== null) void mode.refetch(); }, [testStartedAt]);
   const downloading = pieces.data?.pieces.filter((piece) => piece.state === "installing") ?? [];
   const [pieceError, setPieceError] = useState<string | null>(null);
   const [modeActionBusy, setModeActionBusy] = useState<CodingModeReadinessItemId | null>(null);
@@ -53,7 +69,7 @@ export function CodingAdminSettings() {
     try {
       if (id === "pieces") {
         for (const piece of (pieces.data?.pieces ?? []).filter((item) => item.state !== "installed" && item.can_install)) await api.installCodingPiece(piece.id);
-      } else if (id === "self_test") await api.runCodingModeSelfTest();
+      } else if (id === "self_test") { await api.runCodingModeSelfTest(); setTestStartedAt(Date.now()); }
       else if (id === "coding_enabled") await api.setSetting("household", "coding.enabled", true);
       await refreshModeChecklist();
     } catch (reason) {
@@ -98,12 +114,14 @@ export function CodingAdminSettings() {
     <Card><CardHeader><CardTitle>Home mode checklist</CardTitle><CardDescription>Finish these steps before you turn on Coding mode.</CardDescription></CardHeader><CardContent>
       <AsyncState data={mode.data?.readiness.items} error={mode.isError} isFetching={mode.isFetching} onRetry={() => void mode.refetch()} errorMessage="Could not load the Home mode checklist." loadingLabel="Loading Home mode checklist">
         {(rows) => <ItemGroup variant="card" aria-label="Home mode checklist">{rows.map((item, index) => <Item key={item.id}>
-          <ItemContent><ItemTitle>{MODE_LABELS[item.id]} <Badge variant={item.state === "done" ? "secondary" : "outline"}>{modeActionBusy === item.id && item.id === "self_test" ? "Running" : item.id === "pieces" && downloading.length > 0 ? "Installing" : item.state === "done" ? "Ready" : item.state === "can_do" ? "Needs setup" : "Needs a step from you"}</Badge></ItemTitle>
+          <ItemContent><ItemTitle>{MODE_LABELS[item.id]} <Badge variant={item.state === "done" ? "secondary" : "outline"}>{(modeActionBusy === item.id || selfTest.running) && item.id === "self_test" ? "Running" : item.id === "pieces" && downloading.length > 0 ? "Installing" : item.id === "self_test" && selfTest.running ? "Running" : item.state === "done" ? "Ready" : item.state === "can_do" ? "Needs setup" : "Needs a step from you"}</Badge></ItemTitle>
             {item.state !== "done" ? <ItemDescription>{codingModeReasons[item.reason_key]}</ItemDescription> : null}
+            {item.id === "self_test" && selfTest.running ? <ItemDescription>Home is loading the large model, checking it, and switching back. This takes a few minutes. You can leave this page.</ItemDescription> : null}
+            {item.id === "self_test" && selfTest.failure ? <ItemDescription role="alert">{selfTest.failure}</ItemDescription> : null}
             {item.id === "pieces" ? downloading.map((piece) => <div key={piece.id}><ItemDescription>{`${piece.label} · ${piece.percent ?? 0}%`}</ItemDescription><Progress value={piece.percent ?? 0} aria-label={`Installing ${piece.label}`} /></div>) : null}
             {item.state === "manual" ? <ItemDescription><Link to={`/docs/user/coding-mode#${item.doc_anchor}`}>How</Link></ItemDescription> : null}
           </ItemContent>
-          {item.state === "can_do" ? <ItemActions><Button type="button" variant="outline" disabled={modeActionBusy !== null || (item.id === "pieces" && downloading.length > 0)} onClick={() => void runModeAction(item.id)}>{modeActionBusy === item.id ? item.id === "self_test" ? "Running" : "Working" : item.id === "pieces" && downloading.length > 0 ? "Installing" : item.id === "pieces" ? "Install" : item.id === "self_test" ? "Run the test" : "Turn coding on"}</Button></ItemActions> : null}
+          {item.state === "can_do" ? <ItemActions><Button type="button" variant="outline" disabled={modeActionBusy !== null || (item.id === "pieces" && downloading.length > 0) || (item.id === "self_test" && selfTest.running)} onClick={() => void runModeAction(item.id)}>{modeActionBusy === item.id ? item.id === "self_test" ? "Running" : "Working" : item.id === "pieces" && downloading.length > 0 ? "Installing" : item.id === "self_test" && selfTest.running ? "Running" : item.id === "pieces" ? "Install" : item.id === "self_test" ? "Run the test" : "Turn coding on"}</Button></ItemActions> : null}
           {index < rows.length - 1 ? <ItemSeparator variant="inset" /> : null}
         </Item>)}</ItemGroup>}
       </AsyncState>

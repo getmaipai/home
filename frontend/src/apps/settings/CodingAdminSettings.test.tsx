@@ -2,7 +2,7 @@ import { afterEach, describe, expect, mock, test } from "bun:test";
 import { fireEvent, cleanup, waitFor, within } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import settingsFile from "@maipai/spec/settings/keys.json";
-import { CodingAdminSettings } from "@/apps/settings/CodingSettings";
+import { CodingAdminSettings, selfTestState } from "@/apps/settings/CodingSettings";
 import { renderWithQueryClient } from "../../../tests/renderWithQueryClient";
 
 afterEach(cleanup);
@@ -128,6 +128,44 @@ describe("Coding admin settings", () => {
       fireEvent.click(view.getByRole("button", { name: "Turn coding on" }));
       await waitFor(() => expect(view.getByRole("alert")).toHaveTextContent("Coding needs setup before you can turn it on."));
     } finally { globalThis.fetch = original; }
+  });
+
+  test("the coding test shows Running while Home switches and back", async () => {
+    const original = globalThis.fetch;
+    const registry = settingsFile.filter((setting) => setting.key.startsWith("coding."));
+    const values = registry.map((setting) => ({ key: setting.key, value: setting.default, source: "default", label: setting.label, level: setting.level, secret: false }));
+    const item = (id: string, state: string) => ({ id, state, reason_key: id, doc_anchor: id });
+    const ids = ["coding_enabled", "engine", "pieces", "hardware", "memory", "client", "bench"];
+    let phase: "before" | "running" = "before";
+    globalThis.fetch = mock((input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      if (url.endsWith("/api/settings/registry")) return Promise.resolve(Response.json(registry));
+      if (url.includes("/api/settings?scope=household")) return Promise.resolve(Response.json(values));
+      if (url.endsWith("/api/people")) return Promise.resolve(Response.json([]));
+      if (url.endsWith("/api/grants")) return Promise.resolve(Response.json([]));
+      if (url.endsWith("/api/coding/pieces")) return Promise.resolve(Response.json({ stack: "ok", message: null, coding_enabled: false, engine: "splash", missing: null, pieces: [] }));
+      if (url.endsWith("/api/coding/mode/self-test") && init?.method === "POST") { phase = "running"; return Promise.resolve(Response.json({ accepted: true }, { status: 202 })); }
+      if (url.endsWith("/api/coding/mode")) {
+        const testState = "can_do";
+        return Promise.resolve(Response.json({ readiness: { ready: false, first_unmet: "self_test", items: [...ids.map((id) => item(id, "done")), item("self_test", testState)] }, mode: "normal", state: phase === "running" ? "switching" : "stable", reason: null }));
+      }
+      throw new Error(`unstubbed fetch: ${url}`);
+    }) as unknown as typeof fetch;
+    try {
+      const view = renderWithQueryClient(<MemoryRouter><CodingAdminSettings /></MemoryRouter>);
+      fireEvent.click(await view.findByText("Run the test"));
+      await waitFor(() => expect(view.getByText(/This takes a few minutes/)).toBeTruthy());
+    } finally { globalThis.fetch = original; }
+  });
+
+  test("the coding test state: running while switching, done when the check passes, failure with the reason", () => {
+    const view = (state: string, reason: string | null, testDone: boolean) => ({ mode: "normal", state, reason, readiness: { ready: false, first_unmet: null, items: [{ id: "self_test", state: testDone ? "done" : "can_do", reason_key: "self_test", doc_anchor: "x" }] } }) as never;
+    const t0 = Date.now();
+    expect(selfTestState(undefined, null)).toEqual({ running: false, failure: null });
+    expect(selfTestState(view("switching", null, false), t0).running).toBe(true);
+    expect(selfTestState(view("stable", null, true), t0)).toEqual({ running: false, failure: null });
+    expect(selfTestState(view("failed", "The large coding model did not complete its tool check.", false), t0 - 20_000).failure).toBe("The large coding model did not complete its tool check.");
+    expect(selfTestState(view("stable", null, false), t0 - 16 * 60_000).failure).toContain("longer than expected");
   });
 
 });
