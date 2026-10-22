@@ -174,6 +174,7 @@ const EXEMPT: Record<string, string> = {
   "lib/conversationTitle.ts": "a two to five word label, run through the output gate for the owner's band; gives no advice",
   "lib/news/summary.ts": "Key points for a stored article, one per story and age band; a minor's text passes the minor floor, and a child's also the child gate sentence by sentence, before storage and again at release; gives no advice",
   "lib/conversationHistory.ts": "retention summaries kept as records; never sent to the person as a reply",
+  "lib/companionLook.ts": "describes a companion's own character picture as a JSON card for its editor; no text reaches a person as a reply",
   "lib/pictures/ageCheck.ts": "labels a picture as a possible minor in JSON; no text reaches the person, a doubt withholds the picture",
   "lib/pictures/laneGate.ts": "labels a picture child-safe or not in JSON; no text reaches the person, a doubt withholds the picture",
   "lib/pictures/people.ts": "picks which numbered, boxed person a description means, as numbers in JSON; no text reaches the person, a doubt removes no one",

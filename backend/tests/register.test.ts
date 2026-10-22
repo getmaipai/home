@@ -157,7 +157,7 @@ describe("planFor", () => {
 });
 
 describe("RECENCY-02: a curious companion's spoken turn points at what it remembers", () => {
-  const tie = "If something you remember about them, or they said earlier, fits, tie it in playfully.";
+  const tie = "Bring back something they told you earlier today whenever it connects to what they say now, and make a playful remark about the link.";
   test("a curious companion's spoken plan line carries the tie-in sentence, a balanced one's does not, and the written class never does", () => {
     const signal = base("inform");
     const plan = planFor(input(signal, { surface: "robot" }));
@@ -165,5 +165,25 @@ describe("RECENCY-02: a curious companion's spoken turn points at what it rememb
     expect(planLineForTurnMachine(plan, signal, "spoken", "balanced")).not.toContain(tie);
     expect(planLineForTurnMachine(plan, signal, "spoken")).not.toContain(tie);
     expect(planLineForTurnMachine(plan, signal, "written", "curious")).not.toContain(tie);
+  });
+});
+
+describe("ROBOT-VOICE-02: a lively companion's spoken turn carries its voice", () => {
+  const lively = { directness: "diplomatic" as const, engagement: "curious" as const, vocabulary: "standard" as const };
+  test("a directive on a spoken turn allows a reaction and the plan line asks for one", () => {
+    const signal = base("directive");
+    const plan = planFor(input(signal, { surface: "robot", surfaceClass: "spoken", companion: lively }));
+    expect(plan.moves.react).toBe("allowed");
+    expect(planLineForTurnMachine(plan, signal, "spoken", "curious")).toContain("open with a quick happy reaction");
+  });
+  test("a balanced companion, the written class and a sad turn keep today's lines", () => {
+    const signal = base("directive");
+    expect(planFor(input(signal, { surfaceClass: "spoken" })).moves.react).toBe("forbidden");
+    expect(planFor(input(signal, { surfaceClass: "written", companion: lively })).moves.react).toBe("forbidden");
+    const sad = base("inform", "sadness", "moderate");
+    const sadPlan = planFor(input(sad, { surfaceClass: "spoken", companion: lively }));
+    expect(sadPlan.moves.care).toBe("required");
+    expect(planLineForTurnMachine(sadPlan, sad, "spoken", "curious")).not.toContain("happy reaction");
+    expect(planLineForTurnMachine(planFor(input(signal)), signal, "spoken", "balanced")).not.toContain("happy reaction");
   });
 });

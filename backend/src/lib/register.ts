@@ -168,6 +168,9 @@ export function planFor(input: PlanInput): ReplyPlan {
   if (input.companion.engagement === "brief") forbid("ask_back");
   if (input.companion.engagement === "balanced") allow("ask_back");
   if (input.companion.engagement === "curious" && (signal.primary_act === "inform" || signal.primary_act === "commissive")) allow("ask_back");
+  // ROBOT-VOICE-02: a lively companion reacts first on a spoken turn whatever the act ("tell me a joke" gets "Ooh!" before the joke); only
+  // care (sadness, fear), anger at the hub and brevity take that away, because they run on the lines around this one.
+  if (input.companion.engagement === "curious" && (input.surfaceClass ?? "spoken") === "spoken" && !input.brevity && plan.care !== "required" && !(signal.expressed_emotion === "anger" && signal.target === "hub")) allow("react");
   if (input.brevity) forbid("react", "ask_back");
   if (signal.expressed_emotion === "anger" && signal.target === "hub") {
     plan.react = "forbidden";
@@ -252,6 +255,9 @@ export function planLine(plan: ReplyPlan, signal: TurnSignal, surfaceClass: Surf
   return planLineAbout(plan, signal, surfaceClass, "themselves");
 }
 
+const LIVELY_VOICE_LINE = "Answer in your own voice, upbeat and friendly: open with a quick happy reaction to what they said, then the answer.";
+const TIE_IN_LINE = "Bring back something they told you earlier today whenever it connects to what they say now, and make a playful remark about the link.";
+
 /** New turn-machine path: name the subject the signal classifier chose,
  * so a world question cannot be prompted as an answer about the speaker
  * (or the companion). */
@@ -267,7 +273,15 @@ export function planLineForTurnMachine(plan: ReplyPlan, signal: TurnSignal, surf
   // RECENCY-02 (the robot on Qwen3.6): the plan line is the last thing the model reads, and for a neutral statement it says "no required
   // move" and "no unnecessary follow-up", which cancelled a lively companion's habit of bringing back what the person said earlier. A curious
   // companion's spoken turns carry one more sentence that points the model at what it already has in front of it. Memory use, not voice.
-  const line = surfaceClass === "spoken" && engagement === "curious" ? `${aboutLine} If something you remember about them, or they said earlier, fits, tie it in playfully.` : aboutLine;
+  // ROBOT-VOICE-02 (the real robot, 2026-10-21): the plan line is the last thing read and, with a day of the robot's own short replies in the
+  // window, it decided the voice: "say, one sentence, no question, no tasks" got a flat answer from a companion built to be bright. For a lively
+  // companion the line now carries the voice itself, except where care leads (sadness, fear) or playfulness is ruled out.
+  const lively = surfaceClass === "spoken" && engagement === "curious";
+  const line = lively
+    ? plan.moves.care !== "required" && plan.playfulness !== "forbidden"
+      ? `${aboutLine} ${LIVELY_VOICE_LINE} ${TIE_IN_LINE}`
+      : `${aboutLine} Stay warm and friendly, never flat. ${TIE_IN_LINE}`
+    : aboutLine;
   // THIN-0B: a mode control held a record back, so the model is told, and
   // told where to send the question.
   // Turn-machine path only; planLine() above keeps the frozen wording.

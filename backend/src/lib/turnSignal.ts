@@ -139,6 +139,9 @@ const EMOTION_CUES: ReadonlyArray<[RegExp, EmotionCue]> = [
 const INTENSIFIER_RE = /\b(?:so|very|extremely|absolutely|totally|completely|incredibly|utterly|super|truly|deeply|beyond)\b/i;
 // "I'm not nervous anymore" expresses no fear: a negated cue is neutral.
 const NEGATED_CUE_RE = /\b(?:not|never|no longer|n't|isn'?t|aren'?t|wasn'?t|don'?t|doesn'?t|didn'?t|hardly)\s+(?:\w+\s+){0,2}$/i;
+// ROBOT-VOICE-02 (live): "I said you're freaking out" is about the one being spoken to, not a feeling the speaker expressed. A cue that
+// follows a second-person subject ("you're", "you seem", "you sound") is not the speaker's emotion.
+const ABOUT_YOU_CUE_RE = /\byou(?:'re|’re| are| were| seem| seemed| sound| sounded| look| looked| keep| kept| been)\s+(?:\w+\s+){0,1}$/i;
 const DIMINISHER_RE = /\b(?:a (?:little|bit|tad|touch)|slightly|kind of|kinda|sort of|sorta|somewhat|mildly|a little bit)\b/i;
 const EXPLETIVE_RE = /\b(?:damn|dammit|hell|crap|shit|fuck\w*|bloody|freaking|frigging|wtf|ffs)\b/i;
 const REPEATED_PUNCTUATION_RE = /[!?]{2,}|!\s*$/;
@@ -357,7 +360,7 @@ function clauseEmotion(text: string): { emotion: Emotion; intensity: Intensity; 
   for (const [re, c] of EMOTION_CUES) {
     const m = re.exec(text);
     if (!m) continue;
-    if (NEGATED_CUE_RE.test(text.slice(0, m.index))) continue;
+    if (NEGATED_CUE_RE.test(text.slice(0, m.index)) || ABOUT_YOU_CUE_RE.test(text.slice(0, m.index))) continue;
     cue = c;
     break;
   }

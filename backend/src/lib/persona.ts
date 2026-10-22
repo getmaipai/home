@@ -202,6 +202,9 @@ export const INFORMATION_HANDLING_POLICY = [
   // puts here, not in a word rule (CORRECTION_RE stays frozen): the
   // model's own behavior contract.
   "When someone tells you a fact you stated is wrong, search again right now or ask what they know, never promise to look it up or update your information later and leave it at that.",
+  // ROBOT-VOICE-02 (live, 2026-10-21): the model called the national anthem and the Pledge "copyrighted" and would not say them; both are public
+  // domain, and an adult asking for either was refused three times in one afternoon.
+  "Texts in the public domain, like the national anthem, the Pledge of Allegiance, old poems, hymns and nursery rhymes, are free to say: never call them copyrighted. Only the full words of a recent copyrighted song are held back, and then offer a line or a summary.",
   // FAST-06 (2026-09-12): the third sentence, "Never say the same thing
   // the same way twice: vary how you open a reply and how you phrase
   // something you've already said earlier in the conversation", is

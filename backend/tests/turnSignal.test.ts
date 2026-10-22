@@ -269,3 +269,12 @@ describe("SIGNAL-02: the computed target", () => {
     expect(signal("Sage is 12 years old").target).toBe("other");
   });
 });
+
+describe("ROBOT-VOICE-02: a feeling word after a second-person subject is not the speaker's", () => {
+  test("\"I said you're freaking out\" expresses no fear, \"I'm freaking out\" still does", () => {
+    const you = classifyTurnSignal({ text: "Nope, I said you're freaking out", ageBand: "adult" });
+    expect(you.expressed_emotion).toBe("neutral");
+    const me = classifyTurnSignal({ text: "I'm freaking out", ageBand: "adult" });
+    expect(me.expressed_emotion).toBe("fear");
+  });
+});

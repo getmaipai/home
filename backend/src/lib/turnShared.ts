@@ -241,7 +241,7 @@ export const MAX_MEMORY_SNIPPETS = 5;
 // genuinely varies per persona) each get their own cap too - the bot's
 // test_prompt_budget.py precedent this step copies found rules alone
 // once hit 68% of a prompt with no independent section cap to stop it.
-export const MAX_RULES_SECTION_CHARS = 800;
+export const MAX_RULES_SECTION_CHARS = 950;
 // Session C step 4: NATURALNESS_POLICY's own budget, separate from
 // MAX_RULES_SECTION_CHARS above - a distinct concern (how something
 // sounds spoken aloud, not what information handling is allowed) added
@@ -276,7 +276,8 @@ export const MAX_NATURALNESS_SECTION_CHARS = 500;
 // constant. 1200 gives real headroom above that, matching
 // MAX_SKILLS_SECTION_CHARS's own budget for the section most likely to
 // grow with real content.
-export const MAX_COMPANION_SECTION_CHARS = 1500;
+// ROBOT-VOICE-02: 1700, because Rivet's adult section was 1616 characters and the cap cut its last two few-shot examples mid-word.
+export const MAX_COMPANION_SECTION_CHARS = 1700;
 
 // PREFIX-CLASS-01: the written class's own composePersonaPrompt() output
 // now folds what used to be three separate capped sections (companion,

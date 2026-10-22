@@ -12,6 +12,7 @@ checklist (`docs/dev.md`). The first release is 0.1.0.
 - Companions app: browse the companions you may use, read about each one, play its voice and set your default; admins also see which companion each robot has (COMPANIONS-APP-01).
 
 ### Fixed
+- The robot's companion (Rivet, Nova, Riff, Sprout) is brighter and friendlier on the robot: it reacts first, brings back things you said earlier, answers "you're freaking out" as being about itself, and no longer refuses the national anthem or the Pledge as copyrighted (ROBOT-VOICE-02).
 - Robot: the lively companions (Rivet, Nova, Riff, Sprout) now open with a quick happy reaction more reliably (28 of 40 test replies before, 35 to 40 after) and bring back what you told them earlier (2 of 8 before, 5 to 8 after) (ROBOT-VOICE-01).
 - Chat: a weather question the model answered without checking ("Is it going to rain?" answered "where are you?") now gets the real weather when a household home is set and Settings, "Help the chat remember to search the web", is on rescue, typed or spoken, for every age. A small trained detector decides; the model still answers first (weather questions it misses: 27% before, 0% in the bench) (WEATHER-ASSIST-01).
 - Chat: when a household home is set, the prompt names it, so "Is it going to rain?" with no place named uses it (weather tool calls on that case went from 27 of 40 to 32 of 40 in the bench) (RECENCY-02).
