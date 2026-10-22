@@ -1,9 +1,8 @@
 import { readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import sharp from "sharp";
 import media from "@maipai/spec/vocab/companion-media.json";
 import type { PersonRow } from "@/types";
-import { readLook, versionPath } from "@/lib/companionLook";
+import { readLook, versionOriginalPath, versionPath } from "@/lib/companionLook";
 import { addTake, companionHasFinishingJob, finishTake, readStates, recordTakeFailure, setMotion, takePath, TAKE_LIMIT_LINE } from "@/lib/companionStates";
 import { routeAudience } from "@/lib/pictures/audience";
 import { videoDenial, VIDEO_DENIAL_LINE, VIDEO_NOT_HERE_LINE, refuseVideoPrompt, VIDEO_REFUSAL_LINE } from "@/lib/videos/policy";
@@ -18,6 +17,7 @@ export const TAKE_QUICK_NOT_READY_LINE = "Making a character's clips needs the s
 export const TAKE_RUN_NOT_FOUND_LINE = "That clip run could not be found. Start it again.";
 export const TAKE_RUN_TIMEOUT_LINE = "The video engine took too long. Try again.";
 export const TAKE_NEGATIVE_PROMPT = "different character, changed colours, changed face, extra limbs, text, watermark, camera movement, background change, shadows";
+export const TAKE_NO_ORIGINAL_LINE = 'The video model can only start from a picture the picture model made. Use "Change it" on this picture to make a version with the picture model, then pick that one as the starting picture.';
 
 export type TakeRunState = "queued" | "running" | "done" | "failed" | "cancelled";
 export interface TakeRun {
@@ -36,15 +36,6 @@ export function takePrompt(card: { text: string }, motion: string, keyName: "gre
   return `${card.text.slice(0, 600)}. ${motion}. Locked camera, no zoom, no pan, the character stays in the centre of the frame and keeps the same size. Plain solid ${keyName} background, no shadows, no ground, no text, no other objects. Smooth natural motion.`;
 }
 
-/** Composites the approved transparent square rest image into the fixed 832 by 480 key-colour frame. */
-export async function compositeTakeStartPicture(png: Uint8Array, key: "#00FF00" | "#FF00FF"): Promise<Uint8Array> {
-  const [r, g, b] = key === "#FF00FF" ? [255, 0, 255] : [0, 255, 0];
-  const character = await sharp(png, { failOn: "error", limitInputPixels: 40_000_000 }).resize({ height: 440, fit: "inside", withoutEnlargement: false }).png().toBuffer();
-  const overlay = await sharp(character).metadata();
-  const left = Math.round((832 - (overlay.width ?? 440)) / 2), top = Math.round((480 - (overlay.height ?? 440)) / 2);
-  return new Uint8Array(await sharp({ create: { width: 832, height: 480, channels: 3, background: { r, g, b } } }).composite([{ input: character, left, top }]).removeAlpha().png().toBuffer());
-}
-
 export function activeTakeRun(companionId: string): TakeRun | null {
   const id = activeByCompanion.get(companionId), run = id ? runs.get(id) : null;
   return run && (run.state === "queued" || run.state === "running") ? run : null;
@@ -53,10 +44,10 @@ export function companionHasTakeRun(companionId: string): boolean { const id = a
 export function __clearCompanionTakeRunsForTests(): void { runs.clear(); activeByCompanion.clear(); starting.clear(); }
 export function takeRunFor(id: string, actor: PersonRow, companionId: string): TakeRun | null { const run = runs.get(id); return run?.personId === actor.id && run.companionId === companionId ? run : null; }
 
-function readySheet(companionId: string): { look: ReturnType<typeof readLook>; restPath: string; card: NonNullable<NonNullable<ReturnType<typeof readLook>["sheet"]>["card"]> } {
+function readySheet(companionId: string): { look: ReturnType<typeof readLook>; restPath: string; originalPath: string | null; card: NonNullable<NonNullable<ReturnType<typeof readLook>["sheet"]>["card"]> } {
   const look = readLook(companionId), restPath = look.rest ? versionPath(companionId, look.rest) : null;
   if (look.sheet?.state !== "approved" || !restPath || !look.sheet.card) throw Object.assign(new Error("Approve the character sheet first, so every clip starts from the same character."), { status: 409 });
-  return { look, restPath, card: look.sheet.card };
+  return { look, restPath, originalPath: look.rest ? versionOriginalPath(companionId, look.rest) : null, card: look.sheet.card };
 }
 
 function errorCode(error: unknown): string | null { return error instanceof StackVideoError ? error.code : null; }
@@ -70,7 +61,7 @@ async function runTakes(run: TakeRun, count: number, motionOverride?: string): P
   run.state = "running";
   let consecutiveEngineFailures = 0;
   const look = readLook(run.companionId), sheet = readySheet(run.companionId), keyName = sheet.look.sheet!.key === "#FF00FF" ? "magenta" : "green";
-  const pictureB64 = Buffer.from(await compositeTakeStartPicture(new Uint8Array(readFileSync(sheet.restPath)), sheet.look.sheet!.key as "#00FF00" | "#FF00FF")).toString("base64");
+  const pictureB64 = Buffer.from(readFileSync(sheet.originalPath!)).toString("base64");
   try {
     for (let stateIndex = 0; stateIndex < run.states.length; stateIndex++) {
       const state = run.states[stateIndex]!;
@@ -90,7 +81,7 @@ async function runTakes(run: TakeRun, count: number, motionOverride?: string): P
         try {
           const seed = Math.floor(Math.random() * 2_147_483_647);
           take = addTake(run.companionId, state, { source: "generated", seed, label: `Candidate ${index}` });
-          const submitted = await submitVideo({ prompt, negative_prompt: TAKE_NEGATIVE_PROMPT, size: "832x480", seconds: 5, seed, image: pictureB64, image_source: "generated", audience: "all-ages", timeout_ms: 1 });
+          const submitted = await submitVideo({ prompt, negative_prompt: TAKE_NEGATIVE_PROMPT, size: `${media.generate.width}x${media.generate.height}`, seconds: media.generate.seconds, seed, image: pictureB64, image_source: "generated", audience: "all-ages", timeout_ms: 1 });
           stackJob = submitted.job; run.stackJob = stackJob;
           let done = submitted.done;
           const deadline = Date.now() + 15 * 60_000;
@@ -153,9 +144,10 @@ export async function startStateTakes(input: { actor: PersonRow; companionId: st
   if (denial) throw Object.assign(new Error(VIDEO_DENIAL_LINE[denial]), { status: 403 });
   const refused = refuseVideoPrompt(promptText, { lane: "adult" });
   if (refused) throw Object.assign(new Error(VIDEO_REFUSAL_LINE[refused]), { status: 422 });
+  const sheet = readySheet(input.companionId);
+  if (!sheet.originalPath) throw Object.assign(new Error(TAKE_NO_ORIGINAL_LINE), { status: 409, code: "no_original" });
   const engineReady = await videoEngineReady(), engineStatus = await videoEngineStatus();
   if (!engineReady && (!engineStatus || engineStatus.available === false || engineStatus.state === "unsupported" || engineStatus.state === "off")) throw Object.assign(new Error(VIDEO_NOT_HERE_LINE), { status: 503 });
-  readySheet(input.companionId);
   if (companionHasTakeRun(input.companionId) || companionHasFinishingJob(input.companionId) || activeLookJob(input.companionId)) throw Object.assign(new Error(TAKE_RUN_BUSY_LINE), { status: 409 });
   const states = readStates(input.companionId);
   if (input.states.some((state) => (states.states[state]?.takes.length ?? 0) + input.count > 12)) throw Object.assign(new Error(TAKE_LIMIT_LINE), { status: 409 });

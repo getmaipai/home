@@ -123,18 +123,19 @@ describe("companion look generation jobs", () => {
     if (!created.ok) throw new Error(created.error);
     const image = await keyedPicture();
     __setPictureStatusForTests(readyStatusForTests());
-    const started: string[] = [];
+    const started: string[] = [], postedSources: Array<{ image: string; image_source: string | File | null }> = [];
     __setPicturesFetchForTests((async (input, init) => {
       const url = String(input), method = init?.method ?? "GET";
-      if (url.endsWith("/v1/images/edits") && method === "POST") { started.push("edit"); return Response.json({ job: "look-edit-1" }, { status: 202 }); }
+      if (url.endsWith("/v1/images/edits") && method === "POST") { const form = init?.body as FormData, file = form.get("image") as File; postedSources.push({ image: Buffer.from(await file.arrayBuffer()).toString("base64"), image_source: form.get("image_source") }); started.push("edit"); return Response.json({ job: "look-edit-1" }, { status: 202 }); }
       if (url.endsWith("/look-edit-1")) return Response.json({ job: "look-edit-1", state: "done", progress: 1, data: [] });
       if (url.endsWith("/look-edit-1/0.png")) return new Response(image, { headers: { "content-type": "image/png" } });
       return new Response("Not found", { status: 404 });
     }) as typeof fetch);
-    const sourceResponse = await upload(`companions/${created.value.id}/look/upload`, adult, await transparentPng(), "true", "false");
-    const { id: sourceId } = await sourceResponse.json() as { id: string };
+    const sourceOriginal = image;
+    const sourceVersion = addVersion(created.value.id, await transparentPng(), { source: "generated", label: "Rest", width: 1024, height: 1024, from: null }, sourceOriginal);
+    const sourceId = sourceVersion.id;
     const edit = await request(`companions/${created.value.id}/look/edit`, adult, "POST", { version_id: sourceId, instruction: "Add a blue scarf" });
-    expect(edit.status).toBe(202); expect(started).toEqual(["edit"]);
+    expect(edit.status).toBe(202); expect(started).toEqual(["edit"]); expect(postedSources).toEqual([{ image: Buffer.from(sourceOriginal).toString("base64"), image_source: "generated" }]);
     const { job } = await edit.json() as { job: string };
     const result = await request(`companions/${created.value.id}/look/jobs/${job}`, adult);
     expect(await result.json()).toMatchObject({ state: "done", versions: [{ label: "Add a blue scarf" }] });
@@ -150,17 +151,17 @@ describe("companion look generation jobs", () => {
     __setPictureStatusForTests(readyStatusForTests());
     __setCharacterPictureCapabilityForTests({ imageParts: false, pictureTokensMax: null });
     const output = await sharp({ create: { width: 512, height: 512, channels: 3, background: "#cc3322" } }).png().toBuffer();
-    let next = 0; const submitted: string[] = [];
+    let next = 0; const submitted: string[] = [], postedSources: Array<{ image: string; image_source: string | File | null }> = [];
     __setPicturesFetchForTests((async (input, init) => {
       const url = String(input), method = init?.method ?? "GET";
-      if (url.endsWith("/v1/images/edits") && method === "POST") { const job = `sheet-stack-${++next}`; submitted.push(String((init?.body as FormData).get("instruction"))); return Response.json({ job }, { status: 202 }); }
+      if (url.endsWith("/v1/images/edits") && method === "POST") { const form = init?.body as FormData, file = form.get("image") as File; postedSources.push({ image: Buffer.from(await file.arrayBuffer()).toString("base64"), image_source: form.get("image_source") }); const job = `sheet-stack-${++next}`; submitted.push(String(form.get("instruction"))); return Response.json({ job }, { status: 202 }); }
       const match = url.match(/sheet-stack-(\d+)(?:\/(\d+)\.png)?$/);
       if (match?.[2] !== undefined) return new Response(output, { headers: { "content-type": "image/png" } });
       if (match) return Response.json({ job: `sheet-stack-${match[1]}`, state: "done", progress: 1, data: [] });
       return new Response("Not found", { status: 404 });
     }) as typeof fetch);
-    const uploaded = await upload(`companions/${created.value.id}/look/upload`, adult, await transparentPng(), "true", "false");
-    const rest = (await uploaded.json() as { id: string }).id;
+    const stackOriginal = new Uint8Array(output);
+    const rest = addVersion(created.value.id, await transparentPng(), { source: "generated", label: "Rest", width: 1024, height: 1024, from: null }, stackOriginal).id;
     for (const token of [other, child, teen]) expect((await request(`companions/${created.value.id}/look/sheet`, token, "POST", {})).status).toBe(403);
     const start = await request(`companions/${created.value.id}/look/sheet`, adult, "POST", {});
     expect(start.status).toBe(202); const started = await start.json() as { job: string; card_source: string }; expect(started).toMatchObject({ card_source: "look_prompt" });
@@ -170,7 +171,7 @@ describe("companion look generation jobs", () => {
     await request(poll, adult); await request(poll, adult); const done = await request(poll, adult);
     expect(await done.json()).toMatchObject({ state: "done", versions: [{ label: "Turned left" }, { label: "Turned right" }, { label: "Mouth open" }] });
     expect(await (await request(poll, adult)).json()).toMatchObject({ state: "done" });
-    expect(submitted).toHaveLength(3); expect(submitted[0]).toContain("three quarters to its left"); expect(submitted[1]).toContain("three quarters to its right");
+    expect(submitted).toHaveLength(3); expect(submitted[0]).toContain("three quarters to its left"); expect(submitted[1]).toContain("three quarters to its right"); expect(postedSources).toEqual(Array.from({ length: 3 }, () => ({ image: Buffer.from(stackOriginal).toString("base64"), image_source: "generated" })));
     const look = await (await request(`companions/${created.value.id}/look`, adult)).json() as { versions: unknown[]; sheet: { card: { text: string }; views: Record<string, { version_id: string }>; state: string }; ready_for_video: boolean };
     expect(look.sheet).toMatchObject({ state: "needs_review", card: { text: "a red fox wearing a blue scarf" } }); expect(Object.keys(look.sheet.views)).toEqual(["left", "right", "mouth"]); expect(look.ready_for_video).toBe(false);
     expect(look.versions).toHaveLength(4);
@@ -346,7 +347,8 @@ describe("household companion routes", () => {
     mkdirSync(join(path, ".."), { recursive: true }); writeFileSync(path, Buffer.from("0123456789"));
     const stateResponse = await request(`companions/${created.value.id}/states`, adult);
     expect(stateResponse.status).toBe(200);
-    const stateBody = await stateResponse.json() as { states: Array<{ id: string; required: boolean }> };
+    const stateBody = await stateResponse.json() as { start_ready: boolean; start_reason?: string; states: Array<{ id: string; required: boolean }> };
+    expect(stateBody.start_ready).toBe(false); expect(stateBody.start_reason).toContain("The video model can only start from a picture the picture model made.");
     expect(stateBody.states.map((s) => s.id)).toEqual(["idle", "idle_look", "listening", "thinking", "working", "speaking", "needs_you", "greeting", "happy", "oops", "celebrate", "sleeping"]);
     expect(stateBody.states[0]?.required).toBe(true);
     const partial = await app.request(`http://localhost/api/companions/${created.value.id}/states/idle/${take.id}/clip.h264.mp4`, { headers: { cookie: `session=${adult}`, range: "bytes=2-5" } });
@@ -386,7 +388,8 @@ describe("household companion routes", () => {
 
   test("generates two candidates in sequence, finishes them, stores reports and deletes Stack jobs", async () => {
     const adult = addPerson("person-state-generate", "adult"), created = createHouseholdCompanion({ ...fixture(), display_name: "Generated character" }, { display_name: "Author", person_id: "person-state-generate" }); if (!created.ok) throw new Error(created.error); const id = created.value.id;
-    const rest = addVersion(id, await transparentPng(), { source: "upload", label: "rest", width: 1024, height: 1024, from: null }); setRest(id, rest.id); updateSheet(id, { views: { left: null, right: null, mouth: null }, card: { text: "A red fox with white paws", species: "fox", colours: ["#CC3322"] }, key: "#FF00FF", state: "needs_review", approved_by: null, approved_at: null }); approveSheet(id, "Author");
+    const stackOriginal = await transparentPng();
+    const rest = addVersion(id, await transparentPng(), { source: "upload", label: "rest", width: 1024, height: 1024, from: null }, stackOriginal); setRest(id, rest.id); updateSheet(id, { views: { left: null, right: null, mouth: null }, card: { text: "A red fox with white paws", species: "fox", colours: ["#CC3322"] }, key: "#FF00FF", state: "needs_review", approved_by: null, approved_at: null }); approveSheet(id, "Author");
     __setVideoStatusForTests(readyVideoStatusForTests());
     const submitted: Array<Record<string, unknown>> = [], deleted: string[] = [], fetched: string[] = [];
     __setVideosFetchForTests((async (input, init) => {
@@ -405,8 +408,8 @@ describe("household companion routes", () => {
     let progress: any;
     for (let attempt = 0; attempt < 100; attempt++) { const response = await request(`companions/${id}/states/jobs/run/${job}`, adult); progress = await response.json(); if (progress.state === "done" || progress.state === "failed") break; await new Promise((resolve) => setTimeout(resolve, 5)); }
     expect(progress).toMatchObject({ state: "done", percent: 100, takes_made: 2 }); expect(progress.label).toContain("take 2 of 2");
-    expect(submitted).toHaveLength(2); expect(submitted[0]?.seed).not.toBe(submitted[1]?.seed); expect(submitted[0]).toMatchObject({ size: "832x480", seconds: 5, image_source: "generated", audience: "all-ages", timeout_ms: 1 }); expect(submitted[0]).not.toHaveProperty("model");
-    const startImage = await sharp(Buffer.from(String(submitted[0]?.image), "base64")).raw().toBuffer({ resolveWithObject: true }); expect(startImage.info.width).toBe(832); expect(startImage.info.height).toBe(480); expect([...startImage.data.subarray(0, 3)]).toEqual([255, 0, 255]);
+    expect(submitted).toHaveLength(2); expect(submitted[0]?.seed).not.toBe(submitted[1]?.seed); expect(submitted[0]).toMatchObject({ size: `${media.generate.width}x${media.generate.height}`, seconds: media.generate.seconds, image_source: "generated", audience: "all-ages", timeout_ms: 1 }); expect(submitted[0]).not.toHaveProperty("model");
+    expect(submitted[0]?.image).toBe(Buffer.from(stackOriginal).toString("base64"));
     expect(fetched).toEqual(["video-1", "video-2"]); expect(deleted).toEqual(["video-1", "video-2"]); expect(finished).toBe(2);
     const takes = readStates(id).states.idle!.takes; expect(takes).toHaveLength(2); expect(takes.every((take) => take.report?.ok)).toBe(true); expect(bestTake(takes)?.id).toBe("take-2");
   });
@@ -417,7 +420,8 @@ describe("household companion routes", () => {
     expect((await request(`companions/${id}/states/idle/generate`, child, "POST", { count: 1 })).status).toBe(403);
     expect((await request(`companions/${id}/states/idle/generate`, adult, "POST", { count: 1 })).status).toBe(409);
     __setVideoStatusForTests(null);
-    const rest = addVersion(id, await transparentPng(), { source: "upload", label: "rest", width: 1024, height: 1024, from: null }); setRest(id, rest.id); updateSheet(id, { views: { left: null, right: null, mouth: null }, card: { text: "A red fox", species: "fox", colours: ["#CC3322"] }, key: "#00FF00", state: "needs_review", approved_by: null, approved_at: null }); approveSheet(id, "Author");
+    const restBytes = await transparentPng();
+    const rest = addVersion(id, restBytes, { source: "upload", label: "rest", width: 1024, height: 1024, from: null }, restBytes); setRest(id, rest.id); updateSheet(id, { views: { left: null, right: null, mouth: null }, card: { text: "A red fox", species: "fox", colours: ["#CC3322"] }, key: "#00FF00", state: "needs_review", approved_by: null, approved_at: null }); approveSheet(id, "Author");
     expect((await request(`companions/${id}/states/idle/generate`, adult, "POST", { count: 1 })).status).toBe(503); expect(calls).toBe(0);
     __setVideoStatusForTests(readyVideoStatusForTests()); updateSheet(id, { views: { left: null, right: null, mouth: null }, card: { text: "a naked child character", species: "fox", colours: ["#CC3322"] }, key: "#00FF00", state: "approved", approved_by: "Author", approved_at: now });
     const refused = await request(`companions/${id}/states/idle/generate`, adult, "POST", { count: 1 }); expect(refused.status).toBe(422); expect((await refused.json() as { error: string }).error).toContain("never allowed"); expect(calls).toBe(0);
@@ -426,9 +430,19 @@ describe("household companion routes", () => {
     const quickMissing = await request(`companions/${id}/states/idle/generate`, adult, "POST", { count: 1 }); expect(quickMissing.status).toBe(503); expect((await quickMissing.json() as { error: string }).error).toContain("standard video model"); expect(calls).toBe(0);
   });
 
+  test("blocks video start without a Stack original before calling the Stack", async () => {
+    const adult = addPerson("person-state-no-original", "adult"), created = createHouseholdCompanion({ ...fixture(), display_name: "Upload only rest" }, { display_name: "Author", person_id: "person-state-no-original" }); if (!created.ok) throw new Error(created.error); const id = created.value.id;
+    const rest = addVersion(id, await transparentPng(), { source: "upload", label: "rest", width: 1024, height: 1024, from: null }); setRest(id, rest.id); updateSheet(id, { views: { left: null, right: null, mouth: null }, card: { text: "A red fox", species: "fox", colours: ["#CC3322"] }, key: "#00FF00", state: "needs_review", approved_by: null, approved_at: null }); approveSheet(id, "Author");
+    let calls = 0; __setVideosFetchForTests((async () => { calls++; return new Response("unexpected", { status: 500 }); }) as unknown as typeof fetch);
+    const response = await request(`companions/${id}/states/idle/generate`, adult, "POST", { count: 1 });
+    expect(response.status).toBe(409); expect(await response.json()).toEqual({ error: 'The video model can only start from a picture the picture model made. Use "Change it" on this picture to make a version with the picture model, then pick that one as the starting picture.', code: "no_original" }); expect(calls).toBe(0);
+    const look = await (await request(`companions/${id}/look`, adult)).json() as { start_ready: boolean; start_reason?: string }; expect(look.start_ready).toBe(false); expect(look.start_reason).toContain("Use \"Change it\"");
+  });
+
   test("keeps one companion run active and cancels its live Stack video job", async () => {
     const adult = addPerson("person-state-cancel", "adult"), created = createHouseholdCompanion({ ...fixture(), display_name: "Cancelable character" }, { display_name: "Author", person_id: "person-state-cancel" }); if (!created.ok) throw new Error(created.error); const id = created.value.id;
-    const rest = addVersion(id, await transparentPng(), { source: "upload", label: "rest", width: 1024, height: 1024, from: null }); setRest(id, rest.id); updateSheet(id, { views: { left: null, right: null, mouth: null }, card: { text: "A red fox", species: "fox", colours: ["#CC3322"] }, key: "#00FF00", state: "needs_review", approved_by: null, approved_at: null }); approveSheet(id, "Author");
+    const restBytes = await transparentPng();
+    const rest = addVersion(id, restBytes, { source: "upload", label: "rest", width: 1024, height: 1024, from: null }, restBytes); setRest(id, rest.id); updateSheet(id, { views: { left: null, right: null, mouth: null }, card: { text: "A red fox", species: "fox", colours: ["#CC3322"] }, key: "#00FF00", state: "needs_review", approved_by: null, approved_at: null }); approveSheet(id, "Author");
     __setVideoStatusForTests(readyVideoStatusForTests()); let sawPoll!: () => void; const pollStarted = new Promise<void>((resolve) => { sawPoll = resolve; }); let cancelled = 0;
     __setVideosFetchForTests((async (input: string | URL | Request, init?: RequestInit) => { const url = new URL(String(input)), method = init?.method ?? "GET"; if (url.pathname === "/v1/videos/generations" && method === "POST") return Response.json({ job: "video-live" }, { status: 202 }); if (url.pathname.endsWith("/video-live") && method === "GET") { sawPoll(); return Response.json({ job: "video-live", state: "running", progress: 20, data: [] }); } if (url.pathname.endsWith("/video-live") && method === "DELETE") { cancelled++; return new Response(null, { status: 204 }); } return new Response("Not found", { status: 404 }); }) as unknown as typeof fetch);
     const started = await request(`companions/${id}/states/idle/generate`, adult, "POST", { count: 1 }); expect(started.status).toBe(202); const { job } = await started.json() as { job: string }; await pollStarted;

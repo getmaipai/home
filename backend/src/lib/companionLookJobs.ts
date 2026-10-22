@@ -1,5 +1,5 @@
 import sharp from "sharp";
-import { addVersion, chooseKeyColour, compositeOnKey, describeCharacter, keyOut, lookPromptFor, normalizePicture, readLook, updateSheet, versionPath } from "@/lib/companionLook";
+import { addVersion, chooseKeyColour, compositeOnKey, describeCharacter, keyOut, lookPromptFor, normalizePicture, readLook, updateSheet, versionOriginalPath, versionPath } from "@/lib/companionLook";
 import { routeAudience } from "@/lib/pictures/audience";
 import { laneOf } from "@/lib/pictures/lane";
 import { pictureDenial, PICTURE_DENIAL_LINE, PROMPT_REFUSAL_LINE, refusePrompt } from "@/lib/pictures/policy";
@@ -103,13 +103,13 @@ export async function startLookEdit(input: { actor: PersonRow; companionId: stri
   try {
     const look = readLook(input.companionId), version = look.versions.find((item) => item.id === input.versionId), path = versionPath(input.companionId, input.versionId);
     if (!version || !path) throw Object.assign(new Error("That picture could not be found. Choose one of this companion's pictures."), { status: 404 });
-    const png = new Uint8Array(readFileSync(path));
-    const keyed = await compositeOnKey(png, look.key);
+    const png = new Uint8Array(readFileSync(path)), originalPath = versionOriginalPath(input.companionId, version.id);
+    const sourceBytes = originalPath ? new Uint8Array(readFileSync(originalPath)) : await compositeOnKey(png, look.key);
     const form = new FormData();
-    form.append("image", new File([new Uint8Array(keyed)], "picture.png", { type: "image/png" }));
+    form.append("image", new File([new Uint8Array(sourceBytes)], "picture.png", { type: "image/png" }));
     form.append("operation", "edit");
     form.append("instruction", instruction);
-    form.append("image_source", "uploaded");
+    form.append("image_source", originalPath ? "generated" : "uploaded");
     form.append("audience", "all-ages");
     form.append("timeout_ms", "1");
     const submitted = await submitEdit(form);
@@ -118,8 +118,8 @@ export async function startLookEdit(input: { actor: PersonRow; companionId: stri
   } finally { startingCompanions.delete(input.companionId); }
 }
 
-function editForm(keyed: Uint8Array, instruction: string): FormData {
-  const form = new FormData(); form.append("image", new File([new Uint8Array(keyed)], "picture.png", { type: "image/png" })); form.append("operation", "edit"); form.append("instruction", instruction); form.append("image_source", "uploaded"); form.append("audience", "all-ages"); form.append("timeout_ms", "1"); return form;
+function editForm(source: Uint8Array, instruction: string, generated: boolean): FormData {
+  const form = new FormData(); form.append("image", new File([new Uint8Array(source)], "picture.png", { type: "image/png" })); form.append("operation", "edit"); form.append("instruction", instruction); form.append("image_source", generated ? "generated" : "uploaded"); form.append("audience", "all-ages"); form.append("timeout_ms", "1"); return form;
 }
 
 export async function startLookSheet(input: { actor: PersonRow; companionId: string; lookPrompt: string }): Promise<{ job: string; card_source: "model" | "look_prompt" }> {
@@ -135,8 +135,8 @@ export async function startLookSheet(input: { actor: PersonRow; companionId: str
     const png = new Uint8Array(readFileSync(path)), key = await chooseKeyColour(png), described = await describeCharacter(png, input.lookPrompt);
     const sheet = { views: { left: null, right: null, mouth: null }, card: described.card, key, state: "making" as const, approved_by: null, approved_at: null };
     updateSheet(input.companionId, sheet);
-    const keyed = await compositeOnKey(png, key), instruction = SHEET_VIEWS[0]!.prompt.replaceAll("<key>", key);
-    const submitted = await submitEdit(editForm(keyed, instruction));
+    const originalPath = versionOriginalPath(input.companionId, version.id), sourceBytes = originalPath ? new Uint8Array(readFileSync(originalPath)) : await compositeOnKey(png, key), instruction = SHEET_VIEWS[0]!.prompt.replaceAll("<key>", key);
+    const submitted = await submitEdit(editForm(sourceBytes, instruction, Boolean(originalPath)));
     const job = crypto.randomUUID();
     sheetJobs.set(job, { companionId: input.companionId, personId: input.actor.id, state: "queued", percent: 0, versions: [], error: null, stackJob: submitted.job, index: 0 });
     activeByCompanion.set(input.companionId, job);
@@ -198,7 +198,7 @@ export async function pollLookJob(id: string, actor: PersonRow, companionId: str
           const fraction = opaque / (rgba.info.width * rgba.info.height);
           if (fraction < 0.05 || fraction > 0.95) label += " (check the edges)";
           const normalized = await normalizePicture(picture, { removeBackground: async (bytes) => bytes });
-          const saved = addVersion(job.companionId, normalized, { source: job.sourceVersion ? "edit" : "generated", label, width: 1024, height: 1024, from: job.sourceVersion });
+          const saved = addVersion(job.companionId, normalized, { source: job.sourceVersion ? "edit" : "generated", label, width: 1024, height: 1024, from: job.sourceVersion }, images[index]!);
           job.versions.push(saved.id);
         }
         if (wasCancelled()) return;
@@ -226,15 +226,15 @@ async function pollSheetJob(id: string, job: SheetJob, actor: PersonRow, compani
     } else if (!job.finalising) job.finalising = (async () => {
       const view = SHEET_VIEWS[job.index]!, image = await fetchPicture(job.stackJob, 0), look = readLook(companionId), key = look.sheet?.key ?? look.key;
       let keyedOut = await keyOut(image, key); keyedOut = await normalizePicture(keyedOut, { removeBackground: async (bytes) => bytes });
-      const saved = addVersion(companionId, keyedOut, { source: "edit", label: view.label, width: 1024, height: 1024, from: look.rest });
+      const saved = addVersion(companionId, keyedOut, { source: "edit", label: view.label, width: 1024, height: 1024, from: look.rest }, image);
       job.versions.push(saved.id);
       const updated = readLook(companionId), sheet = updated.sheet;
       if (sheet) updateSheet(companionId, { ...sheet, views: { ...sheet.views, [view.slot]: saved.id } });
       job.index++;
       if (job.index >= SHEET_VIEWS.length) { const doneLook = readLook(companionId); if (doneLook.sheet) updateSheet(companionId, { ...doneLook.sheet, state: "needs_review" }); job.state = "done"; job.percent = 100; activeByCompanion.delete(companionId); return; }
       const restPath = versionPath(companionId, look.rest!); if (!restPath) throw new Error("The rest picture could not be found. Choose it again and retry the sheet.");
-      const rest = new Uint8Array(readFileSync(restPath)), keyed = await compositeOnKey(rest, key), instruction = SHEET_VIEWS[job.index]!.prompt.replaceAll("<key>", key);
-      job.stackJob = (await submitEdit(editForm(keyed, instruction))).job; job.state = "queued";
+      const rest = new Uint8Array(readFileSync(restPath)), originalPath = versionOriginalPath(companionId, look.rest!), sourceBytes = originalPath ? new Uint8Array(readFileSync(originalPath)) : await compositeOnKey(rest, key), instruction = SHEET_VIEWS[job.index]!.prompt.replaceAll("<key>", key);
+      job.stackJob = (await submitEdit(editForm(sourceBytes, instruction, Boolean(originalPath)))).job; job.state = "queued";
     })();
     try { await job.finalising; } catch { job.state = "failed"; job.error = `The ${SHEET_VIEWS[job.index]?.slot === "mouth" ? "mouth-open" : "side"} view did not work. Try again.`; const look = readLook(companionId); if (look.sheet) updateSheet(companionId, { ...look.sheet, state: "needs_review" }); activeByCompanion.delete(companionId); }
     finally { job.finalising = undefined; }

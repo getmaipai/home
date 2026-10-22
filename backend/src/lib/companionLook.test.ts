@@ -1,8 +1,8 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
-import { rmSync } from "node:fs";
+import { existsSync, readFileSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import sharp from "sharp";
-import { addVersion, approveSheet, chooseKeyColour, compositeOnKey, deleteLook, deleteVersion, describeCharacter, dominantColours, keyOut, lookPromptFor, normalizePicture, readLook, setRest, updateSheet, versionPath, __setCharacterCompletionForTests, __setCharacterPictureCapabilityForTests, LOOK_LIMIT_LINE, SMALL_PICTURE_LINE } from "@/lib/companionLook";
+import { addVersion, approveSheet, chooseKeyColour, compositeOnKey, deleteLook, deleteVersion, describeCharacter, dominantColours, keyOut, lookPromptFor, normalizePicture, readLook, setRest, updateSheet, versionOriginalPath, versionPath, KEY_ALPHA_END, KEY_ALPHA_START, __setCharacterCompletionForTests, __setCharacterPictureCapabilityForTests, LOOK_LIMIT_LINE, SMALL_PICTURE_LINE } from "@/lib/companionLook";
 import { createHouseholdCompanion, deleteHouseholdCompanion } from "@/lib/householdCompanions";
 import { loadManifestOnly } from "@/lib/plugins";
 
@@ -76,6 +76,57 @@ describe("companion look store", () => {
     }
   });
 
+  test("uses the estimated muted background for green and magenta frames", async () => {
+    const frame = async (background: [number, number, number], artwork: string) => new Uint8Array(await sharp(Buffer.from(`<svg width="256" height="256"><rect width="256" height="256" fill="rgb(${background.join(",")})"/>${artwork}</svg>`)).png().toBuffer());
+    const green = await frame([113, 174, 112], '<defs><filter id="soft"><feGaussianBlur stdDeviation="2"/></filter></defs><ellipse cx="128" cy="168" rx="48" ry="8" fill="rgb(80,130,85)" filter="url(#soft)"/><circle cx="128" cy="128" r="36" fill="rgb(240,140,40)"/>');
+    const greenOut = await sharp(await keyOut(green, "#00FF00")).ensureAlpha().raw().toBuffer({ resolveWithObject: true });
+    expect([...greenOut.data.subarray(3, 4)]).toEqual([0]);
+    expect([...greenOut.data.subarray((128 * 256 + 128) * 4, (128 * 256 + 128) * 4 + 4)]).toEqual([240, 140, 40, 255]);
+    expect(greenOut.data[(168 * 256 + 128) * 4 + 3]!).toBeLessThanOrEqual(20);
+    let opaque = 0;
+    for (let i = 0; i < greenOut.data.length; i += 4) {
+      if (greenOut.data[i + 3]! > 0) opaque++;
+      if (greenOut.data[i + 3]! > 20) expect(greenOut.data[i + 1]!).toBeLessThanOrEqual(Math.max(greenOut.data[i]!, greenOut.data[i + 2]!) + 12);
+    }
+    expect(opaque / (256 * 256)).toBeGreaterThan(0.02);
+    const magenta = await frame([170, 90, 175], '<circle cx="128" cy="128" r="36" fill="rgb(250,210,40)"/><circle cx="185" cy="128" r="20" fill="rgb(230,40,30)"/>');
+    const magentaOut = await sharp(await keyOut(magenta, "#FF00FF")).ensureAlpha().raw().toBuffer({ resolveWithObject: true });
+    expect(magentaOut.data[3]).toBe(0);
+    expect([...magentaOut.data.subarray((128 * 256 + 128) * 4, (128 * 256 + 128) * 4 + 4)]).toEqual([250, 210, 40, 255]);
+    expect(magentaOut.data[(128 * 256 + 204) * 4]!).toBeGreaterThan(220);
+  });
+
+  test("falls back to the pure-key formula when the foreground touches most of the border", async () => {
+    const png = new Uint8Array(await sharp(Buffer.from('<svg width="32" height="32"><rect width="32" height="32" fill="rgb(0,255,0)"/><rect width="24" height="32" fill="rgb(255,0,0)"/></svg>')).png().toBuffer());
+    const decoded = await sharp(png).ensureAlpha().raw().toBuffer({ resolveWithObject: true });
+    const expected = new Uint8Array(decoded.data);
+    for (let i = 0; i < expected.length; i += 4) {
+      const r = expected[i]!, g = expected[i + 1]!, b = expected[i + 2]!;
+      const coverage = Math.min(g, 255 - r, 255 - b) / 255;
+      const rawAlpha = (1 - coverage) * 255;
+      expected[i + 3] = Math.min(expected[i + 3]!, Math.round(Math.max(0, Math.min(1, (rawAlpha - KEY_ALPHA_START) / (KEY_ALPHA_END - KEY_ALPHA_START))) * 255));
+    }
+    const result = await sharp(await keyOut(png, "#00FF00")).ensureAlpha().raw().toBuffer();
+    expect(new Uint8Array(result)).toEqual(expected);
+  });
+
+  test("keys the Rivet muted-green fixture and keeps its white chest panel", async () => {
+    const fixture = new Uint8Array(await Bun.file(new URL("../../tests/fixtures/rivet-muted-green-256.png", import.meta.url)).arrayBuffer());
+    const result = await sharp(await keyOut(fixture, "#00FF00")).ensureAlpha().raw().toBuffer({ resolveWithObject: true });
+    expect(result.data[3]).toBe(0);
+    const fixturePixels = await sharp(fixture).ensureAlpha().raw().toBuffer({ resolveWithObject: true });
+    let originalOpaque = 0, kept = 0;
+    for (let i = 0; i < result.data.length; i += 4) {
+      if (fixturePixels.data[i + 3]! > 0) originalOpaque++;
+      if (result.data[i + 3] === 255) kept++;
+    }
+    expect(kept / (256 * 256)).toBeGreaterThan(0.12); expect(kept / (256 * 256)).toBeLessThan(0.3);
+    const chest = (151 * 256 + 123) * 4;
+    expect([...result.data.subarray(chest, chest + 4)]).toEqual([255, 255, 255, 255]);
+    const outside = (220 * 256 + 128) * 4; expect(result.data[outside + 3]).toBeLessThanOrEqual(40);
+    expect(originalOpaque).toBeGreaterThan(0);
+  });
+
   test("composites a transparent look picture on the chosen key colour", async () => {
     const input = new Uint8Array(await sharp({ create: { width: 4, height: 4, channels: 4, background: { r: 0, g: 0, b: 0, alpha: 0 } } }).composite([{ input: Buffer.from('<svg width="4" height="4"><rect width="2" height="4" fill="red"/></svg>') }]).png().toBuffer());
     const output = await sharp(await compositeOnKey(input, "#FF00FF")).ensureAlpha().raw().toBuffer({ resolveWithObject: true });
@@ -116,6 +167,22 @@ describe("companion look store", () => {
     expect(addVersion(id, png, item("Three")).id).toBe("v-3");
   });
 
+  test("stores exact Stack originals and removes them with the version while old manifests still parse", () => {
+    const id = create(), original = new Uint8Array([9, 8, 7]);
+    const withOriginal = addVersion(id, png, item("Generated"), original);
+    expect(new Uint8Array(readFileSync(versionOriginalPath(id, withOriginal.id)!))).toEqual(original);
+    expect(readLook(id).versions[0]?.has_original).toBe(true);
+    const withoutOriginal = addVersion(id, png, item("Upload"));
+    expect(versionOriginalPath(id, withoutOriginal.id)).toBeNull();
+    expect(readLook(id).versions[1]?.has_original).toBeUndefined();
+    const removable = addVersion(id, png, item("Edited"), original);
+    setRest(id, withOriginal.id);
+    expect(deleteVersion(id, removable.id)).toBe(true);
+    expect(existsSync(join(companionsRoot, id, "look", `${removable.id}.orig.png`))).toBe(false);
+    deleteLook(id);
+    expect(versionOriginalPath(id, withOriginal.id)).toBeNull();
+  });
+
   test("refuses the 61st picture and refuses to delete the rest picture", () => {
     const id = create();
     for (let index = 0; index < 60; index++) addVersion(id, png, item(`Picture ${index}`));
@@ -128,10 +195,11 @@ describe("companion look store", () => {
   });
 
   test("setting rest changes the approved picture and deleting the companion removes its pictures", () => {
-    const id = create(); const one = addVersion(id, png, item("One")), two = addVersion(id, png, item("Two"));
+    const id = create(); const one = addVersion(id, png, item("One"), png), two = addVersion(id, png, item("Two"));
     expect(readLook(id).rest).toBe(one.id); expect(setRest(id, two.id)).toBe(true); expect(readLook(id).rest).toBe(two.id);
     expect(deleteHouseholdCompanion(id)).toBe(true);
     expect(readLook(id).versions).toEqual([]);
+    expect(existsSync(join(companionsRoot, id, "look", `${one.id}.orig.png`))).toBe(false);
     deleteLook(id);
   });
 

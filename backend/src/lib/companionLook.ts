@@ -8,7 +8,7 @@ import { chatModelReadsPictures } from "@/lib/chatPictures";
 import { complete } from "@/lib/llm";
 
 const Source = z.enum(["upload", "generated", "edit"]);
-const Version = z.object({ id: z.string().regex(/^v-[0-9]+$/), created_at: z.string().datetime(), source: Source, label: z.string().max(80), width: z.number().int().positive(), height: z.number().int().positive(), from: z.string().nullable() });
+const Version = z.object({ id: z.string().regex(/^v-[0-9]+$/), created_at: z.string().datetime(), source: Source, label: z.string().max(80), width: z.number().int().positive(), height: z.number().int().positive(), from: z.string().nullable(), has_original: z.boolean().optional() });
 const Sheet = z.object({ views: z.object({ left: z.string().nullable(), right: z.string().nullable(), mouth: z.string().nullable() }), card: z.object({ text: z.string().max(600), colours: z.array(z.string().regex(/^#[0-9A-F]{6}$/)).max(8), species: z.string().max(60) }).nullable(), key: z.enum([media.key.default, media.key.alternate]), state: z.enum(["empty", "making", "needs_review", "approved"]), approved_by: z.string().nullable(), approved_at: z.string().datetime().nullable() });
 export const LookSchema = z.object({ version: z.literal(1), versions: z.array(Version), rest: z.string().nullable(), key: z.enum([media.key.default, media.key.alternate]), sheet: Sheet.nullable().optional() });
 export type LookVersion = z.infer<typeof Version>;
@@ -28,6 +28,14 @@ export function lookPromptFor(lookPrompt: string, keyHex: string): string {
 export const KEY_ALPHA_START = 5;
 export const KEY_ALPHA_END = 245;
 export const KEY_DESPILL_TOLERANCE = 8;
+export const KEY_HUE_DESPILL_TOLERANCE = 6;
+export const KEY_BACKGROUND_RING = 2;
+export const KEY_HUE_MIN = 30;
+export const KEY_PURE_MIN = 200;
+export const KEY_HUE_LOW_THRESHOLD = 12;
+export const KEY_HUE_THRESHOLD_MIN = 28;
+export const KEY_HUE_THRESHOLD_MAX = 44;
+export const KEY_HUE_THRESHOLD_SCALE = 0.75;
 const KEY_BYTES: Record<string, [number, number, number]> = { "#00FF00": [0, 255, 0], "#FF00FF": [255, 0, 255] };
 
 export const GREEN_HUE_MIN = 70;
@@ -118,29 +126,51 @@ function keyRgb(keyHex: string): [number, number, number] {
 export async function keyOut(png: Uint8Array, keyHex: string): Promise<Uint8Array> {
   const key = keyRgb(keyHex);
   const decoded = await sharp(png, { limitInputPixels: 40_000_000, failOn: "error" }).ensureAlpha().raw().toBuffer({ resolveWithObject: true });
-  const pixels = decoded.data;
-  for (let offset = 0; offset < pixels.length; offset += 4) {
-    const channels = [pixels[offset]!, pixels[offset + 1]!, pixels[offset + 2]!];
-    // Estimate how much of the key is present in the pixel. The overlap of key-channel
-    // intensity with the inverse foreground channels remains linear at antialiased edges.
-    const keyCoverage = key[1] === 255
-      ? Math.min(channels[1]!, 255 - channels[0]!, 255 - channels[2]!) / 255
-      : Math.min(channels[0]!, channels[2]!, 255 - channels[1]!) / 255;
-    const rawAlpha = Math.max(0, Math.min(1, 1 - keyCoverage)) * 255;
-    const alpha = Math.round(Math.max(0, Math.min(1, (rawAlpha - KEY_ALPHA_START) / (KEY_ALPHA_END - KEY_ALPHA_START))) * 255);
-    pixels[offset + 3] = Math.min(pixels[offset + 3]!, alpha);
-    if (alpha > 0 && alpha < 255) {
-      const coverage = alpha / 255;
-      for (let channel = 0; channel < 3; channel++) {
-        const foreground = (channels[channel]! - key[channel]! * (1 - coverage)) / coverage;
-        pixels[offset + channel] = Math.max(0, Math.min(255, Math.round(foreground)));
-      }
-      // A final small clamp stops quantisation from leaving a green fringe. It is only for the green key: a magenta key must
-      // never clamp red or blue, which are real colours of the character (a red fox on magenta), and the unmixing above already removes it.
-      if (key[1] === 255) pixels[offset + 1] = Math.min(pixels[offset + 1]!, Math.max(pixels[offset]!, pixels[offset + 2]!) + KEY_DESPILL_TOLERANCE);
-    }
-  }
+  const pixels = keyOutRgbaBuffer(decoded.data, decoded.info.width, decoded.info.height, keyHex);
   return new Uint8Array(await sharp(pixels, { raw: decoded.info }).png().toBuffer());
+}
+
+const clamp = (value: number, min: number, max: number) => Math.max(min, Math.min(max, value));
+function keyness(r: number, g: number, b: number, greenKey: boolean): number { return greenKey ? g - Math.max(r, b) : Math.min(r, b) - g; }
+function pureKeyAlpha(r: number, g: number, b: number, key: [number, number, number]): number {
+  const coverage = key[1] === 255 ? Math.min(g, 255 - r, 255 - b) / 255 : Math.min(r, b, 255 - g) / 255;
+  const rawAlpha = clamp(1 - coverage, 0, 1) * 255;
+  return Math.round(clamp((rawAlpha - KEY_ALPHA_START) / (KEY_ALPHA_END - KEY_ALPHA_START), 0, 1) * 255);
+}
+export function keyOutRgbaBuffer(pixels: Uint8Array, width: number, height: number, keyHex: string): Uint8Array {
+  const key = keyRgb(keyHex), greenKey = key[1] === 255, samples: [number[], number[], number[]] = [[], [], []];
+  for (let y = 0; y < height; y++) for (let x = 0; x < width; x++) {
+    if (x >= KEY_BACKGROUND_RING && x < width - KEY_BACKGROUND_RING && y >= KEY_BACKGROUND_RING && y < height - KEY_BACKGROUND_RING) continue;
+    const offset = (y * width + x) * 4;
+    if ((y * width + x) % 2 !== 0) continue;
+    for (let channel = 0; channel < 3; channel++) samples[channel]!.push(pixels[offset + channel]!);
+  }
+  const background = samples.map((values) => { values.sort((a, b) => a - b); return values[Math.floor(values.length / 2)] ?? 0; }) as [number, number, number];
+  const bgKeyness = keyness(...background, greenKey);
+  const hueRegime = bgKeyness >= KEY_HUE_MIN && bgKeyness < KEY_PURE_MIN;
+  const threshold = clamp(bgKeyness * KEY_HUE_THRESHOLD_SCALE, KEY_HUE_THRESHOLD_MIN, KEY_HUE_THRESHOLD_MAX);
+  for (let offset = 0; offset + 3 < pixels.length; offset += 4) {
+    const r = pixels[offset]!, g = pixels[offset + 1]!, b = pixels[offset + 2]!, incoming = pixels[offset + 3]!;
+    let alpha: number;
+    if (hueRegime) {
+      const amount = clamp(1 - (keyness(r, g, b, greenKey) - KEY_HUE_LOW_THRESHOLD) / (threshold - KEY_HUE_LOW_THRESHOLD), 0, 1);
+      alpha = Math.round(amount * 255);
+      if (amount > 0 && amount < 1) {
+        const channels = [r, g, b];
+        for (let channel = 0; channel < 3; channel++) pixels[offset + channel] = clamp(Math.round((channels[channel]! - background[channel]! * (1 - amount)) / amount), 0, 255);
+        if (greenKey) pixels[offset + 1] = Math.min(pixels[offset + 1]!, Math.max(pixels[offset]!, pixels[offset + 2]!) + KEY_HUE_DESPILL_TOLERANCE);
+      }
+    } else {
+      alpha = pureKeyAlpha(r, g, b, key);
+      if (alpha > 0 && alpha < 255) {
+        const coverage = alpha / 255, channels = [r, g, b];
+        for (let channel = 0; channel < 3; channel++) pixels[offset + channel] = clamp(Math.round((channels[channel]! - key[channel]! * (1 - coverage)) / coverage), 0, 255);
+        if (greenKey) pixels[offset + 1] = Math.min(pixels[offset + 1]!, Math.max(pixels[offset]!, pixels[offset + 2]!) + KEY_DESPILL_TOLERANCE);
+      }
+    }
+    pixels[offset + 3] = Math.min(incoming, alpha);
+  }
+  return pixels;
 }
 
 /** Makes a transparent look picture opaque on the selected key for a reference edit. */
@@ -173,7 +203,14 @@ export function versionPath(id: string, versionId: string): string | null {
   return dir ? join(dir, `${versionId}.png`) : null;
 }
 
-export function addVersion(id: string, png: Uint8Array, meta: Omit<LookVersion, "id" | "created_at" | "width" | "height"> & { width: number; height: number }): LookVersion {
+export function versionOriginalPath(id: string, versionId: string): string | null {
+  if (!/^v-[0-9]+$/.test(versionId)) return null;
+  const dir = lookFolder(id);
+  const path = dir ? join(dir, `${versionId}.orig.png`) : null;
+  return path && existsSync(path) ? path : null;
+}
+
+export function addVersion(id: string, png: Uint8Array, meta: Omit<LookVersion, "id" | "created_at" | "width" | "height" | "has_original"> & { width: number; height: number }, original?: Uint8Array): LookVersion {
   const dir = lookFolder(id), path = manifestPath(id), seqPath = sequencePath(id);
   if (!dir || !path || !seqPath) throw new Error("That household companion could not be found.");
   const look = readLook(id);
@@ -181,17 +218,18 @@ export function addVersion(id: string, png: Uint8Array, meta: Omit<LookVersion, 
   mkdirSync(dir, { recursive: true });
   const prior = Number(readFileSyncSafe(seqPath));
   const idNum = Math.max(Number.isSafeInteger(prior) ? prior : 0, ...look.versions.map((v) => Number(v.id.slice(2)))) + 1;
-  const version: LookVersion = { id: `v-${idNum}`, created_at: new Date().toISOString(), source: meta.source, label: meta.label.slice(0, 80), width: meta.width, height: meta.height, from: meta.from };
+  const version: LookVersion = { id: `v-${idNum}`, created_at: new Date().toISOString(), source: meta.source, label: meta.label.slice(0, 80), width: meta.width, height: meta.height, from: meta.from, ...(original ? { has_original: true } : {}) };
   const filePath = versionPath(id, version.id)!;
   const temp = `${filePath}.${crypto.randomUUID()}.tmp`;
   try {
     writeFileSync(seqPath, String(idNum), "utf8");
     writeFileSync(temp, png, { flag: "wx" });
     renameSync(temp, filePath);
+    if (original) writeFileSync(join(dir, `${version.id}.orig.png`), original, { flag: "wx" });
     const next = { ...look, versions: [...look.versions, version], rest: look.rest ?? version.id };
     atomicJson(path, next);
     return version;
-  } catch (error) { rmSync(temp, { force: true }); rmSync(filePath, { force: true }); throw error; }
+  } catch (error) { rmSync(temp, { force: true }); rmSync(filePath, { force: true }); rmSync(join(dir, `${version.id}.orig.png`), { force: true }); throw error; }
 }
 function readFileSyncSafe(path: string): string { try { return readFileSync(path, "utf8"); } catch { return "0"; } }
 
@@ -205,6 +243,7 @@ export function deleteVersion(id: string, versionId: string): boolean {
   const next = { ...look, versions: look.versions.filter((item) => item.id !== versionId), sheet };
   atomicJson(path, next);
   rmSync(image, { force: true });
+  rmSync(join(lookFolder(id)!, `${versionId}.orig.png`), { force: true });
   return true;
 }
 export function setRest(id: string, versionId: string): boolean {

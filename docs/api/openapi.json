@@ -54992,6 +54992,12 @@
                     "ready_for_video": {
                       "type": "boolean"
                     },
+                    "start_ready": {
+                      "type": "boolean"
+                    },
+                    "start_reason": {
+                      "type": "string"
+                    },
                     "can_generate": {
                       "type": "boolean"
                     },
@@ -55005,6 +55011,7 @@
                     "key",
                     "sheet",
                     "ready_for_video",
+                    "start_ready",
                     "can_generate"
                   ]
                 }
@@ -56507,11 +56514,25 @@
             }
           },
           "409": {
-            "description": "Approve the character sheet first or wait for the active clip run",
+            "description": "A clip run is busy, the character sheet is not approved, or the rest picture has no Stack original.",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Error"
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "no_original"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
                 }
               }
             }
@@ -56618,11 +56639,25 @@
             }
           },
           "409": {
-            "description": "Approve the character sheet first or wait for the active clip run",
+            "description": "A clip run is busy, the character sheet is not approved, or the rest picture has no Stack original.",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Error"
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "no_original"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
                 }
               }
             }

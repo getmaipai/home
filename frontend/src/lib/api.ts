@@ -356,7 +356,7 @@ export interface CompanionLookVersion { id: string; label: string; source: "uplo
 export interface CompanionLookView { version_id: string; url: string }
 type CompanionLookKey = `#${"00FF00" | "FF00FF"}`;
 export interface CompanionLookSheet { views: { left: CompanionLookView | null; right: CompanionLookView | null; mouth: CompanionLookView | null }; card: { text: string; colours: string[]; species: string } | null; key: CompanionLookKey; state: "empty" | "making" | "needs_review" | "approved"; approved_by: string | null; approved_at: string | null }
-export interface CompanionLook { versions: CompanionLookVersion[]; rest: string | null; key: CompanionLookKey; sheet: CompanionLookSheet | null; ready_for_video: boolean; can_generate: boolean; generate_reason?: string }
+export interface CompanionLook { versions: CompanionLookVersion[]; rest: string | null; key: CompanionLookKey; sheet: CompanionLookSheet | null; ready_for_video: boolean; start_ready: boolean; start_reason?: string; can_generate: boolean; generate_reason?: string }
 export interface CompanionLookJob { state: "queued" | "running" | "done" | "failed" | "cancelled"; percent: number; label: string; versions: Array<{ id: string; url: string; label: string }>; error: string | null }
 export interface CompanionStateUrls { h264: string; av1: string; still: string }
 export interface CompanionStateTake {
@@ -370,7 +370,7 @@ export interface CompanionStateRow {
   takes: CompanionStateTake[]; busy: boolean;
 }
 export interface CompanionStates {
-  sheet_ready: boolean; key: string; states: CompanionStateRow[]; run: { job: string; label: string; percent: number } | null;
+  sheet_ready: boolean; start_ready: boolean; start_reason?: string; key: string; states: CompanionStateRow[]; run: { job: string; label: string; percent: number } | null;
   counts: { approved: number; total: number; required_missing: string[] };
 }
 export interface CompanionStateRun { state: "queued" | "running" | "done" | "failed" | "cancelled"; label: string; percent: number; current: { state: string; take: number; index: number; of: number } | null; takes_made: number; error: string | null }
