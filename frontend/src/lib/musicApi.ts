@@ -34,7 +34,7 @@ export interface MusicCard {
   timed_lyrics: { t: number; line: string; section: string | null }[] | null;
   duration_s: number | null;
   /** ISO time the song was asked for. */
-  started_at: string | null;
+  started_at: number;
 }
 export interface MusicStatus { can_make: boolean; engine_ready: boolean; limits: { min_seconds: number; max_seconds: number } | null }
 

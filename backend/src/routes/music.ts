@@ -51,7 +51,7 @@ const cardSchema = z.object({
   id: z.string(), state: z.enum(["queued", "running", "done", "failed", "cancelled"]), stage: z.string().nullable(), stage_label: z.string(),
   cut: z.enum(["asked", "ceiling"]).nullable(), max_seconds: z.number().nullable(),
   progress: z.number(), eta_seconds: z.number().nullable(), position: z.number().nullable(), error_line: z.string().nullable(),
-  stages: musicStagesSchema, stage_index: z.number().int().min(0), started_at: z.string().nullable(),
+  stages: musicStagesSchema, stage_index: z.number().int().min(0), started_at: z.number(),
   cover_pending: z.boolean(), cover_url: z.string().nullable(), cover_versions: z.array(z.object({ id: z.string(), url: z.string() })),
   timed_lyrics: z.array(z.object({ t: z.number(), line: z.string(), section: z.string().nullable() })).nullable(),
   versions: z.array(versionSchema), current_id: z.string().nullable(), length: z.enum(["quick", "full"]), title: z.string().nullable(), description: z.string().nullable(), lyrics: z.string().nullable(), duration_s: z.number().nullable(),
@@ -121,7 +121,7 @@ export async function musicCardView(actor: PersonRow, input: Omit<MusicJob, "cov
   }
   return {
     stages: stages.map((label, index) => ({ id: ["queued", "model", "planning", "making", "mixing", "finishing"][index]!, label })),
-    stage_index: musicStageIndex(root), started_at: Number.isFinite(Date.parse(root.createdAt)) ? root.createdAt : null,
+    stage_index: musicStageIndex(root), started_at: Date.parse(root.createdAt),
     cover_pending: coverPending,
     cover_url: covers.at(-1)?.url ?? null, cover_versions: covers,
     id: root.id, state: root.state, stage: root.stage, stage_label: musicStageLabel(root), progress: root.progress,

@@ -54,7 +54,7 @@ export function useMusicTrackProps({ card, owner = true, onRefresh, onStop, onSh
     { id: "cover", label: "New cover", content: <><div className="grid gap-2"><Input aria-label="Describe the new cover" placeholder="Describe the new cover" value={coverChange} onChange={event => setCoverChange(event.currentTarget.value)} maxLength={500} disabled={editing} /><Button type="button" variant="outline" disabled={editing || !coverChange.trim()} onClick={makeCover}>Make</Button></div>{editError ? <Alert variant="destructive"><AlertDescription>{editError}</AlertDescription></Alert> : null}</> },
     { id: "full", label: "Make it full", content: <>{card.length !== "full" ? <Button type="button" variant="outline" onClick={makeFull} disabled={editing}>Make it full</Button> : <p>This is already a full song.</p>}{editError ? <Alert variant="destructive"><AlertDescription>{editError}</AlertDescription></Alert> : null}</> },
   ] : undefined;
-  const cardStarted = card.started_at ? Date.parse(card.started_at) : NaN;
+  const cardStarted = Number.isFinite(card.started_at) && card.started_at > 0 ? card.started_at : NaN;
   const elapsedSeconds = Number.isFinite(cardStarted) ? Math.max(0, Math.floor((now - cardStarted) / 1000)) : undefined;
   const lyrics = card.lyrics?.trim() === "[Instrumental]" ? undefined : card.lyrics ?? undefined;
   return { status, width: "full", ...(editModes ? { editModes, editLabel: "Edit", editPanelLabel: "Edit song" } : {}), title,

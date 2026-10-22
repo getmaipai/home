@@ -19,7 +19,7 @@ const V1 = { id: "file-one", label: "Version 1", url: "/api/music/jobs/mus-1/fil
 const V2 = { id: "file-two", label: "Version 2", url: "/api/music/jobs/mus-2/files/file-two" };
 function make(over: Partial<MusicCard>): MusicCard {
   return { id: "mus-1", state: "running", stage: "planning", stage_label: "Planning the song", stages: [{ id: "queued", label: "Queued" }, { id: "model", label: "Getting the model ready" }, { id: "planning", label: "Planning" }, { id: "making", label: "Making the music" }, { id: "mixing", label: "Mixing" }, { id: "finishing", label: "Finishing" }], stage_index: 2, progress: 0.25, eta_seconds: 40, position: null, error_line: null, cover_url: null, cover_versions: [], cover_pending: false, versions: [], current_id: null, length: "quick", cut: null, max_seconds: 240,
-    title: "Pancakes", description: "a gentle folk song with an original voice", lyrics: "[Verse]\nMorning light\n[Chorus]\nPancakes rise", duration_s: 60, timed_lyrics: null, started_at: new Date(Date.now() - 30_000).toISOString(), ...over };
+    title: "Pancakes", description: "a gentle folk song with an original voice", lyrics: "[Verse]\nMorning light\n[Chorus]\nPancakes rise", duration_s: 60, timed_lyrics: null, started_at: Date.now() - 30_000, ...over };
 }
 const done = (over: Partial<MusicCard> = {}): MusicCard => make({ state: "done", stage: "ready", stage_label: "", progress: 1, eta_seconds: 0, versions: [V1], current_id: V1.id, ...over });
 beforeEach(() => {
