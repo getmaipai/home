@@ -35,6 +35,10 @@ Home records the firmware version when the robot checks in. It also shows whethe
 
 Open the robot from **Settings, Home, Devices**. The **This robot** card holds its name, voice, face color and night mode. It also sets how long the robot listens for a follow-up and how much its camera watches. The **Companion and controls** card sets how it talks and what it may say.
 
+
+### What the robot's camera remembers
+
+A robot with its camera on can tell you what it sees, such as "a person, three chairs and a tv, and it is bright in here." It keeps only a short list of the kinds of things it saw, with counts, colors and the light. It forgets each kind 90 seconds after it last saw it. It never keeps the picture, and it never writes the list down anywhere, so nobody can read it back later. When you ask it about something, such as a car, it can say the color or a guess at the make. It does not describe people beyond how many there are, and it does not say who anyone is. To change how much it watches, open the robot in **Settings, Home, Devices** and pick **Always watching**, **Only when asked** or **Camera off**.
 ## Choose a robot's companion
 
 An owner or admin picks how a robot talks. Open the robot and look for **Companion and controls**.

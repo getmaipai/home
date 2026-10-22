@@ -11,6 +11,7 @@ import { chatModelReadsPictures } from "@/lib/chatPictures";
 import { getDeviceSettingValue, getHouseholdSettingValue } from "@/lib/settings";
 import { activeTurnCount } from "@/lib/turnActivity";
 import { ROBOT_VISION_KEY } from "@/settings/robotVisionKeys";
+import type { LookResult } from "@maipai/spec/gen/ts/look-result.js";
 
 export type RobotVisionMode = "continual" | "on_demand" | "none";
 export type Brightness = "dark" | "dim" | "bright" | "unknown";
@@ -38,6 +39,28 @@ export interface RobotScene {
   brightness: Brightness;
   at: number;
   expiresAt: number;
+  /** LOOK-01: what the Stack's Look found in the latest picture, kept in this process's memory only and never returned by a route. */
+  look?: SceneLook;
+}
+
+/** One kind of thing the robot has seen, with the details a detailed look gave it. Lives at most SCENE_TTL_MS after it was last seen. */
+export interface SeenObject {
+  label: string;
+  count: number;
+  colour?: string;
+  kind?: string;
+  make?: string;
+  model?: string;
+  uncertain: boolean;
+  lastSeen: number;
+}
+
+export interface SceneLook {
+  objects: SeenObject[];
+  tags: string[];
+  colours: string[];
+  roomType?: string;
+  light: Brightness;
 }
 
 const scenes = new Map<string, RobotScene>();
@@ -45,6 +68,59 @@ const lastFrameAt = new Map<string, number>();
 const lastSceneFrameAt = new Map<string, number>();
 /** Robots with a picture being described right now. */
 const captioning = new Set<string>();
+
+
+/** The Stack's Look capability, as Home calls it: a picture in, a LookResult out, null when it cannot look right now. "detailed" crops each
+ * object it found (never a person) and describes it; the crops stay inside that call. The picture is not kept by the caller. */
+export type LookFn = (bytes: Uint8Array, detail: "fast" | "detailed") => Promise<LookResult | null>;
+let lookForTests: LookFn | null = null;
+/** Test seam: a Look without a Stack. */
+export function __setLookForTests(fn: LookFn | null): void {
+  lookForTests = fn;
+}
+async function lookViaStack(bytes: Uint8Array, detail: "fast" | "detailed"): Promise<LookResult | null> {
+  if (lookForTests) return lookForTests(bytes, detail);
+  // The Stack's Look tool is not on the Stack's main yet (LOOK-01 step 3); until it is, a picture falls back to the one-sentence caption.
+  return null;
+}
+
+const MAX_SEEN_OBJECTS = 24;
+const PERSON_LABEL = "person";
+
+/** Fold a new look into what the robot already knows. A kind of thing seen again is refreshed (its count follows the new picture, its
+ * details are kept unless the new look brings some); a kind not in this picture stays until SCENE_TTL_MS after it was last seen. Details
+ * are never kept for a person. */
+export function mergeLook(previous: SceneLook | undefined, result: LookResult, now: number): SceneLook {
+  const kept = new Map<string, SeenObject>();
+  for (const old of previous?.objects ?? []) if (now - old.lastSeen < SCENE_TTL_MS) kept.set(old.label, old);
+  for (const found of result.objects) {
+    const before = kept.get(found.label);
+    const details = found.label === PERSON_LABEL ? {} : (found.attributes ?? {});
+    kept.set(found.label, {
+      label: found.label,
+      count: found.count,
+      ...(details.colour ?? before?.colour ? { colour: details.colour ?? before?.colour } : {}),
+      ...(details.kind ?? before?.kind ? { kind: details.kind ?? before?.kind } : {}),
+      ...(details.make ?? before?.make ? { make: details.make ?? before?.make } : {}),
+      ...(details.model ?? before?.model ? { model: details.model ?? before?.model } : {}),
+      uncertain: found.uncertain,
+      lastSeen: now,
+    });
+  }
+  const objects = [...kept.values()].sort((a, b) => b.lastSeen - a.lastSeen || b.count - a.count).slice(0, MAX_SEEN_OBJECTS);
+  return {
+    objects,
+    tags: result.scene.tags.slice().sort((a, b) => b.score - a.score).map((tag) => tag.label),
+    colours: result.scene.colours ?? [],
+    ...(result.scene.room_type ? { roomType: result.scene.room_type } : {}),
+    light: result.scene.light,
+  };
+}
+
+/** True when a kind of thing has not been seen for SCENE_TTL_MS or more. */
+function stillSeen(object: SeenObject, now: number): boolean {
+  return now - object.lastSeen < SCENE_TTL_MS;
+}
 
 /** The latest description for this robot, or null when there is none or it has expired. An expired one is deleted on the way. */
 export function sceneFor(deviceId: string, now = Date.now()): RobotScene | null {
@@ -54,6 +130,7 @@ export function sceneFor(deviceId: string, now = Date.now()): RobotScene | null 
     scenes.delete(deviceId);
     return null;
   }
+  if (scene.look) scene.look = { ...scene.look, objects: scene.look.objects.filter((object) => stillSeen(object, now)) };
   return scene;
 }
 
@@ -87,10 +164,26 @@ export function sceneContextLine(deviceId: string, now = Date.now()): string | n
   if (!scene) return null;
   const seconds = Math.max(0, Math.round((now - scene.at) / 1000));
   const people = scene.people === null ? "unknown" : String(scene.people);
+  if (scene.look && !scene.caption) {
+    const seen = scene.look.objects.map(objectPhrase);
+    const parts = [`Looked ${seconds} seconds ago (it may be out of date): ${seen.length ? seen.join(", ") : "nothing it recognises"}`];
+    if (scene.look.roomType) parts.push(`room: ${scene.look.roomType}`);
+    if (scene.look.colours.length) parts.push(`colours: ${scene.look.colours.slice(0, 4).join(", ")}`);
+    return [`${parts.join("; ")}.`, `Light: ${scene.brightness === "unknown" ? scene.look.light : scene.brightness}. People in view: ${people}.`].join("\n");
+  }
   return [
     `Looked ${seconds} seconds ago (it may be out of date): ${scene.caption}`,
     `Light: ${scene.brightness}. People in view: ${people}.`,
   ].join("\n");
+}
+
+/** "a person", "3 chairs", "a blue Tesla Model 3 (a guess)". Plain words; a person is only ever counted. */
+function objectPhrase(object: SeenObject): string {
+  if (object.label === PERSON_LABEL) return object.count === 1 ? "a person" : `${object.count} people`;
+  const named = [object.colour, object.make, object.model].filter(Boolean).join(" ");
+  const base = named ? `${named} ${object.kind ?? object.label}`.trim() : object.label;
+  const counted = object.count > 1 ? `${object.count} ${base}s` : `a ${base}`;
+  return object.uncertain && (object.make || object.model || object.kind) ? `${counted} (a guess)` : counted;
 }
 
 const CAPTION_SYSTEM = [
@@ -174,14 +267,26 @@ export async function acceptFrame(input: FrameInput): Promise<FrameOutcome> {
   if (busy) return { ok: false, status: 503, code: "busy", error: "Home is busy with something else right now, so the robot skipped this look. It will try again later." };
   (scene ? lastSceneFrameAt : lastFrameAt).set(input.deviceId, now);
   captioning.add(input.deviceId);
-  let caption: string | null;
+  // LOOK-01: the Stack's Look names what is in the picture with no language model; an asked look also gets per-object details. When Look
+  // cannot answer (not built on this Stack, or busy), the one-sentence caption by the chat model is the fallback, as before.
+  let caption: string | null = null;
+  let look: LookResult | null = null;
   try {
-    caption = await captionWithChatModel(input.bytes);
+    look = await lookViaStack(input.bytes, scene ? "fast" : "detailed");
+    if (look === null) caption = await captionWithChatModel(input.bytes);
   } finally {
     captioning.delete(input.deviceId);
   }
-  if (caption === null) return { ok: false, status: 503, code: "no_vision", error: "Home's chat model is not reading pictures right now. Check Settings, then Engines, and try again." };
-  const result: RobotScene = { caption, people: input.people, brightness: input.brightness, at: now, expiresAt: now + SCENE_TTL_MS };
+  if (look === null && caption === null) return { ok: false, status: 503, code: "no_vision", error: "Home's chat model is not reading pictures right now. Check Settings, then Engines, and try again." };
+  const brightness: Brightness = input.brightness !== "unknown" ? input.brightness : look ? look.scene.light : "unknown";
+  const result: RobotScene = {
+    caption: caption ?? "",
+    people: input.people,
+    brightness,
+    at: now,
+    expiresAt: now + SCENE_TTL_MS,
+    ...(look ? { look: mergeLook(scenes.get(input.deviceId)?.look, look, now) } : {}),
+  };
   scenes.set(input.deviceId, result);
   return { ok: true, scene: result };
 }

@@ -8,7 +8,7 @@ import { issueDeviceToken } from "@/lib/deviceTokens";
 import { storeRobotCredential } from "@/lib/robotCredentials";
 import { getDeviceSettingValue, setHouseholdSettingValue, setValue } from "@/lib/settings";
 import {
-  SCENE_TTL_MS, MIN_FRAME_INTERVAL_MS, SCENE_FRAME_INTERVAL_MS, __resetRobotVisionForTests, __setCaptionForTests, acceptFrame, cleanCaption, robotVisionMode, sceneContextLine, sceneFor,
+  SCENE_TTL_MS, MIN_FRAME_INTERVAL_MS, SCENE_FRAME_INTERVAL_MS, __resetRobotVisionForTests, __setCaptionForTests, __setLookForTests, acceptFrame, cleanCaption, robotVisionMode, sceneContextLine, sceneFor,
 } from "@/lib/robotVision";
 import { acquireTurnLease, __resetTurnActivityForTests } from "@/lib/turnActivity";
 import { contextToMessages } from "@/lib/turnMachine/messages";
@@ -18,6 +18,7 @@ const JPEG = new Uint8Array([0xff, 0xd8, 0xff, 0xe0, 0x00, 0x10, 0x4a, 0x46, 0xf
 const CAPTION = "A tidy living room with a sofa and one person standing near a window.";
 
 beforeEach(() => {
+  __setLookForTests(null);
   resetDb();
   setHouseholdSettingValue("home.robots.enabled", true);
   __resetRobotVisionForTests();
@@ -208,5 +209,92 @@ describe("ROBOT-VISION-BUSY-01: a look never competes with real work", () => {
     release();
     expect((await first).ok).toBe(true);
     expect(calls).toBe(1);
+  });
+});
+
+describe("LOOK-01: the Stack's Look names what is in the picture, and Home keeps it 90 seconds", () => {
+  const frame = (deviceId: string, purpose: "scene" | "ask", now: number) => acceptFrame({ deviceId, bytes: JPEG, people: null, brightness: "unknown", purpose, now });
+  const look = (objects: { label: string; count: number; attributes?: Record<string, string>; uncertain?: boolean }[], over: Record<string, unknown> = {}) => async () => ({
+    objects: objects.map((o) => ({ label: o.label, count: o.count, score: 0.9, uncertain: o.uncertain ?? false, ...(o.attributes ? { attributes: o.attributes } : {}) })),
+    scene: { light: "bright" as const, tags: [{ label: "living room", score: 0.8 }], colours: ["blue", "white"], ...over },
+    cost: { ms: 14, tier: "fast" as const },
+  });
+
+  test("a background look is kept as labels, counts, colours and light, and reads as one short camera line", async () => {
+    const { deviceId } = await household();
+    __setLookForTests(look([{ label: "person", count: 1 }, { label: "chair", count: 3 }, { label: "tv", count: 1 }], { room_type: "living room" }));
+    expect((await frame(deviceId, "scene", 1_000_000)).ok).toBe(true);
+    const line = sceneContextLine(deviceId, 1_012_000)!;
+    expect(line).toContain("Looked 12 seconds ago");
+    expect(line).toContain("a person");
+    expect(line).toContain("3 chairs");
+    expect(line).toContain("a tv");
+    expect(line).toContain("room: living room");
+    expect(line).toContain("colours: blue, white");
+    expect(line).toContain("Light: bright");
+  });
+
+  test("a kind of thing is kept for 90 s after it was last seen, not after the picture it came from", async () => {
+    const { deviceId } = await household();
+    __setLookForTests(look([{ label: "chair", count: 2 }, { label: "tv", count: 1 }]));
+    await frame(deviceId, "scene", 1_000_000);
+    __setLookForTests(look([{ label: "tv", count: 1 }]));
+    await frame(deviceId, "scene", 1_000_000 + SCENE_FRAME_INTERVAL_MS);
+    const mid = sceneContextLine(deviceId, 1_000_000 + SCENE_FRAME_INTERVAL_MS + 10_000)!;
+    expect(mid).toContain("2 chairs");
+    const late = sceneContextLine(deviceId, 1_000_000 + SCENE_TTL_MS + 1_000)!;
+    expect(late).not.toContain("chair");
+    expect(late).toContain("a tv");
+  });
+
+  test("an asked look keeps details, flags a guess, and never keeps a detail for a person", async () => {
+    const { deviceId } = await household();
+    let asked = null as string | null;
+    __setLookForTests(async (_bytes, detail) => {
+      asked = detail;
+      return look([
+        { label: "car", count: 1, attributes: { colour: "blue", make: "Tesla", model: "Model 3" }, uncertain: true },
+        { label: "person", count: 1, attributes: { colour: "red", kind: "tall man" } },
+      ])();
+    });
+    expect((await frame(deviceId, "ask", 1_000_000)).ok).toBe(true);
+    expect(asked).toBe("detailed");
+    const line = sceneContextLine(deviceId, 1_001_000)!;
+    expect(line).toContain("a blue Tesla Model 3 car (a guess)");
+    expect(line).toContain("a person");
+    expect(line).not.toContain("red");
+    expect(line).not.toContain("tall");
+    __setLookForTests(async (_bytes, detail) => { asked = detail; return look([{ label: "chair", count: 1 }])(); });
+    await frame(deviceId, "scene", 2_000_000);
+    expect(asked).toBe("fast");
+  });
+
+  test("when Look cannot answer, the one-sentence caption is the fallback; with neither, the robot is told", async () => {
+    const { deviceId } = await household();
+    __setLookForTests(async () => null);
+    expect((await frame(deviceId, "scene", 1_000_000)).ok).toBe(true);
+    expect(sceneContextLine(deviceId, 1_001_000)).toContain(CAPTION);
+    __setCaptionForTests(async () => null);
+    const none = await frame(deviceId, "scene", 1_000_000 + SCENE_FRAME_INTERVAL_MS);
+    expect(none.ok === false && none.code).toBe("no_vision");
+  });
+
+  test("no label, tag or detail reaches a log, and the route answer carries none", async () => {
+    const { robot, deviceId } = await household();
+    __setLookForTests(look([{ label: "zebra-print sofa", count: 1, attributes: { make: "Acmeco" } }], { room_type: "attic" }));
+    const lines: string[] = [];
+    const spies = (["log", "info", "warn", "error"] as const).map((k) => spyOn(console, k).mockImplementation((...args: unknown[]) => { lines.push(args.map(String).join(" ")); }));
+    let body = "";
+    try {
+      const response = await robot.postBytes("/api/devices/me/vision", JPEG, "image/jpeg");
+      body = await response.text();
+    } finally {
+      for (const spy of spies) spy.mockRestore();
+    }
+    for (const word of ["zebra-print", "Acmeco", "attic", "living room"]) {
+      expect(lines.join("\n")).not.toContain(word);
+      expect(body).not.toContain(word);
+    }
+    expect(sceneContextLine(deviceId)).toContain("zebra-print sofa");
   });
 });

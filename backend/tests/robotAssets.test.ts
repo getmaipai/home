@@ -44,6 +44,16 @@ describe("ROBOT-ASSETS-01", () => {
     expect(body.assets.some((asset) => asset.kind === "moves")).toBe(false);
   });
 
+  test("LOOK-01: the YOLOX-nano detector is a pinned asset the robot can fetch by name", async () => {
+    const { personId } = await household();
+    const robot = await robotFor(personId);
+    const body = await (await robot.get("/api/devices/me/assets")).json() as { assets: { id: string; file: string; sha256: string; kind: string; licence: string }[] };
+    const yolox = body.assets.find((asset) => asset.id === "yolox-nano-0_1_1rc0");
+    expect(yolox).toMatchObject({ file: "yolox_nano.onnx", sha256: "c789161ed43c8269fcd4e67c67eeeb4e80c622da2eb296a20bc6007bd18a0b7d", kind: "model", licence: "Apache-2.0" });
+    const pinned = ROBOT_ASSETS.find((asset) => asset.id === "yolox-nano-0_1_1rc0")!;
+    expect(new URL(pinned.source_url).host).toBe("github.com");
+  });
+
   test("a corrupt pinned file is refused and creates a Repair", async () => {
     const { personId } = await household();
     const robot = await robotFor(personId);

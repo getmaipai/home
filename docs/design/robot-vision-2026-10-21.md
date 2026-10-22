@@ -56,6 +56,17 @@ still being described (one at a time per robot, a second is dropped, never queue
 status UI. Not covered: low free memory has no existing signal in Home, so it is not checked here; the Stack's own queue is the place
 for it when LOOK-01 lands.
 
+## LOOK-01 in Home (2026-10-22)
+
+Pinned to spec-v0.1.208 (`LookResult`, the household vocabulary, the `yolox-nano-0_1_1rc0` asset). The hub already serves every entry of
+`robot-assets.json` to a paired robot by id, fetched by digest from the entry's source URL and never vendored, so the detector arrives
+with the pin. `acceptFrame` asks the Stack's Look for `fast` on a background picture and `detailed` on an asked one (the caller decides, no
+word rule); a person is only ever counted, any detail the Stack sends for a person is dropped. Each kind of thing is kept in memory for 90 s
+after it was last seen (not after the picture it came from) and read as one line: "Looked 12 seconds ago: a person, 3 chairs, a blue Tesla
+Model 3 car (a guess); room: living room; colours: blue, white. Light: bright." Until the Stack's Look tool lands, `lookViaStack` returns
+null and the one-sentence caption is the fallback, so nothing changes for a robot today. A model tool call for details is the other allowed
+source of a detail request; no such tool exists yet.
+
 ## Not built here
 
 Naming people by face. A second look model. Any retention. The commons spec carrying `robot.vision` (it rides in Home's registry,
