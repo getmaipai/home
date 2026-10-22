@@ -358,3 +358,15 @@ describe("identity", () => {
     expect(last("chat_hello")).toBeNull();
   });
 });
+
+describe("canary in coding mode", () => {
+  test("the picture check is skipped, not failed, while Home is in coding mode", async () => {
+    const { setHouseholdSettingValue } = await import("@/lib/settings");
+    const { CHECK_BY_ID } = await import("@/lib/canary/checks");
+    setHouseholdSettingValue("coding.home_mode", "coding");
+    let asked = false;
+    const out = await CHECK_BY_ID.get("image_tiny")!.run({ image: async () => { asked = true; return { ok: false }; } } as never);
+    setHouseholdSettingValue("coding.home_mode", "normal");
+    expect(out.kind).toBe("skip"); expect(asked).toBe(false);
+  });
+});
