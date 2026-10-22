@@ -543,6 +543,7 @@ describe("household companion routes", () => {
     }
     expect((await request("companions/rivet/look/prompt", author)).status).toBe(403);
     expect((await request(`companions/${created.value.id}/states/dancing/prompt`, author)).status).toBe(404);
+  });
 
   test("avatar returns only ready usable active animation and caches its manifest version", async () => {
     const adult = addPerson("person-avatar-adult", "adult"), child = addPerson("person-avatar-child", "child"), admin = addPerson("person-avatar-admin", "admin");
