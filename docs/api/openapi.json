@@ -54101,12 +54101,10 @@
                 "type": "object",
                 "properties": {
                   "name": {
-                    "type": "string",
-                    "minLength": 1
+                    "type": "string"
                   },
                   "display_name": {
-                    "type": "string",
-                    "minLength": 1
+                    "type": "string"
                   },
                   "pronouns": {
                     "type": "string",
@@ -54217,11 +54215,25 @@
             }
           },
           "400": {
-            "description": "Invalid companion fields",
+            "description": "Companion fields are invalid.",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Error"
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "fields": {
+                      "type": "object",
+                      "additionalProperties": {
+                        "type": "string"
+                      }
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
                 }
               }
             }
@@ -54482,12 +54494,10 @@
                 "type": "object",
                 "properties": {
                   "name": {
-                    "type": "string",
-                    "minLength": 1
+                    "type": "string"
                   },
                   "display_name": {
-                    "type": "string",
-                    "minLength": 1
+                    "type": "string"
                   },
                   "pronouns": {
                     "type": "string",
@@ -54598,11 +54608,25 @@
             }
           },
           "400": {
-            "description": "Invalid companion fields",
+            "description": "Companion fields are invalid.",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Error"
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "fields": {
+                      "type": "object",
+                      "additionalProperties": {
+                        "type": "string"
+                      }
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
                 }
               }
             }
@@ -57917,11 +57941,25 @@
             }
           },
           "400": {
-            "description": "Identity or Voice fields are missing",
+            "description": "Companion fields are invalid.",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Error"
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "fields": {
+                      "type": "object",
+                      "additionalProperties": {
+                        "type": "string"
+                      }
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
                 }
               }
             }

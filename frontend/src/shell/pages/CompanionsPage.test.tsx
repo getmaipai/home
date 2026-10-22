@@ -51,8 +51,8 @@ test("when companions are off for the person the page says so", async () => {
   await waitFor(() => expect(view.getByText(/turned off for you/)).toBeTruthy());
 });
 
-test("the detail shows edit and copy actions where allowed", async () => {
-  api.companion = async () => detail({ can_edit: true, can_copy: true });
+test("the household detail shows its Edit and copy actions", async () => {
+  api.companion = async () => detail({ is_household: true, can_edit: true, can_copy: true });
   api.copyCompanion = async () => ({ id: "copy-id" });
   const saved: string[] = [];
   api.setDefaultCompanion = async (id) => { saved.push(id); return { default_id: id }; };
@@ -67,6 +67,15 @@ test("the detail shows edit and copy actions where allowed", async () => {
   fireEvent.click(view.getByRole("button", { name: "Set as my default" }));
   await waitFor(() => expect(saved).toEqual(["lively-child"]));
   await waitFor(() => expect((view.getByRole("button", { name: "Your default" }) as HTMLButtonElement).disabled).toBe(true));
+});
+
+test("a bundled companion makes editing through a copy clear", async () => {
+  api.companion = async () => detail({ is_household: false, can_edit: false, can_copy: true });
+  const view = open("/companions/lively-child");
+  await waitFor(() => expect(view.getByText("Sprout loves questions.")).toBeTruthy());
+  expect(view.getByRole("button", { name: "Edit a copy" })).toBeTruthy();
+  expect(view.getByText("This companion comes with Home, so it can't be changed. Make a copy and edit that.")).toBeTruthy();
+  expect(view.queryByRole("link", { name: "Edit" })).toBeNull();
 });
 
 test("a refused save shows the sentence from the hub", async () => {

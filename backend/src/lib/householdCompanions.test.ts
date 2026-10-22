@@ -34,6 +34,29 @@ describe("household companion store", () => {
     expect(reread).toEqual(result.value);
   });
 
+  test("a name alone creates a draft and blank tagline uses the home description", () => {
+    const result = createHouseholdCompanion({ display_name: "Solo" } as never, author);
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.value.companion?.status).toBe("draft");
+      expect(result.value.description).toBe("A companion made at home.");
+    }
+    const blankTagline = createHouseholdCompanion({ ...input, display_name: "Blank line", tagline: "" }, author);
+    expect(blankTagline.ok).toBe(true);
+    if (blankTagline.ok) expect(blankTagline.value.description).toBe("A companion made at home.");
+  });
+
+  test("invalid fields name their field and preserve multiple messages", () => {
+    const result = createHouseholdCompanion({ ...input, backstory: "x".repeat(500), examples: ["one", "two"] }, author);
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.fields?.backstory).toContain("About is too long");
+      expect(result.fields?.examples).toBe("Example lines: add at least 3.");
+      expect(result.error).toContain("About is too long");
+      expect(result.error).toContain("Example lines: add at least 3.");
+    }
+  });
+
   test("a bad field returns a plain sentence", () => {
     const result = createHouseholdCompanion({ ...input, formality: "wild" } as never, author);
     expect(result.ok).toBe(false);

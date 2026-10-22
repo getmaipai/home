@@ -646,6 +646,8 @@ export class ApiError extends Error {
     public next?: string,
     /** Seconds until a lockout (429) ends, when the route sends it. */
     public retryAfter?: number,
+    /** Field-level validation messages returned by editable forms. */
+    public fields?: Record<string, string>,
   ) {
     super(message);
   }
@@ -714,7 +716,7 @@ export async function request<T>(path: string, init?: RequestInit & { timeoutMs?
     const body = await res.json().catch(() => ({}));
     if (!res.ok) {
       if (isDeviceRevoked(res.status, body)) await removeAllOfflineMedia();
-      throw new ApiError(body.error ?? res.statusText, res.status, body.code, typeof body.next === "string" ? body.next : undefined, typeof body.retryAfter === "number" ? body.retryAfter : undefined);
+      throw new ApiError(body.error ?? res.statusText, res.status, body.code, typeof body.next === "string" ? body.next : undefined, typeof body.retryAfter === "number" ? body.retryAfter : undefined, body.fields && typeof body.fields === "object" ? body.fields as Record<string, string> : undefined);
     }
     return body as T;
   } catch (err) {

@@ -101,13 +101,25 @@ companionsRoutes.openapi(defaultRoute, (c) => {
 });
 
 const fields = z.object({
-  name: z.string().min(1).optional(), display_name: z.string().min(1).optional(), pronouns: z.string().nullable().optional(), tagline: z.string().optional(), backstory: z.string().optional(), interests: z.array(z.string()).optional(),
+  name: z.string().optional(), display_name: z.string().optional(), pronouns: z.string().nullable().optional(), tagline: z.string().optional(), backstory: z.string().optional(), interests: z.array(z.string()).optional(),
   formality: z.enum(["casual", "neutral", "formal"]).optional(), complexity: z.enum(["simple", "standard", "advanced"]).optional(), engagement: z.enum(["brief", "balanced", "curious"]).optional(), filler_density: z.enum(["none", "light", "frequent"]).optional(),
   behavior: z.array(z.string()).optional(), examples: z.array(z.string()).optional(), examples_child: z.array(z.string()).optional(), examples_teen: z.array(z.string()).optional(), examples_adult: z.array(z.string()).optional(), voice_id: z.string().optional(), look_prompt: z.string().optional(),
 });
-function normalizedFields(value: z.infer<typeof fields>) { const { name, ...rest } = value; return { ...rest, ...(name ? { display_name: name } : {}) }; }
+function normalizedFields(value: z.infer<typeof fields>) {
+  const { name, ...rest } = value;
+  const normalized: Record<string, unknown> = {};
+  for (const [field, raw] of Object.entries(rest)) {
+    if (typeof raw === "string") { const trimmed = raw.trim(); if (trimmed) normalized[field] = trimmed; }
+    else if (Array.isArray(raw)) { const items = raw.map((item) => typeof item === "string" ? item.trim() : item).filter((item) => item !== ""); if (items.length) normalized[field] = items; }
+    else if (raw !== null && raw !== undefined) normalized[field] = raw;
+  }
+  const rawName = name ?? value.display_name;
+  if (typeof rawName === "string") normalized.display_name = rawName.trim();
+  return normalized;
+}
 const idPath = idParamSchema("id", "hc-companion");
 const fieldsJson = { content: { "application/json": { schema: fields } } };
+const companionValidationError = { content: { "application/json": { schema: z.object({ error: z.string(), fields: z.record(z.string(), z.string()).optional() }) } }, description: "Companion fields are invalid." };
 function mayEdit(actor: import("@/types").PersonRow, id: string): boolean { return isOwnerOrAdmin(actor) || householdCompanionAuthorId(id) === actor.id; }
 const bundledLookLine = "A bundled companion can't be changed. Make a copy to edit it.";
 function lookAccess(actor: import("@/types").PersonRow, id: string): { status: 403 | 404; error: string } | null {
@@ -335,11 +347,11 @@ function allUseCounts(id: string) {
 }
 
 const createCompanionRoute = createRoute({ method: "post", path: "/", tags: ["Companions"], summary: "Create a household companion draft", middleware: [requireAuth] as const,
-  request: { body: fieldsJson }, responses: { 201: { content: { "application/json": { schema: z.object({ id: z.string() }) } }, description: "Draft created." }, ...errorResponses({ 400: "Invalid companion fields", 401: "Not signed in", 403: "Only adults can make a companion." }) } });
+  request: { body: fieldsJson }, responses: { 201: { content: { "application/json": { schema: z.object({ id: z.string() }) } }, description: "Draft created." }, 400: companionValidationError, ...errorResponses({ 401: "Not signed in", 403: "Only adults can make a companion." }) } });
 companionsRoutes.openapi(createCompanionRoute, (c) => {
   const actor = c.get("person"); if (speakerAgeBand(actor, new Date()) !== "adult" && !isOwnerOrAdmin(actor)) return c.json({ error: "Only adults can make a companion." }, 403);
   const result = createHouseholdCompanion(normalizedFields(c.req.valid("json")) as never, { display_name: actor.displayName, person_id: actor.id });
-  if (!result.ok) return c.json({ error: result.error }, 400);
+  if (!result.ok) return c.json({ error: result.error, ...(result.fields ? { fields: result.fields } : {}) }, 400);
   return c.json({ id: result.value.id }, 201);
 });
 
@@ -364,13 +376,13 @@ companionsRoutes.openapi(editRoute, (c) => {
 });
 
 const updateRoute = createRoute({ method: "put", path: "/{id}", tags: ["Companions"], summary: "Edit a household companion", middleware: [requireAuth] as const,
-  request: { params: idPath, body: fieldsJson }, responses: { 200: { content: { "application/json": { schema: z.object({ id: z.string() }) } }, description: "Saved." }, ...errorResponses({ 400: "Invalid companion fields", 401: "Not signed in", 403: "Not allowed to edit this companion", 404: "No such companion" }) } });
+  request: { params: idPath, body: fieldsJson }, responses: { 200: { content: { "application/json": { schema: z.object({ id: z.string() }) } }, description: "Saved." }, 400: companionValidationError, ...errorResponses({ 401: "Not signed in", 403: "Not allowed to edit this companion", 404: "No such companion" }) } });
 companionsRoutes.openapi(updateRoute, (c) => {
   const actor = c.get("person"), id = c.req.valid("param").id;
   if (PERSONAS.some((p) => p.id === id) && !getHouseholdCompanion(id)) return c.json({ error: "A bundled companion can't be changed. Make a copy to edit it." }, 403);
   if (!getHouseholdCompanion(id)) return c.json({ error: "That household companion could not be found." }, 404);
   if (!mayEdit(actor, id)) return c.json({ error: "Only the author or an admin can edit this companion." }, 403);
-  const result = updateHouseholdCompanion(id, normalizedFields(c.req.valid("json")) as never); if (!result.ok) return c.json({ error: result.error }, 400);
+  const result = updateHouseholdCompanion(id, normalizedFields(c.req.valid("json")) as never); if (!result.ok) return c.json({ error: result.error, ...(result.fields ? { fields: result.fields } : {}) }, 400);
   if (result.value.companion?.status === "ready") reloadPersonas(); return c.json({ id }, 200);
 });
 
@@ -387,12 +399,12 @@ companionsRoutes.openapi(audienceRoute, (c) => {
 });
 
 const statusRoute = createRoute({ method: "put", path: "/{id}/status", tags: ["Companions"], summary: "Set companion status", middleware: [requireAuth] as const,
-  request: { params: idPath, body: { content: { "application/json": { schema: z.object({ status: z.enum(["draft", "ready"]) }) } } } }, responses: { 200: { content: { "application/json": { schema: z.object({ id: z.string() }) } }, description: "Status saved." }, ...errorResponses({ 400: "Identity or Voice fields are missing", 403: "Only the author or an admin can change status", 404: "No such household companion" }) } });
+  request: { params: idPath, body: { content: { "application/json": { schema: z.object({ status: z.enum(["draft", "ready"]) }) } } } }, responses: { 200: { content: { "application/json": { schema: z.object({ id: z.string() }) } }, description: "Status saved." }, 400: companionValidationError, ...errorResponses({ 403: "Only the author or an admin can change status", 404: "No such household companion" }) } });
 companionsRoutes.openapi(statusRoute, (c) => {
   const actor = c.get("person"), id = c.req.valid("param").id, body = c.req.valid("json"), manifest = getHouseholdCompanion(id);
   if (!manifest?.companion) return c.json({ error: "That household companion could not be found." }, 404);
   if (!mayEdit(actor, id)) return c.json({ error: "Only the author or an admin can change this companion's status." }, 403);
-  if (body.status === "ready" && (manifest.companion.examples?.length ?? 0) < 3) return c.json({ error: "Add at least 3 example lines before marking this companion ready." }, 400);
+  if (body.status === "ready" && (manifest.companion.examples?.length ?? 0) < 3) return c.json({ error: "Example lines: add at least 3.", fields: { examples: "Example lines: add at least 3." } }, 400);
   const result = setHouseholdCompanionStatus(id, body.status); if (!result.ok) return c.json({ error: result.error }, 400);
   reloadPersonas(); return c.json({ id }, 200);
 });

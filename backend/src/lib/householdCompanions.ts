@@ -20,10 +20,44 @@ function read(id: string): Manifest | null {
     return value.success && value.data.kind === "companion" && value.data.id === id ? value.data : null;
   } catch { return null; }
 }
-function write(manifest: Manifest): { ok: true; value: Manifest } | { ok: false; error: string } {
+const fieldLabels: Record<string, string> = {
+  display_name: "Name", pronouns: "Pronouns", tagline: "One-line description", backstory: "About", interests: "Interests",
+  behavior: "Behavior lines", examples: "Example lines", examples_child: "Child example lines", examples_teen: "Teen example lines",
+  examples_adult: "Adult example lines", voice_id: "Voice", look_prompt: "Look prompt", formality: "Formality",
+  complexity: "Word choice", engagement: "Questions back", filler_density: "Casual chatter",
+};
+type WriteResult = { ok: true; value: Manifest } | { ok: false; error: string; fields?: Record<string, string> };
+function validationMessage(issue: { code: string; path: PropertyKey[]; minimum?: number | bigint; maximum?: number | bigint; origin?: string; message: string }, manifest: Manifest): { field: string; message: string } | null {
+  const field = String(issue.path[issue.path.indexOf("companion") + 1] ?? "");
+  const label = fieldLabels[field];
+  if (!label) return null;
+  const value = manifest.companion?.[field as keyof Companion];
+  const tooSmall = issue.code === "too_small";
+  const tooBig = issue.code === "too_big";
+  const max = typeof issue.maximum === "bigint" ? Number(issue.maximum) : issue.maximum;
+  const min = typeof issue.minimum === "bigint" ? Number(issue.minimum) : issue.minimum;
+  const itemIndex = issue.path[issue.path.indexOf("companion") + 2];
+  let message = `${label} is not valid. Check it and try again.`;
+  if (tooSmall && typeof itemIndex === "number" && Array.isArray(value)) message = `${label} can't be empty. Add a few words.`;
+  else if (tooBig && typeof itemIndex === "number" && Array.isArray(value)) message = `${label}, line ${itemIndex + 1}: use at most ${max ?? 0} characters.`;
+  else if (tooSmall && Array.isArray(value)) message = `${label}: add at least ${min ?? 1}.`;
+  else if (tooBig && Array.isArray(value)) message = `${label}: use at most ${max ?? value.length}.`;
+  else if (tooSmall && typeof value === "string") message = `${label} can't be empty. Add a few words.`;
+  else if (tooBig && typeof value === "string") message = `${label} is too long: use at most ${max ?? value.length} characters (you have ${value.length}).`;
+  return { field: field === "display_name" ? "name" : field, message };
+}
+function write(manifest: Manifest): WriteResult {
   const dir = folder(manifest.id); if (!dir) return { ok: false, error: "That companion ID is not valid." };
   const parsed = PackageManifest.safeParse(manifest);
-  if (!parsed.success) return { ok: false, error: "One or more companion fields are invalid. Check the values and try again." };
+  if (!parsed.success) {
+    const fields: Record<string, string> = {};
+    for (const issue of parsed.error.issues) {
+      const item = validationMessage(issue as typeof issue & { minimum?: number; maximum?: number; origin?: string }, manifest);
+      if (item && !fields[item.field]) fields[item.field] = item.message;
+    }
+    const messages = Object.values(fields);
+    return { ok: false, error: messages.length ? `${messages.slice(0, 3).join(" ")}` : "The companion is not valid. Check the fields and try again.", ...(messages.length ? { fields } : {}) };
+  }
   try {
     mkdirSync(dir, { recursive: true });
     const tmp = join(dir, `.manifest-${crypto.randomUUID()}.tmp`);
@@ -44,14 +78,22 @@ export function listHouseholdCompanionIds(): string[] {
   try { return readdirSync(root(), { withFileTypes: true }).filter((entry) => entry.isDirectory() && validId(entry.name) && read(entry.name)).map((entry) => entry.name).sort(); }
   catch { return []; }
 }
-export function createHouseholdCompanion(input: Companion, author: CompanionAuthor): { ok: true; value: Manifest } | { ok: false; error: string } {
+export function createHouseholdCompanion(input: Companion, author: CompanionAuthor): WriteResult {
   const name = typeof input?.display_name === "string" ? input.display_name.trim() : "";
-  if (!name) return { ok: false, error: "Add a display name for the companion." };
+  if (!name) return { ok: false, error: "Name can't be empty. Add a few words.", fields: { name: "Name can't be empty. Add a few words." } };
+  const clean: Record<string, unknown> = {};
+  for (const [key, raw] of Object.entries(input)) {
+    if (typeof raw === "string") { const value = raw.trim(); if (value) clean[key] = value; }
+    else if (raw === null) continue;
+    else if (Array.isArray(raw)) { const value = raw.map((item) => typeof item === "string" ? item.trim() : item).filter((item) => item !== ""); if (value.length) clean[key] = value; }
+    else clean[key] = raw;
+  }
   const base = `hc-${slug(name).slice(0, 37).replace(/-+$/g, "")}`;
   const occupied = new Set([...listPackageIds(), ...listHouseholdCompanionIds()]);
   let id = base, suffix = 2;
   while (occupied.has(id)) { const tail = `-${suffix++}`; id = `${base.slice(0, 40 - tail.length).replace(/-+$/g, "")}${tail}`; }
-  const manifest = { id, version: "0.1.0", kind: "companion", category: "Fun", display: name, description: input.tagline, author: author.display_name, license: "AGPL-3.0", homepage: "https://github.com/getmaipai/home", companion: { ...input, display_name: name, audience: "adult", status: "draft" }, incognito: "unaffected", requires: [], optional: [], platforms: ["home", "bot"], min_role: "adult", consequential: false, offline: "full", config: [], notifications: [], backup: "exclude", background: false, contributes: {}, min_app: "0.1.0", tier: 0, quality_scale: "bronze", channel: "stable" } as Manifest;
+  const companion = Object.assign({ formality: "neutral", complexity: "standard", engagement: "balanced", filler_density: "light" }, clean, { display_name: name, audience: "adult", status: "draft" });
+  const manifest = { id, version: "0.1.0", kind: "companion", category: "Fun", display: name, description: typeof clean.tagline === "string" ? clean.tagline : "A companion made at home.", author: author.display_name, license: "AGPL-3.0", homepage: "https://github.com/getmaipai/home", companion, incognito: "unaffected", requires: [], optional: [], platforms: ["home", "bot"], min_role: "adult", consequential: false, offline: "full", config: [], notifications: [], backup: "exclude", background: false, contributes: {}, min_app: "0.1.0", tier: 0, quality_scale: "bronze", channel: "stable" } as unknown as Manifest;
   const result = write(manifest);
   if (result.ok && author.person_id) {
     const dir = folder(result.value.id)!;
@@ -59,7 +101,7 @@ export function createHouseholdCompanion(input: Companion, author: CompanionAuth
   }
   return result;
 }
-export function updateHouseholdCompanion(id: string, patch: Partial<Companion>): { ok: true; value: Manifest } | { ok: false; error: string } {
+export function updateHouseholdCompanion(id: string, patch: Partial<Companion>): WriteResult {
   const current = read(id); if (!current?.companion) return { ok: false, error: "That household companion could not be found." };
   const allowed = ["display_name", "pronouns", "tagline", "backstory", "interests", "formality", "complexity", "engagement", "filler_density", "behavior", "examples", "examples_child", "examples_teen", "examples_adult", "voice_id", "look_prompt"] as const;
   const fields = Object.fromEntries(allowed.filter((key) => Object.hasOwn(patch, key)).map((key) => [key, patch[key]]));

@@ -263,6 +263,27 @@ describe("household companion routes", () => {
     expect(stored?.companion).toMatchObject({ audience: "adult", status: "draft" });
   });
 
+  test("a name alone creates a draft and blank optional fields are omitted", async () => {
+    const adult = addPerson("person-adult-companion-blank", "adult");
+    const response = await request("companions", adult, "POST", { name: "Only a name", tagline: "  ", backstory: "", pronouns: null, interests: [] });
+    expect(response.status).toBe(201);
+    const { id } = await response.json() as { id: string };
+    const stored = getHouseholdCompanion(id);
+    expect(stored?.description).toBe("A companion made at home.");
+    expect(stored?.companion).toMatchObject({ display_name: "Only a name", status: "draft" });
+    expect(stored?.companion?.tagline).toBeUndefined();
+  });
+
+  test("create validation returns field messages for one or more bad fields", async () => {
+    const adult = addPerson("person-adult-companion-invalid", "adult");
+    const one = await request("companions", adult, "POST", { ...fixture(), name: "Invalid about", backstory: "x".repeat(500) });
+    expect(one.status).toBe(400);
+    expect(await one.json()).toMatchObject({ fields: { backstory: expect.stringContaining("About is too long") }, error: expect.stringContaining("About is too long") });
+    const two = await request("companions", adult, "POST", { ...fixture(), name: "Two invalid fields", backstory: "x".repeat(500), examples: ["one", "two"] });
+    expect(two.status).toBe(400);
+    expect(await two.json()).toMatchObject({ fields: { backstory: expect.stringContaining("About is too long"), examples: "Example lines: add at least 3." } });
+  });
+
   test("bundled companion cannot be edited and can be copied", async () => {
     const adult = addPerson("person-adult02", "adult");
     const edit = await request("companions/rivet", adult, "PUT", { tagline: "Changed" });
@@ -313,7 +334,7 @@ describe("household companion routes", () => {
     const created = createHouseholdCompanion({ ...fixture(), display_name: "Short samples", examples: undefined }, { display_name: "person-adult05", person_id: "person-adult05" });
     if (!created.ok) throw new Error(created.error);
     const response = await request(`companions/${created.value.id}/status`, adult, "PUT", { status: "ready" });
-    expect(response.status).toBe(400); expect(((await response.json()) as { error: string }).error).toBe("Add at least 3 example lines before marking this companion ready.");
+    expect(response.status).toBe(400); expect(await response.json()).toEqual({ error: "Example lines: add at least 3.", fields: { examples: "Example lines: add at least 3." } });
   });
 
   test("states view follows the media vocabulary, files support byte ranges, and bundled states are blocked", async () => {
