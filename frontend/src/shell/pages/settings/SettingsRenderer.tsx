@@ -113,6 +113,7 @@ export function SettingsRenderer({ scope, scopeValue, only, includeKeys, include
         else throw first;
       }
       replaceValue(updated);
+      if (key === "persona.active_id" && selfPersonId) void queryClient.invalidateQueries({ queryKey: ["companion-avatar", selfPersonId] });
       return true;
     } catch (e) {
       setWriteError(e instanceof ApiError ? e.message : "Could not save that change.");
@@ -128,6 +129,7 @@ export function SettingsRenderer({ scope, scopeValue, only, includeKeys, include
     try {
       const restored = await api.resetSetting(scopeValue, key);
       replaceValue(restored);
+      if (key === "persona.active_id" && selfPersonId) void queryClient.invalidateQueries({ queryKey: ["companion-avatar", selfPersonId] });
     } catch (e) {
       setWriteError(e instanceof ApiError ? e.message : "Could not reset that setting.");
     } finally {

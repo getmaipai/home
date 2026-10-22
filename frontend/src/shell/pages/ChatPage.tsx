@@ -73,7 +73,7 @@ import { INCOGNITO_DISCARDED_EVENT, useIncognitoContext } from "@/shell/incognit
 import { useNotificationsQuery } from "@/shell/NotificationBell";
 import { AskHandoff } from "@/apps/chat/AskHandoff";
 import { ChatShortcutReference } from "@/shell/pages/ChatShortcutReference";
-import { ArtifactOpenContext, AdminContext, ChatAgeBandContext, type CompareTarget, CompareOpenContext, SourcesOpenContext, DetailsOpenContext, ThinkingModeContext, ThinkingModeCapabilityContext, BareModeContext, TemporaryChatContext, DraftConversationContext, WakeWordPersonContext, ConnectionStateContext, ChatComposerNoticeContext, type ConnectionState } from "@/apps/chat/chatThreadContexts";
+import { ArtifactOpenContext, AdminContext, ChatAgeBandContext, type CompareTarget, CompareOpenContext, SourcesOpenContext, DetailsOpenContext, ThinkingModeContext, ThinkingModeCapabilityContext, BareModeContext, TemporaryChatContext, DraftConversationContext, WakeWordPersonContext, ConnectionStateContext, ChatComposerNoticeContext, CompanionSpeechContext, type ConnectionState } from "@/apps/chat/chatThreadContexts";
 import { ConfirmAskAnswerProvider, ReloadMainThreadProvider } from "@/apps/chat/chatToolUis";
 import { CompareIcon, toolCallPartFromMessage } from "@/apps/chat/chatThreadSlots";
 import { discardDraft } from "@/apps/chat/draftStore";
@@ -1681,6 +1681,7 @@ export function ChatPage({ person }: { person: Roster }) {
               and the error slot draw the kit GuardrailNotice). */}
               <ConnectionStateContext.Provider value={{ ...connection, setConnection }}>
                 <PageContext.Provider value={projectPage?.context ?? null}>
+                <CompanionSpeechContext.Provider value={{ isSpeaking, liveVoiceListening: voiceSession.mode === "listening" }}>
                 <ChatThread
                   temporary={temporaryNext}
                   onEditSend={(_messageId, turnId) => setPendingSupersedes(turnId ?? null)}
@@ -1695,6 +1696,7 @@ export function ChatPage({ person }: { person: Roster }) {
                   projectFolderId={projectPage?.folderId}
                   focusKey={`${routeLocation.key}:${openingConversationId ?? ""}`}
                 />
+                </CompanionSpeechContext.Provider>
                 </PageContext.Provider>
               </ConnectionStateContext.Provider>
             </div>

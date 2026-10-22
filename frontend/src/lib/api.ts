@@ -360,6 +360,16 @@ export interface CompanionLook { versions: CompanionLookVersion[]; rest: string 
 export interface CompanionLookJob { state: "queued" | "running" | "done" | "failed" | "cancelled"; percent: number; label: string; versions: Array<{ id: string; url: string; label: string }>; error: string | null }
 export interface CompanionPromptPack { title: string; prompt: string; negative_prompt: string; text: string }
 export interface CompanionStateUrls { h264: string; av1: string; still: string }
+/** Signed-in person's ready avatar clips for chat. */
+export interface CompanionAvatarView {
+  avatar: null | {
+    id: string;
+    name: string;
+    key: string;
+    version: number;
+    states: Record<string, { loop: boolean; urls: { h264: string; av1: string | null; still: string } }>;
+  };
+}
 export interface CompanionStateTake {
   id: string; label: string; source: "generated" | "upload"; created_at: string; ok: boolean | null; reasons: string[];
   seconds: number | null; bytes: { h264: number; av1: number | null } | null; colour_distance: number | null; area_ratio: number | null;
@@ -906,6 +916,7 @@ export type HealthChecks = {
 export interface MediaBudgetResponse { limit_min: number; used_min: number; left_min: number; exhausted: boolean; /** The kid time-up words when time is up (GET /api/media/budget only). */ line?: string | null }
 
 export const api = {
+  companionAvatar: () => request<CompanionAvatarView>("/api/companions/avatar"),
   mediaBudget: () => request<MediaBudgetResponse>("/api/media/budget"),
   referenceBooks: () => request<ReferenceBookView[]>("/api/reference/books"),
   referenceSuggest: (book: string | undefined, q: string) => request<ReferenceSuggestion[]>(`/api/reference/suggest?${book ? `book=${encodeURIComponent(book)}&` : ""}q=${encodeURIComponent(q)}`),

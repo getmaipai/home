@@ -414,3 +414,25 @@ Finished through the Stack's `media.companion_clip` job: **83 to 213 kB per H.26
 - **CMEDIA-LOOP-01 (medium).** A one-shot should also skip the first 15 to 20 frames (the settling jump) and blend toward its own post-settle first frame, not frame 0.
 - **CMEDIA-MEM-01 (medium, Stack).** The memory guard stayed "paused" for 1 to 3 minutes after a pressure event even with 100 GB available, and cancelled a running clip at 21 and 37 percent when a 23 GB chat model loaded beside it (swap was 9.7 of 11.2 GB, left over from the coder speed test). The 480 x 480, 3 second size succeeded. Home should wait on the Stack's memory state and retry a cancelled take once instead of reporting a failure.
 - **CMEDIA-SIZE-01.** Make the take size square 480 x 480 and 3 seconds (the spec's ship size) instead of 832 x 480 and 5 seconds: about 2.3 times faster and light enough to run beside the chat model.
+
+## 14. The player and the companion in chat (2026-10-21, CMEDIA-PLAYER-01)
+
+Owner ask (Jesse, 2026-10-21): build the kit player and the Avatar state machine so companions show up in chat.
+
+**Where it lives.** The player is a kit Element, not a Home component: `CompanionAvatar` and `StackedAlphaVideo` in `commons/ui` (release `ui-v0.5.309`), with the state machine as a pure module
+(`companion-avatar-machine.ts`: no React, no DOM, no clock, tested with an injected clock and random). Home draws it with the kit Element as shipped (rule 9, no wrapper, no className that changes it).
+The editor's temporary preview (`StackedAlphaPreview` in Home) is still there and works; replacing it with the kit element is a follow-up row (CMEDIA-PLAYER-02).
+
+**Which state plays.** The host passes live booleans; `pickWanted` takes the highest of `needs_you`, `speaking`, `working`, `thinking`, `listening`, `sleeping`, else `idle`.
+A loop clip switches to a different wanted state only at its loop point (at most one clip length, 4 seconds, later); a one-shot plays once and returns to the wanted state;
+`needs_you` and `speaking` interrupt a one-shot at once; a one-shot (greeting, oops, celebrate, idle_look) is ignored while `needs_you` or `speaking` is current or wanted. `idle_look` plays itself every 20 to 40 seconds while idle.
+A state with no clip falls back to idle; a clip that will not load removes that state for the session; an idle that will not load hides the character and the chat is unchanged.
+Reduced motion, a hidden tab or no WebGL shows the state's still. The character never announces anything: the wrapper is one `role="img"` named for the companion, no live region.
+
+**What drives it in chat (Home).** `thinking`: the thread is running and the reply has no text yet. `working`: a tool call is running, or a job in this conversation is running. `speaking`: the chat page's spoken-reply flag.
+`needs_you`: a job of this conversation waits for the person, or an approval is pending. `sleeping`: ten minutes with no activity. One-shots: `greeting` the first time the chat opens each day for that person (kept in the browser), `oops` when the last reply ended in an error, `celebrate` when a job of this conversation finishes.
+`listening` and `happy` are wired only where a clean signal exists; the wiring task's report says which.
+
+**What it plays and for whom.** `GET /api/companions/avatar` returns the signed-in person's active companion when they may use it, it is ready and it has an idle clip (otherwise `{ avatar: null }` and nothing is drawn).
+The approved clip files are served to anyone who may use the companion, with Range support and an etag (a file name repeats after a redo, so no long-lived cache). Placement in this version: the thread's top-right corner (`ThreadViewportExtra`),
+a smaller size on a phone, with a "Hide the character" control that is remembered in the browser. Not in this version: the large launcher bubble, the robot's screen, the Apple TV client.

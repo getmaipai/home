@@ -126,6 +126,8 @@ export const DraftConversationContext = createContext<string | undefined>(undefi
 export type ConnectionState = { phase: ConnectionPhase; attempt?: number; resumedTokens?: number };
 export const ConnectionStateContext = createContext<ConnectionState & { setConnection?(state: ConnectionState): void }>({ phase: "online" });
 export const WakeWordPersonContext = createContext<Roster | null>(null);
+/** Chat page speech state for ThreadViewportExtra without prop drilling through kit slots. */
+export const CompanionSpeechContext = createContext<{ isSpeaking: boolean; liveVoiceListening: boolean }>({ isSpeaking: false, liveVoiceListening: false });
 
 /** CHAT-CALM-ERRORS-01d (design section 7): the one quiet line under the
  * composer while chat cannot answer, already chosen for this person's band

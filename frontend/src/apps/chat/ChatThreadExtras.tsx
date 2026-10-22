@@ -9,6 +9,8 @@ import { buildChatCommands, type ChatCommandAction } from "@/apps/chat/chatComma
 import { ChatAvailabilityContext } from "@/apps/chat/useChatAvailability";
 import { useIncognitoContext } from "@/shell/incognitoContext";
 import { setPendingChatFolder } from "@/apps/chat/chatThreadListAdapter";
+import { CompanionAvatar } from "@maipai/ui/src/elements/companion-avatar";
+import { useCompanionPresence } from "@/apps/chat/useCompanionPresence";
 
 const StableConversationMap = memo(ConversationMap);
 
@@ -24,6 +26,7 @@ export function ChatThreadExtras() {
   const scrollToMessage = useScrollToMessage();
   const { setOn, on: incognitoOn } = useIncognitoContext();
   const availability = useContext(ChatAvailabilityContext);
+  const presence = useCompanionPresence();
   const [searchOpen, setSearchOpen] = useState(false);
   const [query, setQuery] = useState("");
   const [activeIndex, setActiveIndex] = useState(0);
@@ -175,6 +178,7 @@ export function ChatThreadExtras() {
 
   return (
     <>
+      {presence ? <CompanionAvatar placement="corner" {...presence} /> : null}
       {entries.length >= 8 && (
         <StableConversationMap
           entries={entries}

@@ -106,5 +106,12 @@ export function useChatActivity() {
     if (pick) setDismissed((current) => new Set(current).add(pick.row.id));
   };
 
-  return { pick, backgroundRuns, busy, act, dismiss };
+  const conversationRows = view ? [...view.running, ...view.waiting, ...view.done].filter((row) => row.conversationId === conversationId) : [];
+  return {
+    pick, backgroundRuns, busy, act, dismiss,
+    conversationRunning: conversationRows.some((row) => row.tone === "running"),
+    conversationWaiting: conversationRows.some((row) => row.tone === "waiting"),
+    conversationRunningIds: new Set(conversationRows.filter((row) => row.tone === "running").map((row) => row.id)),
+    conversationDoneIds: new Set(conversationRows.filter((row) => row.tone === "done").map((row) => row.id)),
+  };
 }

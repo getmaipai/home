@@ -1,6 +1,6 @@
 {
-  "generatedAt": "2026-10-20T21:52:52.017Z",
-  "kitTag": "ui-v0.5.307",
+  "generatedAt": "2026-10-22T00:48:24.426Z",
+  "kitTag": "ui-v0.5.310",
   "items": [
     {
       "file": "ActivityCardsShowcase.tsx",
@@ -270,6 +270,22 @@
       "group": "other",
       "verdict": "wire-now",
       "verdictReason": "Selected for current Home UI adoption because the shipped Element fits a current or accepted Home feature.",
+      "implemented": true
+    },
+    {
+      "file": "companion-avatar-machine.ts",
+      "name": "companion-avatar-machine",
+      "group": "companion",
+      "verdict": "unassessed",
+      "verdictReason": "Recorded unassessed verdict in elements-plan.json; see the plan entry for its dependency or scope.",
+      "implemented": true
+    },
+    {
+      "file": "companion-avatar.tsx",
+      "name": "companion-avatar",
+      "group": "companion",
+      "verdict": "unassessed",
+      "verdictReason": "Recorded unassessed verdict in elements-plan.json; see the plan entry for its dependency or scope.",
       "implemented": true
     },
     {
@@ -1132,6 +1148,14 @@
       "verdict": "wire-now",
       "verdictReason": "Selected for current Home UI adoption because the shipped Element fits a current or accepted Home feature.",
       "implemented": true
+    },
+    {
+      "file": "stacked-alpha-video.tsx",
+      "name": "stacked-alpha-video",
+      "group": "stacked",
+      "verdict": "unassessed",
+      "verdictReason": "Recorded unassessed verdict in elements-plan.json; see the plan entry for its dependency or scope.",
+      "implemented": false
     },
     {
       "file": "stopped-run.tsx",
