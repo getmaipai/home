@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { checklistFromFacts, SETUP_CHECKLIST_ITEMS } from "@/lib/setupChecklist";
+import { getSettingsAreas } from "@/lib/settingsAreas";
 
 describe("setup checklist facts", () => {
   test("keeps the existing facts and adds the new facts", () => {
@@ -47,5 +48,15 @@ describe("setup checklist facts", () => {
       "remote-engine": false,
     }, new Set(["voice"]));
     expect(items.map((item) => item.id)).not.toContain("voice");
+  });
+
+  test("every Home settings checklist link names a real section", () => {
+    const home = getSettingsAreas().areas.find((area) => area.id === "home");
+    expect(home).toBeTruthy();
+    const sectionIds = new Set(home!.sections.map((section) => section.id));
+    for (const item of SETUP_CHECKLIST_ITEMS) {
+      const match = item.open.href.match(/^\/settings\/home\/([^/?#]+)$/);
+      if (match) expect(sectionIds.has(match[1]!), `${item.id} links to missing Home section ${match[1]}`).toBe(true);
+    }
   });
 });

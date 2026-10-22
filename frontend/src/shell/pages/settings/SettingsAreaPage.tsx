@@ -54,7 +54,20 @@ export function SettingsAreaPage({ person, onPersonChange }: { person: Roster; o
   const area = settingsArea(areaId) ?? packageAreas.find((candidate) => candidate.id === areaId);
   // A package's area is known only once the app list has answered: wait for it, never bounce to Account first.
   if (!area && !ready) return <Progress mode="spinner" label="Loading settings" />;
-  if (!area || !areaAllows(area, baseViewer(person))) return <Navigate to={settingsPath("account")} replace />;
+  if (!area) return <Navigate to={settingsPath("account")} replace />;
+  if (!areaAllows(area, baseViewer(person))) {
+    if (area.id === "home") return (
+      <>
+        <Empty>
+          <EmptyHeader>
+            <EmptyDescription>Only a parent or admin can change these settings. Ask the person who set up Home.</EmptyDescription>
+          </EmptyHeader>
+          <Button variant="link" render={<Link to={settingsPath("account")} />}>Open your settings</Button>
+        </Empty>
+      </>
+    );
+    return <Navigate to={settingsPath("account")} replace />;
+  }
   return <SettingsAreaBody key={area.id} area={area} packageAreas={packageAreas} person={person} onPersonChange={onPersonChange} />;
 }
 
@@ -62,7 +75,7 @@ const BackIcon = getIcon("arrow-left");
 
 /** COLUMN-UNIFY-01 (owner, 2026-10-19: a settings page had no way back to the app): the settings column's first row returns to the
  * app the person came from, with the column's title under it. The kit draws no title of its own once it is given a back link. */
-function SettingsBackLink() {
+function SettingsBackLink({ title, reach }: { title: string; reach: string }) {
   const rows = useAppRows();
   const to = lastAppRoute();
   const label = backLabelFor(to, Object.fromEntries((rows ?? []).map((row) => [row.package, row.label])));
@@ -72,7 +85,8 @@ function SettingsBackLink() {
         <BackIcon aria-hidden />
         {label}
       </Button></div>
-      <h2 className="px-2 text-lg leading-7 font-semibold">Settings</h2>
+      <h2 className="px-2 text-lg leading-7 font-semibold">{title}</h2>
+      <Badge variant="secondary">{reach}</Badge>
     </>
   );
 }
@@ -220,8 +234,8 @@ function SettingsAreaBody({ area, packageAreas, person, onPersonChange }: { area
   return (
     <SettingsShell
       layout="docked"
-      backLink={<SettingsBackLink />}
-      labels={{ columnTitle: "Settings" }}
+      backLink={<SettingsBackLink title={area.title} reach={area.id === "home" && scopes.includes("household") ? "Applies to everyone at home" : "Only you"} />}
+      labels={{ columnTitle: area.title }}
       contentAs="section"
       area={area}
       viewer={viewer}

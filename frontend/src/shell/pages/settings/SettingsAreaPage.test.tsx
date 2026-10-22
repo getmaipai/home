@@ -9,6 +9,7 @@ import RailProfileMenu from "@maipai/ui/src/dashboard/layouts/full/vertical/rail
 import { renderWithQueryClient } from "../../../../tests/renderWithQueryClient";
 import { CustomizeRedirect, SettingsEntryRedirect } from "@/shell/pages/settings/SettingsEntryRedirect";
 import { SettingsAreaPage } from "@/shell/pages/settings/SettingsAreaPage";
+import { settingsArea } from "@/shell/pages/settings/settingsAreas";
 import { activeAppHref, rememberLastAppRoute } from "@/shell/pages/settings/settingsBackLink";
 import { makePerson, mockHome, type HomeFixture } from "@/shell/pages/settings/settingsTestKit";
 import type { Roster } from "@/lib/api";
@@ -98,14 +99,27 @@ describe("the settings route", () => {
     expect(view.queryByText("Finish setting up")).toBeNull();
   });
 
-  test("an adult asking for Home settings is replaced to Account and no household request is made", async () => {
+  test("an adult asking for Home settings sees why access is refused and can open their settings", async () => {
     const adult = makePerson("adult");
     const view = open(adult, "/settings/home/ai");
-    await waitFor(() => expect(where(view)).toBe("/settings/account/profile"));
-    await waitFor(() => expect(rows(view)).toContain("Profile"));
+    expect(await view.findByText("Only a parent or admin can change these settings. Ask the person who set up Home.")).toBeTruthy();
+    expect(view.getByRole("link", { name: "Open your settings" }).getAttribute("href")).toBe("/settings/account");
+    expect(where(view)).toBe("/settings/home/ai");
     expect(fixture!.scopes).not.toContain("household");
     expect(fixture!.requests.filter((r) => r.includes("scope=household"))).toEqual([]);
-    expect(rows(view)).not.toContain("Storage and backups");
+  });
+
+  test("the column names its area and shows its reach", async () => {
+    const home = open(makePerson("owner"), "/settings/home/general");
+    expect(await home.findByRole("heading", { level: 2, name: settingsArea("home")!.title })).toBeTruthy();
+    expect(within(column(home)).getByText("Applies to everyone at home")).toBeTruthy();
+    cleanup();
+    fixture?.restore();
+    fixture = null;
+
+    const personal = open(makePerson("adult"), "/settings/chat/general");
+    expect(await personal.findByRole("heading", { level: 2, name: settingsArea("chat")!.title })).toBeTruthy();
+    expect(within(column(personal)).getByText("Only you")).toBeTruthy();
   });
 
   test("an owner opens Home settings on General and sees every Home section", async () => {
@@ -116,25 +130,27 @@ describe("the settings route", () => {
     expect(view.getByRole("heading", { level: 1, name: /^General$/ })).toBeTruthy();
   });
 
-  test("COLUMN-UNIFY-01: the column's first row goes back to the app the person came from, and the title stays", async () => {
+  test("COLUMN-UNIFY-01: the column's first row goes back to the app the person came from, and the area title stays", async () => {
     rememberLastAppRoute("/files?section=all");
     const view = open(makePerson("adult"), "/settings/chat/general");
     const back = await waitFor(() => within(column(view)).getByRole("link", { name: "Back to Library" }));
     expect(back.getAttribute("href")).toBe("/files?section=all");
-    expect(within(column(view)).getByRole("heading", { level: 2, name: "Settings" })).toBeTruthy();
+    expect(within(column(view)).getByRole("heading", { level: 2, name: settingsArea("chat")!.title })).toBeTruthy();
     window.sessionStorage.clear();
   });
 
-  test("a child cannot reach Reference library settings by direct URL", async () => {
+  test("a child gets the Home settings access explanation on a direct URL", async () => {
     const view = open(makePerson("child"), "/settings/home/reference-library");
-    await waitFor(() => expect(where(view)).toBe("/settings/account/profile"));
+    expect(await view.findByText("Only a parent or admin can change these settings. Ask the person who set up Home.")).toBeTruthy();
+    expect(where(view)).toBe("/settings/home/reference-library");
     expect(view.queryByText("All sets")).toBeNull();
     expect(fixture!.requests.some((r) => r.includes("/api/reference/"))).toBe(false);
   });
 
-  test.each(["child", "teen"] as const)("a %s cannot reach Engines and AI by direct URL", async (role) => {
+  test.each(["child", "teen"] as const)("a %s gets the Home settings access explanation for Engines and AI", async (role) => {
     const view = open(makePerson(role), "/settings/home/ai");
-    await waitFor(() => expect(where(view)).toBe("/settings/account/profile"));
+    expect(await view.findByText("Only a parent or admin can change these settings. Ask the person who set up Home.")).toBeTruthy();
+    expect(where(view)).toBe("/settings/home/ai");
     expect(view.queryByText("Where the engine runs")).toBeNull();
     expect(fixture!.requests.filter((r) => /api\/(engines|settings\?scope=household)/.test(r))).toEqual([]);
   });
@@ -251,10 +267,10 @@ describe("the settings route", () => {
     }
   });
 
-  test("the column title stays Settings with no back row or collapse controls; Cmd/Ctrl+B is inert", async () => {
+  test("the column title names the area with no back row or collapse controls; Cmd/Ctrl+B is inert", async () => {
     window.sessionStorage.setItem("maipai.settings.last-app-route", "/status?tab=system");
     const view = open(makePerson("adult"), "/settings/chat/general");
-    expect(await view.findByRole("heading", { level: 2, name: "Settings" })).toBeTruthy();
+    expect(await view.findByRole("heading", { level: 2, name: settingsArea("chat")!.title })).toBeTruthy();
     expect(view.queryByRole("link", { name: "Back to app" })).toBeNull();
     expect(view.queryByRole("button", { name: /settings sidebar/i })).toBeNull();
     const before = column(view).getAttribute("data-state");

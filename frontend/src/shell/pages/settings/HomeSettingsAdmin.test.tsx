@@ -56,9 +56,9 @@ afterEach(() => {
 });
 
 describe("who may open Home settings", () => {
-  test.each(["adult", "teen", "child", "guest"] as const)("a %s opening /settings/home lands on Account and no household request is made", async (role) => {
+  test.each(["adult", "teen", "child", "guest"] as const)("a %s opening /settings/home sees why it is refused and no household request is made", async (role) => {
     const view = open(makePerson(role), "/settings/home");
-    await waitFor(() => expect(where(view)).toMatch(/^\/settings\/account/));
+    expect(await view.findByText("Only a parent or admin can change these settings. Ask the person who set up Home.")).toBeTruthy();
     expect(fixture!.requests.filter((r) => r.includes("scope=household"))).toEqual([]);
   });
 

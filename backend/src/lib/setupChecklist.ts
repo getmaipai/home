@@ -20,7 +20,7 @@ export const SETUP_CHECKLIST_ITEMS = [
   { id: "apps", title: "Add apps", reason: "Add an app to give Home another useful skill.", open: { label: "Open", href: "/store" } },
   { id: "away-access", title: "Set up access away from home", reason: "Tailscale lets your family reach Home when they are away.", open: { label: "Open", href: "/setup/away" } },
   { id: "backup-key", title: "Save your backup key", reason: "This key helps restore your Home if this computer is lost.", open: { label: "Open", href: "/settings/home/storage" } },
-  { id: "voice", title: "Choose a speaking voice", reason: "Home can read replies aloud in this voice.", open: { label: "Open", href: "/settings/home/voice" } },
+  { id: "voice", title: "Choose a speaking voice", reason: "Home can read replies aloud in this voice.", open: { label: "Open", href: "/settings/home/voices" } },
   { id: "photos", title: "Turn on photo understanding", reason: "Home can help with photos when you ask.", open: { label: "Open", href: "/settings/home/ai" } },
   { id: "remote-engine", title: "Pair your remote AI computer", reason: "A paired computer can run Home's AI on another machine.", open: { label: "Open", href: "/settings/home/ai" } },
 ] as const;
