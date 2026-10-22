@@ -216,8 +216,8 @@ UX-01 and UX-02 do not depend on the spec; UX-03 and the IA-02 spec work share o
 - **Rule 9** applies to every step: no `className` that changes shape or layout on an Element in Home; anything missing is a
   `commons` prop first.
 
-## 7. Decisions for Jesse
+## 7. Decisions (Jesse, 2026-10-22)
 
-1. Go order: relief first (UX-01 to UX-05) with the IA moves after, or the IA note's order (moves first).
-2. Add and edit in dialogs (a bottom drawer on a phone), long edits on a detail screen: yes or a different split.
-3. The Mine and Household switch at the top of the column for admins: yes or keep it only in the avatar menu.
+1. Order: readability first (UX-01 to UX-05), then the IA note's page moves.
+2. Add and quick edits in dialogs (a bottom drawer on a phone); anything with many settings on its own detail screen. Nothing expands the page.
+3. Admins get the Mine | Household switch at the top of the column; the avatar menu entries stay.
