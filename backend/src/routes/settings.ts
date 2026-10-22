@@ -38,12 +38,12 @@ import { raiseIssue, resolveIssue } from "@/lib/issues";
 export const settingsRoutes = apiRouter();
 
 async function followCodingMode(target: "normal" | "coding", actor: PersonRow): Promise<void> {
-  const deadline = Date.now() + 15 * 60_000;
+  const deadline = Date.now() + 45 * 60_000;
   while (Date.now() < deadline) {
     await new Promise(resolve => setTimeout(resolve, 2_000));
     try {
       const state = await getStackClient().getCodingMode();
-      if (state.state === "switching") continue;
+      if (state.state === "switching" || state.state === "waiting") continue;
       if (state.state === "stable" && state.mode === target) { await resolveIssue("coding_mode", "switch_failed"); return; }
       if (state.state === "failed") {
         setValue(actor, "household", "coding.home_mode", "normal");
@@ -56,7 +56,7 @@ async function followCodingMode(target: "normal" | "coding", actor: PersonRow): 
   }
   setValue(actor, "household", "coding.home_mode", "normal");
   publishSettingsChanged("household", "coding.home_mode", "normal");
-  await raiseModeFailure("The AI did not finish switching modes within 15 minutes.");
+  await raiseModeFailure("The AI did not finish switching modes within 45 minutes.");
   console.info(JSON.stringify({ event: "coding_mode.switch_timeout" }));
 }
 

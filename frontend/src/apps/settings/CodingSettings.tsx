@@ -42,6 +42,16 @@ export function selfTestState(data: CodingModeView | undefined, startedAt: numbe
   return { running: true, failure: null };
 }
 
+/** One plain sentence for what Home is doing right now, so an admin never has to guess from the dropdown. */
+export function homeModeSentence(data: CodingModeView | undefined): string | null {
+  if (!data) return null;
+  if (data.state === "waiting") return "Coding mode will start when the pictures, videos and songs being made finish. New ones are held until then. Choose Normal to cancel.";
+  if (data.state === "switching") return "Home is switching modes. This takes about a minute, and chat pauses briefly.";
+  if (data.state === "failed" && data.reason) return `The last mode change did not finish: ${data.reason}`;
+  if (data.mode === "coding") return "Coding mode is on. One large model answers chat, search and coding. Pictures, videos and songs wait until you switch back to Normal.";
+  return "Normal mode is on. Chat, pictures, videos and songs run as usual.";
+}
+
 export function CodingAdminSettings() {
   const client = useQueryClient();
   const people = useQuery({ queryKey: ["people"], queryFn: () => api.people() });
@@ -50,7 +60,7 @@ export function CodingAdminSettings() {
   const [pending, setPending] = useState<Record<string, "install" | "remove">>({});
   const pieces = useQuery({ queryKey: ["coding-pieces"], queryFn: api.codingPieces, refetchIntervalInBackground: true, refetchInterval: (q) => q.state.data?.pieces.some((piece) => piece.state === "installing") || Object.keys(pending).length > 0 ? 2000 : false });
   const [testStartedAt, setTestStartedAt] = useState<number | null>(null);
-  const mode = useQuery({ queryKey: ["coding-mode"], queryFn: api.codingMode, refetchIntervalInBackground: true, refetchInterval: (q) => (pieces.data?.pieces.some((piece) => piece.state === "installing") || selfTestState(q.state.data, testStartedAt).running ? 3000 : false) });
+  const mode = useQuery({ queryKey: ["coding-mode"], queryFn: api.codingMode, refetchIntervalInBackground: true, refetchInterval: (q) => (pieces.data?.pieces.some((piece) => piece.state === "installing") || selfTestState(q.state.data, testStartedAt).running || q.state.data?.state === "switching" || q.state.data?.state === "waiting" ? 2000 : 5000) });
   const selfTest = selfTestState(mode.data, testStartedAt);
   // The poll is scheduled from the options of the render that follows the start, so ask once more after that render.
   useEffect(() => { if (testStartedAt !== null) void mode.refetch(); }, [testStartedAt]);
@@ -112,6 +122,7 @@ export function CodingAdminSettings() {
   return <div className="flex flex-col gap-4">
     <SettingsRenderer scope="household" scopeValue="household" honouredBy="home" only={["household.coding"]} includeKeys={["coding.enabled", "coding.home_mode"]} rowExtras={{ "coding.home_mode": { lockedReason: mode.data && !mode.data.readiness.ready ? modeReason : undefined } }} />
     <Card><CardHeader><CardTitle>Home mode checklist</CardTitle><CardDescription>Finish these steps before you turn on Coding mode.</CardDescription></CardHeader><CardContent>
+      {homeModeSentence(mode.data) ? <p role="status" className="text-sm">{homeModeSentence(mode.data)}</p> : null}
       <AsyncState data={mode.data?.readiness.items} error={mode.isError} isFetching={mode.isFetching} onRetry={() => void mode.refetch()} errorMessage="Could not load the Home mode checklist." loadingLabel="Loading Home mode checklist">
         {(rows) => <ItemGroup variant="card" aria-label="Home mode checklist">{rows.map((item, index) => <Item key={item.id}>
           <ItemContent><ItemTitle>{MODE_LABELS[item.id]} <Badge variant={item.state === "done" ? "secondary" : "outline"}>{(modeActionBusy === item.id || selfTest.running) && item.id === "self_test" ? "Running" : item.id === "pieces" && downloading.length > 0 ? "Installing" : item.id === "self_test" && selfTest.running ? "Running" : item.state === "done" ? "Ready" : item.state === "can_do" ? "Needs setup" : "Needs a step from you"}</Badge></ItemTitle>

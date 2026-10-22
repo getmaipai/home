@@ -10,7 +10,7 @@ export type { StackJob };
 
 /** GET /stack/v1/coding/mode: Stack-owned coding mode transaction status. */
 export interface StackCodingMode {
-  mode: "normal" | "coding"; target: "normal" | "coding"; state: "stable" | "switching" | "failed";
+  mode: "normal" | "coding"; target: "normal" | "coding"; state: "stable" | "waiting" | "switching" | "failed";
   reason: string | null; available: boolean;
   checks: { engine: boolean; pieces: boolean; hardware: boolean; memory: boolean; bench: boolean };
   self_test: { passed_at: string | null; stale: boolean };

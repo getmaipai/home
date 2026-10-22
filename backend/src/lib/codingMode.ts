@@ -46,7 +46,7 @@ export async function reconcileCodingModeAtStartup(): Promise<void> {
     const stored = getHouseholdSettingValue("coding.home_mode");
     if (stack.mode === "coding" && stored !== "coding") {
       try { await getStackClient().setCodingMode("normal"); } catch { /* Next boot/change retries. */ }
-    } else if (stored === "coding" && stack.mode === "normal" && stack.state !== "switching") {
+    } else if (stored === "coding" && stack.mode === "normal" && stack.state !== "switching" && stack.state !== "waiting") {
       setHouseholdSettingValue("coding.home_mode", "normal");
       await raiseModeFailure(stack.reason ?? "The AI is in normal mode.");
     }

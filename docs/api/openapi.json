@@ -27391,6 +27391,7 @@
                       "nullable": true,
                       "enum": [
                         "stable",
+                        "waiting",
                         "switching",
                         "failed",
                         null
@@ -27985,6 +27986,7 @@
                       "nullable": true,
                       "enum": [
                         "stable",
+                        "waiting",
                         "switching",
                         "failed",
                         null

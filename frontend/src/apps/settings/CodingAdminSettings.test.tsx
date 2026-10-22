@@ -169,3 +169,16 @@ describe("Coding admin settings", () => {
   });
 
 });
+
+describe("Home mode sentence", () => {
+  test("names the mode, the switch in progress, and a failure", async () => {
+    const { homeModeSentence } = await import("@/apps/settings/CodingSettings");
+    const view = (mode: string, state: string, reason: string | null) => ({ mode, state, reason, readiness: { ready: true, first_unmet: null, items: [] } }) as never;
+    expect(homeModeSentence(undefined)).toBeNull();
+    expect(homeModeSentence(view("normal", "stable", null))).toContain("Normal mode is on");
+    expect(homeModeSentence(view("coding", "stable", null))).toContain("Pictures, videos and songs wait");
+    expect(homeModeSentence(view("normal", "switching", null))).toContain("switching modes");
+    expect(homeModeSentence(view("normal", "waiting", null))).toContain("New ones are held");
+    expect(homeModeSentence(view("normal", "failed", "A picture, video or song is still being made."))).toContain("still being made");
+  });
+});
