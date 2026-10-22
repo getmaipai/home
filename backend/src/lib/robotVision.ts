@@ -10,6 +10,7 @@ import { complete, type LlmImagePart } from "@/lib/llm";
 import { chatModelReadsPictures } from "@/lib/chatPictures";
 import { getDeviceSettingValue, getHouseholdSettingValue } from "@/lib/settings";
 import { activeTurnCount } from "@/lib/turnActivity";
+import { getStackClient } from "@/lib/stackEngine";
 import { ROBOT_VISION_KEY } from "@/settings/robotVisionKeys";
 import type { LookResult } from "@maipai/spec/gen/ts/look-result.js";
 
@@ -72,16 +73,70 @@ const captioning = new Set<string>();
 
 /** The Stack's Look capability, as Home calls it: a picture in, a LookResult out, null when it cannot look right now. "detailed" crops each
  * object it found (never a person) and describes it; the crops stay inside that call. The picture is not kept by the caller. */
-export type LookFn = (bytes: Uint8Array, detail: "fast" | "detailed") => Promise<LookResult | null>;
+export type LookFn = (bytes: Uint8Array, detail: "fast" | "detailed", source: string) => Promise<LookResult | null>;
 let lookForTests: LookFn | null = null;
 /** Test seam: a Look without a Stack. */
 export function __setLookForTests(fn: LookFn | null): void {
   lookForTests = fn;
 }
-async function lookViaStack(bytes: Uint8Array, detail: "fast" | "detailed"): Promise<LookResult | null> {
-  if (lookForTests) return lookForTests(bytes, detail);
-  // The Stack's Look tool is not on the Stack's main yet (LOOK-01 step 3); until it is, a picture falls back to the one-sentence caption.
-  return null;
+
+/** A background look is droppable: a slow Stack costs the robot this one look, not a stuck request. */
+const LOOK_TIMEOUT_MS = 8_000;
+
+const isRecord = (value: unknown): value is Record<string, unknown> => typeof value === "object" && value !== null && !Array.isArray(value);
+const text = (value: unknown, max: number): string | null => (typeof value === "string" && value.trim() ? value.trim().slice(0, max) : null);
+
+/** Read the Stack's reply into a LookResult. Read, not trusted: only the fields Home keeps, bounded, and an object the Stack marks stale
+ * (a track it remembered from an earlier picture) is left out, because Home keeps its own 90 seconds and must not extend the Stack's. */
+export function readStackLook(raw: unknown): LookResult | null {
+  if (!isRecord(raw) || !Array.isArray(raw.objects) || !isRecord(raw.scene)) return null;
+  const objects: LookResult["objects"] = [];
+  for (const entry of raw.objects.slice(0, 64)) {
+    if (!isRecord(entry) || entry.stale === true) continue;
+    const label = text(entry.label, 64);
+    if (!label) continue;
+    const attributes: Record<string, string> = {};
+    if (isRecord(entry.attributes)) {
+      for (const key of ["colour", "kind", "make", "model"] as const) {
+        const value = text(entry.attributes[key], 64);
+        if (value) attributes[key] = value;
+      }
+    }
+    objects.push({
+      label,
+      count: typeof entry.count === "number" && entry.count >= 1 ? Math.floor(entry.count) : 1,
+      score: typeof entry.score === "number" ? Math.min(1, Math.max(0, entry.score)) : 0,
+      uncertain: entry.uncertain === true,
+      ...(Object.keys(attributes).length ? { attributes } : {}),
+    });
+  }
+  const light = raw.scene.light === "dark" || raw.scene.light === "dim" || raw.scene.light === "bright" ? raw.scene.light : null;
+  if (light === null) return null;
+  const tags = (Array.isArray(raw.scene.tags) ? raw.scene.tags : []).flatMap((tag) => {
+    if (!isRecord(tag)) return [];
+    const label = text(tag.label, 64);
+    return label ? [{ label, score: typeof tag.score === "number" ? Math.min(1, Math.max(0, tag.score)) : 0 }] : [];
+  }).slice(0, 64);
+  const colours = (Array.isArray(raw.scene.colours) ? raw.scene.colours : []).flatMap((colour) => text(colour, 32) ?? []).slice(0, 8);
+  const roomType = text(raw.scene.room_type, 64);
+  const cost = isRecord(raw.cost) && typeof raw.cost.ms === "number" ? raw.cost.ms : 0;
+  return { objects, scene: { light, tags, ...(roomType ? { room_type: roomType } : {}), colours }, cost: { ms: cost, tier: raw.cost && isRecord(raw.cost) && raw.cost.tier === "detailed" ? "detailed" : "fast" } };
+}
+
+/** Ask the Stack's Look about one picture, with no language model on the fast tier. Any refusal or failure (the Look part not installed,
+ * detail not built yet, too many looks, no memory, a timeout) is a plain null: the caller falls back to the caption. Nothing is logged;
+ * a failure's text is never kept because it may carry the Stack's own words about the picture. */
+async function lookViaStack(bytes: Uint8Array, detail: "fast" | "detailed", source: string): Promise<LookResult | null> {
+  if (lookForTests) return lookForTests(bytes, detail, source);
+  try {
+    const form = new FormData();
+    form.set("image", new Blob([bytes], { type: "image/jpeg" }), "camera.jpg");
+    form.set("source", source);
+    form.set("detail", detail);
+    return readStackLook(await getStackClient().look(form, { signal: AbortSignal.timeout(LOOK_TIMEOUT_MS) }));
+  } catch {
+    return null;
+  }
 }
 
 const MAX_SEEN_OBJECTS = 24;
@@ -272,7 +327,7 @@ export async function acceptFrame(input: FrameInput): Promise<FrameOutcome> {
   let caption: string | null = null;
   let look: LookResult | null = null;
   try {
-    look = await lookViaStack(input.bytes, scene ? "fast" : "detailed");
+    look = await lookViaStack(input.bytes, scene ? "fast" : "detailed", input.deviceId);
     if (look === null) caption = await captionWithChatModel(input.bytes);
   } finally {
     captioning.delete(input.deviceId);

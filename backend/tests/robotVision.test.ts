@@ -10,6 +10,8 @@ import { getDeviceSettingValue, setHouseholdSettingValue, setValue } from "@/lib
 import {
   SCENE_TTL_MS, MIN_FRAME_INTERVAL_MS, SCENE_FRAME_INTERVAL_MS, __resetRobotVisionForTests, __setCaptionForTests, __setLookForTests, acceptFrame, cleanCaption, robotVisionMode, sceneContextLine, sceneFor,
 } from "@/lib/robotVision";
+import { startStackFixture } from "./stackFixture";
+import { __setStackClientForTests } from "@/lib/stackEngine";
 import { acquireTurnLease, __resetTurnActivityForTests } from "@/lib/turnActivity";
 import { contextToMessages } from "@/lib/turnMachine/messages";
 import type { PersonRow } from "@/types";
@@ -203,7 +205,7 @@ describe("ROBOT-VISION-BUSY-01: a look never competes with real work", () => {
     let calls = 0;
     __setCaptionForTests(() => { calls++; return new Promise((resolve) => { release = () => resolve(CAPTION); }); });
     const first = frame(deviceId, "ask", 1_000_000);
-    await Promise.resolve();
+    for (let waited = 0; calls === 0 && waited < 200; waited++) await new Promise((r) => setTimeout(r, 10));
     const second = await frame(deviceId, "ask", 1_000_000 + MIN_FRAME_INTERVAL_MS);
     expect(second.ok === false && second.code).toBe("busy");
     release();
@@ -296,5 +298,70 @@ describe("LOOK-01: the Stack's Look names what is in the picture, and Home keeps
       expect(body).not.toContain(word);
     }
     expect(sceneContextLine(deviceId)).toContain("zebra-print sofa");
+  });
+});
+
+describe("LOOK-01: Home calls the Stack's Look route", () => {
+  const frame = (deviceId: string, purpose: "scene" | "ask", now: number) => acceptFrame({ deviceId, bytes: JPEG, people: null, brightness: "unknown", purpose, now });
+  const reply = {
+    objects: [
+      { label: "couch", count: 1, score: 0.8, box: [0.1, 0.1, 0.5, 0.5], uncertain: false },
+      { label: "lamp", count: 1, score: 0.7, box: [0.6, 0.1, 0.8, 0.4], uncertain: false, stale: true },
+    ],
+    scene: { light: "dim", colours: ["green"], tags: [{ label: "living room", score: 0.7 }] },
+    cost: { ms: 14, tier: "fast" },
+    expires_in_s: 90,
+  };
+
+  test("a background picture goes up as a fast look keyed by the robot, and the reply is read, not trusted", async () => {
+    const { deviceId } = await household();
+    let seen = null as { source: string; detail: string; image: number } | null;
+    const stack = startStackFixture({
+      "POST /v1/images/looks": async (req) => {
+        const form = await req.formData();
+        seen = { source: String(form.get("source")), detail: String(form.get("detail")), image: (form.get("image") as unknown as { size: number }).size };
+        return Response.json(reply);
+      },
+    });
+    __setStackClientForTests(stack.client);
+    try {
+      expect((await frame(deviceId, "scene", 1_000_000)).ok).toBe(true);
+    } finally {
+      stack.stop();
+    }
+    expect(seen).toEqual({ source: deviceId, detail: "fast", image: JPEG.byteLength });
+    const line = sceneContextLine(deviceId, 1_002_000)!;
+    expect(line).toContain("a couch");
+    expect(line).not.toContain("lamp");
+    expect(line).toContain("colours: green");
+    expect(line).toContain("Light: dim");
+  });
+
+  test("detail_unavailable, no memory, too many looks and a down Stack all fall back to the caption, with nothing logged", async () => {
+    const { deviceId } = await household();
+    const lines: string[] = [];
+    const spies = (["log", "info", "warn", "error"] as const).map((k) => spyOn(console, k).mockImplementation((...args: unknown[]) => { lines.push(args.map(String).join(" ")); }));
+    try {
+      let at = 1_000_000;
+      for (const [status, code] of [[422, "detail_unavailable"], [503, "no_memory"], [429, "too_fast"], [500, "failed"]] as const) {
+        const stack = startStackFixture({ "POST /v1/images/looks": () => Response.json({ error: "a sofa-shaped secret", code }, { status }) });
+        __setStackClientForTests(stack.client);
+        try {
+          const purpose = status === 422 ? "ask" : "scene";
+          expect((await frame(deviceId, purpose, at)).ok).toBe(true);
+        } finally {
+          stack.stop();
+        }
+        expect(sceneContextLine(deviceId, at + 1_000)).toContain(CAPTION);
+        at += SCENE_FRAME_INTERVAL_MS + 1_000;
+      }
+      const down = startStackFixture({});
+      __setStackClientForTests(down.client);
+      down.stop();
+      expect((await frame(deviceId, "scene", at)).ok).toBe(true);
+    } finally {
+      for (const spy of spies) spy.mockRestore();
+    }
+    expect(lines.join("\n")).not.toContain("sofa-shaped");
   });
 });

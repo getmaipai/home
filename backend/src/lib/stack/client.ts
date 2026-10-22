@@ -127,6 +127,9 @@ export interface StackClient {
   imageJob(request: RoleRequest, opts?: { signal?: AbortSignal }): Promise<StackJob>;
   /** GET /stack/v1/image-tools. */
   imageTools(opts?: { signal?: AbortSignal }): Promise<StackImageToolsStatus>;
+  /** POST /v1/images/looks (LOOK-01): one JPEG in, the Stack's look out (objects, scene, cost). The reply is returned as the Stack sent it;
+   * lib/robotVision.ts reads the fields it keeps. Refusals are StackErrors (413, 415, 422 detail_unavailable, 429, 503, 500). */
+  look(form: FormData, opts?: { signal?: AbortSignal }): Promise<unknown>;
   /** POST /v1/images/edits: 200 is the finished PNG, 202 a job to poll (`job()`), fetch with `imageEditResult()` and stop with `cancelJob()`. */
   imageEdit(form: FormData, opts?: { signal?: AbortSignal }): Promise<StackImageEditReply>;
   /** GET /v1/images/edits/{job}: the PNG a finished edit made (the Stack keeps it in memory a few minutes). */
@@ -443,6 +446,7 @@ export function createStackClient(options: StackClientOptions = {}): StackClient
       throw new Error("unreachable");
     },
     imageTools: (opts) => call("/stack/v1/image-tools", { method: "GET" }, async (res) => (await json<{ image_tools: StackImageToolsStatus }>(res)).image_tools, opts),
+    look: (form, opts) => call("/v1/images/looks", formInit(form), (res) => json<unknown>(res), opts),
     imageEdit: (form, opts) => call("/v1/images/edits", formInit(form), async (res) => {
       const body = await json<{ job: string; data: StackImageEditItem[] }>(res);
       const item = res.status === 200 ? body.data?.[0] : undefined;

@@ -63,8 +63,10 @@ Pinned to spec-v0.1.208 (`LookResult`, the household vocabulary, the `yolox-nano
 with the pin. `acceptFrame` asks the Stack's Look for `fast` on a background picture and `detailed` on an asked one (the caller decides, no
 word rule); a person is only ever counted, any detail the Stack sends for a person is dropped. Each kind of thing is kept in memory for 90 s
 after it was last seen (not after the picture it came from) and read as one line: "Looked 12 seconds ago: a person, 3 chairs, a blue Tesla
-Model 3 car (a guess); room: living room; colours: blue, white. Light: bright." Until the Stack's Look tool lands, `lookViaStack` returns
-null and the one-sentence caption is the fallback, so nothing changes for a robot today. A model tool call for details is the other allowed
+Model 3 car (a guess); room: living room; colours: blue, white. Light: bright." The call is the Stack's `POST /v1/images/looks` (STACK_TAG 662b872, the optional Look part under Models and storage); the picture goes up as
+multipart with the robot's device id as `source`, a 429, 503, 422 `detail_unavailable`, a timeout (8 s) or a missing Look part is a plain
+null, and the one-sentence caption by the chat model is the fallback, so a robot without the Look part behaves as before. An object the Stack
+marks `stale` is ignored: Home keeps its own 90 seconds. Nothing is logged on any path. A model tool call for details is the other allowed
 source of a detail request; no such tool exists yet.
 
 ## Not built here
