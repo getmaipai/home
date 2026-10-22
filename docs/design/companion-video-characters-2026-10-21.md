@@ -389,3 +389,28 @@ Playback in the grid is the real player (CMEDIA-PLAYER-01): until it ships, the 
 (3) Home: states store, take orchestration, routes; (4) Home: the grid page and the preview shader; (5) a real run on the Studio, which is also CMEDIA-BENCH-01's first data.
 The key-colour bench is still owed and is now cheaper: the finishing job's `report.json` is its measurement. If the bench shows FastWan does not hold a flat background, the finishing job's
 cut-out is replaced by a per-frame segmentation fallback, and nothing else in this section changes.
+
+## 15. First real run: Rivet (2026-10-22, CMEDIA-BENCH-01, first data)
+
+Jesse asked for pictures and clips of one companion to judge. Run on the Studio against the live Stack (picture model FLUX.2 Klein 4B, video model Wan2.2 FastWan), calling the engines directly; nothing was installed or changed on the hub.
+The companion was Rivet (a small robot). The finished review page is `data-scratch/evaluations/rivet-evaluation.html` (local only).
+
+**What was made.** Four pictures from one prompt in about 40 seconds (1024 square, same look prompt template as section 4). One picked (the one that smiles) and cut out on a hue key. Five clips from that picture at **480 x 480, 3 seconds**:
+idle (two seeds), thinking, speaking, greeting. **57 to 60 seconds per clip** (the 832 x 480, 5 second size of the first bench took 130 to 140 seconds), 0.9 to 1.1 MB raw each.
+Finished through the Stack's `media.companion_clip` job: **83 to 213 kB per H.264 file** (budget 600 kB), AV1 100 to 350 kB, 2 second loops (one-shot 3 s), loop gaps 0 to 2.4 on a 0 to 255 scale, size steadiness 1.00 to 1.17.
+
+**What held.** One character in every clip (shape, face, outfit). The motions read: thinking raises a hand, speaking opens the mouth, greeting waves. The transparent result plays cleanly over a checkerboard, white and black in a browser through the WebGL shader.
+
+**What did not hold (measured by looking at frames).**
+1. **Colour drift.** Dominant colours of the rest picture: yellow (248,200,72), orange (248,136,56). Of the clips: yellow (248,200,8), red (248,56,8). The model re-saturates (the first bench called this the DMD look). A black outline also gets heavier and small extras appear (eyebrows). A one-shot that blends its last frames toward frame 0 therefore shows a visible colour step at its end.
+2. **Scale jump.** Frame 0 is the start picture; within about 15 frames the character grows about a third larger. The finishing job's loop window (start 0 to 12) happens to skip most of it for loops; a one-shot starts at frame 0 and keeps the jump (greeting: size steadiness 1.17).
+3. **Muted green.** The picture model's "plain solid green background" came out as about (113,174,112), not (0,255,0), and the video model shifts it by a few shades between frames.
+
+**Findings that change the build (each a row; none is fixed yet).**
+- **CMEDIA-START-01 (design break, high).** The Stack refuses a clip whose start picture was not made by the Stack, unchanged ("That picture was not made by this computer's image generator", code `reference_not_generated`). `startStateTakes` composites the rest picture onto a key-colour canvas first, so **in production every take would be refused**. Fix: the start picture is a Stack-made picture used as it came out (the approved look picture itself, or a Klein reference edit of it), and the clip is made square (480 x 480 or 608 x 608) so no crop is needed. The sheet's rest picture keeps its background in the clip's start; the transparent cut-out is for display and the still only. Uploaded pictures reach a clip only through a Klein edit.
+- **CMEDIA-KEY-01 (high).** Keying must work on the background that was actually drawn, not on a pure key colour: estimate the background from the border of the first frame, and key on how green (or magenta) a pixel is (`g - max(r, b)`, thresholds 12 and 44 worked on Rivet), with the unmix against the estimated background and a green clamp on edge pixels. Both `keyOut` (Home, pictures) and `keyOutRgba` (Stack, clips) assume a pure key today, so both are wrong for real model output. Keep the pure-key unit tests (a red disc on pure green and magenta) passing.
+- **CMEDIA-ALPHA-01 (Stack, medium).** The finishing job decides a clip has alpha from the pixel format name. A real VP9 WebM with alpha reports `yuv420p` plus an `alpha_mode` tag, so a genuine transparent WebM is refused as `no_alpha`. Read the stream tag as well.
+- **CMEDIA-COLOUR-01 (medium).** Add a per-clip colour match to the rest picture's palette in the finishing job (a global transform toward the rest picture's colours, fixed strength) and use the rest picture's own palette for the colour check, then re-measure. Until then the check will fail most takes; its limits stay first guesses.
+- **CMEDIA-LOOP-01 (medium).** A one-shot should also skip the first 15 to 20 frames (the settling jump) and blend toward its own post-settle first frame, not frame 0.
+- **CMEDIA-MEM-01 (medium, Stack).** The memory guard stayed "paused" for 1 to 3 minutes after a pressure event even with 100 GB available, and cancelled a running clip at 21 and 37 percent when a 23 GB chat model loaded beside it (swap was 9.7 of 11.2 GB, left over from the coder speed test). The 480 x 480, 3 second size succeeded. Home should wait on the Stack's memory state and retry a cancelled take once instead of reporting a failure.
+- **CMEDIA-SIZE-01.** Make the take size square 480 x 480 and 3 seconds (the spec's ship size) instead of 832 x 480 and 5 seconds: about 2.3 times faster and light enough to run beside the chat model.
