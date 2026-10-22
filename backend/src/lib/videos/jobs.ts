@@ -86,7 +86,7 @@ export function busyLine(position: number | null): string {
 export function plainVideoFailure(error: unknown): string {
   if (error instanceof StackVideoError) {
     switch (error.code) {
-      case "coding_mode": return "Home is busy with a big job, so pictures, videos and songs wait. They start again when it is done.";
+      case "coding_mode": return "Home is busy with a big job right now, so pictures, videos and songs are paused. Please try again later.";
       case "already_making": return `${VIDEO_FAILED_PREFIX} ${error.message}`;
       case "queue_full": return `${VIDEO_FAILED_PREFIX} Home already has a full line of videos waiting. Try again in a few minutes.`;
       case "no_memory": case "out_of_memory": return `${VIDEO_FAILED_PREFIX} Paused: this computer is low on memory. Close big apps, or try again in a few minutes.`;

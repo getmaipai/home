@@ -68,7 +68,7 @@ export const PICTURE_FAILED_PREFIX = "I couldn't make that picture.";
 export function plainFailure(error: unknown): string {
   if (error instanceof StackPicturesError) {
     switch (error.code) {
-      case "coding_mode": return "Home is busy with a big job, so pictures, videos and songs wait. They start again when it is done.";
+      case "coding_mode": return "Home is busy with a big job right now, so pictures, videos and songs are paused. Please try again later.";
       case "queue_full": return `${PICTURE_FAILED_PREFIX} The picture engine has a full line right now. Try again in a minute.`;
       case "no_memory": return `${PICTURE_FAILED_PREFIX} Paused: this computer is low on memory. Close big apps, or try again in a minute.`;
       case "not_installed": case "unsupported": return `${PICTURE_FAILED_PREFIX} No picture model is installed on this computer yet. An admin can add one in Settings, Pictures and videos.`;

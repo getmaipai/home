@@ -26,7 +26,7 @@ const starting = new Set<string>();
 export function plainMusicFailure(code: string): string {
   const prefix = "I couldn't make that song.";
   switch (code) {
-    case "coding_mode": return "Home is busy with a big job, so pictures, videos and songs wait. They start again when it is done.";
+    case "coding_mode": return "Home is busy with a big job right now, so pictures, videos and songs are paused. Please try again later.";
     case "already_making": return "You already have a song being made. Wait for it to finish, or stop it first.";
     case "storage_full": return `${prefix} Your storage is full. Delete some files in Settings, Storage, then try again.`;
     case "no_memory": return `${prefix} Paused: this computer is low on memory. Close big apps, or try again in a few minutes.`;
