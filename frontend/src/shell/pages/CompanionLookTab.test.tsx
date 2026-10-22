@@ -1,11 +1,12 @@
-import { afterEach, expect, test } from "bun:test";
+import { afterEach, expect, spyOn, test } from "bun:test";
+import * as sonner from "sonner";
 import { act, cleanup, fireEvent, render, waitFor } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { api, ApiError, type CompanionEditable, type CompanionLook, type CompanionLookJob } from "@/lib/api";
 import { CompanionEditorPage } from "@/shell/pages/CompanionEditorPage";
 
-const methods = ["editCompanion", "stackVoices", "companionLook", "generateCompanionLook", "companionLookJob", "cancelCompanionLookJob", "uploadCompanionLook", "setCompanionLookRest", "deleteCompanionLookVersion", "editCompanionLook", "makeCompanionLookSheet", "saveCompanionLookCard", "setCompanionLookKey", "approveCompanionLookSheet", "unapproveCompanionLookSheet"] as const;
+const methods = ["editCompanion", "stackVoices", "companionLook", "companionLookPrompt", "generateCompanionLook", "companionLookJob", "cancelCompanionLookJob", "uploadCompanionLook", "setCompanionLookRest", "deleteCompanionLookVersion", "editCompanionLook", "makeCompanionLookSheet", "saveCompanionLookCard", "setCompanionLookKey", "approveCompanionLookSheet", "unapproveCompanionLookSheet"] as const;
 const originals = Object.fromEntries(methods.map((key) => [key, api[key]]));
 afterEach(() => { cleanup(); Object.assign(api, originals); });
 const version = (id: string, label = `Picture ${id}`) => ({ id, label, source: "generated" as const, width: 480, height: 480, created_at: "2026-10-21T12:00:00Z", from: null, url: `/api/companions/hc-one/look/${id}/image` });
@@ -20,6 +21,24 @@ test("new companion has no look editor and asks to save first", async () => { co
 test("generation is disabled with Home's reason and while the prompt is empty", async () => {
   const view = open("/companions/hc-one/edit", look({ can_generate: false, generate_reason: "Picture creation is not set up on this computer." })); await showLook(view); expect(view.getByText("Picture creation is not set up on this computer.")).toBeTruthy(); expect(view.getByRole("button", { name: "Generate 4 pictures" }).hasAttribute("disabled")).toBe(true);
   const second = open("/companions/hc-one/edit", look({ can_generate: true })); await showLook(second); fireEvent.change(second.getByLabelText("Look prompt"), { target: { value: "" } }); expect(second.getByRole("button", { name: "Generate 4 pictures" }).hasAttribute("disabled")).toBe(true);
+});
+
+test("Copy prompt fetches the latest pack even when Home picture generation is disabled", async () => {
+  const text = "Character picture for Marlow\nPrompt: A friendly fox"; let copied = ""; let requested = 0;
+  api.companionLookPrompt = async () => { requested++; return { title: "Character picture for Marlow", prompt: "A friendly fox", negative_prompt: "none", text }; };
+  Object.defineProperty(navigator, "clipboard", { configurable: true, value: { writeText: async (value: string) => { copied = value; } } });
+  const toast = spyOn(sonner, "toast");
+  const view = open("/companions/hc-one/edit", look({ can_generate: false })); await showLook(view);
+  const button = view.getByRole("button", { name: "Copy prompt" }); expect((button as HTMLButtonElement).disabled).toBe(false); fireEvent.click(button);
+  await waitFor(() => expect(copied).toBe(text)); expect(requested).toBe(1); expect(toast).toHaveBeenCalledWith("Prompt copied. Paste it into your tool."); toast.mockRestore();
+});
+
+test("Copy prompt shows selectable text when clipboard access is denied", async () => {
+  const text = "Character picture for Marlow\nPrompt: A friendly fox";
+  api.companionLookPrompt = async () => ({ title: "Character picture for Marlow", prompt: "A friendly fox", negative_prompt: "none", text });
+  Object.defineProperty(navigator, "clipboard", { configurable: true, value: { writeText: async () => { throw new Error("denied"); } } });
+  const view = open(); await showLook(view); fireEvent.click(view.getByRole("button", { name: "Copy prompt" }));
+  expect((await view.findByLabelText("Copy this text yourself.")).getAttribute("readonly")).not.toBeNull(); expect((view.getByLabelText("Copy this text yourself.") as HTMLTextAreaElement).value).toBe(text);
 });
 
 test("upload sends rights and likeness fields and shows Home's 400 sentence", async () => {

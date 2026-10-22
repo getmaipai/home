@@ -358,6 +358,7 @@ type CompanionLookKey = `#${"00FF00" | "FF00FF"}`;
 export interface CompanionLookSheet { views: { left: CompanionLookView | null; right: CompanionLookView | null; mouth: CompanionLookView | null }; card: { text: string; colours: string[]; species: string } | null; key: CompanionLookKey; state: "empty" | "making" | "needs_review" | "approved"; approved_by: string | null; approved_at: string | null }
 export interface CompanionLook { versions: CompanionLookVersion[]; rest: string | null; key: CompanionLookKey; sheet: CompanionLookSheet | null; ready_for_video: boolean; start_ready: boolean; start_reason?: string; can_generate: boolean; generate_reason?: string }
 export interface CompanionLookJob { state: "queued" | "running" | "done" | "failed" | "cancelled"; percent: number; label: string; versions: Array<{ id: string; url: string; label: string }>; error: string | null }
+export interface CompanionPromptPack { title: string; prompt: string; negative_prompt: string; text: string }
 export interface CompanionStateUrls { h264: string; av1: string; still: string }
 export interface CompanionStateTake {
   id: string; label: string; source: "generated" | "upload"; created_at: string; ok: boolean | null; reasons: string[];
@@ -1421,6 +1422,8 @@ export const api = {
   copyCompanion: (id: string) => request<{ id: string }>(`/api/companions/${encodeURIComponent(id)}/copy`, { method: "POST", body: "{}" }),
   editCompanion: (id: string) => request<CompanionEditable>(`/api/companions/${encodeURIComponent(id)}/edit`),
   companionLook: (id: string) => request<CompanionLook>(`/api/companions/${encodeURIComponent(id)}/look`),
+  companionLookPrompt: (id: string) => request<CompanionPromptPack>(`/api/companions/${encodeURIComponent(id)}/look/prompt`),
+  companionStatePrompt: (id: string, state: string) => request<CompanionPromptPack>(`/api/companions/${encodeURIComponent(id)}/states/${encodeURIComponent(state)}/prompt`),
   companionStates: (id: string) => request<CompanionStates>(`/api/companions/${encodeURIComponent(id)}/states`),
   companionStateFile: (id: string, state: string, take: string, file: string) => `/api/companions/${encodeURIComponent(id)}/states/${encodeURIComponent(state)}/${encodeURIComponent(take)}/${encodeURIComponent(file)}`,
   setCompanionStateMotion: (id: string, state: string, motion: string | null) => request<{ ok: boolean }>(`/api/companions/${encodeURIComponent(id)}/states/${encodeURIComponent(state)}/motion`, { method: "PUT", body: JSON.stringify({ motion }) }),

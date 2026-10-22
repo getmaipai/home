@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { toast } from "sonner";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Alert, AlertDescription } from "@maipai/ui/src/ui/alert";
 import { Badge } from "@maipai/ui/src/dashboard/components/ui/badge";
@@ -37,6 +38,7 @@ export function CompanionLookTab({ id, prompt, promptError, onPromptChange, acti
   const [notice, setNotice] = useState("");
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [copyFallback, setCopyFallback] = useState("");
   const data = lookQuery.data;
   const job = jobQuery.data;
   const running = !!jobId && (job?.state === "queued" || job?.state === "running" || job === undefined);
@@ -46,13 +48,21 @@ export function CompanionLookTab({ id, prompt, promptError, onPromptChange, acti
   async function perform(action: () => Promise<unknown>) { setError(""); setNotice(""); setBusy(true); try { await action(); await client.invalidateQueries({ queryKey: queryKey(id) }); } catch (e) { setError(errorText(e)); } finally { setBusy(false); } }
   async function startJob(action: () => Promise<{ job: string }>) { setError(""); try { setJobId((await action()).job); } catch (e) { setError(errorText(e)); } }
   async function upload() { if (!file || !rights || realPerson) return; const body = new FormData(); body.append("image", file); body.append("rights_confirmed", "true"); body.append("shows_real_person", "false"); await perform(async () => { await api.uploadCompanionLook(id, body); setFormOpen(false); setFile(null); setRights(false); }); }
+  async function copyPrompt() {
+    setCopyFallback("");
+    try {
+      const pack = await api.companionLookPrompt(id);
+      try { await navigator.clipboard.writeText(pack.text); toast("Prompt copied. Paste it into your tool."); }
+      catch { setCopyFallback(pack.text); }
+    } catch (cause) { setError(errorText(cause)); }
+  }
   const rest = data?.versions.find((v) => v.id === data.rest);
   if (!active) return null;
   if (lookQuery.isError) return <AsyncState data={null} error onRetry={() => void lookQuery.refetch()} errorMessage={errorText(lookQuery.error)} loadingLabel="Loading companion look">{() => null}</AsyncState>;
   if (!data) return <AsyncState data={undefined} isFetching={lookQuery.isFetching} onRetry={() => void lookQuery.refetch()} loadingLabel="Loading companion look">{() => null}</AsyncState>;
   return <div className="flex flex-col gap-4">
     <Section heading="Look prompt"><div className="flex flex-col gap-2"><p className="text-sm text-muted-foreground">Describe how the character looks: species, colours, clothes. Keep it simple and friendly.</p><Label htmlFor="look-prompt">Look prompt ({prompt.length}/600)</Label><Textarea id="look-prompt" aria-label="Look prompt" aria-invalid={Boolean(promptError)} maxLength={600} value={prompt} onChange={(e) => onPromptChange(e.target.value)} />{promptError ? <p role="alert" className="text-sm text-destructive">{promptError}</p> : null}</div></Section>
-    <Section heading="Start"><div className="flex flex-wrap gap-2"><Button disabled={running || busy || !prompt.trim() || !data.can_generate} onClick={() => void startJob(() => api.generateCompanionLook(id, { prompt, count: 4 }))}>Generate 4 pictures</Button><Button type="button" variant="outline" disabled={running || busy} onClick={() => setFormOpen((v) => !v)}>Upload a picture</Button></div>{!data.can_generate && data.generate_reason ? <p className="text-sm text-muted-foreground">{data.generate_reason}</p> : null}{!prompt.trim() ? <p className="text-sm text-muted-foreground">Write a look prompt before generating pictures.</p> : null}
+    <Section heading="Start"><div className="flex flex-wrap gap-2"><Button disabled={running || busy || !prompt.trim() || !data.can_generate} onClick={() => void startJob(() => api.generateCompanionLook(id, { prompt, count: 4 }))}>Generate 4 pictures</Button><Button type="button" variant="outline" disabled={running || busy} onClick={() => setFormOpen((v) => !v)}>Upload a picture</Button><Button type="button" variant="outline" onClick={() => void copyPrompt()}>Copy prompt</Button></div>{copyFallback ? <div className="flex flex-col gap-2"><Label htmlFor="copy-picture-prompt">Copy this text yourself.</Label><Textarea id="copy-picture-prompt" readOnly value={copyFallback} onFocus={(event) => event.currentTarget.select()} /></div> : null}{!data.can_generate && data.generate_reason ? <p className="text-sm text-muted-foreground">{data.generate_reason}</p> : null}{!prompt.trim() ? <p className="text-sm text-muted-foreground">Write a look prompt before generating pictures.</p> : null}
       {formOpen ? <div className="flex flex-col gap-3"><div className="flex flex-col gap-1"><Label htmlFor="look-upload">Picture (PNG, JPEG or WebP)</Label><Input id="look-upload" type="file" accept="image/png,image/jpeg,image/webp" disabled={running || busy} onChange={(e) => setFile(e.target.files?.[0] ?? null)} /></div><div className="flex items-center gap-2"><Checkbox id="look-rights" checked={rights} disabled={running || busy} onCheckedChange={(v) => setRights(v === true)} /><Label htmlFor="look-rights">I made this picture or have the right to use it</Label></div><div className="flex items-center gap-2"><Checkbox id="look-real-person" checked={realPerson} disabled={running || busy} onCheckedChange={(v) => setRealPerson(v === true)} /><Label htmlFor="look-real-person">This is a picture of a real person</Label></div>{realPerson ? <Alert><AlertDescription>Pictures of real people are not supported here yet. Use a drawing or a character instead.</AlertDescription></Alert> : null}<Button disabled={!file || !rights || realPerson || running || busy} onClick={() => void upload()}>Upload</Button></div> : null}
     </Section>
     {running ? <Section heading="Picture progress"><p>{job?.label ?? "Starting picture"}</p><Progress value={job?.percent ?? 0} aria-label={job?.label ?? "Picture progress"} /><Button variant="outline" onClick={() => void perform(async () => { await api.cancelCompanionLookJob(id, jobId!); setJobId(null); })}>Stop</Button></Section> : null}

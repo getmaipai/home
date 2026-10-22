@@ -54785,6 +54785,180 @@
         }
       }
     },
+    "/api/companions/{id}/look/prompt": {
+      "get": {
+        "tags": [
+          "Companions"
+        ],
+        "summary": "Get a copyable prompt for a companion picture",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 80
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "A picture prompt and its full generation specification.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "title": {
+                      "type": "string"
+                    },
+                    "prompt": {
+                      "type": "string"
+                    },
+                    "negative_prompt": {
+                      "type": "string"
+                    },
+                    "text": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "title",
+                    "prompt",
+                    "negative_prompt",
+                    "text"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Only the author or an admin can read this companion's pictures",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No household companion",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/companions/{id}/states/{state}/prompt": {
+      "get": {
+        "tags": [
+          "Companions"
+        ],
+        "summary": "Get a copyable prompt for a companion clip",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 80
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 80
+            },
+            "required": true,
+            "name": "state",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "A clip prompt and its full generation specification.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "title": {
+                      "type": "string"
+                    },
+                    "prompt": {
+                      "type": "string"
+                    },
+                    "negative_prompt": {
+                      "type": "string"
+                    },
+                    "text": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "title",
+                    "prompt",
+                    "negative_prompt",
+                    "text"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Only the author or an admin can read this companion's clips",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No household companion or state",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/companions/{id}/look": {
       "get": {
         "tags": [

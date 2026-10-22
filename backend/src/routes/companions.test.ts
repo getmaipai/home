@@ -483,4 +483,20 @@ describe("household companion routes", () => {
     }
     expect((await request("companions/rivet/states", author)).status).toBe(403);
   });
+
+  test("copy prompt routes are editor-only, include complete packs, and reject unknown states", async () => {
+    const author = addPerson("person-prompt-owner", "adult"), other = addPerson("person-prompt-other", "adult"), child = addPerson("person-prompt-child", "child"), teen = addPerson("person-prompt-teen", "teen");
+    const created = createHouseholdCompanion({ ...fixture(), display_name: "Prompt companion", look_prompt: "A blue bird" }, { display_name: "Author", person_id: "person-prompt-owner" });
+    if (!created.ok) throw new Error(created.error);
+    const picture = await request(`companions/${created.value.id}/look/prompt`, author);
+    expect(picture.status).toBe(200); expect(await picture.json()).toMatchObject({ title: "Character picture for Prompt companion", text: expect.stringContaining("Size:") });
+    const clip = await request(`companions/${created.value.id}/states/idle/prompt`, author);
+    expect(clip.status).toBe(200); expect(await clip.json()).toMatchObject({ title: "Character clip: Idle for Prompt companion", text: expect.stringContaining("Start from: the starting picture you pick in the Look tab") });
+    for (const token of [other, child, teen]) {
+      expect((await request(`companions/${created.value.id}/look/prompt`, token)).status).toBe(403);
+      expect((await request(`companions/${created.value.id}/states/idle/prompt`, token)).status).toBe(403);
+    }
+    expect((await request("companions/rivet/look/prompt", author)).status).toBe(403);
+    expect((await request(`companions/${created.value.id}/states/dancing/prompt`, author)).status).toBe(404);
+  });
 });

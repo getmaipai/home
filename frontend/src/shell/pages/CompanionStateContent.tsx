@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { toast } from "sonner";
 import { useQuery } from "@tanstack/react-query";
 import { Alert, AlertDescription } from "@maipai/ui/src/ui/alert";
 import { Badge } from "@maipai/ui/src/dashboard/components/ui/badge";
@@ -17,7 +18,7 @@ const networkError = "Could not reach Home. Check your connection and try again.
 const errorText = (error: unknown) => error instanceof ApiError ? error.message : networkError;
 const sizeText = (bytes: number) => `${Math.round(bytes / 1000)} kB`;
 
-export function CompanionStateContents({ id, state, index, busy, startReady = true, onAction, onError }: { id: string; state: CompanionStateRow; index: number; busy: boolean; startReady?: boolean; onAction: (action: () => Promise<unknown>) => Promise<void>; onError: (message: string) => void }) {
+export function CompanionStateContents({ id, state, index, busy, startReady = true, sheetReady = true, onAction, onError }: { id: string; state: CompanionStateRow; index: number; busy: boolean; startReady?: boolean; sheetReady?: boolean; onAction: (action: () => Promise<unknown>) => Promise<void>; onError: (message: string) => void }) {
   const [motion, setMotion] = useState(state.motion);
   const [count, setCount] = useState("4");
   const [uploadOpen, setUploadOpen] = useState(false);
@@ -30,6 +31,7 @@ export function CompanionStateContents({ id, state, index, busy, startReady = tr
   const [forceTake, setForceTake] = useState<string | null>(null);
   const [forceMessage, setForceMessage] = useState("");
   const [finishingTake, setFinishingTake] = useState<string | null>(null);
+  const [copyFallback, setCopyFallback] = useState("");
   useEffect(() => setMotion(state.motion), [state.motion]);
   const finishQuery = useQuery<CompanionStateJob>({ queryKey: ["companions", id, "states", "job", finishingTake], queryFn: () => api.companionStateJob(id, finishingTake!), enabled: !!finishingTake, retry: false, refetchInterval: (query) => document.hidden ? false : query.state.data?.state === "running" || query.state.data === undefined ? 1500 : false });
   useEffect(() => {
@@ -44,13 +46,22 @@ export function CompanionStateContents({ id, state, index, busy, startReady = tr
     const form = new FormData(); form.append("video", file); form.append("rights_confirmed", "true"); form.append("shows_real_person", "false"); form.append("has_alpha", String(alpha));
     await onAction(async () => { const result = await api.uploadCompanionState(id, state.id, form); setFinishingTake(result.take_id); setUploadOpen(false); setFile(null); setRights(false); setAlpha(false); });
   }
+  async function copyPrompt() {
+    setCopyFallback("");
+    try {
+      const pack = await api.companionStatePrompt(id, state.id);
+      try { await navigator.clipboard.writeText(pack.text); toast("Prompt copied. Paste it into your tool."); }
+      catch { setCopyFallback(pack.text); }
+    } catch (error) { onError(errorText(error)); }
+  }
   return <div className="flex flex-col gap-3">
     <div className="flex flex-wrap items-center gap-2"><h3 className="text-base font-semibold">{state.label}</h3>{state.required ? <Badge>Required</Badge> : null}{approved ? <Badge>In use</Badge> : null}</div>
     <p className="text-sm text-muted-foreground">{state.when_it_plays}</p>
     {state.approved ? <StackedAlphaPreview urls={state.approved.urls} label={state.label} priority={index < 2} /> : <div className="companion-alpha-placeholder flex items-center justify-center rounded-md bg-muted text-sm text-muted-foreground">No approved clip yet</div>}
     {approved ? <Button type="button" variant="outline" disabled={cardBusy} onClick={() => void onAction(() => api.removeCompanionStateApproval(id, state.id))}>Remove approval</Button> : null}
     <div className="flex flex-col gap-2"><Label htmlFor={`motion-${state.id}`}>Motion sentence</Label><Textarea id={`motion-${state.id}`} aria-label={`${state.label} motion`} maxLength={200} placeholder="Describe the movement in one sentence" value={motion} onChange={(event) => setMotion(event.target.value)} onBlur={() => { if (motion !== state.motion) void onAction(() => api.setCompanionStateMotion(id, state.id, motion.trim() || null)); }} />{motion !== state.default_motion ? <Button type="button" variant="outline" disabled={busy} onClick={() => { setMotion(state.default_motion); void onAction(() => api.setCompanionStateMotion(id, state.id, null)); }}>Reset to default</Button> : null}</div>
-    <div className="flex flex-col gap-2"><Select aria-label={`${state.label} clip count`} value={count} options={["1", "2", "3", "4"]} getLabel={(value) => value} onValueChange={setCount} disabled={cardBusy} /><Button disabled={cardBusy || !startReady} onClick={() => void onAction(() => api.generateCompanionState(id, state.id, { count: Number(count), motion: motion.trim() || undefined }))}>Make clips</Button><Button type="button" variant="outline" disabled={cardBusy} onClick={() => setUploadOpen((open) => !open)}>Upload a clip</Button></div>
+    <div className="flex flex-col gap-2"><Select aria-label={`${state.label} clip count`} value={count} options={["1", "2", "3", "4"]} getLabel={(value) => value} onValueChange={setCount} disabled={cardBusy} /><div className="flex flex-wrap gap-2"><Button disabled={cardBusy || !startReady || !sheetReady} onClick={() => void onAction(() => api.generateCompanionState(id, state.id, { count: Number(count), motion: motion.trim() || undefined }))}>Make clips</Button><Button type="button" variant="outline" disabled={cardBusy || !sheetReady} onClick={() => setUploadOpen((open) => !open)}>Upload a clip</Button><Button type="button" variant="outline" onClick={() => void copyPrompt()}>Copy prompt</Button></div></div>
+    {copyFallback ? <div className="flex flex-col gap-2"><Label htmlFor={`copy-clip-prompt-${state.id}`}>Copy this text yourself.</Label><Textarea id={`copy-clip-prompt-${state.id}`} readOnly value={copyFallback} onFocus={(event) => event.currentTarget.select()} /></div> : null}
     {uploadOpen ? <div className="flex flex-col gap-3"><div className="flex flex-col gap-1"><Label htmlFor={`clip-file-${state.id}`}>Clip (MP4, MOV or WebM)</Label><Input id={`clip-file-${state.id}`} type="file" accept="video/mp4,video/quicktime,video/webm" disabled={cardBusy} onChange={(event) => setFile(event.target.files?.[0] ?? null)} /></div>
       <div className="flex items-center gap-2"><Checkbox id={`clip-rights-${state.id}`} checked={rights} disabled={cardBusy} onCheckedChange={(value) => setRights(value === true)} /><Label htmlFor={`clip-rights-${state.id}`}>I made this clip or have the right to use it</Label></div>
       <div className="flex items-center gap-2"><Checkbox id={`clip-alpha-${state.id}`} checked={alpha} disabled={cardBusy} onCheckedChange={(value) => setAlpha(value === true)} /><Label htmlFor={`clip-alpha-${state.id}`}>This clip has a transparent background already</Label></div>

@@ -30,6 +30,7 @@ import media from "@maipai/spec/vocab/companion-media.json";
 import { readStates, addTake, deleteTake, setMotion, takePath, bestTake, finishTake, companionStateJob, companionHasFinishingJob, deleteStates, clearApprovedStates, saveStates } from "@/lib/companionStates";
 import { householdCompanionFolder, setHouseholdCompanionAnimation } from "@/lib/householdCompanions";
 import { activeTakeRun, cancelTakeRun, companionHasTakeRun, publicTakeRun, startStateTakes, takeRunFor, TAKE_NO_ORIGINAL_LINE } from "@/lib/companionTakes";
+import { clipPromptPack, picturePromptPack } from "@/lib/companionPromptPack";
 
 export const companionsRoutes = apiRouter();
 
@@ -134,6 +135,27 @@ const lookIdParam = z.object({ id: z.string().min(1).max(80).openapi({ param: { 
 const lookVersionParam = z.object({ id: z.string().min(1).max(80), versionId: z.string().min(1).max(80).openapi({ param: { name: "versionId", in: "path" } }) });
 const SheetResponse = z.object({ views: z.object({ left: z.object({ version_id: z.string(), url: z.string() }).nullable(), right: z.object({ version_id: z.string(), url: z.string() }).nullable(), mouth: z.object({ version_id: z.string(), url: z.string() }).nullable() }), card: z.object({ text: z.string(), colours: z.array(z.string()), species: z.string() }).nullable(), key: z.enum([media.key.default, media.key.alternate]), state: z.enum(["empty", "making", "needs_review", "approved"]), approved_by: z.string().nullable(), approved_at: z.string().nullable() });
 const LookResponse = z.object({ versions: z.array(z.object({ id: z.string(), label: z.string(), source: z.enum(["upload", "generated", "edit"]), width: z.number().int(), height: z.number().int(), created_at: z.string(), from: z.string().nullable(), url: z.string() })), rest: z.string().nullable(), key: z.enum([media.key.default, media.key.alternate]), sheet: SheetResponse.nullable(), ready_for_video: z.boolean(), start_ready: z.boolean(), start_reason: z.string().optional(), can_generate: z.boolean(), generate_reason: z.string().optional() });
+const PromptPackResponse = z.object({ title: z.string(), prompt: z.string(), negative_prompt: z.string(), text: z.string() });
+const lookPromptRoute = createRoute({ method: "get", path: "/{id}/look/prompt", tags: ["Companions"], summary: "Get a copyable prompt for a companion picture", middleware: [requireAuth] as const,
+  request: { params: lookIdParam }, responses: { 200: { content: { "application/json": { schema: PromptPackResponse } }, description: "A picture prompt and its full generation specification." }, ...errorResponses({ 401: "Not signed in", 403: "Only the author or an admin can read this companion's pictures", 404: "No household companion" }) } });
+companionsRoutes.openapi(lookPromptRoute, (c) => {
+  const id = c.req.valid("param").id, denied = lookAccess(c.get("person"), id); if (denied) return c.json({ error: denied.error }, denied.status);
+  const manifest = getHouseholdCompanion(id);
+  if (!manifest?.companion) return c.json({ error: "That household companion could not be found." }, 404);
+  return c.json(picturePromptPack(manifest.companion, readLook(id)), 200);
+});
+
+const statePromptParams = z.object({ id: z.string().min(1).max(80), state: z.string().min(1).max(80) });
+const statePromptRoute = createRoute({ method: "get", path: "/{id}/states/{state}/prompt", tags: ["Companions"], summary: "Get a copyable prompt for a companion clip", middleware: [requireAuth] as const,
+  request: { params: statePromptParams }, responses: { 200: { content: { "application/json": { schema: PromptPackResponse } }, description: "A clip prompt and its full generation specification." }, ...errorResponses({ 401: "Not signed in", 403: "Only the author or an admin can read this companion's clips", 404: "No household companion or state" }) } });
+companionsRoutes.openapi(statePromptRoute, (c) => {
+  const { id, state } = c.req.valid("param"), denied = lookAccess(c.get("person"), id); if (denied) return c.json({ error: denied.error }, denied.status);
+  if (!media.states.some((row) => row.id === state)) return c.json({ error: "That companion state could not be found." }, 404);
+  const manifest = getHouseholdCompanion(id);
+  if (!manifest?.companion) return c.json({ error: "That household companion could not be found." }, 404);
+  const look = readLook(id), stored = readStates(id).states[state];
+  return c.json(clipPromptPack(manifest.companion, look, state, stored?.motion ?? undefined), 200);
+});
 const lookRoute = createRoute({ method: "get", path: "/{id}/look", tags: ["Companions"], summary: "Read a household companion's look pictures", middleware: [requireAuth] as const,
   request: { params: lookIdParam }, responses: { 200: { content: { "application/json": { schema: LookResponse } }, description: "Picture versions and the approved starting picture." }, ...errorResponses({ 401: "Not signed in", 403: "Only the author or an admin can read this companion's pictures", 404: "No household companion" }) } });
 companionsRoutes.openapi(lookRoute, async (c) => {

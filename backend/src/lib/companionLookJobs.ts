@@ -1,4 +1,5 @@
 import sharp from "sharp";
+import media from "@maipai/spec/vocab/companion-media.json";
 import { addVersion, chooseKeyColour, compositeOnKey, describeCharacter, keyOut, lookPromptFor, normalizePicture, readLook, updateSheet, versionOriginalPath, versionPath } from "@/lib/companionLook";
 import { routeAudience } from "@/lib/pictures/audience";
 import { laneOf } from "@/lib/pictures/lane";
@@ -86,7 +87,7 @@ export async function startLookGeneration(input: { actor: PersonRow; companionId
   const key = readLook(input.companionId).key;
   startingCompanions.add(input.companionId);
   try {
-    const submitted = await submitGeneration({ prompt, model: QUICK_MODEL, size: "1024x1024", n: input.count, seed: Math.floor(Math.random() * 2_147_483_647), audience: "all-ages", timeout_ms: 1 });
+    const submitted = await submitGeneration({ prompt, model: QUICK_MODEL, size: `${media.image.size}x${media.image.size}`, n: input.count, seed: Math.floor(Math.random() * 2_147_483_647), audience: "all-ages", timeout_ms: 1 });
     register(submitted.job, { companionId: input.companionId, personId: input.actor.id, state: "queued", percent: 0, versions: [], error: null, count: input.count, key, sourceVersion: null, instruction: null });
     return submitted.job;
   } finally { startingCompanions.delete(input.companionId); }
@@ -198,7 +199,7 @@ export async function pollLookJob(id: string, actor: PersonRow, companionId: str
           const fraction = opaque / (rgba.info.width * rgba.info.height);
           if (fraction < 0.05 || fraction > 0.95) label += " (check the edges)";
           const normalized = await normalizePicture(picture, { removeBackground: async (bytes) => bytes });
-          const saved = addVersion(job.companionId, normalized, { source: job.sourceVersion ? "edit" : "generated", label, width: 1024, height: 1024, from: job.sourceVersion }, images[index]!);
+          const saved = addVersion(job.companionId, normalized, { source: job.sourceVersion ? "edit" : "generated", label, width: media.image.size, height: media.image.size, from: job.sourceVersion }, images[index]!);
           job.versions.push(saved.id);
         }
         if (wasCancelled()) return;
@@ -226,7 +227,7 @@ async function pollSheetJob(id: string, job: SheetJob, actor: PersonRow, compani
     } else if (!job.finalising) job.finalising = (async () => {
       const view = SHEET_VIEWS[job.index]!, image = await fetchPicture(job.stackJob, 0), look = readLook(companionId), key = look.sheet?.key ?? look.key;
       let keyedOut = await keyOut(image, key); keyedOut = await normalizePicture(keyedOut, { removeBackground: async (bytes) => bytes });
-      const saved = addVersion(companionId, keyedOut, { source: "edit", label: view.label, width: 1024, height: 1024, from: look.rest }, image);
+      const saved = addVersion(companionId, keyedOut, { source: "edit", label: view.label, width: media.image.size, height: media.image.size, from: look.rest }, image);
       job.versions.push(saved.id);
       const updated = readLook(companionId), sheet = updated.sheet;
       if (sheet) updateSheet(companionId, { ...sheet, views: { ...sheet.views, [view.slot]: saved.id } });
