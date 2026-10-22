@@ -148,7 +148,7 @@ const CAUSE_NOTICE: Record<"restarting" | "memory" | "not_installed" | "mode_cha
     child: "I'm not ready yet. Ask a grown-up.",
     repairs_link: "Open Repairs",
   },
-  mode_change: { adult: "Home is switching modes. Chat will be back in a minute.", teen: "Home is switching modes. Chat will be back in a minute.", child: "I am switching modes. Try again in a minute.", repairs_link: null },
+  mode_change: { adult: "Home is getting ready for a big job. Chat will be back in about a minute.", teen: "Home is getting ready for a big job. Chat will be back in about a minute.", child: "I am getting ready for a big job. Try again in a minute.", repairs_link: null },
   paused_by_admin: {
     adult: "Chat is paused by an admin until it is turned back on.",
     teen: "Chat is paused by an admin until it is turned back on.",

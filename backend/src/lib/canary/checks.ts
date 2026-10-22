@@ -115,7 +115,7 @@ export const CHECKS: CanaryCheck[] = [
     id: "image_tiny", name: "Pictures", group: "pictures", timeoutMs: 240_000, title: "Picture making is not working",
     async run(deps) {
       // In coding mode picture jobs wait on purpose, so a missing test picture is not a fault.
-      if (getHouseholdSettingValue("coding.home_mode") === "coding") return { kind: "skip", reason: "Home is in coding mode, so pictures wait." };
+      if (getHouseholdSettingValue("coding.home_mode") === "coding") return { kind: "skip", reason: "Home is busy with a big job, so pictures wait." };
       const result = await deps.image();
       return result.ok ? pass() : fail("The picture engine did not make a small test picture.", "Open Settings, Pictures and videos, check the picture model, then run the checks again.");
     },

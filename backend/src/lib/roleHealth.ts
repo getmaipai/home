@@ -45,7 +45,7 @@ export async function roleHealth(role: HealthRole, opts: { live?: boolean } = {}
   if (role === "chat") {
     try {
       const mode = await getStackClient().getCodingMode();
-      if (mode.state === "switching") return { availability: "starting", reason: null, cause: "mode_change", detail: "Home is switching modes. Chat will be back in a minute." };
+      if (mode.state === "switching") return { availability: "starting", reason: null, cause: "mode_change", detail: "Home is getting ready for a big job. Chat will be back in about a minute." };
     } catch { /* Older or unreachable Stack; role health below remains authoritative. */ }
   }
   // THIN-1C: the Stack's own recent refusal of this role outranks what

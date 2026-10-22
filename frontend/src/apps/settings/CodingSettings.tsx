@@ -60,8 +60,11 @@ export function CodingAdminSettings() {
   const [pending, setPending] = useState<Record<string, "install" | "remove">>({});
   const pieces = useQuery({ queryKey: ["coding-pieces"], queryFn: api.codingPieces, refetchIntervalInBackground: true, refetchInterval: (q) => q.state.data?.pieces.some((piece) => piece.state === "installing") || Object.keys(pending).length > 0 ? 2000 : false });
   const [testStartedAt, setTestStartedAt] = useState<number | null>(null);
-  const mode = useQuery({ queryKey: ["coding-mode"], queryFn: api.codingMode, refetchIntervalInBackground: true, refetchInterval: (q) => (pieces.data?.pieces.some((piece) => piece.state === "installing") || selfTestState(q.state.data, testStartedAt).running || q.state.data?.state === "switching" || q.state.data?.state === "waiting" ? 2000 : 5000) });
+  const mode = useQuery({ queryKey: ["coding-mode"], queryFn: api.codingMode, refetchIntervalInBackground: true, refetchInterval: (q) => (pieces.data?.pieces.some((piece) => piece.state === "installing") || selfTestState(q.state.data, testStartedAt).running || q.state.data?.state === "switching" || q.state.data?.state === "waiting" ? 2000 : false) });
   const selfTest = selfTestState(mode.data, testStartedAt);
+  const homeModeValue = settings.data?.find((setting) => setting.key === "coding.home_mode")?.value;
+  // A change in the Home mode dropdown starts a switch; look once, then the poll above follows it while it runs.
+  useEffect(() => { void mode.refetch(); }, [homeModeValue]);
   // The poll is scheduled from the options of the render that follows the start, so ask once more after that render.
   useEffect(() => { if (testStartedAt !== null) void mode.refetch(); }, [testStartedAt]);
   const downloading = pieces.data?.pieces.filter((piece) => piece.state === "installing") ?? [];
