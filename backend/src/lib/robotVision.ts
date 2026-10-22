@@ -8,7 +8,8 @@
 // beyond handing them once to the local chat engine through Home's own Stack client (docs/PRIVACY.md).
 import { complete, type LlmImagePart } from "@/lib/llm";
 import { chatModelReadsPictures } from "@/lib/chatPictures";
-import { getDeviceSettingValue } from "@/lib/settings";
+import { getDeviceSettingValue, getHouseholdSettingValue } from "@/lib/settings";
+import { activeTurnCount } from "@/lib/turnActivity";
 import { ROBOT_VISION_KEY } from "@/settings/robotVisionKeys";
 
 export type RobotVisionMode = "continual" | "on_demand" | "none";
@@ -18,6 +19,8 @@ export type Brightness = "dark" | "dim" | "bright" | "unknown";
 export const SCENE_TTL_MS = 90_000;
 /** One picture per robot at most this often; the robot's cadence is slower, this is the hub's own floor. */
 export const MIN_FRAME_INTERVAL_MS = 4_000;
+/** ROBOT-VISION-BUSY-01: the background look is the lowest priority (chat, then pictures, then video, then the rest), so it is rare. */
+export const SCENE_FRAME_INTERVAL_MS = 30_000;
 export const MAX_FRAME_BYTES = 512 * 1024;
 /** What an on-demand look may reuse: a description younger than this answers "what do you see" without a new picture. */
 export const FRESH_ENOUGH_MS = 12_000;
@@ -39,6 +42,9 @@ export interface RobotScene {
 
 const scenes = new Map<string, RobotScene>();
 const lastFrameAt = new Map<string, number>();
+const lastSceneFrameAt = new Map<string, number>();
+/** Robots with a picture being described right now. */
+const captioning = new Set<string>();
 
 /** The latest description for this robot, or null when there is none or it has expired. An expired one is deleted on the way. */
 export function sceneFor(deviceId: string, now = Date.now()): RobotScene | null {
@@ -54,6 +60,7 @@ export function sceneFor(deviceId: string, now = Date.now()): RobotScene | null 
 export function clearScene(deviceId: string): void {
   scenes.delete(deviceId);
   lastFrameAt.delete(deviceId);
+  lastSceneFrameAt.delete(deviceId);
 }
 
 /** Expired descriptions leave memory on a timer even if nobody asks for them. */
@@ -61,12 +68,15 @@ const sweeper = setInterval(() => {
   const now = Date.now();
   for (const [id, scene] of scenes) if (scene.expiresAt <= now) scenes.delete(id);
   for (const [id, at] of lastFrameAt) if (now - at > 10 * 60_000) lastFrameAt.delete(id);
+  for (const [id, at] of lastSceneFrameAt) if (now - at > 10 * 60_000) lastSceneFrameAt.delete(id);
 }, 30_000);
 (sweeper as { unref?: () => void }).unref?.();
 
 export function __resetRobotVisionForTests(): void {
   scenes.clear();
   lastFrameAt.clear();
+  lastSceneFrameAt.clear();
+  captioning.clear();
 }
 
 /** The one latest description as a labelled line for that robot's turns, or null. It tells the model how old the picture is and what
@@ -154,13 +164,24 @@ export async function acceptFrame(input: FrameInput): Promise<FrameOutcome> {
   if (mode === "on_demand" && input.purpose !== "ask") return { ok: false, status: 403, code: "vision_on_demand", error: "This robot looks only when someone asks it to. Send a picture only for an ask, or set Robot vision to Always watching." };
   if (input.bytes.byteLength > MAX_FRAME_BYTES) return { ok: false, status: 413, code: "too_large", error: "A camera picture must be under 512 KB. Send a smaller one." };
   if (!isJpeg(input.bytes)) return { ok: false, status: 415, code: "not_jpeg", error: "A camera picture must be a JPEG." };
-  const last = lastFrameAt.get(input.deviceId);
-  if (last !== undefined && now - last < MIN_FRAME_INTERVAL_MS) return { ok: false, status: 429, code: "too_fast", error: "Pictures are coming too fast. Wait a few seconds between pictures." };
-  lastFrameAt.set(input.deviceId, now);
-
-  const caption = await captionWithChatModel(input.bytes);
+  const scene = input.purpose === "scene";
+  const last = (scene ? lastSceneFrameAt : lastFrameAt).get(input.deviceId);
+  const floor = scene ? SCENE_FRAME_INTERVAL_MS : MIN_FRAME_INTERVAL_MS;
+  if (last !== undefined && now - last < floor) return { ok: false, status: 429, code: "too_fast", error: "Pictures are coming too fast. Wait a few seconds between pictures." };
+  // ROBOT-VISION-BUSY-01: a look never competes with real work. Coding mode refuses every look; a background look also waits for any running
+  // chat turn; and only one picture is described at a time per robot (dropped, never stacked). Nothing touches the model before these.
+  const busy = getHouseholdSettingValue("coding.home_mode") === "coding" || (scene && activeTurnCount() > 0) || captioning.has(input.deviceId);
+  if (busy) return { ok: false, status: 503, code: "busy", error: "Home is busy with something else right now, so the robot skipped this look. It will try again later." };
+  (scene ? lastSceneFrameAt : lastFrameAt).set(input.deviceId, now);
+  captioning.add(input.deviceId);
+  let caption: string | null;
+  try {
+    caption = await captionWithChatModel(input.bytes);
+  } finally {
+    captioning.delete(input.deviceId);
+  }
   if (caption === null) return { ok: false, status: 503, code: "no_vision", error: "Home's chat model is not reading pictures right now. Check Settings, then Engines, and try again." };
-  const scene: RobotScene = { caption, people: input.people, brightness: input.brightness, at: now, expiresAt: now + SCENE_TTL_MS };
-  scenes.set(input.deviceId, scene);
-  return { ok: true, scene };
+  const result: RobotScene = { caption, people: input.people, brightness: input.brightness, at: now, expiresAt: now + SCENE_TTL_MS };
+  scenes.set(input.deviceId, result);
+  return { ok: true, scene: result };
 }

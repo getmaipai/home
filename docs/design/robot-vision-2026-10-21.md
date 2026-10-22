@@ -46,6 +46,16 @@ route with its own protections and enters a turn only as the description (R4).
 - The bot keeps no frame after the post, writes none to disk or logs, and logs counts only.
 - On `robot.vision = none` the bot must not start the camera stream at all. On `on_demand` it starts it only for an ask.
 
+## A look never competes with real work (ROBOT-VISION-BUSY-01, 2026-10-22)
+
+Priority is chat, then pictures, then video, then everything else, so the robot's own look is the lowest. `acceptFrame` answers 503
+`busy` without touching the model when: Coding mode is on (every look, asked or background); a chat turn is running or queued (a
+background look only; an asked look is part of someone talking to the robot, so it goes through); or that robot's previous picture is
+still being described (one at a time per robot, a second is dropped, never queued). Background pictures are accepted at most every
+30 s per robot, asked pictures every 4 s. The signals are the existing ones (`coding.home_mode`, the turn-activity lease count); no new
+status UI. Not covered: low free memory has no existing signal in Home, so it is not checked here; the Stack's own queue is the place
+for it when LOOK-01 lands.
+
 ## Not built here
 
 Naming people by face. A second look model. Any retention. The commons spec carrying `robot.vision` (it rides in Home's registry,

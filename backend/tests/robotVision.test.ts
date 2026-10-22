@@ -8,8 +8,9 @@ import { issueDeviceToken } from "@/lib/deviceTokens";
 import { storeRobotCredential } from "@/lib/robotCredentials";
 import { getDeviceSettingValue, setHouseholdSettingValue, setValue } from "@/lib/settings";
 import {
-  SCENE_TTL_MS, MIN_FRAME_INTERVAL_MS, __resetRobotVisionForTests, __setCaptionForTests, acceptFrame, cleanCaption, robotVisionMode, sceneContextLine, sceneFor,
+  SCENE_TTL_MS, MIN_FRAME_INTERVAL_MS, SCENE_FRAME_INTERVAL_MS, __resetRobotVisionForTests, __setCaptionForTests, acceptFrame, cleanCaption, robotVisionMode, sceneContextLine, sceneFor,
 } from "@/lib/robotVision";
+import { acquireTurnLease, __resetTurnActivityForTests } from "@/lib/turnActivity";
 import { contextToMessages } from "@/lib/turnMachine/messages";
 import type { PersonRow } from "@/types";
 
@@ -149,5 +150,63 @@ describe("the scene is short-lived and only a robot turn reads it", () => {
   test("a caption is plain one-line text", () => {
     expect(cleanCaption('  "A room"\n\n* with *a* [lamp]  ')).toBe("A room with a lamp");
     expect(cleanCaption("word ".repeat(80)).split(" ").length).toBeLessThanOrEqual(30);
+  });
+});
+
+describe("ROBOT-VISION-BUSY-01: a look never competes with real work", () => {
+  const frame = (deviceId: string, purpose: "scene" | "ask", now: number) => acceptFrame({ deviceId, bytes: JPEG, people: null, brightness: "bright", purpose, now });
+
+  test("background pictures wait 30 s apart, asked pictures 4 s", async () => {
+    const { deviceId } = await household();
+    expect((await frame(deviceId, "scene", 1_000_000)).ok).toBe(true);
+    const early = await frame(deviceId, "scene", 1_000_000 + SCENE_FRAME_INTERVAL_MS - 1);
+    expect(early.ok === false && early.code).toBe("too_fast");
+    expect((await frame(deviceId, "scene", 1_000_000 + SCENE_FRAME_INTERVAL_MS)).ok).toBe(true);
+    expect((await frame(deviceId, "ask", 2_000_000)).ok).toBe(true);
+    expect((await frame(deviceId, "ask", 2_000_000 + MIN_FRAME_INTERVAL_MS)).ok).toBe(true);
+  });
+
+  test("a running chat turn turns a background look away without touching the model, and an asked look still works", async () => {
+    const { deviceId } = await household();
+    let calls = 0;
+    __setCaptionForTests(async () => { calls++; return CAPTION; });
+    const lease = acquireTurnLease();
+    try {
+      const busy = await frame(deviceId, "scene", 1_000_000);
+      expect(busy.ok === false && busy.status).toBe(503);
+      expect(busy.ok === false && busy.code).toBe("busy");
+      expect(calls).toBe(0);
+      expect((await frame(deviceId, "ask", 1_000_001)).ok).toBe(true);
+    } finally {
+      lease.release();
+      __resetTurnActivityForTests();
+    }
+    expect((await frame(deviceId, "scene", 1_000_000 + SCENE_FRAME_INTERVAL_MS)).ok).toBe(true);
+  });
+
+  test("Coding mode refuses every look, asked or background, without touching the model", async () => {
+    const { deviceId } = await household();
+    let calls = 0;
+    __setCaptionForTests(async () => { calls++; return CAPTION; });
+    expect(setHouseholdSettingValue("coding.home_mode", "coding").ok).toBe(true);
+    for (const purpose of ["scene", "ask"] as const) {
+      const out = await frame(deviceId, purpose, 1_000_000);
+      expect(out.ok === false && out.code).toBe("busy");
+    }
+    expect(calls).toBe(0);
+  });
+
+  test("only one picture is described at a time per robot; a second is dropped, not queued", async () => {
+    const { deviceId } = await household();
+    let release: () => void = () => {};
+    let calls = 0;
+    __setCaptionForTests(() => { calls++; return new Promise((resolve) => { release = () => resolve(CAPTION); }); });
+    const first = frame(deviceId, "ask", 1_000_000);
+    await Promise.resolve();
+    const second = await frame(deviceId, "ask", 1_000_000 + MIN_FRAME_INTERVAL_MS);
+    expect(second.ok === false && second.code).toBe("busy");
+    release();
+    expect((await first).ok).toBe(true);
+    expect(calls).toBe(1);
   });
 });
