@@ -120,7 +120,7 @@ export function CodingAdminSettings() {
   });
   const enabledValue = grants.data ?? [];
   return <div className="flex flex-col gap-4">
-    <SettingsRenderer scope="household" scopeValue="household" honouredBy="home" only={["household.coding"]} includeKeys={["coding.enabled", "coding.home_mode"]} rowExtras={{ "coding.home_mode": { lockedReason: mode.data && !mode.data.readiness.ready ? modeReason : undefined } }} />
+    <SettingsRenderer scope="household" scopeValue="household" honouredBy="home" only={["household.coding"]} includeKeys={["coding.enabled", "coding.home_mode"]} titleOverrides={{ "household.coding": "Coding and Home mode" }} rowExtras={{ "coding.home_mode": { lockedReason: mode.data && !mode.data.readiness.ready ? modeReason : undefined } }} />
     <Card><CardHeader><CardTitle>Home mode checklist</CardTitle><CardDescription>Finish these steps before you turn on Coding mode.</CardDescription></CardHeader><CardContent>
       {homeModeSentence(mode.data) ? <p role="status" className="text-sm">{homeModeSentence(mode.data)}</p> : null}
       <AsyncState data={mode.data?.readiness.items} error={mode.isError} isFetching={mode.isFetching} onRetry={() => void mode.refetch()} errorMessage="Could not load the Home mode checklist." loadingLabel="Loading Home mode checklist">

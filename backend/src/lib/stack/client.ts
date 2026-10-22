@@ -283,14 +283,16 @@ export function createStackClient(options: StackClientOptions = {}): StackClient
     const kind = KIND_BY_STATUS[res.status] ?? "unexpected";
     const fb = isFailureBody(body) ? body : undefined;
     const failureMessage = typeof fb?.error === "string" ? fb.error : fb?.error?.message;
-    const message = failureMessage ?? (res.statusText || `the Stack answered ${res.status}`);
+    // The coding mode routes refuse with {reason}, not {error}: keep that sentence instead of the HTTP label.
+    const bodyReason = typeof (body as { reason?: unknown } | null | undefined)?.reason === "string" ? (body as { reason: string }).reason : undefined;
+    const message = failureMessage ?? bodyReason ?? (res.statusText || `the Stack answered ${res.status}`);
     // CHAT-CALM-ERRORS-01b: the body's `state` and the reply's identity
     // headers ride on the error so an admin's details name them.
     const header = (name: string) => {
       const value = res.headers.get(name);
       return value && value !== "none" ? value : undefined;
     };
-    const facts = { status: res.status, body: text, state: typeof fb?.state === "string" ? fb.state : undefined, engine: header("x-maipai-engine"), model: header("x-maipai-model"), reason: typeof fb?.reason === "string" ? fb.reason : undefined };
+    const facts = { status: res.status, body: text, state: typeof fb?.state === "string" ? fb.state : undefined, engine: header("x-maipai-engine"), model: header("x-maipai-model"), reason: typeof fb?.reason === "string" ? fb.reason : bodyReason };
     if (kind === "offline") {
       throw new StackError("offline", message, { ...facts, offline_reason: fb?.offline_reason });
     }

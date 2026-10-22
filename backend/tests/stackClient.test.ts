@@ -15,6 +15,7 @@ const IDENTITY_HEADERS: Record<string, string> = {
 const IDENTITY = { host: "local", build: "b10797", model: MODEL, healthy: null } as const;
 
 const ROUTES: Array<[string, string, (body: unknown, form: FormData | null) => { status: number; body: unknown; headers?: Record<string, string> }]> = [
+  ["/stack/v1/coding/mode", "POST", () => ({ status: 409, body: { reason: "A Home mode change is already running." } })],
   ["/healthz", "GET", () => ({ status: 200, body: { ok: true, version: "0.1.0", uptimeSeconds: 42 } })],
   [
     "/v1/chat/completions",
@@ -341,6 +342,15 @@ describe("createStackClient", () => {
       expect(err).toBeInstanceOf(StackError);
       expect((err as StackError).kind).toBe("unexpected");
     }
+  });
+
+  test("a refusal that carries only a reason keeps that sentence, not the HTTP label", async () => {
+    const client = createStackClient({ baseUrl });
+    const failure = await client.setCodingMode("coding").catch((error: unknown) => error);
+    expect(failure).toBeInstanceOf(StackError);
+    expect((failure as StackError).message).toBe("A Home mode change is already running.");
+    expect((failure as StackError).reason).toBe("A Home mode change is already running.");
+    expect((failure as StackError).status).toBe(409);
   });
 
   test("healthz returns the Stack's version", async () => {

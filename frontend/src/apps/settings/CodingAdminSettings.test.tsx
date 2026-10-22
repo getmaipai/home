@@ -182,3 +182,26 @@ describe("Home mode sentence", () => {
     expect(homeModeSentence(view("normal", "failed", "A picture, video or song is still being made."))).toContain("still being made");
   });
 });
+
+describe("section headings", () => {
+  test("no raw group id is shown as a heading", async () => {
+    const original = globalThis.fetch;
+    const registry = settingsFile.filter((setting) => setting.key.startsWith("coding."));
+    const values = registry.map((setting) => ({ key: setting.key, value: setting.default, source: "default", label: setting.label, level: setting.level, secret: false }));
+    globalThis.fetch = mock((input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.endsWith("/api/settings/registry")) return Promise.resolve(Response.json(registry));
+      if (url.includes("/api/settings?scope=household")) return Promise.resolve(Response.json(values));
+      if (url.endsWith("/api/people")) return Promise.resolve(Response.json([]));
+      if (url.endsWith("/api/grants")) return Promise.resolve(Response.json([]));
+      if (url.endsWith("/api/coding/pieces")) return Promise.resolve(Response.json({ stack: "ok", message: null, coding_enabled: false, engine: "splash", missing: null, pieces: [] }));
+      if (url.endsWith("/api/coding/mode")) return Promise.resolve(Response.json({ readiness: { ready: true, first_unmet: null, items: [] }, mode: "normal", state: "stable", reason: null }));
+      throw new Error(`unstubbed fetch: ${url}`);
+    }) as unknown as typeof fetch;
+    try {
+      const view = renderWithQueryClient(<MemoryRouter><CodingAdminSettings /></MemoryRouter>);
+      await view.findByText("Coding and Home mode");
+      expect(view.queryByText("household.coding")).toBeNull();
+    } finally { globalThis.fetch = original; }
+  });
+});
