@@ -1,6 +1,6 @@
 # Settings layout revamp: a column you can read, pages that do not sprawl (2026-10-22)
 
-Status: design only, nothing built. Owner words (Jesse, 2026-10-22): the Home settings left column "is difficult to read, recognize
+Status: design approved 2026-10-22 (section 7), nothing built. Owner words (Jesse, 2026-10-22): the Home settings left column "is difficult to read, recognize
 where you are"; the Devices page "is so crowded and expanding a bit expands on the page"; other apps "have a better layout, use things
 like tabs and modals".
 
