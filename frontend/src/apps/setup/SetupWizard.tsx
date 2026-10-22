@@ -98,6 +98,7 @@ const SCREEN_ART: Partial<Record<ScreenId, string>> = {
   host_tune: "/setup-art/tune.webp",
   web_search: "/setup-art/search.webp",
   owner: "/setup-art/owner.webp",
+  coding_mode: "/setup-art/coding.webp",
   backup: "/setup-art/backup.webp",
   checks: "/setup-art/checking.webp",
   done: "/setup-art/done.webp",
