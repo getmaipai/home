@@ -68913,8 +68913,7 @@
                       "minimum": 0
                     },
                     "started_at": {
-                      "type": "string",
-                      "nullable": true
+                      "type": "number"
                     },
                     "cover_pending": {
                       "type": "boolean"
@@ -69183,8 +69182,7 @@
                       "minimum": 0
                     },
                     "started_at": {
-                      "type": "string",
-                      "nullable": true
+                      "type": "number"
                     },
                     "cover_pending": {
                       "type": "boolean"
@@ -69471,8 +69469,7 @@
                       "minimum": 0
                     },
                     "started_at": {
-                      "type": "string",
-                      "nullable": true
+                      "type": "number"
                     },
                     "cover_pending": {
                       "type": "boolean"
@@ -69767,8 +69764,7 @@
                       "minimum": 0
                     },
                     "started_at": {
-                      "type": "string",
-                      "nullable": true
+                      "type": "number"
                     },
                     "cover_pending": {
                       "type": "boolean"
@@ -70061,8 +70057,7 @@
                       "minimum": 0
                     },
                     "started_at": {
-                      "type": "string",
-                      "nullable": true
+                      "type": "number"
                     },
                     "cover_pending": {
                       "type": "boolean"
@@ -70359,8 +70354,7 @@
                       "minimum": 0
                     },
                     "started_at": {
-                      "type": "string",
-                      "nullable": true
+                      "type": "number"
                     },
                     "cover_pending": {
                       "type": "boolean"
