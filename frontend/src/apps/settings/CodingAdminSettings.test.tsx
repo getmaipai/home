@@ -45,7 +45,7 @@ describe("Coding admin settings", () => {
       expect(await view.findByRole("button", { name: "Install" })).toBeEnabled();
       current = "installing";
       await view.queryClient.invalidateQueries({ queryKey: ["coding-pieces"] });
-      expect(await view.findByText(/37%/)).toBeInTheDocument();
+      expect((await view.findAllByText(/37%/)).length).toBeGreaterThanOrEqual(1);
       current = "installed";
       await view.queryClient.invalidateQueries({ queryKey: ["coding-pieces"] });
       await waitFor(() => expect(view.getByRole("button", { name: "Remove" })).toBeEnabled());

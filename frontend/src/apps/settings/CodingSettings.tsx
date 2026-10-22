@@ -35,9 +35,10 @@ export function CodingAdminSettings() {
   const people = useQuery({ queryKey: ["people"], queryFn: () => api.people() });
   const grants = useQuery({ queryKey: ["coding-grants"], queryFn: () => api.grants() });
   const settings = useQuery({ queryKey: ["settings-values", "household"], queryFn: () => api.settingsValues("household") });
-  const mode = useQuery({ queryKey: ["coding-mode"], queryFn: api.codingMode });
   const [pending, setPending] = useState<Record<string, "install" | "remove">>({});
   const pieces = useQuery({ queryKey: ["coding-pieces"], queryFn: api.codingPieces, refetchInterval: (q) => q.state.data?.pieces.some((piece) => piece.state === "installing") || Object.keys(pending).length > 0 ? 2000 : false });
+  const mode = useQuery({ queryKey: ["coding-mode"], queryFn: api.codingMode, refetchInterval: () => (pieces.data?.pieces.some((piece) => piece.state === "installing") ? 3000 : false) });
+  const downloading = pieces.data?.pieces.filter((piece) => piece.state === "installing") ?? [];
   const [pieceError, setPieceError] = useState<string | null>(null);
   const [modeActionBusy, setModeActionBusy] = useState<CodingModeReadinessItemId | null>(null);
   const [modeActionError, setModeActionError] = useState<string | null>(null);
@@ -97,11 +98,12 @@ export function CodingAdminSettings() {
     <Card><CardHeader><CardTitle>Home mode checklist</CardTitle><CardDescription>Finish these steps before you turn on Coding mode.</CardDescription></CardHeader><CardContent>
       <AsyncState data={mode.data?.readiness.items} error={mode.isError} isFetching={mode.isFetching} onRetry={() => void mode.refetch()} errorMessage="Could not load the Home mode checklist." loadingLabel="Loading Home mode checklist">
         {(rows) => <ItemGroup variant="card" aria-label="Home mode checklist">{rows.map((item, index) => <Item key={item.id}>
-          <ItemContent><ItemTitle>{MODE_LABELS[item.id]} <Badge variant={item.state === "done" ? "secondary" : "outline"}>{modeActionBusy === item.id && item.id === "self_test" ? "Running" : item.state === "done" ? "Ready" : item.state === "can_do" ? "Needs setup" : "Needs a step from you"}</Badge></ItemTitle>
+          <ItemContent><ItemTitle>{MODE_LABELS[item.id]} <Badge variant={item.state === "done" ? "secondary" : "outline"}>{modeActionBusy === item.id && item.id === "self_test" ? "Running" : item.id === "pieces" && downloading.length > 0 ? "Installing" : item.state === "done" ? "Ready" : item.state === "can_do" ? "Needs setup" : "Needs a step from you"}</Badge></ItemTitle>
             {item.state !== "done" ? <ItemDescription>{codingModeReasons[item.reason_key]}</ItemDescription> : null}
+            {item.id === "pieces" ? downloading.map((piece) => <div key={piece.id}><ItemDescription>{`${piece.label} · ${piece.percent ?? 0}%`}</ItemDescription><Progress value={piece.percent ?? 0} aria-label={`Installing ${piece.label}`} /></div>) : null}
             {item.state === "manual" ? <ItemDescription><Link to={`/docs/user/coding-mode#${item.doc_anchor}`}>How</Link></ItemDescription> : null}
           </ItemContent>
-          {item.state === "can_do" ? <ItemActions><Button type="button" variant="outline" disabled={modeActionBusy !== null} onClick={() => void runModeAction(item.id)}>{modeActionBusy === item.id ? item.id === "self_test" ? "Running" : "Working" : item.id === "pieces" ? "Install" : item.id === "self_test" ? "Run the test" : "Turn coding on"}</Button></ItemActions> : null}
+          {item.state === "can_do" ? <ItemActions><Button type="button" variant="outline" disabled={modeActionBusy !== null || (item.id === "pieces" && downloading.length > 0)} onClick={() => void runModeAction(item.id)}>{modeActionBusy === item.id ? item.id === "self_test" ? "Running" : "Working" : item.id === "pieces" && downloading.length > 0 ? "Installing" : item.id === "pieces" ? "Install" : item.id === "self_test" ? "Run the test" : "Turn coding on"}</Button></ItemActions> : null}
           {index < rows.length - 1 ? <ItemSeparator variant="inset" /> : null}
         </Item>)}</ItemGroup>}
       </AsyncState>
