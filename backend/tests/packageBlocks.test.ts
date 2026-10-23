@@ -264,7 +264,7 @@ describe("GENUI-04: weather returns a spec_sheet, a chart and a data_table", () 
     const q = new URL(forecastUrls[0]!).searchParams;
     expect(q.get("hourly")).toBe("temperature_2m,precipitation_probability");
     expect(q.get("forecast_hours")).toBe("24");
-    expect(q.get("forecast_days")).toBe("8");
+    expect(q.get("forecast_days")).toBe("10");
     expect(q.get("current")).toBe("temperature_2m,weather_code,is_day,apparent_temperature,relative_humidity_2m,precipitation,wind_speed_10m,wind_direction_10m,pressure_msl,visibility");
     expect(q.get("daily")).toBe("weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max,sunrise,sunset,uv_index_max");
     expect(urls.every((u) => ["geocoding-api.open-meteo.com", "api.open-meteo.com"].includes(new URL(u).hostname))).toBe(true);
