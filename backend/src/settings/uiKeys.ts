@@ -124,7 +124,7 @@ export const UI_SETTINGS_KEYS: SettingsKey[] = [
     label: "Pinned apps (advanced)",
     help: "A JSON list of nav entry ids, in the order they should appear. Normally set by pinning an app, not by editing this directly.",
     level: "expert",
-    lives_in: "profile.appearance",
+    lives_in: "profile.appearance.internal",
     honoured_by: ["home"],
   }),
 ];

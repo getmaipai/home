@@ -66,7 +66,7 @@
     "help": "Adults and teens are on by default. Children are off unless a parent enables this.",
     "level": "basic",
     "secret": false,
-    "lives_in": "robot.settings",
+    "lives_in": "person.robot",
     "honoured_by": [
       "home"
     ]
@@ -80,7 +80,7 @@
     "help": "Adults are on by default; children are off until a parent enables this. Teens control their own setting.",
     "level": "basic",
     "secret": false,
-    "lives_in": "robot.settings",
+    "lives_in": "person.robot",
     "honoured_by": [
       "home"
     ]
@@ -94,7 +94,7 @@
     "help": "Adults are on by default. Children are off until a parent enables this; teens control their own setting.",
     "level": "basic",
     "secret": false,
-    "lives_in": "robot.settings",
+    "lives_in": "person.robot",
     "honoured_by": [
       "home"
     ]
@@ -108,7 +108,7 @@
     "help": "Adults are on by default; children are off until a parent enables this. Teens control their own setting.",
     "level": "basic",
     "secret": false,
-    "lives_in": "robot.settings",
+    "lives_in": "person.robot",
     "honoured_by": [
       "home"
     ]
@@ -130,7 +130,7 @@
     "help": "Controls optional nudges and chit-chat. Adults get nudges on and chit-chat off by default; children get both off. Teens control their own setting.",
     "level": "basic",
     "secret": false,
-    "lives_in": "robot.settings",
+    "lives_in": "person.robot",
     "honoured_by": [
       "home"
     ]
@@ -144,7 +144,7 @@
     "help": "On by default; a parent can change a child setting and teens control their own setting.",
     "level": "basic",
     "secret": false,
-    "lives_in": "robot.settings",
+    "lives_in": "person.robot",
     "honoured_by": [
       "home"
     ]
@@ -165,7 +165,7 @@
     "help": "Identity is used only for enrolled people. Children stay at presence until a parent chooses; teens control their own setting. The stricter person and robot levels apply.",
     "level": "basic",
     "secret": false,
-    "lives_in": "robot.settings",
+    "lives_in": "person.robot",
     "honoured_by": [
       "home"
     ]
@@ -198,7 +198,7 @@
     },
     "default": "identify",
     "label": "Robot camera watch level",
-    "help": "Robot-only device setting delivered by Home as settings_changed. The stricter of this and each person\u2019s watch level applies.",
+    "help": "Robot-only device setting delivered by Home as settings_changed. The stricter of this and each person’s watch level applies.",
     "level": "basic",
     "secret": false,
     "lives_in": "robot.hello",
@@ -295,7 +295,7 @@
     },
     "default": "default",
     "label": "Offer acceptance phrases",
-    "help": "Uses the closed default set: \u201cgo ahead\u201d or \u201cyes please\u201d to accept, and \u201cnot now\u201d or \u201cno thanks\u201d to decline. No gesture accepts an offer.",
+    "help": "Uses the closed default set: “go ahead” or “yes please” to accept, and “not now” or “no thanks” to decline. No gesture accepts an offer.",
     "level": "basic",
     "secret": false,
     "lives_in": "robot.settings",
@@ -400,10 +400,7 @@
     "lives_in": "robot.settings",
     "honoured_by": [
       "home"
-    ],
-    "range": {
-      "multiple": true
-    }
+    ]
   },
   {
     "key": "robot.offlan.tailnet",
