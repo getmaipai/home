@@ -8,7 +8,7 @@ import { DestructiveConfirm } from "@maipai/ui/src/primitives/DestructiveConfirm
 import { BatchBar, SelectModeToggle } from "@maipai/ui/src/primitives/BatchBar";
 import { useSelectMode } from "@/kit/hooks/useSelectMode";
 import { Checkbox } from "@maipai/ui/src/ui/checkbox";
-import { Button } from "@maipai/ui/src/ui/button";
+import { Button } from "@maipai/ui/src/dashboard/components/ui/button";
 import { getIcon } from "@maipai/ui/src/icons";
 import { api, ApiError, type MemoryRecordWithDevice as MemoryRecord } from "@/lib/api";
 
@@ -214,11 +214,11 @@ export function OtherPersonMemories({ personId, personName }: { personId: string
     <div className="flex flex-col gap-4">
       {actionError ? <p className="text-base text-destructive">{actionError}</p> : null}
 
-      <div className="flex flex-wrap gap-2">
-        <Button variant="secondary" onClick={handleExport} disabled={busy}>
+      <div className="flex min-w-0 flex-wrap gap-2">
+        <Button size="row" variant="secondary" onClick={handleExport} disabled={busy}>
           Export {personName}'s memories
         </Button>
-        <Button variant="ghost" onClick={() => setConfirmingForget(true)} disabled={busy}>
+        <Button size="row" variant="ghost" onClick={() => setConfirmingForget(true)} disabled={busy}>
           Forget everything about {personName}
         </Button>
       </div>

@@ -156,7 +156,7 @@ export function SettingField({ setting, onChange, onReset, disabled, selfPersonI
       </div>
     );
   } else if (def.selector === "boolean") {
-    control = <><Switch size={def.key === "companions.allowed" ? "md" : "default"} checked={Boolean(resolved.value)} onCheckedChange={handleSwitchChange} disabled={disabled} aria-label={def.label} />{permissionMessage ? <span role="status" className="text-sm text-muted-foreground">{permissionMessage}</span> : null}</>;
+    control = <><Switch size={def.key === "companions.allowed" || def.key === "ui.enrollment_sounds" ? "md" : "default"} checked={Boolean(resolved.value)} onCheckedChange={handleSwitchChange} disabled={disabled} aria-label={def.label} />{permissionMessage ? <span role="status" className="text-sm text-muted-foreground">{permissionMessage}</span> : null}</>;
   } else if (def.selector === "select" && (def.range as { multiple?: boolean } | undefined)?.multiple) {
     control = (
       <OptionMultiSelect

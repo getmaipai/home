@@ -350,7 +350,7 @@ export function UsersSection({ person }: UsersSectionProps) {
                     </div>
                   </div>
                   <SettingsRenderer scope="person" scopeValue={`person:${p.id}`} settingKey="companions.allowed" only={["person.companions"]} plainRows />
-                  {p.age_band === "child" ? <Section heading="Memories"><OtherPersonMemories personId={p.id} personName={p.display_name} /></Section> : null}
+                  {p.age_band === "child" ? <Section heading="Memories"><div className="min-w-0 break-words [&_div.flex-wrap]:min-w-0 [&_button]:whitespace-normal [&_button]:break-words"><OtherPersonMemories personId={p.id} personName={p.display_name} /></div></Section> : null}
                 </div>
               );
             }}

@@ -29,7 +29,7 @@ export function FaceEnrollmentBody({ viewer, profile, viewingSelf = viewer.id ==
         {(prints) => {
           const faces = prints.filter((print) => print.modality === "face" && print.deleted_at === null).sort((a, b) => b.created_at.localeCompare(a.created_at));
           const label = faces.length ? `Set up on ${new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", year: "numeric", timeZone: "UTC" }).format(new Date(faces[0]!.created_at))}` : "Not set up yet";
-          return <div className="flex flex-wrap items-center justify-between gap-3"><p className="text-sm text-muted-foreground">{label}</p>{canEnroll ? <Link to={`/people/${profile.id}/enroll-face`}><Button type="button" variant="outline">{faces.length ? "Re-enroll" : "Enroll"}</Button></Link> : viewingSelf && profile.role === "child" ? <p className="text-sm text-muted-foreground">Ask an admin to set this up.</p> : null}</div>;
+          return <div className="flex flex-wrap items-center justify-between gap-3"><p className="text-sm text-muted-foreground">{label}</p>{canEnroll ? <Link to={`/people/${profile.id}/enroll-face`}><Button type="button" variant="outline" size="row">{faces.length ? "Re-enroll" : "Enroll"}</Button></Link> : viewingSelf && profile.role === "child" ? <p className="text-sm text-muted-foreground">Ask an admin to set this up.</p> : null}</div>;
         }}
       </AsyncState>
       {canEnroll ? <SettingsRenderer scope="person" scopeValue={`person:${profile.id}`} only={["person.profile"]} includeKeys={["ui.enrollment_sounds"]} plainRows /> : null}
