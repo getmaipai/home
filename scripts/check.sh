@@ -419,7 +419,7 @@ export MAIPAI_STANDARDS_DIR="$STANDARDS_DIR"
 # without them resolved first, regardless of which scope's tests run.
 if [ "$SCOPE" != "docs" ]; then
   CORE_TAG="core-v0.1.5"
-  UI_TAG="ui-v0.5.326"
+  UI_TAG="ui-v0.5.327"
   SPEC_TAG="spec-v0.1.223"
   SHARED_REPO="${MAIPAI_COMMONS_DIR:-../commons}"
   if [ ! -d "$SHARED_REPO" ]; then
