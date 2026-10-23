@@ -157,7 +157,7 @@ describe("planFor", () => {
 });
 
 describe("RECENCY-02: a curious companion's spoken turn points at what it remembers", () => {
-  const tie = "Bring back something they told you earlier today whenever it connects to what they say now, and make a playful remark about the link.";
+  const tie = "When what they say now connects to something they told you earlier, bring it back once with a playful remark, using only what they said";
   test("a curious companion's spoken plan line carries the tie-in sentence, a balanced one's does not, and the written class never does", () => {
     const signal = base("inform");
     const plan = planFor(input(signal, { surface: "robot" }));
@@ -185,5 +185,26 @@ describe("ROBOT-VOICE-02: a lively companion's spoken turn carries its voice", (
     expect(sadPlan.moves.care).toBe("required");
     expect(planLineForTurnMachine(sadPlan, sad, "spoken", "curious")).not.toContain("happy reaction");
     expect(planLineForTurnMachine(planFor(input(signal)), signal, "spoken", "balanced")).not.toContain("happy reaction");
+  });
+});
+
+describe("ROBOT-VOICE-03: the tie-in is rare, relevant to a turn that says something, and faithful", () => {
+  const tieStart = "When what they say now connects to something they told you earlier";
+  const lively = { directness: "diplomatic" as const, engagement: "curious" as const, vocabulary: "standard" as const };
+  const line = (act: TurnSignal["primary_act"]) => {
+    const signal = base(act);
+    return planLineForTurnMachine(planFor(input(signal, { surface: "robot", surfaceClass: "spoken", companion: lively })), signal, "spoken", "curious");
+  };
+  test("a statement, a plan or a request is offered the tie-in; a question, a greeting, a thanks and a goodbye are not", () => {
+    for (const act of ["inform", "commissive", "directive"] as const) expect(line(act)).toContain(tieStart);
+    for (const act of ["question", "greeting", "backchannel", "closing"] as const) expect(line(act)).not.toContain(tieStart);
+  });
+  test("the sentence forbids inventing details, rewriting the robot as a person, and repeating a recent callback", () => {
+    const text = line("inform");
+    expect(text).toContain("using only what they said");
+    expect(text).toContain("never add details");
+    expect(text).toContain("never turn something about you, the robot, into something about a person");
+    expect(text).toContain("Do not bring up anything you already mentioned in your last few replies");
+    expect(text).toContain("most replies bring nothing back");
   });
 });

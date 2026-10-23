@@ -256,7 +256,11 @@ export function planLine(plan: ReplyPlan, signal: TurnSignal, surfaceClass: Surf
 }
 
 const LIVELY_VOICE_LINE = "Answer in your own voice, upbeat and friendly: open with a quick happy reaction to what they said, then the answer.";
-const TIE_IN_LINE = "Bring back something they told you earlier today whenever it connects to what they say now, and make a playful remark about the link.";
+const TIE_IN_LINE = "When what they say now connects to something they told you earlier, bring it back once with a playful remark, using only what they said: never add details, never guess what anyone is doing, never turn something about you, the robot, into something about a person. Do not bring up anything you already mentioned in your last few replies, and most replies bring nothing back.";
+/** ROBOT-VOICE-03: the tie-in is offered only on a turn that says something (a statement, a plan or a request). A greeting, a thanks, a
+ * "are you there?" or a question about the robot gives it nothing to connect to, and offering it there made the robot bring the same
+ * remembered thing up in every short reply. */
+const TIE_IN_ACTS: ReadonlySet<TurnSignal["primary_act"]> = new Set(["inform", "commissive", "directive"]);
 
 /** New turn-machine path: name the subject the signal classifier chose,
  * so a world question cannot be prompted as an answer about the speaker
@@ -277,10 +281,11 @@ export function planLineForTurnMachine(plan: ReplyPlan, signal: TurnSignal, surf
   // window, it decided the voice: "say, one sentence, no question, no tasks" got a flat answer from a companion built to be bright. For a lively
   // companion the line now carries the voice itself, except where care leads (sadness, fear) or playfulness is ruled out.
   const lively = surfaceClass === "spoken" && engagement === "curious";
+  const tieIn = TIE_IN_ACTS.has(signal.primary_act) ? ` ${TIE_IN_LINE}` : "";
   const line = lively
     ? plan.moves.care !== "required" && plan.playfulness !== "forbidden"
-      ? `${aboutLine} ${LIVELY_VOICE_LINE} ${TIE_IN_LINE}`
-      : `${aboutLine} Stay warm and friendly, never flat. ${TIE_IN_LINE}`
+      ? `${aboutLine} ${LIVELY_VOICE_LINE}${tieIn}`
+      : `${aboutLine} Stay warm and friendly, never flat.${tieIn}`
     : aboutLine;
   // THIN-0B: a mode control held a record back, so the model is told, and
   // told where to send the question.
