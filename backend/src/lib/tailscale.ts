@@ -4,6 +4,7 @@
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import { existsSync, mkdirSync, readFileSync, writeFileSync, chmodSync, rmSync } from "node:fs";
+import { homedir } from "node:os";
 import { join } from "node:path";
 import { dataDir } from "@/lib/paths";
 import { protectSecretPath } from "@/lib/secretPaths";
@@ -28,6 +29,20 @@ export function isTailscaleRequest(c: { req: { header(name: string): string | un
 
 function tailscaleBinary(): string {
   return process.platform === "darwin" && existsSync(TAILSCALE_APP_STORE_CLI) ? TAILSCALE_APP_STORE_CLI : "tailscale";
+}
+
+const TAILSCALE_SYSTEM_SOCKET = "/var/run/tailscaled.socket";
+
+/** The command-line tool only looks at the system daemon's socket. A user-mode tailscaled (the Mac Studio runs one) listens on its own
+ * socket, so name it when the system socket is absent; MAIPAI_TAILSCALE_SOCKET names one explicitly. The App Store build's own CLI
+ * talks to its app and takes no socket. */
+function tailscaleSocketArgs(): string[] {
+  if (tailscaleBinary() === TAILSCALE_APP_STORE_CLI) return [];
+  const named = process.env.MAIPAI_TAILSCALE_SOCKET?.trim();
+  if (named) return [`--socket=${named}`];
+  if (existsSync(TAILSCALE_SYSTEM_SOCKET)) return [];
+  const userSocket = join(homedir(), "Library", "Application Support", "tailscale-user", "tailscaled.sock");
+  return existsSync(userSocket) ? [`--socket=${userSocket}`] : [];
 }
 
 export type TailscaleState = "not_installed" | "stopped" | "running";
@@ -92,7 +107,7 @@ export function interpretTailscaleStatusJson(stdout: string): TailscaleStatus {
  * take. */
 export async function getTailscaleStatus(): Promise<TailscaleStatus> {
   try {
-    const { stdout } = await execFileAsync(tailscaleBinary(), ["status", "--json"], { timeout: 5_000 });
+    const { stdout } = await execFileAsync(tailscaleBinary(), [...tailscaleSocketArgs(), "status", "--json"], { timeout: 3_000 });
     return interpretTailscaleStatusJson(stdout);
   } catch {
     return { state: "not_installed", dnsName: null, ips: [], installed: false, signedIn: false, httpsEnabled: false, machineName: null, peers: [] };
@@ -115,7 +130,7 @@ export async function ensureTailscaleCert(): Promise<TsCert> {
   mkdirSync(join(dataDir, "keys"), { recursive: true, mode: 0o700 });
   const certPath = join(dataDir, "keys", "tailscale-cert-source.pem");
   const keyPath = join(dataDir, "keys", "tailscale-key-source.pem");
-  try { await execFileAsync(tailscaleBinary(), ["cert", "--cert-file", certPath, "--key-file", keyPath, status.dnsName], { timeout: 30_000 }); }
+  try { await execFileAsync(tailscaleBinary(), [...tailscaleSocketArgs(), "cert", "--cert-file", certPath, "--key-file", keyPath, status.dnsName], { timeout: 30_000 }); }
   catch (error) { rmSync(certPath, { force: true }); rmSync(keyPath, { force: true }); throw error; }
   const certPem = readFileSync(certPath, "utf8");
   const keyPem = readFileSync(keyPath, "utf8");

@@ -28,7 +28,7 @@ describe("audio.speed.<kind> settings", () => {
       const place = placeSetting(key, { role: "adult", band: "adult", capabilities: new Set() });
       expect(place?.area).toBe("settings");
       // Rule S4: a person-scope key sits on one of "Yours" (the personal pages), never on a household page.
-      expect(["profile", "appearance", "chat", "voice", "notifications", "pictures", "data"]).toContain(place?.section);
+      expect(["profile", "appearance", "chat", "voice", "notifications", "pictures", "data"]).toContain(place?.section ?? "");
     }
   });
 });
