@@ -46,6 +46,23 @@ Guidance for coding-agent instruction files is consistent, and the method follow
 Sources: the [SWE-agent paper](https://arxiv.org/pdf/2405.15793) (prompt tips, system template), and general guidance on
 [AGENTS.md and CLAUDE.md files](https://mac.install.guide/ai/agent-instructions/best-practices).
 
+## Landing and releasing without Claude
+
+When Claude is unavailable the local model has to be able to finish the job: land its work on `main`, and release it so the family's hub runs it.
+It does not get push rights or release rights of its own. It calls `scripts/local-land.py`, which applies fixed guards and uses the repo's own
+`wt.sh` and `release-home.sh`:
+
+| Command | What it does |
+|---|---|
+| `python3 scripts/local-land.py land [--dry]` | In a worktree: commits the changes by file name, runs `wt.sh check`, lands on `main` as a fast-forward, removes the worktree. |
+| `python3 scripts/local-land.py release --yes` | On the Studio: tags `origin/main` as the next version and installs it through `release-home.sh`, which restarts the hub. |
+
+Guards, all in the script (one definition): it refuses anything touching access, credentials, safety, migrations, installers, the gates, package
+files or `RULES.md`; more than 12 files or 700 diff lines; a failing check; a newest `main` that failed its gate; and a second release within 30
+minutes. A refusal says why and leaves the work on its branch for a person. `local-lane dispatch --land` runs the same script after a finished
+dispatch. On the laptop, `localland` and `localrelease` (in the homelab shell file) run it; `localrelease` runs it on the Studio over SSH. The
+person who types `localrelease` or lets the model run it is giving the owner's yes for that release.
+
 ## Always on the latest repo
 
 The model must never work from an old copy of the code. `local-lane dispatch` checks this before the model starts: it fetches `origin/main`, and
