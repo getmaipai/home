@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-10-22T01:00:41.446Z",
+  "generatedAt": "2026-10-23T00:25:04.475Z",
   "kitTag": "ui-v0.5.310",
   "items": [
     {
@@ -1155,7 +1155,7 @@
       "group": "stacked",
       "verdict": "support",
       "verdictReason": "The WebGL stacked-alpha clip renderer inside the companion avatar; Home does not draw it on its own. The editor's preview still has its own copy until CMEDIA-PLAYER-02 swaps it for this Element.",
-      "implemented": false
+      "implemented": true
     },
     {
       "file": "stopped-run.tsx",
