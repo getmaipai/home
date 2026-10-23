@@ -16,6 +16,13 @@ copy the same text into every place below, so the files never contradict each ot
 8. If the task is unclear or has two readings, take the safer one and say which you took. Go on only if it is easy to undo; otherwise stop and ask.
 9. When the checks pass, stop. Do not start extra work. Report in a few lines: what changed (files), the checks you ran and their results, and what is not done or not verified.
 
+## Answers, docs and commits
+
+10. Say where you saw it. When you state a fact about the code, name the file and line you read. If you did not read it, say you do not know; never guess.
+11. Read your own diff before you finish. Remove anything you cannot explain, debug output, and any file the task did not ask for. Never change a test, a type or a check just to make it pass; if the test looks wrong, say so and stop.
+12. Docs change with the behaviour, in the same change. Find the page that describes what you changed (grep `docs/` for the feature's name) and update it. Put new text in the right tier: `docs/user` is plain words and short sentences for the people in the home, `docs/dev` is how it works for a developer, and `docs/api` is generated, so never edit it by hand. Write concrete words (numbers, names, paths), no em dashes, no filler. Examples use `example.com` and `192.0.2.x` addresses, never real names or addresses. Run `bash scripts/check.sh --docs` and fix what it reports.
+13. Commit by file name (never `git add -A` or `git add .`), one logical change per commit, a plain message. Never run `git push`, merge, rebase, reset or tag yourself. When your checks pass, land with `python3 scripts/local-land.py land` (or `localland`); when it refuses, stop and say why. Release only with `localrelease`, and only when the task asks for it.
+
 ## Where it is installed
 
 The text is a section of three instruction files. All three are read by the model at the start of a run.
@@ -36,7 +43,7 @@ that runs the local coder through OpenCode needs the same section in whichever i
 Guidance for coding-agent instruction files is consistent, and the method follows it:
 
 - Keep it short and limited to what the agent cannot work out from the repo. Long files get ignored, and repeating what the code already shows
-  only adds cost. Nine numbered rules is the budget; before adding one, remove or merge another.
+  only adds cost. Thirteen numbered rules is the budget (nine for the method, four for answers, docs and commits); before adding one, remove or merge another.
 - Make rules concrete and checkable. The test and typecheck commands are named, and the model is told to run them and read the output.
 - Warn against the mistakes seen in practice. SWE-agent found that tips against known failure patterns raised success. Rules 2, 5 and 7 come
   from runs where the model edited without reading, changed unrelated code, or repeated the same failing edit.
