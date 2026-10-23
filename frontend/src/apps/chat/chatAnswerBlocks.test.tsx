@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, test } from "bun:test";
 import { cleanup, render } from "@testing-library/react";
-import { AnswerBlockDataRender } from "@/apps/chat/chatAnswerBlocks";
+import { AnswerBlockDataRender, drawableBlocks } from "@/apps/chat/chatAnswerBlocks";
+import newsFeedFixture from "@maipai/spec/fixtures/answer-block/valid-story_feed.json";
 
 afterEach(cleanup);
 
@@ -22,5 +23,17 @@ describe("the answer_block part draws the kit Element, not the alt sentence", ()
     const { container } = render(<Render data={{ ...block, after_paragraph: 0 }} />);
     expect(container.querySelector('[data-slot="spec-sheet"]')).not.toBeNull();
     expect(container.querySelector("[data-fallback]")).toBeNull();
+  });
+
+  test("the pinned UI validator keeps News stories with sourceIconUrl", () => {
+    const storyFeed = structuredClone(newsFeedFixture);
+    storyFeed.props.rows[0] = { ...storyFeed.props.rows[0]!, sourceIconUrl: "/api/favicon?domain=example.com" } as typeof storyFeed.props.rows[0];
+    const [accepted] = drawableBlocks([storyFeed]);
+    expect(accepted?.kind).toBe("story_feed");
+
+    const Render = AnswerBlockDataRender as unknown as (props: { data: unknown }) => React.ReactElement;
+    const { container, getByText } = render(<Render data={accepted} />);
+    expect(container.querySelector('[data-slot="story-feed"]')).not.toBeNull();
+    expect(getByText("Headline 5")).toBeTruthy();
   });
 });

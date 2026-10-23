@@ -7,10 +7,22 @@ import { checkAppPackage } from "@maipai/spec/ui/app-check.js";
 import UI_SCHEMA from "@maipai/spec/ui/schema.json" with { type: "json" };
 import { PackageManifest } from "@maipai/spec/gen/ts/manifest.js";
 import { SettingsKey } from "@maipai/spec/gen/ts/settings-key.js";
+import { AnswerBlock } from "@maipai/spec/gen/ts/answer-block.js";
+import newsFeedFixture from "@maipai/spec/fixtures/answer-block/valid-story_feed.json";
 
 const dir = join(import.meta.dir, "../packages/news");
 const read = (file: string) => JSON.parse(readFileSync(join(dir, file), "utf-8"));
 const manifest = read("manifest.json");
+
+test("News story_feed cards retain sourceIconUrl through backend block validation", () => {
+  const block = structuredClone(newsFeedFixture);
+  block.props.rows[0] = { ...block.props.rows[0]!, sourceIconUrl: "/api/favicon?domain=example.com" } as typeof block.props.rows[0];
+  const parsed = AnswerBlock.safeParse(block);
+  expect(parsed.success).toBe(true);
+  if (parsed.success && parsed.data.kind === "story_feed") {
+    expect(parsed.data.props.rows[0]?.sourceIconUrl).toBe("/api/favicon?domain=example.com");
+  }
+});
 
 test("News is a valid manifest and its seven pages validate against the pinned spec", () => {
   const ajv = new Ajv2020({ strict: false });
