@@ -35,7 +35,7 @@ import { acceptRobotSelfTestResult, startRobotSelfTest } from "@/lib/robotSelfTe
 import { robotSelfTestPartsFor } from "@/wire";
 import { RobotSelfTestResult } from "@maipai/spec/gen/ts/robot-self-test-result.js";
 import { forgetRobotHost } from "@/lib/robotHost";
-import { recordRobotCheckin, type RobotCheckin } from "@/lib/robotCheckin";
+import { getRobotCheckin, recordRobotCheckin, type RobotCheckin } from "@/lib/robotCheckin";
 
 export const devicesRoutes = apiRouter();
 
@@ -57,6 +57,8 @@ const DeviceSchema = z.object({
   name: z.string(),
   area: z.string().nullable(),
   lastSeenAt: z.string().nullable(),
+  /** Robots only: the body reports the unit connected right now (last seen alone also moves when the body calls the hub). */
+  online: z.boolean().optional(),
   createdAt: z.string(),
   ipAddress: z.string().optional(),
   // ROBOT-ADMIN-PLACE-01: a robot is a household member like a pet; everyone sees who owns it.
@@ -101,7 +103,7 @@ devicesRoutes.openapi(listRoute, (c) => {
   const actor = c.get("person");
   const devices = listDevicesForPerson(actor.id);
   return c.json(
-    devices.map((d) => ({ id: d.id, kind: d.kind, name: d.name, area: d.area, lastSeenAt: d.lastSeenAt, createdAt: d.createdAt, ...(d.kind === "robot" && (actor.role === "owner" || actor.role === "admin") && getRobotSocketAddress(d.id) ? { ipAddress: getRobotSocketAddress(d.id)! } : {}), capabilities: d.capabilities, offlineScope: d.offlineScope as Array<"media.offline" | "offline.records">, state: d.kind === "robot" ? stateForViewer(getDeviceState(d.id), actor) : null })),
+    devices.map((d) => ({ id: d.id, kind: d.kind, name: d.name, area: d.area, lastSeenAt: d.lastSeenAt, ...(d.kind === "robot" ? { online: getRobotCheckin(d.id)?.online ?? false } : {}), createdAt: d.createdAt, ...(d.kind === "robot" && (actor.role === "owner" || actor.role === "admin") && getRobotSocketAddress(d.id) ? { ipAddress: getRobotSocketAddress(d.id)! } : {}), capabilities: d.capabilities, offlineScope: d.offlineScope as Array<"media.offline" | "offline.records">, state: d.kind === "robot" ? stateForViewer(getDeviceState(d.id), actor) : null })),
     200,
   );
 });
@@ -125,7 +127,7 @@ devicesRoutes.openapi(listRobotsRoute, (c) => {
   const robots = listDevicesByKind("robot");
   const ownerNames = new Map(db.select({ id: people.id, name: people.displayName }).from(people).all().map((row) => [row.id, row.name] as const));
   return c.json(
-    robots.map((d) => ({ id: d.id, kind: d.kind, name: d.name, area: d.area, lastSeenAt: d.lastSeenAt, createdAt: d.createdAt, ...(admin && getRobotSocketAddress(d.id) ? { ipAddress: getRobotSocketAddress(d.id)! } : {}), ...(ownerNames.has(d.personId) ? { ownerName: ownerNames.get(d.personId)!, ownerId: d.personId } : {}), capabilities: d.capabilities, offlineScope: d.offlineScope as Array<"media.offline" | "offline.records">, state: stateForViewer(getDeviceState(d.id), viewer) })),
+    robots.map((d) => ({ id: d.id, kind: d.kind, name: d.name, area: d.area, lastSeenAt: d.lastSeenAt, ...(d.kind === "robot" ? { online: getRobotCheckin(d.id)?.online ?? false } : {}), createdAt: d.createdAt, ...(admin && getRobotSocketAddress(d.id) ? { ipAddress: getRobotSocketAddress(d.id)! } : {}), ...(ownerNames.has(d.personId) ? { ownerName: ownerNames.get(d.personId)!, ownerId: d.personId } : {}), capabilities: d.capabilities, offlineScope: d.offlineScope as Array<"media.offline" | "offline.records">, state: stateForViewer(getDeviceState(d.id), viewer) })),
     200,
   );
 });

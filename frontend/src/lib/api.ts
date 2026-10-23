@@ -308,6 +308,8 @@ export interface DeviceInfo {
   name: string;
   area: string | null;
   lastSeenAt: string | null;
+  /** Robots only: the body reports the unit connected right now. */
+  online?: boolean;
   createdAt: string;
   ipAddress?: string;
   /** The household robots route: who the robot belongs to, shown to everyone like a pet's owner. */

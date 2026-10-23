@@ -25,11 +25,14 @@ export type RobotCheckin = {
 };
 
 const latest = new Map<string, { value: RobotCheckin; receivedAt: number }>();
+/** When the body last reported its unit connected. Other authenticated calls from the body never move this, so a powered-off unit cannot look alive. */
+const unitOnlineAt = new Map<string, number>();
 
 /** Store the newest body report in memory; only last-seen and the installed firmware are durable. */
 export function recordRobotCheckin(deviceId: string, value: RobotCheckin, setBy: string): void {
   const now = Date.now();
   latest.set(deviceId, { value: { ...value, device_id: deviceId }, receivedAt: now });
+  if (value.online) unitOnlineAt.set(deviceId, now);
   touchDevice(deviceId);
   if (value.firmware_version !== null) {
     const installed = getRobotSoftware(deviceId).firmware.installed;
@@ -45,6 +48,6 @@ export function getRobotCheckin(deviceId: string, now = Date.now()): (RobotCheck
   return { ...report.value, online: report.value.online && now - report.receivedAt < ROBOT_CHECKIN_ONLINE_MS };
 }
 
-export function getRobotCheckinReceivedAt(deviceId: string): number | null { return latest.get(deviceId)?.receivedAt ?? null; }
+export function getRobotUnitOnlineAt(deviceId: string): number | null { return unitOnlineAt.get(deviceId) ?? null; }
 
-export function forgetRobotCheckin(deviceId: string): void { latest.delete(deviceId); }
+export function forgetRobotCheckin(deviceId: string): void { latest.delete(deviceId); unitOnlineAt.delete(deviceId); }

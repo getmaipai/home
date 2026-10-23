@@ -76,3 +76,22 @@ test("the durable marker prevents another notice after a watcher restart", async
   await pollRobotOffline(start + ROBOT_OFFLINE_AFTER_MS * 2);
   expect(sent).toHaveLength(1);
 });
+
+test("a notice that failed to go out is tried again on the next poll", async () => {
+  addRobot(new Date(start).toISOString());
+  let fail = true;
+  __setRobotOfflineNotifierForTests(async (type, vars = {}) => { if (fail) throw new Error("busy"); sent.push({ type, name: vars.name ?? "" }); });
+  await pollRobotOffline(start + ROBOT_OFFLINE_AFTER_MS);
+  expect(sent).toHaveLength(0);
+  fail = false;
+  await pollRobotOffline(start + ROBOT_OFFLINE_AFTER_MS + 60_000);
+  expect(sent).toEqual([{ type: "robot.offline", name: "Rivet" }]);
+});
+
+test("the body's own calls do not make a powered-off unit look alive", async () => {
+  const id = addRobot(new Date(start + ROBOT_OFFLINE_AFTER_MS).toISOString()); // the body touched last_seen just now
+  recordRobotCheckin(id, { device_id: id, board: "test", online: false, last_seen: new Date(start).toISOString(), connected_since: null, ip: null, firmware_version: null, bot_version: null, rssi: null, signal: null, free_heap_internal: null, free_heap_min: null, psram_free: null, boot_reason: null, crash_resets: null, battery_level: null, charging: null } satisfies RobotCheckin, "test");
+  await pollRobotOffline(start + ROBOT_OFFLINE_AFTER_MS);
+  expect(sent).toHaveLength(1);
+  forgetRobotCheckin(id);
+});

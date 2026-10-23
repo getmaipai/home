@@ -1,7 +1,7 @@
 import { and, eq, gt } from "drizzle-orm";
 import { db } from "@/db";
 import { devices, deviceTokens } from "@/db/schema";
-import { getRobotCheckinReceivedAt, ROBOT_CHECKIN_ONLINE_MS } from "@/lib/robotCheckin";
+import { getRobotUnitOnlineAt, ROBOT_CHECKIN_ONLINE_MS } from "@/lib/robotCheckin";
 import { trigger as realTrigger } from "@/lib/notifications";
 
 export const ROBOT_OFFLINE_AFTER_MS = 10 * 60_000;
@@ -23,25 +23,24 @@ export async function pollRobotOffline(now = Date.now()): Promise<void> {
     if (!token) continue;
     if (seenIds.has(device.id)) continue;
     seenIds.add(device.id);
-    const receivedAt = getRobotCheckinReceivedAt(device.id) ?? 0;
-    const persistedAt = device.lastSeenAt ? Date.parse(device.lastSeenAt) : 0;
-    const latestSeen = Math.max(receivedAt, persistedAt);
-    if (!latestSeen) continue;
-    const notificationAt = device.offlineNotifiedAt ? Date.parse(device.offlineNotifiedAt) : 0;
-    if (notificationAt && persistedAt > notificationAt) {
-      db.update(devices).set({ offlineNotifiedAt: null }).where(eq(devices.id, device.id)).run();
-      continue;
-    }
-    if (latestSeen >= now - ROBOT_CHECKIN_ONLINE_MS) {
+    // A robot counts as seen only while its body reports the unit connected: the body keeps calling the hub
+    // (its own token touches last_seen) even when the unit is off. A robot never seen at all stays quiet.
+    if (!device.lastSeenAt) continue;
+    const onlineAt = getRobotUnitOnlineAt(device.id) ?? 0;
+    if (onlineAt >= now - ROBOT_CHECKIN_ONLINE_MS) {
       if (device.offlineNotifiedAt !== null) db.update(devices).set({ offlineNotifiedAt: null }).where(eq(devices.id, device.id)).run();
       continue;
     }
-    const outageAnchor = Math.max(latestSeen, hubStartedAt);
+    const outageAnchor = Math.max(onlineAt, hubStartedAt);
     if (now - outageAnchor < ROBOT_OFFLINE_AFTER_MS || device.offlineNotifiedAt !== null) continue;
     const notifiedAt = stamp(now);
     db.update(devices).set({ offlineNotifiedAt: notifiedAt }).where(eq(devices.id, device.id)).run();
     try { await trigger("robot.offline", { name: device.name }); }
-    catch (error) { console.error(`[robot-offline] Could not notify about ${device.name}: ${(error as Error).message}`); }
+    catch (error) {
+      // The notice did not go out: clear the marker so the next poll tries again.
+      db.update(devices).set({ offlineNotifiedAt: null }).where(eq(devices.id, device.id)).run();
+      console.error(`[robot-offline] Could not notify about ${device.name}: ${(error as Error).message}`);
+    }
   }
 }
 

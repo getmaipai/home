@@ -22,7 +22,6 @@ import { RobotCompanionChoices } from "@/apps/settings/RobotCompanionChoices";
 import { playableVoices, voiceFriendlyName } from "@/lib/voice/voiceBrowserRows";
 import { Card, CardAction, CardContent, CardHeader, CardTitle } from "@maipai/ui/src/dashboard/components/ui/card";
 import { useTabItem } from "@/shell/tabIdentity";
-import { ROBOT_CHECKIN_ONLINE_MS } from "@/lib/robotStatus";
 
 
 function statusText(device: DeviceInfo): string {
@@ -32,7 +31,7 @@ function statusText(device: DeviceInfo): string {
 }
 
 function robotOnline(device: DeviceInfo): boolean {
-  return device.lastSeenAt !== null && Date.now() - Date.parse(device.lastSeenAt) < ROBOT_CHECKIN_ONLINE_MS;
+  return device.online === true;
 }
 
 function robotLastSeen(device: DeviceInfo): string {
@@ -146,7 +145,7 @@ function RobotDetail({ device, tab, onClose }: { device: DeviceInfo; tab?: strin
       <div className="flex flex-col gap-4">
         {lifecycleError ? <Alert variant="destructive"><AlertDescription>{lifecycleError}</AlertDescription></Alert> : null}
         {activeTab === "overview" ? <>
-        <p className="text-base"><Badge variant="secondary">{softwareQuery.data?.checkin?.online || (device.lastSeenAt !== null && Date.now() - Date.parse(device.lastSeenAt) < ROBOT_CHECKIN_ONLINE_MS) ? "Online" : device.lastSeenAt ? "Offline" : statusText(device)}</Badge>{softwareQuery.data?.checkin ? <> Last seen {new Intl.DateTimeFormat(undefined, { dateStyle: "medium", timeStyle: "short" }).format(new Date(softwareQuery.data.checkin.lastSeen))}{softwareQuery.data.checkin.ip ? ` · IP address ${softwareQuery.data.checkin.ip}` : ""}</> : device.lastSeenAt ? <> Last seen {new Intl.DateTimeFormat(undefined, { dateStyle: "medium", timeStyle: "short" }).format(new Date(device.lastSeenAt))}</> : null}</p>
+        <p className="text-base"><Badge variant="secondary">{softwareQuery.data?.checkin?.online ? "Online" : device.lastSeenAt ? "Offline" : statusText(device)}</Badge>{softwareQuery.data?.checkin ? <> Last seen {new Intl.DateTimeFormat(undefined, { dateStyle: "medium", timeStyle: "short" }).format(new Date(softwareQuery.data.checkin.lastSeen))}{softwareQuery.data.checkin.ip ? ` · IP address ${softwareQuery.data.checkin.ip}` : ""}</> : device.lastSeenAt ? <> Last seen {new Intl.DateTimeFormat(undefined, { dateStyle: "medium", timeStyle: "short" }).format(new Date(device.lastSeenAt))}</> : null}</p>
         <RobotSelfTests device={device} />
         {hostedInstall && softwareQuery.data ? <Section heading="Software">
           <ItemGroup variant="card" aria-label="Robot software">
@@ -157,7 +156,7 @@ function RobotDetail({ device, tab, onClose }: { device: DeviceInfo; tab?: strin
                   softwareQuery.data.checkin?.battery.level !== null && softwareQuery.data.checkin ? `Battery ${softwareQuery.data.checkin.battery.level}%${softwareQuery.data.checkin.battery.charging ? ", charging" : ""}` : null,
                   softwareQuery.data.checkin?.ip ? `IP address ${softwareQuery.data.checkin.ip}` : null].filter(Boolean).join(" · ") || "No connection details reported."
                 : "Waiting for the robot to check in."}</ItemDescription></ItemContent>
-              <Badge variant="secondary">{softwareQuery.data.checkin?.online || (softwareQuery.data.lastSeenAt !== null && Date.now() - Date.parse(softwareQuery.data.lastSeenAt) < ROBOT_CHECKIN_ONLINE_MS) ? "Online" : "Offline"}</Badge>
+              <Badge variant="secondary">{softwareQuery.data.checkin?.online ? "Online" : "Offline"}</Badge>
             </Item>
             <Item size="setting">
               <ItemContent>

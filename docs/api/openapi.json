@@ -28420,6 +28420,9 @@
                         "type": "string",
                         "nullable": true
                       },
+                      "online": {
+                        "type": "boolean"
+                      },
                       "createdAt": {
                         "type": "string"
                       },
@@ -28667,6 +28670,9 @@
                       "lastSeenAt": {
                         "type": "string",
                         "nullable": true
+                      },
+                      "online": {
+                        "type": "boolean"
                       },
                       "createdAt": {
                         "type": "string"
@@ -29604,6 +29610,9 @@
                     "lastSeenAt": {
                       "type": "string",
                       "nullable": true
+                    },
+                    "online": {
+                      "type": "boolean"
                     },
                     "createdAt": {
                       "type": "string"
