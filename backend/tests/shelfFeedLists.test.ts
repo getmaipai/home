@@ -93,6 +93,13 @@ describe("the bundled feed-list packages", () => {
     expect(children.feeds).toContainEqual({ url: "https://www.nasa.gov/feeds/iotd-feed/", title: "NASA Image of the Day", publisher: "NASA", lang: "en", topics_hint: ["kids"] });
   });
 
+  test("the household list has multiple business, technology and national local sources", () => {
+    const household = FeedListPackage.parse(read("feeds-household", "feeds.json"));
+    const coverage = (topic: string) => household.feeds.filter((feed) => feed.topics_hint?.includes(topic));
+    for (const topic of ["business", "technology", "local"]) expect(coverage(topic).length).toBeGreaterThanOrEqual(3);
+    expect(coverage("local").map((feed) => feed.publisher)).toContain("NPR");
+  });
+
   test("no feed address appears in two lists", () => {
     const urls = FEED_LISTS.flatMap((list) => FeedListPackage.parse(read(list.package_id, "feeds.json")).feeds.map((feed) => feed.url));
     expect(new Set(urls).size).toBe(urls.length);

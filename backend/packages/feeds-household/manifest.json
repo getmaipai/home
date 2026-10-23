@@ -108,6 +108,24 @@
       "who": "Grist",
       "opt_in": true,
       "retention": "unknown, see the publisher's own policy"
+    },
+    {
+      "id": "feed-www-marketwatch-com",
+      "destination": "MarketWatch's own public news feed (www.marketwatch.com)",
+      "when": "automatically, about every 30 minutes at most, only while nobody is using MaiPai, and only while the News shelf and this list are on in Settings",
+      "what": "a plain, unauthenticated request for the feed file, plus your home's internet address. No name, device ID or cookie goes with it. MaiPai reads only the feed file and never opens the articles. Nothing anyone in the house said, asked, or saved.",
+      "who": "MarketWatch",
+      "opt_in": true,
+      "retention": "unknown, see the publisher's own policy"
+    },
+    {
+      "id": "feed-techcrunch-com",
+      "destination": "TechCrunch's own public news feed (techcrunch.com)",
+      "when": "automatically, about every 30 minutes at most, only while nobody is using MaiPai, and only while the News shelf and this list are on in Settings",
+      "what": "a plain, unauthenticated request for the feed file, plus your home's internet address. No name, device ID or cookie goes with it. MaiPai reads only the feed file and never opens the articles. Nothing anyone in the house said, asked, or saved.",
+      "who": "TechCrunch",
+      "opt_in": true,
+      "retention": "unknown, see the publisher's own policy"
     }
   ],
   "permissions": [
@@ -120,7 +138,9 @@
     "net:www.si.com",
     "net:www.popsci.com",
     "net:variety.com",
-    "net:grist.org"
+    "net:grist.org",
+    "net:www.marketwatch.com",
+    "net:techcrunch.com"
   ],
   "notifications": [],
   "backup": "exclude",

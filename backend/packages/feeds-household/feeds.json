@@ -333,6 +333,41 @@
       "topics_hint": [
         "environment"
       ]
+    },
+    {
+      "url": "https://www.marketwatch.com/rss/topstories",
+      "title": "MarketWatch Top Stories",
+      "publisher": "MarketWatch",
+      "lang": "en",
+      "topics_hint": ["business"]
+    },
+    {
+      "url": "https://techcrunch.com/feed/",
+      "title": "TechCrunch",
+      "publisher": "TechCrunch",
+      "lang": "en",
+      "topics_hint": ["technology"]
+    },
+    {
+      "url": "https://feeds.npr.org/1003/rss.xml",
+      "title": "NPR U.S. News",
+      "publisher": "NPR",
+      "lang": "en",
+      "topics_hint": ["local"]
+    },
+    {
+      "url": "https://www.theguardian.com/us-news/rss",
+      "title": "The Guardian U.S. News",
+      "publisher": "The Guardian",
+      "lang": "en",
+      "topics_hint": ["local"]
+    },
+    {
+      "url": "https://feeds.bbci.co.uk/news/world/us_and_canada/rss.xml",
+      "title": "BBC U.S. and Canada",
+      "publisher": "BBC",
+      "lang": "en",
+      "topics_hint": ["local"]
     }
   ]
 }
