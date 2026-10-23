@@ -1,10 +1,13 @@
-import { afterEach, expect, spyOn, test } from "bun:test";
+import { afterEach, expect, mock, spyOn, test } from "bun:test";
+import { createElement } from "react";
 import * as sonner from "sonner";
 import { act, cleanup, fireEvent, render, waitFor } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { api, ApiError, type CompanionEditable, type CompanionLook, type CompanionLookJob } from "@/lib/api";
 import { CompanionEditorPage } from "@/shell/pages/CompanionEditorPage";
+
+mock.module("@maipai/ui/src/elements/stacked-alpha-video", () => ({ StackedAlphaVideo: ({ src, label }: { src: string; label: string }) => createElement("div", { role: "img", "aria-label": label, "data-testid": "stacked-alpha-video", "data-src": src }) }));
 
 const methods = ["editCompanion", "stackVoices", "companionLook", "companionLookPrompt", "generateCompanionLook", "companionLookJob", "cancelCompanionLookJob", "uploadCompanionLook", "setCompanionLookRest", "deleteCompanionLookVersion", "editCompanionLook", "makeCompanionLookSheet", "saveCompanionLookCard", "setCompanionLookKey", "approveCompanionLookSheet", "unapproveCompanionLookSheet"] as const;
 const originals = Object.fromEntries(methods.map((key) => [key, api[key]]));

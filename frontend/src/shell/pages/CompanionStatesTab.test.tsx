@@ -1,9 +1,12 @@
-import { afterEach, expect, spyOn, test } from "bun:test";
+import { afterEach, expect, mock, spyOn, test } from "bun:test";
+import { createElement } from "react";
 import * as sonner from "sonner";
 import { cleanup, fireEvent, render, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { api, ApiError, type CompanionStates } from "@/lib/api";
 import { CompanionStatesTab } from "@/shell/pages/CompanionStatesTab";
+
+mock.module("@maipai/ui/src/elements/stacked-alpha-video", () => ({ StackedAlphaVideo: ({ src, label, onError }: { src: string; label: string; onError?: () => void }) => createElement("div", { role: "img", "aria-label": label, "data-testid": "stacked-alpha-video", "data-src": src }, createElement("button", { type: "button", "aria-label": `Fail ${label} preview`, onClick: onError })) }));
 
 const names = ["Idle", "Idle Look", "Listening", "Thinking", "Working", "Speaking", "Needs You", "Greeting", "Happy", "Oops", "Celebrate", "Sleeping"];
 const url = { h264: "/clip.h264.mp4", av1: "/clip.av1.mp4", still: "/still.png" };
@@ -14,6 +17,20 @@ function open() { const client = new QueryClient({ defaultOptions: { queries: { 
 
 test("without an approved sheet the states and copy prompts stay available while uploads and generation are disabled", async () => { api.companionStates = async () => ({ ...fixture(), sheet_ready: false }); const view = open(); expect(await view.findByText("Approve the character sheet in the Look tab first. Every clip starts from it. You can still copy a prompt for another tool.")).toBeTruthy(); expect(view.getAllByRole("button", { name: "Copy prompt" })).toHaveLength(12); expect(view.getAllByRole("button", { name: "Make clips" }).every((button) => (button as HTMLButtonElement).disabled)).toBe(true); expect(view.getAllByRole("button", { name: "Upload a clip" }).every((button) => (button as HTMLButtonElement).disabled)).toBe(true); });
 test("shows twelve states in API order with readiness and required badges", async () => { api.companionStates = async () => fixture(); const view = open(); expect(await view.findByText("7 of 12 ready")).toBeTruthy(); expect(view.getAllByRole("heading", { level: 3 }).map((heading) => heading.textContent)).toEqual(names); expect(view.getAllByText("Required")).toHaveLength(7); expect(view.getByText("Still needed: Thinking, Working")).toBeTruthy(); });
+test("approved state uses the kit player with AV1 when supported and shows still fallback on error", async () => {
+  const canPlayType = HTMLMediaElement.prototype.canPlayType;
+  HTMLMediaElement.prototype.canPlayType = () => "probably";
+  try {
+    api.companionStates = async () => fixture();
+    const view = open();
+    const player = await view.findByLabelText("Idle");
+    await waitFor(() => expect(player.getAttribute("data-src")).toBe("/clip.av1.mp4"));
+    expect(player.getAttribute("aria-label")).toBe("Idle");
+    fireEvent.click(view.getByRole("button", { name: "Fail Idle preview" }));
+    expect(await view.findByText("Preview not available in this browser.")).toBeTruthy();
+    expect(view.getByAltText("Idle clip still").getAttribute("src")).toBe("/still.png");
+  } finally { HTMLMediaElement.prototype.canPlayType = canPlayType; }
+});
 test("every state has a working Copy prompt button", async () => {
   api.companionStates = async () => fixture(); const copied: string[] = [], requested: string[] = [];
   api.companionStatePrompt = async (_id, state) => { requested.push(state); return { title: `Character clip: ${state}`, prompt: "animate", negative_prompt: "none", text: `prompt for ${state}` }; };

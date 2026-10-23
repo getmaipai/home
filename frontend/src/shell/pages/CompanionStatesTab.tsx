@@ -53,7 +53,7 @@ export function CompanionStatesTab({ id, active }: { id: string; active: boolean
     </section>
     {running ? <section aria-label="Clip run progress" className="flex flex-col gap-2"><p>{run?.label ?? data.run?.label ?? "Starting clip run"}</p><Progress value={run?.percent ?? data.run?.percent ?? 0} aria-label={run?.label ?? "Clip run progress"} /><Button type="button" variant="outline" onClick={() => void perform(async () => { await api.stopCompanionStateRun(id, runId!); setRunId(null); void client.invalidateQueries({ queryKey: key(id) }); })}>Stop</Button></section> : null}
     {runQuery.isError ? <Alert variant="destructive"><AlertDescription>{errorText(runQuery.error)}</AlertDescription></Alert> : null}
-    <ul aria-label="Companion states" className={`grid list-none gap-4 p-0 ${GRID_COLUMNS.default}`}>{data.states.map((state, index) => <li key={state.id}><Card><CardContent><CompanionStateContents id={id} state={state} index={index} busy={running} startReady={data.start_ready} sheetReady={data.sheet_ready} onAction={perform} onError={setError} /></CardContent></Card></li>)}</ul>
+    <ul aria-label="Companion states" className={`grid list-none gap-4 p-0 ${GRID_COLUMNS.default}`}>{data.states.map((state) => <li key={state.id}><Card><CardContent><CompanionStateContents id={id} state={state} busy={running} startReady={data.start_ready} sheetReady={data.sheet_ready} onAction={perform} onError={setError} /></CardContent></Card></li>)}</ul>
     {error ? <Alert variant="destructive"><AlertDescription>{error}</AlertDescription></Alert> : null}
   </div>;
 }
