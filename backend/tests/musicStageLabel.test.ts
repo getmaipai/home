@@ -15,8 +15,12 @@ test("the Stack's known stages have plain, distinct labels without repeating the
   expect(labels.every(Boolean)).toBe(true);
   expect(new Set(labels).size).toBe(labels.length);
   expect(labels).not.toContain("Making your song");
-  expect(musicStageLabel(job({ stage: "lm" }))).toBe("Planning the song");
-  expect(musicStageLabel(job({ stage: "dit" }))).toBe("Making the music");
+  expect(musicStageLabel(job({ stage: "loading" }))).toBe("Loading");
+  expect(musicStageLabel(job({ stage: "starting" }))).toBe("Loading");
+  expect(musicStageLabel(job({ stage: "planning" }))).toBe("Planning");
+  expect(musicStageLabel(job({ stage: "lm" }))).toBe("Planning");
+  expect(musicStageLabel(job({ stage: "making" }))).toBe("Making");
+  expect(musicStageLabel(job({ stage: "dit" }))).toBe("Making");
   expect(musicStageLabel(job({ stage: "vae" }))).toBe("Mixing");
   expect(musicStageLabel(job({ stage: "mixing" }))).toBe("Finishing");
   expect(musicStageLabel(job({ stage: "encoding" }))).toBe("Finishing");

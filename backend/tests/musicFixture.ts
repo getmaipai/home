@@ -43,7 +43,7 @@ export function installFakeMusicStack() {
       const body = fake.submitted[Number(id.split("-")[1]) - 1]!;
       const result: StackMusicJob = fake.queued ? { state: "queued", stage: "queued", progress_fraction: 0, eta_seconds: 15, position: 2 } : polls >= fake.pollsToFinish
         ? { state: "done", data: [{ duration_s: body.duration_s, seed: body.seed ?? 77, lrc: typeof fake.lrc === "function" ? fake.lrc(body.duration_s!) : fake.lrc, bpm: body.bpm, key: body.key, model: body.task === "edit" ? "none" : fake.model }] }
-        : { state: polls === 1 ? "queued" : "running", stage: "planning", stage_label: "Planning the song", progress_fraction: 0.25, eta_seconds: 15, position: 2 };
+        : { state: polls === 1 ? "queued" : "running", stage: "planning", stage_label: "Planning", progress_fraction: 0.25, eta_seconds: 15, position: 2 };
       return json(result);
     }
     return json({ code: "unknown_route" }, 404);

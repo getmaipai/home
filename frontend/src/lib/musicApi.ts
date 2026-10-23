@@ -8,7 +8,7 @@ export interface MusicCard {
   id: string;
   state: "queued" | "running" | "done" | "failed" | "cancelled";
   stage: string | null;
-  /** The plain stage line: "Planning the song", "Making the music", "Mixing it down", or the shared busy line while queued. */
+  /** The plain stage label for the current short stage, or the shared busy line while queued. */
   stage_label: string;
   stages: Array<{ id: string; label: string }>;
   stage_index: number;

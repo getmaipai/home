@@ -45,7 +45,7 @@ const viewMiddleware = [requireAuth, viewGate] as [typeof requireAuth, typeof vi
 const refusals = errorResponses({ 401: "Not signed in", 403: "Music is off for this profile", 404: "No such song", 409: "Commercial export not allowed" });
 const params = z.object({ id: z.string().min(1).max(80) });
 const versionSchema = z.object({ id: z.string(), label: z.string(), url: z.string() });
-const stages = ["Queued", "Getting the model ready", "Planning", "Making the music", "Mixing", "Finishing"] as const;
+const stages = ["Queued", "Loading", "Planning", "Making", "Mixing", "Finishing"] as const;
 const musicStagesSchema = z.array(z.object({ id: z.string(), label: z.string() }));
 const cardSchema = z.object({
   id: z.string(), state: z.enum(["queued", "running", "done", "failed", "cancelled"]), stage: z.string().nullable(), stage_label: z.string(),
@@ -58,9 +58,9 @@ const cardSchema = z.object({
 });
 export function musicFileUrl(job: MusicJob): string { return `/api/music/jobs/${encodeURIComponent(job.id)}/files/${encodeURIComponent(job.fileId!)}`; }
 const MUSIC_STAGE_LABELS: Record<string, string> = {
-  loading: "Getting the model ready", starting: "Getting the model ready",
-  planning: "Planning the song", lm: "Planning the song",
-  making: "Making the music", dit: "Making the music", music: "Making the music", generating: "Making the music",
+  loading: "Loading", starting: "Loading",
+  planning: "Planning", lm: "Planning",
+  making: "Making", dit: "Making", music: "Making", generating: "Making",
   vae: "Mixing", decoding: "Mixing", mixing: "Finishing", encoding: "Finishing", saving: "Finishing",
   paused: "Paused while chat is working",
 };
