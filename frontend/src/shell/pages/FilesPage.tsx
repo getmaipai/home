@@ -312,7 +312,7 @@ export function FilesPage({ person }: { person: Roster }) {
   );
 
   return (
-    <div className="flex min-h-0 flex-1" data-testid="library-page"
+    <div className="flex min-h-0 flex-1" data-workspace-fill="" data-testid="library-page"
       onDragOver={(event) => { if (event.dataTransfer?.types.includes("Files")) { event.preventDefault(); setDragging(true); } }}
       onDragLeave={(event) => { if (event.currentTarget === event.target) setDragging(false); }}
       onDrop={(event) => { setDragging(false); const files = Array.from(event.dataTransfer?.files ?? []); if (files.length > 0) { event.preventDefault(); addFiles(files); } }}>

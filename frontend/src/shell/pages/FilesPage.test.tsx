@@ -60,6 +60,15 @@ const where = () => document.querySelector('[data-testid="where"]')!.textContent
 const tile = (name: string) => Array.from(document.querySelectorAll<HTMLElement>('[data-slot="file-tile-main"]')).find((el) => el.getAttribute("aria-label")?.startsWith(name));
 
 describe("Library states", () => {
+  test("the Library page marks itself as a workspace page, so its sidebar sits flush against the rail", async () => {
+    const server = serve({ items: [item("f1", "Fox")] });
+    try {
+      page();
+      await waitFor(() => expect(tile("Fox")).toBeTruthy());
+      expect(document.querySelector('[data-testid="library-page"]')?.hasAttribute("data-workspace-fill")).toBe(true);
+    } finally { server.restore(); }
+  });
+
   test("loading shows a status with a plain label, then the tiles", async () => {
     const server = serve({ items: [item("f1", "Fox in the snow")] });
     try {
