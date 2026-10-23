@@ -326,6 +326,10 @@ if [ "$RELEASE_REQUESTED" = 1 ]; then
   SCOPE_WHY="${RELEASE_WHY#release gate: }"
 fi
 echo "== scope: $SCOPE ($SCOPE_WHY)"
+# The code map (docs/dev/code-map.md) must describe the code on every scope. Regenerate with: python3 scripts/code-map.py
+if [ -f scripts/code-map.py ]; then
+  python3 scripts/code-map.py --check || exit 1
+fi
 if [ -z "${GATE_DIFF_BASE:-}" ]; then GATE_DIFF_BASE="$(gate_diff_base 2>/dev/null || true)"; fi
 
 # One check at a time in this exact worktree, including standalone --pre.
