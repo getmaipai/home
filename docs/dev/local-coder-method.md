@@ -43,6 +43,15 @@ Guidance for coding-agent instruction files is consistent, and the method follow
 Sources: the [SWE-agent paper](https://arxiv.org/pdf/2405.15793) (prompt tips, system template), and general guidance on
 [AGENTS.md and CLAUDE.md files](https://mac.install.guide/ai/agent-instructions/best-practices).
 
+## Always on the latest repo
+
+The model must never work from an old copy of the code. `local-lane dispatch` checks this before the model starts: it fetches `origin/main`, and
+a clean worktree that is behind main with no commits of its own is fast-forwarded to it. A worktree that is behind and has its own commits or
+edits is refused with the next step (sync it, or start a new worktree). If the fetch cannot run, the run goes on from the last known
+`origin/main` and the first line of the output says so. Start every dispatch in a fresh worktree (`bash scripts/wt.sh start <slug>`), which is
+cut from the latest main. A long-lived worktree (the offline coder's) or an OpenCode started by hand is not covered by this check: sync it
+before use.
+
 ## Keeping it honest
 
 - Record the verdict of every dispatch (`local-lane verdict RUN accepted|edited|discarded`). When a failure repeats, add one rule for it here
