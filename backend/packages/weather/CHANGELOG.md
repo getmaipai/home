@@ -2,6 +2,12 @@
 
 All notable changes to the Weather package, in [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) format.
 
+## [0.3.2] - 2026-10-23
+
+### Added
+
+- The weather forecast request includes feels-like temperature, humidity, precipitation, wind speed and direction, pressure, visibility, sunrise and sunset, and UV index. These values are passed as `block_detail_*` data keys for the weather reply.
+
 ## [0.3.1] - 2026-10-17
 
 - The Weather app says why it has nothing to show. With no place chosen it asks you to add a place or use your location (and explains how to allow location in Safari). If the weather source cannot be reached it says so and offers Try again, instead of one generic error. A saved place is used when Current location is the default and the browser shares no position.
