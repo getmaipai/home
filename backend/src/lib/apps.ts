@@ -36,6 +36,8 @@ export type { AppRow, AppSection };
 export interface AppData {
   as_of: string;
   blocks?: unknown[];
+  /** Weather forecast detail values (feels like, humidity, wind, sun times, UV) for the Weather page tiles. */
+  details?: Record<string, unknown>;
   rows?: Array<{ id: string; label: string }>;
   degraded?: true;
   /** The page has no place to show: nothing was chosen and the person has no default or household home. */
@@ -510,6 +512,11 @@ export async function getAppData(person: PersonRow, packageId: string, dataId: s
   if ((result.value.data as { needs?: string } | undefined)?.needs === "place") return { ok: true, status: 200, value: { as_of: asOf, blocks: [], needs: "place" } };
   const raw = (result.value as typeof result.value & { blocks?: unknown }).blocks;
   const blocks = Array.isArray(raw) ? filterAnswerBlocks(raw, packageId, app.manifest.returns_blocks ?? [], speakerAgeBand(person, new Date()), person) : [];
+  if (packageId === "weather" && dataId === "forecast" && Array.isArray(raw)) {
+    const resultData = (result.value as typeof result.value & { data?: Record<string, unknown> }).data;
+    const detailValues = Object.fromEntries(Object.entries(resultData ?? {}).filter(([key]) => key.startsWith("detail_")).map(([key, value]) => [key.slice("detail_".length), value]));
+    return { ok: true, status: 200, value: { as_of: asOf, blocks, details: detailValues } };
+  }
   return { ok: true, status: 200, value: { as_of: asOf, blocks } };
 }
 

@@ -560,7 +560,7 @@ function seedWeatherCache(dataDir: string): void {
   // carries the same shape): current temperature and weather_code, plus
   // today's high, low and rain chance.
   const forecastUrl =
-    "https://api.open-meteo.com/v1/forecast?latitude=47.60621&longitude=-122.33207&current=temperature_2m,weather_code,is_day&hourly=temperature_2m,precipitation_probability&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max&forecast_days=8&forecast_hours=24&timezone=auto&temperature_unit=fahrenheit";
+    "https://api.open-meteo.com/v1/forecast?latitude=47.60621&longitude=-122.33207&current=temperature_2m,weather_code,is_day,apparent_temperature,relative_humidity_2m,precipitation,wind_speed_10m,wind_direction_10m,pressure_msl,visibility&hourly=temperature_2m,precipitation_probability&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max,sunrise,sunset,uv_index_max&forecast_days=8&forecast_hours=24&timezone=auto&temperature_unit=fahrenheit";
   const hourTemps = [57.3, 56.8, 56.1, 55.4, 54.9, 54.6, 54.8, 56.0, 58.2, 60.5, 62.4, 63.8, 64.2, 64.0, 63.1, 61.7, 60.0, 58.6, 57.5, 56.9, 56.2, 55.7, 55.1, 54.8];
   const dayHighs = [64.2, 66.0, 63.5, 61.8, 65.1, 67.3, 62.9, 60.4];
   const dayLows = [52.1, 51.4, 50.2, 49.8, 51.0, 52.6, 50.7, 49.2];

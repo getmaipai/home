@@ -25,7 +25,7 @@ const CardProps = z.object({
   attribution: z.string().min(1),
 }).strict();
 
-const FORECAST_URL = "https://api.open-meteo.com/v1/forecast?latitude=47.6&longitude=-122.3&current=temperature_2m,weather_code,is_day&hourly=temperature_2m,precipitation_probability&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max&forecast_days=8&forecast_hours=24&timezone=auto&temperature_unit=fahrenheit";
+const FORECAST_URL = "https://api.open-meteo.com/v1/forecast?latitude=47.6&longitude=-122.3&current=temperature_2m,weather_code,is_day,apparent_temperature,relative_humidity_2m,precipitation,wind_speed_10m,wind_direction_10m,pressure_msl,visibility&hourly=temperature_2m,precipitation_probability&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max,sunrise,sunset,uv_index_max&forecast_days=8&forecast_hours=24&timezone=auto&temperature_unit=fahrenheit";
 
 function fixture(name: string): any {
   return JSON.parse(readFileSync(join(import.meta.dir, "fixtures", "weather", `open-meteo-${name}.json`), "utf-8"));
@@ -49,9 +49,9 @@ describe("WEATHER-CARD-01: weather_card from the recipe's one forecast response"
     if (!loaded.ok) throw new Error(loaded.error);
     const fetches = loaded.value.recipe.steps.filter((s: any) => s.op === "fetch") as { url: string }[];
     const q = new URL(fetches[1]!.url.replace("{lat}", "1").replace("{lon}", "2")).searchParams;
-    expect(q.get("current")).toBe("temperature_2m,weather_code,is_day");
+    expect(q.get("current")).toBe("temperature_2m,weather_code,is_day,apparent_temperature,relative_humidity_2m,precipitation,wind_speed_10m,wind_direction_10m,pressure_msl,visibility");
     expect(q.get("hourly")).toBe("temperature_2m,precipitation_probability");
-    expect(q.get("daily")).toBe("weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max");
+    expect(q.get("daily")).toBe("weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max,sunrise,sunset,uv_index_max");
     expect(q.get("forecast_days")).toBe("8");
     expect(fetches.every((f) => ["geocoding-api.open-meteo.com", "api.open-meteo.com"].includes(new URL(f.url.replace(/\{\w+\}/g, "1")).hostname))).toBe(true);
   });

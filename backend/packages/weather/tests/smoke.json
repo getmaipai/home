@@ -16,12 +16,14 @@
           }
         ]
       },
-      "https://api.open-meteo.com/v1/forecast?latitude=47.60621&longitude=-122.33207&current=temperature_2m,weather_code,is_day&hourly=temperature_2m,precipitation_probability&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max&forecast_days=8&forecast_hours=24&timezone=auto&temperature_unit=fahrenheit": {
+      "https://api.open-meteo.com/v1/forecast?latitude=47.60621&longitude=-122.33207&current=temperature_2m,weather_code,is_day,apparent_temperature,relative_humidity_2m,precipitation,wind_speed_10m,wind_direction_10m,pressure_msl,visibility&hourly=temperature_2m,precipitation_probability&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max,sunrise,sunset,uv_index_max&forecast_days=8&forecast_hours=24&timezone=auto&temperature_unit=fahrenheit": {
         "current": {
           "time": "2026-09-05T05:30",
           "temperature_2m": 57.3,
           "weather_code": 61,
-          "is_day": 0
+          "is_day": 0,
+          "apparent_temperature": 54.2, "relative_humidity_2m": 81, "precipitation": 0.4,
+          "wind_speed_10m": 12.3, "wind_direction_10m": 240, "pressure_msl": 1014.2, "visibility": 8000
         },
         "hourly": {
           "time": [
@@ -57,6 +59,9 @@
             52.1,
             51.4
           ],
+          "sunrise": ["2026-09-05T06:30", "2026-09-06T06:31"],
+          "sunset": ["2026-09-05T19:42", "2026-09-06T19:40"],
+          "uv_index_max": [4.2, 5.1],
           "precipitation_probability_max": [
             70,
             40

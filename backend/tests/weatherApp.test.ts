@@ -18,7 +18,7 @@ import { resetDb } from "./reset-db";
 import type { TestClient } from "./client";
 
 const FORECAST = {
-  current: { time: "2026-10-17T21:00", temperature_2m: 41.2, weather_code: 73, is_day: 0 },
+  current: { time: "2026-10-17T21:00", temperature_2m: 41.2, weather_code: 73, is_day: 0, apparent_temperature: 37.8, relative_humidity_2m: 84, precipitation: 0.1, wind_speed_10m: 8.2, wind_direction_10m: 225, pressure_msl: 1012.4, visibility: 10000 },
   hourly: { time: ["2026-10-17T21:00", "2026-10-17T22:00"], temperature_2m: [41, 40], precipitation_probability: [60, 70] },
   daily: {
     time: ["2026-10-17", "2026-10-18", "2026-10-19"],
@@ -26,6 +26,9 @@ const FORECAST = {
     temperature_2m_max: [44.1, 47.3, 52.0],
     temperature_2m_min: [33.0, 35.5, 38.2],
     precipitation_probability_max: [80, 20, 0],
+    sunrise: ["2026-10-17T07:22", "2026-10-18T07:24", "2026-10-19T07:25"],
+    sunset: ["2026-10-17T18:10", "2026-10-18T18:08", "2026-10-19T18:06"],
+    uv_index_max: [2.1, 2.3, 2.4],
   },
 };
 const GEOCODE = { results: [{ name: "Portland", latitude: 45.5234, longitude: -122.6762 }] };
@@ -144,6 +147,7 @@ describe("the forecast data call", () => {
     expect(blocks[0]!.props.current).toMatchObject({ code: 73, is_day: false });
     expect(blocks[0]!.props.daily.length).toBe(3);
     expect(blocks[0]!.props.hourly.length).toBe(2);
+    expect((result as { value: { details: Record<string, unknown> } }).value.details).toMatchObject({ feels_like: 37.8, humidity: 84, precipitation: 0.1, wind_speed: 8.2, wind_direction: 225, pressure: 1012.4, visibility: 10000, sunrise: "2026-10-17T07:22", sunset: "2026-10-17T18:10", uv_index: 2.1 });
     expect(blocks[0]!.props.attribution).toContain("Open-Meteo");
     const hosts = new Set(urls.map((url) => new URL(url).host));
     expect([...hosts].every((host) => host === "api.open-meteo.com" || host === "geocoding-api.open-meteo.com")).toBe(true);

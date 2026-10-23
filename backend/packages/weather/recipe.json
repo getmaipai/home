@@ -68,7 +68,7 @@
     {
       "op": "fetch",
       "as": "wx",
-      "url": "https://api.open-meteo.com/v1/forecast?latitude={latitude}&longitude={longitude}&current=temperature_2m,weather_code,is_day&hourly=temperature_2m,precipitation_probability&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max&forecast_days=8&forecast_hours=24&timezone=auto&temperature_unit={unit}",
+      "url": "https://api.open-meteo.com/v1/forecast?latitude={latitude}&longitude={longitude}&current=temperature_2m,weather_code,is_day,apparent_temperature,relative_humidity_2m,precipitation,wind_speed_10m,wind_direction_10m,pressure_msl,visibility&hourly=temperature_2m,precipitation_probability&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max,sunrise,sunset,uv_index_max&forecast_days=8&forecast_hours=24&timezone=auto&temperature_unit={unit}",
       "method": "GET"
     },
     {
@@ -173,6 +173,16 @@
       "from": "wx",
       "path": "current.is_day"
     },
+    { "op": "pick", "as": "feels_like", "from": "wx", "path": "current.apparent_temperature" },
+    { "op": "pick", "as": "humidity", "from": "wx", "path": "current.relative_humidity_2m" },
+    { "op": "pick", "as": "precipitation", "from": "wx", "path": "current.precipitation" },
+    { "op": "pick", "as": "wind_speed", "from": "wx", "path": "current.wind_speed_10m" },
+    { "op": "pick", "as": "wind_direction", "from": "wx", "path": "current.wind_direction_10m" },
+    { "op": "pick", "as": "pressure", "from": "wx", "path": "current.pressure_msl" },
+    { "op": "pick", "as": "visibility", "from": "wx", "path": "current.visibility" },
+    { "op": "pick", "as": "sunrise", "from": "wx", "path": "daily.sunrise.0" },
+    { "op": "pick", "as": "sunset", "from": "wx", "path": "daily.sunset.0" },
+    { "op": "pick", "as": "uv_index", "from": "wx", "path": "daily.uv_index_max.0" },
     {
       "op": "pick",
       "as": "hour_times",
@@ -234,7 +244,17 @@
         "block_is_day": "{is_day}",
         "block_hour_times": "{hour_times}",
         "block_hour_pop": "{hour_pop}",
-        "block_day_codes": "{day_codes}"
+        "block_day_codes": "{day_codes}",
+        "detail_feels_like": "{feels_like}",
+        "detail_humidity": "{humidity}",
+        "detail_precipitation": "{precipitation}",
+        "detail_wind_speed": "{wind_speed}",
+        "detail_wind_direction": "{wind_direction}",
+        "detail_pressure": "{pressure}",
+        "detail_visibility": "{visibility}",
+        "detail_sunrise": "{sunrise}",
+        "detail_sunset": "{sunset}",
+        "detail_uv_index": "{uv_index}"
       }
     }
   ]

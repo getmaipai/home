@@ -174,6 +174,7 @@ export function ChatThreadExtras() {
     label: command.name,
     group: command.group,
     keys: command.shortcut ? [command.shortcut] : [],
+    iconUrl: `data:image/svg+xml,${encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="${command.id === "new-chat" ? "M12 5v14M5 12h14" : command.id === "focus-composer" ? "M12 20h9M16.5 3.5a2.12 2.12 0 0 1 3 3L8 18l-4 1 1-4Z" : command.id === "stop-reply" ? "M6 6h12v12H6z" : command.id === "toggle-sidebar" ? "M3 3h18v18H3zM9 3v18" : command.id === "search-chats" ? "M11 19a8 8 0 1 1 0-16 8 8 0 0 1 0 16ZM21 21l-4.35-4.35" : command.id === "open-settings" ? "M12 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8ZM19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06-1.7 2.94-.08-.03a1.65 1.65 0 0 0-1.76.4l-.06.06h-3.4l-.02-.08a1.65 1.65 0 0 0-1.23-1.18l-.08-.02-1.7-2.94.06-.06A1.65 1.65 0 0 0 9.2 14.1l-.03-.08v-3.4l.08-.02a1.65 1.65 0 0 0 1.18-1.23l.02-.08 2.94-1.7.06.06a1.65 1.65 0 0 0 1.82.33l.06-.03h3.4l.02.08a1.65 1.65 0 0 0 1.18 1.23l.08.02v3.4l-.08.02a1.65 1.65 0 0 0-1.23 1.23Z" : "M12 3v3m0 12v3M3 12h3m12 0h3M5.6 5.6l2.1 2.1m8.6 8.6 2.1 2.1m0-12.8-2.1 2.1m-8.6 8.6-2.1 2.1"}"/></svg>`)}`,
   })), [commands]);
 
   return (
