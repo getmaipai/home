@@ -216,7 +216,7 @@ describe("GENUI-04: weather returns a spec_sheet, a chart and a data_table", () 
 
   function forecast(): unknown {
     return {
-      current: { time: "2026-10-09T14:00", temperature_2m: 61.4, weather_code: 3 },
+      current: { time: "2026-10-09T14:00", temperature_2m: 61.4, weather_code: 3, is_day: 1, apparent_temperature: 60.8, relative_humidity_2m: 72, precipitation: 0, wind_speed_10m: 4.3, wind_direction_10m: 225, pressure_msl: 1012.4, visibility: 16000 },
       hourly: { time: HOURS, temperature_2m: TEMPS },
       daily: {
         time: DAYS,
@@ -265,7 +265,8 @@ describe("GENUI-04: weather returns a spec_sheet, a chart and a data_table", () 
     expect(q.get("hourly")).toBe("temperature_2m,precipitation_probability");
     expect(q.get("forecast_hours")).toBe("24");
     expect(q.get("forecast_days")).toBe("8");
-    expect(q.get("current")).toBe("temperature_2m,weather_code,is_day");
+    expect(q.get("current")).toBe("temperature_2m,weather_code,is_day,apparent_temperature,relative_humidity_2m,precipitation,wind_speed_10m,wind_direction_10m,pressure_msl,visibility");
+    expect(q.get("daily")).toBe("weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max,sunrise,sunset,uv_index_max");
     expect(urls.every((u) => ["geocoding-api.open-meteo.com", "api.open-meteo.com"].includes(new URL(u).hostname))).toBe(true);
   });
 
