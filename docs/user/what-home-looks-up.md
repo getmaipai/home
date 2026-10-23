@@ -27,7 +27,7 @@ Open **Settings**, then **Privacy**. This page lists the connections Home can ma
 
 ## News and news feeds
 
-**What it is for:** Headlines from NPR or from the News shelf. The shelf can use feeds from the BBC, CBC News, Grist, MarketWatch, NASA, NPR, PBS, Popular Science, Science News Explores, Sports Illustrated, TechCrunch, The Guardian, TIME for Kids and Variety.
+**What it is for:** Headlines from NPR or from the News shelf. The shelf can use feeds from 9to5Mac, ABC News, Al Jazeera, Android Authority, Ars Technica, Business Insider, CBC News, CBS News, CBS Sports, CNBC, CNET, Daring Fireball, Deadline, Deutsche Welle, Engadget, Entrepreneur, ESPN, Fast Company, Forbes, Fortune, Fox News, France 24, Gizmodo, Grist, Hacker News, Inc., Los Angeles Times, MacRumors, MarketWatch, Mashable, MIT Technology Review, NASA, Nature, NBC News, New Scientist, NPR, PBS, Phys.org, Popular Science, Rolling Stone, Science News Explores, ScienceDaily, Seeking Alpha, Sky News, Slashdot, Smithsonian, Space.com, Sports Illustrated, Star Tribune, TechCrunch, TechRadar, the BBC, The Economist, The Guardian, The Hollywood Reporter, The New York Times, The Oregonian, The Register, The Texas Tribune, The Verge, The Wall Street Journal, TIME for Kids and Variety, Tom's Guide, Wired, Yahoo Sports and ZDNet.
 
 **When it happens:** With the shelf on, Home checks enabled feeds in the background about every 30 minutes, while nobody is using Home. With the shelf off, Home asks NPR when someone asks for news.
 

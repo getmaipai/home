@@ -339,35 +339,639 @@
       "title": "MarketWatch Top Stories",
       "publisher": "MarketWatch",
       "lang": "en",
-      "topics_hint": ["business"]
+      "topics_hint": [
+        "business"
+      ]
     },
     {
       "url": "https://techcrunch.com/feed/",
       "title": "TechCrunch",
       "publisher": "TechCrunch",
       "lang": "en",
-      "topics_hint": ["technology"]
+      "topics_hint": [
+        "technology"
+      ]
     },
     {
       "url": "https://feeds.npr.org/1003/rss.xml",
       "title": "NPR U.S. News",
       "publisher": "NPR",
       "lang": "en",
-      "topics_hint": ["local"]
+      "topics_hint": [
+        "local"
+      ]
     },
     {
       "url": "https://www.theguardian.com/us-news/rss",
       "title": "The Guardian U.S. News",
       "publisher": "The Guardian",
       "lang": "en",
-      "topics_hint": ["local"]
+      "topics_hint": [
+        "local"
+      ]
     },
     {
       "url": "https://feeds.bbci.co.uk/news/world/us_and_canada/rss.xml",
       "title": "BBC U.S. and Canada",
       "publisher": "BBC",
       "lang": "en",
-      "topics_hint": ["local"]
+      "topics_hint": [
+        "local"
+      ]
+    },
+    {
+      "url": "https://search.cnbc.com/rs/search/combinedcms/view.xml?partnerId=wrss01&id=100003114",
+      "title": "CNBC Top News",
+      "publisher": "CNBC",
+      "lang": "en",
+      "topics_hint": [
+        "business"
+      ]
+    },
+    {
+      "url": "https://search.cnbc.com/rs/search/combinedcms/view.xml?partnerId=wrss01&id=10000664",
+      "title": "CNBC Finance",
+      "publisher": "CNBC",
+      "lang": "en",
+      "topics_hint": [
+        "business"
+      ]
+    },
+    {
+      "url": "https://rss.nytimes.com/services/xml/rss/nyt/Business.xml",
+      "title": "NYT Business",
+      "publisher": "The New York Times",
+      "lang": "en",
+      "topics_hint": [
+        "business"
+      ]
+    },
+    {
+      "url": "https://rss.nytimes.com/services/xml/rss/nyt/Economy.xml",
+      "title": "NYT Economy",
+      "publisher": "The New York Times",
+      "lang": "en",
+      "topics_hint": [
+        "business"
+      ]
+    },
+    {
+      "url": "https://www.theguardian.com/uk/business/rss",
+      "title": "Guardian Business",
+      "publisher": "The Guardian",
+      "lang": "en",
+      "topics_hint": [
+        "business"
+      ]
+    },
+    {
+      "url": "https://fortune.com/feed/",
+      "title": "Fortune",
+      "publisher": "Fortune",
+      "lang": "en",
+      "topics_hint": [
+        "business"
+      ]
+    },
+    {
+      "url": "https://www.forbes.com/business/feed/",
+      "title": "Forbes Business",
+      "publisher": "Forbes",
+      "lang": "en",
+      "topics_hint": [
+        "business"
+      ]
+    },
+    {
+      "url": "https://feeds.businessinsider.com/custom/all",
+      "title": "Business Insider",
+      "publisher": "Business Insider",
+      "lang": "en",
+      "topics_hint": [
+        "business"
+      ]
+    },
+    {
+      "url": "https://seekingalpha.com/market_currents.xml",
+      "title": "Seeking Alpha",
+      "publisher": "Seeking Alpha",
+      "lang": "en",
+      "topics_hint": [
+        "business"
+      ]
+    },
+    {
+      "url": "https://feeds.npr.org/1017/rss.xml",
+      "title": "NPR Economy",
+      "publisher": "NPR",
+      "lang": "en",
+      "topics_hint": [
+        "business"
+      ]
+    },
+    {
+      "url": "https://feeds.a.dj.com/rss/RSSMarketsMain.xml",
+      "title": "WSJ Markets",
+      "publisher": "The Wall Street Journal",
+      "lang": "en",
+      "topics_hint": [
+        "business"
+      ]
+    },
+    {
+      "url": "https://feeds.a.dj.com/rss/WSJcomUSBusiness.xml",
+      "title": "WSJ Business",
+      "publisher": "The Wall Street Journal",
+      "lang": "en",
+      "topics_hint": [
+        "business"
+      ]
+    },
+    {
+      "url": "https://www.economist.com/finance-and-economics/rss.xml",
+      "title": "Economist Finance",
+      "publisher": "The Economist",
+      "lang": "en",
+      "topics_hint": [
+        "business"
+      ]
+    },
+    {
+      "url": "https://www.inc.com/rss",
+      "title": "Inc",
+      "publisher": "Inc.",
+      "lang": "en",
+      "topics_hint": [
+        "business"
+      ]
+    },
+    {
+      "url": "https://www.fastcompany.com/latest/rss",
+      "title": "Fast Company",
+      "publisher": "Fast Company",
+      "lang": "en",
+      "topics_hint": [
+        "business"
+      ]
+    },
+    {
+      "url": "https://www.entrepreneur.com/latest.rss",
+      "title": "Entrepreneur",
+      "publisher": "Entrepreneur",
+      "lang": "en",
+      "topics_hint": [
+        "business"
+      ]
+    },
+    {
+      "url": "https://rss.nytimes.com/services/xml/rss/nyt/Technology.xml",
+      "title": "NYT Technology",
+      "publisher": "The New York Times",
+      "lang": "en",
+      "topics_hint": [
+        "technology"
+      ]
+    },
+    {
+      "url": "https://www.theverge.com/rss/index.xml",
+      "title": "The Verge",
+      "publisher": "The Verge",
+      "lang": "en",
+      "topics_hint": [
+        "technology"
+      ]
+    },
+    {
+      "url": "https://www.wired.com/feed/rss",
+      "title": "Wired",
+      "publisher": "Wired",
+      "lang": "en",
+      "topics_hint": [
+        "technology"
+      ]
+    },
+    {
+      "url": "https://feeds.arstechnica.com/arstechnica/index",
+      "title": "Ars Technica",
+      "publisher": "Ars Technica",
+      "lang": "en",
+      "topics_hint": [
+        "technology"
+      ]
+    },
+    {
+      "url": "https://www.engadget.com/rss.xml",
+      "title": "Engadget",
+      "publisher": "Engadget",
+      "lang": "en",
+      "topics_hint": [
+        "technology"
+      ]
+    },
+    {
+      "url": "https://gizmodo.com/feed",
+      "title": "Gizmodo",
+      "publisher": "Gizmodo",
+      "lang": "en",
+      "topics_hint": [
+        "technology"
+      ]
+    },
+    {
+      "url": "https://www.cnet.com/rss/news/",
+      "title": "CNET",
+      "publisher": "CNET",
+      "lang": "en",
+      "topics_hint": [
+        "technology"
+      ]
+    },
+    {
+      "url": "https://www.zdnet.com/news/rss.xml",
+      "title": "ZDNet",
+      "publisher": "ZDNet",
+      "lang": "en",
+      "topics_hint": [
+        "technology"
+      ]
+    },
+    {
+      "url": "https://9to5mac.com/feed/",
+      "title": "9to5Mac",
+      "publisher": "9to5Mac",
+      "lang": "en",
+      "topics_hint": [
+        "technology"
+      ]
+    },
+    {
+      "url": "https://feeds.macrumors.com/MacRumors-All",
+      "title": "MacRumors",
+      "publisher": "MacRumors",
+      "lang": "en",
+      "topics_hint": [
+        "technology"
+      ]
+    },
+    {
+      "url": "https://daringfireball.net/feeds/main",
+      "title": "Daring Fireball",
+      "publisher": "Daring Fireball",
+      "lang": "en",
+      "topics_hint": [
+        "technology"
+      ]
+    },
+    {
+      "url": "https://www.techradar.com/rss",
+      "title": "TechRadar",
+      "publisher": "TechRadar",
+      "lang": "en",
+      "topics_hint": [
+        "technology"
+      ]
+    },
+    {
+      "url": "https://mashable.com/feeds/rss/all",
+      "title": "Mashable",
+      "publisher": "Mashable",
+      "lang": "en",
+      "topics_hint": [
+        "technology"
+      ]
+    },
+    {
+      "url": "https://www.theguardian.com/technology/rss",
+      "title": "Guardian Technology",
+      "publisher": "The Guardian",
+      "lang": "en",
+      "topics_hint": [
+        "technology"
+      ]
+    },
+    {
+      "url": "https://www.technologyreview.com/feed/",
+      "title": "MIT Technology Review",
+      "publisher": "MIT Technology Review",
+      "lang": "en",
+      "topics_hint": [
+        "technology"
+      ]
+    },
+    {
+      "url": "https://hnrss.org/frontpage",
+      "title": "Hacker News",
+      "publisher": "Hacker News",
+      "lang": "en",
+      "topics_hint": [
+        "technology"
+      ]
+    },
+    {
+      "url": "https://www.theregister.com/headlines.atom",
+      "title": "The Register",
+      "publisher": "The Register",
+      "lang": "en",
+      "topics_hint": [
+        "technology"
+      ]
+    },
+    {
+      "url": "https://www.androidauthority.com/feed/",
+      "title": "Android Authority",
+      "publisher": "Android Authority",
+      "lang": "en",
+      "topics_hint": [
+        "technology"
+      ]
+    },
+    {
+      "url": "https://www.tomsguide.com/feeds/all",
+      "title": "Tom's Guide",
+      "publisher": "Tom's Guide",
+      "lang": "en",
+      "topics_hint": [
+        "technology"
+      ]
+    },
+    {
+      "url": "https://rss.slashdot.org/Slashdot/slashdotMain",
+      "title": "Slashdot",
+      "publisher": "Slashdot",
+      "lang": "en",
+      "topics_hint": [
+        "technology"
+      ]
+    },
+    {
+      "url": "https://abcnews.go.com/abcnews/usheadlines",
+      "title": "ABC News US",
+      "publisher": "ABC News",
+      "lang": "en",
+      "topics_hint": [
+        "local"
+      ]
+    },
+    {
+      "url": "https://www.cbsnews.com/latest/rss/us",
+      "title": "CBS News US",
+      "publisher": "CBS News",
+      "lang": "en",
+      "topics_hint": [
+        "local"
+      ]
+    },
+    {
+      "url": "https://feeds.nbcnews.com/nbcnews/public/us-news",
+      "title": "NBC News US",
+      "publisher": "NBC News",
+      "lang": "en",
+      "topics_hint": [
+        "local"
+      ]
+    },
+    {
+      "url": "https://rss.nytimes.com/services/xml/rss/nyt/US.xml",
+      "title": "NYT US",
+      "publisher": "The New York Times",
+      "lang": "en",
+      "topics_hint": [
+        "local"
+      ]
+    },
+    {
+      "url": "https://moxie.foxnews.com/google-publisher/us.xml",
+      "title": "Fox News US",
+      "publisher": "Fox News",
+      "lang": "en",
+      "topics_hint": [
+        "local"
+      ]
+    },
+    {
+      "url": "https://www.latimes.com/local/rss2.0.xml",
+      "title": "LA Times",
+      "publisher": "Los Angeles Times",
+      "lang": "en",
+      "topics_hint": [
+        "local"
+      ]
+    },
+    {
+      "url": "https://www.texastribune.org/feeds/main/",
+      "title": "Texas Tribune",
+      "publisher": "The Texas Tribune",
+      "lang": "en",
+      "topics_hint": [
+        "local"
+      ]
+    },
+    {
+      "url": "https://www.startribune.com/local/index.rss2",
+      "title": "Star Tribune",
+      "publisher": "Star Tribune",
+      "lang": "en",
+      "topics_hint": [
+        "local"
+      ]
+    },
+    {
+      "url": "https://www.oregonlive.com/arc/outboundfeeds/rss/?outputType=xml",
+      "title": "Oregonian",
+      "publisher": "The Oregonian",
+      "lang": "en",
+      "topics_hint": [
+        "local"
+      ]
+    },
+    {
+      "url": "https://rss.nytimes.com/services/xml/rss/nyt/World.xml",
+      "title": "NYT World",
+      "publisher": "The New York Times",
+      "lang": "en",
+      "topics_hint": [
+        "world"
+      ]
+    },
+    {
+      "url": "https://www.aljazeera.com/xml/rss/all.xml",
+      "title": "Al Jazeera",
+      "publisher": "Al Jazeera",
+      "lang": "en",
+      "topics_hint": [
+        "world"
+      ]
+    },
+    {
+      "url": "https://rss.dw.com/rdf/rss-en-all",
+      "title": "DW",
+      "publisher": "Deutsche Welle",
+      "lang": "en",
+      "topics_hint": [
+        "world"
+      ]
+    },
+    {
+      "url": "https://www.france24.com/en/rss",
+      "title": "France24",
+      "publisher": "France 24",
+      "lang": "en",
+      "topics_hint": [
+        "world"
+      ]
+    },
+    {
+      "url": "https://feeds.skynews.com/feeds/rss/world.xml",
+      "title": "Sky News",
+      "publisher": "Sky News",
+      "lang": "en",
+      "topics_hint": [
+        "world"
+      ]
+    },
+    {
+      "url": "https://www.nasa.gov/feed/",
+      "title": "NASA",
+      "publisher": "NASA",
+      "lang": "en",
+      "topics_hint": [
+        "science"
+      ]
+    },
+    {
+      "url": "https://www.sciencedaily.com/rss/all.xml",
+      "title": "Science Daily",
+      "publisher": "ScienceDaily",
+      "lang": "en",
+      "topics_hint": [
+        "science"
+      ]
+    },
+    {
+      "url": "https://rss.nytimes.com/services/xml/rss/nyt/Science.xml",
+      "title": "NYT Science",
+      "publisher": "The New York Times",
+      "lang": "en",
+      "topics_hint": [
+        "science"
+      ]
+    },
+    {
+      "url": "https://phys.org/rss-feed/",
+      "title": "Phys.org",
+      "publisher": "Phys.org",
+      "lang": "en",
+      "topics_hint": [
+        "science"
+      ]
+    },
+    {
+      "url": "https://www.space.com/feeds/all",
+      "title": "Space.com",
+      "publisher": "Space.com",
+      "lang": "en",
+      "topics_hint": [
+        "science"
+      ]
+    },
+    {
+      "url": "https://www.nature.com/nature.rss",
+      "title": "Nature",
+      "publisher": "Nature",
+      "lang": "en",
+      "topics_hint": [
+        "science"
+      ]
+    },
+    {
+      "url": "https://www.newscientist.com/feed/home/",
+      "title": "New Scientist",
+      "publisher": "New Scientist",
+      "lang": "en",
+      "topics_hint": [
+        "science"
+      ]
+    },
+    {
+      "url": "https://www.smithsonianmag.com/rss/latest_articles/",
+      "title": "Smithsonian",
+      "publisher": "Smithsonian",
+      "lang": "en",
+      "topics_hint": [
+        "science"
+      ]
+    },
+    {
+      "url": "https://www.espn.com/espn/rss/news",
+      "title": "ESPN Top",
+      "publisher": "ESPN",
+      "lang": "en",
+      "topics_hint": [
+        "sports"
+      ]
+    },
+    {
+      "url": "https://www.cbssports.com/rss/headlines/",
+      "title": "CBS Sports",
+      "publisher": "CBS Sports",
+      "lang": "en",
+      "topics_hint": [
+        "sports"
+      ]
+    },
+    {
+      "url": "https://sports.yahoo.com/rss/",
+      "title": "Yahoo Sports",
+      "publisher": "Yahoo Sports",
+      "lang": "en",
+      "topics_hint": [
+        "sports"
+      ]
+    },
+    {
+      "url": "https://rss.nytimes.com/services/xml/rss/nyt/Arts.xml",
+      "title": "NYT Arts",
+      "publisher": "The New York Times",
+      "lang": "en",
+      "topics_hint": [
+        "entertainment"
+      ]
+    },
+    {
+      "url": "https://www.hollywoodreporter.com/feed/",
+      "title": "Hollywood Reporter",
+      "publisher": "The Hollywood Reporter",
+      "lang": "en",
+      "topics_hint": [
+        "entertainment"
+      ]
+    },
+    {
+      "url": "https://www.rollingstone.com/feed/",
+      "title": "Rolling Stone",
+      "publisher": "Rolling Stone",
+      "lang": "en",
+      "topics_hint": [
+        "entertainment"
+      ]
+    },
+    {
+      "url": "https://deadline.com/feed/",
+      "title": "Deadline",
+      "publisher": "Deadline",
+      "lang": "en",
+      "topics_hint": [
+        "entertainment"
+      ]
+    },
+    {
+      "url": "https://rss.nytimes.com/services/xml/rss/nyt/Health.xml",
+      "title": "NYT Health",
+      "publisher": "The New York Times",
+      "lang": "en",
+      "topics_hint": [
+        "health"
+      ]
     }
   ]
 }
