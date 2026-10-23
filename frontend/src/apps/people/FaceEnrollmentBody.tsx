@@ -2,7 +2,6 @@ import { useQuery } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
 import { AsyncState } from "@maipai/ui/src/primitives/AsyncState";
 import { CardContent, CardDescription, CardHeader, CardTitle } from "@maipai/ui/src/dashboard/components/ui/card";
-import { Button } from "@maipai/ui/src/dashboard/components/ui/button";
 import { api, type BiometricPrintSummary, type PersonRosterEntry, type Roster } from "@/lib/api";
 import { canManagePerson } from "@/apps/people/roles";
 import { canEnrollFace } from "@/apps/people/faceEnrollmentGate";
@@ -29,7 +28,7 @@ export function FaceEnrollmentBody({ viewer, profile, viewingSelf = viewer.id ==
         {(prints) => {
           const faces = prints.filter((print) => print.modality === "face" && print.deleted_at === null).sort((a, b) => b.created_at.localeCompare(a.created_at));
           const label = faces.length ? `Set up on ${new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", year: "numeric", timeZone: "UTC" }).format(new Date(faces[0]!.created_at))}` : "Not set up yet";
-          return <div className="flex flex-wrap items-center justify-between gap-3"><p className="text-sm text-muted-foreground">{label}</p>{canEnroll ? <Link to={`/people/${profile.id}/enroll-face`}><Button type="button" variant="outline" size="row">{faces.length ? "Re-enroll" : "Enroll"}</Button></Link> : viewingSelf && profile.role === "child" ? <p className="text-sm text-muted-foreground">Ask an admin to set this up.</p> : null}</div>;
+          return <div className="flex flex-wrap items-center justify-between gap-3"><p className="text-sm text-muted-foreground">{label}</p>{canEnroll ? <Link className="inline-flex min-h-12 items-center justify-center rounded-[var(--radius)] border border-border px-4 text-sm font-medium" to={`/people/${profile.id}/enroll-face`}>{faces.length ? "Re-enroll" : "Enroll"}</Link> : viewingSelf && profile.role === "child" ? <p className="text-sm text-muted-foreground">Ask an admin to set this up.</p> : null}</div>;
         }}
       </AsyncState>
       {canEnroll ? <SettingsRenderer scope="person" scopeValue={`person:${profile.id}`} only={["person.profile"]} includeKeys={["ui.enrollment_sounds"]} plainRows /> : null}

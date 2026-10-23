@@ -98,7 +98,7 @@ function MemoryRows({
         selectMode
           ? undefined
           : (m) => (
-              <div className="flex shrink-0 items-center gap-1">
+              <div className="flex min-w-0 max-w-full flex-wrap items-center justify-end gap-1">
                 {actorIsAdult && m.scope === "household" && onSetAudience ? (
                   <Select
                     value={m.child_disclosure ?? "child_ok"}
@@ -214,13 +214,13 @@ export function OtherPersonMemories({ personId, personName }: { personId: string
     <div className="flex flex-col gap-4">
       {actionError ? <p className="text-base text-destructive">{actionError}</p> : null}
 
-      <div className="flex min-w-0 flex-wrap gap-2">
-        <Button size="row" variant="secondary" onClick={handleExport} disabled={busy}>
+      <div className="flex min-w-0 flex-col gap-2 sm:flex-row sm:flex-wrap">
+        <div className="w-full sm:w-auto"><Button size="row" variant="secondary" onClick={handleExport} disabled={busy}>
           Export {personName}'s memories
-        </Button>
-        <Button size="row" variant="ghost" onClick={() => setConfirmingForget(true)} disabled={busy}>
+        </Button></div>
+        <div className="w-full sm:w-auto"><Button size="row" variant="ghost" onClick={() => setConfirmingForget(true)} disabled={busy}>
           Forget everything about {personName}
-        </Button>
+        </Button></div>
       </div>
 
       {confirmingForget ? (
@@ -374,7 +374,7 @@ export function OwnMemories({ filterIds, actorIsAdult }: { filterIds: Set<string
             <SelectModeToggle label="Select memories" onClick={selectMode.enter} />
           )}
           {!selectMode.active ? (
-            <Button variant="ghost" disabled={all.length === 0} onClick={() => setConfirmingForget("clear")}>
+            <Button size="row" variant="ghost" disabled={all.length === 0} onClick={() => setConfirmingForget("clear")}>
               Clear all
             </Button>
           ) : null}

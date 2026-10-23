@@ -327,8 +327,8 @@ export function UsersSection({ person }: UsersSectionProps) {
                 );
               }
               return (
-                <div className="flex min-w-0 flex-1 flex-col items-stretch gap-2 py-2">
-                  <div className="flex min-w-0 items-center gap-3">
+                <div className="flex min-w-0 flex-1 flex-col items-stretch gap-2 py-2 break-words">
+                  <div className="flex min-w-0 flex-wrap items-center gap-3">
                     {selectMode.active && canDeletePerson(actorRole, person.id, { id: p.id, role: p.role as Role }) ? (
                       // The box stays its designed 16px; `kit/ui/checkbox.tsx`
                       // already carries its own 48px hit area (docs/UI.md's
@@ -344,13 +344,12 @@ export function UsersSection({ person }: UsersSectionProps) {
                       />
                     ) : null}
                     <Avatar name={p.display_name} className="h-10 w-10 shrink-0" />
-                    <div className="flex min-w-0 flex-col">
+                    <div className="flex min-w-0 flex-1 flex-col break-words">
                       <span className="truncate text-base">{p.display_name}</span>
                       <span className="text-sm text-[var(--muted-foreground)]">{ROLE_LABELS[p.role]}</span>
                     </div>
                   </div>
                   <SettingsRenderer scope="person" scopeValue={`person:${p.id}`} settingKey="companions.allowed" only={["person.companions"]} plainRows />
-                  {p.age_band === "child" ? <Section heading="Memories"><div className="min-w-0 break-words [&_div.flex-wrap]:min-w-0 [&_button]:whitespace-normal [&_button]:break-words"><OtherPersonMemories personId={p.id} personName={p.display_name} /></div></Section> : null}
                 </div>
               );
             }}
@@ -422,6 +421,12 @@ export function UsersSection({ person }: UsersSectionProps) {
         </Section>
         )}
       </AsyncState>
+
+      {roster?.filter((p) => p.age_band === "child").map((p) => (
+        <Section key={`memories-${p.id}`} heading={`Memories for ${p.display_name}`}>
+          <OtherPersonMemories personId={p.id} personName={p.display_name} />
+        </Section>
+      ))}
 
       {roster ? (
         <SiteBlocksSection
