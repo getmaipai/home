@@ -3,6 +3,7 @@ import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
 import { useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
 import { getIcon } from "@maipai/ui/src/icons";
+import { HitField } from "@maipai/ui/src/settings/HitField";
 import { formatBytes } from "@maipai/ui/src/format";
 import { useIsPhoneLayout } from "@maipai/ui/src/dashboard/layouts/full/FullLayout";
 import { SectionSidebar, SectionSidebarDrawerSections, SectionSidebarShowButton, type SectionSidebarGroup, type SectionSidebarItem } from "@maipai/ui/src/primitives/SectionSidebar";
@@ -336,7 +337,7 @@ export function FilesPage({ person }: { person: Roster }) {
             {sections.map((section) => <div key={section.id} className="shrink-0"><Button type="button" variant={view.section === section.id ? "secondary" : "outline"} aria-pressed={view.section === section.id} onClick={() => goSection(section.id)}>{section.label}</Button></div>)}
           </div>
         ) : null}
-        {!wide && !trashView ? searchField : null}
+        {!wide && !trashView ? <HitField pad={10}>{searchField}</HitField> : null}
 
         {!trashView ? (
           <div className="flex flex-wrap items-center gap-3">
