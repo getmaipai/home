@@ -114,6 +114,9 @@ test("child eligibility is checked before fetching and stored descriptions remai
   expect(card(kid, "child").dek).toBeUndefined();
   await enrichItem(kid, "child");
   expect(card(kid, "child").dek).toContain("Ducks swam today.");
+  expect(card(kid, "child")).toMatchObject({ sourceIconUrl: `/api/favicon?domain=${new URL(KIDS_HOST).hostname}` });
+  expect(card(kid, "child").open_url).toBeUndefined();
+  expect(card(kid, "child").sourceIconUrl).toMatch(/^\/api\/favicon\?domain=/);
   expect(JSON.stringify(card(kid, "child"))).not.toContain("system prompt");
   expect(JSON.stringify(card(kid, "child"))).not.toContain("http");
 });

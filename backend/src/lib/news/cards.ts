@@ -19,6 +19,7 @@ export interface StoryCard {
   dek?: string;
   publisher: string;
   site: string;
+  sourceIconUrl?: string;
   published_at: string;
   outlets: number;
   topics: string[];
@@ -126,6 +127,7 @@ export function cardOf(item: ShelfItem, env: CardEnv): StoryCard | null {
   const image = imageOf(item, title, publisher, env);
   return {
     story_id: storyIdOf(item), item_id: item.id, title, ...(dek ? { dek } : {}), publisher, site: hostOf(item.canonical_url) || publisher,
+    ...(hostOf(item.canonical_url) ? { sourceIconUrl: `/api/favicon?domain=${encodeURIComponent(hostOf(item.canonical_url))}` } : {}),
     published_at: publishedAtOf(item), outlets: 1, topics: topicsShown(item, band), ...(image ? { image } : {}),
     saved: env.saved.has(item.id), opened: env.opened.has(item.id),
     ...(band !== "child" ? { open_url: item.url } : {}),
