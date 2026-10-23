@@ -1,6 +1,6 @@
 {
-  "generatedAt": "2026-10-23T19:56:14.016Z",
-  "kitTag": "ui-v0.5.326",
+  "generatedAt": "2026-10-23T23:52:51.937Z",
+  "kitTag": "ui-v0.5.327",
   "items": [
     {
       "file": "ActivityCardsShowcase.tsx",
@@ -16,6 +16,14 @@
       "group": "answers/showcase",
       "verdict": "support",
       "verdictReason": "Developer-only fixture for the kit dispatcher; it is not a standalone Home product surface.",
+      "implemented": false
+    },
+    {
+      "file": "CreationKitShowcase.tsx",
+      "name": "CreationKitShowcase",
+      "group": "CreationKitShowcase",
+      "verdict": "unassessed",
+      "verdictReason": "Recorded unassessed verdict in elements-plan.json; see the plan entry for its dependency or scope.",
       "implemented": false
     },
     {
@@ -430,6 +438,14 @@
       "group": "charts/data",
       "verdict": "no-fit",
       "verdictReason": "No current Home feature needs this Element’s specific data and interaction; the audit records the current scope decision.",
+      "implemented": false
+    },
+    {
+      "file": "creation-header.tsx",
+      "name": "creation-header",
+      "group": "creation",
+      "verdict": "unassessed",
+      "verdictReason": "Recorded unassessed verdict in elements-plan.json; see the plan entry for its dependency or scope.",
       "implemented": false
     },
     {
@@ -1109,6 +1125,14 @@
       "reading": "The Library page shares a file through ShareDialog over the existing share route, with a household row and per-person rows (LIBRARY-REVAMP-09)."
     },
     {
+      "file": "share-panel.tsx",
+      "name": "share-panel",
+      "group": "share",
+      "verdict": "unassessed",
+      "verdictReason": "Recorded unassessed verdict in elements-plan.json; see the plan entry for its dependency or scope.",
+      "implemented": false
+    },
+    {
       "file": "shared-conversation.tsx",
       "name": "shared-conversation",
       "group": "thread/list",
@@ -1502,6 +1526,14 @@
       "verdict": "wire-now",
       "verdictReason": "The generated-clip card (progress with Stop, then the clip with poster, controls, loop, Download, Share, Make another); VIDEO-GEN-06 binds it as the chat's `video` tool part.",
       "implemented": true
+    },
+    {
+      "file": "visibility-chip.tsx",
+      "name": "visibility-chip",
+      "group": "visibility",
+      "verdict": "unassessed",
+      "verdictReason": "Recorded unassessed verdict in elements-plan.json; see the plan entry for its dependency or scope.",
+      "implemented": false
     },
     {
       "file": "voice-conversation.tsx",
