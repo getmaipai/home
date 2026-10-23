@@ -5,10 +5,7 @@ Priority inside the queue: first after music, because Jesse called the current p
 testing v0.2.17): "You are putting household settings on the user settings page." and "We need a better household settings page:
 there are so many and it's hard to clearly navigate: it's very overwhelming."
 
-Architect verdict (written by the author, no architect agent run): **APPROVED for SETTINGS-IA-01 to -06, -08 and -09; NEEDS-RULE-CHANGE,
-narrowly, for one sentence in RULES.md S4 (section 7); one owner decision before SETTINGS-IA-07 (section 8).** The design uses only shipped
-kit parts (rule 9), the existing areas-as-data mechanism (S4), `describeSetting` copy (S5) and the existing status mechanisms (S6). Only
-Jesse changes a rule; that edit carries `Owner-approved: <date>` when he says so.
+Architect verdict: the author's own line that stood here (2026-10-18, no architect agent run) is stale and is not a verdict. The architect agent ruled on this note's items together with the layout revamp on 2026-10-22; the records are in `data-scratch/architect/` (SETTINGS-IA-02, -04, -05, SETTINGS-UX-03b, SETTINGS-UX-03-detail). Read the Supersedes section at the end before building from this note.
 
 Evidence: the scope audit script and live captures were run on 2026-10-18 against origin/main `49d5b73f` (Home v0.2.17 plus one fix),
 pinned `@maipai/spec` v0.1.175 and `@maipai/ui` v0.5.265, on a scratch Home (own data directory, port 8874, owner plus a teen and a
@@ -229,7 +226,7 @@ because the pages they pointed at are now one tap in the rail.
 | home / People | H1 | |
 | home / Engines and AI | H3 | Voice keys and Hugging Face token to H5; 13 model choices fold into "Model per job" |
 | home / Pictures, videos and music | H4 | |
-| home / Devices | H7 | keys appear when a robot is paired |
+| home / Robots (section id `robot`, labelled Devices) | H7 | keys appear when a robot is paired; the list, Add dialog and robot screen are built (SETTINGS-UX-04) |
 | home / Search | H6 | Blocked sites and the web rules for children and teens to H2 |
 | home / Integrations | H7 | Quiet hours to H1; Reference library to H6 |
 | home / Commands | H5 | |
@@ -240,6 +237,9 @@ because the pages they pointed at are now one tap in the rail.
 | home / Privacy | H2 | |
 | home / Developer tools | H9 | `media.budget.exempt_bedtime_audio` to H4 |
 | home / Network and access | H9 | |
+| home / Media library (`media-library`) | H4 | drawn by its view; moves with Pictures, videos and music |
+| home / Coding (`coding`) | H3 | Home mode Normal and Coding (2026-10-22); the `household.coding*` groups stay with the Coding view |
+| account / Coding (`coding`) | P3 | the person's coding keys |
 | news / Shelf (household, in the app gear) | H7, "News" card | the app gear keeps Reading only |
 | account / Profile, Data and privacy (sign-in parts) | P1 | |
 | account / Appearance | P2 | |
@@ -595,3 +595,15 @@ Generated 2026-10-18 from `getRegistry()` and the pinned `areas.json`, 219 rows.
 | `weather.default_place` | person | basic | weather/places | ok | P7 Your data and apps |
 | `weather.places` | person | basic | weather/places | ok | P7 Your data and apps |
 | `weather.unit` | person | basic | weather/places | ok | P7 Your data and apps |
+
+## Supersedes (added 2026-10-22, on the architect's ruling)
+
+[settings-layout-revamp-2026-10-22.md](settings-layout-revamp-2026-10-22.md) changes how the pages are drawn. Where the two notes disagree the revamp note wins:
+
+- Section 5.2 and 5.5 "each page is one scroll" and "one Show advanced row per page" (and backlog SETTINGS-IA-03's per-page advanced): a page is a short summary plus tabs; advanced is its own tab or a detail screen; nothing expands in place (owner decisions 7.1 to 7.3 of the revamp note).
+- Section 9's slice order: the revamp note's order applies (readability slices first, then IA-02, IA-04, IA-05).
+- Section 5.1 "SETTINGS-IA-01" is built as SETTINGS-UX-01.
+- The "cap of 10 visible settings per page" is counted per tab (a page's tabs may together exceed 10 only when each tab is its own topic); the lint counts per tab.
+- Section 5.4's Engines and AI row: the page is built as four tabs (Overview, Models, Engines, Advanced) that move onto spec-declared tabs; the Voice and Hugging Face moves to H5 still apply when H5 is built.
+
+Kept as written: the scope audit (section 3), the two sides and their names, search (5.6), the Recommended, Changed, New and install-state markers (5.7), enforcement (6), the one decision about reset (8).

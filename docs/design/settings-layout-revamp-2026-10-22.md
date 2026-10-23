@@ -198,13 +198,34 @@ Visible relief first, big content moves second. Each slice is its own landing.
 |---|---|---|
 | SETTINGS-UX-01 (S, Home) | Column title from the area, reach Badge, remove one-item group headings, fix `/settings/home/voice`, a non-admin gets an explanation not a silent redirect (this is the IA note's SETTINGS-IA-01 plus the heading fix) | Fixes the "column is hard to read" complaint with no spec change |
 | SETTINGS-UX-02 (M, `commons` ui, then pin) | Icon tile rows, strong active row, trail and sticky header, 260 and 760 widths, Mine and Household switch | "Recognize where you are" |
-| SETTINGS-UX-03 (M, `commons`, then pin) | Page tabs as data, value rows with dialog edit, Advanced as a tab (IA-03's kit work folds in here) | Removes the in-place sprawl everywhere at once |
+| SETTINGS-UX-03a (S, `commons` ui) | Sides switch selected state, a choice of more than four edits in a dialog (in `ui-v0.5.313`) | Built |
+| SETTINGS-UX-03b (M, `commons` spec then ui, then Home pin) | Page tabs and detail views declared as data, area scope and checks; moves UX-04 and UX-05 onto them (see the architect ruling) | Removes the in-place sprawl everywhere at once |
 | SETTINGS-UX-04 (M, Home) | Devices: list, Add a device dialog, device detail screen with tabs, password row | The page Jesse named |
 | SETTINGS-UX-05 (M, Home) | AI and models in four tabs; the 13 role choices as value rows | Biggest page |
 | SETTINGS-IA-04 to -06 (the IA note) | The 9 household pages and 7 personal pages, News shelf move | Content moves land on the new template |
 | SETTINGS-UX-06 (S) | Verification: captures at 1440 and 390, light and dark, owner, adult, teen and child; a11y matrix; the user doc page | Done means opened and judged |
 
 UX-01 and UX-02 do not depend on the spec; UX-03 and the IA-02 spec work share one `areas.json` change and should be one tag.
+
+## Supersedes
+
+This note overrides these parts of [settings-ia-2026-10-18.md](settings-ia-2026-10-18.md) (that note carries the matching list):
+
+- Its "each page is one scroll" (5.2) and "one Show advanced row per page" (5.5, backlog SETTINGS-IA-03): replaced by summary strip, page tabs, value rows and detail screens; nothing expands in place.
+- Its slice order (section 9): replaced by section 5 of this note.
+- Its 10-per-page cap: counted per tab.
+- The `?device=<id>` drill-in of the robot list: replaced by a detail route, with `?device=` redirecting to it.
+- ENGINES-AI-01's single-page Engines and AI layout: replaced by four tabs.
+
+## Architect ruling (2026-10-22) and what it changes in this plan
+
+The architect found the design conforming on the merits (S4, rule 9c) and required: (1) tabs are declared as data in `areas.json` and drawn by `SettingsShell`
+(a controlled tab prop; Home passes `?tab=`), one tab mechanism only; (2) a view never places settings keys, and the keys that today are split across three
+Engines and AI tabs by hand-picked lists get their own registry groups (`lives_in`, one per tab) so every group stays in exactly one card; (3) detail screens
+declare their own tabs in data, `?device=` redirects to the new path, and a detail screen is not a page in the page-count check; (4) the page-count check applies
+to `home` and `account` only, and the package household-card check is allowlisted until SETTINGS-IA-06. The hand-written tabs landed in SETTINGS-UX-04 (Devices)
+and SETTINGS-UX-05 (Engines and AI) move onto the data tabs in the same Home change that bumps the pin; until then they are a known S4 gap
+(`SettingsSectionContent.tsx` hides the `household.ai` card and `settingsViews.tsx` redraws its keys).
 
 ## 6. Risks and open points
 
