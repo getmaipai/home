@@ -311,6 +311,8 @@ describe("viewer, menu, sharing and roles", () => {
       await waitFor(() => expect(dialog.textContent).toContain("Morning light"));
       expect(within(dialog).getByRole("button", { name: "Edit" })).toBeTruthy();
     } finally { server.restore(); }
+    // The owner's viewer is still mounted; unmount it so the next check reads only the non-owner view.
+    cleanup();
     const shared = serve({ items: [item("f-song", "River song", { kind: "audio", media_type: "audio/mp4", owner: { id: "person-other", display_name: "Sage" } })], music: { ...music, owner: false } });
     try {
       page("adult", "/files?file=f-song");
