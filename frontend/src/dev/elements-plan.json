@@ -3922,6 +3922,23 @@
       "batch": null,
       "replacesHandBuilt": [],
       "realTurnToday": null
+    },
+    {
+      "file": "weather-forecast-page.tsx",
+      "name": "weather-forecast-page",
+      "group": "weather",
+      "verdict": "wire-now",
+      "verdictReason": "Two-pane weather forecast page Element (ui-v0.5.315); Home's weather app page draws it.",
+      "backendNeeded": null,
+      "effort": null,
+      "specTagNeeded": false,
+      "newDependency": false,
+      "bindings": [],
+      "size": "M",
+      "showcaseScenario": null,
+      "batch": null,
+      "replacesHandBuilt": [],
+      "realTurnToday": null
     }
   ]
 }

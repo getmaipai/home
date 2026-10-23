@@ -168,7 +168,7 @@ test("the Cmd+K palette opens at the kit's large size, ChatGPT-search proportion
   expect(dialog).toContain("sm:max-w-3xl");
   expect(dialog).not.toContain("sm:max-w-sm");
   const palette = document.querySelector('[data-slot="command-palette"]')?.getAttribute("class") ?? "";
-  expect(palette).toContain("h-[min(36rem,calc(100dvh-4rem))]");
+  expect(palette).toContain("h-[min(40rem,calc(100dvh-4rem))]");
 });
 
 test("Focus composer keeps focus after the command palette closes", async () => {

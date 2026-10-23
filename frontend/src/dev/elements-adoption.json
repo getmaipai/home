@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-10-23T04:32:25.074Z",
+  "generatedAt": "2026-10-23T04:38:01.515Z",
   "kitTag": "ui-v0.5.317",
   "items": [
     {
@@ -1531,8 +1531,8 @@
       "file": "weather-forecast-page.tsx",
       "name": "weather-forecast-page",
       "group": "weather",
-      "verdict": "unassessed",
-      "verdictReason": "Recorded unassessed verdict in elements-plan.json; see the plan entry for its dependency or scope.",
+      "verdict": "wire-now",
+      "verdictReason": "Two-pane weather forecast page Element (ui-v0.5.315); Home's weather app page draws it.",
       "implemented": false
     },
     {
