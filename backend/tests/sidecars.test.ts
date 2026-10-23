@@ -166,6 +166,36 @@ describe("spawnAndWaitHealthy", () => {
   });
 });
 
+describe("a stop that lands during a health check", () => {
+  test("stays stopped when the check then answers healthy", async () => {
+    __setSidecarTimingForTestsOnly({ healthPollMs: 20 });
+    const port = reserveFreePort();
+    let releaseCheck: (healthy: boolean) => void = () => {};
+    let checks = 0;
+    let hold = false;
+    registerSidecar({
+      id: "slow-check",
+      command: ["bun", "-e", `Bun.serve({ port: ${port}, fetch: () => new Response("ok") });`],
+      port,
+      healthCheck: () => {
+        // Until the sidecar is up the check is real; afterwards each check waits until the test lets it answer.
+        if (!hold) return fetch(`http://127.0.0.1:${port}`).then(() => true, () => false);
+        checks++;
+        return new Promise<boolean>((resolve) => { releaseCheck = resolve; });
+      },
+    });
+    await startSidecar("slow-check");
+    hold = true;
+    const deadline = Date.now() + 5_000;
+    while (checks < 1 && Date.now() < deadline) await new Promise((r) => setTimeout(r, 10));
+    expect(checks).toBeGreaterThanOrEqual(1);
+    await stopSidecar("slow-check");
+    releaseCheck(true);
+    await new Promise((r) => setTimeout(r, 100));
+    expect(getSidecar("slow-check")!.status).toBe("stopped");
+  });
+});
+
 describe("startSidecar/stopSidecar", () => {
   test("reaches running with a real health check, then stops and frees its port", async () => {
     const port = reserveFreePort();

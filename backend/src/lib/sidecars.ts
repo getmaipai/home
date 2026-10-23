@@ -1361,6 +1361,9 @@ async function pollHealth(entry: SidecarEntry): Promise<void> {
     return;
   }
   const healthy = entry.config.healthCheck ? await entry.config.healthCheck() : await checkHealthUrl(entry.config.healthUrl!);
+  // A stop that landed while this check was in flight already set "stopped"; a check that then answers healthy (the process had not
+  // exited yet) must not turn it back into "running", which nothing would ever correct again (the robot-host on/off test, under load).
+  if (entry.stopping) return;
   if (healthy) {
     entry.consecutiveFailures = 0;
     if (entry.status !== "running") {
