@@ -152,22 +152,22 @@ describe("GET /api/search: settings", () => {
     const { client } = await owner();
     const groups = await search(client, "SearXNG");
     const found = group(groups, "setting")?.results.find((r) => r.id === "search.searxng_url");
-    expect(found?.href).toBe("/settings/home/search#search.searxng_url");
+    expect(found?.href).toBe("/settings/search?tab=search#search.searxng_url");
   });
 
-  test("a word from a household setting's label opens Home settings on that section", async () => {
+  test("a word from a household setting's label opens the household page that holds it", async () => {
     const { client } = await owner();
     const groups = await search(client, "teen's replies");
     const found = group(groups, "setting")?.results.find((r) => r.id === "chat.teen_gate_grain");
-    expect(found).toMatchObject({ kind: "setting", title: "How a teen's replies are checked", subtitle: expect.stringContaining("checks every sentence before a teen sees it"), href: "/settings/home/ai#chat.teen_gate_grain" });
+    expect(found).toMatchObject({ kind: "setting", title: "How a teen's replies are checked", subtitle: expect.stringContaining("checks every sentence before a teen sees it"), href: "/settings/ai?tab=advanced#chat.teen_gate_grain" });
   });
 
   test("a person-scope setting opens the Account or Chat settings page that draws it", async () => {
     const { client } = await owner();
     const alerts = (await search(client, "Show alerts on this device")).find((g) => g.kind === "setting")?.results.find((r) => r.id === "notifications.browser.enabled");
-    expect(alerts?.href).toBe("/settings/account/notifications#notifications.browser.enabled");
+    expect(alerts?.href).toBe("/settings/notifications?tab=notifications#notifications.browser.enabled");
     const stats = (await search(client, "reply stats")).find((g) => g.kind === "setting")?.results.find((r) => r.id === "ui.show_turn_stats");
-    expect(stats?.href).toBe("/settings/chat/general#ui.show_turn_stats");
+    expect(stats?.href).toBe("/settings/chat?tab=general#ui.show_turn_stats");
   });
 
   // A non-admin has no Home settings at all: a household-scope result would
@@ -188,14 +188,14 @@ describe("GET /api/search: settings", () => {
     const child = group(await search(childClient, "photos"), "setting")?.results ?? [];
     expect(child.find((r) => r.id === "chat.photo_uploads")).toBeUndefined();
     const teen = group(await search(teenClient, "photos"), "setting")?.results ?? [];
-    expect(teen.find((r) => r.id === "chat.photo_uploads")?.href).toBe("/settings/chat/general#chat.photo_uploads");
+    expect(teen.find((r) => r.id === "chat.photo_uploads")?.href).toBe("/settings/chat?tab=general#chat.photo_uploads");
   });
 
   test("a teen never gets another person's or an admin's key as a result", async () => {
     const { client: ownerClient } = await owner();
     const { client: teenClient } = await addPerson(ownerClient, "Nova", "teen");
     const results = group(await search(teenClient, "quiet hours"), "setting")?.results ?? [];
-    expect(results.every((r) => r.href.startsWith("/settings/account/") || r.href.startsWith("/settings/chat/"))).toBe(true);
+    expect(results.every((r) => /^\/settings\/(profile|appearance|chat|voice|notifications|pictures|data)(\?|#|$)/.test(r.href))).toBe(true);
     expect(results.find((r) => r.id.startsWith("household."))).toBeUndefined();
   });
   // APP-SET-02: nobody gains a key. A child or teen is shown no more than the

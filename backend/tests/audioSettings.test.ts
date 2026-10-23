@@ -23,10 +23,12 @@ describe("audio.speed.<kind> settings", () => {
     for (const key of keys) expect(key.copy?.does?.length).toBeGreaterThan(10);
   });
 
-  test("each key sits in a card of the person's own Account settings (rule S4)", () => {
+  test("each key sits in a card of the person's own pages (Yours) (rule S4)", () => {
     for (const key of keys) {
       const place = placeSetting(key, { role: "adult", band: "adult", capabilities: new Set() });
-      expect(place?.area).toBe("account");
+      expect(place?.area).toBe("settings");
+      // Rule S4: a person-scope key sits on one of "Yours" (the personal pages), never on a household page.
+      expect(["profile", "appearance", "chat", "voice", "notifications", "pictures", "data"]).toContain(place?.section);
     }
   });
 });

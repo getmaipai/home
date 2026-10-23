@@ -27,8 +27,8 @@ describe("GET /api/setup-checklist", () => {
       "backup-key", "voice", "photos",
     ]);
     expect(result.every((item) => typeof item.done === "boolean" && item.reason.length > 0 && item.open.href.length > 0)).toBe(true);
-    expect(result.find((item) => item.id === "backup-key")?.open.href).toBe("/settings/home/storage");
-    expect(result.find((item) => item.id === "phone-or-tablet")?.open.href).toBe("/settings/account/profile");
+    expect(result.find((item) => item.id === "backup-key")?.open.href).toBe("/settings/backups?tab=storage");
+    expect(result.find((item) => item.id === "phone-or-tablet")?.open.href).toBe("/settings/profile?tab=profile");
     expect(result.find((item) => item.id === "away-access")?.open.href).toBe("/setup/away");
     expect(result.map((item) => item.title)).not.toContain("Add the offline library");
   });
