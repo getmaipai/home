@@ -157,6 +157,7 @@ describe("sections, search, filters and sort", () => {
     try {
       page();
       await waitFor(() => expect(tile("Fox")).toBeTruthy());
+      fireEvent.click(document.querySelector<HTMLButtonElement>('[data-slot="section-sidebar-search"][aria-label="Search your Library"]')!);
       const field = document.querySelector<HTMLInputElement>('input[aria-label="Search your Library"]')!;
       fireEvent.change(field, { target: { value: "fox" } });
       await waitFor(() => expect(where()).toBe("?q=fox"), { timeout: 2000 });
@@ -269,7 +270,7 @@ describe("selection, batch actions and Trash", () => {
       fireEvent.keyDown(document, { key: "s" });
       await waitFor(() => expect(document.querySelector('[role="toolbar"][aria-label="Batch actions"]')).toBeNull());
       fireEvent.keyDown(document, { key: "/" });
-      expect(document.activeElement?.getAttribute("aria-label")).toBe("Search your Library");
+      await waitFor(() => expect(document.activeElement?.getAttribute("aria-label")).toBe("Search your Library"));
     } finally { server.restore(); }
   });
   test("the Trash section lists deleted files with days left and Restore", async () => {

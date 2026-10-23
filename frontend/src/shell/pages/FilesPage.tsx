@@ -200,8 +200,11 @@ export function FilesPage({ person }: { person: Roster }) {
       if (event.metaKey || event.ctrlKey || event.altKey || editable(event.target)) return;
       const modal = document.querySelector('[role="dialog"], [role="alertdialog"]');
       if (event.key === "/" && !modal) {
+        // The column's search field is hidden until its header icon opens it (as Chat's is); the icon's click opens it and the column focuses it.
+        event.preventDefault();
         const field = document.querySelector<HTMLInputElement>('input[type="search"][aria-label="Search your Library"]');
-        if (field) { event.preventDefault(); field.focus(); }
+        if (field) field.focus();
+        else document.querySelector<HTMLButtonElement>('[data-slot="section-sidebar-search"][aria-label="Search your Library"]')?.click();
       } else if ((event.key === "s" || event.key === "S") && !modal && !trashView) {
         event.preventDefault(); setSelecting((on) => { if (on) setSelected([]); return !on; });
       } else if (event.key === "Delete") {

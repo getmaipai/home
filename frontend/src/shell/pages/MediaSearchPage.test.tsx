@@ -32,7 +32,7 @@ test("groups render in shelves and a tile opens its href", async () => {
 test("no matches show the query in the empty state and the search column is present", async () => {
   const view = open(async () => ({ groups: [] }));
   await waitFor(() => expect(view.getByText('No matches for "Garden Road". Try another word.')).toBeTruthy());
-  expect(view.getByLabelText("Search Media")).toBeTruthy();
+  expect(view.getByRole("searchbox", { name: "Search Media" })).toBeTruthy();
 });
 
 test("an empty query shows the prompt", async () => {

@@ -135,6 +135,7 @@ describe("an app that declares a sidebar", () => {
   test("typing in the search and pressing Enter opens the search page", async () => {
     const view = open("/apps/demo");
     await view.findByText("Today's stories");
+    fireEvent.click((await column(view)).getByRole("button", { name: "Search Demo" }));
     const box = (await column(view)).getByRole("searchbox", { name: "Search Demo" });
     fireEvent.change(box, { target: { value: "eclipse" } });
     await act(async () => { fireEvent.keyDown(box, { key: "Enter" }); });

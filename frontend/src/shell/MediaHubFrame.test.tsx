@@ -78,7 +78,8 @@ test("clicking Home navigates to the media hub's own route", async () => {
 
 test("typing in the column search and pressing Enter opens Media search", async () => {
   const view = open("search");
-  const field = await view.findByLabelText("Search Media");
+  fireEvent.click(await view.findByRole("button", { name: "Search Media" }));
+  const field = await view.findByRole("searchbox", { name: "Search Media" });
   fireEvent.change(field, { target: { value: "Garden Road" } });
   fireEvent.keyDown(field, { key: "Enter", code: "Enter" });
   await waitFor(() => expect(view.getByTestId("where").textContent).toBe("/media/search?q=Garden%20Road"));
