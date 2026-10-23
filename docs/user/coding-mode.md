@@ -5,7 +5,7 @@ description: Give most of your computer's memory to one big coding model, and wh
 
 # Coding mode
 
-Home has two modes. You pick one in **Settings**, **Household**, **Coding**, in the row called **Home mode**.
+Home has two modes. You pick one in **Settings**, **AI and models**, **Coding**, in the row called **Home mode**.
 
 **Normal** is how Home works today. Chat, pictures, videos and songs all run as usual.
 
@@ -30,7 +30,7 @@ Coding mode needs a Mac with 128 GB of memory, Apple silicon and macOS 26.4 or l
 
 ### Turn on coding
 
-Coding must be on. Open **Settings**, **Household**, **Coding** and turn **Coding** on.
+Coding must be on. Open **Settings**, **AI and models**, **Coding** and turn **Coding** on.
 
 ### Choose a coding engine
 
