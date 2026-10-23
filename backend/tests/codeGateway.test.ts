@@ -9,6 +9,7 @@ import { newPersonId } from "@/lib/id";
 import { nextHlc } from "@/lib/hlc";
 import { createApiKey, revokeApiKey } from "@/lib/apiKeys";
 import { setHouseholdSettingValue } from "@/lib/settings";
+import { __setWhoisForTests } from "@/lib/tailnetNode";
 import { __resetCodeGateForTests, __setStreamIdleForTests, __setTrustProxyForTests, createFairQueue, createStreamCounter, createTokenLedger, isTailnetAddress, tokenLedger } from "@/lib/codeGate";
 import { __resetRateLimiterForTests } from "@/lib/rateLimiter";
 import { __setStackClientForTests } from "@/lib/stackEngine";
@@ -246,6 +247,61 @@ describe("where it may come from", () => {
     process.env.APP_ORIGIN = "https://home.example.com";
     try { expect((await say(secret)).status).toBe(403); } finally { delete process.env.APP_ORIGIN; }
     expect((await say(secret)).status).toBe(200);
+  });
+
+  describe("a named device over Tailscale Serve", () => {
+    const SERVE_HOST = "studio.example.ts.net";
+    const serveHeaders = (extra: Record<string, string> = {}) => ({ "x-forwarded-for": TAILNET, "x-forwarded-proto": "https", "x-forwarded-host": SERVE_HOST, "tailscale-user-login": "sage@example.com", ...extra });
+    const viaServe = (secret: string, extra: Partial<CallOptions> = {}) => say(secret, { address: "127.0.0.1", host: SERVE_HOST, headers: serveHeaders(), ...extra });
+    beforeEach(() => {
+      process.env.CODING_TAILNET_NODES = "Laptop-Test";
+      setHouseholdSettingValue("coding.api.away", true);
+      __setWhoisForTests(async (address) => (address === TAILNET ? { name: "laptop-test", login: "sage@example.com" } : null));
+    });
+    afterEach(() => { delete process.env.CODING_TAILNET_NODES; __setWhoisForTests(null); });
+
+    test("a request from the allowed device is let through to the key check", async () => {
+      const { secret } = adultWithKey();
+      expect((await viaServe(secret)).status).toBe(200);
+      // The key is still required: the same request without one is refused by the key check, not waved through.
+      expect((await viaServe("")).status).toBe(401);
+    });
+
+    test("a device that is not on the list is refused", async () => {
+      const { secret } = adultWithKey();
+      __setWhoisForTests(async () => ({ name: "other-device", login: "sage@example.com" }));
+      expect((await viaServe(secret)).status).toBe(403);
+    });
+
+    test("a public request is still refused, with or without the Serve headers", async () => {
+      const { secret } = adultWithKey();
+      expect((await viaServe(secret, { address: PUBLIC })).status).toBe(403);
+      expect((await viaServe(secret, { address: HOME })).status).toBe(403);
+      expect((await say(secret, { address: PUBLIC })).status).toBe(403);
+      process.env.APP_ORIGIN = `https://${SERVE_HOST}`;
+      try { expect((await viaServe(secret)).status).toBe(403); } finally { delete process.env.APP_ORIGIN; }
+    });
+
+    test("a request through any other proxy is still refused", async () => {
+      const { secret } = adultWithKey();
+      for (const extra of <Array<Record<string, string>>>[{ "cf-connecting-ip": PUBLIC }, { forwarded: "for=192.0.2.1" }, { "x-real-ip": TAILNET }, { "x-forwarded-for": `${TAILNET}, ${PUBLIC}` }, { "x-forwarded-for": PUBLIC }, { "x-forwarded-for": HOME }, { "x-forwarded-proto": "http" }]) {
+        expect((await viaServe(secret, { headers: serveHeaders(extra) })).status).toBe(403);
+      }
+    });
+
+    test("it needs the list, the away setting, an answer from Tailscale, and a matching login", async () => {
+      const { secret } = adultWithKey();
+      delete process.env.CODING_TAILNET_NODES;
+      expect((await viaServe(secret)).status).toBe(403);
+      process.env.CODING_TAILNET_NODES = "laptop-test";
+      setHouseholdSettingValue("coding.api.away", false);
+      expect((await viaServe(secret)).status).toBe(403);
+      setHouseholdSettingValue("coding.api.away", true);
+      __setWhoisForTests(async () => null);
+      expect((await viaServe(secret)).status).toBe(403);
+      __setWhoisForTests(async () => ({ name: "laptop-test", login: "someone-else@example.com" }));
+      expect((await viaServe(secret)).status).toBe(403);
+    });
   });
 
   test("tailnet ranges", () => {

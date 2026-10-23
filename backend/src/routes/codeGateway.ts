@@ -17,6 +17,7 @@
 //  12. the floor   the engine's answer, out: text, reasoning and tool arguments; reasoning dropped for a minor; crisis resources added when due
 // A failure at any step answers in the wire's own error shape with a sentence that says what went wrong and what to do. No log line or error body carries a
 // key, a prompt, a name, a host or an address (rule 6a); the one event recorded is `coding.api_request` with a status class and a duration.
+import { tailnetServeAllows } from "@/lib/tailnetNode";
 import { Hono, type Context } from "hono";
 import { bodyLimit } from "hono/body-limit";
 import { requireApiKey, type ApiKeyDoor } from "@/middleware/auth";
@@ -65,7 +66,9 @@ const door: ApiKeyDoor = {
 };
 
 const viaTransport = async (c: Context, next: () => Promise<void>) => {
-  const refusal = transportRefusal(c);
+  let refusal = transportRefusal(c);
+  // Tailscale Serve (a proxy on this computer) is the one proxy that may carry a request, and only from a named device.
+  if (refusal?.code === "public_address" && await tailnetServeAllows(c)) refusal = null;
   if (refusal) { recordApiRequest(refusal.status, Date.now()); return refusedBy(c, refusal); }
   await ensureCodingPiecesFresh();
   return next();

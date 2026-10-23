@@ -15,7 +15,7 @@ export type GateRefusal = { status: 403 | 429 | 503; message: string; code: stri
 // ---- 1. Transport (3.6: HTTPS only, home network or tailnet, never a public URL) --------------------------------------------------------
 
 /** Headers a reverse proxy, tunnel or CDN adds. Any one of them means the request did not come straight from the person's device. */
-const PROXY_HEADERS = ["x-forwarded-for", "x-forwarded-host", "x-forwarded-proto", "x-forwarded-server", "forwarded", "x-real-ip", "cf-connecting-ip", "true-client-ip", "x-original-forwarded-for"];
+export const PROXY_HEADERS = ["x-forwarded-for", "x-forwarded-host", "x-forwarded-proto", "x-forwarded-server", "forwarded", "x-real-ip", "cf-connecting-ip", "true-client-ip", "x-original-forwarded-for"];
 
 /** 100.64.0.0/10 and fd7a:115c:a1e0::/48, the ranges Tailscale hands out. */
 export function isTailnetAddress(address: string): boolean {
@@ -26,6 +26,11 @@ export function isTailnetAddress(address: string): boolean {
 }
 
 const proxyTrusted = (): boolean => trustProxyOverride ?? TRUST_PROXY;
+
+export function isPublicHost(c: Context): boolean {
+  const configured = publicHost();
+  return configured !== null && c.req.header("host")?.toLowerCase() === configured;
+}
 
 function publicHost(): string | null {
   const configured = process.env.APP_ORIGIN ?? process.env.PUBLIC_ORIGIN;
