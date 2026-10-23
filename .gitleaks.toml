@@ -38,6 +38,9 @@ paths = [
   '''(^|/)frontend/dist(/|$)''',
   '''(^|/)spec/schemas\.resolved(/|$)''',
   '''(^|/)\.demo-data(/|$)''',
+  # .gitignore's `.demo-data-*/`: a screenshot run's own scratch directory (scripts/screenshotRuntime.ts), which holds a pid file and a
+  # session token that structurally never reach a commit. It turned main's idle gate red on a leftover one (2026-10-22).
+  '''(^|/)\.demo-data-[^/]+(/|$)''',
   '''(^|/)\.DS_Store$''',
   '''\.pyc$''',
   '''\.tsbuildinfo$''',
