@@ -1103,11 +1103,13 @@ commons_archive_sha256() {
     ui-v0.5.307) printf '%s\n' "e03105e3cc51288f36081f707d1c8cde95b2b8f953bde2ee9d18b76098007542" ;;
     ui-v0.5.310) printf '%s\n' "da189d4beff3831e4fa90bf8a4aa3b6ecd17591b409497fe423c9bf1d7d50bdd" ;;
     ui-v0.5.312) printf '%s\n' "1da911aa0e705aa2541ad651329a6694cf07e466811a0c2eb13391d50f85c099" ;;
+    ui-v0.5.314) printf '%s\n' "040abfbd68a60e7ff5b7fa309447480ceca5cbcb90c1b3c8f1f058e30c02c2fd" ;;
     spec-v0.1.203) printf '%s\n' "78d0d5663a19dc8274c6d222be142251de70aa3e937ecee78e34c097c320ea71" ;;
     spec-v0.1.204) printf '%s\n' "1fe37f7ff49ec4021dda7fa62ba877e3126e6e74069640ce9d3a935be2a34333" ;;
     spec-v0.1.206) printf '%s\n' "b597613454a5429cf649daa2b5aa8f04850b1ce0a8634ebad7aa99b1b5a11c55" ;;
     spec-v0.1.207) printf '%s\n' "0f2eb7efffd6e5f4c41542803a3c94a2d5f0ae7e5db62e602eda2519fc29852d" ;;
     spec-v0.1.208) printf '%s\n' "d4ef6758603bb6182471517e49b126ff621bc77940e52585e7f22e108f6bdbe0" ;;
+    spec-v0.1.214) printf '%s\n' "e54d9704b88d1453af583621800253a923f8e0ceffcf326bc8118fb32efbd736" ;;
     *) return 1 ;;
   esac
 }
