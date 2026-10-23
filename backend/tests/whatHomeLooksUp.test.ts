@@ -24,6 +24,8 @@ const SERVICE_NAMES: Record<string, string> = {
   "feed-variety-com": "Variety",
   "feed-www-timeforkids-com": "TIME for Kids",
   "feed-grist-org": "Grist",
+  "feed-www-marketwatch-com": "MarketWatch",
+  "feed-techcrunch-com": "TechCrunch",
   "icanhazdadjoke": "icanhazdadjoke.com",
   "wikidata": "Wikidata",
   "musicbrainz": "MusicBrainz",
