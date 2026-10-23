@@ -26,7 +26,10 @@ The text is a section of three instruction files. All three are read by the mode
 | The lane's global rules (`OC_GLOBAL_RULES` in `local-lane`, written to OpenCode's own `AGENTS.md`) | OpenCode started by hand on the Studio |
 | The offline coder's `RULES.md` | the offline coder worktree |
 
-Any other computer that runs the local coder through OpenCode needs the same section in its own `AGENTS.md`.
+On the laptop, the `localcode` command loads `~/.config/opencode/dispatch-rules.md` by path (its wrapper is `mac/zsh/localclaude.zsh` in the
+homelab repo), so the method goes in that file, not in `AGENTS.md`. The wrapper also fetches `origin/main` before it starts and fast-forwards a
+clean checkout that is only behind; a checkout with its own work gets one warning line with the behind count and starts anyway. Any other computer
+that runs the local coder through OpenCode needs the same section in whichever instructions file its launcher loads.
 
 ## Why these rules
 
