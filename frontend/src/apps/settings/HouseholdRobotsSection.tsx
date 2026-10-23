@@ -143,7 +143,8 @@ function RobotDetail({ device, tab, onClose }: { device: DeviceInfo; tab?: strin
           <ItemGroup variant="card" aria-label="Robot software">
             <Item size="setting">
               <ItemContent><ItemTitle>Connection</ItemTitle><ItemDescription>{softwareQuery.data.checkin
-                ? [softwareQuery.data.checkin.signal ? `Wi-Fi ${softwareQuery.data.checkin.signal}` : null,
+                ? [softwareQuery.data.checkin.online ? null : `Offline, last seen ${new Intl.DateTimeFormat(undefined, { hour: "2-digit", minute: "2-digit" }).format(new Date(softwareQuery.data.checkin.lastSeen))}`,
+                  softwareQuery.data.checkin.signal ? `Wi-Fi ${softwareQuery.data.checkin.signal}` : null,
                   softwareQuery.data.checkin.battery.level !== null ? `Battery ${softwareQuery.data.checkin.battery.level}%${softwareQuery.data.checkin.battery.charging ? ", charging" : ""}` : null,
                   softwareQuery.data.checkin.ip ? `IP address ${softwareQuery.data.checkin.ip}` : null].filter(Boolean).join(" · ") || "No connection details reported."
                 : "Waiting for the robot to check in."}</ItemDescription></ItemContent>

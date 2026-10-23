@@ -48,4 +48,10 @@ describe("robot software details", () => {
     expect(view.getByRole("button", { name: "Update firmware" })).toBeTruthy();
     expect(view.getByText("Not running. Ready: 0.2.24.")).toBeTruthy();
   });
+
+  test("says Offline with the time it was last seen when the robot stopped checking in", async () => {
+    const view = renderRobot({ firmware: { installed: { version: "0.2.24", at: "2026-10-21T12:00:00.000Z" }, available: "0.2.24", status: "up_to_date" }, bot: { running: "0.2.24", available: "0.2.24", status: "up_to_date" }, checkin: { online: false, lastSeen: "2026-10-21T12:00:00.000Z", ip: "192.168.1.8", rssi: -48, signal: "strong", battery: { level: 87, charging: false }, boot_reason: 1, crash_resets: 0, heap: { internal: 10000, minimum: 9000, psram: 20000 } } });
+    await waitFor(() => expect(view.getByText(/Offline, last seen \d{1,2}:\d{2}/)).toBeTruthy());
+    expect(view.getAllByText("Offline").length).toBeGreaterThan(0);
+  });
 });
