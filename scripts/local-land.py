@@ -40,6 +40,8 @@ def guard(worktree):
 
 
 def land(worktree, dry=False):
+    # The code map is regenerated on every landing, so it can never describe code that is not there.
+    subprocess.run([sys.executable, os.path.join(worktree, "scripts", "code-map.py")], cwd=worktree, capture_output=True)
     files, why = guard(worktree)
     if why: print("not landed: %s. The changes stay in the worktree for review." % why); return 1
     top = git(worktree, "rev-parse", "--show-toplevel").stdout.strip()

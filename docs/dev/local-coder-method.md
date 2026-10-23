@@ -6,7 +6,7 @@ copy the same text into every place below, so the files never contradict each ot
 
 ## The method
 
-1. Look first. Find the relevant files, read what they import and a sibling file for style, and read the acceptance test: it is the spec. Search (grep) before you use a name; never invent one. Read the part of a file you need, not all of it.
+1. Look first. For "where is" questions, read `docs/dev/code-map.md` before searching: it lists every screen, package page and exported component with its file. Find the relevant files, read what they import and a sibling file for style, and read the acceptance test: it is the spec. Search (grep) before you use a name; never invent one. Read the part of a file you need, not all of it.
 2. Reproduce or understand. Run the failing test or command and read the output so you know what is wrong before you change anything. If there is no test, write a small failing one first.
 3. Plan. Write a short numbered plan in your reply: the goal in one sentence, then 3 to 7 small steps, each with the command that checks it. Tick steps off as you go.
 4. One step at a time. Finish a step and run its check before you start the next. Never start a step while the last one is failing.
