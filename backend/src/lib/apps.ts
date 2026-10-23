@@ -513,8 +513,7 @@ export async function getAppData(person: PersonRow, packageId: string, dataId: s
   const raw = (result.value as typeof result.value & { blocks?: unknown }).blocks;
   const blocks = Array.isArray(raw) ? filterAnswerBlocks(raw, packageId, app.manifest.returns_blocks ?? [], speakerAgeBand(person, new Date()), person) : [];
   if (packageId === "weather" && dataId === "forecast" && Array.isArray(raw)) {
-    const resultData = (result.value as typeof result.value & { data?: Record<string, unknown> }).data;
-    const detailValues = Object.fromEntries(Object.entries(resultData ?? {}).filter(([key]) => key.startsWith("detail_")).map(([key, value]) => [key.slice("detail_".length), value]));
+    const detailValues = (result.value as typeof result.value & { appDetails?: Record<string, unknown> }).appDetails ?? {};
     return { ok: true, status: 200, value: { as_of: asOf, blocks, details: detailValues } };
   }
   return { ok: true, status: 200, value: { as_of: asOf, blocks } };

@@ -245,16 +245,16 @@
         "block_hour_times": "{hour_times}",
         "block_hour_pop": "{hour_pop}",
         "block_day_codes": "{day_codes}",
-        "detail_feels_like": "{feels_like}",
-        "detail_humidity": "{humidity}",
-        "detail_precipitation": "{precipitation}",
-        "detail_wind_speed": "{wind_speed}",
-        "detail_wind_direction": "{wind_direction}",
-        "detail_pressure": "{pressure}",
-        "detail_visibility": "{visibility}",
-        "detail_sunrise": "{sunrise}",
-        "detail_sunset": "{sunset}",
-        "detail_uv_index": "{uv_index}"
+        "block_detail_feels_like": "{feels_like}",
+        "block_detail_humidity": "{humidity}",
+        "block_detail_precipitation": "{precipitation}",
+        "block_detail_wind_speed": "{wind_speed}",
+        "block_detail_wind_direction": "{wind_direction}",
+        "block_detail_pressure": "{pressure}",
+        "block_detail_visibility": "{visibility}",
+        "block_detail_sunrise": "{sunrise}",
+        "block_detail_sunset": "{sunset}",
+        "block_detail_uv_index": "{uv_index}"
       }
     }
   ]

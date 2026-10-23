@@ -660,7 +660,10 @@ export async function runPlugin(
     }
     // GENUI-04: data bound only to feed the blocks never reaches the composer.
     const answer = withoutBlockOnlyData(value);
-    return { ok: true, value: blocks.length > 0 ? ({ ...answer, blocks } as PluginResult) : answer };
+    const appDetails = id === "weather"
+      ? Object.fromEntries(Object.entries(value.data ?? {}).filter(([key]) => key.startsWith("block_detail_")).map(([key, item]) => [key.slice("block_detail_".length), item]))
+      : undefined;
+    return { ok: true, value: blocks.length > 0 ? ({ ...answer, blocks, ...(appDetails ? { appDetails } : {}) } as PluginResult) : answer };
   } catch (err) {
     if (err instanceof HostError) {
       const status = err.code === "permission_denied" ? 403 : err.code === "not_found" ? 404 : 400;
