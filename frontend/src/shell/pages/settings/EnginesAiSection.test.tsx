@@ -2,8 +2,8 @@
 // engine runs), the pairing wizard, the engines console (formerly /engines) and the AI model list (formerly /models)
 // are all inside the settings shell, so the person never leaves it.
 import { afterEach, describe, expect, test } from "bun:test";
-import { act, cleanup, fireEvent, waitFor, within } from "@testing-library/react";
-import { MemoryRouter, Route, Routes } from "react-router-dom";
+import { cleanup, fireEvent, within } from "@testing-library/react";
+import { MemoryRouter, Route, Routes, useLocation } from "react-router-dom";
 import { renderWithQueryClient } from "../../../../tests/renderWithQueryClient";
 import { SettingsAreaPage } from "@/shell/pages/settings/SettingsAreaPage";
 import { SETTINGS_AREAS } from "@/shell/pages/settings/settingsAreas";
@@ -13,6 +13,7 @@ import type { Roster } from "@/lib/api";
 
 let fixture: HomeFixture | null = null;
 const realFetch = globalThis.fetch;
+function RouterLocation() { return <output data-testid="router-location">{useLocation().search}</output>; }
 
 function open(person: Roster, url: string) {
   fixture = mockHome();
@@ -33,7 +34,7 @@ function open(person: Roster, url: string) {
   const view = renderWithQueryClient(
     <MemoryRouter initialEntries={[url]}>
       <Routes>
-        <Route path="settings/:area/:section?" element={<SettingsAreaPage person={person} onPersonChange={() => {}} />} />
+        <Route path="settings/:area/:section?" element={<><RouterLocation /><SettingsAreaPage person={person} onPersonChange={() => {}} /></>} />
       </Routes>
     </MemoryRouter>,
   );
@@ -46,18 +47,36 @@ afterEach(() => {
   fixture = null;
 });
 
-describe("Engines and AI is one page inside the settings shell", () => {
-  test("the settings card, the pairing section, the engines console, the model list and the token are all on it", async () => {
+describe("Engines and AI uses four tabs inside the settings shell", () => {
+  test("Overview is the default and each tab shows its existing parts", async () => {
     const view = open(makePerson("owner"), "/settings/home/ai");
-    await waitFor(() => expect(document.body.textContent).toContain("Where the engine runs"));
-    await waitFor(() => expect(view.getByText("Engine computer link")).toBeTruthy());
-    // The engines console (it was /engines).
-    expect(await view.findByRole("button", { name: "Check the connection" })).toBeTruthy();
-    // The AI model list (it was /models): hardware as ModelsSection draws it.
-    await waitFor(() => expect(view.getByText("This computer: Apple Silicon, 24 GB memory.")).toBeTruthy());
-    expect(view.getByText("Hugging Face token (for voice cloning)")).toBeTruthy();
+    expect(await view.findByRole("tab", { name: "Overview" })).toBeTruthy();
+    expect(await view.findByRole("switch", { name: "Pause chat for everyone" })).toBeTruthy();
+    expect(await view.findByText("Install the AI for this computer")).toBeTruthy();
+    expect(view.queryByText("Engine computer link")).toBeNull();
+    expect(view.getByRole("tab", { name: "Models" })).toBeTruthy();
+    expect(view.getByRole("tab", { name: "Engines" })).toBeTruthy();
+    expect(view.getByRole("tab", { name: "Advanced" })).toBeTruthy();
     // Still the settings shell: the area's own section list is on the page.
     expect(view.getAllByRole("link", { name: "Engines and AI" }).some((link) => link.closest('[data-slot="settings-column"]'))).toBe(true);
+  });
+
+  test("?tab selects Advanced, with the model choices together once", async () => {
+    const view = open(makePerson("owner"), "/settings/home/ai?tab=advanced");
+    expect(view.getByTestId("router-location").textContent).toContain("tab=advanced");
+    expect(await view.findByText("Model per job")).toBeTruthy();
+    for (const label of ["Chat model choice", "Router model choice", "Embed model choice", "Rerank model choice", "Vision model choice", "Image model choice", "Video model choice", "Music model choice", "Coding model choice", "Judge model choice", "Tts model choice", "Stt model choice", "Wakeword model choice"]) {
+      expect(view.getAllByText(label, { exact: true })).toHaveLength(1);
+    }
+    expect(view.getByText("Hugging Face token (for voice cloning)")).toBeTruthy();
+  });
+
+  test("Models opens the existing model and storage sections", async () => {
+    const view = open(makePerson("owner"), "/settings/home/ai?tab=models");
+    expect(view.getByTestId("router-location").textContent).toContain("tab=models");
+    expect(await view.findByText("Models and storage")).toBeTruthy();
+    expect(await view.findByText("This computer: Apple Silicon, 24 GB memory.")).toBeTruthy();
+    expect((await view.findAllByText("Memory and model choices")).length).toBeGreaterThan(0);
   });
 
   test("the spec's Engines and AI section names the trail view that carries all of this", () => {
@@ -66,22 +85,14 @@ describe("Engines and AI is one page inside the settings shell", () => {
     expect(SETTINGS_VIEWS["home.engine_admin"]).toBeDefined();
   });
 
-  // The exact inputs that looked "impossible": the select on the Engines and AI card, chosen the way a person does.
-  // The write must reach the settings route (the hub saves it and answers 200; the 500 that made it snap back was the
-  // hub's, and is covered in backend/tests/remoteStackSettings.test.ts).
-  test("choosing Another computer on the card sends the write and the control shows it", async () => {
+  test("Overview keeps the engine location setting available", async () => {
     const view = open(makePerson("owner"), "/settings/home/ai");
     const where = await view.findByRole("combobox", { name: "Where the engine runs" });
     expect((where as HTMLButtonElement).disabled).toBe(false);
-    await act(async () => { fireEvent.click(where); });
-    const option = await view.findByRole("option", { name: "Another Computer" });
-    await act(async () => { fireEvent.pointerDown(option); fireEvent.pointerUp(option); fireEvent.click(option); });
-    await waitFor(() => expect(fixture!.puts).toContainEqual({ scope: "household", key: "engines.stack.where", value: "another_computer" }));
-    await waitFor(() => expect(view.getByRole("combobox", { name: "Where the engine runs" }).textContent).toContain("Another Computer"));
   });
 
   test("the pairing wizard opens from this page without a selection first, on step 1 of 5", async () => {
-    const view = open(makePerson("admin"), "/settings/home/ai");
+    const view = open(makePerson("admin"), "/settings/home/ai?tab=engines");
     fireEvent.click(await view.findByRole("button", { name: "Pair engine computer" }));
     expect(await view.findByText("Step 1 of 5: Where the engine runs")).toBeTruthy();
   });

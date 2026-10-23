@@ -31,6 +31,7 @@ interface SettingsRendererProps {
   /** Read one narrowly authorized setting when embedding a person control. */
   settingKey?: string;
   optionsFrom?: Readonly<Record<string, readonly { value: string; label: string }[]>>;
+  includeExpert?: boolean;
 }
 
 const REGISTRY_QUERY_KEY = ["settings-registry"];
@@ -50,7 +51,7 @@ const REGISTRY_QUERY_KEY = ["settings-registry"];
  * `Section` primitive `SettingsRenderer.tsx` renders with. `honouredBy`
  * is always "home": this repo is Home, the same constant `SettingsPage.
  * tsx`'s own instances already pass. */
-export function SettingsRenderer({ scope, scopeValue, only, includeKeys, includeKeysByGroup, expandAdvanced = false, titleOverrides = {}, plainRows = false, mergeGroups = false, settingKey, optionsFrom }: SettingsRendererProps) {
+export function SettingsRenderer({ scope, scopeValue, only, includeKeys, includeKeysByGroup, expandAdvanced = false, titleOverrides = {}, plainRows = false, mergeGroups = false, settingKey, optionsFrom, includeExpert = false }: SettingsRendererProps) {
   // NOTIFY-SHARE-02: SettingField's own PersonMultiSelect control
   // needs the viewer's own id to drop from its option list -
   // `scopeValue` is already exactly "person:<id>" for a person-scope
@@ -193,7 +194,7 @@ export function SettingsRenderer({ scope, scopeValue, only, includeKeys, include
       >
         {({ registry, values }: { registry: SettingsKey[]; values: ResolvedSetting[] }) => {
           const renderableRegistry = registry.filter((key) => key.selector !== "location" || key.key === "household.home") as KitSettingsKey[];
-          const allGroups: SettingsGroup[] = groupSettings(renderableRegistry, values, scope, "home");
+          const allGroups: SettingsGroup[] = groupSettings(renderableRegistry, values, scope, "home", includeExpert);
           let groups = (only ? allGroups.filter((g) => only.includes(g.id)) : allGroups).map((group) => {
             const companionsVisible = values.find((value) => value.key === "companions.allowed")?.value !== false;
             const eligible = (item: (typeof group.basic)[number]) =>

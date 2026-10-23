@@ -32,11 +32,14 @@ import { SizingPanel } from "@/shell/pages/settings/SizingPanel";
 import { Card, CardContent, CardHeader, CardTitle } from "@maipai/ui/src/dashboard/components/ui/card";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@maipai/ui/src/dashboard/components/ui/alert-dialog";
 import { useState } from "react";
+import { Tabs, TabsList, TabsTrigger } from "@maipai/ui/src/ui/tabs";
+import { SettingsRenderer } from "@/shell/pages/settings/SettingsRenderer";
 import { useSearchParams } from "react-router-dom";
 import { useTabItem } from "@/shell/tabIdentity";
 import { useSettingsCapabilities } from "@/shell/pages/settings/useSettingsCapabilities";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@maipai/ui/src/ui/dialog";
 import type { PersonRosterEntry, Roster } from "@/lib/api";
+import { scopeValueFor } from "@/shell/pages/settings/settingsViewer";
 
 export interface SettingsViewProps {
   person: Roster;
@@ -73,12 +76,42 @@ function HomeVoiceCatalogSettings() { useTabItem("Voices"); return <VoiceManager
 // Each is a trail view of its Home settings section (spec/settings/areas.json),
 // so the area's min_role gate (admin) is the only one this layer needs; the
 // hub still gates every call these make.
-// ENGINES-AI-01: the one Engines and AI page. After the section's own settings card (where the engine runs, the engine
-// computer's name and ports) come the pairing wizard, the engines console (roles, installed engines, health, the
-// connection check, formerly /engines), the AI model list (formerly /models) and the Hugging Face token.
+// SETTINGS-UX-05: the existing Engines and AI pieces are placed in four short tabs.
 function HomeEngineAdminSettings({ person }: SettingsViewProps) {
   const [removal, setRemoval] = useState<{ message: string; confirm: () => void } | null>(null);
-  return <><InstallPlanSection /><ModelsAndStorageSection /><EngineLinkCredentialSection /><EnginesConsole person={person} /><Card><CardHeader><CardTitle>Memory and model choices</CardTitle></CardHeader><CardContent><SizingPanel person={person} onRemoval={(message, confirm) => setRemoval({ message, confirm })} /></CardContent></Card><AlertDialog open={removal !== null} onOpenChange={(open) => { if (!open) setRemoval(null); }}><AlertDialogContent><AlertDialogHeader><AlertDialogTitle>Turn this feature off?</AlertDialogTitle><AlertDialogDescription>{removal?.message}</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel>Cancel</AlertDialogCancel><AlertDialogAction onClick={() => { const pending = removal; setRemoval(null); pending?.confirm(); }}>Confirm</AlertDialogAction></AlertDialogFooter></AlertDialogContent></AlertDialog><ModelsSection /><HuggingFaceTokenSection /></>;
+  const [params, setParams] = useSearchParams();
+  const tabIds = ["overview", "models", "engines", "advanced"] as const;
+  const requestedTab = params.get("tab");
+  const activeTab = tabIds.includes(requestedTab as typeof tabIds[number]) ? requestedTab! : "overview";
+  function changeTab(value: string) {
+    setParams((previous) => { const next = new URLSearchParams(previous); if (value === "overview") next.delete("tab"); else next.set("tab", value); return next; });
+  }
+  const household = { scope: "household" as const, scopeValue: scopeValueFor("household", person.id), only: ["household.ai"] };
+  return <>
+  <Tabs value={activeTab} onValueChange={changeTab}>
+    <TabsList variant="line" aria-label="Engines and AI topics">
+      <TabsTrigger value="overview">Overview</TabsTrigger><TabsTrigger value="models">Models</TabsTrigger><TabsTrigger value="engines">Engines</TabsTrigger><TabsTrigger value="advanced">Advanced</TabsTrigger>
+    </TabsList>
+    {activeTab === "overview" ? <div role="tabpanel" aria-label="Overview" id="engine-tab-overview">
+      <div className="flex min-w-0 flex-col gap-6">
+        <SettingsRenderer {...household} includeKeys={["chat.paused", "chat.paused_message", "engines.stack.where"]} />
+        <InstallPlanSection />
+      </div>
+    </div> : null}
+    {activeTab === "models" ? <div role="tabpanel" aria-label="Models" id="engine-tab-models"><div className="flex min-w-0 flex-col gap-6"><ModelsAndStorageSection /><Card><CardHeader><CardTitle>Memory and model choices</CardTitle></CardHeader><CardContent><SizingPanel person={person} onRemoval={(message, confirm) => setRemoval({ message, confirm })} /></CardContent></Card><ModelsSection /></div></div> : null}
+    {activeTab === "engines" ? <div role="tabpanel" aria-label="Engines" id="engine-tab-engines"><div className="flex min-w-0 flex-col gap-6"><SettingsRenderer {...household} includeExpert includeKeys={["engines.stack.remote.host", "engines.stack.remote.local_port", "engines.stack.remote.ssh_port", "engines.stack.remote.allow_tailnet"]} /><EngineLinkCredentialSection /><EnginesConsole person={person} /></div></div> : null}
+    {activeTab === "advanced" ? <div role="tabpanel" aria-label="Advanced" id="engine-tab-advanced">
+      <div className="flex min-w-0 flex-col gap-6">
+        <SettingsRenderer {...household} includeExpert includeKeys={[
+          "chat.context_size_override", "chat.flash_attention_override", "chat.kv_cache_override", "chat.model_id", "health.keep_warm", "chat.teen_gate_grain", "chat.search_assist", "engines.stack.url", "engines.stack.use_chat", "engines.stack.use_embeddings", "engines.stack.use_stt", "engines.stack.use_tts", "voice.hesitations", "engines.turn_signal.choice",
+          ...["chat", "router", "embed", "rerank", "vision", "image", "video", "music", "coding", "judge", "tts", "stt", "wakeword"].map((role) => `engines.${role}.choice`),
+        ]} expandAdvanced titleOverrides={{ "household.ai": "Model per job" }} />
+        <HuggingFaceTokenSection />
+      </div>
+    </div> : null}
+  </Tabs>
+  <AlertDialog open={removal !== null} onOpenChange={(open) => { if (!open) setRemoval(null); }}><AlertDialogContent><AlertDialogHeader><AlertDialogTitle>Turn this feature off?</AlertDialogTitle><AlertDialogDescription>{removal?.message}</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel>Cancel</AlertDialogCancel><AlertDialogAction onClick={() => { const pending = removal; setRemoval(null); pending?.confirm(); }}>Confirm</AlertDialogAction></AlertDialogFooter></AlertDialogContent></AlertDialog>
+  </>;
 }
 // The user list, ready for the People section once the spec names this trail view (the report's commons order).
 function HomeUsersAdminSettings({ person }: SettingsViewProps) { return <UsersSection person={person} />; }

@@ -139,6 +139,8 @@ export function SettingsSectionContent(props: SectionContentProps) {
       {webSearchBlock ? <WebSearchSettings minorsControl={<SettingsRenderer scope="household" scopeValue={scopeValueFor("household", props.person.id)} honouredBy="home" only={["household.search"]} includeKeys={MINOR_DDGS_ONLY} titleOverrides={MINOR_DDGS_TITLE} beforeChange={beforeSettingChange} focusKey={props.focusKey} />} /> : null}
       {section.lead_view ? <SettingsView view={section.lead_view} {...viewProps} /> : null}
       {visibleCards(section, viewer, registry, "home").map((card) => {
+        // SETTINGS-UX-05: the AI registry group is placed inside its four tabs by the trail view.
+        if (section.id === "ai" && card.scope === "household" && card.group === "household.ai") return null;
         // Until APP-SET-05 re-points the face card onto the kit renderer, the
         // face card inside `account.profile` already draws this group's one
         // key (the enrollment sounds switch); a second card would repeat it.
