@@ -119,6 +119,23 @@ describe("app.sh pull (the first step of bun restart)", () => {
     expect(existsSync(join(main, "NEW.md"))).toBe(true);
   });
 
+  test("reinstalls in a directory whose package.json changed upstream, and only that one", () => {
+    const shim = join(scratch, "shim");
+    mkdirSync(shim, { recursive: true });
+    const log = join(scratch, "bun-calls.log");
+    writeFileSync(join(shim, "bun"), `#!/bin/sh\necho "$(basename "$PWD") $*" >> "${log}"\n`, { mode: 0o755 });
+    const other = join(scratch, "other");
+    git(other, "pull", "--ff-only");
+    mkdirSync(join(other, "backend"), { recursive: true });
+    writeFileSync(join(other, "backend/package.json"), JSON.stringify({ name: "pin-bump" }));
+    git(other, "add", "backend/package.json");
+    git(other, "commit", "-m", "pin bump");
+    git(other, "push", "origin", "HEAD:main");
+    const r = app(main, ["pull"], { PATH: `${shim}:${process.env.PATH}` });
+    expect(r.status).toBe(0);
+    expect(readFileSync(log, "utf8").trim()).toBe("backend install --force");
+  });
+
   test("aborts with a clear message when history has diverged", () => {
     writeFileSync(join(main, "LOCAL.md"), "local\n");
     git(main, "add", "LOCAL.md");

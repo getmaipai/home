@@ -233,11 +233,24 @@ case "${1:-}" in
     if [ "$in_worktree" = 1 ] || ! git -C "$root" rev-parse --git-dir >/dev/null 2>&1; then
       exit 0
     fi
+    before="$(git -C "$root" rev-parse HEAD)"
     if ! git -C "$root" pull --ff-only; then
       echo "Restart stopped before touching the running hub: $root could not fast-forward to origin." >&2
       echo "It has local commits or edits that conflict with origin/main. Inspect it with git -C $root status, move that work into a worktree, then run bun restart again." >&2
       exit 1
     fi
+    # A pin bump changes package.json but not what is installed, so the running hub would
+    # start against old @maipai/* code. Reinstall in each directory whose package.json moved.
+    for d in backend frontend; do
+      if [ -n "$(git -C "$root" diff --name-only "$before" HEAD -- "$d/package.json")" ]; then
+        echo "$d/package.json changed; running bun install --force in $d."
+        if ! (cd "$root/$d" && bun install --force); then
+          echo "Restart stopped before touching the running hub: bun install failed in $d." >&2
+          echo "Fix the install error shown above, then run bun restart again." >&2
+          exit 1
+        fi
+      fi
+    done
     ;;
   *)
     echo "Usage: bun start | bun stop | bun restart" >&2
