@@ -49,7 +49,7 @@ The wizard asks where the AI runs.
 
 The plan lists what you get, including voice ("Voice: talk to Home"). The browser asks for the microphone the first time you use voice, not during setup.
 
-If Home's own web search is not ready when the plan finishes, one more screen, **Turn on web search**, asks for the address of a SearXNG you run on your home network. Press **Test**. **Continue** turns on once the test for that exact address passes. Leave the address empty and press **Continue** to skip it, which turns on DuckDuckGo search for adults. You can change this later in **Settings**, **Home settings**, then **Search**. See [Set up your hub](getting-started.md) for every wizard screen.
+If Home's own web search is not ready when the plan finishes, one more screen, **Turn on web search**, asks for the address of a SearXNG you run on your home network. Press **Test**. **Continue** turns on once the test for that exact address passes. Leave the address empty and press **Continue** to skip it, which turns on DuckDuckGo search for adults. You can change this later in **Settings**, then **Search**. See [Set up your hub](getting-started.md) for every wizard screen.
 
 The engine needs the Mac's logged-in desktop to use the graphics chip. If nobody is logged in at the Mac, the bar stops and says so. Log in at the Mac and press Try again.
 

@@ -81,7 +81,7 @@ Songs are made with a model whose makers say its songs may be used for money, fo
 
 ## Choose how it works (owner and admin)
 
-- **Settings**, **Home settings**, **Pictures, videos and music**: **Adults can make music**. Turn it off to stop all song making. **Song length** picks full (the default) or quick songs when nobody says which.
+- **Settings**, **Pictures, videos and music**: **Adults can make music**. Turn it off to stop all song making. **Song length** picks full (the default) or quick songs when nobody says which.
 - **Settings**, **Models and storage**, **Music**: get the music model, or remove it to free space.
 
 ## Something not working?

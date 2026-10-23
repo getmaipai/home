@@ -42,7 +42,7 @@ On a computer with 64 GB of memory or more, like the Mac Studio, Home speaks wit
 
 ## Natural speech sounds
 
-An owner or admin can let spoken replies include a small human touch, like "hmm," or a laugh. Open **Settings**, then **Home settings**, then **Engines and AI**, and find **Natural speech sounds**.
+An owner or admin can let spoken replies include a small human touch, like "hmm," or a laugh. Open **Settings**, then then **Engines and AI**, and find **Natural speech sounds**.
 
 - **Off.** Replies are read exactly as written.
 - **Light.** A rare "hmm," or laugh, at most once per reply. This is the default.

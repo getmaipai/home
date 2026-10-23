@@ -52,7 +52,7 @@ If a child's chat worries MaiPai, adults get a note with the child's name. The n
 
 Only an owner or admin can change these controls:
 
-- Open **Settings**, **Home settings**, **Pictures, videos and music**. **Let kids make cartoon pictures and videos** starts on. Children can make cartoons as soon as a picture model is installed.
+- Open **Settings**, **Pictures, videos and music**. **Let kids make cartoon pictures and videos** starts on. Children can make cartoons as soon as a picture model is installed.
 - On that same page, **Cartoon pictures a child can make each day** starts at 20. Changing one of the child's own cartoons counts as one picture. **Cartoon videos a child can make each day** starts at 5. Set either limit to 0 for none.
 - Open **People**, choose the child, then open **Limits**. **This child can make cartoon pictures and videos** starts on while the home switch is on. Turn it off to stop cartoons for that child. Only owners and admins see **Limits**.
 

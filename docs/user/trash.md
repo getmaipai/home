@@ -1,7 +1,7 @@
 # Trash
 
 Open **Settings**, then **Data and privacy**, then **Storage** and **Trash**.
-An admin can also open Storage from **Home settings**, **Storage and backups**.
+An admin can also open Storage from **Storage and backups**.
 
 Deleted media and playlists stay in Trash for 30 days. Pick **Restore** to put an item back.
 You can restore an item until its keep date. After that, Home clears it within six hours, or the next time Home starts.

@@ -1,5 +1,9 @@
 # MaiPai Home: design record
 
+## One Settings area (owner-approved 2026-10-23)
+
+Settings is one spec-declared area at `/settings`, with one column grouped into **Yours** and **The home**. Household pages are visible in that same column to owners and admins; section audiences keep them hidden from other roles, and direct non-admin household URLs show the access explanation. Old `/settings/home`, `/settings/account`, and `/settings/chat` routes replace to their mapped page and tab using the pinned spec's `legacy-sections.json`. The owner approved S1's single profile-menu entry: **Settings**.
+
 Seeded 2026-09-03 from the platform plan (`purring-chasing-noodle.md`).
 This repo is a fresh start on that design: chapter 0 explains why (build
 fresh, do not migrate; decision 11), chapters 3 and 4 are the hub's

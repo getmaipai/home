@@ -371,7 +371,9 @@ drawer, S2 phone layout, S3 widths); they supersede the earlier S1
 profile-menu list and the "every width" wording. Owner-approved 2026-10-17: S6
 (system status reaches the person through the existing mechanisms); his words are the
 record: "make a rule for that: we already have a pattern and mechanisms to relay system
-status to the user".
+status to the user". Owner-approved 2026-10-23: S1 (one Settings entry; household
+pages live in the same column for owner and admin); his words: "get rid of household
+settings now since settings includes both".
 
 Governs: frontend/src/shell/**, frontend/src/apps/**, backend/src/settings/**, backend/src/wire.ts, backend/src/lib/roleHealth.ts, backend/src/lib/healthSnapshot.ts, backend/src/lib/installStatus.ts, backend/src/lib/issues.ts
 
@@ -392,9 +394,8 @@ S1. **The main navigation is permanent.** The column that lists the apps
     screen carries its own Close. The rail holds the brand, global
     Search, the app icons, a More button above the profile control, and,
     pinned at its bottom, the profile control whose menu holds
-    Notifications, System status, Settings, Home settings (owner and
-    admin only), Help and Log out; Incognito is in the rail's More menu
-    (owner-approved 2026-10-06). It is never removed, hidden or merged
+    Notifications, System status, Settings, Help and Log out; Incognito is
+    in the rail's More menu (owner-approved 2026-10-06). It is never removed, hidden or merged
     into an app, and app content (thread lists, filters, sub-navigation)
     never lives inside it. On a phone the drawer holds the selected app's
     own sections below the apps; that is the only place app content meets

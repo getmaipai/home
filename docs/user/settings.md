@@ -3,9 +3,9 @@ title: Settings
 description: Find your way around MaiPai's settings, for the household and for you.
 ---
 
-Settings are split into two tabs at the top of the page. **Household** holds shared settings, usually owner or admin only. **Me** holds your own personal preferences.
+Settings has one column grouped into **Yours** and **The home**. Your personal pages are available to you; household pages are available to an owner or admin and apply to everyone at home. Choose a page from the column, then use its tabs to move between related settings.
 
-## Household settings
+## The home group
 
 - **System**: your household's language and region. Also how long backups and conversation history are kept.
 - **AI model tuning**, **Integrations**, **Notifications**, **Hugging Face token**: advanced options for MaiPai's models and connections.
@@ -24,7 +24,7 @@ An owner or admin can open **Manage**, then **Storage**, to see saved copies Hom
 
 ## Your own settings
 
-Switch to the **Me** tab for your own personal preferences:
+Choose a page in the **Yours** group for your own personal preferences:
 
 - **Appearance**, **Personality**, **Voice**: how MaiPai looks and sounds when it talks to you.
 - **Look**: pick the color scheme of the whole app. Neutral is the standard look, black and white, the same as the design it comes from. Navy is MaiPai's own blue-black set. The other six are ready-made color sets (Stone, Zinc, Mauve, Olive, Mist, Taupe). Light and dark mode both follow whichever one you pick.
@@ -38,7 +38,7 @@ Switch to the **Me** tab for your own personal preferences:
 
 ## Voices
 
-Open **Settings**, choose the **Me** tab, then choose **Voices**. Pick a voice from the **Voice for you** list and press **Test** to hear a short sentence. Press **Stop** to end it. Your choice is saved as soon as you pick it, and Home uses that voice in chat and when it reads text aloud.
+Open **Settings**, choose the **Yours** group, then choose **Voices**. Pick a voice from the **Voice for you** list and press **Test** to hear a short sentence. Press **Stop** to end it. Your choice is saved as soon as you pick it, and Home uses that voice in chat and when it reads text aloud.
 
 If you have more than one microphone, the page also has a **Microphone** choice, remembered on this device only.
 
@@ -48,7 +48,7 @@ If the page says "Voices are still getting ready", wait a minute. After setup th
 
 ## Models and storage
 
-An owner or admin opens **Settings**, **Home settings**, **Engines and AI**, and scrolls to **Models and storage**. It lists every part of the AI on this computer, such as the chat models, the voices, the picture and video models and the picture tools. Each row shows how much space it uses, when it was last used and what uses it. The top line shows how much room is left. A part Home recommends but did not install, such as Detailed videos on a Mac that was upgraded, says "Recommended, not installed" and has an **Install** button. Home never downloads it for you after an upgrade. The LTX Detailed video model is optional. It needs a Mac with 128 GB of memory and about 74 GB of disk space. Its licence is free under 10 million dollars of yearly revenue. You accepted the licences of everything Home installs once, in setup (or with the single **Accept the licences for the AI models Home installs** prompt at the top of this section on a Home set up earlier), so a part never asks for its own accept. Once the licences are accepted, an **Install the recommended extras** button appears while any recommended extra is missing. A licence that is new, or whose terms changed, asks once, in plain words.
+An owner or admin opens **Settings**, **Engines and AI**, and scrolls to **Models and storage**. It lists every part of the AI on this computer, such as the chat models, the voices, the picture and video models and the picture tools. Each row shows how much space it uses, when it was last used and what uses it. The top line shows how much room is left. A part Home recommends but did not install, such as Detailed videos on a Mac that was upgraded, says "Recommended, not installed" and has an **Install** button. Home never downloads it for you after an upgrade. The LTX Detailed video model is optional. It needs a Mac with 128 GB of memory and about 74 GB of disk space. Its licence is free under 10 million dollars of yearly revenue. You accepted the licences of everything Home installs once, in setup (or with the single **Accept the licences for the AI models Home installs** prompt at the top of this section on a Home set up earlier), so a part never asks for its own accept. Once the licences are accepted, an **Install the recommended extras** button appears while any recommended extra is missing. A licence that is new, or whose terms changed, asks once, in plain words.
 
 Press **Install** to download a part. A bar shows how far it has got, and you can keep using Home while it downloads. If there is not enough room, or this computer is too small to run it, the button is off and the row says why. Press **Uninstall** to remove a part. Home tells you how much space it frees and that you can install it again later. Chat keeps at least one model: the model chat is using, and the only chat model, cannot be removed.
 
@@ -56,7 +56,7 @@ If a download stops, the row says why and offers **Try again**. The same item is
 
 ### Assistant access
 
-An owner or admin can let an assistant, such as Claude Code, change a few settings for them. Open **Settings**, **Home settings**, **Engines and AI**, and find **Assistant access**. Press **Make an assistant key**, name it, choose how long it lasts (7, 30 or 90 days) and copy the key when Home shows it. Home shows it only once. Give the key to the assistant. It can change only the short list of settings Home allows, today how Home helps the chat remember to search the web, and nothing else: it cannot change people, passwords, safety rules or ages. It stops working on its end date, when you revoke it here, or if the person who made it is no longer an owner or admin.
+An owner or admin can let an assistant, such as Claude Code, change a few settings for them. Open **Settings**, **Engines and AI**, and find **Assistant access**. Press **Make an assistant key**, name it, choose how long it lasts (7, 30 or 90 days) and copy the key when Home shows it. Home shows it only once. Give the key to the assistant. It can change only the short list of settings Home allows, today how Home helps the chat remember to search the web, and nothing else: it cannot change people, passwords, safety rules or ages. It stops working on its end date, when you revoke it here, or if the person who made it is no longer an owner or admin.
 
 ### Choosing which chat model answers
 
@@ -66,7 +66,7 @@ Qwen3.6 35B A3B is the first model offered beside the default. It starts answeri
 
 ## Pictures, videos and music
 
-An owner or admin opens **Settings**, **Home settings**, **Pictures, videos and music**. It has the picture model (install or see it), who can make pictures, the style library, and the same for videos. Children can make cartoons by default. See [cartoon controls](people.md#cartoon-pictures-and-videos) to change this. See [Pictures](pictures.md) and [Videos](videos.md).
+An owner or admin opens **Settings**, **Pictures, videos and music**. It has the picture model (install or see it), who can make pictures, the style library, and the same for videos. Children can make cartoons by default. See [cartoon controls](people.md#cartoon-pictures-and-videos) to change this. See [Pictures](pictures.md) and [Videos](videos.md).
 
 **Ask me before making pictures and videos of people** is on this page. It starts off and never turns off the safety rules.
 
@@ -74,13 +74,13 @@ An owner or admin opens **Settings**, **Home settings**, **Pictures, videos and 
 
 ## Web search settings
 
-An owner or admin opens **Settings**, **Home settings**, **Search**. The **Web search** block holds the SearXNG address with **Test** and **Save**, the source switches and the teen and child DuckDuckGo choice. See [Set up web search](web-search.md).
+An owner or admin opens **Settings**, **Search**. The **Web search** block holds the SearXNG address with **Test** and **Save**, the source switches and the teen and child DuckDuckGo choice. See [Set up web search](web-search.md).
 
 ## Find a setting fast
 
 Use the **Search settings** box at the top of the page. It jumps you straight to what you're looking for.
 
-![The Settings page, showing the Household tab's System section](../assets/screens/settings-desktop-light.png)
+![Settings, showing a household settings page](../assets/screens/settings-desktop-light.png)
 
 ## Still need help?
 

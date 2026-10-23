@@ -44,7 +44,7 @@ The original is never changed. The new picture is the next version of it: press 
 
 ## Fewer questions and warnings about people
 
-Home starts with extra questions and warnings about people turned off. To turn them on, an owner or admin opens **Settings**, **Home settings**, **Pictures, videos and music**. Turn on **Ask me before making pictures and videos of people**. Safety rules for children and real people never turn off. When Home needs to know who is in a photo, it asks once and remembers your answer for that photo.
+Home starts with extra questions and warnings about people turned off. To turn them on, an owner or admin opens **Settings**, **Pictures, videos and music**. Turn on **Ask me before making pictures and videos of people**. Safety rules for children and real people never turn off. When Home needs to know who is in a photo, it asks once and remembers your answer for that photo.
 
 ## Who can make pictures
 
@@ -56,7 +56,7 @@ Two things are never made, whatever the settings: anything sexual that shows a c
 
 ## Choose how it works (owner and admin)
 
-Open **Settings**, **Home settings**, **Pictures, videos and music**.
+Open **Settings**, **Pictures, videos and music**.
 
 - **Adults can make pictures.** Turn it off to stop all picture making.
 - **Adult-only styles.** Choose whether styles marked adults only can be used.
@@ -89,7 +89,7 @@ The page also lists every time someone made something that looks like them, and 
 | What you see | Why | What to do |
 |---|---|---|
 | Home says it cannot make pictures for you | You are a guest, or you are on a shared screen or a spoken chat, or a parent turned cartoon pictures off for you | Ask an adult, or use your own written chat |
-| "No picture model is installed" | The model is not on this computer | An owner or admin presses **Install the picture model** in Settings, Home settings, Pictures, videos and music |
+| "No picture model is installed" | The model is not on this computer | An owner or admin presses **Install the picture model** in Settings, Pictures, videos and music |
 | "The picture engine isn't answering", or Home says it cannot reach the engine | The AI engine is restarting or stopped | Wait a minute and ask again. If it stays, open **Repairs** |
 | "Waiting for memory to free up" | A video or another big job holds the memory | Wait. It starts by itself |
 | "Something went wrong while making it" | The job failed | Press **Try again**, or change the words |

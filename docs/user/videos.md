@@ -49,7 +49,7 @@ Two things are never made, whatever the settings: anything sexual that shows a c
 
 ## Choose how it works (owner and admin)
 
-Open **Settings**, **Home settings**, **Pictures, videos and music**.
+Open **Settings**, **Pictures, videos and music**.
 
 - **Adults can make videos.** Turn it off to stop all video making.
 - **Adult-only video styles.** Choose whether styles marked adults only can be used.
@@ -71,7 +71,7 @@ The video engine checks the file and refuses any style that puts a child in an a
 
 - **No video option.** Why: your Mac has less than 128 GB, your account cannot make videos, or videos are off. Fix: ask an owner or admin to check Settings.
 - **"No video model is installed".** Why: the video model is not downloaded. Fix: an owner or admin installs it in Settings.
-- **Chat says it made a Quick video when I asked for sound.** Why: Detailed videos are not on this computer yet. Fix: an owner or admin chooses **Get Detailed videos** in **Settings**, **Home settings**, **Pictures, videos and music**, and accepts the licence.
+- **Chat says it made a Quick video when I asked for sound.** Why: Detailed videos are not on this computer yet. Fix: an owner or admin chooses **Get Detailed videos** in **Settings**, **Pictures, videos and music**, and accepts the licence.
 - **A Detailed video is slow.** Why: it makes the sound and the picture together, and the first one after a restart loads a very large model. Fix: wait. A 10 second one takes about two minutes, and the first one after a restart a little more.
 - **"Home is busy making another picture or video".** Why: Home does one job at a time. Fix: wait. It starts by itself.
 - **"Waiting for memory to free up".** Why: another big job has the memory. Fix: wait a few minutes.

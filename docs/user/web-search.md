@@ -28,7 +28,7 @@ When you search, MaiPai sends your search words to your SearXNG. It does not nee
 
 ## Connect MaiPai
 
-1. Open **Settings**, then **Home settings**, then **Search**. Only an owner or an admin sees this page.
+1. Open **Settings**, then then **Search**. Only an owner or an admin sees this page.
 2. Under **Web search**, paste the address into **SearXNG address**, for example `http://192.0.2.10:8888`.
 3. Press **Test**. Home says in plain words whether the address works, with a **Recommended** line and a **Details** list. A warning still counts as working.
 4. Press **Save**. **Save** stays off until the exact text in the box has passed a Test. If you change the address afterward, test it again.
@@ -40,16 +40,16 @@ The line at the top of the Web search block says what web search uses right now,
 
 ## Add DuckDuckGo as a second source (optional)
 
-SearXNG stays your main search. You can also add DuckDuckGo, and MaiPai blends both lists into one. If SearXNG could not be set up during setup, DuckDuckGo is turned on for you, and you can turn it off under **Settings**, **Home settings**, **Search**. MaiPai sets up its small search service by itself, which can take a few minutes after install, and only adults use it unless you allow it for teens or children (below). Guests always use SearXNG alone.
+SearXNG stays your main search. You can also add DuckDuckGo, and MaiPai blends both lists into one. If SearXNG could not be set up during setup, DuckDuckGo is turned on for you, and you can turn it off under **Settings**, **Search**. MaiPai sets up its small search service by itself, which can take a few minutes after install, and only adults use it unless you allow it for teens or children (below). Guests always use SearXNG alone.
 
 1. Wait for the small search service to finish setting itself up. Until it does, a web question answers "Web search is still being set up on this computer." If it cannot, **Repairs** says why and has a **Try again** button.
-2. Open **Settings**, **Home settings**, **Search**, and check that **DuckDuckGo** is on under the address box. The switch appears once the helper runs, and it is on for you when SearXNG is not set up.
+2. Open **Settings**, **Search**, and check that **DuckDuckGo** is on under the address box. The switch appears once the helper runs, and it is on for you when SearXNG is not set up.
 
 What it sends: the words searched and your home's internet address go to DuckDuckGo, from the service on your computer. Nothing else anyone in the house said or saved. It asks at a person's pace. If DuckDuckGo pushes back, MaiPai stops asking for an hour or more and answers from your other source meanwhile.
 
 ### Allow DuckDuckGo for teens and children (off by default)
 
-Teens and children use SearXNG alone. An admin can change that. Once DuckDuckGo is running, open **Settings**, **Home settings**, **Search**, and set **DuckDuckGo for teens and children** (under **Teens and children**) to **Teens** or **Teens and children**. Only an admin can change it.
+Teens and children use SearXNG alone. An admin can change that. Once DuckDuckGo is running, open **Settings**, **Search**, and set **DuckDuckGo for teens and children** (under **Teens and children**) to **Teens** or **Teens and children**. Only an admin can change it.
 
 Read this first. DuckDuckGo's own filter is not guaranteed, and the tool MaiPai uses to reach it often ignores the strict setting MaiPai asks for. Adult results may reach this age group. Leave this off unless you accept that.
 
@@ -128,7 +128,7 @@ Each problem goes away by itself when search works again. MaiPai also runs a tes
 Go down this list in order.
 
 1. **Is the search server running?** Open its address in a browser on the computer that runs MaiPai. You should see the SearXNG page.
-2. **Is the address right?** Check **SearXNG address** in **Settings**, **Home settings**, **Search**, and press **Test**. It needs `http://`, the right number after the colon, and no login page in front.
+2. **Is the address right?** Check **SearXNG address** in **Settings**, **Search**, and press **Test**. It needs `http://`, the right number after the colon, and no login page in front.
 3. **Is Home allowed?** Check `pass_ip` in `limiter.toml` and your firewall for the address MaiPai connects from. Restart SearXNG.
 4. **Is JSON on?** Check `formats: [html, json]` in `settings.yml`.
 5. **Is the tailnet up?** If you reach the search server over Tailscale, make sure Tailscale is running on the computer that runs MaiPai.
