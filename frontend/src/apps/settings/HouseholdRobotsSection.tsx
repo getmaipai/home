@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Link, useSearchParams } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { AsyncState } from "@maipai/ui/src/primitives/AsyncState";
 import { EmptyState } from "@maipai/ui/src/primitives/EmptyState";
@@ -20,10 +20,9 @@ import { StackChanInstallDialog } from "@/apps/settings/StackChanInstallDialog";
 import { RobotSelfTests } from "@/apps/settings/RobotSelfTests";
 import { RobotCompanionChoices } from "@/apps/settings/RobotCompanionChoices";
 import { playableVoices, voiceFriendlyName } from "@/lib/voice/voiceBrowserRows";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@maipai/ui/src/ui/tabs";
 import { Card, CardAction, CardContent, CardHeader, CardTitle } from "@maipai/ui/src/dashboard/components/ui/card";
+import { useTabItem } from "@/shell/tabIdentity";
 
-const DEVICE_PARAM = "device";
 
 function statusText(device: DeviceInfo): string {
   if (device.lastSeenAt === null && device.state == null) return "Waiting for first report";
@@ -31,13 +30,10 @@ function statusText(device: DeviceInfo): string {
   return "Paired";
 }
 
-/** ROBOT-ADMIN-PLACE-01: Home settings, Devices. One row per household robot; opening a row (`?device=<id>`)
- * shows that robot's own settings, name, area, Forget and Cancel install in one detail view with the lifecycle
- * button in its header, so nothing sits below the screen. Admin only; the section's area gate and the hub both
- * enforce it. */
-export function HouseholdRobotsSection() {
-  const [params, setParams] = useSearchParams();
-  const openId = params.get(DEVICE_PARAM);
+/** ROBOT-ADMIN-PLACE-01: Home settings, Devices. The list opens a robot's route detail. Admin only; the section's area gate and the hub enforce it. */
+export function HouseholdRobotsSection({ detailId, tab }: { detailId?: string; tab?: string }) {
+  const navigate = useNavigate();
+  const [, setParams] = useSearchParams();
   const query = useQuery<DeviceInfo[]>({ queryKey: ["robot-devices"], queryFn: () => api.robotDevices(), refetchInterval: 5000 });
   const queryClient = useQueryClient();
   useEffect(() => {
@@ -45,19 +41,22 @@ export function HouseholdRobotsSection() {
     window.addEventListener("devices-updated", refresh);
     return () => window.removeEventListener("devices-updated", refresh);
   }, [queryClient]);
-  const close = () => setParams((previous) => { const next = new URLSearchParams(previous); next.delete(DEVICE_PARAM); return next; });
   return (
     <AsyncState data={query.data} error={query.isError} isFetching={query.isFetching} onRetry={() => query.refetch()} errorMessage="Could not load the household's robots." loadingLabel="Loading robots">
       {(robots: DeviceInfo[]) => {
-        const open = openId ? robots.find((robot) => robot.id === openId) : undefined;
-        if (open) return <RobotDetail key={open.id} device={open} onClose={close} />;
+        const open = detailId ? robots.find((robot) => robot.id === detailId) : undefined;
+        if (detailId && !open) {
+          navigate("/settings/home/robot", { replace: true });
+          return null;
+        }
+        if (open) return <RobotDetail key={open.id} device={open} tab={tab} onClose={() => {}} />;
         return (
           <Card>
             <CardHeader><CardTitle>Robots</CardTitle><CardAction><Button size="lg" onClick={() => setParams((p) => { const n = new URLSearchParams(p); n.set("addRobot", "1"); return n; })}>Add a robot</Button></CardAction></CardHeader>
             <CardContent>{robots.length === 0 ? <EmptyState icon="inbox" text="No robots yet." /> : (
               <ItemGroup variant="card" aria-label="Household robots">
                 {robots.map((robot) => (
-                  <Item key={robot.id} size="setting" render={<Link to={`?${DEVICE_PARAM}=${encodeURIComponent(robot.id)}`} aria-label={`${robot.name} settings`} />}>
+                  <Item key={robot.id} size="setting" render={<Link to={`/settings/home/robot/${encodeURIComponent(robot.id)}`} aria-label={`${robot.name} settings`} />}>
                     <ItemContent>
                       <ItemTitle>{robot.name}</ItemTitle>
                       <ItemDescription>{robot.area ?? "No area"}</ItemDescription>
@@ -74,7 +73,8 @@ export function HouseholdRobotsSection() {
   );
 }
 
-function RobotDetail({ device, onClose }: { device: DeviceInfo; onClose: () => void }) {
+function RobotDetail({ device, tab, onClose }: { device: DeviceInfo; tab?: string; onClose: () => void }) {
+  useTabItem(device.name);
   const queryClient = useQueryClient();
   const [name, setName] = useState(device.name);
   const [area, setArea] = useState(device.area ?? "");
@@ -96,9 +96,7 @@ function RobotDetail({ device, onClose }: { device: DeviceInfo; onClose: () => v
     void api.robotInstallStatus(device.id).then(() => { if (active) setHostedInstall(true); }).catch(() => { if (active) setHostedInstall(false); });
     return () => { active = false; };
   }, [device.id, device.lastSeenAt]);
-  const [detailParams, setDetailParams] = useSearchParams();
-  const activeTab = detailParams.get("tab") ?? "overview";
-  const setTab = (tab: string) => setDetailParams((previous) => { const n = new URLSearchParams(previous); n.set("tab", tab); return n; });
+  const activeTab = tab ?? "overview";
   const top = useRef<HTMLDivElement>(null);
   useEffect(() => { top.current?.scrollIntoView?.({ block: "start" }); }, []);
   const installing = hostedInstall && device.lastSeenAt === null;
@@ -138,9 +136,7 @@ function RobotDetail({ device, onClose }: { device: DeviceInfo; onClose: () => v
     >
       <div className="flex flex-col gap-4">
         {lifecycleError ? <Alert variant="destructive"><AlertDescription>{lifecycleError}</AlertDescription></Alert> : null}
-        <Tabs value={activeTab} onValueChange={setTab}>
-          <TabsList variant="line"><TabsTrigger value="overview">Overview</TabsTrigger><TabsTrigger value="behaviour">Behaviour</TabsTrigger><TabsTrigger value="access">Access</TabsTrigger></TabsList>
-          <TabsContent value="overview">
+        {activeTab === "overview" ? <>
         <p className="text-base"><Badge variant="secondary">{statusText(device)}</Badge>{softwareQuery.data?.checkin ? <> Last seen {new Intl.DateTimeFormat(undefined, { dateStyle: "medium", timeStyle: "short" }).format(new Date(softwareQuery.data.checkin.lastSeen))}{softwareQuery.data.checkin.ip ? ` · IP address ${softwareQuery.data.checkin.ip}` : ""}</> : null}</p>
         <RobotSelfTests device={device} />
         {hostedInstall && softwareQuery.data ? <Section heading="Software">
@@ -172,16 +168,15 @@ function RobotDetail({ device, onClose }: { device: DeviceInfo; onClose: () => v
           </ItemGroup>
           <StackChanInstallDialog updateOf={device.id} showButton={softwareQuery.data.firmware.status !== "up_to_date"} onInstalled={() => void queryClient.invalidateQueries({ queryKey: ["robot-software", device.id] })} />
         </Section> : null}
-          </TabsContent>
-          <TabsContent value="behaviour">
+        </> : null}
+        {activeTab === "behaviour" ? <>
         <RobotCompanionChoices deviceId={device.id} />
         {cards.map((card) => <SettingsRenderer key={`${card.scope}:${card.group}`} scope="device" scopeValue={`device:${device.id}`} only={[card.group]} titleOverrides={{ [card.group]: card.label }} optionsFrom={{ "voices.tts": voiceOptions }} />)}
-          </TabsContent>
-          <TabsContent value="access">
+        </> : null}
+        {activeTab === "access" ? <>
         <Section heading="Access"><div className="flex flex-col gap-3"><Label htmlFor={`robot-name-${device.id}`}>Name</Label><Input id={`robot-name-${device.id}`} value={name} maxLength={60} aria-invalid={saveError !== null} onChange={(event) => setName(event.target.value)} /><FieldError errors={saveError ? [{ message: saveError }] : []} /><Label htmlFor={`robot-area-${device.id}`}>Area</Label><Input id={`robot-area-${device.id}`} value={area} maxLength={60} onChange={(event) => setArea(event.target.value)} /><Button disabled={saveBusy || !name.trim()} onClick={() => void saveIdentity()}>{saveBusy ? "Saving…" : "Save name and area"}</Button></div></Section>
         <Section heading="Remove">{confirming ? <DestructiveConfirm message={installing ? `Cancel the install and forget ${device.name}?` : `Forget ${device.name}?`} detail={installing ? "This revokes its enrollment code and deletes its saved firmware backup." : "It will need to be paired again. This also deletes the robot's memories and its saved firmware backup."} confirmLabel={installing ? "Yes, cancel install" : "Yes, forget it"} busyLabel="Working…" busy={lifecycleBusy} cancelLabel={installing ? "Keep installing" : "Keep it"} onConfirm={() => void endLifecycle()} onCancel={() => setConfirming(false)} /> : <ItemGroup variant="card"><Item size="setting"><ItemContent><ItemTitle>{installing ? "Cancel install" : "Forget this robot"}</ItemTitle><ItemDescription>{installing ? "Stop this robot's installation." : "Remove this robot from the household."}</ItemDescription></ItemContent><Button size="lg" variant="destructive" onClick={() => setConfirming(true)}>{installing ? "Cancel install" : "Forget this robot"}</Button></Item></ItemGroup>}</Section>
-          </TabsContent>
-        </Tabs>
+        </> : null}
       </div>
     </DetailPane>
     </div>

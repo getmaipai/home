@@ -19,7 +19,7 @@ function renderRobot(software: unknown) {
     return Response.json([]);
   }) as typeof fetch;
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-  return render(<QueryClientProvider client={client}><MemoryRouter initialEntries={["/?device=device-test"]}><Routes><Route path="/" element={<HouseholdRobotsSection />} /></Routes></MemoryRouter></QueryClientProvider>);
+  return render(<QueryClientProvider client={client}><MemoryRouter initialEntries={["/"]}><Routes><Route path="/" element={<HouseholdRobotsSection detailId="device-test" tab="overview" />} /></Routes></MemoryRouter></QueryClientProvider>);
 }
 
 describe("robot software details", () => {

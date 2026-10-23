@@ -52,7 +52,7 @@ function open(person: Roster, url: string, home: Parameters<typeof mockHome>[0] 
         <Route path="setup/away" element={<h1>Away setup wizard</h1>} />
         <Route element={<FullLayout rail activeAppHref={activeAppHref(new URL(url, "http://home").pathname)} railProfile={<RailProfileMenu displayName={person.display_name} subtitle={person.role} settingsHref="/settings" helpHref="https://example.com/help" onLogout={() => {}} />} />}>
           <Route path="settings" element={<SettingsEntryRedirect person={person} />} />
-          <Route path="settings/:area/:section?" element={<SettingsAreaPage person={person} onPersonChange={() => {}} />} />
+          <Route path="settings/:area/:section?/:detailId?" element={<SettingsAreaPage person={person} onPersonChange={() => {}} />} />
           <Route path="customize" element={<CustomizeRedirect person={person} />} />
           <Route path="chat" element={<h1>Chat</h1>} />
           <Route path="status" element={<h1>Status</h1>} />
@@ -128,6 +128,29 @@ describe("the settings route", () => {
     await waitFor(() => expect(rows(view)).toContain("Maintenance"));
     expect(rows(view)).toEqual(["General", "People", "Engines and AI", "Pictures, videos and music", "Coding", "Devices", "Search", "Integrations", "Commands", "Voices", "Storage and backups", "Reference library", "Media library", "Maintenance", "Privacy", "Developer tools", "Network and access"]);
     expect(view.getByRole("heading", { level: 1, name: /^General$/ })).toBeTruthy();
+  });
+
+  test("robot detail uses the spec tabs and the URL selects the active shell tab", async () => {
+    const view = open(makePerson("owner"), "/settings/home/robot/d1?tab=behaviour", { robots: true });
+    await waitFor(() => expect(where(view)).toBe("/settings/home/robot/d1?tab=behaviour"));
+    expect(view.getByRole("tab", { name: "Overview" })).toBeTruthy();
+    expect(view.getByRole("tab", { name: "Behaviour" }).getAttribute("aria-selected")).toBe("true");
+    expect(view.getByRole("tab", { name: "Access" })).toBeTruthy();
+  });
+
+  test("legacy device query replaces to the robot route and keeps other parameters", async () => {
+    const view = open(makePerson("owner"), "/settings/home/robot?device=d1&tab=access&addRobot=1", { robots: true });
+    await waitFor(() => expect(where(view)).toContain("/settings/home/robot/d1?tab=access&addRobot=1"));
+  });
+
+  test("unknown robot detail redirects to the section page", async () => {
+    const view = open(makePerson("owner"), "/settings/home/robot/missing", { robots: true });
+    await waitFor(() => expect(where(view)).toBe("/settings/home/robot"));
+  });
+
+  test("robot list row links to the route detail", async () => {
+    const view = open(makePerson("owner"), "/settings/home/robot", { robots: true });
+    expect(await view.findByRole("link", { name: "Robot settings" })).toHaveAttribute("href", "/settings/home/robot/d1");
   });
 
   test("COLUMN-UNIFY-01: the column's first row goes back to the app the person came from, and the area title stays", async () => {

@@ -19,8 +19,8 @@ export function settingsArea(id: string | undefined): SettingsAreaDef | undefine
 }
 
 /** `/settings/<area>[/<section>][#<key>]`. */
-export function settingsPath(area: string, section?: string, key?: string): string {
-  return `/settings/${area}${section ? `/${section}` : ""}${key ? `#${key}` : ""}`;
+export function settingsPath(area: string, section?: string, key?: string, detailId?: string): string {
+  return `/settings/${area}${section ? `/${section}` : ""}${detailId ? `/${encodeURIComponent(detailId)}` : ""}${key ? `#${key}` : ""}`;
 }
 
 /** The area and section whose card draws this registry group at this scope. */

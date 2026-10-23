@@ -272,7 +272,7 @@ function RoutesWithIncognito({ person, onPersonChange, onSignedOut }: { person: 
               replace to the page that holds them now; `/customize` is gone. */}
           <Route path="storage/trash" element={<TrashPage person={person} />} />
           <Route path="settings" element={<SettingsEntryRedirect person={person} />} />
-          <Route path="settings/:area/:section?" element={<Suspense fallback={<RouteSkeleton />}><SettingsAreaPage person={person} onPersonChange={onPersonChange} /></Suspense>} />
+          <Route path="settings/:area/:section?/:detailId?" element={<Suspense fallback={<RouteSkeleton />}><SettingsAreaPage person={person} onPersonChange={onPersonChange} /></Suspense>} />
           {/* ENGINES-AI-01: the Manage pages that moved into Home settings are links that land on their section. */}
           {["voices", "engines", "models", "devices"].map((path) => (
             <Route key={path} path={path} element={<Navigate to={retiredManagePageTarget(`/${path}`, { canManageHousehold: meetsMinRole(person.role, "admin") }) ?? "/settings/account"} replace />} />

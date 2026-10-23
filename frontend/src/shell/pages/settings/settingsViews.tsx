@@ -41,6 +41,7 @@ export interface SettingsViewProps {
   person: Roster;
   onPersonChange: () => void | Promise<void>;
   tab?: string;
+  detailId?: string;
 }
 
 function AccountProfile({ person, onPersonChange }: SettingsViewProps) {
@@ -87,12 +88,12 @@ function HomeEngineAdminSettings({ person, tab }: SettingsViewProps) {
 }
 // The user list, ready for the People section once the spec names this trail view (the report's commons order).
 function HomeUsersAdminSettings({ person }: SettingsViewProps) { return <UsersSection person={person} />; }
-function HomeDevicesAdminSettings({ person }: SettingsViewProps) {
+function HomeDevicesAdminSettings({ person, detailId, tab }: SettingsViewProps) {
   const { capabilities } = useSettingsCapabilities(person);
   const [params, setParams] = useSearchParams();
   const addOpen = params.get("addRobot") === "1";
   const setAddOpen = (open: boolean) => setParams((previous) => { const next = new URLSearchParams(previous); if (open) next.set("addRobot", "1"); else next.delete("addRobot"); return next; });
-  return capabilities.includes("robots.enabled") ? <><HouseholdRobotsSection /><Dialog open={addOpen} onOpenChange={setAddOpen}><DialogContent scroll="viewport"><DialogHeader><DialogTitle>Add a robot</DialogTitle><DialogDescription>Pair a robot with this home.</DialogDescription></DialogHeader><AddRobotSection onClose={() => setAddOpen(false)} /><StackChanInstallDialog /></DialogContent></Dialog><RobotPasswordSection /></> : null;
+  return capabilities.includes("robots.enabled") ? <>{detailId ? <HouseholdRobotsSection detailId={detailId} tab={tab} /> : <><HouseholdRobotsSection /><Dialog open={addOpen} onOpenChange={setAddOpen}><DialogContent scroll="viewport"><DialogHeader><DialogTitle>Add a robot</DialogTitle><DialogDescription>Pair a robot with this home.</DialogDescription></DialogHeader><AddRobotSection onClose={() => setAddOpen(false)} /><StackChanInstallDialog /></DialogContent></Dialog><RobotPasswordSection /></>}</> : null;
 }
 function AccountLikenessView() { useTabItem("Pictures and videos"); return <LikenessSettings />; }
 function PicturesLibraryView() { useTabItem("Pictures and videos"); return <><PicturesLibrary /><VideoLibrary /></>; }
@@ -116,9 +117,9 @@ export const SETTINGS_VIEWS: Record<string, ComponentType<SettingsViewProps>> = 
   "chat.shortcuts": ChatShortcutsSettings,
 };
 
-export function SettingsView({ view, person, onPersonChange, tab }: SettingsViewProps & { view: string }) {
+export function SettingsView({ view, person, onPersonChange, tab, detailId }: SettingsViewProps & { view: string }) {
   const View = SETTINGS_VIEWS[view];
-  return View ? <View person={person} onPersonChange={onPersonChange} tab={tab} /> : null;
+  return View ? <View person={person} onPersonChange={onPersonChange} tab={tab} detailId={detailId} /> : null;
 }
 
 function AccountVoiceControls({ person }: SettingsViewProps) {

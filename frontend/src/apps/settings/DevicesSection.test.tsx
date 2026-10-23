@@ -66,7 +66,7 @@ function session(overrides: Partial<SessionInfo> = {}): SessionInfo {
 }
 
 function renderDetail(tab = "overview") {
-  return renderWithQueryClient(<MemoryRouter initialEntries={[`/?device=robot-1&tab=${tab}`]}><HouseholdRobotsSection /></MemoryRouter>);
+  return renderWithQueryClient(<MemoryRouter initialEntries={[`/?tab=${tab}`]}><HouseholdRobotsSection detailId="robot-1" tab={tab} /></MemoryRouter>);
 }
 
 function renderRobots() {
@@ -155,24 +155,21 @@ describe("DevicesSection", () => {
     } finally { globalThis.fetch = original; }
   });
 
-  test("a household robot opens in a detail view with every registry key, and the settings dialog is gone", async () => {
+  test("a household robot detail renders only the selected tab's registry keys", async () => {
     const restore = settingsFetch(true);
     try {
       const view = renderDetail("behaviour");
-      await view.findByText("robot.hello.future");
+      await view.findByText("Controls");
+      expect(view.queryByText("robot.hello.future")).toBeTruthy();
       expect(view.getByText("robot.barge_in.open_mic")).toBeTruthy();
-      expect(view.getByText("Face color")).toBeTruthy();
-      expect(view.getByText("Night mode")).toBeTruthy();
       expect(view.queryByRole("dialog")).toBeNull();
     } finally { restore(); }
   });
-  test("the list shows one row per household robot and opens a row to its detail", async () => {
+  test("the list shows one row per household robot and links to its route detail", async () => {
     const restore = settingsFetch(false);
     try {
       const view = renderWithQueryClient(<MemoryRouter><HouseholdRobotsSection /></MemoryRouter>);
-      fireEvent.click(await view.findByRole("link", { name: "Riff settings" }));
-      expect(await view.findByRole("button", { name: "Back to robots" })).toBeTruthy();
-      expect(view.getByRole("tab", { name: "Access" })).toBeTruthy();
+      expect(await view.findByRole("link", { name: "Riff settings" })).toHaveAttribute("href", "/settings/home/robot/robot-1");
     } finally { restore(); }
   });
   test("robot Voice row lists mocked voices with the companion's voice first", async () => {
