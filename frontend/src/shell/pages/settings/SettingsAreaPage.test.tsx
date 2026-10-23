@@ -131,8 +131,8 @@ describe("the settings route", () => {
   test("an owner opens Settings and sees the personal and household pages together", async () => {
     const view = open(makePerson("owner"), "/settings/home");
     await waitFor(() => expect(where(view)).toBe("/settings/household"));
-    expect(rows(view)).toEqual(["Profile and sign-in", "Look and ease", "Chat and AI", "Voice and robot", "Notifications", "Pictures and videos", "Your data and apps", "Household", "Privacy and safety", "AI and models", "Pictures, videos and music", "Voice", "Search and web", "Apps and devices", "Backups, storage and updates", "Advanced"]);
-    expect(view.getByRole("heading", { level: 1, name: /^Household$/ })).toBeTruthy();
+    expect(rows(view)).toEqual(["Profile and sign-in", "Look and ease", "Chat and AI", "Voice and robot", "Notifications", "Pictures and videos", "Your data and apps", "Household and people", "Privacy and safety", "AI and models", "Pictures, videos and music", "Voice", "Search and web", "Apps and devices", "Backups, storage and updates", "Advanced"]);
+    expect(view.getByRole("heading", { level: 1, name: /^Household and people$/ })).toBeTruthy();
   });
 
   test("robot detail uses the spec tabs and the URL selects the active shell tab", async () => {
