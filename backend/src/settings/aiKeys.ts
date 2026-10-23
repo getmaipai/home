@@ -20,7 +20,7 @@ export const AI_SETTINGS_KEYS: SettingsKey[] = [
     label: "Selected chat model",
     help: "The catalog model id currently downloaded and running for chat. Changed through the AI models page, not here.",
     level: "expert",
-    lives_in: "household.ai",
+    lives_in: "household.ai_developer",
     honoured_by: ["home"],
   }),
   SettingsKey.parse({
@@ -32,7 +32,7 @@ export const AI_SETTINGS_KEYS: SettingsKey[] = [
     label: "Chat context size override",
     help: "0 lets the hub pick the largest context that fits this computer's memory. A higher number can run out of memory; a lower one leaves headroom but remembers less of the conversation.",
     level: "advanced",
-    lives_in: "household.ai",
+    lives_in: "household.ai_advanced",
     honoured_by: ["home"],
   }),
   SettingsKey.parse({
@@ -44,7 +44,7 @@ export const AI_SETTINGS_KEYS: SettingsKey[] = [
     label: "Flash attention override",
     help: "\"Auto\" lets the hub decide based on the model and the quantized-KV-cache setting. Flash attention speeds up longer conversations; a very old GPU may not support it.",
     level: "advanced",
-    lives_in: "household.ai",
+    lives_in: "household.ai_advanced",
     honoured_by: ["home"],
   }),
   SettingsKey.parse({
@@ -56,7 +56,7 @@ export const AI_SETTINGS_KEYS: SettingsKey[] = [
     label: "KV cache precision override",
     help: "\"Auto\" quantizes the conversation cache to fit more context in the same memory, with a small quality tradeoff. \"Full\" uses full precision: more accurate, uses roughly twice the memory for the same context size.",
     level: "advanced",
-    lives_in: "household.ai",
+    lives_in: "household.ai_advanced",
     honoured_by: ["home"],
   }),
   // THIN-5C (docs/design/RULES.md rule 10, SAFETY.md): the only admin choice
@@ -90,7 +90,7 @@ export const AI_SETTINGS_KEYS: SettingsKey[] = [
     help: "Turns chat off for the whole household until you turn it back on. Messages are not sent while it is paused. Timers, alarms and the emergency lines keep working.",
     copy: { does: "Stops chat from answering until you turn it back on." },
     level: "basic",
-    lives_in: "household.ai",
+    lives_in: "household.chat_pause",
     honoured_by: ["home"],
   }),
   // CANARY-01: the health checks and the warm-up pings. Off stops the timers and the search check; the post-start suite,
@@ -104,7 +104,7 @@ export const AI_SETTINGS_KEYS: SettingsKey[] = [
     help: "Home sends a tiny made-up message to the AI every few minutes so the first real reply is quick, and checks that chat, tools, search and voice still work. It uses about 1,000 words of AI output an hour, stores nothing, and never runs while someone is talking to the AI. Turn it off to stop these checks.",
     copy: { does: "Sends a tiny test message every few minutes so replies start fast." },
     level: "basic",
-    lives_in: "household.ai",
+    lives_in: "household.ai_advanced",
     honoured_by: ["home"],
   }),
   SettingsKey.parse({
@@ -116,7 +116,7 @@ export const AI_SETTINGS_KEYS: SettingsKey[] = [
     help: "Optional. One short line everyone sees next to the pause notice, for example when chat comes back.",
     copy: { does: "Adds a short note to the notice people see while chat waits." },
     level: "basic",
-    lives_in: "household.ai",
+    lives_in: "household.chat_pause",
     honoured_by: ["home"],
   }),
   SettingsKey.parse({
@@ -128,7 +128,7 @@ export const AI_SETTINGS_KEYS: SettingsKey[] = [
     label: "How a teen's replies are checked",
     help: "\"Sentence\" checks every sentence before a teen sees it (the default). \"Arrival\" shows a teen's reply as it is written and checks it as it comes, so part of a sentence can show before its check finishes and the reply stops there if the check fails. Children and anything spoken always check every sentence first.",
     level: "advanced",
-    lives_in: "household.ai",
+    lives_in: "household.ai_advanced",
     honoured_by: ["home"],
   }),
   SettingsKey.parse({
@@ -140,7 +140,7 @@ export const AI_SETTINGS_KEYS: SettingsKey[] = [
     label: "Help the chat remember to search the web",
     help: "\"Off\" is the kill switch: nothing is scored. \"Shadow\" (the default) only counts, as a number, how often a web search looked needed, and changes no reply. \"Rescue\" is not active yet; for now it behaves like shadow. Children and teens are never scored.",
     level: "advanced",
-    lives_in: "household.ai",
+    lives_in: "household.ai_advanced",
     honoured_by: ["home"],
   }),
   SettingsKey.parse({
@@ -151,7 +151,7 @@ export const AI_SETTINGS_KEYS: SettingsKey[] = [
     label: "MaiPai Stack address",
     help: "Empty uses Home's own built-in engines. Set once a MaiPai Stack is installed on this machine to route chat, embeddings and voice through it instead.",
     level: "expert",
-    lives_in: "household.ai",
+    lives_in: "household.ai_developer",
     honoured_by: ["home"],
   }),
   SettingsKey.parse({
@@ -163,7 +163,7 @@ export const AI_SETTINGS_KEYS: SettingsKey[] = [
     label: "Use the MaiPai Stack for chat",
     help: "This switch is retired and does nothing; setting 'MaiPai Stack address' routes every role to the Stack.",
     level: "expert",
-    lives_in: "household.ai",
+    lives_in: "household.ai_developer",
     honoured_by: ["home"],
   }),
   SettingsKey.parse({
@@ -175,7 +175,7 @@ export const AI_SETTINGS_KEYS: SettingsKey[] = [
     label: "Use the MaiPai Stack for search (embeddings)",
     help: "This switch is retired and does nothing; setting 'MaiPai Stack address' routes every role to the Stack.",
     level: "expert",
-    lives_in: "household.ai",
+    lives_in: "household.ai_developer",
     honoured_by: ["home"],
   }),
   SettingsKey.parse({
@@ -187,7 +187,7 @@ export const AI_SETTINGS_KEYS: SettingsKey[] = [
     label: "Use the MaiPai Stack for listening (speech to text)",
     help: "This switch is retired and does nothing; setting 'MaiPai Stack address' routes every role to the Stack.",
     level: "expert",
-    lives_in: "household.ai",
+    lives_in: "household.ai_developer",
     honoured_by: ["home"],
   }),
   SettingsKey.parse({
@@ -199,7 +199,7 @@ export const AI_SETTINGS_KEYS: SettingsKey[] = [
     label: "Use the MaiPai Stack for speaking (text to speech)",
     help: "This switch is retired and does nothing; setting 'MaiPai Stack address' routes every role to the Stack.",
     level: "expert",
-    lives_in: "household.ai",
+    lives_in: "household.ai_developer",
     honoured_by: ["home"],
   }),
 ];

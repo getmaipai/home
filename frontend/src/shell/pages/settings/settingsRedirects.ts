@@ -21,6 +21,12 @@ const HOME_SECTIONS = new Set(["general", "people", "ai", "integrations", "stora
 
 const ACCOUNT = settingsPath("account");
 
+/** Groups the spec split (spec-v0.1.209), old name to the groups that hold its keys now, first choice first. */
+const LEGACY_GROUPS: Record<string, readonly string[]> = {
+  "household.ai": ["household.ai_advanced", "household.ai_models", "household.chat_pause", "household.ai_runtime", "household.ai_developer"],
+  "household.network": ["household.network_port"],
+};
+
 export function legacySettingsTarget(search: string, hash: string, viewer: { canManageHousehold: boolean }, registry: readonly SettingsKey[] | undefined): string {
   const params = new URLSearchParams(search);
   const section = params.get("section");
@@ -35,10 +41,15 @@ export function legacySettingsTarget(search: string, hash: string, viewer: { can
   // An old search link: `section` is a registry group (`lives_in`), so it
   // lands on the card that draws it, at that group's first key.
   if (section?.includes(".")) {
-    const place = placeForGroup(section, scope);
-    if (!place) return tab === "household" ? settingsPath("home", "general") : ACCOUNT;
-    const first = keyFromHash ?? registry?.find((k) => k.lives_in === section && k.scope === scope && k.level !== "expert")?.key;
-    return settingsPath(place.area, place.section, first);
+    // SETTINGS-UX-03b: one card per group split some groups; an old link names the group as it was, so try the groups that took its keys.
+    const candidates = placeForGroup(section, scope) ? [section] : (LEGACY_GROUPS[section] ?? [section]);
+    for (const group of candidates) {
+      const place = placeForGroup(group, scope);
+      if (!place) continue;
+      const first = keyFromHash ?? registry?.find((k) => k.lives_in === group && k.scope === scope && k.level !== "expert")?.key;
+      return settingsPath(place.area, place.section, first);
+    }
+    return tab === "household" ? settingsPath("home", "general") : ACCOUNT;
   }
 
   if (tab === "household") return settingsPath("home", section && HOME_SECTIONS.has(section) ? section : "general", keyFromHash);

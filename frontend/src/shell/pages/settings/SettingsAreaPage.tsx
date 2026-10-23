@@ -10,6 +10,8 @@ import { SettingsRenderer } from "@maipai/ui/src/settings/SettingsRenderer";
 import { searchSettings, type ScopedValues } from "@maipai/ui/src/settings/searchSettings";
 import {
   areaAllows,
+  sectionTabs,
+  resolveTab,
   firstVisibleSection,
   resolveHref,
   visibleGroups,
@@ -128,6 +130,8 @@ function SettingsAreaBody({ area, packageAreas, person, onPersonChange }: { area
 
   const groups = registry ? visibleGroups(area, viewer, registry, "home") : [];
   const active = groups.flatMap((group) => group.sections).find((section) => section.id === sectionId);
+  const tabs = active ? sectionTabs(active) : [];
+  const tab = resolveTab(tabs, params.get("tab") ?? undefined);
   const first = registry ? firstVisibleSection(area, viewer, registry, "home") : undefined;
 
   useEffect(() => {
@@ -188,13 +192,12 @@ function SettingsAreaBody({ area, packageAreas, person, onPersonChange }: { area
       );
   } else if (active) {
     content = active.kind === "view"
-      ? <>{active.view ? <SettingsView view={active.view} person={person} onPersonChange={onPersonChange} /> : null}</>
+      ? <>{active.view ? <SettingsView view={active.view} person={person} onPersonChange={onPersonChange} tab={tab} /> : null}</>
       : area.id === "home" && active.id === "coding"
         ? <CodingAdminSettings />
         : area.id === "home" && active.id === "ai"
-          // OPS-KEY-01: an owner or admin can make a short-lived key an assistant uses to change a few named settings.
-          ? <><SettingsSectionContent section={active} viewer={viewer} registry={registry} packageKeys={packageKeys} person={person} onPersonChange={onPersonChange} focusKey={focusKey} />{viewer.role === "owner" || viewer.role === "admin" ? <AssistantKeysSettings /> : null}</>
-          : <SettingsSectionContent section={active} viewer={viewer} registry={registry} packageKeys={packageKeys} person={person} onPersonChange={onPersonChange} focusKey={focusKey} />;
+          ? <><SettingsSectionContent section={active} viewer={viewer} registry={registry} packageKeys={packageKeys} person={person} onPersonChange={onPersonChange} focusKey={focusKey} tab={tab} />{viewer.role === "owner" || viewer.role === "admin" ? <AssistantKeysSettings /> : null}</>
+          : <SettingsSectionContent section={active} viewer={viewer} registry={registry} packageKeys={packageKeys} person={person} onPersonChange={onPersonChange} focusKey={focusKey} tab={tab} />;
   }
 
   const checklistItems = setupChecklist.checklist.data ?? [];
@@ -247,6 +250,9 @@ function SettingsAreaBody({ area, packageAreas, person, onPersonChange }: { area
       registry={registry}
       honouredBy="home"
       activeSection={active?.id}
+      tabs={tabs}
+      tab={tab}
+      onTabChange={(id) => { if (confirmRouteLeave()) setParams((current) => { const next = new URLSearchParams(current); if (id === tabs[0]?.id) next.delete("tab"); else next.set("tab", id); return next; }); }}
       sectionHref={(id) => settingsPath(area.id, id)}
       onNavigate={(to) => { if (confirmRouteLeave()) navigate(to.kind === "link" ? to.href : settingsPath(area.id, to.sectionId)); }}
       searchQuery={query}

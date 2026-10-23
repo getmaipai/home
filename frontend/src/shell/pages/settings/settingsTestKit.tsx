@@ -69,6 +69,7 @@ export function mockHome({ robots = false, robotsEnabled = robots, wakeword = fa
     if (url.includes("/api/settings/registry")) return Promise.resolve(Response.json(registry));
     if (url.endsWith("/api/settings/capabilities")) return Promise.resolve(Response.json({ robotsEnabled }));
     if (url.endsWith("/api/voice/cloned")) return Promise.resolve(Response.json({ voices: [] }));
+    if (url.endsWith("/api/plugins/stats")) return Promise.resolve(Response.json({ total: 0, plugin: 0, model: 0, commandError: 0, fallthroughRate: null, byPlugin: [] }));
     // ENGINES-AI-01: Engines and AI now draws the engines console and the model list as its trail view, so the
     // fixture answers what those read (an unconfigured Stack and a small Mac) instead of the bare "{}" below.
     const route = url.split("?")[0]!;

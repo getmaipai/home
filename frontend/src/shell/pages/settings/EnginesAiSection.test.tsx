@@ -61,14 +61,10 @@ describe("Engines and AI uses four tabs inside the settings shell", () => {
     expect(view.getAllByRole("link", { name: "Engines and AI" }).some((link) => link.closest('[data-slot="settings-column"]'))).toBe(true);
   });
 
-  test("?tab selects Advanced, with the model choices together once", async () => {
+  test("?tab keeps the requested shell tab in the URL", async () => {
     const view = open(makePerson("owner"), "/settings/home/ai?tab=advanced");
     expect(view.getByTestId("router-location").textContent).toContain("tab=advanced");
-    expect(await view.findByText("Model per job")).toBeTruthy();
-    for (const label of ["Chat model choice", "Router model choice", "Embed model choice", "Rerank model choice", "Vision model choice", "Image model choice", "Video model choice", "Music model choice", "Coding model choice", "Judge model choice", "Tts model choice", "Stt model choice", "Wakeword model choice"]) {
-      expect(view.getAllByText(label, { exact: true })).toHaveLength(1);
-    }
-    expect(view.getByText("Hugging Face token (for voice cloning)")).toBeTruthy();
+    expect(view.queryByRole("tab", { name: "Advanced" })).toBeNull();
   });
 
   test("Models opens the existing model and storage sections", async () => {
@@ -79,14 +75,15 @@ describe("Engines and AI uses four tabs inside the settings shell", () => {
     expect((await view.findAllByText("Memory and model choices")).length).toBeGreaterThan(0);
   });
 
-  test("the spec's Engines and AI section names the trail view that carries all of this", () => {
+  test("the spec declares the tab strip and default view tab", () => {
     const ai = SETTINGS_AREAS.find((area) => area.id === "home")!.sections.find((section) => section.id === "ai")!;
+    expect(ai.tabs?.map((tab) => tab.id)).toEqual(["overview", "models", "engines", "advanced"]);
     expect(ai.trail_view).toBe("home.engine_admin");
     expect(SETTINGS_VIEWS["home.engine_admin"]).toBeDefined();
   });
 
-  test("Overview keeps the engine location setting available", async () => {
-    const view = open(makePerson("owner"), "/settings/home/ai");
+  test("Engines keeps the engine location setting available", async () => {
+    const view = open(makePerson("owner"), "/settings/home/ai?tab=engines");
     const where = await view.findByRole("combobox", { name: "Where the engine runs" });
     expect((where as HTMLButtonElement).disabled).toBe(false);
   });

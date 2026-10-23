@@ -122,7 +122,7 @@ export const VOICE_SETTINGS_KEYS: SettingsKey[] = [
     help: "Needed to clone a voice from a recording. Accept the terms at huggingface.co/kyutai/pocket-tts, then create a read token at huggingface.co/settings/tokens and paste it here.",
     level: "advanced",
     secret: true,
-    lives_in: "household.ai",
+    lives_in: "household.ai_advanced",
     honoured_by: ["home"],
   }),
   // REG-02: composer-owned spoken hesitations and nonverbal cues. One
@@ -147,7 +147,7 @@ export const VOICE_SETTINGS_KEYS: SettingsKey[] = [
     },
     help: "Lets spoken replies include a light \"hmm,\" or a laugh now and then. The written chat never shows them, and children and teens never hear them.",
     level: "basic",
-    lives_in: "household.ai",
+    lives_in: "household.ai_advanced",
     honoured_by: ["home"],
   }),
 ];

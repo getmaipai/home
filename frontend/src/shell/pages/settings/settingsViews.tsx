@@ -1,4 +1,4 @@
-import type { ComponentType } from "react";
+import { useState, type ComponentType } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { FaceEnrollmentBody, canViewFaceEnrollment } from "@/apps/people/FaceEnrollmentBody";
 import { VoiceEnrollmentBody } from "@/apps/people/VoiceEnrollmentBody";
@@ -14,9 +14,9 @@ import { EngineLinkCredentialSection } from "@/apps/settings/EngineLinkCredentia
 import { ModelsSection } from "@/apps/settings/ModelsSection";
 import { InstallPlanSection } from "@/apps/settings/InstallPlanSection";
 import { ModelsAndStorageSection } from "@/apps/settings/ModelsAndStorageSection";
+import { HuggingFaceTokenSection } from "@/apps/settings/HuggingFaceTokenSection";
 import { UsersSection } from "@/apps/settings/UsersSection";
 import { EnginesConsole } from "@/shell/pages/EnginesPage";
-import { HuggingFaceTokenSection } from "@/apps/settings/HuggingFaceTokenSection";
 import { HouseholdRobotsSection } from "@/apps/settings/HouseholdRobotsSection";
 import { AddRobotSection } from "@/apps/settings/AddRobotSection";
 import { StackChanInstallDialog } from "@/apps/settings/StackChanInstallDialog";
@@ -31,19 +31,16 @@ import { CodingKeysSettings } from "@/apps/settings/CodingSettings";
 import { SizingPanel } from "@/shell/pages/settings/SizingPanel";
 import { Card, CardContent, CardHeader, CardTitle } from "@maipai/ui/src/dashboard/components/ui/card";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@maipai/ui/src/dashboard/components/ui/alert-dialog";
-import { useState } from "react";
-import { Tabs, TabsList, TabsTrigger } from "@maipai/ui/src/ui/tabs";
-import { SettingsRenderer } from "@/shell/pages/settings/SettingsRenderer";
-import { useSearchParams } from "react-router-dom";
 import { useTabItem } from "@/shell/tabIdentity";
+import { useSearchParams } from "react-router-dom";
 import { useSettingsCapabilities } from "@/shell/pages/settings/useSettingsCapabilities";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@maipai/ui/src/ui/dialog";
 import type { PersonRosterEntry, Roster } from "@/lib/api";
-import { scopeValueFor } from "@/shell/pages/settings/settingsViewer";
 
 export interface SettingsViewProps {
   person: Roster;
   onPersonChange: () => void | Promise<void>;
+  tab?: string;
 }
 
 function AccountProfile({ person, onPersonChange }: SettingsViewProps) {
@@ -77,40 +74,15 @@ function HomeVoiceCatalogSettings() { useTabItem("Voices"); return <VoiceManager
 // so the area's min_role gate (admin) is the only one this layer needs; the
 // hub still gates every call these make.
 // SETTINGS-UX-05: the existing Engines and AI pieces are placed in four short tabs.
-function HomeEngineAdminSettings({ person }: SettingsViewProps) {
+function HomeEngineAdminSettings({ person, tab }: SettingsViewProps) {
   const [removal, setRemoval] = useState<{ message: string; confirm: () => void } | null>(null);
-  const [params, setParams] = useSearchParams();
-  const tabIds = ["overview", "models", "engines", "advanced"] as const;
-  const requestedTab = params.get("tab");
-  const activeTab = tabIds.includes(requestedTab as typeof tabIds[number]) ? requestedTab! : "overview";
-  function changeTab(value: string) {
-    setParams((previous) => { const next = new URLSearchParams(previous); if (value === "overview") next.delete("tab"); else next.set("tab", value); return next; });
-  }
-  const household = { scope: "household" as const, scopeValue: scopeValueFor("household", person.id), only: ["household.ai"] };
+  const show = (id: string) => tab === undefined || tab === id;
   return <>
-  <Tabs value={activeTab} onValueChange={changeTab}>
-    <TabsList variant="line" aria-label="Engines and AI topics">
-      <TabsTrigger value="overview">Overview</TabsTrigger><TabsTrigger value="models">Models</TabsTrigger><TabsTrigger value="engines">Engines</TabsTrigger><TabsTrigger value="advanced">Advanced</TabsTrigger>
-    </TabsList>
-    {activeTab === "overview" ? <div role="tabpanel" aria-label="Overview" id="engine-tab-overview">
-      <div className="flex min-w-0 flex-col gap-6">
-        <SettingsRenderer {...household} includeKeys={["chat.paused", "chat.paused_message", "engines.stack.where"]} />
-        <InstallPlanSection />
-      </div>
-    </div> : null}
-    {activeTab === "models" ? <div role="tabpanel" aria-label="Models" id="engine-tab-models"><div className="flex min-w-0 flex-col gap-6"><ModelsAndStorageSection /><Card><CardHeader><CardTitle>Memory and model choices</CardTitle></CardHeader><CardContent><SizingPanel person={person} onRemoval={(message, confirm) => setRemoval({ message, confirm })} /></CardContent></Card><ModelsSection /></div></div> : null}
-    {activeTab === "engines" ? <div role="tabpanel" aria-label="Engines" id="engine-tab-engines"><div className="flex min-w-0 flex-col gap-6"><SettingsRenderer {...household} includeExpert includeKeys={["engines.stack.remote.host", "engines.stack.remote.local_port", "engines.stack.remote.ssh_port", "engines.stack.remote.allow_tailnet"]} /><EngineLinkCredentialSection /><EnginesConsole person={person} /></div></div> : null}
-    {activeTab === "advanced" ? <div role="tabpanel" aria-label="Advanced" id="engine-tab-advanced">
-      <div className="flex min-w-0 flex-col gap-6">
-        <SettingsRenderer {...household} includeExpert includeKeys={[
-          "chat.context_size_override", "chat.flash_attention_override", "chat.kv_cache_override", "chat.model_id", "health.keep_warm", "chat.teen_gate_grain", "chat.search_assist", "engines.stack.url", "engines.stack.use_chat", "engines.stack.use_embeddings", "engines.stack.use_stt", "engines.stack.use_tts", "voice.hesitations", "engines.turn_signal.choice",
-          ...["chat", "router", "embed", "rerank", "vision", "image", "video", "music", "coding", "judge", "tts", "stt", "wakeword"].map((role) => `engines.${role}.choice`),
-        ]} expandAdvanced titleOverrides={{ "household.ai": "Model per job" }} />
-        <HuggingFaceTokenSection />
-      </div>
-    </div> : null}
-  </Tabs>
-  <AlertDialog open={removal !== null} onOpenChange={(open) => { if (!open) setRemoval(null); }}><AlertDialogContent><AlertDialogHeader><AlertDialogTitle>Turn this feature off?</AlertDialogTitle><AlertDialogDescription>{removal?.message}</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel>Cancel</AlertDialogCancel><AlertDialogAction onClick={() => { const pending = removal; setRemoval(null); pending?.confirm(); }}>Confirm</AlertDialogAction></AlertDialogFooter></AlertDialogContent></AlertDialog>
+    {show("overview") ? <InstallPlanSection /> : null}
+    {show("models") ? <><ModelsAndStorageSection /><Card><CardHeader><CardTitle>Memory and model choices</CardTitle></CardHeader><CardContent><SizingPanel person={person} onRemoval={(message, confirm) => setRemoval({ message, confirm })} /></CardContent></Card><ModelsSection /></> : null}
+    {show("engines") ? <><EngineLinkCredentialSection /><EnginesConsole person={person} /></> : null}
+    {show("advanced") ? <HuggingFaceTokenSection /> : null}
+    <AlertDialog open={removal !== null} onOpenChange={(open) => { if (!open) setRemoval(null); }}><AlertDialogContent><AlertDialogHeader><AlertDialogTitle>Turn this feature off?</AlertDialogTitle><AlertDialogDescription>{removal?.message}</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel>Cancel</AlertDialogCancel><AlertDialogAction onClick={() => { const pending = removal; setRemoval(null); pending?.confirm(); }}>Confirm</AlertDialogAction></AlertDialogFooter></AlertDialogContent></AlertDialog>
   </>;
 }
 // The user list, ready for the People section once the spec names this trail view (the report's commons order).
@@ -144,9 +116,9 @@ export const SETTINGS_VIEWS: Record<string, ComponentType<SettingsViewProps>> = 
   "chat.shortcuts": ChatShortcutsSettings,
 };
 
-export function SettingsView({ view, person, onPersonChange }: SettingsViewProps & { view: string }) {
+export function SettingsView({ view, person, onPersonChange, tab }: SettingsViewProps & { view: string }) {
   const View = SETTINGS_VIEWS[view];
-  return View ? <View person={person} onPersonChange={onPersonChange} /> : null;
+  return View ? <View person={person} onPersonChange={onPersonChange} tab={tab} /> : null;
 }
 
 function AccountVoiceControls({ person }: SettingsViewProps) {

@@ -9,7 +9,7 @@ import { ApiError, api } from "@/lib/api";
 afterEach(cleanup);
 
 test("capability removal uses the kit dialog and confirms the same server message", async () => {
-  const key = SettingsKey.parse({ key: "engines.image.choice", scope: "household", selector: "boolean", default: true, label: "Pictures", help: "Use pictures.", level: "basic", lives_in: "household.ai", honoured_by: ["home"] });
+  const key = SettingsKey.parse({ key: "engines.image.choice", scope: "household", selector: "boolean", default: true, label: "Pictures", help: "Use pictures.", level: "basic", lives_in: "household.ai_models", honoured_by: ["home"] });
   const registry = spyOn(api, "settingsRegistry").mockResolvedValue([key] as never);
   const values = spyOn(api, "settingsValues").mockResolvedValue([{ key: key.key, value: true, source: "default", label: key.label, level: "basic", secret: false }] as never);
   const message = "Turning off Pictures removes Art. The following will be uninstalled and users will lose access. Anything made with them stays in Library.";
@@ -18,7 +18,7 @@ test("capability removal uses the kit dialog and confirms the same server messag
     .mockResolvedValueOnce({ key: key.key, value: false, source: "user", label: key.label, level: "basic", secret: false } as never);
   try {
     const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-    const view = render(<QueryClientProvider client={client}><MemoryRouter><SettingsRenderer scope="household" scopeValue="household" only={["household.ai"]} /></MemoryRouter></QueryClientProvider>);
+    const view = render(<QueryClientProvider client={client}><MemoryRouter><SettingsRenderer scope="household" scopeValue="household" only={["household.ai_models"]} /></MemoryRouter></QueryClientProvider>);
     const control = await view.findByRole("switch", { name: "Pictures" });
     fireEvent.click(control);
     expect(await view.findByText(message)).toBeTruthy();

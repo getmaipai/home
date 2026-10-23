@@ -63,7 +63,7 @@ test("dynamic model selects retain and explain the fixed off option", () => {
   const def = SettingsKey.parse({
     key: "engines.vision.choice", scope: "household", selector: "select",
     range: { options: ["off"], options_from: "models.vision" }, default: "auto",
-    label: "Vision model choice", level: "basic", lives_in: "household.ai", honoured_by: ["home"],
+    label: "Vision model choice", level: "basic", lives_in: "household.ai_models", honoured_by: ["home"],
     copy: { does: "Directs vision work.", options: { off: "Off: Home will not use photo understanding." } },
   });
   const view = render(<SettingField setting={{ def, resolved: { key: def.key, value: "auto", source: "default", label: def.label, level: "basic", secret: false } } as MergedSetting} onChange={async () => true} onReset={() => {}} />);

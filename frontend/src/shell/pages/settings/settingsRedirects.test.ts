@@ -10,7 +10,7 @@ const key = (k: string, lives_in: string, scope: SettingsKey["scope"] = "person"
 const registry = [
   key("search.safe_search", "person.search"),
   key("search.searxng_url", "household.search", "household"),
-  key("chat.teen_gate_grain", "household.ai", "household"),
+  key("chat.teen_gate_grain", "household.ai_advanced", "household"),
   key("notifications.browser.enabled", "person.notifications"),
   key("ui.show_turn_stats", "person.chat", "person", "advanced"),
 ];

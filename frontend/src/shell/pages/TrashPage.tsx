@@ -18,7 +18,7 @@ export interface TrashRow {
 }
 // Storage's record actions have no preference keys. The kit owns the settings layout.
 const TRASH_AREA: SettingsAreaDef = {
-  id: "storage-trash", title: "Storage", audience: { min_role: "guest" }, groups: [{ label: "Storage", sections: ["trash"] }], sections: [{ id: "trash", label: "Trash", icon: "trash", kind: "view", view: "trash" }],
+  id: "storage-trash", title: "Storage", scope: "person", audience: { min_role: "guest" }, groups: [{ label: "Storage", sections: ["trash"] }], sections: [{ id: "trash", label: "Trash", icon: "trash", kind: "view", view: "trash" }],
 };
 export function TrashPage({ person }: { person: Roster }) {
   useTabItem("Trash");

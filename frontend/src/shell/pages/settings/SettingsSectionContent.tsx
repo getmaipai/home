@@ -7,7 +7,7 @@ import { Item, ItemActions, ItemContent, ItemGroup, ItemTitle } from "@maipai/ui
 import { getIcon } from "@maipai/ui/src/icons";
 import { SettingsRenderer } from "@maipai/ui/src/settings/SettingsRenderer";
 import type { BeforeChange } from "@maipai/ui/src/settings/SettingRow";
-import { resolveHref, visibleCards, type Card, type Section, type SettingsViewer } from "@maipai/ui/src/settings/settingsAudience";
+import { cardsInTab, resolveHref, visibleCards, type Card, type Section, type SettingsViewer } from "@maipai/ui/src/settings/settingsAudience";
 import { minorVisibleSettingKeys } from "@maipai/home-backend/src/wire";
 import { SettingsLinks } from "@/shell/pages/settings/SettingsLinks";
 import { SettingsView, type SettingsViewProps } from "@/shell/pages/settings/settingsViews";
@@ -100,7 +100,7 @@ function keysCard(card: Card, viewer: SettingsViewer, props: SectionContentProps
     includeExpert: props.section.id === "network",
   };
   const renderer = group === "profile.ease" ? <EaseCardRenderer viewingSelf={viewer.selfId === props.person.id} {...rendererProps} /> : <SettingsRenderer {...rendererProps} />;
-  if (props.section.id === "network") return <>{renderer}{viewer.role === "owner" || viewer.role === "admin" ? <Button asChild variant="outline"><Link to="/setup/away" state={{ from: returnPath }}>Set up away access</Link></Button> : null}</>;
+  if (props.section.id === "network") return <>{renderer}{group === "household.network" && (viewer.role === "owner" || viewer.role === "admin") ? <Button asChild variant="outline"><Link to="/setup/away" state={{ from: returnPath }}>Set up away access</Link></Button> : null}</>;
   if (!card.collapsed) return renderer;
   const focused = props.focusKey !== undefined && props.registry.some((k) => k.key === props.focusKey && k.lives_in === group && k.scope === scope);
   return (
@@ -118,6 +118,7 @@ export interface SectionContentProps extends SettingsViewProps {
   /** The keys a package settings area draws (see packageAreaKeySet): the person's own, so a minor sees them too. */
   packageKeys?: ReadonlySet<string>;
   focusKey?: string;
+  tab?: string;
 }
 
 /** One open section: its lead view, its cards in the area's order (a card
@@ -127,7 +128,7 @@ export function SettingsSectionContent(props: SectionContentProps) {
   const { section, viewer, registry, person, onPersonChange } = props;
   const location = useLocation();
   const returnPath = `${location.pathname}${location.search}${location.hash}`;
-  const viewProps = { person, onPersonChange };
+  const viewProps = { person, onPersonChange, tab: props.tab };
   // The place calls (search, save, rename) are made only on a page that draws a location row, and not at all in Incognito.
   const { on: incognito } = useIncognitoContext();
   const drawsPlaces = section.kind === "keys" && (section.cards ?? []).some((card) => registry.some((k) => k.selector === ("location" as string) && k.lives_in === card.group && k.scope === card.scope));
@@ -138,9 +139,7 @@ export function SettingsSectionContent(props: SectionContentProps) {
     <div className="flex min-w-0 flex-col gap-14">
       {webSearchBlock ? <WebSearchSettings minorsControl={<SettingsRenderer scope="household" scopeValue={scopeValueFor("household", props.person.id)} honouredBy="home" only={["household.search"]} includeKeys={MINOR_DDGS_ONLY} titleOverrides={MINOR_DDGS_TITLE} beforeChange={beforeSettingChange} focusKey={props.focusKey} />} /> : null}
       {section.lead_view ? <SettingsView view={section.lead_view} {...viewProps} /> : null}
-      {visibleCards(section, viewer, registry, "home").map((card) => {
-        // SETTINGS-UX-05: the AI registry group is placed inside its four tabs by the trail view.
-        if (section.id === "ai" && card.scope === "household" && card.group === "household.ai") return null;
+      {cardsInTab(visibleCards(section, viewer, registry, "home"), props.tab).map((card) => {
         // Until APP-SET-05 re-points the face card onto the kit renderer, the
         // face card inside `account.profile` already draws this group's one
         // key (the enrollment sounds switch); a second card would repeat it.
@@ -153,7 +152,7 @@ export function SettingsSectionContent(props: SectionContentProps) {
           {incognito && drawsPlaces ? <p className="text-sm text-muted-foreground">Incognito is on, so places cannot be added or renamed until you turn it off.</p> : null}
 {keysCard(card, viewer, props, returnPath, places)}</div>;
       })}
-      {section.trail_view ? <SettingsView view={section.trail_view} {...viewProps} /> : null}
+      {section.trail_view && (section.view_tab === undefined || section.view_tab === props.tab) ? <SettingsView view={section.trail_view} {...viewProps} /> : null}
     </div>
   );
 }
