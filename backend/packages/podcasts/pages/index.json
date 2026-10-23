@@ -96,7 +96,7 @@
           "empty_state": {
             "type": "empty_state",
             "icon": "mic",
-            "text": "No new episodes. An admin can add a show with Settings, then Podcasts."
+            "text": "No new episodes yet."
           }
         }
       ],

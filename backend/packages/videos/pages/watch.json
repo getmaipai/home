@@ -18,7 +18,7 @@
           },
           "kind": "video",
           "autoplay_next": true,
-          "details": true,
+          "details": false,
           "actions": [
             {
               "label": "Like",

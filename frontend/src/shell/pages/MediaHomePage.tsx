@@ -38,15 +38,15 @@ export function MediaHomePage() {
         >
           {(data: MediaHome) => {
             const shelves = [
-              { heading: "Made at home", items: data.made_at_home, aspect: "square" as const, getProgress: undefined },
+              { heading: "Made at home", items: data.made_at_home, aspect: "wide" as const, getProgress: undefined },
               {
                 heading: "Pick up where you left off",
                 items: data.continue,
                 aspect: "wide" as const,
                 getProgress: (row: MediaHomeRow) => (row.percent === null ? undefined : row.percent / 100),
               },
-              { heading: "New in your media", items: data.new, aspect: "square" as const, getProgress: undefined },
-              { heading: "Recently played", items: data.recent_music, aspect: "square" as const, getProgress: undefined },
+              { heading: "New in your media", items: data.new, aspect: "wide" as const, getProgress: undefined },
+              { heading: "Recently played", items: data.recent_music, aspect: "wide" as const, getProgress: undefined },
             ].filter((shelf) => shelf.items.length > 0);
             if (shelves.length === 0 && data.made_at_home.length === 0) {
               return <EmptyState icon="film" text="Nothing here yet. Add music, videos, shows, podcasts or books to your library and they show up here." />;
@@ -60,14 +60,14 @@ export function MediaHomePage() {
                 getLabel={(row) => row.title}
                 renderItem={(row) => <SafeImage src={row.artwork_url} alt="" kind={FALLBACK_KIND[row.app]} />}
                 renderCaption={(row) => (
-                  <>
-                    <p>{row.title}</p>
-                    {row.subtitle ? <p>{row.subtitle}</p> : null}
-                  </>
+                  <span className="flex min-w-0 flex-col">
+                    <span className="truncate text-sm font-semibold">{row.title}</span>
+                    {row.subtitle ? <span className="truncate text-sm text-muted-foreground">{row.subtitle}</span> : null}
+                  </span>
                 )}
                 aspect={shelf.aspect}
                 getProgress={shelf.getProgress}
-                variant="plain"
+                variant="card"
                 onSelect={(row) => navigate(row.href)}
               />
             ));

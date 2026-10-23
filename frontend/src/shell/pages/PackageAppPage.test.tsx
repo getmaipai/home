@@ -224,4 +224,10 @@ describe("a media app is drawn inside the Media hub", () => {
     await waitFor(() => expect(view.container.querySelector('[data-slot="weather-card"]')).not.toBeNull());
     expect(view.queryByTestId("media-hub-frame")).toBeNull();
   });
+
+  test("standalone media app headings and tabs have the shared shell inset", async () => {
+    const view = open("/apps/music");
+    await view.findByText("No music yet.");
+    expect(view.getByTestId("package-app").className).toContain("p-4");
+  });
 });

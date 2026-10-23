@@ -21,6 +21,22 @@ import { useAppSidebar } from "@/shell/useAppSidebar";
 import { MediaHubFrame } from "@/shell/MediaHubFrame";
 import { useMediaHubActive } from "@/shell/mediaHubSession";
 
+function VideoDetails({ id }: { id: string }) {
+  const query = useQuery({
+    queryKey: ["video-details", id],
+    queryFn: () => api.appData<{ rows?: { title?: string; channel?: string; date?: string; published_at?: string; description?: string }[] }>("videos", "item", { id }),
+    enabled: Boolean(id),
+  });
+  const item = query.data?.rows?.[0];
+  if (!item) return null;
+  const date = item.date ?? item.published_at;
+  return <section className="flex flex-col gap-3" data-slot="video-details">
+    <h2 className="text-xl font-bold tracking-tight text-foreground">{item.title}</h2>
+    <p className="text-sm text-muted-foreground">{[item.channel, date].filter(Boolean).join(" · ")}</p>
+    {item.description ? <div className="rounded-lg bg-muted p-4 text-sm text-muted-foreground">{item.description}</div> : null}
+  </section>;
+}
+
 const PAGE_FRESH_MS = 5 * 60_000;
 
 /** One page document of a package app. A document the interpreter cannot parse is an error state with a retry, never a crashed page. */
@@ -131,7 +147,7 @@ export function PackageAppPage({ person }: { person: Roster }) {
   const contextTitle = sidebarProps ? contextTitleFor(activeLabel, pageDoc?.title) : undefined;
 
   const content = (
-    <div className={cn("flex min-h-0 min-w-0 flex-1 flex-col gap-2", sidebarProps && "p-4 lg:ps-6")} data-testid="package-app" data-package={packageId}>
+    <div className={cn("flex min-h-0 min-w-0 flex-1 flex-col gap-2", (sidebarProps || media) && "p-4 lg:ps-6")} data-testid="package-app" data-package={packageId}>
       {familyHeader ? null : <h1 className="sr-only">{app?.label ?? "App"}</h1>}
       {app ? <AppToolbar hideSectionsOnWide={sidebar !== undefined} person={person} to={app.to} label={app.label} homeLabel={appHomeLabel(packageId, media)} settingsArea={app.settings_area?.id} sections={app.sections} current={pageId} familyHeader={familyHeader} title={contextTitle} titleSrOnly={sidebarProps ? ownHeader || contextTitle === undefined : false} /> : null}
       <AsyncState
@@ -142,7 +158,10 @@ export function PackageAppPage({ person }: { person: Roster }) {
         errorMessage="Could not open this app. Check your connection and try again."
         loadingLabel="Opening the app"
       >
-        {(doc) => (hasQuery && !sameQuery ? null : <SchemaPage key={`${packageId}/${pageId}`} page={doc} packageId={packageId} hideTitle sidebar={sidebarProps !== null} />)}
+        {(doc) => (hasQuery && !sameQuery ? null : <>
+          <SchemaPage key={`${packageId}/${pageId}`} page={doc} packageId={packageId} hideTitle sidebar={sidebarProps !== null} />
+          {packageId === "videos" && pageId === "watch" ? <VideoDetails id={new URLSearchParams(location.search).get("id") ?? String((location.state as { pageState?: { id?: string } } | null)?.pageState?.id ?? "")} /> : null}
+        </>)}
       </AsyncState>
       {docked ? (
         <Player

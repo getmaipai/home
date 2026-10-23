@@ -219,7 +219,7 @@
     },
     {
       "type": "media_shelf",
-      "heading": "From your video folders",
+      "heading": "From your videos",
       "bind": {
         "source": "package",
         "path": "library"
@@ -249,7 +249,7 @@
       "empty_state": {
         "type": "empty_state",
         "icon": "film",
-        "text": "No video folders yet. An admin can add one in Settings, Home, Storage."
+        "text": "No videos yet."
       }
     }
   ]

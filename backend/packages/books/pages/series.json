@@ -29,7 +29,7 @@
       "empty_state": {
         "type": "empty_state",
         "icon": "book-open",
-        "text": "No series yet. Add series tags to your books, then scan the folder again."
+        "text": "No series yet."
       }
     }
   ]

@@ -29,7 +29,7 @@
       "empty_state": {
         "type": "empty_state",
         "icon": "film",
-        "text": "No titles here yet. Pick another section, or ask a grown-up to add some."
+        "text": "No shows yet."
       },
       "layout": "grid"
     }

@@ -28,7 +28,7 @@
       "empty_state": {
         "type": "empty_state",
         "icon": "music",
-        "text": "No music yet. Ask an admin to add a music folder in Settings, Home, Storage."
+        "text": "No albums yet."
       }
     }
   ]

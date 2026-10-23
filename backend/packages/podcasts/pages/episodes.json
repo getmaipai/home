@@ -43,7 +43,7 @@
       "empty_state": {
         "type": "empty_state",
         "icon": "headphones",
-        "text": "No episodes yet. They show up when a show you follow has one."
+        "text": "No episodes yet."
       }
     }
   ]

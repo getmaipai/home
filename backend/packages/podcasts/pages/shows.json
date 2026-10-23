@@ -31,7 +31,7 @@
       "empty_state": {
         "type": "empty_state",
         "icon": "mic",
-        "text": "No shows yet. An admin can add a show with Settings, then Podcasts."
+        "text": "No shows yet.."
       }
     }
   ]

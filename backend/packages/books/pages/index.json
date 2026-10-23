@@ -81,7 +81,7 @@
       "empty_state": {
         "type": "empty_state",
         "icon": "book",
-        "text": "No e-books yet. An admin can add a book folder in Settings, Home, Storage."
+        "text": "No books yet."
       }
     },
     {
