@@ -59,6 +59,10 @@ function floorTextOf(blocks: readonly ArticleBlock[]): string {
 
 const MAX_FIGURES = 12;
 const withoutQuery = (address: string): string => { try { const url = new URL(address); return `${url.hostname}${url.pathname}`; } catch { return address; } };
+export function sourceIconUrlOf(item: Pick<ShelfItem, "canonical_url">): string | undefined {
+  const host = hostOf(item.canonical_url);
+  return host ? `/api/favicon?domain=${encodeURIComponent(host)}` : undefined;
+}
 
 /** The page's pictures a reader may keep: the same file only once, never the story's own lead picture again, at most twelve. */
 function keepFigures(blocks: readonly ArticleBlock[], leadAddress: string | undefined): ArticleBlock[] {
@@ -195,6 +199,7 @@ export async function articleBlock(item: ShelfItem, env: CardEnv, options: { ret
     props: {
       story_id: storyIdOf(item), item_id: item.id, kicker: topic ?? publisher, title,
       byline: { publisher, site: hostOf(item.canonical_url) || publisher, published_at: publishedAtOf(item), outlets: 1, reading_s: loaded.reading_s },
+      ...(sourceIconUrlOf(item) ? { sourceIconUrl: sourceIconUrlOf(item) } : {}),
       ...(image ? { image } : {}),
       blocks, also_covering: [], speech,
       ...(band !== "child" ? { open_url: item.url } : {}),

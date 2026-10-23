@@ -1,5 +1,6 @@
 // Pure package validation runs without Home's server-based test preload from the repo root.
 import { expect, test } from "bun:test";
+import { sourceIconUrlOf } from "@/lib/news/article";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import Ajv2020 from "ajv/dist/2020.js";
@@ -22,6 +23,11 @@ test("News story_feed cards retain sourceIconUrl through backend block validatio
   if (parsed.success && parsed.data.kind === "story_feed") {
     expect(parsed.data.props.rows[0]?.sourceIconUrl).toBe("/api/favicon?domain=example.com");
   }
+});
+
+test("News article data uses a relative favicon path for its source host", () => {
+  expect(sourceIconUrlOf({ canonical_url: "https://news.example.com/story/one" })).toBe("/api/favicon?domain=news.example.com");
+  expect(sourceIconUrlOf({ canonical_url: "not a URL" })).toBeUndefined();
 });
 
 test("News is a valid manifest and its seven pages validate against the pinned spec", () => {

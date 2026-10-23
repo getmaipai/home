@@ -1,4 +1,4 @@
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQueries, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useMemo, useState } from "react";
 import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
 import { Button } from "@maipai/ui/src/dashboard/components/ui/button";
@@ -17,7 +17,7 @@ import { useTabItem } from "@/shell/tabIdentity";
 import { appHomeLabel, isMediaApp, isMediaPlayPage, playPageOf, usesFamilyHeader } from "@/shell/mediaApps";
 import { useMediaDock } from "@/shell/mediaHost";
 import { SectionSidebar } from "@maipai/ui/src/primitives/SectionSidebar";
-import { WeatherForecastPage, type WeatherLocation } from "@maipai/ui/src/elements/weather-forecast-page";
+import { WeatherForecastPage, dedupeLocations, type WeatherLocation } from "@maipai/ui/src/elements/weather-forecast-page";
 import { useAppSidebar } from "@/shell/useAppSidebar";
 import { MediaHubFrame } from "@/shell/MediaHubFrame";
 import { useMediaHubActive } from "@/shell/mediaHubSession";
@@ -42,23 +42,29 @@ function VideoDetails({ id }: { id: string }) {
 
 const PAGE_FRESH_MS = 5 * 60_000;
 
-function weatherLocation(place: { id: string; label: string }, props: Record<string, unknown>): WeatherLocation {
+function weatherLocation(place: { id: string; label: string; geo?: { lat?: number; lon?: number; area?: string | null } | null }, props: Record<string, unknown>): WeatherLocation {
   const current = (props.current && typeof props.current === "object" ? props.current : {}) as Record<string, unknown>;
   const daily = Array.isArray(props.daily) ? props.daily as Array<Record<string, unknown>> : [];
   const hourly = Array.isArray(props.hourly) ? props.hourly as Array<Record<string, unknown>> : [];
   const details = (props.details && typeof props.details === "object" ? props.details : {}) as Record<string, unknown>;
   const number = (source: Record<string, unknown>, key: string) => typeof source[key] === "number" ? source[key] as number : undefined;
   const string = (source: Record<string, unknown>, key: string) => typeof source[key] === "string" ? source[key] as string : undefined;
-  return { id: place.id, city: place.label.replace(/ \(home\)$/, ""), detail: {
-    temp: number(current, "temp") ?? 0, condition: string(current, "condition") ?? "Weather unavailable", code: number(current, "code") ?? 3, isDay: current.is_day !== false,
+  const clock = (value: string) => {
+    const match = /T(\d{2}):(\d{2})/.exec(value);
+    if (!match) return value;
+    return new Intl.DateTimeFormat(undefined, { hour: "numeric", minute: "2-digit", timeZone: "UTC" }).format(new Date(Date.UTC(2020, 0, 1, Number(match[1]), Number(match[2]))));
+  };
+  const hasWeather = number(current, "temp") !== undefined && string(current, "condition") !== undefined;
+  return { id: place.id, city: place.label.replace(/ \(home\)$/, ""), state: place.geo?.area ?? undefined, latitude: place.geo?.lat, longitude: place.geo?.lon, timezone: string(details, "timezone"), detail: hasWeather ? {
+    temp: number(current, "temp")!, condition: string(current, "condition")!, code: number(current, "code") ?? 3, isDay: current.is_day !== false,
     high: number(daily[0] ?? {}, "high"), low: number(daily[0] ?? {}, "low"),
-    hourly: hourly.map((hour) => ({ time: String(hour.time ?? ""), temp: Number(hour.temp ?? 0), pop: number(hour, "pop") })),
+    hourly: hourly.map((hour) => ({ time: clock(String(hour.time ?? "")), temp: Number(hour.temp ?? 0), pop: number(hour, "pop") })),
     daily: daily.map((day) => ({ date: String(day.date ?? ""), high: Number(day.high ?? 0), low: Number(day.low ?? 0), code: Number(day.code ?? 3), pop: number(day, "pop") })),
     feelsLike: number(details, "feels_like"), humidity: number(details, "humidity"), precipitation: number(details, "precipitation"),
     wind: number(details, "wind_speed") !== undefined ? { speed: number(details, "wind_speed")!, direction: number(details, "wind_direction") ?? 0 } : undefined,
     pressure: number(details, "pressure"), visibility: number(details, "visibility") === undefined ? undefined : number(details, "visibility")! / 1000,
-    sunrise: string(details, "sunrise"), sunset: string(details, "sunset"), uvIndex: number(details, "uv_index"),
-  } };
+    sunrise: string(details, "sunrise") ? clock(string(details, "sunrise")!) : undefined, sunset: string(details, "sunset") ? clock(string(details, "sunset")!) : undefined, uvIndex: number(details, "uv_index"),
+  } : undefined, localTime: string(details, "timezone") ? new Intl.DateTimeFormat(undefined, { hour: "numeric", minute: "2-digit", timeZone: string(details, "timezone") }).format(new Date()) : undefined };
 }
 
 /** One page document of a package app. A document the interpreter cannot parse is an error state with a retry, never a crashed page. */
@@ -117,20 +123,26 @@ export function PackageAppPage({ person }: { person: Roster }) {
   const pageId = pageSegment || "index";
   const [weatherSelectedId, setWeatherSelectedId] = useState("");
   const [weatherSearch, setWeatherSearch] = useState("");
+  const [weatherResults, setWeatherResults] = useState<Array<{ name: string; area: string | null; lat: number; lon: number }>>([]);
   const weatherPlaces = useQuery({ queryKey: ["weather-places", person.id], queryFn: () => api.appData<{ rows: Array<{ id: string; label: string }> }>("weather", "places"), staleTime: PAGE_FRESH_MS, enabled: packageId === "weather" && pageId === "index" });
+  const weatherEntities = useQuery({ queryKey: ["weather-place-entities", person.id], queryFn: () => api.entities("place"), enabled: packageId === "weather" && pageId === "index" });
   const weatherSettings = useQuery({ queryKey: ["settings-values", `person:${person.id}`], queryFn: () => api.settingsValues(`person:${person.id}`), enabled: packageId === "weather" && pageId === "index" });
   const weatherUnit = weatherSettings.data?.find((row) => row.key === "weather.unit")?.value === "celsius" ? "celsius" : "fahrenheit";
-  const weatherVisiblePlaces = (weatherPlaces.data?.rows ?? []).filter((place) => place.label.toLowerCase().includes(weatherSearch.toLowerCase()));
-  const weatherSelectedPlace = weatherVisiblePlaces.find((place) => place.id === weatherSelectedId) ?? weatherVisiblePlaces[0];
-  const weatherForecast = useQuery({
-    queryKey: ["weather-details", person.id, weatherVisiblePlaces.map((place) => place.id).join(","), weatherUnit],
-    enabled: packageId === "weather" && pageId === "index" && Boolean(weatherSelectedPlace),
-    queryFn: async () => {
-      const data = await api.appData<{ blocks?: Array<{ props?: Record<string, unknown> }>; details?: Record<string, unknown> }>("weather", "forecast", { place: weatherSelectedPlace!.id });
-      return weatherLocation(weatherSelectedPlace!, { ...(data.blocks?.[0]?.props ?? {}), details: data.details });
-    },
+  const weatherVisiblePlaces = (weatherPlaces.data?.rows ?? []).map((place) => {
+    const entity = weatherEntities.data?.find((row) => row.id === place.id);
+    return { ...place, geo: entity?.geo ? { lat: Number(entity.geo.lat), lon: Number(entity.geo.lon), area: entity.geo.area } : null };
   });
-  const weatherLocations = weatherVisiblePlaces.map((place) => place.id === weatherSelectedPlace?.id ? weatherForecast.data ?? weatherLocation(place, {}) : weatherLocation(place, {}));
+  const weatherForecasts = useQueries({ queries: weatherVisiblePlaces.map((place) => ({
+    queryKey: ["weather-details", person.id, place.id, weatherUnit],
+    enabled: packageId === "weather" && pageId === "index",
+    queryFn: async () => {
+      const data = await api.appData<{ blocks?: Array<{ props?: Record<string, unknown> }>; details?: Record<string, unknown> }>("weather", "forecast", { place: place.id });
+      return weatherLocation(place, { ...(data.blocks?.[0]?.props ?? {}), details: data.details });
+    },
+  })) });
+  const weatherSearchQuery = useQuery({ queryKey: ["weather-search", weatherSearch], queryFn: () => api.searchPlaces(weatherSearch), enabled: packageId === "weather" && pageId === "index" && weatherSearch.trim().length > 1 });
+  const weatherLocations = dedupeLocations(weatherVisiblePlaces.map((place, index) => weatherForecasts[index]?.data ?? weatherLocation(place, {})).filter((place) => place.detail));
+  const weatherSelectedPlace = weatherLocations.find((place) => place.id === weatherSelectedId) ?? weatherLocations[0];
   const rows = useAppRows();
   const app = rows?.find((row) => row.package === packageId);
   useTabItem(app?.label ?? "Apps");
@@ -197,9 +209,9 @@ export function PackageAppPage({ person }: { person: Roster }) {
         loadingLabel="Opening the app"
       >
         {(doc) => (hasQuery && !sameQuery ? null : <>
-          <SchemaPage key={`${packageId}/${pageId}`} page={doc} packageId={packageId} hideTitle sidebar={sidebarProps !== null} />
+          {packageId === "weather" && pageId === "index" ? null : <SchemaPage key={`${packageId}/${pageId}`} page={doc} packageId={packageId} hideTitle sidebar={sidebarProps !== null} />}
           {packageId === "videos" && pageId === "watch" ? <VideoDetails id={new URLSearchParams(location.search).get("id") ?? String((location.state as { pageState?: { id?: string } } | null)?.pageState?.id ?? "")} /> : null}
-          {packageId === "weather" && pageId === "index" ? <WeatherForecastPage locations={weatherLocations} selectedId={weatherSelectedPlace?.id} onSelect={(id: string) => { if (id) setWeatherSelectedId(id); }} onSearch={(value: string) => setWeatherSearch(value)} unit={weatherUnit === "celsius" ? "C" : "F"} /> : null}
+          {packageId === "weather" && pageId === "index" ? <WeatherForecastPage locations={weatherLocations} selectedId={weatherSelectedPlace?.id} onSelect={(id: string) => { if (id) setWeatherSelectedId(id); }} onSearch={(value: string) => { setWeatherSearch(value); setWeatherResults([]); }} searchResults={(weatherSearchQuery.data ?? weatherResults).map((r) => ({ id: `${r.lat.toFixed(2)},${r.lon.toFixed(2)}`, city: r.name, state: r.area ?? undefined, latitude: r.lat, longitude: r.lon }))} onSelectResult={async (result) => { const entity = await api.createEntity({ kind: "place", name: result.city, place_kind: "map", scope: "person", geo: { lat: Number(result.latitude!.toFixed(2)), lon: Number(result.longitude!.toFixed(2)), precision: "exact", area: result.state ?? null, from: "search" } }); const ids = (weatherPlaces.data?.rows ?? []).map((row) => row.id); if (!ids.includes(entity.id)) await api.setSetting(`person:${person.id}`, "weather.places", [...ids, entity.id]); await queryClient.invalidateQueries({ queryKey: ["weather-places", person.id] }); setWeatherSearch(""); setWeatherResults([]); }} onAddLocation={() => { if (weatherSearch.trim()) void weatherSearchQuery.refetch().then(({ data }) => setWeatherResults(data ?? [])); }} onRemoveLocation={(id) => { const ids = (weatherPlaces.data?.rows ?? []).map((row) => row.id).filter((item) => item !== id); void api.setSetting(`person:${person.id}`, "weather.places", ids).then(() => queryClient.invalidateQueries({ queryKey: ["weather-places", person.id] })); }} locale={navigator.language} unit={weatherUnit === "celsius" ? "C" : "F"} /> : null}
         </>)}
       </AsyncState>
       {docked ? (

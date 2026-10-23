@@ -68,7 +68,7 @@
     {
       "op": "fetch",
       "as": "wx",
-      "url": "https://api.open-meteo.com/v1/forecast?latitude={latitude}&longitude={longitude}&current=temperature_2m,weather_code,is_day,apparent_temperature,relative_humidity_2m,precipitation,wind_speed_10m,wind_direction_10m,pressure_msl,visibility&hourly=temperature_2m,precipitation_probability&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max,sunrise,sunset,uv_index_max&forecast_days=8&forecast_hours=24&timezone=auto&temperature_unit={unit}",
+      "url": "https://api.open-meteo.com/v1/forecast?latitude={latitude}&longitude={longitude}&current=temperature_2m,weather_code,is_day,apparent_temperature,relative_humidity_2m,precipitation,wind_speed_10m,wind_direction_10m,pressure_msl,visibility&hourly=temperature_2m,precipitation_probability&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max,sunrise,sunset,uv_index_max&forecast_days=10&forecast_hours=24&timezone=auto&temperature_unit={unit}",
       "method": "GET"
     },
     {
@@ -183,6 +183,7 @@
     { "op": "pick", "as": "sunrise", "from": "wx", "path": "daily.sunrise.0" },
     { "op": "pick", "as": "sunset", "from": "wx", "path": "daily.sunset.0" },
     { "op": "pick", "as": "uv_index", "from": "wx", "path": "daily.uv_index_max.0" },
+    { "op": "pick", "as": "timezone", "from": "wx", "path": "timezone" },
     {
       "op": "pick",
       "as": "hour_times",
@@ -254,7 +255,8 @@
         "block_detail_visibility": "{visibility}",
         "block_detail_sunrise": "{sunrise}",
         "block_detail_sunset": "{sunset}",
-        "block_detail_uv_index": "{uv_index}"
+        "block_detail_uv_index": "{uv_index}",
+        "block_detail_timezone": "{timezone}"
       }
     }
   ]

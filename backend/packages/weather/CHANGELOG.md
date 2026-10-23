@@ -2,6 +2,12 @@
 
 All notable changes to the Weather package, in [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) format.
 
+## [0.3.3] - 2026-10-23
+
+### Added
+
+- The forecast covers 10 days and returns the place's timezone for the Weather page.
+
 ## [0.3.2] - 2026-10-23
 
 ### Added
