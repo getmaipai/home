@@ -1,6 +1,8 @@
 // APP-KIND-04: a package app opens at /apps/<id> and /apps/<id>/<page> with no rebuild, inside the permanent
 // rail, from a fixture package the hub lists. Home has no per-package code: the page is schema data.
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 import { ToastProvider } from "@maipai/ui/src/primitives/Toast";
 import { act, cleanup, fireEvent, waitFor } from "@testing-library/react";
 import { MemoryRouter, Route, Routes as RouterRoutes } from "react-router-dom";
@@ -51,6 +53,11 @@ const musicRow: AppRow = {
   incognito: "unaffected",
 };
 const musicIndexPage = { type: "page", id: "index", title: "Music", body: [{ type: "empty_state", icon: "music", text: "No music yet." }] };
+const mediaPageFiles = ["videos", "music", "shows", "podcasts", "books"] as const;
+const mediaIndexes = Object.fromEntries(mediaPageFiles.map((packageId) => [
+  packageId,
+  JSON.parse(readFileSync(resolve(import.meta.dir, `../../../../backend/packages/${packageId}/pages/index.json`), "utf8")),
+])) as Record<(typeof mediaPageFiles)[number], unknown>;
 
 let home: HomeFixture;
 let rows: AppRow[];
@@ -229,5 +236,49 @@ describe("a media app is drawn inside the Media hub", () => {
     const view = open("/apps/music");
     await view.findByText("No music yet.");
     expect(view.getByTestId("package-app").className).toContain("p-4");
+  });
+});
+
+describe("media index empty states", () => {
+  test("real media pages never show a shelf empty line beside rows or while shelf data is loading", async () => {
+    for (const packageId of mediaPageFiles) {
+      const mediaRow: AppRow = { ...musicRow, package: packageId, label: packageId, to: `/apps/${packageId}` };
+      rows = [mediaRow];
+      const page = mediaIndexes[packageId] as { body: unknown[] };
+      const paths = new Set<string>();
+      const walk = (nodes: unknown[]) => {
+        for (const value of nodes) {
+          if (!value || typeof value !== "object") continue;
+          const node = value as { type?: string; bind?: { path?: string }; main?: unknown[]; aside?: unknown[]; body?: unknown[] };
+          if (node.type === "media_shelf" && node.bind?.path) paths.add(node.bind.path);
+          walk(node.main ?? []);
+          walk(node.aside ?? []);
+          walk(node.body ?? []);
+        }
+      };
+      walk(page.body);
+      if (paths.size === 0) throw new Error(`${packageId} index has no bound shelves`);
+      const visiblePath = [...paths][0]!;
+      let releaseData!: (response: Response) => void;
+      const pendingData = new Promise<Response>((resolveData) => { releaseData = resolveData; });
+      globalThis.fetch = ((input: RequestInfo | URL, init?: RequestInit) => {
+        const url = typeof input === "string" ? input : input.toString();
+        if (url.startsWith("/api/apps")) return Promise.resolve(Response.json(rows));
+        if (url.startsWith(`/api/plugins/${packageId}/pages/index`)) return Promise.resolve(Response.json(page));
+        if (url.startsWith(`/api/plugins/${packageId}/data/`)) {
+          const path = url.split("/data/")[1]?.split("?")[0] ?? "";
+          return path === visiblePath ? pendingData : Promise.resolve(Response.json([]));
+        }
+        return baseFetch(input, init);
+      }) as typeof fetch;
+
+      const populated = open(`/apps/${packageId}`);
+      await waitFor(() => expect([...paths].every((path) => path === visiblePath || document.body.textContent?.includes("Loading") === false)).toBe(true));
+      expect(document.body.textContent).not.toMatch(/No (videos|music|shows or films|new episodes|books) yet\./i);
+      await act(async () => { releaseData(Response.json([{ id: `${packageId}-item`, title: "Visible item", kind: "video", thumbnail: null }])); });
+      await populated.findByRole("button", { name: /Visible item/ });
+      expect(document.body.textContent).not.toMatch(/No (videos|music|shows or films|new episodes|books) yet\./i);
+      cleanup();
+    }
   });
 });

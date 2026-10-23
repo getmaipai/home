@@ -246,11 +246,7 @@
           "media_id": "{id}"
         }
       },
-      "empty_state": {
-        "type": "empty_state",
-        "icon": "film",
-        "text": "No videos yet."
-      }
+      "hide_when_empty": true
     }
   ]
 }

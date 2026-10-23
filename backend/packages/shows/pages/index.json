@@ -41,12 +41,7 @@
           }
         }
       ],
-      "hide_when_empty": true,
-      "empty_state": {
-        "type": "empty_state",
-        "icon": "film",
-        "text": "This title is not available. Go back to Shows and Films and choose another."
-      }
+      "hide_when_empty": true
     },
     {
       "type": "media_shelf",
@@ -68,11 +63,6 @@
         "play": {
           "media_id": "{id}"
         }
-      },
-      "empty_state": {
-        "type": "empty_state",
-        "icon": "film",
-        "text": "No shows or films yet."
       },
       "hide_when_empty": true
     },
@@ -96,11 +86,6 @@
         "play": {
           "media_id": "{id}"
         }
-      },
-      "empty_state": {
-        "type": "empty_state",
-        "icon": "film",
-        "text": "No shows or films yet."
       },
       "hide_when_empty": true
     },
@@ -127,11 +112,6 @@
           }
         }
       },
-      "empty_state": {
-        "type": "empty_state",
-        "icon": "film",
-        "text": "No shows or films yet."
-      },
       "hide_when_empty": true
     },
     {
@@ -156,11 +136,6 @@
             "season": "{next_season}"
           }
         }
-      },
-      "empty_state": {
-        "type": "empty_state",
-        "icon": "film",
-        "text": "No shows or films yet."
       },
       "hide_when_empty": true
     },
@@ -202,11 +177,6 @@
           }
         }
       },
-      "empty_state": {
-        "type": "empty_state",
-        "icon": "film",
-        "text": "No shows or films yet."
-      },
       "hide_when_empty": true
     },
     {
@@ -232,11 +202,7 @@
           }
         }
       },
-      "empty_state": {
-        "type": "empty_state",
-        "icon": "film",
-        "text": "No shows or films yet."
-      }
+      "hide_when_empty": true
     }
   ]
 }

@@ -78,11 +78,7 @@
           }
         }
       },
-      "empty_state": {
-        "type": "empty_state",
-        "icon": "book",
-        "text": "No books yet."
-      }
+      "hide_when_empty": true
     },
     {
       "type": "media_shelf",

@@ -93,11 +93,7 @@
               "media_id": "{id}"
             }
           },
-          "empty_state": {
-            "type": "empty_state",
-            "icon": "mic",
-            "text": "No new episodes yet."
-          }
+          "hide_when_empty": true
         }
       ],
       "aside": [

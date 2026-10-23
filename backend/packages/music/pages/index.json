@@ -73,11 +73,7 @@
           }
         }
       },
-      "empty_state": {
-        "type": "empty_state",
-        "icon": "music",
-        "text": "No music yet."
-      }
+      "hide_when_empty": true
     },
     {
       "type": "media_shelf",
