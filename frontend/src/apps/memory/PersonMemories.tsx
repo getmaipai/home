@@ -296,7 +296,7 @@ export function OwnMemories({ filterIds, actorIsAdult }: { filterIds: Set<string
     queryKey: ["memory-list", ME],
     queryFn: () => api.memories(),
   });
-  const all = query.data ?? [];
+  const all = Array.isArray(query.data) ? query.data : [];
   const records = filterIds ? all.filter((m) => filterIds.has(m.id)) : all;
 
   const selectMode = useSelectMode(records.map((m) => m.id));

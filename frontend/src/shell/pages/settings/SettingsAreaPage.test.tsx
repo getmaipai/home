@@ -267,11 +267,11 @@ describe("the settings route", () => {
     await waitFor(() => expect(where(view)).toBe("/settings/account/voice"));
   });
 
-  test("the Memories row opens the viewer's own page, resolved from their own id", async () => {
+  test("the Memories deep link opens the viewer's Account data settings", async () => {
     const view = open(makePerson("adult"), "/settings/chat/general");
     await waitFor(() => expect(rows(view)).toContain("Memories"));
     const memories = within(column(view)).getByRole("link", { name: /Memories/ });
-    expect(memories.getAttribute("href")).toBe("/people/person-adult?tab=memories");
+    expect(memories.getAttribute("href")).toBe("/settings/account/data");
   });
 
   test("a dirty profile draft blocks a SettingsShell section change", async () => {

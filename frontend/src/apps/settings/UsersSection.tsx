@@ -18,6 +18,7 @@ import { NewPersonForm, type NewPersonValues } from "@/apps/people/NewPersonForm
 import { api, ApiError, type PersonDeletionPreview, type PersonRosterEntry, type Role, type Roster } from "@/lib/api";
 import { ROLE_LABELS, canDeletePerson, canManagePerson, creatableRoles } from "@/apps/people/roles";
 import { SettingsRenderer } from "@/shell/pages/settings/SettingsRenderer";
+import { OtherPersonMemories } from "@/apps/memory/PersonMemories";
 
 interface UsersSectionProps {
   person: Roster;
@@ -349,6 +350,7 @@ export function UsersSection({ person }: UsersSectionProps) {
                     </div>
                   </div>
                   <SettingsRenderer scope="person" scopeValue={`person:${p.id}`} settingKey="companions.allowed" only={["person.companions"]} plainRows />
+                  {p.age_band === "child" ? <Section heading="Memories"><OtherPersonMemories personId={p.id} personName={p.display_name} /></Section> : null}
                 </div>
               );
             }}

@@ -16,6 +16,7 @@ import { InstallPlanSection } from "@/apps/settings/InstallPlanSection";
 import { ModelsAndStorageSection } from "@/apps/settings/ModelsAndStorageSection";
 import { HuggingFaceTokenSection } from "@/apps/settings/HuggingFaceTokenSection";
 import { UsersSection } from "@/apps/settings/UsersSection";
+import { OwnMemories } from "@/apps/memory/PersonMemories";
 import { EnginesConsole } from "@/shell/pages/EnginesPage";
 import { HouseholdRobotsSection } from "@/apps/settings/HouseholdRobotsSection";
 import { AddRobotSection } from "@/apps/settings/AddRobotSection";
@@ -32,7 +33,7 @@ import { SizingPanel } from "@/shell/pages/settings/SizingPanel";
 import { Card, CardContent, CardHeader, CardTitle } from "@maipai/ui/src/dashboard/components/ui/card";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@maipai/ui/src/dashboard/components/ui/alert-dialog";
 import { useTabItem } from "@/shell/tabIdentity";
-import { useSearchParams } from "react-router-dom";
+import { useSearchParams, useLocation } from "react-router-dom";
 import { useSettingsCapabilities } from "@/shell/pages/settings/useSettingsCapabilities";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@maipai/ui/src/ui/dialog";
 import type { PersonRosterEntry, Roster } from "@/lib/api";
@@ -56,10 +57,16 @@ function AccountProfile({ person, onPersonChange }: SettingsViewProps) {
       </Card>
       <AwaySessionsSection />
       <DevicesSection />
+      <Card><CardHeader><CardTitle>Memories</CardTitle></CardHeader><CardContent><OwnMemories filterIds={null} actorIsAdult={person.role === "adult"} /></CardContent></Card>
       {canViewFaceEnrollment(person, person) ? <Card><FaceEnrollmentBody profile={person} viewer={person} /></Card> : null}
       {canViewFaceEnrollment(person, person) ? <Card><VoiceEnrollmentBody profile={person} viewer={person} /></Card> : null}
     </>
   );
+}
+function AccountMemories({ person }: SettingsViewProps) {
+  const location = useLocation();
+  const ids = new URLSearchParams(location.search).get("ids");
+  return <OwnMemories filterIds={ids ? new Set(ids.split(",")) : null} actorIsAdult={person.role === "adult"} />;
 }
 
 /** The view table: spec/settings/areas.json names each view, and this is
@@ -101,6 +108,7 @@ function HomeRoutingStatsSettings() { return <RoutingStatsSection />; }
 
 export const SETTINGS_VIEWS: Record<string, ComponentType<SettingsViewProps>> = {
   "account.profile": AccountProfile,
+  "account.memories": AccountMemories,
   "account.coding_keys": CodingKeysSettings,
   "account.voice": AccountVoiceControls,
   "home.commands": HomeCommandsSettings,

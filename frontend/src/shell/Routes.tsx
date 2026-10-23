@@ -24,7 +24,7 @@ import { toast } from "sonner";
 import { AudioSessionProvider } from "@/shell/audioSessionContext";
 import { MediaHostProvider, MediaLinkRedirect } from "@/shell/mediaHost";
 import { IncognitoProvider, INCOGNITO_DISCARDED_EVENT, useIncognitoContext } from "@/shell/incognitoContext";
-import { MemoriesRedirect } from "@/shell/MemoriesRedirect";
+import { MemoriesRedirect, LegacyProfileMemoriesRedirect } from "@/shell/MemoriesRedirect";
 import { InstallDock } from "@/shell/InstallDock";
 import { RailProfile } from "@/shell/RailProfile";
 import { BrowserAlerts } from "@/shell/BrowserAlerts";
@@ -289,7 +289,7 @@ function RoutesWithIncognito({ person, onPersonChange, onSignedOut }: { person: 
             <Route path="companions/:id/edit" element={<CompanionEditorPage />} />
             <Route path="companions/:id" element={<CompanionDetailPage />} />
             <Route path="people" element={<FamilyPage person={person} />} />
-            <Route path="people/:id" element={<PersonProfilePage person={person} onPersonChange={onPersonChange} />} />
+            <Route path="people/:id" element={location.search.includes("tab=memories") ? <LegacyProfileMemoriesRedirect selfId={person.id} /> : <PersonProfilePage person={person} onPersonChange={onPersonChange} />} />
             <Route path="storage" element={<StoragePage person={person} />} />
             <Route path="performance" element={<PerformancePage />} />
             <Route path="trace/:turnId" element={<TurnTracePage />} />

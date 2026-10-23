@@ -30,17 +30,17 @@ describe("route redirects", () => {
     expect(document.querySelector('[data-testid="location"]')?.textContent).toBe("/chat?list=1");
   });
 
-  test("/memory redirects to the signed-in person's own Memories tab", () => {
+  test("/memory redirects to the signed-in person's Account memories", () => {
     render(
       <MemoryRouter initialEntries={["/memory"]}>
         <Location />
         <Routes>
           <Route path="/memory" element={<MemoriesRedirect selfId="person-sage" />} />
-          <Route path="/people/:id" element={<div>Profile</div>} />
+        <Route path="/settings/account/data" element={<div>Memories settings</div>} />
         </Routes>
       </MemoryRouter>,
     );
-    expect(document.querySelector('[data-testid="location"]')?.textContent).toBe("/people/person-sage?tab=memories");
+    expect(document.querySelector('[data-testid="location"]')?.textContent).toBe("/settings/account/data");
   });
 
   test("/memories (the other spelling) redirects the same way", () => {
@@ -49,11 +49,11 @@ describe("route redirects", () => {
         <Location />
         <Routes>
           <Route path="/memories" element={<MemoriesRedirect selfId="person-sage" />} />
-          <Route path="/people/:id" element={<div>Profile</div>} />
+        <Route path="/settings/account/data" element={<div>Memories settings</div>} />
         </Routes>
       </MemoryRouter>,
     );
-    expect(document.querySelector('[data-testid="location"]')?.textContent).toBe("/people/person-sage?tab=memories");
+    expect(document.querySelector('[data-testid="location"]')?.textContent).toBe("/settings/account/data");
   });
 
   // Chat's "memory updated" chip and the header search's memory results
@@ -66,10 +66,10 @@ describe("route redirects", () => {
         <Location />
         <Routes>
           <Route path="/memory" element={<MemoriesRedirect selfId="person-sage" />} />
-          <Route path="/people/:id" element={<div>Profile</div>} />
+        <Route path="/settings/account/data" element={<div>Memories settings</div>} />
         </Routes>
       </MemoryRouter>,
     );
-    expect(document.querySelector('[data-testid="location"]')?.textContent).toBe("/people/person-sage?tab=memories&ids=mem-1,mem-2");
+    expect(document.querySelector('[data-testid="location"]')?.textContent).toBe("/settings/account/data?ids=mem-1%2Cmem-2");
   });
 });

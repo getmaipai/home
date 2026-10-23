@@ -3,8 +3,7 @@ import { act, cleanup, fireEvent, waitFor } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { PersonProfilePage } from "@/shell/pages/PersonProfilePage";
 import { renderWithQueryClient } from "../../../tests/renderWithQueryClient";
-import { waitForGone } from "../../../tests/waitForGone";
-import type { MemoryRecord, PersonRosterEntry, ResolvedSetting, Roster } from "@/lib/api";
+import type { PersonRosterEntry, ResolvedSetting, Roster } from "@/lib/api";
 import type { SettingsKey } from "@maipai/spec/gen/ts/settings-key.js";
 
 afterEach(cleanup);
@@ -23,19 +22,6 @@ function rosterEntry(overrides: Partial<Roster> = {}): PersonRosterEntry {
   const result = { ...viewer(), sessionLockRequired: false, sessionLockTimeoutMinutes: 0, age_band: role === "child" ? "child" : role === "teen" ? "teen" : "adult", ...overrides };
   delete (result as Partial<Roster>).hasSecret;
   return result as PersonRosterEntry;
-}
-
-function memory(overrides: Partial<MemoryRecord> = {}): MemoryRecord {
-  return {
-    id: "mem-one", record_kind: "memory", text: "Likes dinosaurs", category: "preference", tier: "durable",
-    status: "active", scope: "person", person: "person-sage", companion_id: null, subject_id: null,
-    source: "chat", importance: 0.5, pinned: false, sensitive: false, child_disclosure: null,
-    child_disclosure_set_by: null, child_disclosure_set_at: null, fact_confidence: 0.95, confidence_evidence: [],
-    conflicts_with: [], uses: 0, retrieval_feedback: { corrections: 0, last_corrected_at: null },
-    created_at: "2026-09-04T00:00:00.000Z", last_used_at: "2026-09-04T00:00:00.000Z", valid_from: null,
-    valid_to: null, expired_at: null, superseded_by: null, embedding_space: null, hlc: "1788000000000:0:test",
-    deleted_at: null, ...overrides, folder_id: overrides.folder_id ?? null,
-  };
 }
 
 const people: PersonRosterEntry[] = [
@@ -132,34 +118,13 @@ describe("PersonProfilePage", () => {
     } finally { restore(); }
   });
 
-  test("the signed-in person's own profile has Memories even for a child", async () => {
-    const restore = stubFetch({ "/api/memory": [memory()] });
-    try {
-      const view = renderProfile("/people/person-sage?tab=memories", viewer({ role: "child" }));
-      expect(await view.findByText("Likes dinosaurs")).toBeTruthy();
-      expect(view.getByRole("tab", { name: "Memories" })).toBeTruthy();
-    } finally { restore(); }
-  });
-
-  test("an owner sees another person's real memories and their own export/forget actions", async () => {
-    const restore = stubFetch({ "/api/memory?person=person-bramble": [memory({ id: "mem-child", text: "Loves dinosaurs", person: "person-bramble" })] });
-    try {
-      const view = renderProfile("/people/person-bramble?tab=memories", viewer({ role: "owner" }));
-      expect(await view.findByText("Loves dinosaurs")).toBeTruthy();
-      expect(view.queryByText("My own memory")).toBeNull();
-      expect(await view.findByRole("button", { name: "Export Bramble's memories" })).toBeTruthy();
-      expect(await view.findByRole("button", { name: "Forget everything about Bramble" })).toBeTruthy();
-      expect(view.getByText("preference")).toBeTruthy();
-      expect(view.queryByText("preference · person")).toBeNull();
-    } finally { restore(); }
-  });
-
-  test("a non-admin can view another profile but cannot see its Memories tab", async () => {
+  test("profile has no memories tab, list, or management controls", async () => {
     const restore = stubFetch({});
     try {
       const view = renderProfile("/people/person-bramble?tab=memories", viewer({ role: "adult" }));
       expect(await view.findByText("Bramble")).toBeTruthy();
       expect(view.queryByRole("tab", { name: "Memories" })).toBeNull();
+      expect(view.queryByRole("button", { name: /Forget|Export|Clear all|Select memories/ })).toBeNull();
       expect(view.getByRole("tab", { name: "Overview" }).getAttribute("aria-selected")).toBe("true");
     } finally { restore(); }
   });
@@ -308,12 +273,11 @@ describe("PersonProfilePage", () => {
         expect(await teenView.findByText("You cannot open this profile.")).toBeTruthy();
         expect(teenView.getByText("Back to Family").getAttribute("href")).toBe("/people");
         expect(teenView.queryByText("Nova")).toBeNull();
-        expect(teenView.queryByRole("tab", { name: "Memories" })).toBeNull();
         expect(teenView.queryByRole("button", { name: "Edit" })).toBeNull();
         expect(teenView.queryByText("Face recognition")).toBeNull();
         teenView.unmount();
         const childView = renderProfile("/people/person-bramble", viewer({ role }));
-        expect(await childView.findByRole("tab", { name: "Memories" })).toBeTruthy();
+        expect(childView.queryByRole("tab", { name: "Memories" })).toBeNull();
         childView.unmount();
       }
     } finally { globalThis.fetch = original; restore(); }
@@ -355,15 +319,6 @@ describe("PersonProfilePage", () => {
       await waitFor(() => expect(puts).toContainEqual({
         url: "/api/settings", method: "PUT", body: { scope: "person:person-bramble", key: allowanceName, value: 45 },
       }));
-    } finally { restore(); }
-  });
-
-  test("the ids query filters own memories and the unfiltered link returns to the full list", async () => {
-    const restore = stubFetch({ "/api/memory": [memory(), memory({ id: "mem-two", text: "Allergic to peanuts" })] });
-    try {
-      const view = renderProfile("/people/person-sage?tab=memories&ids=mem-one");
-      expect(await view.findByText("Likes dinosaurs")).toBeTruthy();
-      expect(view.queryByText("Allergic to peanuts")).toBeNull();
     } finally { restore(); }
   });
 
@@ -431,21 +386,17 @@ describe("PersonProfilePage", () => {
     } finally { globalThis.fetch = original; }
   });
 
-  test("updates the tab query when changing tabs", async () => {
-    const restore = stubFetch({ "/api/memory": [] });
+  test("keeps the remaining profile tabs and no memories tab", async () => {
+    const restore = stubFetch({});
     try {
       const view = renderProfile("/people/person-sage", viewer({ role: "owner" }));
-      fireEvent.mouseDown(await view.findByRole("tab", { name: "Memories" }), { button: 0 });
-      expect(await view.findByText("Nothing remembered yet.")).toBeTruthy();
-      expect(view.getByRole("tab", { name: "Memories" }).getAttribute("aria-selected")).toBe("true");
+      expect(await view.findByRole("tab", { name: "Overview" })).toBeTruthy();
+      expect(view.queryByRole("tab", { name: "Memories" })).toBeNull();
     } finally { restore(); }
   });
 });
 
-// NEXT-RETIRE-02C: coverage ported from the retired old-shell
-// apps/people/PersonProfilePage.test.tsx. The live page renders the same
-// OwnMemories / OtherPersonMemories, SharedMediaSection and ProfileForm, so
-// these cases keep guarding that behavior now that the old page is gone.
+// Profile-specific coverage after memories moved to Settings.
 describe("PersonProfilePage (ported from the retired old-shell page)", () => {
   function stubByPath(byPath: Record<string, unknown>): () => void {
     const original = globalThis.fetch;
@@ -460,23 +411,7 @@ describe("PersonProfilePage (ported from the retired old-shell page)", () => {
     return () => { globalThis.fetch = original; };
   }
 
-  // Custom handler first; anything it does not claim falls back to the usual roster, files and prints.
-  function stubCustom(handler: (url: string, init?: RequestInit) => Response | null): () => void {
-    const original = globalThis.fetch;
-    globalThis.fetch = mock((input: RequestInfo | URL, init?: RequestInit) => {
-      const url = String(input);
-      const handled = handler(url, init);
-      if (handled) return Promise.resolve(handled);
-      if (url.endsWith("/api/people")) return Promise.resolve(Response.json(people));
-      if (url.includes("/api/files")) return Promise.resolve(Response.json([]));
-      if (url.includes("/api/biometric-prints")) return Promise.resolve(Response.json([]));
-      throw new Error(`unstubbed fetch: ${url}`);
-    }) as unknown as typeof fetch;
-    return () => { globalThis.fetch = original; };
-  }
-
   const owner = () => viewer({ id: "person-sage", role: "owner" });
-  const rec = (overrides: Partial<MemoryRecord> = {}) => memory({ id: "mem1-abc123", ...overrides });
 
   function visibleFile(overrides: Partial<{ id: string; kind: string; media_type: string; shared: boolean }> = {}) {
     const id = overrides.id ?? "file-abc123";
@@ -491,126 +426,6 @@ describe("PersonProfilePage (ported from the retired old-shell page)", () => {
       shared: overrides.shared ?? true,
     };
   }
-
-  test("shows the empty state for a household with nothing remembered yet", async () => {
-    const restore = stubByPath({ "/api/memory": [] });
-    try {
-      const view = renderProfile("/people/person-sage?tab=memories");
-      expect(await view.findByText("Nothing remembered yet.")).toBeTruthy();
-    } finally { restore(); }
-  });
-
-  test("renders a memory with its raw category and scope", async () => {
-    const restore = stubByPath({ "/api/memory": [rec()] });
-    try {
-      const view = renderProfile("/people/person-sage?tab=memories");
-      expect(await view.findByText("Likes dinosaurs")).toBeTruthy();
-      expect(await view.findByText("preference · person")).toBeTruthy();
-    } finally { restore(); }
-  });
-
-  test("offers a retry rather than a blank page when the memory fetch fails", async () => {
-    const restore = stubByPath({ "/api/memory": 500 });
-    try {
-      const view = renderProfile("/people/person-sage?tab=memories");
-      expect(await view.findByRole("button", { name: "Try again" })).toBeTruthy();
-    } finally { restore(); }
-  });
-
-  test("a non-admin cannot open another person's Memories tab at all", async () => {
-    const restore = stubByPath({});
-    try {
-      const view = renderProfile("/people/person-bramble?tab=memories", viewer({ id: "person-sage", role: "adult" }));
-      await view.findByText("Bramble");
-      await waitForGone(() => view.queryByRole("tab", { name: "Memories" }));
-    } finally { restore(); }
-  });
-
-  test("forgetting a child's memories asks first, then calls the real forget route", async () => {
-    let forgetCalled = false;
-    const restore = stubCustom((url, init) => {
-      if (url.endsWith("/api/memory/forget") && init?.method === "POST") { forgetCalled = true; return Response.json({ deleted: 1 }); }
-      if (url.includes("person=person-bramble")) return Response.json([rec({ id: "mem2-def456", text: "Loves dinosaurs", person: "person-bramble" })]);
-      return null;
-    });
-    try {
-      const view = renderProfile("/people/person-bramble?tab=memories", owner());
-      fireEvent.click(await view.findByRole("button", { name: "Forget everything about Bramble" }));
-      await view.findByText("Forget everything MaiPai remembers about Bramble?");
-      expect(forgetCalled).toBe(false);
-      fireEvent.click(await view.findByRole("button", { name: "Yes, forget everything" }));
-      await waitFor(() => expect(forgetCalled).toBe(true));
-    } finally { restore(); }
-  });
-
-  describe("batch select and clear-all (own memories only)", () => {
-    const twoRecords = () => [rec(), rec({ id: "mem2-def456", text: "Allergic to peanuts" })];
-
-    test("select mode shows the count as rows are checked", async () => {
-      const restore = stubByPath({ "/api/memory": twoRecords() });
-      try {
-        const view = renderProfile("/people/person-sage?tab=memories");
-        fireEvent.click(await view.findByRole("button", { name: "Select memories" }));
-        expect(await view.findByText("0 selected")).toBeTruthy();
-        fireEvent.click(await view.findByRole("checkbox", { name: "Select Likes dinosaurs" }));
-        expect(await view.findByText("1 selected")).toBeTruthy();
-      } finally { restore(); }
-    });
-
-    test("clear all asks, names the real count, then empties the list", async () => {
-      let forgottenIds: string[] | null = null;
-      const restore = stubCustom((url, init) => {
-        if (url.endsWith("/api/memory/batch-forget") && init?.method === "POST") {
-          const ids = (JSON.parse(init.body as string) as { ids: string[] }).ids;
-          forgottenIds = ids;
-          return Response.json({ outcomes: ids.map((id) => ({ id, deleted: true })) });
-        }
-        if (url.endsWith("/api/memory")) return Response.json(forgottenIds ? [] : twoRecords());
-        return null;
-      });
-      try {
-        const view = renderProfile("/people/person-sage?tab=memories");
-        await view.findByText("Likes dinosaurs");
-        fireEvent.click(await view.findByRole("button", { name: "Clear all" }));
-        await view.findByText("Forget every one of your 2 memories? This cannot be undone.");
-        fireEvent.click(await view.findByRole("button", { name: "Yes, forget all" }));
-        await waitFor(() => expect(forgottenIds).toEqual(["mem1-abc123", "mem2-def456"]));
-        await waitForGone(() => view.queryByText("Likes dinosaurs"));
-      } finally { restore(); }
-    });
-  });
-
-  describe("who may hear a household memory (audience control)", () => {
-    const household = (overrides: Partial<MemoryRecord> = {}) => rec({ scope: "household", person: null, ...overrides });
-
-    test("an adult sees the control on a household row and changing it calls the real route", async () => {
-      let audienceBody: unknown = null;
-      const restore = stubCustom((url, init) => {
-        if (url.endsWith("/api/memory/mem1-abc123/audience") && init?.method === "POST") {
-          audienceBody = JSON.parse(init.body as string);
-          return Response.json({ ...household(), child_disclosure: "adult_only" });
-        }
-        if (url.endsWith("/api/memory")) return Response.json([household()]);
-        return null;
-      });
-      try {
-        const view = renderProfile("/people/person-sage?tab=memories");
-        await view.findByText("Likes dinosaurs");
-        fireEvent.click(await view.findByRole("combobox", { name: "Who may hear this" }));
-        fireEvent.click(await view.findByRole("option", { name: "Adults only" }));
-        await waitFor(() => expect(audienceBody).toEqual({ child_disclosure: "adult_only" }));
-      } finally { restore(); }
-    });
-
-    test("a child sees no audience control and an adult-only memory still renders", async () => {
-      const restore = stubByPath({ "/api/memory": [household({ child_disclosure: "adult_only" })] });
-      try {
-        const view = renderProfile("/people/person-sage?tab=memories", viewer({ role: "child" }));
-        await view.findByText("Likes dinosaurs");
-        expect(view.queryByRole("combobox", { name: "Who may hear this" })).toBeNull();
-      } finally { restore(); }
-    });
-  });
 
   describe("header card and Edit dialog", () => {
     test("Edit is offered to an owner managing someone else", async () => {

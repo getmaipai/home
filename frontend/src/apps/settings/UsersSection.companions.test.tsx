@@ -61,3 +61,20 @@ test("the person-editor switch is shown to owner and admin for every role, inclu
     }
   } finally { people.mockRestore(); registry.mockRestore(); values.mockRestore(); siteBlocks.mockRestore(); }
 });
+
+test("memory controls appear for child profiles only in owner and admin Users settings", async () => {
+  const rows = [rosterEntry("child-one", "child", "Robin"), rosterEntry("teen-one", "teen", "Marlow"), rosterEntry("adult-one", "adult", "Jordan")];
+  const people = spyOn(api, "people").mockResolvedValue(rows as never);
+  const siteBlocks = noSiteBlocks();
+  const registry = spyOn(api, "settingsRegistry").mockResolvedValue([companionKey] as never);
+  const values = spyOn(api, "settingsValues").mockResolvedValue([] as never);
+  const memories = spyOn(api, "memories").mockResolvedValue([] as never);
+  try {
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    const view = render(<QueryClientProvider client={client}><MemoryRouter><UsersSection person={{ id: "owner", role: "owner", display_name: "Sage" } as Roster} /></MemoryRouter></QueryClientProvider>);
+    await waitFor(() => expect(view.getByText("Nothing remembered about Robin yet.")).toBeTruthy());
+    expect(view.queryByText("Nothing remembered about Marlow yet.")).toBeNull();
+    expect(view.queryByText("Nothing remembered about Jordan yet.")).toBeNull();
+    expect(memories).toHaveBeenCalledWith("child-one");
+  } finally { people.mockRestore(); registry.mockRestore(); values.mockRestore(); siteBlocks.mockRestore(); memories.mockRestore(); }
+});

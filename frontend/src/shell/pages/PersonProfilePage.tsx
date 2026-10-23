@@ -10,21 +10,15 @@ import { Button } from "@maipai/ui/src/dashboard/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@maipai/ui/src/dashboard/components/ui/dialog";
 import { getIcon } from "@maipai/ui/src/icons";
 import { api, isOwnerOrAdminRole, type PersonRosterEntry, type Roster, type VisibleFile } from "@/lib/api";
-import { ACCENT_RING_CLASS, canAccessPerson, canManagePerson, isProfileClosedTo, ROLE_LABELS } from "@/apps/people/roles";
+import { ACCENT_RING_CLASS, canManagePerson, isProfileClosedTo, ROLE_LABELS } from "@/apps/people/roles";
 import { ProfileForm } from "@/apps/people/ProfileForm";
 import { FaceEnrollmentBody, canViewFaceEnrollment } from "@/apps/people/FaceEnrollmentBody";
-import { OwnMemories, OtherPersonMemories } from "@/apps/memory/PersonMemories";
 import { useTabItem } from "@/shell/tabIdentity";
 import { SettingsRenderer } from "@/shell/pages/settings/SettingsRenderer";
 import { PERSON_KID_PICTURES_GROUP_IDS, PERSON_KID_PICTURES_KEYS, PERSON_LIMIT_GROUP_IDS, PERSON_TOPIC_GROUP_IDS } from "@/shell/pages/settings/personLimits";
 
 const PencilIcon = getIcon("pencil");
 type ProfileEntry = PersonRosterEntry | Roster;
-
-function idsFilter(params: URLSearchParams): Set<string> | null {
-  const value = params.get("ids");
-  return value ? new Set(value.split(",")) : null;
-}
 
 /** The person profile page at /people/:id. Its tab permission rule: self, or owner/admin viewing another. */
 export function PersonProfilePage({ person, onPersonChange }: { person: Roster; onPersonChange: () => void | Promise<void> }) {
@@ -35,15 +29,9 @@ export function PersonProfilePage({ person, onPersonChange }: { person: Roster; 
   const queryClient = useQueryClient();
   const rosterQuery = useQuery<PersonRosterEntry[]>({ queryKey: ["people"], queryFn: () => api.people() });
   const viewingSelf = id === person.id;
-  // Mirrors the server's canAccessPerson: an owner or admin reaches only a CHILD's memories
-  // (ruling 2026-09-30), never a teen's or another adult's.
-  const target = rosterQuery.data?.find((entry) => entry.id === id);
-  const canViewMemories = viewingSelf || (target !== undefined && canAccessPerson(person, target));
   const canViewLimits = !viewingSelf && isOwnerOrAdminRole(person.role)
     && rosterQuery.data?.some((entry) => entry.id === id && entry.age_band === "child") === true;
-  const activeTab = params.get("tab") === "memories" && canViewMemories
-    ? "memories"
-    : params.get("tab") === "limits" && canViewLimits
+  const activeTab = params.get("tab") === "limits" && canViewLimits
       ? "limits"
       : params.get("tab") === "topics" && canViewLimits
         ? "topics"
@@ -51,7 +39,7 @@ export function PersonProfilePage({ person, onPersonChange }: { person: Roster; 
   function onTabChange(value: string) {
     setParams((previous) => {
       const next = new URLSearchParams(previous);
-      if (value === "memories" || value === "limits" || value === "topics") next.set("tab", value);
+      if (value === "limits" || value === "topics") next.set("tab", value);
       else next.delete("tab");
       return next;
     }, { replace: true });
@@ -116,7 +104,6 @@ export function PersonProfilePage({ person, onPersonChange }: { person: Roster; 
               <Tabs value={activeTab} onValueChange={onTabChange}>
                 <TabsList>
                   <TabsTrigger value="overview">Overview</TabsTrigger>
-                  {canViewMemories ? <TabsTrigger value="memories">Memories</TabsTrigger> : null}
                   {showLimits ? <TabsTrigger value="limits">Limits</TabsTrigger> : null}
                   {showLimits ? <TabsTrigger value="topics">Topics</TabsTrigger> : null}
                 </TabsList>
@@ -127,15 +114,6 @@ export function PersonProfilePage({ person, onPersonChange }: { person: Roster; 
                     {viewingSelf ? <FaceStatusRow profile={profile} /> : (canViewFaceEnrollment(person, profile) ? <Card><FaceEnrollmentBody profile={profile} viewer={person} viewingSelf={false} /></Card> : null)}
                   </div>
                 </TabsContent>
-                {canViewMemories ? (
-                  <TabsContent value="memories">
-                    <div className="py-2">
-                      {viewingSelf
-                        ? <OwnMemories filterIds={idsFilter(params)} actorIsAdult={person.role === "adult"} />
-                        : <OtherPersonMemories personId={profile.id} personName={profile.display_name} />}
-                    </div>
-                  </TabsContent>
-                ) : null}
                 {showLimits ? (
                   <TabsContent value="limits">
                     <div className="flex flex-col gap-4 py-2">

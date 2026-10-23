@@ -9,8 +9,13 @@ export const SETTINGS_AREAS = (areasFile.areas as unknown as SettingsAreaDef[]).
   ...area,
   sections: area.sections.map((section) => ({
     ...section,
-    ...(section.cards ? { cards: section.cards.filter((card) => card.group !== "household.news") } : {}),
+    ...(area.id === "account" && section.id === "data" ? { trail_view: "account.memories" } : {}),
+    ...(section.cards ? { cards: section.cards.filter((card) => card.group !== "household.news").map((card) => ({
+      ...card,
+      ...(card.links ? { links: card.links.map((link) => link.label === "Memories" ? { ...link, href: "/settings/account/data" } : link) } : {}),
+    })) } : {}),
   })),
+  ...(area.id === "chat" ? { sections: area.sections.map((section) => section.id === "memories" ? { ...section, href: "/settings/account/data" } : section) } : {}),
 }));
 
 /** The area a route segment names, if it is one of the spec's. */

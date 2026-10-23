@@ -1,7 +1,7 @@
-import { Navigate, useLocation } from "react-router-dom";
+import { Navigate, useLocation, useParams } from "react-router-dom";
 
-/** `/memory` and `/memories` redirect to the signed-in person's own
- * profile (owner ruling, "Navigation, corrected," 2026-09-20) - a
+/** `/memory`, `/memories`, and old profile memory tabs redirect to the
+ * signed-in person's Account settings - a
  * component, not a bare `<Navigate to="...">`, so the old location's
  * own `?ids=<memory ids>` (chatMemoryChip.tsx's deep link, search's
  * memory results) carries over to the new URL instead of being
@@ -11,5 +11,13 @@ import { Navigate, useLocation } from "react-router-dom";
  * its own. */
 export function MemoriesRedirect({ selfId }: { selfId: string }) {
   const location = useLocation();
-  return <Navigate to={`/people/${selfId}?tab=memories${location.search ? `&${location.search.slice(1)}` : ""}`} replace />;
+  const query = new URLSearchParams(location.search);
+  const ids = query.get("ids");
+  return <Navigate to={`/settings/account/data${ids ? `?ids=${encodeURIComponent(ids)}` : ""}`} replace state={{ selfId }} />;
+}
+
+export function LegacyProfileMemoriesRedirect({ selfId }: { selfId: string }) {
+  const { id = "" } = useParams<{ id: string }>();
+  const query = new URLSearchParams(useLocation().search);
+  return <Navigate to={id === selfId ? `/settings/account/data${query.has("ids") ? `?ids=${encodeURIComponent(query.get("ids")!)}` : ""}` : "/settings/home/users"} replace />;
 }
