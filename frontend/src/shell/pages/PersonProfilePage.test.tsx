@@ -164,11 +164,12 @@ describe("PersonProfilePage", () => {
     } finally { restore(); }
   });
 
-  test("an admin sees the privacy-limited Coding access row on a person's profile", async () => {
+  test("an admin sees no Coding access row on a person's profile", async () => {
     const restore = stubFetch({});
     try {
       const view = renderProfile("/people/person-bramble", viewer({ role: "owner" }));
-      expect(await view.findByText(/Hint •••• QWER/)).toBeTruthy();
+      expect(await view.findByText("Bramble")).toBeTruthy();
+      expect(view.queryByText(/Hint •••• QWER/)).toBeNull();
       expect(view.queryByText("Laptop, Claude Code")).toBeNull();
       expect(view.queryByText(/last used|host/i)).toBeNull();
     } finally { restore(); }
@@ -634,9 +635,9 @@ describe("PersonProfilePage (ported from the retired old-shell page)", () => {
     test("shows what's been shared, and leaves out a non-image/video file", async () => {
       const restore = stubByPath({
         "/api/files": [
-          visibleFile({ id: "file-photo1", kind: "image" }),
-          visibleFile({ id: "file-video1", kind: "video", media_type: "video/mp4" }),
-          visibleFile({ id: "file-doc1", kind: "document", media_type: "application/pdf" }),
+          visibleFile({ id: "file-photo1", kind: "image", shared: true }),
+          visibleFile({ id: "file-video1", kind: "video", media_type: "video/mp4", shared: true }),
+          visibleFile({ id: "file-doc1", kind: "document", media_type: "application/pdf", shared: true }),
         ],
       });
       try {
@@ -656,19 +657,19 @@ describe("PersonProfilePage (ported from the retired old-shell page)", () => {
       } finally { restore(); }
     });
 
-    test("an honest empty state when nothing's been shared yet, worded for a viewer looking at someone else", async () => {
+    test("shows the plain empty line when nothing's been shared", async () => {
       const restore = stubByPath({});
       try {
         const view = renderProfile("/people/person-bramble", owner());
-        expect(await view.findByText("Bramble hasn't shared anything with you yet.")).toBeTruthy();
+        expect(await view.findByText("Nothing shared yet.")).toBeTruthy();
       } finally { restore(); }
     });
 
-    test("an honest empty state worded for your own page", async () => {
-      const restore = stubByPath({});
+    test("owned files are not shown as shared", async () => {
+      const restore = stubByPath({ "/api/files": [visibleFile({ id: "file-owned", kind: "image", shared: false })] });
       try {
         const view = renderProfile("/people/person-sage", owner());
-        expect(await view.findByText("You haven't shared anything yet.")).toBeTruthy();
+        expect(await view.findByText("Nothing shared yet.")).toBeTruthy();
       } finally { restore(); }
     });
 

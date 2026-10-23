@@ -17,7 +17,6 @@ import { OwnMemories, OtherPersonMemories } from "@/apps/memory/PersonMemories";
 import { useTabItem } from "@/shell/tabIdentity";
 import { SettingsRenderer } from "@/shell/pages/settings/SettingsRenderer";
 import { PERSON_KID_PICTURES_GROUP_IDS, PERSON_KID_PICTURES_KEYS, PERSON_LIMIT_GROUP_IDS, PERSON_TOPIC_GROUP_IDS } from "@/shell/pages/settings/personLimits";
-import { AdminCodingAccessRow } from "@/apps/settings/CodingSettings";
 
 const PencilIcon = getIcon("pencil");
 type ProfileEntry = PersonRosterEntry | Roster;
@@ -124,8 +123,7 @@ export function PersonProfilePage({ person, onPersonChange }: { person: Roster; 
                 <TabsContent value="overview">
                   <div className="flex flex-col gap-4 py-2">
                     {viewingSelf ? null : <p className="text-sm text-muted-foreground">{`${profile.display_name}'s profile in this household.`}</p>}
-                    <SharedMediaSection profile={profile} viewingSelf={viewingSelf} />
-                    {isOwnerOrAdminRole(person.role) ? <AdminCodingAccessRow personId={profile.id} personName={profile.display_name} /> : null}
+                    <SharedMediaSection profile={profile} />
                     {viewingSelf ? <FaceStatusRow profile={profile} /> : (canViewFaceEnrollment(person, profile) ? <Card><FaceEnrollmentBody profile={profile} viewer={person} viewingSelf={false} /></Card> : null)}
                   </div>
                 </TabsContent>
@@ -166,7 +164,7 @@ export function PersonProfilePage({ person, onPersonChange }: { person: Roster; 
   );
 }
 
-function SharedMediaSection({ profile, viewingSelf }: { profile: ProfileEntry; viewingSelf: boolean }) {
+function SharedMediaSection({ profile }: { profile: ProfileEntry }) {
   const query = useQuery<VisibleFile[]>({ queryKey: ["files", "person", profile.id], queryFn: () => api.files(profile.id) });
   return (
     <div className="flex flex-col gap-2">
@@ -174,9 +172,10 @@ function SharedMediaSection({ profile, viewingSelf }: { profile: ProfileEntry; v
       <AsyncState data={query.data} error={query.isError} isFetching={query.isFetching} onRetry={() => query.refetch()} errorMessage="Could not load what's been shared." loadingLabel="Loading shared media">
         {(files) => {
           const items: MediaGridItem[] = files
+            .filter(({ shared }) => shared)
             .filter(({ file }) => file.kind === "image" || file.kind === "video")
             .map(({ file }) => ({ id: file.id, thumbnailUrl: api.fileContentUrl(file.id), mediaType: file.kind as "image" | "video", altText: file.kind === "video" ? `A video ${profile.display_name} shared` : `A photo ${profile.display_name} shared` }));
-          return <MediaGrid items={items} emptyMessage={viewingSelf ? "You haven't shared anything yet." : `${profile.display_name} hasn't shared anything with you yet.`} />;
+          return items.length === 0 ? <p className="text-sm text-muted-foreground">Nothing shared yet.</p> : <MediaGrid items={items} emptyMessage="Nothing shared yet." />;
         }}
       </AsyncState>
     </div>

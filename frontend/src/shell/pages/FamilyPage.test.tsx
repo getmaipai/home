@@ -100,7 +100,7 @@ describe("FamilyPage", () => {
     }
   });
 
-  test("an admin sees only the key hint and can revoke all Coding keys from the Family row", async () => {
+  test("an admin sees the family row without Coding access controls", async () => {
     const original = globalThis.fetch;
     const deleted: string[] = [];
     const roster = [makeRosterEntry({ id: "p1", display_name: "Nova", role: "owner" })];
@@ -116,13 +116,12 @@ describe("FamilyPage", () => {
     }) as unknown as typeof fetch;
     try {
       const view = renderFamilyPage(makePerson({ id: "p1", display_name: "Nova", role: "owner" }));
-      expect(await view.findByText(/Hint •••• QWER/)).toBeTruthy();
+      await view.findByText("Nova");
+      expect(view.queryByText(/Hint •••• QWER/)).toBeNull();
+      expect(view.queryByRole("button", { name: "Revoke all" })).toBeNull();
       expect(view.queryByText("private key name")).toBeNull();
       expect(view.queryByText(/last used|host/i)).toBeNull();
-      fireEvent.click(view.getByRole("button", { name: "Revoke all" }));
-      const confirmButtons = view.getAllByRole("button", { name: "Revoke" });
-      fireEvent.click(confirmButtons[confirmButtons.length - 1]!);
-      await waitFor(() => expect(deleted).toEqual(["/api/settings/api-keys/people/p1"]));
+      expect(deleted).toEqual([]);
     } finally { globalThis.fetch = original; }
   });
 

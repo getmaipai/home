@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { favoriteApps, filterApps } from "@/shell/appCatalog";
+import { favoriteApps } from "@/shell/appCatalog";
 import { useAppCatalog } from "@/shell/useAppCatalog";
 import { usePinnedApps } from "@/shell/usePinnedApps";
 import { runSearchProviders, type SearchGroup, type SearchResultItem } from "@/shell/search/providers";
@@ -32,7 +32,6 @@ export function useSearchCommand(personId: string, query: string, enabled = true
     placeholderData: (previous) => previous,
   });
 
-  const localApps = filterApps(apps, query).slice(0, 8);
   const localFavorites = trimmed ? [] : favoriteApps(pinned, apps).slice(0, 6);
   const toItem = (app: (typeof apps)[number]): SearchResultItem => ({
     id: `app:${app.to}`,
@@ -43,7 +42,6 @@ export function useSearchCommand(personId: string, query: string, enabled = true
   });
   const visibleGroups: SearchGroup[] = [
     { heading: "Favorites", items: localFavorites.map(toItem) },
-    { heading: "Apps", items: localApps.filter((app) => !localFavorites.includes(app)).map(toItem) },
     // `groups` can still hold the previous query's data here: `placeholderData`
     // keeps showing it even once the query is disabled again (cleared back to
     // ""), since TanStack Query computes it from `status`, not `fetchStatus`.
