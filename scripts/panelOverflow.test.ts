@@ -90,6 +90,28 @@ describe("findOverflowingPanels", () => {
     expect(findOverflowingPanels()).toEqual([]);
   });
 
+  test("does not report content clipped by an overflow-hidden ancestor", () => {
+    document.body.innerHTML = `
+      <div id="clipper" style="overflow-x: hidden"><div id="panel"><span id="drifting">cloud</span></div></div>
+    `;
+    Object.defineProperty(document.documentElement, "clientWidth", { value: 400, configurable: true });
+    mockRect(document.getElementById("clipper")!, { left: 0, right: 200 });
+    mockRect(document.getElementById("panel")!, { left: 0, right: 200 });
+    mockRect(document.getElementById("drifting")!, { left: 150, right: 260 });
+
+    expect(findOverflowingPanels()).toEqual([]);
+  });
+
+  test("reports the same overflowing child when no clipping ancestor exists", () => {
+    document.body.innerHTML = `
+      <div id="panel"><span id="drifting">cloud</span></div>
+    `;
+    mockRect(document.getElementById("panel")!, { left: 0, right: 200 });
+    mockRect(document.getElementById("drifting")!, { left: 150, right: 260 });
+
+    expect(findOverflowingPanels()).toContain("div#panel");
+  });
+
   test("does not report SimpleBar's invisible height observer wrapper", () => {
     document.body.innerHTML = `
       <div class="simplebar-height-auto-observer-wrapper" id="observer"><div id="observer-child"></div></div>

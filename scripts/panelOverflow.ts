@@ -88,6 +88,24 @@ export function findOverflowingPanels(): string[] {
     // gap rather than chased by loosening this for every viewport that
     // does matter.
     const parentRect = el.getBoundingClientRect();
+    // Content extending beyond this element is invisible if any ancestor
+    // clips horizontally. Only trust a clipping ancestor whose own box
+    // remains within the viewport, so a clipped subtree cannot hide a
+    // genuine page-edge spill.
+    let clippingAncestor = el.parentElement;
+    let clippedWithinViewport = false;
+    while (clippingAncestor && clippingAncestor !== document.body) {
+      const ancestorStyle = getComputedStyle(clippingAncestor);
+      if (ancestorStyle.overflowX === "hidden" || ancestorStyle.overflowX === "clip") {
+        const ancestorRect = clippingAncestor.getBoundingClientRect();
+        if (ancestorRect.left >= 0 && ancestorRect.right <= document.documentElement.clientWidth) {
+          clippedWithinViewport = true;
+          break;
+        }
+      }
+      clippingAncestor = clippingAncestor.parentElement;
+    }
+    if (clippedWithinViewport) continue;
     const overflowsRight = Array.from(el.children).some((child) => {
       // The Wizard's own fixed footer intentionally spans the viewport,
       // outside a centered column's box. Keep other fixed content in the
