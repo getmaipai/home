@@ -236,6 +236,11 @@ function SettingsAreaBody({ area, packageAreas, person, onPersonChange }: { area
       layout="docked"
       backLink={<SettingsBackLink title={area.title} reach={area.id === "home" && scopes.includes("household") ? "Applies to everyone at home" : "Only you"} />}
       labels={{ columnTitle: area.title }}
+      sides={(area.id === "home" || area.id === "account") && (person.role === "owner" || person.role === "admin")
+        ? { value: area.id === "home" ? "household" : "mine", label: "Which settings", options: [{ id: "mine", label: "Mine" }, { id: "household", label: "Household" }],
+            onChange: (id) => { if (confirmRouteLeave()) navigate(settingsPath(id === "household" ? "home" : "account")); } }
+        : undefined}
+      trail={[{ label: area.title, href: settingsPath(area.id) }, ...(active ? [{ label: active.label }] : [])]}
       contentAs="section"
       area={area}
       viewer={viewer}

@@ -57,7 +57,7 @@ describe("Engines and AI is one page inside the settings shell", () => {
     await waitFor(() => expect(view.getByText("This computer: Apple Silicon, 24 GB memory.")).toBeTruthy());
     expect(view.getByText("Hugging Face token (for voice cloning)")).toBeTruthy();
     // Still the settings shell: the area's own section list is on the page.
-    expect(view.getByRole("link", { name: "Engines and AI" })).toBeTruthy();
+    expect(view.getAllByRole("link", { name: "Engines and AI" }).some((link) => link.closest('[data-slot="settings-column"]'))).toBe(true);
   });
 
   test("the spec's Engines and AI section names the trail view that carries all of this", () => {
