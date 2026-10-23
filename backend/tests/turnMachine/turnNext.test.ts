@@ -48,6 +48,7 @@ import { useDefaultScriptedStack } from "../stackFixture";
 import { judgeQueueStats, runJudgeBatch } from "@/lib/memoryJudge";
 import { activeTurnCount, turnActiveWithin, __resetTurnActivityForTests } from "@/lib/turnActivity";
 import * as ageBand from "@/lib/ageBand";
+import { HAS_DENO } from "../support/deno";
 
 const realBand = ageBand.speakerAgeBand;
 
@@ -462,7 +463,6 @@ describe("turnNext.ts: the interim rule", () => {
 // not fixed here, same as the issue's own text draws that line.
 // TEST-RED-01: almanac-date is a Deno package, offered only once its smoke test has run, so on a
 // machine without Deno the model is never offered the tool and there is no outcome to carry.
-const HAS_DENO = Boolean(Bun.which("deno"));
 describe("turnNext.ts: structured_part and artifact reach TurnValue (home#147)", () => {
   test.skipIf(!HAS_DENO)("a successful almanac-date outcome carries a structured_part spec sheet on the new path", async () => {
     const original = CATALOG.find((m) => m.id === "qwen3-8b-instruct-q4-k-m")!.turn_budget;

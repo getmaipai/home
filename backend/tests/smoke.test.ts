@@ -3,6 +3,7 @@ import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { resetDb } from "./reset-db";
+import { HAS_DENO } from "./support/deno";
 import { runSmoke, runDenoTestSmoke, getPackageStatus, allPackageStatuses, runAllSmokeTests, setDenoLookupForTest } from "@/lib/smoke";
 import { listIssues } from "@/lib/issues";
 
@@ -114,9 +115,15 @@ describe("a package with no smoke entry declared yet", () => {
 
 describe("runAllSmokeTests", () => {
   test("runs every bundled package and counts only real failures", async () => {
-    const { ran, failed } = await runAllSmokeTests();
-    expect(ran).toBeGreaterThanOrEqual(7); // joke, trivia, weather, storytime-style, remember, recall at minimum
-    expect(failed).toBe(0);
+    // A deno on PATH with no primed cache cannot load a Tier 1 handler (--cached-only): treat it as no Deno, as a machine without one does.
+    if (!HAS_DENO) setDenoLookupForTest(() => null);
+    try {
+      const { ran, failed } = await runAllSmokeTests();
+      expect(ran).toBeGreaterThanOrEqual(7); // joke, trivia, weather, storytime-style, remember, recall at minimum
+      expect(failed).toBe(0);
+    } finally {
+      setDenoLookupForTest(null);
+    }
   });
 });
 
@@ -130,7 +137,8 @@ describe("runAllSmokeTests", () => {
 // suite's own bundled packages).
 // TEST-RED-01: these two spawn a real Deno; a machine without one has nothing to time out, so they
 // skip there (the "Deno is optional" block below covers the missing-Deno behaviour itself).
-const HAS_DENO = Boolean(Bun.which("deno"));
+// These two only need a deno binary (a temp directory, no npm: imports), not a primed cache.
+const HAS_DENO_BINARY = Boolean(Bun.which("deno"));
 describe("runDenoTestSmoke timeout (COR-2)", () => {
   let tempDir: string;
 
@@ -142,7 +150,7 @@ describe("runDenoTestSmoke timeout (COR-2)", () => {
     rmSync(tempDir, { recursive: true, force: true });
   });
 
-  test.skipIf(!HAS_DENO)("a hanging deno test is killed and reported as a timeout, not left running forever", async () => {
+  test.skipIf(!HAS_DENO_BINARY)("a hanging deno test is killed and reported as a timeout, not left running forever", async () => {
     // A real, long timer, not an eternally-unresolved bare Promise: Deno's
     // own sanitizers fail an unresolved-with-nothing-pending promise
     // almost instantly on their own ("Promise resolution is still
@@ -159,7 +167,7 @@ describe("runDenoTestSmoke timeout (COR-2)", () => {
     expect(result.message).toContain("timed out");
   }, 15_000);
 
-  test.skipIf(!HAS_DENO)("a fast-passing deno test is unaffected by the timeout", async () => {
+  test.skipIf(!HAS_DENO_BINARY)("a fast-passing deno test is unaffected by the timeout", async () => {
     writeFileSync(join(tempDir, "passes.test.ts"), `Deno.test("passes", () => {});`);
     const result = await runDenoTestSmoke(tempDir, 30_000);
     expect(result.ok).toBe(true);
