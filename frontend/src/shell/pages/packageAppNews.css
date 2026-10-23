@@ -1,0 +1,34 @@
+/* The pinned StoryFeed and ArticleView do not expose link-style props. Keep
+   this override inside the package page's News subtree. */
+[data-testid="package-app"][data-package="news"] [data-slot="story-card"] button,
+[data-testid="package-app"][data-package="news"] [data-slot="story-row"] button {
+  text-decoration: none;
+  text-underline-offset: 0;
+}
+
+[data-testid="package-app"][data-package="news"] [data-slot="story-card"] button:hover,
+[data-testid="package-app"][data-package="news"] [data-slot="story-row"] button:hover {
+  color: var(--primary);
+}
+
+[data-testid="package-app"][data-package="news"] [data-slot="story-card"] button:focus-visible,
+[data-testid="package-app"][data-package="news"] [data-slot="story-row"] button:focus-visible {
+  color: var(--primary);
+  outline: 2px solid var(--ring);
+  outline-offset: 3px;
+}
+
+[data-testid="package-app"][data-package="news"] [data-slot="article-body"] a {
+  color: var(--primary);
+  font-weight: 600;
+  text-decoration: none;
+}
+
+[data-testid="package-app"][data-package="news"] [data-slot="article-body"] a:hover {
+  color: var(--foreground);
+}
+
+[data-testid="package-app"][data-package="news"] [data-slot="article-body"] a:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 3px;
+}

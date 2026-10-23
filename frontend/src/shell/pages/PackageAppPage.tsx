@@ -20,6 +20,7 @@ import { SectionSidebar } from "@maipai/ui/src/primitives/SectionSidebar";
 import { useAppSidebar } from "@/shell/useAppSidebar";
 import { MediaHubFrame } from "@/shell/MediaHubFrame";
 import { useMediaHubActive } from "@/shell/mediaHubSession";
+import "./packageAppNews.css";
 
 function VideoDetails({ id }: { id: string }) {
   const query = useQuery({
