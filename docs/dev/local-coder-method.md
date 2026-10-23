@@ -22,6 +22,7 @@ copy the same text into every place below, so the files never contradict each ot
 11. Read your own diff before you finish. Remove anything you cannot explain, debug output, and any file the task did not ask for. Never change a test, a type or a check just to make it pass; if the test looks wrong, say so and stop.
 12. Docs change with the behaviour, in the same change. Find the page that describes what you changed (grep `docs/` for the feature's name) and update it. Put new text in the right tier: `docs/user` is plain words and short sentences for the people in the home, `docs/dev` is how it works for a developer, and `docs/api` is generated, so never edit it by hand. Write concrete words (numbers, names, paths), no em dashes, no filler. Examples use `example.com` and `192.0.2.x` addresses, never real names or addresses. Run `bash scripts/check.sh --docs` and fix what it reports.
 13. Commit by file name (never `git add -A` or `git add .`), one logical change per commit, a plain message. Never run `git push`, merge, rebase, reset or tag yourself. When your checks pass, land with `python3 scripts/local-land.py land` (or `localland`); when it refuses, stop and say why. Release only with `localrelease`, and only when the task asks for it.
+14. A request to change something means the whole cycle, without being told the steps. Start a fresh worktree (`bash scripts/wt.sh start <short-name>`, never edit the main checkout), find the code, make the smallest change, run the checks that fit (frontend: `cd frontend && bunx tsc --noEmit && bun run lint:ui-rules`; backend: `cd backend && bunx tsc --noEmit` and the tests beside the change; docs only: `bash scripts/check.sh --docs`), then land it with `localland` and report the files, the lines changed, the check results and the commit. A request to "push a release" or "release" means run `localrelease` and report its output; never release unless asked. Before a change to the look of the app, read rule 9 in `docs/design/RULES.md` (no `className` on a kit element that changes how it looks).
 
 ## Where it is installed
 
@@ -43,7 +44,7 @@ that runs the local coder through OpenCode needs the same section in whichever i
 Guidance for coding-agent instruction files is consistent, and the method follows it:
 
 - Keep it short and limited to what the agent cannot work out from the repo. Long files get ignored, and repeating what the code already shows
-  only adds cost. Thirteen numbered rules is the budget (nine for the method, four for answers, docs and commits); before adding one, remove or merge another.
+  only adds cost. Fourteen numbered rules is the budget (nine for the method, five for answers, docs, commits and the whole cycle); before adding one, remove or merge another.
 - Make rules concrete and checkable. The test and typecheck commands are named, and the model is told to run them and read the output.
 - Warn against the mistakes seen in practice. SWE-agent found that tips against known failure patterns raised success. Rules 2, 5 and 7 come
   from runs where the model edited without reading, changed unrelated code, or repeated the same failing edit.
