@@ -1,6 +1,6 @@
 {
-  "generatedAt": "2026-10-23T08:21:19.069Z",
-  "kitTag": "ui-v0.5.320",
+  "generatedAt": "2026-10-23T17:29:39.957Z",
+  "kitTag": "ui-v0.5.323",
   "items": [
     {
       "file": "ActivityCardsShowcase.tsx",
@@ -1534,6 +1534,14 @@
       "verdict": "wire-now",
       "verdictReason": "Two-pane weather forecast page Element (ui-v0.5.315); Home's weather app page draws it.",
       "implemented": true
+    },
+    {
+      "file": "weather-sky.tsx",
+      "name": "weather-sky",
+      "group": "weather",
+      "verdict": "support",
+      "verdictReason": "The animated sky inside the weather card and the weather forecast page (ui-v0.5.323); Home draws it through those Elements, never on its own.",
+      "implemented": false
     },
     {
       "file": "web-preview.tsx",

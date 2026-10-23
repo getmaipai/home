@@ -3939,6 +3939,23 @@
       "batch": null,
       "replacesHandBuilt": [],
       "realTurnToday": null
+    },
+    {
+      "file": "weather-sky.tsx",
+      "name": "weather-sky",
+      "group": "weather",
+      "verdict": "support",
+      "verdictReason": "The animated sky inside the weather card and the weather forecast page (ui-v0.5.323); Home draws it through those Elements, never on its own.",
+      "backendNeeded": null,
+      "effort": null,
+      "specTagNeeded": false,
+      "newDependency": false,
+      "bindings": [],
+      "size": "S",
+      "showcaseScenario": null,
+      "batch": null,
+      "replacesHandBuilt": [],
+      "realTurnToday": null
     }
   ]
 }
