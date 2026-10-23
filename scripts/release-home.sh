@@ -41,6 +41,9 @@ fi
 if [[ -n "$INSTALL" ]]; then WHAT="install the existing tag $TAG"; else WHAT="tag origin/main ($(git log "$LATEST..origin/main" --oneline | wc -l | tr -d ' ') commits since $LATEST) as $TAG"; fi
 echo "plan: $WHAT, then update the live hub from $INSTALLED"
 [[ "$DRY" == 1 ]] && { echo "dry run: nothing changed."; exit 0; }
+# A development Home from the main checkout holds the hub lock and 8787 and blocks the installer (three times on 2026-10-23, the live hub down for
+# minutes each time). Stop it now, before the tag is pushed and before the installer stops the live service, so the downtime is only the install.
+bash "$(dirname "$0")/stop-dev-home.sh" --live "$LIVE" || exit 1
 if [[ -z "$INSTALL" ]]; then
   git tag -a "$TAG" -m "$TAG" origin/main
   git push origin "$TAG"

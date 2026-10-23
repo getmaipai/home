@@ -37723,3 +37723,15 @@ Changed files: `backend/src/app.ts`, `backend/src/routes/library.ts`, `backend/s
 `backend/src/lib/libraryProvenance.ts`, `backend/src/lib/access.ts`, `backend/src/lib/documentMediaTypes.ts`,
 `backend/src/lib/documentExtraction.ts`, `backend/src/lib/storage/usage.ts`, `backend/tests/library.test.ts`,
 `docs/api/openapi.json`, `docs/BACKLOG.md`, `CHANGELOG.md`, and `docs/dev.md`.
+
+## Releasing Home: `scripts/release-home.sh` and a development Home in the way
+
+`scripts/release-home.sh --owner-approved` is the one way to tag Home and update the live hub. A development Home started from the main
+checkout (`bun start` there, port 8787) holds the per-user hub lock and 8787 and blocked the installer three times on 2026-10-23, each
+time taking the live hub down for minutes. The script now runs `scripts/stop-dev-home.sh` after its checks and before it pushes the tag
+or asks the installer to stop the live service, so the downtime is only the install. That script stops a process only when it is this
+user's, is the lock file's pid or listens on 8787, runs `src/index.ts`, and has its working directory in the main checkout (a folder
+whose `.git` is a directory) rather than a worktree or `/usr/local/maipai-home`. It sends TERM and waits up to 10 seconds; a hub that
+stays up stops the release with a sentence naming the folder, and nothing is killed harder. It prints one line saying what it stopped and
+that `bun start` in that folder brings it back. Tests: `scripts/stopDevHome.test.ts`. Run servers from your own worktree, never from the
+main checkout.
