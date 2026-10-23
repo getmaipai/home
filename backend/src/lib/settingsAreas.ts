@@ -59,7 +59,7 @@ function allows(viewer: SettingsViewer, gate: Gate): boolean {
   return true;
 }
 
-export interface SettingPlace { area: string; section: string; card: string }
+export interface SettingPlace { area: string; section: string; card: string; tab?: string }
 
 /** Where the viewer finds a registry key: the area, section and card whose
  * card draws its group at its scope, at the key's level, with every gate on
@@ -78,7 +78,7 @@ export function placeSetting(key: SettingsKey, viewer: SettingsViewer): SettingP
       for (const card of (section.cards ?? []) as AreaCard[]) {
         if (card.group !== key.lives_in || card.scope !== key.scope || !allows(viewer, card)) continue;
         if (card.levels && !card.levels.includes(key.level as never)) continue;
-        return { area: area.id, section: section.id, card: card.label };
+        return { area: area.id, section: section.id, card: card.label, ...(card.tab ? { tab: card.tab } : {}) };
       }
     }
   }
@@ -86,5 +86,5 @@ export function placeSetting(key: SettingsKey, viewer: SettingsViewer): SettingP
 }
 
 export function settingHref(place: SettingPlace, key: string): string {
-  return `/settings/${place.area}/${place.section}#${key}`;
+  return `/settings/${place.section}${place.tab ? `?tab=${encodeURIComponent(place.tab)}` : ""}#${key}`;
 }

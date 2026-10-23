@@ -152,8 +152,8 @@ describe("who sees it", () => {
       return base(input, init);
     }) as typeof fetch;
     const view = renderWithQueryClient(
-      <MemoryRouter initialEntries={["/settings/home/search"]}>
-        <Routes><Route path="settings/:area/:section?" element={<SettingsAreaPage person={makePerson(role)} onPersonChange={() => {}} />} /></Routes>
+      <MemoryRouter initialEntries={["/settings/search?tab=search"]}>
+        <Routes><Route path="settings/:section?/:detailId?" element={<SettingsAreaPage person={makePerson(role)} onPersonChange={() => {}} />} /></Routes>
       </MemoryRouter>,
     );
     return { view, restore: () => { globalThis.fetch = base; fixture.restore(); } };

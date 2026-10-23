@@ -42,7 +42,7 @@ test("an admin sees which companion each robot has, with a link to its settings"
   api.companions = async (): Promise<CompanionList> => ({ allowed: true, can_create: false, companions: [card()], robots: [{ id: "d1", name: "StackChan", controls: "child", companion_id: "lively-child", companion_name: "Sprout" }] });
   const view = open("/companions");
   await waitFor(() => expect(view.getByText(/StackChan: Sprout/)).toBeTruthy());
-  expect(view.getByRole("link", { name: "Companion settings" }).getAttribute("href")).toBe("/settings/home/robot");
+  expect(view.getByRole("link", { name: "Companion settings" }).getAttribute("href")).toBe("/settings/apps?tab=robot");
 });
 
 test("when companions are off for the person the page says so", async () => {

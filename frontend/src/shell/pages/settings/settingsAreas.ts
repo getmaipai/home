@@ -1,39 +1,38 @@
-// APP-SET-02: the settings areas as data. `areas.json` in the pinned
-// @maipai/spec is the one definition of every area, section and card
-// (RULES S4); Home reads it and writes no layout of its own.
 import areasFile from "@maipai/spec/settings/areas.json";
 import type { SettingsAreaDef } from "@maipai/ui/src/settings/settingsAudience";
 
-// NEWS-03, spec-owed: the News package owns its shelf card; remove the pinned Search placement.
 export const SETTINGS_AREAS = (areasFile.areas as unknown as SettingsAreaDef[]).map((area) => ({
   ...area,
   sections: area.sections.map((section) => ({
     ...section,
-    ...(area.id === "account" && section.id === "data" ? { trail_view: "account.memories" } : {}),
+    ...(section.kind === "keys" && (!(section.cards?.length) && section.tabs?.some((tab) => tab.view)) ? { kind: "view" as const } : {}),
+    ...(section.id === "ai" && section.tabs ? { tabs: section.tabs.map((tab) => ({ ...tab, ...(["overview", "models", "engines", "advanced"].includes(tab.id) ? { view: "home.engine_admin" } : {}) })) } : {}),
+    ...(section.id === "ai" && section.cards ? { cards: section.cards.map((card) => ["household.coding", "household.coding_people", "household.coding_limits"].includes(card.group ?? "") ? { ...card, tab: "coding" } : card) } : {}),
+    ...(section.id === "apps" && section.tabs ? { tabs: section.tabs.map((tab) => ({ ...tab, ...(tab.id === "robot" ? { view: "home.devices_admin" } : {}) })) } : {}),
+    ...(section.id === "advanced" ? { tabs: [{ id: "developer", label: "Developer tools", view: "home.routing_stats" }, { id: "network", label: "Network and access" }], cards: section.cards?.map((card) => card.group === "household.network_port" ? { ...card, tab: "network" } : card) } : {}),
+    ...(section.id === "data" ? { tabs: section.tabs?.map((tab) => tab.id === "data" ? { ...tab, view: "account.memories" } : tab) } : {}),
     ...(section.cards ? { cards: section.cards.filter((card) => card.group !== "household.news").map((card) => ({
       ...card,
-      ...(card.links ? { links: card.links.map((link) => link.label === "Memories" ? { ...link, href: "/settings/account/data" } : link) } : {}),
+      ...(card.links ? { links: card.links.map((link) => link.label === "Memories" ? { ...link, href: "/settings/data?tab=data" } : link) } : {}),
     })) } : {}),
   })),
-  ...(area.id === "chat" ? { sections: area.sections.map((section) => section.id === "memories" ? { ...section, href: "/settings/account/data" } : section) } : {}),
 }));
 
-/** The area a route segment names, if it is one of the spec's. */
 export function settingsArea(id: string | undefined): SettingsAreaDef | undefined {
   return SETTINGS_AREAS.find((area) => area.id === id);
 }
 
-/** `/settings/<area>[/<section>][#<key>]`. */
-export function settingsPath(area: string, section?: string, key?: string, detailId?: string): string {
-  return `/settings/${area}${section ? `/${section}` : ""}${detailId ? `/${encodeURIComponent(detailId)}` : ""}${key ? `#${key}` : ""}`;
+/** `/settings/<section>[/<detailId>][?tab=<tab>][#<key>]`. */
+export function settingsPath(section?: string, tab?: string, key?: string, detailId?: string): string {
+  const path = `/settings${section ? `/${section}` : ""}${detailId ? `/${encodeURIComponent(detailId)}` : ""}`;
+  const query = tab ? `?tab=${encodeURIComponent(tab)}` : "";
+  return `${path}${query}${key ? `#${key}` : ""}`;
 }
 
-/** The area and section whose card draws this registry group at this scope. */
-export function placeForGroup(group: string, scope: "household" | "person" | "device"): { area: string; section: string } | undefined {
-  for (const area of SETTINGS_AREAS) {
-    for (const section of area.sections) {
-      if ((section.cards ?? []).some((card) => card.group === group && card.scope === scope && !card.levels)) return { area: area.id, section: section.id };
-    }
+export function placeForGroup(group: string, scope: "household" | "person" | "device"): { area: string; section: string; tab?: string } | undefined {
+  for (const area of SETTINGS_AREAS) for (const section of area.sections) {
+    const card = (section.cards ?? []).find((candidate) => candidate.group === group && candidate.scope === scope && !candidate.levels);
+    if (card) return { area: area.id, section: section.id, tab: card.tab };
   }
   return undefined;
 }

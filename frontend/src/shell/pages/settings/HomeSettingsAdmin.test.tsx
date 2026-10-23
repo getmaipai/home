@@ -38,7 +38,7 @@ function open(person: Roster, url: string, home: Parameters<typeof mockHome>[0] 
     <MemoryRouter initialEntries={[url]}>
       <Where />
       <Routes>
-        <Route path="settings/:area/:section?" element={<SettingsAreaPage person={person} onPersonChange={() => {}} />} />
+        <Route path="settings/:section?/:detailId?" element={<SettingsAreaPage person={person} onPersonChange={() => {}} />} />
       </Routes>
     </MemoryRouter>,
   );
@@ -47,7 +47,7 @@ function open(person: Roster, url: string, home: Parameters<typeof mockHome>[0] 
 
 const where = (view: ReturnType<typeof open>) => view.getByTestId("where").textContent;
 
-const homeArea = () => SETTINGS_AREAS.find((area) => area.id === "home")!;
+const homeArea = () => SETTINGS_AREAS.find((area) => area.id === "settings")!;
 
 afterEach(() => {
   cleanup();
@@ -57,27 +57,32 @@ afterEach(() => {
 
 describe("who may open Home settings", () => {
   test.each(["adult", "teen", "child", "guest"] as const)("a %s opening /settings/home sees why it is refused and no household request is made", async (role) => {
-    const view = open(makePerson(role), "/settings/home");
+    const view = open(makePerson(role), "/settings/household");
     expect(await view.findByText("Only a parent or admin can change these settings. Ask the person who set up Home.")).toBeTruthy();
     expect(fixture!.requests.filter((r) => r.includes("scope=household"))).toEqual([]);
   });
 
   test.each(["owner", "admin"] as const)("an %s opens it", async (role) => {
-    const view = open(makePerson(role), "/settings/home");
-    await waitFor(() => expect(where(view)).toBe("/settings/home/general"));
+    const view = open(makePerson(role), "/settings/household");
+    await waitFor(() => expect(where(view)).toBe("/settings/household"));
   });
 });
 
 describe("the sections that had no entry draw inside Home settings", () => {
-  test("the spec's Home area carries a trail view for each of them", () => {
-    const trail = Object.fromEntries(homeArea().sections.filter((section) => section.trail_view).map((section) => [section.id, section.trail_view]));
-    expect(trail).toEqual({ ai: "home.engine_admin", pictures: "home.pictures_library", robot: "home.devices_admin", developer: "home.routing_stats" });
+  test("tab views retain the old household page content", () => {
+    const tabViews = Object.fromEntries(homeArea().sections.map((section) => [section.id, Object.fromEntries((section.tabs ?? []).filter((tab) => tab.view).map((tab) => [tab.id, tab.view]))]));
+    expect(tabViews.ai).toMatchObject({ overview: "home.engine_admin" });
+    expect(tabViews.media).toMatchObject({ pictures: "home.pictures_library", "media-library": "home.media_library" });
+    expect(tabViews.apps).toMatchObject({ robot: "home.devices_admin" });
+    expect(homeArea().sections.find((section) => section.id === "apps")?.tabs?.[0]?.id).toBe("robot");
+    expect(tabViews.advanced).toMatchObject({ developer: "home.routing_stats" });
+    expect(homeArea().sections.find((section) => section.id === "advanced")?.tabs?.[0]?.id).toBe("developer");
   });
 
 
   const cases: Array<[string, string, string, { robots?: boolean }]> = [
-    ["robot passwords", "/settings/home/robot", "Robot password", { robots: true }],
-    ["plugin routing stats", "/settings/home/developer", "Plugin routing", {}],
+    ["robot passwords", "/settings/apps", "Robot password", { robots: true }],
+    ["plugin routing stats", "/settings/advanced", "Plugin routing", {}],
   ];
   test.each(cases)("%s", async (_name, url, heading, home) => {
     const view = open(makePerson("owner"), url, home);
@@ -86,49 +91,55 @@ describe("the sections that had no entry draw inside Home settings", () => {
   });
 
   test("the Devices page has no inline add form and the add query opens its dialog", async () => {
-    const page = open(makePerson("owner"), "/settings/home/robot", { robots: true });
+    const page = open(makePerson("owner"), "/settings/apps?tab=robot", { robots: true });
     await page.findByRole("button", { name: "Add a robot" });
     expect(page.queryByPlaceholderText("Six-digit code")).toBeNull();
-    const dialog = open(makePerson("owner"), "/settings/home/robot?addRobot=1", { robots: true });
+    const dialog = open(makePerson("owner"), "/settings/apps?tab=robot&addRobot=1", { robots: true });
     expect(await dialog.findByRole("dialog")).toBeTruthy();
     expect(await dialog.findByPlaceholderText("Six-digit code")).toBeTruthy();
     expect(dialog.getByRole("heading", { name: "Add a robot" })).toBeTruthy();
   });
 
   test("engine computer pairing is on Engines", async () => {
-    const view = open(makePerson("owner"), "/settings/home/ai?tab=engines");
+    const view = open(makePerson("owner"), "/settings/ai?tab=engines");
     expect(await view.findByText("Engine computer link")).toBeTruthy();
   });
 
   test("Hugging Face token is on Advanced", async () => {
-    const view = open(makePerson("owner"), "/settings/home/ai?tab=advanced");
+    const view = open(makePerson("owner"), "/settings/ai?tab=advanced");
     expect(await view.findByText("Hugging Face token (for voice cloning)")).toBeTruthy();
   });
 
   test("the robot add, install, and password sections stay hidden while Robots is off", async () => {
-    const view = open(makePerson("owner"), "/settings/home/robot", { robots: true, robotsEnabled: false });
-    await waitFor(() => expect(where(view)).toBe("/settings/home/robot"));
+    const view = open(makePerson("owner"), "/settings/apps?tab=robot", { robots: true, robotsEnabled: false });
+    await waitFor(() => expect(where(view)).toBe("/settings/apps"));
     expect(view.queryByRole("button", { name: "Add a robot" })).toBeNull();
     expect(view.queryByRole("heading", { name: "Robot password" })).toBeNull();
   });
 
   test("an admin sees them too", async () => {
-    const view = open(makePerson("admin"), "/settings/home/ai?tab=engines");
+    const view = open(makePerson("admin"), "/settings/ai?tab=engines");
     expect(await view.findByText("Engine computer link")).toBeTruthy();
   });
 });
 
 describe("Home settings holds household scope only", () => {
-  test("no card in the home area is at a person or device scope", () => {
-    const scopes = homeArea().sections.flatMap((section) => (section.cards ?? []).filter((card) => card.group).map((card) => card.scope));
+  test("household pages use only household scope cards", () => {
+    const scopes = homeArea().sections.filter((section) => section.scope === "household").flatMap((section) => (section.cards ?? []).filter((card) => card.group).map((card) => card.scope));
     expect(scopes.length).toBeGreaterThan(0);
     expect(scopes.every((scope) => scope === "household")).toBe(true);
   });
 
   test("an owner opening every Home section reads the household scope and no person's", async () => {
-    const view = open(makePerson("owner"), "/settings/home/general");
-    await waitFor(() => expect(where(view)).toBe("/settings/home/general"));
-    await view.findByRole("heading", { name: /^General$/ });
-    expect(fixture!.requests.filter((r) => /scope=person/.test(r) || /scope=person%3A/.test(r))).toEqual([]);
+    for (const page of ["household", "privacy", "ai", "home-voice", "apps", "backups"]) {
+      const view = open(makePerson("owner"), `/settings/${page}`);
+      await waitFor(() => expect(where(view)).toBe(`/settings/${page}`));
+      await waitFor(() => expect(fixture!.scopes.length).toBeGreaterThan(0));
+      expect(fixture!.requests.some((r) => /scope=household/.test(r))).toBe(true);
+      expect(fixture!.requests.filter((r) => /scope=person/.test(r) || /scope=person%3A/.test(r))).toEqual([]);
+      cleanup();
+      fixture!.restore();
+      fixture = null;
+    }
   });
 });

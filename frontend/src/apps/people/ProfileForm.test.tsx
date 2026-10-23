@@ -97,7 +97,7 @@ describe("ProfileForm", () => {
       const view = render(
         <>
           <ProfileForm person={makePerson()} canEdit layout="page" />
-          <a href="/settings/account/privacy">Privacy</a>
+          <a href="/settings/privacy?tab=privacy">Privacy</a>
         </>,
       );
       fireEvent.change(view.getByLabelText("Name"), { target: { value: "Avery Lane" } });

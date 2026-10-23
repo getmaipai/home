@@ -13,16 +13,16 @@ import type { SetupChecklistItem } from "@/wire";
 
 export const SETUP_CHECKLIST_ITEMS = [
   { id: "face-sign-in", title: "Set up face sign-in", reason: "A face print lets Home recognise you.", open: { label: "Open", href: "face" } },
-  { id: "family", title: "Add your family", reason: "Home works best when everyone has their own account.", open: { label: "Open", href: "/settings/home/people" } },
-  { id: "backup-target", title: "Choose where backups go", reason: "A second place keeps a copy if this computer fails.", open: { label: "Open", href: "/settings/home/storage" } },
-  { id: "phone-or-tablet", title: "Add a phone or tablet", reason: "Sign in on another device to use Home there.", open: { label: "Open", href: "/settings/account/profile" } },
-  { id: "web-search", title: "Fix web search", reason: "Home cannot complete its web search check yet.", open: { label: "Open", href: "/settings/home/search" } },
+  { id: "family", title: "Add your family", reason: "Home works best when everyone has their own account.", open: { label: "Open", href: "/settings/household?tab=people" } },
+  { id: "backup-target", title: "Choose where backups go", reason: "A second place keeps a copy if this computer fails.", open: { label: "Open", href: "/settings/backups?tab=storage" } },
+  { id: "phone-or-tablet", title: "Add a phone or tablet", reason: "Sign in on another device to use Home there.", open: { label: "Open", href: "/settings/profile?tab=profile" } },
+  { id: "web-search", title: "Fix web search", reason: "Home cannot complete its web search check yet.", open: { label: "Open", href: "/settings/search?tab=search" } },
   { id: "apps", title: "Add apps", reason: "Add an app to give Home another useful skill.", open: { label: "Open", href: "/store" } },
   { id: "away-access", title: "Set up access away from home", reason: "Tailscale lets your family reach Home when they are away.", open: { label: "Open", href: "/setup/away" } },
-  { id: "backup-key", title: "Save your backup key", reason: "This key helps restore your Home if this computer is lost.", open: { label: "Open", href: "/settings/home/storage" } },
-  { id: "voice", title: "Choose a speaking voice", reason: "Home can read replies aloud in this voice.", open: { label: "Open", href: "/settings/home/voices" } },
-  { id: "photos", title: "Turn on photo understanding", reason: "Home can help with photos when you ask.", open: { label: "Open", href: "/settings/home/ai" } },
-  { id: "remote-engine", title: "Pair your remote AI computer", reason: "A paired computer can run Home's AI on another machine.", open: { label: "Open", href: "/settings/home/ai" } },
+  { id: "backup-key", title: "Save your backup key", reason: "This key helps restore your Home if this computer is lost.", open: { label: "Open", href: "/settings/backups?tab=storage" } },
+  { id: "voice", title: "Choose a speaking voice", reason: "Home can read replies aloud in this voice.", open: { label: "Open", href: "/settings/home-voice?tab=voices" } },
+  { id: "photos", title: "Turn on photo understanding", reason: "Home can help with photos when you ask.", open: { label: "Open", href: "/settings/ai?tab=overview" } },
+  { id: "remote-engine", title: "Pair your remote AI computer", reason: "A paired computer can run Home's AI on another machine.", open: { label: "Open", href: "/settings/ai?tab=engines" } },
 ] as const;
 
 export type SetupChecklist = SetupChecklistItem[];

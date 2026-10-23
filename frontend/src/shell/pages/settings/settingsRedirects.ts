@@ -1,78 +1,61 @@
-// APP-SET-02: where every old settings URL goes now (design section 5).
-// Pure, so each row of the table is a test. The old page was one URL,
-// `/settings?tab=<me|household|device>&section=<id or lives_in>`; the areas
-// are `/settings/<area>/<section>`.
 import type { SettingsKey } from "@maipai/spec/gen/ts/settings-key.js";
+import legacyMap from "@maipai/spec/settings/legacy-sections.json";
 import { placeForGroup, settingsPath } from "@/shell/pages/settings/settingsAreas";
 
-/** Old Me-tab section ids, and where each lives now. */
-const ME_SECTIONS: Record<string, readonly [string, string]> = {
-  profile: ["account", "profile"],
-  appearance: ["account", "appearance"],
-  chat: ["chat", "general"],
-  skills: ["chat", "skills"],
-  "voice-ai": ["account", "voice"],
-  notifications: ["account", "notifications"],
-  "privacy-data": ["account", "data"],
-};
-
-/** Old Household-tab section ids; each kept its id under Home settings. */
-const HOME_SECTIONS = new Set(["general", "people", "ai", "integrations", "storage", "maintenance"]);
-
-const ACCOUNT = settingsPath("account");
-
-/** Groups the spec split (spec-v0.1.209), old name to the groups that hold its keys now, first choice first. */
+const HOME_DEFAULT = settingsPath("household", "general");
+const PERSONAL_DEFAULT = settingsPath("profile", "profile");
+const mappings = legacyMap.mappings;
 const LEGACY_GROUPS: Record<string, readonly string[]> = {
   "household.ai": ["household.ai_advanced", "household.ai_models", "household.chat_pause", "household.ai_runtime", "household.ai_developer"],
   "household.network": ["household.network_port"],
 };
 
+export function legacySettingsSectionTarget(area: string, section: string, viewer: { canManageHousehold: boolean }, hash = ""): string {
+  const mapping = mappings.find((row) => row.old.area === area && row.old.section === section);
+  if (!mapping) return area === "home" ? HOME_DEFAULT : area === "chat" ? settingsPath("chat") : PERSONAL_DEFAULT;
+  if (mapping.replacement) return settingsPath(mapping.replacement.section, undefined, hash.slice(1));
+  if (mapping.new.section === "household" || ["privacy", "ai", "media", "home-voice", "search", "apps", "backups", "advanced"].includes(mapping.new.section)) {
+    if (!viewer.canManageHousehold) return settingsPath(mapping.new.section, mapping.new.tab, hash.slice(1));
+  }
+  return settingsPath(mapping.new.section, mapping.new.tab, hash.slice(1));
+}
+
 export function legacySettingsTarget(search: string, hash: string, viewer: { canManageHousehold: boolean }, registry: readonly SettingsKey[] | undefined): string {
   const params = new URLSearchParams(search);
   const section = params.get("section");
-  if (!params.has("tab") && !section) return ACCOUNT;
-  const tab = params.get("tab") ?? (section && ME_SECTIONS[section] ? "me" : viewer.canManageHousehold ? "household" : "me");
-  const keyFromHash = hash.startsWith("#") && hash.length > 1 ? hash.slice(1) : undefined;
-
-  if (tab === "device") return settingsPath("account", "device", keyFromHash);
-  if (tab === "household" && !viewer.canManageHousehold) return ACCOUNT;
-  const scope = tab === "household" ? "household" : "person";
-
-  // An old search link: `section` is a registry group (`lives_in`), so it
-  // lands on the card that draws it, at that group's first key.
+  const oldTab = params.get("tab");
+  const key = hash.startsWith("#") ? hash.slice(1) : undefined;
+  if (section && !section.includes(".")) {
+    if (oldTab === "me" && section === "chat") return settingsPath("chat", undefined, key);
+    const oldArea = oldTab === "household" ? "home" : oldTab === "me" ? "account" : oldTab === "device" ? "account" : "chat";
+    const target = legacySettingsSectionTarget(oldArea, section, viewer, hash);
+    if (oldTab === "device") return settingsPath("voice", "device", key);
+    return target;
+  }
   if (section?.includes(".")) {
-    // SETTINGS-UX-03b: one card per group split some groups; an old link names the group as it was, so try the groups that took its keys.
-    const candidates = placeForGroup(section, scope) ? [section] : (LEGACY_GROUPS[section] ?? [section]);
+    const scope = oldTab === "household" ? "household" : "person";
+    const candidates = placeForGroup(section, scope) ? [section] : LEGACY_GROUPS[section] ?? [section];
     for (const group of candidates) {
       const place = placeForGroup(group, scope);
       if (!place) continue;
-      const first = keyFromHash ?? registry?.find((k) => k.lives_in === group && k.scope === scope && k.level !== "expert")?.key;
-      return settingsPath(place.area, place.section, first);
+      const first = key ?? registry?.find((entry) => entry.lives_in === group && entry.scope === scope && entry.level !== "expert")?.key;
+      return settingsPath(place.section, place.tab, first);
     }
-    return tab === "household" ? settingsPath("home", "general") : ACCOUNT;
+    return scope === "household" ? HOME_DEFAULT : PERSONAL_DEFAULT;
   }
-
-  if (tab === "household") return settingsPath("home", section && HOME_SECTIONS.has(section) ? section : "general", keyFromHash);
-  const place = section ? ME_SECTIONS[section] : undefined;
-  return place ? settingsPath(place[0], place[1], keyFromHash) : ACCOUNT;
+  if (oldTab === "household") return viewer.canManageHousehold ? HOME_DEFAULT : PERSONAL_DEFAULT;
+  if (oldTab === "device") return settingsPath("voice", "device", key);
+  return PERSONAL_DEFAULT;
 }
 
-/** ENGINES-AI-01: the Manage pages that moved into Home settings. Each old route lands on the section that holds its
- * content now; a viewer who may not manage the household lands on Account, as every Home settings link does for them.
- * `/engines` and `/models` are both the Engines and AI section (its trail view draws the engines console and the model
- * list); `/voices` is the Voices section for an admin and the person's own Voice section for anyone else. `/users` stays
- * a page until the spec's People section draws the user list (see the report's commons order), so it is not here. */
 export function retiredManagePageTarget(pathname: string, viewer: { canManageHousehold: boolean }): string | undefined {
   const path = pathname.replace(/\/$/, "");
-  if (path === "/voices") return viewer.canManageHousehold ? settingsPath("home", "voices") : settingsPath("account", "voice");
-  if (path === "/engines" || path === "/models") return viewer.canManageHousehold ? settingsPath("home", "ai") : ACCOUNT;
-  // ROBOT-ADMIN-PLACE-01: /devices was a person's own devices and sessions; they are in Account, Profile and sign-in now.
-  if (path === "/devices") return settingsPath("account", "profile");
+  if (path === "/voices") return viewer.canManageHousehold ? settingsPath("home-voice", "voices") : settingsPath("voice", "voice");
+  if (path === "/engines" || path === "/models") return viewer.canManageHousehold ? settingsPath("ai", "overview") : PERSONAL_DEFAULT;
+  if (path === "/devices") return settingsPath("profile", "profile");
   return undefined;
 }
 
-/** `/customize` is gone; Skills moved under Chat settings. A child has no
- * Skills, so they land on Chat settings. */
 export function customizeTarget(band: "child" | "teen" | "adult"): string {
   return band === "child" ? settingsPath("chat") : settingsPath("chat", "skills");
 }

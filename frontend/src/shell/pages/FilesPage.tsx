@@ -21,7 +21,6 @@ import { api, ApiError, type LibraryItem, type LibraryQuery, type Roster } from 
 import { useTabItem } from "@/shell/tabIdentity";
 import { useDrawerSections } from "@/shell/drawerSections";
 import { readLibrarySidebarCollapsed, writeLibrarySidebarCollapsed } from "@/shell/library/librarySidebarPreference";
-import { meetsMinRole } from "@/apps/people/roles";
 import {
   SECTIONS, SORT_LABELS, canAddFiles, canShareFiles, filterAllowed, filtersOf, parseView, queryOf, sectionOf, viewParams,
   type LibraryView, type SectionId, type SortId,
@@ -260,7 +259,7 @@ export function FilesPage({ person }: { person: Roster }) {
     ];
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [view.section, countsKey, person.role]);
-  const footer = useMemo<SectionSidebarItem[]>(() => [{ id: "settings", label: "Settings", icon: "settings", href: meetsMinRole(person.role, "admin") ? "/settings/home" : "/settings/account" }], [person.role]);
+  const footer = useMemo<SectionSidebarItem[]>(() => [{ id: "settings", label: "Settings", icon: "settings", href: "/settings" }], []);
   const drawer = useMemo(() => <SectionSidebarDrawerSections groups={groups} footer={footer} />, [groups, footer]);
   useDrawerSections(drawer);
   const [collapsed, setCollapsedState] = useState(() => readLibrarySidebarCollapsed(person.id));

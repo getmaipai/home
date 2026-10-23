@@ -50,13 +50,16 @@ describe("setup checklist facts", () => {
     expect(items.map((item) => item.id)).not.toContain("voice");
   });
 
-  test("every Home settings checklist link names a real section", () => {
-    const home = getSettingsAreas().areas.find((area) => area.id === "home");
-    expect(home).toBeTruthy();
-    const sectionIds = new Set(home!.sections.map((section) => section.id));
+  test("every setup checklist link names a real Settings page and tab", () => {
+    const settings = getSettingsAreas().areas.find((area) => area.id === "settings");
+    expect(settings).toBeTruthy();
+    const pages = new Map(settings!.sections.map((section) => [section.id, section]));
     for (const item of SETUP_CHECKLIST_ITEMS) {
-      const match = item.open.href.match(/^\/settings\/home\/([^/?#]+)$/);
-      if (match) expect(sectionIds.has(match[1]!), `${item.id} links to missing Home section ${match[1]}`).toBe(true);
+      const url = new URL(item.open.href, "http://home");
+      const pageId = url.pathname.split("/")[2];
+      expect(pages.has(pageId!), `${item.id} links to missing Settings page ${pageId}`).toBe(true);
+      const tab = url.searchParams.get("tab");
+      if (tab) expect(pages.get(pageId!)!.tabs?.some((entry) => entry.id === tab), `${item.id} links to missing Settings tab ${tab}`).toBe(true);
     }
   });
 });

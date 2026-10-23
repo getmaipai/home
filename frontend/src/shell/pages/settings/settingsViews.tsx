@@ -100,7 +100,7 @@ function HomeDevicesAdminSettings({ person, detailId, tab }: SettingsViewProps) 
   const [params, setParams] = useSearchParams();
   const addOpen = params.get("addRobot") === "1";
   const setAddOpen = (open: boolean) => setParams((previous) => { const next = new URLSearchParams(previous); if (open) next.set("addRobot", "1"); else next.delete("addRobot"); return next; });
-  return capabilities.includes("robots.enabled") ? <>{detailId ? <HouseholdRobotsSection detailId={detailId} tab={tab} /> : <><HouseholdRobotsSection /><Dialog open={addOpen} onOpenChange={setAddOpen}><DialogContent scroll="viewport"><DialogHeader><DialogTitle>Add a robot</DialogTitle><DialogDescription>Pair a robot with this home.</DialogDescription></DialogHeader><AddRobotSection onClose={() => setAddOpen(false)} /><StackChanInstallDialog /></DialogContent></Dialog><RobotPasswordSection /></>}</> : null;
+  return tab === "integrations" ? null : capabilities.includes("robots.enabled") ? <>{detailId ? <HouseholdRobotsSection detailId={detailId} tab={tab} /> : <><HouseholdRobotsSection /><Dialog open={addOpen} onOpenChange={setAddOpen}><DialogContent scroll="viewport"><DialogHeader><DialogTitle>Add a robot</DialogTitle><DialogDescription>Pair a robot with this home.</DialogDescription></DialogHeader><AddRobotSection onClose={() => setAddOpen(false)} /><StackChanInstallDialog /></DialogContent></Dialog><RobotPasswordSection /></>}</> : null;
 }
 function AccountLikenessView() { useTabItem("Pictures and videos"); return <LikenessSettings />; }
 function PicturesLibraryView() { useTabItem("Pictures and videos"); return <><PicturesLibrary /><VideoLibrary /></>; }
@@ -119,6 +119,7 @@ export const SETTINGS_VIEWS: Record<string, ComponentType<SettingsViewProps>> = 
   "home.routing_stats": HomeRoutingStatsSettings,
   "home.reference_library": ReferenceLibrarySettings,
   "home.pictures_library": PicturesLibraryView,
+  "home.media_library": PicturesLibraryView,
   "account.likeness": AccountLikenessView,
   "account.device_appearance": DeviceAppearanceSettings,
   "chat.skills": ChatSkillsSettings,

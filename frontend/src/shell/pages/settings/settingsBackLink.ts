@@ -36,8 +36,8 @@ export function activeAppHref(pathname: string, packageAreaApps: Readonly<Record
   const areaId = /^\/settings\/([^/]+)/.exec(pathname)?.[1];
   const app = areaId ? packageAreaApps[areaId] : undefined;
   if (app) return app;
-  if (pathname === "/settings/chat" || pathname.startsWith("/settings/chat/")) return "/chat";
-  if (pathname === "/settings/account" || pathname.startsWith("/settings/account/") || pathname === "/settings/home" || pathname.startsWith("/settings/home/")) {
+  if (pathname.startsWith("/settings/")) {
+    if (pathname === "/settings/chat" || pathname.startsWith("/settings/chat/")) return "/chat";
     return appHrefForRoute(lastAppRoute());
   }
   return appHrefForRoute(pathname);

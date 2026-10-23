@@ -529,7 +529,7 @@ describe("next Manage routes", () => {
 // PageHeaderLayout: no slim title bar, the shell's column title is the
 // page's heading, and `/settings` itself replaces to Account.
 describe("Routes settings areas", () => {
-  test.each(["/settings/account/profile", "/settings"])("%s draws the settings shell with no page-header title", async (path) => {
+  test.each(["/settings/profile?tab=profile", "/settings"]) ("%s draws the settings shell with no page-header title", async (path) => {
     const fixture = mockHome();
     try {
       const view = renderWithQueryClient(
@@ -538,7 +538,7 @@ describe("Routes settings areas", () => {
         </MemoryRouter>,
       );
       await waitFor(() => expect(document.body.querySelector('[data-slot="settings-shell"]')).toBeTruthy());
-      expect(view.getByRole("heading", { level: 1, name: "Profile" })).toBeTruthy();
+      expect(view.getByRole("heading", { level: 1, name: "Profile and sign-in" })).toBeTruthy();
       expect(view.container.querySelector("h1.sr-only")).toBeNull();
       expect(view.getByRole("navigation", { name: "Primary navigation" })).toBeTruthy();
     } finally {

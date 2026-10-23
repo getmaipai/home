@@ -7,7 +7,7 @@ const ALIASES: Record<string, string> = {
   "/settings/backups": "/backups",
   "/settings/voices": "/voices",
   "/settings/commands": "/commands",
-  "/settings/devices": "/settings/account/profile",
+  "/settings/devices": "/settings/profile",
   "/settings/repairs": "/repairs",
   "/settings/updates": "/updates",
 };
@@ -22,6 +22,7 @@ export function AliasRedirect() {
   const pathname = location.pathname.length > 1 ? location.pathname.replace(/\/+$/, "") : location.pathname;
   const destination = ALIASES[pathname] ?? pathname;
   const params = new URLSearchParams(search);
+  if (pathname === "/settings/devices" && !params.has("tab")) params.set("tab", "profile");
   if (pathname === "/conversations" && !params.has("list")) params.set("list", "1");
   const query = params.size > 0 ? `?${params}` : "";
   return <Navigate to={`${destination}${query}${hash}`} replace />;

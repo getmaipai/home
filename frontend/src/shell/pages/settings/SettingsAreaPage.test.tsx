@@ -7,7 +7,7 @@ import { MemoryRouter, Route, Routes, useLocation } from "react-router-dom";
 import FullLayout from "@maipai/ui/src/dashboard/layouts/full/FullLayout";
 import RailProfileMenu from "@maipai/ui/src/dashboard/layouts/full/vertical/rail/RailProfileMenu";
 import { renderWithQueryClient } from "../../../../tests/renderWithQueryClient";
-import { CustomizeRedirect, SettingsEntryRedirect } from "@/shell/pages/settings/SettingsEntryRedirect";
+import { CustomizeRedirect, LegacySettingsRedirect, SettingsEntryRedirect } from "@/shell/pages/settings/SettingsEntryRedirect";
 import { SettingsAreaPage } from "@/shell/pages/settings/SettingsAreaPage";
 import { settingsArea } from "@/shell/pages/settings/settingsAreas";
 import { activeAppHref, rememberLastAppRoute } from "@/shell/pages/settings/settingsBackLink";
@@ -52,7 +52,13 @@ function open(person: Roster, url: string, home: Parameters<typeof mockHome>[0] 
         <Route path="setup/away" element={<h1>Away setup wizard</h1>} />
         <Route element={<FullLayout rail activeAppHref={activeAppHref(new URL(url, "http://home").pathname)} railProfile={<RailProfileMenu displayName={person.display_name} subtitle={person.role} settingsHref="/settings" helpHref="https://example.com/help" onLogout={() => {}} />} />}>
           <Route path="settings" element={<SettingsEntryRedirect person={person} />} />
-          <Route path="settings/:area/:section?/:detailId?" element={<SettingsAreaPage person={person} onPersonChange={() => {}} />} />
+          <Route path="settings/home/robot/:robotId" element={<LegacySettingsRedirect person={person} />} />
+          <Route path="settings/home" element={<LegacySettingsRedirect person={person} />} />
+          <Route path="settings/account" element={<LegacySettingsRedirect person={person} />} />
+          <Route path="settings/home/:legacySection" element={<LegacySettingsRedirect person={person} />} />
+          <Route path="settings/account/:legacySection" element={<LegacySettingsRedirect person={person} />} />
+          <Route path="settings/chat/:legacySection" element={<LegacySettingsRedirect person={person} />} />
+          <Route path="settings/:section?/:detailId?" element={<SettingsAreaPage person={person} onPersonChange={() => {}} />} />
           <Route path="customize" element={<CustomizeRedirect person={person} />} />
           <Route path="chat" element={<h1>Chat</h1>} />
           <Route path="status" element={<h1>Status</h1>} />
@@ -69,11 +75,11 @@ const rows = (view: ReturnType<typeof open>) => [...within(column(view)).queryAl
 
 describe("the settings route", () => {
   test("Not now writes the dismissal setting and leaves pinned apps byte-identical", async () => {
-    const view = open(makePerson("owner"), "/settings/home/general", {
+    const view = open(makePerson("owner"), "/settings/household?tab=general", {
       pinnedApps: ["existing-app"],
       setupChecklist: [
-        { id: "family", title: "Add your family", reason: "Home works best when everyone has their own account.", done: false, open: { label: "Open People", href: "/settings/home/people" } },
-        { id: "backup-target", title: "Choose where backups go", reason: "A second place keeps a copy if this computer fails.", done: true, open: { label: "Open Storage and backups", href: "/settings/home/storage" } },
+        { id: "family", title: "Add your family", reason: "Home works best when everyone has their own account.", done: false, open: { label: "Open People", href: "/settings/household?tab=people" } },
+        { id: "backup-target", title: "Choose where backups go", reason: "A second place keeps a copy if this computer fails.", done: true, open: { label: "Open Storage and backups", href: "/settings/backups?tab=storage" } },
       ],
     });
     await waitFor(() => expect(view.getByText("1 thing left to finish setting up.")).toBeTruthy());
@@ -90,9 +96,9 @@ describe("the settings route", () => {
   });
 
   test("nothing open means the checklist card is absent", async () => {
-    const view = open(makePerson("owner"), "/settings/home/general", {
+    const view = open(makePerson("owner"), "/settings/household?tab=general", {
       setupChecklist: [
-        { id: "family", title: "Add your family", reason: "Home works best when everyone has their own account.", done: true, open: { label: "Open People", href: "/settings/home/people" } },
+        { id: "family", title: "Add your family", reason: "Home works best when everyone has their own account.", done: true, open: { label: "Open People", href: "/settings/household?tab=people" } },
       ],
     });
     await waitFor(() => expect(fixture!.requests.some((request) => request.includes("/api/setup-checklist"))).toBe(true));
@@ -101,92 +107,91 @@ describe("the settings route", () => {
 
   test("an adult asking for Home settings sees why access is refused and can open their settings", async () => {
     const adult = makePerson("adult");
-    const view = open(adult, "/settings/home/ai");
+    const view = open(adult, "/settings/ai?tab=overview");
     expect(await view.findByText("Only a parent or admin can change these settings. Ask the person who set up Home.")).toBeTruthy();
-    expect(view.getByRole("link", { name: "Open your settings" }).getAttribute("href")).toBe("/settings/account");
-    expect(where(view)).toBe("/settings/home/ai");
+    expect(view.getByRole("link", { name: "Open your settings" }).getAttribute("href")).toBe("/settings/profile");
+    expect(where(view)).toBe("/settings/ai?tab=overview");
     expect(fixture!.scopes).not.toContain("household");
     expect(fixture!.requests.filter((r) => r.includes("scope=household"))).toEqual([]);
   });
 
   test("the column names its area and shows its reach", async () => {
-    const home = open(makePerson("owner"), "/settings/home/general");
-    expect(await home.findByRole("heading", { level: 2, name: settingsArea("home")!.title })).toBeTruthy();
+    const home = open(makePerson("owner"), "/settings/household?tab=general");
+    expect(await home.findByRole("heading", { level: 2, name: settingsArea("settings")!.title })).toBeTruthy();
     expect(within(column(home)).getByText("Applies to everyone at home")).toBeTruthy();
     cleanup();
     fixture?.restore();
     fixture = null;
 
-    const personal = open(makePerson("adult"), "/settings/chat/general");
-    expect(await personal.findByRole("heading", { level: 2, name: settingsArea("chat")!.title })).toBeTruthy();
+    const personal = open(makePerson("adult"), "/settings/chat?tab=general");
+    expect(await personal.findByRole("heading", { level: 2, name: "Settings" })).toBeTruthy();
     expect(within(column(personal)).getByText("Only you")).toBeTruthy();
   });
 
-  test("an owner opens Home settings on General and sees every Home section", async () => {
+  test("an owner opens Settings and sees the personal and household pages together", async () => {
     const view = open(makePerson("owner"), "/settings/home");
-    await waitFor(() => expect(where(view)).toBe("/settings/home/general"));
-    await waitFor(() => expect(rows(view)).toContain("Maintenance"));
-    expect(rows(view)).toEqual(["General", "People", "Engines and AI", "Pictures, videos and music", "Coding", "Devices", "Search", "Integrations", "Commands", "Voices", "Storage and backups", "Reference library", "Media library", "Maintenance", "Privacy", "Developer tools", "Network and access"]);
-    expect(view.getByRole("heading", { level: 1, name: /^General$/ })).toBeTruthy();
+    await waitFor(() => expect(where(view)).toBe("/settings/household"));
+    expect(rows(view)).toEqual(["Profile and sign-in", "Look and ease", "Chat and AI", "Voice and robot", "Notifications", "Pictures and videos", "Your data and apps", "Household", "Privacy and safety", "AI and models", "Pictures, videos and music", "Voice", "Search and web", "Apps and devices", "Backups, storage and updates", "Advanced"]);
+    expect(view.getByRole("heading", { level: 1, name: /^Household$/ })).toBeTruthy();
   });
 
   test("robot detail uses the spec tabs and the URL selects the active shell tab", async () => {
-    const view = open(makePerson("owner"), "/settings/home/robot/d1?tab=behaviour", { robots: true });
-    await waitFor(() => expect(where(view)).toBe("/settings/home/robot/d1?tab=behaviour"));
+    const view = open(makePerson("owner"), "/settings/apps/d1?tab=behaviour", { robots: true });
+    await waitFor(() => expect(where(view)).toBe("/settings/apps/d1?tab=behaviour"));
     expect(view.getByRole("tab", { name: "Overview" })).toBeTruthy();
     expect(view.getByRole("tab", { name: "Behaviour" }).getAttribute("aria-selected")).toBe("true");
     expect(view.getByRole("tab", { name: "Access" })).toBeTruthy();
   });
 
-  test("legacy device query replaces to the robot route and keeps other parameters", async () => {
+  test("legacy device query replaces to the robot detail route", async () => {
     const view = open(makePerson("owner"), "/settings/home/robot?device=d1&tab=access&addRobot=1", { robots: true });
-    await waitFor(() => expect(where(view)).toContain("/settings/home/robot/d1?tab=access&addRobot=1"));
+    await waitFor(() => expect(where(view)).toBe("/settings/apps/d1?tab=access"));
   });
 
   test("unknown robot detail redirects to the section page", async () => {
-    const view = open(makePerson("owner"), "/settings/home/robot/missing", { robots: true });
-    await waitFor(() => expect(where(view)).toBe("/settings/home/robot"));
+    const view = open(makePerson("owner"), "/settings/apps/missing?tab=overview", { robots: true });
+    await waitFor(() => expect(where(view)).toBe("/settings/apps?tab=robot"));
   });
 
   test("robot list row links to the route detail", async () => {
-    const view = open(makePerson("owner"), "/settings/home/robot", { robots: true });
-    expect(await view.findByRole("link", { name: "Robot settings" })).toHaveAttribute("href", "/settings/home/robot/d1");
+    const view = open(makePerson("owner"), "/settings/apps?tab=robot", { robots: true });
+    expect(await view.findByRole("link", { name: "Robot settings" })).toHaveAttribute("href", "/settings/apps/d1?tab=overview");
   });
 
   test("COLUMN-UNIFY-01: the column's first row goes back to the app the person came from, and the area title stays", async () => {
     rememberLastAppRoute("/files?section=all");
-    const view = open(makePerson("adult"), "/settings/chat/general");
+    const view = open(makePerson("adult"), "/settings/chat?tab=general");
     const back = await waitFor(() => within(column(view)).getByRole("link", { name: "Back to Library" }));
     expect(back.getAttribute("href")).toBe("/files?section=all");
-    expect(within(column(view)).getByRole("heading", { level: 2, name: settingsArea("chat")!.title })).toBeTruthy();
+    expect(within(column(view)).getByRole("heading", { level: 2, name: "Settings" })).toBeTruthy();
     window.sessionStorage.clear();
   });
 
   test("a child gets the Home settings access explanation on a direct URL", async () => {
-    const view = open(makePerson("child"), "/settings/home/reference-library");
+    const view = open(makePerson("child"), "/settings/search?tab=reference-library");
     expect(await view.findByText("Only a parent or admin can change these settings. Ask the person who set up Home.")).toBeTruthy();
-    expect(where(view)).toBe("/settings/home/reference-library");
+    expect(where(view)).toBe("/settings/search?tab=reference-library");
     expect(view.queryByText("All sets")).toBeNull();
     expect(fixture!.requests.some((r) => r.includes("/api/reference/"))).toBe(false);
   });
 
   test.each(["child", "teen"] as const)("a %s gets the Home settings access explanation for Engines and AI", async (role) => {
-    const view = open(makePerson(role), "/settings/home/ai");
+    const view = open(makePerson(role), "/settings/ai?tab=overview");
     expect(await view.findByText("Only a parent or admin can change these settings. Ask the person who set up Home.")).toBeTruthy();
-    expect(where(view)).toBe("/settings/home/ai");
+    expect(where(view)).toBe("/settings/ai?tab=overview");
     expect(view.queryByText("Where the engine runs")).toBeNull();
     expect(fixture!.requests.filter((r) => /api\/(engines|settings\?scope=household)/.test(r))).toEqual([]);
   });
 
   test("an admin opens the spec-declared Reference library view", async () => {
-    const view = open(makePerson("admin"), "/settings/home/reference-library");
-    await waitFor(() => expect(where(view)).toBe("/settings/home/reference-library"));
-    expect(view.getByRole("heading", { level: 1, name: "Reference library" })).toBeTruthy();
+    const view = open(makePerson("admin"), "/settings/search?tab=reference-library");
+    await waitFor(() => expect(where(view)).toBe("/settings/search?tab=reference-library"));
+    expect(view.getByRole("tab", { name: "Reference library" })).toBeTruthy();
   });
 
   test("an owner manages the household command list in Home settings", async () => {
-    const view = open(makePerson("owner"), "/settings/home/commands");
-    await waitFor(() => expect(where(view)).toBe("/settings/home/commands"));
+    const view = open(makePerson("owner"), "/settings/home-voice?tab=commands");
+    await waitFor(() => expect(where(view)).toBe("/settings/home-voice?tab=commands"));
     await waitFor(() => expect(document.body.textContent).toContain("No commands yet."));
   });
 
@@ -195,7 +200,7 @@ describe("the settings route", () => {
     const confirm = mock(() => true);
     window.confirm = confirm;
     try {
-      const view = open(makePerson("owner"), "/settings/home/network");
+      const view = open(makePerson("owner"), "/settings/advanced?tab=network");
       const port = await view.findByLabelText("Home network port");
       fireEvent.change(port, { target: { value: "4555" } });
       fireEvent.blur(port);
@@ -207,7 +212,7 @@ describe("the settings route", () => {
   });
 
   test("away wizard opens from the checklist and from Settings, network", async () => {
-    const checklist = open(makePerson("owner"), "/settings/home/general", {
+    const checklist = open(makePerson("owner"), "/settings/household?tab=general", {
       setupChecklist: [{ id: "away-access", title: "Set up access away from home", reason: "Tailscale lets your family reach Home when they are away.", done: false, open: { label: "Open", href: "/setup/away" } }],
     });
     const checklistLink = await checklist.findByRole("link", { name: "Open Set up access away from home" });
@@ -218,14 +223,14 @@ describe("the settings route", () => {
     fixture?.restore();
     fixture = null;
 
-    const settings = open(makePerson("owner"), "/settings/home/network");
+    const settings = open(makePerson("owner"), "/settings/advanced?tab=network");
     fireEvent.click(await settings.findByRole("link", { name: "Set up away access" }));
     await waitFor(() => expect(where(settings)).toBe("/setup/away"));
     expect(settings.getByRole("heading", { name: "Away setup wizard" })).toBeTruthy();
   });
 
   test("Settings, network renders no second copy of the setup steps", async () => {
-    const view = open(makePerson("owner"), "/settings/home/network");
+    const view = open(makePerson("owner"), "/settings/advanced?tab=network");
     await view.findByRole("link", { name: "Set up away access" });
     expect(view.queryByText("Install Tailscale on this computer")).toBeNull();
     expect(view.queryByText("Turn on secure addresses")).toBeNull();
@@ -233,29 +238,29 @@ describe("the settings route", () => {
   });
 
   test("an admin opens the voice manager in Home settings", async () => {
-    const view = open(makePerson("admin"), "/settings/home/voices");
-    await waitFor(() => expect(where(view)).toBe("/settings/home/voices"));
+    const view = open(makePerson("admin"), "/settings/home-voice?tab=voices");
+    await waitFor(() => expect(where(view)).toBe("/settings/home-voice?tab=voices"));
     await waitFor(() => expect(view.getByRole("button", { name: "Add voice" })).toBeTruthy());
   });
 
   test("a section the viewer may not see replaces to the first visible one, naming nothing", async () => {
-    const view = open(makePerson("child"), "/settings/chat/skills");
-    await waitFor(() => expect(where(view)).toBe("/settings/chat/general"));
+    const view = open(makePerson("child"), "/settings/chat?tab=skills");
+    await waitFor(() => expect(where(view)).toBe("/settings/chat"));
     expect(rows(view)).not.toContain("Skills");
     cleanup();
     fixture!.restore();
     const unknown = open(makePerson("adult"), "/settings/chat/not-a-section");
-    await waitFor(() => expect(where(unknown)).toContain("/settings/chat/general"));
+    await waitFor(() => expect(where(unknown)).toBe("/settings/chat"));
   });
 
   test("/settings/<area> opens the area's first visible section on a desktop", async () => {
     const view = open(makePerson("teen"), "/settings/chat");
-    await waitFor(() => expect(where(view)).toBe("/settings/chat/general"));
+    await waitFor(() => expect(where(view)).toBe("/settings/chat"));
   });
 
   test("on a phone /settings/<area> shows the column alone, with its search and rows", async () => {
     const view = open(makePerson("adult"), "/settings/chat", {}, 390);
-    await waitFor(() => expect(rows(view)).toContain("Keyboard shortcuts"));
+    await waitFor(() => expect(rows(view)).toContain("Chat and AI"));
     expect(where(view)).toBe("/settings/chat");
     expect(view.getByRole("searchbox", { name: "Search" })).toBeTruthy();
     expect(column(view).inert).toBe(false);
@@ -264,26 +269,27 @@ describe("the settings route", () => {
 
   test("an arrow row opened directly goes where it points", async () => {
     const view = open(makePerson("adult"), "/settings/chat/voice");
-    await waitFor(() => expect(where(view)).toBe("/settings/account/voice"));
+    await waitFor(() => expect(where(view)).toBe("/settings/voice"));
   });
 
-  test("the Memories deep link opens the viewer's Account data settings", async () => {
-    const view = open(makePerson("adult"), "/settings/chat/general");
-    await waitFor(() => expect(rows(view)).toContain("Memories"));
-    const memories = within(column(view)).getByRole("link", { name: /Memories/ });
-    expect(memories.getAttribute("href")).toBe("/settings/account/data");
+  test("the data page keeps its memory view on the Data and privacy tab", async () => {
+    // An owner has two tabs on the page (Data and privacy, Developer tools); the first tab drops ?tab=.
+    const view = open(makePerson("owner"), "/settings/data");
+    expect(await view.findByRole("tab", { name: "Data and privacy" })).toBeTruthy();
+    expect(view.getByRole("tab", { name: "Developer tools" })).toBeTruthy();
+    expect(where(view)).toBe("/settings/data");
   });
 
   test("a dirty profile draft blocks a SettingsShell section change", async () => {
     const originalConfirm = window.confirm;
     window.confirm = mock(() => false);
     try {
-      const view = open(makePerson("adult"), "/settings/account/profile");
+      const view = open(makePerson("adult"), "/settings/profile?tab=profile");
       await waitFor(() => expect(view.getByLabelText("Name")).toBeTruthy());
       fireEvent.change(view.getByLabelText("Name"), { target: { value: "Changed" } });
-      fireEvent.click(within(column(view)).getByRole("link", { name: "Appearance" }));
+      fireEvent.click(within(column(view)).getByRole("link", { name: "Look and ease" }));
       expect(window.confirm).toHaveBeenCalledWith("Leave without saving?");
-      expect(where(view)).toBe("/settings/account/profile");
+      expect(where(view)).toBe("/settings/profile?tab=profile");
       expect(view.getByText("Unsaved changes.")).toBeTruthy();
     } finally {
       window.confirm = originalConfirm;
@@ -292,8 +298,8 @@ describe("the settings route", () => {
 
   test("the column title names the area with no back row or collapse controls; Cmd/Ctrl+B is inert", async () => {
     window.sessionStorage.setItem("maipai.settings.last-app-route", "/status?tab=system");
-    const view = open(makePerson("adult"), "/settings/chat/general");
-    expect(await view.findByRole("heading", { level: 2, name: settingsArea("chat")!.title })).toBeTruthy();
+    const view = open(makePerson("adult"), "/settings/chat?tab=general");
+    expect(await view.findByRole("heading", { level: 2, name: "Settings" })).toBeTruthy();
     expect(view.queryByRole("link", { name: "Back to app" })).toBeNull();
     expect(view.queryByRole("button", { name: /settings sidebar/i })).toBeNull();
     const before = column(view).getAttribute("data-state");
@@ -307,7 +313,7 @@ describe("the settings route", () => {
 
 describe("what a band is shown", () => {
   test("a teen sees the chat photo switch but neither Show pictures in answers nor any household row", async () => {
-    const view = open(makePerson("teen"), "/settings/chat/general");
+    const view = open(makePerson("teen"), "/settings/chat?tab=general");
     await waitFor(() => expect(view.getByText("Send photos in chat")).toBeTruthy());
     expect(view.queryByText("Show pictures in answers")).toBeNull();
     expect(view.queryByText("How a teen's replies are checked")).toBeNull();
@@ -315,59 +321,68 @@ describe("what a band is shown", () => {
   });
 
   test("a child sees safe search but not the chat card, Skills or Parental controls", async () => {
-    const view = open(makePerson("child"), "/settings/chat/general", { hasChild: true });
+    const view = open(makePerson("child"), "/settings/chat?tab=general", { hasChild: true });
     await waitFor(() => expect(view.getByText("Safe search level")).toBeTruthy());
     expect(view.queryByText("Send photos in chat")).toBeNull();
     expect(rows(view)).not.toContain("Skills");
     expect(rows(view)).not.toContain("Parental controls");
   });
 
-  test("Parental controls shows for an adult account with a child in the home, and never without one", async () => {
-    const withChild = open(makePerson("adult"), "/settings/chat/general", { hasChild: true });
-    await waitFor(() => expect(rows(withChild)).toContain("Parental controls"));
+  test("Chat and AI no longer carries link rows: Parental controls moved to the Family app in the rail (spec legacy map)", async () => {
+    const withChild = open(makePerson("adult"), "/settings/chat", { hasChild: true });
+    await waitFor(() => expect(withChild.getByText("Send photos in chat")).toBeTruthy());
+    expect(withChild.queryByRole("link", { name: "Parental controls" })).toBeNull();
     cleanup();
-    const without = open(makePerson("adult"), "/settings/chat/general", { hasChild: false });
-    await waitFor(() => expect(rows(without)).toContain("Memories"));
-    expect(rows(without)).not.toContain("Parental controls");
+    const without = open(makePerson("adult"), "/settings/chat", { hasChild: false });
+    await waitFor(() => expect(without.getByText("Send photos in chat")).toBeTruthy());
+    expect(without.queryByRole("link", { name: "Parental controls" })).toBeNull();
   });
 
-  test("an adult sees the wake word device section only once its assets are installed", async () => {
-    const without = open(makePerson("adult"), "/settings/account/profile");
-    await waitFor(() => expect(rows(without)).toContain("Voice"));
-    expect(rows(without)).not.toContain("This device");
+  test("an adult sees the wake word device tab only once its assets are installed", async () => {
+    const without = open(makePerson("adult"), "/settings/voice");
+    await waitFor(() => expect(without.getByRole("heading", { level: 1, name: "Voice and robot" })).toBeTruthy());
+    expect(without.queryByRole("tab", { name: "This device" })).toBeNull();
     cleanup();
     fixture!.restore();
-    const withAssets = open(makePerson("adult"), "/settings/account/profile", { wakeword: true });
-    await waitFor(() => expect(rows(withAssets)).toContain("This device"));
+    fixture = null;
+    const withAssets = open(makePerson("adult"), "/settings/voice", { wakeword: true });
+    await waitFor(() => expect(withAssets.getByRole("tab", { name: "This device" })).toBeTruthy());
+    expect(withAssets.getByRole("tab", { name: "Voice" })).toBeTruthy();
   });
 
-  test("the Robot section is an adult's or admin's and only with a paired robot", async () => {
-    const adult = open(makePerson("adult"), "/settings/account/profile", { robots: true });
-    await waitFor(() => expect(rows(adult)).toContain("Robot"));
+  test("the Robot tab is an adult's or admin's and only with a paired robot", async () => {
+    const adult = open(makePerson("adult"), "/settings/voice", { robots: true });
+    await waitFor(() => expect(adult.getByRole("tab", { name: "Robot" })).toBeTruthy());
     cleanup();
     fixture!.restore();
-    const teen = open(makePerson("teen"), "/settings/account/profile", { robots: true });
-    await waitFor(() => expect(rows(teen)).toContain("Voice"));
-    expect(rows(teen)).not.toContain("Robot");
+    fixture = null;
+    const teen = open(makePerson("teen"), "/settings/voice", { robots: true });
+    await waitFor(() => expect(teen.getByRole("heading", { level: 1, name: "Voice and robot" })).toBeTruthy());
+    expect(teen.queryByRole("tab", { name: "Robot" })).toBeNull();
   });
 });
 
 describe("what the page asks for", () => {
   test("it reads the household scope for Home settings and only the viewer's settings when needed", async () => {
-    const teen = open(makePerson("teen"), "/settings/account/notifications");
+    const teen = open(makePerson("teen"), "/settings/notifications?tab=notifications");
     await waitFor(() => expect(teen.getByText("Show alerts on this device")).toBeTruthy());
     expect(fixture!.scopes.every((scope) => scope === "person:person-teen")).toBe(true);
     cleanup();
     fixture!.restore();
-    const owner = open(makePerson("owner"), "/settings/home/general");
-    await waitFor(() => expect(owner.getByText("Family name")).toBeTruthy());
-    expect(fixture!.scopes).toContain("household");
-    expect(fixture!.scopes.every((scope) => scope === "household")).toBe(true);
-    expect(fixture!.requests.some((r) => /scope=person%3A(?!person-owner)/.test(r))).toBe(false);
+    for (const page of ["household", "privacy", "ai", "home-voice", "apps", "backups"]) {
+      open(makePerson("owner"), `/settings/${page}`);
+      await waitFor(() => expect(fixture!.scopes.length).toBeGreaterThan(0));
+      expect(fixture!.scopes).toContain("household");
+      expect(fixture!.scopes.every((scope) => scope === "household")).toBe(true);
+      expect(fixture!.requests.some((r) => /scope=person%3A(?!person-owner)/.test(r))).toBe(false);
+      cleanup();
+      fixture!.restore();
+      fixture = null;
+    }
   });
 
   test("a #<key> deep link scrolls to the row and focuses its control", async () => {
-    open(makePerson("adult"), "/settings/chat/general#chat.photo_uploads");
+    open(makePerson("adult"), "/settings/chat?tab=general#chat.photo_uploads");
     await waitFor(() => {
       const row = document.body.querySelector('[data-setting-key="chat.photo_uploads"]');
       expect(row).toBeTruthy();
@@ -376,17 +391,17 @@ describe("what the page asks for", () => {
   });
 
   test("a search in the column lists matching rows under a section / card breadcrumb, and Escape clears it", async () => {
-    const view = open(makePerson("adult"), "/settings/chat/general");
+    const view = open(makePerson("adult"), "/settings/chat?tab=general");
     await waitFor(() => expect(view.getByText("Send photos in chat")).toBeTruthy());
     fireEvent.change(view.getByRole("searchbox", { name: "Search" }), { target: { value: "safe" } });
     await waitFor(() => expect(where(view)).toContain("q=safe"));
-    await waitFor(() => expect(view.getByText("General / Search")).toBeTruthy());
+    await waitFor(() => expect(view.getByText("Chat and AI / Search")).toBeTruthy());
     fireEvent.keyDown(view.getByRole("searchbox", { name: "Search" }), { key: "Escape" });
     await waitFor(() => expect(where(view)).not.toContain("q="));
   });
 
   test("a search with no match says so", async () => {
-    const view = open(makePerson("adult"), "/settings/chat/general");
+    const view = open(makePerson("adult"), "/settings/chat?tab=general");
     await waitFor(() => expect(view.getByText("Send photos in chat")).toBeTruthy());
     fireEvent.change(view.getByRole("searchbox", { name: "Search" }), { target: { value: "zzzz-nothing" } });
     await waitFor(() => expect(view.getByText("No settings match that search.")).toBeTruthy());
@@ -395,7 +410,7 @@ describe("what the page asks for", () => {
 
 describe("the rail on a settings route (RULES S1 and S3)", () => {
   test("the main navigation renders on /settings/chat at 1440px", async () => {
-    const view = open(makePerson("adult"), "/settings/chat/general", {}, 1440);
+    const view = open(makePerson("adult"), "/settings/chat?tab=general", {}, 1440);
     const rail = view.getByRole("navigation", { name: "Primary navigation" });
     expect(rail.className).toContain("w-[var(--rail-width,56px)]");
     for (const label of ["Home", "Chat", "Library", "Family"]) await waitFor(() => expect(view.getByRole("link", { name: label })).toBeTruthy());
@@ -417,27 +432,28 @@ describe("the rail on a settings route (RULES S1 and S3)", () => {
 describe("old URLs through the route", () => {
   test("/settings?tab=household&section=ai as an admin replaces to Home settings AI", async () => {
     const view = open(makePerson("admin"), "/settings?tab=household&section=ai");
-    await waitFor(() => expect(where(view)).toBe("/settings/home/ai"));
+    await waitFor(() => expect(where(view)).toBe("/settings/ai?tab=overview"));
   });
 
-  test("/settings?tab=household as an adult replaces to Account with no household request", async () => {
+  test("/settings?tab=household as an adult opens the explanation with no household request", async () => {
     const view = open(makePerson("adult"), "/settings?tab=household&section=ai");
-    await waitFor(() => expect(where(view)).toBe("/settings/account/profile"));
+    await waitFor(() => expect(where(view)).toBe("/settings/ai?tab=overview"));
+    expect(await view.findByText("Only a parent or admin can change these settings. Ask the person who set up Home.")).toBeTruthy();
     expect(fixture!.scopes).not.toContain("household");
   });
 
   test("an old search link names a group and lands at its first key", async () => {
     const view = open(makePerson("owner"), "/settings?tab=household&section=household.search");
-    await waitFor(() => expect(where(view)).toMatch(/^\/settings\/home\/search#search\./));
+    await waitFor(() => expect(where(view)).toMatch(/^\/settings\/search\?tab=search#search\./));
   });
 
   test("/customize lands on Skills for an adult and on Chat settings for a child", async () => {
     const adult = open(makePerson("adult"), "/customize");
-    await waitFor(() => expect(where(adult)).toBe("/settings/chat/skills"));
+    await waitFor(() => expect(where(adult)).toBe("/settings/chat?tab=skills"));
     cleanup();
     fixture!.restore();
     const child = open(makePerson("child"), "/customize");
-    await waitFor(() => expect(where(child)).toBe("/settings/chat/general"));
+    await waitFor(() => expect(where(child)).toBe("/settings/chat"));
   });
 });
 
@@ -466,11 +482,11 @@ describe("a package's own settings area", () => {
 
   test("while the app list is loading the page waits; once it answers without that area it goes to Account", async () => {
     const view = open(makePerson("adult"), "/settings/nonesuch", { apps: [] });
-    await waitFor(() => expect(where(view)).toContain("/settings/account"));
+    await waitFor(() => expect(where(view)).toContain("/settings/profile"));
   });
 
   test("the rail selection and the way back are the app the area belongs to", () => {
     expect(activeAppHref("/settings/weather/places", { weather: "/apps/weather" })).toBe("/apps/weather");
-    expect(activeAppHref("/settings/chat/general", { weather: "/apps/weather" })).toBe("/chat");
+    expect(activeAppHref("/settings/chat?tab=general", { weather: "/apps/weather" })).toBe("/chat");
   });
 });

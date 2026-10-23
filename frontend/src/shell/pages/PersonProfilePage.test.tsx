@@ -339,11 +339,11 @@ describe("PersonProfilePage", () => {
     try {
       const self = renderProfile("/people/person-sage", viewer({ role: "owner" }));
       const edit = await self.findByRole("link", { name: "Edit profile" });
-      expect(edit.getAttribute("href")).toBe("/settings/account/profile");
+      expect(edit.getAttribute("href")).toBe("/settings/profile?tab=profile");
       expect(self.queryByRole("link", { name: "Manage in Settings" })).toBeNull();
       expect(self.queryByText("This is your own profile.")).toBeNull();
       expect(self.queryByText(/Face recognition/)).toBeNull();
-      expect(self.getAllByRole("link").filter((link) => link.getAttribute("href") === "/settings/account/profile")).toHaveLength(1);
+      expect(self.getAllByRole("link").filter((link) => link.getAttribute("href") === "/settings/profile?tab=profile")).toHaveLength(1);
       cleanup();
       const other = renderProfile("/people/person-bramble", viewer({ role: "owner" }));
       expect(await other.findByRole("button", { name: "Edit" })).toBeTruthy();

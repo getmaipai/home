@@ -17,7 +17,7 @@ import { voicePreviewPlayer, type VoicePreviewState } from "@/lib/voice/voicePre
 import { useTabItem } from "@/shell/tabIdentity";
 
 const listKey = ["companions"] as const;
-const ROBOT_SETTINGS = "/settings/home/robot";
+const ROBOT_SETTINGS = "/settings/apps?tab=robot";
 
 /** The inside of one card in the gallery: the kit's Avatar, name, one line, the type and who it is for. */
 function CompanionBody({ card }: { card: CompanionCard }) {

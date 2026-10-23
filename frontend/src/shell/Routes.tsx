@@ -14,7 +14,7 @@ import { PageHeaderTitle } from "@/shell/pageHeaderTitle";
 import { DashboardPage } from "@/shell/pages/DashboardPage";
 import { ChatPage } from "@/shell/pages/ChatPage";
 import { ALL_APPS_PATH } from "@/shell/allAppsPath";
-import { CustomizeRedirect, SettingsEntryRedirect } from "@/shell/pages/settings/SettingsEntryRedirect";
+import { CustomizeRedirect, LegacySettingsRedirect, SettingsEntryRedirect } from "@/shell/pages/settings/SettingsEntryRedirect";
 import { meetsMinRole } from "@/apps/people/roles";
 import { SignInPage } from "@/shell/pages/SignInPage";
 import { ChatHeaderDataProvider } from "@/apps/chat/chatHeaderData";
@@ -140,7 +140,7 @@ function PageHeaderLayout() {
  * open it for details; the Home settings AI page already shows its own copy. */
 function ShellInstallStrip({ person }: { person: Roster }) {
   const { pathname } = useLocation();
-  if (pathname.startsWith("/settings/home/ai")) return null;
+  if (pathname === "/settings/ai") return null;
   return <InstallDock admin={meetsMinRole(person.role, "admin")} />;
 }
 
@@ -272,10 +272,16 @@ function RoutesWithIncognito({ person, onPersonChange, onSignedOut }: { person: 
               replace to the page that holds them now; `/customize` is gone. */}
           <Route path="storage/trash" element={<TrashPage person={person} />} />
           <Route path="settings" element={<SettingsEntryRedirect person={person} />} />
-          <Route path="settings/:area/:section?/:detailId?" element={<Suspense fallback={<RouteSkeleton />}><SettingsAreaPage person={person} onPersonChange={onPersonChange} /></Suspense>} />
+          <Route path="settings/home/robot/:robotId" element={<LegacySettingsRedirect person={person} />} />
+          <Route path="settings/home" element={<LegacySettingsRedirect person={person} />} />
+          <Route path="settings/account" element={<LegacySettingsRedirect person={person} />} />
+          <Route path="settings/home/:legacySection" element={<LegacySettingsRedirect person={person} />} />
+          <Route path="settings/account/:legacySection" element={<LegacySettingsRedirect person={person} />} />
+          <Route path="settings/chat/:legacySection" element={<LegacySettingsRedirect person={person} />} />
+          <Route path="settings/:section?/:detailId?" element={<Suspense fallback={<RouteSkeleton />}><SettingsAreaPage person={person} onPersonChange={onPersonChange} /></Suspense>} />
           {/* ENGINES-AI-01: the Manage pages that moved into Home settings are links that land on their section. */}
           {["voices", "engines", "models", "devices"].map((path) => (
-            <Route key={path} path={path} element={<Navigate to={retiredManagePageTarget(`/${path}`, { canManageHousehold: meetsMinRole(person.role, "admin") }) ?? "/settings/account"} replace />} />
+            <Route key={path} path={path} element={<Navigate to={retiredManagePageTarget(`/${path}`, { canManageHousehold: meetsMinRole(person.role, "admin") }) ?? "/settings/profile"} replace />} />
           ))}
           <Route path="customize" element={<CustomizeRedirect person={person} />} />
           {/* APP-KIND-04: every installed package app, with no rebuild. Static routes win over this splat.
@@ -298,7 +304,7 @@ function RoutesWithIncognito({ person, onPersonChange, onSignedOut }: { person: 
             <Route path="setup/review" element={meetsMinRole(person.role, "admin") ? <SetupReviewPage /> : <Navigate to="/" replace />} />
             <Route path="status" element={<StatusPage person={person} />} />
             <Route path="backups" element={<BackupsPage person={person} />} />
-            <Route path="commands" element={meetsMinRole(person.role, "adult") ? <CommandsPage person={person} /> : <Navigate to="/settings/account" replace />} />
+            <Route path="commands" element={meetsMinRole(person.role, "adult") ? <CommandsPage person={person} /> : <Navigate to="/settings/chat" replace />} />
             <Route path="privacy" element={<PrivacyPage />} />
             <Route path="users" element={<UsersPage person={person} />} />
             <Route path="reference/*" element={<ReferencePage />} />

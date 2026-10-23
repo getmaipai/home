@@ -70,7 +70,7 @@ export function RobotCompanionChoices({ deviceId }: { deviceId: string }) {
         </Field>
         <FieldDescription>{speakingLine(info.speaking, voices)}</FieldDescription>
         {!info.home_location_set ? (
-          <Alert><AlertDescription>The weather needs a Home location. <Link to="/settings/home/general">Set it in Settings, Home, General.</Link></AlertDescription></Alert>
+          <Alert><AlertDescription>The weather needs a Home location. <Link to="/settings/household?tab=general">Set it in Settings, Home, General.</Link></AlertDescription></Alert>
         ) : null}
         {error ? <Alert variant="destructive"><AlertDescription>{error}</AlertDescription></Alert> : null}
       </FieldGroup>}

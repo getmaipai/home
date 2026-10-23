@@ -67,56 +67,36 @@ const EASE_KEYS = REGISTRY.filter((k) => k.key.startsWith("ease.")).map((k) => k
 for (const key of EASE_KEYS) OLD_CHILD.add(key);
 const OLD_TEEN = new Set([...OLD_CHILD, "chat.photo_uploads"]);
 
-describe("which sections each role sees", () => {
-  // LIKENESS-01: Pictures and videos (the person's two consent switches) is for adults only, between Voice and Data.
-  test.each(ROLES)("Account, %s", (role) => {
-    const adultOrUp = ["owner", "admin", "adult"].includes(role);
-    const base = adultOrUp ? ["profile", "appearance", "notifications", "voice", "pictures", "data"] : ["profile", "appearance", "notifications", "voice", "data"];
-    expect(sectionIds("account", viewerFor(role, EMPTY_HOME))).toEqual(base);
-    expect(sectionIds("account", viewerFor(role, FULL_HOME))).toEqual([...base, ...(adultOrUp ? ["device", "robot"] : [])]);
+describe("which Settings pages and keys each role sees", () => {
+  test.each(ROLES)("the column groups pages by audience for %s", (role) => {
+    const personal = ["profile", "appearance", "chat", "voice", "notifications"];
+    const expected = role === "owner" || role === "admin"
+      ? [...personal, "pictures", "data", "household", "privacy", "ai", "media", "home-voice", "search", "apps", "backups", "advanced"]
+      : [...personal, ...(role === "adult" ? ["pictures"] : []), "data"];
+    expect(sectionIds("settings", viewerFor(role, EMPTY_HOME))).toEqual(expected);
+    expect(sectionIds("settings", viewerFor(role, FULL_HOME))).toEqual(expected);
   });
 
-  test.each(ROLES)("Chat settings, %s", (role) => {
-    const admin = role === "owner" || role === "admin";
-    const expected = ["general", "personalization", ...(role === "child" ? [] : ["skills"]), "shortcuts", "voice", "notifications", "memories", ...(admin ? ["household"] : [])];
-    expect(sectionIds("chat", viewerFor(role, EMPTY_HOME))).toEqual(expected);
-    const withChild = sectionIds("chat", viewerFor(role, FULL_HOME));
-    // The Parental controls row is for owner, admin and adult accounts that
-    // have a child, and is never about a teen: no teen, child or guest sees it.
-    expect(withChild.includes("parental-controls")).toBe(["owner", "admin", "adult"].includes(role));
-    expect(sectionIds("chat", viewerFor(role, { ...FULL_HOME, child: false })).includes("parental-controls")).toBe(false);
-    expect(withChild.includes("household")).toBe(admin);
-  });
-
-  test("Home settings: only an owner or admin has any section; nobody else is shown one", () => {
-    const home = ["general", "people", "ai", "pictures", "coding", "robot", "search", "integrations", "commands", "voices", "storage", "reference-library", "media-library", "maintenance", "privacy", "developer", "network"];
-    for (const role of ROLES) {
-      const sections = sectionIds("home", viewerFor(role, EMPTY_HOME));
-      expect(sections).toEqual(role === "owner" || role === "admin" ? home : []);
-    }
-    expect(sectionIds("home", viewerFor("admin", FULL_HOME))).toEqual(["general", "people", "ai", "pictures", "coding", "robot", "search", "integrations", "commands", "voices", "storage", "reference-library", "media-library", "maintenance", "privacy", "developer", "network"]);
-  });
-
-  test("a fresh home's Devices area exposes only the Robots card; enabling it reveals the other robot cards", () => {
-    const fresh = keysOf("home", viewerFor("admin", EMPTY_HOME));
+  test("a fresh home's Apps page exposes only the Robots card; enabling it reveals the other robot cards", () => {
+    const fresh = keysOf("settings", viewerFor("admin", EMPTY_HOME));
     expect([...fresh].filter((key) => key.startsWith("home.robots.")).sort()).toEqual(["home.robots.enabled"]);
     expect([...fresh].some((key) => key.startsWith("robot."))).toBe(false);
-    const enabled = keysOf("home", viewerFor("admin", FULL_HOME));
+    const enabled = keysOf("settings", viewerFor("admin", FULL_HOME));
     expect([...enabled].some((key) => key.startsWith("robot."))).toBe(true);
   });
 
   test("a teen sees no Robot card and no household or expert card; a child neither", () => {
     for (const role of ["teen", "child"] as Role[]) {
       const viewer = viewerFor(role, FULL_HOME);
-      expect(sectionIds("account", viewer)).not.toContain("robot");
-      expect(sectionIds("account", viewer)).not.toContain("developer");
-      expect(sectionIds("home", viewer)).toEqual([]);
-      const all = [...keysOf("account", viewer), ...keysOf("chat", viewer)];
+      expect(sectionIds("settings", viewer)).not.toContain("apps");
+      expect(sectionIds("settings", viewer)).not.toContain("advanced");
+      expect(sectionIds("settings", viewer)).not.toContain("household");
+      const all = [...keysOf("settings", viewer)];
       const byKey = new Map(REGISTRY.map((k) => [k.key, k]));
       for (const key of all) {
         expect(byKey.get(key)?.scope).toBe("person");
         expect(byKey.get(key)?.level).not.toBe("expert");
-        expect(byKey.get(key)?.lives_in).not.toBe("robot.settings");
+      expect(byKey.get(key)?.lives_in).not.toBe("robot.settings");
       }
     }
   });
@@ -125,7 +105,7 @@ describe("which sections each role sees", () => {
 describe("nobody gains a key (a snapshot of what each band saw before)", () => {
   test("a child sees no key the old page did not show a child", () => {
     const viewer = viewerFor("child", FULL_HOME);
-    const seen = [...keysOf("account", viewer), ...keysOf("chat", viewer), ...keysOf("home", viewer)];
+    const seen = [...keysOf("settings", viewer)];
     expect(seen.filter((key) => !OLD_CHILD.has(key))).toEqual([]);
     // and keeps what matters: personality, safe search, voice, alerts
     for (const key of ["persona.active_id", "search.safe_search", "tts.voice_id", "notifications.browser.enabled", "ui.appearance"]) expect(seen).toContain(key);
@@ -133,30 +113,28 @@ describe("nobody gains a key (a snapshot of what each band saw before)", () => {
 
   test("a teen sees no key the old page did not show a teen, and a teen keeps the chat photo switch", () => {
     const viewer = viewerFor("teen", FULL_HOME);
-    const seen = [...keysOf("account", viewer), ...keysOf("chat", viewer), ...keysOf("home", viewer)];
+    const seen = [...keysOf("settings", viewer)];
     expect(seen.filter((key) => !OLD_TEEN.has(key))).toEqual([]);
     expect(seen).toContain("chat.photo_uploads");
   });
 
   test("a child never sees the chat photo switch, which is a parent's to set", () => {
-    expect([...keysOf("chat", viewerFor("child", FULL_HOME))]).not.toContain("chat.photo_uploads");
+    expect([...keysOf("settings", viewerFor("child", FULL_HOME))]).not.toContain("chat.photo_uploads");
   });
 
   test("no band but an admin sees a household key", () => {
     const byKey = new Map(REGISTRY.map((k) => [k.key, k]));
     for (const role of ROLES) {
       const viewer = viewerFor(role, FULL_HOME);
-      const household = [...keysOf("account", viewer), ...keysOf("chat", viewer), ...keysOf("home", viewer)].filter((key) => byKey.get(key)?.scope === "household");
+      const household = [...keysOf("settings", viewer)].filter((key) => byKey.get(key)?.scope === "household");
       expect(household.length > 0).toBe(role === "owner" || role === "admin");
     }
   });
 
   test("Account and Chat settings never draw a key at a person scope other than the viewer's own: no area card names a person id", () => {
-    for (const id of ["account", "chat", "home"]) {
-      for (const section of settingsArea(id)!.sections) {
-        for (const card of section.cards ?? []) expect(["household", "person", "device", undefined]).toContain(card.scope);
-        expect(JSON.stringify(section)).not.toMatch(/person:|:id\b|\{person\}/);
-      }
+    for (const section of settingsArea("settings")!.sections) {
+      for (const card of section.cards ?? []) expect(["household", "person", "device", undefined]).toContain(card.scope);
+      expect(JSON.stringify(section)).not.toMatch(/person:|:id\b|\{person\}/);
     }
   });
 });

@@ -21,7 +21,7 @@ export const CHAT_COLUMN_AUTO_COLLAPSE_MAX_WIDTH = 1024;
 export const PEEK_OPEN_DELAY_MS = 120;
 export const PEEK_CLOSE_GRACE_MS = 150;
 /** Where "Chat settings" goes: Settings, Me tab, Chat section. */
-export const CHAT_SETTINGS_PATH = "/settings?tab=me&section=chat";
+export const CHAT_SETTINGS_PATH = "/settings/chat";
 
 // Focus this page moves on a person's behalf (handing focus between the two
 // toggles, back to the search button) must not pop a tooltip open: a

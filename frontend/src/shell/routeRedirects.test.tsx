@@ -36,11 +36,11 @@ describe("route redirects", () => {
         <Location />
         <Routes>
           <Route path="/memory" element={<MemoriesRedirect selfId="person-sage" />} />
-        <Route path="/settings/account/data" element={<div>Memories settings</div>} />
+        <Route path="/settings/data" element={<div>Memories settings</div>} />
         </Routes>
       </MemoryRouter>,
     );
-    expect(document.querySelector('[data-testid="location"]')?.textContent).toBe("/settings/account/data");
+    expect(document.querySelector('[data-testid="location"]')?.textContent).toBe("/settings/data?tab=data");
   });
 
   test("/memories (the other spelling) redirects the same way", () => {
@@ -49,11 +49,11 @@ describe("route redirects", () => {
         <Location />
         <Routes>
           <Route path="/memories" element={<MemoriesRedirect selfId="person-sage" />} />
-        <Route path="/settings/account/data" element={<div>Memories settings</div>} />
+        <Route path="/settings/data" element={<div>Memories settings</div>} />
         </Routes>
       </MemoryRouter>,
     );
-    expect(document.querySelector('[data-testid="location"]')?.textContent).toBe("/settings/account/data");
+    expect(document.querySelector('[data-testid="location"]')?.textContent).toBe("/settings/data?tab=data");
   });
 
   // Chat's "memory updated" chip and the header search's memory results
@@ -66,10 +66,10 @@ describe("route redirects", () => {
         <Location />
         <Routes>
           <Route path="/memory" element={<MemoriesRedirect selfId="person-sage" />} />
-        <Route path="/settings/account/data" element={<div>Memories settings</div>} />
+        <Route path="/settings/data" element={<div>Memories settings</div>} />
         </Routes>
       </MemoryRouter>,
     );
-    expect(document.querySelector('[data-testid="location"]')?.textContent).toBe("/settings/account/data?ids=mem-1%2Cmem-2");
+    expect(document.querySelector('[data-testid="location"]')?.textContent).toBe("/settings/data?tab=data&ids=mem-1%2Cmem-2");
   });
 });

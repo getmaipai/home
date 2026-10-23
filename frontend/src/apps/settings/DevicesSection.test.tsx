@@ -169,7 +169,7 @@ describe("DevicesSection", () => {
     const restore = settingsFetch(false);
     try {
       const view = renderWithQueryClient(<MemoryRouter><HouseholdRobotsSection /></MemoryRouter>);
-      expect(await view.findByRole("link", { name: "Riff settings" })).toHaveAttribute("href", "/settings/home/robot/robot-1");
+      expect(await view.findByRole("link", { name: "Riff settings" })).toHaveAttribute("href", "/settings/apps/robot-1?tab=overview");
     } finally { restore(); }
   });
   test("robot Voice row lists mocked voices with the companion's voice first", async () => {
@@ -198,7 +198,7 @@ describe("DevicesSection", () => {
       const view = renderDetail("behaviour");
       expect(await view.findByRole("combobox", { name: "Controls" })).toHaveTextContent("Child controls");
       expect(view.getByRole("combobox", { name: "Companion" })).toHaveTextContent("None (child controls)");
-      expect(await view.findByRole("link", { name: "Set it in Settings, Home, General." })).toHaveAttribute("href", "/settings/home/general");
+      expect(await view.findByRole("link", { name: "Set it in Settings, Home, General." })).toHaveAttribute("href", "/settings/household?tab=general");
     } finally { restore(); }
   });
   test("shows the duplicate robot name response under the name field", async () => {

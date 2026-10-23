@@ -6,7 +6,7 @@ afterEach(() => window.sessionStorage.clear());
 describe("settings Back to app route", () => {
   test("remembers the latest app route including query and hash", () => {
     rememberLastAppRoute("/people/p1?tab=memory#recent");
-    rememberLastAppRoute("/settings/chat/general");
+    rememberLastAppRoute("/settings/chat?tab=general");
     expect(lastAppRoute()).toBe("/people/p1?tab=memory#recent");
   });
 
@@ -15,11 +15,11 @@ describe("settings Back to app route", () => {
   });
 
   test("keeps one app selected across settings routes", () => {
-    expect(activeAppHref("/settings/chat/general")).toBe("/chat");
+    expect(activeAppHref("/settings/chat?tab=general")).toBe("/chat");
     expect(activeAppHref("/status")).toBe("/");
     rememberLastAppRoute("/people/person-sage?tab=memories");
-    expect(activeAppHref("/settings/account/profile")).toBe("/people");
-    expect(activeAppHref("/settings/home/general")).toBe("/people");
+    expect(activeAppHref("/settings/profile?tab=profile")).toBe("/people");
+    expect(activeAppHref("/settings/household?tab=general")).toBe("/people");
   });
 });
 

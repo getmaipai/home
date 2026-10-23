@@ -53,7 +53,7 @@ export function AwayFromHome({ operator }: { operator: SignedInPerson | null }) 
 
   function close() {
     const from = (location.state as RouteState | null)?.from;
-    navigate(from?.startsWith("/") && !from.startsWith("//") && from !== "/setup/away" ? from : "/settings/home/network");
+    navigate(from?.startsWith("/") && !from.startsWith("//") && from !== "/setup/away" ? from : "/settings/advanced?tab=network");
   }
 
   if (!isOwnerOrAdmin(operator)) {

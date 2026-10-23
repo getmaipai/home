@@ -4,7 +4,7 @@ import { MemoryRouter } from "react-router-dom";
 import { Tour } from "@maipai/spec/gen/ts/tour.js";
 import defaultManifest from "../../../backend/packages/default/manifest.json";
 import type { Roster } from "@/lib/api";
-import { RailProfile, homeSettingsRow } from "@/shell/RailProfile";
+import { RailProfile } from "@/shell/RailProfile";
 import { renderWithQueryClient } from "../../tests/renderWithQueryClient";
 
 afterEach(cleanup);
@@ -140,10 +140,10 @@ describe("RailProfile log out", () => {
   });
 });
 
-// ADMIN-HOME-SETTINGS-01: the Home settings row is the household's owner and
+// ADMIN-HOME-SETTINGS-01: the Settings row is the household's owner and
 // admins only, drawn right after Settings; no one else's menu has it.
-describe("RailProfile Home settings row", () => {
-  test.each([["owner", true], ["admin", true], ["adult", false], ["teen", false], ["child", false], ["guest", false]] as const)("a %s: row shown %s", async (role, shown) => {
+describe("RailProfile settings row", () => {
+  test.each(["owner", "admin", "adult", "teen", "child", "guest"] as const)("a %s sees one Settings entry", async (role) => {
     const originalFetch = globalThis.fetch;
     globalThis.fetch = mock((input: RequestInfo | URL) => {
       const url = typeof input === "string" ? input : input.toString();
@@ -159,16 +159,11 @@ describe("RailProfile Home settings row", () => {
       );
       fireEvent.click(view.getByRole("button", { name: /Open profile menu for Juniper/ }));
       await view.findByRole("menuitem", { name: /Settings/ });
-      const row = view.queryByRole("menuitem", { name: /Home settings/ });
-      expect(row !== null).toBe(shown);
-      if (row) expect(row.getAttribute("href")).toBe("/settings/home");
+      expect(view.getAllByRole("menuitem", { name: "Settings" })).toHaveLength(1);
+      expect(view.queryByRole("menuitem", { name: /Settings/ })).toBeNull();
     } finally {
       globalThis.fetch = originalFetch;
     }
   });
 
-  test("an admin who is also a minor's band is shown no row", () => {
-    expect(homeSettingsRow({ role: "admin", age_band: "teen" })).toBeUndefined();
-    expect(homeSettingsRow({ role: "owner", age_band: "adult" })).toEqual({ href: "/settings/home", label: "Home settings" });
-  });
 });

@@ -28,14 +28,14 @@ function installApi(status: TailscaleStatus) {
   return calls;
 }
 
-function renderAway(operator: SignedInPerson | null, from = "/settings/home/network") {
+function renderAway(operator: SignedInPerson | null, from = "/settings/advanced?tab=network") {
   return render(
     <MemoryRouter initialEntries={[{ pathname: "/setup/away", state: { from } }]}>
       <output data-testid="path"><Path /></output>
       <Routes>
         <Route path="/setup/away" element={<AwayFromHome operator={operator} />} />
-        <Route path="/settings/home/network" element={<p>Network settings</p>} />
-        <Route path="/settings/home/general" element={<p>Home settings</p>} />
+        <Route path="/settings/advanced?tab=network" element={<p>Network settings</p>} />
+        <Route path="/settings/household" element={<p>Settings</p>} />
         <Route path="/" element={<p>Home</p>} />
       </Routes>
     </MemoryRouter>,
@@ -61,7 +61,7 @@ describe("AwayFromHome", () => {
 
   test("Back keeps the live setup state and Close returns to the page it came from", async () => {
     installApi(enabled);
-    const view = renderAway(owner, "/settings/home/general");
+    const view = renderAway(owner, "/settings/household");
     await view.findByRole("heading", { name: "Scan the code on your phone" });
     fireEvent.click(view.getByRole("button", { name: "Back" }));
     await waitFor(() => expect(view.getByRole("heading", { name: "Turn on secure addresses" })).toBeTruthy());
@@ -69,8 +69,8 @@ describe("AwayFromHome", () => {
     fireEvent.click(view.getByRole("button", { name: "Continue" }));
     await waitFor(() => expect(view.getByRole("heading", { name: "Scan the code on your phone" })).toBeTruthy());
     fireEvent.click(view.getByRole("button", { name: "Close" }));
-    await waitFor(() => expect(view.getByText("Home settings")).toBeTruthy());
-    expect(view.getByTestId("path").textContent).toBe("/settings/home/general");
+    await waitFor(() => expect(view.getByText("Settings")).toBeTruthy());
+    expect(view.getByTestId("path").textContent).toBe("/settings/household");
   });
 
   test("signed-out and non-admin visitors see who can set it up and make no Tailscale request", () => {

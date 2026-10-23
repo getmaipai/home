@@ -226,7 +226,7 @@ describe("DashboardPage (Home)", () => {
       expect(view.getAllByRole("button", { name: /^Skip Step / }).map((b) => b.textContent)).toEqual(["Skip Step b", "Skip Step c", "Skip Step d"]);
       expect(view.queryByText("Step a")).toBeNull();
       expect(view.queryByText("Step e")).toBeNull();
-      expect(hrefOf("1 more")).toBe("/settings/home/general");
+      expect(hrefOf("1 more")).toBe("/settings/household?tab=general");
     } finally {
       restore();
     }

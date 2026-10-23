@@ -2441,7 +2441,7 @@ describe("ChatPage (COLUMN-01: one hide/show control for the history column)", (
       const view = renderChat();
       await view.findByLabelText("Message input");
       const link = within(column().querySelector('[data-slot="chat-column-header"]') as HTMLElement).getByRole("link", { name: "Chat settings" });
-      expect(link).toHaveAttribute("href", "/settings?tab=me&section=chat");
+      expect(link).toHaveAttribute("href", "/settings/chat");
     } finally {
       restore();
     }

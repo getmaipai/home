@@ -22,7 +22,7 @@ export function installTitle(status: Pick<InstallStatusView, "state" | "stageLab
 /** One line of install progress: the AI engine installing, then the AI models downloading in the
  * background. It hides itself when nothing is installing or everything
  * has landed. Polls fast while moving, slowly otherwise. */
-export function InstallStrip({ detailsHref = "/settings/home/ai", read = api.installStatus, retry = api.installRetry, compact = false, frame }: {
+export function InstallStrip({ detailsHref = "/settings/ai?tab=overview", read = api.installStatus, retry = api.installRetry, compact = false, frame }: {
   /** Wraps the compact line in a container that exists only while there is something to show (no empty box when idle). */
   frame?: (line: ReactNode) => ReactNode;
   /** One line (what is installing, percent, a thin bar) for the wizard, instead of the full panel. */

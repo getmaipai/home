@@ -54,7 +54,7 @@ export function HouseholdRobotsSection({ detailId, tab }: { detailId?: string; t
       {(robots: DeviceInfo[]) => {
         const open = detailId ? robots.find((robot) => robot.id === detailId) : undefined;
         if (detailId && !open) {
-          navigate("/settings/home/robot", { replace: true });
+          navigate("/settings/apps?tab=robot", { replace: true });
           return null;
         }
         if (open) return <RobotDetail key={open.id} device={open} tab={tab} onClose={() => {}} />;
@@ -64,7 +64,7 @@ export function HouseholdRobotsSection({ detailId, tab }: { detailId?: string; t
             <CardContent>{robots.length === 0 ? <EmptyState icon="inbox" text="No robots yet." /> : (
               <ItemGroup variant="card" aria-label="Household robots">
                 {robots.map((robot) => (
-                  <Item key={robot.id} size="setting" render={<Link to={`/settings/home/robot/${encodeURIComponent(robot.id)}`} aria-label={`${robot.name} settings`} />}>
+                  <Item key={robot.id} size="setting" render={<Link to={`/settings/apps/${encodeURIComponent(robot.id)}?tab=overview`} aria-label={`${robot.name} settings`} />}>
                     <ItemContent>
                       <ItemTitle>{robot.name}</ItemTitle>
                       <ItemDescription>{robot.area ? `${robot.area} · ` : ""}{robot.lastSeenAt ? robotOnline(robot) ? "Online" : `Offline, last seen ${robotLastSeen(robot)}` : "Never connected"}</ItemDescription>

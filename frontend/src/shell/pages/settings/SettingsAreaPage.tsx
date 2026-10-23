@@ -1,4 +1,4 @@
-import { Fragment, useEffect, type ReactNode } from "react";
+import { Fragment, useEffect, useMemo, type ReactNode } from "react";
 import { Link, Navigate, useLocation, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { useQueries, useQuery } from "@tanstack/react-query";
 import type { SettingsKey } from "@maipai/spec/gen/ts/settings-key.js";
@@ -10,11 +10,11 @@ import { SettingsRenderer } from "@maipai/ui/src/settings/SettingsRenderer";
 import { searchSettings, type ScopedValues } from "@maipai/ui/src/settings/searchSettings";
 import {
   areaAllows,
-  sectionTabs,
   resolveTab,
   firstVisibleSection,
   resolveHref,
   visibleGroups,
+  visibleTabs,
   type Scope,
   type SettingsAreaDef,
   type SettingsViewer,
@@ -47,29 +47,42 @@ const DESKTOP_MIN_WIDTH = 960;
  * shell (RULES S4). This page holds data only: the area from the spec, who is
  * looking, the registry, and which section is open; the shell and the
  * renderer draw everything. An area the viewer may not open replaces to
- * Account before any request is made, so an adult asking for Home settings
- * costs no household request. */
+ * their own Settings page before any household request is made. */
 export function SettingsAreaPage({ person, onPersonChange }: { person: Roster; onPersonChange: () => void | Promise<void> }) {
-  const { area: areaId } = useParams();
+  const { section: areaId } = useParams();
   const { areas: packageAreas, ready } = usePackageAreas();
-  const area = settingsArea(areaId) ?? packageAreas.find((candidate) => candidate.id === areaId);
+  const central = settingsArea("settings");
+  const packageArea = packageAreas.find((candidate) => candidate.id === areaId);
+  const area = !areaId || central?.sections.some((section) => section.id === areaId)
+    ? central
+    : packageArea;
   // A package's area is known only once the app list has answered: wait for it, never bounce to Account first.
   if (!area && !ready) return <Progress mode="spinner" label="Loading settings" />;
-  if (!area) return <Navigate to={settingsPath("account")} replace />;
-  if (!areaAllows(area, baseViewer(person))) {
-    if (area.id === "home") return (
+  if (!area) return <Navigate to={settingsPath("profile")} replace />;
+  const routeViewer = { ...baseViewer(person), role: person.role === "owner" ? "admin" as const : person.role as SettingsViewer["role"] };
+  if (!areaAllows(area, routeViewer)) {
+    if (area.id === "settings" && area.sections.find((section) => section.id === areaId)?.scope === "household") return (
       <>
         <Empty>
           <EmptyHeader>
             <EmptyDescription>Only a parent or admin can change these settings. Ask the person who set up Home.</EmptyDescription>
           </EmptyHeader>
-          <Button variant="link" render={<Link to={settingsPath("account")} />}>Open your settings</Button>
+          <Button variant="link" render={<Link to={settingsPath("profile")} />}>Open your settings</Button>
         </Empty>
       </>
     );
-    return <Navigate to={settingsPath("account")} replace />;
+    return <Navigate to={settingsPath("profile")} replace />;
   }
-  return <SettingsAreaBody key={area.id} area={area} packageAreas={packageAreas} person={person} onPersonChange={onPersonChange} />;
+  const requestedSection = area.id === "settings" ? area.sections.find((section) => section.id === areaId) : undefined;
+  if (requestedSection?.scope === "household" && person.role !== "owner" && person.role !== "admin") return (
+    <>
+      <Empty>
+        <EmptyHeader><EmptyDescription>Only a parent or admin can change these settings. Ask the person who set up Home.</EmptyDescription></EmptyHeader>
+        <Button variant="link" render={<Link to={settingsPath("profile")} />}>Open your settings</Button>
+      </Empty>
+    </>
+  );
+  return <SettingsAreaBody key={area.id} area={area} packageAreas={packageAreas} person={person} onPersonChange={onPersonChange} packageArea={area.id !== "settings"} />;
 }
 
 const BackIcon = getIcon("arrow-left");
@@ -95,13 +108,18 @@ function SettingsBackLink({ title, reach }: { title: string; reach: string }) {
 function scopesOf(area: SettingsAreaDef, viewer: SettingsViewer): Scope[] {
   const scopes = new Set<Scope>();
   for (const section of area.sections) for (const card of section.cards ?? []) if (card.scope) scopes.add(card.scope);
-  // The household scope is Home settings' alone, and Home settings is admins'.
+  // An adult may only load the household scope from an admin-visible page.
   if (viewer.role !== "owner" && viewer.role !== "admin") scopes.delete("household");
   return [...scopes];
 }
 
-function SettingsAreaBody({ area, packageAreas, person, onPersonChange }: { area: SettingsAreaDef; packageAreas: readonly SettingsAreaDef[]; person: Roster; onPersonChange: () => void | Promise<void> }) {
-  const { section: sectionId, detailId } = useParams();
+function SettingsAreaBody({ area, packageAreas, person, onPersonChange, packageArea }: { area: SettingsAreaDef; packageAreas: readonly SettingsAreaDef[]; person: Roster; onPersonChange: () => void | Promise<void>; packageArea: boolean }) {
+  const routeParams = useParams();
+  const sectionId = packageArea ? routeParams.detailId : routeParams.section;
+  const detailId = packageArea ? undefined : routeParams.detailId;
+  const pagePath = (id?: string, pageTab?: string) => packageArea
+    ? `/settings/${area.id}${id ? `/${id}` : ""}`
+    : settingsPath(id, pageTab);
   const navigate = useNavigate();
   const location = useLocation();
   const [params, setParams] = useSearchParams();
@@ -109,12 +127,12 @@ function SettingsAreaBody({ area, packageAreas, person, onPersonChange }: { area
   const desktop = useBreakpoint().atLeast(DESKTOP_MIN_WIDTH);
   const query = params.get("q") ?? "";
   const registryQuery = useQuery<SettingsKey[]>({ queryKey: ["settings-registry"], queryFn: () => api.settingsRegistry(), staleTime: Infinity });
-  const robotQuery = useQuery<DeviceInfo[]>({ queryKey: ["robot-devices"], queryFn: () => api.robotDevices(), enabled: area.id === "home" && sectionId === "robot" && Boolean(detailId) });
-  const { capabilities, ready } = useSettingsCapabilities(person, area.id === "account");
+  const robotQuery = useQuery<DeviceInfo[]>({ queryKey: ["robot-devices"], queryFn: () => api.robotDevices(), enabled: area.id === "settings" && sectionId === "apps" && Boolean(detailId) });
+  const { capabilities, ready } = useSettingsCapabilities(person, true);
   const viewer: SettingsViewer = { ...baseViewer(person), capabilities };
   const packageKeys = registryQuery.data ? packageAreaKeySet(packageAreas, registryQuery.data) : undefined;
   const registry = registryQuery.data
-    ? visibleRegistry(registryQuery.data, viewer.band, area.id === "home" && sectionId === "network" ? ["network.hub_port"] : [], packageKeys)
+    ? visibleRegistry(registryQuery.data, viewer.band, area.id === "settings" && sectionId === "advanced" ? ["network.hub_port"] : [], packageKeys)
     : undefined;
 
   const scopes = scopesOf(area, viewer);
@@ -126,11 +144,24 @@ function SettingsAreaBody({ area, packageAreas, person, onPersonChange }: { area
     })),
   });
 
-  const groups = registry ? visibleGroups(area, viewer, registry, "home") : [];
+  const policyViewer: SettingsViewer = { ...viewer, role: person.role === "owner" ? "admin" : viewer.role, capabilities: ready ? capabilities : [] };
+  const groups = registry ? visibleGroups(area, policyViewer, registry, "home") : [];
   const active = groups.flatMap((group) => group.sections).find((section) => section.id === sectionId);
-  const tabs = active ? (detailId && active.detail ? active.detail.tabs ?? [] : sectionTabs(active)) : [];
+  const sectionDefinition = area.sections.find((section) => section.id === sectionId);
+  const tabs = useMemo(() => active ? (detailId && active.detail ? active.detail.tabs ?? [] : visibleTabs(active, policyViewer)) : [], [active, detailId, viewer.band, viewer.role, person.role, ready, capabilities]);
   const tab = resolveTab(tabs, params.get("tab") ?? undefined);
-  const first = registry ? firstVisibleSection(area, viewer, registry, "home") : undefined;
+  const currentTab = params.get("tab") ?? tab;
+  const first = registry ? firstVisibleSection(area, policyViewer, registry, "home") : undefined;
+
+  useEffect(() => {
+    if (!ready || !active || !params.has("tab") || !tab || params.get("tab") === tab) return;
+    setParams((current) => {
+      const next = new URLSearchParams(current);
+      if (tab === tabs[0]?.id) next.delete("tab");
+      else next.set("tab", tab);
+      return next;
+    }, { replace: true });
+  }, [active, params, ready, setParams, tab, tabs]);
 
   useEffect(() => {
     if (!query) return;
@@ -142,22 +173,25 @@ function SettingsAreaBody({ area, packageAreas, person, onPersonChange }: { area
   if (!registry || !ready) return <Progress mode="spinner" label="Loading settings" />;
 
   // No section named: a desktop opens the first one; a phone shows the column.
-  if (!sectionId && desktop && first) return <Navigate to={settingsPath(area.id, first.id)} replace />;
+  if (!sectionId && desktop && first) return <Navigate to={pagePath(first.id)} replace />;
   // A section that is hidden, unknown or has no content here: the response never says it exists.
-  if (sectionId && !active) {
-    if (area.id === "account" && !first) return null;
-    return <Navigate to={desktop && first ? settingsPath(area.id, first.id) : area.id === "account" ? settingsPath("account") : settingsPath(area.id)} replace />;
+  if (sectionId && !active && !(sectionDefinition && sectionDefinition.needs && !ready)) {
+    if (area.id === "settings" && !first) return null;
+    return <Navigate to={desktop && first ? pagePath(first.id) : settingsPath("profile")} replace />;
   }
-  if (detailId && !active?.detail) return <Navigate to={settingsPath(area.id, active?.id)} replace />;
+  if (detailId && !active?.detail) return <Navigate to={settingsPath(active?.id)} replace />;
   if (active?.detail && params.has("device") && !detailId) {
     const next = new URLSearchParams(params);
     const legacyId = next.get("device");
     next.delete("device");
-    return <Navigate to={`${settingsPath(area.id, active.id, undefined, legacyId ?? undefined)}${next.size ? `?${next}` : ""}${location.hash}`} replace />;
+    const detailTab = next.get("tab") ?? "overview";
+    next.delete("tab");
+    const detailPath = settingsPath(active.id, detailTab, undefined, legacyId ?? undefined);
+    return <Navigate to={`${detailPath}${next.size ? `&${next}` : ""}${location.hash}`} replace />;
   }
   // An arrow row asked for directly (`/settings/chat/voice`) goes where it points.
-  if (active?.kind === "link") return <Navigate to={resolveHref(active.href ?? settingsPath(area.id), viewer)} replace />;
-  if (!sectionId && !desktop && !first && area.id !== "account") return <Navigate to={settingsPath("account")} replace />;
+  if (active?.kind === "link") return <Navigate to={resolveHref(active.href ?? settingsPath("profile"), viewer)} replace />;
+  if (!sectionId && !desktop && !first && area.id !== "settings") return <Navigate to={settingsPath("profile")} replace />;
 
   const focusKey = location.hash.length > 1 ? decodeURIComponent(location.hash.slice(1)) : undefined;
   const values: ScopedValues = {};
@@ -199,21 +233,21 @@ function SettingsAreaBody({ area, packageAreas, person, onPersonChange }: { area
     content = detailId && active.detail
       ? <SettingsView view={active.detail.view} person={person} onPersonChange={onPersonChange} tab={tab} detailId={detailId} />
       : active.kind === "view"
-      ? <>{active.view ? <SettingsView view={active.view} person={person} onPersonChange={onPersonChange} tab={tab} /> : null}</>
-      : area.id === "home" && active.id === "coding"
+      ? <>{(active.tabs?.find((item) => item.id === currentTab)?.view ?? active.view) ? <SettingsView view={(active.tabs?.find((item) => item.id === currentTab)?.view ?? active.view)!} person={person} onPersonChange={onPersonChange} tab={currentTab} /> : null}</>
+      : area.id === "settings" && active.id === "ai" && tab === "coding"
         ? <CodingAdminSettings />
-        : area.id === "home" && active.id === "ai"
-          ? <><SettingsSectionContent section={active} viewer={viewer} registry={registry} packageKeys={packageKeys} person={person} onPersonChange={onPersonChange} focusKey={focusKey} tab={tab} />{viewer.role === "owner" || viewer.role === "admin" ? <AssistantKeysSettings /> : null}</>
-          : <SettingsSectionContent section={active} viewer={viewer} registry={registry} packageKeys={packageKeys} person={person} onPersonChange={onPersonChange} focusKey={focusKey} tab={tab} />;
+        : area.id === "settings" && active.id === "ai"
+          ? <><SettingsSectionContent section={active} viewer={policyViewer} registry={registry} packageKeys={packageKeys} person={person} onPersonChange={onPersonChange} focusKey={focusKey} tab={currentTab} />{viewer.role === "owner" || viewer.role === "admin" ? <AssistantKeysSettings /> : null}</>
+          : <SettingsSectionContent section={active} viewer={policyViewer} registry={registry} packageKeys={packageKeys} person={person} onPersonChange={onPersonChange} focusKey={focusKey} tab={currentTab} />;
   }
 
-  const detailName = area.id === "home" && active?.id === "robot" && detailId
+  const detailName = area.id === "settings" && active?.id === "apps" && detailId
     ? robotQuery.data?.find((device) => device.id === detailId)?.name ?? active.label
     : undefined;
 
   const checklistItems = setupChecklist.checklist.data ?? [];
   const checklistOpenCount = checklistItems.filter((item) => !item.done).length;
-  if (area.id === "home" && active?.id === "general" && checklistOpenCount > 0) {
+  if (area.id === "settings" && active?.id === "household" && tab === "general" && checklistOpenCount > 0) {
     content = <>
       <Card>
         <CardHeader>
@@ -248,13 +282,9 @@ function SettingsAreaBody({ area, packageAreas, person, onPersonChange }: { area
   return (
     <SettingsShell
       layout="docked"
-      backLink={<SettingsBackLink title={area.title} reach={area.id === "home" && scopes.includes("household") ? "Applies to everyone at home" : "Only you"} />}
-      labels={{ columnTitle: area.title }}
-      sides={(area.id === "home" || area.id === "account") && (person.role === "owner" || person.role === "admin")
-        ? { value: area.id === "home" ? "household" : "mine", label: "Which settings", options: [{ id: "mine", label: "Mine" }, { id: "household", label: "Household" }],
-            onChange: (id) => { if (confirmRouteLeave()) navigate(settingsPath(id === "household" ? "home" : "account")); } }
-        : undefined}
-      trail={[{ label: area.title, href: settingsPath(area.id) }, ...(active ? [{ label: active.label, href: detailId ? settingsPath(area.id, active.id) : undefined }] : []), ...(detailId ? [{ label: detailName ?? active?.label ?? detailId }] : [])]}
+      backLink={<SettingsBackLink title="Settings" reach={active?.scope === "household" ? "Applies to everyone at home" : "Only you"} />}
+      labels={{ columnTitle: "Settings" }}
+      trail={[{ label: area.title, href: packageArea ? `/settings/${area.id}` : settingsPath() }, ...(active ? [{ label: active.label, href: detailId ? pagePath(active.id, tab) : undefined }] : []), ...(detailId ? [{ label: detailName ?? active?.label ?? detailId }] : [])]}
       contentAs="section"
       area={area}
       viewer={viewer}
@@ -264,11 +294,11 @@ function SettingsAreaBody({ area, packageAreas, person, onPersonChange }: { area
       tabs={tabs}
       tab={tab}
       onTabChange={(id) => { if (confirmRouteLeave()) setParams((current) => { const next = new URLSearchParams(current); if (id === tabs[0]?.id) next.delete("tab"); else next.set("tab", id); return next; }); }}
-      sectionHref={(id) => settingsPath(area.id, id)}
-      onNavigate={(to) => { if (confirmRouteLeave()) navigate(to.kind === "link" ? to.href : settingsPath(area.id, to.sectionId)); }}
+      sectionHref={(id) => packageArea ? `/settings/${area.id}/${id}` : settingsPath(id)}
+      onNavigate={(to) => { if (confirmRouteLeave()) navigate(to.kind === "link" ? to.href : pagePath(to.sectionId)); }}
       searchQuery={query}
       onSearchChange={(next) => setParams((current) => { const updated = new URLSearchParams(current); if (next) updated.set("q", next); else updated.delete("q"); return updated; }, { replace: true })}
-      onBack={() => { if (confirmRouteLeave()) navigate(settingsPath(area.id, detailId ? active?.id : undefined)); }}
+      onBack={() => { if (confirmRouteLeave()) navigate(packageArea ? `/settings/${area.id}` : settingsPath(detailId ? active?.id : undefined)); }}
     >
       {content}
     </SettingsShell>

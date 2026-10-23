@@ -99,10 +99,10 @@ function keysCard(card: Card, viewer: SettingsViewer, props: SectionContentProps
     beforeChange: beforeSettingChange,
     focusKey: props.focusKey,
     matrix: card.matrix,
-    includeExpert: props.section.id === "network",
+    includeExpert: props.section.id === "advanced" && props.tab === "network",
   };
   const renderer = group === "profile.ease" ? <EaseCardRenderer viewingSelf={viewer.selfId === props.person.id} {...rendererProps} /> : <SettingsRenderer {...rendererProps} />;
-  if (props.section.id === "network") return <>{renderer}{group === "household.network" && (viewer.role === "owner" || viewer.role === "admin") ? <Button asChild variant="outline"><Link to="/setup/away" state={{ from: returnPath }}>Set up away access</Link></Button> : null}</>;
+  if (props.section.id === "advanced" && props.tab === "network") return <>{renderer}{group === "household.network" && (viewer.role === "owner" || viewer.role === "admin") ? <Button asChild variant="outline"><Link to="/setup/away" state={{ from: returnPath }}>Set up away access</Link></Button> : null}</>;
   if (!card.collapsed) return renderer;
   const focused = props.focusKey !== undefined && props.registry.some((k) => k.key === props.focusKey && k.lives_in === group && k.scope === scope);
   return (
@@ -135,11 +135,13 @@ export function SettingsSectionContent(props: SectionContentProps) {
   const { on: incognito } = useIncognitoContext();
   const drawsPlaces = section.kind === "keys" && (section.cards ?? []).some((card) => registry.some((k) => k.selector === ("location" as string) && k.lives_in === card.group && k.scope === card.scope));
   const places = { household: usePlaceAdapter("household", { enabled: drawsPlaces, incognito }), person: usePlaceAdapter("person", { enabled: drawsPlaces, incognito }) };
-  if (section.kind === "view") return <>{section.view ? <SettingsView view={section.view} {...viewProps} /> : null}</>;
+  const tabView = section.tabs?.find((item) => item.id === props.tab)?.view;
+  if (section.kind === "view") return <>{tabView ? <SettingsView view={tabView} {...viewProps} /> : section.view ? <SettingsView view={section.view} {...viewProps} /> : null}</>;
   const webSearchBlock = section.id === "search" && (viewer.role === "owner" || viewer.role === "admin");
   return (
     <div className="flex min-w-0 flex-col gap-14">
       {webSearchBlock ? <WebSearchSettings minorsControl={<SettingsRenderer scope="household" scopeValue={scopeValueFor("household", props.person.id)} honouredBy="home" only={["household.search"]} includeKeys={MINOR_DDGS_ONLY} titleOverrides={MINOR_DDGS_TITLE} beforeChange={beforeSettingChange} focusKey={props.focusKey} />} /> : null}
+      {tabView ? <SettingsView view={tabView} {...viewProps} /> : null}
       {section.lead_view ? <SettingsView view={section.lead_view} {...viewProps} /> : null}
       {cardsInTab(visibleCards(section, viewer, registry, "home"), props.tab).map((card) => {
         // The face card inside `account.data` already draws this group's one

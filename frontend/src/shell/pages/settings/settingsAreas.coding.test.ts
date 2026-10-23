@@ -1,32 +1,25 @@
 import { describe, expect, test } from "bun:test";
 import { audienceAllows, type SettingsViewer } from "@maipai/ui/src/settings/settingsAudience";
-import { SETTINGS_AREAS, settingsArea } from "./settingsAreas";
+import { settingsArea } from "./settingsAreas";
 
-describe("Coding settings sections", () => {
-  test("the home and account areas expose their spec-defined Coding sections", () => {
-    for (const id of ["home", "account"]) {
-      expect(settingsArea(id)?.sections.some((section) => section.id === "coding")).toBe(true);
-    }
-  });
-  test("every other section the spec declares is still listed", () => {
-    expect(SETTINGS_AREAS.length).toBeGreaterThan(0);
-    for (const area of SETTINGS_AREAS) expect(area.sections.length).toBeGreaterThan(0);
+describe("Coding tabs in the unified Settings area", () => {
+  test("the household AI page and personal Chat page expose their declared Coding tabs", () => {
+    const area = settingsArea("settings")!;
+    expect(area.sections.find((section) => section.id === "ai")?.tabs?.some((tab) => tab.id === "coding")).toBe(true);
+    expect(area.sections.find((section) => section.id === "chat")?.tabs?.some((tab) => tab.id === "coding")).toBe(true);
   });
 
-  test("only admins see household Coding and account Coding needs an access capability", () => {
-    const home = settingsArea("home")!;
-    const account = settingsArea("account")!;
-    const homeCoding = home.sections.find((section) => section.id === "coding")!;
-    const accountCoding = account.sections.find((section) => section.id === "coding")!;
+  test("household Coding stays admin-only while personal Coding needs the person's grant", () => {
+    const area = settingsArea("settings")!;
+    const ai = area.sections.find((section) => section.id === "ai")!;
+    const personalCoding = area.sections.find((section) => section.id === "chat")!.tabs!.find((tab) => tab.id === "coding")!;
     const admin: SettingsViewer = { role: "admin", band: "adult" };
     const child: SettingsViewer = { role: "child", band: "child" };
     const teen: SettingsViewer = { role: "teen", band: "teen" };
-    const guest: SettingsViewer = { role: "guest", band: "adult" };
-    expect(audienceAllows(admin, homeCoding)).toBe(true);
-    expect(audienceAllows(child, homeCoding)).toBe(false);
-    expect(audienceAllows(child, accountCoding)).toBe(false);
-    expect(audienceAllows(teen, accountCoding)).toBe(false);
-    expect(audienceAllows(guest, accountCoding)).toBe(false);
-    expect(audienceAllows({ ...child, capabilities: ["coding.allowed_for_me"] }, accountCoding)).toBe(true);
+    expect(audienceAllows(admin, ai)).toBe(true);
+    expect(audienceAllows(child, ai)).toBe(false);
+    expect(audienceAllows(child, personalCoding)).toBe(false);
+    expect(audienceAllows(teen, personalCoding)).toBe(false);
+    expect(audienceAllows({ ...child, capabilities: ["coding.allowed_for_me"] }, personalCoding)).toBe(true);
   });
 });

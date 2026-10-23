@@ -13,11 +13,11 @@ export function MemoriesRedirect({ selfId }: { selfId: string }) {
   const location = useLocation();
   const query = new URLSearchParams(location.search);
   const ids = query.get("ids");
-  return <Navigate to={`/settings/account/data${ids ? `?ids=${encodeURIComponent(ids)}` : ""}`} replace state={{ selfId }} />;
+  return <Navigate to={`/settings/data?tab=data${ids ? `&ids=${encodeURIComponent(ids)}` : ""}`} replace state={{ selfId }} />;
 }
 
 export function LegacyProfileMemoriesRedirect({ selfId }: { selfId: string }) {
   const { id = "" } = useParams<{ id: string }>();
   const query = new URLSearchParams(useLocation().search);
-  return <Navigate to={id === selfId ? `/settings/account/data${query.has("ids") ? `?ids=${encodeURIComponent(query.get("ids")!)}` : ""}` : "/settings/home/users"} replace />;
+  return <Navigate to={id === selfId ? `/settings/data?tab=data${query.has("ids") ? `&ids=${encodeURIComponent(query.get("ids")!)}` : ""}` : "/settings/household?tab=people"} replace />;
 }

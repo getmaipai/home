@@ -34,7 +34,7 @@ function open(person: Roster, url: string) {
   const view = renderWithQueryClient(
     <MemoryRouter initialEntries={[url]}>
       <Routes>
-        <Route path="settings/:area/:section?" element={<><RouterLocation /><SettingsAreaPage person={person} onPersonChange={() => {}} /></>} />
+        <Route path="settings/:section?/:detailId?" element={<><RouterLocation /><SettingsAreaPage person={person} onPersonChange={() => {}} /></>} />
       </Routes>
     </MemoryRouter>,
   );
@@ -49,7 +49,7 @@ afterEach(() => {
 
 describe("Engines and AI uses four tabs inside the settings shell", () => {
   test("Overview is the default and each tab shows its existing parts", async () => {
-    const view = open(makePerson("owner"), "/settings/home/ai");
+    const view = open(makePerson("owner"), "/settings/ai?tab=overview");
     expect(await view.findByRole("tab", { name: "Overview" })).toBeTruthy();
     expect(await view.findByRole("switch", { name: "Pause chat for everyone" })).toBeTruthy();
     expect(await view.findByText("Install the AI for this computer")).toBeTruthy();
@@ -58,17 +58,17 @@ describe("Engines and AI uses four tabs inside the settings shell", () => {
     expect(view.getByRole("tab", { name: "Engines" })).toBeTruthy();
     expect(view.getByRole("tab", { name: "Advanced" })).toBeTruthy();
     // Still the settings shell: the area's own section list is on the page.
-    expect(view.getAllByRole("link", { name: "Engines and AI" }).some((link) => link.closest('[data-slot="settings-column"]'))).toBe(true);
+    expect(view.getAllByRole("link", { name: "AI and models" }).some((link) => link.closest('[data-slot="settings-column"]'))).toBe(true);
   });
 
   test("?tab keeps the requested shell tab in the URL", async () => {
-    const view = open(makePerson("owner"), "/settings/home/ai?tab=advanced");
+    const view = open(makePerson("owner"), "/settings/ai?tab=advanced");
     expect(view.getByTestId("router-location").textContent).toContain("tab=advanced");
     expect(view.queryByRole("tab", { name: "Advanced" })).toBeNull();
   });
 
   test("Models opens the existing model and storage sections", async () => {
-    const view = open(makePerson("owner"), "/settings/home/ai?tab=models");
+    const view = open(makePerson("owner"), "/settings/ai?tab=models");
     expect(view.getByTestId("router-location").textContent).toContain("tab=models");
     expect(await view.findByText("Models and storage")).toBeTruthy();
     expect(await view.findByText("This computer: Apple Silicon, 24 GB memory.")).toBeTruthy();
@@ -76,20 +76,20 @@ describe("Engines and AI uses four tabs inside the settings shell", () => {
   });
 
   test("the spec declares the tab strip and default view tab", () => {
-    const ai = SETTINGS_AREAS.find((area) => area.id === "home")!.sections.find((section) => section.id === "ai")!;
-    expect(ai.tabs?.map((tab) => tab.id)).toEqual(["overview", "models", "engines", "advanced"]);
-    expect(ai.trail_view).toBe("home.engine_admin");
+    const ai = SETTINGS_AREAS.find((area) => area.id === "settings")!.sections.find((section) => section.id === "ai")!;
+    expect(ai.tabs?.map((tab) => tab.id)).toEqual(["overview", "models", "engines", "advanced", "coding"]);
+    expect(ai.tabs?.filter((tab) => ["overview", "models", "engines", "advanced"].includes(tab.id)).every((tab) => tab.view === "home.engine_admin")).toBe(true);
     expect(SETTINGS_VIEWS["home.engine_admin"]).toBeDefined();
   });
 
   test("Engines keeps the engine location setting available", async () => {
-    const view = open(makePerson("owner"), "/settings/home/ai?tab=engines");
+    const view = open(makePerson("owner"), "/settings/ai?tab=engines");
     const where = await view.findByRole("combobox", { name: "Where the engine runs" });
     expect((where as HTMLButtonElement).disabled).toBe(false);
   });
 
   test("the pairing wizard opens from this page without a selection first, on step 1 of 5", async () => {
-    const view = open(makePerson("admin"), "/settings/home/ai?tab=engines");
+    const view = open(makePerson("admin"), "/settings/ai?tab=engines");
     fireEvent.click(await view.findByRole("button", { name: "Pair engine computer" }));
     expect(await view.findByText("Step 1 of 5: Where the engine runs")).toBeTruthy();
   });
