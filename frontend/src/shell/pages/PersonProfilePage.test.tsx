@@ -115,6 +115,9 @@ describe("PersonProfilePage", () => {
       expect(view.getByText("Child")).toBeTruthy();
       expect(view.getByText("Loves dinosaurs")).toBeTruthy();
       expect(view.getByText("Bramble's profile in this household.")).toBeTruthy();
+      expect(view.queryByText(/Face recognition:/)).toBeNull();
+      expect(view.queryByText("Face recognition")).toBeNull();
+      expect(view.queryByRole("link", { name: "Enroll" })).toBeNull();
     } finally { restore(); }
   });
 
@@ -331,7 +334,7 @@ describe("PersonProfilePage", () => {
     } finally { restore(); }
   });
 
-  test("self has one Edit profile link and plain face status while another person's page keeps Edit and enrollment", async () => {
+  test("self has one Edit profile link and face enrollment lives off Profile", async () => {
     const restore = stubFetch({});
     try {
       const self = renderProfile("/people/person-sage", viewer({ role: "owner" }));
@@ -339,12 +342,12 @@ describe("PersonProfilePage", () => {
       expect(edit.getAttribute("href")).toBe("/settings/account/profile");
       expect(self.queryByRole("link", { name: "Manage in Settings" })).toBeNull();
       expect(self.queryByText("This is your own profile.")).toBeNull();
-      expect(self.getByText((_, element) => element?.textContent === "Face recognition: Not set up yet")).toBeTruthy();
+      expect(self.queryByText(/Face recognition/)).toBeNull();
       expect(self.getAllByRole("link").filter((link) => link.getAttribute("href") === "/settings/account/profile")).toHaveLength(1);
       cleanup();
       const other = renderProfile("/people/person-bramble", viewer({ role: "owner" }));
       expect(await other.findByRole("button", { name: "Edit" })).toBeTruthy();
-      expect(await other.findByText("Face recognition")).toBeTruthy();
+      expect(other.queryByText("Face recognition")).toBeNull();
       expect(other.queryByRole("link", { name: "Edit profile" })).toBeNull();
       expect(other.queryByRole("link", { name: "Manage in Settings" })).toBeNull();
     } finally { restore(); }

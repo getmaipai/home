@@ -12,7 +12,6 @@ import { getIcon } from "@maipai/ui/src/icons";
 import { api, isOwnerOrAdminRole, type PersonRosterEntry, type Roster, type VisibleFile } from "@/lib/api";
 import { ACCENT_RING_CLASS, canManagePerson, isProfileClosedTo, ROLE_LABELS } from "@/apps/people/roles";
 import { ProfileForm } from "@/apps/people/ProfileForm";
-import { FaceEnrollmentBody, canViewFaceEnrollment } from "@/apps/people/FaceEnrollmentBody";
 import { useTabItem } from "@/shell/tabIdentity";
 import { SettingsRenderer } from "@/shell/pages/settings/SettingsRenderer";
 import { PERSON_KID_PICTURES_GROUP_IDS, PERSON_KID_PICTURES_KEYS, PERSON_LIMIT_GROUP_IDS, PERSON_TOPIC_GROUP_IDS } from "@/shell/pages/settings/personLimits";
@@ -111,7 +110,6 @@ export function PersonProfilePage({ person, onPersonChange }: { person: Roster; 
                   <div className="flex flex-col gap-4 py-2">
                     {viewingSelf ? null : <p className="text-sm text-muted-foreground">{`${profile.display_name}'s profile in this household.`}</p>}
                     <SharedMediaSection profile={profile} />
-                    {viewingSelf ? <FaceStatusRow profile={profile} /> : (canViewFaceEnrollment(person, profile) ? <Card><FaceEnrollmentBody profile={profile} viewer={person} viewingSelf={false} /></Card> : null)}
                   </div>
                 </TabsContent>
                 {showLimits ? (
@@ -158,15 +156,6 @@ function SharedMediaSection({ profile }: { profile: ProfileEntry }) {
       </AsyncState>
     </div>
   );
-}
-
-function FaceStatusRow({ profile }: { profile: ProfileEntry }) {
-  const query = useQuery({
-    queryKey: ["biometric-prints", profile.id],
-    queryFn: () => api.biometricPrints(profile.id),
-  });
-  const setUp = query.data?.some((print) => print.modality === "face") === true;
-  return <p className="text-sm text-muted-foreground">Face recognition: {query.isLoading ? "Checking" : setUp ? "Set up" : "Not set up yet"}</p>;
 }
 
 /** The inside of the page's profile header card (the page owns the Card and

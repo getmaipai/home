@@ -7,10 +7,12 @@ import { Item, ItemActions, ItemContent, ItemGroup, ItemTitle } from "@maipai/ui
 import { getIcon } from "@maipai/ui/src/icons";
 import { SettingsRenderer } from "@maipai/ui/src/settings/SettingsRenderer";
 import type { BeforeChange } from "@maipai/ui/src/settings/SettingRow";
+import { Card as KitCard } from "@maipai/ui/src/dashboard/components/ui/card";
 import { cardsInTab, resolveHref, visibleCards, type Card, type Section, type SettingsViewer } from "@maipai/ui/src/settings/settingsAudience";
 import { minorVisibleSettingKeys } from "@maipai/home-backend/src/wire";
 import { SettingsLinks } from "@/shell/pages/settings/SettingsLinks";
 import { SettingsView, type SettingsViewProps } from "@/shell/pages/settings/settingsViews";
+import { FaceEnrollmentBody, canViewFaceEnrollment } from "@/apps/people/FaceEnrollmentBody";
 import { scopeValueFor, type KitSettingsKey } from "@/shell/pages/settings/settingsViewer";
 import { requestBrowserAlertPermission } from "@/shell/BrowserAlerts";
 import { Button } from "@maipai/ui/src/ui/button";
@@ -140,8 +142,7 @@ export function SettingsSectionContent(props: SectionContentProps) {
       {webSearchBlock ? <WebSearchSettings minorsControl={<SettingsRenderer scope="household" scopeValue={scopeValueFor("household", props.person.id)} honouredBy="home" only={["household.search"]} includeKeys={MINOR_DDGS_ONLY} titleOverrides={MINOR_DDGS_TITLE} beforeChange={beforeSettingChange} focusKey={props.focusKey} />} /> : null}
       {section.lead_view ? <SettingsView view={section.lead_view} {...viewProps} /> : null}
       {cardsInTab(visibleCards(section, viewer, registry, "home"), props.tab).map((card) => {
-        // Until APP-SET-05 re-points the face card onto the kit renderer, the
-        // face card inside `account.profile` already draws this group's one
+        // The face card inside `account.data` already draws this group's one
         // key (the enrollment sounds switch); a second card would repeat it.
         if (section.id === "profile" && card.group === "person.profile") return null;
         // Same for the voice page: its lead view (account.voice) is the one dropdown bound to tts.voice_id, so the
@@ -153,6 +154,7 @@ export function SettingsSectionContent(props: SectionContentProps) {
 {keysCard(card, viewer, props, returnPath, places)}</div>;
       })}
       {section.trail_view && (section.view_tab === undefined || section.view_tab === props.tab) ? <SettingsView view={section.trail_view} {...viewProps} /> : null}
+      {section.id === "data" && canViewFaceEnrollment(person, person) ? <KitCard><FaceEnrollmentBody profile={person} viewer={person} /></KitCard> : null}
     </div>
   );
 }

@@ -46,13 +46,33 @@ describe("ported from the old settings page", () => {
     expect(fixture!.puts.every((put) => put.scope === deviceScope && put.key === "voice.wakeword.enabled")).toBe(true);
   });
 
-  test("the enrollment sounds switch is on the Profile face card and writes false", async () => {
+  test("the enrollment sounds switch is on the Account face card and writes false", async () => {
     const owner = makePerson("owner");
-    const view = open(owner, "/settings/account/profile");
+    const view = open(owner, "/settings/account/data");
     const sounds = await view.findByRole("switch", { name: "Enrollment sounds" });
     expect(view.getAllByRole("switch", { name: "Enrollment sounds" })).toHaveLength(1);
     fireEvent.click(sounds);
     await waitFor(() => expect(fixture!.puts).toContainEqual({ scope: "person:person-owner", key: "ui.enrollment_sounds", value: false }));
+  });
+
+  test("Data and privacy has face status and enrollment for the signed-in person", async () => {
+    const adult = makePerson("adult");
+    const view = open(adult, "/settings/account/data");
+    expect(await view.findByText("Not set up yet")).toBeTruthy();
+    expect(view.getByRole("link", { name: "Enroll" }).getAttribute("href")).toBe("/people/person-adult/enroll-face");
+  });
+
+  test("Data and privacy keeps child self-enrollment hidden and manager enrollment available", async () => {
+    const child = makePerson("child");
+    const childView = open(child, "/settings/account/data");
+    expect(await childView.findByText("Ask an admin to set this up.")).toBeTruthy();
+    expect(childView.queryByRole("link", { name: "Enroll" })).toBeNull();
+    cleanup();
+    fixture!.restore();
+    const manager = makePerson("owner");
+    const managerView = open(manager, "/settings/account/data");
+    expect(await managerView.findByText("Not set up yet")).toBeTruthy();
+    expect(managerView.getByRole("link", { name: "Enroll" }).getAttribute("href")).toBe("/people/person-owner/enroll-face");
   });
 
   test("Profile draws the profile form", async () => {

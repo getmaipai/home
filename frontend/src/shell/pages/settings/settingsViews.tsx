@@ -1,6 +1,6 @@
 import { useState, type ComponentType } from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import { FaceEnrollmentBody, canViewFaceEnrollment } from "@/apps/people/FaceEnrollmentBody";
+import { canViewFaceEnrollment } from "@/apps/people/FaceEnrollmentBody";
 import { VoiceEnrollmentBody } from "@/apps/people/VoiceEnrollmentBody";
 import { ProfileForm } from "@/apps/people/ProfileForm";
 import { DevicesSection } from "@/apps/settings/DevicesSection";
@@ -57,8 +57,6 @@ function AccountProfile({ person, onPersonChange }: SettingsViewProps) {
       </Card>
       <AwaySessionsSection />
       <DevicesSection />
-      <Card><CardHeader><CardTitle>Memories</CardTitle></CardHeader><CardContent><OwnMemories filterIds={null} actorIsAdult={person.role === "adult"} /></CardContent></Card>
-      {canViewFaceEnrollment(person, person) ? <Card><FaceEnrollmentBody profile={person} viewer={person} /></Card> : null}
       {canViewFaceEnrollment(person, person) ? <Card><VoiceEnrollmentBody profile={person} viewer={person} /></Card> : null}
     </>
   );
@@ -66,7 +64,9 @@ function AccountProfile({ person, onPersonChange }: SettingsViewProps) {
 function AccountMemories({ person }: SettingsViewProps) {
   const location = useLocation();
   const ids = new URLSearchParams(location.search).get("ids");
-  return <OwnMemories filterIds={ids ? new Set(ids.split(",")) : null} actorIsAdult={person.role === "adult"} />;
+  return <>
+    <OwnMemories filterIds={ids ? new Set(ids.split(",")) : null} actorIsAdult={person.role === "adult"} />
+  </>;
 }
 
 /** The view table: spec/settings/areas.json names each view, and this is
