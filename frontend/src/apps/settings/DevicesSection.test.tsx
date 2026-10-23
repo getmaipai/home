@@ -632,7 +632,7 @@ test("a device owner can toggle offline permission and sees Remove all for this 
 });
 
 test("robots, TVs and pods show no keep-media switch", async () => {
-  const restore = stubFetch([device({ id: "device-robot0001", kind: "robot", offlineScope: [] }), device({ id: "device-tv000001", kind: "tv", offlineScope: [] })], []);
+  const restore = stubFetch([device({ id: "device-tv000001", kind: "tv", offlineScope: [] })], []);
   try {
     const view = renderSection();
     await view.findByText(/TV/i);

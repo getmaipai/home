@@ -85,6 +85,15 @@ export const NOTIFICATION_TYPES: readonly NotificationType[] = [
     toast: false,
   },
   {
+    id: "robot.offline",
+    level: "passive",
+    audience: "admins",
+    template: "{name} has been offline for 10 minutes.",
+    configurable: false,
+    defaultChannels: ["in_app"],
+    toast: true,
+  },
+  {
     id: "safety.alarm",
     level: "immediate",
     audience: "adults",

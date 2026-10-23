@@ -24,6 +24,7 @@ export interface Device {
   personId: string;
   watermarks: Record<string, unknown>;
   lastSeenAt: string | null;
+  offlineNotifiedAt: string | null;
   createdAt: string;
   updatedAt: string;
   hlc: string;
@@ -40,6 +41,7 @@ function toDevice(row: typeof devices.$inferSelect): Device {
     personId: row.personId,
     watermarks: JSON.parse(row.watermarks) as Record<string, unknown>,
     lastSeenAt: row.lastSeenAt,
+    offlineNotifiedAt: row.offlineNotifiedAt,
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,
     hlc: row.hlc,
@@ -63,6 +65,7 @@ export function createDevice(kind: DeviceKind, name: string, personId: string, c
     offlineScope: "[]",
     watermarks: "{}",
     lastSeenAt: null,
+    offlineNotifiedAt: null,
     createdAt: now,
     updatedAt: now,
     hlc: nextHlc(),

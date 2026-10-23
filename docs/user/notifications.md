@@ -5,6 +5,8 @@ description: See MaiPai's alerts, and set up Telegram notifications.
 
 MaiPai can let you know about things worth your attention. You'll see these in the hub, or on Telegram.
 
+Owners and admins receive an in-hub alert when a paired robot has been offline for 10 minutes.
+
 ## See your notifications
 
 Tap the bell in the header. It shows your recent alerts, and you stay on the page you're on. Tap "View history" for the full list. It goes back 30 days.

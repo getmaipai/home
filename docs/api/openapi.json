@@ -31764,12 +31764,17 @@
                         "crash_resets",
                         "heap"
                       ]
+                    },
+                    "lastSeenAt": {
+                      "type": "string",
+                      "nullable": true
                     }
                   },
                   "required": [
                     "firmware",
                     "bot",
-                    "checkin"
+                    "checkin",
+                    "lastSeenAt"
                   ]
                 }
               }

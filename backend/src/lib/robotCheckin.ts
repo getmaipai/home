@@ -45,4 +45,6 @@ export function getRobotCheckin(deviceId: string, now = Date.now()): (RobotCheck
   return { ...report.value, online: report.value.online && now - report.receivedAt < ROBOT_CHECKIN_ONLINE_MS };
 }
 
+export function getRobotCheckinReceivedAt(deviceId: string): number | null { return latest.get(deviceId)?.receivedAt ?? null; }
+
 export function forgetRobotCheckin(deviceId: string): void { latest.delete(deviceId); }

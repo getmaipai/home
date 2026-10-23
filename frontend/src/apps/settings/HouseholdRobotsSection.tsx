@@ -22,12 +22,21 @@ import { RobotCompanionChoices } from "@/apps/settings/RobotCompanionChoices";
 import { playableVoices, voiceFriendlyName } from "@/lib/voice/voiceBrowserRows";
 import { Card, CardAction, CardContent, CardHeader, CardTitle } from "@maipai/ui/src/dashboard/components/ui/card";
 import { useTabItem } from "@/shell/tabIdentity";
+import { ROBOT_CHECKIN_ONLINE_MS } from "@/lib/robotStatus";
 
 
 function statusText(device: DeviceInfo): string {
   if (device.lastSeenAt === null && device.state == null) return "Waiting for first report";
   if (device.state && !device.state.reachable) return "Not responding";
   return "Paired";
+}
+
+function robotOnline(device: DeviceInfo): boolean {
+  return device.lastSeenAt !== null && Date.now() - Date.parse(device.lastSeenAt) < ROBOT_CHECKIN_ONLINE_MS;
+}
+
+function robotLastSeen(device: DeviceInfo): string {
+  return new Intl.DateTimeFormat(undefined, { hour: "2-digit", minute: "2-digit" }).format(new Date(device.lastSeenAt!));
 }
 
 /** ROBOT-ADMIN-PLACE-01: Home settings, Devices. The list opens a robot's route detail. Admin only; the section's area gate and the hub enforce it. */
@@ -59,9 +68,9 @@ export function HouseholdRobotsSection({ detailId, tab }: { detailId?: string; t
                   <Item key={robot.id} size="setting" render={<Link to={`/settings/home/robot/${encodeURIComponent(robot.id)}`} aria-label={`${robot.name} settings`} />}>
                     <ItemContent>
                       <ItemTitle>{robot.name}</ItemTitle>
-                      <ItemDescription>{robot.area ?? "No area"}</ItemDescription>
+                      <ItemDescription>{robot.area ? `${robot.area} · ` : ""}{robot.lastSeenAt ? robotOnline(robot) ? "Online" : `Offline, last seen ${robotLastSeen(robot)}` : "Never connected"}</ItemDescription>
                     </ItemContent>
-                    <Badge variant="secondary">{statusText(robot)}</Badge>
+                    <Badge variant="secondary">{robotOnline(robot) ? "Online" : statusText(robot)}</Badge>
                   </Item>
                 ))}
               </ItemGroup>
@@ -137,18 +146,18 @@ function RobotDetail({ device, tab, onClose }: { device: DeviceInfo; tab?: strin
       <div className="flex flex-col gap-4">
         {lifecycleError ? <Alert variant="destructive"><AlertDescription>{lifecycleError}</AlertDescription></Alert> : null}
         {activeTab === "overview" ? <>
-        <p className="text-base"><Badge variant="secondary">{statusText(device)}</Badge>{softwareQuery.data?.checkin ? <> Last seen {new Intl.DateTimeFormat(undefined, { dateStyle: "medium", timeStyle: "short" }).format(new Date(softwareQuery.data.checkin.lastSeen))}{softwareQuery.data.checkin.ip ? ` · IP address ${softwareQuery.data.checkin.ip}` : ""}</> : null}</p>
+        <p className="text-base"><Badge variant="secondary">{softwareQuery.data?.checkin?.online || (device.lastSeenAt !== null && Date.now() - Date.parse(device.lastSeenAt) < ROBOT_CHECKIN_ONLINE_MS) ? "Online" : device.lastSeenAt ? "Offline" : statusText(device)}</Badge>{softwareQuery.data?.checkin ? <> Last seen {new Intl.DateTimeFormat(undefined, { dateStyle: "medium", timeStyle: "short" }).format(new Date(softwareQuery.data.checkin.lastSeen))}{softwareQuery.data.checkin.ip ? ` · IP address ${softwareQuery.data.checkin.ip}` : ""}</> : device.lastSeenAt ? <> Last seen {new Intl.DateTimeFormat(undefined, { dateStyle: "medium", timeStyle: "short" }).format(new Date(device.lastSeenAt))}</> : null}</p>
         <RobotSelfTests device={device} />
         {hostedInstall && softwareQuery.data ? <Section heading="Software">
           <ItemGroup variant="card" aria-label="Robot software">
             <Item size="setting">
-              <ItemContent><ItemTitle>Connection</ItemTitle><ItemDescription>{softwareQuery.data.checkin
-                ? [softwareQuery.data.checkin.online ? null : `Offline, last seen ${new Intl.DateTimeFormat(undefined, { hour: "2-digit", minute: "2-digit" }).format(new Date(softwareQuery.data.checkin.lastSeen))}`,
-                  softwareQuery.data.checkin.signal ? `Wi-Fi ${softwareQuery.data.checkin.signal}` : null,
-                  softwareQuery.data.checkin.battery.level !== null ? `Battery ${softwareQuery.data.checkin.battery.level}%${softwareQuery.data.checkin.battery.charging ? ", charging" : ""}` : null,
-                  softwareQuery.data.checkin.ip ? `IP address ${softwareQuery.data.checkin.ip}` : null].filter(Boolean).join(" · ") || "No connection details reported."
+              <ItemContent><ItemTitle>Connection</ItemTitle><ItemDescription>{softwareQuery.data.checkin || softwareQuery.data.lastSeenAt
+                ? [softwareQuery.data.checkin?.online ? null : `Offline, last seen ${new Intl.DateTimeFormat(undefined, { hour: "2-digit", minute: "2-digit" }).format(new Date(softwareQuery.data.checkin?.lastSeen ?? softwareQuery.data.lastSeenAt!))}`,
+                  softwareQuery.data.checkin?.signal ? `Wi-Fi ${softwareQuery.data.checkin.signal}` : null,
+                  softwareQuery.data.checkin?.battery.level !== null && softwareQuery.data.checkin ? `Battery ${softwareQuery.data.checkin.battery.level}%${softwareQuery.data.checkin.battery.charging ? ", charging" : ""}` : null,
+                  softwareQuery.data.checkin?.ip ? `IP address ${softwareQuery.data.checkin.ip}` : null].filter(Boolean).join(" · ") || "No connection details reported."
                 : "Waiting for the robot to check in."}</ItemDescription></ItemContent>
-              <Badge variant="secondary">{softwareQuery.data.checkin?.online ? "Online" : "Offline"}</Badge>
+              <Badge variant="secondary">{softwareQuery.data.checkin?.online || (softwareQuery.data.lastSeenAt !== null && Date.now() - Date.parse(softwareQuery.data.lastSeenAt) < ROBOT_CHECKIN_ONLINE_MS) ? "Online" : "Offline"}</Badge>
             </Item>
             <Item size="setting">
               <ItemContent>

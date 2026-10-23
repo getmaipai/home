@@ -1260,6 +1260,7 @@ export const devices = sqliteTable("devices", {
     .references(() => people.id),
   watermarks: text("watermarks").notNull().default("{}"), // JSON object
   lastSeenAt: text("last_seen_at"),
+  offlineNotifiedAt: text("offline_notified_at"),
   createdAt: text("created_at").notNull(),
   updatedAt: text("updated_at").notNull(),
   hlc: text("hlc").notNull(),

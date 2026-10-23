@@ -42,6 +42,29 @@ describe("robot software details", () => {
     expect(view.getByRole("button", { name: "Update firmware" })).toBeTruthy();
   });
 
+  test("shows last seen in the robots list after a device has checked in", async () => {
+    const seenAt = new Date(Date.now() - 5 * 60_000).toISOString();
+    const robot = { id: "device-test", kind: "robot", name: "Rivet", area: "Kitchen", lastSeenAt: seenAt, createdAt: seenAt, capabilities: [] };
+    globalThis.fetch = (async (input: RequestInfo | URL) => String(input).includes("/api/devices/robots") ? Response.json([robot]) : Response.json([])) as typeof fetch;
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    const view = render(<QueryClientProvider client={client}><MemoryRouter><HouseholdRobotsSection /></MemoryRouter></QueryClientProvider>);
+    await waitFor(() => expect(view.getByText(/Offline, last seen \d{1,2}:\d{2}/)).toBeTruthy());
+  });
+
+  test("shows persisted status in the robots list", async () => {
+    const robot = { id: "device-test", kind: "robot", name: "Rivet", area: "Kitchen", lastSeenAt: "2026-10-20T00:00:00.000Z", createdAt: "2026-10-20T00:00:00.000Z", capabilities: [] };
+    globalThis.fetch = (async (input: RequestInfo | URL) => String(input).includes("/api/devices/robots") ? Response.json([robot]) : Response.json([])) as typeof fetch;
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    const view = render(<QueryClientProvider client={client}><MemoryRouter><HouseholdRobotsSection /></MemoryRouter></QueryClientProvider>);
+    await waitFor(() => expect(view.getByText(/Offline, last seen \d{1,2}:\d{2}/)).toBeTruthy());
+  });
+
+  test("uses the device's persisted last-seen time when check-in memory is empty after restart", async () => {
+    const view = renderRobot({ firmware: { installed: null, available: "0.2.24", status: "unknown" }, bot: { running: null, available: "0.2.24", status: "unknown" }, checkin: null, lastSeenAt: "2026-10-21T12:34:00.000Z" });
+    await waitFor(() => expect(view.getByText(/Offline, last seen \d{1,2}:\d{2}/)).toBeTruthy());
+    expect(view.queryByText("Waiting for the robot to check in.")).toBeNull();
+  });
+
   test("offers Update firmware when the firmware is not recorded, so a flash can be started and recorded", async () => {
     const view = renderRobot({ firmware: { installed: null, available: "0.2.24", status: "unknown" }, bot: { running: null, available: "0.2.24", status: "unknown" }, checkin: null });
     await waitFor(() => expect(view.getByText(/Not recorded\. Ready to install/)).toBeTruthy());

@@ -17,6 +17,7 @@ import { cleanupStaleSnapshots } from "@/lib/backup";
 import { sampleEngineStats } from "@/lib/engineStats";
 import { startAllSidecars, registerGracefulExit } from "@/lib/sidecars";
 import { startRobotHosts } from "@/lib/robotHost";
+import { startRobotOfflineWatch } from "@/lib/robotOfflineWatch";
 import { startKiwixSidecar } from "@/lib/kiwixSidecar";
 import { resumeReferenceJobsOnBoot } from "@/lib/referencePresetEngine";
 import { initCrashBootHold } from "@/lib/dirtyBoot";
@@ -281,6 +282,7 @@ startDdgsStackSync();
 void pushCodingSettings().then(() => import("@/lib/codingMode")).then(({ reconcileCodingModeAtStartup }) => reconcileCodingModeAtStartup()).catch(() => {});
 // ROBOT-HOST-01: hosted StackChan Bot apps register here (never throws; one failing host raises its own Repairs item).
 void startRobotHosts();
+startRobotOfflineWatch();
 void startAllSidecars();
 resumeReferenceJobsOnBoot();
 // Warm Home-owned chat when the Stack does not serve it.

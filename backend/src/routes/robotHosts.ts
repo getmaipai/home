@@ -20,6 +20,7 @@ const softwareShape = z.object({
     battery: z.object({ level: z.number().int().nullable(), charging: z.boolean().nullable() }), boot_reason: z.number().int().nullable(), crash_resets: z.number().int().nullable(),
     heap: z.object({ internal: z.number().int().nullable(), minimum: z.number().int().nullable(), psram: z.number().int().nullable() }),
   }).nullable(),
+  lastSeenAt: z.string().nullable(),
 });
 const softwareRoute = createRoute({
   method: "get", path: "/hosts/{deviceId}/software", tags: ["Robots"], summary: "Get the software status for a hosted robot",
@@ -37,7 +38,7 @@ robotHostRoutes.openapi(softwareRoute, (c) => {
     online: report.online, lastSeen: report.last_seen, ip: report.ip, rssi: report.rssi, signal: report.signal,
     battery: { level: report.battery_level, charging: report.charging }, boot_reason: report.boot_reason, crash_resets: report.crash_resets,
     heap: { internal: report.free_heap_internal, minimum: report.free_heap_min, psram: report.psram_free },
-  } : null }, 200);
+  } : null, lastSeenAt: getDeviceById(deviceId)?.lastSeenAt ?? null }, 200);
 });
 
 const firmwareInstalledRoute = createRoute({

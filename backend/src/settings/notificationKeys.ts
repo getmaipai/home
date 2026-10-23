@@ -83,6 +83,7 @@ export const NOTIFICATION_SETTINGS_KEYS: SettingsKey[] = [
     lives_in: "person.telegram",
     honoured_by: ["home"],
   }),
+  // robot.offline is non-configurable and has no per-person channel toggle.
   // Session F, step 1: lib/notificationTypes.ts's "repairs.new".
   SettingsKey.parse({
     key: "notifications.repairs.new.telegram",

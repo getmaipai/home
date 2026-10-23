@@ -1,5 +1,5 @@
 {
-  "version": "7",
+  "version": "6",
   "dialect": "sqlite",
   "entries": [
     {
@@ -861,6 +861,13 @@
       "version": "6",
       "when": 1792532083128,
       "tag": "0122_fat_war_machine",
+      "breakpoints": true
+    },
+    {
+      "idx": 123,
+      "version": "6",
+      "when": 1792789200000,
+      "tag": "0123_robot_offline_notice",
       "breakpoints": true
     }
   ]

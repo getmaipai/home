@@ -1,0 +1,1 @@
+export const ROBOT_CHECKIN_ONLINE_MS = 150_000;
