@@ -78,8 +78,7 @@ describe("the sections that had no entry draw inside Home settings", () => {
   const cases: Array<[string, string, string, { robots?: boolean }]> = [
     ["engine computer pairing", "/settings/home/ai", "Engine computer link", {}],
     ["Hugging Face token", "/settings/home/ai", "Hugging Face token (for voice cloning)", {}],
-    ["add a robot", "/settings/home/robot", "Add a robot", { robots: true }],
-    ["robot passwords", "/settings/home/robot", "Robot passwords", { robots: true }],
+    ["robot passwords", "/settings/home/robot", "Robot password", { robots: true }],
     ["plugin routing stats", "/settings/home/developer", "Plugin routing", {}],
   ];
   test.each(cases)("%s", async (_name, url, heading, home) => {
@@ -88,11 +87,21 @@ describe("the sections that had no entry draw inside Home settings", () => {
     expect(await view.findByRole("heading", { name: heading })).toBeTruthy();
   });
 
+  test("the Devices page has no inline add form and the add query opens its dialog", async () => {
+    const page = open(makePerson("owner"), "/settings/home/robot", { robots: true });
+    await page.findByRole("button", { name: "Add a robot" });
+    expect(page.queryByPlaceholderText("Six-digit code")).toBeNull();
+    const dialog = open(makePerson("owner"), "/settings/home/robot?addRobot=1", { robots: true });
+    expect(await dialog.findByRole("dialog")).toBeTruthy();
+    expect(await dialog.findByPlaceholderText("Six-digit code")).toBeTruthy();
+    expect(dialog.getByRole("heading", { name: "Add a robot" })).toBeTruthy();
+  });
+
   test("the robot add, install, and password sections stay hidden while Robots is off", async () => {
     const view = open(makePerson("owner"), "/settings/home/robot", { robots: true, robotsEnabled: false });
     await waitFor(() => expect(where(view)).toBe("/settings/home/robot"));
-    expect(view.queryByRole("heading", { name: "Add a robot" })).toBeNull();
-    expect(view.queryByRole("heading", { name: "Robot passwords" })).toBeNull();
+    expect(view.queryByRole("button", { name: "Add a robot" })).toBeNull();
+    expect(view.queryByRole("heading", { name: "Robot password" })).toBeNull();
   });
 
   test("an admin sees them too", async () => {

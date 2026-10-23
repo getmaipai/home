@@ -82,20 +82,22 @@ describe("RobotPasswordSection", () => {
   test("a robot still on the vendor default shows that badge", async () => {
     const restore = stubFetch({ devices: [device()], rotated: false });
     try {
-      const { findByText } = renderSection();
-      await findByText("Reachy Mini");
-      await findByText("Vendor default");
+      const { findByRole, findByText } = renderSection();
+      await findByRole("heading", { name: "Robot password" });
+      await findByText("Not set");
     } finally {
       restore();
     }
   });
 
-  test("an already-rotated robot shows Rotated and offers Rotate again", async () => {
+  test("an already-rotated robot shows Set and opens its change dialog", async () => {
     const restore = stubFetch({ devices: [device()], rotated: true });
     try {
-      const { findByText, findByRole } = renderSection();
-      await findByText("Rotated");
-      await findByRole("button", { name: "Rotate again" });
+      const { findByText, findByRole, queryByPlaceholderText } = renderSection();
+      await findByText("Set");
+      fireEvent.click(await findByRole("button", { name: "Change" }));
+      await findByRole("dialog");
+      expect(queryByPlaceholderText("Robot's LAN address")).toBeTruthy();
     } finally {
       restore();
     }
@@ -106,7 +108,8 @@ describe("RobotPasswordSection", () => {
     const restore = stubFetch({ devices: [device()], rotated: false, onRotate: (body) => calls.push(body) });
     try {
       const { findByRole, findByPlaceholderText, queryByPlaceholderText } = renderSection();
-      fireEvent.click(await findByRole("button", { name: "Rotate password" }));
+      fireEvent.click(await findByRole("button", { name: "Change" }));
+      await findByRole("dialog");
       fireEvent.change(await findByPlaceholderText("Robot's LAN address"), { target: { value: "192.0.2.10" } });
       fireEvent.change(await findByPlaceholderText("Current password (leave blank to try the last one used)"), { target: { value: "vendor-default" } });
       fireEvent.click(await findByRole("button", { name: "Rotate" }));
@@ -126,7 +129,8 @@ describe("RobotPasswordSection", () => {
     });
     try {
       const { findByRole, findByPlaceholderText, findByText } = renderSection();
-      fireEvent.click(await findByRole("button", { name: "Rotate password" }));
+      fireEvent.click(await findByRole("button", { name: "Change" }));
+      await findByRole("dialog");
       fireEvent.change(await findByPlaceholderText("Robot's LAN address"), { target: { value: "192.0.2.10" } });
       fireEvent.change(await findByPlaceholderText("Current password (leave blank to try the last one used)"), { target: { value: "wrong" } });
       fireEvent.click(await findByRole("button", { name: "Rotate" }));

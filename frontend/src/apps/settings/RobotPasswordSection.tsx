@@ -1,13 +1,16 @@
 import { useState } from "react";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQueries, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Section } from "@maipai/ui/src/primitives/Section";
 import { AsyncState } from "@maipai/ui/src/primitives/AsyncState";
-import { List } from "@maipai/ui/src/primitives/List";
 import { Badge } from "@maipai/ui/src/ui/badge";
 import { Input } from "@maipai/ui/src/ui/input";
 import { Button } from "@maipai/ui/src/ui/button";
 import { api, ApiError, type DeviceInfo } from "@/lib/api";
 import { NO_VENDOR_LOGIN } from "./capabilityLabels";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@maipai/ui/src/ui/dialog";
+import { Item, ItemContent, ItemTitle } from "@maipai/ui/src/dashboard/components/ui/item";
+import { ItemGroup } from "@maipai/ui/src/dashboard/components/ui/item";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@maipai/ui/src/ui/select";
 
 // ROBOT-DEVICE-01: "the add flow refuses to finish while the unit's
 // published default SSH password stands and rotates it into the
@@ -66,7 +69,7 @@ export function RobotPasswordRow({
         <span className="truncate text-base font-medium">{device.name}</span>
         {statusQuery.data ? (
           <Badge variant={rotated ? "secondary" : "destructive"}>
-            {rotated ? "Rotated" : "Vendor default"}
+          {rotated ? "Set" : "Not set"}
           </Badge>
         ) : null}
       </div>
@@ -105,13 +108,7 @@ export function RobotPasswordRow({
             </Button>
           </div>
         </div>
-      ) : (
-        <div className="flex">
-          <Button variant="outline" onClick={() => setOpen(true)}>
-            {rotated ? "Rotate again" : "Rotate password"}
-          </Button>
-        </div>
-      )}
+      ) : null}
     </div>
   );
 }
@@ -128,11 +125,7 @@ export function RobotPasswordSection() {
   if (robots.length === 0) return null;
 
   return (
-    <Section heading="Robot passwords">
-      <p className="text-base text-[var(--muted-foreground)]">
-        Every robot ships with a published default password. Rotate it here using the password
-        printed in the robot's own setup guide - this hub never stores or guesses it for you.
-      </p>
+    <Section heading="Robot password">
       <AsyncState
         data={robots}
         error={devicesQuery.isError}
@@ -141,15 +134,17 @@ export function RobotPasswordSection() {
         errorMessage="Could not load your robots."
         loadingLabel="Loading"
       >
-        {(rows) => (
-          <List
-            items={rows}
-            getKey={(d) => d.id}
-            label="Robots"
-            renderItem={(d) => <RobotPasswordRow device={d} />}
-          />
-        )}
+        {(rows) => <PasswordDialogRow devices={rows} />}
       </AsyncState>
     </Section>
   );
+}
+
+function PasswordDialogRow({ devices }: { devices: DeviceInfo[] }) {
+  const [open, setOpen] = useState(false);
+  const [selected, setSelected] = useState(devices[0]!.id);
+  const statusQueries = useQueries({ queries: devices.map((device) => ({ queryKey: ["robot-password-status", device.id], queryFn: () => api.robotPasswordStatus(device.id) })) });
+  const notSet = statusQueries.some((query) => query.data?.rotated === false);
+  const ready = statusQueries.every((query) => query.data !== undefined);
+  return <><ItemGroup variant="card" aria-label="Robot password"><Item size="setting"><ItemContent><ItemTitle>Robot password</ItemTitle></ItemContent><Badge variant={notSet ? "destructive" : "secondary"}>{ready ? (notSet ? "Not set" : "Set") : "Checking"}</Badge><Button size="lg" variant="outline" onClick={() => setOpen(true)}>Change</Button></Item></ItemGroup><Dialog open={open} onOpenChange={setOpen}><DialogContent><DialogHeader><DialogTitle>Change robot password</DialogTitle><DialogDescription>Use the password printed in the robot's setup guide.</DialogDescription></DialogHeader>{devices.length > 1 ? <Select value={selected} onValueChange={setSelected}><SelectTrigger aria-label="Robot"><SelectValue /></SelectTrigger><SelectContent>{devices.map((robot) => <SelectItem key={robot.id} value={robot.id}>{robot.name}</SelectItem>)}</SelectContent></Select> : null}<RobotPasswordRow key={selected} device={devices.find((robot) => robot.id === selected) ?? devices[0]!} defaultOpen /></DialogContent></Dialog></>;
 }

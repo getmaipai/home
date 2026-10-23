@@ -32,8 +32,10 @@ import { SizingPanel } from "@/shell/pages/settings/SizingPanel";
 import { Card, CardContent, CardHeader, CardTitle } from "@maipai/ui/src/dashboard/components/ui/card";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@maipai/ui/src/dashboard/components/ui/alert-dialog";
 import { useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { useTabItem } from "@/shell/tabIdentity";
 import { useSettingsCapabilities } from "@/shell/pages/settings/useSettingsCapabilities";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@maipai/ui/src/ui/dialog";
 import type { PersonRosterEntry, Roster } from "@/lib/api";
 
 export interface SettingsViewProps {
@@ -82,7 +84,10 @@ function HomeEngineAdminSettings({ person }: SettingsViewProps) {
 function HomeUsersAdminSettings({ person }: SettingsViewProps) { return <UsersSection person={person} />; }
 function HomeDevicesAdminSettings({ person }: SettingsViewProps) {
   const { capabilities } = useSettingsCapabilities(person);
-  return capabilities.includes("robots.enabled") ? <><HouseholdRobotsSection /><StackChanInstallDialog /><AddRobotSection /><RobotPasswordSection /></> : null;
+  const [params, setParams] = useSearchParams();
+  const addOpen = params.get("addRobot") === "1";
+  const setAddOpen = (open: boolean) => setParams((previous) => { const next = new URLSearchParams(previous); if (open) next.set("addRobot", "1"); else next.delete("addRobot"); return next; });
+  return capabilities.includes("robots.enabled") ? <><HouseholdRobotsSection /><Dialog open={addOpen} onOpenChange={setAddOpen}><DialogContent scroll="viewport"><DialogHeader><DialogTitle>Add a robot</DialogTitle><DialogDescription>Pair a robot with this home.</DialogDescription></DialogHeader><AddRobotSection onClose={() => setAddOpen(false)} /><StackChanInstallDialog /></DialogContent></Dialog><RobotPasswordSection /></> : null;
 }
 function AccountLikenessView() { useTabItem("Pictures and videos"); return <LikenessSettings />; }
 function PicturesLibraryView() { useTabItem("Pictures and videos"); return <><PicturesLibrary /><VideoLibrary /></>; }

@@ -1,6 +1,5 @@
 import { useEffect, useState, type FormEvent } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { Section } from "@maipai/ui/src/primitives/Section";
 import { AsyncState } from "@maipai/ui/src/primitives/AsyncState";
 import { EmptyState } from "@maipai/ui/src/primitives/EmptyState";
 import { List } from "@maipai/ui/src/primitives/List";
@@ -42,7 +41,7 @@ const CODE_TTL_MS = 5 * 60_000;
 // household-wide robot list until a new one appears, then embeds
 // RobotPasswordRow for exactly that device, defaulted open, and does not
 // call the flow "done" until that rotation succeeds.
-export function AddRobotSection() {
+export function AddRobotSection({ onClose }: { onClose?: () => void } = {}) {
   const queryClient = useQueryClient();
   const discoveryQuery = useQuery<DiscoveredRobotInfo[]>({
     queryKey: ["discover-robots"],
@@ -146,7 +145,7 @@ export function AddRobotSection() {
   }
 
   return (
-    <Section heading="Add a robot">
+    <div>
       <p className="text-base text-[var(--muted-foreground)]">
         Turn on the robot near your Wi-Fi. It will speak a six-digit code (or show it on its
         own settings page) - type that code below to pair it.
@@ -209,9 +208,7 @@ export function AddRobotSection() {
           ) : null}
           {error ? <p className="text-base text-[var(--destructive)]">{error}</p> : null}
           {rotationDone ? (
-            <p className="text-base text-[var(--primary)]">
-              Paired and its password is rotated - it's ready to use.
-            </p>
+            <div className="flex flex-col gap-2"><p className="text-base text-[var(--primary)]">Paired and its password is rotated - it's ready to use.</p>{onClose ? <Button onClick={onClose}>Done</Button> : null}</div>
           ) : null}
           <div className="flex">
             <Button type="submit" disabled={submitting}>
@@ -227,6 +224,7 @@ export function AddRobotSection() {
                 Approved and paired. No vendor password to change. It's ready to use.
               </p>
               <div className="flex">
+                {onClose ? <Button onClick={onClose}>Done</Button> : null}
                 <Button variant="outline" onClick={startOver}>
                   Pair another robot
                 </Button>
@@ -277,6 +275,7 @@ export function AddRobotSection() {
           </Button>
         </div>
       )}
-    </Section>
+      {onClose ? <div className="flex justify-end"><Button variant="outline" onClick={onClose} disabled={submitting}>Cancel</Button></div> : null}
+    </div>
   );
 }

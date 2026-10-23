@@ -65,8 +65,8 @@ function session(overrides: Partial<SessionInfo> = {}): SessionInfo {
   };
 }
 
-function renderDetail() {
-  return renderWithQueryClient(<MemoryRouter initialEntries={["/?device=robot-1"]}><HouseholdRobotsSection /></MemoryRouter>);
+function renderDetail(tab = "overview") {
+  return renderWithQueryClient(<MemoryRouter initialEntries={[`/?device=robot-1&tab=${tab}`]}><HouseholdRobotsSection /></MemoryRouter>);
 }
 
 function renderRobots() {
@@ -158,13 +158,12 @@ describe("DevicesSection", () => {
   test("a household robot opens in a detail view with every registry key, and the settings dialog is gone", async () => {
     const restore = settingsFetch(true);
     try {
-      const view = renderDetail();
+      const view = renderDetail("behaviour");
       await view.findByText("robot.hello.future");
       expect(view.getByText("robot.barge_in.open_mic")).toBeTruthy();
       expect(view.getByText("Face color")).toBeTruthy();
       expect(view.getByText("Night mode")).toBeTruthy();
       expect(view.queryByRole("dialog")).toBeNull();
-      expect(view.getByRole("button", { name: "Forget this robot" })).toBeTruthy();
     } finally { restore(); }
   });
   test("the list shows one row per household robot and opens a row to its detail", async () => {
@@ -173,13 +172,13 @@ describe("DevicesSection", () => {
       const view = renderWithQueryClient(<MemoryRouter><HouseholdRobotsSection /></MemoryRouter>);
       fireEvent.click(await view.findByRole("link", { name: "Riff settings" }));
       expect(await view.findByRole("button", { name: "Back to robots" })).toBeTruthy();
-      expect(view.getByLabelText("Name")).toBeTruthy();
+      expect(view.getByRole("tab", { name: "Access" })).toBeTruthy();
     } finally { restore(); }
   });
   test("robot Voice row lists mocked voices with the companion's voice first", async () => {
     const restore = settingsFetch(false);
     try {
-      const view = renderDetail();
+      const view = renderDetail("behaviour");
       await view.findByText("Voice");
       fireEvent.click(view.getByRole("combobox", { name: "Voice" }));
       const choices = await view.findAllByRole("option");
@@ -190,7 +189,7 @@ describe("DevicesSection", () => {
     const calls: unknown[] = [];
     const restore = settingsFetch(false, calls);
     try {
-      const view = renderDetail();
+      const view = renderDetail("access");
       fireEvent.change(await view.findByLabelText("Name"), { target: { value: "Riff Two" } });
       fireEvent.click(view.getByRole("button", { name: "Save name and area" }));
       await waitFor(() => expect(calls).toContainEqual({ name: "Riff Two", area: null }));
@@ -199,7 +198,7 @@ describe("DevicesSection", () => {
   test("shows the robot's controls and companion, and points to the Home location when none is set (ROBOT-COMPANION-01)", async () => {
     const restore = settingsFetch(false, [], undefined, { homeSet: false });
     try {
-      const view = renderDetail();
+      const view = renderDetail("behaviour");
       expect(await view.findByRole("combobox", { name: "Controls" })).toHaveTextContent("Child controls");
       expect(view.getByRole("combobox", { name: "Companion" })).toHaveTextContent("None (child controls)");
       expect(await view.findByRole("link", { name: "Set it in Settings, Home, General." })).toHaveAttribute("href", "/settings/home/general");
@@ -208,7 +207,7 @@ describe("DevicesSection", () => {
   test("shows the duplicate robot name response under the name field", async () => {
     const restore = settingsFetch(false, [], "Another robot is already called StackChan. Pick a different name.");
     try {
-      const view = renderDetail();
+      const view = renderDetail("access");
       fireEvent.change(await view.findByLabelText("Name"), { target: { value: "StackChan" } });
       fireEvent.click(view.getByRole("button", { name: "Save name and area" }));
       expect(await view.findByRole("alert")).toHaveTextContent("Another robot is already called StackChan. Pick a different name.");
@@ -219,7 +218,7 @@ describe("DevicesSection", () => {
     const deletes: string[] = [];
     const restore = settingsFetch(false, [], undefined, { deletes });
     try {
-      const view = renderDetail();
+      const view = renderDetail("access");
       fireEvent.click(await view.findByRole("button", { name: "Forget this robot" }));
       expect(view.getByText(/Forget Riff\?/)).toBeTruthy();
       expect(view.queryByRole("button", { name: "Forget this robot" })).toBeNull();
@@ -231,7 +230,7 @@ describe("DevicesSection", () => {
     const cancels: string[] = [];
     const restore = settingsFetch(false, [], undefined, { cancels, installing: true, robot: { lastSeenAt: null } });
     try {
-      const view = renderDetail();
+      const view = renderDetail("access");
       fireEvent.click(await view.findByRole("button", { name: "Cancel install" }));
       fireEvent.click(view.getByRole("button", { name: "Yes, cancel install" }));
       await waitFor(() => expect(cancels.length).toBe(1));
