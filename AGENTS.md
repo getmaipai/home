@@ -15,8 +15,9 @@ implementation; no length cap on adult written chat; a failed tool never fails t
 
 **Kit Elements as they ship (rule 9).** Never put a `className` on a kit Element that changes shape, border, radius, shadow,
 background, padding, margin, size or layout, and never write a Home wrapper around an Element. Restyle by tokens and the Element's
-own props; if the look is not reachable, add a prop or variant in `commons` first. Full text in `RULES.md`. `cd frontend && bun run
-lint:ui-rules` runs the lints in about a second.
+own props; if the look is not reachable, add a prop or variant in `commons` first (its own worktree; the pinned tag does not block it,
+and only Jesse says yes to a new tag: [docs/PINNING.md](docs/PINNING.md) "Changing a shared kit element"). Full text in `RULES.md`.
+`cd frontend && bun run lint:ui-rules` runs the lints in about a second.
 
 ## Layout and commands
 

@@ -49,6 +49,21 @@ says whether the restart happened (MANIFEST-REFUSAL-01, fixes #166 -
 the 2026-09-26 incident was exactly a bundled-manifest change landing
 without one).
 
+## Changing a shared kit element (commons first, rule 9)
+
+When a Home screen needs a kit Element to look or behave differently (a prop or variant that does not exist yet), the change goes
+into `getmaipai/commons`. Home never works around it with `className` or a wrapper. Agents often stop here believing the pinned
+tag blocks them. It does not: the pinned tag directory is the immutable one, but `commons` itself has its own worktrees.
+
+1. Make the commons change in a commons worktree, never in `../commons-tags/...` and never in another session's worktree:
+   `cd /Users/jessetorres/Developer/github.com/getmaipai/commons` (its main checkout), then `bash scripts/wt.sh start <short-name>`,
+   and work in the path it prints last.
+2. Add the prop or variant with a test beside it in commons. Run that package's own test and `tsc --noEmit`, then commit by file name.
+3. Land on commons main from that worktree with `bash scripts/wt.sh land`. If it refuses, stop and report why.
+4. Do not tag. A new `ui-vX.Y.Z` tag is a library release, and only Jesse says yes to it. Stop there and end the report with
+   `STATE: blocked [Jesse: yes to tag ui-vX.Y.Z]`, naming the commons commit that holds the change.
+5. After the tag exists, the Home change is the normal pin bump in this file's first section, then the screen change that uses the new prop.
+
 ## Running the gate: prerequisites, docs scope and the lock
 
 package's own tests; `tsc --noEmit` (backend) or `tsc --noEmit && eslint
