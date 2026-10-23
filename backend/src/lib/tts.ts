@@ -5,6 +5,7 @@
 // right status code for.
 import { getTtsTags } from "@/lib/ttsCapabilities";
 import { sanitizeSpeechTags } from "@/lib/voiceCues";
+import { toSpokenText } from "@/lib/spokenText";
 import { getOfferedVoices, resolveVoice } from "@/lib/voiceResolve";
 import { householdVoiceSpeech } from "@/lib/clonedVoices";
 import { getStackClient, isStackConfigured, resolveStackOffline, stackFailureResult } from "@/lib/stackEngine";
@@ -49,9 +50,10 @@ async function synthesizeViaStack(text: string, voiceUrl?: string, household?: {
   }
 }
 
-export async function synthesizeSpeech(rawText: string, voiceUrl?: string): Promise<TtsOpResult> {
+export async function synthesizeSpeech(rawText: string, voiceUrl?: string, opts: { normalize?: boolean } = {}): Promise<TtsOpResult> {
   // REG-02: a bracketed tag the active engine does not advertise is dropped here, the last step before the engine, so "[laugh]" is never read aloud.
-  const text = typeof rawText === "string" ? sanitizeSpeechTags(rawText, await getTtsTags()) : rawText;
+  const taggedText = typeof rawText === "string" ? sanitizeSpeechTags(rawText, await getTtsTags()) : rawText;
+  const text = typeof taggedText === "string" && opts.normalize !== false ? toSpokenText(taggedText) : taggedText;
   if (typeof text !== "string" || text.trim().length === 0) {
     return { ok: false, status: 400, code: "invalid_input", error: "text must be a non-empty string" };
   }

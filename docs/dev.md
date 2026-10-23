@@ -6,6 +6,14 @@ fresh, do not migrate; decision 11), chapters 3 and 4 are the hub's
 architecture, chapter 13 is the release roadmap. This file is the dev-tier
 design doc; it grows as the hub is built.
 
+## SPOKEN-TEXT-01: deterministic speech wording (2026-10-24)
+
+Before synthesis, `backend/src/lib/spokenText.ts` converts written forms (clock times, dates, years, ordinals, money, percentages,
+temperatures, units, phone-style digit strings, ranges, plain numbers) into English words, so an engine never reads "3:02 PM" as
+"three thousand and two". It is deterministic, English only, and leaves code, links, email addresses, versions, hashtags and model names
+as written. `synthesizeSpeech` applies it after the voice cue tags are sanitized, so every speech path shares it and the stored and
+displayed text never changes. A per-call `normalize: false` bypasses it.
+
 ## Personal keys: one key store with scopes (CODE-KEYS-01, 2026-10-18)
 
 `api_keys` (migration 0120, schema version 77) replaces the single interim `person_api_tokens` row per person. A key is the spec
