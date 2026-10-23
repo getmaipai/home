@@ -38,7 +38,7 @@ Normal about 36 GB; with the 27B coder about 59 GB; the large model alone about 
 
 The Stack's `homeMode.ts` takes its runtime operations as an injected adapter; the tests script start, stop, check and bind and assert the order of calls. Home's tests script the Stack client. The real run is the end-to-end test on a scratch Stack with its own data folder.
 
-## Coding from a named device through Tailscale Serve
+## Coding from your own devices through Tailscale Serve
 
 When the hub is reached through Tailscale Serve (a proxy on the same computer), the gateway sees a loopback peer and forwarding headers, so
 `transportRefusal` in `lib/codeGate.ts` refuses it as a proxy. `lib/tailnetNode.ts` is the one narrow exception, and it runs before the API key
@@ -48,14 +48,9 @@ check, never instead of it. A request is let through only when all of these hold
 - the socket peer is loopback, and the Host is not the configured public address;
 - the only proxy headers are the three Serve adds (`x-forwarded-for`, `x-forwarded-host`, `x-forwarded-proto`), the protocol is https, and
   `x-forwarded-for` is a single tailnet address;
-- Tailscale's own answer (the local daemon's whois for that address) names a device on the allowed list, and the `Tailscale-User-Login` header,
-  when present, matches the login Tailscale reports.
+- Tailscale's own answer (the local daemon's whois for that address) says the device belongs to the same Tailscale account as this computer,
+  and is not a tagged device, and the `Tailscale-User-Login` header, when present, matches that account.
 
-Anything else, including no answer from Tailscale, is refused. Two values come from the hub's service environment, not from code:
-
-| Variable | Meaning |
-|---|---|
-| `CODING_TAILNET_NODES` | Comma separated device names allowed to use coding through Serve (for example `my-laptop`). Empty means the exception is off. |
-| `TAILSCALE_SOCKET` | Path to the Tailscale daemon's socket. Defaults to `/var/run/tailscaled.socket`. |
-
-Device names are matched case-insensitively. Tagged devices are never accepted. A settings key for the list is a follow-up (spec first).
+Anything else, including no answer from Tailscale, is refused. The hub finds Tailscale's local socket from `TAILSCALE_SOCKET` when set, else
+`/var/run/tailscaled.socket`, else the user-mode daemon's socket under a home folder (`Library/Application Support/tailscale-user/tailscaled.sock`).
+Limiting this to named devices needs a household setting for the list (spec first); not built.

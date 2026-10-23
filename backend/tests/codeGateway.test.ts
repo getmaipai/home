@@ -9,7 +9,7 @@ import { newPersonId } from "@/lib/id";
 import { nextHlc } from "@/lib/hlc";
 import { createApiKey, revokeApiKey } from "@/lib/apiKeys";
 import { setHouseholdSettingValue } from "@/lib/settings";
-import { __setWhoisForTests } from "@/lib/tailnetNode";
+import { __setSelfLoginForTests, __setWhoisForTests } from "@/lib/tailnetNode";
 import { __resetCodeGateForTests, __setStreamIdleForTests, __setTrustProxyForTests, createFairQueue, createStreamCounter, createTokenLedger, isTailnetAddress, tokenLedger } from "@/lib/codeGate";
 import { __resetRateLimiterForTests } from "@/lib/rateLimiter";
 import { __setStackClientForTests } from "@/lib/stackEngine";
@@ -254,11 +254,11 @@ describe("where it may come from", () => {
     const serveHeaders = (extra: Record<string, string> = {}) => ({ "x-forwarded-for": TAILNET, "x-forwarded-proto": "https", "x-forwarded-host": SERVE_HOST, "tailscale-user-login": "sage@example.com", ...extra });
     const viaServe = (secret: string, extra: Partial<CallOptions> = {}) => say(secret, { address: "127.0.0.1", host: SERVE_HOST, headers: serveHeaders(), ...extra });
     beforeEach(() => {
-      process.env.CODING_TAILNET_NODES = "Laptop-Test";
+      __setSelfLoginForTests(async () => "sage@example.com");
       setHouseholdSettingValue("coding.api.away", true);
       __setWhoisForTests(async (address) => (address === TAILNET ? { name: "laptop-test", login: "sage@example.com" } : null));
     });
-    afterEach(() => { delete process.env.CODING_TAILNET_NODES; __setWhoisForTests(null); });
+    afterEach(() => { __setWhoisForTests(null); __setSelfLoginForTests(null); });
 
     test("a request from the allowed device is let through to the key check", async () => {
       const { secret } = adultWithKey();
@@ -267,9 +267,11 @@ describe("where it may come from", () => {
       expect((await viaServe("")).status).toBe(401);
     });
 
-    test("a device that is not on the list is refused", async () => {
+    test("a device of another account, or a tagged one, is refused", async () => {
       const { secret } = adultWithKey();
-      __setWhoisForTests(async () => ({ name: "other-device", login: "sage@example.com" }));
+      __setWhoisForTests(async () => ({ name: "other-device", login: "stranger@example.com" }));
+      expect((await viaServe(secret, { headers: serveHeaders({ "tailscale-user-login": "stranger@example.com" }) })).status).toBe(403);
+      __setWhoisForTests(async () => ({ name: "tagged-box", login: null }));
       expect((await viaServe(secret)).status).toBe(403);
     });
 
@@ -289,11 +291,11 @@ describe("where it may come from", () => {
       }
     });
 
-    test("it needs the list, the away setting, an answer from Tailscale, and a matching login", async () => {
+    test("it needs the away setting, an answer from Tailscale about this computer and the device, and a matching login", async () => {
       const { secret } = adultWithKey();
-      delete process.env.CODING_TAILNET_NODES;
+      __setSelfLoginForTests(async () => null);
       expect((await viaServe(secret)).status).toBe(403);
-      process.env.CODING_TAILNET_NODES = "laptop-test";
+      __setSelfLoginForTests(async () => "sage@example.com");
       setHouseholdSettingValue("coding.api.away", false);
       expect((await viaServe(secret)).status).toBe(403);
       setHouseholdSettingValue("coding.api.away", true);
