@@ -448,10 +448,24 @@ function savedPlaceRows(person: PersonRow, surface: string): Array<{ id: string;
   }
   const raw = getPersonSettingValue(person, `${surface}.places`);
   const ids = Array.isArray(raw) ? raw.filter((v): v is string => typeof v === "string") : [];
+  const seenIds = new Set(rows.map((row) => row.id));
+  const seenCoords = new Set<string>();
+  for (const id of seenIds) {
+    const home = getEntity(person, id);
+    const geo = home.ok ? home.value?.geo : null;
+    if (geo && home.ok && home.value) seenCoords.add(`${home.value.name.trim().toLowerCase()}|${geo.lat.toFixed(2)},${geo.lon.toFixed(2)}`);
+  }
   for (const id of ids) {
-    if (rows.some((row) => row.id === id)) continue;
+    if (seenIds.has(id)) continue;
     const found = getEntity(person, id);
-    if (found.ok && found.value?.kind === "place") rows.push({ id: found.value.id, label: found.value.name });
+    if (found.ok && found.value?.kind === "place") {
+      const geo = found.value.geo;
+      const coordinate = geo ? `${found.value.name.trim().toLowerCase()}|${geo.lat.toFixed(2)},${geo.lon.toFixed(2)}` : undefined;
+      if (coordinate && seenCoords.has(coordinate)) continue;
+      rows.push({ id: found.value.id, label: found.value.name });
+      seenIds.add(found.value.id);
+      if (coordinate) seenCoords.add(coordinate);
+    }
   }
   return rows;
 }

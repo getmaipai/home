@@ -48,6 +48,10 @@ function weatherLocation(place: { id: string; label: string; geo?: { lat?: numbe
   const hourly = Array.isArray(props.hourly) ? props.hourly as Array<Record<string, unknown>> : [];
   const details = (props.details && typeof props.details === "object" ? props.details : {}) as Record<string, unknown>;
   const number = (source: Record<string, unknown>, key: string) => typeof source[key] === "number" ? source[key] as number : undefined;
+  const numeric = (source: Record<string, unknown>, key: string) => {
+    const value = source[key];
+    return typeof value === "number" ? value : typeof value === "string" && value.trim() !== "" ? Number(value) : undefined;
+  };
   const string = (source: Record<string, unknown>, key: string) => typeof source[key] === "string" ? source[key] as string : undefined;
   const clock = (value: string) => {
     const match = /T(\d{2}):(\d{2})/.exec(value);
@@ -55,8 +59,8 @@ function weatherLocation(place: { id: string; label: string; geo?: { lat?: numbe
     return new Intl.DateTimeFormat(undefined, { hour: "numeric", minute: "2-digit", timeZone: "UTC" }).format(new Date(Date.UTC(2020, 0, 1, Number(match[1]), Number(match[2]))));
   };
   const hasWeather = number(current, "temp") !== undefined && string(current, "condition") !== undefined;
-  return { id: place.id, city: place.label.replace(/ \(home\)$/, ""), state: place.geo?.area ?? undefined, latitude: place.geo?.lat, longitude: place.geo?.lon, timezone: string(details, "timezone"), detail: hasWeather ? {
-    temp: number(current, "temp")!, condition: string(current, "condition")!, code: number(current, "code") ?? 3, isDay: current.is_day !== false,
+  return { id: place.id, city: place.label.replace(/ \(home\)$/, ""), state: place.geo?.area ?? undefined, latitude: place.geo?.lat, longitude: place.geo?.lon, timezone: string(details, "timezone"), isMyLocation: place.label.endsWith(" (home)"), detail: hasWeather ? {
+    temp: number(current, "temp")!, condition: string(current, "condition")!, code: numeric(current, "code") ?? 3, isDay: current.is_day !== false && current.is_day !== 0 && current.is_day !== "0",
     high: number(daily[0] ?? {}, "high"), low: number(daily[0] ?? {}, "low"),
     hourly: hourly.map((hour) => ({ time: clock(String(hour.time ?? "")), temp: Number(hour.temp ?? 0), pop: number(hour, "pop") })),
     daily: daily.map((day) => ({ date: String(day.date ?? ""), high: Number(day.high ?? 0), low: Number(day.low ?? 0), code: Number(day.code ?? 3), pop: number(day, "pop") })),
@@ -123,10 +127,12 @@ export function PackageAppPage({ person }: { person: Roster }) {
   const pageId = pageSegment || "index";
   const [weatherSelectedId, setWeatherSelectedId] = useState("");
   const [weatherSearch, setWeatherSearch] = useState("");
+  const [weatherMessage, setWeatherMessage] = useState("");
   const [weatherResults, setWeatherResults] = useState<Array<{ name: string; area: string | null; lat: number; lon: number }>>([]);
   const weatherPlaces = useQuery({ queryKey: ["weather-places", person.id], queryFn: () => api.appData<{ rows: Array<{ id: string; label: string }> }>("weather", "places"), staleTime: PAGE_FRESH_MS, enabled: packageId === "weather" && pageId === "index" });
   const weatherEntities = useQuery({ queryKey: ["weather-place-entities", person.id], queryFn: () => api.entities("place"), enabled: packageId === "weather" && pageId === "index" });
   const weatherSettings = useQuery({ queryKey: ["settings-values", `person:${person.id}`], queryFn: () => api.settingsValues(`person:${person.id}`), enabled: packageId === "weather" && pageId === "index" });
+  const weatherHomeId = weatherSettings.data?.find((row) => row.key === "household.home")?.value;
   const weatherUnit = weatherSettings.data?.find((row) => row.key === "weather.unit")?.value === "celsius" ? "celsius" : "fahrenheit";
   const weatherVisiblePlaces = (weatherPlaces.data?.rows ?? []).map((place) => {
     const entity = weatherEntities.data?.find((row) => row.id === place.id);
@@ -211,7 +217,36 @@ export function PackageAppPage({ person }: { person: Roster }) {
         {(doc) => (hasQuery && !sameQuery ? null : <>
           {packageId === "weather" && pageId === "index" ? null : <SchemaPage key={`${packageId}/${pageId}`} page={doc} packageId={packageId} hideTitle sidebar={sidebarProps !== null} />}
           {packageId === "videos" && pageId === "watch" ? <VideoDetails id={new URLSearchParams(location.search).get("id") ?? String((location.state as { pageState?: { id?: string } } | null)?.pageState?.id ?? "")} /> : null}
-          {packageId === "weather" && pageId === "index" ? <WeatherForecastPage locations={weatherLocations} selectedId={weatherSelectedPlace?.id} onSelect={(id: string) => { if (id) setWeatherSelectedId(id); }} onSearch={(value: string) => { setWeatherSearch(value); setWeatherResults([]); }} searchResults={(weatherSearchQuery.data ?? weatherResults).map((r) => ({ id: `${r.lat.toFixed(2)},${r.lon.toFixed(2)}`, city: r.name, state: r.area ?? undefined, latitude: r.lat, longitude: r.lon }))} onSelectResult={async (result) => { const entity = await api.createEntity({ kind: "place", name: result.city, place_kind: "map", scope: "person", geo: { lat: Number(result.latitude!.toFixed(2)), lon: Number(result.longitude!.toFixed(2)), precision: "exact", area: result.state ?? null, from: "search" } }); const ids = (weatherPlaces.data?.rows ?? []).map((row) => row.id); if (!ids.includes(entity.id)) await api.setSetting(`person:${person.id}`, "weather.places", [...ids, entity.id]); await queryClient.invalidateQueries({ queryKey: ["weather-places", person.id] }); setWeatherSearch(""); setWeatherResults([]); }} onAddLocation={() => { if (weatherSearch.trim()) void weatherSearchQuery.refetch().then(({ data }) => setWeatherResults(data ?? [])); }} onRemoveLocation={(id) => { const ids = (weatherPlaces.data?.rows ?? []).map((row) => row.id).filter((item) => item !== id); void api.setSetting(`person:${person.id}`, "weather.places", ids).then(() => queryClient.invalidateQueries({ queryKey: ["weather-places", person.id] })); }} locale={navigator.language} unit={weatherUnit === "celsius" ? "C" : "F"} /> : null}
+          {packageId === "weather" && pageId === "index" ? <>
+            {weatherMessage ? <p role="status" className="text-sm text-muted-foreground">{weatherMessage}</p> : null}
+            <WeatherForecastPage locations={weatherLocations} selectedId={weatherSelectedPlace?.id} onSelect={(id: string) => { if (id) setWeatherSelectedId(id); }} onSearch={(value: string) => { setWeatherSearch(value); setWeatherResults([]); setWeatherMessage(""); }} searchResults={(weatherSearchQuery.data ?? weatherResults).map((r) => ({ id: `${r.lat.toFixed(2)},${r.lon.toFixed(2)}`, city: r.name, state: r.area ?? undefined, latitude: r.lat, longitude: r.lon }))} onSelectResult={async (result) => {
+              setWeatherMessage("");
+              const latitude = Number(result.latitude!.toFixed(2)); const longitude = Number(result.longitude!.toFixed(2));
+              const sameSpot = (geo: { lat?: number; lon?: number } | null | undefined) => geo?.lat !== undefined && geo.lon !== undefined && geo.lat.toFixed(2) === latitude.toFixed(2) && geo.lon.toFixed(2) === longitude.toFixed(2);
+              const duplicate = weatherVisiblePlaces.find((place) => place.id === result.id || sameSpot(place.geo)) ?? (weatherHomeId ? weatherEntities.data?.find((place) => place.id === weatherHomeId && sameSpot(place.geo)) : undefined);
+              if (duplicate || result.id === weatherHomeId) {
+                const duplicateName = duplicate && "label" in duplicate ? duplicate.label.replace(/ \(home\)$/, "") : duplicate?.name;
+                setWeatherMessage(`${duplicateName ?? result.city} is already in your list.`);
+              } else {
+                const entity = await api.createEntity({ kind: "place", name: result.city, place_kind: "map", scope: "person", geo: { lat: latitude, lon: longitude, precision: "exact", area: result.state ?? null, from: "search" } });
+                const ids = (weatherPlaces.data?.rows ?? []).map((row) => row.id);
+                if (!ids.includes(entity.id)) await api.setSetting(`person:${person.id}`, "weather.places", [...ids, entity.id]);
+                await queryClient.invalidateQueries({ queryKey: ["weather-places", person.id] });
+              }
+              setWeatherSearch(""); setWeatherResults([]);
+            }} onAddLocation={() => { if (weatherSearch.trim()) void weatherSearchQuery.refetch().then(({ data }) => setWeatherResults(data ?? [])); }} onRemoveLocation={(id) => {
+              const location = weatherLocations.find((place) => place.id === id);
+              if (id === weatherHomeId || (weatherPlaces.data?.rows ?? []).find((place) => place.id === id)?.label.endsWith(" (home)")) {
+                setWeatherMessage(`${location?.city ?? "This place"} is your home place. Change it in Settings, Weather.`); return;
+              }
+              setWeatherMessage("");
+              void api.deleteEntity(id).then(async () => {
+                await queryClient.invalidateQueries({ queryKey: ["weather-places", person.id] });
+                await queryClient.invalidateQueries({ queryKey: ["weather-place-entities", person.id] });
+                setWeatherMessage(`${location?.city ?? "Place"} removed from your list.`);
+              }).catch((error: unknown) => setWeatherMessage(error instanceof Error ? error.message : "Could not remove this place."));
+            }} locale={navigator.language} unit={weatherUnit === "celsius" ? "C" : "F"} />
+          </> : null}
         </>)}
       </AsyncState>
       {docked ? (

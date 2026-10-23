@@ -1,6 +1,6 @@
 {
-  "generatedAt": "2026-10-23T18:19:36.207Z",
-  "kitTag": "ui-v0.5.324",
+  "generatedAt": "2026-10-23T19:56:14.016Z",
+  "kitTag": "ui-v0.5.326",
   "items": [
     {
       "file": "ActivityCardsShowcase.tsx",
@@ -115,6 +115,14 @@
       "group": "trace/showcase",
       "verdict": "support",
       "verdictReason": "Developer-only story fixture for ELT-T1-22, covered by the Commons TraceWaterfall tests; not a standalone Home product surface.",
+      "implemented": false
+    },
+    {
+      "file": "WeatherForecastShowcase.tsx",
+      "name": "WeatherForecastShowcase",
+      "group": "weather",
+      "verdict": "support",
+      "verdictReason": "Developer-only showcase fixture for the weather forecast page (ui-v0.5.323-weather); covered by the commons showcase tests, not a Home product surface.",
       "implemented": false
     },
     {

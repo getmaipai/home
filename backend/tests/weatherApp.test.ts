@@ -132,6 +132,17 @@ describe("the places the picker lists", () => {
     const rows = ((await (await client.post("/api/plugins/weather/data/places", {})).json()) as { rows: Array<{ id: string }> }).rows;
     expect(rows.map((r) => r.id)).toEqual([home.id]);
   });
+
+  test("different home and favorite entities at the same rounded coordinates are drawn once, without deleting either row", async () => {
+    const { client, row } = await owner();
+    const home = await addPlace(client, "Milford", "household", { lat: 41.222, lon: -73.061, precision: "exact", area: "Connecticut", from: "search" });
+    const favorite = await addPlace(client, "Milford", "person", { lat: 41.223, lon: -73.064, precision: "exact", area: "Connecticut", from: "search" });
+    await client.put("/api/settings", { scope: "household", key: "household.home", value: home.id });
+    await client.put("/api/settings", { scope: `person:${row.id}`, key: "weather.places", value: [favorite.id] });
+    const rows = ((await (await client.post("/api/plugins/weather/data/places", {})).json()) as { rows: Array<{ id: string }> }).rows;
+    expect(rows.map((item) => item.id)).toEqual([home.id]);
+    expect(((await (await client.get("/api/entities?kind=place")).json()) as Array<{ id: string }>).map((item) => item.id)).toContain(favorite.id);
+  });
 });
 
 describe("the forecast data call", () => {

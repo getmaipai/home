@@ -3956,6 +3956,23 @@
       "batch": null,
       "replacesHandBuilt": [],
       "realTurnToday": null
+    },
+    {
+      "file": "WeatherForecastShowcase.tsx",
+      "name": "WeatherForecastShowcase",
+      "group": "weather",
+      "verdict": "support",
+      "verdictReason": "Developer-only showcase fixture for the weather forecast page (ui-v0.5.323-weather); covered by the commons showcase tests, not a Home product surface.",
+      "backendNeeded": null,
+      "effort": null,
+      "specTagNeeded": false,
+      "newDependency": false,
+      "bindings": [],
+      "size": "S",
+      "showcaseScenario": null,
+      "batch": null,
+      "replacesHandBuilt": [],
+      "realTurnToday": null
     }
   ]
 }

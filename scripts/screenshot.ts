@@ -158,12 +158,15 @@ async function runPool<T, R>(items: readonly T[], poolSize: number, worker: (ite
 // path is the one that must never move; every other browser writes under
 // its own gitignored subdirectory instead; `bun run screenshots` (default,
 // no `--webkit`) is unaffected by any of this.
+const weatherReview = process.argv.includes("--weather-review");
+const weatherReviewOutDir = process.env.WEATHER_REVIEW_DIR || join(ROOT, "data-scratch", "weather-review");
 const SCREENS_DIR = setupReviewCaptures
   ? join(ROOT, "data-scratch", "screenshots", "setup-review")
   : setupChecksReview
   ? join(ROOT, "data-scratch", "screenshots", "setup-checks")
   : chatIncognitoAudit
   ? "/Users/jessetorres/Developer/github.com/getmaipai/home/data-scratch/chat-ab/incognito-shots"
+  : weatherReview ? weatherReviewOutDir
   : useWebkit ? join(ROOT, "docs", "assets", "screens", "webkit") : join(ROOT, "docs", "assets", "screens");
 const HERO_PATH = useWebkit ? join(ROOT, "docs", "assets", "webkit", "hero.png") : join(ROOT, "docs", "assets", "hero.png");
 const dedicatedScreenshots: Array<{ file: string; route: string; viewport: string; theme: string }> = [];
@@ -593,6 +596,42 @@ function seedWeatherCache(dataDir: string): void {
   }
 }
 
+function seedWeatherReviewCache(dataDir: string): void {
+  seedWeatherCache(dataDir);
+  const cacheDir = join(dataDir, "cache", "weather");
+  const forecasts = [
+    { lat: 47.60621, lon: -122.33207, temp: 57, code: 95, day: 1 },
+    { lat: 41.223, lon: -73.064, temp: 59, code: 0, day: 1 },
+    { lat: 42.36, lon: -71.06, temp: 48, code: 65, day: 1 },
+    { lat: 40.71, lon: -74.01, temp: 52, code: 0, day: 0 },
+    { lat: 39.74, lon: -104.99, temp: 24, code: 73, day: 1 },
+    { lat: 37.77, lon: -122.42, temp: 55, code: 45, day: 1 },
+  ];
+  for (const place of forecasts) {
+    const forecastUrl = `https://api.open-meteo.com/v1/forecast?latitude=${place.lat}&longitude=${place.lon}&current=temperature_2m,weather_code,is_day,apparent_temperature,relative_humidity_2m,precipitation,wind_speed_10m,wind_direction_10m,pressure_msl,visibility&hourly=temperature_2m,precipitation_probability&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max,sunrise,sunset,uv_index_max&forecast_days=10&forecast_hours=24&timezone=auto&temperature_unit=fahrenheit`;
+    const days = Array.from({ length: 10 }, (_, i) => new Date(Date.now() + i * 86400_000).toISOString().slice(0, 10));
+    const profile = place.lat === 41.223 ? { spread: 5, codes: [0, 1, 3, 61, 0, 80, 1, 3, 0, 95], wind: 12, direction: 250, humidity: 62, pressure: 1018, visibility: 16000, sunrise: 6, sunset: 19 }
+      : place.lat === 42.36 ? { spread: 8, codes: [61, 3, 80, 95, 61, 1, 3, 80, 0, 61], wind: 18, direction: 210, humidity: 86, pressure: 1004, visibility: 9000, sunrise: 6, sunset: 18 }
+      : place.lat === 40.71 ? { spread: 6, codes: [1, 0, 3, 61, 80, 1, 0, 3, 61, 0], wind: 9, direction: 160, humidity: 58, pressure: 1022, visibility: 14000, sunrise: 6, sunset: 19 }
+      : place.lat === 39.74 ? { spread: 10, codes: [3, 61, 80, 95, 3, 1, 0, 61, 80, 3], wind: 15, direction: 290, humidity: 44, pressure: 1008, visibility: 18000, sunrise: 7, sunset: 18 }
+      : place.lat === 37.77 ? { spread: 4, codes: [3, 1, 0, 3, 61, 1, 0, 3, 80, 1], wind: 14, direction: 275, humidity: 78, pressure: 1012, visibility: 12000, sunrise: 7, sunset: 19 }
+      : { spread: 7, codes: [95, 61, 80, 3, 1, 61, 0, 80, 3, 95], wind: 20, direction: 230, humidity: 90, pressure: 1001, visibility: 8000, sunrise: 6, sunset: 19 };
+    const highs = days.map((_, i) => place.temp + profile.spread + [0, 2, -1, -4, 1, 3, -2, -5, 0, 2][i]!);
+    const lows = days.map((_, i) => place.temp - profile.spread + [-1, -3, -5, -2, 0, 1, -2, -4, -1, -3][i]!);
+    const dayCodes = profile.codes;
+    const sunrise = days.map((d, i) => `${d}T0${profile.sunrise + (i % 3 === 0 ? 1 : 0)}:${i % 2 ? "42" : "18"}`);
+    const sunset = days.map((d, i) => `${d}T${profile.sunset + (i % 3 === 1 ? 1 : 0)}:${i % 2 ? "36" : "12"}`);
+    const hourlyTemps = Array.from({ length: 24 }, (_, i) => Number((place.temp - 2 + Math.sin(((i - 8) / 24) * Math.PI * 2) * 7).toFixed(1)));
+    const value = {
+      current: { time: new Date().toISOString().slice(0, 16), temperature_2m: place.temp, weather_code: place.code, is_day: place.day, apparent_temperature: place.temp - (place.code === 65 ? 4 : 2), relative_humidity_2m: profile.humidity, precipitation: place.code === 65 ? 1.4 : 0, wind_speed_10m: profile.wind, wind_direction_10m: profile.direction, wind_gusts_10m: profile.wind + 8, pressure_msl: profile.pressure, visibility: profile.visibility },
+      hourly: { time: Array.from({ length: 24 }, (_, i) => new Date(Date.now() + i * 3600_000).toISOString().slice(0, 13) + ":00"), temperature_2m: hourlyTemps, precipitation_probability: Array.from({ length: 24 }, (_, i) => [8, 6, 5, 8, 12, 18, 22, 18, 12, 8, 5, 5, 8, 12, 18, 24, 32, 28, 20, 15, 12, 10, 8, 6][i]!) },
+      daily: { time: days, weather_code: dayCodes, temperature_2m_max: highs, temperature_2m_min: lows, precipitation_probability_max: dayCodes.map((code, i) => [0, 1].includes(code) ? 5 + i % 3 * 5 : code === 3 ? 15 + i % 3 * 5 : code === 61 || code === 80 ? 55 + i % 4 * 8 : 85), sunrise, sunset, uv_index_max: days.map((_, i) => Math.max(1, 6 + (i % 4) - Math.floor(profile.humidity / 35))) },
+    };
+    const entry = { url: forecastUrl, method: "GET", fetchedAt: new Date().toISOString(), value };
+    writeFileSync(join(cacheDir, `${weatherCacheKey(forecastUrl)}.json`), JSON.stringify(entry));
+  }
+}
+
 function seedWriteDocumentRoutingStats(): void {
   if (!chatArtifactCapture) return;
   const source = `import { sqlite } from "./src/db/index.ts";
@@ -630,7 +669,7 @@ async function seedHousehold(): Promise<string> {
   const sessionValue = setCookie?.split(";")[0]?.split("=")[1];
   if (!sessionValue) throw new Error("setup response carried no session cookie");
 
-  if (plainRun || a11yOnly || docsReview || chatArtifactCapture || nextChatToolsReview || chatPageScreenshotFixture || chatIncognitoAudit || chatShellReview || chatColumnReview || mobileSmoke || Boolean(elementsWave2Arg)) {
+  if (plainRun || a11yOnly || docsReview || chatArtifactCapture || nextChatToolsReview || chatPageScreenshotFixture || chatIncognitoAudit || chatShellReview || chatColumnReview || mobileSmoke || weatherReview || Boolean(elementsWave2Arg)) {
     for (const [key, value] of [["engines.stack.url", STACK_URL]] as const) {
       const response = await fetch(`${BASE_URL}/api/settings`, {
         method: "PUT",
@@ -719,6 +758,24 @@ async function seedHousehold(): Promise<string> {
     body: JSON.stringify({ scope: "household", key: "household.home", value: homeId }),
   });
   if (!place.ok) throw new Error(`seed household.home failed: ${place.status}`);
+
+  if (weatherReview) {
+    const weatherHeaders = { "Content-Type": "application/json", Cookie: `session=${sessionValue}` };
+    const fixtures = [
+      { name: "Milford", lat: 41.223, lon: -73.064, area: "Connecticut" },
+      { name: "Rainier", lat: 42.36, lon: -71.06, area: "Massachusetts" },
+      { name: "Clearwater", lat: 40.71, lon: -74.01, area: "New York" },
+      { name: "Denver", lat: 39.74, lon: -104.99, area: "Colorado" },
+      { name: "San Francisco", lat: 37.77, lon: -122.42, area: "California" },
+    ];
+    const created = await Promise.all(fixtures.map(async (fixture) => {
+      const response = await fetch(`${BASE_URL}/api/entities`, { method: "POST", headers: weatherHeaders, body: JSON.stringify({ kind: "place", place_kind: "map", name: fixture.name, scope: "person", geo: { lat: fixture.lat, lon: fixture.lon, precision: "exact", area: fixture.area, from: "search" } }) });
+      if (!response.ok) throw new Error(`seed Weather ${fixture.name} failed: ${response.status} ${await response.text()}`);
+      return (await response.json() as { id: string }).id;
+    }));
+    const saved = await fetch(`${BASE_URL}/api/settings`, { method: "PUT", headers: weatherHeaders, body: JSON.stringify({ scope: `person:${sage.id}`, key: "weather.places", value: created }) });
+    if (!saved.ok) throw new Error(`seed Weather favorites failed: ${saved.status} ${await saved.text()}`);
+  }
 
   await seedPeopleAndThings(sessionValue);
   // LIBRARY-REVAMP-13: the Library routes are drawn from real seeded files (pictures with real pixels, a shared and an adults-only
@@ -829,6 +886,168 @@ async function newContext(browser: Browser, viewport: ViewportSpec, theme: "ligh
     await route.fulfill({ response, json: { ...body, computerName: "Bramble hub" } });
   });
   return context;
+}
+
+async function captureWeatherReview(browser: Browser, sessionValue: string): Promise<void> {
+  mkdirSync(weatherReviewOutDir, { recursive: true });
+  const desktop = VIEWPORTS.find((item) => item.slug === "desktop")!;
+  const phone = VIEWPORTS.find((item) => item.slug === "phone")!;
+  const locations = [
+    { label: /Seattle.*My Location|My Location.*Seattle/i, slug: "my-location" },
+    { label: /Milford/i, slug: "milford" },
+    { label: /Rainier/i, slug: "rainier" },
+    { label: /Clearwater/i, slug: "clearwater" },
+    { label: /Denver/i, slug: "snow" },
+    { label: /San Francisco/i, slug: "fog" },
+  ];
+  const files: string[] = [];
+  const failures: string[] = [];
+  let reviewContext: BrowserContext | undefined;
+  const pageFailureContext = async (page: Page): Promise<string> => page.evaluate(() => {
+    const visible = (element: Element) => {
+      const rect = element.getBoundingClientRect();
+      const style = getComputedStyle(element);
+      return rect.width > 0 && rect.height > 0 && style.visibility !== "hidden" && style.display !== "none";
+    };
+    const locations = [...document.querySelectorAll('[data-slot="weather-location"]')]
+      .filter(visible)
+      .map((element) => (element.textContent ?? "").replace(/\s+/g, " ").trim());
+    const buttons = [...document.querySelectorAll("button")]
+      .filter(visible)
+      .map((element) => (element.getAttribute("aria-label") || element.textContent || "").replace(/\s+/g, " ").trim());
+    return `page.url(): ${location.href}\nvisible location names: ${JSON.stringify(locations)}\nvisible button names: ${JSON.stringify(buttons)}`;
+  });
+  const attempt = async (label: string, capture: () => Promise<string | void>) => {
+    try {
+      const file = await capture();
+      if (file) files.push(file);
+    } catch (error) {
+      const detail = error instanceof Error ? error.stack ?? error.message : String(error);
+      failures.push(`${label}: ${detail}`);
+      const page = reviewContext?.pages()[0];
+      const state = page ? await pageFailureContext(page).catch(() => `page.url(): ${page.url()}\nvisible location names: unavailable`) : "page.url(): unavailable\nvisible location names: unavailable";
+      console.error(`weather-review capture failed [${label}]\n${detail}\n${state}`);
+    }
+  };
+  for (const viewport of [desktop, phone]) for (const theme of THEMES) {
+    let context: BrowserContext | undefined;
+    try {
+      context = await newContext(browser, viewport, theme, sessionValue);
+      reviewContext = context;
+      const page = await context.newPage();
+      await page.goto(`${BASE_URL}/apps/weather`);
+      await page.getByRole("heading", { name: "Weather" }).waitFor();
+      await page.locator('[data-slot="weather-location-sky"]').nth(5).waitFor({ timeout: 30000 });
+      const returnToLocationList = async () => {
+        const back = page.locator('[data-slot="weather-back"]');
+        if (await back.isVisible().catch(() => false)) await back.click();
+        else await page.goto(`${BASE_URL}/apps/weather`);
+        await page.getByRole("heading", { name: "Weather" }).waitFor();
+        await page.locator('[data-slot="weather-location"]').nth(1).waitFor({ state: "visible", timeout: 15000 });
+      };
+      for (const location of locations) {
+        const prefix = `weather-${viewport.slug}-${theme}-${location.slug}`;
+        let selected = false;
+        await attempt(`${prefix}-top`, async () => {
+          await returnToLocationList();
+          const button = viewport.slug === "phone"
+            ? page.locator('[data-slot="weather-location"]').filter({ hasText: location.label }).first()
+            : page.getByRole("button", { name: location.label }).first();
+          await button.waitFor({ timeout: 15000 });
+          await button.click();
+          selected = true;
+          await page.waitForTimeout(150);
+          const file = join(weatherReviewOutDir, `${prefix}-top.png`);
+          await page.evaluate(() => window.scrollTo(0, 0));
+          await page.screenshot({ path: file });
+          return file;
+        });
+        if (!selected) continue;
+
+        const detail = page.locator('[data-slot="weather-location-detail"]');
+        const tileGrid = detail.locator(":scope > div.grid");
+        const hourly = detail.locator('[data-slot="weather-hourly-strip"]').locator("xpath=ancestor::section[@data-slot='weather-tile']");
+        const tenDay = detail.locator('[data-slot="weather-daily-list"]').locator("xpath=ancestor::section[@data-slot='weather-tile']");
+        await attempt(`${prefix}-tiles`, async () => {
+          await detail.waitFor({ state: "visible" });
+          await tileGrid.waitFor({ state: "visible" });
+          await detail.evaluate((element) => {
+            const pane = element as HTMLElement;
+            let ancestor: HTMLElement | null = pane.parentElement;
+            while (ancestor && ancestor !== document.body) {
+              const style = getComputedStyle(ancestor);
+              if (/(auto|scroll)/.test(`${style.overflowY} ${style.overflow}`) && ancestor.scrollHeight > ancestor.clientHeight) break;
+              ancestor = ancestor.parentElement;
+            }
+            const scroller = ancestor ?? document.scrollingElement as HTMLElement | null;
+            const target = pane.querySelector<HTMLElement>(":scope > div.grid");
+            if (!scroller || !target) throw new Error("weather detail scroll container or tile grid not found");
+            const scrollTop = target.getBoundingClientRect().top - scroller.getBoundingClientRect().top + scroller.scrollTop;
+            scroller.scrollTo({ top: scrollTop, behavior: "instant" });
+          });
+          await tileGrid.scrollIntoViewIfNeeded();
+          const file = join(weatherReviewOutDir, `${prefix}-tiles.png`);
+          await tileGrid.screenshot({ path: file });
+          return file;
+        });
+        await attempt(`${prefix}-tiles-viewport`, async () => {
+          await tileGrid.scrollIntoViewIfNeeded();
+          const file = join(weatherReviewOutDir, `${prefix}-tiles-viewport.png`);
+          await page.screenshot({ path: file });
+          return file;
+        });
+        await attempt(`${prefix}-hourly`, async () => {
+          await hourly.waitFor({ state: "visible" });
+          const file = join(weatherReviewOutDir, `${prefix}-hourly.png`);
+          await hourly.screenshot({ path: file });
+          return file;
+        });
+        await attempt(`${prefix}-tenday`, async () => {
+          await tenDay.waitFor({ state: "visible" });
+          const file = join(weatherReviewOutDir, `${prefix}-tenday.png`);
+          await tenDay.screenshot({ path: file });
+          return file;
+        });
+        await returnToLocationList();
+      }
+      // Compare the same location twice, both for the full page and for the sky hero alone.
+      await returnToLocationList();
+      const milford = viewport.slug === "phone"
+        ? page.locator('[data-slot="weather-location"]').filter({ hasText: /Milford/i }).first()
+        : page.getByRole("button", { name: /Milford/i }).first();
+      await milford.click();
+      await page.waitForTimeout(150);
+      const frameA = await page.screenshot();
+      const hero = page.locator('[data-slot="weather-forecast-hero"]').first();
+      const heroA = await hero.screenshot();
+      await page.waitForTimeout(1500);
+      const frameB = await page.screenshot();
+      const heroB = await hero.screenshot();
+      const diff = pngPixelDifference(frameA, frameB);
+      const heroDiff = pngPixelDifference(heroA, heroB);
+      console.log(`weather-review motion ${viewport.slug}/${theme}: page ${diff.toFixed(2)}% pixels differ; hero ${heroDiff.toFixed(2)}% pixels differ`);
+      const motionEarly = join(weatherReviewOutDir, `weather-${viewport.slug}-${theme}-motion-early.png`);
+      writeFileSync(motionEarly, frameA);
+      files.push(motionEarly);
+      const motion = join(weatherReviewOutDir, `weather-${viewport.slug}-${theme}-motion-later.png`);
+      writeFileSync(motion, frameB);
+      files.push(motion);
+      await page.close();
+    } catch (error) {
+      const detail = error instanceof Error ? error.stack ?? error.message : String(error);
+      failures.push(`${viewport.slug}/${theme} setup or motion: ${detail}`);
+      const page = context?.pages()[0];
+      const state = page ? await pageFailureContext(page).catch(() => `page.url(): ${page.url()}\nvisible location names: unavailable`) : "page.url(): unavailable\nvisible location names: unavailable";
+      console.error(`weather-review capture failed [${viewport.slug}/${theme} setup or motion]\n${detail}\n${state}`);
+    } finally { await context?.close(); }
+  }
+  console.log("weather-review written files:");
+  for (const file of files) console.log(file);
+  if (failures.length) {
+    console.error(`weather-review had ${failures.length} capture failure(s):`);
+    for (const failure of failures) console.error(failure);
+    throw new Error(`weather-review failed after attempting all captures (${failures.length} failure(s))`);
+  }
 }
 
 interface RunResult {
@@ -3505,6 +3724,27 @@ function pngFirstPixel(png: Buffer): [number, number, number] {
   // Any PNG filter leaves the first pixel of the first row as stored.
   if (width < 1) throw new Error("pngFirstPixel: no IHDR");
   return [raw[1]!, raw[2]!, raw[3]!];
+}
+
+function pngPixelDifference(first: Buffer, second: Buffer): number {
+  const decode = (png: Buffer) => {
+    let width = 0; let height = 0; let colorType = 0; const chunks: Buffer[] = [];
+    for (let at = 8; at < png.length;) {
+      const length = png.readUInt32BE(at); const type = png.toString("ascii", at + 4, at + 8); const data = png.subarray(at + 8, at + 8 + length);
+      if (type === "IHDR") { width = data.readUInt32BE(0); height = data.readUInt32BE(4); colorType = data[9]!; if (data[8] !== 8 || (colorType !== 2 && colorType !== 6) || data[12] !== 0) throw new Error("weather review pixel diff expects 8-bit non-interlaced RGB/RGBA"); }
+      if (type === "IDAT") chunks.push(data); at += 12 + length;
+    }
+    const raw = inflateSync(Buffer.concat(chunks)); const channels = colorType === 6 ? 4 : 3; const stride = width * channels; const pixels = Buffer.alloc(width * height * channels); let prior = Buffer.alloc(stride); let offset = 0;
+    for (let y = 0; y < height; y++) {
+      const filter = raw[offset++]!; const scan = Buffer.from(raw.subarray(offset, offset + stride)); offset += stride;
+      for (let x = 0; x < stride; x++) { const a = x >= channels ? scan[x - channels]! : 0; const b = prior[x]!; const c = x >= channels ? prior[x - channels]! : 0; if (filter === 1) scan[x] = (scan[x]! + a) & 255; else if (filter === 2) scan[x] = (scan[x]! + b) & 255; else if (filter === 3) scan[x] = (scan[x]! + Math.floor((a + b) / 2)) & 255; else if (filter === 4) { const p = a + b - c; const pa = Math.abs(p - a); const pb = Math.abs(p - b); const pc = Math.abs(p - c); scan[x] = (scan[x]! + (pa <= pb && pa <= pc ? a : pb <= pc ? b : c)) & 255; } else if (filter !== 0) throw new Error(`unsupported PNG filter ${filter}`); }
+      scan.copy(pixels, y * stride); prior = scan;
+    }
+    return { width, height, channels, pixels };
+  };
+  const a = decode(first); const b = decode(second); if (a.width !== b.width || a.height !== b.height) throw new Error("weather review screenshots differ in dimensions");
+  let changed = 0; for (let pixel = 0; pixel < a.width * a.height; pixel++) { const offset = pixel * a.channels; if (a.pixels[offset] !== b.pixels[offset] || a.pixels[offset + 1] !== b.pixels[offset + 1] || a.pixels[offset + 2] !== b.pixels[offset + 2]) changed++; }
+  return changed / (a.width * a.height) * 100;
 }
 
 async function pixelOf(page: Page, locator: Locator): Promise<[number, number, number]> {
@@ -10139,7 +10379,7 @@ async function main() {
   DATA_DIR = createOwnedDemoDataDir(ROOT, DATA_OWNER);
   process.env.MAIPAI_DATA_DIR = DATA_DIR;
   try {
-    seedWeatherCache(DATA_DIR);
+    if (weatherReview) seedWeatherReviewCache(DATA_DIR); else seedWeatherCache(DATA_DIR);
     seedWriteDocumentRoutingStats();
     if (statusC3bReview) seedStatusC3bEvents();
 
@@ -10304,7 +10544,7 @@ async function main() {
     // once the gate itself is fixed).
     return "Start with a sunny spot and a few easy plants.\n\n- Grow lettuce in a shallow container.\n- Give tomatoes a larger pot and a support.\n- Water when the top layer of soil feels dry.\nHow much space do you have?";
   } });
-  const screenshotStack = plainRun || a11yOnly || docsReview || chatArtifactCapture || nextChatToolsReview || chatPageScreenshotFixture || chatIncognitoAudit || chatShellReview || chatColumnReview || mobileSmoke || Boolean(elementsWave2Arg) || regenerateMenuReview ? startScreenshotStack(chatModel.url, regenerateMenuReview) : undefined;
+  const screenshotStack = plainRun || a11yOnly || docsReview || chatArtifactCapture || nextChatToolsReview || chatPageScreenshotFixture || chatIncognitoAudit || chatShellReview || chatColumnReview || mobileSmoke || weatherReview || Boolean(elementsWave2Arg) || regenerateMenuReview ? startScreenshotStack(chatModel.url, regenerateMenuReview) : undefined;
   if (screenshotStack) STACK_URL = `http://127.0.0.1:${screenshotStack.port}`;
   // Keep the HTTP listener independent; intentionally exercise the
   // Repairs surface's real Wyoming bind-failure path via its fixture flag.
@@ -10412,6 +10652,11 @@ async function main() {
       for (const finding of result.findings) console.error(`mobile-smoke FAIL [${finding.step}] ${finding.kind}: ${finding.detail}`);
       if (result.findings.length > 0) throw new Error(`mobile-smoke: ${result.findings.length} finding(s)`);
       console.log("completed named review: --mobile-smoke");
+      return;
+    }
+    if (weatherReview) {
+      await captureWeatherReview(browser, sessionValue);
+      console.log(`completed named review: --weather-review (${weatherReviewOutDir})`);
       return;
     }
     if (voiceBrowserReview) {
@@ -11052,7 +11297,7 @@ async function main() {
       await capturePhoneHeaderFoldReview(browser, sessionValue);
     }
 
-    if (!a11yOnly && !docsReview && !setupReviewCaptures && !filesReview && !referenceReview && !laneBTouchTargetsReview && !settingsReview && !chatReview && !chatStatsReview && !chatResearchReview && !chatTemporaryReview && !chatContinueReview && !fitVerdictReview && !chatAcceptanceReview && !shellRailReview && !chatThreadActionsReview && !chatListReview && !chatSearchReview && !chatMobileSheetReview && !chatShortcutsReview && !chatFindHeaderAlignmentReview && !chatFindBubbleHoverWidthReview && !chatHeaderTitleReview && !phoneHeaderFoldReview && !nextChatArtifactReview && !nextChatComposerReview && !nextSidebarReview && !notificationsReview && !lookReview && !pictureReview && !showcaseScrollReview && !liveVoiceSessionReview && !canvasPaneReview && !liveViewReview && !robotAdminReview && !chatToolsRowReview) {
+    if (!a11yOnly && !weatherReview && !docsReview && !setupReviewCaptures && !filesReview && !referenceReview && !laneBTouchTargetsReview && !settingsReview && !chatReview && !chatStatsReview && !chatResearchReview && !chatTemporaryReview && !chatContinueReview && !fitVerdictReview && !chatAcceptanceReview && !shellRailReview && !chatThreadActionsReview && !chatListReview && !chatSearchReview && !chatMobileSheetReview && !chatShortcutsReview && !chatFindHeaderAlignmentReview && !chatFindBubbleHoverWidthReview && !chatHeaderTitleReview && !phoneHeaderFoldReview && !nextChatArtifactReview && !nextChatComposerReview && !nextSidebarReview && !notificationsReview && !lookReview && !pictureReview && !showcaseScrollReview && !liveVoiceSessionReview && !canvasPaneReview && !liveViewReview && !robotAdminReview && !chatToolsRowReview) {
       await captureHero(browser, sessionValue);
       const phone = VIEWPORTS.find((v) => v.slug === "phone")!;
       const desktop = VIEWPORTS.find((v) => v.slug === "desktop")!;
