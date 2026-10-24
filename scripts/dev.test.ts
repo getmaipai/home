@@ -50,7 +50,7 @@ describe("scripts/dev.sh", () => {
     const url = run(worktree, "url", "--port", "8850");
     expect(url.status).toBe(0);
     expect(url.stdout).toContain("http://localhost:9850");
-    expect(url.stdout).toContain("http://localhost:8850");
+    expect(url.stdout).toContain("http://127.0.0.1:8850");
   });
 
   test("status reports both processes stopped without pid files", () => {
