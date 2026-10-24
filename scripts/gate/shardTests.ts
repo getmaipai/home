@@ -154,9 +154,15 @@ function sysTool(name: string, ...dirs: string[]): string {
 export type ResourceSnapshot = { reclaimableGb: number; totalGb: number; pressureLevel: number };
 
 export function processTreeRssGb(rootPid: number): number {
-  const res = Bun.spawnSync([sysTool("ps", "/bin", "/usr/bin"), "-A", "-o", "pid=,ppid=,rss="]);
-  if (res.exitCode !== 0) return 0;
-  const rows = res.stdout.toString().split(/\r?\n/).flatMap((line) => {
+  let output: string;
+  try {
+    const res = Bun.spawnSync([sysTool("ps", "/bin", "/usr/bin"), "-A", "-o", "pid=,ppid=,rss="]);
+    if (res.exitCode !== 0) return 0;
+    output = res.stdout.toString();
+  } catch {
+    return 0;
+  }
+  const rows = output.split(/\r?\n/).flatMap((line) => {
     const values = line.trim().split(/\s+/).map(Number);
     const [pid, ppid, rssKb] = values;
     return Number.isInteger(pid) && Number.isInteger(ppid) && Number.isFinite(rssKb)
@@ -301,6 +307,18 @@ export function failedTests(output: string): string[] {
   return output.split("\n").filter((l) => l.startsWith("(fail)"));
 }
 
+/** Test files that contain a `(fail)` line, in the order bun reports them. */
+export function failedFiles(output: string): string[] {
+  const files = new Set<string>();
+  let current = "";
+  for (const line of output.split(/\r?\n/)) {
+    const header = /^([^\s].*\.(?:test|spec|_test|_spec)\.(?:ts|tsx|js|jsx|mjs|cjs|mts|cts)):\s*$/.exec(line);
+    if (header) current = header[1] as string;
+    else if (line.startsWith("(fail)") && current) files.add(current);
+  }
+  return [...files];
+}
+
 /** Per-file seconds from a junit report: the sum of each file's testcase times. */
 export function junitFileSeconds(xml: string): Timings {
   const out: Timings = {};
@@ -313,9 +331,16 @@ export function junitFileSeconds(xml: string): Timings {
 }
 
 function descendants(pid: number): number[] {
-  const res = Bun.spawnSync([sysTool("ps", "/bin", "/usr/bin"), "-A", "-o", "pid=,ppid="]);
+  let output: string;
+  try {
+    const res = Bun.spawnSync([sysTool("ps", "/bin", "/usr/bin"), "-A", "-o", "pid=,ppid="]);
+    if (res.exitCode !== 0) return [];
+    output = res.stdout.toString();
+  } catch {
+    return [];
+  }
   const kids = new Map<number, number[]>();
-  for (const line of res.stdout.toString().split("\n")) {
+  for (const line of output.split("\n")) {
     const [p, pp] = line.trim().split(/\s+/).map(Number);
     if (!p || pp === undefined) continue;
     kids.set(pp, [...(kids.get(pp) ?? []), p]);
@@ -680,6 +705,7 @@ export async function run(opts: RunOptions): Promise<number> {
     // A failure that does not repeat alone usually depends on which files
     // shared the process: name them, in run order, to reproduce it.
     console.log(`shard: files in the failing shard, in run order: ${failure.shard.files.join(" ")}`);
+    console.log(`shard: failing files: ${failedFiles(out).join(" ")}`);
   } else {
     const total: Summary = { pass: 0, fail: 0, tests: 0, files: 0 };
     for (const s of live) {

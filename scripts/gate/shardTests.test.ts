@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test";
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { balance, chooseShardCount, discoverTests, failedTests, FlakeLedger, junitFileSeconds, parseStackBudget, parseSummary, readShardLog, reserveWorkerSlot, run, workerSlotCount } from "./shardTests";
+import { balance, chooseShardCount, discoverTests, failedFiles, failedTests, FlakeLedger, junitFileSeconds, parseStackBudget, parseSummary, readShardLog, reserveWorkerSlot, run, workerSlotCount } from "./shardTests";
 
 describe("balance", () => {
   test("every file lands in exactly one shard", () => {
@@ -102,6 +102,11 @@ describe("parsing", () => {
 
   test("failedTests names each red test", () => {
     expect(failedTests("(pass) a\n(fail) b > c [3ms]\n")).toEqual(["(fail) b > c [3ms]"]);
+  });
+
+  test("failedFiles attributes failures to distinct bun file headers in order", () => {
+    const output = "tests/first.test.ts:\n(fail) first failure [1ms]\n(fail) second failure [2ms]\ntests/clean.test.ts:\n(pass) clean [1ms]\ntests/last.test.ts:\n(fail) third failure [3ms]\n";
+    expect(failedFiles(output)).toEqual(["tests/first.test.ts", "tests/last.test.ts"]);
   });
 
   test("junitFileSeconds sums testcase times per file", () => {
