@@ -53,6 +53,9 @@ Rule 0 and the age gates: tightened, never loosened. Rule 9: no wrapper, no clas
 Principle 1: one type rule (`companionFits`), one writer (`persona.active_id`). Open choice for Jesse: whether Companions should be
 pinned in the rail by default (core catalog entries have no default pin; a pin is one tap in All apps).
 
+> **Extended 2026-10-24:** [companions-shared-chat-and-presence-2026-10-24.md](companions-shared-chat-and-presence-2026-10-24.md) splits the one grid into Yours and Discover
+> and adds Activity / Tasks / Chats / Setup to the detail. The decisions here (one type rule, one writer, S1) stand.
+
 ## Supersedes
 
 Nothing is replaced. This note adds behavior to two existing records without changing their decisions: `PUT /api/settings` now refuses a
