@@ -69,8 +69,10 @@ describe("lander pipeline", () => {
     expect(readFileSync(join(data, "queue", awaitQueueName()), "utf8")).toContain(sha);
     expect(git(origin, "rev-parse", "refs/heads/wt/alpha")).toBe(sha);
     const processed = run("lander.sh", ["run-once"]);
-    expect(processed.status).toBe(0, `${processed.stdout}\n${processed.stderr}`);
-    expect(existsSync(join(data, "notes", "wt-alpha.json"))).toBe(true, `${processed.stdout}\n${processed.stderr}`);
+    if (processed.status !== 0) console.error(`lander exited ${processed.status}\nstdout:\n${processed.stdout}\nstderr:\n${processed.stderr}`);
+    expect(processed.status).toBe(0);
+    if (!existsSync(join(data, "notes", "wt-alpha.json"))) console.error(`landing note missing\nstdout:\n${processed.stdout}\nstderr:\n${processed.stderr}`);
+    expect(existsSync(join(data, "notes", "wt-alpha.json"))).toBe(true);
     expect(git(origin, "log", "-1", "--format=%s", "main")).toBe("alpha change");
     expect(note("alpha").status).toBe("landed");
     expect(note("alpha").main_sha).toBe(git(origin, "rev-parse", "main"));
@@ -149,7 +151,8 @@ describe("lander pipeline", () => {
     while (!existsSync(pidfile) && Date.now() < startupDeadline) await Bun.sleep(25);
     expect(existsSync(pidfile)).toBe(true);
     const queued = run("land.sh", ["--detach"], wt);
-    expect(queued.status).toBe(0, `${queued.stdout}\n${queued.stderr}`);
+    if (queued.status !== 0) console.error(`land.sh exited ${queued.status}\nstdout:\n${queued.stdout}\nstderr:\n${queued.stderr}`);
+    expect(queued.status).toBe(0);
     const requestDeadline = Date.now() + 10_000;
     while ((queueFiles().length === 0 || Date.now() < requestDeadline - 9_000) && Date.now() < requestDeadline) await Bun.sleep(25);
     await Bun.sleep(1_050);
@@ -159,7 +162,7 @@ describe("lander pipeline", () => {
     const stdout = await new Response(server.stdout).text();
     const stderr = await new Response(server.stderr).text();
     if (exitCode !== 0) console.error(`serve exited ${exitCode}\nstdout:\n${stdout}\nstderr:\n${stderr}`);
-    expect(exitCode).toBe(0, `${stdout}\n${stderr}`);
+    expect(exitCode).toBe(0);
     expect(note("zeta").status).toBe("landed");
     expect(note("zeta").sha).toBe(sha);
     expect(git(origin, "rev-parse", "main")).toBe(note("zeta").main_sha);
