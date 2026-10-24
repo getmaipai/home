@@ -7,6 +7,8 @@
   "scripts": {
     "start": "bash scripts/app.sh start",
     "stop": "bash scripts/app.sh stop",
+    "dev": "bash scripts/dev.sh start",
+    "dev:stop": "bash scripts/dev.sh stop",
     "restart": "bash scripts/app.sh pull && bun run stop && bun run start",
     "screenshots": "bun run scripts/screenshot.ts",
     "a11y": "bun run scripts/screenshot.ts --a11y-only",
