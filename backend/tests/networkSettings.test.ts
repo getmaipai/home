@@ -14,9 +14,14 @@ import { startupUrls } from "@/lib/startupUrls";
 
 let listeners: HomeListenerSet | null = null;
 let restartCount = 0;
+const originalLanExposure = process.env.MAIPAI_LAN_EXPOSURE;
 
-beforeEach(() => { resetDb(); restartCount = 0; __setHubRestartSchedulerForTests(() => { restartCount++; }); });
-afterEach(() => { listeners?.stop(); listeners = null; __setHubRestartSchedulerForTests(); });
+beforeEach(() => { delete process.env.MAIPAI_LAN_EXPOSURE; resetDb(); restartCount = 0; __setHubRestartSchedulerForTests(() => { restartCount++; }); });
+afterEach(() => {
+  if (originalLanExposure === undefined) delete process.env.MAIPAI_LAN_EXPOSURE;
+  else process.env.MAIPAI_LAN_EXPOSURE = originalLanExposure;
+  listeners?.stop(); listeners = null; __setHubRestartSchedulerForTests();
+});
 
 async function ownerAndChild() {
   const owner = new TestClient();
@@ -29,6 +34,24 @@ async function ownerAndChild() {
 }
 
 describe("Network and access settings", () => {
+  test("LAN exposure environment override takes precedence over the household setting", async () => {
+    const { owner } = await ownerAndChild();
+    const saved = await owner.request("/api/settings", {
+      method: "PUT",
+      body: { scope: "household", key: "network.lan_exposure", value: "loopback" },
+    });
+    expect(saved.status).toBe(200);
+
+    process.env.MAIPAI_LAN_EXPOSURE = "loopback";
+    expect(configuredLanExposure()).toBe("loopback");
+    process.env.MAIPAI_LAN_EXPOSURE = "lan";
+    expect(configuredLanExposure()).toBe("lan");
+    delete process.env.MAIPAI_LAN_EXPOSURE;
+    expect(configuredLanExposure()).toBe("loopback");
+    process.env.MAIPAI_LAN_EXPOSURE = "unexpected";
+    expect(configuredLanExposure()).toBe("loopback");
+  });
+
   test("a non-admin cannot change it", async () => {
     const { childClient } = await ownerAndChild();
     const response = await childClient.request("/api/settings", {

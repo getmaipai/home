@@ -15,6 +15,9 @@ export function configuredHubPort(): number {
 }
 
 export function configuredLanExposure(): "loopback" | "lan" {
+  // Development and scratch hubs pin loopback so a seeded demo household never listens on the LAN; the installed hub never sets this.
+  if (process.env.MAIPAI_LAN_EXPOSURE === "loopback") return "loopback";
+  if (process.env.MAIPAI_LAN_EXPOSURE === "lan") return "lan";
   return getHouseholdSettingValue(LAN_EXPOSURE_SETTING) === "loopback" ? "loopback" : "lan";
 }
 

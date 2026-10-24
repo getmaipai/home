@@ -85,7 +85,7 @@ live_vite() {
 }
 print_urls() {
   echo "Home: http://localhost:$vite_port"
-  echo "API: http://localhost:$backend_port"
+  echo "API: http://127.0.0.1:$backend_port"
 }
 process_status() {
   local label="$1" file="$2" candidate command port
@@ -184,7 +184,7 @@ case "$action" in
     mkdir -p "$hub"
     (
       cd "$root/backend"
-      MAIPAI_TEST_ALLOW_MULTIPLE_HUBS=1 MAIPAI_MDNS=off PORT="$backend_port" \
+      MAIPAI_TEST_ALLOW_MULTIPLE_HUBS=1 MAIPAI_MDNS=off MAIPAI_LAN_EXPOSURE=loopback PORT="$backend_port" \
         MAIPAI_DATA_DIR="$hub" MAIPAI_BACKUP_DIR="$hub/backups" MAIPAI_KEYSTORE_BACKEND=file \
         MAIPAI_TTS_DISABLE_SPAWN=1 MAIPAI_WYOMING_PORT=0 MAIPAI_BACKGROUND_URL=http://127.0.0.1:1 \
         MAIPAI_LLAMA_SERVER_URL= MAIPAI_EMBED_URL= MAIPAI_HUB_LOCK_PATH="$hub.lock" \
