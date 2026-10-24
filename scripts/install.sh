@@ -1111,6 +1111,7 @@ commons_archive_sha256() {
     ui-v0.5.324) printf '%s\n' "90eaeb413c5fdb5983aabfaab51e314599017e421f5ae59a0c758855f80f2af1" ;;
     ui-v0.5.326) printf '%s\n' "0b0c9119a90fb90db13a288e02d73878d8b13b436555073ec714f6b7653404c4" ;;
     ui-v0.5.327) printf '%s\n' "c8ea087c3b8a533d04acdca052037c30212820df936c4e31bc194a1cf012e047" ;;
+    ui-v0.5.328) printf '%s\n' "7b3b67f869f18bcaf1dfcf66817991ea5c52abd712f19a90679821fef270c71b" ;;
     spec-v0.1.203) printf '%s\n' "78d0d5663a19dc8274c6d222be142251de70aa3e937ecee78e34c097c320ea71" ;;
     spec-v0.1.204) printf '%s\n' "1fe37f7ff49ec4021dda7fa62ba877e3126e6e74069640ce9d3a935be2a34333" ;;
     spec-v0.1.206) printf '%s\n' "b597613454a5429cf649daa2b5aa8f04850b1ce0a8634ebad7aa99b1b5a11c55" ;;
