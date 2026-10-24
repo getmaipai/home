@@ -25,6 +25,7 @@ import { join } from "node:path";
 import { reserveFreePort } from "../../tests/fixtures/reserveFreePort";
 import { runningGates } from "../bench/liveHubQuiet";
 import { waitForBackendPort } from "../../../scripts/screenshotRuntime";
+import { seedDemoHousehold } from "../../../scripts/seed";
 import { judgeTurn, parseVmStat, wordCount, type TurnObservation, type TurnSpec, type TurnVerdict } from "./chatChecks";
 
 const BACKEND_DIR = join(import.meta.dir, "..", "..");
@@ -145,28 +146,14 @@ const cookieOf = (response: Response): string => {
 };
 
 /** Seeds the demo household and signs both people in through the real routes. */
-async function seedAndLogin(base: string, searxng: string | null): Promise<{ adult: Session; child: Session }> {
-  const setup = await api(base, "/api/auth/setup", { method: "POST", body: JSON.stringify({ displayName: "Sage", secret: SECRET }) });
-  if (!setup.ok) throw new Error(`setup failed: ${setup.status} ${await setup.text()}`);
-  const setupCookie = cookieOf(setup);
-  const settings: [string, unknown][] = [["engines.stack.url", STACK_URL], ["engines.stack.use_chat", true], ["engines.stack.use_embeddings", true]];
-  if (searxng) settings.push(["search.searxng_url", searxng]);
-  for (const [key, value] of settings) {
-    const response = await api(base, "/api/settings", { method: "PUT", cookie: setupCookie, body: JSON.stringify({ scope: "household", key, value }) });
-    if (!response.ok) throw new Error(`setting ${key} failed: ${response.status} ${await response.text()}`);
-  }
-  const created = await api(base, "/api/people", { method: "POST", cookie: setupCookie, body: JSON.stringify({ displayName: "Nova", role: "child" }) });
-  if (!created.ok) throw new Error(`creating the demo child failed: ${created.status} ${await created.text()}`);
-  const roster = (await (await api(base, "/api/people", { cookie: setupCookie })).json()) as { id: string; display_name: string }[];
-  const sage = roster.find((person) => person.display_name === "Sage");
-  const nova = roster.find((person) => person.display_name === "Nova");
-  if (!sage || !nova) throw new Error("the seeded roster is missing Sage or Nova");
+async function seedAndLogin(base: string, dataDir: string, searxng: string | null): Promise<{ adult: Session; child: Session }> {
+  const seeded = await seedDemoHousehold({ baseUrl: base, dataDir, secret: SECRET, stackUrl: STACK_URL, searxngUrl: searxng, homePlace: null });
   // The real login routes: the adult proves a secret, the child is a bare tap.
-  const adultLogin = await api(base, "/api/auth/verify-secret", { method: "POST", body: JSON.stringify({ personId: sage.id, secret: SECRET }) });
+  const adultLogin = await api(base, "/api/auth/verify-secret", { method: "POST", body: JSON.stringify({ personId: seeded.people.sage, secret: SECRET }) });
   if (!adultLogin.ok) throw new Error(`adult login failed: ${adultLogin.status} ${await adultLogin.text()}`);
-  const childLogin = await api(base, "/api/auth/select", { method: "POST", body: JSON.stringify({ personId: nova.id }) });
+  const childLogin = await api(base, "/api/auth/select", { method: "POST", body: JSON.stringify({ personId: seeded.people.nova }) });
   if (!childLogin.ok) throw new Error(`child login failed: ${childLogin.status} ${await childLogin.text()}`);
-  return { adult: { cookie: cookieOf(adultLogin), personId: sage.id }, child: { cookie: cookieOf(childLogin), personId: nova.id } };
+  return { adult: { cookie: cookieOf(adultLogin), personId: seeded.people.sage }, child: { cookie: cookieOf(childLogin), personId: seeded.people.nova } };
 }
 
 interface Streamed {
@@ -292,7 +279,7 @@ async function main(): Promise<void> {
     if (port === 8787) throw new Error("the scratch Home bound 8787, which is the live app's port");
     const base = `http://127.0.0.1:${port}`;
     console.log(`smoke:chat: scratch Home on port ${port}, data in a throwaway directory, Stack at ${STACK_URL}`);
-    const people = await seedAndLogin(base, searxng);
+    const people = await seedAndLogin(base, dataDir, searxng);
     let conversation: string | null = null;
     let previousSearched = false;
     for (const spec of TURNS.filter((turn) => !ONLY || ONLY.includes(turn.id))) {
