@@ -1,4 +1,7 @@
 #!/usr/bin/env bash
+# MAIPAI_WATCH_LEGS selects real sharder legs (default: backend frontend scripts).
+# Concurrent worker ceilings: MAIPAI_WATCH_BACKEND_SHARDS=4,
+# MAIPAI_WATCH_FRONTEND_SHARDS=2, MAIPAI_WATCH_SCRIPTS_SHARDS=2.
 set -euo pipefail
 umask 077
 
@@ -59,16 +62,50 @@ run_suite() {
   if [[ -n "$command" ]]; then
     (cd "$checkout" && bash -c "$command") >"$output" 2>&1
   else
-    local leg rc=0
-    : > "$output"
+    local leg rc=0 shards root leg_output leg_status leg_rc leg_seconds
+    local requested configured="${MAIPAI_WATCH_LEGS:-backend frontend scripts}"
+    local -a requested_legs=() legs=() pids=()
+    read -r -a requested_legs <<< "$configured"
+    if [[ "${#requested_legs[@]}" -eq 0 ]]; then error "MAIPAI_WATCH_LEGS must name backend, frontend, and/or scripts."; return 2; fi
+    for requested in "${requested_legs[@]}"; do
+      case "$requested" in backend|frontend|scripts) ;; *) error "unknown MAIPAI_WATCH_LEGS entry: $requested"; return 2 ;; esac
+    done
     for leg in backend frontend scripts; do
-      local leg_output="$output.$leg" leg_rc
-      if (cd "$checkout" && export MAIPAI_COMMONS_DIR="$(cd "$main/.." && pwd -P)/commons" MAIPAI_STANDARDS_DIR="$(cd "$main/.." && pwd -P)/.github" && nice -n 10 bun scripts/gate/shardTests.ts --dir "$leg" --root "$([[ "$leg" == backend ]] && echo tests || echo .)") >"$leg_output" 2>&1; then
-        leg_rc=0
-      else
-        leg_rc=$?
-      fi
+      for requested in "${requested_legs[@]}"; do
+        if [[ "$requested" == "$leg" ]]; then legs+=("$leg"); break; fi
+      done
+    done
+    : > "$output"
+    for leg in "${legs[@]}"; do
+      leg_output="$output.$leg"
+      leg_status="$output.$leg.status"
+      case "$leg" in
+        backend) shards="${MAIPAI_WATCH_BACKEND_SHARDS:-4}"; root=tests ;;
+        frontend) shards="${MAIPAI_WATCH_FRONTEND_SHARDS:-2}"; root=. ;;
+        scripts) shards="${MAIPAI_WATCH_SCRIPTS_SHARDS:-2}"; root=. ;;
+      esac
+      (
+        local_started="$(date +%s)"
+        if (cd "$checkout" && export MAIPAI_COMMONS_DIR="$(cd "$main/.." && pwd -P)/commons" MAIPAI_STANDARDS_DIR="$(cd "$main/.." && pwd -P)/.github" && nice -n 10 bun scripts/gate/shardTests.ts --dir "$leg" --root "$root" --shards "$shards"); then
+          leg_rc=0
+        else
+          leg_rc=$?
+        fi
+        leg_seconds=$(( $(date +%s) - local_started ))
+        printf '%s %s\n' "$leg_rc" "$leg_seconds" > "$leg_status"
+        exit "$leg_rc"
+      ) >"$leg_output" 2>&1 &
+      pids+=("$!")
+    done
+    for i in "${!legs[@]}"; do
+      leg="${legs[$i]}"
+      if wait "${pids[$i]}"; then :; else rc=1; fi
+      leg_output="$output.$leg"
+      leg_status="$output.$leg.status"
+      read -r leg_rc leg_seconds < "$leg_status"
+      printf '== leg: %s (exit %s, %s s)\n' "$leg" "$leg_rc" "$leg_seconds" >> "$output"
       cat "$leg_output" >> "$output"
+      rm -f "$leg_output" "$leg_status"
       (( leg_rc == 0 )) || rc=1
     done
     return "$rc"
@@ -76,7 +113,7 @@ run_suite() {
 }
 
 failing_files() {
-  local output="$1" leg leg_output line file command="${MAIPAI_WATCH_SUITE_CMD:-}" seen=" "
+  local output="$1" leg="" line file command="${MAIPAI_WATCH_SUITE_CMD:-}" seen=" "
   local -a files=()
   if [[ -n "$command" ]]; then
     while IFS= read -r line; do
@@ -85,16 +122,16 @@ failing_files() {
       done
     done < <(sed -n -E 's/^(shard: )?failing files:[[:space:]]*//p' "$output")
   else
-    for leg in backend frontend scripts; do
-      leg_output="$output.$leg"
-      [[ -f "$leg_output" ]] || continue
-      while IFS= read -r line; do
-        for file in $line; do
+    while IFS= read -r line; do
+      if [[ "$line" =~ ^==[[:space:]]leg:[[:space:]](backend|frontend|scripts)[[:space:]]\(exit[[:space:]] ]]; then
+        leg="${BASH_REMATCH[1]}"
+      elif [[ "$line" =~ ^shard:\ failing\ files:[[:space:]]*(.*)$ ]]; then
+        for file in ${BASH_REMATCH[1]}; do
           file="$leg/$file"
-          case "$seen" in *" $file "*) ;; *) [[ -n "$file" ]] && { files+=("$file"); seen+="$file "; } ;; esac
+          case "$seen" in *" $file "*) ;; *) [[ -n "$leg" && -n "$file" ]] && { files+=("$file"); seen+="$file "; } ;; esac
         done
-      done < <(sed -n 's/^shard: failing files:[[:space:]]*//p' "$leg_output")
-    done
+      fi
+    done < "$output"
   fi
   printf '%s' "${files[*]}"
 }

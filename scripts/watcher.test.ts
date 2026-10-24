@@ -25,6 +25,7 @@ function fixture() {
     MAIPAI_WATCH_DATA: data,
     MAIPAI_WATCH_CHECKOUT: warm,
     MAIPAI_WATCH_SKIP_INSTALL: "1",
+    MAIPAI_WATCH_LEGS: "backend frontend",
     MAIPAI_LAND_GIT_ENV: "",
     MAIPAI_WATCH_SUITE_CMD: "bash scripts/suite.sh",
     MAIPAI_WATCH_RERUN_CMD: "bash scripts/rerun.sh",
@@ -93,6 +94,26 @@ describe("main watcher", () => {
     expect(existsSync(join(f.scratch, "issue.calls"))).toBe(true);
     expect(readFileSync(join(f.scratch, "issue.calls"), "utf8")).toContain("backend/tests/broken.test.ts");
     expect(existsSync(join(f.data, "green", sha))).toBe(false);
+  }, 60_000);
+
+  test("records failing files from multiple leg sections", () => {
+    const f = fixture();
+    writeFileSync(join(f.main, "scripts/suite.sh"), "#!/usr/bin/env bash\nif [[ -f RED ]]; then\n  echo '== leg: backend (exit 1, 12 s)'\n  echo 'shard: failing files: backend/tests/a.test.ts'\n  echo '== leg: frontend (exit 1, 8 s)'\n  echo 'shard: failing files: frontend/src/b.test.ts'\n  exit 1\nfi\necho 'all green'\n");
+    writeFileSync(join(f.main, "scripts/rerun.sh"), "#!/usr/bin/env bash\nexit 1\n");
+    git(f.main, "add", "-A");
+    git(f.main, "commit", "-m", "fixture multi-leg suite");
+    git(f.main, "push", "origin", "main");
+    expect(run(f, "watcher.sh", ["run-once"]).status).toBe(0);
+    const sha = commit(f, "break backend and frontend tests", { RED: "red\n" });
+    expect(run(f, "watcher.sh", ["run-once"]).status).toBe(0);
+    const last = records(f).at(-1);
+    expect(last.result).toBe("red");
+    expect(last.failing).toEqual(["backend/tests/a.test.ts", "frontend/src/b.test.ts"]);
+    const note = readFileSync(join(f.data, "reds", `${sha}.md`), "utf8");
+    expect(note).toContain("backend/tests/a.test.ts");
+    expect(note).toContain("frontend/src/b.test.ts");
+    expect(note).toContain("== leg: backend (exit 1, 12 s)");
+    expect(note).toContain("== leg: frontend (exit 1, 8 s)");
   }, 60_000);
 
   test("bisects multiple landings to the commit that introduced RED", () => {
