@@ -81,5 +81,7 @@ These non-adoptions carry no baseline entry because the scanners do not see them
   are superseded by the tier assignments in `ELEMENTS-MASTER-PLAN.md` (for example `task-card`, `model-picker`,
   `comparison-card` and `recommendation-card` are wired in ELT-T1-10, -10b and -11). ELT-T1-27 regenerates the JSON; until then
   those rows are a stale record, not a decision.
-- `launcher-bubble`, `assistant-modal` and `assistant-sidebar`: master plan Q5 recommends no floating ask button (the rail's Chat
-  stays the one way in). No ruling is recorded yet, so no row is claimed.
+- `launcher-bubble`, `assistant-modal` and `assistant-sidebar`: master plan Q5 recommended no floating ask button. Ruled the other
+  way by Jesse on 2026-10-24 (S2 edited, Owner-approved): the shell draws the person's companion launcher on non-chat areas and it
+  opens a chat panel, so `launcher-bubble` and `assistant-modal` are claimed by COMPANIONS-PRESENCE-01
+  (`companions-shared-chat-and-presence-2026-10-24.md`, section 7); `assistant-sidebar` stays unclaimed.

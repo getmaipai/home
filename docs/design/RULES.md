@@ -420,7 +420,11 @@ S2. **Each app area emulates its native app.** Everything to the right of
     records and never other apps (chat's thread search; News's search
     over its own stories, topics, sources and saved items) is part of
     that app's own native layout, not a second copy of Search
-    everywhere, and is allowed beside it.
+    everywhere, and is allowed beside it. The shell may draw the person's
+    companion launcher at the bottom corner of any app except Chat; it
+    opens Chat or a chat panel, carries no count or status, and the
+    person can turn it off (Owner-approved 2026-10-24, design record
+    companions-shared-chat-and-presence-2026-10-24.md section 7).
 S3. **A test holds the rail.** A test fails when the main navigation does
     not render on an app page: the rail at 640 and up, the menu button and
     its drawer below 640, with accessible names, at 360, 402, 874 x 402,
@@ -452,6 +456,7 @@ S6. **System status reaches the person through the existing mechanisms.**
     | The AI or chat is not ready | the chat paused or starting state: composer line, Send hold, Welcome state, `useEngineDownReason` | `lib/roleHealth.ts` through `lib/healthSnapshot.ts` (`/api/health`, `availability`, `reason`, `cause`); the admin pause switch is `lib/chatPause.ts` | everyone in chat; a child gets only the composer line |
     | Whole-system health | the Status page and the header pill and rail menu, `StatusPage.tsx`, `StatusIndicator.tsx` | `lib/statusApps.ts`, `lib/statusBoard.ts`, `/api/status` (the Stack's health list is synced by `lib/stackHealthSync.ts`) | the Status page everyone; the pill hidden from a child |
     | One job's progress | that job's own card (picture, video, download) | the job record | whoever started it |
+    | A companion's summary of one person's jobs (Owner-approved 2026-10-24) | one line on that companion's Yours card, "1 working · 2 waiting on you", the kit Status Element as shipped | the same job records, the viewer's own rows only (rule 6a) | the person whose jobs they are |
     | Needs an admin's attention, not a person's screen | Notifications: the bell, `NotificationBell.tsx`, `BrowserAlerts.tsx` | `lib/notifications.ts`, declared in `lib/notificationTypes.ts` | the audience the type declares |
     | A form or action failed | the kit destructive Alert in that form, with the next step | the failing call's own response, `lib/failureCopy.ts` | the person acting |
     | A spoken turn is not ready | the voice session's spoken line | the same readiness function as the written chat | the person speaking |

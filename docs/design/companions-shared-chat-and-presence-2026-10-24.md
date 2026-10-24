@@ -27,9 +27,9 @@ Riff, Rivet, Sprout, Buddy, Pal, The Tutor); the spec's Milo, Ada and Fin are no
    reference image. Detail gets Activity / Tasks / Chats / Setup; Setup is the existing editor, reached by section.
 4. **Creation is a two-step kit Wizard** (template, then name and look) that lands in the existing editor. Templates are
    personality starting points, never free-form system prompts or model picks (rules 1, 8 and 14).
-5. **Presence is one controller, two placements.** The chat corner avatar stays. A floating launcher outside Chat breaks S2 as
-   written ("only the rail is ours"), and so does a shell of it in `frontend/src/shell/`, whoever can see it (architect, 2026-10-24).
-   Jesse sees the launcher as a scripted HTML mockup; a real one needs his rule edit first (section 7).
+5. **Presence is one controller, two placements.** The chat corner avatar stays. Jesse chose the spec's floating launcher on
+   non-chat areas and edited S2 for it on 2026-10-24; it lands in commons first (rule 9c), so phase 0 shows it as a scripted
+   HTML mockup (section 7).
 6. **Tasks ride what exists.** Spec 7's task states map onto jobs, projects, the scheduler and the designed `Ask` record; there is
    no second task system. The agentic tooling itself (shopping, email, acting alone) is a later design (AGENTIC-DESIGN-01) and
    shows only as shells here.
@@ -51,7 +51,7 @@ Riff, Rivet, Sprout, Buddy, Pal, The Tutor); the spec's Milo, Ada and Fin are no
 | 5 | Standard MaiPai always available | The `default` companion ("MaiPai") is a bundled companion and the fallback (`DEFAULT_PERSONA`) | None; it is the first entry of every selector |
 | 6, 7 | Inline task cards; work types; ten task states; approvals | jobs, projects (xstate), `scheduled_jobs`, approvals (two kinds), `Ask` designed; kit `TaskCard`, `AgentStatus`, `BackgroundInbox`, `ApprovalCard` | Companion id on jobs and projects; the agentic tooling itself (deferred) |
 | 8 | Three memory layers; least privilege | `memory_records` scopes self / person / household; no companion partition | Provenance only (section 8) |
-| 9 | Presence Controller; floating launcher; bottom sheet on phone | `useCompanionPresence` in Chat; corner `CompanionAvatar` with Hide; kit `LauncherBubble`; `InstallDock` is the shell's only fixed element | Lift the controller; launcher placement is a rule question |
+| 9 | Presence Controller; floating launcher; bottom sheet on phone | `useCompanionPresence` in Chat; corner `CompanionAvatar` with Hide; kit `LauncherBubble`; `InstallDock` is the shell's only fixed element | Lift the controller; launcher allowed by S2 since 2026-10-24, commons first |
 | 10 | Two-step wizard, six templates, Advanced (instructions, model, tools, memory policy) | `/companions/new` opens the editor directly; kit `Wizard` primitive | Wizard; templates as dial presets; Advanced trimmed by rules |
 | 11 | Yours cards (video, state, latest activity, counts, Open / New chat / Review); Discover entries with Add | One CardGrid of every ready companion the person may use | Two tabs; latest activity and counts (state stays on the job card, S6); a source for Discover |
 | 11.3 | Detail tabs Activity / Tasks / Chats / Setup | Detail page; editor with Identity / Voice and style / Look / States | Four tabs; Chats is a filtered conversation list |
@@ -68,10 +68,10 @@ Riff, Rivet, Sprout, Buddy, Pal, The Tutor); the spec's Milo, Ada and Fin are no
 | Templates Finance, Health | Assistant-layer non-goals (finance, health feeds) | Replaced by Chat buddy, Research, Shopping (coming soon), Homework helper, Storyteller, Custom. Owner question whether Finance or Health returns |
 | Companion states success, error, returning | The twelve shipped video states | success is `celebrate`, error is `oops`, returning is `greeting`; no new states |
 | Ten task states and a Tasks tab | Principle 1 (one definition); S6 (no new status UI); jobs, projects, scheduler, `Ask` already defined | Mapping in section 6; the Tasks tab lists existing records, it defines none |
-| Floating launcher on every page | S2 ("only the rail is ours"; global things only in main navigation); S6 if it carries a count or state | No code, not even a shell; an HTML mockup in phase 0; Jesse's S2 edit before any build (section 7) |
+| Floating launcher on every page | S2 as it stood ("only the rail is ours"); S6 if it carries a count or state | Resolved by Jesse's S2 edit of 2026-10-24: allowed on non-chat areas, no count or status; commons first, an HTML mockup in phase 0 (section 7) |
 | Companion-private memory | Principle 1; memory note (scopes self / person / household; rule 6a) | Provenance, not partition (section 8) |
 | Companions for children | Memory ruling 2026-10-14: companions on by default for every profile; rule 0 | Children switch only among `companionFits` companions; no tasks, no Discover Add without an adult, no model choice |
-| "Needs approval" and "Working" card badges | S6 (a job's state lives on the job's own card and the Ask); owner note 2026-10-24: the agentic layer waits | No state badges on cards; a card links to its Tasks tab; AGENTIC-DESIGN-01 for the tooling |
+| "Needs approval" and "Working" card badges | S6 as it stood (a job's state lives on the job's own card and the Ask); owner note 2026-10-24: the agentic layer waits | Resolved by Jesse's S6 row of 2026-10-24: one own-jobs summary line per card, nothing more (section 4); a card links to its Tasks tab; AGENTIC-DESIGN-01 for the tooling |
 
 ## 3. One conversation, many speakers (spec 3 to 5, 13)
 
@@ -146,9 +146,13 @@ Two kit `Tabs` on `/companions` (the same primitive the editor uses).
 
 **Yours** is today's CardGrid (poster or idle clip, name, tagline, audience badge, "Your default") with two additions per card, both
 the viewer's own: one latest-activity line (the newest of their jobs or conversations with this companion, "Found 3 recipes,
-yesterday") and counts, "N tasks · M chats", from their jobs plus projects and their conversations by `companion_id`. No state badge:
-S6 keeps a job's state on the job's own card and an open ask on the Ask and in Notifications, so the spec's Working / Needs
-approval / Error badges are not drawn; the card's "N tasks" opens the detail's Tasks tab where those cards live. Every viewer,
+yesterday") and counts, "N tasks · M chats", from their jobs plus projects and their conversations by `companion_id`. Counts are inventory: "N tasks · M chats", the viewer's own rows only (rule 6a,
+NO-CROSS-USER-VISIBILITY-01). State is one more line, and only because Jesse added the S6 row for it on 2026-10-24 (the architect
+had read S6 twice as forbidding it: "a job running" is S6's own example, and an open ask already has the Needs-you card, the bell
+and the Ask): "1 working · 2 waiting on you", the viewer's own jobs for this companion, drawn with the kit Status Element as
+shipped, reading the same job records as the Tasks tab and never a copy; the line is absent when every count is zero. The spec's
+Working / Needs approval / Error badges are not drawn beyond that line. "N tasks" opens the detail's Tasks tab, where each job's
+own card shows its state; an open ask is still answered on the Ask, the Needs-you card or Notifications, never on the card. Every viewer,
 admins included, sees only their own rows and counts (rule 6a, NO-CROSS-USER-VISIBILITY-01; the ACTIVITY-01 row's "admins see
 household jobs" predates the 2026-10-07 owner rule and is stale). Actions: Open (detail) and New chat (a conversation with this
 `companion_id`). Jobs and projects gain an additive `companion_id` (provenance of who worked); none of it is a new store.
@@ -220,7 +224,7 @@ to a shell-level context; the state signals stay where a thread exists. Chat kee
 note section 14). "Hideable in settings" means the browser-storage key `maipai.companion.avatar.hidden` becomes one spec person
 setting that every placement reads (principle 4, S4, S5); no second flag.
 
-**The launcher is a rule question, and the answer as written is no, for a shell too.** S2 says "Only the rail is ours" and "Global things (switching
+**The launcher was a rule question, and the reading before 2026-10-24 was no, for a shell too.** S2 says "Only the rail is ours" and "Global things (switching
 apps, ...) live only in the main navigation, and an app never draws a second copy of them" (RULES.md lines 411 and 416 to 419).
 A bubble drawn by the shell over every app is a second way into Chat, the same reading that refused the shell-owned mini bar over
 non-media apps (media apps blend note, lines 218 to 221). S1 is untouched by a bubble outside the rail. S6 is touched only if the
@@ -230,13 +234,20 @@ the one way in" with no ruling recorded; one answer from Jesse closes Q5 and thi
 coming-soon shell in `frontend/src/shell/` breaks S2 the same way, whoever can see it, so phase 0 shows the launcher only as a
 scripted HTML mockup beside this record (`assets/companions-shared-chat-2026-10-24/launcher.html`), rendered at 1440 and 390 px.
 
-**If Jesse wants it**, the sentence to add to S2 (his `Owner-approved:` commit) is: "The shell may draw the person's companion
+**Decided 2026-10-24: Jesse chose the spec's launcher** (the compact character button at the lower right of every non-chat area,
+opening a 320 to 380 px chat panel on desktop and a bottom sheet on the phone, the conversation shared with Chat, hideable by the
+person) and approved the S2 edit in this record's commit (`Owner-approved: 2026-10-24`). The launcher shows only the idle, greeting
+and sleeping looks: no working or needs-you expression and no count, because S2 says it carries no count or status (S6). The sentence added to S2 is: "The shell may draw the person's companion
 launcher at the bottom corner of any app except Chat; it opens Chat or a chat panel, carries no count or status, and the person can
 turn it off." Then it mounts once in the shell beside `ShellInstallStrip` (`Routes.tsx` 141 to 145), stacked clear of `InstallDock`,
 hidden on Chat routes so the character is drawn once. The kit `LauncherBubble` as shipped cannot meet the spec (hard-coded
 message icon, 304 px panel, "typically replies in a minute" copy, no Escape or outside click, no phone sheet), so the slots and
 dismissal go to commons first (rule 9), and a full chat inside the panel also needs the `assistant-modal` Element the kit still lacks.
-A short launcher that opens the Chat app needs none of that.
+A short launcher that opens the Chat app needs none of that. Build order (COMPANIONS-PRESENCE-01): commons first, the
+`LauncherBubble` slots and dismissal plus the `assistant-modal` panel Element, then the shell mount; until that tag exists the
+launcher stays the HTML mockup of section 10 even though S2 now allows it. The spec's "Your research is ready" line on the
+launcher is not adopted: S2 as edited says the launcher carries no count or status (S6), so the ready signal stays the Ask and
+the notification.
 
 **Already covered without a launcher**: the character and its state machine, the phone size, Hide, the avatar gate through
 `companionFits`, and the way into chat from anywhere (rail, phone drawer, the Home page ask box).
@@ -298,14 +309,14 @@ setting `companions.preview_shells` (`level: expert`; written only by an admin a
 | 1 | Chat header companion control | The viewer's real companions with posters, MaiPai first; picking one changes the header label for this page view only | `DropdownMenu`, `Avatar` | toast "Coming soon: switching companions mid-chat" |
 | 2 | `@` mention in the composer | The kit popover with the same list; the chip renders; the turn ignores it | `ComposerMentions`, `ComposerTriggerPopover` | toast "Coming soon: asking another companion one question" |
 | 3 | Who-answered marker | In the HTML mockup only (shell 8): the kit has no `SpeakerMarker` yet and a Home slot component would be a wrapper | none (mockup) | "Mockup: lands in the kit first." |
-| 4 | `/companions` tabs | Yours (today's grid plus "0 tasks · N chats", N real); Discover (bundled companions not held, the chip row, Add disabled) | `Tabs`, `Chip`, `CardGrid`, `Badge` (audience only) | Discover footer: "Coming soon: add a companion to your set from here." |
+| 4 | `/companions` tabs | Yours (today's grid plus "0 tasks · N chats", N real, and one summary line "Example: 1 working" on the first card, labelled like row 6); Discover (bundled companions not held, the chip row, Add disabled) | `Tabs`, `Chip`, `CardGrid`, `Badge` (audience only), `Status` | Discover footer: "Coming soon: add a companion to your set from here." |
 | 5 | Detail tabs | Setup real (links to the editor); Activity, Tasks, Chats as EmptyStates | `Tabs`, `EmptyState` | "Coming soon: what Nova has been doing." / "Coming soon: tasks Nova is working on." / "Coming soon: your chats with Nova." |
 | 6 | Example task card | One `TaskCard` in the Tasks tab with sample steps, labelled Example | `TaskCard` | meta "Example" |
 | 7 | Create a companion wizard | Two real steps: template cards, then name and look; Finish opens the existing editor as a draft | `Wizard`, `CardGrid` | step 2 footer: "Finish opens the editor; templates set the dials, coming soon." |
-| 8 | Launcher mockup (not in the app) | A static HTML page beside this record: the bubble with a companion poster on a non-chat page, the open panel, the phone sheet, and the who-answered marker from row 3 | none (mockup) | "Mockup: needs the S2 rule edit before it is built." |
+| 8 | Launcher mockup (not in the app) | A static HTML page beside this record: the bubble with a companion poster on a non-chat page, the open panel, the phone sheet, and the who-answered marker from row 3 | none (mockup) | "Mockup: the panel Element lands in the kit first." |
 
-Shells 1, 2 and 4 to 7 are in-app behind the switch. Rows 3 and 8 are the two surfaces the rules keep out of the app for now (the
-marker until its kit Element lands, the launcher until Jesse edits S2); one scripted HTML mockup holds both, opened and judged like a
+Shells 1, 2 and 4 to 7 are in-app behind the switch. Rows 3 and 8 are the two surfaces rule 9c keeps out of the app for now (the
+marker until its kit Element lands, the launcher until the panel Element lands; S2 allows the launcher since 2026-10-24); one scripted HTML mockup holds both, opened and judged like a
 screenshot.
 
 Evidence for done: a screenshot of each in-app shell and the mockup at 1440 and 390 px, generated by script against the seeded demo household and opened
@@ -319,11 +330,11 @@ and whether a surface is dropped before phase 1.
 | COMPANIONS-SHELL-01 | 0 | Section 10 | M | Six in-app shells behind the switch plus one mockup (marker, launcher); screenshots judged |
 | COMP-04a | 1 | Spec first: `answered_by` on turns, `companion_id` description; commons first: `SpeakerMarker` in the kit Thread and the `toast` re-export; `PATCH` companion_id with `companionFits`; the pick order in the turn; avatar route per conversation; header control; toast; marker | M | A conversation switches Nova to Riff and each reply names its speaker; a child cannot pick an adult companion (test) |
 | COMP-04b | 1 | `ComposerMentions` wired; one-turn override; "joined for one question" | S | Test: the override lasts one turn; unmatched `@text` is plain text |
-| COMPANIONS-YOURS-01 | 2 | `companion_id` on jobs and projects; the viewer's latest activity and counts; no state badge | S | Counts match the viewer's own records; an admin sees no other person's rows (test) |
+| COMPANIONS-YOURS-01 | 2 | `companion_id` on jobs and projects; the viewer's latest activity, counts and the one own-jobs summary line (S6 row, kit Status as shipped); no other state badge | S | Counts and the summary line match the viewer's own records; an admin sees no other person's rows (test) |
 | COMP-04c | 2 | Spec first: `companions.enabled` and `options_from: "companions"` for both keys; the two groups; Add and Ask an admin; the approval that leads to an install | M | Add for an adult lands on Yours; a teen sees On this Home only; a child has no Discover |
 | COMPANIONS-DETAIL-01 | 2 | Activity, Tasks, Chats with real rows; Setup summary | M | Tabs read ACTIVITY-01 rows; Chats filter by companion_id and guest turns |
 | COMPANIONS-WIZARD-01 | 2 | Templates as dial presets; Finish creates a draft household companion | S | Draft appears in the editor with the preset dials |
-| COMPANIONS-PRESENCE-01 | 3 | Controller in the shell; the hidden flag as a person setting; launcher only after Jesse's S2 edit and commons slots | M | One hidden flag; corner avatar unchanged |
+| COMPANIONS-PRESENCE-01 | 3 | Controller in the shell; the hidden flag as a person setting; the launcher after the commons tag (`LauncherBubble` slots, `assistant-modal`) | M | One hidden flag; corner avatar unchanged |
 | COMPANIONS-MEMORY-01 (COMP-05) | 3 | Spec first: `companion_id` on `person` scope; column, recall filter, judge rapport branch, `canRead` default-deny, delete with the companion | M | Test: A's running joke is absent from B's context; a birthday told to A is known to B |
 | AGENTIC-DESIGN-01 | later | The agentic tooling design (shopping, email, acting alone, receipts) | L, design | Its own record and verdict |
 
@@ -342,25 +353,21 @@ an explicit trigger, no word matching. Rule 2: no engine change. Rule 5: no caps
 failed answer. Rule 6a: `answered_by` holds a companion name, not a person's text. Rule 8: no model choice for minors; none offered at
 all in this note. Rule 9: every chat piece is an assistant-ui or kit Element as shipped, no wrapper, no shape className; the thread
 marker is drawn by the kit Thread from message metadata (commons first, rule 9c), with no Home slot component. Rule 9b: Yours, Discover and the detail use shadcn/ui through the kit. Rule 14: a companion is
-dials and clips, never prompt prose. S1: the rail is untouched. S2: no launcher code, shell included, until Jesse edits the rule; the mockup lives in docs. S4 and
-S5: the preview switch is a setting record with copy from the spec. S6: no state badges on cards; a job's state stays on its own card and an open ask on the Ask. V1:
+dials and clips, never prompt prose. S1: the rail is untouched. S2 (edited 2026-10-24): the shell may draw the companion launcher on non-chat areas; its Elements land in commons first (rule 9c), so phase 0 keeps the mockup in docs. S4 and
+S5: the preview switch is a setting record with copy from the spec. S6 (row added 2026-10-24): a Yours card carries one own-jobs summary line from the job records, the kit Status Element as shipped, and nothing else about state; an open ask is answered on the Ask. V1:
 nothing here touches a video service.
 
-## 13. Open decisions for Jesse
+## 13. Decisions (Jesse, 2026-10-24, through the wizard)
 
-Asked in the wizard with this record, recommended answer first:
-
-1. The floating launcher: no bubble, the rail's Chat stays the one way in (closes master plan Q5 too); or yes, with the S2 sentence
-   in section 7 as his rule edit, as a short launcher that opens Chat; or yes as a full chat panel (needs `assistant-modal` in commons).
-2. Companion memory: shared facts, private rapport (recommended; what the records say); or private by companion, everything said
-   to B stays with B, episodes included (a new reading, more spec work).
-3. Templates: keep Chat buddy, Research, Shopping (coming soon), Homework helper, Storyteller, Custom (recommended); or bring back
-   Finance and Health despite the assistant-layer non-goals.
-4. A per-companion model override for adults: not offered (recommended); or offered, adults only.
-5. A new person's Yours: MaiPai plus their current pick, the rest from Discover (recommended); or every companion that fits their age.
-6. A removed companion on old chats: the saved name with a plain mark (recommended); or keep its picture (a still per look version, a new store).
-7. Companion cards without state badges (S6, the architect's reading): accept (recommended); or ask the architect to re-read S6 for
-   a viewer's own summary row on a card.
+| # | Question | Decision |
+|---|---|---|
+| 1 | Floating launcher | Yes, the spec's full launcher: character button on non-chat areas opening a chat panel (desktop) or bottom sheet (phone). S2 edited in this commit (section 7). Closes master plan Q5 the other way: the rail's Chat is no longer the one way in. |
+| 2 | Companion memory | Shared facts, private rapport (section 8 as written). |
+| 3 | Templates | The current six: Chat buddy, Research, Shopping (coming soon), Homework helper, Storyteller, Custom. No Finance or Health. |
+| 4 | Per-companion model override | Not offered. Every companion uses the household model. |
+| 5 | A new person's Yours | MaiPai plus the companion they picked at setup; the rest wait in Discover. |
+| 6 | A removed companion on old chats | The saved name with a plain mark; no still store. |
+| 7 | Cards without state badges | Jesse asked the architect to re-read S6 for one own-jobs summary row per card. Ruling: S6 as written forbade it in every form. Jesse chose the rule change: one S6 table row added in this commit (`Owner-approved: 2026-10-24`), so each Yours card may carry one own-jobs summary line (section 4). |
 
 ## 14. Supersedes
 
@@ -370,8 +377,12 @@ Three passages are replaced, and the rest is extended:
   qualifier on `person` scope (section 8); the test it names stands.
 - **COMP-04**: its "a name opener in text" trigger is replaced by the `@` chip (rule 1); its `kid_safe` reads `companionFits`; its open
   outcomes become slices a to c (section 11).
-- **`companion-video-characters-2026-10-21.md` section 14**: "Not in this version: the large launcher bubble" becomes "no launcher
-  code until Jesse edits S2; mockup first" (section 7).
+- **`companion-video-characters-2026-10-21.md` section 14**: "Not in this version: the large launcher bubble" becomes "the launcher
+  is decided and allowed by S2; commons first, mockup in phase 0" (section 7).
+- **Master plan Q5** (`ELEMENTS-MASTER-PLAN.md`) and the old `ELEMENTS-DECISIONS.md` ledger line ("the rail's Chat stays the one way
+  in"): replaced by Jesse's 2026-10-24 ruling; `launcher-bubble` and `assistant-modal` are claimed by COMPANIONS-PRESENCE-01.
+- **S2 and S6 before 2026-10-24** as read by the architect in this record's earlier runs: the rule text itself now carries the two
+  owner-approved additions.
 
-Extended, decisions intact: `companions-app-2026-10-21.md` (two tabs, four detail tabs), the assistant-layer plan (the launcher-bubble
-dot now waits on S2; ACTIVITY-01 gains a per-companion view with own-rows-only visibility).
+Extended, decisions intact: `companions-app-2026-10-21.md` (two tabs, four detail tabs), the assistant-layer plan (ACTIVITY-01 gains
+a per-companion view with own-rows-only visibility).
