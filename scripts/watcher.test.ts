@@ -20,11 +20,13 @@ function fixture() {
   const main = join(scratch, "main");
   const data = join(scratch, "watch-data");
   const warm = join(scratch, "home-watcher");
-  const env = {
+  const env: NodeJS.ProcessEnv = {
     ...process.env,
     MAIPAI_WATCH_DATA: data,
     MAIPAI_WATCH_CHECKOUT: warm,
     MAIPAI_WATCH_SKIP_INSTALL: "1",
+    MAIPAI_WATCH_QUIET_MAX_SECONDS: "0",
+    MAIPAI_LAND_DATA: join(scratch, "land-data"),
     MAIPAI_WATCH_LEGS: "backend frontend",
     MAIPAI_LAND_GIT_ENV: "",
     MAIPAI_WATCH_SUITE_CMD: "bash scripts/suite.sh",
@@ -56,10 +58,10 @@ function commit(f: ReturnType<typeof fixture>, message: string, files: Record<st
   return sha;
 }
 
-function run(f: ReturnType<typeof fixture>, script: string, args: string[] = []) {
+function run(f: ReturnType<typeof fixture>, script: string, args: string[] = [], env: NodeJS.ProcessEnv = f.env) {
   return spawnSync("bash", [join(f.main, "scripts", script), ...args], {
     cwd: f.main,
-    env: f.env,
+    env,
     encoding: "utf8",
     timeout: 60_000,
   });
@@ -70,6 +72,49 @@ function records(f: ReturnType<typeof fixture>) {
 }
 
 describe("main watcher", () => {
+  test("waits for a queued landing, then runs and records the suite after the cap", () => {
+    const f = fixture();
+    mkdirSync(join(f.env.MAIPAI_LAND_DATA!, "queue"), { recursive: true });
+    writeFileSync(join(f.env.MAIPAI_LAND_DATA!, "queue", "pending.json"), "{}\n");
+    const started = Date.now();
+    const out = run(f, "watcher.sh", ["run-once"], {
+      ...f.env,
+      MAIPAI_WATCH_QUIET_MAX_SECONDS: "2",
+      MAIPAI_WATCH_QUIET_POLL_SECONDS: "1",
+    });
+    expect(out.status).toBe(0);
+    expect(Date.now() - started).toBeGreaterThanOrEqual(1800);
+    expect(records(f)[0].result).toBe("green");
+    expect(readFileSync(join(f.data, "watcher.log"), "utf8")).toContain("waiting: lander busy");
+    expect(readFileSync(join(f.data, "watcher.log"), "utf8")).toContain("waited 2s; waiting: lander busy; running anyway");
+  }, 60_000);
+
+  test("waits for high load until the cap and skips waiting for low load", () => {
+    const high = fixture();
+    const started = Date.now();
+    const highOut = run(high, "watcher.sh", ["run-once"], {
+      ...high.env,
+      MAIPAI_WATCH_QUIET_MAX_SECONDS: "2",
+      MAIPAI_WATCH_QUIET_POLL_SECONDS: "1",
+      MAIPAI_WATCH_MAX_LOAD: "1",
+      MAIPAI_WATCH_LOAD_CMD: "echo 99",
+    });
+    expect(highOut.status).toBe(0);
+    expect(Date.now() - started).toBeGreaterThanOrEqual(1800);
+    expect(records(high)[0].result).toBe("green");
+    expect(readFileSync(join(high.data, "watcher.log"), "utf8")).toContain("waiting: load 99 above 1");
+
+    const low = fixture();
+    const lowOut = run(low, "watcher.sh", ["run-once"], {
+      ...low.env,
+      MAIPAI_WATCH_MAX_LOAD: "1",
+      MAIPAI_WATCH_LOAD_CMD: "echo 0.1",
+    });
+    expect(lowOut.status).toBe(0);
+    expect(records(low)[0].result).toBe("green");
+    expect(existsSync(join(low.data, "watcher.log"))).toBe(false);
+  }, 60_000);
+
   test("records green, skips an unchanged main, and reports green status", () => {
     const f = fixture();
     const sha = git(f.main, "rev-parse", "HEAD");

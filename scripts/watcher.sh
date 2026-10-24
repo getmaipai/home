@@ -180,6 +180,71 @@ find_culprit() {
   echo "$culprit"
 }
 
+load_average() {
+  local raw
+  if [[ -n "${MAIPAI_WATCH_LOAD_CMD:-}" ]]; then
+    raw="$(bash -c "$MAIPAI_WATCH_LOAD_CMD" 2>/dev/null || true)"
+  elif [[ "$(uname -s)" == Darwin ]]; then
+    raw="$(sysctl -n vm.loadavg 2>/dev/null || true)"
+  else
+    raw="$(awk '{print $1}' /proc/loadavg 2>/dev/null || true)"
+  fi
+  if [[ "${MAIPAI_WATCH_LOAD_CMD:-}" == "" && "$(uname -s)" == Darwin ]]; then
+    raw="$(awk '{gsub(/[{}]/, ""); for (i=1; i<=NF; i++) if ($i != "") { print $i; exit }}' <<< "$raw")"
+  fi
+  awk -v value="$raw" 'BEGIN { if (value ~ /^[0-9]+([.][0-9]+)?$/) print value; else print "unknown" }'
+}
+
+logical_cpu_count() {
+  local count
+  if [[ "$(uname -s)" == Darwin ]]; then count="$(sysctl -n hw.logicalcpu 2>/dev/null || true)"
+  else count="$(nproc 2>/dev/null || true)"
+  fi
+  [[ "$count" =~ ^[0-9]+([.][0-9]+)?$ ]] || count=1
+  printf '%s' "$count"
+}
+
+wait_for_quiet() {
+  local land_data="${MAIPAI_LAND_DATA:-$main/data-scratch/land}"
+  local max_seconds="${MAIPAI_WATCH_QUIET_MAX_SECONDS:-1800}"
+  local poll_seconds="${MAIPAI_WATCH_QUIET_POLL_SECONDS:-15}"
+  local max_load="${MAIPAI_WATCH_MAX_LOAD:-$(logical_cpu_count)}"
+  local started now load lander_busy reason last_log=0 remaining sleep_for
+  [[ "$max_seconds" =~ ^[0-9]+$ ]] || max_seconds=1800
+  [[ "$poll_seconds" =~ ^[0-9]+([.][0-9]+)?$ ]] || poll_seconds=15
+  # Zero is used by tests and operators to disable waiting.
+  (( max_seconds > 0 )) || return 0
+  started="$(date +%s)"
+  while :; do
+    if [[ "${stop_requested:-0}" -eq 1 ]]; then return 1; fi
+    lander_busy=0
+    if compgen -G "$land_data/queue/*.json" >/dev/null; then lander_busy=1; fi
+    load="$(load_average)"
+    reason=""
+    if (( lander_busy )); then reason="waiting: lander busy"
+    elif [[ "$load" != unknown ]] && awk -v load="$load" -v max="$max_load" 'BEGIN { exit !(load >= max) }'; then
+      reason="waiting: load $load above $max_load"
+    elif [[ "$load" == unknown ]]; then reason="waiting: load unknown"
+    fi
+    if [[ -z "$reason" ]]; then return 0; fi
+    now="$(date +%s)"
+    if (( now - started >= max_seconds )); then
+      echo "$(date -u +%Y-%m-%dT%H:%M:%SZ) waited ${max_seconds}s; $reason; running anyway" >> "$data/watcher.log"
+      return 0
+    fi
+    if (( now - last_log >= 60 )); then
+      echo "$(date -u +%Y-%m-%dT%H:%M:%SZ) $reason" >> "$data/watcher.log"
+      last_log="$now"
+    fi
+    remaining=$((max_seconds - (now - started)))
+    sleep_for="$poll_seconds"
+    if awk -v poll="$sleep_for" -v remaining="$remaining" 'BEGIN { exit !(poll > remaining) }'; then sleep_for="$remaining"; fi
+    sleep "$sleep_for" & sleep_pid=$!
+    wait "$sleep_pid" || true
+    sleep_pid=""
+  done
+}
+
 file_issue() {
   local title="$1" first_file="$2" note="$3" command="${MAIPAI_WATCH_ISSUE_CMD:-}" number
   if [[ -n "$command" ]]; then
@@ -197,6 +262,12 @@ file_issue() {
 run_once() {
   local head last_run last_green previous started output seconds rc files file all_pass=1 result culprit subject title note_tmp note
   git -C "$checkout" fetch origin || { echo "watcher.sh: fetch failed" >> "$data/watcher.log"; return 0; }
+  head="$(git -C "$checkout" rev-parse origin/main)"
+  last_run="$(cat "$data/last-run" 2>/dev/null || true)"
+  last_green="$(cat "$data/last-green" 2>/dev/null || true)"
+  if [[ "$head" == "$last_run" || "$head" == "$last_green" ]]; then echo "up to date at ${head:0:7}"; return 0; fi
+  if ! wait_for_quiet; then return 0; fi
+  git -C "$checkout" fetch origin || { echo "watcher.sh: fetch failed after quiet wait" >> "$data/watcher.log"; return 0; }
   head="$(git -C "$checkout" rev-parse origin/main)"
   last_run="$(cat "$data/last-run" 2>/dev/null || true)"
   last_green="$(cat "$data/last-green" 2>/dev/null || true)"
