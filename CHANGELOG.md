@@ -7,6 +7,14 @@ checklist (`docs/dev.md`). The first release is 0.1.0.
 
 ## [Unreleased]
 
+## [0.2.124] - 2026-10-24
+
+The first release cut from a commit that was already live: Home is now shipped by promoting a landed commit to the hub and tagging what runs, instead of tagging first and installing from the tag.
+
+### Changed
+- Building Home: `bun run dev` starts a seeded hot-reload Home per worktree; landings go through one lander after a 15-second static check (`scripts/land.sh`); a watcher runs the whole test suite on `main` after every landing and names the commit that broke it; `scripts/ship.sh` puts a landed commit on the live hub, checks it and rolls back on failure, and `--tag` cuts the release from what is live.
+- Chat: the date line in the prompt now says the model's training is usually months behind, that a recent event it does not recognize is more likely missing than untrue, and that a claim about something recent ("I heard", "is it true") is looked up first, never denied from memory. Qwen3.6 searched 16 of 28 recency prompts before and 26 of 28 after; Muse searched 28 of 28 both times (RECENCY-01).
+
 ### Added
 - A robot can name what its camera sees (people, chairs, a tv, the colors and the light) when you install the Look part under Models and storage; it forgets each thing 90 seconds after it last saw it and never keeps a picture (LOOK-01).
 - Settings, Home, Engines and AI: an Assistant access card. An owner or admin can make a short-lived key that lets an assistant session, such as Claude Code, change a short named list of settings (today: how Home helps the chat remember to search). The key cannot change anything else, ends after 7, 30 or 90 days and can be revoked there (OPS-KEY-01).
@@ -19,11 +27,6 @@ checklist (`docs/dev.md`). The first release is 0.1.0.
 - Chat: a weather question the model answered without checking ("Is it going to rain?" answered "where are you?") now gets the real weather when a household home is set and Settings, "Help the chat remember to search the web", is on rescue, typed or spoken, for every age. A small trained detector decides; the model still answers first (weather questions it misses: 27% before, 0% in the bench) (WEATHER-ASSIST-01).
 - Chat: when a household home is set, the prompt names it, so "Is it going to rain?" with no place named uses it (weather tool calls on that case went from 27 of 40 to 32 of 40 in the bench) (RECENCY-02).
 - Chat: a model's own tool call written as text (`<tool_call>`, `<function=...>`, `[TOOL_CALLS]`, a JSON call after prose) is never shown; and "I have generated an interpretation of that poster" with nothing generated is caught like any other claim of a made picture (TOOL-MARKUP-01).
-
-### Changed
-- Chat: the date line in the prompt now says the model's training is usually months behind, that a recent event it does not recognize is more likely missing than untrue, and that a claim about something recent ("I heard", "is it true") is looked up first, never denied from memory. Qwen3.6 searched 16 of 28 recency prompts before and 26 of 28 after; Muse searched 28 of 28 both times (RECENCY-01).
-
-### Added
 - Settings, AI models: a **Chat models** card lists the chat models this computer can run, with **Download**, **Use this model** and **In use**. Qwen3.6 35B A3B is the first optional model beside Muse: it answers voice questions in under a second because its thinking step can be switched off. The choice survives a restart (MODEL-SWITCH-01).
 - Books app for EPUB, PDF, audiobook chapters, linked editions and reading progress; Shows and Films app for local shows, films, seasons, episodes and a personal watchlist.
 - Playing a song from Music's Created by you shelf now promotes its visible Library audio file to the shared media record and queues it through the normal Music path.
