@@ -27,22 +27,24 @@ checkout_warm() {
 }
 
 atomic_json_note() {
-  local branch="$1" sha="$2" status="$3" reason="$4" main_sha="$5" tail_file="$6" seconds="$7"
+  local branch="$1" sha="$2" status="$3" reason="$4" main_sha="$5" tail_file="$6" seconds="$7" landing_note="${8:-}"
   local slug="${branch//\//-}" json_tmp md_tmp finished check_tail
   local json="$data/notes/$slug.json" md="$data/notes/$slug.md"
   finished="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
   check_tail="$(tail -n 40 "$tail_file" 2>/dev/null || true)"
   json_tmp="$(mktemp "$data/notes/.note.XXXXXX")"
   md_tmp="$(mktemp "$data/notes/.note.XXXXXX")"
-  python3 - "$json_tmp" "$branch" "$sha" "$status" "$reason" "$main_sha" "$check_tail" "$seconds" "$finished" <<'PY'
+python3 - "$json_tmp" "$branch" "$sha" "$status" "$reason" "$main_sha" "$check_tail" "$seconds" "$finished" "$landing_note" <<'PY'
 import json, sys
 with open(sys.argv[1], 'w') as f:
-    json.dump(dict(branch=sys.argv[2], sha=sys.argv[3], status=sys.argv[4], reason=sys.argv[5], main_sha=sys.argv[6], check_tail=sys.argv[7], seconds=int(sys.argv[8]), finished_at=sys.argv[9]), f)
+    json.dump(dict(branch=sys.argv[2], sha=sys.argv[3], status=sys.argv[4], reason=sys.argv[5], main_sha=sys.argv[6], check_tail=sys.argv[7], seconds=int(sys.argv[8]), finished_at=sys.argv[9], note=sys.argv[10]), f)
     f.write('\n')
 PY
   {
     printf '# %s: %s\n\n' "$status" "$branch"
-    printf -- '- Branch: `%s`\n- SHA: `%s`\n- Main SHA: `%s`\n- Reason: %s\n\n' "$branch" "$sha" "$main_sha" "$reason"
+    printf -- '- Branch: `%s`\n- SHA: `%s`\n- Main SHA: `%s`\n- Reason: %s\n' "$branch" "$sha" "$main_sha" "$reason"
+    [[ -z "$landing_note" ]] || printf -- '- Note: %s\n' "$landing_note"
+    printf '\n'
     printf '## Last 40 lines of check output\n\n```text\n%s\n```\n' "$check_tail"
   } > "$md_tmp"
   mv -f "$json_tmp" "$json"
@@ -58,17 +60,24 @@ PY
 }
 
 bounce() {
-  local request="$1" branch="$2" sha="$3" reason="$4" started="$5" output="$6" main_sha seconds slug
+  local request="$1" branch="$2" sha="$3" reason="$4" started="$5" output="$6" main_sha seconds slug landing_note
+  landing_note="$(python3 - "$request" <<'PY'
+import json, sys
+try: print(json.load(open(sys.argv[1])).get('note', ''))
+except Exception: print('')
+PY
+)"
   main_sha="$(git -C "$checkout" rev-parse origin/main 2>/dev/null || git -C "$checkout" rev-parse HEAD 2>/dev/null || echo unknown)"
   seconds=$(( $(date +%s) - started )); slug="${branch//\//-}"
-  atomic_json_note "$branch" "$sha" bounced "$reason" "$main_sha" "$output" "$seconds"
+  atomic_json_note "$branch" "$sha" bounced "$reason" "$main_sha" "$output" "$seconds" "$landing_note"
   log_line "$data/landings.jsonl" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$branch" "$sha" "$main_sha" bounced "$seconds" "$reason"
   rm -f "$request"
   echo "bounced: $branch at $sha: $reason"
 }
 
 run_one() {
-  local request="$1" branch sha started output origin_branch prev_sha conflict reason check_cmd main_sha seconds attempt changed before_rebase after_rebase intersect
+  local request="$1" branch sha started output origin_branch prev_sha conflict reason check_cmd main_sha seconds attempt changed before_rebase after_rebase intersect landing_note last_line changed_files changed_file generated_commit backlog_sha item line found
+  local -a done_items=() generated_paths=("docs/api/" "frontend/src/dev/elements-adoption.json" "docs/dev/code-map.md")
   started="$(date +%s)"; output="$(mktemp "$data/.check.XXXXXX")"
   if ! python3 - "$request" >"$data/.request-values" <<'PY'
 import json, sys
@@ -76,7 +85,10 @@ try:
     v=json.load(open(sys.argv[1]))
     assert all(isinstance(v.get(k), str) and v[k] for k in ('branch','sha','worktree','requested_at'))
     assert isinstance(v.get('session'), str)
-    print(v['branch']); print(v['sha'])
+    assert isinstance(v.get('done', []), list) and all(isinstance(x, str) for x in v.get('done', []))
+    assert isinstance(v.get('note', ''), str) and '\n' not in v.get('note', '') and '\r' not in v.get('note', '')
+    print(v['branch']); print(v['sha']); print(v.get('note', ''))
+    for item in v.get('done', []): print(item)
 except Exception:
     sys.exit(1)
 PY
@@ -88,7 +100,8 @@ PY
     rm -f "$output" "$data/.request-values"
     return 0
   fi
-  branch="$(sed -n '1p' "$data/.request-values")"; sha="$(sed -n '2p' "$data/.request-values")"; rm -f "$data/.request-values"
+  branch="$(sed -n '1p' "$data/.request-values")"; sha="$(sed -n '2p' "$data/.request-values")"; landing_note="$(sed -n '3p' "$data/.request-values")"
+  while IFS= read -r item; do done_items+=("$item"); done < <(tail -n +4 "$data/.request-values"); rm -f "$data/.request-values"
   if [[ ! "$branch" == wt/* || ! "$sha" =~ ^[0-9a-fA-F]{40,64}$ ]]; then
     mkdir -p "$data/queue/bad"; mv "$request" "$data/queue/bad/$(basename "$request")"
     echo "$(date -u +%Y-%m-%dT%H:%M:%SZ) malformed request $(basename "$request") moved to queue/bad; repair or remove it" >> "$data/lander.log"
@@ -106,9 +119,8 @@ PY
     reason="rebase conflict in: ${conflict:-unknown files}; rebase onto origin/main in your worktree, then land.sh again"
     bounce "$request" "$branch" "$sha" "$reason" "$started" "$output"; rm -f "$output"; return 0
   fi
-  local rebased_sha
+  local rebased_sha package_changed
   rebased_sha="$(git -C "$checkout" rev-parse HEAD)"
-  local package_changed
   package_changed="$(git -C "$checkout" diff --name-only "$prev_sha" "$rebased_sha" 2>/dev/null | grep -E '^(backend|frontend)/(package\.json|bun\.lock)$' || true)"
   if [[ -n "$package_changed" && -z "${MAIPAI_LAND_SKIP_INSTALL:-}" ]]; then
     local d
@@ -117,6 +129,52 @@ PY
         (cd "$checkout/$d" && bun install --frozen-lockfile) || { bounce "$request" "$branch" "$sha" "bun install failed in $d; repair dependencies and run land.sh again" "$started" "$output"; rm -f "$output"; return 0; }
       fi
     done
+  fi
+  export MAIPAI_COMMONS_DIR="$(cd "$main/.." && pwd -P)/commons" MAIPAI_STANDARDS_DIR="$(cd "$main/.." && pwd -P)/.github"
+  # gen:settings writes ../commons/spec/settings/keys.json (backend/scripts/gen-settings-registry.ts); include it only when that output lives inside this checkout.
+  settings_file="${MAIPAI_COMMONS_DIR}/spec/settings/keys.json"
+  case "$settings_file" in "$checkout"/*) generated_paths+=("${settings_file#"$checkout"/}");; esac
+  if [[ -n "${MAIPAI_LAND_GENERATE_CMD:-}" ]]; then
+    if ! (cd "$checkout" && eval "$MAIPAI_LAND_GENERATE_CMD") >"$output" 2>&1; then
+      last_line="$(tail -n 1 "$output" 2>/dev/null || true)"
+      bounce "$request" "$branch" "$sha" "generated files failed: ${last_line:-generator exited nonzero}" "$started" "$output"; rm -f "$output"; return 0
+    fi
+  else
+    if ! (cd "$checkout" && (cd backend && bun run gen:settings) && (cd backend && bun run gen:api-docs) && bun run scripts/elementsAdoption.ts && { [[ ! -f scripts/code-map.py ]] || python3 scripts/code-map.py; }) >"$output" 2>&1; then
+      last_line="$(tail -n 1 "$output" 2>/dev/null || true)"
+      bounce "$request" "$branch" "$sha" "generated files failed: ${last_line:-generator exited nonzero}" "$started" "$output"; rm -f "$output"; return 0
+    fi
+  fi
+  changed_files="$(git -C "$checkout" status --porcelain --untracked-files=all -- "${generated_paths[@]}" | sed -E 's/^...//')"
+  if [[ -n "$changed_files" ]]; then
+    while IFS= read -r changed_file; do
+      [[ -z "$changed_file" ]] || git -C "$checkout" add -- "$changed_file" || { bounce "$request" "$branch" "$sha" "generated files failed: could not stage generated files" "$started" "$output"; rm -f "$output"; return 0; }
+    done <<EOF_CHANGED_FILES
+$changed_files
+EOF_CHANGED_FILES
+    git -C "$checkout" -c user.name="MaiPai lander" -c user.email="lander@users.noreply.github.com" commit -m "Generated: $(printf '%s' "$changed_files" | paste -sd ', ' -) (lander, for $branch)" >>"$output" 2>&1 || { last_line="$(tail -n 1 "$output" 2>/dev/null || true)"; bounce "$request" "$branch" "$sha" "generated files failed: ${last_line:-could not commit generated files}" "$started" "$output"; rm -f "$output"; return 0; }
+  fi
+  if ((${#done_items[@]})); then
+    backlog_sha="$(git -C "$checkout" rev-parse --short=7 HEAD)"
+    item="$(python3 - "$checkout/docs/BACKLOG.md" "$backlog_sha" "$(date -u +%F)" "${done_items[@]}" <<'PY'
+import sys
+from pathlib import Path
+path=Path(sys.argv[1]); sha=sys.argv[2]; date=sys.argv[3]; items=sys.argv[4:]
+if not path.exists():
+    print(items[0] if items else 'unknown'); sys.exit(1)
+lines=path.read_text().splitlines()
+for item in items:
+    prefix=f'- [ ] **{item}:'
+    matches=[i for i, line in enumerate(lines) if line.startswith(prefix)]
+    if not matches:
+        print(item); sys.exit(1)
+    i=matches[0]
+    lines[i]=lines[i].replace('- [ ]', '- [x]', 1) + f' Landed {date} ({sha}).'
+path.write_text('\n'.join(lines) + '\n')
+PY
+)" || { item="${item:-${done_items[0]}}"; bounce "$request" "$branch" "$sha" "backlog item $item not found as an open item; check the id or drop --done" "$started" "$output"; rm -f "$output"; return 0; }
+    git -C "$checkout" add -- docs/BACKLOG.md
+    git -C "$checkout" -c user.name="MaiPai lander" -c user.email="lander@users.noreply.github.com" commit -m "Backlog: ${done_items[*]} done (landed by the lander)" >>"$output" 2>&1 || { last_line="$(tail -n 1 "$output" 2>/dev/null || true)"; bounce "$request" "$branch" "$sha" "backlog item update failed: ${last_line:-could not commit backlog}" "$started" "$output"; rm -f "$output"; return 0; }
   fi
   check_cmd="${MAIPAI_LAND_CHECK_CMD:-}"
   if [[ -n "$check_cmd" ]]; then
@@ -130,7 +188,7 @@ PY
       main_sha="$(git -C "$checkout" rev-parse HEAD)"
       git -C "$checkout" push origin --delete "$branch" >>"$data/lander.log" 2>&1 || echo "lander.sh: could not delete remote $branch; remove it when convenient." >&2
       seconds=$(( $(date +%s) - started ))
-      atomic_json_note "$branch" "$sha" landed "landed" "$main_sha" "$output" "$seconds"
+      atomic_json_note "$branch" "$sha" landed "landed" "$main_sha" "$output" "$seconds" "$landing_note"
       log_line "$data/landings.jsonl" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$branch" "$sha" "$main_sha" landed "$seconds" "landed"
       rm -f "$request" "$output"
       echo "landed: $branch at $sha"

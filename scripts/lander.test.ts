@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
-import { copyFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
+import { copyFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, unlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { spawnSync } from "node:child_process";
@@ -17,6 +17,7 @@ const env = {
   MAIPAI_LAND_SKIP_INSTALL: "1",
   MAIPAI_LAND_GIT_ENV: "",
   MAIPAI_LAND_CHECK_CMD: "bash scripts/check.sh --pre",
+  MAIPAI_LAND_GENERATE_CMD: "bash scripts/generate.sh",
 };
 
 function git(dir: string, ...args: string[]) {
@@ -37,7 +38,7 @@ function commit(worktree: string, message: string) {
   git(worktree, "commit", "-m", message);
   return git(worktree, "rev-parse", "HEAD");
 }
-function note(name: string): { branch: string; sha: string; status: string; reason: string; main_sha: string; check_tail: string } {
+function note(name: string): { branch: string; sha: string; status: string; reason: string; main_sha: string; check_tail: string; note?: string } {
   return JSON.parse(readFileSync(join(data, "notes", `wt-${name}.json`), "utf8"));
 }
 function queueFiles() { return readdirSync(join(data, "queue")).filter((f) => f.endsWith(".json")); }
@@ -51,12 +52,15 @@ beforeAll(() => {
   mkdirSync(join(main, "scripts"), { recursive: true });
   for (const name of scriptNames) copyFileSync(join(import.meta.dir, name), join(main, "scripts", name));
   writeFileSync(join(main, "scripts", "check.sh"), "#!/usr/bin/env bash\nif [[ -f RED ]]; then echo 'fake check: RED found'; exit 1; fi\necho 'fake check: clean'\n");
+  writeFileSync(join(main, "scripts", "generate.sh"), "#!/usr/bin/env bash\nif [[ -f GEN ]]; then mkdir -p docs/api; git rev-parse HEAD > docs/api/openapi.json; fi\n");
+  mkdirSync(join(main, "docs"), { recursive: true });
+  writeFileSync(join(main, "docs", "BACKLOG.md"), "- [ ] **ALPHA-01: first** (S).\n- [ ] **BETA-02: second** (S).\n");
   mkdirSync(join(main, "data-scratch"), { recursive: true });
   writeFileSync(join(main, "file.txt"), "line one\nline two\nline three\n");
   git(main, "add", "-A");
   git(main, "commit", "-m", "fixture base");
   git(main, "push", "-u", "origin", "main");
-});
+}, 60_000);
 
 describe("lander pipeline", () => {
   test("green landing fast-forwards main, writes a note and removes the remote branch", () => {
@@ -178,6 +182,54 @@ describe("lander pipeline", () => {
     expect(out.stdout).toContain("queue: 0");
     expect(out.stdout).toContain("landed");
     expect(out.stdout).toContain("bounced");
+  }, 60_000);
+
+  test("--done marks the named backlog item, records the note and commits as lander", () => {
+    const wt = makeWorktree("done");
+    writeFileSync(join(wt, "file.txt"), "done\n");
+    commit(wt, "done change");
+    const queued = run("land.sh", ["--detach", "--done", "ALPHA-01", "--note", "first item"], wt);
+    expect(queued.status).toBe(0);
+    expect(queued.stdout).toContain("done: ALPHA-01");
+    expect(run("lander.sh", ["run-once"]).status).toBe(0);
+    const backlog = git(origin, "show", "main:docs/BACKLOG.md");
+    expect(backlog).toMatch(/^- \[x\] \*\*ALPHA-01:.* Landed \d{4}-\d{2}-\d{2} \([0-9a-f]{7}\)\.$/m);
+    expect(backlog).toContain("- [ ] **BETA-02: second** (S).");
+    const landedCommits = git(main, "log", "origin/main", "--format=%s|%an|%ae");
+    expect(landedCommits).toContain("Backlog: ALPHA-01 done (landed by the lander)|MaiPai lander|lander@users.noreply.github.com");
+    expect(note("done").note).toBe("first item");
+    expect(readFileSync(join(data, "notes", "wt-done.md"), "utf8")).toContain("- Note: first item");
+  }, 60_000);
+
+  test("unknown --done item bounces without moving main", () => {
+    const wt = makeWorktree("unknown_done");
+    writeFileSync(join(wt, "file.txt"), "unknown\n");
+    commit(wt, "unknown done change");
+    const oldMain = git(origin, "rev-parse", "main");
+    expect(run("land.sh", ["--detach", "--done", "NOPE-99"], wt).status).toBe(0);
+    expect(run("lander.sh", ["run-once"]).status).toBe(0);
+    expect(note("unknown_done").status).toBe("bounced");
+    expect(note("unknown_done").reason).toContain("NOPE-99");
+    expect(git(origin, "rev-parse", "main")).toBe(oldMain);
+  }, 60_000);
+
+  test("generator changes are committed, unchanged outputs add no commit", () => {
+    const generated = makeWorktree("generated");
+    writeFileSync(join(generated, "GEN"), "yes\n");
+    const sourceSha = commit(generated, "generate output");
+    expect(run("land.sh", ["--detach"], generated).status).toBe(0);
+    expect(run("lander.sh", ["run-once"]).status).toBe(0);
+    expect(git(origin, "log", "main", "--format=%s")).toContain("Generated: docs/api/openapi.json (lander, for wt/generated)");
+    expect(git(origin, "show", "main:docs/api/openapi.json")).toBe(sourceSha);
+
+    const generatedCommitCount = git(origin, "log", "main", "--format=%s").split("\n").filter((message) => message.startsWith("Generated:")).length;
+    const unchanged = makeWorktree("no_generated");
+    unlinkSync(join(unchanged, "GEN"));
+    writeFileSync(join(unchanged, "file.txt"), "no generated\n");
+    commit(unchanged, "no generated output");
+    expect(run("land.sh", ["--detach"], unchanged).status).toBe(0);
+    expect(run("lander.sh", ["run-once"]).status).toBe(0);
+    expect(git(origin, "log", "main", "--format=%s").split("\n").filter((message) => message.startsWith("Generated:")).length).toBe(generatedCommitCount);
   }, 60_000);
 });
 

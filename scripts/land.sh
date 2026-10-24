@@ -2,15 +2,20 @@
 set -euo pipefail
 umask 077
 
-usage() { echo "usage: bash scripts/land.sh [--detach] [--timeout <seconds>] | wait" >&2; }
+usage() { echo "usage: bash scripts/land.sh [--detach] [--timeout <seconds>] [--done <ITEM-ID>]... [--note <one line>] | wait" >&2; }
 die() { echo "land.sh: $1" >&2; exit "${2:-1}"; }
 
 mode=queue
 timeout_seconds=900
+done_items=()
+done_arg=""
+landing_note=""
 while (($#)); do
   case "$1" in
     --detach) mode=detach; shift ;;
     --timeout) (($# >= 2)) || { usage; exit 2; }; timeout_seconds="$2"; shift 2 ;;
+    --done) (($# >= 2)) || { usage; exit 2; }; [[ "$2" =~ ^[A-Z0-9-]+-[0-9]+$ ]] || die "invalid backlog item id '$2'; expected ^[A-Z0-9-]+-[0-9]+$" 2; done_items+=("$2"); done_arg="${done_arg:+$done_arg }$2"; shift 2 ;;
+    --note) (($# >= 2)) || { usage; exit 2; }; [[ "$2" != *$'\n'* && "$2" != *$'\r'* ]] || die "--note must be one line" 2; landing_note="$2"; shift 2 ;;
     wait) mode=wait; shift ;;
     *) usage; exit 2 ;;
   esac
@@ -76,10 +81,11 @@ sha="$(git rev-parse HEAD)"
 requested_at="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
 queue_file="$data/queue/$(date +%s)-$slug.json"
 tmp="$(mktemp "$data/queue/.request.XXXXXX")"
-python3 - "$tmp" "$branch" "$sha" "$(git rev-parse --show-toplevel)" "${MAIPAI_WT_SESSION:-}" "$requested_at" <<'PY'
+if [[ -n "$done_arg" ]]; then echo "done: ${done_items[*]}"; fi
+python3 - "$tmp" "$branch" "$sha" "$(git rev-parse --show-toplevel)" "${MAIPAI_WT_SESSION:-}" "$requested_at" "$landing_note" "$done_arg" <<'PY'
 import json, sys
 with open(sys.argv[1], 'w') as f:
-    json.dump(dict(branch=sys.argv[2], sha=sys.argv[3], worktree=sys.argv[4], session=sys.argv[5], requested_at=sys.argv[6]), f)
+    json.dump(dict(branch=sys.argv[2], sha=sys.argv[3], worktree=sys.argv[4], session=sys.argv[5], requested_at=sys.argv[6], note=sys.argv[7], done=sys.argv[8].split()), f)
     f.write('\n')
 PY
 mv -f "$tmp" "$queue_file"
