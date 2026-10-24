@@ -348,13 +348,14 @@ fi
 # getmaipai/.github docs/DECISIONS.md, 2026-09-27): the full scope takes
 # the machine-wide lock before any memory-heavy work, blocking FIFO
 # behind any other repo's gate, and on_exit() frees it on every exit
-# path. Quick scoped runs (docs, frontend, backend) skip it by design
-# (Jesse, 2026-10-23: quick checks must not queue behind a full gate).
+# path. Docs and backend quick runs skip it (Jesse, 2026-10-23: quick
+# checks must not queue behind a full gate). A frontend run takes its own
+# lighter lock below, so it queues only behind other frontend gates.
 # The lock comes from the sibling .github checkout, not the pinned standards
 # tag below: it is one machine resource every caller must agree on,
 # whatever tag each pins. GATE_LOCK_ITEM, when a caller sets it, names
 # the item in `gate-lock.sh status`.
-if [ "$SCOPE" = "full" ] && [ "$PRE_ONLY" != 1 ]; then
+if { [ "$SCOPE" = "full" ] || [ "$SCOPE" = "frontend" ]; } && [ "$PRE_ONLY" != 1 ]; then
   if [ ! -f "$GATE_LOCK" ]; then
     echo "== gate-lock: $GATE_LOCK is missing (getmaipai/.github checkout older than gate-lock.sh, or set MAIPAI_GATE_LOCK); not running a $SCOPE gate without the machine-wide lock"
     exit 1
