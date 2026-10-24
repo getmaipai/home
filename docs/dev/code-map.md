@@ -784,7 +784,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/videos/rerun.ts` | prepareVideoRerun |
 | `backend/src/lib/videos/stack.ts` | StackVideoError, __setVideosFetchForTests, submitVideo, convertForMessages, getVideoJob, fetchVideoPreview |
 | `backend/src/lib/videos/tool.ts` | GENERATE_VIDEO_TOOL_ID, VIDEO_SIZES, videoAudienceOf, ATTACHED_PHOTO, videoRefusalFor, latestGeneratedPictureId |
-| `backend/src/lib/visionAssets.ts` | VISION_FACE_DETECTOR, VISION_FACE_EMBEDDER, VISION_ALL_ASSETS, visionAssetPath, isVisionAssetInstalled, areVisionAssetsInstalled |
+| `backend/src/lib/visionAssets.ts` | VISION_FACE_DETECTOR, VISION_FACE_EMBEDDER, VISION_FOCAL_CROP, VISION_ALL_ASSETS, ensureFocalCropAsset, visionAssetPath |
 | `backend/src/lib/voiceCatalog.ts` | voiceCatalogUrl, getVoiceCatalog, isVoiceCatalogPath, __resetVoiceCatalogForTests |
 | `backend/src/lib/voiceCues.ts` | HESITATION_LEVELS, DEFAULT_HESITATION_LEVEL, KNOWN_CUE_TAGS, normalizeTagName, normalizeTagList, freshCueState |
 | `backend/src/lib/voiceForSpeech.ts` | isPresetVoice, voiceForSpeech |
