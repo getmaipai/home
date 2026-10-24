@@ -1088,7 +1088,7 @@ export function __resetSearchCacheForTests(): void {
   searchInFlight.clear();
 }
 
-type SearchOptions = { kMatched?: boolean; timeRange?: "month"; allowWikipediaFallback?: boolean; safeSearchLevel?: SafeSearchLevel; bypassCache?: boolean; minorBand?: MinorBand; speakerBand?: "child" | "teen" | "adult"; signal?: AbortSignal; deadlineAt?: number; fallbackSignal?: AbortSignal; fallbackDeadlineAt?: number; supplementary?: boolean };
+type SearchOptions = { kMatched?: boolean; timeRange?: "month"; allowWikipediaFallback?: boolean; safeSearchLevel?: SafeSearchLevel; bypassCache?: boolean; minorBand?: MinorBand; speakerBand?: "child" | "teen" | "adult"; signal?: AbortSignal; deadlineAt?: number; attemptLimitMs?: number; fallbackSignal?: AbortSignal; fallbackDeadlineAt?: number; supplementary?: boolean };
 
 export async function searxngSearch(args: unknown, opts: SearchOptions = {}): Promise<SearxngSearchResult> {
   const parentSignal = opts.signal;
@@ -1097,7 +1097,7 @@ export async function searxngSearch(args: unknown, opts: SearchOptions = {}): Pr
   if (parentSignal?.aborted) onParentAbort();
   else parentSignal?.addEventListener("abort", onParentAbort, { once: true });
   const fallbackDeadlineAt = opts.deadlineAt ?? Date.now() + ADULT_WRITTEN_WEBSEARCH_DEADLINE_MS;
-  const attemptDeadlineAt = Math.min(fallbackDeadlineAt, Date.now() + SEARXNG_ATTEMPT_LIMIT_MS);
+  const attemptDeadlineAt = Math.min(fallbackDeadlineAt, Date.now() + (opts.attemptLimitMs ?? SEARXNG_ATTEMPT_LIMIT_MS));
   const attemptTimer = setTimeout(() => attemptController.abort(new DOMException("SearXNG attempt deadline exceeded", "TimeoutError")), Math.max(0, attemptDeadlineAt - Date.now()));
   const searchOptions: SearchOptions = { ...opts, signal: attemptController.signal, fallbackSignal: parentSignal, fallbackDeadlineAt, deadlineAt: attemptDeadlineAt };
   try {

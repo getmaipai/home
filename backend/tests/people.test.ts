@@ -157,14 +157,29 @@ describe("creating people", () => {
 
   test("every role can be created without a birthdate and ignores legacy input", async () => {
     const owner = await ownerClient();
-    for (const role of ["child", "teen", "adult", "guest", "admin", "owner"]) {
-      for (const legacy of [{}, { birthdate: "1990-01-01" }, { birthdate: "2099-01-01" }, { birthdate: "not-a-date" }, { birthdate: 12 }]) {
-        const res = await owner.post("/api/people", { displayName: "Quill", role, secret: "1234", ...legacy });
-        expect(res.status).toBe(201);
-        const body = await res.json() as { id: string; age_band: string };
-        expect(body.age_band).toBe(role === "child" || role === "teen" ? role : "adult");
-        expect(db.select().from(people).all().find((p) => p.id === body.id)!.birthdate).toBeNull();
-      }
+    const roles = ["child", "teen", "adult", "guest", "admin", "owner"] as const;
+    for (const role of roles) {
+      const needsSecret = role === "adult" || role === "admin" || role === "owner";
+      const res = await owner.post("/api/people", {
+        displayName: `No birthdate ${role}`,
+        role,
+        ...(needsSecret ? { secret: "1234" } : {}),
+      });
+      expect(res.status).toBe(201);
+      const body = await res.json() as { id: string; age_band: string };
+      expect(body.age_band).toBe(role === "child" || role === "teen" ? role : "adult");
+      expect(db.select().from(people).all().find((p) => p.id === body.id)!.birthdate).toBeNull();
+    }
+
+    // The legacy field is ignored for every shape it historically took.
+    // One credential-free role exercises those input variants without
+    // repeating argon2id work that does not affect the birthdate behavior.
+    for (const legacy of [{}, { birthdate: "1990-01-01" }, { birthdate: "2099-01-01" }, { birthdate: "not-a-date" }, { birthdate: 12 }]) {
+      const res = await owner.post("/api/people", { displayName: "Legacy child", role: "child", ...legacy });
+      expect(res.status).toBe(201);
+      const body = await res.json() as { id: string; age_band: string };
+      expect(body.age_band).toBe("child");
+      expect(db.select().from(people).all().find((p) => p.id === body.id)!.birthdate).toBeNull();
     }
   });
 

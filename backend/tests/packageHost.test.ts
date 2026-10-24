@@ -23,7 +23,7 @@ import { serviceComponent } from "@/lib/serviceComponent";
 import { __drainBackgroundWorkForTests } from "@/lib/backgroundWork";
 import { PackageManifest as ManifestSchema } from "@maipai/spec/gen/ts/manifest.js";
 import { useDefaultScriptedStack } from "./stackFixture";
-import { SEARXNG_ATTEMPT_LIMIT_MS, SEARXNG_CONNECT_LIMIT_MS, ADULT_WRITTEN_WEBSEARCH_DEADLINE_MS, webSearchToolDeadlineMs } from "@/lib/webSearchBudget";
+import { SEARXNG_ATTEMPT_LIMIT_MS, SEARXNG_CONNECT_LIMIT_MS, webSearchToolDeadlineMs } from "@/lib/webSearchBudget";
 import { retryDeadlineMs } from "@/lib/turnMachine/deadline";
 import { cacheDir } from "@/lib/paths";
 import { HOME_USER_AGENT } from "@/lib/outbound";
@@ -2784,6 +2784,8 @@ describe("packageHost data.forget", () => {
 
 describe("SEARCH-BUDGET-01", () => {
   const wikiBase = "http://wikipedia.test";
+  const shortToolDeadlineMs = 1_500;
+  const shortSearxngAttemptMs = 150;
 
   function fakeWikipedia(url: URL): Response {
     if (url.pathname === "/w/rest.php/v1/search/page") return Response.json({ pages: [{ key: "Budget_result" }] });
@@ -2821,12 +2823,16 @@ describe("SEARCH-BUDGET-01", () => {
     await setupBudgetSearch(`http://127.0.0.1:${hanging.port}`);
     const started = Date.now();
     try {
-      const result = await searxngSearch({ query: "budget fallback listener" }, { speakerBand: "adult" });
+      const result = await searxngSearch({ query: "budget fallback listener" }, {
+        speakerBand: "adult",
+        deadlineAt: started + shortToolDeadlineMs,
+        attemptLimitMs: shortSearxngAttemptMs,
+      });
       expect(result.rows.length).toBeGreaterThan(0);
       expect(result.rows[0]?.title).toBe("Budget result");
       expect(acceptedRequests).toBeGreaterThan(0);
       expect(fallbackCalls).toBe(2);
-      expect(Date.now() - started).toBeLessThan(ADULT_WRITTEN_WEBSEARCH_DEADLINE_MS);
+      expect(Date.now() - started).toBeLessThan(shortToolDeadlineMs);
     } finally {
       hanging.stop(true);
     }
@@ -2872,10 +2878,16 @@ describe("SEARCH-BUDGET-01", () => {
       });
     });
     await setupBudgetSearch("http://192.0.2.1:8080");
-    const result = await searxngSearch({ query: "budget fallback no connect" }, { speakerBand: "adult" });
+    const started = Date.now();
+    const result = await searxngSearch({ query: "budget fallback no connect" }, {
+      speakerBand: "adult",
+      deadlineAt: started + shortToolDeadlineMs,
+      attemptLimitMs: shortSearxngAttemptMs,
+    });
     expect(result.rows.length).toBeGreaterThan(0);
     expect(searxngAborted).toBe(true);
     expect(fallbackCalls).toBe(2);
+    expect(Date.now() - started).toBeLessThan(shortToolDeadlineMs);
   }, 20_000);
 
   test("a healthy SearXNG result returns its sources without Wikipedia", async () => {
