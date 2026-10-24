@@ -1,5 +1,5 @@
-import { afterEach, beforeEach, describe, expect, mock, test } from "bun:test";
-import { cleanup, fireEvent, waitFor } from "@testing-library/react";
+import { afterEach, beforeEach, describe, expect, mock, test, jest } from "bun:test";
+import { act, cleanup, fireEvent, waitFor } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { FaceEnrollmentPage } from "@/apps/people/FaceEnrollmentPage";
 import { renderWithQueryClient } from "../../../tests/renderWithQueryClient";
@@ -28,6 +28,7 @@ let facePresent = true;
 let faceSize = 190;
 let pose: Pose = "frontal";
 let pixels: "sharp" | "soft" = "sharp";
+const frameCache = new Map<string, Uint8ClampedArray>();
 
 const POSE_OFFSET: Record<Pose, { yaw: number; pitch: number }> = {
   frontal: { yaw: 0, pitch: 0 },
@@ -79,6 +80,10 @@ function yunetOutputs(): Record<string, OnnxTensor> {
 }
 
 function framePixels(width: number, height: number): Uint8ClampedArray {
+  const key = `${width}x${height}:${pixels}`;
+  const cached = frameCache.get(key);
+  if (cached) return cached;
+
   const data = new Uint8ClampedArray(width * height * 4);
   for (let y = 0; y < height; y += 1) {
     for (let x = 0; x < width; x += 1) {
@@ -86,6 +91,7 @@ function framePixels(width: number, height: number): Uint8ClampedArray {
       data.set([value, value, value, 255], (y * width + x) * 4);
     }
   }
+  frameCache.set(key, data);
   return data;
 }
 
@@ -108,6 +114,7 @@ let failFollowingPost = false;
 let soundsSetting: boolean | undefined;
 
 beforeEach(() => {
+  jest.useFakeTimers();
   postedBodies = [];
   failFollowingPost = false;
   soundsSetting = undefined;
@@ -167,6 +174,7 @@ beforeEach(() => {
 
 afterEach(() => {
   cleanup();
+  jest.useRealTimers();
   setSessionFactory(null);
   setSoundContextFactory(null);
   (HTMLCanvasElement.prototype as unknown as { getContext: unknown }).getContext = originals.getContext;
@@ -215,6 +223,12 @@ function renderPage() {
 
 const ring = (container: HTMLElement) => container.querySelector("[data-capture-ring]");
 const WAIT = { timeout: 4000 };
+async function advance(ms: number) {
+  await act(async () => {
+    jest.advanceTimersByTime(ms);
+    for (let i = 0; i < 8; i += 1) await Promise.resolve();
+  });
+}
 
 describe("the fake camera itself", () => {
   test("the sharp frame really clears the bar and the soft frame really does not (guards the seam)", () => {
@@ -244,7 +258,7 @@ describe("FACE-02J: the capture ring", () => {
     await waitFor(() => expect(ring(container)?.getAttribute("data-capture-ring")).toBe("yellow"), WAIT);
     expect(ring(container)?.className).toContain("--hue-yellow");
     expect(view().getByRole("status").textContent).toContain("soft");
-    await new Promise((resolve) => setTimeout(resolve, 900));
+    await advance(900);
     expect(view().getByText("look straight at me")).toBeTruthy();
     expect(view().queryByText("slowly turn your head to your left")).toBeNull();
     expect(ring(container)?.getAttribute("data-capture-ring")).toBe("yellow");
@@ -385,7 +399,7 @@ describe("FACE-02M: enrollment sounds", () => {
     pixels = "soft";
     renderPage();
     await waitFor(() => expect(started(CUES.soft.freq)).toBeGreaterThan(0), WAIT);
-    await new Promise((resolve) => setTimeout(resolve, 900));
+    await advance(900);
     expect(started(CUES.ready.freq)).toBe(0);
     expect(chimes()).toBe(0);
   });
@@ -405,7 +419,7 @@ describe("FACE-02M: enrollment sounds", () => {
     view2.unmount();
     expect(audio.closed).toBe(true);
     const n = audio.started.length;
-    await new Promise((resolve) => setTimeout(resolve, 1600));
+    await advance(1600);
     expect(audio.started.length).toBe(n);
   });
 
@@ -417,7 +431,7 @@ describe("FACE-02M: enrollment sounds", () => {
     Object.defineProperty(document, "hidden", { configurable: true, get: () => true });
     document.dispatchEvent(new Event("visibilitychange"));
     const n = audio.started.length;
-    await new Promise((resolve) => setTimeout(resolve, 1600));
+    await advance(1600);
     expect(audio.started.length).toBe(n);
     if (hidden) Object.defineProperty(document, "hidden", hidden);
     else delete (document as unknown as Record<string, unknown>).hidden;

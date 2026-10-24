@@ -22,7 +22,9 @@ function renderReply(text: string) {
 describe("a reply with every rich element (UI-1, A3)", () => {
   test("a fenced block shows its language and a Copy button", async () => {
     const { container, getAllByRole } = renderReply(RICH_REPLY_MARKDOWN);
-    await waitFor(() => expect(container.querySelector(".aui-shiki-base")).toBeTruthy());
+    // Each fenced block highlights asynchronously; the first Shiki node can
+    // appear before the other blocks have replaced their fallback markup.
+    await waitFor(() => expect(container.querySelectorAll(".aui-code-header-root button").length).toBe(3));
     const languages = [...container.querySelectorAll(".aui-code-header-language")].map((n) => n.textContent);
     expect(languages).toContain("typescript");
     expect(container.querySelectorAll(".aui-code-header-root button").length).toBe(3);

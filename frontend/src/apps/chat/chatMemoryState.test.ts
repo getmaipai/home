@@ -1,5 +1,5 @@
-import { afterEach, describe, expect, test, mock } from "bun:test";
-import { renderHook, waitFor } from "@testing-library/react";
+import { afterEach, describe, expect, test, mock, jest } from "bun:test";
+import { act, renderHook, waitFor } from "@testing-library/react";
 import { deriveMemoryStatus, useMemoryState, useMemoryStatusPoll } from "@/apps/chat/chatMemoryState";
 
 const originalFetch = globalThis.fetch;
@@ -85,6 +85,7 @@ describe("useMemoryStatusPoll", () => {
   }, 10000);
 
   test("stops polling once every turn in the conversation has resolved", async () => {
+    jest.useFakeTimers();
     const env = stubConversationTurns([
       [{ id: "turn-poll-2", source: "model", judgeStatus: "done", memory_ids: [] }],
     ]);
@@ -94,12 +95,18 @@ describe("useMemoryStatusPoll", () => {
         useMemoryStatusPoll("conv-poll-2");
         return state;
       });
-      await waitFor(() => expect(result.current?.status).toBe("not_saved"), { timeout: 8000, interval: 100 });
+      await act(async () => {
+        jest.advanceTimersByTime(0);
+        await Promise.resolve();
+        await Promise.resolve();
+      });
+      expect(result.current?.status).toBe("not_saved");
       const countAfterResolved = env.callCount();
-      await new Promise((resolve) => setTimeout(resolve, 6500));
+      act(() => { jest.advanceTimersByTime(6500); });
       expect(env.callCount()).toBe(countAfterResolved); // no further ticks once nothing is pending
     } finally {
       env.restore();
+      jest.useRealTimers();
     }
   }, 15000);
 });
