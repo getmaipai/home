@@ -27,6 +27,9 @@ and only Jesse says yes to a new tag: [docs/PINNING.md](docs/PINNING.md) "Changi
 From the repo root: `bun start` / `bun stop` / `bun restart` run the local app: the main checkout serves 8787 and `bun restart` there
 fast-forwards from origin first; a worktree leases a free 88xx port from `scripts/wt.sh port` (set `MAIPAI_MAIN_CHECKOUT=1` to take 8787). `bun test` in `backend/` or `frontend/`.
 `bun run dev` starts a seeded hot-reload Home for this worktree (`scripts/dev.sh`, see its header); `bun run dev:stop` stops it.
+Land with `bash scripts/land.sh` (pushes the branch to the lander's queue; the lander runs the 15 s static check and fast-forwards
+`main`; `wt.sh land` hands off to it). `bash scripts/pipeline.sh status | start | stop` shows the queue and the last landings
+and runs the lander (`scripts/lander.sh`, one per machine, warm checkout `../home-lander`).
 Lint: `tsc --noEmit` (backend); `tsc --noEmit && eslint .` (frontend). `bash scripts/check.sh --docs` for docs-only changes,
 `--pre` for the cheap preflight, plain `check.sh` for the full gate (it takes the machine-wide lock; never hand-roll a wait).
 
