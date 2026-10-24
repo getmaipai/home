@@ -48,7 +48,9 @@ describe("Coding admin settings", () => {
       expect((await view.findAllByText(/37%/)).length).toBeGreaterThanOrEqual(1);
       current = "installed";
       await view.queryClient.invalidateQueries({ queryKey: ["coding-pieces"] });
-      await waitFor(() => expect(view.getByRole("button", { name: "Remove" })).toBeEnabled());
+      // A role query with a name inside waitFor spun a CPU loop here (the main gate lost 512 s to it); read the button from the list instead.
+      await waitFor(() => expect(view.getByText("Coding model")).toBeTruthy());
+      await waitFor(() => expect((view.getAllByRole("button").find((button) => button.textContent === "Remove") as HTMLButtonElement).disabled).toBe(false));
       fireEvent.click(await view.findByRole("button", { name: "Remove" }));
       const removeButtons = view.getAllByRole("button", { name: "Remove" });
       fireEvent.click(removeButtons[removeButtons.length - 1]!);
