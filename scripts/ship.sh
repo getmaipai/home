@@ -20,7 +20,7 @@ health_cmd="${MAIPAI_SHIP_HEALTH_CMD:-}"
 web_url="${MAIPAI_SHIP_WEB_URL:-http://localhost:3000/}"
 stack_url="${MAIPAI_SHIP_STACK_URL:-http://127.0.0.1:8770/healthz}"
 migrations_cmd="${MAIPAI_SHIP_MIGRATIONS_CMD:-sqlite3 -readonly $live/data/hub.db 'select count(*) from __drizzle_migrations'}"
-publish_cmd="${MAIPAI_PUBLISH_CMD:-bash scripts/publish-release.sh TAG --latest}"
+publish_cmd="${MAIPAI_PUBLISH_CMD:-bash scripts/publish-release.sh TAG --latest NOTES}"
 health_timeout="${MAIPAI_SHIP_HEALTH_TIMEOUT:-90}"
 before_green=0; tag_after=0; dry=0; target=main
 while (($#)); do case "$1" in --before-green) before_green=1;; --tag) tag_after=1;; --dry-run) dry=1;; main) target=main;; --*) usage; exit 2;; *) target="$1";; esac; shift; done
@@ -67,8 +67,35 @@ if (( tag_after )); then
   [[ -n "$latest" ]] || die "origin has no vX.Y.Z tag to increment; publish the first release tag manually."
   IFS=. read -r major minor patch <<< "${latest#v}"; next="v$major.$minor.$((patch + 1))"
   if git ls-remote --exit-code --tags origin "refs/tags/$next" >/dev/null 2>&1; then die "$next already exists on origin; fetch tags and retry with the next patch version."; fi
+  if git show-ref --verify --quiet "refs/tags/$next"; then
+    local_sha="$(git rev-parse "$next^{commit}")"
+    local_subject="$(git show -s --format=%s "$local_sha")"
+    local_date="$(git for-each-ref --format='%(taggerdate:short)' "refs/tags/$next")"
+    [[ -n "$local_date" ]] || local_date="$(git show -s --format=%cs "$local_sha")"
+    printf 'local tag %s points at %s "%s", tagged %s, not on origin\n' "$next" "${local_sha:0:7}" "$local_subject" "$local_date" >&2
+    printf 'git tag -d %s\n' "$next" >&2
+    exit 1
+  fi
+  changelog_section=0
+  changelog_version="${next#v}"; changelog_version="${changelog_version//./\\.}"
+  if [[ -f CHANGELOG.md ]] && grep -Eq "^## \\[${changelog_version}\\]([[:space:]]|$)" CHANGELOG.md; then changelog_section=1; fi
+  notes_file=
+  notes_args=
+  if (( changelog_section )); then
+    echo "notes: changelog section"
+  else
+    notes_file="$(mktemp "${TMPDIR:-/tmp}/maipai-release-notes.XXXXXX")"
+    trap '[[ -z "${notes_file:-}" ]] || rm -f "$notes_file"' EXIT
+    release_date="$(date +%F)"
+    printf 'Release %s, cut from commit %s live on the hub on %s.\n' "$next" "${sha:0:7}" "$release_date" > "$notes_file"
+    git log --format='- %s' --first-parent --reverse "$latest..$sha" >> "$notes_file"
+    commit_count="$(git rev-list --first-parent --count "$latest..$sha")"
+    printf 'notes: %s landed commits\n' "$commit_count"
+    printf -v quoted_notes_file '%q' "$notes_file"
+    notes_args="--notes-file $quoted_notes_file"
+  fi
   git tag -a "$next" -m "$next" "$sha" || die "could not create $next; check local Git tag state."
   git push origin "$next" || die "could not push $next; check Git access and retry."
-  publish="${publish_cmd//TAG/$next}"; eval "$publish" || die "published tag $next on GitHub, but the latest-release update failed; run the publish command again."
+  publish="${publish_cmd//TAG/$next}"; publish="${publish//NOTES/$notes_args}"; eval "$publish" || die "published tag $next on GitHub, but the latest-release update failed; run the publish command again."
   echo "tagged $next at ${sha:0:7}"
 fi

@@ -20,8 +20,8 @@ beforeAll(() => {
   writeFileSync(promote, "#!/usr/bin/env bash\nset -e\necho \"$*\" >> '" + join(scratch, "promote.calls") + "'\nif [[ \"$1\" == --check ]]; then echo ok; exit 0; fi\nif [[ -f '" + join(scratch, "promote.fail") + "' ]]; then exit 1; fi\nif [[ \"$1\" == --rollback ]]; then echo v0.0.1 > '" + join(live, ".installed-tag") + "'; rm -f '" + join(scratch, "health.fail") + "'; else echo \"sha-\${1:0:7}\" > '" + join(live, ".installed-tag") + "'; fi\n");
   chmodSync(promote, 0o755);
   writeFileSync(join(scratch, "health-check"), "#!/usr/bin/env bash\n[[ ! -f '" + join(scratch, "health.fail") + "' ]]\n"); chmodSync(join(scratch, "health-check"), 0o755);
-  writeFileSync(join(scratch, "publish"), "#!/usr/bin/env bash\necho \"$1\" >> '" + join(scratch, "publish.calls") + "'\n"); chmodSync(join(scratch, "publish"), 0o755);
-  Object.assign(baseEnv, { MAIPAI_SHIP_DATA: data, MAIPAI_WATCH_DATA: watch, MAIPAI_SHIP_LIVE: live, MAIPAI_PROMOTE_BIN: promote, MAIPAI_SHIP_SUDO: "", MAIPAI_SHIP_STOP_DEV_CMD: "true", MAIPAI_SHIP_HEALTH_CMD: join(scratch, "health-check"), MAIPAI_SHIP_HEALTH_TIMEOUT: "1", MAIPAI_SHIP_MIGRATIONS_CMD: "echo 3", MAIPAI_PUBLISH_CMD: join(scratch, "publish") + " TAG", MAIPAI_LAND_GIT_ENV: "" });
+  writeFileSync(join(scratch, "publish"), "#!/usr/bin/env bash\nprintf '%s\\n' \"$@\" >> '" + join(scratch, "publish.calls") + "'\nwhile (($#)); do if [[ \"$1\" == --notes-file ]]; then echo \"$2\" > '" + join(scratch, "publish.notes.path") + "'; cat \"$2\" > '" + join(scratch, "publish.notes") + "'; shift 2; else shift; fi; done\n"); chmodSync(join(scratch, "publish"), 0o755);
+  Object.assign(baseEnv, { MAIPAI_SHIP_DATA: data, MAIPAI_WATCH_DATA: watch, MAIPAI_SHIP_LIVE: live, MAIPAI_PROMOTE_BIN: promote, MAIPAI_SHIP_SUDO: "", MAIPAI_SHIP_STOP_DEV_CMD: "true", MAIPAI_SHIP_HEALTH_CMD: join(scratch, "health-check"), MAIPAI_SHIP_HEALTH_TIMEOUT: "1", MAIPAI_SHIP_MIGRATIONS_CMD: "echo 3", MAIPAI_PUBLISH_CMD: join(scratch, "publish") + " TAG NOTES", MAIPAI_LAND_GIT_ENV: "" });
 });
 describe("ship pipeline", () => {
   test("rejects side branch commits before calling helper", () => {
@@ -40,9 +40,28 @@ describe("ship pipeline", () => {
     writeFileSync(join(watch, "green", sha), "green\n"); writeFileSync(join(scratch, "health.fail"), "bad"); const out = run([sha]); expect(out.status).toBe(1);
     expect(readFileSync(join(scratch, "promote.calls"), "utf8")).toContain(sha + "\n--rollback"); expect(readFileSync(join(data, "shipped.jsonl"), "utf8")).toContain('"result":"rolled_back"'); expect(out.stdout).toContain("rolled back to v0.0.1");
   }, 60_000);
+  test("refuses a stale local next tag and reports how to remove it", () => {
+    git(main, "tag", "-a", "v0.0.2", "-m", "v0.0.2", sha);
+    const out = run([sha, "--tag"]);
+    expect(out.status).toBe(1); expect(out.stderr).toContain("local tag v0.0.2 points at " + sha.slice(0, 7)); expect(out.stderr).toContain('"fixture main"'); expect(out.stderr).toContain("git tag -d v0.0.2"); expect(git(origin, "tag", "--list", "v0.0.2")).toBe("");
+    git(main, "tag", "-d", "v0.0.2");
+  }, 60_000);
   test("tag publishes next patch and refuses an existing next tag", () => {
     writeFileSync(join(watch, "green", sha), "green\n"); const out = run([sha, "--tag"]); expect(out.status).toBe(0); expect(git(origin, "rev-parse", "refs/tags/v0.0.2^{}")).toBe(sha); expect(readFileSync(join(scratch, "publish.calls"), "utf8")).toContain("v0.0.2"); expect(out.stdout).toContain("tagged v0.0.2");
     const next = run([sha, "--tag"]); expect(next.status).toBe(0); expect(git(origin, "rev-parse", "refs/tags/v0.0.3^{}")).toBe(sha);
+  }, 60_000);
+  test("tag writes notes from landed commits when CHANGELOG has no release section", () => {
+    git(main, "checkout", "main");
+    writeFileSync(join(main, "first.txt"), "first\n"); git(main, "add", "first.txt"); git(main, "commit", "-m", "first landed change");
+    writeFileSync(join(main, "second.txt"), "second\n"); git(main, "add", "second.txt"); git(main, "commit", "-m", "second landed change");
+    const target = git(main, "rev-parse", "HEAD"); git(main, "push", "origin", "main");
+    writeFileSync(join(watch, "green", target), "green\n");
+    const out = run([target, "--tag"]);
+    expect(out.status).toBe(0); expect(out.stdout).toContain("notes: 2 landed commits");
+    const args = readFileSync(join(scratch, "publish.calls"), "utf8"); expect(args).toContain("--notes-file"); expect(args).toContain("v0.0.4");
+    const notes = readFileSync(join(scratch, "publish.notes"), "utf8").trim().split("\n");
+    expect(notes[0]).toContain("Release v0.0.4, cut from commit " + target.slice(0, 7) + " live on the hub on ");
+    expect(notes.slice(1)).toEqual(["- first landed change", "- second landed change"]);
   }, 60_000);
   test("dry run prints plan and never promotes", () => {
     const calls = join(scratch, "promote.calls"); rmSync(calls, { force: true }); const out = run([sha, "--before-green", "--dry-run"]); expect(out.status).toBe(0); expect(out.stdout).toContain("sha=" + sha); expect(out.stdout).toContain("before-green=yes"); expect(existsSync(calls)).toBe(false);
