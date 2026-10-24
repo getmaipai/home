@@ -1,0 +1,24 @@
+#!/usr/bin/env bash
+set -euo pipefail
+ROOT="${MAIPAI_INSTALL_ROOT:-/usr/local/maipai-home}"
+MIRROR="/usr/local/maipai-home-src.git"
+REMOTE="https://github.com/getmaipai/home.git"
+usage() { echo "usage: maipai-promote <7-40 lowercase hex SHA> | --rollback | --check" >&2; }
+fail() { echo "maipai-promote: $1" >&2; exit "${2:-1}"; }
+[[ "$(id -u)" == 0 ]] || fail "run it with sudo." 77
+[[ $# == 1 ]] || { usage; exit 64; }
+case "$1" in
+  --check) echo ok; exit 0 ;;
+  --rollback) [[ -f "$ROOT/scripts/install.sh" ]] || fail "no installed installer at $ROOT/scripts/install.sh; repair the live install first."; exec bash "$ROOT/scripts/install.sh" --rollback ;;
+esac
+[[ "$1" =~ ^[0-9a-f]{7,40}$ ]] || { usage; exit 64; }
+if [[ ! -d "$MIRROR" ]]; then git clone --bare "$REMOTE" "$MIRROR" || fail "could not create $MIRROR; check Git access and retry."; else git -C "$MIRROR" fetch --prune origin '+refs/heads/*:refs/heads/*' || fail "could not refresh $MIRROR; check Git access and retry."; fi
+[[ "$(stat -f '%u' "$MIRROR" 2>/dev/null)" == 0 ]] || fail "$MIRROR is not root-owned; remove it as root and retry so untrusted files cannot be installed."
+[[ -z "$(find "$MIRROR" \( -perm -002 -o -perm -020 \) -print -quit 2>/dev/null)" ]] || fail "$MIRROR contains group- or user-writable files; secure it as root before retrying."
+git -C "$MIRROR" rev-parse --verify "$1^{commit}" >/dev/null 2>&1 || fail "commit $1 is missing from the mirror; check the SHA and retry."
+git -C "$MIRROR" merge-base --is-ancestor "$1" main || fail "commit $1 is not on main; land it first."
+sha="$(git -C "$MIRROR" rev-parse "$1^{commit}")"
+tmp="$(mktemp -d)" || fail "could not create a temporary folder; check disk space and retry."
+trap 'rm -rf "$tmp"' EXIT
+git -C "$MIRROR" archive "$sha" scripts/install.sh | tar -x -C "$tmp" || fail "could not extract the commit installer; check the mirror and retry."
+if MAIPAI_SOURCE_MIRROR="$MIRROR" MAIPAI_SOURCE_REMOTE="$REMOTE" bash "$tmp/scripts/install.sh" --commit "$sha"; then exit 0; else status=$?; exit "$status"; fi

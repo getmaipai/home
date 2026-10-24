@@ -180,7 +180,28 @@ valid_port() {
 }
 
 valid_release_tag() {
-  printf '%s' "$1" | grep -Eq '^v[0-9]+(\.[0-9]+)*([-.][0-9A-Za-z.-]+)?$'
+  printf '%s' "$1" | grep -Eq '^(v[0-9]+(\.[0-9]+)*([-.][0-9A-Za-z.-]+)?|sha-[0-9a-f]{7,40})$'
+}
+
+source_mirror_path() {
+  local root="${1:-${MAIPAI_INSTALL_ROOT:-${SOURCE_INSTALL_ROOT:-$INSTALL_ROOT_DARWIN}}}"
+  echo "${MAIPAI_SOURCE_MIRROR:-$(dirname "$root")/maipai-home-src.git}"
+}
+
+ensure_source_mirror() {
+  local sha="$1" root="${2:-${MAIPAI_INSTALL_ROOT:-$INSTALL_ROOT_DARWIN}}"
+  local mirror remote="${MAIPAI_SOURCE_REMOTE:-https://github.com/${REPO}.git}"
+  mirror=$(source_mirror_path "$root")
+  if [ ! -d "$mirror" ]; then
+    git clone --bare "$remote" "$mirror" >&2 || die "could not create source mirror at ${mirror}. Check Git access, then retry."
+  else
+    git -C "$mirror" fetch --prune origin '+refs/heads/*:refs/heads/*' >&2 \
+      || die "could not refresh source mirror at ${mirror}. Check Git access, then retry."
+  fi
+  git -C "$mirror" rev-parse --verify "${sha}^{commit}" >/dev/null 2>&1 \
+    || die "commit ${sha} was not found in the source mirror. Check the SHA and retry."
+  git -C "$mirror" merge-base --is-ancestor "$sha" main \
+    || die "commit ${sha} is not on main; land it first."
 }
 
 # Everything this installer calls that is not part of a bare macOS or
@@ -712,6 +733,18 @@ ensure_deno() {
 
 fetch_release_source() {
   local tag="$1" dest="$2"
+  if [[ "$tag" == sha-* ]]; then
+    local mirror full_sha
+    mirror=$(source_mirror_path)
+    ensure_source_mirror "${tag#sha-}"
+    full_sha=$(git -C "$mirror" rev-parse --verify "${tag#sha-}^{commit}" 2>/dev/null) \
+      || die "commit label ${tag} is ambiguous or missing in ${mirror}. Use its full SHA and retry."
+    log "Fetching commit ${full_sha:0:7} of main..."
+    mkdir -p "$dest" || return 1
+    git -C "$mirror" archive --format=tar "$full_sha" | tar -x -C "$dest" \
+      || return 1
+    return 0
+  fi
   log "Fetching ${REPO}@${tag}..."
   local tmp
   tmp=$(mktemp -d)
@@ -1640,7 +1673,7 @@ main() {
   local stack_only="no"
   local plan_flag="" plan_flag_seen="no"
   local plan_flag_count=0
-  local version_flag="" rollback="no"
+  local version_flag="" commit_flag="" rollback="no"
   while [ "$#" -gt 0 ]; do
     case "$1" in
       --dry-run) dry_run="yes" ;;
@@ -1650,16 +1683,20 @@ main() {
       --version)
         [ "$#" -ge 2 ] || die "--version needs a release tag such as v0.1.0. Run bash scripts/install.sh --help for the next step."
         version_flag="$2"; shift ;;
+      --commit)
+        [ "$#" -ge 2 ] || die "--commit needs a 7 to 40 character commit SHA."
+        commit_flag="$2"; shift ;;
       --plan)
         [ "$#" -ge 2 ] || die "--plan needs a value: recommended, moderate, or minimal. Run bash scripts/install.sh --help for the next step."
         plan_flag="$2"; plan_flag_seen="yes"; plan_flag_count=$((plan_flag_count + 1)); shift ;;
       --help|-h)
-        log "Usage: install.sh [--dry-run] [--engine-computer] [--stack-only] [--plan recommended|moderate|minimal] [--version vX.Y.Z] [--rollback]"
+        log "Usage: install.sh [--dry-run] [--engine-computer] [--stack-only] [--plan recommended|moderate|minimal] [--version vX.Y.Z] [--commit <sha>] [--rollback]"
         log "With no option this brings up MaiPai Home only. The setup wizard then installs the AI engine (the MaiPai Stack) if this computer should run it."
         log "--stack-only installs just the AI engine on a computer that already runs Home. The setup wizard runs it for you; run it by hand only if the wizard says to."
         log "You can also set MAIPAI_PLAN to recommended, moderate, or minimal. The setup wizard still runs its checks before downloads."
         log "Free disk: the installer checks the plan against the disks that will hold Home, its data and the AI (the installed size, 20 percent more, and the space an install uses while it runs). A smaller plan needs less: --plan moderate or --plan minimal. The setup wizard shows each part with its size."
         log "--version installs a specific release instead of the latest. --rollback goes back to the previous release and the data copy taken before the last upgrade."
+        log "--commit installs a landed commit from main and records its sha-<first 7> label."
         log "MAIPAI_PORT (default 3000) and MAIPAI_STACK_PORT (default 8770) change the ports."
         exit 0 ;;
       --*) die "Unknown option: $1. Run bash scripts/install.sh --help for allowed options." ;;
@@ -1674,6 +1711,11 @@ main() {
     valid_release_tag "$version_flag" || die "Invalid version '${version_flag}'. Use a release tag such as v0.1.0."
     [ "$rollback" = "no" ] || die "--version and --rollback cannot be used together. --rollback picks the previous release by itself."
   fi
+  if [ -n "$commit_flag" ]; then
+    printf '%s' "$commit_flag" | grep -Eq '^[0-9a-f]{7,40}$' || die "Invalid commit SHA '${commit_flag}'. Use 7 to 40 lowercase hexadecimal characters."
+    [ -z "$version_flag" ] && [ "$rollback" = "no" ] || die "--commit cannot be combined with --version or --rollback."
+  fi
+  [ -z "$commit_flag" ] || [ -z "$version_flag" ] || die "--commit and --version cannot be used together."
 
   local requested_plan=""
   if [ "$plan_flag_seen" = "yes" ]; then
@@ -1694,7 +1736,7 @@ main() {
   arch=$(detect_arch)
 
   if [ "$stack_only" = "yes" ]; then
-    [ "$engine_computer" = "no" ] && [ "$rollback" = "no" ] && [ -z "$version_flag" ] \
+    [ "$engine_computer" = "no" ] && [ "$rollback" = "no" ] && [ -z "$version_flag" ] && [ -z "$commit_flag" ] \
       || die "--stack-only cannot be combined with --engine-computer, --rollback or --version."
     stack_main "$dry_run"
     exit $?
@@ -1707,6 +1749,12 @@ main() {
   fi
 
   if [ "$dry_run" = "yes" ]; then
+    if [ -n "$commit_flag" ]; then
+      local commit_root
+      [ "$(uname -s)" = "Linux" ] && commit_root="$INSTALL_ROOT_LINUX" || commit_root="$INSTALL_ROOT_DARWIN"
+      log "[dry-run] would install commit ${commit_flag} of main as sha-${commit_flag:0:7} from mirror $(source_mirror_path "$commit_root")"
+      exit 0
+    fi
     # A focused dry run of Home's own bring-up. The AI engine is not part
     # of it: the setup wizard asks for it, and `--stack-only --dry-run`
     # shows that plan.
@@ -1733,6 +1781,7 @@ main() {
 
   local install_root
   [ "$os" = "linux" ] && install_root="$INSTALL_ROOT_LINUX" || install_root="$INSTALL_ROOT_DARWIN"
+  SOURCE_INSTALL_ROOT="$install_root"
   local bun_home="${install_root}/.bun"
 
   local installed_tag previous_tag
@@ -1745,6 +1794,13 @@ main() {
     tag="$previous_tag"
   elif [ -n "$version_flag" ]; then
     tag="$version_flag"
+  elif [ -n "$commit_flag" ]; then
+    ensure_source_mirror "$commit_flag" "$install_root"
+    local resolved_commit
+    resolved_commit=$(git -C "$(source_mirror_path "$install_root")" rev-parse --verify "${commit_flag}^{commit}") \
+      || die "commit ${commit_flag} is ambiguous in the source mirror. Use a full SHA and retry."
+    tag="sha-${resolved_commit:0:7}"
+    commit_flag="$resolved_commit"
   else
     tag=$(latest_tag)
   fi
@@ -1791,7 +1847,7 @@ main() {
     if [ "$rollback" = "yes" ]; then
       log "Going back from ${installed_tag:-the current version} to ${tag}."
     elif [ "$kind" = "upgrade" ]; then
-      log "Existing install ${installed_tag} found at ${install_root} - upgrading to ${tag}."
+      if [[ "$tag" == sha-* ]]; then log "Existing install ${installed_tag} found at ${install_root} - upgrading to commit ${tag#sha-} of main."; else log "Existing install ${installed_tag} found at ${install_root} - upgrading to ${tag}."; fi
     else
       log "An earlier install at ${install_root} did not finish - continuing with ${tag}."
     fi

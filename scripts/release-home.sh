@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # The one way to tag Home and update the live hub on this Mac. Two sessions releasing at once, or an older tag
 # installed over a newer one, once downgraded the live hub (2026-10-20); this script refuses both.
+# scripts/ship.sh supersedes this script for this Mac's live hub; this remains for tag installs.
 # Usage: scripts/release-home.sh --owner-approved [--dry-run]      tag origin/main as the next patch version, install it, verify it
 #        scripts/release-home.sh --owner-approved --install vX.Y.Z  install an existing tag (a downgrade needs --allow-downgrade)
 # --owner-approved means the owner said yes in this turn; a session never passes it on its own.

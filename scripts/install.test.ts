@@ -1163,7 +1163,34 @@ describe("macOS install checks (Mac Studio audit, 2026-10-16)", () => {
 
   test("valid_port and valid_release_tag", () => {
     expect(bash("valid_port 3000 && valid_port 65535 && ! valid_port 0 && ! valid_port 70000 && ! valid_port abc && ! valid_port ''").exitCode).toBe(0);
-    expect(bash("valid_release_tag v0.1.0 && valid_release_tag v1.2.3-rc1 && ! valid_release_tag main && ! valid_release_tag search-assist-weights-v2").exitCode).toBe(0);
+    expect(bash("valid_release_tag v0.1.0 && valid_release_tag v1.2.3-rc1 && valid_release_tag sha-0123abc && ! valid_release_tag sha-xyz && ! valid_release_tag main && ! valid_release_tag search-assist-weights-v2").exitCode).toBe(0);
+  });
+
+  test("source mirror clones, refreshes, accepts main commits and refuses side commits", () => {
+    const root = mkdtempSync(join(tmpdir(), "maipai-source-mirror-"));
+    try {
+      const remote = join(root, "remote.git"), clone = join(root, "clone"), mirror = join(root, "mirror.git");
+      const git = (dir: string, ...args: string[]) => Bun.spawnSync(["git", "-C", dir, ...args]);
+      expect(Bun.spawnSync(["git", "init", "--bare", "--initial-branch=main", remote]).exitCode).toBe(0);
+      expect(Bun.spawnSync(["git", "clone", remote, clone]).exitCode).toBe(0);
+      git(clone, "config", "user.name", "Install Test"); git(clone, "config", "user.email", "install@example.test");
+      writeFileSync(join(clone, "hello.txt"), "main\n"); git(clone, "add", "."); git(clone, "commit", "-m", "main"); git(clone, "push", "origin", "main");
+      const sha = git(clone, "rev-parse", "HEAD").stdout.toString().trim();
+      const env = { ...process.env, MAIPAI_SOURCE_REMOTE: remote, MAIPAI_SOURCE_MIRROR: mirror };
+      const sourced = (command: string) => Bun.spawnSync(["bash", "-c", `source "${INSTALL_SH}"; ${command}`], { env });
+      expect(sourced(`ensure_source_mirror ${sha}`).exitCode).toBe(0);
+      expect(sourced(`ensure_source_mirror ${sha}`).exitCode).toBe(0);
+      git(clone, "checkout", "-b", "side"); writeFileSync(join(clone, "side.txt"), "side\n"); git(clone, "add", "."); git(clone, "commit", "-m", "side"); git(clone, "push", "origin", "side");
+      const side = git(clone, "rev-parse", "HEAD").stdout.toString().trim();
+      const refused = sourced(`ensure_source_mirror ${side}`);
+      expect(refused.exitCode).not.toBe(0); expect(refused.stderr.toString()).toContain("not on main");
+      const dest = join(root, "extract");
+      const extracted = sourced(`fetch_release_source sha-${sha.slice(0, 7)} "${dest}"`);
+      expect(extracted.exitCode).toBe(0); expect(readFileSync(join(dest, "hello.txt"), "utf8")).toBe("main\n");
+      const dryMirror = join(root, "must-not-exist.git");
+      const dry = Bun.spawnSync(["bash", INSTALL_SH, "--dry-run", "--commit", sha], { env: { ...env, MAIPAI_SOURCE_MIRROR: dryMirror } });
+      expect(dry.exitCode).toBe(0); expect(dry.stdout.toString()).toContain(`sha-${sha.slice(0, 7)}`); expect(existsSync(dryMirror)).toBe(false);
+    } finally { rmSync(root, { recursive: true, force: true }); }
   });
 
   test("missing tools on a Mac point at the Command Line Tools with the exact command", () => {

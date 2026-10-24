@@ -35,7 +35,4 @@ Lint: `tsc --noEmit` (backend); `tsc --noEmit && eslint .` (frontend). `bash scr
 
 A `@maipai/*` pin bump, a lockfile conflict or a bundled-manifest change: load [docs/PINNING.md](docs/PINNING.md) first.
 
-**Releases (one releaser).** Tag and update the live hub only with `scripts/release-home.sh --owner-approved` (see its header), and only after the
-owner said yes in that turn. It refuses a downgrade, a second tag while the live hub is behind, and two runs at once. Sessions that finish
-work land it on `main` and say so; they never tag or run the installer themselves. One session owns releases at a time: the StackChan
-firmware session on the Studio (2026-10-20).
+**Releases (one releaser).** Ship with `bash scripts/ship.sh [sha] [--before-green] [--tag]` after the owner said yes in that turn. It promotes a landed commit to the live hub through `/usr/local/libexec/maipai-promote`, checks it and rolls back on failure; `--tag` cuts and publishes the next patch tag from what is live. One session owns releases at a time: the StackChan firmware session on the Studio (2026-10-20).
