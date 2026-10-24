@@ -14,7 +14,7 @@
 import { KIWIX_BINARIES } from "@/lib/kiwixCatalog";
 import { KIWIX_CATALOG_URL } from "@/lib/referenceLibrary";
 import { WAKEWORD_ALL_ASSETS } from "@/lib/wakewordAssets";
-import { VISION_ALL_ASSETS } from "@/lib/visionAssets";
+import { VISION_ALL_ASSETS, VISION_FOCAL_CROP } from "@/lib/visionAssets";
 import { ROBOT_ASSETS } from "@/lib/robotAssets";
 import { SILERO_VAD_ASSET } from "@/lib/sttAssets";
 import { voiceCatalogUrl } from "@/lib/voiceCatalog";
@@ -93,6 +93,7 @@ export function platformConnections(): PrivacyConnection[] {
   const listsInUse = blockListsInUse();
   const wakewordHosts = hostsOf(WAKEWORD_ALL_ASSETS.map((a) => a.url));
   const visionHosts = hostsOf(VISION_ALL_ASSETS.map((a) => a.url));
+  const focalCropHost = hostsOf([VISION_FOCAL_CROP.url]);
   const robotAssetHosts = hostsOf(ROBOT_ASSETS.map((asset) => asset.source_url));
   const botReleaseHosts = hasBotReleaseAssets() ? "github.com, objects.githubusercontent.com" : null;
   const voiceHost = hostsOf([voiceCatalogUrl()]);
@@ -125,6 +126,10 @@ export function platformConnections(): PrivacyConnection[] {
     }),
     row("platform:face-vision-models", visionHosts, {
       when: "once, when someone starts face enrollment in the browser",
+      what: DOWNLOAD_CARRIES,
+    }),
+    row("platform:focal-crop-model", focalCropHost, {
+      when: "once, the first time News shows an image after this feature is added",
       what: DOWNLOAD_CARRIES,
     }),
     row("platform:robot-assets", robotAssetHosts, {

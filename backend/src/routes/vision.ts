@@ -4,7 +4,9 @@ import {
   VISION_ALL_ASSETS,
   VISION_FACE_DETECTOR,
   VISION_FACE_EMBEDDER,
+  VISION_FOCAL_CROP,
   areVisionAssetsInstalled,
+  ensureFocalCropAsset,
   ensureVisionAssets,
   visionAssetPath,
 } from "@/lib/visionAssets";
@@ -48,7 +50,7 @@ visionRoutes.openapi(modelsRoute, async (c) => {
   );
 });
 
-const ASSET_BY_FILE = new Map(VISION_ALL_ASSETS.map((asset) => [asset.file, asset]));
+const ASSET_BY_FILE = new Map([...VISION_ALL_ASSETS, VISION_FOCAL_CROP].map((asset) => [asset.file, asset]));
 
 const visionFileRoute = createRoute({
   method: "get",
@@ -73,7 +75,8 @@ visionRoutes.openapi(visionFileRoute, async (c) => {
   if (!asset) return c.json({ error: `unknown vision asset: ${file}` }, 404);
 
   try {
-    await ensureVisionAssets();
+    if (asset.file === VISION_FOCAL_CROP.file) await ensureFocalCropAsset();
+    else await ensureVisionAssets();
   } catch (err) {
     return c.json({ error: `vision asset unavailable: ${(err as Error).message}` }, 503);
   }

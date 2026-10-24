@@ -21,6 +21,8 @@ import { WeatherForecastPage, dedupeLocations, type WeatherLocation } from "@mai
 import { useAppSidebar } from "@/shell/useAppSidebar";
 import { MediaHubFrame } from "@/shell/MediaHubFrame";
 import { useMediaHubActive } from "@/shell/mediaHubSession";
+import { FocalImageProvider } from "@maipai/ui/src/primitives/FocalImage";
+import { analyzeFocalImage } from "@/lib/focalImageAnalyzer";
 import "./packageAppNews.css";
 
 
@@ -215,7 +217,7 @@ export function PackageAppPage({ person }: { person: Roster }) {
         loadingLabel="Opening the app"
       >
         {(doc) => (hasQuery && !sameQuery ? null : <>
-          {packageId === "weather" && pageId === "index" ? null : <SchemaPage key={`${packageId}/${pageId}`} page={doc} packageId={packageId} hideTitle sidebar={sidebarProps !== null} />}
+          {packageId === "weather" && pageId === "index" ? null : packageId === "news" ? <FocalImageProvider analyze={analyzeFocalImage}><SchemaPage key={`${packageId}/${pageId}`} page={doc} packageId={packageId} hideTitle sidebar={sidebarProps !== null} /></FocalImageProvider> : <SchemaPage key={`${packageId}/${pageId}`} page={doc} packageId={packageId} hideTitle sidebar={sidebarProps !== null} />}
           {packageId === "videos" && pageId === "watch" ? <VideoDetails id={new URLSearchParams(location.search).get("id") ?? String((location.state as { pageState?: { id?: string } } | null)?.pageState?.id ?? "")} /> : null}
           {packageId === "weather" && pageId === "index" ? <>
             {weatherMessage ? <p role="status" className="text-sm text-muted-foreground">{weatherMessage}</p> : null}

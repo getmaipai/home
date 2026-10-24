@@ -67,6 +67,7 @@ When you ask for a book, Home sends the title or author you said to the Library 
 |---|---|---|---|
 | Feed checks | While the News shelf is on, at its set pace | A request for the feed and your home's internet address | The publisher |
 | A story's picture | The first time a screen shows that story, while pictures are on; never in the background | A plain request for the picture file named by the feed, plus your home's internet address | The publisher's picture host |
+| News image framing model | Once, the first time News shows an image after this feature is added | A request for the pinned model file and your home's internet address. The picture stays on this computer. | Hugging Face |
 | A story's full text | When you open it; in the background only if full-text prefetch is on | A plain request for that one page | The publisher |
 | An archived copy of a dead page | When a teen or adult opens a page that is gone | The missing page's address | The Internet Archive |
 | Follows, saves, reads, My Mix, Key points and Listen | Never sent | Nothing; these stay on the hub | Nobody |

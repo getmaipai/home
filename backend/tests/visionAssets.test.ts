@@ -4,6 +4,7 @@ import { TestClient } from "./client";
 import { resetDb } from "./reset-db";
 import {
   VISION_ALL_ASSETS,
+  VISION_FOCAL_CROP,
   areVisionAssetsInstalled,
   ensureVisionAssets,
   isVisionAssetInstalled,
@@ -14,6 +15,11 @@ import { visionDir } from "@/lib/paths";
 function installPlaceholderAssets() {
   mkdirSync(visionDir, { recursive: true });
   for (const asset of VISION_ALL_ASSETS) writeFileSync(visionAssetPath(asset.file), "placeholder");
+}
+
+function installFocalAsset() {
+  mkdirSync(visionDir, { recursive: true });
+  writeFileSync(visionAssetPath(VISION_FOCAL_CROP.file), "placeholder");
 }
 
 beforeEach(() => resetDb());
@@ -70,6 +76,17 @@ describe("GET /api/vision/model/:file", () => {
     const owner = new TestClient();
     await owner.post("/api/auth/setup", { displayName: "Sage", secret: "correcthorse" });
     expect((await owner.get("/api/vision/model/not-a-model.onnx")).status).toBe(404);
+  });
+
+  test("the focal crop model is auth protected and served from its pinned local file", async () => {
+    expect((await new TestClient().get(`/api/vision/model/${VISION_FOCAL_CROP.file}`)).status).toBe(401);
+    installFocalAsset();
+    const owner = new TestClient();
+    await owner.post("/api/auth/setup", { displayName: "Sage", secret: "correcthorse" });
+    const res = await owner.get(`/api/vision/model/${VISION_FOCAL_CROP.file}`);
+    expect(res.status).toBe(200);
+    expect(res.headers.get("content-type")).toBe("application/octet-stream");
+    expect(await res.text()).toBe("placeholder");
   });
 
   test("serves a known asset's bytes as an octet stream once installed", async () => {

@@ -14,6 +14,7 @@ The page is built from the code and each package's declared sources, so it canno
 | Row | When | What goes |
 |---|---|---|
 | Model downloads (wake word, face, speech, robot) | Once per model, the first time a feature needs it. For the wake word, that is the first time someone switches it on in chat. | A download request |
+| News image framing model | Once, the first time News shows an image that needs content-aware framing | A download request for the pinned FocalNet model. The picture stays on this computer. |
 | Update check (GitHub) | At most once a day | Your internet address |
 | Blocked-site index and lists | Index about daily, lists about monthly | Your internet address. Shown only while a list is on. |
 | Internet check | Once a minute | A DNS lookup of example.com and an empty connection to 1.1.1.1:443. Turn it off under **Internet check**. |
