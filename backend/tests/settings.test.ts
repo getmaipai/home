@@ -990,3 +990,36 @@ describe("secret: true settings keys are encrypted at rest", () => {
     expect(invalid.status).toBe(400);
   });
 });
+
+
+describe("companions.preview_shells setting gate", () => {
+  test("only an owner or admin may set or reset their own preview switch", async () => {
+    const owner = new TestClient();
+    const setup = await owner.post("/api/auth/setup", { displayName: "Sage", secret: "correcthorse" });
+    const { person } = await setup.json() as { person: { id: string } };
+    const target = `person:${person.id}`;
+    const own = await owner.put("/api/settings", { scope: target, key: "companions.preview_shells", value: true });
+    expect(own.status).toBe(200);
+    const listed = await owner.get(`/api/settings?scope=${encodeURIComponent(target)}&key=companions.preview_shells`);
+    expect((await listed.json() as Array<{ value: unknown }>)[0]?.value).toBe(true);
+    const reset = await owner.post("/api/settings/reset", { scope: target, key: "companions.preview_shells" });
+    expect(reset.status).toBe(200);
+    expect((await reset.json() as { value: unknown }).value).toBe(false);
+
+    const made = await owner.post("/api/people", { displayName: "Marlow", role: "adult", secret: "0000" });
+    const { id } = await made.json() as { id: string };
+    const forbiddenSet = await owner.put("/api/settings", { scope: `person:${id}`, key: "companions.preview_shells", value: true });
+    expect(forbiddenSet.status).toBe(403);
+    expect((await forbiddenSet.json() as { error: string }).error).toBe("Only an admin can turn on the companion previews, and only for themselves. Sign in as an admin and turn it on in your own profile.");
+    const forbiddenReset = await owner.post("/api/settings/reset", { scope: `person:${id}`, key: "companions.preview_shells" });
+    expect(forbiddenReset.status).toBe(403);
+    expect((await forbiddenReset.json() as { error: string }).error).toBe("Only an admin can turn on the companion previews, and only for themselves. Sign in as an admin and turn it on in your own profile.");
+
+    const adult = new TestClient();
+    const signIn = await adult.post("/api/auth/verify-secret", { personId: id, secret: "0000" });
+    expect(signIn.status).toBe(200);
+    const adultAttempt = await adult.put("/api/settings", { scope: `person:${id}`, key: "companions.preview_shells", value: true });
+    expect(adultAttempt.status).toBe(403);
+    expect((await adultAttempt.json() as { error: string }).error).toBe("Only an admin can turn on the companion previews, and only for themselves. Sign in as an admin and turn it on in your own profile.");
+  });
+});

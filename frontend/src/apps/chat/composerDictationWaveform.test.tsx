@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, jest, test } from "bun:test";
 import { act, cleanup, fireEvent, render, waitFor } from "@testing-library/react";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { AssistantRuntimeProvider, ComposerPrimitive, useLocalRuntime, type ChatModelAdapter, type DictationAdapter } from "@assistant-ui/react";
 import type { LevelMeter } from "@/lib/voice/audioLevelMeter";
 import { ComposerDictationWaveform, DictationLevelMeterProvider } from "@/apps/chat/composerDictationWaveform";
@@ -51,6 +52,11 @@ function Harness({ meter, availability = "ready" }: { meter: LevelMeter | null; 
   );
 }
 
+function renderHarness(meter: LevelMeter | null, availability?: "ready" | "starting" | "unavailable") {
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  return { ...render(<QueryClientProvider client={client}><Harness meter={meter} availability={availability} /></QueryClientProvider>), client };
+}
+
 describe("ComposerDictationWaveform", () => {
   afterEach(() => {
     cleanup();
@@ -58,7 +64,7 @@ describe("ComposerDictationWaveform", () => {
   });
 
   test("not dictating: renders the real composer input, never the bars - the regression VOICE-LIVE-04b found live", () => {
-    const { getByLabelText, queryAllByTestId } = render(<Harness meter={null} />);
+    const { getByLabelText, queryAllByTestId } = renderHarness(null);
     expect(getByLabelText("Message input")).toBeTruthy();
     expect((getByLabelText("Message input") as HTMLTextAreaElement).placeholder).toBe("Send a message...");
     expect((getByLabelText("Message input") as HTMLTextAreaElement).disabled).toBe(false);
@@ -70,7 +76,7 @@ describe("ComposerDictationWaveform", () => {
   // line says why (ChatPage.calmErrors.test.tsx), and Enter sends nothing.
   test.each(["unavailable", "starting"] as const)("%s keeps the input usable with the plain placeholder, and Enter sends nothing", async (availability) => {
     runs = 0;
-    const { getByLabelText } = render(<Harness meter={null} availability={availability} />);
+    const { getByLabelText } = renderHarness(null, availability);
     const input = getByLabelText("Message input") as HTMLTextAreaElement;
     expect(input.disabled).toBe(false);
     expect(input.placeholder).toBe("Send a message...");
@@ -83,8 +89,8 @@ describe("ComposerDictationWaveform", () => {
 
   test("becoming ready lets Enter send again", async () => {
     runs = 0;
-    const view = render(<Harness meter={null} availability="unavailable" />);
-    view.rerender(<Harness meter={null} availability="ready" />);
+    const view = renderHarness(null, "unavailable");
+    view.rerender(<QueryClientProvider client={view.client}><Harness meter={null} availability="ready" /></QueryClientProvider>);
     const input = view.getByLabelText("Message input") as HTMLTextAreaElement;
     expect(input.disabled).toBe(false);
     fireEvent.change(input, { target: { value: "go" } });
@@ -93,7 +99,7 @@ describe("ComposerDictationWaveform", () => {
   });
 
   test("dictating: uses the shipped voice-level Element and the real input is gone", async () => {
-    const { getByText, container, queryByLabelText } = render(<Harness meter={null} />);
+    const { getByText, container, queryByLabelText } = renderHarness(null);
     fireEvent.click(getByText("Start dictation"));
     await waitFor(() => expect(container.querySelector('[data-slot="composer-voice-levels"]')).not.toBeNull());
     expect(container.querySelectorAll('[data-slot="composer-voice-levels"] [data-bar]')).toHaveLength(14);
@@ -102,14 +108,14 @@ describe("ComposerDictationWaveform", () => {
   });
 
   test("the accessible text is present once dictating, even before the bars have anything to show", async () => {
-    const { getByText, getByRole } = render(<Harness meter={null} />);
+    const { getByText, getByRole } = renderHarness(null);
     fireEvent.click(getByText("Start dictation"));
     await waitFor(() => expect(getByRole("status", { name: "Listening" })).toBeDefined());
   });
 
   test("voice levels use the live meter's own read()", async () => {
     const meter = fakeLevelMeter(() => 0.5);
-    const { getByText, container } = render(<Harness meter={meter} />);
+    const { getByText, container } = renderHarness(meter);
     fireEvent.click(getByText("Start dictation"));
     // The poll interval is 60ms - wait past a few ticks so the rolling
     // window has shifted the fake meter's own 0.5 reading all the way in.
@@ -119,7 +125,7 @@ describe("ComposerDictationWaveform", () => {
   test("the kit voice-level timer advances once a second", async () => {
     jest.useFakeTimers();
     try {
-      const { getByText, getByRole } = render(<Harness meter={null} />);
+      const { getByText, getByRole } = renderHarness(null);
       fireEvent.click(getByText("Start dictation"));
       await waitFor(() => expect(getByRole("status", { name: "Listening" }).textContent).toContain("0:00"));
       act(() => jest.advanceTimersByTime(3_000));

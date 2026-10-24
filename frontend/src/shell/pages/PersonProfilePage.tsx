@@ -108,7 +108,7 @@ export function PersonProfilePage({ person, onPersonChange }: { person: Roster; 
                 </TabsList>
                 <TabsContent value="overview">
                   <div className="flex flex-col gap-4 py-2">
-                    {viewingSelf ? null : <p className="text-sm text-muted-foreground">{`${profile.display_name}'s profile in this household.`}</p>}
+                    {viewingSelf ? <SettingsRenderer scope="person" scopeValue={`person:${profile.id}`} only={["person.companions"]} includeExpert /> : <p className="text-sm text-muted-foreground">{`${profile.display_name}'s profile in this household.`}</p>}
                     <SharedMediaSection profile={profile} />
                   </div>
                 </TabsContent>

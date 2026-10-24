@@ -1,9 +1,9 @@
 // COMPANIONS-APP-01 (docs/design/companions-app-2026-10-21.md): what the Companions app shows about each companion, and who may see
 // or pick it. The catalog is `PERSONAS` plus each companion package's manifest; nothing here is stored. The age rule is the robot
 // rule's own (`companionFits`): a child sees child companions, a teen child and teen, an adult all.
-import { eq, isNull } from "drizzle-orm";
+import { and, eq, isNull, ne } from "drizzle-orm";
 import { db } from "@/db";
-import { people } from "@/db/schema";
+import { conversations, people } from "@/db/schema";
 import { speakerAgeBand, type AgeBand } from "@/lib/ageBand";
 import { listDevicesByKind } from "@/lib/devices";
 import { loadManifestOnly } from "@/lib/plugins";
@@ -58,6 +58,7 @@ export interface CompanionCard {
   is_default: boolean;
   is_household: boolean;
   status: string;
+  chats: number;
 }
 export interface CompanionDetail extends CompanionCard {
   about: string;
@@ -118,6 +119,9 @@ export function cardOf(person: PersonRow, persona: Persona): CompanionCard {
   const manifest = manifestOf(persona.id);
   const household = Boolean(getHouseholdCompanion(persona.id));
   const own = Boolean(manifest?.companion?.voice_id);
+  const isDefault = currentCompanionId(person) === persona.id;
+  const ownChats = db.select().from(conversations).where(and(eq(conversations.personId, person.id), ne(conversations.status, "deleted"))).all();
+  const chats = ownChats.filter((conversation) => conversation.companionId === persona.id || (isDefault && conversation.companionId === null)).length;
   return {
     id: persona.id,
     name: persona.display_name,
@@ -127,7 +131,8 @@ export function cardOf(person: PersonRow, persona: Persona): CompanionCard {
     who_can_use: WHO_CAN_USE[persona.floor],
     dials: dialsOf(persona),
     voice: voiceLabel(manifest?.companion?.voice_id ?? "", own),
-    is_default: currentCompanionId(person) === persona.id,
+    is_default: isDefault,
+    chats,
     is_household: household,
     status: manifest?.companion?.status ?? "ready",
   };
@@ -146,7 +151,7 @@ export function listCompanionCards(person: PersonRow, admin = false): CompanionC
       const c = manifest.companion;
       cards.push({ id, name: c.display_name, type: "adult", type_label: TYPE_LABEL.adult, tagline: c.tagline ?? "", who_can_use: WHO_CAN_USE.adult,
         dials: [{ label: "How it talks", value: FORMALITY[c.formality] }, { label: "Word choice", value: COMPLEXITY[c.complexity] }, { label: "Questions back", value: ENGAGEMENT[c.engagement] }, { label: "Casual chatter", value: FILLER[c.filler_density] }],
-        voice: voiceLabel(c.voice_id ?? "", Boolean(c.voice_id)), is_default: false, is_household: true, status: "draft" });
+        voice: voiceLabel(c.voice_id ?? "", Boolean(c.voice_id)), is_default: false, is_household: true, status: "draft", chats: 0 });
     }
   }
   return cards;

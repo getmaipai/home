@@ -42,6 +42,7 @@ import { lazyNamed } from "@/shell/lazyNamed";
 import { RouteSkeleton } from "@maipai/ui/src/primitives/RouteSkeleton";
 import { Tour } from "@maipai/ui/src/primitives/Tour";
 import { useTourRunner } from "@/shell/useTourRunner";
+import { CompanionShellViewer } from "@/lib/companionShells";
 
 // BUNDLE-SPLIT-01 (2026-10-17): every page but the two a person lands on (Home and Chat) loads on first visit, not
 // with the shell. The shell chunk had grown to 3.84 MB against the 4 MiB PWA precache ceiling; the pages below hold
@@ -50,6 +51,7 @@ const FamilyPage = lazyNamed(() => import("@/shell/pages/FamilyPage"), "FamilyPa
 const CompanionsPage = lazyNamed(() => import("@/shell/pages/CompanionsPage"), "CompanionsPage");
 const CompanionDetailPage = lazyNamed(() => import("@/shell/pages/CompanionsPage"), "CompanionDetailPage");
 const CompanionEditorPage = lazyNamed(() => import("@/shell/pages/CompanionEditorPage"), "CompanionEditorPage");
+const CompanionWizardPage = lazyNamed(() => import("@/shell/pages/CompanionWizardPage"), "CompanionWizardPage");
 const ProjectsPage = lazyNamed(() => import("@/shell/pages/ProjectsPage"), "ProjectsPage");
 const PersonProfilePage = lazyNamed(() => import("@/shell/pages/PersonProfilePage"), "PersonProfilePage");
 const StoragePage = lazyNamed(() => import("@/shell/pages/StoragePage"), "StoragePage");
@@ -215,6 +217,7 @@ function RoutesWithIncognito({ person, onPersonChange, onSignedOut }: { person: 
     // per-page one) since FullLayout's own Header - where ChatHeaderBar
     // actually renders (a sibling of this Outlet, not a descendant) -
     // needs the SAME provider instance ChatPage writes into.
+    <CompanionShellViewer.Provider value={person}>
     <DrawerSectionsContext.Provider value={setDrawerSections}>
     <TabIdentityProvider temporary={incognito} locked={locked} ageBand={person.age_band}>
     <ChatHeaderDataProvider>
@@ -291,6 +294,7 @@ function RoutesWithIncognito({ person, onPersonChange, onSignedOut }: { person: 
           <Route element={<PageHeaderLayout />}>
             <Route index element={<DashboardPage person={person} />} />
             <Route path="companions" element={<CompanionsPage />} />
+            <Route path="companions/start" element={<CompanionWizardPage />} />
             <Route path="companions/new" element={<CompanionEditorPage />} />
             <Route path="companions/:id/edit" element={<CompanionEditorPage />} />
             <Route path="companions/:id" element={<CompanionDetailPage />} />
@@ -321,6 +325,7 @@ function RoutesWithIncognito({ person, onPersonChange, onSignedOut }: { person: 
     </ChatHeaderDataProvider>
     </TabIdentityProvider>
     </DrawerSectionsContext.Provider>
+    </CompanionShellViewer.Provider>
   );
 }
 

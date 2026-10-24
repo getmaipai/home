@@ -26,6 +26,8 @@ import type { LevelMeter } from "@/lib/voice/audioLevelMeter";
 import { ChatAvailabilityContext } from "@/apps/chat/useChatAvailability";
 import { useComposerDraftRestore } from "@/apps/chat/composerDraftRestore";
 import { PageContext } from "@/shell/pages/chatProjectPageContext";
+import { useCompanionShells } from "@/lib/companionShells";
+import { CompanionComposerMentions } from "@/apps/chat/companionComposerMentions";
 
 const DictationLevelMeterContext = createContext<LevelMeter | null>(null);
 
@@ -57,6 +59,7 @@ export function ComposerDictationWaveform() {
   const draftRestore = useComposerDraftRestore();
   const [levels, setLevels] = useState<number[]>(() => Array(LEVEL_COUNT).fill(0));
   const [seconds, setSeconds] = useState(0);
+  const shells = useCompanionShells();
 
   useEffect(() => {
     if (!dictating) {
@@ -87,8 +90,7 @@ export function ComposerDictationWaveform() {
 
   // The kit's compact composer (Thread `composerDensity`) owns the single-row
   // versus wrapped layout and marks its own shell when the text wraps.
-  const input = !dictating ? (
-    <ComposerInputField
+  const field = <ComposerInputField
       // CHAT-CALM-ERRORS-01d (design section 7): the field stays usable
       // while chat is paused or starting so a thought is not lost; the kit
       // holds Send (Thread `sendHeld`, ChatThread.tsx) and Enter sends
@@ -97,7 +99,9 @@ export function ComposerDictationWaveform() {
       placeholder={projectPage ? `New chat in ${projectPage.folderName ?? "this project"}` : "Send a message..."}
       submitMode={held ? "none" : undefined}
       onKeyDown={held ? (event) => { if (event.key === "Enter" && !event.shiftKey) event.preventDefault(); } : undefined}
-    />
+    />;
+  const input = !dictating ? (
+    shells === true ? <CompanionComposerMentions>{field}</CompanionComposerMentions> : field
   ) : <ComposerVoiceLevels levels={levels} recording={dictating} seconds={seconds} role="status" aria-label="Listening" />;
   return (
     <>

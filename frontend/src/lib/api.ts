@@ -335,7 +335,7 @@ export interface RobotCompanionInfo {
 /** COMPANIONS-APP-01: GET /api/companions and /api/companions/{id} (backend/src/routes/companions.ts). */
 export interface CompanionCard {
   id: string; name: string; type: "child" | "teen" | "adult"; type_label: string; tagline: string; who_can_use: string;
-  dials: Array<{ label: string; value: string }>; voice: string; is_default: boolean; is_household: boolean; status: string; can_edit: boolean; can_copy: boolean;
+  dials: Array<{ label: string; value: string }>; voice: string; is_default: boolean; is_household: boolean; status: string; chats: number; can_edit: boolean; can_copy: boolean;
 }
 export interface CompanionDetail extends CompanionCard {
   about: string; pronouns: string | null; interests: string[]; examples: string[]; voice_value: string; voice_is_own: boolean; voice_setting: string | null;
@@ -349,7 +349,7 @@ export interface CompanionEditable {
 }
 export type CompanionFields = Partial<Omit<CompanionEditable, "id" | "status" | "review" | "can_edit" | "can_set_audience" | "look" | "states">>;
 export interface CompanionList {
-  allowed: boolean; can_create: boolean;
+  allowed: boolean; can_create: boolean; can_discover: boolean; default_id: string;
   companions: CompanionCard[];
   robots: Array<{ id: string; name: string; controls: "child" | "teen" | "adult"; companion_id: string; companion_name: string | null }> | null;
 }

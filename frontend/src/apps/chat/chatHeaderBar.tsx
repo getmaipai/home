@@ -79,6 +79,8 @@ import {
 } from "@maipai/ui/src/ui/dropdown-menu";
 import { getIcon } from "@maipai/ui/src/icons";
 import { useChatHeaderData } from "@/apps/chat/chatHeaderData";
+import { useCompanionShells } from "@/lib/companionShells";
+import { CompanionHeaderPicker } from "@/apps/chat/companionHeaderPicker";
 
 const PencilIcon = getIcon("pencil");
 const TrashIcon = getIcon("trash");
@@ -146,6 +148,7 @@ export function ChatHeaderBar({ phoneRow = false, trailing }: { phoneRow?: boole
   const data = useChatHeaderData();
   const [renaming, setRenaming] = useState(false);
   const [open, setOpen] = useState(false);
+  const shells = useCompanionShells();
 
   // Non-chat pages never call useSetChatHeaderData at all (they don't
   // import this file), so this is only ever null for one real reason:
@@ -179,6 +182,7 @@ export function ChatHeaderBar({ phoneRow = false, trailing }: { phoneRow?: boole
           >
             <span className="min-w-0 truncate">{title}</span>
           </Button>
+          {shells === true ? <CompanionHeaderPicker /> : null}
           {phoneRow ? null : <span className="flex-1" aria-hidden />}
           {trailing}
           <DropdownMenu open={open} onOpenChange={setOpen}>

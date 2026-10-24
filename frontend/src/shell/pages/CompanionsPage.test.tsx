@@ -4,28 +4,29 @@ import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { api, ApiError, type CompanionCard, type CompanionDetail, type CompanionList } from "@/lib/api";
 import { CompanionDetailPage, CompanionsPage } from "@/shell/pages/CompanionsPage";
+import { CompanionShellViewer } from "@/lib/companionShells";
 
-const originals = { companions: api.companions, companion: api.companion, setDefaultCompanion: api.setDefaultCompanion, stackVoices: api.stackVoices, setSetting: api.setSetting };
+const originals = { companions: api.companions, companion: api.companion, setDefaultCompanion: api.setDefaultCompanion, stackVoices: api.stackVoices, setSetting: api.setSetting, settingsValues: api.settingsValues };
 afterEach(() => { cleanup(); Object.assign(api, originals); });
 
 function card(overrides: Partial<CompanionCard> = {}): CompanionCard {
   return {
     id: "lively-child", name: "Sprout", type: "child", type_label: "Child companion", tagline: "A cheerful friend.", who_can_use: "Anyone in the family, including kids.",
     dials: [{ label: "How it talks", value: "Talks like a friend." }, { label: "Word choice", value: "Short, simple words." }, { label: "Questions back", value: "Asks you things back and wants to know more." }, { label: "Casual chatter", value: "A few casual words." }],
-    voice: "The voice you chose in Settings", is_default: false, is_household: false, status: "ready", can_edit: false, can_copy: false, ...overrides,
+    voice: "The voice you chose in Settings", is_default: false, is_household: false, status: "ready", chats: 0, can_edit: false, can_copy: false, ...overrides,
   };
 }
 function detail(overrides: Partial<CompanionDetail> = {}): CompanionDetail {
   return { ...card(), about: "Sprout loves questions.", pronouns: "they/them", interests: ["animals"], examples: ["Wow, a slushie? What flavor?"], voice_value: "default", voice_is_own: false, voice_setting: null, used_by: null, ...overrides };
 }
-function open(path: string) {
+function open(path: string, preview = false, viewer = { id: "viewer" } as never) {
   api.stackVoices = async () => ({ voices: [] });
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-  return render(<QueryClientProvider client={client}><MemoryRouter initialEntries={[path]}><Routes><Route path="/companions" element={<CompanionsPage />} /><Route path="/companions/:id" element={<CompanionDetailPage />} /></Routes></MemoryRouter></QueryClientProvider>);
+  return render(<QueryClientProvider client={client}><CompanionShellViewer.Provider value={preview ? viewer : null}><MemoryRouter initialEntries={[path]}><Routes><Route path="/companions" element={<CompanionsPage />} /><Route path="/companions/:id" element={<CompanionDetailPage />} /></Routes></MemoryRouter></CompanionShellViewer.Provider></QueryClientProvider>);
 }
 
 test("the gallery shows cards and create and household status badges", async () => {
-  api.companions = async (): Promise<CompanionList> => ({ allowed: true, can_create: true, companions: [card({ is_household: true, status: "draft" }), card({ id: "lively-teen", name: "Riff", type: "teen", type_label: "Teen companion", is_default: true })], robots: null });
+  api.companions = async (): Promise<CompanionList> => ({ allowed: true, can_create: true, can_discover: true, companions: [card({ is_household: true, status: "draft" }), card({ id: "lively-teen", name: "Riff", type: "teen", type_label: "Teen companion", is_default: true })], robots: null, default_id: "lively-teen" });
   const view = open("/companions");
   await waitFor(() => expect(view.getByText("Sprout")).toBeTruthy());
   expect(view.getByText("Child companion")).toBeTruthy();
@@ -39,14 +40,14 @@ test("the gallery shows cards and create and household status badges", async () 
 });
 
 test("an admin sees which companion each robot has, with a link to its settings", async () => {
-  api.companions = async (): Promise<CompanionList> => ({ allowed: true, can_create: false, companions: [card()], robots: [{ id: "d1", name: "StackChan", controls: "child", companion_id: "lively-child", companion_name: "Sprout" }] });
+  api.companions = async (): Promise<CompanionList> => ({ allowed: true, can_create: false, can_discover: true, default_id: "lively-child", companions: [card()], robots: [{ id: "d1", name: "StackChan", controls: "child", companion_id: "lively-child", companion_name: "Sprout" }] });
   const view = open("/companions");
   await waitFor(() => expect(view.getByText(/StackChan: Sprout/)).toBeTruthy());
   expect(view.getByRole("link", { name: "Companion settings" }).getAttribute("href")).toBe("/settings/apps?tab=robot");
 });
 
 test("when companions are off for the person the page says so", async () => {
-  api.companions = async (): Promise<CompanionList> => ({ allowed: false, can_create: false, companions: [], robots: null });
+  api.companions = async (): Promise<CompanionList> => ({ allowed: false, can_create: false, can_discover: false, companions: [], robots: null, default_id: "lively-teen" });
   const view = open("/companions");
   await waitFor(() => expect(view.getByText(/turned off for you/)).toBeTruthy());
 });
@@ -119,4 +120,38 @@ test("a person who is not an admin gets no voice picker", async () => {
   const view = open("/companions/lively-child");
   await waitFor(() => expect(view.getByText("Sprout loves questions.")).toBeTruthy());
   expect(view.queryByLabelText("Voice for this companion")).toBeNull();
+});
+
+
+test("preview tabs show counts, discovery excludes default, and detail tasks are named", async () => {
+  api.settingsValues = async () => [{ key: "companions.preview_shells", value: true, source: "user", label: "Preview", level: "expert", secret: false }] as never;
+  api.companions = async () => ({ allowed: true, can_create: true, can_discover: true, default_id: "lively-teen", robots: null,
+    companions: [card({ id: "lively-child", name: "Sprout", chats: 2 }), card({ id: "lively-teen", name: "Riff", is_default: true, chats: 0 })] });
+  const yours = open("/companions", true);
+  await waitFor(() => expect(yours.getByText("0 tasks · 2 chats")).toBeTruthy());
+  const discover = yours.getByRole("tab", { name: "Discover" });
+  fireEvent.mouseDown(discover, { button: 0 });
+  fireEvent.click(discover);
+  await waitFor(() => expect(yours.getByText("Included")).toBeTruthy());
+  expect(yours.queryByText("Riff")).toBeNull();
+  expect((yours.getByRole("button", { name: "Add" }) as HTMLButtonElement).disabled).toBe(true);
+  cleanup();
+  api.companion = async () => detail();
+  const detailView = open("/companions/lively-child", true);
+  await waitFor(() => expect(detailView.getByRole("tab", { name: "Tasks" })).toBeTruthy());
+  expect(detailView.getByRole("tab", { name: "Setup" })).toBeTruthy();
+  expect(detailView.getByRole("tab", { name: "Activity" })).toBeTruthy();
+  expect(detailView.getByRole("tab", { name: "Chats" })).toBeTruthy();
+  const tasks = detailView.getByRole("tab", { name: "Tasks" });
+  fireEvent.mouseDown(tasks, { button: 0 });
+  fireEvent.click(tasks);
+  expect(await detailView.findByText("Coming soon: tasks Sprout is working on.")).toBeTruthy();
+});
+
+test("preview discovery is hidden when the list says it is unavailable", async () => {
+  api.settingsValues = async () => [{ key: "companions.preview_shells", value: true, source: "user", label: "Preview", level: "expert", secret: false }] as never;
+  api.companions = async () => ({ allowed: true, can_create: false, can_discover: false, default_id: "lively-child", companions: [card()], robots: null });
+  const view = open("/companions", true);
+  await waitFor(() => expect(view.getByRole("tab", { name: "Yours" })).toBeTruthy());
+  expect(view.queryByRole("tab", { name: "Discover" })).toBeNull();
 });

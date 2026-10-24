@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient, type UseMutationResult } from "@tanstack/react-query";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { AsyncState } from "@maipai/ui/src/primitives/AsyncState";
 import { EmptyState } from "@maipai/ui/src/primitives/EmptyState";
@@ -15,12 +15,15 @@ import { api, ApiError, type CompanionCard, type CompanionDetail, type Companion
 import { playableVoices, previewIdFor, voiceChoices } from "@/lib/voice/voiceBrowserRows";
 import { voicePreviewPlayer, type VoicePreviewState } from "@/lib/voice/voicePreviewPlayer";
 import { useTabItem } from "@/shell/tabIdentity";
+import { useCompanionShells } from "@/lib/companionShells";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@maipai/ui/src/ui/tabs";
+import { Chip } from "@maipai/ui/src/primitives/Chip";
 
 const listKey = ["companions"] as const;
 const ROBOT_SETTINGS = "/settings/apps?tab=robot";
 
-/** The inside of one card in the gallery: the kit's Avatar, name, one line, the type and who it is for. */
-function CompanionBody({ card }: { card: CompanionCard }) {
+/** The inside of one gallery card, shared by Yours and Discover. */
+function CompanionBody({ card, preview = false, discover = false }: { card: CompanionCard; preview?: boolean; discover?: boolean }) {
   return (
     <div className="flex flex-col items-center gap-3 text-center">
       <Avatar name={card.name} size="profile" />
@@ -28,16 +31,19 @@ function CompanionBody({ card }: { card: CompanionCard }) {
         <h2 className="text-base font-semibold">{card.name}</h2>
         <p className="text-sm text-muted-foreground">{card.tagline}</p>
         <p className="text-sm text-muted-foreground">{card.who_can_use}</p>
+        {preview ? <p className="text-sm text-muted-foreground">0 tasks · {card.chats} chats</p> : null}
       </div>
       <div className="flex flex-wrap justify-center gap-2">
         <Badge>{card.type_label}</Badge>
-        {card.is_household ? <Badge>Made at home</Badge> : null}
-        {card.status === "draft" ? <Badge>Draft</Badge> : null}
-        {card.is_default ? <Badge>Your default</Badge> : null}
+        {discover ? <Badge>{card.is_household ? "Made at home" : "Included"}</Badge> : null}
+        {!discover && card.is_household ? <Badge>Made at home</Badge> : null}
+        {!discover && card.status === "draft" ? <Badge>Draft</Badge> : null}
+        {!discover && card.is_default ? <Badge>Your default</Badge> : null}
       </div>
-      <ul className="flex list-none flex-col gap-1 p-0 text-sm text-muted-foreground">
+      {discover ? <Button disabled>Add</Button> : null}
+      {!discover ? <ul className="flex list-none flex-col gap-1 p-0 text-sm text-muted-foreground">
         {card.dials.map((dial) => <li key={dial.label}>{dial.value}</li>)}
-      </ul>
+      </ul> : null}
     </div>
   );
 }
@@ -47,6 +53,8 @@ export function CompanionsPage() {
   useTabItem("Companions");
   const navigate = useNavigate();
   const query = useQuery<CompanionList>({ queryKey: listKey, queryFn: api.companions, retry: false });
+  const preview = useCompanionShells();
+  const [discoverFilter, setDiscoverFilter] = useState("All");
   return (
     <div className="flex flex-col gap-6" data-testid="companions">
       <div className="flex flex-col gap-1">
@@ -63,11 +71,32 @@ export function CompanionsPage() {
       >
         {(data: CompanionList) => (
           <>
-            {data.can_create ? <div><Link to="/companions/new"><Button>New companion</Button></Link></div> : null}
+            {data.can_create ? <div><Link to={preview === true ? "/companions/start" : "/companions/new"}><Button>New companion</Button></Link></div> : null}
             {!data.allowed ? (
               <EmptyState icon="user" text="Companions are turned off for you. Ask an owner or admin to turn them on." />
             ) : data.companions.length === 0 ? (
               <EmptyState icon="user" text="No companions are installed yet." />
+            ) : preview === true ? (
+              <Tabs defaultValue="Yours">
+                <TabsList>
+                  <TabsTrigger value="Yours">Yours</TabsTrigger>
+                  {data.can_discover ? <TabsTrigger value="Discover">Discover</TabsTrigger> : null}
+                </TabsList>
+                <TabsContent value="Yours">
+                  <CardGrid label="Companions" items={data.companions} getKey={(card) => card.id} getLabel={(card) => card.name}
+                    onSelect={(card) => navigate(`/companions/${encodeURIComponent(card.id)}`)}
+                    renderItem={(card) => <CompanionBody card={card} preview />} />
+                </TabsContent>
+                {data.can_discover ? <TabsContent value="Discover">
+                  <div className="flex flex-wrap gap-2">
+                    {["All", "Chat", "Research", "Shopping", "Stories", "Kids"].map((item) =>
+                      <Chip key={item} selected={discoverFilter === item} onClick={() => setDiscoverFilter(item)}>{item}</Chip>)}
+                  </div>
+                  <CardGrid label="Discover companions" items={data.companions.filter((card) => !card.is_default)}
+                    getKey={(card) => card.id} renderItem={(card) => <CompanionBody card={card} discover />} />
+                  <p className="mt-4 text-sm text-muted-foreground">Coming soon: add a companion to your set from here.</p>
+                </TabsContent> : null}
+              </Tabs>
             ) : (
               <CardGrid
                 label="Companions"
@@ -108,6 +137,7 @@ function RobotAssignments({ robots }: { robots: NonNullable<CompanionList["robot
 /** /companions/:id: one companion in full, a voice preview, and Set as my default. */
 export function CompanionDetailPage() {
   const { id = "" } = useParams();
+  const preview = useCompanionShells();
   const query = useQuery<CompanionDetail>({ queryKey: [...listKey, id], queryFn: () => api.companion(id), retry: false });
   useTabItem(query.data?.name ?? "Companion");
   return (
@@ -121,21 +151,39 @@ export function CompanionDetailPage() {
         errorMessage={query.error instanceof ApiError && query.error.status === 404 ? "That companion is not on your list. Go back and pick one from the gallery." : "Could not load this companion. Check your connection and try again."}
         loadingLabel="Loading companion"
       >
-        {(companion: CompanionDetail) => <DetailBody companion={companion} />}
+        {(companion: CompanionDetail) => <>
+          {preview === true ? <Tabs defaultValue="Setup">
+            <TabsList>
+              <TabsTrigger value="Setup">Setup</TabsTrigger>
+              <TabsTrigger value="Activity">Activity</TabsTrigger>
+              <TabsTrigger value="Tasks">Tasks</TabsTrigger>
+              <TabsTrigger value="Chats">Chats</TabsTrigger>
+            </TabsList>
+            <TabsContent value="Setup"><DetailBody companion={companion} /></TabsContent>
+            <TabsContent value="Activity"><EmptyState icon="clock" text={`Coming soon: what ${companion.name} has been doing.`} /></TabsContent>
+            <TabsContent value="Tasks"><EmptyState icon="check" text={`Coming soon: tasks ${companion.name} is working on.`} /></TabsContent>
+            <TabsContent value="Chats"><EmptyState icon="message-circle" text={`Coming soon: your chats with ${companion.name}.`} /></TabsContent>
+          </Tabs> : <DetailBody companion={companion} />}
+        </>}
       </AsyncState>
     </div>
   );
 }
 
 function DetailBody({ companion }: { companion: CompanionDetail }) {
-  const queryClient = useQueryClient();
   const navigate = useNavigate();
-  const copy = useMutation({ mutationFn: () => api.copyCompanion(companion.id), onSuccess: (result) => { void queryClient.invalidateQueries({ queryKey: listKey }); navigate(`/companions/${encodeURIComponent(result.id)}/edit`); } });
-  const save = useMutation({
-    mutationFn: () => api.setDefaultCompanion(companion.id),
-    onSuccess: () => { void queryClient.invalidateQueries({ queryKey: listKey }); },
-  });
-  const saved = save.isSuccess || companion.is_default;
+  const queryClient = useQueryClient();
+  const copy = useMutation({ mutationFn: () => api.copyCompanion(companion.id), onSuccess: (result) => {
+    void queryClient.invalidateQueries({ queryKey: listKey });
+    navigate(`/companions/${encodeURIComponent(result.id)}/edit`);
+  } });
+  const save = useMutation({ mutationFn: () => api.setDefaultCompanion(companion.id), onSuccess: () => {
+    void queryClient.invalidateQueries({ queryKey: listKey });
+  } });
+  return <DetailSetup companion={companion} saved={save.isSuccess || companion.is_default} copy={copy} save={save} />;
+}
+
+function DetailSetup({ companion, saved, copy, save }: { companion: CompanionDetail; saved: boolean; copy: UseMutationResult<unknown, Error, void>; save: UseMutationResult<unknown, Error, void> }) {
   return (
     <>
       <div className="flex flex-col items-start gap-4 sm:flex-row sm:items-center">

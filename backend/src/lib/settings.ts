@@ -390,7 +390,8 @@ export function listValues(actor: PersonRow, scope: string, onlyKey?: string): S
   const parsed = parseScope(scope);
   if (!parsed) return { ok: false, status: 400, error: `invalid scope: ${scope}` };
   const companionsOnly = onlyKey === COMPANIONS_ALLOWED_KEY;
-  if (onlyKey && !companionsOnly) return { ok: false, status: 400, error: `unsupported settings key filter: ${onlyKey}` };
+  const supportedShellOnly = onlyKey === "companions.preview_shells";
+  if (onlyKey && !companionsOnly && !supportedShellOnly) return { ok: false, status: 400, error: `unsupported settings key filter: ${onlyKey}` };
   const adultWakewordRead = parsed.kind === "device" && actor.role === "adult"
     && getRegistry().some((keyDef) => keyDef.key === WAKEWORD_SETTING_KEY);
   const auth = companionsOnly
@@ -595,6 +596,13 @@ function assertCanSetCodingPersonKey(actor: PersonRow, targetPersonId: string, k
   if (!isOwnerOrAdmin(actor)) return { ok: false, status: 403, error: "An admin sets this for you. Ask the person who manages Home to change it." };
   return assertOwnerAdminLadder(actor, targetPersonId, "You cannot change this person's coding access. Ask the person who manages Home.");
 }
+// STORE-CAP-01 pattern: previews are admin-only and may be written only on
+// the acting admin's own profile. Set and reset share this gate.
+const COMPANION_SHELL_PERMISSION_ERROR = "Only an admin can turn on the companion previews, and only for themselves. Sign in as an admin and turn it on in your own profile.";
+function assertCanSetCompanionShells(actor: PersonRow, targetPersonId: string): SettingsOpResult<true> {
+  if (isOwnerOrAdmin(actor) && actor.id === targetPersonId) return { ok: true, value: true };
+  return { ok: false, status: 403, error: COMPANION_SHELL_PERMISSION_ERROR };
+}
 const isCodingPersonKey = (key: string) => key.startsWith("coding.person.");
 
 const isMediaProtection = (key: string) => key === "media.allowlist_only" || key === "allowance.media.daily_minutes";
@@ -725,7 +733,9 @@ export function setValue(
     return written.ok ? { ok: true, value: { ...written.value, layer: "person", locked: gate.setBy !== "self" } } : written;
   }
 
-  const auth = isMediaProtection(key) && parsed.kind === "person"
+  const auth = key === "companions.preview_shells" && parsed.kind === "person"
+    ? assertCanSetCompanionShells(actor, parsed.id!)
+    : isMediaProtection(key) && parsed.kind === "person"
     ? assertCanSetMediaProtection(actor, parsed.id!)
     : isCodingPersonKey(key) && parsed.kind === "person"
     ? assertCanSetCodingPersonKey(actor, parsed.id!, keyDef as { control?: Record<string, string> })
@@ -1000,7 +1010,9 @@ export function resetValue(actor: PersonRow, scope: string, key: string): Settin
     return { ok: true, value: { ...resolveForResponse(keyDef, layered.value, layered.layer === "person" ? "user" : "default", responseContext(actor, subject, parsed.kind)), layer: layered.layer, locked: false } };
   }
 
-  const auth = isMediaProtection(key) && parsed.kind === "person"
+  const auth = key === "companions.preview_shells" && parsed.kind === "person"
+    ? assertCanSetCompanionShells(actor, parsed.id!)
+    : isMediaProtection(key) && parsed.kind === "person"
     ? assertCanSetMediaProtection(actor, parsed.id!)
     : isCodingPersonKey(key) && parsed.kind === "person"
     ? assertCanSetCodingPersonKey(actor, parsed.id!, keyDef as { control?: Record<string, string> })

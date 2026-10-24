@@ -8,7 +8,7 @@ import { statSync } from "node:fs";
 import { apiRouter, errorResponses, idParamSchema } from "@/lib/openapi";
 import { requireAuth } from "@/middleware/auth";
 import { isOwnerOrAdmin } from "@/lib/access";
-import { companionDetail, companionAreaOn, canCreateCompanion, listCompanionCards, mayUseCompanion, pickRefusal, robotAssignments } from "@/lib/companionsApp";
+import { companionDetail, companionAreaOn, canCreateCompanion, currentCompanionId, listCompanionCards, mayUseCompanion, pickRefusal, robotAssignments } from "@/lib/companionsApp";
 import { publishSettingsChanged } from "@/lib/deviceCommands";
 import { getPersonSettingValue, setValue } from "@/lib/settings";
 import { speakerAgeBand } from "@/lib/ageBand";
@@ -41,7 +41,7 @@ export const companionsRoutes = apiRouter();
 const Type = z.enum(["child", "teen", "adult"]);
 const Card = z.object({
   id: z.string(), name: z.string(), type: Type, type_label: z.string(), tagline: z.string(), who_can_use: z.string(),
-  dials: z.array(z.object({ label: z.string(), value: z.string() })), voice: z.string(), is_default: z.boolean(), is_household: z.boolean(), status: z.string(), can_edit: z.boolean(), can_copy: z.boolean(),
+  dials: z.array(z.object({ label: z.string(), value: z.string() })), voice: z.string(), is_default: z.boolean(), is_household: z.boolean(), status: z.string(), chats: z.number(), can_edit: z.boolean(), can_copy: z.boolean(),
 });
 const Detail = Card.extend({
   about: z.string(), pronouns: z.string().nullable(), interests: z.array(z.string()), examples: z.array(z.string()),
@@ -54,7 +54,7 @@ const listRoute = createRoute({
   middleware: [requireAuth] as const,
   responses: {
     200: { content: { "application/json": { schema: z.object({
-      allowed: z.boolean().describe("False when an owner or admin turned companions off for this person."), can_create: z.boolean(),
+      allowed: z.boolean().describe("False when an owner or admin turned companions off for this person."), can_create: z.boolean(), can_discover: z.boolean(), default_id: z.string(),
       companions: z.array(Card),
       robots: z.array(z.object({ id: z.string(), name: z.string(), controls: Type, companion_id: z.string(), companion_name: z.string().nullable() })).nullable(),
     }) } }, description: "My companions. The robots list is for owners and admins only." },
@@ -64,7 +64,7 @@ const listRoute = createRoute({
 companionsRoutes.openapi(listRoute, (c) => {
   const person = c.get("person");
   const admin = isOwnerOrAdmin(person);
-  return c.json({ allowed: companionAreaOn(person), can_create: canCreateCompanion(person, admin), companions: listCompanionCards(person, admin).map((card) => ({ ...card, can_edit: card.is_household && mayEdit(person, card.id), can_copy: canCreateCompanion(person, admin) })), robots: admin ? robotAssignments() : null }, 200);
+  return c.json({ allowed: companionAreaOn(person), can_create: canCreateCompanion(person, admin), can_discover: speakerAgeBand(person, new Date()) !== "child", default_id: currentCompanionId(person), companions: listCompanionCards(person, admin).map((card) => ({ ...card, can_edit: card.is_household && mayEdit(person, card.id), can_copy: canCreateCompanion(person, admin) })), robots: admin ? robotAssignments() : null }, 200);
 });
 
 const AvatarState = z.object({ loop: z.boolean(), urls: z.object({ h264: z.string(), av1: z.string().nullable(), still: z.string() }) });

@@ -89,10 +89,13 @@ describe("settings guard agreement metadata", () => {
       for (const [band, person] of [["child", child], ["teen", teen], ["adult", adult]] as const) {
         const result = setValue(person, `person:${person.id}`, key.key, value);
         const childVoiceGuard = key.key === "tts.voice_id" && band === "child";
-        expect(result.ok, `${key.key} ${band} self write`).toBe(childVoiceGuard ? false : key.control?.[band] === "self");
+        const companionShellGuard = key.key === "companions.preview_shells";
+        expect(result.ok, `${key.key} ${band} self write`).toBe(childVoiceGuard || companionShellGuard ? false : key.control?.[band] === "self");
         // Topic levels exist for a child only; assertCanSetChildTopic refuses a teen or adult target (topicSettingsAccess.test.ts).
         if (key.key.startsWith("topics.") && band !== "child") continue;
         if (key.control?.[band] === "guardian") {
+          // The preview switch allows only an admin on their own profile, covered by settings.test.ts.
+          if (companionShellGuard) continue;
           const guardianResult = setValue(owner, `person:${person.id}`, key.key, value);
           expect(guardianResult.ok, `${key.key} ${band} guardian write`).toBe(true);
         }

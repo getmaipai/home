@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Link, useNavigate, useParams } from "react-router-dom";
+import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
 import { AsyncState } from "@maipai/ui/src/primitives/AsyncState";
 import { EmptyState } from "@maipai/ui/src/primitives/EmptyState";
 import { Section } from "@maipai/ui/src/primitives/Section";
@@ -35,11 +35,12 @@ function audienceWords(audience: Form["audience"]) { return audience === "adult"
 
 export function CompanionEditorPage() {
   const { id } = useParams();
+  const location = useLocation();
   const isNew = !id;
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const query = useQuery({ queryKey: [...key, "edit", id], queryFn: () => api.editCompanion(id!), enabled: !isNew, retry: false });
-  const [form, setForm] = useState<Form>(blank);
+  const [form, setForm] = useState<Form>(() => isNew && typeof location.state?.name === "string" ? { ...blank, name: location.state.name } : blank);
   const [pronounRows, setPronounRows] = useState<string[]>([]);
   const [initial, setInitial] = useState("");
   const [savedFlash, setSavedFlash] = useState(false);

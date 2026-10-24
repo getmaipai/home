@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, test } from "bun:test";
 import { cleanup, fireEvent, render, waitFor } from "@testing-library/react";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { AssistantRuntimeProvider, ComposerPrimitive, useLocalRuntime, type ChatModelAdapter } from "@assistant-ui/react";
 import { ChatAvailabilityContext } from "@/apps/chat/useChatAvailability";
 import { DraftConversationContext, TemporaryChatContext } from "@/apps/chat/chatThreadContexts";
@@ -11,20 +12,23 @@ const id = "draft-test-chat";
 const originalDescriptor = Object.getOwnPropertyDescriptor(window, "localStorage");
 
 function Harness({ temporary = false }: { temporary?: boolean }) {
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   const runtime = useLocalRuntime(adapter);
   return (
-    <AssistantRuntimeProvider runtime={runtime}>
-      <DraftConversationContext.Provider value={id}>
-        <TemporaryChatContext.Provider value={{ on: temporary }}>
-          <ChatAvailabilityContext.Provider value="ready">
-            <ComposerPrimitive.Root>
-              <ComposerDictationWaveform />
-              <ComposerPrimitive.Send>Send</ComposerPrimitive.Send>
-            </ComposerPrimitive.Root>
-          </ChatAvailabilityContext.Provider>
-        </TemporaryChatContext.Provider>
-      </DraftConversationContext.Provider>
-    </AssistantRuntimeProvider>
+    <QueryClientProvider client={client}>
+      <AssistantRuntimeProvider runtime={runtime}>
+        <DraftConversationContext.Provider value={id}>
+          <TemporaryChatContext.Provider value={{ on: temporary }}>
+            <ChatAvailabilityContext.Provider value="ready">
+              <ComposerPrimitive.Root>
+                <ComposerDictationWaveform />
+                <ComposerPrimitive.Send>Send</ComposerPrimitive.Send>
+              </ComposerPrimitive.Root>
+            </ChatAvailabilityContext.Provider>
+          </TemporaryChatContext.Provider>
+        </DraftConversationContext.Provider>
+      </AssistantRuntimeProvider>
+    </QueryClientProvider>
   );
 }
 

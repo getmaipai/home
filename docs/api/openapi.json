@@ -54105,6 +54105,12 @@
                     "can_create": {
                       "type": "boolean"
                     },
+                    "can_discover": {
+                      "type": "boolean"
+                    },
+                    "default_id": {
+                      "type": "string"
+                    },
                     "companions": {
                       "type": "array",
                       "items": {
@@ -54163,6 +54169,9 @@
                           "status": {
                             "type": "string"
                           },
+                          "chats": {
+                            "type": "number"
+                          },
                           "can_edit": {
                             "type": "boolean"
                           },
@@ -54182,6 +54191,7 @@
                           "is_default",
                           "is_household",
                           "status",
+                          "chats",
                           "can_edit",
                           "can_copy"
                         ]
@@ -54228,6 +54238,8 @@
                   "required": [
                     "allowed",
                     "can_create",
+                    "can_discover",
+                    "default_id",
                     "companions",
                     "robots"
                   ]
@@ -54656,6 +54668,9 @@
                     "status": {
                       "type": "string"
                     },
+                    "chats": {
+                      "type": "number"
+                    },
                     "can_edit": {
                       "type": "boolean"
                     },
@@ -54751,6 +54766,7 @@
                     "is_default",
                     "is_household",
                     "status",
+                    "chats",
                     "can_edit",
                     "can_copy",
                     "about",

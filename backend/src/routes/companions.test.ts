@@ -252,6 +252,16 @@ describe("household companion routes", () => {
     expect(response.status).toBe(403); expect((await response.json() as { error: string }).error).toBe("A bundled companion can't be changed. Make a copy to edit it.");
   });
 
+  test("list exposes child discovery eligibility and the actual default id", async () => {
+    const child = addPerson("person-discover-child", "child");
+    const adult = addPerson("person-discover-adult", "adult");
+    const kidList = await (await request("companions", child)).json() as { can_discover: boolean; default_id: string };
+    const adultList = await (await request("companions", adult)).json() as { can_discover: boolean; default_id: string };
+    expect(kidList.can_discover).toBe(false);
+    expect(adultList.can_discover).toBe(true);
+    expect(kidList.default_id).toBe("default");
+  });
+
   test("children and teens cannot create; an adult creates a draft", async () => {
     const child = addPerson("person-child01", "child"), teen = addPerson("person-teen001", "teen"), adult = addPerson("person-adult01", "adult");
     for (const token of [child, teen]) {

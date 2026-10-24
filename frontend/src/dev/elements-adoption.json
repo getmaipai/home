@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-10-24T13:58:59.496Z",
+  "generatedAt": "2026-10-24T23:37:25.461Z",
   "kitTag": "ui-v0.5.330",
   "items": [
     {
@@ -334,7 +334,7 @@
       "group": "composer",
       "verdict": "later",
       "verdictReason": "Vendored by ELT-T1-K01a; wired by an ELEMENTS-ADOPT-01 batch, not yet.",
-      "implemented": false
+      "implemented": true
     },
     {
       "file": "composer-model-picker.aui.tsx",

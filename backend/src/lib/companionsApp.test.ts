@@ -2,8 +2,9 @@ import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { join } from "node:path";
 import { rmSync } from "node:fs";
 import { db } from "@/db";
-import { people } from "@/db/schema";
+import { conversations, people, settingsValues } from "@/db/schema";
 import { canCreateCompanion, listCompanionCards } from "@/lib/companionsApp";
+import { __resetSettingsCacheForTests } from "@/lib/settings";
 import { createHouseholdCompanion, setHouseholdCompanionStatus } from "@/lib/householdCompanions";
 import { loadManifestOnly } from "@/lib/plugins";
 import { __reloadPersonasForTests } from "@/lib/persona";
@@ -38,4 +39,30 @@ describe("companion app cards", () => {
     expect(cards.find((card) => card.id === ready.value.id)).toMatchObject({ is_household: true, status: "ready" });
     expect(cards.find((card) => card.id === draft.value.id)).toMatchObject({ is_household: true, status: "draft", is_default: false });
   });
+});
+
+
+test("cards count only this person's live chats and include null companion chats for their default", () => {
+  addPerson("person-sage-count", "adult");
+  addPerson("person-marlow-count", "adult");
+  const sage = db.select().from(people).all().find((person) => person.id === "person-sage-count")!;
+  const marlow = db.select().from(people).all().find((person) => person.id === "person-marlow-count")!;
+  db.insert(settingsValues).values({ scope: `person:${sage.id}`, key: "persona.active_id", value: JSON.stringify("lively-child"), hlc: "2:0:test", source: "user", updatedAt: new Date().toISOString() }).run();
+  __resetSettingsCacheForTests();
+  const now = new Date().toISOString();
+  const makeChat = (id: string, personId: string, companionId: string | null) => db.insert(conversations).values({ id, personId, companionId, surface: "web", mode: "chat", createdAt: now, updatedAt: now, hlc: "1:0:test", status: "open", source: "hub" }).run();
+  makeChat("sage-nova-1", sage.id, "lively-child");
+  makeChat("sage-nova-2", sage.id, "lively-child");
+  makeChat("sage-default", sage.id, null);
+  makeChat("marlow-nova", marlow.id, "lively-child");
+  const novaBeforeNullChat = listCompanionCards(sage).find((card) => card.id === "lively-child")!;
+  expect(novaBeforeNullChat.chats).toBe(3);
+  makeChat("sage-nova-3", sage.id, "lively-child");
+  const nova = listCompanionCards(sage).find((card) => card.id === "lively-child")!;
+  expect(nova.chats).toBe(4);
+  const other = listCompanionCards(sage).find((card) => card.id === "lively-adult")!;
+  makeChat("sage-other", sage.id, other.id);
+  expect(listCompanionCards(sage).find((card) => card.id === other.id)?.chats).toBe(1);
+  expect(listCompanionCards(marlow).find((card) => card.id === "lively-child")?.chats).toBe(1);
+
 });

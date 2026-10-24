@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, mock, test } from "bun:test";
 import { act, cleanup, fireEvent, render, waitFor } from "@testing-library/react";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { TooltipProvider } from "@maipai/ui/src/ui/tooltip";
 import { Button } from "@maipai/ui/src/ui/button";
 import { ChatHeaderBar } from "@/apps/chat/chatHeaderBar";
@@ -24,13 +25,16 @@ async function openActionsMenu(view: { findByRole: (role: string, opts: { name: 
 }
 
 function renderBar(data: ChatHeaderData | null, phoneRow = false) {
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
-    <TooltipProvider>
-      <ChatHeaderDataProvider>
-        <TestBridge data={data} />
-        <ChatHeaderBar phoneRow={phoneRow} />
-      </ChatHeaderDataProvider>
-    </TooltipProvider>,
+    <QueryClientProvider client={client}>
+      <TooltipProvider>
+        <ChatHeaderDataProvider>
+          <TestBridge data={data} />
+          <ChatHeaderBar phoneRow={phoneRow} />
+        </ChatHeaderDataProvider>
+      </TooltipProvider>
+    </QueryClientProvider>,
   );
 }
 
@@ -102,12 +106,14 @@ describe("ChatHeaderBar", () => {
 
   test("the activity slot renders at the right of the header, before the conversation actions", async () => {
     const view = render(
-      <TooltipProvider>
-        <ChatHeaderDataProvider>
-          <TestBridge data={baseData({ title: "Plans" })} />
-          <ChatHeaderBar trailing={<Button type="button">Activity</Button>} />
-        </ChatHeaderDataProvider>
-      </TooltipProvider>,
+      <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
+        <TooltipProvider>
+          <ChatHeaderDataProvider>
+            <TestBridge data={baseData({ title: "Plans" })} />
+            <ChatHeaderBar trailing={<Button type="button">Activity</Button>} />
+          </ChatHeaderDataProvider>
+        </TooltipProvider>
+      </QueryClientProvider>,
     );
     const activity = await view.findByRole("button", { name: "Activity" });
     const actions = view.getByRole("button", { name: "Conversation actions" });
