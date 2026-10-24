@@ -3990,6 +3990,57 @@
       "replacesHandBuilt": [],
       "realTurnToday": null,
       "verdictReason": "Developer-only showcase fixture for the creation pattern kit (CreationHeader, VisibilityChip, SharePanel); not a standalone Home product surface."
+    },
+    {
+      "file": "creation-header.tsx",
+      "name": "creation-header",
+      "group": "creation",
+      "verdict": "later",
+      "backendNeeded": null,
+      "effort": null,
+      "specTagNeeded": false,
+      "newDependency": false,
+      "bindings": [],
+      "size": "S",
+      "showcaseScenario": null,
+      "batch": null,
+      "replacesHandBuilt": [],
+      "realTurnToday": false,
+      "verdictReason": "Home has no creation, share or visibility flow yet; defer until a Home screen needs it, then adopt without a Home-side wrapper."
+    },
+    {
+      "file": "share-panel.tsx",
+      "name": "share-panel",
+      "group": "share",
+      "verdict": "later",
+      "backendNeeded": null,
+      "effort": null,
+      "specTagNeeded": false,
+      "newDependency": false,
+      "bindings": [],
+      "size": "S",
+      "showcaseScenario": null,
+      "batch": null,
+      "replacesHandBuilt": [],
+      "realTurnToday": false,
+      "verdictReason": "Home has no creation, share or visibility flow yet; defer until a Home screen needs it, then adopt without a Home-side wrapper."
+    },
+    {
+      "file": "visibility-chip.tsx",
+      "name": "visibility-chip",
+      "group": "visibility",
+      "verdict": "later",
+      "backendNeeded": null,
+      "effort": null,
+      "specTagNeeded": false,
+      "newDependency": false,
+      "bindings": [],
+      "size": "S",
+      "showcaseScenario": null,
+      "batch": null,
+      "replacesHandBuilt": [],
+      "realTurnToday": false,
+      "verdictReason": "Home has no creation, share or visibility flow yet; defer until a Home screen needs it, then adopt without a Home-side wrapper."
     }
   ]
 }
