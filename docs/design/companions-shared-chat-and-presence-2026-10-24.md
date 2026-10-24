@@ -36,7 +36,7 @@ Riff, Rivet, Sprout, Buddy, Pal, The Tutor); the spec's Milo, Ada and Fin are no
 7. **Memory stays one store, split by kind of fact (COMP-05).** Facts about the person are shared by every companion; rapport
    (a running joke, how a companion addresses you) is a person-scope record with a `companion_id` qualifier, read only by that
    companion. Conversation context is what the turn already has (section 8).
-8. **Phase 0 is shells.** Six in-app surfaces behind one per-person switch only an admin may turn on, each a kit EmptyState or
+8. **Phase 0 is shells.** Seven in-app surfaces behind one per-person switch only an admin may turn on, each a kit EmptyState or
    a disabled kit Element with one plain sentence of "coming soon" copy, plus one HTML mockup for the two surfaces the rules keep
    out of the app for now, the who-answered marker and the launcher (section 10).
    Nothing in phase 0 writes a record.
@@ -214,6 +214,18 @@ Work types: immediate is a job or a tool call in the turn; background is a proje
 (conditional is a scheduled check that opens an `Ask` when its condition holds). Autonomy is BRAKES-01's per-tool do / ask / never;
 read-only is the default and nothing in this note widens it.
 
+**Quick answers, not typed ones (owner, 2026-10-24, from two Conduit screenshots).** When a companion proposes an action
+("Got it: Magic Night, Friday, November 13, 5 to 11 PM on the shared calendar. Add it?"), the person answers with one tap, never
+by typing yes. That is the asks design as written: the proposal is an `Ask` and the thread shows the kit `ApprovalCard` at that
+turn, states request / running / done / denied, with its shipped buttons "Allow once", "Always allow" (adults, BRAKES-02c) and
+"Deny" (ui-v0.5.330 hard-codes those labels; a wording change such as "Not now" is a kit prop first, rule 9c, not asked for here),
+answered through `ask_answer` (asks note section 3, BRAKES-02b). A child's card reads "Asked a parent" with no buttons (rule 0,
+asks note section 2). Nothing new is designed here: the card is the quick-answer surface for every proposal a companion makes,
+calendar or otherwise, and a typed reply still works. The screenshot's thumbs up and
+down on a reply are the kit action bar and `feedback-dialog` Home already ships (`chatActionBar.tsx`); a companion's reply gets the
+same bar, so the rating reaches the same `answered_by` companion through the turn. Emoji-only buttons are not adopted: the card's
+labels say what happens (STYLE.md, the dad test).
+
 What waits (owner, 2026-10-24): the tooling for a companion to shop online, read and reply to email or act unprompted. That is
 AGENTIC-DESIGN-01, a design of its own (tools, approvals, receipts, the robot). Until it exists the Tasks tab and the task card are shells (section 10).
 
@@ -314,8 +326,9 @@ setting `companions.preview_shells` (`level: expert`; written only by an admin a
 | 6 | Example task card | One `TaskCard` in the Tasks tab with sample steps, labelled Example | `TaskCard` | meta "Example" |
 | 7 | Create a companion wizard | Two real steps: template cards, then name and look; Finish opens the existing editor as a draft | `Wizard`, `CardGrid` | step 2 footer: "Finish opens the editor; templates set the dials, coming soon." |
 | 8 | Launcher mockup (not in the app) | A static HTML page beside this record: the bubble with a companion poster on a non-chat page, the open panel, the phone sheet, and the who-answered marker from row 3 | none (mockup) | "Mockup: the panel Element lands in the kit first." |
+| 9 | Ask card with quick answers | One example `ApprovalCard` in the thread after a companion's proposal ("Add Magic Night to the shared calendar, Friday 5 to 11 PM?"), state request, the shipped buttons with handlers that show the coming-soon toast like the other shells | `ApprovalCard` | "Example: a companion's proposal is answered with one tap once BRAKES-02b lands." |
 
-Shells 1, 2 and 4 to 7 are in-app behind the switch. Rows 3 and 8 are the two surfaces rule 9c keeps out of the app for now (the
+Shells 1, 2, 4 to 7 and 9 are in-app behind the switch. Rows 3 and 8 are the two surfaces rule 9c keeps out of the app for now (the
 marker until its kit Element lands, the launcher until the panel Element lands; S2 allows the launcher since 2026-10-24); one scripted HTML mockup holds both, opened and judged like a
 screenshot.
 
@@ -327,7 +340,7 @@ and whether a surface is dropped before phase 1.
 
 | Row | Phase | Scope | Size | Done when |
 |---|---|---|---|---|
-| COMPANIONS-SHELL-01 | 0 | Section 10 | M | Six in-app shells behind the switch plus one mockup (marker, launcher); screenshots judged |
+| COMPANIONS-SHELL-01 | 0 | Section 10 | M | Seven in-app shells behind the switch plus one mockup (marker, launcher); screenshots judged |
 | COMP-04a | 1 | Spec first: `answered_by` on turns, `companion_id` description; commons first: `SpeakerMarker` in the kit Thread and the `toast` re-export; `PATCH` companion_id with `companionFits`; the pick order in the turn; avatar route per conversation; header control; toast; marker | M | A conversation switches Nova to Riff and each reply names its speaker; a child cannot pick an adult companion (test) |
 | COMP-04b | 1 | `ComposerMentions` wired; one-turn override; "joined for one question" | S | Test: the override lasts one turn; unmatched `@text` is plain text |
 | COMPANIONS-YOURS-01 | 2 | `companion_id` on jobs and projects; the viewer's latest activity, counts and the one own-jobs summary line (S6 row, kit Status as shipped); no other state badge | S | Counts and the summary line match the viewer's own records; an admin sees no other person's rows (test) |
