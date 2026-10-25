@@ -131,8 +131,10 @@ test("preview tabs show counts, discovery excludes default, and detail tasks are
   api.companions = async () => ({ allowed: true, can_create: true, can_discover: true, default_id: "lively-teen", robots: null,
     companions: [card({ id: "lively-child", name: "Sprout", chats: 2 }), card({ id: "lively-teen", name: "Riff", is_default: true, chats: 0 })] });
   const yours = open("/companions", true);
-  await waitFor(() => expect(yours.getByText("2 chats")).toBeTruthy());
-  expect(yours.getAllByText("Voice: Alba")).toHaveLength(2);
+  await waitFor(() => expect(yours.getByText(/\d tasks · 2 chats/)).toBeTruthy());
+  expect(yours.getAllByText(/^(Working|Idle|Needs approval)$/).length).toBe(2);
+  expect(yours.getAllByText(/Researching weekend plans|Last: Reviewed project|Expense report ready/).length).toBe(2);
+  expect(yours.getByText("Sample activity. Real activity is coming soon.")).toBeTruthy();
   expect(yours.queryByRole("button", { name: "Add" })).toBeNull();
   expect(yours.getByRole("heading", { name: "Companions" }).parentElement?.parentElement?.contains(yours.getByRole("link", { name: "New companion" }))).toBe(true);
   const discover = yours.getByRole("tab", { name: "Discover" });
@@ -151,7 +153,10 @@ test("preview tabs show counts, discovery excludes default, and detail tasks are
   expect(detailView.getByRole("button", { name: "Set as my default" })).toBeTruthy();
   expect(detailView.getByRole("button", { name: "Companion settings" }).closest("a")?.getAttribute("href")).toBe("/companions/lively-child/edit");
   expect(detailView.queryByText("Sprout loves questions.")).toBeNull();
-  expect(detailView.getByText("Coming soon: what Sprout has been doing.")).toBeTruthy();
+  expect(detailView.getByRole("heading", { name: "Recent activity" })).toBeTruthy();
+  expect(detailView.getByText("Sample activity. Real activity is coming soon.")).toBeTruthy();
+  expect((detailView.getByRole("button", { name: "Chat" }) as HTMLButtonElement).disabled).toBe(true);
+  expect(detailView.getByRole("button", { name: "Chat" }).title).toBe("Coming soon");
   expect(detailView.getByRole("tab", { name: "Chats" })).toBeTruthy();
   expect(detailView.queryByText("Sprout loves questions.")).toBeNull();
   const tasks = detailView.getByRole("tab", { name: "Tasks" });

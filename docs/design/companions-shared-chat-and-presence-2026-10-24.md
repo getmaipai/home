@@ -184,6 +184,8 @@ section 9, not fixed silently).
 
 ## 5. The detail page: Activity, About, Tasks, Chats (spec 11.3)
 
+For the preview, Yours uses left-aligned cards with a sample status, one activity line and task/chat counts; Activity shows sample recent rows and a note that real activity is coming soon. This data is deterministic per companion id, local only, and is not saved or fetched. Starting a companion-specific chat remains disabled until Home has a route for it.
+
 `/companions/:id` keeps its header (poster or clip, name, tagline, audience, the Make this my default action) and gains four tabs.
 
 - **Activity**: the kit `Timeline` Element over this companion's rows of the ACTIVITY-01 read model (jobs, projects, asks), newest

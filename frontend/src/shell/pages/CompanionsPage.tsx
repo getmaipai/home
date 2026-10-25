@@ -19,22 +19,33 @@ import { useCompanionShells } from "@/lib/companionShells";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@maipai/ui/src/ui/tabs";
 import { Chip } from "@maipai/ui/src/primitives/Chip";
 import { getIcon } from "@maipai/ui/src/icons";
+import { companionPreviewSample } from "@/shell/pages/companionPreviewSample";
 
 const listKey = ["companions"] as const;
 const ROBOT_SETTINGS = "/settings/apps?tab=robot";
 const SettingsIcon = getIcon("settings-2");
+const ChevronRightIcon = getIcon("chevron-right");
 
 /** The inside of one gallery card, shared by Yours and Discover. */
 function CompanionBody({ card, preview = false, discover = false }: { card: CompanionCard; preview?: boolean; discover?: boolean }) {
   if (preview && !discover) {
+    const sample = companionPreviewSample(card.id);
+    const statusTone = sample.status === "Working" ? "success" : sample.status === "Needs approval" ? "warning" : undefined;
     return (
-      <div className="flex flex-col items-center gap-3 text-center">
-        <Avatar name={card.name} size="profile" />
-        <h2 className="text-base font-semibold">{card.name}</h2>
-        {card.is_default ? <Badge>Your default</Badge> : null}
-        <p className="text-sm text-muted-foreground">{card.who_can_use}</p>
-        <p className="text-sm text-muted-foreground">Voice: {card.voice}</p>
-        <p className="text-sm text-muted-foreground">{card.chats} chats</p>
+      <div className="flex flex-col gap-3 text-left">
+        <div className="flex items-center justify-between gap-3">
+          <Avatar name={card.name} size="profile" />
+          <Badge variant="secondary" tone={statusTone}>{sample.status}</Badge>
+        </div>
+        <div className="flex flex-col gap-1">
+          <h2 className="text-base font-semibold">{card.name}</h2>
+          <p className="text-sm text-muted-foreground">{card.tagline}</p>
+          <p className="text-sm text-muted-foreground">{sample.activityLine}</p>
+        </div>
+        <div className="flex items-center justify-between gap-2 text-sm text-muted-foreground">
+          <span>{sample.tasks} tasks · {card.chats} chats</span>
+          <ChevronRightIcon aria-hidden="true" />
+        </div>
       </div>
     );
   }
@@ -103,6 +114,7 @@ export function CompanionsPage() {
                   <CardGrid label="Companions" items={data.companions} getKey={(card) => card.id} getLabel={(card) => card.name}
                     onSelect={(card) => navigate(`/companions/${encodeURIComponent(card.id)}`)}
                     renderItem={(card) => <CompanionBody card={card} preview />} />
+                  <p className="mt-4 text-sm text-muted-foreground">Sample activity. Real activity is coming soon.</p>
                 </TabsContent>
                 {data.can_discover ? <TabsContent value="Discover">
                   <div className="flex flex-wrap gap-2">
@@ -178,7 +190,28 @@ export function CompanionDetailPage() {
               <TabsTrigger value="Tasks">Tasks</TabsTrigger>
               <TabsTrigger value="Chats">Chats</TabsTrigger>
             </TabsList>
-            <TabsContent value="Activity"><EmptyState icon="clock" text={`Coming soon: what ${companion.name} has been doing.`} /></TabsContent>
+            <TabsContent value="Activity">
+              <section aria-labelledby="recent-activity-heading" className="flex flex-col gap-3">
+                <div className="flex items-center justify-between gap-3">
+                  <h2 id="recent-activity-heading" className="text-lg font-semibold">Recent activity</h2>
+                  <span className="text-sm text-muted-foreground">Today</span>
+                </div>
+                <ul className="flex list-none flex-col gap-2 p-0">
+                  {companionPreviewSample(companion.id).activities.map((activity) => {
+                    const ActivityIcon = getIcon(activity.icon);
+                    return <li key={activity.title} className="flex items-center gap-3">
+                      <span className="flex size-10 shrink-0 items-center justify-center rounded-md bg-muted"><ActivityIcon aria-hidden="true" /></span>
+                      <div className="min-w-0 flex-1">
+                        <p className="font-medium">{activity.title}</p>
+                        <p className="text-sm text-muted-foreground">{activity.detail}</p>
+                      </div>
+                      <ChevronRightIcon aria-hidden="true" className="text-muted-foreground" />
+                    </li>;
+                  })}
+                </ul>
+                <p className="text-sm text-muted-foreground">Sample activity. Real activity is coming soon.</p>
+              </section>
+            </TabsContent>
             <TabsContent value="About"><DetailBody companion={companion} aboutOnly /></TabsContent>
             <TabsContent value="Tasks"><EmptyState icon="check" text={`Coming soon: tasks ${companion.name} is working on.`} /></TabsContent>
             <TabsContent value="Chats"><EmptyState icon="message-circle" text={`Coming soon: your chats with ${companion.name}.`} /></TabsContent>
@@ -204,6 +237,7 @@ function DetailBody({ companion, headerOnly = false, aboutOnly = false }: { comp
 }
 
 function DetailSetup({ companion, saved, copy, save, headerOnly = false, aboutOnly = false }: { companion: CompanionDetail; saved: boolean; copy: UseMutationResult<unknown, Error, void>; save: UseMutationResult<unknown, Error, void>; headerOnly?: boolean; aboutOnly?: boolean }) {
+  const preview = useCompanionShells() === true;
   return (
     <>
       {!aboutOnly ? <>
@@ -214,9 +248,12 @@ function DetailSetup({ companion, saved, copy, save, headerOnly = false, aboutOn
           <p className="text-muted-foreground">{companion.tagline}</p>
           <div className="flex flex-wrap gap-2"><Badge>{companion.type_label}</Badge>{saved ? <Badge>Your default</Badge> : null}</div>
         </div>
-        {companion.can_edit ? <Link to={`/companions/${encodeURIComponent(companion.id)}/edit`}><Button type="button" variant="ghost" size="icon" aria-label="Companion settings" title="Companion settings"><SettingsIcon /></Button></Link> : null}
-        {companion.can_copy ? <Button type="button" variant="outline" disabled={copy.isPending} onClick={() => copy.mutate()}>{companion.is_household ? "Make a copy" : "Edit a copy"}</Button> : null}
-        <Button type="button" disabled={saved || save.isPending} onClick={() => save.mutate()}>{saved ? "Your default" : "Set as my default"}</Button>
+        <div className="flex flex-wrap items-center gap-2 sm:ml-auto">
+          {preview ? <Button type="button" disabled title="Coming soon">Chat</Button> : null}
+          {companion.can_edit ? <Link to={`/companions/${encodeURIComponent(companion.id)}/edit`}><Button type="button" variant="ghost" size="icon" aria-label="Companion settings" title="Companion settings"><SettingsIcon /></Button></Link> : null}
+          {companion.can_copy ? <Button type="button" variant="outline" disabled={copy.isPending} onClick={() => copy.mutate()}>{companion.is_household ? "Make a copy" : "Edit a copy"}</Button> : null}
+          <Button type="button" disabled={saved || save.isPending} onClick={() => save.mutate()}>{saved ? "Your default" : "Set as my default"}</Button>
+        </div>
       </div>
       {save.isError ? <Alert variant="destructive"><AlertDescription>{save.error instanceof ApiError ? save.error.message : "Could not save this. Check your connection and try again."}</AlertDescription></Alert> : null}
       {copy.isError ? <Alert variant="destructive"><AlertDescription>{copy.error instanceof ApiError ? copy.error.message : "Could not reach Home. Check your connection and try again."}</AlertDescription></Alert> : null}
