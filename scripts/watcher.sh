@@ -324,7 +324,8 @@ wait_for_quiet() {
     fi
     if [[ -z "$reason" ]]; then return 0; fi
     now="$(date +%s)"
-    if (( now - started >= max_seconds )); then
+    # date +%s has one-second resolution; the extra tick prevents the cap from firing early at a second boundary.
+    if (( now - started >= max_seconds + 1 )); then
       echo "$(date -u +%Y-%m-%dT%H:%M:%SZ) waited ${max_seconds}s; $reason; running anyway" >> "$data/watcher.log"
       return 0
     fi

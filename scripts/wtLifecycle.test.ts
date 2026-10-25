@@ -3,54 +3,10 @@ import { existsSync, mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { spawnSync } from "node:child_process";
-
-const scratch = mkdtempSync(join(tmpdir(), "maipai-wt-test-"));
-const repoRoot = join(import.meta.dir, "..");
-// The logic is the shared getmaipai/.github script; this repo's scripts/wt.sh is a thin wrapper, so the
-// lifecycle is exercised against the shared file in the sibling .github checkout.
-const common = resolve(repoRoot, spawnSync("git", ["-C", repoRoot, "rev-parse", "--git-common-dir"], { encoding: "utf8" }).stdout.trim());
-// Same source as the wrapper: the sibling .github checkout's origin/main, never its working tree (which may be stale or mid-edit).
-const sharedFromOrigin = () => {
-  const dir = mkdtempSync(join(tmpdir(), "maipai-wt-shared-"));
-  const std = join(common, "..", "..", ".github");
-  const archive = spawnSync("bash", ["-c", `git -C '${std}' archive origin/main standards/bin | tar -x -C '${dir}'`], { encoding: "utf8" });
-  if (archive.status !== 0) throw new Error(`cannot read .github origin/main:standards/bin: ${archive.stderr}`);
-  return join(dir, "standards", "bin", "wt.sh");
-};
-const script = process.env.MAIPAI_WT_SHARED || sharedFromOrigin();
-// wt.sh reads its session files with node, so a machine without node cannot run these tests; they skip with this reason.
-const hasNode = spawnSync("node", ["-v"], { stdio: "ignore" }).status === 0;
-const hasTmuxBin = spawnSync("tmux", ["-V"], { stdio: "ignore" }).status === 0;
-process.env.WT_T2_GLOBS ??= "backend/src/auth/* docs/design/RULES.md scripts/check.sh";
-const fixture = join(scratch, "home");
-const bare = join(scratch, "origin.git");
-const data = join(scratch, "session-data");
-const socket = `wt-test-${process.pid}-${Date.now()}`;
-const run = (args: string[], env: Record<string, string> = {}) => spawnSync("bash", [script, ...args], {
-  cwd: fixture,
-  encoding: "utf8",
-  env: { ...process.env, MAIPAI_WT_DATA: data, MAIPAI_WT_TMUX_SOCKET: socket, ...env },
-});
-
-beforeAll(() => {
-  mkdirSync(fixture, { recursive: true });
-  spawnSync("git", ["init", "--bare", bare], { stdio: "inherit" });
-  spawnSync("git", ["init", "-b", "main", fixture], { stdio: "inherit" });
-  spawnSync("git", ["-C", fixture, "config", "user.name", "Test User"]);
-  spawnSync("git", ["-C", fixture, "config", "user.email", "test@example.invalid"]);
-  writeFileSync(join(fixture, "README.md"), "fixture\n");
-  mkdirSync(join(fixture, "scripts"), { recursive: true });
-  writeFileSync(join(fixture, "scripts", "check.sh"), "#!/usr/bin/env bash\necho '== scope: fixture'\n");
-  spawnSync("git", ["-C", fixture, "add", "."]);
-  spawnSync("git", ["-C", fixture, "commit", "-m", "initial"]);
-  spawnSync("git", ["-C", fixture, "remote", "add", "origin", bare]);
-  spawnSync("git", ["-C", fixture, "push", "-u", "origin", "main"]);
-});
-
-afterAll(() => {
-  spawnSync("tmux", ["-L", socket, "kill-server"], { stdio: "ignore" });
-  rmSync(scratch, { recursive: true, force: true });
-});
+import * as fixtures from "./tests/wtFixtures";
+const { scratch, repoRoot, common, script, hasNode, hasTmuxBin, fixture, bare, data, socket, run, setup, cleanup } = fixtures.createWtFixtures();
+beforeAll(setup);
+afterAll(cleanup);
 
 describe.skipIf(!hasNode)("wt.sh worktree lifecycle (needs node installed)", () => {
   test("start and done remove the worktree, branch, and session file", () => {
@@ -176,73 +132,3 @@ describe.skipIf(!hasNode)("wt.sh worktree lifecycle (needs node installed)", () 
     });
   });
 });
-
-describe.skipIf(!hasNode)("wt.sh land gate stamp (needs node installed)", () => {
-  const originMain = () => spawnSync("git", ["--git-dir", bare, "rev-parse", "main"], { encoding: "utf8" }).stdout.trim();
-  // A worktree with one committed file; `file` decides the tier (docs T0, other code T1).
-  const session = (slug: string, file: string) => {
-    const started = run(["start", slug]);
-    if (started.status !== 0 || !started.stdout.trim()) throw new Error(`wt.sh start failed: ${started.stderr}`);
-    const path = started.stdout.trim();
-    const name = path.split("/").at(-1)!.replace(/^home-/, "");
-    mkdirSync(join(path, file, ".."), { recursive: true });
-    writeFileSync(join(path, file), `${slug}\n`);
-    spawnSync("git", ["-C", path, "add", file]);
-    spawnSync("git", ["-C", path, "commit", "-m", slug], { env: { ...process.env, GIT_AUTHOR_NAME: "T", GIT_AUTHOR_EMAIL: "t@example.invalid", GIT_COMMITTER_NAME: "T", GIT_COMMITTER_EMAIL: "t@example.invalid" } });
-    const sh = (args: string[]) => spawnSync("bash", [script, ...args], { cwd: path, encoding: "utf8", env: { ...process.env, MAIPAI_WT_DATA: data, MAIPAI_WT_SESSION: name } });
-    const stampPath = join(data, "gate-stamps", `${name}.json`);
-    const edit = (fn: (s: any) => void) => { const s = JSON.parse(readFileSync(stampPath, "utf8")); fn(s); writeFileSync(stampPath, JSON.stringify(s)); };
-    return { path, name, sh, stampPath, edit };
-  };
-  const refused = (r: { status: number | null; stderr: string }, text: string, next: string) => {
-    expect(r.status).not.toBe(0);
-    expect(r.stderr).toContain(text);
-    expect(r.stderr).toContain(next);
-  };
-
-  test("refuses with the exact next command when no stamp exists", () => {
-    const before = originMain();
-    const s = session("nostamp", "docs/nostamp.md");
-    refused(s.sh(["land"]), "no gate stamp", `MAIPAI_WT_SESSION=${s.name} bash scripts/wt.sh check`);
-    expect(originMain()).toBe(before);
-    s.sh(["done"]);
-  });
-
-  test("refuses a failed, too-weak, stale, or drifted stamp, then lands after a fresh green check", () => {
-    const before = originMain();
-    const s = session("stamped", "tools/stamped.ts");
-    expect(s.sh(["check"]).status).toBe(0);
-    const good = readFileSync(s.stampPath, "utf8");
-    const next = `MAIPAI_WT_SESSION=${s.name} bash scripts/wt.sh check`;
-
-    s.edit((j) => { j.exitCode = 1; });
-    refused(s.sh(["land"]), "check for session", next);
-
-    writeFileSync(s.stampPath, good);
-    s.edit((j) => { j.tier = "T0"; });
-    refused(s.sh(["land"]), "need tier T1", `${next} T1`);
-
-    writeFileSync(s.stampPath, good);
-    s.edit((j) => { j.created = new Date(Date.now() - 241 * 60 * 1000).toISOString(); });
-    refused(s.sh(["land"]), "only 4 hours counts", next);
-
-    writeFileSync(s.stampPath, good);
-    writeFileSync(join(s.path, "tools/stamped.ts"), "changed after the check\n");
-    spawnSync("git", ["-C", s.path, "commit", "-am", "drift"], { env: { ...process.env, GIT_AUTHOR_NAME: "T", GIT_AUTHOR_EMAIL: "t@example.invalid", GIT_COMMITTER_NAME: "T", GIT_COMMITTER_EMAIL: "t@example.invalid" } });
-    refused(s.sh(["land"]), "changed since the gate stamp", next);
-    expect(originMain()).toBe(before);
-
-    expect(s.sh(["check"]).status).toBe(0);
-    const landed = s.sh(["land"]);
-    expect(landed.status).toBe(0);
-    expect(originMain()).not.toBe(before);
-  }, 30000);
-
-  test("a stronger stamp than needed lands", () => {
-    const s = session("stronger", "docs/stronger.md");
-    expect(s.sh(["check", "T1"]).status).toBe(0);
-    expect(JSON.parse(readFileSync(s.stampPath, "utf8")).tier).toBe("T1");
-    expect(s.sh(["land"]).status).toBe(0);
-  }, 30000);
-});
-
