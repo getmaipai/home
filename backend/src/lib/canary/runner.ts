@@ -2,6 +2,7 @@
 // (which fires the one admin Notification per incident), the Status page row, and one restart request for a dead chat.
 import { hotReloadState } from "@/lib/hotReloadState";
 import { raiseIssue, resolveIssue } from "@/lib/issues";
+import { getStackClient, isStackConfigured } from "@/lib/stackEngine";
 import { CHECKS, CHECK_BY_ID } from "./checks";
 import * as results from "./results";
 import { ORDER, SLOW_BACKOFF_MS, dueChecks, noteRun, pickSearchPhrase, schedule, searchAllowed, SEARCH_QUIET_MS } from "./schedule";
@@ -10,8 +11,8 @@ import type { CanaryCheck, CanaryDeps, CanaryGroup, CanaryId, CheckResult, Outco
 export const ISSUE_SOURCE = "canary";
 export type RunReason = "post_start" | "heal" | "scheduled" | "manual";
 
-const flags = hotReloadState<{ running: boolean; pendingPostStart: boolean; pendingReason: RunReason; lastChatKey: string | null; lastManualAt: number }>("canaryFlags", () => ({ running: false, pendingPostStart: true, pendingReason: "post_start", lastChatKey: null, lastManualAt: 0 }));
-export function __resetCanaryRunnerForTests(): void { Object.assign(flags, { running: false, pendingPostStart: true, pendingReason: "post_start" as RunReason, lastChatKey: null, lastManualAt: 0 }); }
+const flags = hotReloadState<{ running: boolean; pendingPostStart: boolean; pendingReason: RunReason; lastChatKey: string | null; lastChatGeneration: string | null; lastManualAt: number }>("canaryFlags", () => ({ running: false, pendingPostStart: true, pendingReason: "post_start", lastChatKey: null, lastChatGeneration: null, lastManualAt: 0 }));
+export function __resetCanaryRunnerForTests(): void { Object.assign(flags, { running: false, pendingPostStart: true, pendingReason: "post_start" as RunReason, lastChatKey: null, lastChatGeneration: null, lastManualAt: 0 }); }
 export function isRunning(): boolean { return flags.running; }
 export const MANUAL_DEBOUNCE_MS = 30_000;
 
@@ -137,13 +138,29 @@ export function requestFullSuite(reason: RunReason = "heal"): void {
   flags.pendingReason = reason;
 }
 
+async function chatGeneration(): Promise<string | null> {
+  if (!isStackConfigured()) return null;
+  try {
+    const role = (await getStackClient().roles()).roles.find((item) => item.id === "chat");
+    return role?.state.since || null;
+  } catch {
+    return null;
+  }
+}
+
 /** One 60 second tick: the full suite when one is owed, otherwise whatever is due. */
 export async function canaryTick(deps: CanaryDeps): Promise<CheckResult[]> {
   if (flags.running) return [];
   const role = await deps.chatRole().catch(() => null);
   if (role) {
     const key = `${role.availability === "unavailable" ? "down" : "up"}`;
-    if (flags.lastChatKey === "down" && key === "up") requestFullSuite("heal");
+    const generation = role.availability === "ready" ? await chatGeneration() : null;
+    if (generation) {
+      if (flags.lastChatGeneration && flags.lastChatGeneration !== generation) requestFullSuite("post_start");
+      flags.lastChatGeneration = generation;
+    } else if (flags.lastChatKey === "down" && key === "up") {
+      requestFullSuite("heal");
+    }
     flags.lastChatKey = key;
   }
   if (flags.pendingPostStart) {

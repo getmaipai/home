@@ -288,6 +288,32 @@ describe("when checks must not run", () => {
     expect(await canaryTick(deps())).not.toEqual([]);
   });
 
+  test("a new Stack chat generation queues one post-start suite, with chat_hello first", async () => {
+    const { __setStackClientForTests } = await import("@/lib/stackEngine");
+    let generation = "chat-start-1";
+    __setStackClientForTests({
+      roles: async () => ({ roles: [{ id: "chat", state: { state: "ready", since: generation } }] }),
+    } as never);
+    try {
+      await runSuite(deps(), { reason: "manual", only: ["image_tiny"] });
+      await canaryTick(deps()); // consume Home's initial post-start suite
+      calls = [];
+      expect(await canaryTick(deps())).toEqual([]);
+
+      generation = "chat-start-2";
+      const restarted = await canaryTick(deps());
+      expect(restarted.map((result) => result.id)[0]).toBe("chat_hello");
+      expect(restarted.length).toBeGreaterThan(1);
+      expect(calls[0]).toBe("hi");
+
+      calls = [];
+      expect(await canaryTick(deps())).toEqual([]);
+      expect(calls).toEqual([]);
+    } finally {
+      __setStackClientForTests(null);
+    }
+  });
+
   test("the post-start suite runs everything but the picture check, and the search check only when keep-warm and quota allow", async () => {
     const out = await runSuite(deps(), { reason: "post_start" });
     expect(out.map((r) => r.id)).toContain("chat_search_trigger");
