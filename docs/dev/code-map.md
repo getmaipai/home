@@ -773,7 +773,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/turnMachine/nodes/tool.ts` | modelFacingArgs, toolStatusMoment, toolNode |
 | `backend/src/lib/turnMachine/speaker.ts` | speakerIsAnonymous, turnAgeBand, touchesMemory |
 | `backend/src/lib/turnMachine/trace.ts` | TraceRecorder |
-| `backend/src/lib/turnMachine/turnNext.ts` | conversationPersona, runTurnNext, runTurnNextStream |
+| `backend/src/lib/turnMachine/turnNext.ts` | conversationPersona, mentionedConversationPersona, runTurnNext, runTurnNextStream |
 | `backend/src/lib/turnMachine/warmup.ts` | turnWarmupPrompt |
 | `backend/src/lib/turnShared.ts` | validateTurnInput, judgeStatusAtInsert, deriveCrisisResources, identityLine, PRIVACY_SENTENCE, PHOTO_IDENTITY_SENTENCE |
 | `backend/src/lib/turnSignal.ts` | EVERYDAY_IMPERATIVES, COMMAND_CONFIDENCE, fallbackSignal, classifyTurnSignal, freezeDirective, asBackchannelOnLiveSubject |
