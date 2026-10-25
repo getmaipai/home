@@ -308,6 +308,22 @@ export function topicRows(person: PersonRow, now = new Date()): RowsData {
   });
 }
 
+/** NEWS-INSTANT-01: the sidebar's own rows (key, label, icon, follow) without the story counts, so GET /api/apps can carry them and the
+ * column draws on the first paint with no request of its own. Same rows as `topics` and `sources`; only the shelf scan is left out. */
+export function sidebarInlineRows(person: PersonRow, path: string, now = new Date()): RowsData | undefined {
+  const viewer = viewerOf(person, now);
+  if (path === "topics") {
+    const followed = followedChannels(person.id).topics;
+    return topicsFor(viewer.band).map((topic) => ({ key: topic.id, id: topic.id, label: topic.label, icon: topic.icon, followed: followed.has(topic.id) }));
+  }
+  if (path === "sources") {
+    const visible = new Set(visibleFeedIds(viewer.band));
+    const followed = followedChannels(person.id).sources;
+    return listFeeds().filter((feed) => visible.has(feed.id)).map((feed) => ({ key: feed.id, id: feed.id, label: feed.publisher, icon: "newspaper", followed: followed.has(feed.id) }));
+  }
+  return undefined;
+}
+
 /** `sources`: the feeds this band is shown, grouped by list, with the person's follow. A child's rows carry the list name, never an address. */
 export function sourceRows(person: PersonRow, now = new Date()): RowsData {
   const viewer = viewerOf(person, now);

@@ -101,6 +101,17 @@ describe("an app that declares a sidebar", () => {
     expect(side.getByText("Following")).toBeTruthy();
   });
 
+  test("NEWS-INSTANT-01: rows the app list carries draw the column with no wait on the data route", async () => {
+    const withInitial = { ...sidebar, groups: sidebar.groups.map((group) => group.id === "topics" ? { ...group, rows: { ...group.rows, initial: [{ key: "world", label: "World", icon: "globe" }, { key: "science", label: "Science", icon: "flask-conical" }] } } : group) };
+    rows = [{ ...row, sidebar: withInitial } as AppRow];
+    const slow = globalThis.fetch;
+    globalThis.fetch = ((input: RequestInfo | URL, init?: RequestInit) => (String(input).startsWith("/api/plugins/demo/data/topics") ? new Promise<Response>(() => {}) : slow(input, init))) as typeof fetch;
+    const view = open("/apps/demo");
+    const side = await column(view);
+    await waitFor(() => expect(side.queryByRole("link", { name: "World" })).not.toBeNull());
+    expect(side.getByRole("link", { name: "Science" })).toBeTruthy();
+  });
+
   test("COLUMN-UNIFY-01: the column carries the app's name, its settings and its favorite control, and the page keeps none from wide screens up", async () => {
     rows = [{ ...row, settings_area: { id: "demo", title: "Demo news", app: "/apps/demo" } } as AppRow];
     const view = open("/apps/demo");

@@ -32,7 +32,7 @@ export function useAppSidebar(app: Pick<AppRow, "package" | "to" | "label"> | un
         return data;
       },
       // The column's rows from this browser's last visit draw at once while the fresh rows load behind them.
-      initialData: app ? storedRows(ownerId, app.package, String((group.rows as Rows).bind.path)) : undefined,
+      initialData: (group.rows as Rows).initial ?? (app ? storedRows(ownerId, app.package, String((group.rows as Rows).bind.path)) : undefined),
       initialDataUpdatedAt: 0,
       enabled: app !== undefined,
       placeholderData: keepPreviousData,

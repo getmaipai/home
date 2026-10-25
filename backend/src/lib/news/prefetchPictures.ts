@@ -42,7 +42,7 @@ export async function prefetchNewsPictures(deps: { now?: () => number; busy?: ()
         if (!tryConsume(`net:news:prefetch:${host}`, { capacity: 1, refillPerSecond: 1 / 30 }, at)) continue;
         hostsTried.add(host);
         try {
-          const picture = await newsPicture(item, 480, band);
+          const picture = await newsPicture(item, 480, band, "prefetch");
           store.prefetchOutcome(picture !== null, now(), host);
         } catch {
           store.prefetchOutcome(false, now(), host);

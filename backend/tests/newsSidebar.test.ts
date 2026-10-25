@@ -46,6 +46,18 @@ test("an adult and a teen get the whole column: Today, My Mix and Saved, topics,
   }
 });
 
+test("the topic rows ride in the app list, so the column draws with no request of its own, and a child gets only the child set", async () => {
+  const { client } = await owner();
+  const kid = (await child(client)).client;
+  const rowsOf = async (viewer: typeof client) => ((await newsRow(viewer))?.sidebar?.groups.find((g) => g.id === "topics")?.rows as { initial?: Array<{ key: string; label: string }> }).initial;
+  const adult = await rowsOf(client);
+  const young = await rowsOf(kid);
+  expect(adult?.length).toBeGreaterThan(3);
+  expect(adult?.every((row) => row.key && row.label)).toBe(true);
+  expect(young?.length).toBeGreaterThan(0);
+  expect(young?.map((row) => row.key)).not.toEqual(adult?.map((row) => row.key));
+});
+
 test("a child's column has no My Mix; what it does show points only at pages a child may open", async () => {
   const { client } = await owner();
   const kid = (await child(client)).client;

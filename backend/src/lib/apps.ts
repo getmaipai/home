@@ -15,6 +15,7 @@ import { checkAppPackage, type AppContributes, type AppDataEntry, type AppPageEn
 import type { PackageManifest } from "@maipai/spec/gen/ts/manifest.js";
 import { CENTRAL_AREA_IDS, RESERVED_AREA_IDS, type SettingsArea } from "@maipai/spec/settings/areas-check.js";
 import { speakerAgeBand } from "@/lib/ageBand";
+import { sidebarInlineRows } from "@/lib/news/data";
 import { filterAnswerBlocks } from "@/lib/answerBlocks";
 import { missingRequired, unavailableCapabilities } from "@/lib/capabilities";
 import { getEntity } from "@/lib/entities";
@@ -198,7 +199,9 @@ export function sidebarFor(person: PersonRow, manifest: PackageManifest, contrib
       if (entries.length > 0) groups.push({ id: group.id, ...(group.title ? { title: group.title } : {}), pages: entries });
     } else if (group.rows && actionVisible(group.rows.open)) {
       const { manage, ...rest } = group.rows;
-      groups.push({ id: group.id, ...(group.title ? { title: group.title } : {}), rows: { ...rest, ...(manage && actionVisible(manage.open) ? { manage } : {}) } as AppSidebarRows });
+      const bind = rest.bind as { source?: string; path?: string };
+      const initial = manifest.id === "news" && bind.source === "package" && bind.path ? sidebarInlineRows(person, bind.path) : undefined;
+      groups.push({ id: group.id, ...(group.title ? { title: group.title } : {}), rows: { ...rest, ...(initial ? { initial } : {}), ...(manage && actionVisible(manage.open) ? { manage } : {}) } as AppSidebarRows });
     }
   }
   if (groups.length === 0) return undefined;

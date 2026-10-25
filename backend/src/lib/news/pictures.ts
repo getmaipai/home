@@ -2,7 +2,7 @@
 //
 // `newsPicture` is called from `GET /api/plugins/news/images/:item`, i.e. when a person's screen shows that story, and from the
 // idle picture prefetch (prefetchPictures.ts, NEWS-PICTURES-01) under the same switch and per-site pace as NEWS-07. The first request for an item fetches the feed's own `image_url` once, through the SSRF
-// guard (10 second timeout, 8 MB cap, one request to a host at a time, a pace ceiling per host, the first 429 or 403 puts the
+// guard (10 second timeout, 8 MB cap, six at a time to a host for a screen and one for the idle prefetch, a pace ceiling per host, the first 429 or 403 puts the
 // host quiet for an hour), resizes it to 1280 and 480 pixels wide as WebP and stores both under the cache folder. Every later
 // request is the cache. The publisher's address never leaves this file: callers get bytes, never the address.
 //
@@ -87,12 +87,11 @@ export function __setNewsPictureDepsForTests(next: PictureDeps | null): void {
 }
 const failed = new Map<string, number>();
 const inFlight = new Map<string, Promise<boolean>>();
-const hostQueues = new Map<string, Promise<unknown>>();
 export function __resetNewsPicturesForTests(): void {
   __resetNewsHostBackoffForTests();
   failed.clear();
   inFlight.clear();
-  hostQueues.clear();
+  lanes.clear();
 }
 const clock = (): number => (deps.now ?? Date.now)();
 
@@ -117,15 +116,27 @@ async function readLimited(response: Response, limit: number, signal: AbortSigna
   return bytes;
 }
 
-/** One request to a host at a time: queued behind the host's last one (the shared limiter paces the rest). */
-function perHost<T>(host: string, task: () => Promise<T>): Promise<T> {
-  const previous = hostQueues.get(host) ?? Promise.resolve();
-  const next = previous.then(task, task);
-  hostQueues.set(host, next.catch(() => undefined));
-  return next;
+/** A person looking at a screen asks a host for several pictures at once, as their own browser would (VIEW_PARALLEL); the idle
+ * prefetch keeps to one at a time on its own lane, so it never queues a screen behind it and a screen never queues it. */
+type Lane = "view" | "prefetch";
+const VIEW_PARALLEL = 6;
+const lanes = new Map<string, { active: number; waiting: Array<() => void> }>();
+async function perHost<T>(host: string, lane: Lane, task: () => Promise<T>): Promise<T> {
+  const key = `${lane}:${host}`;
+  const limit = lane === "view" ? VIEW_PARALLEL : 1;
+  const state = lanes.get(key) ?? { active: 0, waiting: [] };
+  lanes.set(key, state);
+  if (state.active >= limit) await new Promise<void>((resolve) => state.waiting.push(resolve));
+  else state.active++;
+  try {
+    return await task();
+  } finally {
+    const next = state.waiting.shift();
+    if (next) next(); else state.active--;
+  }
 }
 
-async function downloadOnce(imageUrl: string, band: AgeBand): Promise<Uint8Array | null> {
+async function downloadOnce(imageUrl: string, band: AgeBand, lane: Lane = "view"): Promise<Uint8Array | null> {
   let url: URL;
   try { url = new URL(imageUrl); } catch { return null; }
   if (!/^https?:$/.test(url.protocol) || url.username || url.password || !urlAllowedFor(band, imageUrl)) return null;
@@ -137,7 +148,7 @@ async function downloadOnce(imageUrl: string, band: AgeBand): Promise<Uint8Array
     bumpNewsCounter(error instanceof SsrfBlockedError ? "picture_ssrf_blocked" : "picture_failed");
     return null;
   }
-  return perHost(host, async () => {
+  return perHost(host, lane, async () => {
     if (newsHostQuiet(host, clock())) { bumpNewsCounter("picture_host_quiet"); return null; }
     if (!tryConsume(`net:${host}`, HOST_RATE, clock())) { bumpNewsCounter("picture_paced"); return null; }
     const controller = new AbortController();
@@ -241,29 +252,29 @@ export function newsPictureCached(itemId: string): boolean {
 }
 
 /** One download per item and band at a time, shared by the picture route and a save. */
-function ensureShared(item: ShelfItem, band: AgeBand): Promise<boolean> {
+function ensureShared(item: ShelfItem, band: AgeBand, lane: Lane = "view"): Promise<boolean> {
   const key = `${item.id}:${band}`;
   let pending = inFlight.get(key);
   if (!pending) {
-    pending = ensure(item, band).finally(() => inFlight.delete(key));
+    pending = ensure(item, band, lane).finally(() => inFlight.delete(key));
     inFlight.set(key, pending);
   }
   return pending;
 }
 
 /** Fetches, resizes and stores an item's picture if it is not cached yet. True when the cache holds it afterwards. */
-async function ensure(item: ShelfItem, band: AgeBand): Promise<boolean> {
+async function ensure(item: ShelfItem, band: AgeBand, lane: Lane): Promise<boolean> {
   const ref = pictureRefOf(item.id);
   const index = readIndex();
   if (index[ref] && NEWS_PICTURE_WIDTHS.every((width) => existsSync(fileOf(ref, width)))) return true;
   const failureKey = `${item.id}:${band}`;
   if ((failed.get(failureKey) ?? 0) > clock()) return false;
-  const bytes = item.image_url ? await downloadOnce(item.image_url, band) : null;
+  const bytes = item.image_url ? await downloadOnce(item.image_url, band, lane) : null;
   let sizes = bytes ? await resizeBoth(bytes) : null;
   if (!sizes) {
     const enriched = await enrichItem(item, band);
     if (enriched?.image_url && enriched.image_url !== item.image_url) {
-      const fallback = await downloadOnce(enriched.image_url, band);
+      const fallback = await downloadOnce(enriched.image_url, band, lane);
       sizes = fallback ? await resizeBoth(fallback) : null;
     }
   }
@@ -328,10 +339,10 @@ export async function newsFigurePicture(itemId: string, n: number, address: stri
 
 /** The picture of an item at one width, from the cache; the first request for the item fetches it once. Null when the item
  * has no picture, the household turned pictures off, the host is backed off or the fetch failed (the card is then text only). */
-export async function newsPicture(item: ShelfItem, width: NewsPictureWidth, band: AgeBand = "adult"): Promise<{ bytes: Uint8Array; etag: string } | null> {
+export async function newsPicture(item: ShelfItem, width: NewsPictureWidth, band: AgeBand = "adult", lane: Lane = "view"): Promise<{ bytes: Uint8Array; etag: string } | null> {
   if (!newsImagesOn()) return null;
   const ref = pictureRefOf(item.id);
-  if (!(await ensureShared(item, band))) return null;
+  if (!(await ensureShared(item, band, lane))) return null;
   const path = fileOf(ref, width);
   if (!existsSync(path)) return null;
   const bytes = new Uint8Array(readFileSync(path));

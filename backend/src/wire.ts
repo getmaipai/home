@@ -1229,6 +1229,8 @@ export interface AppSidebarRows {
   item_label_field?: string;
   item_media_field?: string;
   only_followed?: boolean;
+  /** The rows themselves, when the hub can resolve them without a request (the column then draws on the first paint). */
+  initial?: Array<Record<string, unknown>>;
   open: Record<string, unknown>;
   manage?: { label: string; open: Record<string, unknown> };
 }

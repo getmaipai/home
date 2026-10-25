@@ -108,6 +108,8 @@ export interface Publisher {
   requests: string[];
   /** Hosts the hub asked for (the Host header it sent), in order. */
   hosts: string[];
+  /** The most `/slowimg/` requests the server held open at once (each takes 150 ms). */
+  slowImagePeak(): number;
   stop(): void;
   /** Install the seams so the hub's one picture fetch and its article fetch reach this server. */
   attach(): void;
@@ -125,13 +127,21 @@ export async function startPublisher(pages: Record<string, string | ((req: Reque
   const png = await sharp({ create: { width: 1600, height: 900, channels: 3, background: { r: 30, g: 90, b: 160 } } }).png().toBuffer();
   const requests: string[] = [];
   const hosts: string[] = [];
+  let slowNow = 0;
+  let slowPeak = 0;
   const server = Bun.serve({
     port: 0, hostname: "127.0.0.1",
-    fetch(req) {
+    async fetch(req) {
       const url = new URL(req.url);
       requests.push(url.pathname);
       hosts.push(req.headers.get("x-original-host") ?? "");
       if (url.pathname.startsWith("/limited/")) return new Response("slow down", { status: 429 });
+      if (url.pathname.startsWith("/slowimg/")) {
+        slowNow++; slowPeak = Math.max(slowPeak, slowNow);
+        await new Promise((resolve) => setTimeout(resolve, 150));
+        slowNow--;
+        return new Response(png, { headers: { "content-type": "image/png" } });
+      }
       if (url.pathname.startsWith("/img/")) return new Response(png, { headers: { "content-type": "image/png" } });
       if (url.pathname.startsWith("/text/")) return new Response("not an image", { headers: { "content-type": "text/plain" } });
       const page = pages[url.pathname];
@@ -142,6 +152,7 @@ export async function startPublisher(pages: Record<string, string | ((req: Reque
   const fetchFromServer = (original: URL, init?: RequestInit) => fetch(`http://127.0.0.1:${server.port}${original.pathname}${original.search}`, { ...init, headers: { ...(init?.headers as Record<string, string> | undefined), "x-original-host": original.hostname } });
   return {
     port: server.port ?? 0, requests, hosts,
+    slowImagePeak: () => slowPeak,
     stop: () => server.stop(true),
     attach() {
       __setNewsPictureDepsForTests({
