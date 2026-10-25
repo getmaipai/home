@@ -230,7 +230,7 @@ export function PackageAppPage({ person }: { person: Roster }) {
   const contextTitle = sidebarProps ? contextTitleFor(activeLabel, pageDoc?.title) : undefined;
 
   const content = (
-    <div className={cn("flex min-h-0 min-w-0 flex-1 flex-col gap-2", (sidebarProps || media) && "py-4 lg:p-4 lg:ps-6", sectionsBar && "pb-24")} data-testid="package-app" data-package={packageId}>
+    <div className={cn("flex min-h-0 min-w-0 flex-1 flex-col gap-2", (sidebarProps || media) && "py-4 lg:p-4 lg:ps-6")} data-testid="package-app" data-package={packageId}>
       {sectionsBar ? <PhoneNav variant="floating" label={`${app?.label ?? "App"} sections`} entries={sectionsBar.entries} {...(sectionsBar.trailing ? { trailing: sectionsBar.trailing } : {})} /> : null}
       {familyHeader ? null : <h1 className="sr-only">{app?.label ?? "App"}</h1>}
       {app ? <AppToolbar inShellBar={inShellBar} sectionsInBar={sectionsBar !== null} hideSectionsOnWide={sidebar !== undefined} to={app.to} label={app.label} homeLabel={appHomeLabel(packageId, media)} settingsArea={app.settings_area?.id} sections={app.sections} current={pageId} familyHeader={familyHeader} title={contextTitle} titleSrOnly={sidebarProps ? ownHeader || contextTitle === undefined : false} /> : null}
@@ -243,7 +243,7 @@ export function PackageAppPage({ person }: { person: Roster }) {
         loadingLabel="Opening the app"
       >
         {(shown) => { const doc = sectionsBar?.trailing && pageId !== "search" ? withoutSearchBox(shown) : shown; return (hasQuery && !sameQuery ? null : <>
-          {packageId === "weather" && pageId === "index" ? null : packageId === "news" ? <FocalImageProvider analyze={analyzeFocalImage}><SchemaPage key={`${packageId}/${pageId}`} page={doc} packageId={packageId} hideTitle sidebar={sidebarProps !== null} /></FocalImageProvider> : <SchemaPage key={`${packageId}/${pageId}`} page={doc} packageId={packageId} hideTitle sidebar={sidebarProps !== null} />}
+          {packageId === "weather" && pageId === "index" ? null : packageId === "news" ? <FocalImageProvider analyze={analyzeFocalImage}><SchemaPage key={`${packageId}/${pageId}`} page={doc} packageId={packageId} hideTitle sidebar={sidebarProps !== null} floatingBar={sectionsBar !== null} /></FocalImageProvider> : <SchemaPage key={`${packageId}/${pageId}`} page={doc} packageId={packageId} hideTitle sidebar={sidebarProps !== null} floatingBar={sectionsBar !== null} />}
           {packageId === "videos" && pageId === "watch" ? <VideoDetails id={new URLSearchParams(location.search).get("id") ?? String((location.state as { pageState?: { id?: string } } | null)?.pageState?.id ?? "")} /> : null}
           {packageId === "weather" && pageId === "index" ? <>
             {weatherMessage ? <p role="status" className="text-sm text-muted-foreground">{weatherMessage}</p> : null}
