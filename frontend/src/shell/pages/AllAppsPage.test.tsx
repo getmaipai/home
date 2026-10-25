@@ -21,19 +21,24 @@ const fakeApps = (n: number): AppRow[] => Array.from({ length: n }, (_, i) => ({
 let home: HomeFixture;
 let rows: AppRow[];
 let baseFetch: typeof fetch;
+let views: Array<ReturnType<typeof render>> = [];
 
 function start(pinnedApps?: string[]) {
-  home = mockHome({ pinnedApps });
   baseFetch = globalThis.fetch;
+  home = mockHome({ pinnedApps });
+  const fixtureFetch = globalThis.fetch;
   globalThis.fetch = ((input: RequestInfo | URL, init?: RequestInit) => {
     const url = typeof input === "string" ? input : input.toString();
     if (url.startsWith("/api/apps")) return Promise.resolve(Response.json(rows));
-    return baseFetch(input, init);
+    if (url.startsWith("/api/memory")) return Promise.resolve(Response.json([]));
+    if (url.startsWith("/api/settings")) return fixtureFetch(input, init);
+    if (url.startsWith("/api/")) return Promise.resolve(Response.json({}));
+    return fixtureFetch(input, init);
   }) as typeof fetch;
 }
 
 function open(path = "/all-apps") {
-  return render(
+  const view = render(
     <QueryClientProvider client={createQueryClient()}>
       <ToastProvider><TooltipProvider>
         <MemoryRouter initialEntries={[path]}>
@@ -42,11 +47,19 @@ function open(path = "/all-apps") {
       </TooltipProvider></ToastProvider>
     </QueryClientProvider>,
   );
+  views.push(view);
+  return view;
 }
 const page = (view: ReturnType<typeof open>) => within(view.container.querySelector('[data-slot="app-directory"]') as HTMLElement);
 
 beforeEach(() => { rows = fakeApps(60); });
-afterEach(() => { cleanup(); home.restore(); globalThis.fetch = baseFetch; });
+afterEach(() => {
+  for (const view of views) view.unmount();
+  views = [];
+  cleanup();
+  globalThis.fetch = baseFetch;
+  home.restore();
+});
 
 describe("the All apps page with 60 apps", () => {
   test("the rail's grid button opens it, and it lists every app with the search box focused", async () => {

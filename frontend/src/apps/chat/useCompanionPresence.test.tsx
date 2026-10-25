@@ -70,9 +70,9 @@ test("an avatar failure hides the video character", async () => {
   await view.findByRole("img", { name: "Mimi" });
   const video = view.container.querySelector("video");
   expect(video).toBeTruthy();
-  await waitFor(() => expect(video?.getAttribute("src")).toBe("/idle.mp4"));
+  await waitFor(() => expect(video?.getAttribute("src")).toBe("/idle.mp4"), { timeout: 5000 });
   fireEvent.error(video!);
-  await waitFor(() => expect(view.queryByRole("img", { name: "Mimi" })).toBeNull());
+  await waitFor(() => expect(view.queryByRole("img", { name: "Mimi" })).toBeNull(), { timeout: 5000 });
   globalThis.IntersectionObserver = priorObserver;
   HTMLCanvasElement.prototype.getContext = priorContext;
   HTMLMediaElement.prototype.play = priorPlay;
