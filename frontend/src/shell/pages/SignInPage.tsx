@@ -106,6 +106,7 @@ export function SignInPage({ onSignedIn }: { onSignedIn: () => void }) {
                         id="secret"
                         name="maipai-secret"
                         type="text"
+                        // eslint-disable-next-line shadcn/no-inline-styles -- WebkitTextSecurity preserves the masked appearance of this text input.
                         style={{ WebkitTextSecurity: "disc" } as MaskedSecretStyle}
                         autoCapitalize="off"
                         autoCorrect="off"

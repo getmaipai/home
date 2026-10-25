@@ -45,6 +45,7 @@ function CompanionBody({ card, preview = false, discover = false, onFailure, onD
   </DropdownMenu></div>;
   if (preview && !discover) {
     const sample = companionPreviewSample(card.id);
+    // eslint-disable-next-line shadcn/no-arbitrary-values -- the teal and orange status hues have no scale token
     const statusClass = sample.status === "Working" ? "bg-[color:var(--hue-teal)] text-foreground" : sample.status === "Needs approval" ? "bg-[color:var(--hue-orange)] text-foreground" : "bg-muted text-foreground";
     return (
       <div className="flex flex-col gap-3 text-left">
