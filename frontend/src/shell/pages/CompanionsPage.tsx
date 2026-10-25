@@ -17,6 +17,8 @@ import { voicePreviewPlayer, type VoicePreviewState } from "@/lib/voice/voicePre
 import { useTabItem } from "@/shell/tabIdentity";
 import { useCompanionShells } from "@/lib/companionShells";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@maipai/ui/src/ui/tabs";
+import { List } from "@maipai/ui/src/primitives/List";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@maipai/ui/src/ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@maipai/ui/src/ui/alert-dialog";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@maipai/ui/src/ui/dropdown-menu";
 import { Chip } from "@maipai/ui/src/primitives/Chip";
@@ -28,6 +30,7 @@ const ROBOT_SETTINGS = "/settings/apps?tab=robot";
 const SettingsIcon = getIcon("settings-2");
 const ChevronRightIcon = getIcon("chevron-right");
 const MoreIcon = getIcon("more-horizontal");
+const BackIcon = getIcon("arrow-left");
 
 /** Props for one companion tile, shared by Yours and Discover. */
 function companionTileProps({ card, preview = false, discover = false, onDelete, onSelect, onSetDefault }: { card: CompanionCard; preview?: boolean; discover?: boolean; onDelete: (card: CompanionCard) => void; onSelect: () => void; onSetDefault: (card: CompanionCard) => void }) {
@@ -148,7 +151,9 @@ export function CompanionDetailPage() {
   useTabItem(query.data?.name ?? "Companion");
   return (
     <div className="flex flex-col gap-6" data-testid="companion-detail">
-      <Link to="/companions" className="text-sm underline">All companions</Link>
+      {preview === true
+        ? <Link to="/companions" className="self-start" aria-label="All companions"><Button type="button" variant="ghost" size="icon" tabIndex={-1}><BackIcon aria-hidden="true" /></Button></Link>
+        : <Link to="/companions" className="text-sm underline">All companions</Link>}
       <AsyncState
         data={query.isError ? null : query.data}
         error={query.isError}
@@ -160,44 +165,57 @@ export function CompanionDetailPage() {
         {(companion: CompanionDetail) => <>
           {preview === true ? <>
             <DetailBody companion={companion} headerOnly />
-            <Tabs defaultValue="Activity">
-            <TabsList>
-              <TabsTrigger value="Activity">Activity</TabsTrigger>
-              <TabsTrigger value="About">About</TabsTrigger>
-              <TabsTrigger value="Tasks">Tasks</TabsTrigger>
-              <TabsTrigger value="Chats">Chats</TabsTrigger>
-            </TabsList>
-            <TabsContent value="Activity">
-              <section aria-labelledby="recent-activity-heading" className="flex flex-col gap-3">
-                <div className="flex items-center justify-between gap-3">
-                  <h2 id="recent-activity-heading" className="text-lg font-semibold">Recent activity</h2>
-                  <span className="text-sm text-muted-foreground">Today</span>
-                </div>
-                <ul className="flex list-none flex-col gap-2 p-0">
-                  {companionPreviewSample(companion.id).activities.map((activity) => {
-                    const ActivityIcon = getIcon(activity.icon);
-                    return <li key={activity.title} className="flex items-center gap-3">
-                      <span className="flex size-10 shrink-0 items-center justify-center rounded-md bg-muted"><ActivityIcon aria-hidden="true" /></span>
-                      <div className="min-w-0 flex-1">
-                        <p className="font-medium">{activity.title}</p>
-                        <p className="text-sm text-muted-foreground">{activity.detail}</p>
-                      </div>
-                      <ChevronRightIcon aria-hidden="true" className="text-muted-foreground" />
-                    </li>;
-                  })}
-                </ul>
-                <p className="text-sm text-muted-foreground">Sample activity. Real activity is coming soon.</p>
-              </section>
-            </TabsContent>
-            <TabsContent value="About"><DetailBody companion={companion} aboutOnly /></TabsContent>
-            <TabsContent value="Tasks"><EmptyState icon="check" text={`Coming soon: tasks ${companion.name} is working on.`} /></TabsContent>
-            <TabsContent value="Chats"><EmptyState icon="message-circle" text={`Coming soon: your chats with ${companion.name}.`} /></TabsContent>
-          </Tabs>
+            <DetailRows companion={companion} />
           </> : <DetailBody companion={companion} />}
         </>}
       </AsyncState>
     </div>
   );
+}
+
+type DetailRow = { key: string; title: string; hint: string; body: ReactNode };
+
+/** The preview detail page: a short list of rows, each opening its own sheet, so nothing long sits under the hero. */
+function DetailRows({ companion }: { companion: CompanionDetail }) {
+  const [open, setOpen] = useState<string | null>(null);
+  const sample = companionPreviewSample(companion.id);
+  const rows: DetailRow[] = [
+    { key: "voice", title: "Voice", hint: companion.voice_is_own ? "Its own voice" : "Your Settings voice", body: <VoiceRow companion={companion} /> },
+    { key: "personality", title: "Personality", hint: companion.tagline, body: <div className="flex flex-col gap-3">
+      <p>{companion.about}</p>
+      {companion.pronouns ? <p className="text-sm text-muted-foreground">Pronouns: {companion.pronouns}</p> : null}
+      {companion.interests.length > 0 ? <p className="text-sm text-muted-foreground">Likes: {companion.interests.join(", ")}.</p> : null}
+      <dl className="grid gap-3 sm:grid-cols-2">{companion.dials.map((dial) => <div key={dial.label}><dt className="text-sm font-medium">{dial.label}</dt><dd className="text-muted-foreground">{dial.value}</dd></div>)}</dl>
+    </div> },
+    { key: "examples", title: "Things it might say", hint: `${companion.examples.length} examples`, body: <ul className="flex list-none flex-col gap-2 p-0">{companion.examples.map((line) => <li key={line}>&ldquo;{line}&rdquo;</li>)}</ul> },
+  ];
+  if (companion.used_by) {
+    const people = companion.used_by.people.length ? companion.used_by.people.map((person) => person.name).join(", ") : "nobody yet";
+    const robots = companion.used_by.robots.length ? companion.used_by.robots.map((robot) => robot.name).join(", ") : "none yet";
+    rows.push({ key: "used", title: "Who uses it", hint: people, body: <div className="flex flex-col gap-2">
+      <p>People: {people}.</p>
+      <p>Robots: {robots}. <Link to={ROBOT_SETTINGS} className="underline">Companion settings</Link></p>
+      <p className="text-sm text-muted-foreground">{companion.who_can_use}</p>
+    </div> });
+  }
+  rows.push({ key: "activity", title: "Recent activity", hint: "Sample", body: <div className="flex flex-col gap-3">
+    <ul className="flex list-none flex-col gap-2 p-0">{sample.activities.map((activity) => <li key={activity.title}><p className="font-medium">{activity.title}</p><p className="text-sm text-muted-foreground">{activity.detail}</p></li>)}</ul>
+    <p className="text-sm text-muted-foreground">Sample activity. Real activity is coming soon.</p>
+  </div> });
+  const current = rows.find((row) => row.key === open) ?? null;
+  return <>
+    {!companion.is_household && companion.can_copy ? <p>This companion comes with Home, so it can't be changed. Make a copy and edit that.</p> : null}
+    <List label={`About ${companion.name}`} items={rows} getKey={(row) => row.key} onSelect={(row) => setOpen(row.key)} renderItem={(row) => <div className="flex min-w-0 flex-1 items-center gap-3">
+      <div className="min-w-0 flex-1"><p className="font-medium">{row.title}</p><p className="truncate text-sm text-muted-foreground">{row.hint}</p></div>
+      <ChevronRightIcon aria-hidden="true" className="text-muted-foreground" />
+    </div>} />
+    <Dialog open={current !== null} onOpenChange={(next) => { if (!next) setOpen(null); }}>
+      <DialogContent>
+        <DialogHeader><DialogTitle>{current?.title}</DialogTitle><DialogDescription>{companion.name}</DialogDescription></DialogHeader>
+        {current?.body}
+      </DialogContent>
+    </Dialog>
+  </>;
 }
 
 function DetailBody({ companion, headerOnly = false, aboutOnly = false }: { companion: CompanionDetail; headerOnly?: boolean; aboutOnly?: boolean }) {
@@ -221,10 +239,21 @@ function DetailSetup({ companion, saved, copy, save, headerOnly = false, aboutOn
       <>
       <h1 className="sr-only">{companion.name}</h1>
       <CharacterHero name={companion.name} seed={companion.id} line={<><span>{companion.tagline}</span><div className="flex flex-wrap justify-center gap-2"><Badge>{companion.type_label}</Badge>{saved ? <Badge>Your default</Badge> : null}</div></>} actions={<>
-          {preview ? <Button type="button" disabled title="Coming soon">Chat</Button> : null}
+              {preview ? <>
+            <Button type="button" disabled title="Coming soon">Chat</Button>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild><Button type="button" variant="ghost" size="icon" aria-label="Companion actions"><MoreIcon aria-hidden="true" /></Button></DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem disabled={saved || save.isPending} onSelect={() => save.mutate()}>{saved ? "Your default" : "Set as my default"}</DropdownMenuItem>
+                {companion.can_edit ? <DropdownMenuItem asChild><Link to={`/companions/${encodeURIComponent(companion.id)}/edit`}>Edit settings</Link></DropdownMenuItem> : null}
+                {companion.can_copy ? <DropdownMenuItem disabled={copy.isPending} onSelect={() => copy.mutate()}>{companion.is_household ? "Make a copy" : "Edit a copy"}</DropdownMenuItem> : null}
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </> : <>
           {companion.can_edit ? <Link to={`/companions/${encodeURIComponent(companion.id)}/edit`}><Button type="button" variant="ghost" size="icon" aria-label="Companion settings" title="Companion settings"><SettingsIcon /></Button></Link> : null}
           {companion.can_copy ? <Button type="button" variant="outline" disabled={copy.isPending} onClick={() => copy.mutate()}>{companion.is_household ? "Make a copy" : "Edit a copy"}</Button> : null}
           <Button type="button" disabled={saved || save.isPending} onClick={() => save.mutate()}>{saved ? "Your default" : "Set as my default"}</Button>
+          </>}
       </>} />
       </>
       {save.isError ? <Alert variant="destructive"><AlertDescription>{save.error instanceof ApiError ? save.error.message : "Could not save this. Check your connection and try again."}</AlertDescription></Alert> : null}

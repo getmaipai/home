@@ -179,7 +179,7 @@ test("a person who is not an admin gets no voice picker", async () => {
 });
 
 
-test("preview tabs show status and activity, and detail tasks are named", async () => {
+test("preview tabs show status and activity, and the detail page is a hero with rows", async () => {
   api.settingsValues = async () => [{ key: "companions.preview_shells", value: true, source: "user", label: "Preview", level: "basic", secret: false }] as never;
   api.companions = async () => ({ allowed: true, can_create: true, can_discover: true, default_id: "lively-teen", robots: null,
     companions: [card({ id: "lively-child", name: "Sprout", chats: 2 }), card({ id: "lively-teen", name: "Riff", is_default: true, chats: 0 })] });
@@ -198,23 +198,15 @@ test("preview tabs show status and activity, and detail tasks are named", async 
   cleanup();
   api.companion = async () => detail({ can_edit: true });
   const detailView = open("/companions/lively-child", true);
-  await waitFor(() => expect(detailView.getByRole("tab", { name: "Tasks" })).toBeTruthy());
-  const activity = detailView.getByRole("tab", { name: "Activity" });
-  expect(activity.getAttribute("data-state")).toBe("active");
-  expect(detailView.getByRole("tab", { name: "About" })).toBeTruthy();
-  expect(detailView.getByRole("button", { name: "Set as my default" })).toBeTruthy();
-  expect(detailView.getByRole("button", { name: "Companion settings" }).closest("a")?.getAttribute("href")).toBe("/companions/lively-child/edit");
+  await waitFor(() => expect(detailView.getByRole("button", { name: /^Voice/ })).toBeTruthy());
+  expect(detailView.queryByRole("tab")).toBeNull();
+  expect(detailView.queryByText(/Coming soon: (tasks|your chats)/)).toBeNull();
+  expect(detailView.getByRole("link", { name: "All companions" }).getAttribute("href")).toBe("/companions");
   expect(detailView.queryByText("Sprout loves questions.")).toBeNull();
-  expect(detailView.getByRole("heading", { name: "Recent activity" })).toBeTruthy();
-  expect(detailView.getByText("Sample activity. Real activity is coming soon.")).toBeTruthy();
   expect((detailView.getByRole("button", { name: "Chat" }) as HTMLButtonElement).disabled).toBe(true);
-  expect(detailView.getByRole("button", { name: "Chat" }).title).toBe("Coming soon");
-  expect(detailView.getByRole("tab", { name: "Chats" })).toBeTruthy();
-  expect(detailView.queryByText("Sprout loves questions.")).toBeNull();
-  const tasks = detailView.getByRole("tab", { name: "Tasks" });
-  fireEvent.mouseDown(tasks, { button: 0 });
-  fireEvent.click(tasks);
-  expect(await detailView.findByText("Coming soon: tasks Sprout is working on.")).toBeTruthy();
+  expect(detailView.getByRole("button", { name: "Companion actions" })).toBeTruthy();
+  fireEvent.click(detailView.getByRole("button", { name: /Recent activity/ }));
+  expect(await detailView.findByText("Sample activity. Real activity is coming soon.")).toBeTruthy();
 });
 
 test("preview discovery is hidden when the list says it is unavailable", async () => {
