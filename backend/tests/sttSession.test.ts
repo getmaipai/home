@@ -106,7 +106,8 @@ describe("SttSession reply pause", () => {
     for (let i = 0; i < count; i++) session.pushPcm(voiced ? loudFrame() : silenceFrame());
     await flush();
   }
-  const types = (events: SttWireEvent[]) => events.map((event) => event.t);
+  // A partial transcript can land at any moment (it depends on how fast the recognizer answers), so these tests read only the pause events.
+  const types = (events: SttWireEvent[]) => events.map((event) => event.t).filter((type) => type !== "partial");
 
   afterEach(() => __resetSileroLoaderForTests());
 
