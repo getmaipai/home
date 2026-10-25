@@ -82,6 +82,8 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { ChatHeader } from "@maipai/ui/src/elements/chat-header";
 import { CompanionAvatar } from "@maipai/ui/src/elements/companion-avatar";
 import { getIcon } from "@maipai/ui/src/icons";
+
+const ColumnOpenIcon = getIcon("panel-left-open");
 import { useChatHeaderData } from "@/apps/chat/chatHeaderData";
 import { useCompanionPresence } from "@/apps/chat/useCompanionPresence";
 
@@ -277,6 +279,23 @@ export function ChatHeaderBar({ phoneRow = false, trailing, shells = false, onMe
           </DropdownMenu>
         </>
       )}
+    </div>
+  );
+}
+
+/** On a phone the conversation's header lives in the shell's top bar (one bar, not a second row under it): the history toggle, then
+ * the title and its actions. A stable component for `useHeaderExtra`; it reads everything from the header data bridge. */
+export function ChatPhoneHeaderBar() {
+  const data = useChatHeaderData();
+  if (!data) return null;
+  return (
+    <div className="flex min-w-0 flex-1 items-center gap-1">
+      {data.onToggleSheet ? (
+        <Button variant="ghost" size="icon-lg" aria-label={data.sheetOpen ? "Hide threads" : "Show threads"} aria-expanded={data.sheetOpen === true} aria-controls="next-chat-threads" onClick={data.onToggleSheet}>
+          <ColumnOpenIcon className="size-4.5" />
+        </Button>
+      ) : null}
+      <ChatHeaderBar phoneRow />
     </div>
   );
 }

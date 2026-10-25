@@ -52,7 +52,9 @@ import "@/shell/pages/chatTouchTargets.css";
 import "@/shell/pages/chatReplyMarkdown.css";
 import { WakeWordController } from "@/apps/chat/WakeWordController";
 import { useSetChatHeaderData } from "@/apps/chat/chatHeaderData";
-import { ChatHeaderBar } from "@/apps/chat/chatHeaderBar";
+import { ChatHeaderBar, ChatPhoneHeaderBar } from "@/apps/chat/chatHeaderBar";
+import { useHeaderExtra } from "@maipai/ui/src/dashboard/layouts/full/vertical/header/HeaderExtraContext";
+import { useIsPhoneLayout } from "@maipai/ui/src/dashboard/layouts/full/FullLayout";
 import { useCompanionShells } from "@/lib/companionShells";
 import { useVoiceCallReady } from "@/apps/chat/composerVoiceControls";
 import { micHelp, useMicGate } from "@/lib/media/micGate";
@@ -764,11 +766,13 @@ function ChatTitleCatchUp({ incognito }: { incognito: boolean }) {
  * pushes it into the data context. Same side-effect-mount shape as
  * ArtifactCacheInvalidator/ChatDocumentTitle above, just carrying data
  * instead of a DOM/browser-API side effect. */
-function ChatHeaderDataBridge({ autoReadReplies, setAutoReadReplies, ttsAvailable, pinnable }: {
+function ChatHeaderDataBridge({ autoReadReplies, setAutoReadReplies, ttsAvailable, pinnable, sheetOpen, onToggleSheet }: {
   autoReadReplies: boolean;
   setAutoReadReplies: (enabled: boolean) => void;
   ttsAvailable: boolean;
   pinnable: boolean;
+  sheetOpen: boolean;
+  onToggleSheet: () => void;
 }) {
   const aui = useAui();
   const title = useAuiState((s) => s.threadListItem.title) ?? "";
@@ -779,6 +783,8 @@ function ChatHeaderDataBridge({ autoReadReplies, setAutoReadReplies, ttsAvailabl
     return () => window.removeEventListener(INCOGNITO_DISCARDED_EVENT, reloadThreads);
   }, [aui]);
   useSetChatHeaderData({
+    sheetOpen,
+    onToggleSheet,
     title,
     ttsAvailable,
     autoReadReplies,
@@ -1096,6 +1102,10 @@ export function ChatPage({ person }: { person: Roster }) {
   const chatColumnBreakpoint = useBreakpoint();
   const column = useChatColumn({ isDesktop: chatColumnBreakpoint.atLeast(960) });
   const { sheetOpen, setSheetOpen } = column;
+  // On a phone the conversation's title and actions sit in the shell's top bar, not in a second row under it.
+  const phone = useIsPhoneLayout();
+  const barOnPhone = phone && !companionShells;
+  useHeaderExtra(barOnPhone ? ChatPhoneHeaderBar : undefined);
   const callReady = useVoiceCallReady(false, chatAvailability === "ready" ? undefined : "Chat is unavailable");
   const openVoiceFromHeader = useCallback(() => closeAwareSetVoiceOpen(true), [closeAwareSetVoiceOpen]);
   const [openArtifactId, setOpenArtifactId] = useState<string | null>(null);
@@ -1501,7 +1511,7 @@ export function ChatPage({ person }: { person: Roster }) {
               <ChatDocumentTitle person={person} />
         <ChatTitleCatchUp incognito={temporaryNext} />
         <ChatMemoryPoll incognito={temporaryNext} />
-        <ChatHeaderDataBridge autoReadReplies={autoReadReplies} setAutoReadReplies={setAutoReadReplies} ttsAvailable={ttsAvailable} pinnable={!temporaryNext} />
+        <ChatHeaderDataBridge autoReadReplies={autoReadReplies} setAutoReadReplies={setAutoReadReplies} ttsAvailable={ttsAvailable} pinnable={!temporaryNext} sheetOpen={sheetOpen} onToggleSheet={() => setSheetOpen((open) => !open)} />
         <ProjectResultReload />
         {settingsDialog}
         <Dialog open={micGate.problem !== null} onOpenChange={(open) => { if (!open) micGate.dismiss(); }}>
@@ -1562,7 +1572,7 @@ export function ChatPage({ person }: { person: Roster }) {
             re-deriving the same number a second, guessable way. */}
         <div data-slot="chat-shell" className="flex h-full flex-col overflow-hidden">
           {/* Below lg the column is a sheet, opened from this row. */}
-          {companionShells ? (chatColumnBreakpoint.atLeast(960) ? null : <ChatHeaderBar shells onHistory={() => setSheetOpen(true)} onCall={callReady ? openVoiceFromHeader : undefined} />) : <div className="flex items-center gap-1 border-b border-border pb-2 lg:hidden">
+          {companionShells ? (chatColumnBreakpoint.atLeast(960) ? null : <ChatHeaderBar shells onHistory={() => setSheetOpen(true)} onCall={callReady ? openVoiceFromHeader : undefined} />) : barOnPhone ? null : <div className="flex items-center gap-1 border-b border-border pb-2 lg:hidden">
             <Button variant="ghost" size="icon" aria-label={sheetOpen ? "Hide threads" : "Show threads"} aria-expanded={sheetOpen} aria-controls="next-chat-threads" onClick={() => setSheetOpen((open) => !open)}>
               <ColumnOpenIcon className="size-4.5" />
             </Button>
