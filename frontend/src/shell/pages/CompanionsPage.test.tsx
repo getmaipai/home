@@ -38,7 +38,7 @@ test("the gallery shows character tiles, default check and new companion tile", 
   expect(view.queryByText("Teen companion")).toBeNull();
   expect(view.getAllByText("A cheerful friend.").length).toBe(2);
   expect(view.getByRole("button", { name: "Riff" }).getAttribute("aria-pressed")).toBe("true");
-  expect(view.queryByRole("link", { name: "New companion" })).toBeNull();
+  expect(view.getByRole("link", { name: "New companion" }).getAttribute("href")).toBe("/companions/new");
   expect(view.getAllByRole("button", { name: "New companion" }).length).toBe(1);
   expect(view.queryByText("Made at home")).toBeNull();
   expect(view.queryByText("Draft")).toBeNull();
@@ -188,7 +188,7 @@ test("preview tabs show status and activity, and the detail page is a hero with 
   expect(yours.getByText("Sample activity. Real activity is coming soon.")).toBeTruthy();
   expect(yours.queryByRole("button", { name: "Add" })).toBeNull();
   expect(yours.getAllByRole("button", { name: "New companion" }).length).toBe(1);
-  expect(yours.queryByRole("link", { name: "New companion" })).toBeNull();
+  expect(yours.getByRole("link", { name: "New companion" }).getAttribute("href")).toBe("/companions/start");
   const discover = yours.getByRole("tab", { name: "Discover" });
   fireEvent.mouseDown(discover, { button: 0 });
   fireEvent.click(discover);

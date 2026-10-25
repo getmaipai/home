@@ -79,6 +79,7 @@ export function CompanionsPage() {
           <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">Companions</h1>
           <p className="text-sm text-muted-foreground">A companion is how your assistant sounds. Pick one, read about it, and make it your default.</p>
         </div>
+        {query.data?.can_create ? <Link to={preview === true ? "/companions/start" : "/companions/new"}><Button>New companion</Button></Link> : null}
       </div>
       <AsyncState
         data={query.isError ? null : query.data}
@@ -106,7 +107,6 @@ export function CompanionsPage() {
                       <CharacterTile {...companionTileProps({ card, preview: true, onDelete: setDeleteTarget, onSetDefault: (item) => saveDefault.mutate(item.id), onSelect: () => navigate(`/companions/${encodeURIComponent(card.id)}`) })} />
                       <p className="mt-1 text-center text-sm text-muted-foreground">{companionPreviewSample(card.id).activityLine}</p>
                     </div>)}
-                    {data.can_create ? <CharacterTile name="New companion" variant="add" onSelect={() => navigate("/companions/start")} /> : null}
                   </div>
                   <p className="mt-4 text-sm text-muted-foreground">Sample activity. Real activity is coming soon.</p>
                 </TabsContent>
@@ -127,7 +127,6 @@ export function CompanionsPage() {
             ) : (
               <div className="grid grid-cols-2 justify-items-center gap-4 sm:grid-cols-3 lg:grid-cols-4">
                 {data.companions.map((card) => <CharacterTile key={card.id} {...companionTileProps({ card, onDelete: setDeleteTarget, onSetDefault: (item) => saveDefault.mutate(item.id), onSelect: () => navigate(`/companions/${encodeURIComponent(card.id)}`) })} />)}
-                {data.can_create ? <CharacterTile name="New companion" variant="add" onSelect={() => navigate("/companions/new")} /> : null}
               </div>
             )}
             <AlertDialog open={deleteTarget !== null} onOpenChange={(open) => { if (!open) setDeleteTarget(null); }}>
