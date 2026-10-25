@@ -1562,7 +1562,7 @@ export function ChatPage({ person }: { person: Roster }) {
             re-deriving the same number a second, guessable way. */}
         <div data-slot="chat-shell" className="flex h-full flex-col overflow-hidden">
           {/* Below lg the column is a sheet, opened from this row. */}
-          {companionShells ? (chatColumnBreakpoint.atLeast(960) ? null : <ChatHeaderBar shells onMenu={() => setSheetOpen((open) => !open)} menuExpanded={sheetOpen} menuControls="next-chat-threads" onCall={callReady ? openVoiceFromHeader : undefined} />) : <div className="flex items-center gap-1 border-b border-border pb-2 lg:hidden">
+          {companionShells ? (chatColumnBreakpoint.atLeast(960) ? null : <ChatHeaderBar shells onHistory={() => setSheetOpen(true)} onCall={callReady ? openVoiceFromHeader : undefined} />) : <div className="flex items-center gap-1 border-b border-border pb-2 lg:hidden">
             <Button variant="ghost" size="icon" aria-label={sheetOpen ? "Hide threads" : "Show threads"} aria-expanded={sheetOpen} aria-controls="next-chat-threads" onClick={() => setSheetOpen((open) => !open)}>
               <ColumnOpenIcon className="size-4.5" />
             </Button>

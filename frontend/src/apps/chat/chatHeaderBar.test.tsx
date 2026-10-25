@@ -257,7 +257,7 @@ describe("ChatHeaderBar", () => {
   });
 
   describe("with the companion preview header (DOTS-CHAT-01)", () => {
-    function renderShells(data: ChatHeaderData, props: { onMenu?: () => void; onCall?: () => void } = {}) {
+    function renderShells(data: ChatHeaderData, props: { onMenu?: () => void; onHistory?: () => void; onCall?: () => void } = {}) {
       const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
       return render(
         <QueryClientProvider client={client}>
@@ -297,6 +297,16 @@ describe("ChatHeaderBar", () => {
       const second = renderShells(baseData(), { onCall });
       fireEvent.click(await second.findByRole("button", { name: "Call Nova" }));
       expect(onCall).toHaveBeenCalledTimes(1);
+    });
+
+    test("onHistory puts Chat history in the actions menu and draws no second menu button", async () => {
+      presenceMock = { name: "Nova" };
+      const onHistory = mock(() => {});
+      const view = renderShells(baseData(), { onHistory });
+      expect(view.queryByRole("button", { name: "Open menu" })).toBeNull();
+      await openActionsMenu(view);
+      fireEvent.click(await view.findByRole("menuitem", { name: "Chat history" }));
+      expect(onHistory).toHaveBeenCalledTimes(1);
     });
 
     test("Rename opens a dialog that saves on Enter and closes on Escape; the other actions stay in the menu", async () => {

@@ -89,6 +89,7 @@ const PencilIcon = getIcon("pencil");
 const TrashIcon = getIcon("trash");
 const PinIcon = getIcon("pin");
 const PinOffIcon = getIcon("pin-off");
+const HistoryIcon = getIcon("history");
 const ArchiveIcon = getIcon("archive");
 const MoreIcon = getIcon("more-horizontal");
 
@@ -156,9 +157,9 @@ function WithCompanion({ children }: { children: (name: string, media: ReactNode
     : <Avatar><AvatarFallback>{name.slice(0, 1)}</AvatarFallback></Avatar>);
 }
 
-type ShellsProps = { shells?: boolean; onMenu?: (() => void) | undefined; menuExpanded?: boolean; menuControls?: string; onCall?: (() => void) | undefined };
+type ShellsProps = { shells?: boolean; onMenu?: (() => void) | undefined; menuExpanded?: boolean; menuControls?: string; onHistory?: (() => void) | undefined; onCall?: (() => void) | undefined };
 
-export function ChatHeaderBar({ phoneRow = false, trailing, shells = false, onMenu, menuExpanded, menuControls, onCall }: { phoneRow?: boolean; trailing?: ReactNode } & ShellsProps = {}) {
+export function ChatHeaderBar({ phoneRow = false, trailing, shells = false, onMenu, menuExpanded, menuControls, onHistory, onCall }: { phoneRow?: boolean; trailing?: ReactNode } & ShellsProps = {}) {
   const data = useChatHeaderData();
   const [renaming, setRenaming] = useState(false);
   const [open, setOpen] = useState(false);
@@ -184,6 +185,7 @@ export function ChatHeaderBar({ phoneRow = false, trailing, shells = false, onMe
           <Button type="button" variant="ghost" size="icon" className="text-muted-foreground" aria-label="Conversation actions"><MoreIcon className="size-[18px]" /></Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end" density="compact">
+          {onHistory ? <><DropdownMenuItem onClick={onHistory}><HistoryIcon className="size-4" />Chat history</DropdownMenuItem><DropdownMenuSeparator /></> : null}
           <DropdownMenuItem onClick={() => setRenaming(true)}><PencilIcon className="size-4" />Rename</DropdownMenuItem>
           {data.pinnable ? <DropdownMenuItem onClick={() => void data.onPinChange(!data.pinned)}>{data.pinned ? <PinOffIcon className="size-4" /> : <PinIcon className="size-4" />}{data.pinned ? "Unpin" : "Pin"}</DropdownMenuItem> : null}
           <DropdownMenuItem onClick={() => void data.onArchive()}><ArchiveIcon className="size-4" />Archive</DropdownMenuItem>
