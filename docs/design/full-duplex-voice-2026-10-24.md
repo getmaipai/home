@@ -17,7 +17,16 @@ Architect verdict: not yet run. Needs one before any slice is built. No rule cha
    WebRTC loopback (used by Mozilla Hubs). Step zero measures whether Home needs it.
 3. **iPhone and iPad PWA: pause-only until measured.** Open WebKit bugs describe crackling and degraded audio with the microphone open.
 4. **Robot: turn on what the firmware already has, then measure.** Section 4.
-5. **No new model is trained or hosted.** Two existing small components are adopted: Silero (already in) and Smart Turn v3.
+5. **No new model is trained or hosted** (owner's answer, 2026-10-24: rules only). Two existing small components are adopted: Silero
+   (already in) and Smart Turn v3.2 (one pinned version, as STT-SMARTTURN-01 names it).
+6. **Who gets it.** Adults first. Jesse ruled on 2026-10-14 that he wants natural full duplex for everyone, adults, teens and children,
+   and that it needs a RULES.md change by his word (filed then as VOICE-DUPLEX-01, an id that is not in the repo). CHAT-PARITY-05 still
+   says child profiles do not enable a continuous microphone. Teens and children stay on the current path until Jesse gives that
+   word for this design; the Supersedes section below names the clause that then changes.
+7. **Reuse check (why not adopt Pipecat or LiveKit Agents as the controller).** Both are Python pipeline frameworks that own the
+   whole turn (STT, model, TTS, transport) and LiveKit's best interruption model is hosted. Home's turn engine, gate, voices and
+   package host already own those steps; a second controller would be a second definition of the turn (platform principle 1). Their
+   settings and behaviors are copied, not their code.
 
 ## 1. What exists in Home today (read 2026-10-24)
 
@@ -61,7 +70,9 @@ Architect verdict: not yet run. Needs one before any slice is built. No rule cha
 4. **Pause, then decide.** On detection, playback pauses (pausable output is a LiveKit requirement; the browser player must support
    it). If the person kept talking, drop the unplayed sentences, store the heard prefix (already built) and take the new speech as
    the next turn. If not, resume.
-5. **Smart Turn v3 decides when the person has finished**, replacing the silence timer, with the existing Silero VAD in front.
+5. **Smart Turn v3.2 decides when the person has finished**, replacing the silence timer, with the existing Silero VAD in front, and
+   keeping STT-SMARTTURN-01's own parameters: an 800 ms reopen window, the Silero hysteresis it names, and the flag
+   `stack.engines.stt.smart_turn`, off until measured.
 6. **iPhone and iPad:** the open WebKit bugs [326286](https://bugs.webkit.org/show_bug.cgi?id=326286) (playback crackles with the
    microphone open and echo cancellation on; filed as an iOS 26.2 to 27 regression) and
    [311451](https://bugs.webkit.org/show_bug.cgi?id=311451) (audio degrades once the microphone is on) mean the iPhone PWA runs
@@ -80,6 +91,14 @@ Architect verdict: not yet run. Needs one before any slice is built. No rule cha
   on-unit stop word (patch 049) stays as the fallback.
 - **Ladder:** hub reachable and the spike passed, duplex; otherwise the wake word and stop word as now (principle 2). A robot never
   loosens a gate to answer faster. Voice unchanged: its chosen Chatterbox voice.
+
+## 4b. Privacy and what is recorded
+
+- The loopback uses no STUN or TURN servers (`iceServers: []`) and only local candidates, so it adds no outbound connection (PRIVACY.md).
+- DUPLEX-00's microphone recordings and the bench's audio stay in `data-scratch` with the demo voice, never in git. Robot and bench
+  logs carry counts and timings only, never transcripts (rule 6a).
+- Pause, resume and stop show through the shipped `voice-conversation.tsx` Element's states and props. Any new state is a `commons`
+  kit prop first (rule 9c); Home adds no wrapper and no `className`.
 
 ## 5. Gates and voices
 
@@ -103,12 +122,25 @@ Each can come back as its own item if someone ships it or a measurement of ours 
 2. **DUPLEX-01 (S, spec first):** playback marker, pause, resume and stop events; the `duplex` value on `robot.barge_in.open_mic`; pin bump.
 3. **DUPLEX-02 (M):** Smart Turn v3 in `SttSession` and the settings in section 3.
 4. **DUPLEX-03 (M):** pause, resume, stop and heard prefix in the browser player; the echo check; the loopback only if DUPLEX-00 says so.
-5. **DUPLEX-04 (M):** early start (idle only) and cancel of in-flight tools.
+5. **DUPLEX-04 is removed from this design.** Early start is STT-SMARTTURN-01's speculative turn start and is a latency feature, not
+   duplex. It is built on the existing turn route and its cancel, with no new `turnMachine` code (that would be a rule 9 named gap,
+   which only Jesse adds). Its guard applies: a speculative start is side-effect free until committed (no memory write, no tool with
+   effects), and nothing is released, spoken or stored until the turn is confirmed (rules 9 and 10). Cancelling an in-flight tool on
+   interruption uses the same existing cancel.
 6. **DUPLEX-05 (M, `bot`):** the robot spike.
 7. **DUPLEX-BENCH-01 (M):** a recorded rig: interruptions, "mm-hm" and second voices played at timed offsets into the browser and beside the unit; median and 95th percentile of stop time, wrong stops, wrong resumes, own speech taken for the person, and Home talking over the person.
-Order: 00 and 01, then 02 and 03, 05 in parallel, then 04, then the bench. Codex first for 02 to 04.
+Order: 00 and 01, then 02 and 03, 05 in parallel, then the bench. Codex first for 02 and 03.
 
 ## 8. Legacy verdicts (rule 8)
 
 - VOICE-LOOP-01 numbers: **kept** where section 3 names them (stop-word bypass), re-measured by the bench.
 - Legacy `useHandsFree.ts` thresholds: **dropped**. Legacy "listen only after the reply ends": **dropped** once DUPLEX-03 lands.
+
+## Supersedes
+
+- `voiceBargeIn`'s rule in `liveVoiceSession.tsx` that any speech after a 400 ms arm delay stops the reply: **replaced** by section 3 (0.5 s of speech, a 1.0 s cooldown, pause then decide).
+- The silence-timer end of turn in `sttSession.ts`: **replaced** by Smart Turn v3.2 (section 3).
+- STT-SMARTTURN-01: **absorbed** into DUPLEX-02; its 800 ms reopen window, Silero hysteresis and off-until-measured flag are kept; its speculative start stays its own item (see DUPLEX-04 above).
+- VOICE-LOOP-01's barge-in numbers: 0.6 s confirm is **replaced** by 0.5 s (LiveKit's default, re-measured); "stop phrases bypass" and "backchannels never stop" are **kept**; duck 0.35 and 0.75, the 0.7 s re-arm grace and the self-echo at 0.8 overlap are **dropped** for the browser (pause replaces duck; the bench measures the rest) and **kept** for the robot until its spike reports.
+- "Listen only after the reply ends": **dropped** once DUPLEX-03 lands.
+- CHAT-PARITY-05's clause that child profiles do not enable a continuous microphone: **unchanged** by this design; it changes only if Jesse gives his word to extend duplex to children (2026-10-14 ruling), by his rule change.
