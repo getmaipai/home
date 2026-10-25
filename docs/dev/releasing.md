@@ -1,5 +1,7 @@
 # Releasing Home
 
+> On the Mac Studio, Home reaches the live hub with `scripts/ship.sh` (and `ship.sh --tag` for the release), not the steps below. See [delivery-pipeline.md](delivery-pipeline.md). The steps below still apply to installing a tag.
+
 Every release does all of these, in order. A release that skips the GitHub Release is not finished: the Releases page and its "Latest" badge are what people read.
 
 1. Merge the work to `main` (`scripts/wt.sh check`, then `scripts/wt.sh land`).

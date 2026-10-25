@@ -39,6 +39,8 @@ Lint: `tsc --noEmit` (backend); `tsc --noEmit && eslint .` (frontend). `bash scr
 
 A `@maipai/*` pin bump, a lockfile conflict or a bundled-manifest change: load [docs/PINNING.md](docs/PINNING.md) first.
 
+The whole delivery path (preview, land, watcher, ship, recovery) is documented in [docs/dev/delivery-pipeline.md](docs/dev/delivery-pipeline.md).
+
 ## Previewing a change (Jesse looks, and so do you)
 
 Never hand Jesse a UI change you have not opened yourself. One command gives both of you the same running app, from your worktree:
