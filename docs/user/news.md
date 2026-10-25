@@ -23,6 +23,12 @@ On the Today and My Mix pages, the topic chips under the title show only the sto
 
 Home remembers your last five searches so you can run one again, and **Clear** removes them. Only you can see them, and they stay on the hub. Children can search the Kids' stories, and Home keeps no list of what they searched.
 
+## Share a story or come back to it
+
+Every story, topic, source and search has its own web address. Copy it from the address bar to send it to someone in your home, or bookmark it. Reload the page and you are back on the same story. Someone you send it to needs to be signed in to Home and allowed to see that story.
+
+When you open a story that Home has not read yet, you see its short summary right away and the full text takes its place a moment later.
+
 ## News settings
 
 Open the gear in News. Reading choices include My Mix, where stories open and the news digest. My Mix works now. The choice of where stories open and the news digest do nothing yet. Only an admin can change the **News shelf** lists and extra feed boxes. See [the shelf guide](news-shelf.md).

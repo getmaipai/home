@@ -10,11 +10,22 @@ import { QueryClient } from "@tanstack/react-query";
  * QueryClient in the app (the real one in App.tsx, a fresh one per test)
  * is built from this one function. */
 export function createQueryClient(): QueryClient {
-  return new QueryClient({
+  const client = new QueryClient({
     defaultOptions: {
       queries: {
         retry: false,
       },
     },
   });
+  // NEWS-FAST-01: a News page the person has just seen (a front page, a category, a story) is drawn from memory on the way back and
+  // refreshed behind it, so moving around the app never waits on the hub or shows a skeleton for what was on screen a moment ago.
+  // A save or a follow still refreshes every page at once (the kit's action dispatch invalidates `schema-binding`).
+  client.setQueryDefaults(["schema-binding", "package", "news"], { staleTime: 60_000, gcTime: 30 * 60_000 });
+  // A story the hub could only summarise yet (its full text is still being fetched) is asked for again until the text lands, then kept.
+  const summaryOnly = (data: unknown): boolean => (data as { blocks?: Array<{ props?: { content_source?: string } }> } | undefined)?.blocks?.[0]?.props?.content_source === "teaser";
+  client.setQueryDefaults(["schema-binding", "package", "news", "story"], {
+    staleTime: (query: { state: { data: unknown } }) => (summaryOnly(query.state.data) ? 0 : 60_000),
+    refetchInterval: (query: { state: { data: unknown; dataUpdateCount: number } }) => (summaryOnly(query.state.data) && query.state.dataUpdateCount < 8 ? 1_500 : false),
+  });
+  return client;
 }

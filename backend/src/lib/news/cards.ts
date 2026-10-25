@@ -140,6 +140,9 @@ export function releasedItem(viewer: Viewer, idValue: unknown, store: ShelfStore
   return id ? releaseShelfItem(viewer.band, id, store) : null;
 }
 
+/** How long a Today or channel response waits for lead-card enrichment before it answers with what is stored. */
+export const ENRICH_GRACE_MS = 150;
+
 /** Only the existing hero/featured slots, never rows or shelf tiles. Late work may populate the next request's cache. */
 export async function enrichLeadCards(raw: unknown[], env: CardEnv): Promise<void> {
   type Feed = { props: { hero?: StoryCard; featured?: StoryCard[] } };
@@ -162,9 +165,13 @@ export async function enrichLeadCards(raw: unknown[], env: CardEnv): Promise<voi
   };
   let timer: ReturnType<typeof setTimeout> | undefined;
   try {
+    // The page never waits on a publisher: workers keep running to the full deadline and store what they find for the next request,
+    // while this response waits only the short grace that a stored or quick answer needs.
+    const work = Promise.all([worker(), worker()]);
+    work.catch(() => undefined);
     await Promise.race([
-      Promise.all([worker(), worker()]),
-      new Promise<void>((resolve) => { timer = setTimeout(resolve, Math.max(0, deadlineAt - Date.now())); }),
+      work,
+      new Promise<void>((resolve) => { timer = setTimeout(resolve, ENRICH_GRACE_MS); }),
     ]);
   } catch { /* enrichment never fails a response */ }
   finally { clearTimeout(timer); }

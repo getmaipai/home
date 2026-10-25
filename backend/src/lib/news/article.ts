@@ -176,6 +176,24 @@ async function loadContentOnce(item: ShelfItem, band: "child" | "teen" | "adult"
   }
 }
 
+/** How long opening a story waits for the publisher before it shows the feed's own summary. */
+export const STORY_GRACE_MS = 600;
+
+/** A stored or quick page answers at once. A slow one shows the summary now while the same fetch finishes and is stored: the page asks
+ * again, and the second answer joins that fetch or reads its copy, so a story never opens on a blank wait. "Try again" waits in full. */
+async function loadWithinGrace(item: ShelfItem, band: "child" | "teen" | "adult", options: { retry?: boolean; store?: ShelfStore | null }): Promise<LoadedContent> {
+  const full = loadContent(item, band, options);
+  if (options.retry) return full;
+  full.catch(() => undefined);
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const early = await Promise.race([
+    full,
+    new Promise<null>((resolve) => { timer = setTimeout(() => resolve(null), STORY_GRACE_MS); }),
+  ]);
+  clearTimeout(timer);
+  return early ?? loadContent(item, band, { ...options, storedOnly: true });
+}
+
 /** The `article` block for one released item. Null when nothing is left to show (a child's gate removed every sentence). */
 export async function articleBlock(item: ShelfItem, env: CardEnv, options: { retry?: boolean } = {}): Promise<Record<string, unknown> | null> {
   const { band } = env.viewer;
@@ -184,7 +202,7 @@ export async function articleBlock(item: ShelfItem, env: CardEnv, options: { ret
   const gate = env.gate;
   const title = band === "child" ? gate.text(item.title) : item.title;
   if (!title || (band === "child" && !gate.passes(publisher))) return null;
-  const loaded = await loadContent(item, band, { retry: options.retry, store: env.store });
+  const loaded = await loadWithinGrace(item, band, { retry: options.retry, store: env.store });
   // A figure's `src` is a hub path numbered in the stored article's order; the publisher's address never leaves the hub.
   let figureNumber = 0;
   const shown = newsImagesOn() ? loaded.blocks.map((block) => (block.type === "figure" ? { ...block, src: `/api/plugins/news/images/${item.id}/figure/${figureNumber++}?w=1280` } : block)) : loaded.blocks.filter((block) => block.type !== "figure");

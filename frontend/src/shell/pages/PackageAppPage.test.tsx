@@ -5,7 +5,7 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { ToastProvider } from "@maipai/ui/src/primitives/Toast";
 import { act, cleanup, fireEvent, waitFor } from "@testing-library/react";
-import { MemoryRouter, Route, Routes as RouterRoutes } from "react-router-dom";
+import { MemoryRouter, Route, Routes as RouterRoutes, useLocation } from "react-router-dom";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { TooltipProvider } from "@maipai/ui/src/ui/tooltip";
 import weatherCard from "@maipai/spec/fixtures/answer-block/valid-weather_card.json";
@@ -59,6 +59,10 @@ const mediaIndexes = Object.fromEntries(mediaPageFiles.map((packageId) => [
   JSON.parse(readFileSync(resolve(import.meta.dir, `../../../../backend/packages/${packageId}/pages/index.json`), "utf8")),
 ])) as Record<(typeof mediaPageFiles)[number], unknown>;
 
+const newsRow: AppRow = { package: "news", page: "index", label: "News", icon: "newspaper", description: "A fixture news app.", category: "Info", keywords: [], sections: [], to: "/apps/news", incognito: "unaffected" };
+const newsStoryPage = { type: "page", id: "news-story", title: "Story", body: [{ type: "answer_blocks", bind: { source: "package", path: "story", params: { id: "$state.id" } }, empty_state: { type: "empty_state", icon: "newspaper", text: "This story is not available." } }] };
+function LocationProbe() { const location = useLocation(); return <output data-testid="where">{location.pathname}{location.search}</output>; }
+
 let home: HomeFixture;
 let rows: AppRow[];
 let calls: string[];
@@ -75,6 +79,8 @@ beforeEach(() => {
     if (url.startsWith("/api/plugins/demo/pages/index")) return Promise.resolve(rows.length ? Response.json(indexPage) : Response.json({ error: "no such app" }, { status: 404 }));
     if (url.startsWith("/api/plugins/demo/pages/week")) return Promise.resolve(Response.json(weekPage));
     if (url.startsWith("/api/plugins/music/pages/index")) return Promise.resolve(Response.json(musicIndexPage));
+    if (url.startsWith("/api/plugins/news/pages/story")) return Promise.resolve(Response.json(newsStoryPage));
+    if (url.startsWith("/api/plugins/news/data/story")) { calls.push(String(init?.body)); return Promise.resolve(Response.json({ as_of: "x", blocks: [] })); }
     if (url.startsWith("/api/plugins/other/pages/")) return Promise.resolve(Response.json({ error: "no such app" }, { status: 404 }));
     if (url.startsWith("/api/plugins/demo/pages/")) return Promise.resolve(Response.json({ error: "no such page" }, { status: 404 }));
     if (url.startsWith("/api/plugins/demo/data/places")) return Promise.resolve(Response.json({ as_of: "x", rows: [{ id: "pl1", label: "Cabin" }] }));
@@ -93,7 +99,7 @@ afterEach(() => {
   Object.defineProperty(window, "innerWidth", { configurable: true, value: originalWidth });
 });
 
-function open(path: string, width = 1440) {
+function open(path: string | { pathname: string; state: unknown }, width = 1440) {
   Object.defineProperty(window, "innerWidth", { configurable: true, value: width });
   window.matchMedia = ((query: string) => ({
     matches: query.includes("639.98") ? width < 640 : query.includes("max-width") && width <= 768,
@@ -105,6 +111,7 @@ function open(path: string, width = 1440) {
       <ToastProvider><TooltipProvider>
         <MemoryRouter initialEntries={[path]}>
           <RouterRoutes><Route path="/*" element={<Routes person={makePerson("owner")} onSignedIn={() => {}} />} /></RouterRoutes>
+          <LocationProbe />
         </MemoryRouter>
       </TooltipProvider></ToastProvider>
     </QueryClientProvider>,
@@ -196,6 +203,25 @@ describe("a package app at /apps/<id>", () => {
     await act(async () => { fireEvent.click(button); });
     await waitFor(() => expect(home.puts.some((p) => p.key === "ui.pinned_apps" && p.value === JSON.stringify(["/apps/demo"]))).toBe(true));
     await view.findByRole("button", { name: "Remove from favorites" });
+  });
+});
+
+describe("a News page has an address of its own", () => {
+  beforeEach(() => { rows = [newsRow]; });
+
+  test("a story opened by navigation writes its id into the address, keeping the page's state", async () => {
+    const view = open({ pathname: "/apps/news/story", state: { pageState: { id: "item-7" } } });
+    await waitFor(() => expect(view.getByTestId("where").textContent).toBe("/apps/news/story?id=item-7"));
+    await view.findByText("This story is not available.");
+    expect(calls.every((body) => JSON.parse(body).id === "item-7")).toBe(true);
+  });
+
+  test("a story address opened cold (a reload, a shared link) asks the hub for that story", async () => {
+    const view = open("/apps/news/story?id=item-9");
+    await view.findByText("This story is not available.");
+    expect(view.getByTestId("where").textContent).toBe("/apps/news/story?id=item-9");
+    expect(calls.length).toBeGreaterThan(0);
+    expect(calls.every((body) => JSON.parse(body).id === "item-9")).toBe(true);
   });
 });
 

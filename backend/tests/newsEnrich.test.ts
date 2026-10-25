@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, expect, test } from "bun:test";
 import { __resetNewsEnrichForTests, __setNewsEnrichClockForTests, enrichItem } from "@/lib/news/enrich";
-import { cardEnv, cardOf } from "@/lib/news/cards";
+import { articleBlock, STORY_GRACE_MS } from "@/lib/news/article";
+import { cardEnv, cardOf, enrichLeadCards, ENRICH_GRACE_MS } from "@/lib/news/cards";
 import { newsPicture } from "@/lib/news/pictures";
 import { newsCounters, __resetNewsCountersForTests } from "@/lib/news/newsCounters";
 import { sharedShelfStore, __resetSharedShelfStoreForTests } from "@/lib/shelf/shelfStore";
@@ -216,4 +217,31 @@ test("the reader's real SSRF guard rejects a private page before any request and
   expect(await enrichItem(item, "adult")).toMatchObject({ status: "none" });
   expect(publisher.requests).toEqual([]);
   expect(newsCounters()["news.enrichment_blocked"]).toBe(1);
+});
+
+test("a Today response never waits on a slow publisher: it answers within the grace and the page lands for the next request", async () => {
+  await pages({ "/slow": async () => { await Bun.sleep(900); return new Response(OG, { headers: { "content-type": "text/html" } }); } });
+  const item = putItem(feeds.household, ADULT_HOST, { path: "/slow", image: null, summary: "" });
+  const env = cardEnv({ personId: null, band: "adult" })!;
+  const block = { props: { hero: card(item), featured: [] as ReturnType<typeof card>[] } };
+  const started = Date.now();
+  await enrichLeadCards([block], env);
+  expect(Date.now() - started).toBeLessThan(ENRICH_GRACE_MS + 400);
+  expect(block.props.hero.dek).toBeUndefined();
+  await Bun.sleep(1200);
+  expect(sharedShelfStore()!.getEnrichment(item.id, "adult")).toMatchObject({ status: "ok" });
+  expect(card(item).dek).toBe("The harbor council approved a new park for families.");
+});
+
+test("a story whose page is slow opens on its summary within the grace, and the next open has the full text", async () => {
+  await pages({ "/story": async () => { await Bun.sleep(1000); return new Response(articleHtml(), { headers: { "content-type": "text/html" } }); } });
+  const item = putItem(feeds.household, ADULT_HOST, { path: "/story", summary: "The feed's own summary of the story." });
+  const env = cardEnv({ personId: null, band: "adult" })!;
+  const started = Date.now();
+  const first = await articleBlock(item, env) as { props: { content_source: string } };
+  expect(Date.now() - started).toBeLessThan(STORY_GRACE_MS + 400);
+  expect(first.props.content_source).toBe("teaser");
+  const second = await articleBlock(item, env) as { props: { content_source: string } };
+  expect(second.props.content_source).toBe("fetched");
+  expect(publisher.requests.filter((path) => path === "/story")).toHaveLength(1);
 });

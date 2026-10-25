@@ -174,14 +174,24 @@ export function PackageAppPage({ person }: { person: Roster }) {
   const media = isMediaApp(packageId);
   const hubActive = useMediaHubActive();
   const familyHeader = usesFamilyHeader(packageId);
-  // Only a media app reads its query as state: News and others mirror a tab in the query themselves.
-  const queryState = useMemo<Record<string, string>>(() => (media ? Object.fromEntries(new URLSearchParams(location.search)) : {}), [media, location.search]);
+  // A media app and News read their query as page state, so a reload or a shared link opens the same item.
+  const urlState = media || packageId === "news";
+  const queryState = useMemo<Record<string, string>>(() => (urlState ? Object.fromEntries(new URLSearchParams(location.search)) : {}), [urlState, location.search]);
   const hasQuery = Object.keys(queryState).length > 0;
   const arrived = (location.state as { pageState?: Record<string, unknown> } | null)?.pageState;
   const sameQuery = hasQuery && arrived !== undefined && Object.entries(queryState).every(([name, value]) => String(arrived[name]) === value);
   useEffect(() => {
     if (hasQuery && !sameQuery) navigate(`${location.pathname}${location.search}`, { replace: true, state: { pageState: { ...arrived, ...queryState } } });
   }, [hasQuery, sameQuery, location.pathname, location.search, arrived, queryState, navigate]);
+  // NEWS-URL-01: a page a `navigate` action opened with state (a story's id, a channel's kind and key, a search's text) writes that state
+  // into its own address, replacing the entry in place, so the address bar always names the item: it reloads, shares and goes back to it.
+  useEffect(() => {
+    if (packageId !== "news" || location.search !== "" || arrived === undefined) return;
+    const params = new URLSearchParams();
+    for (const [name, value] of Object.entries(arrived)) if (typeof value === "string" && value !== "") params.set(name, value);
+    const search = params.toString();
+    if (search) navigate(`${location.pathname}?${search}`, { replace: true, state: location.state });
+  }, [packageId, location.pathname, location.search, location.state, arrived, navigate]);
   // MEDIA-POLISH-01: the docked mini bar. What the media host holds, drawn in a media app's area once the person started it, except
   // on the page that is playing it right now.
   const dock = useMediaDock();
