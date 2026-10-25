@@ -1,4 +1,4 @@
-import { afterEach, expect, mock, spyOn, test } from "bun:test";
+import { afterAll, afterEach, expect, mock, spyOn, test } from "bun:test";
 import { createElement } from "react";
 import * as sonner from "sonner";
 import { cleanup, fireEvent, render, waitFor } from "@testing-library/react";
@@ -6,12 +6,14 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { api, ApiError, type CompanionStates } from "@/lib/api";
 import { CompanionStatesTab } from "@/shell/pages/CompanionStatesTab";
 
+const realStackedAlphaVideo = { ...(await import("@maipai/ui/src/elements/stacked-alpha-video")) };
 mock.module("@maipai/ui/src/elements/stacked-alpha-video", () => ({ StackedAlphaVideo: ({ src, label, onError }: { src: string; label: string; onError?: () => void }) => createElement("div", { role: "img", "aria-label": label, "data-testid": "stacked-alpha-video", "data-src": src }, createElement("button", { type: "button", "aria-label": `Fail ${label} preview`, onClick: onError })) }));
 
 const names = ["Idle", "Idle Look", "Listening", "Thinking", "Working", "Speaking", "Needs You", "Greeting", "Happy", "Oops", "Celebrate", "Sleeping"];
 const url = { h264: "/clip.h264.mp4", av1: "/clip.av1.mp4", still: "/still.png" };
 function fixture(): CompanionStates { return { sheet_ready: true, start_ready: true, key: "#00FF00", counts: { approved: 7, total: 12, required_missing: ["thinking", "working"] }, run: null, states: names.map((label, index) => ({ id: label.toLowerCase().replaceAll(" ", "_"), label, kind: "loop", required: index < 7, when_it_plays: `When ${label.toLowerCase()} plays`, default_motion: "breathes slowly", motion: index === 0 ? "sways gently" : "breathes slowly", approved: index < 7 ? { take_id: `take-${index + 1}`, approved_by: "Jesse", approved_at: "2026-10-21", urls: url } : null, busy: false, takes: index === 0 ? [{ id: "take-1", label: "Take one", source: "generated", created_at: "2026-10-21", ok: true, reasons: ["Colours match well"], seconds: 2.9, bytes: { h264: 27000, av1: null }, colour_distance: 0.1, area_ratio: 1.1, urls: url, is_best: true }] : [] })) }; }
 const originals = { companionStates: api.companionStates, companionStatePrompt: api.companionStatePrompt, setCompanionStateMotion: api.setCompanionStateMotion, generateCompanionState: api.generateCompanionState, generateCompanionStates: api.generateCompanionStates, companionStateRun: api.companionStateRun, stopCompanionStateRun: api.stopCompanionStateRun, uploadCompanionState: api.uploadCompanionState, companionStateJob: api.companionStateJob, approveCompanionState: api.approveCompanionState, deleteCompanionStateTake: api.deleteCompanionStateTake };
+afterAll(() => { mock.module("@maipai/ui/src/elements/stacked-alpha-video", () => realStackedAlphaVideo); });
 afterEach(() => { cleanup(); Object.assign(api, originals); });
 function open() { const client = new QueryClient({ defaultOptions: { queries: { retry: false } } }); return render(<QueryClientProvider client={client}><CompanionStatesTab id="hc-one" active /></QueryClientProvider>); }
 

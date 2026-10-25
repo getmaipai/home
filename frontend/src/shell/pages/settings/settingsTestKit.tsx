@@ -97,6 +97,7 @@ export function mockHome({ robots = false, robotsEnabled = robots, wakeword = fa
     if (url.includes("/api/plugins/skills")) return Promise.resolve(Response.json([]));
     if (url.includes("/api/biometric-prints")) return Promise.resolve(Response.json([]));
     if (url.startsWith("/api/voice-prints?")) return Promise.resolve(Response.json([]));
+    if (url.includes("/api/memory")) return Promise.resolve(Response.json([]));
     return Promise.resolve(new Response("{}", { status: 200 }));
   }) as unknown as typeof fetch;
   return { requests, scopes, puts, pinnedAppsValue: () => pinnedAppsSerialized, restore: () => { globalThis.fetch = original; } };

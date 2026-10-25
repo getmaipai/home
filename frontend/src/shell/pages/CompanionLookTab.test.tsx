@@ -1,4 +1,4 @@
-import { afterEach, expect, mock, spyOn, test } from "bun:test";
+import { afterAll, afterEach, expect, mock, spyOn, test } from "bun:test";
 import { createElement } from "react";
 import * as sonner from "sonner";
 import { act, cleanup, fireEvent, render, waitFor } from "@testing-library/react";
@@ -7,10 +7,12 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { api, ApiError, type CompanionEditable, type CompanionLook, type CompanionLookJob } from "@/lib/api";
 import { CompanionEditorPage } from "@/shell/pages/CompanionEditorPage";
 
+const realStackedAlphaVideo = { ...(await import("@maipai/ui/src/elements/stacked-alpha-video")) };
 mock.module("@maipai/ui/src/elements/stacked-alpha-video", () => ({ StackedAlphaVideo: ({ src, label }: { src: string; label: string }) => createElement("div", { role: "img", "aria-label": label, "data-testid": "stacked-alpha-video", "data-src": src }) }));
 
 const methods = ["editCompanion", "stackVoices", "companionLook", "companionLookPrompt", "generateCompanionLook", "companionLookJob", "cancelCompanionLookJob", "uploadCompanionLook", "setCompanionLookRest", "deleteCompanionLookVersion", "editCompanionLook", "makeCompanionLookSheet", "saveCompanionLookCard", "setCompanionLookKey", "approveCompanionLookSheet", "unapproveCompanionLookSheet"] as const;
 const originals = Object.fromEntries(methods.map((key) => [key, api[key]]));
+afterAll(() => { mock.module("@maipai/ui/src/elements/stacked-alpha-video", () => realStackedAlphaVideo); });
 afterEach(() => { cleanup(); Object.assign(api, originals); });
 const version = (id: string, label = `Picture ${id}`) => ({ id, label, source: "generated" as const, width: 480, height: 480, created_at: "2026-10-21T12:00:00Z", from: null, url: `/api/companions/hc-one/look/${id}/image` });
 function look(overrides: Partial<CompanionLook> = {}): CompanionLook { return { versions: [version("v-1"), version("v-2")], rest: "v-1", key: `#${"00FF00"}`, sheet: { views: { left: null, right: null, mouth: null }, card: null, key: `#${"00FF00"}`, state: "empty", approved_by: null, approved_at: null }, ready_for_video: false, start_ready: false, can_generate: true, ...overrides }; }
