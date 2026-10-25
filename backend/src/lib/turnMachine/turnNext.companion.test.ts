@@ -6,7 +6,7 @@ import { loadManifestOnly } from "@/lib/plugins";
 import { __reloadPersonasForTests } from "@/lib/persona";
 import { __resetSettingsCacheForTests } from "@/lib/settings";
 import { setValue } from "@/lib/settings";
-import { conversationPersona } from "@/lib/turnMachine/turnNext";
+import { conversationPersona, mentionedConversationPersona } from "@/lib/turnMachine/turnNext";
 import { resetDb } from "../../../tests/reset-db";
 
 function addPerson(id: string, role: string) {
@@ -28,6 +28,24 @@ beforeEach(() => { resetDb(); __reloadPersonasForTests(); __resetSettingsCacheFo
 afterEach(() => { resetDb(); __reloadPersonasForTests(); __resetSettingsCacheForTests(); });
 
 describe("conversation persona", () => {
+  test("a valid mention picks a guest for one selection while the conversation pick stays available", () => {
+    addPerson("person-compoowner", "adult");
+    const actor = addPerson("turn-adult", "adult");
+    const active = companion("all");
+    const guest = companion("adult");
+    expect(mentionedConversationPersona(actor, guest)?.id).toBe(guest);
+    expect(conversationPersona(actor, active).id).toBe(active);
+  });
+
+  test("a mention that is not allowed falls back to the conversation pick", () => {
+    const owner = addPerson("person-turnowner", "owner");
+    const actor = addPerson("person-turnteen", "teen");
+    const active = "default";
+    const guest = companion("adult");
+    expect(mentionedConversationPersona(actor, guest)).toBeNull();
+    expect(conversationPersona(actor, active).id).toBe(active);
+    setValue(owner, `person:${actor.id}`, "companions.allowed", false);
+  });
   test("uses the allowed companion stored on the conversation", () => {
     addPerson("person-compoowner", "adult");
     const actor = addPerson("turn-adult", "adult");

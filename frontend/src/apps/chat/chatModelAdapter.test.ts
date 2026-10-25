@@ -136,6 +136,23 @@ describe("regenerate model override", () => {
   });
 });
 
+describe("companion mention request", () => {
+  async function bodyFor(text: string) {
+    const env = stubEnvironment(ndjsonStream([{ type: "done", value: { turn_id: "turn-mention", reply: { text: "ok" }, source: "model", safety: SAFETY } }]));
+    try {
+      const message = fakeUserMessage(text);
+      const result = await collect([message]);
+      expect(result.error).toBeUndefined();
+      return env.turnBodies[0] as Record<string, unknown>;
+    } finally { env.restore(); }
+  }
+
+  test("sends a selected directive id and leaves unmatched @ text unstructured", async () => {
+    expect(await bodyFor("Please ask :person[Rivet]{name=guest-rivet}")).toHaveProperty("mention_companion_id", "guest-rivet");
+    expect(await bodyFor("Please email @Rivet")).not.toHaveProperty("mention_companion_id");
+  });
+});
+
 describe("stripThinking", () => {
   test("removes a <think> block ahead of the real answer", () => {
     expect(stripThinking("<think>let me work this out</think>The answer is 42.")).toBe("The answer is 42.");

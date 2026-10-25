@@ -77,6 +77,7 @@ export interface RunTurnNextOpts {
   robotName?: string;
   deviceId?: string;
   conversationId?: string;
+  mentionCompanionId?: string;
   turnId?: string;
   images?: import("@/wire").ChatImagePart[];
   temporary?: boolean;
@@ -529,7 +530,10 @@ async function beginTurn(actor: PersonRow, surface: Surface, text: string, opts:
   // companions switch are theirs, not the robot's (an admin chose this robot's companion).
   const robotCompanion = surface === "robot" && opts.deviceId && !bare ? resolveRobotPersona(opts.deviceId) : null;
   // DYNAMIC-COMPANION-01: whichever companion speaks, it speaks at this turn's band (its band lines first, its vocabulary clamped).
-  const persona = adaptPersonaToBand(robotCompanion ?? (temporary || bare ? DEFAULT_PERSONA : conversationPersona(actor, conversation.companion_id)), band);
+  const mentionedPersona = !robotCompanion && !temporary && !bare && opts.mentionCompanionId
+    ? mentionedConversationPersona(actor, opts.mentionCompanionId)
+    : null;
+  const persona = adaptPersonaToBand(robotCompanion ?? (temporary || bare ? DEFAULT_PERSONA : mentionedPersona ?? conversationPersona(actor, conversation.companion_id)), band);
   // U4/RESP-01: computed once, the register's only length authority -
   // never recomputed by a later node, the same "decided once" shape
   // `reasoning.emit` already follows in `context`. U4c: everything
@@ -927,6 +931,14 @@ export function conversationPersona(actor: PersonRow, companionId: string | null
   if (!companionId) return ownPersona(actor);
   const picked = resolvePersona(companionId);
   return picked.id === companionId && mayUseCompanion(actor, picked) ? picked : ownPersona(actor);
+}
+
+// COMP-04b: a mention is a one-turn guest pick. Invalid or unavailable ids
+// silently defer to the conversation's existing pick at the call site.
+export function mentionedConversationPersona(actor: PersonRow, companionId: string): Persona | null {
+  if (!companionAreaOn(actor)) return null;
+  const picked = resolvePersona(companionId);
+  return picked.id === companionId && mayUseCompanion(actor, picked) ? picked : null;
 }
 
 // ROBOT-COMPANION-01: the persona of the companion assigned to this robot, or null.

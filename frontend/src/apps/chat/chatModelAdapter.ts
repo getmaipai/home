@@ -20,6 +20,7 @@ import { ChatTurnError } from "@/apps/chat/chatTurnError";
 import { HUB_DOWN_LINE, isHubUnreachable } from "@/lib/hubReachability";
 import { failureLine } from "@maipai/home-backend/src/lib/failureCopy";
 import { randomUuid } from "@/lib/randomUuid";
+import { unstable_defaultDirectiveFormatter } from "@assistant-ui/react";
 
 // The backend already emits the song job id; the pinned spec has not added it yet.
 const MusicToolResultEvent = ToolTurnStreamEvent.options[1].extend({
@@ -70,7 +71,8 @@ function userQuote(last: ChatModelRunOptions["messages"][number] | undefined): s
 function lastUserText(messages: ChatModelRunOptions["messages"], includeQuote = true): string | undefined {
   const last = messages[messages.length - 1];
   if (!last || last.role !== "user") return undefined;
-  const typed = messageText(last);
+  // A chosen @mention travels as its own id field; the model reads it as plain "@Name".
+  const typed = unstable_defaultDirectiveFormatter.parse(messageText(last)).map((segment) => (segment.kind === "mention" ? `@${segment.label}` : segment.text)).join("");
   const selectedQuote = includeQuote ? userQuote(last) : undefined;
   const quoteText = selectedQuote
     ? `> ${selectedQuote.replace(/\r\n?/g, "\n").split("\n").join("\n> ")}`
@@ -232,6 +234,7 @@ export function createChatModelAdapter(deps: ChatModelAdapterDeps): ChatModelAda
       const imageAttached = newPictures.length > 0;
       const documentPayloads = lastMessage?.role === "user" ? (await Promise.all(lastMessage.attachments.filter((attachment) => attachment.type === "file").map((attachment) => stagedDocumentPayload(attachment.id)))).filter((item): item is NonNullable<typeof item> => Boolean(item)) : [];
       const typedText = lastUserText(messages, !quoteSpoken);
+      const mentionCompanionId = lastMessage?.role === "user" ? unstable_defaultDirectiveFormatter.parse(messageText(lastMessage)).find((segment): segment is Extract<ReturnType<typeof unstable_defaultDirectiveFormatter.parse>[number], { kind: "mention" }> => segment.kind === "mention" && segment.type === "person")?.id : undefined;
       const text = typedText || (documentPayloads.length > 0 ? "Please read the attached document." : undefined);
       if (!text && !imageAttached && documentPayloads.length === 0) return;
 
@@ -400,6 +403,7 @@ export function createChatModelAdapter(deps: ChatModelAdapterDeps): ChatModelAda
             bare: bare || undefined,
             assistantStream: true,
             conversationId,
+            mentionCompanionId: reconnectAttempts === 0 ? mentionCompanionId : undefined,
             supersedes,
             continuation,
             resumeToken,
