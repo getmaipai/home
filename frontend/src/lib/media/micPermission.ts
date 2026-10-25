@@ -6,6 +6,7 @@
 // Pure functions here; the React hook is useMicGate (micGate.tsx).
 import { recordMicFailure } from "@/lib/voice/micDiagnostics";
 import { acquireMicStream, type MicLease } from "@/lib/media/micStream";
+import { primePlaybackAudio } from "@/lib/voice/playbackContext";
 import { micStreamKey, openMicStream, primeMicAudio, releasePrimedAudio } from "@/lib/voice/mic-capture";
 
 export type MicPermission = "prompt" | "granted" | "denied" | "unknown";
@@ -66,6 +67,8 @@ export async function probeMic(deps: MicProbeDeps = {}): Promise<MicProbeResult>
   // and the audio context start now; the Permissions API query runs beside
   // them and only decides which message a failure gets.
   (deps.prime ?? primeMicAudio)();
+  // The same tap unlocks the context spoken replies play through (iOS plays nothing otherwise).
+  primePlaybackAudio();
   let media: Promise<MicLease>;
   try {
     // The shared stream (micStream.ts): the capture that follows reuses it,

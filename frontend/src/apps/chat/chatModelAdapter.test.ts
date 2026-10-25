@@ -8,10 +8,13 @@ import { SHOWCASE_BLOCKS } from "@maipai/home-backend/src/lib/uiFixtureBlocks";
 import { galleryBlockFor } from "@maipai/home-backend/src/lib/answerImages/gallery";
 import { createLocalImageAttachmentAdapter, clearStagedImageAttachments } from "@/apps/chat/localImageAttachmentAdapter";
 import { FakeAudioContext, fakeWavBody } from "../../../tests/fakeAudioContext";
+import { __resetPlaybackContextForTests } from "@/lib/voice/playbackContext";
+import { SentenceSpeechScheduler } from "@/lib/sentenceSpeechScheduler";
 import { assistantStreamBody as ndjsonStream, staggeredAssistantStreamBody as staggeredNdjsonStream, ASSISTANT_STREAM_HEADERS } from "../../../tests/assistantStreamBody";
 
 afterEach(() => {
   (globalThis as unknown as { AudioContext: unknown }).AudioContext = undefined;
+  __resetPlaybackContextForTests();
   clearStagedImageAttachments();
 });
 
@@ -1571,12 +1574,12 @@ describe("createChatModelAdapter errors", () => {
   // Jesse, 2026-09-06: stopping a reply should behave like every other
   // voice/chat app's barge-in - cut audio immediately, not let whatever's
   // already queued keep playing out. scheduler.stop() (unlike finish())
-  // closes the AudioContext right away, so that's the observable signal
+  // is called right away, so that's the observable signal
   // a user-initiated stop actually took the barge-in path.
   test("an aborted run cuts audio immediately (stop), not letting it finish naturally", async () => {
-    const originalClose = FakeAudioContext.prototype.close;
-    const close = mock(() => Promise.resolve());
-    FakeAudioContext.prototype.close = close;
+    const originalStop = SentenceSpeechScheduler.prototype.stop;
+    const close = mock(function (this: SentenceSpeechScheduler) { return originalStop.call(this); });
+    SentenceSpeechScheduler.prototype.stop = close;
     const controller = new AbortController();
     const env = stubEnvironment(() => {
       controller.abort();
@@ -1587,7 +1590,7 @@ describe("createChatModelAdapter errors", () => {
       expect(error).toBeInstanceOf(DOMException);
       expect(close).toHaveBeenCalledTimes(1);
     } finally {
-      FakeAudioContext.prototype.close = originalClose;
+      SentenceSpeechScheduler.prototype.stop = originalStop;
       env.restore();
     }
   });
@@ -1596,9 +1599,9 @@ describe("createChatModelAdapter errors", () => {
   // lets whatever's already been enqueued finish naturally - only a real
   // Stop click is barge-in.
   test("a mid-stream failure that isn't a user stop never cuts audio short", async () => {
-    const originalClose = FakeAudioContext.prototype.close;
-    const close = mock(() => Promise.resolve());
-    FakeAudioContext.prototype.close = close;
+    const originalStop = SentenceSpeechScheduler.prototype.stop;
+    const close = mock(function (this: SentenceSpeechScheduler) { return originalStop.call(this); });
+    SentenceSpeechScheduler.prototype.stop = close;
     const env = stubEnvironment(
       ndjsonStream([{ type: "delta", text: "Partial reply" }, { type: "error", error: "chat model unavailable: llama-server crashed" }]),
     );
@@ -1607,7 +1610,7 @@ describe("createChatModelAdapter errors", () => {
       expect(error).toBeInstanceOf(Error);
       expect(close).not.toHaveBeenCalled();
     } finally {
-      FakeAudioContext.prototype.close = originalClose;
+      SentenceSpeechScheduler.prototype.stop = originalStop;
       env.restore();
     }
   });

@@ -190,6 +190,13 @@ html.incognito body[class*="style-"] .aui-root.aui-thread-root {
   --composer-compact-border-focus: var(--shell-composer-border-focus);
 }
 
+/* A text field under 16px makes iOS Safari zoom the page when it takes focus; on a touch screen the composer types at 16px. */
+@media (pointer: coarse) {
+  [data-slot="chat-pane"] {
+    --composer-compact-text-size: 16px;
+  }
+}
+
 /* SHELL2 tones (owner, 2026-10-06: "change our color scheme to
  * chatgpt's"). Sampled from his ChatGPT desktop reference (dark, 2x
  * screenshot): rail #282828, history column #1e1e1e, conversation

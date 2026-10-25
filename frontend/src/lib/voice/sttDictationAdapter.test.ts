@@ -1,3 +1,4 @@
+import { __resetPlaybackContextForTests } from "@/lib/voice/playbackContext";
 import { describe, expect, test, mock } from "bun:test";
 import type { DictationAdapter } from "@assistant-ui/react";
 import { createSttDictationAdapter } from "@/lib/voice/sttDictationAdapter";
@@ -46,6 +47,7 @@ function withFakeAudioEnv<T>(run: () => Promise<T>): Promise<T> {
   const originalAudioContext = (globalThis as unknown as { AudioContext?: unknown }).AudioContext;
   const originalWorkletNode = (globalThis as unknown as { AudioWorkletNode?: unknown }).AudioWorkletNode;
   const originalMediaDevices = navigator.mediaDevices;
+  __resetPlaybackContextForTests();
   (globalThis as unknown as { AudioContext: unknown }).AudioContext = FakeAudioContext;
   (globalThis as unknown as { AudioWorkletNode: unknown }).AudioWorkletNode = FakeAudioWorkletNode;
   Object.defineProperty(navigator, "mediaDevices", {
@@ -53,6 +55,7 @@ function withFakeAudioEnv<T>(run: () => Promise<T>): Promise<T> {
     value: { getUserMedia: () => Promise.resolve({ getTracks: () => [] } as unknown as MediaStream) },
   });
   return run().finally(() => {
+    __resetPlaybackContextForTests();
     (globalThis as unknown as { AudioContext: unknown }).AudioContext = originalAudioContext;
     (globalThis as unknown as { AudioWorkletNode: unknown }).AudioWorkletNode = originalWorkletNode;
     Object.defineProperty(navigator, "mediaDevices", { configurable: true, value: originalMediaDevices });

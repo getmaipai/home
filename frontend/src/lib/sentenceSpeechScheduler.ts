@@ -23,6 +23,7 @@
 import { ApiError, api } from "@/lib/api";
 import { createLevelMeter, type LevelMeter } from "@/lib/voice/audioLevelMeter";
 import { audioSession, type AudioHandle } from "@/shell/audioSession";
+import { sharedPlaybackContext } from "@/lib/voice/playbackContext";
 
 const MAX_PARALLEL_FETCHES = 2;
 
@@ -47,6 +48,9 @@ function fixWavHeaderSize(bytes: Uint8Array): void {
 
 export class SentenceSpeechScheduler {
   private readonly audioContext: AudioContext;
+  // The page-wide context (playbackContext.ts) outlives a reply: stop() silences this reply's own sources instead of closing it.
+  private readonly sharedContext: boolean;
+  private readonly sources = new Set<AudioBufferSourceNode>();
   // VOICE-LIVE-02: every scheduled sentence routes through this one gain
   // node (never straight to `destination`) so `audioLevelMeter.ts`'s own
   // meter can tap ONE stable node across sentence boundaries - a plain
@@ -85,7 +89,9 @@ export class SentenceSpeechScheduler {
     // stack returns (streamingWavPlayer.ts's own constructor comment;
     // a code review, 2026-09-04, flagged the risk of creating one after
     // an awaited fetch instead).
-    this.audioContext = audioContext ?? new AudioContext({ latencyHint: "interactive" });
+    this.sharedContext = audioContext === undefined;
+    this.audioContext = audioContext ?? sharedPlaybackContext();
+    if (this.sharedContext && this.audioContext.state !== "running") void this.audioContext.resume?.().catch(() => {});
     this.speechStream = speechStream;
     this.playbackBus = this.audioContext.createGain();
     this.playbackBus.connect(this.audioContext.destination);
@@ -309,10 +315,12 @@ export class SentenceSpeechScheduler {
     source.connect(this.playbackBus);
     const startTime = Math.max(this.audioContext.currentTime, this.nextStartTime);
     source.start(startTime);
+    this.sources.add(source);
     this.scheduledSentences.push({ ...(meta?.visibleEnd === undefined ? {} : { visibleEnd: meta.visibleEnd }), startTime });
     this.scheduledCount++;
     if (this.scheduledCount === 1) this.onFirstAudio?.();
     source.onended = () => {
+      this.sources.delete(source);
       this.finishedCount++;
       if (this.streamDone && this.finishedCount === this.scheduledCount) {
         this.sessionHandle?.release();
@@ -353,6 +361,17 @@ export class SentenceSpeechScheduler {
     this.meter.stop();
     this.sessionHandle?.release();
     this.sessionHandle = null;
-    this.audioContext.close().catch(() => {});
+    if (!this.sharedContext) {
+      this.audioContext.close().catch(() => {});
+      return;
+    }
+    for (const source of this.sources) {
+      try { source.stop?.(); } catch { /* already ended */ }
+      try { source.disconnect?.(); } catch { /* already disconnected */ }
+    }
+    this.sources.clear();
+    try { this.playbackBus.disconnect?.(); } catch { /* already disconnected */ }
+    // A pause left the shared context suspended: the next reply needs it running.
+    if (this.audioContext.state === "suspended") void this.audioContext.resume?.().catch(() => {});
   }
 }

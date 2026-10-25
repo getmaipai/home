@@ -4,6 +4,7 @@ import { App } from "@/App";
 import { installHiddenReloadOnNewServiceWorker, installStaleChunkRetry, runBootWatchdog } from "@/lib/pwaBoot";
 import "@/shell/tokens.css";
 import { applyFirstPaintPalette } from "@/shell/firstPaintPalette";
+import { installPlaybackUnlock } from "@/lib/voice/playbackContext";
 
 window.__setupPreview = __SETUP_PREVIEW__;
 if (!__SETUP_PREVIEW__) installStaleChunkRetry(window, sessionStorage);
@@ -41,6 +42,7 @@ runBootWatchdog(
     const rootEl = document.getElementById("root");
     if (!rootEl) throw new Error("#root element missing from index.html");
     applyFirstPaintPalette();
+    installPlaybackUnlock();
     createRoot(rootEl).render(
       <StrictMode>
         <BootConfirm onConfirmed={confirmBooted} />
