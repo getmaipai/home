@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 # MAIPAI_WATCH_LEGS selects real sharder legs (default: backend frontend scripts).
+# Quiet check sums CPU used by suite-related processes; MAIPAI_WATCH_MAX_CPU defaults to 200.
 # Concurrent worker ceilings: MAIPAI_WATCH_BACKEND_SHARDS=4,
 # MAIPAI_WATCH_FRONTEND_SHARDS=2, MAIPAI_WATCH_SCRIPTS_SHARDS=2.
 set -euo pipefail
@@ -262,36 +263,50 @@ find_culprit() {
   echo "$culprit"
 }
 
-load_average() {
+work_cpu_percent() {
   local raw
-  if [[ -n "${MAIPAI_WATCH_LOAD_CMD:-}" ]]; then
-    raw="$(bash -c "$MAIPAI_WATCH_LOAD_CMD" 2>/dev/null || true)"
-  elif [[ "$(uname -s)" == Darwin ]]; then
-    raw="$(sysctl -n vm.loadavg 2>/dev/null || true)"
+  if [[ -n "${MAIPAI_WATCH_CPU_CMD:-}" ]]; then
+    raw="$(bash -c "$MAIPAI_WATCH_CPU_CMD" 2>/dev/null || true)"
+    awk -v value="$raw" 'BEGIN { if (value ~ /^[0-9]+([.][0-9]+)?$/) print value; else print "unknown" }'
   else
-    raw="$(awk '{print $1}' /proc/loadavg 2>/dev/null || true)"
+    raw="$(ps -Ao pid=,ppid=,pcpu=,comm=,args= 2>/dev/null)" || { printf '%s\n' unknown; return; }
+    [[ -n "$raw" ]] || { printf '%s\n' unknown; return; }
+    awk -v self="$$" '
+      NF >= 5 {
+        pid[NR]=$1; parent[NR]=$2; cpu[NR]=$3; comm[NR]=$4
+        command=$5
+        for (i=6; i<=NF; i++) command=command " " $i
+        args[NR]=command
+        count=NR
+      }
+      END {
+        total=0
+        for (i=1; i<=count; i++) {
+          if (cpu[i] !~ /^[0-9]+([.][0-9]+)?$/) continue
+          excluded=0; p=pid[i]
+          for (depth=0; depth<=count && p!=""; depth++) {
+            if (p==self) { excluded=1; break }
+            ancestor=""
+            for (j=1; j<=count; j++) if (pid[j]==p) { ancestor=parent[j]; break }
+            if (ancestor==p) break
+            p=ancestor
+          }
+          if (excluded || args[i] ~ /lander\.sh serve|watcher\.sh serve/) continue
+          n=split(comm[i], parts, "/"); base=parts[n]
+          if (base ~ /^(bun|node|codex|tsc|vite|eslint|gitleaks|deno|sqlite3|python3)$/ || args[i] ~ /shardTests\.ts|maipai-stack/) total+=cpu[i]
+        }
+        printf "%.10g\n", total
+      }
+    ' <<< "$raw"
   fi
-  if [[ "${MAIPAI_WATCH_LOAD_CMD:-}" == "" && "$(uname -s)" == Darwin ]]; then
-    raw="$(awk '{gsub(/[{}]/, ""); for (i=1; i<=NF; i++) if ($i != "") { print $i; exit }}' <<< "$raw")"
-  fi
-  awk -v value="$raw" 'BEGIN { if (value ~ /^[0-9]+([.][0-9]+)?$/) print value; else print "unknown" }'
-}
-
-logical_cpu_count() {
-  local count
-  if [[ "$(uname -s)" == Darwin ]]; then count="$(sysctl -n hw.logicalcpu 2>/dev/null || true)"
-  else count="$(nproc 2>/dev/null || true)"
-  fi
-  [[ "$count" =~ ^[0-9]+([.][0-9]+)?$ ]] || count=1
-  printf '%s' "$count"
 }
 
 wait_for_quiet() {
   local land_data="${MAIPAI_LAND_DATA:-$main/data-scratch/land}"
   local max_seconds="${MAIPAI_WATCH_QUIET_MAX_SECONDS:-1800}"
   local poll_seconds="${MAIPAI_WATCH_QUIET_POLL_SECONDS:-15}"
-  local max_load="${MAIPAI_WATCH_MAX_LOAD:-$(logical_cpu_count)}"
-  local started now load lander_busy reason last_log=0 remaining sleep_for
+  local max_cpu="${MAIPAI_WATCH_MAX_CPU:-200}"
+  local started now cpu lander_busy reason last_log=0 remaining sleep_for
   [[ "$max_seconds" =~ ^[0-9]+$ ]] || max_seconds=1800
   [[ "$poll_seconds" =~ ^[0-9]+([.][0-9]+)?$ ]] || poll_seconds=15
   # Zero is used by tests and operators to disable waiting.
@@ -301,12 +316,11 @@ wait_for_quiet() {
     if [[ "${stop_requested:-0}" -eq 1 ]]; then return 1; fi
     lander_busy=0
     if compgen -G "$land_data/queue/*.json" >/dev/null; then lander_busy=1; fi
-    load="$(load_average)"
+    cpu="$(work_cpu_percent)"
     reason=""
     if (( lander_busy )); then reason="waiting: lander busy"
-    elif [[ "$load" != unknown ]] && awk -v load="$load" -v max="$max_load" 'BEGIN { exit !(load >= max) }'; then
-      reason="waiting: load $load above $max_load"
-    elif [[ "$load" == unknown ]]; then reason="waiting: load unknown"
+    elif [[ "$cpu" != unknown ]] && awk -v cpu="$cpu" -v max="$max_cpu" 'BEGIN { exit !(cpu >= max) }'; then
+      reason="waiting: our work uses ${cpu}% cpu, above ${max_cpu}%"
     fi
     if [[ -z "$reason" ]]; then return 0; fi
     now="$(date +%s)"
