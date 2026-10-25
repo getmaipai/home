@@ -152,6 +152,12 @@ function ShellInstallStrip({ person }: { person: Roster }) {
 // which needs to return `<ThemeProvider>` before anything inside it
 // can call a hook that reads from it.
 function RoutesInner({ person, onPersonChange, onSignedOut }: { person: Roster; onPersonChange: () => void | Promise<void>; onSignedOut: () => void }) {
+  // The kit's phone layouts keep one column and the larger kid targets for a child (docs/design/phone-minimal-2026-10-25.md P4a):
+  // the page says whose band it is, the kit's CSS reads it.
+  useEffect(() => {
+    document.documentElement.dataset.ageBand = person.age_band;
+    return () => { delete document.documentElement.dataset.ageBand; };
+  }, [person.age_band]);
   useAppearance(person.id);
   useLook(person.id);
   useEase(person.id);
