@@ -147,6 +147,18 @@ export function turnOwnerId(turnId: string): string | null {
   return db.select({ personId: conversationTurns.personId }).from(conversationTurns).where(eq(conversationTurns.id, turnId)).get()?.personId ?? null;
 }
 
+/** A spoken reply was cut in on AFTER it had finished generating (almost always: generation is much faster than speech), so the
+ * stream's own cancel path never ran. The stored reply becomes the heard prefix, as the owner's rule (2026-10-14) says, and the unheard
+ * rest is returned so the caller can hand it to the next turn as background (lib/interruptedReply.ts). Null when the person does not own
+ * the turn, the turn is unknown, or everything was heard. `cut` decides where the prefix ends (turn.ts's cutAtWord). */
+export function applyHeardPrefix(turnId: string, personId: string, heardChars: number, cut: (released: string, heardChars: number) => string): { conversationId: string; released: string; heardPrefix: string } | null {
+  const row = db.select({ personId: conversationTurns.personId, conversationId: conversationTurns.conversationId, replyText: conversationTurns.replyText }).from(conversationTurns).where(eq(conversationTurns.id, turnId)).get();
+  if (!row || row.personId !== personId || !row.conversationId || heardChars >= row.replyText.length) return null;
+  const heardPrefix = cut(row.replyText, heardChars).trim();
+  db.update(conversationTurns).set({ replyText: heardPrefix }).where(eq(conversationTurns.id, turnId)).run();
+  return { conversationId: row.conversationId, released: row.replyText, heardPrefix };
+}
+
 export type ConversationOpResult<T> =
   | { ok: true; value: T }
   | { ok: false; status: 400 | 403 | 404; error: string; code?: "temporary_mismatch" };

@@ -43,6 +43,7 @@ import { chatModelReadsPictures, loadPictureParts, picturePartsAllowed } from "@
 import type { LlmImagePart } from "@/lib/llm";
 import { chatCatalogEntry } from "@/lib/modelCatalog";
 import { sceneContextLine } from "@/lib/robotVision";
+import { takeInterruptedReply } from "@/lib/interruptedReply";
 import { librarySnapshotDate } from "@/lib/retrieval/referenceReader";
 
 /** MEMORY-FLOOR-01: the floor on recall()'s own composite `score`
@@ -408,6 +409,11 @@ export const contextNode: Node<ContextInput, ContextOutput> = async (state, inpu
     const scene = sceneContextLine(state.deviceId);
     if (scene) items.push({ id: "robot-scene", text: scene, source: "camera", subjects: [], disclosure: "child_ok" });
   }
+
+  // DUPLEX-06: the part of the last spoken reply this person cut in on before hearing it, once, for the next turn only (memory only,
+  // never stored; it passed the output gate when released). Rides as labelled background, like the robot look above.
+  const unheard = takeInterruptedReply(conversation.id, state.actor.id);
+  if (unheard) items.push({ id: "interrupted-reply", text: unheard, source: "interrupted", subjects: [], disclosure: "child_ok" });
 
   // The roster: who this household has, so "he"/"she"/a name resolves
   // against real people without a pronoun-guessing rule. One item per

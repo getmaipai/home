@@ -1,3 +1,4 @@
+import { noteInterruptedReply } from "@/lib/interruptedReply";
 import { createRoute, z } from "@hono/zod-openapi";
 import { parseCurrentLocation } from "@/lib/places";
 import { bodyLimit } from "hono/body-limit";
@@ -21,7 +22,7 @@ import type { TurnStreamEvent as ToolStreamEvent } from "@maipai/spec/stack/ts/t
 import type { AppEnv, PersonRow } from "@/types";
 import { streamEventForViewer, valueForViewer } from "@/lib/turnErrorDetail";
 import { apiRouter, errorResponses, idParamSchema } from "@/lib/openapi";
-import { turnOwnerId, isTemporaryConversation, packageLatencyFromRecentOutcomes } from "@/lib/conversationHistory";
+import { turnOwnerId, isTemporaryConversation, packageLatencyFromRecentOutcomes, applyHeardPrefix } from "@/lib/conversationHistory";
 import { surfaceClassOf } from "@/lib/surfaceClass";
 import { attachments } from "@/db/schema";
 import { db } from "@/db";
@@ -192,6 +193,12 @@ turnRoutes.openapi(cancelTurnRoute, (c) => {
     flight.controller.abort();
     flight.cancelled = true;
     flight.generation += 1;
+  }
+  // DUPLEX-06: a reply that finished generating before the cut-in (generation is much faster than speech) is already stored in full, so
+  // cut the stored row to what was heard; one that is still finishing is cut where it finalizes (streamTurnEvents). Idempotent.
+  if (typeof heardChars === "number") {
+    const applied = applyHeardPrefix(c.req.valid("param").turn_id, owner, heardChars, cutAtWord);
+    if (applied) noteInterruptedReply(applied.conversationId, owner, applied.released, applied.heardPrefix);
   }
   return c.json({ cancelled: wasInFlight }, 200);
 });
@@ -745,7 +752,14 @@ export async function* streamTurnEvents(
     // all. finalize() returns that TurnValue as-is, so this is still
     // exactly one "done" line either way, and the resolved case simply
     // has no "delta" lines before it.
-    const value = result.finalize(fullText.trim(), (current as IteratorReturnResult<import("@/lib/turnShared").StreamOutcome>).value);
+    // DUPLEX-06: a cut-in that landed while the reply was still finishing generating stores only what was heard.
+    const finalText = fullText.trim();
+    const heardNow = heardChars?.();
+    const storedText = typeof heardNow === "number" && heardNow < finalText.length ? cutAtWord(finalText, heardNow).trim() : finalText;
+    const value = result.finalize(storedText, (current as IteratorReturnResult<import("@/lib/turnShared").StreamOutcome>).value);
+    // The turn machine persists the row from the full text before this point, so cut the stored row to the heard prefix too.
+    if (storedText !== finalText && typeof heardNow === "number") applyHeardPrefix(result.turnId, actorId, heardNow, cutAtWord);
+    if (storedText !== finalText && options.spokenTurn) noteInterruptedReply(result.conversationId, actorId, finalText, storedText);
     // REASONING-02: TurnValue.reasoning is dropped from the `done` event
     // for a minor's turn, the same gate `spanEvents()` already applies to
     // the live `reasoning` stream event above.
@@ -785,7 +799,10 @@ export async function* streamTurnEvents(
     if (signal?.aborted) {
       const released = releasedText?.() ?? fullText;
       const heard = heardChars?.();
-      result.finalize((typeof heard === "number" && heard <= released.length ? cutAtWord(released, heard) : released).trim());
+      const heardPrefix = (typeof heard === "number" && heard <= released.length ? cutAtWord(released, heard) : released).trim();
+      result.finalize(heardPrefix);
+      // DUPLEX-06: a spoken reply that was cut in on keeps its unheard part for the next turn only (memory only, never stored).
+      if (options.spokenTurn) noteInterruptedReply(result.conversationId, actorId, released, heardPrefix);
       yield { type: "error", error: "cancelled", code: "turn_cancelled" };
       return;
     }

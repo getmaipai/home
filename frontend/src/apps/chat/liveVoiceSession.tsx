@@ -86,7 +86,7 @@ export const DUPLEX_FALSE_INTERRUPTION_MS = 2000;
 // not in the list, including every phrase with "no" or "not" except "no way", is a real interruption. The words of a reaction are
 // dropped: never stored, never sent. Only the counts below are kept.
 export const REACTION_PHRASES: ReadonlySet<string> = new Set([
-  "mm", "mhm", "mm hm", "mmhmm", "hm", "hmm", "uh huh", "yeah", "yep", "yes", "okay", "ok", "right", "oh", "ohh", "ah", "ooh", "aw",
+  "m", "mm", "mhm", "mm hm", "mmhm", "mmhmm", "hm", "hmm", "uh huh", "yeah", "yep", "yes", "okay", "ok", "right", "oh", "ohh", "ah", "ooh", "aw",
   "wow", "oh wow", "whoa", "oh whoa", "no way", "i see", "oh i see", "got it", "really", "oh really", "seriously", "cool", "oh cool",
   "nice", "oh nice", "great", "awesome", "amazing", "wild", "crazy", "interesting", "true", "exactly", "sure", "haha", "ha", "lol",
   "yikes", "geez", "jeez", "oh my", "oh my god", "oh my gosh", "oh okay", "oh ok", "ah okay",
@@ -94,8 +94,9 @@ export const REACTION_PHRASES: ReadonlySet<string> = new Set([
 /** Counts only, never text (rule 6a): how often a reaction kept Home talking and how often a real interruption stopped it. */
 export const duplexCounters = { reactionResumes: 0, interruptions: 0 };
 
+// A drawn-out sound ("mmm", "hmmm", "woooow", "yeahhh") is the same reaction: a run of three or more of one letter counts as one.
 function isReaction(normalized: string): boolean {
-  return REACTION_PHRASES.has(normalized);
+  return REACTION_PHRASES.has(normalized.replace(/(\p{L})\1{2,}/gu, "$1"));
 }
 
 function normalizedTranscript(text: string): string {

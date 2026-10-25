@@ -1,3 +1,4 @@
+import { takeInterruptedReply } from "@/lib/interruptedReply";
 import { describe, expect, test, beforeEach, afterEach, spyOn } from "bun:test";
 import { TestClient } from "./client";
 import { resetDb } from "./reset-db";
@@ -115,6 +116,22 @@ describe("turn cancellation generations", () => {
     const history = await client.get(`/api/conversations/${stored!.conversationId}/turns`);
     const turns = await history.json() as Array<{ id: string; replyText: string }>;
     expect(turns.find((turn) => turn.id === turnId)?.replyText).toBe(stored?.replyText);
+  }, 10_000);
+
+  test("a cancel that lands after the reply finished generating still stores only the heard part, and the unheard part rides into the next turn once", async () => {
+    const { client } = await owner();
+    const response = await client.post("/api/turn/stream", { text: "say a short answer", spoken: true });
+    const events = await readNdjson(response);
+    const turnId = events.find((event) => event.type === "turn_meta")!.turn_id as string;
+    const full = events.filter((event) => event.type === "delta").map((event) => event.text as string).join("");
+    expect(full.length).toBeGreaterThan(40);
+    const heardChars = 15;
+    await client.post(`/api/turn/${turnId}/cancel`, { heard_chars: heardChars });
+    const stored = db.select().from(conversationTurns).where(eq(conversationTurns.id, turnId)).get();
+    expect(stored!.replyText.length).toBeLessThanOrEqual(heardChars);
+    expect(stored!.replyText.length).toBeGreaterThan(0);
+    expect(takeInterruptedReply(stored!.conversationId!, stored!.personId)).toContain(full.slice(heardChars).trim().slice(0, 10));
+    expect(takeInterruptedReply(stored!.conversationId!, stored!.personId)).toBeNull();
   }, 10_000);
 
   test("talking over the third sentence after sentence two starts saves the first two in the thread and history", async () => {

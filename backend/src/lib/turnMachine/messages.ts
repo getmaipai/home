@@ -51,6 +51,8 @@ const SOURCE_LABEL: Record<Exclude<ContextItem["source"], "window" | "utterance"
   project: "project instructions",
   // ROBOT-VISION-01: the robot's own short-lived camera look (lib/robotVision.ts).
   camera: "the robot's camera look",
+  // DUPLEX-06: the part of the last spoken reply the person cut in on before hearing it (lib/interruptedReply.ts).
+  interrupted: "the part of your last reply the person did not hear",
 };
 
 function renderContextLine(item: ContextItem): string {
@@ -240,6 +242,8 @@ export function contextToMessages(context: readonly ContextItem[], utterance: st
     userContent += `\n\nHow to answer this one: ${planLineForTurnMachine(plan, signal, promptSurfaceClass, persona.engagement)}`;
     // ROBOT-VISION-01: the guidance for the camera block sits here, outside the untrusted data wrapper, so it is read as an instruction.
     if (context.some((item) => item.source === "camera")) userContent += "\n\nAbout the camera look above: it is all the robot knows about what it can see. Say only what it says, never claim to see more, never name or identify anyone from how they look, and when it shows nothing or does not cover the question, say plainly that you cannot see that. Mention it only when it helps the answer.";
+    // DUPLEX-06: the guidance sits outside the data wrapper too, so it is read as an instruction.
+    if (context.some((item) => item.source === "interrupted")) userContent += "\n\nAbout the part of your last reply the person did not hear: they cut in while you were speaking it. Answer what they said first, briefly. Then, unless they changed the subject, asked you to stop or said goodbye, pick that reply back up from where they stopped hearing it, in your own words, without repeating what they already heard.";
     userContent += `\n\nThe person's words:\n${utterance}`;
   }
   messages.push(pictures.length > 0 ? { role: "user", content: userContent, images: [...pictures] } : { role: "user", content: userContent });
