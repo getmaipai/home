@@ -1,6 +1,6 @@
 # Household memory management: queue, never fail (2026-10-25)
 
-Status: design note, nothing built. Item id MEMMGMT-2026-10-25. Owner's ask (Jesse, 2026-10-25): a household-wide memory
+Status: design note, nothing built. Item id MEMMGMT-2026-10-25. Updated the same day with the owner's answers (section 9) and the SSD research (section 10). Owner's ask (Jesse, 2026-10-25): a household-wide memory
 management system for the Mac Studio (Apple M5 Max, 128 GB unified memory) that runs chat, pictures, video, voice and the other
 workers. His example: a person asks for a picture, there is not enough memory, and the request is not failed; it is queued, worked
 when memory frees, and the person is told. The pieces he named: telling the person plus a queue, system memory monitoring, model
@@ -39,7 +39,7 @@ rejected there), and anything that changes a child's or teen's gates.
 | System | Idea | Verdict | Why |
 |---|---|---|---|
 | [llama-swap](https://github.com/mostlygeek/llama-swap) ([guide](https://betterstack.com/community/guides/ai/llama-swap/)) | One proxy; the model named in a request is started on demand, another is stopped to make room, a per-model `ttl` in seconds unloads it idle, `groups` let several stay loaded together | Adapted | The Stack already does this (jit roles, `idleTtlSeconds` 600, `keepAliveSeconds` per request). We take the `groups` idea as the picture pool (section 4.3): the create and edit models are one group that loads together and is evicted as one. Not adopted as software (RULES.md chat rule 11: only our own tested Stack components run the models). |
-| [Ollama](https://ollama.readthedocs.io/en/faq/) ([env vars](https://dev.to/threesevenths/ollama-environment-variables-362j)) | `keep_alive` 5 minutes per model, restarted on each request; `OLLAMA_MAX_LOADED_MODELS`; a request for an unloaded model unloads idle models and waits in a queue of 512 until it loads; a full queue is a 503 | Adapted | The "unload idle, then wait, never fail" order is exactly goal 1. We keep our idle window (10 minutes) and a much shorter queue (section 4.5). Rejected: a fixed count of loaded models; our limit is bytes. |
+| [Ollama](https://ollama.readthedocs.io/en/faq/) ([env vars](https://dev.to/threesevenths/ollama-environment-variables-362j)) | `keep_alive` 5 minutes per model, restarted on each request; `OLLAMA_MAX_LOADED_MODELS`; a request for an unloaded model unloads idle models and waits in a queue of 512 until it loads; a full queue is a 503 | Adapted | The "unload idle, then wait, never fail" order is exactly goal 1. We keep our idle window (10 minutes); the queue has no cap and the card shows the wait (Q7). Rejected: a fixed count of loaded models; our limit is bytes. |
 | [LM Studio](https://lmstudio.ai/docs/app/api/ttl-and-auto-evict) | JIT loading with an idle TTL (60 minutes default), auto-evict of the last JIT model before loading the next, explicitly loaded models exempt from eviction | Adapted | "Explicitly loaded is exempt" becomes the reserved class (chat, voice, judge, embed are never evicted by a job). Rejected: a 60 minute TTL for picture models; the bakeoff's 10 minute default stands because pictures take chat's memory. |
 | [vLLM sleep mode](https://docs.vllm.ai/en/stable/features/sleep_mode/) | Level 1 moves weights to CPU memory and drops the KV cache; level 2 discards weights too; `wake_up` restores | Rejected | On unified memory there is no "other" memory to sleep into. A model on disk in the file cache is our level 2: the bakeoff measured ERNIE reloading in 6 to 10 s from the page cache against 17 s cold, so unload and reload is cheap enough. |
 | [Triton model control](https://docs.nvidia.com/deeplearning/triton-inference-server/user-guide/docs/user_guide/model_management.html) | EXPLICIT mode: nothing loads or unloads unless an API call says so; every load reports success or failure | Adopted | The governor is the only thing that loads or unloads a model; a worker never decides for itself. Already the Stack's shape; this note makes the eviction order explicit (section 4.3). |
@@ -51,7 +51,7 @@ rejected there), and anything that changes a child's or teen's gates.
 | [MLX memory API](https://www.mintlify.com/ml-explore/mlx/api/memory) ([issue 3350](https://upd.dev/ml-explore/mlx/issues/3350)) | `set_memory_limit` (default 1.5 times the working set), `set_cache_limit`, `clear_cache`; the Metal buffer pool grows without bound in a long-running server unless the cache is cleared between requests | Adopted | Every MLX worker (picture, video, song) calls `clear_cache` after each job and sets a cache limit at start, so "resident" means the weights, not a stale buffer pool. The music note already saw this (a 25 GB resting worker peaking at 64 GB in a decode). |
 | [Slurm](https://docs.icer.msu.edu/How_Jobs_are_Scheduled/) ([fair share](https://docs.ycrc.yale.edu/clusters-at-yale/job-scheduling/fairshare), [backfill](https://docs.rcac.purdue.edu/blog/2025/08/08/job-priority-and-scheduling/)) | Priority = age + fair share + size + QoS; backfill starts a small job early when it cannot delay the job at the head; reservations hold resources for a known future job; accurate size requests make backfill work | Adapted | Backfill becomes rule Q4 (a picture may start ahead of a waiting video when it fits beside it and the video is still waiting on something else). Aging becomes rule Q5 (a waiting video is not starved forever). Rejected: usage-based fair share across days; a family is not a cluster, round robin by person is enough. The chat model's set-aside is our one reservation. |
 | [Deficit round robin](https://en.wikipedia.org/wiki/Deficit_round_robin) | Serve one item per person per round; a person who was skipped keeps credit | Adopted, simplified | Round robin by person with quantum one job (the isolation note's rule 6). Weights are all one; a child's daily cap is a separate gate, not a weight. |
-| Queue UX ([Unblu](https://docs.unblu.com/en/docs/latest/knowledge-base/configuration/conversations/queue-status.html), [Haptik](https://docs.haptik.ai/set-up-queue-position-wait-time-messages), [Zendesk](https://support.zendesk.com/hc/en-us/articles/8945071149210-Displaying-the-estimated-wait-time-banner-in-messaging-conversations)) | Show position before a precise time; cap large numbers ("10+"); an estimate is an average of past jobs, not a countdown; a known wait feels shorter than an unknown one | Adopted | The card says why first, then "about N minutes" from measured per-kind times (the isolation note's estimate), and the position only when it is 2 or more. The queue is at most 4 per kind, so no capping is needed. |
+| Queue UX ([Unblu](https://docs.unblu.com/en/docs/latest/knowledge-base/configuration/conversations/queue-status.html), [Haptik](https://docs.haptik.ai/set-up-queue-position-wait-time-messages), [Zendesk](https://support.zendesk.com/hc/en-us/articles/8945071149210-Displaying-the-estimated-wait-time-banner-in-messaging-conversations)) | Show position before a precise time; cap large numbers ("10+"); an estimate is an average of past jobs, not a countdown; a known wait feels shorter than an unknown one | Adopted | The card says why first, then "about N minutes" from measured per-kind times (the isolation note's estimate), and the position only when it is 2 or more. The line has no cap (Q7), so the card caps the shown position at "10+" as Haptik does. |
 
 Rejected outright: a scheduler process of our own, a second ledger in Home, a new status surface, a time window for heavy
 work, and any outside runner. Everything above lands as rules and small changes inside the governor, the watchdog, the job
@@ -87,7 +87,7 @@ One ledger, in the governor, as today, with every loaded item tagged with a **cl
 
 | Class | Members | Rule |
 |---|---|---|
-| reserved | chat (with its projector and draft), voice (stt, tts), the memory judge, embed, router | Set aside first at boot from the fit plan. Never evicted for a job. The watchdog's CRITICAL steps (judge eviction, chat restart after 60 s) stay as the last line of defence, unchanged. Voice and the judge are not unloaded within 5 minutes of a conversation (reliability item 7, ISOLATION-05). |
+| reserved | chat (with its picture projector; the DFlash draft is not live, see below), voice (stt, tts), the memory judge, embed, router | Set aside first at boot from the fit plan. Never evicted for a job. The watchdog's CRITICAL steps (judge eviction, chat restart after 60 s) stay as the last line of defence, unchanged. Voice and the judge are not unloaded within 5 minutes of a conversation (reliability item 7, ISOLATION-05). |
 | warm | the picture pool (create model resident, edit model on demand), the coding model in Normal mode, vision | Loaded on first use, kept for the keep-warm window, evicted in order (4.3) when a job needs the room. |
 | burst | video, song, image tools, the daily picture canary, benches and other sessions' processes (reported as dev load, not ours to evict) | One at a time household wide. Loaded for the job, unloaded after the keep-warm window. |
 
@@ -95,8 +95,11 @@ Budget arithmetic stays what `admissionRoomBytes` computes: the smaller of (mode
 the tier margin). The chat set-aside is the reserved class's sum; a picture request is sized from the pool's measured peak and
 the budget comes from what remains, so pictures never shrink the chat context (bakeoff section 4, RULES.md chat rule 4).
 
-Numbers on the Studio today (coding note, 2026-10-22; bakeoff, 2026-10-25): reserved about 36 GB (chat 21.4 to 23.8, judge,
-embed, voice); picture pool 15.8 GB resting with both models loaded, 26 GB peak at 8-bit edits and 29 GB planned at bf16; video
+Numbers on the Studio today (coding note, 2026-10-22; bakeoff, 2026-10-25): reserved about 36 GB (chat 21.4 with the
+projector, judge, embed, voice; no draft). The DFlash draft model (CHAT-TPS-02) is not live: it is faster only without the
+picture projector (21 to 24 against 26 tokens per second with it), so Jesse decided on 2026-10-25 to keep the projector, run no
+draft now, retest the draft at the next llama.cpp engine pin and enable it only if it is faster with pictures then. If it is
+enabled, the reserved class grows by 2.2 GB (its measured resident cost) and nothing else here changes; picture pool 15.8 GB resting with both models loaded, 26 GB peak at 8-bit edits and 29 GB planned at bf16; video
 44.1 GB; song 33 GB (a 64 GB decode peak was seen before the cache limit); coding model 23 GB. Budget 116.8 GB, working margin
 20 GB.
 
@@ -128,7 +131,7 @@ second wording and reaches an admin through the Status page, never a person's ca
   about 10 GB, it reloads in 6 to 12 s), (4) the idle coding model, (5) the whole picture pool, (6) a paused burst job is never
   evicted for another burst job (it would lose minutes of work; it keeps its slot), (7) never reserved. A warm item that is
   busy is not evicted; the request waits for it to finish. Eviction is for a request of a higher or equal class; a video (burst)
-  never evicts the picture pool (warm) unless the pool is idle past 2 minutes (open question 3).
+  never evicts the picture pool (warm) unless the pool is idle past 2 minutes (owner's answer 3, 2026-10-25).
 - **Measured peaks** keep updating the record (`refreshMeasuredPeak`); the bakeoff's numbers are the seed, the machine's own
   runs replace them.
 
@@ -155,9 +158,14 @@ Rules, in order of precedence:
 - **Q6. Start rule.** A job starts only when no interactive request is in flight (ISOLATION-02) and the watchdog level is
   normal; at WARN the queue holds, at CRITICAL the running burst job is cancelled by the watchdog and re-queued by Home at the
   head of its class (not failed; up to 2 re-queues, then failed with the low-memory line).
-- **Q7. Queue depth.** 4 waiting per kind in the Stack stays as the wire limit; Home's household queue is the one people see and
-  holds the rest (at most 8 per household, 2 per person; the ninth gets the "full line" copy, which stays a refusal because a
-  longer line is a worse answer than a plain no).
+- **Q7. No cap on the line** (owner's answer 2, 2026-10-25). Home's household queue holds every fitting request; nobody is
+  told the line is full. One person cannot hog it: Q3's round robin decides the order, and the card shows the honest wait. The
+  Stack's 4 waiting per kind stays as a wire buffer only; Home hands the Stack the next job when a slot opens.
+- **Q8. The flex band** (owner's answer 4). The 20 GB working margin stays a rule, not a dial, and may flex by at most 4 GB,
+  down to 16 GB free, only for a picture-class job (the class right under chat), only while the watchdog level is normal, and
+  only one job at a time. The borrowed 4 GB is given back when that job ends; no other admission happens while it is borrowed.
+  The system never lets free memory fall under 16 GB by its own admission, and the watchdog's WARN (reserve plus 4 GB) and
+  CRITICAL (3 GB) floors are untouched. Video, song and tool jobs never use the band.
 
 ### 4.5 User messaging and states
 
@@ -195,7 +203,7 @@ line, and the picture, video and song cards all read it. The lines are in sectio
 - Settings, all existing: `generation.keep_warm_minutes` (declare ahead of spec with the picture pool slice),
   `coding.keep_warm_minutes`, `health.keep_warm`, `stack.memory.watchdog`, `stack.memory.reap_orphans`,
   `generation.kids_daily_pictures`, `generation.kids_daily_videos`. No new key. The working margin and the budget stay rules in
-  `GovernorRules`, not settings; if Jesse wants a dial it is one key (open question 4).
+  `GovernorRules`, not settings (owner's answer 4: no dial; the 4 GB flex band of Q8 is a rule too).
 
 ## 5. The request's state machine
 
@@ -206,7 +214,6 @@ One table for a picture, a video, a song or an image tool job. The state is the 
 |---|---|---|---|
 | (new) | submitted; policy, age gate, daily cap pass | checking | nothing yet (under a second) |
 | checking | `fits_ever` is no | refused | the cannot-fit line, with numbers (6.4) |
-| checking | the household line is full | refused | the full-line copy (existing) |
 | checking | fits, room now, no chat in flight, no job of its kind running | starting | "Starting" (6.3) |
 | checking | fits, but must wait | queued (reason: `chat`, `memory`, `turn`) | the queued line for that reason (6.1, 6.2) |
 | checking | fits, but coding mode is on | queued (reason: `coding_mode`) | the coding-mode line (6.2) |
@@ -279,7 +286,7 @@ Budget 116.8 GB; reserved 36 GB; working margin 20 GB; so the room for jobs with
    No eviction: the pool stays warm because the clip fits beside it.
 4. **Memory tight: an outside bench holds 31 GB.** Same as 3 but a session's bench holds 31 GB. Free is now 77 minus 31, about
    46 GB; 46 minus 44.1 is under the 20 margin, so the clip cannot start. `room_after_eviction` says evicting the idle pool
-   (15.8 GB) would give 62 GB free, enough. The governor waits for the pool's 2 minute idle grace (open question 3), evicts it,
+   (15.8 GB) would give 62 GB free, enough. The governor waits for the pool's 2 minute idle grace, evicts it,
    starts the clip; card "Waiting for memory. Home is putting away another model (about 30 seconds)", then "Starting". If the
    bench held 50 GB instead, eviction would not be enough: card "Waiting for memory. Something else on this computer is using
    it", Status shows `memory.dev-load` to the admin, the clip waits with no deadline and the person's Cancel. When the bench ends
@@ -289,7 +296,10 @@ Budget 116.8 GB; reserved 36 GB; working margin 20 GB; so the room for jobs with
    picture request is queued reason `turn` ("Next after a video (about 2 minutes)"); if 10 minutes pass it does not age
    above the clip because pictures are already the class above video; Q4 backfill lets it start if the clip is paused by chat
    and the pool fits beside the paused worker (36 plus 44.1 plus 29 is 109, under 116.8; free 128 minus 109 is 19, under the
-   20 margin, so on this exact mix it waits; with the chat draft off, or a 4-bit edit, it fits).
+   20 margin but inside the Q8 flex band, so the picture starts with 1 GB borrowed and gives it back when it ends; the 36 GB
+   reserved figure has no draft model, and with the optional 2.2 GB draft on it would be 17 GB free, still inside the band).
+   Editing stays at full quality (bf16, owner's answer 5): the band exists for exactly this mix, and when it is not enough (an
+   edit beside a clip beside a larger chat model) the picture waits for the clip, which is accepted.
 6. **Can never fit: a song on a p64 Mac.** Reserved 28 GB there, budget 56 GB (64 minus 8), margin 12: room 24 GB. A song's
    33 GB fails `fits_ever` at submit: the 6.4 line with 33 and 24. Nothing is queued.
 7. **Watchdog CRITICAL during a clip.** Available memory drops under 3 GB (a runaway outside process). The watchdog cancels the
@@ -315,20 +325,66 @@ Budget 116.8 GB; reserved 36 GB; working margin 20 GB; so the room for jobs with
   create and an edit at once". Reliability item 7 and ISOLATION-02, -03, -05 and -06 become slices here with their original names.
 - Coding mode note: followed (jobs queue with reason `coding_mode`, never refused).
 
-## 9. Open questions for Jesse
+## 9. The owner's answers (2026-10-25, closed)
 
-1. **Aging (Q5):** after 10 minutes a waiting video moves up to picture class so pictures cannot starve it forever. Keep, or
-   should pictures always win however long the clip waits?
-2. **Household line length (Q7):** 8 waiting per household and 2 per person, then a plain "full line" refusal. Longer, or no cap
-   at all with the wait shown?
-3. **Idle grace before evicting the picture pool for a video:** 2 minutes proposed (so a person mid-session making several pictures
-   is not made to wait 17 s for a reload because one clip arrived). Shorter, or none?
-4. **A memory dial:** the 20 GB working margin and the budget stay fixed rules. Do you want one admin setting ("Memory kept free
-   for the computer") or none?
-5. **Video on this Studio beside the draft and projector:** example 5 shows a picture cannot backfill beside a paused clip when
-   the chat draft is on. Accept that, or prefer the 4-bit edit model on this machine so it fits?
+Jesse answered the five open questions the same day; the earlier text was changed where named.
 
-## 10. Build slices (small; no backlog rows yet)
+1. **Aging: yes.** A video that has waited 10 minutes moves up one class (Q5 unchanged).
+2. **No cap on waiting requests, but no hogging.** The 8 per household and 2 per person caps and the "full line" refusal are
+   gone (Q7 rewritten, the state table's full-line row removed). Round robin by person stays and the card shows the wait.
+3. **Idle grace: 2 minutes** before the picture pool is evicted for a video (4.3 and example 4 now state it as a rule).
+4. **No admin dial; the 20 GB margin flexes a little.** New rule Q8: a bounded 4 GB band, borrowed only by a picture-class job,
+   one at a time, only at watchdog level normal, given back when the job ends; free memory never falls under 16 GB by the
+   system's own admission, and the watchdog floors stay. 4.7 now says so.
+5. **Accept the wait, keep full-quality editing.** No 4-bit editor on the Studio. Example 5 now shows the flex band covering
+   that exact mix, and the wait when it does not.
+
+## 10. The SSD as a cache and as extra memory (research, 2026-10-25)
+
+Jesse asked whether the SSD can serve as a cache and as extra memory for the models, as people do elsewhere. Measured first,
+then the table.
+
+**This Studio's SSD, measured** (2 TB Apple Fabric SSD, 990 GB free, 300 GB of models in the Stack's store; a read-only test of
+8 GiB from one bakeoff weights file, 64 MiB reads, run twice each, with the machine at load average 40):
+
+| Read | Speed |
+|---|---|
+| Uncached (`F_NOCACHE`), straight from the SSD | 12.4 GB/s, both runs |
+| From the page cache, single thread | 11.9 then 17.1 GB/s (bounded by one core's copy, not the disk) |
+| Unified memory, for comparison (chat throughput note) | 614 GB/s on the M5 Max 40-core |
+
+So the SSD reads at about one fiftieth of memory bandwidth, which matches the published 13.4 GB/s Blackmagic result for this
+model ([Macworld review](https://www.macworld.com/article/3238319/mac-studio-m5-max-review.html), [Apple Wiki spec, up to 14.5 GB/s](https://theapplewiki.com/wiki/Mac_Studio_(M5_Max))).
+Two consequences carry the whole section: a model's weights can be read back from the SSD in about a second per 12 GB (the
+chat model's 19.65 GB file in 1.6 s, the ERNIE 8-bit weights in under a second), so the 6 to 17 s model loads measured in the
+bakeoff are the loader's own work, not the disk; and a dense model that streams its weights per token would run at under one
+token per second (19.65 GB per token at 12.4 GB/s is 0.6 tokens per second against 26 measured in memory). The same
+`vm_stat` reading during the test showed 4.2 GB of swap in use and 850,080 pages ever swapped out on this machine, so paging
+is already happening under the dev load, which is the thing goal 2 exists to stop.
+
+| System | Idea | Verdict for this Studio | Why, with numbers |
+|---|---|---|---|
+| [Apple, LLM in a flash](https://arxiv.org/html/2312.11514v3) ([Apple ML](https://machinelearning.apple.com/research/efficient-large-language)) | Keep the weights in flash, load what a token needs, reuse recently active neurons (windowing), read big contiguous chunks (row-column bundling); up to twice the DRAM size at 4x to 20x over naive loading | Rejected for the chat model, noted for a future MoE | It works by reading a fraction of the weights per token, which needs sparse activation the dense Muse 30B does not have; and nothing beats the 50x bandwidth gap for a model that already fits. If a later chat model is a mixture of experts (chat throughput note, option 3), revisit. |
+| [Flash-MoE](https://lilting.ch/en/articles/flash-moe-qwen35-397b-metal-inference) and mlx-flash ([oMLX issue 986](https://github.com/jundot/omlx/issues/986)) | Stream expert weights from the SSD per token; a 397B MoE on a 48 GB Mac at 4.4 tokens per second | Rejected | Same reason; 4.4 tokens per second is below the 24 tokens per second the household gets in memory, and the Stack runs only its own tested engines (chat rule 11). |
+| [PowerInfer](https://arxiv.org/html/2312.12456v2) | Hot neurons on the GPU, cold ones on the CPU, chosen by a predictor; 11.69x over llama.cpp on a 4090 | Rejected | Made for a split GPU and CPU memory; unified memory has no second pool to spill to, and the engine is a fork of llama.cpp with its own kernels (rule 11). |
+| [ZeRO-Infinity](https://arxiv.org/pdf/2104.07857) ([ISPASS study](https://utw10244.utweb.utexas.edu/pubs/Hanindhito_BandwidthCharacterization.pdf)) | Partition and overlap NVMe, CPU and GPU transfers; needs over 70 GB/s for parameters, hides the rest | Rejected | Training machinery for GPU clusters; a single 12.4 GB/s SSD cannot feed a 614 GB/s decode. |
+| [llama.cpp mmap and `--load-mode`](https://github.com/ggml-org/llama.cpp/discussions/19883) ([mlock commit note](https://app.semanticdiff.com/gh/ggerganov/llama.cpp/commit/f963b63afa0e057cfb9eba4d88407c6a0850a0d8)) | Weights are memory mapped by default, so a cold start reads from the SSD and a warm one from the page cache; `mlock` pins them; macOS is "eager to start compressing" an unpinned model and then stalls to decompress | Adapted | The chat engine stays mmap, unpinned (the chat throughput note found 0 pageouts with the reserved set in memory). What protects it from compression and swap is the reserved class and the margin, not a lock. New: the watchdog treats a rising `Swapouts` counter while chat is loaded as WARN (slice 12), because a swapped chat model is the "20 to 0.5 tokens per second" cliff people report ([guide](https://mljourney.com/?p=4413)), and it is never allowed to happen on purpose (owner: never swap the chat model). |
+| Ollama and LM Studio mmap of a model larger than RAM ([guide](https://insiderllm.com/guides/running-llms-mac-m-series/)) | Let the OS page weights in on demand so a model bigger than memory still runs | Rejected | A page per token at SSD speed; the `fits_ever` refusal (Q1) is the right answer for a model that does not fit, with the numbers on the card. |
+| The page cache as the model cache (this note's measurement) | Unloaded weights stay in the file cache until memory is needed; a reload reads nothing from disk | Adopted | This is why eviction is cheap and why the eviction order can be aggressive: the edit model (about 10 GB on disk) reloads in 6 to 12 s, almost all of it loader time. One rule: the Stack never purges the file cache, and the bench that measures a cold load (`IMGGEN-BENCH-01`) says it forced one. Slice 13 measures the loader's share so the estimate on the card ("about 10 seconds") is honest. |
+| llama.cpp slot save and restore ([tutorial](https://github.com/ggml-org/llama.cpp/discussions/13606), [commit](https://cdn04132025.gitlink.org.cn/replica/llama.cpp/commit/beea6e1b16e783a0886e78dec01002a8c00db24d)) | `--slot-save-path` plus `POST /slots/{id}?action=save` writes a slot's KV cache to a file and `restore` reads it back; loopback only, opt in, not automatic | Rejected | The chat model is never evicted, so the only use would be keeping the prefix across the watchdog's chat restart (60 s of CRITICAL). A slot file holds the slot's token ids and KV, so it would write a person's turn, a temporary chat and a robot's look sentence to disk, which RULES.md R1 and the temporary-chat design forbid even for a second. The prefix (2,890 tokens, 0.42 s first token warm against 3 to 5 s cold) is rebuilt in memory instead by the existing post-start suite (`chat_hello` first, on the one shared schedule of the reliability note), which already runs after any restart; slice 11 only makes the watchdog's restart count as one. Nothing is written. |
+| [LMCache](https://arxiv.org/pdf/2510.09665) and vLLM KV offload ([docs](https://docs.lmcache.ai/getting_started/quickstart/offload_kv_cache)) | Keep KV caches of recurring prefixes in CPU memory and on local disk across requests; 2.3x to 14x throughput on long multi-turn traces (vendor numbers) | Rejected as software, idea covered | Needs vLLM and a GPU-CPU split. The idea, reuse of a recurring prefix, is already the engine's own prompt cache (`--cache-reuse 256`) and the prewarm `chat_hello`, which also covers the one restart case. |
+| [MLX lazy loading and mflux `--low-ram`](https://upd.dev/ml-explore/mlx/issues/2878) ([mflux 0.16.5 notes](https://newreleases.io/project/github/filipstrand/mflux/release/v.0.16.5)) | MLX arrays are lazy, but `mx.load` has no streaming mode (an open request); mflux's low-ram mode and its cache cap trade speed for footprint | Adapted | The cache cap is slice 4 (already adopted). Low-ram mode is rejected on p128 (the pool fits) and is the right fallback for p32 and p16 tiers, where the image engine note already picks smaller models; no change here. |
+| macOS compressed memory and swap ([box.co.uk](https://box.co.uk/blog/macbook-air-memory-usage-macos), [insiderllm](https://insiderllm.com/guides/running-llms-mac-m-series/)) | macOS compresses inactive pages before it swaps; yellow pressure is compression, red is swap; LLM speed collapses once weights swap | Adopted as a signal | Compression is already in the watchdog's reading (`kern.memorystatus_level`, the compressor pages). Swap growth is already a CRITICAL trigger (1 GB in 30 s). Slice 12 adds the chat-specific pageout rule above. Nothing is designed to use swap on purpose. |
+| SSD wear ([mjtsai, 2026](https://mjtsai.com/blog/2026/03/06/how-long-will-my-macs-ssd-last/), [M1 reports](https://www.pcgamer.com/uk/apple-m1-macs-appear-to-be-chewing-through-their-ssds)) | Reads cost no wear; swap writes do (one 8 GB user saw about 1 TB a day); Apple does not publish the TBW | Adopted as a constraint | Everything above is read-only; the design writes nothing to the SSD and never uses swap as memory. Jesse's rule "never swap the chat model" is also the wear rule. |
+
+What changes in the design because of this research: the eviction order of 4.3 stays aggressive (reload is cheap, the disk is
+not the cost); a swapped-out chat model becomes a watchdog state (slice 12); the chat restart rebuilds its prefix in memory
+through the existing post-start suite, with nothing written to disk (slice 11); the
+card's "about 10 seconds" load estimate is measured as loader time, not disk time (slice 13). Nothing keeps a model on the
+SSD "instead of unloading": unloading already is that, through the page cache. Weights are never streamed per token on a dense
+model, and no engine outside the Stack's set is adopted.
+
+## 11. Build slices (small; no backlog rows yet)
 
 | # | Repo | Files | What | Test |
 |---|---|---|---|---|
@@ -336,15 +392,19 @@ Budget 116.8 GB; reserved 36 GB; working margin 20 GB; so the room for jobs with
 | 2 | Stack | `lib/governor.ts`, `roles.ts`, `tests/governor.test.ts` | the class tag on requests and loaded items; the eviction order of 4.3 with the busy and grace rules | eviction picks the idle edit model before the pool, never reserved, never a busy item |
 | 3 | Stack | image worker (`image-gen` worker script), `lib/imageGen.ts`, its test | the picture pool: one admission, create model resident, edit model on demand, one-model fallback (bakeoff slice 2) | both models load inside the window; a second edit does not reload; pool unloads after idle |
 | 4 | Stack | the picture, video and song worker scripts | `clear_cache` after each job and a cache limit at start | resting footprint after a job is within 10 percent of the weights |
-| 5 | Home | `lib/jobs/householdQueue.ts` (new), `lib/pictures/jobs.ts`, `lib/videos/jobs.ts` | the household queue: class order Q2, round robin Q3, backfill Q4, aging Q5, depth Q7; one job per person; re-submit on reconnect (ISOLATION-03 extended) | two people interleave; a video ages after 10 minutes; a picture backfills a paused clip; a child's cap holds |
+| 5 | Home | `lib/jobs/householdQueue.ts` (new), `lib/pictures/jobs.ts`, `lib/videos/jobs.ts` | the household queue: class order Q2, round robin Q3, backfill Q4, aging Q5, no cap Q7; one job per person; re-submit on reconnect (ISOLATION-03 extended) | two people interleave; a video ages after 10 minutes; a picture backfills a paused clip; a child's cap holds; one person's 20 requests do not delay another's first |
 | 6 | Home | `lib/jobQueueCopy.ts` (new), `lib/videos/jobs.ts` (`busyLine` deleted), the song jobs file | the one copy table of section 6, read by every card | every state and reason has an adult and a child line; no em dash; the dad test by review |
 | 7 | Home | `lib/pictures/jobs.ts`, `lib/videos/jobs.ts`, a test | re-queue on a watchdog cancel (Q6), twice, then fail | a cancelled job reappears queued at the head of its class |
 | 8 | Stack and Home | `routes/memory.ts`; Home `lib/stackHealthSync.ts`, `StatusPage` data | the `ledger` block and its Status row | the Status page shows class totals and queue depth from a fixture |
 | 9 | Stack | `routes/jobs.ts`, `lib/jobs.ts` | the start rule (ISOLATION-02): no admission while an interactive request is in flight; the watchdog's WARN holds the queue instead of cancelling it | a queued job is admitted after the 4 s tail, never during a request |
 | 10 | Stack | `scripts/bench-isolation.ts` (ISOLATION-06's harness, bench lane) | examples 2, 3 and 4 added as scenarios to the isolation bench; no second harness | two pictures plus a clip; the clip waits then starts; no job fails |
+| 11 | Stack and Home | `lib/supervisor.ts` (the restart it already reports), the Home code that turns a restart into the post-start suite, a test | the watchdog's chat restart is reported to Home as a restart like any other, so the one shared schedule's existing post-start suite runs once (`chat_hello` first, single flight, a person's turn still wins, the reliability note's scheduler untouched); no new prewarm caller, no slot save, nothing written | a scripted watchdog restart triggers the post-start suite once, with `chat_hello` first; the bench shows a first token under 1 s on the next turn |
+| 12 | Stack | `lib/memoryWatchdog.ts`, `lib/memoryState.ts`, a test | the `Swapouts` counter rising while the chat role is loaded enters WARN at once (not after 2 samples); the ledger block reports `chat_paged_out: true` | a fixture with rising swapouts and a loaded chat role is WARN on the first sample |
+| 13 | Stack | `scripts/bench-isolation.ts` (bench lane) | the reload bench: time to first picture after an eviction with the weights in the page cache against after a forced cold read; the loader's share becomes the card's load estimate | two numbers in the bench output; the card estimate is within 3 s of the warm number |
+| 14 | Stack | `lib/governor.ts`, `tests/governor.test.ts` | the Q8 flex band: 4 GB, picture class only, level normal only, one borrower, returned on release | a picture is admitted at 19 GB free, a video is not; a second picture waits while the band is borrowed |
 
-Order: 1, 2, 9 (the Stack stops failing and starts ordering), then 5 and 6 (people see the right words), then 3, 4, 7, 8, 10.
-Each is a Codex brief of 1 to 3 files with a failing test first.
+Order: 1, 2, 9 (the Stack stops failing and starts ordering), then 5 and 6 (people see the right words), then 14, 3, 4, 7, 8,
+12, 11, 10, 13. Each is a Codex brief of 1 to 3 files with a failing test first.
 
 ## Supersedes
 
@@ -360,9 +420,15 @@ Each is a Codex brief of 1 to 3 files with a failing test first.
   the same time (the bakeoff measured 23 GB together and no slowdown, section 3 there). One heavy job per person across kinds
   stays.
 - The resource priority memory note's "memory-budget-2026-10-21.md, to be written": this note is it.
+- `isolation-2026-10-18.md` section 1's inventory line "Memory watchdog ladder ... 2 samples to enter": one addition, slice 12,
+  a rising `Swapouts` counter while the chat role is loaded enters WARN on the first sample. Every other step of the ladder,
+  the chat restart after 60 s of CRITICAL included, stays.
+- `isolation-2026-10-18.md` section 1's "free memory minus the tier margin (20 GB on p128) stays above zero": the margin may
+  flex by 4 GB for one picture-class job under rule Q8 (owner's answer 4); the 20 GB stays the rule for every other admission.
+- `isolation-2026-10-18.md` section 1's "the fifth person gets 'a full line'": Home's household queue has no cap (owner's
+  answer 2); the Stack's 4 per kind is a wire buffer Home feeds, never a refusal a person sees.
 
-Nothing else in the isolation note's design, the bakeoff's decision, the coding mode note, the watchdog ladder or any gate is
-superseded.
+Nothing else in the isolation note's design, the bakeoff's decision, the coding mode note or any gate is superseded.
 
 Reuse check: the governor stays the one admission decision (one definition, one place); Home's job rows stay the one queue
 store; the job card, the Yours line, the Status page, the composer line, the admin notification and `failureCopy.ts` carry every
