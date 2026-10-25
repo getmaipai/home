@@ -1,4 +1,5 @@
 import { takeInterruptedReply } from "@/lib/interruptedReply";
+import { __temporaryReplyForTests, applyHeardPrefix, getPendingAsk, setPendingAsk, type PendingAsk } from "@/lib/conversationHistory";
 import { describe, expect, test, beforeEach, afterEach, spyOn } from "bun:test";
 import { TestClient } from "./client";
 import { resetDb } from "./reset-db";
@@ -132,6 +133,33 @@ describe("turn cancellation generations", () => {
     expect(stored!.replyText.length).toBeGreaterThan(0);
     expect(takeInterruptedReply(stored!.conversationId!, stored!.personId)).toContain(full.slice(heardChars).trim().slice(0, 10));
     expect(takeInterruptedReply(stored!.conversationId!, stored!.personId)).toBeNull();
+  }, 10_000);
+
+  test("a temporary chat's in-memory window is cut to the heard part too", async () => {
+    const { client } = await owner();
+    const response = await client.post("/api/turn/stream", { text: "say a short answer", spoken: true, temporary: true });
+    const events = await readNdjson(response);
+    const meta = events.find((event) => event.type === "turn_meta")!;
+    const full = events.filter((event) => event.type === "delta").map((event) => event.text as string).join("");
+    expect(full.length).toBeGreaterThan(40);
+    await client.post(`/api/turn/${meta.turn_id}/cancel`, { heard_chars: 15 });
+    const reply = __temporaryReplyForTests(meta.conversation_id as string, meta.turn_id as string);
+    expect(reply).not.toBeNull();
+    expect(reply!.length).toBeLessThanOrEqual(15);
+    expect(reply!.length).toBeGreaterThan(0);
+  }, 10_000);
+
+  test("a question that only the unheard part asked is not left as a pending ask", async () => {
+    const { client, actor } = await owner();
+    const response = await client.post("/api/turn/stream", { text: "say a short answer", spoken: true });
+    const events = await readNdjson(response);
+    const turnId = events.find((event) => event.type === "turn_meta")!.turn_id as string;
+    const stored = db.select().from(conversationTurns).where(eq(conversationTurns.id, turnId)).get()!;
+    db.update(conversationTurns).set({ replyText: "One two three four five six seven eight. Do you want to hear more?" }).where(eq(conversationTurns.id, turnId)).run();
+    setPendingAsk(stored.conversationId!, { kind: "lookup", prompt: "more?", packageId: "websearch" } as PendingAsk);
+    expect(getPendingAsk(stored.conversationId!)).not.toBeNull();
+    applyHeardPrefix(turnId, actor.id, 20, (released, heard) => released.slice(0, heard));
+    expect(getPendingAsk(stored.conversationId!)).toBeNull();
   }, 10_000);
 
   test("talking over the third sentence after sentence two starts saves the first two in the thread and history", async () => {

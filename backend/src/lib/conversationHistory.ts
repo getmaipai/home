@@ -153,10 +153,34 @@ export function turnOwnerId(turnId: string): string | null {
  * the turn, the turn is unknown, or everything was heard. `cut` decides where the prefix ends (turn.ts's cutAtWord). */
 export function applyHeardPrefix(turnId: string, personId: string, heardChars: number, cut: (released: string, heardChars: number) => string): { conversationId: string; released: string; heardPrefix: string } | null {
   const row = db.select({ personId: conversationTurns.personId, conversationId: conversationTurns.conversationId, replyText: conversationTurns.replyText }).from(conversationTurns).where(eq(conversationTurns.id, turnId)).get();
-  if (!row || row.personId !== personId || !row.conversationId || heardChars >= row.replyText.length) return null;
-  const heardPrefix = cut(row.replyText, heardChars).trim();
-  db.update(conversationTurns).set({ replyText: heardPrefix }).where(eq(conversationTurns.id, turnId)).run();
-  return { conversationId: row.conversationId, released: row.replyText, heardPrefix };
+  if (row) {
+    if (row.personId !== personId || !row.conversationId || heardChars >= row.replyText.length) return null;
+    const heardPrefix = cut(row.replyText, heardChars).trim();
+    db.update(conversationTurns).set({ replyText: heardPrefix }).where(eq(conversationTurns.id, turnId)).run();
+    dropUnheardAsk(row.conversationId, row.replyText, heardPrefix);
+    return { conversationId: row.conversationId, released: row.replyText, heardPrefix };
+  }
+  // A temporary chat's turns live in process memory only; its window must not show the unheard text either (rule 4: one window builder).
+  for (const [conversationId, session] of temporarySessions) {
+    const mem = session.turns.find((turn) => turn.id === turnId);
+    if (!mem) continue;
+    if (mem.personId !== personId || heardChars >= mem.replyText.length) return null;
+    const released = mem.replyText;
+    const heardPrefix = cut(released, heardChars).trim();
+    mem.replyText = heardPrefix;
+    return { conversationId, released, heardPrefix };
+  }
+  return null;
+}
+
+/** Test hook: the reply text a temporary chat's in-memory window holds for one turn. */
+export function __temporaryReplyForTests(conversationId: string, turnId: string): string | null {
+  return temporarySessions.get(conversationId)?.turns.find((turn) => turn.id === turnId)?.replyText ?? null;
+}
+
+// A question that ended the unheard part was never asked of the person: their next words are not an answer to it (single-shot ask).
+function dropUnheardAsk(conversationId: string, released: string, heardPrefix: string): void {
+  if (released.slice(heardPrefix.length).includes("?")) setPendingAsk(conversationId, null);
 }
 
 export type ConversationOpResult<T> =
