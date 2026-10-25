@@ -54,9 +54,7 @@ A companion definition (the package manifest of a catalog companion, and the bun
 | Field | Meaning |
 |---|---|
 | `rate` | `none`, `sparse`, `light`, `natural`, `lively`. Maps to the knobs below. Missing means today's household level. |
-| `fillers` | Up to eight entries `{ text, weight, where }`. `where` is `start` (opens a sentence: "Um,", "Well,") or `inline` (inside a sentence at a clause boundary: "like,", "you know,"). |
-| `interjections` | Up to eight entries `{ text, on }`. `on` is the situation it answers: `surprise`, `agreement`, `humor`, `sympathy`, `excitement`. Each is a whole short utterance placed before or after a sentence ("No way", "Get out"). |
-| `tags` | A subset of the six engine tags this companion may use, in order of preference. |
+| `sounds` | Up to sixteen references `{ id, weight }` into the master list (section 2a): fillers, interjections and tags are all master-list ids, so an author never spells a sound and there is one record shape. A household may add custom filler or interjection entries to one companion, written with the same fields as a master entry (section 2a). |
 
 Rates, as numbers the planner already has (a new `lively`, and a `sparse` between none and light):
 
@@ -68,7 +66,7 @@ Rates, as numbers the planner already has (a new `lively`, and a `sparse` betwee
 | `natural` (today) | 2 | 3 | 1 | 90% | 40% | 0 to 1 only for a companion that lists inline fillers |
 | `lively` | 4 | 1 | 0 | 90% | 50% | up to 1, never two sentences in a row |
 
-Examples (authoring defaults, judged by ear per voice before they ship):
+Examples (illustrative: each sound named here is a master-list id, written out in plain words for reading; authoring defaults, judged by ear per voice before they ship):
 
 | Companion | Rate | Fillers | Interjections | Tags |
 |---|---|---|---|---|
@@ -91,7 +89,7 @@ first, versioned like the speech normalizer), so every companion, every voice an
 | `text` | What is handed to the speech engine (for a tag, the engine tag; for a filler or interjection, the spelling that reads best, which may differ from how it is written: "um" and "umm", "like,"). |
 | `where` | For a filler, `start` or `inline` or both; for an interjection, `before` or `after` a sentence. |
 | `on` | For an interjection, the situation it answers (surprise, agreement, humor, sympathy, excitement). |
-| `voices` | Which voices say it well, from listening (a voice that says an entry badly, or an engine without the tag, skips it, never a mangled line). |
+| (no voice list) | Which voices say an entry badly is judged by ear and kept on the **voice's own catalog record** (`says_badly: [ids]`), so a new catalog voice needs no spec release to be listed. A voice that says an entry badly, or an engine without the tag, skips it, never a mangled line. |
 | `floor` | Reviewed against the child floor when added, and a unit test keeps every entry passing for every band. |
 
 - **A companion's style is a list of ids with weights**, plus the rate. A companion author can write a very short style ("um, uh, like at
@@ -180,4 +178,4 @@ Order: 01, 02, 03, then 04 and 05.
   `speech_style`: merging would change a manifest field and needs its own ruling.
 
 - `voice.hesitations` (off, light, natural) stays as the household master; it no longer is the only control. Nothing is removed.
-- The fixed filler pair ("Hmm,", "Well,") in `voiceCues.ts` becomes the default list for a companion that has no style.
+- The fixed filler pair ("Hmm,", "Well,") in `voiceCues.ts` become the master entries `hmm` and `well`, and are the default sounds for a companion that has no style.
