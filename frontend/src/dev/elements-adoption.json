@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-10-25T14:47:45.017Z",
+  "generatedAt": "2026-10-25T15:00:34.635Z",
   "kitTag": "ui-v0.5.332",
   "items": [
     {
@@ -254,7 +254,7 @@
       "group": "character",
       "verdict": "wire-now",
       "verdictReason": "The detail page and the editor strip lead with the large round character and name pill (DOTS-DETAIL-01); adopted as shipped with props only.",
-      "implemented": false
+      "implemented": true
     },
     {
       "file": "chart.tsx",
