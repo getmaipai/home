@@ -17,6 +17,8 @@ import { voicePreviewPlayer, type VoicePreviewState } from "@/lib/voice/voicePre
 import { useTabItem } from "@/shell/tabIdentity";
 import { useCompanionShells } from "@/lib/companionShells";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@maipai/ui/src/ui/tabs";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@maipai/ui/src/ui/alert-dialog";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@maipai/ui/src/ui/dropdown-menu";
 import { Chip } from "@maipai/ui/src/primitives/Chip";
 import { getIcon } from "@maipai/ui/src/icons";
 import { companionPreviewSample } from "@/shell/pages/companionPreviewSample";
@@ -25,20 +27,34 @@ const listKey = ["companions"] as const;
 const ROBOT_SETTINGS = "/settings/apps?tab=robot";
 const SettingsIcon = getIcon("settings-2");
 const ChevronRightIcon = getIcon("chevron-right");
+const MoreIcon = getIcon("more-horizontal");
 
 /** The inside of one gallery card, shared by Yours and Discover. */
-function CompanionBody({ card, preview = false, discover = false }: { card: CompanionCard; preview?: boolean; discover?: boolean }) {
+function CompanionBody({ card, preview = false, discover = false, onFailure, onDelete }: { card: CompanionCard; preview?: boolean; discover?: boolean; onFailure: (message: string) => void; onDelete: (card: CompanionCard) => void }) {
+  const queryClient = useQueryClient();
+  const save = useMutation({ mutationFn: () => api.setDefaultCompanion(card.id), onSuccess: () => { void queryClient.invalidateQueries({ queryKey: listKey }); }, onError: (error) => onFailure(error instanceof ApiError ? error.message : "Could not set your default. Check your connection and try again.") });
+  const title = <span className="font-semibold">{card.name}</span>;
+  const actions = <div className="flex justify-end"><DropdownMenu>
+    <DropdownMenuTrigger asChild>
+      <Button type="button" variant="ghost" size="icon" aria-label="Companion actions" onClick={(event) => event.stopPropagation()} onPointerDown={(event) => event.stopPropagation()} onKeyDown={(event) => event.stopPropagation()}><MoreIcon aria-hidden="true" /></Button>
+    </DropdownMenuTrigger>
+    <DropdownMenuContent align="end" onClick={(event) => event.stopPropagation()} onPointerDown={(event) => event.stopPropagation()} onKeyDown={(event) => event.stopPropagation()}>
+      <DropdownMenuItem disabled={card.is_default || save.isPending} onSelect={() => save.mutate()}>{card.is_default ? "Your default" : "Set as my default"}</DropdownMenuItem>
+      {card.can_edit && card.is_household ? <DropdownMenuItem variant="destructive" onSelect={() => onDelete(card)}>Delete</DropdownMenuItem> : null}
+    </DropdownMenuContent>
+  </DropdownMenu></div>;
   if (preview && !discover) {
     const sample = companionPreviewSample(card.id);
-    const statusTone = sample.status === "Working" ? "success" : sample.status === "Needs approval" ? "warning" : undefined;
+    const statusClass = sample.status === "Working" ? "bg-[color:var(--hue-teal)] text-foreground" : sample.status === "Needs approval" ? "bg-[color:var(--hue-orange)] text-foreground" : "bg-muted text-foreground";
     return (
       <div className="flex flex-col gap-3 text-left">
         <div className="flex items-center justify-between gap-3">
           <Avatar name={card.name} size="profile" />
-          <Badge variant="secondary" tone={statusTone}>{sample.status}</Badge>
+          <div className="ml-auto flex items-center gap-2">{actions}</div>
+          <span className={`rounded-full px-3 py-1 text-sm font-medium ${statusClass}`}>{sample.status}</span>
         </div>
         <div className="flex flex-col gap-1">
-          <h2 className="text-base font-semibold">{card.name}</h2>
+          <h2 className="text-base">{title}</h2>
           <p className="text-sm text-muted-foreground">{card.tagline}</p>
           <p className="text-sm text-muted-foreground">{sample.activityLine}</p>
         </div>
@@ -50,10 +66,11 @@ function CompanionBody({ card, preview = false, discover = false }: { card: Comp
     );
   }
   return (
-    <div className="flex flex-col items-center gap-3 text-center">
+    <div className="relative flex flex-col items-center gap-3 text-center">
+      <div className="absolute right-0 top-0">{actions}</div>
       <Avatar name={card.name} size="profile" />
       <div className="flex flex-col gap-1">
-        <h2 className="text-base font-semibold">{card.name}</h2>
+        <h2 className="text-base">{title}</h2>
         <p className="text-sm text-muted-foreground">{card.tagline}</p>
         <p className="text-sm text-muted-foreground">{card.who_can_use}</p>
         {preview && !discover ? <p className="text-sm text-muted-foreground">{card.chats} chats</p> : null}
@@ -81,8 +98,13 @@ export function CompanionsPage() {
   const query = useQuery<CompanionList>({ queryKey: listKey, queryFn: api.companions, retry: false });
   const preview = useCompanionShells();
   const [discoverFilter, setDiscoverFilter] = useState("All");
+  const [actionError, setActionError] = useState<string | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<CompanionCard | null>(null);
+  const queryClient = useQueryClient();
+  const remove = useMutation({ mutationFn: (id: string) => api.deleteCompanion(id), onSuccess: () => { setDeleteTarget(null); void queryClient.invalidateQueries({ queryKey: listKey }); }, onError: (error) => setActionError(error instanceof ApiError ? error.message : "Could not delete this companion. Check your connection and try again.") });
   return (
     <div className="flex flex-col gap-6" data-testid="companions">
+      {actionError ? <Alert variant="destructive"><AlertDescription>{actionError}</AlertDescription></Alert> : null}
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div className="flex min-w-0 flex-col gap-1">
           <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">Companions</h1>
@@ -113,7 +135,7 @@ export function CompanionsPage() {
                 <TabsContent value="Yours">
                   <CardGrid label="Companions" items={data.companions} getKey={(card) => card.id} getLabel={(card) => card.name}
                     onSelect={(card) => navigate(`/companions/${encodeURIComponent(card.id)}`)}
-                    renderItem={(card) => <CompanionBody card={card} preview />} />
+                    renderItem={(card) => <CompanionBody card={card} preview onFailure={setActionError} onDelete={setDeleteTarget} />} />
                   <p className="mt-4 text-sm text-muted-foreground">Sample activity. Real activity is coming soon.</p>
                 </TabsContent>
                 {data.can_discover ? <TabsContent value="Discover">
@@ -122,7 +144,7 @@ export function CompanionsPage() {
                       <Chip key={item} selected={discoverFilter === item} onClick={() => setDiscoverFilter(item)}>{item}</Chip>)}
                   </div>
                   <CardGrid label="Discover companions" items={data.companions.filter((card) => !card.is_default)}
-                    getKey={(card) => card.id} renderItem={(card) => <CompanionBody card={card} discover />} />
+                    getKey={(card) => card.id} renderItem={(card) => <CompanionBody card={card} discover onFailure={setActionError} onDelete={setDeleteTarget} />} />
                   <p className="mt-4 text-sm text-muted-foreground">Coming soon: add a companion to your set from here.</p>
                 </TabsContent> : null}
               </Tabs>
@@ -133,9 +155,15 @@ export function CompanionsPage() {
                 getKey={(card) => card.id}
                 getLabel={(card) => card.name}
                 onSelect={(card) => navigate(`/companions/${encodeURIComponent(card.id)}`)}
-                renderItem={(card) => <CompanionBody card={card} />}
+                renderItem={(card) => <CompanionBody card={card} onFailure={setActionError} onDelete={setDeleteTarget} />}
               />
             )}
+            <AlertDialog open={deleteTarget !== null} onOpenChange={(open) => { if (!open) setDeleteTarget(null); }}>
+              <AlertDialogContent onClick={(event) => event.stopPropagation()} onPointerDown={(event) => event.stopPropagation()} onKeyDown={(event) => event.stopPropagation()}>
+                <AlertDialogHeader><AlertDialogTitle>Delete {deleteTarget?.name}?</AlertDialogTitle><AlertDialogDescription>This removes it for the whole home.</AlertDialogDescription></AlertDialogHeader>
+                <AlertDialogFooter><AlertDialogCancel>Cancel</AlertDialogCancel><AlertDialogAction disabled={remove.isPending} onClick={() => { if (deleteTarget) remove.mutate(deleteTarget.id); }}>Delete</AlertDialogAction></AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
             {data.robots ? <RobotAssignments robots={data.robots} /> : null}
           </>
         )}
