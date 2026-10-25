@@ -9,9 +9,11 @@ import { settingsArea } from "@/shell/pages/settings/settingsAreas";
 /** Every app's settings carry one more section the host adds, "Sidebar", with the switch that pins the app to the rail (owner,
  * 2026-10-25: the favorites star left the app pages and went under settings). The package declares nothing for it. */
 export function withSidebarSection(area: SettingsAreaDef): SettingsAreaDef {
-  if (!area.app || area.sections.some((section) => section.id === "sidebar")) return area;
-  const groups = area.groups.length > 0 ? area.groups.map((group, index) => (index === 0 ? { ...group, sections: [...group.sections, "sidebar"] } : group)) : [{ label: area.title, sections: ["sidebar"] }];
-  return { ...area, groups, sections: [...area.sections, { id: "sidebar", label: "Sidebar", icon: "pin", kind: "view", view: `app.pin:${area.app}` }] };
+  const sections = area.sections ?? [];
+  const existing = area.groups ?? [];
+  if (!area.app || sections.some((section) => section.id === "sidebar")) return area;
+  const groups = existing.length > 0 ? existing.map((group, index) => (index === 0 ? { ...group, sections: [...group.sections, "sidebar"] } : group)) : [{ label: area.title, sections: ["sidebar"] }];
+  return { ...area, groups, sections: [...sections, { id: "sidebar", label: "Sidebar", icon: "pin", kind: "view", view: `app.pin:${area.app}` }] };
 }
 
 /** The package areas on these app rows. A central area id is never overridden (the hub refuses one at install). */
