@@ -54326,6 +54326,92 @@
                         ]
                       }
                     },
+                    "discover": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string"
+                          },
+                          "name": {
+                            "type": "string"
+                          },
+                          "type": {
+                            "type": "string",
+                            "enum": [
+                              "child",
+                              "teen",
+                              "adult"
+                            ]
+                          },
+                          "type_label": {
+                            "type": "string"
+                          },
+                          "tagline": {
+                            "type": "string"
+                          },
+                          "who_can_use": {
+                            "type": "string"
+                          },
+                          "dials": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "label": {
+                                  "type": "string"
+                                },
+                                "value": {
+                                  "type": "string"
+                                }
+                              },
+                              "required": [
+                                "label",
+                                "value"
+                              ]
+                            }
+                          },
+                          "voice": {
+                            "type": "string"
+                          },
+                          "is_default": {
+                            "type": "boolean"
+                          },
+                          "is_household": {
+                            "type": "boolean"
+                          },
+                          "status": {
+                            "type": "string"
+                          },
+                          "chats": {
+                            "type": "number"
+                          },
+                          "can_edit": {
+                            "type": "boolean"
+                          },
+                          "can_copy": {
+                            "type": "boolean"
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "name",
+                          "type",
+                          "type_label",
+                          "tagline",
+                          "who_can_use",
+                          "dials",
+                          "voice",
+                          "is_default",
+                          "is_household",
+                          "status",
+                          "chats",
+                          "can_edit",
+                          "can_copy"
+                        ]
+                      }
+                    },
                     "robots": {
                       "type": "array",
                       "nullable": true,
@@ -54370,6 +54456,7 @@
                     "can_discover",
                     "default_id",
                     "companions",
+                    "discover",
                     "robots"
                   ]
                 }
@@ -54549,6 +54636,186 @@
           },
           "403": {
             "description": "Only adults can make a companion.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/companions/{id}/add": {
+      "post": {
+        "tags": [
+          "Companions"
+        ],
+        "summary": "Add companion to my Yours set",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "lively-teen"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Updated the signed-in person's companion set.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "companions": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    }
+                  },
+                  "required": [
+                    "companions"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The requested set change is not allowed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "This action is unavailable for this person",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such companion",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/companions/{id}/remove": {
+      "post": {
+        "tags": [
+          "Companions"
+        ],
+        "summary": "Remove companion from my Yours set",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "lively-teen"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Updated the signed-in person's companion set.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "companions": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    }
+                  },
+                  "required": [
+                    "companions"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The requested set change is not allowed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "This action is unavailable for this person",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such companion",
             "content": {
               "application/json": {
                 "schema": {
