@@ -140,19 +140,50 @@ export function cardOf(person: PersonRow, persona: Persona): CompanionCard {
 
 export function listCompanionCards(person: PersonRow, admin = false): CompanionCard[] {
   if (!companionAreaOn(person)) return [];
-  const cards = PERSONAS.filter((persona) => mayUseCompanion(person, persona)).map((persona) => cardOf(person, persona));
+  const usable = PERSONAS.filter((persona) => mayUseCompanion(person, persona));
+  const stored = getPersonSettingValue(person, "companions.enabled");
+  const held = Array.isArray(stored) && stored.every((id) => typeof id === "string") ? new Set(stored) : new Set(usable.map((persona) => persona.id));
+  const defaultId = currentCompanionId(person);
+  held.add(defaultId);
+  held.add("default");
+  for (const id of listHouseholdCompanionIds()) {
+    const household = getHouseholdCompanion(id);
+    if (household?.companion && householdCompanionAuthorId(id) === person.id) held.add(id);
+  }
+  const cards = usable.filter((persona) => held.has(persona.id)).map((persona) => cardOf(person, persona));
   const seen = new Set(cards.map((card) => card.id));
   if (admin || speakerAgeBand(person, new Date()) === "adult") {
     for (const id of listHouseholdCompanionIds()) {
       if (seen.has(id)) continue;
       const manifest = getHouseholdCompanion(id);
-      if (!manifest?.companion || manifest.companion.status !== "draft") continue;
+      if (!manifest?.companion || manifest.companion.status !== "draft" || seen.has(id)) continue;
       if (!admin && householdCompanionAuthorId(id) !== person.id) continue;
       const c = manifest.companion;
       cards.push({ id, name: c.display_name, type: "adult", type_label: TYPE_LABEL.adult, tagline: c.tagline ?? "", who_can_use: WHO_CAN_USE.adult,
         dials: [{ label: "How it talks", value: FORMALITY[c.formality] }, { label: "Word choice", value: COMPLEXITY[c.complexity] }, { label: "Questions back", value: ENGAGEMENT[c.engagement] }, { label: "Casual chatter", value: FILLER[c.filler_density] }],
         voice: voiceLabel(c.voice_id ?? "", Boolean(c.voice_id)), is_default: false, is_household: true, status: "draft", chats: 0 });
     }
+  }
+  return cards;
+}
+
+/** Companion ids this person currently holds, materializing the legacy unset state as all usable ids. */
+export function heldCompanionIds(person: PersonRow): string[] {
+  return listCompanionCards(person).map((card) => card.id);
+}
+
+/** Companion cards available to add, excluding the person's held set. */
+export function discoverCompanionCards(person: PersonRow): CompanionCard[] {
+  if (speakerAgeBand(person, new Date()) === "child" || !companionAreaOn(person)) return [];
+  const held = new Set(heldCompanionIds(person));
+  const cards = PERSONAS.filter((persona) => mayUseCompanion(person, persona) && !held.has(persona.id)).map((persona) => cardOf(person, persona));
+  for (const id of listHouseholdCompanionIds()) {
+    if (held.has(id)) continue;
+    const manifest = getHouseholdCompanion(id)?.companion;
+    if (!manifest || manifest.status !== "ready") continue;
+    const persona = PERSONAS.find((candidate) => candidate.id === id);
+    if (!persona || !mayUseCompanion(person, persona)) continue;
+    cards.push(cardOf(person, persona));
   }
   return cards;
 }

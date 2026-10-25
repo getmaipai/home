@@ -8,7 +8,7 @@ import { statSync } from "node:fs";
 import { apiRouter, errorResponses, idParamSchema } from "@/lib/openapi";
 import { requireAuth } from "@/middleware/auth";
 import { isOwnerOrAdmin } from "@/lib/access";
-import { companionDetail, companionAreaOn, canCreateCompanion, currentCompanionId, listCompanionCards, mayUseCompanion, pickRefusal, robotAssignments } from "@/lib/companionsApp";
+import { companionDetail, companionAreaOn, canCreateCompanion, currentCompanionId, listCompanionCards, discoverCompanionCards, heldCompanionIds, mayUseCompanion, pickRefusal, robotAssignments } from "@/lib/companionsApp";
 import { publishSettingsChanged } from "@/lib/deviceCommands";
 import { getPersonSettingValue, setValue } from "@/lib/settings";
 import { speakerAgeBand } from "@/lib/ageBand";
@@ -56,6 +56,7 @@ const listRoute = createRoute({
     200: { content: { "application/json": { schema: z.object({
       allowed: z.boolean().describe("False when an owner or admin turned companions off for this person."), can_create: z.boolean(), can_discover: z.boolean(), default_id: z.string(),
       companions: z.array(Card),
+      discover: z.array(Card),
       robots: z.array(z.object({ id: z.string(), name: z.string(), controls: Type, companion_id: z.string(), companion_name: z.string().nullable() })).nullable(),
     }) } }, description: "My companions. The robots list is for owners and admins only." },
     ...errorResponses({ 401: "Not signed in" }),
@@ -64,8 +65,31 @@ const listRoute = createRoute({
 companionsRoutes.openapi(listRoute, (c) => {
   const person = c.get("person");
   const admin = isOwnerOrAdmin(person);
-  return c.json({ allowed: companionAreaOn(person), can_create: canCreateCompanion(person, admin), can_discover: speakerAgeBand(person, new Date()) !== "child", default_id: currentCompanionId(person), companions: listCompanionCards(person, admin).map((card) => ({ ...card, can_edit: card.is_household && mayEdit(person, card.id), can_copy: canCreateCompanion(person, admin) })), robots: admin ? robotAssignments() : null }, 200);
+  const decorate = (card: ReturnType<typeof listCompanionCards>[number]) => ({ ...card, can_edit: card.is_household && mayEdit(person, card.id), can_copy: canCreateCompanion(person, admin) });
+  return c.json({ allowed: companionAreaOn(person), can_create: canCreateCompanion(person, admin), can_discover: speakerAgeBand(person, new Date()) !== "child", default_id: currentCompanionId(person), companions: listCompanionCards(person, admin).map(decorate), discover: discoverCompanionCards(person).map(decorate), robots: admin ? robotAssignments() : null }, 200);
 });
+
+const setMembershipRoute = (action: "add" | "remove") => {
+  const route = createRoute({ method: "post", path: `/{id}/${action}`, tags: ["Companions"], summary: `${action === "add" ? "Add companion to" : "Remove companion from"} my Yours set`,
+    middleware: [requireAuth] as const, request: { params: idParamSchema("id", "lively-teen") },
+    responses: { 200: { content: { "application/json": { schema: z.object({ companions: z.array(z.string()) }) } }, description: "Updated the signed-in person's companion set." }, 400: { content: { "application/json": { schema: z.object({ error: z.string() }) } }, description: "The requested set change is not allowed." }, ...errorResponses({ 401: "Not signed in", 403: "This action is unavailable for this person", 404: "No such companion" }) },
+  });
+  companionsRoutes.openapi(route, (c) => {
+    const person = c.get("person"), id = c.req.valid("param").id;
+    if (speakerAgeBand(person, new Date()) === "child") return c.json({ error: "A parent or admin manages your companions. Ask them to update your set." }, 403);
+    const persona = PERSONAS.find((candidate) => candidate.id === id);
+    if (!persona || !mayUseCompanion(person, persona)) return c.json({ error: "That companion is not available to you. Choose another from Discover." }, 403);
+    const current = heldCompanionIds(person);
+    if (action === "remove" && currentCompanionId(person) === id) return c.json({ error: "Make another companion your default first." }, 400);
+    const next = action === "add" ? [...new Set([...current, id])] : current.filter((entry) => entry !== id);
+    const result = setValue(person, `person:${person.id}`, "companions.enabled", next);
+    if (!result.ok) return c.json({ error: result.error }, 403);
+    publishSettingsChanged(`person:${person.id}`, "companions.enabled", next);
+    return c.json({ companions: next }, 200);
+  });
+};
+setMembershipRoute("add");
+setMembershipRoute("remove");
 
 const AvatarState = z.object({ loop: z.boolean(), urls: z.object({ h264: z.string(), av1: z.string().nullable(), still: z.string() }) });
 const avatarRoute = createRoute({

@@ -178,6 +178,10 @@ function assertCanSetChildTopic(actor: PersonRow, targetId: string): SettingsOpR
 }
 
 function validateSelectorValue(keyDef: SettingsKey, value: unknown): SettingsOpResult<true> {
+  if (keyDef.key === "companions.enabled") {
+    if (!Array.isArray(value) || value.some((id) => typeof id !== "string") || new Set(value).size !== value.length) return { ok: false, status: 400, error: "Choose a list of companion ids without duplicates." };
+    return { ok: true, value: true };
+  }
   const range = keyDef.range as Record<string, unknown> | undefined;
   switch (keyDef.selector) {
     case "boolean":

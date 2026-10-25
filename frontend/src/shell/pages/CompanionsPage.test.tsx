@@ -6,7 +6,7 @@ import { api, ApiError, type CompanionCard, type CompanionDetail, type Companion
 import { CompanionDetailPage, CompanionsPage } from "@/shell/pages/CompanionsPage";
 import { CompanionShellViewer } from "@/lib/companionShells";
 
-const originals = { companions: api.companions, companion: api.companion, conversationList: api.conversationList, createConversation: api.createConversation, setDefaultCompanion: api.setDefaultCompanion, deleteCompanion: api.deleteCompanion, stackVoices: api.stackVoices, setSetting: api.setSetting, settingsValues: api.settingsValues };
+const originals = { companions: api.companions, companion: api.companion, conversationList: api.conversationList, createConversation: api.createConversation, setDefaultCompanion: api.setDefaultCompanion, addCompanion: api.addCompanion, removeCompanion: api.removeCompanion, deleteCompanion: api.deleteCompanion, stackVoices: api.stackVoices, setSetting: api.setSetting, settingsValues: api.settingsValues };
 afterEach(() => { cleanup(); Object.assign(api, originals); });
 
 function card(overrides: Partial<CompanionCard> = {}): CompanionCard {
@@ -32,7 +32,7 @@ async function openCardActions(view: { findByRole: (role: string, opts: { name: 
 }
 
 test("the gallery shows character tiles, default check and new companion tile", async () => {
-  api.companions = async (): Promise<CompanionList> => ({ allowed: true, can_create: true, can_discover: true, companions: [card({ is_household: true, status: "draft" }), card({ id: "lively-teen", name: "Riff", type: "teen", type_label: "Teen companion", is_default: true })], robots: null, default_id: "lively-teen" });
+  api.companions = async (): Promise<CompanionList> => ({ allowed: true, can_create: true, can_discover: true, companions: [card({ is_household: true, status: "draft" }), card({ id: "lively-teen", name: "Riff", type: "teen", type_label: "Teen companion", is_default: true })], discover: [], robots: null, default_id: "lively-teen" });
   const view = open("/companions");
   await waitFor(() => expect(view.getByText("Sprout")).toBeTruthy());
   expect(view.queryByText("Child companion")).toBeNull();
@@ -48,7 +48,7 @@ test("the gallery shows character tiles, default check and new companion tile", 
 
 test("preview status uses the kit badge and tile selection opens its detail", async () => {
   api.settingsValues = async () => [{ key: "companions.preview_shells", value: true, source: "user", label: "Preview", level: "basic", secret: false }] as never;
-  api.companions = async (): Promise<CompanionList> => ({ allowed: true, can_create: false, can_discover: false, companions: [card({ id: "lively-child" })], robots: null, default_id: "" });
+  api.companions = async (): Promise<CompanionList> => ({ allowed: true, can_create: false, can_discover: false, companions: [card({ id: "lively-child" })], discover: [], robots: null, default_id: "" });
   const view = open("/companions", true, { id: "viewer" } as never);
   const status = await view.findByText("Needs approval");
   expect(status.className).toContain("cn-badge");
@@ -56,7 +56,7 @@ test("preview status uses the kit badge and tile selection opens its detail", as
 });
 
 test("standard companion card selection opens detail", async () => {
-  api.companions = async (): Promise<CompanionList> => ({ allowed: true, can_create: false, can_discover: false, companions: [card()], robots: null, default_id: "" });
+  api.companions = async (): Promise<CompanionList> => ({ allowed: true, can_create: false, can_discover: false, companions: [card()], discover: [], robots: null, default_id: "" });
   api.companion = async () => detail();
   const view = open("/companions");
   fireEvent.click(await view.findByRole("button", { name: "Sprout" }));
@@ -64,7 +64,7 @@ test("standard companion card selection opens detail", async () => {
 });
 
 test("card actions set a default without opening the card", async () => {
-  api.companions = async (): Promise<CompanionList> => ({ allowed: true, can_create: false, can_discover: true, companions: [card()], robots: null, default_id: "" });
+  api.companions = async (): Promise<CompanionList> => ({ allowed: true, can_create: false, can_discover: true, companions: [card()], discover: [], robots: null, default_id: "" });
   const saved: string[] = [];
   api.setDefaultCompanion = async (id) => { saved.push(id); return { default_id: id }; };
   const view = open("/companions");
@@ -76,8 +76,34 @@ test("card actions set a default without opening the card", async () => {
   expect(view.queryByText("Sprout loves questions.")).toBeNull();
 });
 
+test("Add moves a discovered companion into Yours", async () => {
+  api.settingsValues = async () => [{ key: "companions.preview_shells", value: true, source: "user", label: "Preview", level: "basic", secret: false }] as never;
+  let held = [card({ id: "default", name: "MaiPai", is_default: true })];
+  const added = card({ id: "pal", name: "Pal", type: "adult" });
+  api.companions = async () => ({ allowed: true, can_create: false, can_discover: true, default_id: "default", companions: held, discover: held.some((item) => item.id === "pal") ? [] : [added], robots: null });
+  api.addCompanion = async (id) => { held = [...held, added]; return { companions: ["default", id] }; };
+  const view = open("/companions", true);
+  const discoverTab = await view.findByRole("tab", { name: "Discover" });
+  fireEvent.mouseDown(discoverTab, { button: 0 }); fireEvent.click(discoverTab);
+  fireEvent.click(await view.findByRole("button", { name: "Add" }));
+  await waitFor(() => expect(held.some((item) => item.id === "pal")).toBe(true));
+  expect(held.some((item) => item.id === "pal")).toBe(true);
+});
+
+test("Yours menu removes a held companion", async () => {
+  const pal = card({ id: "pal", name: "Pal", type: "adult" });
+  api.companions = async () => ({ allowed: true, can_create: false, can_discover: true, default_id: "default", companions: [pal], discover: [], robots: null });
+  let removed = "";
+  api.removeCompanion = async (id) => { removed = id; return { companions: ["default"] }; };
+  const view = open("/companions");
+  await view.findByRole("button", { name: "Pal" });
+  await openCardActions(view);
+  fireEvent.click(await view.findByRole("menuitem", { name: "Remove from Yours" }));
+  await waitFor(() => expect(removed).toBe("pal"));
+});
+
 test("card delete asks for confirmation before deleting a household companion", async () => {
-  api.companions = async (): Promise<CompanionList> => ({ allowed: true, can_create: false, can_discover: false, companions: [card({ is_household: true, can_edit: true })], robots: null, default_id: "" });
+  api.companions = async (): Promise<CompanionList> => ({ allowed: true, can_create: false, can_discover: false, companions: [card({ is_household: true, can_edit: true })], discover: [], robots: null, default_id: "" });
   const deleted: string[] = [];
   api.deleteCompanion = async (id) => { deleted.push(id); };
   const view = open("/companions");
@@ -94,14 +120,14 @@ test("card delete asks for confirmation before deleting a household companion", 
 });
 
 test("the gallery does not list robots; robot companions are set in Settings", async () => {
-  api.companions = async (): Promise<CompanionList> => ({ allowed: true, can_create: false, can_discover: true, default_id: "lively-child", companions: [card()], robots: [{ id: "d1", name: "StackChan", controls: "child", companion_id: "lively-child", companion_name: "Sprout" }] });
+  api.companions = async (): Promise<CompanionList> => ({ allowed: true, can_create: false, can_discover: true, default_id: "lively-child", companions: [card()], discover: [], robots: [{ id: "d1", name: "StackChan", controls: "child", companion_id: "lively-child", companion_name: "Sprout" }] });
   const view = open("/companions");
   await waitFor(() => expect(view.getByText("Sprout")).toBeTruthy());
   expect(view.queryByText(/StackChan/)).toBeNull();
 });
 
 test("when companions are off for the person the page says so", async () => {
-  api.companions = async (): Promise<CompanionList> => ({ allowed: false, can_create: false, can_discover: false, companions: [], robots: null, default_id: "lively-teen" });
+  api.companions = async (): Promise<CompanionList> => ({ allowed: false, can_create: false, can_discover: false, companions: [], discover: [], robots: null, default_id: "lively-teen" });
   const view = open("/companions");
   await waitFor(() => expect(view.getByText(/turned off for you/)).toBeTruthy());
 });
@@ -183,7 +209,7 @@ test("a person who is not an admin gets no voice picker", async () => {
 test("preview tabs show status and activity, and the detail page is a hero with rows", async () => {
   api.settingsValues = async () => [{ key: "companions.preview_shells", value: true, source: "user", label: "Preview", level: "basic", secret: false }] as never;
   api.companions = async () => ({ allowed: true, can_create: true, can_discover: true, default_id: "lively-teen", robots: null,
-    companions: [card({ id: "lively-child", name: "Sprout", chats: 2 }), card({ id: "lively-teen", name: "Riff", is_default: true, chats: 0 })] });
+    companions: [card({ id: "lively-child", name: "Sprout", chats: 2 }), card({ id: "lively-teen", name: "Riff", is_default: true, chats: 0 })], discover: [card({ id: "lively-adult", name: "Pal", type: "adult", tagline: "Research helper" })] });
   const yours = open("/companions", true);
   await waitFor(() => expect(yours.getAllByText(/^(Working|Idle|Needs approval)$/).length).toBe(2));
   expect(yours.getByText("Sample activity. Real activity is coming soon.")).toBeTruthy();
@@ -193,9 +219,10 @@ test("preview tabs show status and activity, and the detail page is a hero with 
   const discover = yours.getByRole("tab", { name: "Discover" });
   fireEvent.mouseDown(discover, { button: 0 });
   fireEvent.click(discover);
-  await waitFor(() => expect(yours.getByRole("button", { name: "Sprout" })).toBeTruthy());
+  await waitFor(() => expect(yours.getByRole("button", { name: "Pal" })).toBeTruthy());
+  expect(yours.getByRole("button", { name: "Add" })).toBeTruthy();
   expect(yours.queryByText("Riff")).toBeNull();
-  expect((yours.getByRole("button", { name: "Add" }) as HTMLButtonElement).disabled).toBe(true);
+  expect((yours.getByRole("button", { name: "Add" }) as HTMLButtonElement).disabled).toBe(false);
   cleanup();
   api.companion = async () => detail({ can_edit: true });
   const detailView = open("/companions/lively-child", true);
@@ -220,7 +247,7 @@ test("preview tabs show status and activity, and the detail page is a hero with 
 
 test("preview discovery is hidden when the list says it is unavailable", async () => {
   api.settingsValues = async () => [{ key: "companions.preview_shells", value: true, source: "user", label: "Preview", level: "basic", secret: false }] as never;
-  api.companions = async () => ({ allowed: true, can_create: false, can_discover: false, default_id: "lively-child", companions: [card()], robots: null });
+  api.companions = async () => ({ allowed: true, can_create: false, can_discover: false, default_id: "lively-child", companions: [card()], discover: [], robots: null });
   const view = open("/companions", true);
   await waitFor(() => expect(view.getByRole("tab", { name: "Yours" })).toBeTruthy());
   expect(view.queryByRole("tab", { name: "Discover" })).toBeNull();

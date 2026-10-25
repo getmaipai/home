@@ -10,7 +10,7 @@ const original = api.settingsValues;
 afterEach(() => { cleanup(); api.settingsValues = original; });
 function open(enabled: boolean) {
   api.settingsValues = async () => [{ key: "companions.preview_shells", value: enabled, source: "user", label: "Preview", level: "basic", secret: false }] as never;
-  api.companions = async () => ({ allowed: true, can_create: true, can_discover: true, default_id: "default", companions: [], robots: null });
+  api.companions = async () => ({ allowed: true, can_create: true, can_discover: true, default_id: "default", companions: [], discover: [], robots: null });
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(<QueryClientProvider client={client}><CompanionShellViewer.Provider value={{ id: "person-sage" } as never}><MemoryRouter initialEntries={["/companions/start"]}><Routes><Route path="/companions/start" element={<CompanionWizardPage />} /><Route path="/companions/new" element={<EditorLocation />} /></Routes></MemoryRouter></CompanionShellViewer.Provider></QueryClientProvider>);
 }

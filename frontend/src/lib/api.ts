@@ -351,6 +351,7 @@ export type CompanionFields = Partial<Omit<CompanionEditable, "id" | "status" | 
 export interface CompanionList {
   allowed: boolean; can_create: boolean; can_discover: boolean; default_id: string;
   companions: CompanionCard[];
+  discover: CompanionCard[];
   robots: Array<{ id: string; name: string; controls: "child" | "teen" | "adult"; companion_id: string; companion_name: string | null }> | null;
 }
 
@@ -1434,6 +1435,8 @@ export const api = {
   companions: () => request<CompanionList>("/api/companions"),
   companion: (id: string) => request<CompanionDetail>(`/api/companions/${encodeURIComponent(id)}`),
   setDefaultCompanion: (id: string) => request<{ default_id: string }>(`/api/companions/${encodeURIComponent(id)}/default`, { method: "PUT" }),
+  addCompanion: (id: string) => request<{ companions: string[] }>(`/api/companions/${encodeURIComponent(id)}/add`, { method: "POST" }),
+  removeCompanion: (id: string) => request<{ companions: string[] }>(`/api/companions/${encodeURIComponent(id)}/remove`, { method: "POST" }),
   createCompanion: (fields: CompanionFields) => request<{ id: string }>("/api/companions", { method: "POST", body: JSON.stringify(fields) }),
   copyCompanion: (id: string) => request<{ id: string }>(`/api/companions/${encodeURIComponent(id)}/copy`, { method: "POST", body: "{}" }),
   editCompanion: (id: string) => request<CompanionEditable>(`/api/companions/${encodeURIComponent(id)}/edit`),

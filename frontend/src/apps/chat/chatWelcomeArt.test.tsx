@@ -23,7 +23,7 @@ describe("chat welcome art", () => {
     const oldSettings = api.settingsValues;
     const oldCompanions = api.companions;
     api.settingsValues = (async () => [{ key: "persona.active_id", value: "sprout", source: "user", label: "Personality", level: "basic", secret: false }]) as unknown as typeof api.settingsValues;
-    api.companions = (async () => ({ allowed: true, can_create: false, can_discover: false, default_id: "default", companions: [{ id: "sprout", name: "Sprout", is_default: false }, { id: "default", name: "Default", is_default: true }], robots: null })) as typeof api.companions;
+    api.companions = (async () => ({ allowed: true, can_create: false, can_discover: false, default_id: "default", companions: [{ id: "sprout", name: "Sprout", is_default: false }, { id: "default", name: "Default", is_default: true }], discover: [], robots: null })) as unknown as typeof api.companions;
     try {
       const view = renderWithQueryClient(<Harness />);
       const hero = await view.findByRole("region", { name: "Sprout" });

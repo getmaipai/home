@@ -34,13 +34,14 @@ const MoreIcon = getIcon("more-horizontal");
 const BackIcon = getIcon("arrow-left");
 
 /** Props for one companion tile, shared by Yours and Discover. */
-function companionTileProps({ card, preview = false, discover = false, onDelete, onSelect, onSetDefault }: { card: CompanionCard; preview?: boolean; discover?: boolean; onDelete: (card: CompanionCard) => void; onSelect: () => void; onSetDefault: (card: CompanionCard) => void }) {
+function companionTileProps({ card, preview = false, discover = false, onDelete, onRemove, onSelect, onSetDefault }: { card: CompanionCard; preview?: boolean; discover?: boolean; onDelete: (card: CompanionCard) => void; onRemove?: (card: CompanionCard) => void; onSelect: () => void; onSetDefault: (card: CompanionCard) => void }) {
   const actions = <DropdownMenu>
     <DropdownMenuTrigger asChild>
       <Button type="button" variant="ghost" size="icon" aria-label="Companion actions" onClick={(event) => event.stopPropagation()} onPointerDown={(event) => event.stopPropagation()} onKeyDown={(event) => event.stopPropagation()}><MoreIcon aria-hidden="true" /></Button>
     </DropdownMenuTrigger>
     <DropdownMenuContent align="end" onClick={(event) => event.stopPropagation()} onPointerDown={(event) => event.stopPropagation()} onKeyDown={(event) => event.stopPropagation()}>
       <DropdownMenuItem disabled={card.is_default} onSelect={() => onSetDefault(card)}>Set as my default</DropdownMenuItem>
+      {!discover && onRemove ? <DropdownMenuItem disabled={card.is_default} onSelect={() => onRemove(card)}>Remove from Yours</DropdownMenuItem> : null}
       {card.can_edit && card.is_household ? <DropdownMenuItem variant="destructive" onSelect={() => onDelete(card)}>Delete</DropdownMenuItem> : null}
     </DropdownMenuContent>
   </DropdownMenu>;
@@ -72,6 +73,8 @@ export function CompanionsPage() {
   const queryClient = useQueryClient();
   const saveDefault = useMutation({ mutationFn: (id: string) => api.setDefaultCompanion(id), onSuccess: () => { void queryClient.invalidateQueries({ queryKey: listKey }); }, onError: (error) => setActionError(error instanceof ApiError ? error.message : "Could not set your default. Check your connection and try again.") });
   const remove = useMutation({ mutationFn: (id: string) => api.deleteCompanion(id), onSuccess: () => { setDeleteTarget(null); void queryClient.invalidateQueries({ queryKey: listKey }); }, onError: (error) => setActionError(error instanceof ApiError ? error.message : "Could not delete this companion. Check your connection and try again.") });
+  const addToYours = useMutation({ mutationFn: (id: string) => api.addCompanion(id), onSuccess: () => { setActionError(null); void queryClient.invalidateQueries({ queryKey: listKey }); }, onError: (error) => setActionError(error instanceof ApiError ? error.message : "Could not add this companion. Check your connection and try again.") });
+  const removeFromYours = useMutation({ mutationFn: (id: string) => api.removeCompanion(id), onSuccess: () => { setActionError(null); void queryClient.invalidateQueries({ queryKey: listKey }); }, onError: (error) => setActionError(error instanceof ApiError ? error.message : "Could not remove this companion. Check your connection and try again.") });
   return (
     <div className="flex flex-col gap-6" data-testid="companions">
       {actionError ? <Alert variant="destructive"><AlertDescription>{actionError}</AlertDescription></Alert> : null}
@@ -96,7 +99,7 @@ export function CompanionsPage() {
               <EmptyState icon="user" text="Companions are turned off for you. Ask an owner or admin to turn them on." />
             ) : data.companions.length === 0 ? (
               <EmptyState icon="user" text="No companions are installed yet." />
-            ) : preview === true ? (
+            ) : (
               <Tabs defaultValue="Yours">
                 <TabsList>
                   <TabsTrigger value="Yours">Yours</TabsTrigger>
@@ -105,11 +108,11 @@ export function CompanionsPage() {
                 <TabsContent value="Yours">
                   <div className="grid grid-cols-2 justify-items-center gap-4 sm:grid-cols-3 lg:grid-cols-4">
                     {data.companions.map((card) => <div key={card.id}>
-                      <CharacterTile {...companionTileProps({ card, preview: true, onDelete: setDeleteTarget, onSetDefault: (item) => saveDefault.mutate(item.id), onSelect: () => navigate(`/companions/${encodeURIComponent(card.id)}`) })} />
-                      <p className="mt-1 text-center text-sm text-muted-foreground">{companionPreviewSample(card.id).activityLine}</p>
+                      <CharacterTile {...companionTileProps({ card, preview: preview === true, onDelete: setDeleteTarget, onRemove: (item) => removeFromYours.mutate(item.id), onSetDefault: (item) => saveDefault.mutate(item.id), onSelect: () => navigate(`/companions/${encodeURIComponent(card.id)}`) })} />
+                      {preview === true ? <p className="mt-1 text-center text-sm text-muted-foreground">{companionPreviewSample(card.id).activityLine}</p> : null}
                     </div>)}
                   </div>
-                  <p className="mt-4 text-sm text-muted-foreground">Sample activity. Real activity is coming soon.</p>
+                  {preview === true ? <p className="mt-4 text-sm text-muted-foreground">Sample activity. Real activity is coming soon.</p> : null}
                 </TabsContent>
                 {data.can_discover ? <TabsContent value="Discover">
                   <div className="flex flex-wrap gap-2">
@@ -117,18 +120,14 @@ export function CompanionsPage() {
                       <Chip key={item} selected={discoverFilter === item} onClick={() => setDiscoverFilter(item)}>{item}</Chip>)}
                   </div>
                   <div className="grid grid-cols-2 justify-items-center gap-4 sm:grid-cols-3 lg:grid-cols-4">
-                    {data.companions.filter((card) => !card.is_default).map((card) => <div key={card.id}>
+                    {data.discover.filter((card) => discoverFilter === "All" || card.tagline.toLowerCase().includes(discoverFilter.toLowerCase())).map((card) => <div key={card.id}>
                       <CharacterTile {...companionTileProps({ card, discover: true, onDelete: setDeleteTarget, onSetDefault: (item) => saveDefault.mutate(item.id), onSelect: () => navigate(`/companions/${encodeURIComponent(card.id)}`) })} />
-                      <div className="mt-2"><Button disabled>Add</Button></div>
+                      <div className="mt-2"><Button disabled={addToYours.isPending} onClick={() => addToYours.mutate(card.id)}>Add</Button></div>
                     </div>)}
                   </div>
-                  <p className="mt-4 text-sm text-muted-foreground">Coming soon: add a companion to your set from here.</p>
+                  <p className="mt-4 text-sm text-muted-foreground">More companions from the catalog are coming soon.</p>
                 </TabsContent> : null}
               </Tabs>
-            ) : (
-              <div className="grid grid-cols-2 justify-items-center gap-4 sm:grid-cols-3 lg:grid-cols-4">
-                {data.companions.map((card) => <CharacterTile key={card.id} {...companionTileProps({ card, onDelete: setDeleteTarget, onSetDefault: (item) => saveDefault.mutate(item.id), onSelect: () => navigate(`/companions/${encodeURIComponent(card.id)}`) })} />)}
-              </div>
             )}
             <AlertDialog open={deleteTarget !== null} onOpenChange={(open) => { if (!open) setDeleteTarget(null); }}>
               <AlertDialogContent onClick={(event) => event.stopPropagation()} onPointerDown={(event) => event.stopPropagation()} onKeyDown={(event) => event.stopPropagation()}>

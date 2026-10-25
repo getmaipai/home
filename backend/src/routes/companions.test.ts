@@ -59,6 +59,32 @@ function fixture() {
 beforeEach(() => { resetDb(); rmSync(companionRoot, { recursive: true, force: true }); __reloadPersonasForTests(); __clearCompanionLookJobsForTests(); __clearCompanionTakeRunsForTests(); __resetCompanionStatesForTests(); __setPicturesFetchForTests(null); __setVideoStatusForTests(undefined); __setVideosFetchForTests(null); __setPictureStatusForTests(undefined); __setCharacterPictureCapabilityForTests(null); __setStackClientForTests(null); });
 afterEach(() => { resetDb(); rmSync(companionRoot, { recursive: true, force: true }); __reloadPersonasForTests(); __clearCompanionLookJobsForTests(); __clearCompanionTakeRunsForTests(); __resetCompanionStatesForTests(); __setPicturesFetchForTests(null); __setVideoStatusForTests(undefined); __setVideosFetchForTests(null); __setPictureStatusForTests(undefined); __setCharacterPictureCapabilityForTests(null); __setStackClientForTests(null); });
 
+test("companion set routes materialize unset, add and remove per person, and enforce default and age limits", async () => {
+  const adult = addPerson("person-set-route", "adult"), other = addPerson("person-set-other", "adult"), child = addPerson("person-set-child", "child"), teen = addPerson("person-set-teen", "teen");
+  const created = createHouseholdCompanion({ ...fixture(), display_name: "Set candidate" }, { display_name: "Author", person_id: "person-set-other" });
+  if (!created.ok) throw new Error(created.error);
+  setHouseholdCompanionStatus(created.value.id, "ready"); __reloadPersonasForTests();
+  const addableId = created.value.id;
+  const initial = await (await request("companions", adult)).json() as { companions: Array<{ id: string }>; discover: Array<{ id: string }> };
+  expect(initial.companions.map((item) => item.id)).toContain(addableId);
+  expect((await request("companions/default/remove", adult, "POST")).status).toBe(400);
+  const add = await request(`companions/${addableId}/add`, adult, "POST"); expect(add.status).toBe(200);
+  const afterAdd = await (await request("companions", adult)).json() as { companions: Array<{ id: string }>; discover: Array<{ id: string }> };
+  expect(afterAdd.companions.map((item) => item.id)).toContain(addableId);
+  expect((await request(`companions/${addableId}/remove`, adult, "POST")).status).toBe(200);
+  const afterRemove = await (await request("companions", adult)).json() as { companions: Array<{ id: string }>; discover: Array<{ id: string }> };
+  expect(afterRemove.companions.map((item) => item.id)).not.toContain(addableId);
+  const otherList = await (await request("companions", other)).json() as { companions: Array<{ id: string }> };
+  expect(otherList.companions.map((item) => item.id)).toContain(addableId);
+  const adultOnly = addableId;
+  expect((await request(`companions/${adultOnly}/add`, child, "POST")).status).toBe(403);
+  expect((await request(`companions/${adultOnly}/add`, teen, "POST")).status).toBe(403);
+  const teenHouse = createHouseholdCompanion({ ...fixture(), display_name: "Teen set candidate", audience: "teen" }, { display_name: "Author", person_id: "person-set-route" });
+  if (!teenHouse.ok) throw new Error(teenHouse.error);
+  setHouseholdCompanionStatus(teenHouse.value.id, "ready"); setHouseholdCompanionAudience(teenHouse.value.id, "teen"); __reloadPersonasForTests();
+  expect((await request(`companions/${teenHouse.value.id}/add`, teen, "POST")).status).toBe(200);
+});
+
 async function keyedPicture() {
   const svg = Buffer.from('<svg width="512" height="512"><circle cx="256" cy="256" r="150" fill="red"/></svg>');
   return new Uint8Array(await sharp({ create: { width: 512, height: 512, channels: 3, background: { r: 0, g: 255, b: 0 } } }).composite([{ input: svg }]).png().toBuffer());

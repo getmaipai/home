@@ -3,7 +3,7 @@ import { join } from "node:path";
 import { rmSync } from "node:fs";
 import { db } from "@/db";
 import { conversations, people, settingsValues } from "@/db/schema";
-import { canCreateCompanion, listCompanionCards } from "@/lib/companionsApp";
+import { canCreateCompanion, listCompanionCards, discoverCompanionCards } from "@/lib/companionsApp";
 import { __resetSettingsCacheForTests } from "@/lib/settings";
 import { createHouseholdCompanion, setHouseholdCompanionStatus } from "@/lib/householdCompanions";
 import { loadManifestOnly } from "@/lib/plugins";
@@ -19,6 +19,17 @@ beforeEach(() => { resetDb(); rmSync(root, { recursive: true, force: true }); __
 afterEach(() => { resetDb(); rmSync(root, { recursive: true, force: true }); __reloadPersonasForTests(); });
 
 describe("companion app cards", () => {
+  test("unset means all companions, while stored sets are person scoped and include the default", () => {
+    addPerson("person-set-a", "adult"); addPerson("person-set-b", "adult");
+    const [a, b] = db.select().from(people).all();
+    expect(listCompanionCards(a!).length).toBeGreaterThan(1);
+    db.insert(settingsValues).values({ scope: `person:${a!.id}`, key: "companions.enabled", value: JSON.stringify(["buddy"]), hlc: "2:0:test", source: "user", updatedAt: new Date().toISOString() }).run();
+    __resetSettingsCacheForTests();
+    expect(listCompanionCards(a!).map((card) => card.id)).toEqual(expect.arrayContaining(["buddy", "default"]));
+    expect(listCompanionCards(a!).map((card) => card.id)).not.toContain("rivet");
+    expect(listCompanionCards(b!).map((card) => card.id)).toContain("rivet");
+    expect(discoverCompanionCards(a!).map((card) => card.id)).toContain("rivet");
+  });
   test("only adults and admins may create companions", () => {
     addPerson("person-adult-create", "adult"); addPerson("person-teen-create", "teen"); addPerson("person-child-create", "child"); addPerson("person-admin-create", "admin");
     const rows = db.select().from(people).all();
