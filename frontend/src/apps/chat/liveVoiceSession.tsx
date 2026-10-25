@@ -80,15 +80,22 @@ export const WAKE_SESSION_IDLE_CLOSE_MS = 8000;
 export const BARGE_IN_ARM_DELAY_MS = 400;
 export const DUPLEX_PAUSE_AFTER_MS = 500;
 export const DUPLEX_FALSE_INTERRUPTION_MS = 2000;
-// A reaction is up to three words, all of them acknowledgements or exclamations ("mm-hm", "oh wow", "no way", "i see"). Benchmarks
-// (Full-Duplex-Bench v1.5) and shipped agents (LiveKit, Retell) treat these as "keep talking", not as a new turn.
-const REACTION_WORDS = new Set(["mm", "mhm", "hm", "hmm", "uh", "huh", "yeah", "yep", "yes", "okay", "ok", "right", "oh", "wow", "whoa", "really", "way", "sure", "cool", "nice", "great", "awesome", "amazing", "haha", "ha", "lol", "aw", "aww", "ooh", "ah", "gosh", "god", "my", "i", "see", "got", "it", "crazy", "seriously", "interesting", "good", "fun", "funny", "wild", "yikes", "geez", "jeez", "man", "dude", "no", "not", "so", "true", "exactly", "indeed", "absolutely", "definitely", "that", "thats", "is", "ohh", "mmhmm"]);
-// A question, a request or a stop word is always a real interruption, however short.
-const QUESTION_STARTS = new Set(["did", "does", "do", "what", "why", "how", "who", "where", "when", "which", "is", "are", "was", "were", "can", "could", "will", "would", "should", "wait", "but", "tell", "show", "explain", "stop", "hold", "hang", "be", "shush"]);
+// rule: duplexReaction (docs/design/full-duplex-voice-2026-10-24.md)
+// A reaction is one of these whole phrases, matched exactly after normalising, and nothing else: "mm-hm", "oh wow", "no way".
+// Benchmarks (Full-Duplex-Bench v1.5) and shipped agents (LiveKit, Retell) treat these as "keep talking", not as a new turn. Anything
+// not in the list, including every phrase with "no" or "not" except "no way", is a real interruption. The words of a reaction are
+// dropped: never stored, never sent. Only the counts below are kept.
+export const REACTION_PHRASES: ReadonlySet<string> = new Set([
+  "mm", "mhm", "mm hm", "mmhmm", "hm", "hmm", "uh huh", "yeah", "yep", "yes", "okay", "ok", "right", "oh", "ohh", "ah", "ooh", "aw",
+  "wow", "oh wow", "whoa", "oh whoa", "no way", "i see", "oh i see", "got it", "really", "oh really", "seriously", "cool", "oh cool",
+  "nice", "oh nice", "great", "awesome", "amazing", "wild", "crazy", "interesting", "true", "exactly", "sure", "haha", "ha", "lol",
+  "yikes", "geez", "jeez", "oh my", "oh my god", "oh my gosh", "oh okay", "oh ok", "ah okay",
+]);
+/** Counts only, never text (rule 6a): how often a reaction kept Home talking and how often a real interruption stopped it. */
+export const duplexCounters = { reactionResumes: 0, interruptions: 0 };
 
 function isReaction(normalized: string): boolean {
-  const words = normalized.split(" ").filter(Boolean);
-  return words.length > 0 && words.length <= 3 && words.every((word) => REACTION_WORDS.has(word)) && !QUESTION_STARTS.has(words[0]!) && normalized !== "no";
+  return REACTION_PHRASES.has(normalized);
 }
 
 function normalizedTranscript(text: string): string {
@@ -281,11 +288,13 @@ export function useLiveVoiceSession({ composer, open, onOpenChange, onProblem, i
               if (Date.now() - speakingStartedAtRef.current < BARGE_IN_ARM_DELAY_MS) break;
               if (!normalized || isReaction(normalized)) {
                 // Only noise or a bare reaction: carry on speaking.
+                if (normalized) duplexCounters.reactionResumes++;
                 if (overlapPausedRef.current) turnSchedulerRef.current?.resume();
                 overlapPausedRef.current = false;
                 break;
               }
               overlapTranscriptRef.current = true;
+              duplexCounters.interruptions++;
               interrupt("voice");
             } else if (voiceBargeIn && modeRef.current === "thinking" && !mutedRef.current) {
               interrupt("voice");
