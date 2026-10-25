@@ -18,6 +18,7 @@ function EditorLocation() { const location = useLocation(); return <div data-tes
 
 test("wizard selects a template and finishes with a trimmed name", async () => {
   const view = open(true);
+  fireEvent.click(await view.findByRole("button", { name: "Continue" }));
   await waitFor(() => expect(view.getByTestId("companion-wizard")).toBeTruthy(), { timeout: 1000 });
   for (const template of ["Chat buddy", "Research", "Shopping", "Homework helper", "Storyteller", "Custom"]) {
     expect(view.getByRole("button", { name: template })).toBeTruthy();
@@ -29,6 +30,17 @@ test("wizard selects a template and finishes with a trimmed name", async () => {
   expect((finish as HTMLButtonElement).disabled).toBe(false);
   fireEvent.click(finish);
   await waitFor(() => expect(view.getByTestId("editor-location").textContent).toBe(JSON.stringify({ name: "Nova", template: "chat-buddy" })));
+});
+
+test("intro explains companions and Continue opens the template step", async () => {
+  const view = open(true);
+  expect(await view.findByRole("heading", { name: "Create your companion" })).toBeTruthy();
+  expect(view.getByText("Pick a starting point")).toBeTruthy();
+  expect(view.getByText("Give it a name and a look")).toBeTruthy();
+  expect(view.getByText("It stays in your home")).toBeTruthy();
+  expect(view.getByRole("list").querySelectorAll("li")).toHaveLength(3);
+  fireEvent.click(view.getByRole("button", { name: "Continue" }));
+  expect(await view.findByTestId("companion-wizard")).toBeTruthy();
 });
 
 test("wizard route redirects when previews are off", async () => {
