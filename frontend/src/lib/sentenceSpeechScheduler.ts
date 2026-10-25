@@ -59,6 +59,7 @@ export class SentenceSpeechScheduler {
   private finishedCount = 0;
   private streamDone = false;
   private stopped = false;
+  private paused = false;
   private activeFetches = 0;
   private readonly waiters: Array<() => void> = [];
   private dispatchTail: Promise<void> = Promise.resolve();
@@ -106,6 +107,18 @@ export class SentenceSpeechScheduler {
       if (sentence.visibleEnd !== undefined && sentence.startTime <= currentTime) heardEnd = sentence.visibleEnd;
     }
     return heardEnd;
+  }
+
+  pause(): void {
+    if (this.stopped || this.paused) return;
+    this.paused = true;
+    void this.audioContext.suspend?.().catch(() => {});
+  }
+
+  resume(): void {
+    if (this.stopped || !this.paused) return;
+    this.paused = false;
+    void this.audioContext.resume?.().catch(() => {});
   }
 
   private async acquireFetchSlot(): Promise<void> {
@@ -222,6 +235,7 @@ export class SentenceSpeechScheduler {
     if (this.stopped) return;
     this.heardEndAtStop = this.heardVisibleEnd();
     this.stopped = true;
+    this.paused = false;
     this.abortController.abort();
     for (const wake of this.waiters.splice(0)) wake();
     this.meter.stop();

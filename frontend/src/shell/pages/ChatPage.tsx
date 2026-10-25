@@ -1373,7 +1373,7 @@ export function ChatPage({ person }: { person: Roster }) {
     pendingSpeechRef,
     activeTurnRef,
     cancelRun: runtime.thread.cancelRun,
-    voiceBargeIn: person.age_band === "adult",
+    voiceBargeIn: true,
     isSpeaking,
     speakingEndedAt,
     speechFailed,

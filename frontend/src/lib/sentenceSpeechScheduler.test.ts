@@ -7,6 +7,10 @@ class FakeAudioContext {
   startTimes: number[] = [];
   destination = {} as AudioNode;
   currentTime = 0;
+  suspended = 0;
+  resumed = 0;
+  async suspend() { this.suspended++; }
+  async resume() { this.resumed++; }
   createGain() { return { connect: () => {}, gain: { value: 1 } } as unknown as GainNode; }
   createAnalyser() { return { fftSize: 0, smoothingTimeConstant: 0, frequencyBinCount: 8, connect: () => {}, disconnect: () => {}, getByteTimeDomainData: (data: Uint8Array) => data.fill(128) } as unknown as AnalyserNode; }
   createBufferSource() { return { buffer: null, connect: () => {}, start: (when?: number) => { this.started++; this.startTimes.push(when ?? this.currentTime); }, onended: null } as unknown as AudioBufferSourceNode; }
@@ -68,6 +72,15 @@ describe("sentence speech scheduler", () => {
     await settle();
     expect(signal?.aborted).toBe(true);
     expect(errors).toBe(0);
+  });
+
+  test("pause and resume suspend and resume once, and pause after stop is safe", async () => {
+    const context = new FakeAudioContext();
+    const scheduler = new SentenceSpeechScheduler(context as unknown as AudioContext, async () => new Response(new Uint8Array(44)));
+    scheduler.pause(); scheduler.pause(); scheduler.resume(); scheduler.resume();
+    expect(context.suspended).toBe(1); expect(context.resumed).toBe(1);
+    scheduler.stop(); scheduler.pause(); scheduler.resume();
+    expect(context.suspended).toBe(1); expect(context.resumed).toBe(1);
   });
 
   test("heardVisibleEnd counts only sentences whose audio has started", async () => {

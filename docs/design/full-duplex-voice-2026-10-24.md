@@ -5,7 +5,7 @@ like StackChan; then, after a review: "research more and only build on an existi
 if someone ships it (or Home's own firmware or code already does) and names the source. Everything else moved to "Not in this design".
 Four earlier versions are in git history. Design only; nothing here is built.
 
-Architect verdict: see `data-scratch/architect/DUPLEX-DESIGN-2026-10-24.verdict`. The open point is whether a continuous microphone for a child needs a rule change (Answer, item 6).
+Architect verdict: see `data-scratch/architect/DUPLEX-DESIGN-2026-10-24.verdict`. No rule change is needed, including for children (Answer, item 6).
 
 ## Answer
 
@@ -24,8 +24,9 @@ Architect verdict: see `data-scratch/architect/DUPLEX-DESIGN-2026-10-24.verdict`
    changes when audio plays and stops, never what is said, so every age and surface gate, the child output gate and the spoken-turn
    limits are untouched. It supersedes the CHAT-PARITY-05 backlog clause that child profiles do not enable a continuous microphone
    (a backlog clause, not a RULES.md rule). The microphone is open only inside a voice session the child or a parent started, and
-   nothing it hears while Home talks is kept beyond the turn it becomes. Whether a continuous microphone for a child counts as a
-   protection under rule 0 is a question for the architect and Jesse, answered with the ruling.
+   nothing it hears while Home talks is kept beyond the turn it becomes. The architect's ruling: the rulebook has no
+   continuous-microphone protection (the only such clause is CHAT-PARITY-05's, a backlog clause Jesse has superseded); duplex changes when
+   audio plays, not what is said, and nothing heard is kept beyond its turn, so rule 0 is not engaged and no rule change is needed.
 7. **Reuse check (why not adopt Pipecat or LiveKit Agents as the controller).** Both are Python pipeline frameworks that own the
    whole turn (STT, model, TTS, transport) and LiveKit's best interruption model is hosted. Home's turn engine, gate, voices and
    package host already own those steps; a second controller would be a second definition of the turn (platform principle 1). Their
@@ -47,21 +48,21 @@ Architect verdict: see `data-scratch/architect/DUPLEX-DESIGN-2026-10-24.verdict`
 |---|---|---|---|
 | Stop playback and cancel in-flight text generation and speech synthesis when the person speaks; flush audio generated but not yet played | Pipecat | [interruptions](https://docs.pipecat.ai/pipecat/fundamentals/interruptions) | Interruption path (DUPLEX-03) |
 | The saved context holds only the text actually spoken | Pipecat (output synced with playback); OpenAI Realtime (client stops, then sends `conversation.item.truncate` with `audio_end_ms`; community reports it can lag when the server sends audio faster than playback) | Pipecat page above; [thread](https://community.openai.com/t/realtime-api-interruptions-dont-properly-trim-the-transcript/1000703) | Home already does this (`heardVisibleEnd`, `cancelTurn`); keep it |
-| Ignore short acknowledgements: minimum speech of 0.5 s, optional minimum words (Pipecat example: 3) | LiveKit `interruption.min_duration` 0.5 s, `min_words`; Pipecat `MinWordsUserTurnStartStrategy` | [LiveKit tuning](https://docs.livekit.io/agents/logic/turns/tuning.md), Pipecat page | First backchannel rule (version 1) |
+| A sound must last 0.5 s over the reply before it counts (a cough or bump does nothing) | LiveKit `interruption.min_duration` 0.5 s | [LiveKit tuning](https://docs.livekit.io/agents/logic/turns/tuning.md) | The pause threshold. The word-count and keep-going-list ideas are dropped: any words stop the reply (Answer; section 3, item 3) |
 | Learned filter for "uh-huh" versus a real interruption | LiveKit adaptive mode (hosted model, LiveKit Cloud only); Pipecat Krisp (commercial) | [LiveKit adaptive](https://docs.livekit.io/agents/logic/turns/adaptive-interruption-handling.md) | Not used: both are hosted or commercial. Rules first. |
-| For the first second after the agent starts speaking, use plain voice detection so real barge-ins get through | LiveKit turn-boundary cooldown (1.0 s) | LiveKit adaptive page | Same rule |
+| Do not react to the first moments of a reply | Home's existing 400 ms arm delay (`BARGE_IN_ARM_DELAY_MS`) | `liveVoiceSession.tsx` | Kept as the one start rule (LiveKit's 1.0 s cooldown is not adopted) |
 | Resume the interrupted speech when no transcript follows within a timeout (2.0 s), no regeneration | LiveKit `resume_false_interruption`, `false_interruption_timeout` 2.0 s; needs pausable audio output, and one forum report saw no difference with it on or off | [LiveKit tuning](https://docs.livekit.io/agents/logic/turns/tuning.md), [forum](https://community.livekit.io/t/with-the-new-adaptive-interruption-feature-im-seeing-the-same-agent-interruption-behaviour-resume-false-interruption-true-or-false/776) | Pause and resume (DUPLEX-03); the bench checks it |
 | End of turn from audio, not a silence timer | Pipecat default Smart Turn v3 (BSD-2, 8 MB on CPU, 10 to 100 ms, up to 8 s of 16 kHz audio, 23 languages); Kyutai STT predicts "done talking" | [smart-turn](https://github.com/pipecat-ai/smart-turn), [Pipecat](https://docs.pipecat.ai/server/utilities/turn-management/user-turn-strategies), [Kyutai](https://kyutai.org/stt) | DUPLEX-02 (pulls STT-SMARTTURN-01 forward) |
 | Start the text model on the transcript before the turn is confirmed; text-to-speech not started early; skip for long utterances (10 s); at most 3 retries | LiveKit preemptive generation | LiveKit tuning page | Not in this design: early start is STT-SMARTTURN-01's speculative start, with its guard |
 | Cancel in-flight tool calls on interruption | Pipecat | Pipecat page | Cancelling a tool on interruption uses the turn route's existing cancel (DUPLEX-03) |
 | Hybrid controller: fast voice onset, reversible playback, speculative generation held privately | Voice-Light research prototype (36 turns, median 758 ms from endpoint to first audio; its learned end-of-turn model recalled 12.5% of turn ends, Silero timing 95.6%, so it kept the hybrid) | [arXiv 2609.20995](https://arxiv.org/abs/2609.20995) | Evidence for rules over a learned model; not a shipped product |
 | Make Web Audio output reach Chrome's echo canceller: route it through a local pair of `RTCPeerConnection`s into an `<audio>` element | Mozilla Hubs (reported), guidance in Atmoky's docs; Chrome treats this as not a bug | [Atmoky](https://docs.atmoky.com/known-issues), [W3C list](https://lists.w3.org/Archives/Public/public-webrtc-logs/2019Apr/0334.html) | Browser echo, only if step zero shows it is needed |
-| Delay microphone audio a few seconds after the stream opens so the canceller can settle | A developer report (one anecdote) | [dev.to](https://dev.to/hamedhajiloo/how-i-fixed-a-web-audio-echo-problem-with-a-5-second-delay-384h) | Do not allow interruptions for the first seconds; the bench measures it |
+| Delay microphone audio a few seconds after the stream opens so the canceller can settle | A developer report (one anecdote) | [dev.to](https://dev.to/hamedhajiloo/how-i-fixed-a-web-audio-echo-problem-with-a-5-second-delay-384h) | Not used: desktop Chrome measured clean (DUPLEX-00); it comes back per browser only if a measurement shows echo at stream start |
 | Full-duplex AEC mode for the robot's chip | Espressif ESP-SR documents AEC modes for speech recognition, full-duplex dialogue and VoIP, and recommends `AEC_MODE_FD_LOW_COST` for full duplex | [ESP-SR AEC](https://docs.espressif.com/projects/esp-sr/en/latest/esp32s3/acoustic_echo_cancellation/README.html) | Robot spike |
 
 ## 3. Browser app and PWA
 
-This section applies to every age band's session, with the band's gates and limits unchanged. Children interrupt more and wait less, so the bench measures children's speech separately (section 7, DUPLEX-BENCH-01).
+This section applies to every age band's session, with the band's gates and limits unchanged. The interrupted turn runs through the same turn engine, gate and memory as any other spoken turn. Children interrupt more and wait less, so the bench measures children's speech separately (section 7, DUPLEX-BENCH-01).
 
 1. **Step zero, before any code (DUPLEX-00, S):** play a reply through the current Web Audio path with `echoCancellation: true` on
    desktop Chrome, Safari and Firefox, and Android Chrome, and measure how much of Home's own voice reaches the microphone (record the
@@ -73,13 +74,17 @@ This section applies to every age band's session, with the band's gates and limi
    Safari, Firefox, Android Chrome and iPhone are not yet measured.
 2. **If a browser does not cancel Web Audio output (not Chrome on macOS, measured above):** play replies through the local `RTCPeerConnection` loopback into an `<audio>`
    element (the Mozilla Hubs pattern), on Chromium only.
-3. **Settings copied from LiveKit and Pipecat, as starting values:** speech must last 0.5 s over Home's voice before it counts; during
-   the first 1.0 s after Home starts speaking, plain voice detection decides; stop words and a minimum of three words bypass the 0.5 s
-   (Pipecat's example value; the stop-word bypass is Home's own VOICE-LOOP-01 behavior, already tuned on the robot). A sound that stays
-   under 0.5 s with no transcript for 2.0 s is a false interruption and playback resumes from where it was.
-4. **Pause, then decide.** On detection, playback pauses (pausable output is a LiveKit requirement; the browser player must support
-   it). If the person kept talking, drop the unplayed sentences, store the heard prefix (already built) and take the new speech as
-   the next turn. If not, resume.
+3. **Anything you say interrupts, and Home answers it (Jesse, 2026-10-24: "I can say anything to interrupt, the agent would hear that and
+   respond with that in context to what it said and its memories").** There is no list of "keep going" sounds. Voice over Home's reply for
+   0.5 s pauses playback (the sound-duration idea LiveKit and Pipecat use, so a cough or a bump does not trigger it). Once the speech is
+   transcribed, any words at all stop the reply: the heard prefix is stored as what Home said, the person's words are the next turn, and
+   the turn engine answers them with the conversation so far and the person's memories, exactly as a typed message would be. "Oh wow",
+   "mm-hm" and "did he really do that" are all real turns; the model decides whether to carry on with the story, answer, or react. Only
+   noise with no words (a sound the transcriber returns empty for, or no words within 2.0 s of the sound ending) resumes playback from
+   the same sentence. The first 400 ms after Home starts speaking is not armed, as today.
+4. **Pause, then the transcript decides.** Playback pauses with `AudioContext.suspend()` (so what is heard stays exact), and either
+   resumes (noise) or stops (words). The unspoken remainder of the reply is a follow-up item (DUPLEX-06): pass it to the next turn as
+   background so Home can pick the story back up after a reaction, instead of only knowing what was heard.
 5. **Smart Turn v3.2 decides when the person has finished**, replacing the silence timer, with the existing Silero VAD in front, and
    keeping STT-SMARTTURN-01's own parameters: an 800 ms reopen window, the Silero hysteresis it names, and the flag
    `stack.engines.stt.smart_turn`, off until measured.
@@ -89,6 +94,63 @@ This section applies to every age band's session, with the band's gates and limi
    **pause-only until it is measured**: the person can stop Home by speaking after Home finishes its sentence or with the on-screen
    control, and headphones are the supported way to talk over it. No fix or home-screen difference was found in the sources.
 7. **Android Chrome:** the same as desktop, measured on a real device.
+
+## 3b. Home answers back: continuers and acknowledgements
+
+Jesse, 2026-10-24: part of what makes ChatGPT's voice feel real is that it says "umm, ok, yeah" while it is being talked to and when it is
+interrupted. Shipped examples: Retell AI has a backchannel setting with a word list and a frequency
+([docs](https://docs.retellai.com/build/interaction-configuration)); Vapi describes backchanneling with customizable cues (a support
+answer, no official doc found); the community Pipecat Backchannel processor plays short continuers ("mhm", "yeah", "right") on pauses
+the turn model reads as incomplete, with clips recorded once from the bot's own voice and cached
+([docs](https://docs.pipecat.ai/api-reference/server/extensions/pipecat-backchannel.md); community-maintained, not officially
+supported); and Voice-Light plays "bridge speech" while work runs ([arXiv 2609.20995](https://arxiv.org/abs/2609.20995)). LiveKit
+has none yet.
+
+1. **Closed list, rendered by Home's own voice.** Clips are recorded once through the voice engine, cached on disk and played with no model
+   call, as the Pipecat processor does (grouped by function: continuer, agreement, hesitation, surprise, at least two clips per group or
+   it repeats itself; played at volume 0.6, below the voice's normal level; not written into the conversation). Retell's default words
+   for English are "okay", "uh-huh", "mhmm", "yah", and its docs advise testing words with the chosen voice first, since some voices
+   say certain words badly; Home does the same per voice by ear. The model never writes these sounds.
+2. **Listening-back (continuers), starting from the shipped defaults.** From the Pipecat processor: eligible only after 0.7 s of the
+   person's speech, only in a pause of at least 0.2 s that the end-of-turn model reads as incomplete, at least 2.5 s between two, and a
+   0.8 chance at an eligible pause (Retell's default frequency is also 0.8; both stay below 1.0 so it does not sound mechanical).
+   Human speech supports the timing: backchannels average about 178 ms after a pause in a published study, run at roughly 6 to 9 per
+   minute in task dialogue, and stay acceptable within about 1.5 s before to 2 s after the ideal moment
+   ([TalkTive](https://arxiv.org/pdf/2202.08216), [Frontiers](https://public-pages-files-2025.frontiersin.org/journals/communication/articles/10.3389/fcomm.2025.1655049/epub)).
+   Jesse tunes the values by ear on the dev copy. Cost to measure first: the Pipecat page says a second voice detector and end-of-turn
+   check roughly double that inference while the person speaks.
+3. **Acknowledgement on interruption: our extension, built on the shipped `spoken_cue`.** No product ships this exact thing. The
+   closest precedents are Voice-Light's "bridge speech" while tool calls run ([arXiv 2609.20995](https://arxiv.org/abs/2609.20995)),
+   and Home's own `spoken_cue`, which already plays a short fixed sound ahead of a reply, is never stored and is skipped on repair turns
+   (`backend/src/routes/turn.ts`, `backend/src/lib/replyVariation.ts` `THINKING_CUE_VARIANTS`). The acknowledgement therefore **is a
+   `spoken_cue`**: a second fixed pool beside `THINKING_CUE_VARIANTS`, rotated the same way with banned phrases, passed through
+   `normalizeForSpeech`, and given an interruption-turn delay. Rule 9 names the spoken cue as an allowed gap, so no new chat-path
+   code path is added. The delay is the open number: Home's own record says `SPOKEN_CUE_DELAY_MS` is 2500 and cites
+   [arXiv 2507.22352](https://arxiv.org/abs/2507.22352) that fillers hurt at sub-second waits, while people backchannel about 178 ms
+   after a pause. So the interruption-turn delay starts at the existing cue value, a shorter value is only tried against the bench's
+   new acknowledgement-timing row (rule 13) and by Jesse's ear, and the item is dropped if it does not feel better. OpenAI's
+   GPT-Live system card describes full duplex and gives no timing or backchannel numbers, so there is no ChatGPT figure to copy.
+   **Continuers** are an additive cue event on the same cue path, decided on the hub in `SttSession` (where Smart Turn runs) so the
+   browser and the robot share one rule; both events are added to DUPLEX-01.
+4. **Why the fixed clips pass the gates.**
+   - **Rule 10:** the list is one code constant that nothing (a model, companion, package or setting) can add to; banned phrases only
+     remove entries. A person reviews each entry against the child floor when it is written, and a unit test runs the output floor over
+     every entry for every age band. Rule 10's exemption is for rule 6 clips that play when no model can speak, which these are not (they play while a model speaks), so the per-band unit test over every entry is the check before release that rule 10 asks for. The second reason is rule 9's named gap, sentence-gated speech scheduling with the spoken cue, which the shipped cue pool already uses the same way.
+   - **Context check:** a clip never affirms a disclosure. No continuer plays unless the partial transcript so far has passed the
+     deterministic input floor, and no acknowledgement plays on a crisis, consent, refusal or repair turn (`cueSuppressed` in
+     `backend/src/lib/turnMachine/turnNext.ts`, which covers repair only today, is extended to those).
+   - **Rule 0 and REG-02:** `backend/src/lib/voiceCues.ts` keeps its rule that a child or teen never gets a cue inside the reply's speech
+     text and is unchanged; these clips play outside the reply text, exactly as the shipped spoken cue already does for every band.
+   - **Rules 5 and 9:** the clips are never stored, never in history, never counted in the heard prefix, and never count toward or extend
+     the band's spoken limits.
+   - **Rule 14:** each clip is rendered in the voice resolved for that request; the cache is keyed by voice id, engine and companion; if
+     no clip exists for that voice, nothing plays and no default voice is used.
+5. **Quiet when it should be, and the switch.** Never over the person's voice, never in the first 400 ms of a reply. One person-scope key
+   in group `person.voice`, shown on Your settings P4 "Voice and robot", declared in the commons spec first (`spec/settings/keys.json`),
+   named apart from the household `voice.hesitations` key (sounds inside the reply). A child may turn it off; a robot's unknown speaker
+   gets the default. These clips are not system status, so no new status surface (S6).
+6. **Reuse check.** The Pipecat Backchannel processor is Python, community-maintained and owns its own pipeline, so it is copied for its
+   numbers and not adopted; Home's `spoken_cue` and `SttSession` are what is reused.
 
 ## 4. Robots (StackChan first)
 
@@ -115,14 +177,13 @@ Duplex applies to a robot at any band the admin set, with that band's gates and 
 ## 5. Gates and voices
 
 Unchanged. Every spoken sentence is a sentence the turn engine released after the age band and output gate (rule 0), in the voice
-chosen for the person, companion or robot (rule 14). All of the above act on when audio plays or stops, never on what is said. A
+chosen for the person, companion or robot (rule 14). All of the above act on when audio plays or stops, never on what is said, with one exception: the fixed continuer and acknowledgement clips of section 3b, gated when written and played outside the reply text. A
 child's or teen's spoken turn keeps its own limits.
 
 ## 6. Not in this design (no shipped example found)
 
 - Duplex speech models (Moshi, PersonaPlex, NemotronLabs VoiceChat, MiniCPM-o) as the voice, the timing signal or a conductor.
 - A voice-activity-projection model (research only; licence unchecked).
-- Home saying "mm-hm" or "go on" while the person talks.
 - A 200 ms fade-and-pause threshold; hub-side echo cancellation against audio sent over Wi-Fi; a speaker level cap; resuming a held
   reply after a clarifying question.
 - Duplex on iPhone with the speaker (until the WebKit bugs are measured).
@@ -131,7 +192,7 @@ Each can come back as its own item if someone ships it or a measurement of ours 
 ## 7. Slices
 
 1. **DUPLEX-00 (S):** step zero, the echo measurement per browser and device.
-2. **DUPLEX-01 (S, spec first):** playback marker, pause, resume and stop events; the `duplex` value on `robot.barge_in.open_mic`; pin bump.
+2. **DUPLEX-01 (S, spec first):** playback marker, pause, resume and stop events, the continuer cue event, the acknowledgement cue variant; the `duplex` value on `robot.barge_in.open_mic`; pin bump.
 3. **DUPLEX-02 (M):** Smart Turn v3 in `SttSession` and the settings in section 3.
 4. **DUPLEX-03 (M):** pause, resume, stop and heard prefix in the browser player; the echo check; the loopback only if DUPLEX-00 says so.
 5. **DUPLEX-04 is removed from this design.** Early start is STT-SMARTTURN-01's speculative turn start and is a latency feature, not
@@ -140,19 +201,22 @@ Each can come back as its own item if someone ships it or a measurement of ours 
    effects), and nothing is released, spoken or stored until the turn is confirmed (rules 9 and 10). Cancelling an in-flight tool on
    interruption uses the same existing cancel.
 6. **DUPLEX-05 (M, `bot`):** the robot spike.
-7. **DUPLEX-BENCH-01 (M):** a recorded rig: interruptions, "mm-hm" and second voices played at timed offsets into the browser and beside the unit; median and 95th percentile of stop time, run separately on children's speech (higher pitch, shorter words, more overlap; recorded with the demo voices or a parent's consent, kept in `data-scratch`, never in git) as well as adult speech, wrong stops, wrong resumes, own speech taken for the person, and Home talking over the person.
-Order: 00 and 01, then 02 and 03, 05 in parallel, then the bench. Codex first for 02 and 03.
+7. **DUPLEX-BENCH-01 (M):** a recorded rig: interruptions, "mm-hm" and second voices played at timed offsets into the browser and beside the unit; median and 95th percentile of stop time, run separately on children's speech (higher pitch, shorter words, more overlap; recorded with the demo voices or a parent's consent, kept in `data-scratch`, never in git) as well as adult speech, wrong stops, wrong resumes, own speech taken for the person, and Home talking over the person, plus the acknowledgement-timing row (rule 13): time from the end of the person's words to the first sound, with and without the acknowledgement, judged by ear.
+8. **DUPLEX-07 (M):** section 3b: the fixed clip list rendered per voice as a second cue pool, continuers at incomplete pauses, the acknowledgement as a `spoken_cue` with an interruption-turn delay, the spec-first on/off key; plus an acknowledgement-timing row in DUPLEX-BENCH-01.
+Order: 00 and 01, then 02 and 03, 05 in parallel, 07 after 02 (it needs Smart Turn), then the bench. Codex first for 02 and 03.
 
 ## 8. Legacy verdicts (rule 8)
 
-- VOICE-LOOP-01 numbers: **kept** where section 3 names them (stop-word bypass), re-measured by the bench.
+- VOICE-LOOP-01 numbers: for the browser, the 0.6 s confirm, the stop-phrase bypass and "backchannels never stop" are **dropped** (section 3; any words stop the reply); for the robot, duck, re-arm grace and self-echo are **kept** until its spike reports.
 - Legacy `useHandsFree.ts` thresholds: **dropped**. Legacy "listen only after the reply ends": **dropped** once DUPLEX-03 lands.
 
 ## Supersedes
 
-- `voiceBargeIn`'s rule in `liveVoiceSession.tsx` that any speech after a 400 ms arm delay stops the reply: **replaced** by section 3 (0.5 s of speech, a 1.0 s cooldown, pause then decide).
+- `voiceBargeIn`'s rule in `liveVoiceSession.tsx` that any speech after a 400 ms arm delay stops the reply: **replaced** by section 3 (0.5 s of speech, then the transcript decides; any words stop the reply).
 - The silence-timer end of turn in `sttSession.ts`: **replaced** by Smart Turn v3.2 (section 3).
 - STT-SMARTTURN-01: its endpointer half (Smart Turn v3.2, the 800 ms reopen window, the Silero hysteresis and the off-until-measured flag) **moves** to DUPLEX-02; its speculative start stays in the STT-SMARTTURN-01 backlog row, which keeps one owner for it.
-- VOICE-LOOP-01's barge-in numbers: 0.6 s confirm is **replaced** by 0.5 s (LiveKit's default, re-measured); "stop phrases bypass" and "backchannels never stop" are **kept**; duck 0.35 and 0.75, the 0.7 s re-arm grace and the self-echo at 0.8 overlap are **dropped** for the browser (pause replaces duck; the bench measures the rest) and **kept** for the robot until its spike reports.
+- VOICE-LOOP-01's barge-in numbers: 0.6 s confirm is **replaced** by 0.5 s (LiveKit's default, re-measured); "stop phrases bypass" and "backchannels never stop" are **dropped** (any words stop the reply); duck 0.35 and 0.75, the 0.7 s re-arm grace and the self-echo at 0.8 overlap are **dropped** for the browser (pause replaces duck; the bench measures the rest) and **kept** for the robot until its spike reports.
 - "Listen only after the reply ends": **dropped** once DUPLEX-03 lands.
 - CHAT-PARITY-05's clause that child profiles do not enable a continuous microphone: **superseded** by this design on Jesse's word (2026-10-14 ruling, restated 2026-10-24 in chat). The row is edited when the first slice lands.
+- Section 6's former exclusion "Home saying mm-hm while the person talks": **removed**; section 3b is its replacement.
+- `SPOKEN_CUE_DELAY_MS` (2500): **replaced** on interruption turns by the delay section 3b names, tested on the bench.

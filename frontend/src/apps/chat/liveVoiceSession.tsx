@@ -78,6 +78,11 @@ export interface LiveVoiceSessionProps {
 
 export const WAKE_SESSION_IDLE_CLOSE_MS = 8000;
 export const BARGE_IN_ARM_DELAY_MS = 400;
+export const DUPLEX_PAUSE_AFTER_MS = 500;
+export const DUPLEX_FALSE_INTERRUPTION_MS = 2000;
+function normalizedTranscript(text: string): string {
+  return text.toLowerCase().replace(/[-\u2010-\u2015]/g, " ").replace(/[^\p{L}\p{N}\s]/gu, "").replace(/\s+/g, " ").trim();
+}
 
 export function useLiveVoiceSession({ composer, open, onOpenChange, onProblem, idleCloseMs = null, turnSchedulerRef, liveVoiceActiveRef, pendingSpeechRef, activeTurnRef, cancelRun, voiceBargeIn = false, isSpeaking, speakingEndedAt, speechFailed = 0, retryDelays = [0, 1500], installationNotice = false, createSocket = createSttSocket, startCapture = startMicCapture }: LiveVoiceSessionProps) {
   const [mode, setMode] = useState<VoiceMode>("connecting");
@@ -90,6 +95,10 @@ export function useLiveVoiceSession({ composer, open, onOpenChange, onProblem, i
   const isSpeakingRef = useRef(isSpeaking);
   const activeSpeechRef = useRef(false);
   const interruptedTurnRef = useRef<string | null>(null);
+  const overlapPauseTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const falseInterruptionTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const overlapPausedRef = useRef(false);
+  const overlapTranscriptRef = useRef(false);
   const mutedRef = useRef(false);
   const retryCountRef = useRef(0);
   const speechFailureShownRef = useRef(false);
@@ -97,7 +106,13 @@ export function useLiveVoiceSession({ composer, open, onOpenChange, onProblem, i
   mutedRef.current = muted;
   isSpeakingRef.current = isSpeaking;
   const setCurrentMode = (next: VoiceMode) => { modeRef.current = next; setMode(next); };
+  const isReplySpeaking = () => modeRef.current === "speaking" || isSpeakingRef.current;
   const interrupt = (_reason: "voice" | "tap") => {
+    if (overlapPauseTimerRef.current) clearTimeout(overlapPauseTimerRef.current);
+    if (falseInterruptionTimerRef.current) clearTimeout(falseInterruptionTimerRef.current);
+    overlapPauseTimerRef.current = null;
+    falseInterruptionTimerRef.current = null;
+    overlapPausedRef.current = false;
     const active = activeTurnRef.current;
     if (active && interruptedTurnRef.current !== active.turnId) {
       interruptedTurnRef.current = active.turnId;
@@ -200,8 +215,12 @@ export function useLiveVoiceSession({ composer, open, onOpenChange, onProblem, i
           case "partial":
             activeSpeechRef.current = true;
             setIdleActivity((value) => value + 1);
-            if (voiceBargeIn && !mutedRef.current && (modeRef.current === "thinking" || modeRef.current === "speaking")) {
-              if (modeRef.current !== "speaking" || Date.now() - speakingStartedAtRef.current >= BARGE_IN_ARM_DELAY_MS) interrupt("voice");
+            if (voiceBargeIn && !mutedRef.current && isReplySpeaking() && Date.now() - speakingStartedAtRef.current >= BARGE_IN_ARM_DELAY_MS) {
+              // Any words over the reply are a real interruption: the person can say anything and Home answers it in context.
+              if (normalizedTranscript(message.v)) {
+                overlapTranscriptRef.current = true;
+                interrupt("voice");
+              }
             }
             // Not shown: a partial can revise itself several times a
             // second (interim ASR hypotheses) - the listening ring's
@@ -209,15 +228,56 @@ export function useLiveVoiceSession({ composer, open, onOpenChange, onProblem, i
             // hearing you" signal while this is live.
             break;
           case "vad":
-            if (message.speaking) { activeSpeechRef.current = true; setIdleActivity((value) => value + 1); }
+            if (message.speaking) {
+              activeSpeechRef.current = true;
+              setIdleActivity((value) => value + 1);
+              const elapsed = Date.now() - speakingStartedAtRef.current;
+              if (voiceBargeIn && !mutedRef.current && isReplySpeaking() && !overlapPauseTimerRef.current && !overlapPausedRef.current) {
+                overlapTranscriptRef.current = false;
+                overlapPauseTimerRef.current = setTimeout(() => {
+                  overlapPauseTimerRef.current = null;
+                  if (isReplySpeaking() && activeSpeechRef.current) {
+                    turnSchedulerRef.current?.pause();
+                    overlapPausedRef.current = true;
+                  }
+                }, Math.max(0, BARGE_IN_ARM_DELAY_MS - elapsed) + DUPLEX_PAUSE_AFTER_MS);
+              }
+            } else {
+              activeSpeechRef.current = false;
+              if (overlapPauseTimerRef.current) clearTimeout(overlapPauseTimerRef.current);
+              overlapPauseTimerRef.current = null;
+              if (overlapPausedRef.current && !overlapTranscriptRef.current) {
+                if (falseInterruptionTimerRef.current) clearTimeout(falseInterruptionTimerRef.current);
+                falseInterruptionTimerRef.current = setTimeout(() => {
+                  falseInterruptionTimerRef.current = null;
+                  if (overlapPausedRef.current) turnSchedulerRef.current?.resume();
+                  overlapPausedRef.current = false;
+                }, DUPLEX_FALSE_INTERRUPTION_MS);
+              }
+            }
             break;
           case "final": {
             activeSpeechRef.current = false;
             setIdleActivity((value) => value + 1);
-            const duringReply = modeRef.current === "thinking" || modeRef.current === "speaking";
-            if (voiceBargeIn && modeRef.current === "speaking" && Date.now() - speakingStartedAtRef.current < BARGE_IN_ARM_DELAY_MS) break;
-            if (voiceBargeIn && duringReply && !mutedRef.current && (modeRef.current !== "speaking" || Date.now() - speakingStartedAtRef.current >= BARGE_IN_ARM_DELAY_MS)) interrupt("voice");
             const text = message.v.trim();
+            const normalized = normalizedTranscript(text);
+            if (voiceBargeIn && isReplySpeaking() && !mutedRef.current) {
+              if (overlapPauseTimerRef.current) clearTimeout(overlapPauseTimerRef.current);
+              overlapPauseTimerRef.current = null;
+              if (falseInterruptionTimerRef.current) clearTimeout(falseInterruptionTimerRef.current);
+              falseInterruptionTimerRef.current = null;
+              if (Date.now() - speakingStartedAtRef.current < BARGE_IN_ARM_DELAY_MS) break;
+              if (!normalized) {
+                // Only noise: no words, so carry on speaking.
+                if (overlapPausedRef.current) turnSchedulerRef.current?.resume();
+                overlapPausedRef.current = false;
+                break;
+              }
+              overlapTranscriptRef.current = true;
+              interrupt("voice");
+            } else if (voiceBargeIn && modeRef.current === "thinking" && !mutedRef.current) {
+              interrupt("voice");
+            }
             if (!voiceBargeIn) {
               micHandle?.stop();
               micHandle = null;
@@ -286,6 +346,8 @@ export function useLiveVoiceSession({ composer, open, onOpenChange, onProblem, i
 
     return () => {
       cancelled = true;
+      if (overlapPauseTimerRef.current) clearTimeout(overlapPauseTimerRef.current);
+      if (falseInterruptionTimerRef.current) clearTimeout(falseInterruptionTimerRef.current);
       clearTimeout(retryTimer);
       clearInterval(levelTimer);
       micHandle?.stop();
@@ -304,8 +366,9 @@ export function useLiveVoiceSession({ composer, open, onOpenChange, onProblem, i
   useEffect(() => {
     if (!open) return;
     if (isSpeaking) {
+      const wasSpeaking = modeRef.current === "speaking";
       modeRef.current = "speaking";
-      speakingStartedAtRef.current = Date.now();
+      if (!wasSpeaking) speakingStartedAtRef.current = Date.now();
       setMode("speaking");
       const timer = setInterval(() => setAmplitude(turnSchedulerRef.current?.readLevel() ?? 0), 60);
       return () => clearInterval(timer);
