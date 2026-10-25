@@ -373,7 +373,7 @@ describe("live voice session", () => {
     }
   });
 
-  test("a short VAD sound does not pause playback", async () => {
+  test("a sound shorter than the 150 ms start window does not pause playback", async () => {
     const pause = mock();
     const socket = controlledSocket();
     const view = render(<Harness open onOpenChange={() => {}} isSpeaking={false} speakingEndedAt={0} fixture={[]} sentTexts={[]} pauseScheduler={pause} socketFactory={socket.createSocket} />);
@@ -382,7 +382,7 @@ describe("live voice session", () => {
     await waitFor(() => expect(view.getByText("Speaking")).toBeTruthy());
     await new Promise((resolve) => setTimeout(resolve, 600));
     act(() => socket.send({ t: "vad", speaking: true, rms: 0.1 }));
-    await new Promise((resolve) => setTimeout(resolve, 300));
+    await new Promise((resolve) => setTimeout(resolve, 80));
     act(() => socket.send({ t: "vad", speaking: false, rms: 0 }));
     await new Promise((resolve) => setTimeout(resolve, 250));
     expect(pause).not.toHaveBeenCalled();

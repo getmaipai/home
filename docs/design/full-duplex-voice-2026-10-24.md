@@ -164,6 +164,51 @@ has none yet.
 6. **Reuse check.** The Pipecat Backchannel processor is Python, community-maintained and owns its own pipeline, so it is copied for its
    numbers and not adopted; Home's `spoken_cue` and `SttSession` are what is reused.
 
+## 3c. What `local-voice` does, read from its source, and what Home takes
+
+[local-voice](https://github.com/mthomas100/local-voice) (MIT; one developer's working prototype on an M5 Max 128 GB; its numbers are
+developer-reported) is the closest working implementation of this design. It cannot run unchanged beside Home (it needs the author's GPU
+hold-gate and the Pi agent, and its voice port 8770 is the Stack's), so Home ports the algorithms, not the code. Its source was read
+file by file (`orchestrator/local_voice/bargein.py`, `echo_guard.py`, `turn_start.py`, `turn_end.py`, `services/stt.py`,
+`tools/bargein_bench.py`, `tools/turn_end_bench.py`). The facts that matter:
+
+1. **Pause on the first speech frame, decide afterwards.** One 32 ms Silero frame at confidence 0.5 (and volume 0.5) while audio is
+   playing pauses the reply. If the VAD has not confirmed within 0.4 s and no speech was heard in the last 0.1 s, it resumes; at most
+   1.5 s of pause; at most 2 unconfirmed pauses in any 10 s. Confirmation is the Silero VAD at confidence 0.7 and start 0.15 s, which
+   interrupts: queued audio is dropped, the generation counter changes so a chunk waiting at the gate is discarded. Measured: pause at a
+   median 72 ms after speech starts, interrupt at about 275 ms; with real models audio stopped 238 to 267 ms after speech start.
+   Their bench (110 synthetic interruptions, 260 ESC-50 sounds): a 0.15 s start gives 24 false interruptions in 260, 0.1 s gives 37,
+   0.064 s gives 43.
+2. **Heard text is reconciled by time.** The client reports `played_ms`; the server maps it to words (proportional inside a partly played
+   sentence, 2.6 words per second for a sentence still streaming) and the next prompt starts with a note that the user heard only that
+   much of the last reply. Home already stores the heard prefix; what it lacks is telling the model.
+3. **The echo guard is a text check, not audio.** Smith-Waterman alignment (+2 equal word, -1 gap or mismatch) between the transcript and
+   every sentence spoken in the last 300 s (sentences under 30 s apart joined): echo if at least 3 words align and at least 60% of the
+   heard words are covered; a 1 or 2 word fragment is echo if all its words are in the last 3 sentences. It runs before a transcript
+   becomes a turn, and "busy" lasts 1.0 s after the bot stops. Their own caveat: never run with the real recogniser through real laptop
+   speakers; a one-word interruption that the bot itself just said ("no") resumes instead of stopping.
+4. **A word-hold decides after the pause.** Echo resumes the reply; a transcript made only of backchannel words or a fragment resumes it
+   and is dropped; any other words start the turn and interrupt; no words for 1.5 s while the VAD still hears speech interrupts; after the
+   VAD stops, 0.6 s with no final transcript resumes; a pending yes/no question is never held.
+5. **Turn end:** Silero 0.7 / start 0.15 s / stop 0.2 s / volume 0.5; Smart Turn v3.2 at each VAD stop with a 2.0 s silence fallback;
+   a "dangling" last word (article, conjunction, object preposition, filler) holds a COMPLETE verdict until the fallback, except a
+   question; punctuation-based holds were measured harmful (mid-sentence cut-offs rose from 31 to 37-44 of 80) and are off.
+6. **Streaming speech-to-text is mostly a fast final.** Partials come about once a second (the encoder chunk); the final lands 53 ms
+   after the audio ends. The recipe: one session per VAD segment, 1.0 s of preroll, 0.3 s of zero padding at the end (it fixed dropped
+   last words), a segment with no words is decoded again with the next. A fast model (Parakeet: 23 ms for a 2.5 s clip) makes a 0.5 s
+   interim cycle cheap.
+7. **Bench method:** `bargein_bench` scores each 20 ms frame once, then replays the VAD state machine for each setting; interruptions are
+   macOS `say` phrases in several voices, controls are ESC-50 clips scaled to the median interruption level plus noise and backchannels
+   (ESC-50 is CC BY-NC: local measurement only). `turn_end_bench` splices 0.8 and 1.5 s pauses at word boundaries into finished requests.
+8. **Fragile or untested in their code:** it depends on Pipecat 1.12 internals and private mlx-audio queues; the echo guard, the dangling
+   hold and the word-hold have only model-free tests; TTS grouping is unmeasured.
+
+What this changes in Home: the pause threshold moves from "500 ms of voice" to "the first confirmed voiced frame" (DUPLEX-02 sends a
+`reply_pause` event from `SttSession`; the browser suspends its `AudioContext`, so the pause is client-side because Home's client
+buffers far more than their 40 ms); the 2.0 s false-interruption wait becomes 0.4 s with a 1.5 s cap once words arrive fast enough
+(until DUPLEX-02's segment-level transcription lands, the dev copy keeps 2.0 s); the text echo guard is ported into `SttSession` and also
+protects the robot and any browser without echo cancellation; the interrupted-reply note is added to the next turn (DUPLEX-06).
+
 ## 4. Robots (StackChan first)
 
 Duplex applies to a robot at any band the admin set, with that band's gates and limits unchanged (rule 0: an unknown speaker gets the child result, and it gets duplex too).
@@ -204,7 +249,7 @@ Each can come back as its own item if someone ships it or a measurement of ours 
 
 1. **DUPLEX-00 (S):** step zero, the echo measurement per browser and device.
 2. **DUPLEX-01 (S, spec first):** playback marker, pause, resume and stop events, the continuer cue event, the acknowledgement cue variant; the `duplex` value on `robot.barge_in.open_mic`; pin bump.
-3. **DUPLEX-02 (M):** Smart Turn v3 in `SttSession` and the settings in section 3.
+3. **DUPLEX-02 (M):** (also: first-frame `reply_pause` / `reply_resume` events from `SttSession` with local-voice's 0.4 s, 1.5 s and 2-per-10-s limits; the Smith-Waterman text echo guard with its 300 s window; per-VAD-segment transcription with 1.0 s preroll and 0.3 s tail pad; section 3c) Smart Turn v3 in `SttSession` and the settings in section 3.
 4. **DUPLEX-03 (M):** pause, resume, stop and heard prefix in the browser player; the echo check; the loopback only if DUPLEX-00 says so.
 5. **DUPLEX-04 is removed from this design.** Early start is STT-SMARTTURN-01's speculative turn start and is a latency feature, not
    duplex. It is built on the existing turn route and its cancel, with no new `turnMachine` code (that would be a rule 9 named gap,
