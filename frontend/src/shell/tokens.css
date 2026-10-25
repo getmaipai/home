@@ -722,3 +722,13 @@ body {
 @utility companion-alpha-placeholder {
   aspect-ratio: 1 / 1;
 }
+
+/* Say which scheme the page is drawn in, so a browser that darkens light pages by itself (iPhone Safari on a dark phone, seen
+ * 2026-10-25 as a dark page behind light-theme text and cards) leaves it alone. The class is set before first paint
+ * (public/first-paint.js) from the saved choice, else the device. */
+:root, html.light {
+  color-scheme: light;
+}
+html.dark {
+  color-scheme: dark;
+}

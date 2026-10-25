@@ -1,3 +1,6 @@
+import { Switch } from "@maipai/ui/src/dashboard/components/ui/switch";
+import { Item, ItemActions, ItemContent, ItemDescription, ItemGroup, ItemTitle } from "@maipai/ui/src/dashboard/components/ui/item";
+import { usePinnedApps } from "@/shell/usePinnedApps";
 import { useState, type ComponentType } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { canViewFaceEnrollment } from "@/apps/people/FaceEnrollmentBody";
@@ -131,7 +134,26 @@ export const SETTINGS_VIEWS: Record<string, ComponentType<SettingsViewProps>> = 
   "chat.shortcuts": ChatShortcutsSettings,
 };
 
+/** Settings > an app > Sidebar, view `app.pin:<route>`: the one switch that shows the app in the rail. */
+function AppPinSettings({ person, to }: { person: SettingsViewProps["person"]; to: string }) {
+  const { isPinned, togglePin, isLoading, isSaving } = usePinnedApps(person.id);
+  return (
+    <section aria-label="Sidebar" className="flex flex-col gap-3">
+      <ItemGroup variant="card">
+      <Item size="setting">
+        <ItemContent>
+          <ItemTitle>Show in the sidebar</ItemTitle>
+          <ItemDescription>Keep this app in the sidebar so it is one tap away.</ItemDescription>
+        </ItemContent>
+        <ItemActions><Switch size="md" aria-label="Show in the sidebar" checked={isPinned(to)} disabled={isLoading || isSaving} onCheckedChange={() => togglePin(to)} /></ItemActions>
+      </Item>
+      </ItemGroup>
+    </section>
+  );
+}
+
 export function SettingsView({ view, person, onPersonChange, tab, detailId }: SettingsViewProps & { view: string }) {
+  if (view.startsWith("app.pin:")) return <AppPinSettings person={person} to={view.slice("app.pin:".length)} />;
   const View = SETTINGS_VIEWS[view];
   return View ? <View person={person} onPersonChange={onPersonChange} tab={tab} detailId={detailId} /> : null;
 }
