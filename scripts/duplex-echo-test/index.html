@@ -16,8 +16,9 @@
 </head>
 <body>
   <h1>Home speaker echo check</h1>
-  <p>Use laptop speakers, not headphones. Set a normal listening volume and keep the laptop in its usual place. Stay quiet while each test runs.</p>
-  <p>The test plays a short voice-like sound through the speakers and measures what the microphone hears. Nothing is recorded, saved, or sent anywhere.</p>
+  <p>Use laptop speakers, not headphones. Set the volume to what you would really use to hear Home across a room (clearly loud, not quiet), and keep the laptop in its usual place. Stay quiet while each test runs.</p>
+  <p>The test plays a spoken sentence (or, if the server has no voice file, a voice-like noise) through the speakers and measures what the microphone hears. Nothing is recorded, saved, or sent anywhere.</p>
+  <p>You will also be asked to talk over the sentence once, to check that your own voice is not removed with the echo.</p>
   <p>Path A uses the same Web Audio route as Home. Path B sends the same sound through a local pair of <code>RTCPeerConnection</code>s into an audio player.</p>
   <button id="start">Start test</button>
   <button id="copy" disabled>Copy results</button>
@@ -39,6 +40,23 @@
     let report = '';
     const wait = ms => new Promise(resolve => setTimeout(resolve, ms));
 
+    let speech = null;
+    async function loadSpeech(context) {
+      try {
+        const response = await fetch('speech.wav');
+        if (!response.ok) return null;
+        const decoded = await context.decodeAudioData(await response.arrayBuffer());
+        const rate = decoded.sampleRate, length = Math.ceil(rate * 7);
+        const out = context.createBuffer(1, length, rate);
+        const src = decoded.getChannelData(0), dst = out.getChannelData(0);
+        let peak = 0.0001;
+        for (let i = 0; i < src.length; i++) peak = Math.max(peak, Math.abs(src[i]));
+        for (let i = 0; i < Math.min(src.length, length); i++) dst[i] = src[i] / peak * 0.9;
+        return out;
+      } catch { return null; }
+    }
+    function pick(context) { return speech || signal(context); }
+
     function signal(context, seconds = 6) {
       const rate = context.sampleRate;
       const buffer = context.createBuffer(1, Math.ceil(rate * seconds), rate);
@@ -51,7 +69,7 @@
         band = 0.8 * band + 0.2 * high;
         const t = i / rate;
         const modulation = 0.18 + 0.82 * (0.5 + 0.5 * Math.sin(2 * Math.PI * 4 * t));
-        data[i] = band * modulation * 0.22;
+        data[i] = band * modulation * 0.9;
       }
       return buffer;
     }
@@ -125,6 +143,8 @@
         const output = devices.find(device => device.kind === 'audiooutput' && device.deviceId === 'default') || devices.find(device => device.kind === 'audiooutput');
         document.querySelector('#device').textContent = output ? `Output device: ${output.label || 'browser default audio output'}` : 'Output device: browser did not provide its name.';
         const context = new AudioContext();
+        speech = await loadSpeech(context);
+        document.querySelector('#control').textContent = speech ? 'Playing a spoken sentence.' : 'No voice file on the server; using voice-like noise.';
         const input = context.createMediaStreamSource(stream);
         const analyser = context.createAnalyser(); analyser.fftSize = 2048;
         input.connect(analyser);
@@ -133,7 +153,7 @@
         const floor = floorSamples.reduce((a, b) => a + b, 0) / floorSamples.length;
         status.textContent = 'Letting the microphone settle for 3 seconds.';
         await wait(3000);
-        const bufferA = signal(context);
+        const bufferA = pick(context);
         status.textContent = 'Path A is playing. Please stay quiet.';
         const playA = playWebAudio(context, bufferA);
         await wait(2000);
@@ -142,7 +162,7 @@
         const statsA = summarize(levelsA, floor); addResult('A: Web Audio', statsA);
         status.textContent = 'Silence between paths for 2 seconds.';
         await wait(2000);
-        const bufferB = signal(context);
+        const bufferB = pick(context);
         status.textContent = 'Path B is playing. Please stay quiet.';
         const playB = playLoopback(context, bufferB);
         await wait(2000);
@@ -156,13 +176,26 @@
           `A: Web Audio | average ${statsA.meanDb.toFixed(1)} dB | worst 100 ms ${statsA.worstDb.toFixed(1)} dB | ${verdict(statsA.meanDb)}`,
           `B: local WebRTC audio player | average ${statsB.meanDb.toFixed(1)} dB | worst 100 ms ${statsB.worstDb.toFixed(1)} dB | ${verdict(statsB.meanDb)}`,
         ].join('\n');
+        status.textContent = 'Now talk over it. In about 2 seconds, say "testing one two three, can you hear me" in your normal voice while the sentence plays.';
+        await wait(3000);
+        const playD = playWebAudio(context, pick(context));
+        await wait(1500);
+        status.textContent = 'SAY IT NOW: "testing one two three, can you hear me".';
+        const levelsD = await capture(analyser, 4.5);
+        await playD;
+        const statsD = summarize(levelsD, floor);
+        const voiceVerdict = statsD.worstDb >= 12 ? 'your voice comes through' : statsD.worstDb >= 6 ? 'your voice is weak' : 'your voice is being removed';
+        const tr = document.createElement('tr');
+        for (const value of ['D: your voice over Home speaking (echo cancellation on)', `${statsD.meanDb.toFixed(1)} dB`, `${statsD.worstDb.toFixed(1)} dB`, voiceVerdict]) { const td = document.createElement('td'); td.textContent = value; tr.append(td); }
+        rows.append(tr);
+        report += `\nD: talking over Home | average ${statsD.meanDb.toFixed(1)} dB | loudest 100 ms ${statsD.worstDb.toFixed(1)} dB | ${voiceVerdict}`;
         status.textContent = 'Control run: echo cancellation off, so the speaker should be heard. Stay quiet.';
         const rawStream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false } });
         const rawAnalyser = context.createAnalyser(); rawAnalyser.fftSize = 2048;
         context.createMediaStreamSource(rawStream).connect(rawAnalyser);
         const rawFloorSamples = await capture(rawAnalyser, 2);
         const rawFloor = rawFloorSamples.reduce((a, b) => a + b, 0) / rawFloorSamples.length;
-        const playC = playWebAudio(context, signal(context));
+        const playC = playWebAudio(context, pick(context));
         await wait(2000);
         const statsC = summarize(await capture(rawAnalyser, 4), rawFloor);
         await playC;
