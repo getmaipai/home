@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-10-25T16:39:26.153Z",
+  "generatedAt": "2026-10-25T17:08:10.492Z",
   "kitTag": "ui-v0.5.337",
   "items": [
     {
@@ -270,7 +270,7 @@
       "group": "character",
       "verdict": "wire-now",
       "verdictReason": "The chat header shows the companion over a name pill with menu and call buttons (DOTS-CHAT-01); adopted as shipped with props only.",
-      "implemented": false
+      "implemented": true
     },
     {
       "file": "chat-panel.tsx",
