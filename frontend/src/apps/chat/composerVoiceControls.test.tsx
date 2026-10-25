@@ -2,7 +2,7 @@ import { afterEach, describe, expect, mock, test } from "bun:test";
 import { cleanup, waitFor } from "@testing-library/react";
 import { AdminContext } from "@/apps/chat/chatThreadContexts";
 import { renderWithQueryClient } from "../../../tests/renderWithQueryClient";
-import { ComposerVoiceControls } from "@/apps/chat/composerVoiceControls";
+import { ComposerVoiceControls, useVoiceCallReady } from "@/apps/chat/composerVoiceControls";
 
 afterEach(cleanup);
 
@@ -126,5 +126,47 @@ describe("ComposerVoiceControls for someone who is not an owner or admin", () =>
     } finally {
       restore();
     }
+  });
+});
+
+// DOTS-CHAT-01: the chat header's Call button and the composer waveform share one gate.
+describe("useVoiceCallReady (the Call gate)", () => {
+  function Probe({ disabled, engineDown }: { disabled?: boolean; engineDown?: string }) {
+    return <span data-testid="ready">{String(useVoiceCallReady(disabled, engineDown))}</span>;
+  }
+  const both = [{ id: "stt", state: "ready" }, { id: "tts", state: "ready" }];
+
+  test("true once speech in and out are usable", async () => {
+    const restore = stubEngines(both);
+    try {
+      const view = renderWithQueryClient(<AdminContext.Provider value><Probe /></AdminContext.Provider>);
+      await waitFor(() => expect(view.getByTestId("ready").textContent).toBe("true"));
+    } finally { restore(); }
+  });
+
+  test("false without speech out, while a turn runs (disabled) and with the engine down", async () => {
+    const restore = stubEngines([{ id: "stt", state: "ready" }]);
+    try {
+      const view = renderWithQueryClient(<AdminContext.Provider value><Probe /></AdminContext.Provider>);
+      await waitFor(() => expect(globalThis.fetch).toHaveBeenCalled());
+      expect(view.getByTestId("ready").textContent).toBe("false");
+    } finally { restore(); }
+    const again = stubEngines(both);
+    try {
+      const running = renderWithQueryClient(<AdminContext.Provider value><Probe disabled /></AdminContext.Provider>);
+      await waitFor(() => expect(globalThis.fetch).toHaveBeenCalled());
+      expect(running.container.textContent).toBe("false");
+      const down = renderWithQueryClient(<AdminContext.Provider value><Probe engineDown="Chat is unavailable" /></AdminContext.Provider>);
+      expect(down.container.textContent).toBe("false");
+    } finally { again(); }
+  });
+
+  test("false for someone who is not an admin (the engines route is admin-only)", async () => {
+    const restore = stubEngines(both);
+    try {
+      const view = renderWithQueryClient(<AdminContext.Provider value={false}><Probe /></AdminContext.Provider>);
+      await new Promise((r) => setTimeout(r, 50));
+      expect(view.getByTestId("ready").textContent).toBe("false");
+    } finally { restore(); }
   });
 });

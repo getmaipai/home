@@ -53,6 +53,8 @@ import "@/shell/pages/chatReplyMarkdown.css";
 import { WakeWordController } from "@/apps/chat/WakeWordController";
 import { useSetChatHeaderData } from "@/apps/chat/chatHeaderData";
 import { ChatHeaderBar } from "@/apps/chat/chatHeaderBar";
+import { useCompanionShells } from "@/lib/companionShells";
+import { useVoiceCallReady } from "@/apps/chat/composerVoiceControls";
 import { micHelp, useMicGate } from "@/lib/media/micGate";
 import { copyMicDetails, lastMicFailure, micFailureLine } from "@/lib/voice/micDiagnostics";
 import { VoiceSessionProvider } from "@/apps/chat/voiceSessionContext";
@@ -979,6 +981,7 @@ function ProjectResultReload() {
 }
 
 export function ChatPage({ person }: { person: Roster }) {
+  const companionShells = useCompanionShells() === true;
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [draftConversationId, setDraftConversationId] = useState<string | undefined>(() => new URLSearchParams(window.location.search).get("conversation") ?? undefined);
@@ -1093,6 +1096,8 @@ export function ChatPage({ person }: { person: Roster }) {
   const chatColumnBreakpoint = useBreakpoint();
   const column = useChatColumn({ isDesktop: chatColumnBreakpoint.atLeast(960) });
   const { sheetOpen, setSheetOpen } = column;
+  const callReady = useVoiceCallReady(false, chatAvailability === "ready" ? undefined : "Chat is unavailable");
+  const openVoiceFromHeader = useCallback(() => closeAwareSetVoiceOpen(true), [closeAwareSetVoiceOpen]);
   const [openArtifactId, setOpenArtifactId] = useState<string | null>(null);
   // Jesse's own standing rule (2026-09-27): every expand/collapse
   // surface animates open and closed, never snaps - the desktop canvas
@@ -1557,12 +1562,12 @@ export function ChatPage({ person }: { person: Roster }) {
             re-deriving the same number a second, guessable way. */}
         <div data-slot="chat-shell" className="flex h-full flex-col overflow-hidden">
           {/* Below lg the column is a sheet, opened from this row. */}
-          <div className="flex items-center gap-1 border-b border-border pb-2 lg:hidden">
+          {companionShells ? (chatColumnBreakpoint.atLeast(960) ? null : <ChatHeaderBar shells onMenu={() => setSheetOpen((open) => !open)} menuExpanded={sheetOpen} menuControls="next-chat-threads" onCall={callReady ? openVoiceFromHeader : undefined} />) : <div className="flex items-center gap-1 border-b border-border pb-2 lg:hidden">
             <Button variant="ghost" size="icon" aria-label={sheetOpen ? "Hide threads" : "Show threads"} aria-expanded={sheetOpen} aria-controls="next-chat-threads" onClick={() => setSheetOpen((open) => !open)}>
               <ColumnOpenIcon className="size-4.5" />
             </Button>
             <ChatHeaderBar phoneRow />
-          </div>
+          </div>}
           <div className="relative flex min-h-0 flex-1" data-slot="chat-column-stage">
             {/* COLUMN-02: while hidden, the kit's thin hover zone opens this
                 column as an overlay without shifting the conversation. */}
@@ -1639,7 +1644,7 @@ export function ChatPage({ person }: { person: Roster }) {
                   way Claude's is (owner, 2026-10-06): the controls just
                   sit at the top. While the history column is hidden, its
                   show control sits at this header's left edge, in flow. */}
-              <header data-slot="chat-header" data-column={column.collapsed ? "closed" : "open"} className={cn("hidden h-13 shrink-0 items-center gap-1 px-5 lg:flex", column.collapsed && "ps-3")}>
+              {companionShells ? (chatColumnBreakpoint.atLeast(960) ? <ChatHeaderBar shells onMenu={!column.collapsed ? undefined : column.toggleFromButton} menuExpanded={!column.collapsed} menuControls={CHAT_COLUMN_ID} onCall={callReady ? openVoiceFromHeader : undefined} /> : null) : <header data-slot="chat-header" data-column={column.collapsed ? "closed" : "open"} className={cn("hidden h-13 shrink-0 items-center gap-1 px-5 lg:flex", column.collapsed && "ps-3")}>
                 {column.collapsed ? <TooltipIconButton
                   ref={column.headerToggleRef}
                   tooltip={`Show conversations ${chatColumnShortcutLabel()}`}
@@ -1658,7 +1663,7 @@ export function ChatPage({ person }: { person: Roster }) {
                   onClick={column.toggleFromButton}
                 ><ColumnOpenIcon className="size-4.5" /></TooltipIconButton> : null}
                 <ChatHeaderBar />
-              </header>
+              </header>}
           {bareMode ? (
             // COORDINATOR, 2026-09-22: "while it is on, it is obvious...
             // a persistent visible marker on the conversation for as

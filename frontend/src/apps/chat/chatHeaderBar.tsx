@@ -77,10 +77,13 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@maipai/ui/src/ui/dropdown-menu";
+import { Avatar, AvatarFallback } from "@maipai/ui/src/ui/avatar";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@maipai/ui/src/ui/dialog";
+import { ChatHeader } from "@maipai/ui/src/elements/chat-header";
+import { CompanionAvatar } from "@maipai/ui/src/elements/companion-avatar";
 import { getIcon } from "@maipai/ui/src/icons";
 import { useChatHeaderData } from "@/apps/chat/chatHeaderData";
-import { useCompanionShells } from "@/lib/companionShells";
-import { CompanionHeaderPicker } from "@/apps/chat/companionHeaderPicker";
+import { useCompanionPresence } from "@/apps/chat/useCompanionPresence";
 
 const PencilIcon = getIcon("pencil");
 const TrashIcon = getIcon("trash");
@@ -89,7 +92,7 @@ const PinOffIcon = getIcon("pin-off");
 const ArchiveIcon = getIcon("archive");
 const MoreIcon = getIcon("more-horizontal");
 
-function ChatHeaderRename({ title, onRename, onDone }: { title: string; onRename: (title: string) => Promise<void>; onDone: () => void }) {
+function ChatHeaderRename({ title, onRename, onDone, commitOnBlur = true }: { title: string; onRename: (title: string) => Promise<void>; onDone: () => void; commitOnBlur?: boolean }) {
   const [value, setValue] = useState(title);
   const inputRef = useRef<HTMLInputElement>(null);
   const settledRef = useRef(false);
@@ -125,7 +128,7 @@ function ChatHeaderRename({ title, onRename, onDone }: { title: string; onRename
       value={value}
       className="h-8 min-w-0 flex-1 text-base"
       onChange={(event) => setValue(event.target.value)}
-      onBlur={commit}
+      onBlur={commitOnBlur ? commit : undefined}
       onKeyDown={(event) => {
         if (event.key === "Enter") {
           event.preventDefault();
@@ -144,11 +147,21 @@ function ChatHeaderRename({ title, onRename, onDone }: { title: string; onRename
  * renames) sits on the left; the conversation's options menu and
  * `trailing` (the agent/task activity toggle's slot, when there is one)
  * sit on the right. */
-export function ChatHeaderBar({ phoneRow = false, trailing }: { phoneRow?: boolean; trailing?: ReactNode } = {}) {
+/** DOTS-CHAT-01: reads the companion for the kit header. Its own component so the presence hooks (runtime and router) run only when the preview switch is on. */
+function WithCompanion({ children }: { children: (name: string, media: ReactNode) => ReactNode }) {
+  const presence = useCompanionPresence();
+  const name = presence?.name ?? "MaiPai";
+  return children(name, presence
+    ? <CompanionAvatar name={presence.name} clips={presence.clips} wanted={presence.wanted} once={presence.once} size="sm" onFail={presence.onFail} />
+    : <Avatar><AvatarFallback>{name.slice(0, 1)}</AvatarFallback></Avatar>);
+}
+
+type ShellsProps = { shells?: boolean; onMenu?: (() => void) | undefined; menuExpanded?: boolean; menuControls?: string; onCall?: (() => void) | undefined };
+
+export function ChatHeaderBar({ phoneRow = false, trailing, shells = false, onMenu, menuExpanded, menuControls, onCall }: { phoneRow?: boolean; trailing?: ReactNode } & ShellsProps = {}) {
   const data = useChatHeaderData();
   const [renaming, setRenaming] = useState(false);
   const [open, setOpen] = useState(false);
-  const shells = useCompanionShells();
 
   // Non-chat pages never call useSetChatHeaderData at all (they don't
   // import this file), so this is only ever null for one real reason:
@@ -163,6 +176,36 @@ export function ChatHeaderBar({ phoneRow = false, trailing }: { phoneRow?: boole
   // never a blank bar.
   const title = data.title || "New Chat";
 
+  const actions = (
+    <>
+      {trailing}
+      <DropdownMenu open={open} onOpenChange={setOpen}>
+        <DropdownMenuTrigger asChild>
+          <Button type="button" variant="ghost" size="icon" className="text-muted-foreground" aria-label="Conversation actions"><MoreIcon className="size-[18px]" /></Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end" density="compact">
+          <DropdownMenuItem onClick={() => setRenaming(true)}><PencilIcon className="size-4" />Rename</DropdownMenuItem>
+          {data.pinnable ? <DropdownMenuItem onClick={() => void data.onPinChange(!data.pinned)}>{data.pinned ? <PinOffIcon className="size-4" /> : <PinIcon className="size-4" />}{data.pinned ? "Unpin" : "Pin"}</DropdownMenuItem> : null}
+          <DropdownMenuItem onClick={() => void data.onArchive()}><ArchiveIcon className="size-4" />Archive</DropdownMenuItem>
+          <DropdownMenuItem variant="destructive" onClick={() => void data.onDelete()}><TrashIcon className="size-4" />Delete</DropdownMenuItem>
+          {data.ttsAvailable ? <><DropdownMenuSeparator /><DropdownMenuCheckboxItem checked={data.autoReadReplies} onCheckedChange={data.onAutoReadRepliesChange}>Read replies aloud</DropdownMenuCheckboxItem></> : null}
+        </DropdownMenuContent>
+      </DropdownMenu>
+    </>
+  );
+  if (shells) {
+    return (
+      <>
+        <WithCompanion>{(name, media) => <ChatHeader name={name} media={media} onMenu={onMenu} onCall={onCall} actions={actions} menuExpanded={menuExpanded} menuControls={menuControls} />}</WithCompanion>
+        <Dialog open={renaming} onOpenChange={setRenaming}>
+          <DialogContent>
+            <DialogHeader><DialogTitle>Rename</DialogTitle><DialogDescription>{title}</DialogDescription></DialogHeader>
+            <ChatHeaderRename title={data.title} onRename={data.onRename} onDone={() => setRenaming(false)} commitOnBlur={false} />
+          </DialogContent>
+        </Dialog>
+      </>
+    );
+  }
   return (
     <div data-chat-header-bar className={phoneRow ? "flex min-w-0 flex-1 items-center gap-1 overflow-hidden" : "hidden min-w-0 flex-1 items-center gap-1 overflow-hidden lg:flex"}>
       {renaming ? (
@@ -184,7 +227,6 @@ export function ChatHeaderBar({ phoneRow = false, trailing }: { phoneRow?: boole
           </Button>
           {phoneRow ? null : <span className="flex-1" aria-hidden />}
           {trailing}
-          {shells === true ? <CompanionHeaderPicker /> : null}
           <DropdownMenu open={open} onOpenChange={setOpen}>
             <DropdownMenuTrigger asChild>
               {/* Keep an 8px visual gap between the two independent

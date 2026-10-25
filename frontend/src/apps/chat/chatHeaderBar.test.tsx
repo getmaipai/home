@@ -1,8 +1,20 @@
-import { afterEach, describe, expect, mock, test } from "bun:test";
+import { afterAll, afterEach, describe, expect, mock, test } from "bun:test";
 import { act, cleanup, fireEvent, render, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { TooltipProvider } from "@maipai/ui/src/ui/tooltip";
 import { Button } from "@maipai/ui/src/ui/button";
+import * as realPresence from "@/apps/chat/useCompanionPresence";
+import * as realAvatar from "@maipai/ui/src/elements/companion-avatar";
+const presenceSnapshot = { ...realPresence };
+const avatarSnapshot = { ...realAvatar };
+// mock.module outlives this file; put the real modules back for the files that run after it.
+afterAll(() => {
+  mock.module("@/apps/chat/useCompanionPresence", () => presenceSnapshot);
+  mock.module("@maipai/ui/src/elements/companion-avatar", () => avatarSnapshot);
+});
+let presenceMock: { name: string } | null = null;
+mock.module("@/apps/chat/useCompanionPresence", () => ({ useCompanionPresence: () => presenceMock && { ...presenceMock, clips: {}, wanted: undefined, once: null, size: "lg", hidden: false, onHiddenChange: () => {}, onFail: () => {} } }));
+mock.module("@maipai/ui/src/elements/companion-avatar", () => ({ CompanionAvatar: ({ name }: { name: string }) => <div role="img" aria-label={name} /> }));
 import { ChatHeaderBar } from "@/apps/chat/chatHeaderBar";
 import { ChatHeaderDataProvider, useSetChatHeaderData, type ChatHeaderData } from "@/apps/chat/chatHeaderData";
 
@@ -242,5 +254,64 @@ describe("ChatHeaderBar", () => {
     await view.findByText("Rename");
     expect(document.querySelector('[data-slot="dropdown-menu-content"]')?.getAttribute("data-density")).toBe("compact");
     expect(view.getByText("Delete").closest('[role="menuitem"]')?.getAttribute("data-variant")).toBe("destructive");
+  });
+
+  describe("with the companion preview header (DOTS-CHAT-01)", () => {
+    function renderShells(data: ChatHeaderData, props: { onMenu?: () => void; onCall?: () => void } = {}) {
+      const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+      return render(
+        <QueryClientProvider client={client}>
+          <TooltipProvider>
+            <ChatHeaderDataProvider>
+              <TestBridge data={data} />
+              <ChatHeaderBar shells menuExpanded={false} menuControls="next-chat-threads" {...props} />
+            </ChatHeaderDataProvider>
+          </TooltipProvider>
+        </QueryClientProvider>,
+      );
+    }
+
+    test("shows the companion's name over its character, not the conversation title row", async () => {
+      presenceMock = { name: "Nova" };
+      const view = renderShells(baseData());
+      expect(await view.findByText("Nova")).toBeVisible();
+      expect(view.getByRole("img", { name: "Nova" })).toBeTruthy();
+      expect(view.container.querySelector("[data-chat-header-bar]")).toBeNull();
+    });
+
+    test("falls back to MaiPai with no animated companion", async () => {
+      presenceMock = null;
+      const view = renderShells(baseData());
+      expect(await view.findByText("MaiPai")).toBeVisible();
+    });
+
+    test("the menu button calls onMenu, and Call shows only when onCall is given", async () => {
+      presenceMock = { name: "Nova" };
+      const onMenu = mock(() => {});
+      const onCall = mock(() => {});
+      const view = renderShells(baseData(), { onMenu });
+      fireEvent.click(await view.findByRole("button", { name: "Open menu" }));
+      expect(onMenu).toHaveBeenCalledTimes(1);
+      expect(view.queryByRole("button", { name: "Call Nova" })).toBeNull();
+      view.unmount();
+      const second = renderShells(baseData(), { onCall });
+      fireEvent.click(await second.findByRole("button", { name: "Call Nova" }));
+      expect(onCall).toHaveBeenCalledTimes(1);
+    });
+
+    test("Rename opens a dialog that saves on Enter and closes on Escape; the other actions stay in the menu", async () => {
+      presenceMock = { name: "Nova" };
+      const onRename = mock(async (_title: string) => {});
+      const view = renderShells(baseData({ onRename, ttsAvailable: true }));
+      await openActionsMenu(view);
+      for (const label of ["Pin", "Archive", "Delete"]) expect(await view.findByRole("menuitem", { name: label })).toBeTruthy();
+      expect(view.getByRole("menuitemcheckbox", { name: "Read replies aloud" })).toBeTruthy();
+      fireEvent.click(view.getByRole("menuitem", { name: "Rename" }));
+      const input = await view.findByRole("textbox", { name: "Rename conversation" });
+      fireEvent.change(input, { target: { value: "Dinner ideas" } });
+      fireEvent.keyDown(input, { key: "Enter" });
+      await waitFor(() => expect(onRename).toHaveBeenCalledWith("Dinner ideas"));
+      await waitFor(() => expect(view.queryByLabelText("Rename conversation")).toBeNull());
+    });
   });
 });

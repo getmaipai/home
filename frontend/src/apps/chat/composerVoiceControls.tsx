@@ -24,6 +24,13 @@ import { AdminContext } from "@/apps/chat/chatThreadContexts";
 import { useVoiceSession } from "@/apps/chat/voiceSessionContext";
 import { api, type EnginesOverview } from "@/lib/api";
 
+/** Shared readiness gate for the composer waveform and the chat header Call action. */
+export function useVoiceCallReady(disabled = false, engineDown?: string): boolean {
+  const isAdmin = useContext(AdminContext);
+  const enginesQuery = useQuery<EnginesOverview>({ queryKey: ["engines"], queryFn: () => api.engines(), enabled: isAdmin });
+  return !disabled && engineDown === undefined && usableRole(enginesQuery.data, "stt") && usableRole(enginesQuery.data, "tts");
+}
+
 const AudioWaveformIcon = getIcon("audio-waveform");
 
 // VOICE-LIVE-05 follow-up (Jesse's own live read, 2026-09-23): the pill
@@ -56,12 +63,6 @@ function WaveformButton({ onClick, engineDown }: { onClick: () => void; engineDo
  * absent, not disabled, the same posture Create image and the composer
  * Attach's other role-gated rows already take. */
 export function ComposerVoiceControls({ disabled = false, engineDown }: { disabled?: boolean; engineDown?: string | undefined }) {
-  // GET /api/engines is owner/admin only: asking as anyone else is a 403 the
-  // browser prints as a console error on every Chat visit (found by the
-  // MOBILE-LIVE-01 phone smoke), and the answer was never usable.
-  const isAdmin = useContext(AdminContext);
-  const enginesQuery = useQuery<EnginesOverview>({ queryKey: ["engines"], queryFn: () => api.engines(), enabled: isAdmin });
-  const overview = enginesQuery.data;
   // VOICE-LIVE-02: `null` here (no VoiceSessionProvider in this tree)
   // means this component was mounted somewhere other than ChatPage's
   // own composer - the waveform still renders (readyRole alone still
@@ -69,6 +70,6 @@ export function ComposerVoiceControls({ disabled = false, engineDown }: { disabl
   // posture the rest of this file already takes for a role that isn't
   // ready.
   const session = useVoiceSession();
-  if (disabled || !usableRole(overview, "stt") || !usableRole(overview, "tts")) return null;
+  if (!useVoiceCallReady(disabled, engineDown)) return null;
   return <WaveformButton onClick={() => session?.setOpen(true)} engineDown={engineDown} />;
 }

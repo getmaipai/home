@@ -1,12 +1,28 @@
-import { afterEach, expect, mock, test } from "bun:test";
+import { afterAll, afterEach, expect, mock, test } from "bun:test";
 import { act, cleanup, fireEvent, waitFor } from "@testing-library/react";
 import { AssistantRuntimeProvider, useLocalRuntime, type ChatModelAdapter, type ThreadMessageLike } from "@assistant-ui/react";
 import { MemoryRouter } from "react-router-dom";
+import { ToastProvider } from "@maipai/ui/src/primitives/Toast";
 import { ChatThread } from "@/apps/chat/ChatThread";
 import { CHAT_COMMAND_SHORTCUTS, buildChatCommands, type ChatCommandAction } from "@/apps/chat/chatCommands";
 import { CHAT_SHORTCUTS } from "@/shell/pages/chatShortcuts";
 import { canHaveTemporaryChatRole, type Roster } from "@/lib/api";
 import { renderWithQueryClient } from "../../../tests/renderWithQueryClient";
+
+import * as realPresence from "@/apps/chat/useCompanionPresence";
+import * as realShells from "@/lib/companionShells";
+import * as realAvatar from "@maipai/ui/src/elements/companion-avatar";
+const snapshots = { presence: { ...realPresence }, shells: { ...realShells }, avatar: { ...realAvatar } };
+let shellsOn: boolean | undefined = false;
+mock.module("@/apps/chat/useCompanionPresence", () => ({ useCompanionPresence: () => ({ name: "Nova", clips: {}, wanted: undefined, once: null, size: "lg", hidden: false, onHiddenChange: () => {}, onFail: () => {} }) }));
+mock.module("@/lib/companionShells", () => ({ ...snapshots.shells, useCompanionShells: () => shellsOn }));
+mock.module("@maipai/ui/src/elements/companion-avatar", () => ({ CompanionAvatar: ({ name, placement }: { name: string; placement?: string }) => <div role="img" aria-label={name} data-placement={placement} /> }));
+// mock.module outlives this file; put the real modules back for the files that run after it.
+afterAll(() => {
+  mock.module("@/apps/chat/useCompanionPresence", () => snapshots.presence);
+  mock.module("@/lib/companionShells", () => snapshots.shells);
+  mock.module("@maipai/ui/src/elements/companion-avatar", () => snapshots.avatar);
+});
 
 const NOOP: ChatModelAdapter = { run: async function* () {} };
 
@@ -23,7 +39,7 @@ function Harness({ count, content, role = "adult", canUseIncognito }: { count: n
 }
 
 function renderChat(props: React.ComponentProps<typeof Harness>) {
-  return renderWithQueryClient(<MemoryRouter><Harness {...props} /></MemoryRouter>);
+  return renderWithQueryClient(<ToastProvider><MemoryRouter><Harness {...props} /></MemoryRouter></ToastProvider>);
 }
 
 afterEach(() => cleanup());
@@ -202,4 +218,16 @@ test("the shortcut reference and the palette read the same catalog", () => {
   const expected = CHAT_COMMAND_SHORTCUTS.map(({ name, shortcut }) => [name, shortcut] as const);
   expect(CHAT_SHORTCUTS).toEqual(expected);
   expect(palette.filter((command) => command.shortcut).map(({ name, shortcut }) => [name, shortcut] as const)).toEqual(expected);
+});
+
+test("the corner avatar draws without the preview header and gives way to the header's character with it", async () => {
+  shellsOn = false;
+  const off = renderChat({ count: 2 });
+  await waitFor(() => expect(off.container.querySelector('[data-placement="corner"]')).not.toBeNull());
+  off.unmount();
+  shellsOn = true;
+  const on = renderChat({ count: 2 });
+  await waitFor(() => expect(on.container.querySelector('[data-slot="aui_thread-viewport"]')).not.toBeNull());
+  expect(on.container.querySelector('[data-placement="corner"]')).toBeNull();
+  shellsOn = false;
 });
