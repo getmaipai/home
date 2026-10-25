@@ -82,7 +82,7 @@ The News app pages and these controls ship with the News app package. The shelf 
 
 ## Keep full stories ready
 
-**Load News stories ahead of time** is on by default, so stories open fast. Home asks each site for at most one page every 30 seconds, so no single site is flooded. An admin can turn it off in the News settings, under advanced options. With it off, Home loads a story page only when someone opens or saves it.
+**Load News stories ahead of time** is off by default. An admin can turn it on in the News settings, under advanced options. Home then asks each site for at most one page every 30 seconds, so no single site is flooded. With it off, Home loads a story page only when someone opens or saves it.
 
 When it is on, Home loads text from followed channels and the top stories in Today while nobody is using MaiPai. It tries each item only once. It loads at most one page every 30 seconds and 150 pages per site in 24 hours. It follows each site's rules for automated readers. If a site blocks a request, Home pauses these background reads for at least an hour. More failures make the wait longer, up to a day. You can still open a story yourself.
 
