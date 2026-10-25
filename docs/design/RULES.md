@@ -203,7 +203,10 @@ companion. Owner-approved: 2026-10-21 (chat).
    text is not stored as if heard (owner's rule, 2026-10-14). Custom code in the chat path needs a named gap in
    this record first. Named gaps today: sentence-gated speech scheduling
    with the spoken cue, the `[n]` citation mapper, the output gate, the
-   prose tool-call fallback.
+   prose tool-call fallback, the chat header (the companion's character
+   over a name pill with a menu button and a call button, drawn by the
+   kit `ChatHeader` Element because assistant-ui has none; owner-approved
+   2026-10-25, COMPANIONS-DOTS-01 / DOTS-CHAT-01).
    One small block-validation checker may validate answer blocks from
    tools before the kit draws them; all drawing stays in shipped kit
    Elements, never hand-written (owner-approved 2026-10-08; GENUI-02).
