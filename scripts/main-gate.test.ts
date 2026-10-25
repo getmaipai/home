@@ -134,6 +134,14 @@ describe("main-gate", () => {
     expect(note).not.toContain("Probable cause");
   });
 
+  test("frontend a11y retry runs the root package script", () => {
+    commit("a11y landing");
+    const command = `mkdir -p frontend; printf '%s\\n' '{"scripts":{"a11y":"echo root-a11y-ran"}}' > package.json; printf '%s\\n' '{"scripts":{}}' > frontend/package.json; echo '== frontend: a11y'; echo 'a11y failure'; exit 1`;
+    const result = invoke(command);
+    expect(result.status, result.stderr + result.stdout).toBe(0);
+    expect(result.stderr + result.stdout).toContain("root-a11y-ran");
+  });
+
   // RELEASE-GATE-01: the idle run after a landing never makes a session wait for the gate lock.
   function fakeLock(script: string) {
     writeFileSync(join(sandbox, "standards", "standards", "bin", "gate-lock.sh"), `#!/usr/bin/env bash\n${script}\n`);

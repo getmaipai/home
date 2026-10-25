@@ -70,7 +70,7 @@ stage_retry() {
         *"backend: bun test"*) (cd "$WT/backend" && bun test) ;;
         *"scripts: bun test"*) (cd "$WT" && bun test scripts) ;;
         *"frontend: build"*) (cd "$WT/frontend" && bun run build) ;;
-        *"frontend: a11y"*) (cd "$WT/frontend" && bun run a11y) ;;
+        *"frontend: a11y"*) (cd "$WT" && bun run a11y) ;;
         *"frontend: ui rules"*) (cd "$WT/frontend" && bun run lint:ui-rules) ;;
         *"backend: test server hostname lint"*) (cd "$WT" && bun run scripts/gate/testServersLint.ts) ;;
         *) return 1 ;;
