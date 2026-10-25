@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, type FormEvent } from "react";
+import { createContext, useContext, useState, type CSSProperties, type FormEvent } from "react";
 import { Avatar } from "@maipai/ui/src/primitives/Avatar";
 import { Card, CardContent } from "@maipai/ui/src/dashboard/components/ui/card";
 import { Input } from "@maipai/ui/src/dashboard/components/ui/input";
@@ -9,6 +9,8 @@ import { PasscodeInput } from "@maipai/ui/src/ui/passcode-input";
 import { usePinAutoSubmit } from "@/kit/hooks/usePinAutoSubmit";
 import { usePasscodeAttempt } from "@/kit/hooks/usePasscodeAttempt";
 import { api, type SignedInPerson } from "@/lib/api";
+
+type MaskedSecretStyle = CSSProperties & { WebkitTextSecurity: "disc" };
 
 /** INCOGNITO-07: session lock with PIN re-entry, a standalone capability
  * (the backlog item's own framing - "not Incognito-specific plumbing")
@@ -97,7 +99,17 @@ export function SessionLockGate({ person, children }: { person: SignedInPerson |
                         <Input
                           key={attemptState.attempt}
                           id="lock-secret"
-                          type="password"
+                          name="maipai-secret"
+                          type="text"
+                          style={{ WebkitTextSecurity: "disc" } as MaskedSecretStyle}
+                          autoCapitalize="off"
+                          autoCorrect="off"
+                          spellCheck={false}
+                          autoComplete="off"
+                          data-1p-ignore
+                          data-lpignore="true"
+                          data-bwignore
+                          data-form-type="other"
                           value={secret}
                           disabled={attemptState.locked}
                           onChange={(e) => setSecret(e.target.value)}

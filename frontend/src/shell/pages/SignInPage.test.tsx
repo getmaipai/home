@@ -242,7 +242,7 @@ describe("SignInPage PIN edge cases (ported from the retired SignIn)", () => {
       await act(async () => {
         fireEvent.click(buttonByText(/use a password instead/i));
       });
-      const input = document.body.querySelector('input[type="password"]') as HTMLInputElement;
+      const input = document.body.querySelector('#secret') as HTMLInputElement;
       await act(async () => {
         fireEvent.change(input, { target: { value: "123456" } });
       });
@@ -333,8 +333,7 @@ describe("SignInPage credential step is a numeric keypad (MOBILE-LIVE-01)", () =
       const otp = document.body.querySelector("input[data-input-otp]") as HTMLInputElement;
       expect(otp.getAttribute("inputmode")).toBe("numeric");
       expect(document.body.querySelectorAll('[data-slot="passcode-input-slot"]').length).toBe(4);
-      expect(document.body.querySelector('input[type="password"]')).toBeNull();
-      expect(document.body.querySelector('input[type="text"]:not([data-input-otp])')).toBeNull();
+      expect(document.body.querySelector('#secret:not([data-input-otp])')).toBeNull();
     } finally {
       restore();
     }
@@ -354,8 +353,18 @@ describe("SignInPage credential step is a numeric keypad (MOBILE-LIVE-01)", () =
       await act(async () => {
         fireEvent.click(buttonByText(/use a password instead/i));
       });
-      const field = document.body.querySelector('input[type="password"]') as HTMLInputElement;
+      const field = document.body.querySelector('#secret') as HTMLInputElement;
       expect(field).not.toBeNull();
+      expect(field.type).toBe("text");
+      const reactPropsKey = Object.keys(field).find((key) => key.startsWith("__reactProps$"));
+      expect(reactPropsKey).toBeDefined();
+      expect((field as unknown as Record<string, { style?: { WebkitTextSecurity?: string } }>)[reactPropsKey!]?.style?.WebkitTextSecurity).toBe("disc");
+      expect(field.getAttribute("autocomplete")).toBe("off");
+      expect(field.getAttribute("name")).not.toBe("password");
+      expect(field.getAttribute("data-1p-ignore")).not.toBeNull();
+      expect(field.getAttribute("data-lpignore")).toBe("true");
+      expect(field.getAttribute("data-bwignore")).not.toBeNull();
+      expect(field.getAttribute("data-form-type")).toBe("other");
       expect(document.body.querySelector("input[data-input-otp]")).toBeNull();
       await act(async () => {
         fireEvent.change(field, { target: { value: "correct horse battery" } });
@@ -439,7 +448,7 @@ describe("SignInPage sizes the keypad to the account (pinDigits, 2026-10-17)", (
     });
     try {
       const field = await waitFor(() => {
-        const el = document.body.querySelector('input[type="password"]');
+        const el = document.body.querySelector('#secret');
         if (!el) throw new Error("not yet rendered");
         return el as HTMLInputElement;
       });

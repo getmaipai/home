@@ -62,7 +62,7 @@ describe("SessionLockGate", () => {
     );
     expect(document.body.textContent).toContain("the app");
     await new Promise((r) => setTimeout(r, 60));
-    expect(document.body.querySelector('input[type="password"]')).toBeNull();
+    expect(document.body.querySelector('#lock-secret')).toBeNull();
   });
 
   test("renders children with no overlay when signed out (person is null)", async () => {
@@ -72,7 +72,7 @@ describe("SessionLockGate", () => {
       </SessionLockGate>,
     );
     await new Promise((r) => setTimeout(r, 60));
-    expect(document.body.querySelector('input[type="password"]')).toBeNull();
+    expect(document.body.querySelector('#lock-secret')).toBeNull();
   });
 
   test("locks behind a PIN prompt after the configured inactivity window - content stays mounted underneath, not wiped", async () => {
@@ -81,7 +81,7 @@ describe("SessionLockGate", () => {
         <div>the app</div>
       </SessionLockGate>,
     );
-    await waitFor(() => expect(document.body.querySelector('input[type="password"]')).not.toBeNull());
+    await waitFor(() => expect(document.body.querySelector('#lock-secret')).not.toBeNull());
     // The forced-wipe idle timeout an earlier draft proposed (Jesse's own
     // correction, 2026-09-25) is explicitly not this: the app's own
     // content is still in the DOM, just covered.
@@ -97,10 +97,20 @@ describe("SessionLockGate", () => {
         </SessionLockGate>,
       );
       const input = await waitFor(() => {
-        const el = document.body.querySelector('input[type="password"]');
+        const el = document.body.querySelector('#lock-secret');
         if (!el) throw new Error("not locked yet");
         return el as HTMLInputElement;
       });
+      expect(input.getAttribute("autocomplete")).toBe("off");
+      expect(input.type).toBe("text");
+      const reactPropsKey = Object.keys(input).find((key) => key.startsWith("__reactProps$"));
+      expect(reactPropsKey).toBeDefined();
+      expect((input as unknown as Record<string, { style?: { WebkitTextSecurity?: string } }>)[reactPropsKey!]?.style?.WebkitTextSecurity).toBe("disc");
+      expect(input.getAttribute("name")).not.toBe("password");
+      expect(input.getAttribute("data-1p-ignore")).not.toBeNull();
+      expect(input.getAttribute("data-lpignore")).toBe("true");
+      expect(input.getAttribute("data-bwignore")).not.toBeNull();
+      expect(input.getAttribute("data-form-type")).toBe("other");
       await act(async () => {
         fireEvent.change(input, { target: { value: "correcthorse" } });
       });
@@ -108,7 +118,7 @@ describe("SessionLockGate", () => {
       await act(async () => {
         fireEvent.click(button);
       });
-      await waitForGone(() => document.body.querySelector('input[type="password"]'));
+      await waitForGone(() => document.body.querySelector('#lock-secret'));
     } finally {
       restore();
     }
@@ -163,7 +173,7 @@ describe("SessionLockGate", () => {
         </SessionLockGate>,
       );
       const input = await waitFor(() => {
-        const el = document.body.querySelector('input[type="password"]');
+        const el = document.body.querySelector('#lock-secret');
         if (!el) throw new Error("not locked yet");
         return el as HTMLInputElement;
       });
@@ -175,7 +185,7 @@ describe("SessionLockGate", () => {
         fireEvent.click(button);
       });
       await waitFor(() => expect(document.body.textContent).toContain("That PIN or password is not right"));
-      expect(document.body.querySelector('input[type="password"]')).not.toBeNull();
+      expect(document.body.querySelector('#lock-secret')).not.toBeNull();
     } finally {
       restore();
     }
@@ -235,7 +245,7 @@ describe("SessionLockGate", () => {
         fireEvent.click(toggle);
       });
       expect(document.body.querySelector("input[data-input-otp]")).toBeNull();
-      expect(document.body.querySelector('input[type="password"]')).not.toBeNull();
+      expect(document.body.querySelector('#lock-secret')).not.toBeNull();
     } finally {
       restore();
     }

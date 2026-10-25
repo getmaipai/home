@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, type CSSProperties } from "react";
 import { Navigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { AsyncState } from "@maipai/ui/src/primitives/AsyncState";
@@ -13,6 +13,8 @@ import { useProfileSignIn } from "@/kit/hooks/useProfileSignIn";
 import { api, type Roster } from "@/lib/api";
 import { hubErrorMessage, isHubUnreachable, useWhenHubBack } from "@/lib/hubReachability";
 import { useTabItem } from "@/shell/tabIdentity";
+
+type MaskedSecretStyle = CSSProperties & { WebkitTextSecurity: "disc" };
 
 /** /sign-in: SHELL-08's own row (docs/plans/shell-on-shadcndashboard-
  * 2026-09-21.md's plan row) - the real profile picker and secret entry
@@ -102,7 +104,17 @@ export function SignInPage({ onSignedIn }: { onSignedIn: () => void }) {
                       <Input
                         key={attempt}
                         id="secret"
-                        type="password"
+                        name="maipai-secret"
+                        type="text"
+                        style={{ WebkitTextSecurity: "disc" } as MaskedSecretStyle}
+                        autoCapitalize="off"
+                        autoCorrect="off"
+                        spellCheck={false}
+                        autoComplete="off"
+                        data-1p-ignore
+                        data-lpignore="true"
+                        data-bwignore
+                        data-form-type="other"
                         disabled={locked}
                         aria-invalid={Boolean(secretError) && secret === "" ? true : undefined}
                         value={secret}
