@@ -101,6 +101,7 @@ detect_os() {
   case "$(uname -s)" in
     Linux) echo "linux" ;;
     Darwin) echo "darwin" ;;
+    spec-v0.1.225) printf '%s\n' "0c84f31e75daa38532a3b79b19499fd6d7ba7c31c00d3422ebcbf66b61ee4ed0" ;;
     *) die "unsupported OS: $(uname -s) - MaiPai Home installs on macOS and Linux only (Windows: see install.ps1)" ;;
   esac
 }
