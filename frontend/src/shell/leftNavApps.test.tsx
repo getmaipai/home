@@ -49,8 +49,8 @@ const rail = (view: ReturnType<typeof open>) => within(view.container.querySelec
 beforeEach(() => { rows = [base, notes]; });
 afterEach(() => {
   cleanup();
-  home.restore();
   globalThis.fetch = baseFetch;
+  home.restore();
   window.matchMedia = originalMatchMedia;
   Object.defineProperty(window, "innerWidth", { configurable: true, value: originalWidth });
 });
@@ -81,7 +81,7 @@ describe("the rail's apps", () => {
     const view = open();
     await rail(view).findByRole("link", { name: "Notes" });
     expect(rail(view).queryByRole("link", { name: "Weather" })).toBeNull();
-    cleanup(); home.restore(); globalThis.fetch = baseFetch;
+    cleanup(); globalThis.fetch = baseFetch; home.restore();
     start([]);
     const empty = open();
     await rail(empty).findByRole("link", { name: "All apps" });

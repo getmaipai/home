@@ -54,8 +54,8 @@ beforeEach(() => {
 
 afterEach(() => {
   cleanup();
-  home.restore();
   globalThis.fetch = baseFetch;
+  home.restore();
   window.matchMedia = originalMatchMedia;
   Object.defineProperty(window, "innerWidth", { configurable: true, value: originalWidth });
 });
