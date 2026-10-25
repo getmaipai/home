@@ -16,6 +16,9 @@ describe("DUPLEX-06: the unheard part of an interrupted reply reaches the model 
     expect(last).toContain("the part of your last reply the person did not hear");
     expect(last).toContain("The second built a house of sticks.");
     expect(last.indexOf("About the part of your last reply the person did not hear")).toBeGreaterThan(last.indexOf("</untrusted_data>"));
-    expect(last).toContain("pick that reply back up from where they stopped hearing it");
+    expect(last).toContain("First decide which ONE case their words are");
+    expect(last).toContain("carry on with your reply from where they stopped hearing it");
+    expect(last).toContain("do not go back to what you were saying");
+    expect(last).toContain("do not repeat what they heard");
   });
 });

@@ -108,6 +108,54 @@ This section applies to every age band's session, with the band's gates and limi
    control, and headphones are the supported way to talk over it. No fix or home-screen difference was found in the sources.
 7. **Android Chrome:** the same as desktop, measured on a real device.
 
+## 3d. After every interruption: what to do with the rest (researched 2026-10-25)
+
+Jesse, 2026-10-25: people do not only let the other person speak; they decide whether to continue where they left off, do something
+else, or drop it. No study gives one validated decision tree, so this one is built from what is well supported and marked where it is
+our own inference. Sources (peer-reviewed unless noted): Ström and Seneff, "Intelligent barge-in", ICSLP 2000
+([paper](https://www.isca-archive.org/icslp_2000/strom00_icslp.pdf)); Crook et al., handling user interruptions in an embodied agent,
+AAMAS workshop 2010, continue / abort / replan, a design proposal with no evaluation
+([paper](https://www.csc.kth.se/~jboye/publications/aamas2010_interruptions.pdf)); Villing, resumption after interruption in
+multi-tasking dialogue, ACL 2010 ([paper](https://aclanthology.org/P10-1082.pdf)); Yang, Heeman and Kun, interruptions and resumptions in
+multi-tasking dialogues, Computational Linguistics 2011 ([paper](https://aclanthology.org/J11-1004.pdf)); Gervits and Scheutz, LREC 2018
+([paper](https://hrilab.tufts.edu/publications/gervits2018lrec.pdf)); preprints: IHBench, post-interruption recovery in voice agents
+([arXiv 2606.19595](https://arxiv.org/html/2606.19595)), interruption handling for conversational robots
+([arXiv 2501.01568](https://arxiv.org/html/2501.01568v1)), SpokenUS ([arXiv 2603.16783](https://arxiv.org/html/2603.16783)), and the ICML 2026
+ContinuityBench abstract (read only as an abstract). Three factors are well supported: the interrupter's act decides continue, answer
+and resume, replan or drop; how long the detour ran decides whether to recap (Villing: up to 4 turns, non-redundant resumption outnumbered
+redundant about 2 to 1; above about 10 turns almost all resumptions were redundant, repeating a keyword); and whether the interjection changes
+the plan's assumptions decides whether to replan.
+
+**The tree Home follows, by the interrupter's act (the step order is our inference; each step names its evidence):**
+
+1. **Noise, a remark to someone else, a sound with no words** (Ström and Seneff; the side remark is our inference): resume from the same
+   place at once. Built: the server's `reply_pause` / `reply_resume` and the browser's pause.
+2. **A plain backchannel or agreement** ("mm-hm", "oh wow"; IHBench, Crook, arXiv 2501.01568): continue from the exact cut, with no
+   acknowledgement and no restart. Built: the reaction list resumes playback and never becomes a turn.
+3. **A stop, goodbye or turning the subject down** (arXiv 2501.01568, Crook "abort", IHBench pushback): drop the rest, answer, and do not
+   finish the cut sentence. Built: guidance case STOP.
+4. **Skip ahead** (IHBench, SpokenUS): give only the point or the next step; never re-explain what was skipped. Case SKIP.
+5. **A correction or new facts** (Crook "replan", IHBench): accept it, give a new and shorter answer to what is still unsaid. Case FIX.
+6. **A question about what was being said** (arXiv 2501.01568: held the floor in 14 of 22 cases, yielded in 4; answer, then return to the
+   original thought): answer in one short sentence, then carry on from where the person stopped hearing it, in the assistant's own
+   words. Case ABOUT.
+7. **Something unrelated** (IHBench "handle it, then return without blending"; the offer is our inference, no study tested offers): answer
+   only that, then say in one statement that the interrupted reply can be finished. Case OTHER.
+8. **Resume sized to the detour** (Villing, Yang): after a short detour, continue bare; after a long one, a keyword or one-line recap, never
+   the whole thing; high-memory content (steps, directions) restates the last point. Today the unheard part is read by the next turn only
+   (section 3b DUPLEX-06), so a long detour is not tracked; that is a measured gap, not a decision.
+9. **A long gap, or doubt that the person still wants it**: offer, do not resume (our inference).
+
+**How it is built:** steps 1 and 2 are client and server timing (no model). Steps 3 to 7 are one guidance block outside the data wrapper
+(`messages.ts`), written as five labelled cases the model picks from, because a single sentence was ignored and a numbered list with a
+literal example ("anyway") made the model resume every time. **Measured on the local chat model (two runs, five cases, 2026-10-25):** the
+question case answered and resumed in 2 of 2, stop dropped the story in 2 of 2, the correction replanned in 2 of 2, skip-ahead gave the
+point in 2 of 2 (once with a stray "anyway"), and the unrelated question answered and then resumed rather than offering in 3 of 4. A
+small model follows the branch it is shown most clearly, so DUPLEX-BENCH-01 scores recovery with IHBench's three tests (returns to the
+right place, addresses the interjection, never repeats what was heard) before the guidance is called done. Failure modes the research
+names, to test for: restarting the interrupted sentence after a backchannel (GPT-family models 7 to 31%, best Gemini 2.5 68% on
+IHBench's filler test), re-reading the cut sentence, and losing the thread over a long conversation.
+
 ## 3b. Home answers back: continuers and acknowledgements
 
 Jesse, 2026-10-24: part of what makes ChatGPT's voice feel real is that it says "umm, ok, yeah" while it is being talked to and when it is

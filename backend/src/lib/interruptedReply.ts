@@ -11,6 +11,8 @@ interface Interrupted {
   personId: string;
   remainder: string;
   at: number;
+  /** The turn that read it: the turn machine builds its context more than once per turn, so the same turn reads it again; any other turn does not. */
+  readBy?: string;
 }
 
 const pending = new Map<string, Interrupted>();
@@ -25,12 +27,20 @@ export function noteInterruptedReply(conversationId: string, personId: string, r
   pending.set(conversationId, { personId, remainder: remainder.slice(0, MAX_REMAINDER_CHARS), at: now });
 }
 
-/** The unheard part of the last interrupted reply, once: taking it removes it. Null when none, another person's, or too old. */
-export function takeInterruptedReply(conversationId: string, personId: string, now = Date.now()): string | null {
+/** The unheard part of the last interrupted reply, for ONE turn: the first turn to ask owns it and may ask again (its context is built
+ * more than once); a later turn gets nothing. Null when none, another person's, or too old. */
+export function takeInterruptedReply(conversationId: string, personId: string, turnId: string, now = Date.now()): string | null {
   const entry = pending.get(conversationId);
   if (!entry) return null;
-  pending.delete(conversationId);
-  if (entry.personId !== personId || now - entry.at > EXPIRES_MS) return null;
+  if (entry.personId !== personId || now - entry.at > EXPIRES_MS) {
+    pending.delete(conversationId);
+    return null;
+  }
+  if (entry.readBy === undefined) entry.readBy = turnId;
+  if (entry.readBy !== turnId) {
+    pending.delete(conversationId);
+    return null;
+  }
   return entry.remainder;
 }
 

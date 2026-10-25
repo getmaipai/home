@@ -131,8 +131,9 @@ describe("turn cancellation generations", () => {
     const stored = db.select().from(conversationTurns).where(eq(conversationTurns.id, turnId)).get();
     expect(stored!.replyText.length).toBeLessThanOrEqual(heardChars);
     expect(stored!.replyText.length).toBeGreaterThan(0);
-    expect(takeInterruptedReply(stored!.conversationId!, stored!.personId)).toContain(full.slice(heardChars).trim().slice(0, 10));
-    expect(takeInterruptedReply(stored!.conversationId!, stored!.personId)).toBeNull();
+    expect(takeInterruptedReply(stored!.conversationId!, stored!.personId, "turn-next")).toContain(full.slice(heardChars).trim().slice(0, 10));
+    expect(takeInterruptedReply(stored!.conversationId!, stored!.personId, "turn-next")).toContain(full.slice(heardChars).trim().slice(0, 10));
+    expect(takeInterruptedReply(stored!.conversationId!, stored!.personId, "turn-after")).toBeNull();
   }, 10_000);
 
   test("a temporary chat's in-memory window is cut to the heard part too", async () => {

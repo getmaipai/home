@@ -412,7 +412,7 @@ export const contextNode: Node<ContextInput, ContextOutput> = async (state, inpu
 
   // DUPLEX-06: the part of the last spoken reply this person cut in on before hearing it, once, for the next turn only (memory only,
   // never stored; it passed the output gate when released). Rides as labelled background, like the robot look above.
-  const unheard = takeInterruptedReply(conversation.id, state.actor.id);
+  const unheard = takeInterruptedReply(conversation.id, state.actor.id, state.turnId);
   if (unheard) items.push({ id: "interrupted-reply", text: unheard, source: "interrupted", subjects: [], disclosure: "child_ok" });
 
   // The roster: who this household has, so "he"/"she"/a name resolves
