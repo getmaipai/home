@@ -176,6 +176,32 @@ state (`failureCopy.ts` `memory`), unchanged. No banner, toast or dot is added.
 The copy lives in one table, `lib/jobQueueCopy.ts` in Home (slice 6), keyed by state and reason, with an adult and a child
 line, and the picture, video and song cards all read it. The lines are in section 6.
 
+**The number in the line** (owner's requirement, 2026-10-25: the queued message says the person's number and updates live
+until the job starts).
+
+- **Definition.** A waiting job's `position` is one plus the count of waiting jobs that the household queue will start before
+  it under Q2 (class order), Q3 (round robin by person), Q4 (backfill) and Q5 (aging), computed over the whole household line
+  at every queue change. It is the real order, never the order of arrival. The job at the head is number 1; a job that is
+  `starting` or `working` has no number.
+- **How a number moves.** Down by one each time a job ahead starts, finishes, is cancelled or is refused. Down by more when
+  backfill lets this job jump (its own number becomes 1) or when an aging promotion (Q5) lifts it over a class. Up when a
+  job of a higher class arrives (a picture arriving ahead of a waiting video), when another person's first job slots in ahead
+  under round robin, or when a job ahead is re-queued after a watchdog cancel. A number that goes up is explained on the card
+  (6.1), never left as a bare change.
+- **Where it shows, and how it updates.** The existing path, with no new surface, stream or poll: Home's household queue
+  writes `position` on the job record (the field `lib/pictures/jobStore.ts` and `lib/videos/jobs.ts` already carry) whenever
+  the line changes, and the job card's existing poll of Home (700 ms for pictures, 1 s for videos, `updateLive`) draws it, so
+  the number on the card moves within about a second of the line moving. The companion's Yours line reads the same records
+  ("2 waiting, next is number 3") and the Status page's whole-system row shows the household's queue depth per class from the
+  ledger block, never a person's number (rule 6a). Notifications carry no queue number: `engines.problem` is an admin's signal
+  about the engines, and a person's place in the line is their own job's progress (S6 row "One job's progress"), so nothing is
+  sent, repeated or edited there. The one notification a waiting person gets is the existing finished-job one when the result
+  is ready.
+- **The estimate.** Cheap, so it is shown beside the number: the sum over the jobs ahead of the Stack's `eta_seconds` for the
+  running job plus the measured typical time per kind for each waiting one (create 22 to 44 s by model, edit 20 s, video
+  140 s, song from its bench), rounded to "about N minutes" (under a minute: "about a minute"). A paused or waiting-for-memory
+  job ahead makes the estimate unknown, and the card then shows the number alone.
+
 ### 4.6 Failure and recovery
 
 - **Stack restart while jobs wait.** Home's job rows are the queue (state `queued` in SQLite); on reconnect Home re-submits in
@@ -218,6 +244,7 @@ One table for a picture, a video, a song or an image tool job. The state is the 
 | checking | fits, but must wait | queued (reason: `chat`, `memory`, `turn`) | the queued line for that reason (6.1, 6.2) |
 | checking | fits, but coding mode is on | queued (reason: `coding_mode`) | the coding-mode line (6.2) |
 | queued | reason changes (chat ended, memory freed, a job finished, the mode is off) | queued (new reason) or starting | the line updates in place; no new card |
+| queued | the line moves (a job ahead starts or ends, a higher class arrives, backfill, aging, a re-queue ahead) | queued (new `position`) | the number on the card changes within about a second; a rise carries its reason (6.1) |
 | queued | 10 minutes waiting | queued (aged one class) | the same line; the estimate shortens |
 | queued | the person cancels | cancelled | "Cancelled" (existing) |
 | starting | the model is loaded | working | the Stack's stage and percent (existing) |
@@ -239,8 +266,14 @@ bench) plus the Stack's `eta_seconds` for the job ahead.
 
 - Behind chat: adult "Waiting for chat to finish. Your picture starts by itself after that." Child "Waiting for the chat to
   finish, then it's your turn."
-- Behind another job: adult "Next after another video (about 2 minutes). You are number 2 in line." (the position only when it
-  is 2 or more). Child "Someone else's picture is first. Yours is next, in about a minute."
+- Behind another job, always with the number: adult "You are number 3 in line, behind a video and a picture (about 3
+  minutes)." At the head: "You are next. It starts when the video ahead finishes (about 2 minutes)." Child "You are number 3.
+  Two more, then yours." At the head: "You are next."
+- The number went up: adult "You are number 2 in line now. A picture from someone else goes first because pictures are quick."
+  (or "because they have waited longer" for round robin, or "because it is starting over after the computer ran low on memory"
+  for a re-queue). Child "Someone's quick picture goes first. You are number 2 now."
+- The number went down by more than one: adult "You moved up to number 1 in line." Child "You are next."
+- The line updates on the card as it moves; nothing is sent to Notifications for a number change.
 - Still waiting after 10 minutes: adult "Still waiting. It starts when the computer is free, or tap Cancel." Child "Still
   waiting. It will start soon."
 
@@ -282,7 +315,10 @@ Budget 116.8 GB; reserved 36 GB; working margin 20 GB; so the room for jobs with
    Neither waits; both cards show "Working". Ledger: reserved 36, warm 29 peak, 51 GB used; free about 77 GB.
 3. **A video arrives during example 2.** Nova asks for a clip (44.1 GB). Memory says yes (36 plus 29 plus 44.1 is 109 under
    116.8; free 77 minus 44.1 leaves 33, over the 20 margin). Class order says pictures first and one burst job at a time: the
-   clip is `queued`, reason `turn`, card "Next after two pictures (about 1 minute)". The pictures finish in 44 s, the clip starts.
+   clip is `queued`, reason `turn`, card "You are next. It starts when the pictures ahead finish (about a minute)." If Marlow
+   then asks for a second picture, it goes ahead of the clip (pictures first) and Nova's card changes to "You are number 2 in
+   line now. A picture from someone else goes first because pictures are quick." The pictures finish, the number returns to
+   next, the clip starts.
    No eviction: the pool stays warm because the clip fits beside it.
 4. **Memory tight: an outside bench holds 31 GB.** Same as 3 but a session's bench holds 31 GB. Free is now 77 minus 31, about
    46 GB; 46 minus 44.1 is under the 20 margin, so the clip cannot start. `room_after_eviction` says evicting the idle pool
@@ -293,7 +329,7 @@ Budget 116.8 GB; reserved 36 GB; working margin 20 GB; so the room for jobs with
    the clip starts by itself.
 5. **A chat turn while the clip renders.** Sage sends a long message. The heavy gate pauses the video worker (built); card
    "Paused while chat is working"; chat runs at 24 tokens per second; the clip resumes 4 s after the reply ends. Sage's next
-   picture request is queued reason `turn` ("Next after a video (about 2 minutes)"); if 10 minutes pass it does not age
+   picture request is queued reason `turn` ("You are next. It starts when the video ahead finishes (about 2 minutes)."); if 10 minutes pass it does not age
    above the clip because pictures are already the class above video; Q4 backfill lets it start if the clip is paused by chat
    and the pool fits beside the paused worker (36 plus 44.1 plus 29 is 109, under 116.8; free 128 minus 109 is 19, under the
    20 margin but inside the Q8 flex band, so the picture starts with 1 GB borrowed and gives it back when it ends; the 36 GB
@@ -393,7 +429,9 @@ model, and no engine outside the Stack's set is adopted.
 | 3 | Stack | image worker (`image-gen` worker script), `lib/imageGen.ts`, its test | the picture pool: one admission, create model resident, edit model on demand, one-model fallback (bakeoff slice 2) | both models load inside the window; a second edit does not reload; pool unloads after idle |
 | 4 | Stack | the picture, video and song worker scripts | `clear_cache` after each job and a cache limit at start | resting footprint after a job is within 10 percent of the weights |
 | 5 | Home | `lib/jobs/householdQueue.ts` (new), `lib/pictures/jobs.ts`, `lib/videos/jobs.ts` | the household queue: class order Q2, round robin Q3, backfill Q4, aging Q5, no cap Q7; one job per person; re-submit on reconnect (ISOLATION-03 extended) | two people interleave; a video ages after 10 minutes; a picture backfills a paused clip; a child's cap holds; one person's 20 requests do not delay another's first |
-| 6 | Home | `lib/jobQueueCopy.ts` (new), `lib/videos/jobs.ts` (`busyLine` deleted), the song jobs file | the one copy table of section 6, read by every card | every state and reason has an adult and a child line; no em dash; the dad test by review |
+| 6 | Home | `lib/jobQueueCopy.ts` (new), `lib/videos/jobs.ts` (`busyLine` deleted), the song jobs file | the one copy table of section 6, read by every card, the number-in-line lines included | every state and reason has an adult and a child line; no em dash; the dad test by review |
+| 15 | Home | `lib/jobs/householdQueue.ts`, a test | the live number: the queue writes `position` (and the estimate and the rise reason) on every affected job record at each queue change; the cards' existing poll draws it; nothing to Notifications | three jobs queued: numbers 1, 2, 3; a higher-class arrival makes 2 into 3 with the reason set; the head starting makes every number drop by one; no notification is sent |
+| 16 | Home | `lib/pictures/jobs.ts`, `lib/videos/jobs.ts`, the song jobs file | the Stack's per-kind queue position no longer overwrites `position` (the `job.position = status.position` lines go); the household number is the one definition of a place in the line | a Stack status with position 1 does not change a job the household queue holds at number 3 |
 | 7 | Home | `lib/pictures/jobs.ts`, `lib/videos/jobs.ts`, a test | re-queue on a watchdog cancel (Q6), twice, then fail | a cancelled job reappears queued at the head of its class |
 | 8 | Stack and Home | `routes/memory.ts`; Home `lib/stackHealthSync.ts`, `StatusPage` data | the `ledger` block and its Status row | the Status page shows class totals and queue depth from a fixture |
 | 9 | Stack | `routes/jobs.ts`, `lib/jobs.ts` | the start rule (ISOLATION-02): no admission while an interactive request is in flight; the watchdog's WARN holds the queue instead of cancelling it | a queued job is admitted after the 4 s tail, never during a request |
@@ -403,7 +441,7 @@ model, and no engine outside the Stack's set is adopted.
 | 13 | Stack | `scripts/bench-isolation.ts` (bench lane) | the reload bench: time to first picture after an eviction with the weights in the page cache against after a forced cold read; the loader's share becomes the card's load estimate | two numbers in the bench output; the card estimate is within 3 s of the warm number |
 | 14 | Stack | `lib/governor.ts`, `tests/governor.test.ts` | the Q8 flex band: 4 GB, picture class only, level normal only, one borrower, returned on release | a picture is admitted at 19 GB free, a video is not; a second picture waits while the band is borrowed |
 
-Order: 1, 2, 9 (the Stack stops failing and starts ordering), then 5 and 6 (people see the right words), then 14, 3, 4, 7, 8,
+Order: 1, 2, 9 (the Stack stops failing and starts ordering), then 5, 6, 15 and 16 (people see the right words and their number), then 14, 3, 4, 7, 8,
 12, 11, 10, 13. Each is a Codex brief of 1 to 3 files with a failing test first.
 
 ## Supersedes
