@@ -18,6 +18,20 @@ import { __drainBackgroundWorkForTests } from "@/lib/backgroundWork";
 import type { StackFixture } from "./stackFixture";
 import { HostError } from "@maipai/spec/emulators/ts/host-emulator.js";
 
+// This preload runs only in tests; the cost drop does not apply to production.
+{
+  const realHash = Bun.password.hash.bind(Bun.password);
+  Bun.password.hash = ((password, options) => {
+    const objectOptions = typeof options === "object" && options !== null
+      ? options as { algorithm?: string; memoryCost?: number; timeCost?: number }
+      : undefined;
+    if (process.env.MAIPAI_TEST_REAL_HASH === "1" || objectOptions?.algorithm !== "argon2id") {
+      return realHash(password, options);
+    }
+    return realHash(password, { ...objectOptions, memoryCost: 8, timeCost: 1 } as typeof options);
+  }) as typeof Bun.password.hash;
+}
+
 // IMGQ-09: the answer-picture re-ask is on in production (an extra model call after the reply). Tests that count model calls or
 // script one reply must not see it, so it is off for every test unless a test deletes this variable to turn it on.
 process.env.MAIPAI_IMGQ09_REASK ??= "0";

@@ -1,4 +1,4 @@
-import { describe, expect, test, afterEach } from "bun:test";
+import { describe, expect, test, afterAll, afterEach } from "bun:test";
 import { existsSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { Person } from "@maipai/spec/gen/ts/person.js";
@@ -7,6 +7,13 @@ import { KeystoreProtectionFailedError } from "@/lib/keystore";
 import { dataDir } from "@/lib/paths";
 import { newPersonId } from "@/lib/id";
 import { ROLE_LADDER } from "@/middleware/auth";
+
+const previousRealHash = process.env.MAIPAI_TEST_REAL_HASH;
+process.env.MAIPAI_TEST_REAL_HASH = "1";
+afterAll(() => {
+  if (previousRealHash === undefined) delete process.env.MAIPAI_TEST_REAL_HASH;
+  else process.env.MAIPAI_TEST_REAL_HASH = previousRealHash;
+});
 
 describe("secret hashing", () => {
   test("a correct secret verifies against its own hash", async () => {
