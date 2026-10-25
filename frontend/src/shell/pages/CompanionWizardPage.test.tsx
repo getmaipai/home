@@ -35,7 +35,7 @@ test("wizard selects a template and finishes with a trimmed name", async () => {
 
 test("Storyteller opens the editor with preset dials and an unsaved draft", async () => {
   api.settingsValues = async () => [{ key: "companions.preview_shells", value: true, source: "user", label: "Preview", level: "basic", secret: false }] as never;
-  api.companions = async () => ({ allowed: true, can_create: true, can_discover: true, default_id: "default", companions: [], robots: null });
+  api.companions = async () => ({ allowed: true, can_create: true, can_discover: true, default_id: "default", companions: [], discover: [], robots: null });
   api.createCompanion = async () => ({ id: "hc-new" });
   api.stackVoices = async () => ({ voices: [] });
   const view = open(true);
