@@ -80,6 +80,17 @@ export const WAKE_SESSION_IDLE_CLOSE_MS = 8000;
 export const BARGE_IN_ARM_DELAY_MS = 400;
 export const DUPLEX_PAUSE_AFTER_MS = 500;
 export const DUPLEX_FALSE_INTERRUPTION_MS = 2000;
+// A reaction is up to three words, all of them acknowledgements or exclamations ("mm-hm", "oh wow", "no way", "i see"). Benchmarks
+// (Full-Duplex-Bench v1.5) and shipped agents (LiveKit, Retell) treat these as "keep talking", not as a new turn.
+const REACTION_WORDS = new Set(["mm", "mhm", "hm", "hmm", "uh", "huh", "yeah", "yep", "yes", "okay", "ok", "right", "oh", "wow", "whoa", "really", "way", "sure", "cool", "nice", "great", "awesome", "amazing", "haha", "ha", "lol", "aw", "aww", "ooh", "ah", "gosh", "god", "my", "i", "see", "got", "it", "crazy", "seriously", "interesting", "good", "fun", "funny", "wild", "yikes", "geez", "jeez", "man", "dude", "no", "not", "so", "true", "exactly", "indeed", "absolutely", "definitely", "that", "thats", "is", "ohh", "mmhmm"]);
+// A question, a request or a stop word is always a real interruption, however short.
+const QUESTION_STARTS = new Set(["did", "does", "do", "what", "why", "how", "who", "where", "when", "which", "is", "are", "was", "were", "can", "could", "will", "would", "should", "wait", "but", "tell", "show", "explain", "stop", "hold", "hang", "be", "shush"]);
+
+function isReaction(normalized: string): boolean {
+  const words = normalized.split(" ").filter(Boolean);
+  return words.length > 0 && words.length <= 3 && words.every((word) => REACTION_WORDS.has(word)) && !QUESTION_STARTS.has(words[0]!) && normalized !== "no";
+}
+
 function normalizedTranscript(text: string): string {
   return text.toLowerCase().replace(/[-\u2010-\u2015]/g, " ").replace(/[^\p{L}\p{N}\s]/gu, "").replace(/\s+/g, " ").trim();
 }
@@ -216,8 +227,9 @@ export function useLiveVoiceSession({ composer, open, onOpenChange, onProblem, i
             activeSpeechRef.current = true;
             setIdleActivity((value) => value + 1);
             if (voiceBargeIn && !mutedRef.current && isReplySpeaking() && Date.now() - speakingStartedAtRef.current >= BARGE_IN_ARM_DELAY_MS) {
-              // Any words over the reply are a real interruption: the person can say anything and Home answers it in context.
-              if (normalizedTranscript(message.v)) {
+              // Any real words over the reply are an interruption Home answers in context; a bare reaction ("mm-hm", "oh wow") keeps it talking.
+              const heard = normalizedTranscript(message.v);
+              if (heard && !isReaction(heard)) {
                 overlapTranscriptRef.current = true;
                 interrupt("voice");
               }
@@ -267,8 +279,8 @@ export function useLiveVoiceSession({ composer, open, onOpenChange, onProblem, i
               if (falseInterruptionTimerRef.current) clearTimeout(falseInterruptionTimerRef.current);
               falseInterruptionTimerRef.current = null;
               if (Date.now() - speakingStartedAtRef.current < BARGE_IN_ARM_DELAY_MS) break;
-              if (!normalized) {
-                // Only noise: no words, so carry on speaking.
+              if (!normalized || isReaction(normalized)) {
+                // Only noise or a bare reaction: carry on speaking.
                 if (overlapPausedRef.current) turnSchedulerRef.current?.resume();
                 overlapPausedRef.current = false;
                 break;

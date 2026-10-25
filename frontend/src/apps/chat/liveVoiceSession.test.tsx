@@ -406,34 +406,72 @@ describe("live voice session", () => {
     expect(cancel).toHaveBeenCalledWith("turn-test", 23); expect(stop).toHaveBeenCalled();
     cancel.mockRestore();
   });
-  test("the words mm-hm over the reply interrupt it and become the next turn", async () => {
-    const pause = mock(); const stop = mock(); const cancel = spyOn(api, "cancelTurn").mockResolvedValue({ cancelled: true });
-    const fixture: SttFixtureStep[] = [
-      { delayMs: 0, message: { t: "ready" } },
-      { delayMs: 450, message: { t: "vad", speaking: true, rms: 0.1 } },
-      { delayMs: 1000, message: { t: "final", v: "mm-hm" } },
-    ];
+  test("the reaction mm-hm over the reply pauses it and then resumes without cancelling or sending", async () => {
+    const pause = mock(); const resume = mock(); const stop = mock(); const cancel = spyOn(api, "cancelTurn").mockResolvedValue({ cancelled: true });
+    const socket = controlledSocket();
     const sent: string[] = [];
-    const view = render(<Harness open onOpenChange={() => {}} isSpeaking={false} speakingEndedAt={0} fixture={fixture} sentTexts={sent} pauseScheduler={pause} stopScheduler={stop} />);
+    const view = render(<Harness open onOpenChange={() => {}} isSpeaking={false} speakingEndedAt={0} fixture={[]} sentTexts={sent} pauseScheduler={pause} resumeScheduler={resume} stopScheduler={stop} socketFactory={socket.createSocket} />);
     await waitFor(() => expect(view.getByText("Listening")).toBeTruthy());
-    act(() => view.rerender(<Harness open onOpenChange={() => {}} isSpeaking={true} speakingEndedAt={0} fixture={fixture} sentTexts={sent} pauseScheduler={pause} stopScheduler={stop} />));
-    await waitFor(() => expect(sent).toEqual(["mm-hm"]), { timeout: 1800 });
-    expect(cancel).toHaveBeenCalledWith("turn-test", 23); expect(stop).toHaveBeenCalled();
+    act(() => view.rerender(<Harness open onOpenChange={() => {}} isSpeaking={true} speakingEndedAt={0} fixture={[]} sentTexts={sent} pauseScheduler={pause} resumeScheduler={resume} stopScheduler={stop} socketFactory={socket.createSocket} />));
+    await waitFor(() => expect(view.getByText("Speaking")).toBeTruthy());
+    await new Promise((resolve) => setTimeout(resolve, 600));
+    act(() => socket.send({ t: "vad", speaking: true, rms: 0.1 }));
+    await new Promise((resolve) => setTimeout(resolve, 600));
+    act(() => socket.send({ t: "final", v: "mm-hm" }));
+    await new Promise((resolve) => setTimeout(resolve, 300));
+    expect(pause).toHaveBeenCalledTimes(1); expect(resume).toHaveBeenCalledTimes(1);
+    expect(cancel).not.toHaveBeenCalled(); expect(stop).not.toHaveBeenCalled(); expect(sent).toEqual([]);
     cancel.mockRestore();
   });
-  test("the words oh wow over the reply interrupt it and become the next turn", async () => {
-    const pause = mock(); const stop = mock(); const cancel = spyOn(api, "cancelTurn").mockResolvedValue({ cancelled: true });
-    const fixture: SttFixtureStep[] = [
-      { delayMs: 0, message: { t: "ready" } },
-      { delayMs: 450, message: { t: "vad", speaking: true, rms: 0.1 } },
-      { delayMs: 1000, message: { t: "final", v: "oh wow" } },
-    ];
+  test("the reaction oh wow over the reply pauses it and then resumes without cancelling or sending", async () => {
+    const pause = mock(); const resume = mock(); const stop = mock(); const cancel = spyOn(api, "cancelTurn").mockResolvedValue({ cancelled: true });
+    const socket = controlledSocket();
     const sent: string[] = [];
-    const view = render(<Harness open onOpenChange={() => {}} isSpeaking={false} speakingEndedAt={0} fixture={fixture} sentTexts={sent} pauseScheduler={pause} stopScheduler={stop} />);
+    const view = render(<Harness open onOpenChange={() => {}} isSpeaking={false} speakingEndedAt={0} fixture={[]} sentTexts={sent} pauseScheduler={pause} resumeScheduler={resume} stopScheduler={stop} socketFactory={socket.createSocket} />);
     await waitFor(() => expect(view.getByText("Listening")).toBeTruthy());
-    act(() => view.rerender(<Harness open onOpenChange={() => {}} isSpeaking={true} speakingEndedAt={0} fixture={fixture} sentTexts={sent} pauseScheduler={pause} stopScheduler={stop} />));
-    await waitFor(() => expect(sent).toEqual(["oh wow"]), { timeout: 1800 });
-    expect(cancel).toHaveBeenCalledWith("turn-test", 23); expect(stop).toHaveBeenCalled();
+    act(() => view.rerender(<Harness open onOpenChange={() => {}} isSpeaking={true} speakingEndedAt={0} fixture={[]} sentTexts={sent} pauseScheduler={pause} resumeScheduler={resume} stopScheduler={stop} socketFactory={socket.createSocket} />));
+    await waitFor(() => expect(view.getByText("Speaking")).toBeTruthy());
+    await new Promise((resolve) => setTimeout(resolve, 600));
+    act(() => socket.send({ t: "vad", speaking: true, rms: 0.1 }));
+    await new Promise((resolve) => setTimeout(resolve, 600));
+    act(() => socket.send({ t: "final", v: "oh wow" }));
+    await new Promise((resolve) => setTimeout(resolve, 300));
+    expect(pause).toHaveBeenCalledTimes(1); expect(resume).toHaveBeenCalledTimes(1);
+    expect(cancel).not.toHaveBeenCalled(); expect(stop).not.toHaveBeenCalled(); expect(sent).toEqual([]);
+    cancel.mockRestore();
+  });
+  test("the reaction oh my god over the reply pauses it and then resumes without cancelling or sending", async () => {
+    const pause = mock(); const resume = mock(); const stop = mock(); const cancel = spyOn(api, "cancelTurn").mockResolvedValue({ cancelled: true });
+    const socket = controlledSocket();
+    const sent: string[] = [];
+    const view = render(<Harness open onOpenChange={() => {}} isSpeaking={false} speakingEndedAt={0} fixture={[]} sentTexts={sent} pauseScheduler={pause} resumeScheduler={resume} stopScheduler={stop} socketFactory={socket.createSocket} />);
+    await waitFor(() => expect(view.getByText("Listening")).toBeTruthy());
+    act(() => view.rerender(<Harness open onOpenChange={() => {}} isSpeaking={true} speakingEndedAt={0} fixture={[]} sentTexts={sent} pauseScheduler={pause} resumeScheduler={resume} stopScheduler={stop} socketFactory={socket.createSocket} />));
+    await waitFor(() => expect(view.getByText("Speaking")).toBeTruthy());
+    await new Promise((resolve) => setTimeout(resolve, 600));
+    act(() => socket.send({ t: "vad", speaking: true, rms: 0.1 }));
+    await new Promise((resolve) => setTimeout(resolve, 600));
+    act(() => socket.send({ t: "final", v: "oh my god" }));
+    await new Promise((resolve) => setTimeout(resolve, 300));
+    expect(pause).toHaveBeenCalledTimes(1); expect(resume).toHaveBeenCalledTimes(1);
+    expect(cancel).not.toHaveBeenCalled(); expect(stop).not.toHaveBeenCalled(); expect(sent).toEqual([]);
+    cancel.mockRestore();
+  });
+  test("the reaction no way over the reply pauses it and then resumes without cancelling or sending", async () => {
+    const pause = mock(); const resume = mock(); const stop = mock(); const cancel = spyOn(api, "cancelTurn").mockResolvedValue({ cancelled: true });
+    const socket = controlledSocket();
+    const sent: string[] = [];
+    const view = render(<Harness open onOpenChange={() => {}} isSpeaking={false} speakingEndedAt={0} fixture={[]} sentTexts={sent} pauseScheduler={pause} resumeScheduler={resume} stopScheduler={stop} socketFactory={socket.createSocket} />);
+    await waitFor(() => expect(view.getByText("Listening")).toBeTruthy());
+    act(() => view.rerender(<Harness open onOpenChange={() => {}} isSpeaking={true} speakingEndedAt={0} fixture={[]} sentTexts={sent} pauseScheduler={pause} resumeScheduler={resume} stopScheduler={stop} socketFactory={socket.createSocket} />));
+    await waitFor(() => expect(view.getByText("Speaking")).toBeTruthy());
+    await new Promise((resolve) => setTimeout(resolve, 600));
+    act(() => socket.send({ t: "vad", speaking: true, rms: 0.1 }));
+    await new Promise((resolve) => setTimeout(resolve, 600));
+    act(() => socket.send({ t: "final", v: "no way" }));
+    await new Promise((resolve) => setTimeout(resolve, 300));
+    expect(pause).toHaveBeenCalledTimes(1); expect(resume).toHaveBeenCalledTimes(1);
+    expect(cancel).not.toHaveBeenCalled(); expect(stop).not.toHaveBeenCalled(); expect(sent).toEqual([]);
     cancel.mockRestore();
   });
   test("the words did he really do that over the reply interrupt it and become the next turn", async () => {
@@ -448,21 +486,6 @@ describe("live voice session", () => {
     await waitFor(() => expect(view.getByText("Listening")).toBeTruthy());
     act(() => view.rerender(<Harness open onOpenChange={() => {}} isSpeaking={true} speakingEndedAt={0} fixture={fixture} sentTexts={sent} pauseScheduler={pause} stopScheduler={stop} />));
     await waitFor(() => expect(sent).toEqual(["did he really do that"]), { timeout: 1800 });
-    expect(cancel).toHaveBeenCalledWith("turn-test", 23); expect(stop).toHaveBeenCalled();
-    cancel.mockRestore();
-  });
-  test("the words oh my god over the reply interrupt it and become the next turn", async () => {
-    const pause = mock(); const stop = mock(); const cancel = spyOn(api, "cancelTurn").mockResolvedValue({ cancelled: true });
-    const fixture: SttFixtureStep[] = [
-      { delayMs: 0, message: { t: "ready" } },
-      { delayMs: 450, message: { t: "vad", speaking: true, rms: 0.1 } },
-      { delayMs: 1000, message: { t: "final", v: "oh my god" } },
-    ];
-    const sent: string[] = [];
-    const view = render(<Harness open onOpenChange={() => {}} isSpeaking={false} speakingEndedAt={0} fixture={fixture} sentTexts={sent} pauseScheduler={pause} stopScheduler={stop} />);
-    await waitFor(() => expect(view.getByText("Listening")).toBeTruthy());
-    act(() => view.rerender(<Harness open onOpenChange={() => {}} isSpeaking={true} speakingEndedAt={0} fixture={fixture} sentTexts={sent} pauseScheduler={pause} stopScheduler={stop} />));
-    await waitFor(() => expect(sent).toEqual(["oh my god"]), { timeout: 1800 });
     expect(cancel).toHaveBeenCalledWith("turn-test", 23); expect(stop).toHaveBeenCalled();
     cancel.mockRestore();
   });

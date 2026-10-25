@@ -74,16 +74,21 @@ This section applies to every age band's session, with the band's gates and limi
    Safari, Firefox, Android Chrome and iPhone are not yet measured.
 2. **If a browser does not cancel Web Audio output (not Chrome on macOS, measured above):** play replies through the local `RTCPeerConnection` loopback into an `<audio>`
    element (the Mozilla Hubs pattern), on Chromium only.
-3. **Anything you say interrupts, and Home answers it (Jesse, 2026-10-24: "I can say anything to interrupt, the agent would hear that and
-   respond with that in context to what it said and its memories").** There is no list of "keep going" sounds. Voice over Home's reply for
-   0.5 s pauses playback (the sound-duration idea LiveKit and Pipecat use, so a cough or a bump does not trigger it). Once the speech is
-   transcribed, any words at all stop the reply: the heard prefix is stored as what Home said, the person's words are the next turn, and
-   the turn engine answers them with the conversation so far and the person's memories, exactly as a typed message would be. "Oh wow",
-   "mm-hm" and "did he really do that" are all real turns; the model decides whether to carry on with the story, answer, or react. Only
-   noise with no words (a sound the transcriber returns empty for, or no words within 2.0 s of the sound ending) resumes playback from
-   the same sentence. The first 400 ms after Home starts speaking is not armed, as today.
+3. **A real interruption stops Home and is answered in context; a bare reaction does not (Jesse, 2026-10-24: "dont follow me, do whats
+   right").** Jesse's first ask was that anything he says over Home stops it and gets an answer in context of what Home said and its
+   memories. When the evidence was checked, a pure reaction ("mm-hm", "oh wow", "no way") is not a new turn: Full-Duplex-Bench v1.5
+   scores a user backchannel as "should keep talking" and calls stopping on short cues over-eager, LiveKit's adaptive mode ignores
+   "uh-huh, okay, right", and Retell and Pipecat treat them as continuers. So: voice over Home's reply for 0.5 s pauses playback (the
+   sound-duration idea LiveKit and Pipecat use, so a cough or a bump does nothing). Once transcribed, a **question, a request, a stop
+   word, or anything that is not a reaction** stops the reply: the heard prefix is stored as what Home said, the person's words are the
+   next turn, and the turn engine answers them with the conversation so far and the person's memories, exactly as a typed message
+   would be ("did he really do that", "wait, tell me about the dog"). A **reaction** is up to three words, all of them acknowledgements
+   or exclamations from a fixed vocabulary, and never starting with a question word or a stop word; it resumes playback from the same
+   sentence, as does noise with no words or no words within 2.0 s of the sound ending. The vocabulary is a starting list judged by
+   ear, and a learned end-of-turn model with a backchannel class (Easy Turn) is measured in DUPLEX-02 as its replacement. The first
+   400 ms after Home starts speaking is not armed, as today.
 4. **Pause, then the transcript decides.** Playback pauses with `AudioContext.suspend()` (so what is heard stays exact), and either
-   resumes (noise) or stops (words). The unspoken remainder of the reply is a follow-up item (DUPLEX-06): pass it to the next turn as
+   resumes (noise or a reaction) or stops (a real interruption). The unspoken remainder of the reply is a follow-up item (DUPLEX-06): pass it to the next turn as
    background so Home can pick the story back up after a reaction, instead of only knowing what was heard.
 5. **Smart Turn v3.2 is the starting end-of-turn model, to be measured before it is locked in.** An independent benchmark ranks it 17th of 25 on [TurnBench](https://turnbench.sesame.com) (recall 0.752, false positives 0.047, median decision latency 1017 ms; VAP scores 0.845 at 368 ms) and TurnSense reports its English F1 near 71/64 against 94/94 for TEN-Turn. DUPLEX-02 therefore scores Smart Turn, VAP, TurnSense and TEN-Turn on TurnBench's development split first, keeps whichever wins, and keeps the existing silence timer as the fallback. It decides when the person has finished, replacing the silence timer, with the existing Silero VAD in front, and
    keeping STT-SMARTTURN-01's own parameters: an 800 ms reopen window, the Silero hysteresis it names, and the flag
@@ -211,12 +216,12 @@ Order: 00 and 01, then 02 and 03, 05 in parallel, 07 after 02 (it needs the end-
 
 ## 8. Legacy verdicts (rule 8)
 
-- VOICE-LOOP-01 numbers: for the browser, the 0.6 s confirm, the stop-phrase bypass and "backchannels never stop" are **dropped** (section 3; any words stop the reply); for the robot, duck, re-arm grace and self-echo are **kept** until its spike reports.
+- VOICE-LOOP-01 numbers: for the browser, the 0.6 s confirm, the stop-phrase bypass and "backchannels never stop" are **replaced** by section 3's reaction rule (a reaction resumes, a question or stop word interrupts); for the robot, duck, re-arm grace and self-echo are **kept** until its spike reports.
 - Legacy `useHandsFree.ts` thresholds: **dropped**. Legacy "listen only after the reply ends": **dropped** once DUPLEX-03 lands.
 
 ## Supersedes
 
-- `voiceBargeIn`'s rule in `liveVoiceSession.tsx` that any speech after a 400 ms arm delay stops the reply: **replaced** by section 3 (0.5 s of speech, then the transcript decides; any words stop the reply).
+- `voiceBargeIn`'s rule in `liveVoiceSession.tsx` that any speech after a 400 ms arm delay stops the reply: **replaced** by section 3 (0.5 s of speech, then the transcript decides; a real interruption stops the reply, a bare reaction does not).
 - The silence-timer end of turn in `sttSession.ts`: **replaced as the primary end of turn** by Smart Turn v3.2 or the DUPLEX-02 TurnBench winner (section 3), and **kept as the fallback**.
 - STT-SMARTTURN-01: its endpointer half (Smart Turn v3.2, the 800 ms reopen window, the Silero hysteresis and the off-until-measured flag) **moves** to DUPLEX-02; its speculative start stays in the STT-SMARTTURN-01 backlog row, which keeps one owner for it.
 - VOICE-LOOP-01's barge-in numbers: 0.6 s confirm is **replaced** by 0.5 s (LiveKit's default, re-measured); "stop phrases bypass" and "backchannels never stop" are **dropped** (any words stop the reply); duck 0.35 and 0.75, the 0.7 s re-arm grace and the self-echo at 0.8 overlap are **dropped** for the browser (pause replaces duck; the bench measures the rest) and **kept** for the robot until its spike reports.
