@@ -64,13 +64,27 @@ export function sourceIconUrlOf(item: Pick<ShelfItem, "canonical_url">): string 
   return host ? `/api/favicon?domain=${encodeURIComponent(host)}` : undefined;
 }
 
-/** The page's pictures a reader may keep: the same file only once, never the story's own lead picture again, at most twelve. */
-function keepFigures(blocks: readonly ArticleBlock[], leadAddress: string | undefined): ArticleBlock[] {
-  const seen = new Set<string>(leadAddress ? [withoutQuery(leadAddress)] : []);
+/** Publishers serve one picture under several addresses (a resize folder, a size suffix, another host of the same CDN), so the
+ * same-picture test compares the file's own name with size marks removed, and falls back to host and path when that name is short. */
+export function pictureKey(address: string): string {
+  let host = "";
+  let path = address;
+  try { const url = new URL(address); host = url.hostname; path = url.pathname; } catch { /* a relative address: the whole text is the path */ }
+  const file = decodeURIComponent(path.split("/").filter(Boolean).pop() ?? "").toLowerCase();
+  const stem = file
+    .replace(/\.[a-z0-9]{2,5}$/, "")
+    .replace(/[-_.]?\d{2,4}x\d{2,4}$/, "")
+    .replace(/[-_.](scaled|small|medium|large|thumb|thumbnail|full|orig|original|retina|\d{3,4}w?)$/, "");
+  return stem.length >= 8 ? `file:${stem}` : `${host}${path}`;
+}
+
+/** The page's pictures a reader may keep: the same picture only once, never the story's own lead picture again, at most twelve. */
+export function keepFigures(blocks: readonly ArticleBlock[], leadAddress: string | undefined): ArticleBlock[] {
+  const seen = new Set<string>(leadAddress ? [pictureKey(leadAddress)] : []);
   let kept = 0;
   return blocks.filter((block) => {
     if (block.type !== "figure") return true;
-    const key = withoutQuery(block.src);
+    const key = pictureKey(block.src);
     if (seen.has(key) || kept >= MAX_FIGURES) return false;
     seen.add(key);
     kept++;
@@ -204,8 +218,19 @@ export async function articleBlock(item: ShelfItem, env: CardEnv, options: { ret
   if (!title || (band === "child" && !gate.passes(publisher))) return null;
   const loaded = await loadWithinGrace(item, band, { retry: options.retry, store: env.store });
   // A figure's `src` is a hub path numbered in the stored article's order; the publisher's address never leaves the hub.
+  // A copy stored before the lead picture was recognized by its file name may still carry it: it is dropped here too, and the number
+  // stays the figure's place in the stored copy, so the picture route keeps resolving the same file.
   let figureNumber = 0;
-  const shown = newsImagesOn() ? loaded.blocks.map((block) => (block.type === "figure" ? { ...block, src: `/api/plugins/news/images/${item.id}/figure/${figureNumber++}?w=1280` } : block)) : loaded.blocks.filter((block) => block.type !== "figure");
+  const leadKey = item.image_url ? pictureKey(item.image_url) : undefined;
+  const shownKeys = new Set<string>(leadKey ? [leadKey] : []);
+  const shown: ArticleBlock[] = newsImagesOn() ? loaded.blocks.flatMap((block): ArticleBlock[] => {
+    if (block.type !== "figure") return [block];
+    const number = figureNumber++;
+    const key = pictureKey(block.src);
+    if (shownKeys.has(key)) return [];
+    shownKeys.add(key);
+    return [{ ...block, src: `/api/plugins/news/images/${item.id}/figure/${number}?w=1280` }];
+  }) : loaded.blocks.filter((block) => block.type !== "figure");
   const blocks = band === "child" ? gateBlocks(loaded.blocks, gate) : shown;
   if (blocks.length === 0 || gate.sawCrisis()) return null;
   const topic = topicsShown(item, band).map((id) => topicById(id)?.label).find((label): label is string => !!label);
