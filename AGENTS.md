@@ -38,4 +38,15 @@ Lint: `tsc --noEmit` (backend); `tsc --noEmit && eslint .` (frontend). `bash scr
 
 A `@maipai/*` pin bump, a lockfile conflict or a bundled-manifest change: load [docs/PINNING.md](docs/PINNING.md) first.
 
+## Previewing a change (Jesse looks, and so do you)
+
+Never hand Jesse a UI change you have not opened yourself. One command gives both of you the same running app, from your worktree:
+
+- **Start:** `bun run dev` (or `bash scripts/dev.sh start`). No build; a frontend edit shows in about a second, a backend edit restarts the hub in one to three seconds. The first start seeds a demo household (Sage the owner, Marlow a teen, Nova a child, tours off) into `data/dev/hub`; `bash scripts/dev.sh reseed` starts it fresh, `--no-stack` skips the engine, `--stack <url>` points at another one. By default it uses the real Stack on `127.0.0.1:8770` when that answers, so chat works, and that Stack is shared with the live hub: keep chat checks short.
+- **Where:** `bash scripts/dev.sh url` prints it. Home is `http://localhost:<port + 1000>`, the API `http://127.0.0.1:<port>`, and the port is 8800 plus a number derived from the worktree path (the same every time). Sign in as Sage with the secret `dev.sh start` prints; it belongs to the demo household only.
+- **See it yourself:** use the built-in browser tools (`mcp__Claude_Browser__*`): navigate to the Home URL, pick Sage, type the secret, press Return, then `read_page` or `get_page_text` for structure and a screenshot you open and judge. A blank page or "Something went wrong" means read `read_console_messages` first: that is how the Vite pre-bundling crash was found. Check both a desktop and a phone width (`resize_window`) for any layout change.
+- **Show Jesse:** start the dev hub, verify it yourself as above, then put the Home URL and what to click in your final message. He opens it on this Mac. Leave it running while he looks and stop it afterwards (`bun run dev:stop`; `bash scripts/dev.sh status` lists what runs). Viewing from another device is not set up (it needs `VITE_ALLOWED_HOSTS` and a non-loopback bind); ask before changing that.
+- **Never preview on:** the live hub (`localhost:3000`, the installed app with the family's data), or the main checkout's 8787 (a dev Home there blocked the installer three times). `bun run screenshots` is for generated documentation captures, not for looking at a change.
+- **Then land it:** `bash scripts/land.sh`. A change reaches the live hub only through `bash scripts/ship.sh`, and only when Jesse says so in that turn.
+
 **Releases (one releaser).** Ship with `bash scripts/ship.sh [sha] [--before-green] [--tag]` after the owner said yes in that turn. It promotes a landed commit to the live hub through `/usr/local/libexec/maipai-promote`, checks it and rolls back on failure; `--tag` cuts and publishes the next patch tag from what is live. One session owns releases at a time: the StackChan firmware session on the Studio (2026-10-20).
