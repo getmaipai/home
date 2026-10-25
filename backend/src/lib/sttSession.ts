@@ -123,6 +123,9 @@ export class SttSession {
   private pauseSamples = 0;
   private samplesSinceVoiced = 0;
   private pauseOpen = false;
+  // The reply stays paused on the client from reply_pause until a reply_resume, a transcript, or the end of the utterance: a pause the
+  // server stopped managing (voice confirmed) still resumes if the utterance turns out to hold no speech.
+  private replyPaused = false;
   private unconfirmedPauses: number[] = [];
 
   constructor(cfg: SttSessionConfig, send: (msg: SttWireEvent) => void, now: () => number = Date.now) {
@@ -246,6 +249,7 @@ export class SttSession {
     this.unconfirmedPauses = this.unconfirmedPauses.filter((at) => this.now() - at < REPLY_PAUSE_WINDOW_MS);
     if (this.unconfirmedPauses.length >= REPLY_PAUSE_BUDGET) return;
     this.pauseOpen = true;
+    this.replyPaused = true;
     this.pauseSamples = 0;
     this.samplesSinceVoiced = 0;
     this.send({ t: "reply_pause" });
@@ -268,6 +272,7 @@ export class SttSession {
 
   // The pause turned out not to be speech: tell the client to carry on, and remember it for the budget of unconfirmed pauses.
   private resumeReply(): void {
+    this.replyPaused = false;
     const now = this.now();
     this.unconfirmedPauses = this.unconfirmedPauses.filter((at) => now - at < REPLY_PAUSE_WINDOW_MS);
     this.unconfirmedPauses.push(now);
@@ -276,6 +281,7 @@ export class SttSession {
 
   private finishReplyPause(): void {
     this.pauseOpen = false;
+    this.replyPaused = false;
     this.pauseSamples = 0;
     this.samplesSinceVoiced = 0;
   }
@@ -389,7 +395,7 @@ export class SttSession {
 
     const minSamples = MIN_SPEECH_SAMPLES_FRAC * this.cfg.sampleRate;
     if (this.speechLen < minSamples) {
-      const wasPaused = this.pauseOpen;
+      const wasPaused = this.replyPaused;
       this.reset();
       if (wasPaused) this.resumeReply();
       this.send({ t: "no_speech" });
@@ -431,7 +437,7 @@ export class SttSession {
       }
     }
 
-    const wasPaused = this.pauseOpen;
+    const wasPaused = this.replyPaused;
     this.finishReplyPause();
     this.reset();
     if (this.closed) return;

@@ -148,6 +148,15 @@ the plan's assumptions decides whether to replan.
 
 **Limits on where it applies (architect, 2026-10-25):** the unheard part and its guidance ride on **spoken turns only** (an adult who cuts in by voice and then types gets nothing, so written chat never receives length instructions: rule 5), and **never on a crisis, safety or repair turn** (the same turns the spoken cue is suppressed on; a person who has just said something hard is not offered the rest of a story: rule 0). A turn that may not carry it also ends it.
 
+**What the first real use found, and the fixes (2026-10-25, from Jesse's own session):** (1) A partial transcript is a guess, so it
+never cancels a reply any more; it only keeps the pause from timing out, and the **final** transcript decides. Before, a partial of
+background TV words cancelled the reply for good, the final then came back empty or as a reaction, and Home stayed silent. (2) A pause the
+server had stopped managing (voice confirmed) now still sends `reply_resume` when the utterance turns out to hold no speech. (3) A
+reaction is also any run of up to four words that only ever react ("oh yeah", "uh, nice", "yeah right"; the set holds no "no", "not",
+"stop", "wait", "but" or question word), and a reaction word said as a question ("really?", "seriously?") is a real question, decided
+by the transcript's own question mark, so Home answers it and carries on. (4) A final that lands in the first 400 ms of a reply is no longer
+dropped. Sources for "really?" being a request to confirm and carry on: the clarification and confirmation cases in section 3d.
+
 **How it is built:** steps 1 and 2 are client and server timing (no model). Steps 3 to 7 are one guidance block outside the data wrapper
 (`messages.ts`), written as five labelled cases the model picks from, because a single sentence was ignored and a numbered list with a
 literal example ("anyway") made the model resume every time. **Measured on the local chat model (two runs, five cases, 2026-10-25):** the

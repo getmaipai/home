@@ -94,9 +94,23 @@ export const REACTION_PHRASES: ReadonlySet<string> = new Set([
 /** Counts only, never text (rule 6a): how often a reaction kept Home talking and how often a real interruption stopped it. */
 export const duplexCounters = { reactionResumes: 0, interruptions: 0 };
 
-// A drawn-out sound ("mmm", "hmmm", "woooow", "yeahhh") is the same reaction: a run of three or more of one letter counts as one.
-function isReaction(normalized: string): boolean {
-  return REACTION_PHRASES.has(normalized.replace(/(\p{L})\1{2,}/gu, "$1"));
+// Words that only ever react ("oh", "yeah", "nice", "wow"): up to four of them together are a reaction too ("oh yeah", "uh, nice", "yeah
+// right"). Nothing that stops, refuses or asks is in this set: no "no", "not", "stop", "wait", "but", question words or names.
+const POSITIVE_REACTION_WORDS: ReadonlySet<string> = new Set([
+  "m", "mm", "mhm", "hm", "hmm", "uh", "yeah", "yep", "yes", "okay", "ok", "right", "oh", "ohh", "ah", "ooh", "aw", "wow", "whoa", "really",
+  "seriously", "cool", "nice", "great", "awesome", "amazing", "wild", "crazy", "interesting", "true", "exactly", "sure", "haha", "ha", "lol",
+  "yikes", "geez", "jeez", "my", "god", "gosh", "i", "see", "got", "it", "that", "is", "so", "good", "fun", "funny",
+]);
+
+// A drawn-out sound ("mmm", "hmmm", "woooow", "yeahhh") is the same reaction: a run of three or more of one letter counts as one. A
+// reaction word said as a question ("really?", "seriously?") is a real question: the transcript's own question mark decides, since
+// the person is asking Home to confirm and carry on, not just nodding.
+function isReaction(normalized: string, rawText: string): boolean {
+  if (rawText.trim().endsWith("?")) return false;
+  const collapsed = normalized.replace(/(\p{L})\1{2,}/gu, "$1");
+  if (REACTION_PHRASES.has(collapsed)) return true;
+  const words = collapsed.split(" ").filter(Boolean);
+  return words.length > 0 && words.length <= 4 && words.every((word) => POSITIVE_REACTION_WORDS.has(word));
 }
 
 function normalizedTranscript(text: string): string {
@@ -260,12 +274,11 @@ export function useLiveVoiceSession({ composer, open, onOpenChange, onProblem, i
             activeSpeechRef.current = true;
             setIdleActivity((value) => value + 1);
             if (voiceBargeIn && !mutedRef.current && isReplySpeaking() && Date.now() - speakingStartedAtRef.current >= BARGE_IN_ARM_DELAY_MS) {
-              // Any real words over the reply are an interruption Home answers in context; a bare reaction ("mm-hm", "oh wow") keeps it talking.
+              // A partial is only a guess at what is being said, so it never cancels the reply (a cancel cannot be undone, and a wrong guess
+              // from background TV or a cough left Home silent). The reply stays paused; the final transcript decides. Real-looking
+              // words just stop the pause from timing out into a resume.
               const heard = normalizedTranscript(message.v);
-              if (heard && !isReaction(heard)) {
-                overlapTranscriptRef.current = true;
-                interrupt("voice");
-              }
+              if (heard && !isReaction(heard, message.v)) overlapTranscriptRef.current = true;
             }
             // Not shown: a partial can revise itself several times a
             // second (interim ASR hypotheses) - the listening ring's
@@ -311,8 +324,7 @@ export function useLiveVoiceSession({ composer, open, onOpenChange, onProblem, i
               overlapPauseTimerRef.current = null;
               if (falseInterruptionTimerRef.current) clearTimeout(falseInterruptionTimerRef.current);
               falseInterruptionTimerRef.current = null;
-              if (Date.now() - speakingStartedAtRef.current < BARGE_IN_ARM_DELAY_MS) break;
-              if (!normalized || isReaction(normalized)) {
+              if (!normalized || isReaction(normalized, text)) {
                 // Only noise or a bare reaction: carry on speaking.
                 if (normalized) duplexCounters.reactionResumes++;
                 if (overlapPausedRef.current) turnSchedulerRef.current?.resume();

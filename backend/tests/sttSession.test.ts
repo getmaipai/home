@@ -180,6 +180,31 @@ describe("SttSession reply pause", () => {
     second.session.close();
   });
 
+  test("a pause the server stopped managing (voice confirmed) still resumes the reply when the transcript holds no speech", async () => {
+    scriptTranscript("");
+    const { session, events } = await voicedSession();
+    session.notePlayback("reply", 0, 1000);
+    await frames(session, 60, true);
+    expect(types(events)).toEqual(["vad", "reply_pause"]);
+    await frames(session, 120, false);
+    await new Promise((resolve) => setTimeout(resolve, 100));
+    expect(types(events).filter((type) => type === "reply_resume")).toHaveLength(1);
+    expect(types(events)).toContain("no_speech");
+    session.close();
+  });
+
+  test("a confirmed pause whose transcript is real speech sends no resume", async () => {
+    scriptTranscript("did he really win four");
+    const { session, events } = await voicedSession();
+    session.notePlayback("reply", 0, 1000);
+    await frames(session, 60, true);
+    await frames(session, 120, false);
+    await new Promise((resolve) => setTimeout(resolve, 100));
+    expect(types(events).filter((type) => type === "reply_resume")).toHaveLength(0);
+    expect(events.some((event) => event.t === "final")).toBe(true);
+    session.close();
+  });
+
   test("a playback report older than 700 ms does not count as playing", async () => {
     const { session, events } = await voicedSession(() => 2000);
     session.notePlayback("reply", 0, 1000);
