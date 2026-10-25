@@ -55,7 +55,9 @@ function Bar({ state }: { state: PackageAppHeaderState }) {
 // The sections of an app as the kit's phone bar entries (phone-minimal-2026-10-25 P2): the app's own index first (active only on its
 // own address), then each section, and a trailing Search item when the app has a search page. An icon the hub did not name falls back
 // to one of the kit's own.
-const SECTION_ICONS: Record<string, string> = { mix: "sparkles", following: "heart", saved: "bookmark", library: "folder", history: "history", "watch-later": "clock", search: "search", channel: "layout-grid" };
+const SECTION_ICONS: Record<string, string> = { mix: "sparkles", following: "heart", saved: "bookmark", library: "folder", history: "history", "watch-later": "clock", search: "search", channel: "layout-grid", albums: "disc-3", artists: "mic-vocal", songs: "music", playlists: "list-music" };
+// An app whose own icon is also a section's icon (Music: the note is Songs) names its index tab differently.
+const HOME_ICONS: Record<string, string> = { "/apps/music": "headphones" };
 const iconOrNull = (name: string | null | undefined): string | null => (name && (iconNames as string[]).includes(name) ? name : null);
 export interface SectionsBarEntries {
   entries: Array<{ to: string; icon: string; label: string; exact?: boolean }>;
@@ -64,7 +66,7 @@ export interface SectionsBarEntries {
 }
 export function sectionsBarEntries(app: { to: string; label?: string; icon?: string | null; settings_area?: { id: string } | null; sections: ReadonlyArray<{ page: string; label: string; icon?: string | null }> }, homeLabel: string, hasSearchPage: boolean): SectionsBarEntries {
   const entries = [
-    { to: app.to, icon: iconOrNull(app.icon) ?? "layout-grid", label: homeLabel, exact: true },
+    { to: app.to, icon: HOME_ICONS[app.to] ?? iconOrNull(app.icon) ?? "layout-grid", label: homeLabel, exact: true },
     ...app.sections.filter((section) => section.page !== "search").map((section) => ({ to: `${app.to}/${section.page}`, icon: SECTION_ICONS[section.page] ?? iconOrNull(section.icon) ?? "layout-grid", label: section.label })),
   ];
   // The last item is always the three-dot More button: the app's settings live under it, with anything that did not fit.
