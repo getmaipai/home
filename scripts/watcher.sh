@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
-# MAIPAI_WATCH_LEGS selects real sharder legs (default: backend frontend scripts).
+# MAIPAI_WATCH_LEGS selects real sharder legs; they run scripts, backend, frontend.
 # Quiet check sums CPU used by suite-related processes; MAIPAI_WATCH_MAX_CPU defaults to 200.
-# Concurrent worker ceilings: MAIPAI_WATCH_BACKEND_SHARDS=10,
-# MAIPAI_WATCH_FRONTEND_SHARDS=4, MAIPAI_WATCH_SCRIPTS_SHARDS=2 (16 total).
+# Worker ceilings: MAIPAI_WATCH_BACKEND_SHARDS=10,
+# MAIPAI_WATCH_FRONTEND_SHARDS=12, MAIPAI_WATCH_SCRIPTS_SHARDS=8.
 set -euo pipefail
 umask 077
 
@@ -83,15 +83,15 @@ run_suite() {
   if [[ -n "$command" ]]; then
     (cd "$checkout" && bash -c "$command") >"$output" 2>&1
   else
-    local leg rc=0 shards root leg_output leg_status leg_rc leg_seconds
+    local leg rc=0 shards root leg_output leg_status leg_rc leg_seconds wait_rc
     local requested configured="${MAIPAI_WATCH_LEGS:-backend frontend scripts}"
-    local -a requested_legs=() legs=() pids=()
+    local -a requested_legs=() legs=()
     read -r -a requested_legs <<< "$configured"
     if [[ "${#requested_legs[@]}" -eq 0 ]]; then error "MAIPAI_WATCH_LEGS must name backend, frontend, and/or scripts."; return 2; fi
     for requested in "${requested_legs[@]}"; do
       case "$requested" in backend|frontend|scripts) ;; *) error "unknown MAIPAI_WATCH_LEGS entry: $requested"; return 2 ;; esac
     done
-    for leg in backend frontend scripts; do
+    for leg in scripts backend frontend; do
       for requested in "${requested_legs[@]}"; do
         if [[ "$requested" == "$leg" ]]; then legs+=("$leg"); break; fi
       done
@@ -102,8 +102,8 @@ run_suite() {
       leg_status="$output.$leg.status"
       case "$leg" in
         backend) shards="${MAIPAI_WATCH_BACKEND_SHARDS:-10}"; root=tests ;;
-        frontend) shards="${MAIPAI_WATCH_FRONTEND_SHARDS:-4}"; root=. ;;
-        scripts) shards="${MAIPAI_WATCH_SCRIPTS_SHARDS:-2}"; root=. ;;
+        frontend) shards="${MAIPAI_WATCH_FRONTEND_SHARDS:-12}"; root=. ;;
+        scripts) shards="${MAIPAI_WATCH_SCRIPTS_SHARDS:-8}"; root=. ;;
       esac
       (
         local_started="$(date +%s)"
@@ -116,15 +116,19 @@ run_suite() {
         printf '%s %s\n' "$leg_rc" "$leg_seconds" > "$leg_status"
         exit "$leg_rc"
       ) >"$leg_output" 2>&1 &
-      pids+=("$!")
-    done
-    for i in "${!legs[@]}"; do
-      leg="${legs[$i]}"
-      if wait "${pids[$i]}"; then :; else rc=1; fi
+      if wait "$!"; then wait_rc=0; else wait_rc=$?; rc=1; fi
       leg_output="$output.$leg"
       leg_status="$output.$leg.status"
-      read -r leg_rc leg_seconds < "$leg_status"
+      if [[ -s "$leg_status" ]] && read -r leg_rc leg_seconds < "$leg_status"; then
+        :
+      else
+        leg_rc=137
+        leg_seconds=0
+      fi
       printf '== leg: %s (exit %s, %s s)\n' "$leg" "$leg_rc" "$leg_seconds" >> "$output"
+      if [[ "$leg_rc" -eq 137 && ! -s "$leg_status" ]]; then
+        printf 'shard: failing files: unknown\n' >> "$output"
+      fi
       cat "$leg_output" >> "$output"
       rm -f "$leg_output" "$leg_status"
       (( leg_rc == 0 )) || rc=1
@@ -148,7 +152,7 @@ failing_files() {
         leg="${BASH_REMATCH[1]}"
       elif [[ "$line" =~ ^shard:\ failing\ files:[[:space:]]*(.*)$ ]]; then
         for file in ${BASH_REMATCH[1]}; do
-          file="$leg/$file"
+          [[ "$file" == unknown ]] || file="$leg/$file"
           case "$seen" in *" $file "*) ;; *) [[ -n "$leg" && -n "$file" ]] && { files+=("$file"); seen+="$file "; } ;; esac
         done
       fi
@@ -301,14 +305,38 @@ work_cpu_percent() {
   fi
 }
 
+free_memory_gb() {
+  local command="${MAIPAI_WATCH_FREE_GB_CMD:-}" stats
+  if [[ -n "$command" ]]; then
+    if ! stats="$(bash -c "$command" 2>/dev/null)"; then echo unknown; return 0; fi
+    awk 'NR==1 && $1 ~ /^[0-9]+([.][0-9]+)?$/ { print $1; ok=1; exit } END { if (!ok) print "unknown" }' <<< "$stats"
+    return
+  fi
+  if ! stats="$(vm_stat 2>/dev/null)"; then echo unknown; return 0; fi
+  awk '
+    NR==1 { line=$0; sub(/^.*page size of /, "", line); sub(/ bytes.*$/, "", line); page=line }
+    /Pages free:/ { free=$3 }
+    /Pages inactive:/ { inactive=$3 }
+    /Pages speculative:/ { speculative=$3 }
+    END {
+      gsub(/\./, "", free); gsub(/\./, "", inactive); gsub(/\./, "", speculative)
+      if (page ~ /^[0-9]+$/ && free ~ /^[0-9]+$/ && inactive ~ /^[0-9]+$/ && speculative ~ /^[0-9]+$/)
+        printf "%.6g\n", (free + inactive + speculative) * page / 1073741824
+      else print "unknown"
+    }
+  ' <<< "$stats"
+}
+
 wait_for_quiet() {
   local land_data="${MAIPAI_LAND_DATA:-$main/data-scratch/land}"
   local max_seconds="${MAIPAI_WATCH_QUIET_MAX_SECONDS:-1800}"
   local poll_seconds="${MAIPAI_WATCH_QUIET_POLL_SECONDS:-15}"
   local max_cpu="${MAIPAI_WATCH_MAX_CPU:-200}"
-  local started now cpu lander_busy reason last_log=0 remaining sleep_for
+  local min_free_gb="${MAIPAI_WATCH_MIN_FREE_GB:-40}"
+  local started now cpu free_gb free_display lander_busy reason last_log=0 remaining sleep_for
   [[ "$max_seconds" =~ ^[0-9]+$ ]] || max_seconds=1800
   [[ "$poll_seconds" =~ ^[0-9]+([.][0-9]+)?$ ]] || poll_seconds=15
+  [[ "$min_free_gb" =~ ^[0-9]+([.][0-9]+)?$ ]] || min_free_gb=40
   # Zero is used by tests and operators to disable waiting.
   (( max_seconds > 0 )) || return 0
   started="$(date +%s)"
@@ -317,10 +345,14 @@ wait_for_quiet() {
     lander_busy=0
     if compgen -G "$land_data/queue/*.json" >/dev/null; then lander_busy=1; fi
     cpu="$(work_cpu_percent)"
+    free_gb="$(free_memory_gb)"
     reason=""
     if (( lander_busy )); then reason="waiting: lander busy"
     elif [[ "$cpu" != unknown ]] && awk -v cpu="$cpu" -v max="$max_cpu" 'BEGIN { exit !(cpu >= max) }'; then
       reason="waiting: our work uses ${cpu}% cpu, above ${max_cpu}%"
+    elif [[ "$free_gb" != unknown ]] && awk -v free="$free_gb" -v min="$min_free_gb" 'BEGIN { exit !(free < min) }'; then
+      free_display="$(awk -v free="$free_gb" 'BEGIN { printf "%.0f", free }')"
+      reason="waiting: free memory ${free_display} GB below ${min_free_gb} GB"
     fi
     if [[ -z "$reason" ]]; then return 0; fi
     now="$(date +%s)"
