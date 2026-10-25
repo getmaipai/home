@@ -335,7 +335,7 @@ function AppToolbar({ hideSectionsOnWide = false, person, to, label, title, titl
     // icon buttons, so a phone gives that row back to the stories.
     const oneRow = titleSrOnly && sections.length > 0;
     const tabs = sections.length > 0 ? (
-      <div className={cn("min-w-0", oneRow && "flex-1 overflow-x-auto [mask-image:linear-gradient(to_right,black_88%,transparent)] lg:[mask-image:none]", hideSectionsOnWide && "lg:hidden")} data-slot="app-section-tabs">
+      <div className={cn("min-w-0", oneRow && "flex-1 overflow-x-auto", hideSectionsOnWide && "lg:hidden")} data-slot="app-section-tabs">
         <Tabs value={current} onValueChange={(value) => navigate(value === "index" ? to : `${to}/${String(value)}`)}>
           <TabsList variant="pill" aria-label="Sections">
             <TabsTrigger value="index">{homeLabel}</TabsTrigger>

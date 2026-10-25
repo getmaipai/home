@@ -5,4 +5,4 @@ try {
   var saved = JSON.parse(localStorage.getItem("maipai.shell.palette") || "null");
   var dark = saved && typeof saved.dark === "boolean" ? saved.dark : matchMedia("(prefers-color-scheme: dark)").matches;
   root.classList.add(dark ? "dark" : "light");
-} catch (e) { /* main.tsx sets the class again */ }
+} catch { /* main.tsx sets the class again */ }
