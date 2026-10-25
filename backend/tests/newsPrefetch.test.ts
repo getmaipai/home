@@ -112,7 +112,7 @@ test("robots refusal never fetches a page, quiets the next item; a missing page 
 
 test("privacy lists background text only while the setting and shelf are on", () => {
   const row = () => platformConnections().find((entry) => entry.id === "platform:news-full-text-prefetch");
-  expect(row()).toBeUndefined(); enabled(); expect(row()?.when).toContain("150 pages per site");
+  setHouseholdSettingValue("news.full_text_prefetch", false); expect(row()).toBeUndefined(); enabled(); expect(row()?.when).toContain("150 pages per site");
   setHouseholdSettingValue("news.shelf.enabled", false); expect(row()).toBeUndefined();
 });
 
