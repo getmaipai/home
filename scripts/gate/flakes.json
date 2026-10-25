@@ -4,6 +4,10 @@
   "serial": {
     "backend": [
       {
+        "file": "tests/answerImageFetch.test.ts",
+        "reason": "The real deadline assertions read process-global Date.now while other files in the worker can move the clock with setSystemTime."
+      },
+      {
         "file": "tests/legacyImport.test.ts",
         "reason": "Clears the process-wide backup directory while asserting that no backup exists."
       },
@@ -14,6 +18,10 @@
       {
         "file": "tests/turnMachine/turnNext.test.ts",
         "reason": "Installs temporary Stack clients in a process-global slot used by other test files."
+      },
+      {
+        "file": "tests/deviceCommands.test.ts",
+        "reason": "Overrides the process-global device heartbeat interval; resetDb() in a concurrent file can reset it while the WebSocket test is waiting for heartbeats."
       }
     ],
     "frontend": [
@@ -28,6 +36,18 @@
       {
         "file": "src/shell/pages/NextModelsPage.test.tsx",
         "reason": "The fetch mock observes process-global fetch and has shown cross-file interference."
+      },
+      {
+        "file": "src/shell/pages/PackageAppPage.test.tsx",
+        "reason": "The fixture replaces process-global fetch while the package page's async queries are in flight; another file can replace it before they resolve."
+      },
+      {
+        "file": "src/shell/mediaApp.test.tsx",
+        "reason": "The fixture replaces process-global fetch while media queries and player requests are in flight; another file can replace it before they resolve."
+      },
+      {
+        "file": "src/shell/pages/ChatPage.calmErrors.test.tsx",
+        "reason": "The scripted chat fetch mock observes process-global fetch and can be replaced by another file before the stream resolves."
       }
     ]
   },

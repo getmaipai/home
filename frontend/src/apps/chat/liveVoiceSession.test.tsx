@@ -7,7 +7,7 @@
 // runtime adapter that just records what it received.
 import { describe, expect, test, afterEach, mock, spyOn } from "bun:test";
 import { act, cleanup, render, waitFor } from "@testing-library/react";
-import { useRef } from "react";
+import { useEffect, useRef } from "react";
 import { Link, MemoryRouter } from "react-router-dom";
 import { AssistantRuntimeProvider, useLocalRuntime, type ChatModelAdapter } from "@assistant-ui/react";
 import { Dialog, DialogContent } from "@maipai/ui/src/ui/dialog";
@@ -15,7 +15,7 @@ import { VoiceConversation } from "@maipai/ui/src/elements/voice-conversation";
 import { TooltipIconButton } from "@maipai/ui/src/elements/tooltip-icon-button";
 import { getIcon } from "@maipai/ui/src/icons";
 import { useLiveVoiceSession } from "@/apps/chat/liveVoiceSession";
-import { createMockSttSocket, type SttFixtureStep } from "@/lib/voice/sttSocket";
+import { createMockSttSocket, type SttFixtureStep, type SttSocketHandlers } from "@/lib/voice/sttSocket";
 import type { MicCaptureHandle, MicCaptureOptions } from "@/lib/voice/mic-capture";
 import type { SentenceSpeechScheduler } from "@/lib/sentenceSpeechScheduler";
 import { api } from "@/lib/api";
@@ -51,6 +51,7 @@ function Harness({ open, onOpenChange, onProblem = () => {}, isSpeaking, speakin
   const liveVoiceActiveRef = useRef(false);
   const pendingSpeechRef = useRef(false);
   const activeTurnRef = useRef<{ turnId: string; heardVisibleEnd: () => number } | null>(activeTurn);
+  const firstSocketHandlers = useRef<SttSocketHandlers | null>(null);
   activeTurnRef.current = activeTurn;
   turnSchedulerRef.current = { stop: stopScheduler, readLevel: () => 0 } as unknown as SentenceSpeechScheduler;
   const connectionCount = useRef(0);
@@ -85,11 +86,16 @@ function Harness({ open, onOpenChange, onProblem = () => {}, isSpeaking, speakin
         }, 0);
         return { sendAudio: () => {}, close: () => {} };
       }
-      if (dropWhileSpeaking && connection === 0) setTimeout(() => handlers.onError?.(new Error("socket dropped")), 30);
+      if (dropWhileSpeaking && connection === 0) {
+        firstSocketHandlers.current = handlers;
+      }
       return createMockSttSocket(typeof fixture === "function" ? fixture(connection) : fixture, handlers);
     },
     startCapture: async (options) => { captureCalls?.push(captureCalls.length); return fakeStartCapture()(options); },
   });
+  useEffect(() => {
+    if (dropWhileSpeaking && isSpeaking) firstSocketHandlers.current?.onError?.(new Error("socket dropped"));
+  }, [dropWhileSpeaking, isSpeaking]);
   return (
     <MemoryRouter initialEntries={["/chat"]}>
       <AssistantRuntimeProvider runtime={runtime}>
@@ -133,11 +139,12 @@ describe("live voice session", () => {
     const onProblem = mock();
     const stopScheduler = mock();
     const cancelRun = mock();
-    const view = render(<Harness open onOpenChange={() => {}} onProblem={onProblem} isSpeaking={false} speakingEndedAt={0} fixture={[{ delayMs: 0, message: { t: "ready" } }]} sentTexts={[]} stopScheduler={stopScheduler} cancelRun={cancelRun} dropWhileSpeaking retryDelays={[0, 5]} />);
+    const socketConnections: number[] = [];
+    const view = render(<Harness open onOpenChange={() => {}} onProblem={onProblem} isSpeaking={false} speakingEndedAt={0} fixture={[{ delayMs: 0, message: { t: "ready" } }]} sentTexts={[]} stopScheduler={stopScheduler} cancelRun={cancelRun} socketConnections={socketConnections} dropWhileSpeaking retryDelays={[0, 5]} />);
     await waitFor(() => expect(view.getByText("Listening")).toBeTruthy());
-    view.rerender(<Harness open onOpenChange={() => {}} onProblem={onProblem} isSpeaking={true} speakingEndedAt={0} fixture={[{ delayMs: 0, message: { t: "ready" } }]} sentTexts={[]} stopScheduler={stopScheduler} cancelRun={cancelRun} dropWhileSpeaking retryDelays={[0, 5]} />);
+    view.rerender(<Harness open onOpenChange={() => {}} onProblem={onProblem} isSpeaking={true} speakingEndedAt={0} fixture={[{ delayMs: 0, message: { t: "ready" } }]} sentTexts={[]} stopScheduler={stopScheduler} cancelRun={cancelRun} socketConnections={socketConnections} dropWhileSpeaking retryDelays={[0, 5]} />);
     await waitFor(() => expect(view.getByText("Speaking")).toBeTruthy());
-    await new Promise((resolve) => setTimeout(resolve, 50));
+    await waitFor(() => expect(socketConnections.length).toBeGreaterThanOrEqual(2));
     expect(view.getByText("Speaking")).toBeTruthy();
     expect(stopScheduler).not.toHaveBeenCalled();
     expect(cancelRun).not.toHaveBeenCalled();
@@ -146,11 +153,12 @@ describe("live voice session", () => {
 
   test("a child's recovered listening socket stays off while Home speaks", async () => {
     const captureCalls: number[] = [];
-    const view = render(<Harness open onOpenChange={() => {}} isSpeaking={false} speakingEndedAt={0} fixture={(connection) => connection === 0 ? [{ delayMs: 0, message: { t: "ready" } }] : [{ delayMs: 0, message: { t: "ready" } }]} sentTexts={[]} voiceBargeIn={false} captureCalls={captureCalls} dropWhileSpeaking retryDelays={[0, 5]} />);
+    const socketConnections: number[] = [];
+    const view = render(<Harness open onOpenChange={() => {}} isSpeaking={false} speakingEndedAt={0} fixture={(connection) => connection === 0 ? [{ delayMs: 0, message: { t: "ready" } }] : [{ delayMs: 0, message: { t: "ready" } }]} sentTexts={[]} voiceBargeIn={false} captureCalls={captureCalls} socketConnections={socketConnections} dropWhileSpeaking retryDelays={[0, 5]} />);
     await waitFor(() => expect(view.getByText("Listening")).toBeTruthy());
-    view.rerender(<Harness open onOpenChange={() => {}} isSpeaking={true} speakingEndedAt={0} fixture={(connection) => connection === 0 ? [{ delayMs: 0, message: { t: "ready" } }] : [{ delayMs: 0, message: { t: "ready" } }]} sentTexts={[]} voiceBargeIn={false} captureCalls={captureCalls} dropWhileSpeaking retryDelays={[0, 5]} />);
+    view.rerender(<Harness open onOpenChange={() => {}} isSpeaking={true} speakingEndedAt={0} fixture={(connection) => connection === 0 ? [{ delayMs: 0, message: { t: "ready" } }] : [{ delayMs: 0, message: { t: "ready" } }]} sentTexts={[]} voiceBargeIn={false} captureCalls={captureCalls} socketConnections={socketConnections} dropWhileSpeaking retryDelays={[0, 5]} />);
     await waitFor(() => expect(view.getByText("Speaking")).toBeTruthy());
-    await new Promise((resolve) => setTimeout(resolve, 60));
+    await waitFor(() => expect(socketConnections.length).toBeGreaterThanOrEqual(2));
     expect(captureCalls).toHaveLength(1);
   });
 

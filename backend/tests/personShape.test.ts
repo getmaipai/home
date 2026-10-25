@@ -1,18 +1,17 @@
-import { describe, expect, test, beforeEach } from "bun:test";
+import { describe, expect, test } from "bun:test";
 import { toPerson, toRoster, parsePersonCandidate, personToDbValues, guestExpiryProblem } from "@/lib/personShape";
-import { db } from "@/db";
 import { people } from "@/db/schema";
-import { resetDb } from "./reset-db";
+import type { PersonRow } from "@/types";
 
-beforeEach(() => resetDb());
-
-function insertPerson(overrides: Partial<typeof people.$inferInsert> = {}) {
+function personRow(overrides: Partial<typeof people.$inferInsert> = {}): PersonRow {
   const now = new Date().toISOString();
   const id = overrides.id ?? "person-abc123";
-  const row = {
+  return {
     id,
     displayName: "Test Person",
     nickname: null,
+    bio: null,
+    accent: null,
     birthdate: null,
     role: "adult",
     avatarSeed: id,
@@ -26,14 +25,12 @@ function insertPerson(overrides: Partial<typeof people.$inferInsert> = {}) {
     deletedAt: null,
     hlc: "1700000000000:0:testfix",
     ...overrides,
-  };
-  db.insert(people).values(row).run();
-  return db.select().from(people).all()[0]!;
+  } as PersonRow;
 }
 
 describe("toPerson", () => {
   test("converts a valid row to the spec Person shape", () => {
-    const row = insertPerson();
+    const row = personRow();
     const person = toPerson(row);
     expect(person.id).toBe("person-abc123");
     expect(person.display_name).toBe("Test Person");
@@ -46,7 +43,7 @@ describe("toPerson", () => {
   });
 
   test("handles a guest with expiry", () => {
-    const row = insertPerson({
+    const row = personRow({
       id: "person-guest1",
       displayName: "Guest",
       role: "guest",
@@ -58,7 +55,7 @@ describe("toPerson", () => {
   });
 
   test("handles a memorialized person", () => {
-    const row = insertPerson({
+    const row = personRow({
       id: "person-memor1",
       displayName: "Deceased",
       memorializedAt: "2026-01-01T00:00:00.000Z",
@@ -68,7 +65,7 @@ describe("toPerson", () => {
   });
 
   test("handles a disabled person", () => {
-    const row = insertPerson({ enabled: false });
+    const row = personRow({ enabled: false });
     const person = toPerson(row);
     expect(person.enabled).toBe(false);
   });
@@ -78,14 +75,14 @@ describe("toPerson", () => {
   // wiring, so it gets its own round-trip coverage the same way every
   // other field on this row already has.
   test("surfaces a set bio and accent", () => {
-    const row = insertPerson({ id: "person-bioacc1", bio: "Likes dinosaurs", accent: "teal" });
+    const row = personRow({ id: "person-bioacc1", bio: "Likes dinosaurs", accent: "teal" });
     const person = toPerson(row);
     expect(person.bio).toBe("Likes dinosaurs");
     expect(person.accent).toBe("teal");
   });
 
   test("bio and accent default to null when never set", () => {
-    const row = insertPerson({ id: "person-nobioacc" });
+    const row = personRow({ id: "person-nobioacc" });
     const person = toPerson(row);
     expect(person.bio).toBeNull();
     expect(person.accent).toBeNull();
@@ -94,7 +91,7 @@ describe("toPerson", () => {
 
 describe("toRoster", () => {
   test("omits birthdate from the wire shape", () => {
-    const row = insertPerson();
+    const row = personRow();
     const roster = toRoster(row);
     expect("birthdate" in roster).toBe(false);
     expect(roster.id).toBe("person-abc123");
@@ -102,14 +99,14 @@ describe("toRoster", () => {
   });
 
   test("works for a disabled person", () => {
-    const row = insertPerson({ id: "person-disab1", enabled: false });
+    const row = personRow({ id: "person-disab1", enabled: false });
     const roster = toRoster(row);
     expect(roster.id).toBe("person-disab1");
     expect(roster.enabled).toBe(false);
   });
 
   test("works for a live guest", () => {
-    const row = insertPerson({
+    const row = personRow({
       id: "person-live123",
       role: "guest",
       guestExpiresAt: "2099-12-31T00:00:00.000Z",
@@ -175,7 +172,7 @@ describe("parsePersonCandidate", () => {
 
 describe("personToDbValues", () => {
   test("round-trips a spec Person back to Drizzle row values", () => {
-    const person = toPerson(insertPerson({ birthdate: "1990-01-01" }));
+    const person = toPerson(personRow({ birthdate: "1990-01-01" }));
     const values = personToDbValues(person);
     expect(values.id).toBe(person.id);
     expect(values.displayName).toBe(person.display_name);
@@ -187,7 +184,7 @@ describe("personToDbValues", () => {
   });
 
   test("round-trips bio and accent", () => {
-    const person = toPerson(insertPerson({ id: "person-rtbioacc", bio: "Loves the beach", accent: "violet" }));
+    const person = toPerson(personRow({ id: "person-rtbioacc", bio: "Loves the beach", accent: "violet" }));
     const values = personToDbValues(person);
     expect(values.bio).toBe("Loves the beach");
     expect(values.accent).toBe("violet");
