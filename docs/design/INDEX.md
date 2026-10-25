@@ -27,7 +27,7 @@ and a proposed design; otherwise the household IP gets blocked.
 |---|---|---|
 | [child-safety-text-2026-10-19.md](child-safety-text-2026-10-19.md) | built (S1 to S3); owner-approved 2026-10-19 | CSAM-TEXT-01 |
 | [content-policy-2026-10-18.md](content-policy-2026-10-18.md) | proposed, design only; architect has not ruled | CONTENT-POLICY-01 to -05; LIKENESS-SIMPLIFY-01 |
-| [full-duplex-voice-2026-10-24.md](full-duplex-voice-2026-10-24.md) | proposed, design only; architect has not ruled | DUPLEX-00 to -05, DUPLEX-BENCH-01 (rows added after the verdict) |
+| [full-duplex-voice-2026-10-24.md](full-duplex-voice-2026-10-24.md) | proposed, design only; architect ruling in `data-scratch/architect/DUPLEX-DESIGN-2026-10-24.verdict` | DUPLEX-00 to -03, -05, DUPLEX-BENCH-01 (rows added after the verdict) |
 | [RULES.md](RULES.md) | the rulebook; only Jesse changes it | n/a |
 | [ELEMENTS-DECISIONS.md](ELEMENTS-DECISIONS.md) | ledger, current | ELEMENTS-ADOPT-01, -02; the ELT-T1 rows |
 | [UI-DECISIONS.md](UI-DECISIONS.md) | ledger, current | KIT-ALERT-01, KIT-CAROUSEL-01, KIT-TOUR-01 |

@@ -49,14 +49,16 @@ Architect verdict: not yet run. Needs one before any slice is built. No rule cha
 | For the first second after the agent starts speaking, use plain voice detection so real barge-ins get through | LiveKit turn-boundary cooldown (1.0 s) | LiveKit adaptive page | Same rule |
 | Resume the interrupted speech when no transcript follows within a timeout (2.0 s), no regeneration | LiveKit `resume_false_interruption`, `false_interruption_timeout` 2.0 s; needs pausable audio output, and one forum report saw no difference with it on or off | [LiveKit tuning](https://docs.livekit.io/agents/logic/turns/tuning.md), [forum](https://community.livekit.io/t/with-the-new-adaptive-interruption-feature-im-seeing-the-same-agent-interruption-behaviour-resume-false-interruption-true-or-false/776) | Pause and resume (DUPLEX-03); the bench checks it |
 | End of turn from audio, not a silence timer | Pipecat default Smart Turn v3 (BSD-2, 8 MB on CPU, 10 to 100 ms, up to 8 s of 16 kHz audio, 23 languages); Kyutai STT predicts "done talking" | [smart-turn](https://github.com/pipecat-ai/smart-turn), [Pipecat](https://docs.pipecat.ai/server/utilities/turn-management/user-turn-strategies), [Kyutai](https://kyutai.org/stt) | DUPLEX-02 (pulls STT-SMARTTURN-01 forward) |
-| Start the text model on the transcript before the turn is confirmed; text-to-speech not started early; skip for long utterances (10 s); at most 3 retries | LiveKit preemptive generation | LiveKit tuning page | Early start (DUPLEX-04), only when the chat model is idle |
-| Cancel in-flight tool calls on interruption | Pipecat | Pipecat page | Clean repair (DUPLEX-04) |
+| Start the text model on the transcript before the turn is confirmed; text-to-speech not started early; skip for long utterances (10 s); at most 3 retries | LiveKit preemptive generation | LiveKit tuning page | Not in this design: early start is STT-SMARTTURN-01's speculative start, with its guard |
+| Cancel in-flight tool calls on interruption | Pipecat | Pipecat page | Cancelling a tool on interruption uses the turn route's existing cancel (DUPLEX-03) |
 | Hybrid controller: fast voice onset, reversible playback, speculative generation held privately | Voice-Light research prototype (36 turns, median 758 ms from endpoint to first audio; its learned end-of-turn model recalled 12.5% of turn ends, Silero timing 95.6%, so it kept the hybrid) | [arXiv 2609.20995](https://arxiv.org/abs/2609.20995) | Evidence for rules over a learned model; not a shipped product |
 | Make Web Audio output reach Chrome's echo canceller: route it through a local pair of `RTCPeerConnection`s into an `<audio>` element | Mozilla Hubs (reported), guidance in Atmoky's docs; Chrome treats this as not a bug | [Atmoky](https://docs.atmoky.com/known-issues), [W3C list](https://lists.w3.org/Archives/Public/public-webrtc-logs/2019Apr/0334.html) | Browser echo, only if step zero shows it is needed |
 | Delay microphone audio a few seconds after the stream opens so the canceller can settle | A developer report (one anecdote) | [dev.to](https://dev.to/hamedhajiloo/how-i-fixed-a-web-audio-echo-problem-with-a-5-second-delay-384h) | Do not allow interruptions for the first seconds; the bench measures it |
 | Full-duplex AEC mode for the robot's chip | Espressif ESP-SR documents AEC modes for speech recognition, full-duplex dialogue and VoIP, and recommends `AEC_MODE_FD_LOW_COST` for full duplex | [ESP-SR AEC](https://docs.espressif.com/projects/esp-sr/en/latest/esp32s3/acoustic_echo_cancellation/README.html) | Robot spike |
 
 ## 3. Browser app and PWA
+
+This section applies to an adult's session. A teen's or child's session keeps the current behavior until Jesse gives his word (Answer, item 6).
 
 1. **Step zero, before any code (DUPLEX-00, S):** play a reply through the current Web Audio path with `echoCancellation: true` on
    desktop Chrome, Safari and Firefox, and Android Chrome, and measure how much of Home's own voice reaches the microphone (record the
@@ -81,6 +83,8 @@ Architect verdict: not yet run. Needs one before any slice is built. No rule cha
 7. **Android Chrome:** the same as desktop, measured on a real device.
 
 ## 4. Robots (StackChan first)
+
+Duplex applies only to a robot whose controls are at the adult band. A teen-band, child-band or no-companion robot keeps the wake word and stop word (rule 0: an unknown speaker gets the child result).
 
 - **What is proven:** the unit's firmware is xiaozhi-esp32 (MIT) and has a realtime listening mode; Espressif documents a full-duplex
   AEC mode for the chip; the bridge already takes uplink during speech when the session reports AEC and measures abort-to-silence.
@@ -138,9 +142,9 @@ Order: 00 and 01, then 02 and 03, 05 in parallel, then the bench. Codex first fo
 
 ## Supersedes
 
-- `voiceBargeIn`'s rule in `liveVoiceSession.tsx` that any speech after a 400 ms arm delay stops the reply: **replaced** by section 3 (0.5 s of speech, a 1.0 s cooldown, pause then decide).
-- The silence-timer end of turn in `sttSession.ts`: **replaced** by Smart Turn v3.2 (section 3).
-- STT-SMARTTURN-01: **absorbed** into DUPLEX-02; its 800 ms reopen window, Silero hysteresis and off-until-measured flag are kept; its speculative start stays its own item (see DUPLEX-04 above).
+- `voiceBargeIn`'s rule in `liveVoiceSession.tsx` that any speech after a 400 ms arm delay stops the reply: **replaced for adults** by section 3 (teens and children keep the current behavior) (0.5 s of speech, a 1.0 s cooldown, pause then decide).
+- The silence-timer end of turn in `sttSession.ts`: **replaced for adults** by Smart Turn v3.2 (section 3).
+- STT-SMARTTURN-01: its endpointer half (Smart Turn v3.2, the 800 ms reopen window, the Silero hysteresis and the off-until-measured flag) **moves** to DUPLEX-02; its speculative start stays in the STT-SMARTTURN-01 backlog row, which keeps one owner for it.
 - VOICE-LOOP-01's barge-in numbers: 0.6 s confirm is **replaced** by 0.5 s (LiveKit's default, re-measured); "stop phrases bypass" and "backchannels never stop" are **kept**; duck 0.35 and 0.75, the 0.7 s re-arm grace and the self-echo at 0.8 overlap are **dropped** for the browser (pause replaces duck; the bench measures the rest) and **kept** for the robot until its spike reports.
 - "Listen only after the reply ends": **dropped** once DUPLEX-03 lands.
 - CHAT-PARITY-05's clause that child profiles do not enable a continuous microphone: **unchanged** by this design; it changes only if Jesse gives his word to extend duplex to children (2026-10-14 ruling), by his rule change.
