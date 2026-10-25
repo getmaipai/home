@@ -4,6 +4,23 @@ type FocalMapAnalyzer = (input: Float32Array) => Promise<Float32Array>;
 /** The shared image component supplies its locally sampled 256×256 NCHW input. The model never receives image data over the network. */
 let queue = Promise.resolve();
 
+function nextAnimationFrame(): Promise<void> {
+  return new Promise((settle) => {
+    let frame = 0;
+    const finish = () => {
+      clearTimeout(timeout);
+      if (typeof cancelAnimationFrame === "function") cancelAnimationFrame(frame);
+      settle();
+    };
+    const timeout = setTimeout(finish, 50);
+    if (typeof requestAnimationFrame === "function") {
+      frame = requestAnimationFrame(finish);
+    } else {
+      finish();
+    }
+  });
+}
+
 /** Starts loading the model before the first picture needs it, so the first crop on a page is not waiting on a download. */
 export function warmFocalModel(): void {
   void getOrLoadSession("/api/vision/model/focalnet.onnx").catch(() => {});
@@ -11,6 +28,7 @@ export function warmFocalModel(): void {
 
 export const analyzeFocalImage: FocalMapAnalyzer = (input) => {
   const result = queue.then(async () => {
+    await nextAnimationFrame();
     const session = await getOrLoadSession("/api/vision/model/focalnet.onnx");
     const tensor = await tensorFor(input, [1, 3, 256, 256]);
     const output = await session.run({ image: tensor });

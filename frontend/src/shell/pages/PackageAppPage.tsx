@@ -163,7 +163,7 @@ export function PackageAppPage({ person }: { person: Roster }) {
   // A page document is static until the package changes, so every page this app can open is fetched once, up front: moving between its
   // pages then shows the next page at once instead of replacing the whole panel with a loading skeleton while its document loads.
   const queryClient = useQueryClient();
-  useEffect(() => { if (packageId === "news") warmFocalModel(); }, [packageId]);
+  useEffect(() => { if (packageId === "news" && page.data) warmFocalModel(); }, [packageId, page.data]);
   const preload = app ? pagesOf(app).join(",") : "";
   useEffect(() => {
     if (packageId === "" || preload === "") return;

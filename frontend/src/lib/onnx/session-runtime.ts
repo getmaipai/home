@@ -99,7 +99,11 @@ async function loadDefaultFactory(): Promise<SessionFactory> {
     // See bundledWasmPaths() above for why this isn't just `import.meta.env.PROD`.
     ort.env.wasm.wasmPaths = bundledWasmPaths();
     ort.env.wasm.numThreads = 1;
-    ort.env.wasm.proxy = false;
+    // FocalNet is expensive enough to block the shell when it runs on the
+    // main thread. ORT's proxy worker keeps inference off the UI thread.
+    // Keep this runtime shared so the existing voice sessions use the same
+    // worker-backed execution path where supported.
+    ort.env.wasm.proxy = true;
     const built: SessionFactory = {
       async create(modelPath: string): Promise<OnnxInferenceSession> {
         const session = await ort.InferenceSession.create(modelPath, { executionProviders: ["wasm"] });

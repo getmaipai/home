@@ -35,7 +35,7 @@ afterEach(() => {
 });
 
 describe("wake-word-runtime's default session factory", () => {
-  test("dev mode: numThreads=1, proxy=false, wasmPaths left unset", async () => {
+  test("dev mode: numThreads=1, proxy=true, wasmPaths left unset", async () => {
     const fakeOrt = makeFakeOrt();
     mock.module("onnxruntime-web", () => fakeOrt);
     // import.meta.env.PROD is undefined under bun:test by default (no
@@ -46,7 +46,7 @@ describe("wake-word-runtime's default session factory", () => {
     evictAllSessions();
     await getOrLoadSession("/api/voice/wakeword/hey_jarvis_v0.1.onnx");
     expect(fakeOrt.__wasm.numThreads).toBe(1);
-    expect(fakeOrt.__wasm.proxy).toBe(false);
+    expect(fakeOrt.__wasm.proxy).toBe(true);
     expect(fakeOrt.__wasm.wasmPaths).toBeUndefined();
     expect(fakeOrt.__created).toEqual(["/api/voice/wakeword/hey_jarvis_v0.1.onnx"]);
   });
