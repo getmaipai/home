@@ -233,6 +233,10 @@ Measured on the Studio (18 cores, 128 GB, the Stack's model holding about 35 GB)
 - The shared main preview on 8787 from the first design was not built.
 - Issue 231: an embedding that finishes after a person is erased still writes onto the erased memory (found while making backend tests runnable without sockets).
 
-## 17. History
+## 17. Slow hub diagnostics
+
+The backend logs requests over 700 ms with their matched route pattern and samples event-loop lag every five seconds; windows over 200 ms p99 or 1,000 ms max include active scheduler and background work. Owners can read current lag and the last 50 slow request lines at `GET /api/performance/perf`.
+
+## 18. History
 
 Designed and built 2026-10-24 to 2026-10-25 in one session, with Codex writing the code and the session writing briefs, reading diffs, running the tests it could not hand off, and landing. First landing through the lander: 2026-10-24. First ship through `ship.sh`: `sha-1e8aa28`, 156 s, followed by `v0.2.124` cut at that commit. Incidents on the way, each fixed and recorded above: a stale local tag blocking the first tag; the lander's first bounce on a scripts type error; a main-gate red from its own stale checkout; an out-of-memory from three parallel test legs; and a watcher that waited its full 30 minutes because it judged "busy" by load average.

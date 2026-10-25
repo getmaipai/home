@@ -10,6 +10,7 @@ import { getHouseholdSettingValue } from "@/lib/settings";
 import { tryConsume } from "@/lib/rateLimiter";
 import { DEFAULT_IDLE_WINDOW_MS, turnActiveWithin } from "@/lib/turnActivity";
 import { sharedShelfStore } from "@/lib/shelf/shelfStore";
+import { markBusy, markIdle } from "@/lib/perfWatch";
 import { NEWS_FULL_TEXT_PREFETCH_KEY } from "@/settings/newsKeys";
 import { pictureCandidates, viewerOf } from "./data";
 import { newsImagesOn, newsPicture, newsPictureCached } from "./pictures";
@@ -25,6 +26,8 @@ export async function prefetchNewsPictures(deps: { now?: () => number; busy?: ()
   const store = sharedShelfStore();
   if (!store) return 0;
   running = true;
+  const busyName = "news.prefetch.pictures";
+  markBusy(busyName);
   try {
     const hostsTried = new Set<string>();
     let fetched = 0;
@@ -52,5 +55,5 @@ export async function prefetchNewsPictures(deps: { now?: () => number; busy?: ()
       }
     }
     return fetched;
-  } finally { running = false; }
+  } finally { running = false; markIdle(busyName); }
 }

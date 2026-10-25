@@ -8,6 +8,7 @@
 import { embed } from "@/lib/llm";
 import { sharedShelfStore, type ShelfItem, type ShelfStore } from "@/lib/shelf/shelfStore";
 import { TOPICS } from "./topics";
+import { markBusy, markIdle } from "@/lib/perfWatch";
 
 /** How much better another topic must score than the feed's own label before the story moves. */
 export const TOPIC_OVERRIDE_MARGIN = 0.08;
@@ -54,6 +55,9 @@ const textOf = (item: ShelfItem): string => `${PREFIX}${item.title}. ${item.summ
 
 /** Reads the newest stories whose topic is still only their feed's label and settles each on one topic. Returns how many it settled. */
 export async function classifyPendingTopics(options: { store?: ShelfStore | null; embedTexts?: EmbedFn; limit?: number } = {}): Promise<number> {
+  const busyName = "news.topic.tagger";
+  markBusy(busyName);
+  try {
   const store = options.store === undefined ? sharedShelfStore() : options.store;
   if (!store) return 0;
   const items = store.pendingTopicItems(options.limit ?? PER_TICK);
@@ -73,4 +77,7 @@ export async function classifyPendingTopics(options: { store?: ShelfStore | null
     settled++;
   });
   return settled;
+  } finally {
+    markIdle(busyName);
+  }
 }

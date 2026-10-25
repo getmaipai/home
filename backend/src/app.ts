@@ -101,6 +101,7 @@ import { dashboardRoutes } from "@/routes/dashboard";
 import { requireAuth } from "@/middleware/auth";
 import { pageCsp } from "@/middleware/pageCsp";
 import { collectHealth } from "@/lib/healthSnapshot";
+import { slowRequestMiddleware } from "@/lib/perfWatch";
 
 // Session F, step 4: every route file converts to @hono/zod-openapi
 // through lib/openapi.ts's apiRouter() - app.ts's own top-level instance
@@ -111,6 +112,7 @@ import { collectHealth } from "@/lib/healthSnapshot";
 // OpenAPIHono only adds the `.openapi()` method and the document
 // generation, it doesn't require every mounted router to use it.
 export const app = apiRouter();
+app.use("*", slowRequestMiddleware);
 
 // Session F, step 2: real sidecar reporting, per the wave-2 contract
 // ("F to E: health, repairs, updates..."). gpu/disk/last_backup/

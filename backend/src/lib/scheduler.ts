@@ -63,6 +63,7 @@ import { prefetchNewsText } from "@/lib/news/prefetch";
 import { prefetchNewsPictures } from "@/lib/news/prefetchPictures";
 import { runShelfTick, pruneShelf } from "@/lib/shelf/shelfJobs";
 import { withTimeout } from "@maipai/core/src/withTimeout";
+import { markBusy, markIdle } from "@/lib/perfWatch";
 import type { PluginOpResult } from "@/lib/plugins";
 import type { PluginResult } from "@maipai/spec/interpreters/ts/recipe-interpreter.js";
 import type { PersonRow } from "@/types";
@@ -503,6 +504,8 @@ async function runDueJobsUnguarded(
     const priorActivity = db.select({ id: jobs.id }).from(jobs).where(eq(jobs.id, activityId)).get();
     if (priorActivity) updateJob(activityId, { state: "running", progress: { phase: "running" }, errorKind: null, raw: null });
     else createJob({ id: activityId, kind: row.kind === "core" && row.job === "backup.run" ? "backup" : "routine", startedBy: row.personId ?? "system", forPerson: row.personId, title: row.job, state: "running", progress: { phase: "running" }, conversationId: null, resultRef: null, waitingReason: null, errorKind: null, raw: null, provenance: { producer: "scheduler", sourceId: row.id } });
+    const busyName = row.kind === "core" ? row.job : `scheduler:${row.packageId}:${row.job}`;
+    markBusy(busyName);
     try {
       if (row.kind === "core") {
         const handler = CORE_JOBS[row.job] ?? extraCoreJobs[row.job];
@@ -529,6 +532,8 @@ async function runDueJobsUnguarded(
           detail: error,
         });
       }
+    } finally {
+      markIdle(busyName);
     }
 
     if (row.recurring) {

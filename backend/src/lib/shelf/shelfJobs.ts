@@ -9,9 +9,13 @@ import { retentionDays, shelfEnabled } from "./shelfPolicy";
 import { sharedShelfStore, type ShelfStore } from "./shelfStore";
 import { syncShelfFeeds } from "./shelfFeeds";
 import { classifyPendingTopics } from "@/lib/news/topicTagger";
+import { markBusy, markIdle } from "@/lib/perfWatch";
 
 /** Brings the feeds table in line with the settings, then polls what is due. */
 export async function runShelfTick(deps: PollDeps = {}): Promise<void> {
+  const busyName = "shelf.tick";
+  markBusy(busyName);
+  try {
   const now = deps.now ?? Date.now;
   try { syncShelfFeeds({ nowIso: new Date(now()).toISOString(), store: deps.store }); }
   catch { reportShelfEvent("sync_failed"); }
@@ -19,6 +23,9 @@ export async function runShelfTick(deps: PollDeps = {}): Promise<void> {
   await pollDueFeeds(deps, shelfEnabled() ? ["news", "podcast"] : ["podcast"]);
   // Settle each new story on one topic by reading its words; a Stack that is down leaves the feed's own label in place.
   if (shelfEnabled()) { try { await classifyPendingTopics({ store: deps.store }); } catch { reportShelfEvent("topics_failed"); } }
+  } finally {
+    markIdle(busyName);
+  }
 }
 
 export function pruneShelf(nowMs: number = Date.now(), store: ShelfStore | null = sharedShelfStore()): number {

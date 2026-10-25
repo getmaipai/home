@@ -8,8 +8,20 @@ import { createRoute, z } from "@hono/zod-openapi";
 import { apiRouter, errorResponses } from "@/lib/openapi";
 import { requireRole } from "@/middleware/auth";
 import { getPerformance } from "@/lib/performance";
+import { getPerfSnapshot } from "@/lib/perfWatch";
 
 export const performanceRoutes = apiRouter();
+
+const PerfWatchSchema = z.object({
+  lag: z.object({ max_ms: z.number(), p99_ms: z.number(), over_s: z.number() }),
+  slow_requests: z.array(z.string()).max(50),
+});
+const perfWatchRoute = createRoute({
+  method: "get", path: "/perf", tags: ["Performance"], summary: "Recent slow requests and event loop lag",
+  middleware: [requireRole("owner")] as const,
+  responses: { 200: { content: { "application/json": { schema: PerfWatchSchema } }, description: "Current lag and the last 50 slow request lines." }, ...errorResponses({ 403: "Not owner" }) },
+});
+performanceRoutes.openapi(perfWatchRoute, (c) => c.json(getPerfSnapshot(), 200));
 
 const TurnDaySchema = z.object({
   date: z.string(),

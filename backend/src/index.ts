@@ -61,8 +61,10 @@ import { syncTailscaleRenewalSetting } from "@/lib/tailscale";
 import { startDdgsStackSync } from "@/lib/retrieval/ddgsStackSync";
 import { startStackSelfHealWatch } from "@/lib/stackSelfHeal";
 import { startCanary } from "@/lib/canary";
+import { startPerfWatch } from "@/lib/perfWatch";
 
 const configuredPort = configuredHubPort();
+startPerfWatch();
 purgeLegacyHubLogs();
 initSafetyAlarm();
 installConsoleFileMirror();
