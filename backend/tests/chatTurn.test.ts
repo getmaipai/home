@@ -2185,6 +2185,9 @@ describe("POST /api/turn/stream", () => {
     });
     expect(crossPerson.status).toBe(503);
     expect(await crossPerson.json()).toMatchObject({ code: "turn_resume_unavailable" });
+
+    // The abandoned stream's turn keeps running; end it so it cannot hold the model for the tests after this one.
+    expect(await (await client.post(`/api/turn/${meta.turn_id}/cancel`, {})).json()).toEqual({ cancelled: true });
   });
 
   describe("WIRE-01: cancel", () => {
