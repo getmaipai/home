@@ -58,9 +58,17 @@ describe("chooseShardCount", () => {
     expect(chooseShardCount({ cores: 14, freeGb: 1.7, files: 100, gbPerShard: 1.25 })).toBe(1);
   });
 
-  test("cores cap it at half, and it is never below 1", () => {
-    expect(chooseShardCount({ cores: 8, freeGb: 64, files: 100 })).toBe(4);
+  test("cores cap it at cores minus 2, and it is never below 1", () => {
+    expect(chooseShardCount({ cores: 8, freeGb: 64, files: 100 })).toBe(6);
     expect(chooseShardCount({ cores: 1, freeGb: 0.1, files: 100 })).toBe(1);
+  });
+
+  test("uses the 16 worker ceiling on a well-provisioned machine", () => {
+    expect(chooseShardCount({ cores: 18, freeGb: 90, totalGb: 128, files: 300 })).toBe(16);
+  });
+
+  test("memory still caps workers on a small machine", () => {
+    expect(chooseShardCount({ cores: 10, freeGb: 4, totalGb: 16, engineGb: 6, osReserveGb: 3, files: 300, gbPerShard: 1.5 })).toBe(2);
   });
 });
 

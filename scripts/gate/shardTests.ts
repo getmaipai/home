@@ -120,8 +120,9 @@ export function balance(files: string[], timings: Timings, n: number): string[][
  * The requested shard count can never exceed the budget: reclaimable pages
  * are capped by total memory minus the Stack and OS/editor reserves, then
  * divided by the sampled peak of a prior worker or a conservative bootstrap
- * value. Worker count is also capped at half the cores and six, with at least
- * one worker when current memory pressure allows a new launch.
+ * value. Worker count is also capped at the logical core count minus two,
+ * sixteen, and the discovered file count, with at least one worker when
+ * current memory pressure allows a new launch.
  */
 export function chooseShardCount(opts: {
   env?: string | undefined;
@@ -136,9 +137,9 @@ export function chooseShardCount(opts: {
 }): number {
   const reclaimableGb = Math.min(opts.freeGb, Math.max(0, (opts.totalGb ?? Number.POSITIVE_INFINITY) - (opts.engineGb ?? 0) - (opts.osReserveGb ?? 0)));
   const gbPerShard = opts.gbPerShard ?? 1.25;
-  const byCores = Math.max(1, Math.floor(opts.cores / 2));
+  const byCores = Math.max(1, opts.cores - 2);
   const byMem = Math.max(1, Math.floor(reclaimableGb / gbPerShard));
-  const safeMaximum = Math.max(1, Math.min(byCores, byMem, opts.files, 6));
+  const safeMaximum = Math.max(1, Math.min(byCores, byMem, opts.files, 16));
   const forced = Number.parseInt(opts.env ?? "", 10);
   if (Number.isInteger(forced) && forced > 0) return Math.min(forced, safeMaximum);
   return safeMaximum;

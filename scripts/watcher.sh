@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # MAIPAI_WATCH_LEGS selects real sharder legs (default: backend frontend scripts).
 # Quiet check sums CPU used by suite-related processes; MAIPAI_WATCH_MAX_CPU defaults to 200.
-# Concurrent worker ceilings: MAIPAI_WATCH_BACKEND_SHARDS=4,
-# MAIPAI_WATCH_FRONTEND_SHARDS=2, MAIPAI_WATCH_SCRIPTS_SHARDS=2.
+# Concurrent worker ceilings: MAIPAI_WATCH_BACKEND_SHARDS=10,
+# MAIPAI_WATCH_FRONTEND_SHARDS=4, MAIPAI_WATCH_SCRIPTS_SHARDS=2 (16 total).
 set -euo pipefail
 umask 077
 
@@ -101,8 +101,8 @@ run_suite() {
       leg_output="$output.$leg"
       leg_status="$output.$leg.status"
       case "$leg" in
-        backend) shards="${MAIPAI_WATCH_BACKEND_SHARDS:-4}"; root=tests ;;
-        frontend) shards="${MAIPAI_WATCH_FRONTEND_SHARDS:-2}"; root=. ;;
+        backend) shards="${MAIPAI_WATCH_BACKEND_SHARDS:-10}"; root=tests ;;
+        frontend) shards="${MAIPAI_WATCH_FRONTEND_SHARDS:-4}"; root=. ;;
         scripts) shards="${MAIPAI_WATCH_SCRIPTS_SHARDS:-2}"; root=. ;;
       esac
       (
