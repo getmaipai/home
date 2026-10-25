@@ -1,139 +1,151 @@
-# Full-duplex conversation on Home's own brain, voices and filters (2026-10-24, third design)
+# Full-duplex conversation on Home's own brain, voices and filters (2026-10-24, fourth design)
 
 Owner's request (Jesse, 2026-10-24): "I just want the capability of full duplex, but we need our brain, our voices, our filters,
-etc." A true full-duplex conversation, listening while speaking and handling interruptions naturally, in the app and on robots like
-StackChan. The words stay the turn engine's, the age band and output gate stay in front of every spoken sentence, the voice stays the
-household, companion or robot voice. This replaces two earlier versions of this note (a plain listening layer, then a duplex model as
-the voice); both are in git history. Design only; nothing here is built.
+etc." Listening while speaking and handling interruptions naturally, in the app and on robots like StackChan. The words stay the
+turn engine's, the age band and output gate stay in front of every spoken sentence, the voice stays the household, companion or
+robot voice. He doubted that duplex can be done in software without a duplex model and asked for a check with Fable first; the
+findings are folded in below. Three earlier versions are in git history. Design only; nothing here is built.
 
 Architect verdict: not yet run. Needs one before any slice is built. No rule change is asked for.
 
 ## Answer
 
-1. **Full duplex is a behavior, built around the cascade Home already has.** The duplex models that exist (Moshi, PersonaPlex, MiniCPM-o,
-   NemotronLabs VoiceChat) combine hearing, thinking and speaking in one network, which would replace the brain, the voices and the
-   filters. Home keeps those three and adds what makes those models feel alive: continuous hearing, backchannels, pausing and
-   resuming, early starts and clean repairs.
-2. **Eight capabilities** (section 2) make up the behavior. Each is testable on its own and works the same in the app and on the robot.
-3. **A "conductor" decides the timing.** It is a small decision component that hears both sides and decides: yield, duck, hold,
-   backchannel, take the turn. It starts as a rule-based classifier on the existing voice activity and transcripts. A full-duplex
-   model can replace it only as a conductor (its listening and timing outputs used, its audio and words discarded), and only if the
-   bench (section 5) shows it beats the classifier. Words and voice never come from it.
-4. **The robot needs one firmware change:** keep sending cleaned microphone audio while it speaks (section 4).
+1. **Yes, in software, without a new generative model.** Duplex behavior on a cascade is real and shipped: Kyutai's Unmute is its own
+   speech-to-text with end-of-turn detection, any text model, and its own streaming voice; LiveKit Agents and Pipecat do the same with
+   voice activity, an end-of-turn model and cancelable playback. What makes those feel natural is **timing logic**, not a model that
+   speaks. That is what is built here, with Home's brain, voices and filters unchanged.
+2. **Pause first, decide second.** The first version of this note said "duck and keep talking". Production systems do not: talking
+   over a person at lower volume reads as rude and they miss words. People pause, then resume or stop. The design pauses within about
+   200 ms of sustained voice, then resumes from the same sentence if it was a backchannel or stops if it was an interruption.
+3. **End-to-end duplex models (Moshi, PersonaPlex, NemotronLabs VoiceChat, MiniCPM-o) are not used, not even as a timing signal.**
+   They decide timing together with their own speech; fed Home's voice and words they are out of their training distribution. The
+   right learned component is a small voice-activity-projection model (version 2), and the duplex models serve only as a "feel"
+   reference in the bench.
+4. **The robot is the hard part.** The unit must make the pause decision itself and its echo cancellation is unproven for speech to
+   the hub; a spike on the unit comes first.
 
 ## 1. What exists today (read 2026-10-24)
 
-- Listening: `GET /api/stt/stream` (16 kHz mono in; `ready`, `vad`, `partial`, `final`, `no_speech`, `error` out). `SttSession`
-  runs Silero VAD with the legacy hub's tuned numbers. Smart Turn endpointing is a queued row (STT-SMARTTURN-01). The robot uses the
-  same route.
-- Speaking: `sentenceSpeechScheduler` plays Chatterbox sentences one by one. `stop()` records `heardVisibleEnd()` and
+- Listening: `GET /api/stt/stream` (16 kHz mono in; `ready`, `vad`, `partial`, `final`, `no_speech`, `error` out). `SttSession` runs
+  Silero VAD with the legacy hub's tuned numbers and **re-sends the whole utterance as a WAV every 1.5 s** for partials, so the first
+  partial lands 1.5 s plus model time after onset. Smart Turn endpointing is queued (STT-SMARTTURN-01).
+- Speaking: `sentenceSpeechScheduler` plays Chatterbox sentences one by one; `stop()` records `heardVisibleEnd()` and
   `cancelTurn(turnId, heard)` stores only the heard part.
 - App barge-in exists behind `voiceBargeIn` (400 ms arm delay, any speech stops the reply, no echo reference).
-- Robot: no barge-in. In the Speaking state the microphone stream is off; only the wake word can abort (firmware patch 049 adds an
-  on-unit stop word). `robot.barge_in.open_mic` is a device setting with no behavior behind it.
-- Written down, never built: VOICE-LOOP-01 (0.6 s confirm, backchannels never stop, duck 0.35 without echo cancellation and 0.75 with,
-  0.25 s playout slices, 0.7 s re-arm grace, self-echo at 0.8 overlap) and dev.md item 12 (fillers only when a tool will take over a
-  second; barge-in cancels inference and reconciles history with what was heard).
+- Robot: in the Speaking state the microphone stream is off; only the wake word can abort (firmware patch 049 adds an on-unit stop
+  word). `robot.barge_in.open_mic` is a device setting with no behavior behind it.
+- Written down, never built: VOICE-LOOP-01 (0.6 s confirm, backchannels never stop, 0.25 s playout slices, 0.7 s re-arm grace) and
+  dev.md item 12 (fillers only when a tool will take over a second; barge-in cancels inference and reconciles history).
 
-## 2. The eight capabilities
+## 2. The capabilities
 
-1. **Hearing while speaking.** The microphone stays open during playback. The client marks what it is playing and when; the hub keeps
-   that audio as the echo reference. Browser: platform echo cancellation. Robot: its audio front end (section 4).
-2. **Telling the sounds apart.** While Home speaks, what it hears is one of: a *stop* (a stop phrase, or a sentence of four words or
-   more), a *backchannel* ("mm-hm", "yeah", a laugh, a cough), a *take-over* (a new thought started over Home), or *background* (a
-   second voice, TV, noise). Each has its own response (items 3 and 4).
-3. **Yielding fast.** On a stop or take-over, audio stops within 300 ms. Playback runs in 0.25 s slices so a stop never waits on a long
-   buffer. Unplayed sentences are dropped and the heard prefix is stored.
-4. **Backchannel without losing the floor.** On a backchannel Home ducks to 0.35 for its length and carries on. It never becomes a
-   turn.
-5. **Pause and resume, not only cancel.** A stop that is a question about the reply ("wait, which one?") holds the generated reply
-   instead of discarding it. After the person's turn is answered, Home may return to it ("as I was saying") from the sentence it was
-   in. A take-over discards it. The turn engine gets the heard prefix as context, as written chat does today.
-6. **Home can listen back.** While the person speaks a long thought, Home may give a short backchannel in the speaking voice ("mm-hm",
-   "I see", "go on") at a natural pause, not on every pause. These are a closed list per voice, rendered ahead of time by the same
-   voice engine, so each one is that voice, and each passes the output gate once at install (a closed list needs no live check).
-   Never for a child's or teen's account beyond "mm-hm"; never while the person is mid-word.
-7. **Starting early.** The turn begins from the streaming transcript before the person has certainly finished (speculative start, the
-   STT-SMARTTURN-01 reopen window). If they keep talking, the in-flight turn is cancelled or replaced (dev.md item 11) and nothing
-   was spoken. The first sentence is held until the end of turn is confirmed, so no half-formed answer is ever heard.
-8. **Clean repair.** If the person cuts in during a lookup, the turn engine cancels the lookup and folds the new speech into the same
-   question. A short acknowledgement ("one sec") is spoken only when a tool is predicted to take over a second (dev.md item 12), in the
-   companion's register and through the gate, like any reply.
+1. **Hearing while speaking.** The microphone stays open during playback with the echo removed (sections 4 and 5 say how, per
+   surface). Where it cannot be removed (no working echo cancellation, a Bluetooth speaker), Home falls back to pause-only: it
+   still hears the voice onset but does not try to transcribe over its own playback.
+2. **Pause first.** On sustained voice activity (about 200 ms) over Home's speech, playback fades out in 50 ms and holds. Playback
+   runs in 0.25 s slices, so the hold never waits on a long buffer. The mute decision is local to the surface (browser, unit), the
+   hub is told after.
+3. **Decide from what the sound is**, not from word counts: how long it lasted, its energy contour, whether it matches a short
+   phrase list ("mm-hm", "yeah", "okay", a laugh or cough) or a stop list ("stop", "wait", "no", the robot's name plus stop), and
+   whether it **continues past the pause** (a backchannel ends within about 500 ms; an interruption keeps going). Outcomes:
+   *backchannel* (resume from the same sentence), *stop or take-over* (drop the unplayed sentences, store the heard prefix, the
+   new speech is the next turn), *background* (a second voice or noise: resume).
+4. **A fast overlap path.** While Home is paused, a small buffer holding only the overlapping sound is transcribed with a short
+   interval (about 0.4 s) for stop-phrase spotting, not the 1.5 s whole-utterance partials. Smart Turn v3 (an audio-only end-of-turn
+   model that runs on the CPU) is pulled into this plan from STT-SMARTTURN-01.
+5. **Hold and resume.** A stop that is a question about the reply ("wait, which one?") holds the generated reply instead of
+   discarding it; after the person's turn is answered Home may return to it from the sentence it was in. A take-over discards it. The
+   turn engine gets the heard prefix as context, as written chat does today.
+6. **Starting early, only when idle.** The turn can begin from the streaming transcript before the person has certainly finished, but
+   only when the local chat model is idle (it is shared with the family). If they keep talking the in-flight turn is cancelled or
+   replaced (dev.md item 11) and nothing was spoken: the first sentence is held until end of turn is confirmed.
+7. **Clean repair.** If the person cuts in during a lookup, the turn engine cancels the lookup and folds the new speech into the same
+   question. A short acknowledgement ("one sec") is spoken only when a tool is predicted to take over a second (dev.md item 12), in
+   the companion's register and through the gate.
+8. **Listening-back sounds, last and off by default.** A closed list per voice ("mm-hm", "I see") rendered ahead of time by the same
+   voice engine, played at a natural pause in a long thought, adults only. Built last because they create the robot's own
+   double-talk problem and can misfire on the pause rules.
 
-All eight act on audio timing. None of them changes what is said: every spoken sentence is a sentence the turn engine released after
-the age band and output gate (rule 0), in the voice chosen for the person, companion or robot (rule 14). A child's or teen's spoken
-turn keeps its own limits.
+None of these changes what is said: every spoken sentence is a sentence the turn engine released after the age band and output
+gate (rule 0), in the voice chosen for the person, companion or robot (rule 14). A child's or teen's spoken turn keeps its own limits.
 
-## 3. The conductor
+## 3. The timing decision, and the one learned model that may help
 
-- **Inputs:** the person's voice activity and partial transcripts, the playback marker, what Home is saying and which sentence it is in,
-  the turn state (thinking, speaking, waiting), the person's band.
-- **Outputs:** one of `continue`, `duck`, `hold`, `yield`, `take_turn`, `backchannel(kind)`, with a reason, as events on the
-  existing wire (additive, spec first).
-- **Version 1: rules.** Silero VAD, partials, a stop-phrase list, a backchannel list, Smart Turn for end of turn, and the numbers in
-  section 1. No new model.
-- **Version 2, only if the bench says so: a duplex model as the conductor.** Feed it the same audio, discard its speech, read its
-  turn-taking signals. The candidates and what is known (checked 2026-10-24):
+- **Version 1: rules**, as in capabilities 2 to 4. Silero voice activity, the phrase lists, continuation past the pause, Smart Turn
+  for end of turn, the fast overlap path. No generative model.
+- **Version 2, only if the bench says rules fall short: a voice-activity-projection model.** This is a small research model family
+  (Skantze group; real-time versions run on a CPU with both speakers' audio as input) that predicts turn shifts and backchannel
+  windows, which is the signal needed. Its licence and weights are unchecked; that is the first task of the version 2 row.
+- **Why not a duplex speech model as the timing signal.** Moshi-family models treat their own generated audio as the "self"
+  channel and decide timing together with their own words; given Home's voice and words that state is wrong, and the timing read
+  would be a 7B voice detector coupled to a discarded answer, competing with chat for the same GPU (resource order: chat first).
+  MiniCPM-o has the same coupling (moderate confidence). There is no supported path for injecting text into these models either.
+  They stay in the bench as the reference for how a natural conversation feels, run beside Home, never inside it.
+  Facts checked 2026-10-24: [NemotronLabs VoiceChat 11B](https://arxiv.org/abs/2609.21967) (licence OpenMDW 1.1 on its card,
+  coverage disagrees on research-only), [PersonaPlex 7B](https://github.com/mu-hashmi/personaplex-mlx) (NVIDIA Open Model License),
+  [Moshi 7B](https://github.com/kyutai-labs/moshi) (weights CC-BY 4.0), [MiniCPM-o 4.5](https://huggingface.co/openbmb/MiniCPM-o-4_5)
+  (Apache 2.0 per two secondary sources, `llama.cpp-omni` fork).
 
-| Model | What the conductor would use | Unconfirmed |
-|---|---|---|
-| [NemotronLabs VoiceChat 11B](https://arxiv.org/abs/2609.21967) | Pause handling, takeover after interruptions, 93% resume after backchannels (its paper); streaming user transcription head ([arXiv 2609.15759](https://arxiv.org/abs/2609.15759)); 4-bit MLX build in [mlx-audio](https://github.com/Blaizzy/mlx-audio) | Licence (OpenMDW 1.1 on the card; coverage disagrees on research-only); how to read signals without its speech |
-| [PersonaPlex 7B](https://github.com/mu-hashmi/personaplex-mlx) | Moshi-family timing, community MLX port | Weights under the NVIDIA Open Model License (commercial terms to check, Jesse may sell) |
-| [Moshi 7B](https://github.com/kyutai-labs/moshi) | Official MLX int4 and int8, about 200 ms, weights CC-BY 4.0 | Whether its state is readable apart from speech |
-| [MiniCPM-o 4.5](https://huggingface.co/openbmb/MiniCPM-o-4_5) | Apache 2.0 per two secondary sources, full-duplex on Macs through the `llama.cpp-omni` fork | A fork, not mainline; vision must stay off (a picture is looked at once and dropped) |
+## 4. The app (browser)
 
-  Memory is not the constraint (the Studio has 128 GB); the rank in resources is: chat first, images, video, then everything else.
-  A conductor model runs only during a live voice session, on a free seat, and the rule-based conductor takes over when none is free.
-- **Why a model might still win:** it can learn that "yeah, but..." is a take-over and "yeah." is not, and that a long pause after
-  "um" is not the end of a turn. That is what the classifier is weakest at. The bench measures it instead of assuming it.
+- Capture requests `echoCancellation`, and the session reads `getSettings()` to confirm it is on; if it is off, or the output is a
+  Bluetooth speaker (latency defeats echo cancellation), the session runs pause-only with no listening over playback.
+- Playback should go through a path the browser's echo canceller can use as its reference (to verify per browser; Safari with
+  WebAudio is unreliable, and macOS voice processing already lowers system output, so a Home-side fade is not stacked on top).
+- Pause, fade and resume are done in the browser; `liveVoiceSession` keeps `voiceBargeIn` as the level switch and gains the duplex
+  level.
 
-## 4. Robots (StackChan first)
+## 5. Robots (StackChan first)
 
 - **Today:** the Speaking state turns voice processing off and sends nothing.
-- **Change (bot repo, its own design note):** keep the front end's echo cancellation on in the Speaking state, using the playback
-  reference the CoreS3 codec already provides, and stream the cleaned microphone audio to `/api/stt/stream` as in listening. Unit memory
-  is tight (internal RAM minimum seen 12.5 KB), so it is measured on the unit first and ships only above the figure the spoken-stop
-  note sets. The host also holds the played audio for the overlap check.
-- **The robot's face** shows that it heard the person (the existing state path; no new status screen).
-- **Ladder:** hub reachable, full duplex; otherwise the wake word and the on-unit stop word as now (principle 2). A robot never
-  loosens a gate to answer faster.
-- **Setting:** `robot.barge_in.open_mic` stays the one device switch; add the value `duplex`, spec first.
-- **Voice unchanged:** the robot keeps its chosen Chatterbox voice; backchannels are rendered in it.
+- **Mute decision on the unit.** Voice activity on the front end's output stops or fades the amplifier locally; the hub is told
+  after. A hub round trip over Wi-Fi cannot meet the 200 ms pause, and the unit's playout buffer must be kept at 150 ms or less.
+- **Echo is the unknown.** The front end's echo cancellation is tuned for the wake word; its double-talk handling may mangle the
+  person's speech, so its output may be good enough for voice detection but not for transcription. Plan: transcribe the person's
+  speech from audio after the pause, when Home is silent. A 1 W speaker at 1 m can clip and a linear canceller cannot remove clipping
+  distortion, so duplex mode caps the speaker level. Hub-side cancellation against audio sent over Wi-Fi is not attempted; the hub
+  only compares text overlap.
+- **Spike first (DUPLEX-05):** on the unit, measure with the front end, echo cancellation, the WebSocket and playback all running:
+  internal RAM minimum (12.5 KB seen), CPU, pause latency, false-trigger rate from its own speech at the capped level. Nothing in the
+  hub is frozen until the spike reports.
+- **Ladder:** hub reachable, duplex; otherwise the wake word and on-unit stop word as now (principle 2). A robot never loosens a gate
+  to answer faster. Voice unchanged: its chosen Chatterbox voice. Setting: `robot.barge_in.open_mic` gains the value `duplex`, spec first.
 
-## 5. The bench (DUPLEX-BENCH-01)
+## 6. The bench (DUPLEX-BENCH-01)
 
-The same scripted calls (40 adult turns, 10 interruptions, 10 backchannels, 10 noisy-room or second-voice cases, 10 slow lookups
-with a cut-in) in the app and on the robot, once with the rule conductor and once per model conductor. Run on the Studio when chat is
-idle.
+A reproducible rig: recorded interruptions, backchannels and second voices played at timed offsets through a second speaker beside
+the unit and into the browser mic; reported as median and 95th percentile. Run when chat is idle.
 
 | Measure | Pass |
 |---|---|
-| Real interruption to silence | at most 300 ms |
+| Sustained voice to playback faded out | median at most 250 ms, 95th at most 400 ms |
 | Backchannels wrongly stopping speech | under 5% |
-| Take-overs wrongly treated as backchannels | under 5% |
-| Pause-for-thought wrongly ending the person's turn | under 5% |
-| Own echo taken for the person (robot speaker, 1 m) | 0 in 50 lines |
+| Interruptions wrongly treated as backchannels | under 5% |
+| Person's pause-for-thought wrongly ending their turn | under 5% |
+| Home's own speech taken for the person (robot, capped level) | under 2% of lines |
 | Held reply resumed correctly after a clarifying stop | 9 of 10 |
 | Speculative starts cancelled with nothing spoken | 100% |
-| Words spoken not released by the turn engine | 0 |
-| Added delay on a normal turn | none over today's |
+| Words spoken that the turn engine did not release | 0 |
+| Home talking over the person (Home starts while they are still speaking) | under 2% |
+| Delay on a normal turn against today's | measured with the same rig; no worse at the median |
 
-The rule conductor ships first. A model replaces it only by passing every row and beating the rules on the three timing rows.
+The duplex models are run beside the rig for a subjective feel comparison only, and are not part of the pass.
 
-## 6. Slices
+## 7. Slices
 
-1. **DUPLEX-01 (S, spec first):** playback marker, conductor events and the `duplex` device value in the voice spec; pin bump.
-2. **DUPLEX-02 (M):** hearing while speaking and the rule conductor in `SttSession`, with fixture audio per case and a failing test
-   for every wrong stop.
-3. **DUPLEX-03 (M):** the app side: 0.25 s slices, duck, yield, heard prefix, hold and resume; `voiceBargeIn` becomes the duplex level.
-4. **DUPLEX-04 (M):** speculative start and clean repair in the turn engine (with STT-SMARTTURN-01).
-5. **DUPLEX-05 (M, `bot`):** the Speaking-state audio stream; unit memory measured first.
-6. **DUPLEX-06 (S):** listening-back backchannels, rendered per voice, adults first.
-7. **DUPLEX-BENCH-01 (M):** section 5; the model conductor is built only after it, as DUPLEX-07.
-Order: 01, 02, 03 and 04, then the bench with 05, then 06. Codex first for 02 to 04 (decided and testable).
+1. **DUPLEX-01 (S, spec first):** playback marker, pause, resume and stop events and the `duplex` device value in the voice spec; pin bump.
+2. **DUPLEX-05 (M, `bot`), the spike, first:** the on-unit measurement above; it decides whether the robot gets duplex or pause-only.
+3. **DUPLEX-02 (M):** the fast overlap path, the rule decision and Smart Turn in `SttSession`, with fixture audio per case and a
+   failing test for every wrong stop.
+4. **DUPLEX-03 (M):** the browser side: slices, fade, pause, resume, heard prefix, hold; the echo check; `voiceBargeIn` becomes the duplex level.
+5. **DUPLEX-04 (M):** early start and clean repair in the turn engine, idle-only.
+6. **DUPLEX-BENCH-01 (M):** section 6, then DUPLEX-07 (the voice-activity-projection model) only if rules fall short.
+7. **DUPLEX-06 (S):** listening-back sounds, last, off by default.
+Order: 01 and the spike, then 02 and 03, then 04, then the bench, then 06. Codex first for 02 to 04 once the spike reports.
 
-## 7. Legacy verdicts (rule 8)
+## 8. Legacy verdicts (rule 8)
 
-- Legacy barge-in numbers (VOICE-LOOP-01): **kept as the starting values**, re-measured by the bench.
+- Legacy barge-in numbers (VOICE-LOOP-01): **kept as starting values**, re-measured by the bench.
 - Legacy browser hands-free thresholds (`useHandsFree.ts`): **dropped**; the server voice activity already decides.
 - Legacy "listen only after the reply ends": **dropped** once DUPLEX-03 lands.
+- The earlier "duck and keep talking", "four words means stop" and "duplex model as the timing signal" ideas: **dropped** after the Fable review.
