@@ -160,7 +160,7 @@ describe("RailProfile settings row", () => {
       fireEvent.click(view.getByRole("button", { name: /Open profile menu for Juniper/ }));
       await view.findByRole("menuitem", { name: /Settings/ });
       expect(view.getAllByRole("menuitem", { name: "Settings" })).toHaveLength(1);
-      expect(view.queryByRole("menuitem", { name: /Settings/ })).toBeNull();
+      expect(view.queryByRole("menuitem", { name: "Home settings" })).toBeNull();
     } finally {
       globalThis.fetch = originalFetch;
     }
