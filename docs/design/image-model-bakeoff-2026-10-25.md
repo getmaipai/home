@@ -1,6 +1,6 @@
 # Image model bakeoff and the create-plus-edit design (2026-10-25)
 
-Status: decision record plus bench result. Nothing is built yet; the build slices are listed in section 6 and have no backlog rows yet.
+Status: decision record plus bench result. Built 2026-10-25: slices 1 and 2 (ERNIE as a Stack family with pinned weights, Quick means ERNIE in Home when it is installed and falls back to Klein, edits stay on Klein, the picture pool with the memory note's slice 3) and slice 4 (the markers in the 2026-10-17 note). Open: slice 3, the regression bench that reads the text back, and the person-facing copy of the spec-owned `generation.picture_quality` setting, which still says Quick takes a few seconds (a change to it goes spec first and needs Jesse's tag).
 It extends [image-engine-2026-10-17.md](image-engine-2026-10-17.md) and, for the new-picture default only, supersedes its section 16
 ruling that Klein is the default on every tier (see section 5 for what stays).
 

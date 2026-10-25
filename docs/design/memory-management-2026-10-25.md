@@ -1,6 +1,6 @@
 # Household memory management: queue, never fail (2026-10-25)
 
-Status: design note, nothing built. Item id MEMMGMT-2026-10-25. Updated the same day with the owner's answers (section 9) and the SSD research (section 10). Owner's ask (Jesse, 2026-10-25): a household-wide memory
+Status: built 2026-10-25 except the bench-lane slices 10 and 13 (section 11 marks each). Item id MEMMGMT-2026-10-25. Updated the same day with the owner's answers (section 9) and the SSD research (section 10). Owner's ask (Jesse, 2026-10-25): a household-wide memory
 management system for the Mac Studio (Apple M5 Max, 128 GB unified memory) that runs chat, pictures, video, voice and the other
 workers. His example: a person asks for a picture, there is not enough memory, and the request is not failed; it is queued, worked
 when memory frees, and the person is told. The pieces he named: telling the person plus a queue, system memory monitoring, model
@@ -440,6 +440,8 @@ model, and no engine outside the Stack's set is adopted.
 | 12 | Stack | `lib/memoryWatchdog.ts`, `lib/memoryState.ts`, a test | the `Swapouts` counter rising while the chat role is loaded enters WARN at once (not after 2 samples); the ledger block reports `chat_paged_out: true` | a fixture with rising swapouts and a loaded chat role is WARN on the first sample |
 | 13 | Stack | `scripts/bench-isolation.ts` (bench lane) | the reload bench: time to first picture after an eviction with the weights in the page cache against after a forced cold read; the loader's share becomes the card's load estimate | two numbers in the bench output; the card estimate is within 3 s of the warm number |
 | 14 | Stack | `lib/governor.ts`, `tests/governor.test.ts` | the Q8 flex band: 4 GB, picture class only, level normal only, one borrower, returned on release | a picture is admitted at 19 GB free, a video is not; a second picture waits while the band is borrowed |
+
+Built 2026-10-25: slices 1 to 9, 11, 12, 14, 15 and 16 (Stack and Home, each with tests; the picture pool of slice 3 keeps one governor item between jobs). Open: slices 10 and 13, which are bench-lane scripts that need the real engines under the bench lock and were not run. Known gaps: a kid's daily allowance counts a queued job that the Stack later refuses (a refused-at-submit job no longer gives it back); the cache limits of slice 4 (2.9 GB pictures, 4.4 GB video) want a timing check before a release.
 
 Order: 1, 2, 9 (the Stack stops failing and starts ordering), then 5, 6, 15 and 16 (people see the right words and their number), then 14, 3, 4, 7, 8,
 12, 11, 10, 13. Each is a Codex brief of 1 to 3 files with a failing test first.

@@ -20,6 +20,8 @@ launchd services and `/usr/local/maipai-home` were not touched. Weights came fro
 
 **Section 16 (owner ruling, 2026-10-17) keeps Klein as the default on every tier and makes Z-Image-Turbo the advanced choice named Detailed. This section stands as the original pick.**
 
+> **Superseded in part (2026-10-25, [image-model-bakeoff-2026-10-25.md](image-model-bakeoff-2026-10-25.md), [memory-management-2026-10-25.md](memory-management-2026-10-25.md)):** new pictures use ERNIE-Image-Turbo when it is installed (Klein remains the editor and the fallback), and "One model is resident at a time" and section 7's "Load on demand, one model resident" are replaced by the picture pool: the create model stays loaded, the edit model loads on demand, one at a time when memory is tight.
+
 | Slot | Pick | Runtime | Licence | Why in one line |
 |---|---|---|---|---|
 | Default (every tier that can hold it: p32 and up) | **FLUX.2 Klein 4B distilled**, 8-bit, 4 steps | mflux 0.23.0 on MLX, in a Stack-managed worker | Apache-2.0 | 4.0 s per 1024 px picture warm, 13.5 GB peak, text rendered correctly, and the same weights do reference edits (8.4 s) |
