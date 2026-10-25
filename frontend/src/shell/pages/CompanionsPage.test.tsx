@@ -6,7 +6,7 @@ import { api, ApiError, type CompanionCard, type CompanionDetail, type Companion
 import { CompanionDetailPage, CompanionsPage } from "@/shell/pages/CompanionsPage";
 import { CompanionShellViewer } from "@/lib/companionShells";
 
-const originals = { companions: api.companions, companion: api.companion, createConversation: api.createConversation, setDefaultCompanion: api.setDefaultCompanion, deleteCompanion: api.deleteCompanion, stackVoices: api.stackVoices, setSetting: api.setSetting, settingsValues: api.settingsValues };
+const originals = { companions: api.companions, companion: api.companion, conversationList: api.conversationList, createConversation: api.createConversation, setDefaultCompanion: api.setDefaultCompanion, deleteCompanion: api.deleteCompanion, stackVoices: api.stackVoices, setSetting: api.setSetting, settingsValues: api.settingsValues };
 afterEach(() => { cleanup(); Object.assign(api, originals); });
 
 function card(overrides: Partial<CompanionCard> = {}): CompanionCard {
@@ -224,4 +224,36 @@ test("preview discovery is hidden when the list says it is unavailable", async (
   const view = open("/companions", true);
   await waitFor(() => expect(view.getByRole("tab", { name: "Yours" })).toBeTruthy());
   expect(view.queryByRole("tab", { name: "Discover" })).toBeNull();
+});
+
+test("the Chats row counts and lists only this companion's chats, and opens the selected chat", async () => {
+  api.settingsValues = async () => [{ key: "companions.preview_shells", value: true, source: "user", label: "Preview", level: "basic", secret: false }] as never;
+  api.companion = async () => detail();
+  api.conversationList = async () => [
+    { id: "chat-1", companion_id: "lively-child", title: "Animal facts", created_at: "2026-10-20T00:00:00Z", last_turn_at: "2026-10-24T00:00:00Z" },
+    { id: "chat-other", companion_id: "other", title: "Other companion", created_at: "2026-10-23T00:00:00Z", last_turn_at: "2026-10-23T00:00:00Z" },
+  ] as never;
+  const view = open("/companions/lively-child", true);
+  await waitFor(() => expect(view.getByRole("button", { name: /Chats/ })).toBeTruthy());
+  expect(view.getByRole("button", { name: /Chats/ }).textContent).toContain("1 chats");
+  fireEvent.click(view.getByRole("button", { name: /Chats/ }));
+  expect(await view.findByRole("button", { name: /Animal facts/ })).toBeTruthy();
+  expect(view.queryByText("Other companion")).toBeNull();
+  fireEvent.click(view.getByRole("button", { name: /Animal facts/ }));
+  await waitFor(() => expect(view.getByTestId("location").textContent).toBe("/chat?conversation=chat-1"));
+});
+
+test("Chats shows its empty state and creates a chat with this companion", async () => {
+  api.settingsValues = async () => [{ key: "companions.preview_shells", value: true, source: "user", label: "Preview", level: "basic", secret: false }] as never;
+  api.companion = async () => detail();
+  api.conversationList = async () => [];
+  const created: unknown[][] = [];
+  api.createConversation = async (...args) => { created.push(args); return { id: "new-chat" } as never; };
+  const view = open("/companions/lively-child", true);
+  fireEvent.click(await view.findByRole("button", { name: /Chats/ }));
+  expect(await view.findByText("No chats with Sprout yet.")).toBeTruthy();
+  fireEvent.click(view.getByRole("button", { name: "New chat with Sprout" }));
+  await waitFor(() => expect(created.length).toBe(1));
+  expect(created[0]?.[3]).toBe("lively-child");
+  await waitFor(() => expect(view.getByTestId("location").textContent).toBe("/chat?conversation=new-chat"));
 });

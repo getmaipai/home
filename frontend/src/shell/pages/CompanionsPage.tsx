@@ -24,6 +24,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { Chip } from "@maipai/ui/src/primitives/Chip";
 import { getIcon } from "@maipai/ui/src/icons";
 import { companionPreviewSample } from "@/shell/pages/companionPreviewSample";
+import { formatRelative } from "@maipai/ui/src/relativeTime";
 
 const listKey = ["companions"] as const;
 const ROBOT_SETTINGS = "/settings/apps?tab=robot";
@@ -177,6 +178,25 @@ type DetailRow = { key: string; title: string; hint: string; body: ReactNode };
 /** The preview detail page: a short list of rows, each opening its own sheet, so nothing long sits under the hero. */
 function DetailRows({ companion }: { companion: CompanionDetail }) {
   const [open, setOpen] = useState<string | null>(null);
+  const navigate = useNavigate();
+  const chatsQuery = useQuery({ queryKey: ["companion-chats", companion.id], queryFn: () => api.conversationList(), retry: false });
+  const matchingChats = (chatsQuery.data ?? []).filter((chat) => chat.companion_id === companion.id)
+    .sort((a, b) => new Date(b.last_turn_at ?? b.created_at).getTime() - new Date(a.last_turn_at ?? a.created_at).getTime());
+  const chats = matchingChats.slice(0, 20);
+  const [startingChat, setStartingChat] = useState(false);
+  const [chatError, setChatError] = useState<string | null>(null);
+  const startChat = async () => {
+    setStartingChat(true);
+    setChatError(null);
+    try {
+      const conversation = await api.createConversation(undefined, undefined, undefined, companion.id);
+      navigate(`/chat?conversation=${encodeURIComponent(conversation.id)}`);
+    } catch (error) {
+      setChatError(error instanceof ApiError ? error.message : "Could not start a chat. Check your connection and try again.");
+    } finally {
+      setStartingChat(false);
+    }
+  };
   const sample = companionPreviewSample(companion.id);
   const rows: DetailRow[] = [
     { key: "voice", title: "Voice", hint: companion.voice_is_own ? "Its own voice" : "Your Settings voice", body: <VoiceRow companion={companion} /> },
@@ -200,6 +220,12 @@ function DetailRows({ companion }: { companion: CompanionDetail }) {
   rows.push({ key: "activity", title: "Recent activity", hint: "Sample", body: <div className="flex flex-col gap-3">
     <ul className="flex list-none flex-col gap-2 p-0">{sample.activities.map((activity) => <li key={activity.title}><p className="font-medium">{activity.title}</p><p className="text-sm text-muted-foreground">{activity.detail}</p></li>)}</ul>
     <p className="text-sm text-muted-foreground">Sample activity. Real activity is coming soon.</p>
+  </div> });
+  rows.push({ key: "chats", title: "Chats", hint: matchingChats.length ? `${matchingChats.length} ${matchingChats.length === 1 ? "chat" : "chats"}` : "No chats yet", body: <div className="flex flex-col gap-4">
+    {chats.length ? <ul className="flex list-none flex-col gap-3 p-0">{chats.map((chat) => <li key={chat.id}><Button type="button" variant="ghost" onClick={() => navigate(`/chat?conversation=${encodeURIComponent(chat.id)}`)}>{chat.title || "New chat"} · {formatRelative(chat.last_turn_at ?? chat.created_at)}</Button></li>)}</ul> : <p>No chats with {companion.name} yet.</p>}
+    {chatsQuery.isError ? <p className="text-sm text-destructive">Could not load chats. Check your connection and try again.</p> : null}
+    {chatError ? <Alert variant="destructive"><AlertDescription>{chatError}</AlertDescription></Alert> : null}
+    <Button type="button" disabled={startingChat} onClick={() => void startChat()}>{startingChat ? "Starting chat…" : `New chat with ${companion.name}`}</Button>
   </div> });
   const current = rows.find((row) => row.key === open) ?? null;
   return <>
