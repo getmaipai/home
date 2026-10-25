@@ -31,12 +31,17 @@ if [[ -n "$INSTALL" ]]; then
   TAG="$INSTALL"
   git rev-parse -q --verify "refs/tags/$TAG" >/dev/null || { echo "Tag $TAG does not exist on origin. Fetch tags or check the name." >&2; exit 1; }
 else
-  [[ "$INSTALLED" == "$LATEST" ]] || { echo "The live hub ($INSTALLED) is not on the latest tag ($LATEST): someone tagged without installing. Install $LATEST first with --install $LATEST, or ask the owner." >&2; exit 1; }
+  # scripts/ship.sh labels the live hub sha-<7>, not a tag: that is fine while the commit is on origin/main.
+  if [[ "$INSTALLED" == sha-* ]]; then
+    git merge-base --is-ancestor "${INSTALLED#sha-}" origin/main 2>/dev/null || { echo "The live hub ($INSTALLED) is not a commit on origin/main. Fetch, or ask the owner." >&2; exit 1; }
+  else
+    [[ "$INSTALLED" == "$LATEST" ]] || { echo "The live hub ($INSTALLED) is not on the latest tag ($LATEST): someone tagged without installing. Install $LATEST first with --install $LATEST, or ask the owner." >&2; exit 1; }
+  fi
   [[ -n "$(git log "$LATEST..origin/main" --oneline | head -1)" ]] || { echo "origin/main has no commits after $LATEST; nothing to release." >&2; exit 1; }
   IFS=. read -r MA MI PA <<< "${LATEST#v}"; TAG="v$MA.$MI.$((PA + 1))"
   git ls-remote --tags origin "$TAG" | grep -q . && { echo "$TAG already exists on origin (another session tagged it). Fetch tags and start over." >&2; exit 1; }
 fi
-if [[ "$INSTALLED" != none && "$(version_key "$TAG")" < "$(version_key "$INSTALLED")" && "$DOWNGRADE" != 1 ]]; then
+if [[ "$INSTALLED" != none && "$INSTALLED" != sha-* && "$(version_key "$TAG")" < "$(version_key "$INSTALLED")" && "$DOWNGRADE" != 1 ]]; then
   echo "$TAG is older than the live hub ($INSTALLED): that is a downgrade. Pass --allow-downgrade only if the owner asked for one." >&2; exit 1
 fi
 if [[ -n "$INSTALL" ]]; then WHAT="install the existing tag $TAG"; else WHAT="tag origin/main ($(git log "$LATEST..origin/main" --oneline | wc -l | tr -d ' ') commits since $LATEST) as $TAG"; fi
