@@ -38,8 +38,8 @@ test("the gallery shows character tiles, default check and new companion tile", 
   expect(view.queryByText("Teen companion")).toBeNull();
   expect(view.getAllByText("A cheerful friend.").length).toBe(2);
   expect(view.getByRole("button", { name: "Riff" }).getAttribute("aria-pressed")).toBe("true");
-  expect(view.getByRole("link", { name: "New companion" }).getAttribute("href")).toBe("/companions/new");
-  expect(view.getAllByRole("button", { name: "New companion" }).length).toBe(2);
+  expect(view.queryByRole("link", { name: "New companion" })).toBeNull();
+  expect(view.getAllByRole("button", { name: "New companion" }).length).toBe(1);
   expect(view.queryByText("Made at home")).toBeNull();
   expect(view.queryByText("Draft")).toBeNull();
   expect(view.queryByText("Robots")).toBeNull();
@@ -92,11 +92,11 @@ test("card delete asks for confirmation before deleting a household companion", 
   await waitFor(() => expect(deleted).toEqual(["lively-child"]));
 });
 
-test("an admin sees which companion each robot has, with a link to its settings", async () => {
+test("the gallery does not list robots; robot companions are set in Settings", async () => {
   api.companions = async (): Promise<CompanionList> => ({ allowed: true, can_create: false, can_discover: true, default_id: "lively-child", companions: [card()], robots: [{ id: "d1", name: "StackChan", controls: "child", companion_id: "lively-child", companion_name: "Sprout" }] });
   const view = open("/companions");
-  await waitFor(() => expect(view.getByText(/StackChan: Sprout/)).toBeTruthy());
-  expect(view.getByRole("link", { name: "Companion settings" }).getAttribute("href")).toBe("/settings/apps?tab=robot");
+  await waitFor(() => expect(view.getByText("Sprout")).toBeTruthy());
+  expect(view.queryByText(/StackChan/)).toBeNull();
 });
 
 test("when companions are off for the person the page says so", async () => {
@@ -187,7 +187,8 @@ test("preview tabs show status and activity, and detail tasks are named", async 
   await waitFor(() => expect(yours.getAllByText(/^(Working|Idle|Needs approval)$/).length).toBe(2));
   expect(yours.getByText("Sample activity. Real activity is coming soon.")).toBeTruthy();
   expect(yours.queryByRole("button", { name: "Add" })).toBeNull();
-  expect(yours.getByRole("heading", { name: "Companions" }).parentElement?.parentElement?.contains(yours.getByRole("link", { name: "New companion" }))).toBe(true);
+  expect(yours.getAllByRole("button", { name: "New companion" }).length).toBe(1);
+  expect(yours.queryByRole("link", { name: "New companion" })).toBeNull();
   const discover = yours.getByRole("tab", { name: "Discover" });
   fireEvent.mouseDown(discover, { button: 0 });
   fireEvent.click(discover);

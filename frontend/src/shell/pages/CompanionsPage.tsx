@@ -56,7 +56,7 @@ function companionTileProps({ card, preview = false, discover = false, onDelete,
   };
 }
 
-/** /companions: the companions this person may use, as a card grid. An owner or admin also sees which companion each robot has. */
+/** /companions: the companions this person may use, as a card grid. */
 export function CompanionsPage() {
   useTabItem("Companions");
   const navigate = useNavigate();
@@ -76,7 +76,6 @@ export function CompanionsPage() {
           <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">Companions</h1>
           <p className="text-sm text-muted-foreground">A companion is how your assistant sounds. Pick one, read about it, and make it your default.</p>
         </div>
-        {query.data?.can_create ? <Link to={preview === true ? "/companions/start" : "/companions/new"}><Button>New companion</Button></Link> : null}
       </div>
       <AsyncState
         data={query.isError ? null : query.data}
@@ -134,30 +133,10 @@ export function CompanionsPage() {
                 <AlertDialogFooter><AlertDialogCancel>Cancel</AlertDialogCancel><AlertDialogAction disabled={remove.isPending} onClick={() => { if (deleteTarget) remove.mutate(deleteTarget.id); }}>Delete</AlertDialogAction></AlertDialogFooter>
               </AlertDialogContent>
             </AlertDialog>
-            {data.robots ? <RobotAssignments robots={data.robots} /> : null}
           </>
         )}
       </AsyncState>
     </div>
-  );
-}
-
-function RobotAssignments({ robots }: { robots: NonNullable<CompanionList["robots"]> }) {
-  return (
-    <Section heading="Robots">
-      {robots.length === 0 ? (
-        <p className="text-sm text-muted-foreground">No robots are set up yet.</p>
-      ) : (
-        <ul aria-label="Robots" className="flex list-none flex-col gap-2 p-0">
-          {robots.map((robot) => (
-            <li key={robot.id} className="flex flex-wrap items-center justify-between gap-2">
-              <span>{robot.name}: {robot.companion_name ?? "No companion yet"} <span className="text-sm text-muted-foreground">({robot.controls} controls)</span></span>
-              <Link to={ROBOT_SETTINGS} className="text-sm underline">Companion settings</Link>
-            </li>
-          ))}
-        </ul>
-      )}
-    </Section>
   );
 }
 
