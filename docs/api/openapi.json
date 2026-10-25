@@ -14318,6 +14318,61 @@
                         "line",
                         "days"
                       ]
+                    },
+                    "memory_ledger": {
+                      "type": "object",
+                      "properties": {
+                        "reserved_bytes": {
+                          "type": "number"
+                        },
+                        "warm_bytes": {
+                          "type": "number"
+                        },
+                        "burst_bytes": {
+                          "type": "number"
+                        },
+                        "budget_bytes": {
+                          "type": "number"
+                        },
+                        "working_margin_bytes": {
+                          "type": "number"
+                        },
+                        "free_bytes": {
+                          "type": "number"
+                        },
+                        "queue_depth": {
+                          "type": "object",
+                          "properties": {
+                            "reserved": {
+                              "type": "number"
+                            },
+                            "warm": {
+                              "type": "number"
+                            },
+                            "burst": {
+                              "type": "number"
+                            }
+                          },
+                          "required": [
+                            "reserved",
+                            "warm",
+                            "burst"
+                          ]
+                        },
+                        "chat_paged_out": {
+                          "type": "boolean"
+                        }
+                      },
+                      "required": [
+                        "reserved_bytes",
+                        "warm_bytes",
+                        "burst_bytes",
+                        "budget_bytes",
+                        "working_margin_bytes",
+                        "free_bytes",
+                        "queue_depth",
+                        "chat_paged_out"
+                      ]
                     }
                   },
                   "required": [

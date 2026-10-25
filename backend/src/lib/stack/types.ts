@@ -17,6 +17,18 @@ export interface StackCodingMode {
   memory: { plan_bytes: number; budget_bytes: number };
 }
 
+/** Additive ledger block from GET /stack/v1/memory. Older Stacks omit it. */
+export interface StackMemoryLedger {
+  reserved_bytes: number;
+  warm_bytes: number;
+  burst_bytes: number;
+  budget_bytes: number;
+  working_margin_bytes: number;
+  free_bytes: number;
+  queue_depth: { reserved: number; warm: number; burst: number };
+  chat_paged_out: boolean;
+}
+
 export interface StackVoice {
   id: string; name: string; description: string; language: string; country: string;
   gender: "female" | "male" | "neutral" | "unknown";

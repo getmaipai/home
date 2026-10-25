@@ -13,9 +13,25 @@
 // engines).
 import { isStackConfigured, getStackClient } from "@/lib/stackEngine";
 import { raiseIssue, resolveIssue, registerFixHandler, listIssues, type IssueSeverity } from "@/lib/issues";
-import type { HealthItem } from "@/lib/stack/types";
+import type { HealthItem, StackMemoryLedger } from "@/lib/stack/types";
 
 const HEALTH_KEY_PREFIX = "health.";
+
+/** Read the Stack's additive memory ledger through the existing Stack
+ * client path. Older Stacks and transient read failures simply omit it. */
+export async function readStackMemoryLedger(): Promise<StackMemoryLedger | undefined> {
+  if (!isStackConfigured()) return undefined;
+  try {
+    const ledger = (await getStackClient().memory?.())?.ledger;
+    if (!ledger || ![ledger.reserved_bytes, ledger.warm_bytes, ledger.burst_bytes, ledger.budget_bytes,
+      ledger.working_margin_bytes, ledger.free_bytes].every(Number.isFinite) ||
+      ![ledger.queue_depth?.reserved, ledger.queue_depth?.warm, ledger.queue_depth?.burst].every(Number.isFinite) ||
+      typeof ledger.chat_paged_out !== "boolean") return undefined;
+    return ledger;
+  } catch {
+    return undefined;
+  }
+}
 
 // Issue's own severity enum has no "critical" tier (issue.schema.json:
 // info/warning/error) - the Stack's HealthItem does, so a critical item

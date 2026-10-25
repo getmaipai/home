@@ -190,4 +190,42 @@ describe("StatusPage app-first view", () => {
       expect(view.queryByTestId("chat-pauses")).toBeNull();
     } finally { member.restore(); }
   });
+
+  test("admins see the memory ledger row and paged out warning; members do not", async () => {
+    const history = { generated_at: "2026-10-25T12:00:00.000Z", days: 90, components: [], incidents: [], memory_ledger: {
+      reserved_bytes: 21.5 * 1024 ** 3, warm_bytes: 15.25 * 1024 ** 3, burst_bytes: 42.75 * 1024 ** 3,
+      budget_bytes: 116 * 1024 ** 3, working_margin_bytes: 20 * 1024 ** 3, free_bytes: 36.5 * 1024 ** 3,
+      queue_depth: { reserved: 1, warm: 2, burst: 3 }, chat_paged_out: true,
+    } } satisfies StatusHistory;
+    const adminMock = mockStatus(true, history);
+    try {
+      const admin = renderWithQueryClient(<StatusPage person={makePerson("admin")} />);
+      expect(await admin.findByTestId("memory-ledger")).toBeTruthy();
+      expect(admin.getByText("Memory in use by chat and voice: 21.5 GB")).toBeTruthy();
+      expect(admin.getByText("Kept ready for pictures and tools: 15.3 GB")).toBeTruthy();
+      expect(admin.getByText("Running a big job: 42.8 GB")).toBeTruthy();
+      expect(admin.getByText("Free for jobs: 36.5 GB")).toBeTruthy();
+      expect(admin.getByText("Waiting in line: chat and voice 1, pictures and tools 2, big jobs 3")).toBeTruthy();
+      expect(admin.getByText("Chat is being paged out to disk. Close big apps, or stop a big job.")).toBeTruthy();
+      admin.unmount();
+    } finally { adminMock.restore(); }
+
+    const memberMock = mockStatus(true, history);
+    try {
+      const member = renderWithQueryClient(<StatusPage person={makePerson("adult")} />);
+      await member.findByText("Apps");
+      expect(member.queryByTestId("memory-ledger")).toBeNull();
+      expect(member.queryByText(/Memory in use by chat and voice/)).toBeNull();
+    } finally { memberMock.restore(); }
+  });
+
+  test("an older Stack without ledger data renders no memory row", async () => {
+    const history = { generated_at: "2026-10-25T12:00:00.000Z", days: 90, components: [], incidents: [] } satisfies StatusHistory;
+    const { restore } = mockStatus(true, history);
+    try {
+      const admin = renderWithQueryClient(<StatusPage person={makePerson("admin")} />);
+      await admin.findByText("Apps");
+      expect(admin.queryByTestId("memory-ledger")).toBeNull();
+    } finally { restore(); }
+  });
 });

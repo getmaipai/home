@@ -52,6 +52,7 @@ export function formatUptime(seconds: number): string {
 }
 
 const HEALTH_QUERY_KEY = ["health"];
+const gb = (bytes: number) => (bytes / 1024 ** 3).toFixed(1);
 
 /** The "Last 90 days" key under the Parts title. */
 export function StatusLegend() {
@@ -121,6 +122,19 @@ export function StatusPartsBody({ person, health: initialHealth, maintenance = [
           {ENGINE_HEALTH_ROWS.some((engine) => engine.key === row.key) && engineComputer?.configured && engineComputer.state !== "working" && state.status === "offline" ? <p className="pl-8 text-sm text-muted-foreground">This part cannot reach the engine computer: {engineComputer.reason ?? "the connection is unavailable."}</p> : null}
         </div>;
       })}
+      {history?.memory_ledger ? <div data-testid="memory-ledger" className="flex flex-col gap-2 py-3 sm:gap-2">
+        <div className="flex min-w-0 flex-col gap-2 sm:flex-row sm:items-center sm:justify-between sm:gap-3">
+          <div className="min-w-0"><div className="flex min-h-12 items-center"><span className="font-medium">Memory</span></div><p className="text-sm text-muted-foreground">Memory used by the whole system.</p></div>
+          <div className="flex min-h-12 flex-wrap items-center gap-2 pl-8 text-sm sm:min-h-0 sm:pl-0">
+            <span>Memory in use by chat and voice: {gb(history.memory_ledger.reserved_bytes)} GB</span>
+            <span>Kept ready for pictures and tools: {gb(history.memory_ledger.warm_bytes)} GB</span>
+            <span>Running a big job: {gb(history.memory_ledger.burst_bytes)} GB</span>
+            <span>Free for jobs: {gb(history.memory_ledger.free_bytes)} GB</span>
+            <span>Waiting in line: chat and voice {history.memory_ledger.queue_depth.reserved}, pictures and tools {history.memory_ledger.queue_depth.warm}, big jobs {history.memory_ledger.queue_depth.burst}</span>
+          </div>
+        </div>
+        {history.memory_ledger.chat_paged_out ? <p className="pl-8 text-sm text-attention-fg">Chat is being paged out to disk. Close big apps, or stop a big job.</p> : null}
+      </div> : null}
     <AlertDialog open={pendingRole !== null} onOpenChange={(open) => { if (!open && restartingRole === null) setPendingRole(null); }}>
           <AlertDialogContent><AlertDialogHeader><AlertDialogTitle>Restart {ENGINE_HEALTH_ROWS.find((row) => row.key === pendingRole)?.label ?? "part"}?</AlertDialogTitle><AlertDialogDescription>Anything using it will pause for a moment.{pendingRole === "chat" ? " A reply being written right now will be cut off." : ""}</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel disabled={restartingRole !== null}>Cancel</AlertDialogCancel><Button variant="destructive" onClick={handleRestart} disabled={restartingRole !== null}>{restartingRole !== null ? "Restarting…" : "Restart"}</Button></AlertDialogFooter></AlertDialogContent>
     </AlertDialog>

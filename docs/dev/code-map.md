@@ -707,7 +707,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/stackCodingSync.ts` | CODING_STACK_MAP, isCodingStackKey, codingStackValues, __setCodingSyncClientForTests, pushCodingSettings |
 | `backend/src/lib/stackComponents.ts` | StackComponentError, __setComponentsFetchForTests, listStackComponents, installStackComponent, uninstallStackComponent |
 | `backend/src/lib/stackEngine.ts` | getStackUrl, isRemoteStackSelected, engineComputerAwayFromHome, isStackConfigured, STACK_ROLES, isStackRoleEnabled |
-| `backend/src/lib/stackHealthSync.ts` | syncStackHealthIssues |
+| `backend/src/lib/stackHealthSync.ts` | readStackMemoryLedger, syncStackHealthIssues |
 | `backend/src/lib/stackInstall.ts` | NO_ENGINE_INSTALL, __setEngineInstallRunnerForTests, engineInstallStatus, startEngineInstall |
 | `backend/src/lib/stackRequirement.ts` | STACK_REQUIREMENT_ISSUE, syncStackRequirementIssue |
 | `backend/src/lib/stackRestart.ts` | STACK_BACK_MAX_MS, isStackRestart, waitForStackBack |
