@@ -12,6 +12,10 @@ const companionKey = SettingsKey.parse({
   key: "companions.allowed", scope: "person", selector: "boolean", layers: ["household", "person"], merge: "override",
   default: true, label: "AI companions", help: "AI companions are on by default.", level: "basic", lives_in: "person.companions", honoured_by: ["home"],
 });
+const previewShellKey = SettingsKey.parse({
+  key: "companions.preview_shells", scope: "person", selector: "boolean", layers: ["person"], merge: "override",
+  default: false, label: "Preview the coming companion features", help: "Only you see them.", level: "expert", lives_in: "person.companions", honoured_by: ["home"],
+});
 
 function rosterEntry(id: string, role: string, display_name: string): PersonRosterEntry {
   return { id, role, display_name, age_band: role === "child" ? "child" : role === "teen" ? "teen" : "adult" } as PersonRosterEntry;
@@ -57,6 +61,36 @@ test("the person-editor switch is shown to owner and admin for every role, inclu
       const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
       const view = render(<QueryClientProvider client={client}><MemoryRouter><UsersSection person={{ id: `${role}-id`, role, display_name: "Sage" } as Roster} /></MemoryRouter></QueryClientProvider>);
       await waitFor(() => expect(view.getAllByRole("switch", { name: "AI companions" }).length).toBe(rows.length + 1));
+      view.unmount();
+    }
+  } finally { people.mockRestore(); registry.mockRestore(); values.mockRestore(); siteBlocks.mockRestore(); }
+});
+
+test("preview shells appears only on an owner or admin's own Settings row", async () => {
+  const rows = [rosterEntry("owner", "owner", "Sage"), rosterEntry("admin", "admin", "Avery"), rosterEntry("adult", "adult", "Jordan")];
+  const people = spyOn(api, "people").mockResolvedValue(rows as never);
+  const siteBlocks = noSiteBlocks();
+  const registry = spyOn(api, "settingsRegistry").mockResolvedValue([companionKey, previewShellKey] as never);
+  const values = spyOn(api, "settingsValues").mockImplementation(async (scope, key) => {
+    if (scope === "household") return [{ key: "companions.allowed", value: true, source: "default", label: companionKey.label, help: companionKey.help, level: "basic", secret: false }];
+    if (key === "companions.allowed") return [{ key, value: true, source: "default", label: companionKey.label, help: companionKey.help, level: "basic", secret: false }];
+    if (key === "companions.preview_shells") return [{ key, value: false, source: "default", label: previewShellKey.label, help: previewShellKey.help, level: "expert", secret: false }];
+    return [];
+  });
+  try {
+    for (const actor of [
+      { id: "owner", role: "owner", visible: true },
+      { id: "admin", role: "admin", visible: true },
+      { id: "adult", role: "adult", visible: false },
+      { id: "another-admin", role: "admin", visible: false },
+    ] as const) {
+      const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+      const view = render(<QueryClientProvider client={client}><MemoryRouter><UsersSection person={{ id: actor.id, role: actor.role, display_name: "Sage" } as Roster} /></MemoryRouter></QueryClientProvider>);
+      if (actor.visible) await waitFor(() => expect(view.getAllByRole("switch", { name: previewShellKey.label })).toHaveLength(1));
+      else {
+        await waitFor(() => expect(view.getAllByRole("switch", { name: "AI companions" })).toHaveLength(rows.length + 1));
+        expect(view.queryByRole("switch", { name: previewShellKey.label })).toBeNull();
+      }
       view.unmount();
     }
   } finally { people.mockRestore(); registry.mockRestore(); values.mockRestore(); siteBlocks.mockRestore(); }
