@@ -1,5 +1,7 @@
 # Home: pinning commons and running the gate
 
+> **Current rules (2026-10-24).** A pin bump is one command: `bash scripts/pin.sh commons <pkg>-vX.Y.Z`, `stack <sha>` or `bot <version>`. It edits every file the pin lives in (both `package.json` files, the SHA-256 tables in `install.sh` and `maipai-engine`, `STACK_TAG` and `shared/diskPlan.json`, the bot pin file), runs `bun install --force`, commits and lands through the lander. Do not edit those by hand. What is live is no longer judged on port 8787: the family's hub is the installed app on `localhost:3000`, updated only by `bash scripts/ship.sh`; 8787 and the main checkout are not a place to restart or preview anything (a development hub there blocked the installer three times). A pin or manifest change reaches the live hub when it is shipped; say in the done report whether it was. The text below describes the old manual flow and the old gate; the facts about how pins resolve still hold.
+
 Dev tier. Full text moved out of `AGENTS.md`. Load before bumping a `@maipai/*` pin, resolving a lockfile conflict, changing a bundled manifest, claiming something is live on port 8787, or running `scripts/check.sh` for the first time on a machine.
 
 ## Pinning `getmaipai/commons`, lockfile conflicts and what is live on 8787
