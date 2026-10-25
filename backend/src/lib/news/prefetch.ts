@@ -12,6 +12,7 @@ import { loadContent } from "./article";
 import { fullTextCandidates, viewerOf } from "./data";
 
 let running = false;
+const MAX_SITES_PER_PASS = 8;
 
 /** Scheduler granularity is one minute, deliberately slower than the allowed 30 second floor.
  * Receipts and rolling site counts live in the shelf database and survive prune and process restart.
@@ -27,6 +28,8 @@ export async function prefetchNewsText(deps: { now?: () => number; busy?: () => 
   if (!store) return 0;
   running = true;
   try {
+    const sitesTried = new Set<string>();
+    let tried = 0;
     for (const person of db.select().from(people).where(isNull(people.deletedAt)).all()) {
       if (person.role === "guest" || !person.enabled || person.memorializedAt || !appRouteAllowed(person, "news", "data", "today") || !appRouteAllowed(person, "news", "data", "story")) continue;
       const at = now();
@@ -36,17 +39,20 @@ export async function prefetchNewsText(deps: { now?: () => number; busy?: () => 
         if ((["child", "teen", "adult"] as const).some((variant) => store.getContent(item.id, variant))) continue;
         if (busy() || getHouseholdSettingValue(NEWS_FULL_TEXT_PREFETCH_KEY) !== true) return 0;
         const site = new URL(item.canonical_url).hostname.toLowerCase().replace(/^www\./, "");
+        // One page per site per pass; a pass runs once a minute, so no site is asked more than once in 30 seconds.
+        if (sitesTried.has(site)) continue;
         if (!store.claimPrefetch(item.canonical_url, site, at)) continue;
-        if (!tryConsume("net:news:prefetch", { capacity: 1, refillPerSecond: 1 / 30 }, at)) return 0;
+        if (!tryConsume(`net:news:prefetch:${site}`, { capacity: 1, refillPerSecond: 1 / 30 }, at)) continue;
+        sitesTried.add(site);
         try {
           const loaded = await loadContent(item, band, { store, background: true });
-          store.prefetchOutcome(loaded.source !== "teaser", now());
+          store.prefetchOutcome(loaded.source !== "teaser", now(), site);
         } catch {
-          store.prefetchOutcome(false, now());
+          store.prefetchOutcome(false, now(), site);
         }
-        return 1;
+        if (++tried >= MAX_SITES_PER_PASS) return tried;
       }
     }
-    return 0;
+    return tried;
   } finally { running = false; }
 }

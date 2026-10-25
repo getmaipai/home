@@ -92,7 +92,7 @@ export interface ShelfStore {
   forgetFeed(feedId: string): number;
   /** Atomically reserve one background attempt, including failed fetches. Rolling 24 hour site cap, global pace. */
   claimPrefetch(url: string, site: string, nowMs: number): boolean;
-  prefetchOutcome(ok: boolean, nowMs: number): void;
+  prefetchOutcome(ok: boolean, nowMs: number, site: string): void;
   getEnrichment(itemId: string, band: AgeBand): Enrichment | null;
   putEnrichment(itemId: string, band: AgeBand, value: Enrichment): void;
   count(): number;

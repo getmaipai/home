@@ -2,11 +2,11 @@
 
 Reuse verdict: reuse `loadContent`, `pageHtml`, `fetchCache`, `extractFullArticle`, the shared limiter, the shelf release path, Today ranking and the scheduler. No new fetcher, model call or UI component.
 
-The household setting defaults off. The per-minute core job skips active turns, guests, disabled or deleted profiles, memorialized profiles and people whose app or owning pages are not accessible. Candidate selection uses released cards, explicit follows and Today's hero plus featured set. It writes no read, affinity or interest record. Stored articles of any band are skipped. Prefetched child content uses the child variant and is sentence-gated into blocks and speech again by the existing release path.
+The household setting defaults on (owner, 2026-10-25). The per-minute core job skips active turns, guests, disabled or deleted profiles, memorialized profiles and people whose app or owning pages are not accessible. Candidate selection uses released cards, explicit follows and Today's hero plus featured set. It writes no read, affinity or interest record. Stored articles of any band are skipped. Prefetched child content uses the child variant and is sentence-gated into blocks and speech again by the existing release path.
 
-`prefetchBudget.ts` owns receipt and quiet tables created by the shelf store in `knowledge.db`. A transaction reserves a canonical URL once and checks the global 30 second floor and the site's rolling 24 hour count of 150. The worker also uses the shared limiter. Receipts outlive shelf pruning; deleting the cache database clears them. No person id is stored in the budget tables. A background request never follows redirects or invokes Wayback. A false `robots_ok` cache entry is not used.
+`prefetchBudget.ts` owns receipt and quiet tables created by the shelf store in `knowledge.db`. A transaction reserves a canonical URL once and checks that site's own 30 second floor and its rolling 24 hour count of 150. The worker also uses the shared limiter. Receipts outlive shelf pruning; deleting the cache database clears them. No person id is stored in the budget tables. A background request never follows redirects or invokes Wayback. A false `robots_ok` cache entry is not used.
 
-The first failure or unusable page quiets all background full text for one hour. Further failed probes double the wait to a maximum of one day. The next probe is a different eligible item, never a retry. Foreground opens keep their existing behavior.
+The first failure or unusable page quiets that site's background full text for one hour (other sites carry on). Further failed probes on it double the wait to a maximum of one day. A pass runs once a minute and asks each site at most once. The next probe is a different eligible item, never a retry. Foreground opens keep their existing behavior.
 
 ## Verification
 

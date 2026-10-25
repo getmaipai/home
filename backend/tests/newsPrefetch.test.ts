@@ -27,11 +27,12 @@ afterEach(() => { publisher?.detach(); publisher?.stop(); publisher = undefined;
 const enabled = () => expect(setHouseholdSettingValue("news.full_text_prefetch", true).ok).toBe(true);
 const tick = (at = NOW) => prefetchNewsText({ now: () => at, busy: () => false });
 
-test("off by default: idle fetches nothing, explicit open still fetches once", async () => {
+test("on by default; switched off, idle fetches nothing and an explicit open still fetches once", async () => {
   await owner();
   const item = putItem(feeds.household, ADULT_HOST, { path: "/story/open" });
   publisher = await startPublisher({ "/story/open": articleHtml() }); publisher.attach();
-  expect(NEWS_SETTINGS_KEYS.find((key) => key.key === "news.full_text_prefetch")?.default).toBe(false);
+  expect(NEWS_SETTINGS_KEYS.find((key) => key.key === "news.full_text_prefetch")?.default).toBe(true);
+  setHouseholdSettingValue("news.full_text_prefetch", false);
   expect(await tick()).toBe(0); expect(publisher.requests).toEqual([]);
   expect((await loadContent(item, "adult")).source).toBe("fetched");
   expect(publisher.requests).toEqual(["/story/open"]);
