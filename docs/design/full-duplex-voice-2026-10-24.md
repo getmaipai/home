@@ -5,7 +5,7 @@ like StackChan; then, after a review: "research more and only build on an existi
 if someone ships it (or Home's own firmware or code already does) and names the source. Everything else moved to "Not in this design".
 Four earlier versions are in git history. Design only; nothing here is built.
 
-Architect verdict: not yet run. Needs one before any slice is built. No rule change is asked for.
+Architect verdict: see `data-scratch/architect/DUPLEX-DESIGN-2026-10-24.verdict`. The open point is whether a continuous microphone for a child needs a rule change (Answer, item 6).
 
 ## Answer
 
@@ -19,10 +19,13 @@ Architect verdict: not yet run. Needs one before any slice is built. No rule cha
 4. **Robot: turn on what the firmware already has, then measure.** Section 4.
 5. **No new model is trained or hosted** (owner's answer, 2026-10-24: rules only). Two existing small components are adopted: Silero
    (already in) and Smart Turn v3.2 (one pinned version, as STT-SMARTTURN-01 names it).
-6. **Who gets it.** Adults first. Jesse ruled on 2026-10-14 that he wants natural full duplex for everyone, adults, teens and children,
-   and that it needs a RULES.md change by his word (filed then as VOICE-DUPLEX-01, an id that is not in the repo). CHAT-PARITY-05 still
-   says child profiles do not enable a continuous microphone. Teens and children stay on the current path until Jesse gives that
-   word for this design; the Supersedes section below names the clause that then changes.
+6. **Who gets it: everyone, children first in importance.** Jesse, 2026-10-24, in chat: "kids need full duplex because kids interrupt a
+   lot and dont wait their turn." This matches his 2026-10-14 ruling (natural full duplex for adults, teens and children). Duplex
+   changes when audio plays and stops, never what is said, so every age and surface gate, the child output gate and the spoken-turn
+   limits are untouched. It supersedes the CHAT-PARITY-05 backlog clause that child profiles do not enable a continuous microphone
+   (a backlog clause, not a RULES.md rule). The microphone is open only inside a voice session the child or a parent started, and
+   nothing it hears while Home talks is kept beyond the turn it becomes. Whether a continuous microphone for a child counts as a
+   protection under rule 0 is a question for the architect and Jesse, answered with the ruling.
 7. **Reuse check (why not adopt Pipecat or LiveKit Agents as the controller).** Both are Python pipeline frameworks that own the
    whole turn (STT, model, TTS, transport) and LiveKit's best interruption model is hosted. Home's turn engine, gate, voices and
    package host already own those steps; a second controller would be a second definition of the turn (platform principle 1). Their
@@ -58,7 +61,7 @@ Architect verdict: not yet run. Needs one before any slice is built. No rule cha
 
 ## 3. Browser app and PWA
 
-This section applies to an adult's session. A teen's or child's session keeps the current behavior until Jesse gives his word (Answer, item 6).
+This section applies to every age band's session, with the band's gates and limits unchanged. Children interrupt more and wait less, so the bench measures children's speech separately (section 7, DUPLEX-BENCH-01).
 
 1. **Step zero, before any code (DUPLEX-00, S):** play a reply through the current Web Audio path with `echoCancellation: true` on
    desktop Chrome, Safari and Firefox, and Android Chrome, and measure how much of Home's own voice reaches the microphone (record the
@@ -84,7 +87,7 @@ This section applies to an adult's session. A teen's or child's session keeps th
 
 ## 4. Robots (StackChan first)
 
-Duplex applies only to a robot whose controls are at the adult band. A teen-band, child-band or no-companion robot keeps the wake word and stop word (rule 0: an unknown speaker gets the child result).
+Duplex applies to a robot at any band the admin set, with that band's gates and limits unchanged (rule 0: an unknown speaker gets the child result, and it gets duplex too).
 
 - **What is proven:** the unit's firmware is xiaozhi-esp32 (MIT) and has a realtime listening mode; Espressif documents a full-duplex
   AEC mode for the chip; the bridge already takes uplink during speech when the session reports AEC and measures abort-to-silence.
@@ -132,7 +135,7 @@ Each can come back as its own item if someone ships it or a measurement of ours 
    effects), and nothing is released, spoken or stored until the turn is confirmed (rules 9 and 10). Cancelling an in-flight tool on
    interruption uses the same existing cancel.
 6. **DUPLEX-05 (M, `bot`):** the robot spike.
-7. **DUPLEX-BENCH-01 (M):** a recorded rig: interruptions, "mm-hm" and second voices played at timed offsets into the browser and beside the unit; median and 95th percentile of stop time, wrong stops, wrong resumes, own speech taken for the person, and Home talking over the person.
+7. **DUPLEX-BENCH-01 (M):** a recorded rig: interruptions, "mm-hm" and second voices played at timed offsets into the browser and beside the unit; median and 95th percentile of stop time, run separately on children's speech (higher pitch, shorter words, more overlap; recorded with the demo voices or a parent's consent, kept in `data-scratch`, never in git) as well as adult speech, wrong stops, wrong resumes, own speech taken for the person, and Home talking over the person.
 Order: 00 and 01, then 02 and 03, 05 in parallel, then the bench. Codex first for 02 and 03.
 
 ## 8. Legacy verdicts (rule 8)
@@ -142,9 +145,9 @@ Order: 00 and 01, then 02 and 03, 05 in parallel, then the bench. Codex first fo
 
 ## Supersedes
 
-- `voiceBargeIn`'s rule in `liveVoiceSession.tsx` that any speech after a 400 ms arm delay stops the reply: **replaced for adults** by section 3 (teens and children keep the current behavior) (0.5 s of speech, a 1.0 s cooldown, pause then decide).
-- The silence-timer end of turn in `sttSession.ts`: **replaced for adults** by Smart Turn v3.2 (section 3).
+- `voiceBargeIn`'s rule in `liveVoiceSession.tsx` that any speech after a 400 ms arm delay stops the reply: **replaced** by section 3 (0.5 s of speech, a 1.0 s cooldown, pause then decide).
+- The silence-timer end of turn in `sttSession.ts`: **replaced** by Smart Turn v3.2 (section 3).
 - STT-SMARTTURN-01: its endpointer half (Smart Turn v3.2, the 800 ms reopen window, the Silero hysteresis and the off-until-measured flag) **moves** to DUPLEX-02; its speculative start stays in the STT-SMARTTURN-01 backlog row, which keeps one owner for it.
 - VOICE-LOOP-01's barge-in numbers: 0.6 s confirm is **replaced** by 0.5 s (LiveKit's default, re-measured); "stop phrases bypass" and "backchannels never stop" are **kept**; duck 0.35 and 0.75, the 0.7 s re-arm grace and the self-echo at 0.8 overlap are **dropped** for the browser (pause replaces duck; the bench measures the rest) and **kept** for the robot until its spike reports.
 - "Listen only after the reply ends": **dropped** once DUPLEX-03 lands.
-- CHAT-PARITY-05's clause that child profiles do not enable a continuous microphone: **unchanged** by this design; it changes only if Jesse gives his word to extend duplex to children (2026-10-14 ruling), by his rule change.
+- CHAT-PARITY-05's clause that child profiles do not enable a continuous microphone: **superseded** by this design on Jesse's word (2026-10-14 ruling, restated 2026-10-24 in chat). The row is edited when the first slice lands.
