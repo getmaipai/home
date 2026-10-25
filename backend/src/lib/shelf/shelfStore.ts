@@ -33,6 +33,7 @@ CREATE TABLE IF NOT EXISTS shelf_item (
   provenance TEXT NOT NULL
 );
 CREATE INDEX IF NOT EXISTS shelf_item_fetched ON shelf_item (fetched_at);
+CREATE INDEX IF NOT EXISTS shelf_item_recent ON shelf_item (COALESCE(published_at, fetched_at) DESC, canonical_url);
 CREATE TABLE IF NOT EXISTS shelf_item_feed (
   canonical_url TEXT NOT NULL,
   feed_id TEXT NOT NULL,
@@ -96,6 +97,8 @@ export interface ShelfStore {
   getEnrichment(itemId: string, band: AgeBand): Enrichment | null;
   putEnrichment(itemId: string, band: AgeBand, value: Enrichment): void;
   count(): number;
+  /** Test support: SQLite's plan for the same ordering used by list(). */
+  explainListPlan(): string[];
   close(): void;
 }
 
@@ -255,6 +258,9 @@ export function openShelfStore(path: string): ShelfStore {
     ...enrichmentStore(sqlite),
     count() {
       return total.get()?.n ?? 0;
+    },
+    explainListPlan() {
+      return sqlite.query<{ detail: string }, []>("EXPLAIN QUERY PLAN SELECT * FROM shelf_item ORDER BY COALESCE(published_at, fetched_at) DESC, canonical_url LIMIT 500").all().map((row) => row.detail);
     },
     close() {
       sqlite.close();

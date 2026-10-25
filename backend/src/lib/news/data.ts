@@ -40,6 +40,22 @@ const ROWS_PAGE = 20;
 const ROWS_MAX = 60;
 const SHELF_MAX = 8;
 const FILTERS_MAX = 9;
+const RELEASED_MEMO_MS = 10_000;
+const releasedMemo = new Map<AgeBand, { expiresAt: number; shelfCount: number; visibleFeeds: string; items: ShelfItem[] }>();
+
+function releasedForBand(band: AgeBand, store: ReturnType<typeof sharedShelfStore>): ShelfItem[] {
+  if (!store || !shelfEnabled()) { releasedMemo.delete(band); return []; }
+  const now = Date.now();
+  const shelfCount = store.count();
+  const visibleFeeds = visibleFeedIds(band).join(",");
+  const cached = releasedMemo.get(band);
+  if (cached && cached.expiresAt > now && cached.shelfCount === shelfCount && cached.visibleFeeds === visibleFeeds) return cached.items;
+  const items = releaseShelfItems(band, CANDIDATES, store);
+  releasedMemo.set(band, { expiresAt: now + RELEASED_MEMO_MS, shelfCount, visibleFeeds, items });
+  return items;
+}
+
+export const __releasedForBandForTests = releasedForBand;
 
 export function viewerOf(person: PersonRow, now = new Date()): Viewer {
   return { personId: person.id, band: speakerAgeBand(person, now) };
@@ -104,7 +120,7 @@ export function withKicker(card: StoryCard, band: AgeBand, hero = false): StoryC
 
 function feedBlock(env: CardEnv, request: FeedRequest, now: Date): unknown[] {
   const band = env.viewer.band;
-  const items = releaseShelfItems(band, CANDIDATES, env.store)
+  const items = releasedForBand(band, env.store)
     .filter((item) => ageMs(item, now) <= request.windowH * HOUR_MS && (!request.match || request.match(item)));
   const cards = new Map<string, StoryCard>();
   const byItem = new Map<string, ShelfItem>();
@@ -151,7 +167,7 @@ function channelShelf(env: CardEnv, followed: { topics: Set<string>; sources: Se
   const labels = feedLabels();
   for (const id of [...followed.sources].sort()) { const label = labels.get(id); if (label && env.visibleFeeds.has(id)) channels.push({ kind: "source", key: id, label }); }
   if (channels.length === 0) return [];
-  const items = releaseShelfItems(env.viewer.band, CANDIDATES, env.store).filter((item) => ageMs(item, now) <= TODAY_WINDOW_H * HOUR_MS);
+  const items = releasedForBand(env.viewer.band, env.store).filter((item) => ageMs(item, now) <= TODAY_WINDOW_H * HOUR_MS);
   const stories: StoryCard[] = [];
   const used = new Set(shown);
   for (const channel of channels.slice(0, SHELF_MAX)) {
@@ -222,7 +238,7 @@ export async function channelData(person: PersonRow, body: Record<string, unknow
     if (!topic || !topicOfferedTo(key, viewer.band)) return null;
     title = topic.label;
     sectionStyle = topic.section_style;
-    const sources = new Set(releaseShelfItems(viewer.band, CANDIDATES, env.store).filter((item) => (item.topics ?? []).includes(key)).map((item) => item.publisher));
+    const sources = new Set(releasedForBand(viewer.band, env.store).filter((item) => (item.topics ?? []).includes(key)).map((item) => item.publisher));
     subtitle = sources.size > 0 ? `${sources.size} ${sources.size === 1 ? "source" : "sources"}` : undefined;
     match = (item) => (item.topics ?? []).includes(key);
   } else {
@@ -300,7 +316,7 @@ export function storiesTodayLabel(count: number): string {
 export function topicRows(person: PersonRow, now = new Date()): RowsData {
   const viewer = viewerOf(person, now);
   const store = sharedShelfStore();
-  const items = store && shelfEnabled() ? releaseShelfItems(viewer.band, CANDIDATES, store).filter((item) => ageMs(item, now) <= ROWS_WINDOW_H * HOUR_MS) : [];
+  const items = store && shelfEnabled() ? releasedForBand(viewer.band, store).filter((item) => ageMs(item, now) <= ROWS_WINDOW_H * HOUR_MS) : [];
   const followed = followedChannels(person.id).topics;
   return topicsFor(viewer.band).map((topic) => {
     const count = items.filter((item) => (item.topics ?? []).includes(topic.id)).length;
@@ -329,7 +345,7 @@ export function sourceRows(person: PersonRow, now = new Date()): RowsData {
   const viewer = viewerOf(person, now);
   const visible = new Set(visibleFeedIds(viewer.band));
   const store = sharedShelfStore();
-  const items = store && shelfEnabled() ? releaseShelfItems(viewer.band, CANDIDATES, store).filter((item) => ageMs(item, now) <= ROWS_WINDOW_H * HOUR_MS) : [];
+  const items = store && shelfEnabled() ? releasedForBand(viewer.band, store).filter((item) => ageMs(item, now) <= ROWS_WINDOW_H * HOUR_MS) : [];
   const followed = followedChannels(person.id).sources;
   return listFeeds().filter((feed) => visible.has(feed.id)).map((feed) => {
     const list = FEED_LISTS.find((candidate) => candidate.package_id === feed.package_id);
@@ -363,7 +379,7 @@ export function pictureCandidates(person: PersonRow, now = new Date()): ShelfIte
   if (person.role === "guest" || !person.enabled || person.deletedAt || person.memorializedAt || !shelfEnabled()) return [];
   const env = cardEnv(viewerOf(person, now));
   if (!env) return [];
-  return releaseShelfItems(env.viewer.band, CANDIDATES, env.store)
+  return releasedForBand(env.viewer.band, env.store)
     .filter((item) => !!item.image_url && ageMs(item, now) <= TODAY_WINDOW_H * HOUR_MS)
     .sort((a, b) => publishedAtOf(b).localeCompare(publishedAtOf(a)))
     .slice(0, 40);
@@ -375,7 +391,7 @@ export function fullTextCandidates(person: PersonRow, now = new Date()): ShelfIt
   const env = cardEnv(viewerOf(person, now));
   if (!env) return [];
   const followed = followedChannels(person.id);
-  const items = releaseShelfItems(env.viewer.band, CANDIDATES, env.store)
+  const items = releasedForBand(env.viewer.band, env.store)
     .filter((item) => ageMs(item, now) <= TODAY_WINDOW_H * HOUR_MS);
   const inputs = items.flatMap((item) => {
     const card = cardOf(item, env);

@@ -13,6 +13,21 @@ import { bumpShelfCounter } from "./shelfCounters";
 import { bandOkAllowedFor, feedOfferedTo, feedVisibleTo, shelfEnabled, tickedByBand } from "./shelfPolicy";
 import { sharedShelfStore, type ShelfItem, type ShelfStore } from "./shelfStore";
 
+const FLOOR_MEMO_MS = 60_000;
+let floorMemo = new Map<string, { trips: boolean; expiresAt: number }>();
+
+function tripsMinorFloorMemo(text: string): boolean {
+  const now = Date.now();
+  const entry = floorMemo.get(text);
+  if (entry && entry.expiresAt > now) return entry.trips;
+  if (entry) floorMemo.delete(text);
+  const trips = tripsMinorFloor(text);
+  floorMemo.set(text, { trips, expiresAt: now + FLOOR_MEMO_MS });
+  return trips;
+}
+
+export function __resetFloorMemoForTests(): void { floorMemo.clear(); }
+
 /** The ids of every feed whose items may reach this user type right now. */
 export function visibleFeedIds(band: AgeBand): string[] {
   if (!shelfEnabled()) return [];
@@ -42,7 +57,7 @@ export function releaseShelfItems(band: AgeBand, limit: number, store: ShelfStor
   const candidates = store.list(feedIds, bandOkAllowedFor(band), band === "adult" ? limit : limit * 3);
   const released: ShelfItem[] = [];
   for (const item of candidates) {
-    if (band !== "adult" && tripsMinorFloor(item.summary ? `${item.title}. ${item.summary}` : item.title)) {
+    if (band !== "adult" && tripsMinorFloorMemo(item.summary ? `${item.title}. ${item.summary}` : item.title)) {
       bumpShelfCounter("release_floor_dropped", band);
       continue;
     }
@@ -62,7 +77,7 @@ export function releaseShelfItem(band: AgeBand, id: string, store: ShelfStore | 
   const visible = new Set(visibleFeedIds(band));
   if (!store.feedIdsOf(item.canonical_url).some((feedId) => visible.has(feedId))) return null;
   if (!bandOkAllowedFor(band).includes(item.band_ok)) return null;
-  if (band !== "adult" && tripsMinorFloor(item.summary ? `${item.title}. ${item.summary}` : item.title)) {
+  if (band !== "adult" && tripsMinorFloorMemo(item.summary ? `${item.title}. ${item.summary}` : item.title)) {
     bumpShelfCounter("release_floor_dropped", band);
     return null;
   }
