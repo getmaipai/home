@@ -4,8 +4,9 @@ import { Alert, AlertDescription } from "@maipai/ui/src/ui/alert";
 import { Progress } from "@maipai/ui/src/dashboard/components/ui/progress";
 import { Button } from "@maipai/ui/src/ui/button";
 import { Card, CardContent } from "@maipai/ui/src/dashboard/components/ui/card";
+import { Badge } from "@maipai/ui/src/dashboard/components/ui/badge";
 import { AsyncState } from "@maipai/ui/src/primitives/AsyncState";
-import { GRID_COLUMNS } from "@maipai/ui/src/responsive";
+import { CharacterTile } from "@maipai/ui/src/primitives/CharacterTile";
 import { ApiError, api } from "@/lib/api";
 import { CompanionStateContents } from "@/shell/pages/CompanionStateCard";
 
@@ -18,6 +19,7 @@ export function CompanionStatesTab({ id, active }: { id: string; active: boolean
   const client = useQueryClient();
   const query = useQuery({ queryKey: key(id), queryFn: () => api.companionStates(id), enabled: active, retry: false });
   const [runId, setRunId] = useState<string | null>(null);
+  const [openId, setOpenId] = useState<string | null>(null);
   const [error, setError] = useState("");
   const data = query.data;
   useEffect(() => { if (data?.run?.job) setRunId(data.run.job); }, [data?.run?.job]);
@@ -53,7 +55,8 @@ export function CompanionStatesTab({ id, active }: { id: string; active: boolean
     </section>
     {running ? <section aria-label="Clip run progress" className="flex flex-col gap-2"><p>{run?.label ?? data.run?.label ?? "Starting clip run"}</p><Progress value={run?.percent ?? data.run?.percent ?? 0} aria-label={run?.label ?? "Clip run progress"} /><Button type="button" variant="outline" onClick={() => void perform(async () => { await api.stopCompanionStateRun(id, runId!); setRunId(null); void client.invalidateQueries({ queryKey: key(id) }); })}>Stop</Button></section> : null}
     {runQuery.isError ? <Alert variant="destructive"><AlertDescription>{errorText(runQuery.error)}</AlertDescription></Alert> : null}
-    <ul aria-label="Companion states" className={`grid list-none gap-4 p-0 ${GRID_COLUMNS.default}`}>{data.states.map((state) => <li key={state.id}><Card><CardContent><CompanionStateContents id={id} state={state} busy={running} startReady={data.start_ready} sheetReady={data.sheet_ready} onAction={perform} onError={setError} /></CardContent></Card></li>)}</ul>
+    <ul aria-label="Companion states" className="grid list-none grid-cols-2 justify-items-center gap-4 p-0 sm:grid-cols-3 lg:grid-cols-4">{data.states.map((state) => <li key={state.id}><CharacterTile name={state.label} seed={state.id} media={state.approved ? <img src={state.approved.urls.still} alt="" className="size-full object-cover" /> : undefined} status={state.approved ? <Badge>In use</Badge> : state.required ? <Badge>Required</Badge> : undefined} selected={openId === state.id} onSelect={() => setOpenId((current) => current === state.id ? null : state.id)} /></li>)}</ul>
+    {openId ? (() => { const openState = data.states.find((state) => state.id === openId); return openState ? <Card><CardContent><CompanionStateContents id={id} state={openState} busy={running} startReady={data.start_ready} sheetReady={data.sheet_ready} onAction={perform} onError={setError} /></CardContent></Card> : null; })() : null}
     {error ? <Alert variant="destructive"><AlertDescription>{error}</AlertDescription></Alert> : null}
   </div>;
 }
