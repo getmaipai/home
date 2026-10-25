@@ -4,7 +4,7 @@ import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
 import { AsyncState } from "@maipai/ui/src/primitives/AsyncState";
 import { EmptyState } from "@maipai/ui/src/primitives/EmptyState";
 import { Section } from "@maipai/ui/src/primitives/Section";
-import { Avatar } from "@maipai/ui/src/primitives/Avatar";
+import { CharacterHero } from "@maipai/ui/src/elements/character-hero";
 import { DestructiveConfirm } from "@maipai/ui/src/primitives/DestructiveConfirm";
 import { Badge } from "@maipai/ui/src/dashboard/components/ui/badge";
 import { Alert, AlertDescription } from "@maipai/ui/src/ui/alert";
@@ -73,12 +73,11 @@ export function CompanionEditorPage() {
   const companion = query.data;
   const mutationError = error || (save.isError ? errorText(save.error) : status.isError ? errorText(status.error) : remove.isError ? errorText(remove.error) : copy.isError ? errorText(copy.error) : "");
   if (!isNew && query.isError && query.error instanceof ApiError && query.error.status === 404) return <EmptyState icon="user" text="That companion is not yours to edit. Open it from the Companions app, or make a copy." />;
-  return <div className="flex flex-col gap-6" data-testid="companion-editor">
+  return <>
     <Link to="/companions" className="text-sm underline">All companions</Link>
-    <header className="flex flex-wrap items-center gap-3">
-      {!isNew && companion ? <Avatar name={companion.name} size="profile" /> : null}
-      <h1 className="mr-auto text-2xl font-bold">{form.name || "New companion"}</h1>
-    </header>
+    <h1 className="sr-only">{form.name || "New companion"}</h1>
+    <CharacterHero sticky name={form.name || "New companion"} seed={id} />
+    <div className="flex flex-col gap-6" data-testid="companion-editor">
     <AsyncState data={isNew ? true : query.isError ? null : companion} error={!isNew && query.isError} isFetching={query.isFetching} onRetry={() => query.refetch()} errorMessage={query.error instanceof ApiError ? query.error.message : "Could not reach Home. Check your connection and try again."} loadingLabel="Loading companion">
       {() => <>
         <header className="flex flex-wrap items-center gap-3">{companion ? <><Badge>{companion.status === "draft" ? "Draft" : "Ready"}</Badge><Badge>{audienceWords(form.audience)}</Badge>{companion.look?.sheet_state === "approved" ? <Badge>Look: Approved</Badge> : null}{companion.states ? <Badge>Clips: {companion.states.approved} of {companion.states.total}</Badge> : null}</> : null}
@@ -112,7 +111,8 @@ export function CompanionEditorPage() {
         {confirmDelete ? <DestructiveConfirm message={`Delete ${form.name}?`} confirmLabel="Delete" busyLabel="Deleting" busy={remove.isPending} onConfirm={() => remove.mutate()} onCancel={() => setConfirmDelete(false)} /> : null}
       </>}
     </AsyncState>
-  </div>;
+    </div>
+  </>;
 }
 function StringRows({ label, values, max, min = 0, error, onChange }: { label: string; values: string[]; max: number; min?: number; error?: string; onChange: (values: string[]) => void }) { const base = label.toLowerCase().replaceAll(" ", "-"); return <fieldset className="flex flex-col gap-2"><legend className="text-base font-medium">{label} ({values.length}{min ? `, at least ${min}` : ""}/{max})</legend>{values.map((value, i) => <div className="flex gap-2" key={i}><Input id={`${base} ${i + 1}`} aria-label={`${label} ${i + 1}`} aria-invalid={Boolean(error)} value={value} onChange={(e) => onChange(values.map((item, j) => j === i ? e.target.value : item))} />{i === 0 && error ? <span role="alert" className="self-center text-sm text-destructive">{error}</span> : null}<Button type="button" variant="outline" onClick={() => onChange(values.filter((_, j) => i !== j))}>Remove</Button></div>)}{!values.length && error ? <p role="alert" className="text-sm text-destructive">{error}</p> : null}{values.length < max ? <Button type="button" variant="outline" onClick={() => onChange([...values, ""])}>Add {label.toLowerCase().includes("interest") ? "interest" : label === "Pronouns" ? "pronoun" : "line"}</Button> : null}</fieldset>; }
 function VoicePicker({ value, error, onChange }: { value: string; error?: string; onChange: (value: string) => void }) {

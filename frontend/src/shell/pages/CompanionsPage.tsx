@@ -4,7 +4,7 @@ import { Link, useNavigate, useParams } from "react-router-dom";
 import { AsyncState } from "@maipai/ui/src/primitives/AsyncState";
 import { EmptyState } from "@maipai/ui/src/primitives/EmptyState";
 import { Section } from "@maipai/ui/src/primitives/Section";
-import { Avatar } from "@maipai/ui/src/primitives/Avatar";
+import { CharacterHero } from "@maipai/ui/src/elements/character-hero";
 import { CharacterTile } from "@maipai/ui/src/primitives/CharacterTile";
 import { Badge } from "@maipai/ui/src/dashboard/components/ui/badge";
 import { Alert, AlertDescription } from "@maipai/ui/src/ui/alert";
@@ -239,20 +239,15 @@ function DetailSetup({ companion, saved, copy, save, headerOnly = false, aboutOn
   return (
     <>
       {!aboutOnly ? <>
-      <div className="flex flex-col items-start gap-4 sm:flex-row sm:items-center">
-        <Avatar name={companion.name} size="profile" />
-        <div className="flex min-w-0 flex-1 flex-col gap-1">
-          <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">{companion.name}</h1>
-          <p className="text-muted-foreground">{companion.tagline}</p>
-          <div className="flex flex-wrap gap-2"><Badge>{companion.type_label}</Badge>{saved ? <Badge>Your default</Badge> : null}</div>
-        </div>
-        <div className="flex flex-wrap items-center gap-2 sm:ml-auto">
+      <>
+      <h1 className="sr-only">{companion.name}</h1>
+      <CharacterHero name={companion.name} seed={companion.id} line={<><span>{companion.tagline}</span><div className="flex flex-wrap justify-center gap-2"><Badge>{companion.type_label}</Badge>{saved ? <Badge>Your default</Badge> : null}</div></>} actions={<>
           {preview ? <Button type="button" disabled title="Coming soon">Chat</Button> : null}
           {companion.can_edit ? <Link to={`/companions/${encodeURIComponent(companion.id)}/edit`}><Button type="button" variant="ghost" size="icon" aria-label="Companion settings" title="Companion settings"><SettingsIcon /></Button></Link> : null}
           {companion.can_copy ? <Button type="button" variant="outline" disabled={copy.isPending} onClick={() => copy.mutate()}>{companion.is_household ? "Make a copy" : "Edit a copy"}</Button> : null}
           <Button type="button" disabled={saved || save.isPending} onClick={() => save.mutate()}>{saved ? "Your default" : "Set as my default"}</Button>
-        </div>
-      </div>
+      </>} />
+      </>
       {save.isError ? <Alert variant="destructive"><AlertDescription>{save.error instanceof ApiError ? save.error.message : "Could not save this. Check your connection and try again."}</AlertDescription></Alert> : null}
       {copy.isError ? <Alert variant="destructive"><AlertDescription>{copy.error instanceof ApiError ? copy.error.message : "Could not reach Home. Check your connection and try again."}</AlertDescription></Alert> : null}
       </> : null}
