@@ -19,7 +19,7 @@ Seen in the screenshots:
 2. **Messages.** The dot's replies are dark rounded bubbles with no avatar and no name; the person's are muted blue rounded
    bubbles on the right. "Read 10:50" sits under the person's last bubble. A date line ("Today 9:15 AM") centres above the
    first message.
-3. **First message** is two short bubbles: "Hey! I'm your dot." then one sentence on how to reach it.
+3. **First message** is two short bubbles: "Hey, I'm your dot." then one sentence on how to reach it.
 4. **Create page.** One centred column on the page background: a large round character, a large title ("Create your dot"), one
    grey sentence, then three rows of icon tile (rounded square, soft fill), bold line and grey explanation, then one wide white
    pill button "Continue". No card borders, no boxes around the column.
