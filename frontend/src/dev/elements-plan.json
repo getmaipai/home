@@ -4041,6 +4041,60 @@
       "replacesHandBuilt": [],
       "realTurnToday": false,
       "verdictReason": "Home has no creation, share or visibility flow yet; defer until a Home screen needs it, then adopt without a Home-side wrapper."
+    },
+    {
+      "file": "CharacterShowcase.tsx",
+      "name": "CharacterShowcase",
+      "group": "character",
+      "verdict": "support",
+      "verdictReason": "Developer-only story fixture for the companion character parts (COMPANIONS-DOTS-01), covered by the Commons tests; not a standalone Home product surface.",
+      "backendNeeded": null,
+      "effort": null,
+      "specTagNeeded": false,
+      "newDependency": false,
+      "size": "S",
+      "showcaseScenario": null,
+      "batch": null,
+      "replacesHandBuilt": [],
+      "realTurnToday": false
+    },
+    {
+      "file": "character-hero.tsx",
+      "name": "character-hero",
+      "group": "character",
+      "verdict": "wire-now",
+      "verdictReason": "The detail page and the editor strip lead with the large round character and name pill (DOTS-DETAIL-01); adopted as shipped with props only.",
+      "bindings": [
+        "companion detail hero"
+      ],
+      "backendNeeded": null,
+      "effort": null,
+      "specTagNeeded": false,
+      "newDependency": false,
+      "size": "S",
+      "showcaseScenario": null,
+      "batch": null,
+      "replacesHandBuilt": [],
+      "realTurnToday": false
+    },
+    {
+      "file": "chat-header.tsx",
+      "name": "chat-header",
+      "group": "character",
+      "verdict": "wire-now",
+      "verdictReason": "The chat header shows the companion over a name pill with menu and call buttons (DOTS-CHAT-01); adopted as shipped with props only.",
+      "bindings": [
+        "chat header"
+      ],
+      "backendNeeded": null,
+      "effort": null,
+      "specTagNeeded": false,
+      "newDependency": false,
+      "size": "S",
+      "showcaseScenario": null,
+      "batch": null,
+      "replacesHandBuilt": [],
+      "realTurnToday": false
     }
   ]
 }
