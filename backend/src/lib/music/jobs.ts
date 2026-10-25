@@ -16,6 +16,7 @@ import { startSongCover } from "./cover";
 import { modelStampFor } from "./models";
 import { provenanceFor } from "./commercial";
 import { refuseMusicPrompt } from "./policy";
+import { jobQueueCopy } from "@/lib/jobQueueCopy";
 import { activeMusicJobsFor, dropMusicJob, dropTemporaryMusicConversation, getMusicJobFor, jobsForConversation, forgetRemovedMusicJob, liveJobs, memory, pendingMusicJobs, pruneMusicJobs, saveMusicJob, temporarySongs, watching } from "./store";
 export { getMusicJobFor, musicJobIdsByTurn, __resetMusicJobsForTests } from "./store";
 export type { MusicJob, MusicRequest } from "./types";
@@ -29,7 +30,7 @@ export function plainMusicFailure(code: string): string {
     case "coding_mode": return "Home is busy with a big job right now, so pictures, videos and songs are paused. Please try again later.";
     case "already_making": return "You already have a song being made. Wait for it to finish, or stop it first.";
     case "storage_full": return `${prefix} Your storage is full. Delete some files in Settings, Storage, then try again.`;
-    case "no_memory": return `${prefix} Paused: this computer is low on memory. Close big apps, or try again in a few minutes.`;
+    case "no_memory": return `${prefix} ${jobQueueCopy("failed_memory", "low_memory_failure", null, null, "adult")}`;
     case "not_installed": return `${prefix} No music model is installed. An admin can add one in Settings, Pictures, videos and music.`;
     case "not_available_on_this_computer": return `${prefix} This computer can't run the music model. Try on a computer that can.`;
     case "source_not_made_here": return "I can only edit a song made here in this chat. Ask me to make one first.";

@@ -10,6 +10,7 @@ import { createAttachment, getTemporaryChatImage, latestGeneratedTemporaryImage,
 import { newFileId, newVideoJobId } from "@/lib/id";
 import { nextHlc } from "@/lib/hlc";
 import { refreshHouseholdQueue, registerQueueProvider, type QueueJob } from "@/lib/jobs/householdQueue";
+import { jobQueueCopy } from "@/lib/jobQueueCopy";
 import type { PersonRow } from "@/types";
 import { allVideoAdapters } from "./adapters";
 import { checkImages, isAdultOnlyJob } from "@/lib/pictures/ageCheck";
@@ -80,19 +81,13 @@ export interface VideoJob {
 /** The plain line a failed video starts with. It says what happened and what to do; the Stack's own sentence is used when it has one. */
 export const VIDEO_FAILED_PREFIX = "I couldn't make that video.";
 
-/** The line a queued job shows while the Stack is busy with another picture or video. */
-export function busyLine(position: number | null): string {
-  const base = "Home is busy making another picture, video or song. It will start in a minute.";
-  return position && position > 1 ? `${base} You are number ${position} in line.` : base;
-}
-
 export function plainVideoFailure(error: unknown): string {
   if (error instanceof StackVideoError) {
     switch (error.code) {
       case "coding_mode": return "Home is busy with a big job right now, so pictures, videos and songs are paused. Please try again later.";
       case "already_making": return `${VIDEO_FAILED_PREFIX} ${error.message}`;
       case "queue_full": return `${VIDEO_FAILED_PREFIX} Home already has a full line of videos waiting. Try again in a few minutes.`;
-      case "no_memory": case "out_of_memory": return `${VIDEO_FAILED_PREFIX} Paused: this computer is low on memory. Close big apps, or try again in a few minutes.`;
+      case "no_memory": case "out_of_memory": return `${VIDEO_FAILED_PREFIX} ${jobQueueCopy("failed_memory", "low_memory_failure", null, null, "adult")}`;
       case "not_installed": case "model_missing": case "setup_failed": return `${VIDEO_FAILED_PREFIX} No video model is installed on this computer yet. An admin can add one in Settings, Pictures, videos and music.`;
       case "not_available_on_this_computer": case "unsupported": return `${VIDEO_FAILED_PREFIX} This computer can't make videos. Videos need a Mac with 128 GB of memory.`;
       case "unreachable": case "no_stack": return `${VIDEO_FAILED_PREFIX} The video engine isn't answering. Check that the engine is running, then try again.`;

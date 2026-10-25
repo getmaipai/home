@@ -155,7 +155,7 @@ describe("VIDEO-GEN-05: the call, the job and the stored clip", () => {
       const { value } = await streamValue(people.owner, "make a short video of a paper boat in the rain");
       await until(() => getVideoJobFor(people.owner, value.video!.id)?.phase === "waiting for memory");
       const card = videoCardView(people.owner, getVideoJobFor(people.owner, value.video!.id)!, true);
-      expect(card.items[0]!.label).toContain("Home is busy making another picture, video or song. It will start in a minute.");
+      expect(card.items[0]!.label).toBe("You are next.");
       // The household queue is the one definition of the place in line (MEMMGMT slice 16): alone in the line this job is next, so no number is shown.
       expect(card.items[0]!.label).not.toContain("in line");
       await until(() => getVideoJobFor(people.owner, value.video!.id)?.state === "done");
@@ -189,7 +189,7 @@ describe("VIDEO-GEN-05: the call, the job and the stored clip", () => {
       const { value } = await streamValue(people.owner, "make a short video of a paper boat");
       expect(value.reply.text).toBe("I started it for you.");
       await until(() => getVideoJobFor(people.owner, value.video!.id)?.state === "failed");
-      expect(getVideoJobFor(people.owner, value.video!.id)!.error).toContain("Paused: this computer is low on memory");
+      expect(getVideoJobFor(people.owner, value.video!.id)!.error).toContain("The computer ran low on memory, so the job stopped. Try again when there is room.");
     });
   });
 

@@ -8,7 +8,8 @@ import { apiRouter, errorResponses } from "@/lib/openapi";
 import { requireAuth, requireRole } from "@/middleware/auth";
 import { speakerAgeBand } from "@/lib/ageBand";
 import { PENDING, videoAdaptersFor, allVideoAdapters, dropVideoAdapterCache, forgetVideoAdapterPref, setVideoAdapterEnabled } from "@/lib/videos/adapters";
-import { cancelVideoJob, clipUrl, getVideoJobFor, plainVideoFailure, posterUrl, readVideoFile, startVideoJob, videoJobsForTurn, busyLine, type VideoJob } from "@/lib/videos/jobs";
+import { cancelVideoJob, clipUrl, getVideoJobFor, plainVideoFailure, posterUrl, readVideoFile, startVideoJob, videoJobsForTurn, type VideoJob } from "@/lib/videos/jobs";
+import { jobQueueCopy } from "@/lib/jobQueueCopy";
 import { promptRefusalLineFor } from "@/lib/pictures/ageCheck";
 import { CHILD_NEGATIVE_PROMPT, CHILD_NO_PHOTOS_LINE, CHILD_VIDEO_LIMIT_LINE, forceCartoon, kidsDailyVideos, laneOf, releaseKid, reserveKid, videoModelForLane, videosMadeToday } from "@/lib/pictures/lane";
 import { adultVideoAdaptersAllowed, householdAllowsVideo, refuseVideoPrompt, stackAudienceFor, videoAdapterAudiencesFor, videoDenial, VIDEO_DENIAL_LINE, VIDEO_REFUSAL_LINE, type VideoAudience } from "@/lib/videos/policy";
@@ -62,9 +63,10 @@ const ItemSchema = z.object({
 });
 const CardSchema = z.object({ id: z.string(), conversation_id: z.string().nullable(), items: z.array(ItemSchema), can_make_another: z.boolean(), limits: z.string() });
 
-function phaseLabel(job: VideoJob): string {
+function phaseLabel(job: VideoJob, audience: "adult" | "child"): string {
+  if (job.phase === "paused while chat is working") return jobQueueCopy("paused_chat", "paused_chat", null, null, audience);
   if (job.phase === "paused: low memory") return "Paused: low memory";
-  if (job.state === "queued" || job.phase === "queued" || job.phase === "waiting for memory") return busyLine(job.position);
+  if (job.state === "queued" || job.phase === "queued" || job.phase === "waiting for memory") return jobQueueCopy("queued", job.riseReason ?? "queue", job.position, job.estimateSeconds ?? null, audience);
   if (job.phase === "setting up") return "Setting up the video model for the first time";
   if (job.phase === "starting" || job.phase === "loading") return "Getting the video model ready";
   if (job.phase === "rendering") return "Drawing the frames";
@@ -86,7 +88,7 @@ function itemView(job: VideoJob, actor: PersonRow, ready: { quick: boolean; deta
   const file = job.state === "done" ? job.files[0] : undefined;
   return {
     id: job.id, state: job.state, percent: job.state === "done" ? 100 : job.percent,
-    label: job.state === "queued" ? phaseLabel(job) : job.state === "running" ? getLive(job.id)?.stageLabel ?? phaseLabel(job) : "",
+    label: job.state === "queued" ? phaseLabel(job, laneOfPerson(actor) === "child" ? "child" : "adult") : job.state === "running" ? getLive(job.id)?.stageLabel ?? phaseLabel(job, laneOfPerson(actor) === "child" ? "child" : "adult") : "",
     position: job.position,
     ...(job.state === "running" ? (({ eta_seconds, step, steps, preview_url }) => ({ eta_seconds, step, steps, preview_url: laneOfPerson(actor) === "adult" ? preview_url : null }))(liveCardFields(job.id, (version) => `/api/videos/jobs/${encodeURIComponent(job.id)}/preview?v=${version}`)) : { eta_seconds: null, step: null, steps: null, preview_url: null }), started_at: new Date(job.createdAt).getTime(), prompt: job.prompt, kind: job.kind,
     error: job.state === "failed" ? job.error : null,

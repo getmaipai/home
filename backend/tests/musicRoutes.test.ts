@@ -105,7 +105,7 @@ describe("music routes", () => {
     const out = await runGenerateMusic({ state: musicState(actor, true), args: { description: "a folk tune" }, callId: "g", spoken: false });
     const id = musicForOutcomes([out])!.id;
     const queued = await (await client.get(`/api/music/jobs/${id}`)).json() as { stage_label: string; stages: Array<{ id: string; label: string }> };
-    expect(queued.stage_label).toContain("Home is busy making another picture, video or song.");
+    expect(queued.stage_label).toContain("You are number");
     expect(queued.stages).toEqual([
       { id: "queued", label: "Queued" }, { id: "model", label: "Loading" }, { id: "planning", label: "Planning" },
       { id: "making", label: "Making" }, { id: "mixing", label: "Mixing" }, { id: "finishing", label: "Finishing" },

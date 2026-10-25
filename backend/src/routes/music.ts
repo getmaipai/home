@@ -16,6 +16,8 @@ import { speakerAgeBand } from "@/lib/ageBand";
 import type { PersonRow } from "@/types";
 import type { AppEnv } from "@/types";
 import { musicDenial, musicViewDenial, MUSIC_DENIAL_LINE } from "@/lib/music/policy";
+import { jobQueueCopy } from "@/lib/jobQueueCopy";
+import { laneOf } from "@/lib/pictures/lane";
 import { musicEngineStatus, musicStatusReady } from "@/lib/music/ready";
 import { cancelMusicJob, getMusicJobFor, musicVersions, openMusicFile, plainMusicFailure, startMusicJob, useMusicVersion, type MusicFileHandle, type MusicJob } from "@/lib/music/jobs";
 import { lengthOf, prepareMusicEdit } from "@/lib/music/tool";
@@ -23,8 +25,6 @@ import { refuseMusicPrompt, MUSIC_REFUSAL_LINE } from "@/lib/music/policy";
 import { StackMusicError } from "@/lib/music/stack";
 import { sungLyricsFromLrc, withoutLastLines } from "@/lib/music/sections";
 import { commercialUseOf, COMMERCIAL_REFUSAL_LINE } from "@/lib/music/commercial";
-import { busyLine } from "@/lib/videos/jobs";
-import { laneOf } from "@/lib/pictures/lane";
 import { refusePrompt } from "@/lib/pictures/policy";
 export const musicRoutes = apiRouter();
 export function musicRouteAudience(actor: PersonRow) { return { actor, band: speakerAgeBand(actor, new Date()), surface: "chat" as const, surfaceClass: "written" as const, spoken: false }; }
@@ -83,9 +83,10 @@ export function musicStageIndex(job: MusicJob): number {
   return lastKnownMusicStage.get(job.id) ?? 0;
 }
 const warnedMusicStages = new Set<string>();
-export function musicStageLabel(job: MusicJob): string {
+export function musicStageLabel(job: MusicJob, audience: "adult" | "child" = "adult"): string {
   if (job.stage == null || job.stage === "") return "";
-  if (job.state === "queued" && job.stage === "queued") return busyLine(job.position);
+  if (job.state === "queued" && job.stage === "queued") return jobQueueCopy("queued", "queue", job.position, null, audience);
+  if (job.stage === "paused") return jobQueueCopy("paused_chat", "paused_chat", null, null, audience);
   if (job.stage === "longer") return ["queued", "running"].includes(job.state) ? "Making it longer so every line fits" : "";
   const label = MUSIC_STAGE_LABELS[job.stage];
   if (!label && !warnedMusicStages.has(job.stage)) {
@@ -124,7 +125,7 @@ export async function musicCardView(actor: PersonRow, input: Omit<MusicJob, "cov
     stage_index: musicStageIndex(root), started_at: Date.parse(root.createdAt),
     cover_pending: coverPending,
     cover_url: covers.at(-1)?.url ?? null, cover_versions: covers,
-    id: root.id, state: root.state, stage: root.stage, stage_label: musicStageLabel(root), progress: root.progress,
+    id: root.id, state: root.state, stage: root.stage, stage_label: musicStageLabel(root, laneOf(musicRouteAudience(actor)) === "child" ? "child" : "adult"), progress: root.progress,
     cut: (current ?? root).request.cut ?? null, max_seconds: (current ?? root).request.max_seconds ?? null,
     eta_seconds: root.etaSeconds, position: root.position, error_line: root.errorLine,
     versions: versions.map((job, index) => ({ id: job.fileId!, label: `Version ${index + 1}`, url: musicFileUrl(job) })),

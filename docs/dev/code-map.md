@@ -401,6 +401,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/interruptedReply.ts` | noteInterruptedReply, takeInterruptedReply, mayCarryInterruptedReply, dropInterruptedReply, __clearInterruptedRepliesForTests |
 | `backend/src/lib/issues.ts` | __setReminderTimingForTests, __resetReminderTimersForTests, __setMaintenanceNowForTests, raiseIssue, resolveIssue, listIssues |
 | `backend/src/lib/jobProducers.ts` | mapStackJobToHomeJob, mapModelDownloadStackJob, modelDownloadJobsAsHomeJobs, listStackModelDownloadJobs, registerProducerJob, updateProducerJob |
+| `backend/src/lib/jobQueueCopy.ts` | JOB_QUEUE_COPY, jobQueueCopy |
 | `backend/src/lib/jobs.ts` | visibleJobFor, createJob, updateJob, listJobsForViewer, listJobsForViewerLive, canStopJob |
 | `backend/src/lib/jobs/householdQueue.ts` | order, writePositions, registerQueueProvider, refreshHouseholdQueue |
 | `backend/src/lib/keystore.ts` | getOrCreateHexKey, markKeychainProvisioned, wasKeychainProvisioned |
@@ -784,7 +785,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/utteranceShape.ts` | COURTESY_PREFIX, QUESTION_OPENER, commandOpenersFrom, readClauses, utteranceShape, shapeFromReading |
 | `backend/src/lib/validation.ts` | validateDisplayName, validateSecret |
 | `backend/src/lib/videos/adapters.ts` | __resetVideoAdapterCacheForTests, dropVideoAdapterCache, PENDING, allVideoAdapters, videoAdaptersFor, setVideoAdapterEnabled |
-| `backend/src/lib/videos/jobs.ts` | VIDEO_FAILED_PREFIX, busyLine, plainVideoFailure, getVideoJobFor, videoJobsForTurn, videoJobIdsByTurn |
+| `backend/src/lib/videos/jobs.ts` | VIDEO_FAILED_PREFIX, plainVideoFailure, getVideoJobFor, videoJobsForTurn, videoJobIdsByTurn, readVideoFile |
 | `backend/src/lib/videos/messagesCopy.ts` | videoFileName, videoTitle, hasAudioTrack, messagesCopyOf, __resetMessagesCopiesForTests |
 | `backend/src/lib/videos/policy.ts` | VIDEO_ENABLED_KEY, VIDEO_ADULT_ADAPTERS_KEY, VIDEO_QUALITY_KEY, VIDEO_DENIAL_LINE, VIDEO_NOT_HERE_LINE, householdAllowsVideo |
 | `backend/src/lib/videos/quality.ts` | QUICK_BASE, DETAILED_BASE, QUICK_MAX_SECONDS, DETAILED_MAX_SECONDS, isVideoQuality, qualityOfBase |
