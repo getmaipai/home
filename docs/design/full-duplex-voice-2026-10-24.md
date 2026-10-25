@@ -66,7 +66,12 @@ This section applies to every age band's session, with the band's gates and limi
 1. **Step zero, before any code (DUPLEX-00, S):** play a reply through the current Web Audio path with `echoCancellation: true` on
    desktop Chrome, Safari and Firefox, and Android Chrome, and measure how much of Home's own voice reaches the microphone (record the
    microphone track). This decides whether the loopback workaround below is needed. Nothing else in this section assumes the answer.
-2. **If Chrome does not cancel Web Audio output:** play replies through the local `RTCPeerConnection` loopback into an `<audio>`
+   **Measured 2026-10-24 (Jesse, Chrome 155 on a MacBook Pro, built-in speakers, loud volume, `bun run duplex:echo`):** echo with echo
+   cancellation on is below the room noise for both Web Audio (-6.6 dB average, -4.8 dB worst 100 ms) and the loopback (-5.1 and -3.4);
+   the control with cancellation off is 31.3 dB, so the test could hear the speaker; talking over Home, his voice averages 19.1 dB and
+   peaks at 38.2 dB over the room, so it is not removed with the echo. Result for desktop Chrome on macOS: no loopback needed.
+   Safari, Firefox, Android Chrome and iPhone are not yet measured.
+2. **If a browser does not cancel Web Audio output (not Chrome on macOS, measured above):** play replies through the local `RTCPeerConnection` loopback into an `<audio>`
    element (the Mozilla Hubs pattern), on Chromium only.
 3. **Settings copied from LiveKit and Pipecat, as starting values:** speech must last 0.5 s over Home's voice before it counts; during
    the first 1.0 s after Home starts speaking, plain voice detection decides; stop words and a minimum of three words bypass the 0.5 s
