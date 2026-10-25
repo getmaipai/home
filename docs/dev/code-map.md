@@ -547,7 +547,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/pictures/ageCheck.ts` | minorRefusalLine, uncheckedRefusalLine, VERDICT_SCHEMA, AGE_CHECK_SYSTEM_PROMPT, parseVerdict, MIN_ADULT_CONFIDENCE |
 | `backend/src/lib/pictures/audience.ts` | routeAudience |
 | `backend/src/lib/pictures/editSources.ts` | TEEN_PHOTO_LINE, SUBJECT_NOT_ALLOWED_LINE, prepareEditSource |
-| `backend/src/lib/pictures/editTool.ts` | GENERATE_IMAGE_TOOL_ID, EDIT_KINDS, latestPictureId, runEditPicture |
+| `backend/src/lib/pictures/editTool.ts` | GENERATE_IMAGE_TOOL_ID, EDIT_KINDS, nameEditModel, latestPictureId, runEditPicture |
 | `backend/src/lib/pictures/jobStore.ts` | PICTURE_FAILED_PREFIX, plainFailure, saveJob, markLive, markSettled, getPictureJob |
 | `backend/src/lib/pictures/jobs.ts` | __resetPictureJobsForTests, startPictureJob, __setPicturePollMsForTests, stopLikenessPictureJobs, cancelPictureJob, resumePictureJobs |
 | `backend/src/lib/pictures/keyframes.ts` | ensureKeyframeHelper, __setKeyframesForTests, __resetKeyframeHelperForTests, keyframeCount, extractKeyframes |
@@ -556,7 +556,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/pictures/minorLine.ts` | MINOR_MARKERS, SEXUAL_WORDS, UNCLOTHED_PHRASES, normalise, hasWord, mentionsSexualWord |
 | `backend/src/lib/pictures/people.ts` | PeopleError, NO_PEOPLE_LINE, PEOPLE_UNAVAILABLE_LINE, PEOPLE_UNSURE_LINE, PEOPLE_BUSY_LINE, RETRY_PAUSE_MS |
 | `backend/src/lib/pictures/policy.ts` | GENERATION_ADULTS_KEY, GENERATION_ADULT_ADAPTERS_KEY, PEOPLE_PROMPTS_KEY, peoplePromptsOn, peopleGuidanceSuffix, NO_PEOPLE_PROMPTS_GUIDANCE |
-| `backend/src/lib/pictures/quality.ts` | QUICK_MODEL, DETAILED_MODEL, qualityOfModel, isPictureQuality, detailedReady, chooseQuality |
+| `backend/src/lib/pictures/quality.ts` | QUICK_MODEL, ERNIE_MODEL, DETAILED_MODEL, qualityOfModel, isPictureQuality, quickModelFor |
 | `backend/src/lib/pictures/ready.ts` | __setPictureStatusForTests, pictureEngineStatus, dropPictureStatusCache, pictureEngineReady, readyStatusForTests, pictureNotReadyReason |
 | `backend/src/lib/pictures/stack.ts` | StackPicturesError, __setPicturesFetchForTests, submitGeneration, submitEdit, getGenerationJob, fetchPicturePreview |
 | `backend/src/lib/pictures/tool.ts` | PICTURE_SIZES, audienceOf, refusalFor, runGenerateImage |

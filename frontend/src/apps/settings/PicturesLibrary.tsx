@@ -75,14 +75,14 @@ function PictureModelSection({ overview, refresh }: { overview: AdminOverview; r
             <Item>
               <ItemContent>
                 <ItemTitle>Quick</ItemTitle>
-                <ItemDescription clamp={false}>A picture in a few seconds. It also changes pictures you already have.</ItemDescription>
+                <ItemDescription clamp={false}>Clear words in about 15 to 25 seconds. It also changes pictures you already have.</ItemDescription>
               </ItemContent>
               <ItemActions><Badge variant="secondary">On this computer</Badge></ItemActions>
             </Item>
             <Item>
               <ItemContent>
                 <ItemTitle>Detailed</ItemTitle>
-                <ItemDescription clamp={false}>Takes 15 to 30 seconds. Finer detail, and many more styles to add.{detailed && !detailed.installed && !detailed.available ? " This computer does not have the memory for it." : ""}</ItemDescription>
+                <ItemDescription clamp={false}>Takes about 30 to 45 seconds. Finer detail, and many more styles to add.{detailed && !detailed.installed && !detailed.available ? " This computer does not have the memory for it." : ""}</ItemDescription>
               </ItemContent>
               <ItemActions>
                 {detailed?.installed ? <Badge variant="secondary">On this computer</Badge>
@@ -100,7 +100,7 @@ function PictureModelSection({ overview, refresh }: { overview: AdminOverview; r
               <Table aria-label="Quick compared with Detailed">
                 <TableHeader><TableRow><TableHead /><TableHead>Quick</TableHead><TableHead>Detailed</TableHead></TableRow></TableHeader>
                 <TableBody>
-                  <TableRow><TableHead scope="row">Time</TableHead><TableCell>A few seconds</TableCell><TableCell>About 15 to 30 seconds</TableCell></TableRow>
+                  <TableRow><TableHead scope="row">Time</TableHead><TableCell>About 15 to 25 seconds</TableCell><TableCell>About 30 to 45 seconds</TableCell></TableRow>
                   <TableRow><TableHead scope="row">Look</TableHead><TableCell>Clean and sharp. Good for most pictures and for words in a picture.</TableCell><TableCell>Finer detail, skin and fur that look real.</TableCell></TableRow>
                   <TableRow><TableHead scope="row">Styles</TableHead><TableCell>A few to choose from.</TableCell><TableCell>Many more, including most styles shared online.</TableCell></TableRow>
                   <TableRow><TableHead scope="row">Changing a picture</TableHead><TableCell>Yes (Edit)</TableCell><TableCell>No. Edit always uses Quick.</TableCell></TableRow>

@@ -15,7 +15,8 @@ import { useDefaultScriptedStack } from "./stackFixture";
 import { withStub } from "./turnMachine/toolHarness";
 import { getPictureJob, startPictureJob } from "@/lib/pictures/jobs";
 import { __setPictureStatusForTests, readyStatusForTests } from "@/lib/pictures/ready";
-import { chooseQuality, detailedReady } from "@/lib/pictures/quality";
+import { chooseQuality, detailedReady, ERNIE_MODEL, QUICK_MODEL, qualityOfModel, QUALITY_NOTE_LINE } from "@/lib/pictures/quality";
+import { nameEditModel } from "@/lib/pictures/editTool";
 import { cardView } from "@/routes/pictures";
 import { adaptersFor, __resetAdapterCacheForTests } from "@/lib/pictures/adapters";
 import type { ChatCompletionRequest } from "@maipai/spec/llm/ts/types.js";
@@ -30,6 +31,7 @@ let people: BenchPeople;
 let fake: FakeImageStack;
 
 const KLEIN = { id: "flux2-klein-4b", family: "flux2", installed: true, licence: "Apache-2.0", loras: true, edit: true, steps_default: 4, peak_gb: 13.5 };
+const ERNIE = { id: ERNIE_MODEL, family: "ernie-image-turbo", installed: true, available: true, licence: "Apache-2.0", edit: false, steps_default: 8, peak_gb: 18.8 };
 const ZIMAGE = { id: "z-image-turbo", family: "z-image", installed: true, licence: "Apache-2.0", loras: true, edit: false, steps_default: 9, peak_gb: 34 };
 const ZIMAGE_LORA = { ...TEST_LORAS[0]!, id: "lora-cccccccccccccccc", name: "Technicolor", sha256: "c".repeat(64), base_model: "z-image-turbo", trigger_words: ["technicolor"] };
 
@@ -81,6 +83,21 @@ describe("chooseQuality", () => {
   test("no ask and no setting is Quick with no model named", () => {
     expect(chooseQuality({ engine: withZ, household: "quick" })).toEqual({ quality: "quick", note: null, announce: false });
   });
+  test("Quick uses ERNIE when installed and available, while Detailed remains Z-Image", () => {
+    expect(chooseQuality({ engine: { models: [KLEIN, ERNIE, ZIMAGE] }, household: "quick" })).toEqual({ quality: "quick", model: ERNIE_MODEL, note: null, announce: false });
+    expect(chooseQuality({ requested: "detailed", engine: { models: [KLEIN, ERNIE, ZIMAGE] } })).toMatchObject({ quality: "detailed", model: "z-image-turbo" });
+  });
+  test("Quick leaves model selection to the Stack when ERNIE is missing or unavailable", () => {
+    expect(chooseQuality({ engine: withZ, household: "quick" })).toEqual({ quality: "quick", note: null, announce: false });
+    expect(chooseQuality({ engine: { models: [{ ...ERNIE, available: false }] }, household: "quick" })).toEqual({ quality: "quick", note: null, announce: false });
+    expect(chooseQuality({ engine: { models: [{ ...ERNIE, installed: false }] }, household: "quick" })).toEqual({ quality: "quick", note: null, announce: false });
+  });
+  test("model ids map to the two person-facing qualities", () => {
+    expect(qualityOfModel(ERNIE_MODEL)).toBe("quick");
+    expect(qualityOfModel(QUICK_MODEL)).toBe("quick");
+    expect(qualityOfModel("z-image-turbo")).toBe("detailed");
+    expect(qualityOfModel("unknown")).toBeNull();
+  });
   test("the household's Detailed uses Detailed when it is installed, and falls back to Quick with a note when it is not", () => {
     expect(chooseQuality({ engine: withZ, household: "detailed" })).toMatchObject({ quality: "detailed", model: "z-image-turbo", note: null });
     expect(chooseQuality({ engine: withoutZ, household: "detailed" })).toEqual({ quality: "quick", note: "detailed_not_installed", announce: false });
@@ -95,10 +112,18 @@ describe("chooseQuality", () => {
     expect(chooseQuality({ style: { base_model: "z-image-turbo" }, engine: withZ, household: "detailed" })).toMatchObject({ quality: "detailed", note: null });
     expect(chooseQuality({ style: { base_model: "flux2-klein-4b" }, requested: "detailed", engine: withZ })).toMatchObject({ quality: "quick", note: "style_needs_quick" });
     expect(chooseQuality({ style: { base_model: "flux2-klein-4b" }, engine: withZ, household: "detailed" })).toMatchObject({ quality: "quick", note: null });
+    expect(chooseQuality({ style: { base_model: ERNIE_MODEL }, engine: { models: [KLEIN, ERNIE, ZIMAGE] }, household: "quick" })).toMatchObject({ quality: "quick", model: QUICK_MODEL });
   });
 });
 
 describe("the chat tool", () => {
+  test("an installed ERNIE is named for a new Quick picture", async () => {
+    __setPictureStatusForTests(readyStatusForTests({ models: [KLEIN, ERNIE, ZIMAGE] }));
+    await run({});
+    expect(fake.submitted[0]!.model).toBe(ERNIE_MODEL);
+    await until(() => fake.jobs.length > 0);
+  });
+
   test("a plain request is Quick: the Stack is told no model", async () => {
     await run({});
     expect(fake.submitted[0]!.model).toBeUndefined();
@@ -139,6 +164,20 @@ describe("the chat tool", () => {
     expect(fake.submitted[0]!.model).toBe("flux2-klein-4b");
     expect(told).toContain("only works with Quick");
   });
+
+  test("all edit forms explicitly name Klein", () => {
+    const form = new FormData();
+    nameEditModel(form);
+    expect(form.get("model")).toBe(QUICK_MODEL);
+  });
+});
+
+test("changed person-facing picture copy contains no model names", async () => {
+  const settings = await Bun.file(new URL("../src/settings/pictureKeys.ts", import.meta.url)).text();
+  const manifest = await Bun.file(new URL("../packages/generate_image/manifest.json", import.meta.url)).text();
+  const frontend = await Bun.file(new URL("../../frontend/src/apps/settings/PicturesLibrary.tsx", import.meta.url)).text();
+  const personFacing = [settings.match(/help: "Quick draws[^"]+"/)?.[0], settings.match(/quick: "Clear words[^"]+"/)?.[0], settings.match(/detailed: "About 30 to 45[^"]+"/)?.[0], QUALITY_NOTE_LINE.detailed_not_installed, QUALITY_NOTE_LINE.style_needs_detailed, QUALITY_NOTE_LINE.style_needs_quick, JSON.parse(manifest).args.properties.quality.description, frontend.match(/Clear words in about[^<]+/)?.[0], frontend.match(/About 15 to 25 seconds[^<]+/)?.[0]].join(" ");
+  expect(personFacing).not.toMatch(/Klein|ERNIE|Z-Image/i);
 });
 
 describe("the card and its switch", () => {
@@ -170,8 +209,11 @@ describe("the card and its switch", () => {
     expect(again.status).toBe(200);
     expect(fake.submitted.at(-1)!.model).toBe("z-image-turbo");
     await until(() => getPictureJob(actor, job.id)?.state === "done" && fake.jobs.every((j) => j.state === "done"));
+    const before = fake.submitted.length;
     const kept = await client.post(`/api/pictures/jobs/${job.id}/variation`, {});
     expect(kept.status).toBe(200);
+    // The household queue submits a job when its turn comes, so wait for the Stack to receive it.
+    await until(() => fake.submitted.length > before);
     expect(fake.submitted.at(-1)!.model).toBeUndefined();
   });
 });

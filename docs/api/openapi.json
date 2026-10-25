@@ -50784,7 +50784,7 @@
                         "quick",
                         "detailed"
                       ],
-                      "description": "Which maker made it: Quick (a few seconds) or Detailed (slower, finer, more styles)."
+                      "description": "Which kind made it: Quick (about 15 to 25 seconds) or Detailed (slower, finer, more styles)."
                     },
                     "switch_to": {
                       "type": "string",
@@ -51117,7 +51117,7 @@
                         "quick",
                         "detailed"
                       ],
-                      "description": "Which maker made it: Quick (a few seconds) or Detailed (slower, finer, more styles)."
+                      "description": "Which kind made it: Quick (about 15 to 25 seconds) or Detailed (slower, finer, more styles)."
                     },
                     "switch_to": {
                       "type": "string",
@@ -51418,7 +51418,7 @@
                         "quick",
                         "detailed"
                       ],
-                      "description": "Which maker made it: Quick (a few seconds) or Detailed (slower, finer, more styles)."
+                      "description": "Which kind made it: Quick (about 15 to 25 seconds) or Detailed (slower, finer, more styles)."
                     },
                     "switch_to": {
                       "type": "string",

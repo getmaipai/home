@@ -55,7 +55,7 @@ describe("Pictures and videos settings view", () => {
     expect(v.getByText("Detailed is chosen, but it is not ready")).toBeTruthy();
     fireEvent.click(v.getByRole("button", { name: "What is the difference?" }));
     await waitFor(() => expect(v.getByRole("table", { name: "Quick compared with Detailed" })).toBeTruthy());
-    expect(v.getByText("About 15 to 30 seconds")).toBeTruthy();
+    expect(v.getByText("About 30 to 45 seconds")).toBeTruthy();
     fireEvent.click(v.getByRole("button", { name: "Details" }));
     await waitFor(() => expect(v.getByText("FLUX.2 Klein 4B")).toBeTruthy());
     fireEvent.click(v.getByRole("button", { name: "Get Detailed pictures (32.8 GB)" }));

@@ -31,9 +31,15 @@ import { asksToUndress, peopleGuidanceSuffix, peoplePromptsOn, PROMPT_REFUSAL_LI
 import { startPictureJob, plainFailure } from "./jobs";
 import { pictureEngineStatus } from "./ready";
 import { cancelOrDelete, fetchPicture, getGenerationJob, StackPicturesError, submitEdit, type StackPic } from "./stack";
+import { QUICK_MODEL } from "./quality";
 
 export const GENERATE_IMAGE_TOOL_ID = "generate_image";
 export const EDIT_KINDS = ["remove_people", "remove_background", "upscale", "change"] as const;
+
+/** Every Stack edit operation, including reference edits, is handled by Klein. */
+export function nameEditModel(form: FormData): void {
+  form.set("model", QUICK_MODEL);
+}
 
 export { WHO_IS_IN_PHOTO_LINE };
 const NOT_FOUND_LINE = "I can't find that picture any more. Attach it again and ask once more.";
@@ -266,6 +272,7 @@ async function runEditPictureUnmetered(input: RunEditInput): Promise<ToolExecuti
     const form = new FormData();
     form.append("image", new File([new Uint8Array(base.bytes)], "picture", { type: base.mediaType }));
     form.append("operation", "edit");
+    nameEditModel(form);
     form.append("instruction", kid ? `${instruction}. Keep it a friendly children's cartoon drawing, not a photograph.` : instruction);
     form.append("image_source", baseSource);
     if (basePrep.proof) form.append("consent_proof", basePrep.proof);
@@ -305,6 +312,7 @@ async function maskedFill(base: SourcePicture, mask: Uint8Array, instruction: st
   form.append("image", new File([new Uint8Array(base.bytes)], "picture", { type: base.mediaType }));
   form.append("mask", new File([new Uint8Array(mask)], "mask.png", { type: "image/png" }));
   form.append("operation", "edit_masked");
+  nameEditModel(form);
   form.append("instruction", instruction);
   form.append("image_source", "generated");
   form.append("timeout_ms", "1");

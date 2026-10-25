@@ -40,7 +40,7 @@ const JobSchema = z.object({
   error: z.string().nullable(),
   files: z.array(FileSchema),
   can_vary: z.boolean(),
-  quality: z.enum(["quick", "detailed"]).describe("Which maker made it: Quick (a few seconds) or Detailed (slower, finer, more styles)."),
+  quality: z.enum(["quick", "detailed"]).describe("Which kind made it: Quick (about 15 to 25 seconds) or Detailed (slower, finer, more styles)."),
   switch_to: z.enum(["quick", "detailed"]).nullable().describe("The other kind this picture can be made again as, or null (it uses a style made for one kind, or the other kind is not on this computer)."),
   size: z.string().describe("The size being made, like 1024x1024."),
   stop_id: z.string().describe("The id to POST to /jobs/{id}/cancel to stop what is being made now."),

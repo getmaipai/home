@@ -1,16 +1,22 @@
-// IMGGEN-QUALITY-01 (owner ruling 2026-10-17): the person-facing picture choice. "Quick" is FLUX.2 Klein 4B (about 4 s) and
-// the default; "Detailed" is Z-Image-Turbo (13 to 30 s, finer detail, the large community library of styles). The words
-// "Klein" and "Z-Image" never reach a person outside the Details disclosure; this file is the one place that maps the two.
+// IMGGEN-QUALITY-01: Quick and Detailed are the person-facing choices. New Quick pictures use ERNIE when installed, otherwise
+// the Stack's Klein default; Detailed uses Z-Image. Model names stay in the Details disclosure and this internal mapping.
 // Rule 0 is untouched: the age and surface gates ran before anything here.
 import { householdPictureQuality } from "./policy";
 import type { StackImageStatus } from "./stack";
 
 export type PictureQuality = "quick" | "detailed";
 export const QUICK_MODEL = "flux2-klein-4b";
+export const ERNIE_MODEL = "ernie-image-turbo";
 export const DETAILED_MODEL = "z-image-turbo";
 
-export const qualityOfModel = (model: string | null | undefined): PictureQuality | null => (model === DETAILED_MODEL ? "detailed" : model === QUICK_MODEL ? "quick" : null);
+export const qualityOfModel = (model: string | null | undefined): PictureQuality | null => (model === DETAILED_MODEL ? "detailed" : model === QUICK_MODEL || model === ERNIE_MODEL ? "quick" : null);
 export const isPictureQuality = (value: unknown): value is PictureQuality => value === "quick" || value === "detailed";
+
+/** ERNIE is text-to-picture only. If it is not ready, leave Quick unnamed so the Stack uses its existing Klein default. */
+export function quickModelFor(engine: Pick<StackImageStatus, "models"> | null): string | undefined {
+  const model = engine?.models.find((m) => m.id === ERNIE_MODEL);
+  return model?.installed && model.available !== false ? ERNIE_MODEL : undefined;
+}
 
 /** Why the quality is not the one that was wanted, as a code the tool turns into one sentence for the model to relay. */
 export type QualityNote = "detailed_not_installed" | "style_needs_detailed" | "style_needs_quick" | null;
@@ -46,7 +52,8 @@ export function chooseQuality(input: { requested?: PictureQuality | undefined; s
     if (detailedReady(input.engine)) return { quality: "detailed", model: DETAILED_MODEL, note: null, announce: input.requested === "detailed" };
     return { quality: "quick", note: "detailed_not_installed", announce: false };
   }
-  return { quality: "quick", note: null, announce: false };
+  const model = quickModelFor(input.engine);
+  return { quality: "quick", ...(model ? { model } : {}), note: null, announce: false };
 }
 
 /** The line the model relays for a quality note (plain words, no model names). */
