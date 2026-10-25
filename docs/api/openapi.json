@@ -21245,6 +21245,68 @@
         }
       }
     },
+    "/api/performance/perf": {
+      "get": {
+        "tags": [
+          "Performance"
+        ],
+        "summary": "Recent slow requests and event loop lag",
+        "responses": {
+          "200": {
+            "description": "Current lag and the last 50 slow request lines.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "lag": {
+                      "type": "object",
+                      "properties": {
+                        "max_ms": {
+                          "type": "number"
+                        },
+                        "p99_ms": {
+                          "type": "number"
+                        },
+                        "over_s": {
+                          "type": "number"
+                        }
+                      },
+                      "required": [
+                        "max_ms",
+                        "p99_ms",
+                        "over_s"
+                      ]
+                    },
+                    "slow_requests": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      },
+                      "maxItems": 50
+                    }
+                  },
+                  "required": [
+                    "lag",
+                    "slow_requests"
+                  ]
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not owner",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/performance": {
       "get": {
         "tags": [
