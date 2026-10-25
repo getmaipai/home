@@ -22,6 +22,32 @@ function fakeAudioContext() { return new FakeAudioContext() as unknown as AudioC
 
 async function settle() { await new Promise((resolve) => setTimeout(resolve, 0)); }
 
+class StreamingFakeAudioContext extends FakeAudioContext {
+  decoded = 0;
+  buffers: number[] = [];
+  createBuffer(_channels: number, length: number, sampleRate: number) {
+    this.buffers.push(length);
+    return { duration: length / sampleRate, getChannelData: () => new Float32Array(length) } as unknown as AudioBuffer;
+  }
+  async decodeAudioData() { this.decoded++; return { duration: 2 } as AudioBuffer; }
+}
+
+function wavHeader(channels = 1, rate = 24_000, bits = 16): Uint8Array {
+  const bytes = new Uint8Array(44);
+  const view = new DataView(bytes.buffer);
+  view.setUint32(0, 0x52494646, false); view.setUint32(4, 0x7fffffff, true); view.setUint32(8, 0x57415645, false);
+  view.setUint32(12, 0x666d7420, false); view.setUint32(16, 16, true); view.setUint16(20, 1, true); view.setUint16(22, channels, true);
+  view.setUint32(24, rate, true); view.setUint32(28, rate * channels * (bits / 8), true); view.setUint16(32, channels * (bits / 8), true); view.setUint16(34, bits, true);
+  view.setUint32(36, 0x64617461, false); view.setUint32(40, 0x7fffffff, true);
+  return bytes;
+}
+
+function controlledStream() {
+  let controller!: ReadableStreamDefaultController<Uint8Array>;
+  const stream = new ReadableStream<Uint8Array>({ start(c) { controller = c; } });
+  return { response: new Response(stream), push: (bytes: Uint8Array) => controller.enqueue(bytes), end: () => controller.close() };
+}
+
 describe("sentence speech scheduler", () => {
   test("a cut TTS body drops the whole sentence but later sentences still schedule in order", async () => {
     const context = new FakeAudioContext();
@@ -128,4 +154,65 @@ describe("sentence speech scheduler", () => {
     expect(scheduler.heardVisibleEnd()).toBe(7);
   });
 
+
+  test("a sentence starts playing while it is still arriving, not after all of it", async () => {
+    const context = new StreamingFakeAudioContext();
+    const stream = controlledStream();
+    const scheduler = new SentenceSpeechScheduler(context as unknown as AudioContext, async () => stream.response);
+    scheduler.enqueueSentence("hello there", { visibleEnd: 11 });
+    stream.push(wavHeader());
+    stream.push(new Uint8Array(6_000));
+    for (let i = 0; i < 6; i++) await settle();
+    expect(context.started).toBeGreaterThanOrEqual(1);
+    const early = context.started;
+    stream.push(new Uint8Array(30_000));
+    stream.end();
+    scheduler.finish();
+    for (let i = 0; i < 6; i++) await settle();
+    expect(context.started).toBeGreaterThan(early);
+    expect(context.decoded).toBe(0);
+  });
+
+  test("a later sentence's audio waits for the earlier sentence to finish arriving, so order is kept", async () => {
+    const context = new StreamingFakeAudioContext();
+    const first = controlledStream();
+    const second = controlledStream();
+    const streams = [first, second];
+    const scheduler = new SentenceSpeechScheduler(context as unknown as AudioContext, async () => streams.shift()!.response);
+    scheduler.enqueueSentence("one", { visibleEnd: 3 });
+    scheduler.enqueueSentence("two", { visibleEnd: 6 });
+    second.push(wavHeader()); second.push(new Uint8Array(8_000));
+    for (let i = 0; i < 6; i++) await settle();
+    expect(context.started).toBe(0);
+    first.push(wavHeader()); first.push(new Uint8Array(8_000)); first.end();
+    for (let i = 0; i < 8; i++) await settle();
+    expect(context.started).toBeGreaterThanOrEqual(2);
+    second.end();
+  });
+
+  test("stereo audio is collected and decoded whole instead of cut", async () => {
+    const context = new StreamingFakeAudioContext();
+    const stream = controlledStream();
+    const scheduler = new SentenceSpeechScheduler(context as unknown as AudioContext, async () => stream.response);
+    scheduler.enqueueSentence("hello", { visibleEnd: 5 });
+    stream.push(wavHeader(2));
+    stream.push(new Uint8Array(4_000));
+    stream.end();
+    scheduler.finish();
+    for (let i = 0; i < 8; i++) await settle();
+    expect(context.decoded).toBe(1);
+    expect(context.started).toBe(1);
+  });
+
+  test("the first sentence's visible end counts when its first buffer starts, later buffers add none", async () => {
+    const context = new StreamingFakeAudioContext();
+    const stream = controlledStream();
+    const scheduler = new SentenceSpeechScheduler(context as unknown as AudioContext, async () => stream.response);
+    scheduler.enqueueSentence("hello there", { visibleEnd: 11 });
+    stream.push(wavHeader()); stream.push(new Uint8Array(40_000)); stream.end();
+    scheduler.finish();
+    for (let i = 0; i < 8; i++) await settle();
+    context.currentTime = 0.01;
+    expect(scheduler.heardVisibleEnd()).toBe(11);
+  });
 });

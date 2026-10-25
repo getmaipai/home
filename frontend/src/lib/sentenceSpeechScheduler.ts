@@ -160,14 +160,36 @@ export class SentenceSpeechScheduler {
 
   private async fetchAndSchedule(text: string, predecessorDone: Promise<void>, meta?: SpeechSentenceMeta): Promise<void> {
     await this.acquireFetchSlot();
-    let audioBuffer: AudioBuffer | null = null;
+    // Streamed playback (Jesse, 2026-09-04: "streaming responses as you get them instead of generating the entire wav and then
+    // just playing that"): the sentence's PCM is cut into small buffers and scheduled as it arrives, so the first sound plays
+    // after the first bytes, not after the whole sentence is synthesized (measured 2026-10-25: first byte 250 ms, a whole
+    // 85-character sentence 1.3 s, 151 characters 2.8 s). A buffer waits only for the sentence before it to finish scheduling, so
+    // order is kept.
+    let predecessorFinished = false;
+    void predecessorDone.then(() => { predecessorFinished = true; });
+    const pending: AudioBuffer[] = [];
+    let scheduledAny = false;
+    const emit = (buffer: AudioBuffer) => {
+      this.scheduleBuffer(buffer, scheduledAny ? undefined : meta);
+      scheduledAny = true;
+    };
+    const offer = (buffer: AudioBuffer) => {
+      if (predecessorFinished && pending.length === 0) emit(buffer);
+      else pending.push(buffer);
+    };
+    let whole: AudioBuffer | null = null;
     try {
       if (this.stopped) return;
       const response = await this.speechStream(text, this.abortController.signal, meta?.turnId && meta.generation !== undefined ? { turnId: meta.turnId, generation: meta.generation } : undefined);
-      const bytes = new Uint8Array(await response.arrayBuffer());
-      if (this.stopped) return;
-      fixWavHeaderSize(bytes);
-      audioBuffer = await this.audioContext.decodeAudioData(bytes.buffer as ArrayBuffer);
+      const reader = typeof this.audioContext.createBuffer === "function" ? response.body?.getReader() : undefined;
+      if (!reader) {
+        const bytes = new Uint8Array(await response.arrayBuffer());
+        if (this.stopped) return;
+        fixWavHeaderSize(bytes);
+        whole = await this.audioContext.decodeAudioData(bytes.buffer as ArrayBuffer);
+      } else {
+        whole = await this.readStreamed(reader, offer);
+      }
     } catch (error) {
       if (!this.stopped && !(error instanceof DOMException && error.name === "AbortError") && !(error instanceof ApiError && error.code === "turn_cancelled")) this.onError?.();
       // A failed sentence just doesn't speak - the reply's TEXT already
@@ -179,8 +201,88 @@ export class SentenceSpeechScheduler {
       this.releaseFetchSlot();
     }
     await predecessorDone;
-    if (this.stopped || !audioBuffer) return;
-    this.scheduleBuffer(audioBuffer, meta);
+    if (this.stopped) return;
+    for (const buffer of pending.splice(0)) emit(buffer);
+    if (whole) emit(whole);
+  }
+
+  /** Reads a streamed 16-bit mono WAV, offering each ~60 to 250 ms of audio as a buffer. A format it cannot cut (stereo, another bit
+   * depth) is collected whole and returned decoded, as before. Never trusts the header's data size (Pocket and Chatterbox ship a
+   * placeholder there). */
+  private async readStreamed(reader: ReadableStreamDefaultReader<Uint8Array>, offer: (buffer: AudioBuffer) => void): Promise<AudioBuffer | null> {
+    const HEADER = 44;
+    const FIRST_BYTES = 3_000;
+    const NEXT_BYTES = 12_000;
+    const head = new Uint8Array(HEADER);
+    let headLen = 0;
+    let rate = 0;
+    let streamable = false;
+    let carry = new Uint8Array(0);
+    const rawParts: Uint8Array[] = [];
+    let offered = 0;
+    const cutBuffers = (final: boolean) => {
+      for (;;) {
+        const want = offered === 0 ? FIRST_BYTES : NEXT_BYTES;
+        if (carry.length < want && !(final && carry.length >= 2)) return;
+        const take = (carry.length >= want ? want : carry.length) & ~1;
+        if (take < 2) return;
+        const samples = take / 2;
+        const buffer = this.audioContext.createBuffer(1, samples, rate);
+        const channel = buffer.getChannelData(0);
+        const view = new DataView(carry.buffer, carry.byteOffset, take);
+        for (let k = 0; k < samples; k++) channel[k] = view.getInt16(k * 2, true) / 32768;
+        offer(buffer);
+        offered++;
+        carry = carry.subarray(take);
+        if (carry.length === 0) return;
+      }
+    };
+    for (;;) {
+      const { value, done } = await reader.read();
+      if (this.stopped) {
+        void reader.cancel().catch(() => {});
+        return null;
+      }
+      if (done) break;
+      let chunk = value;
+      if (headLen < HEADER) {
+        const take = Math.min(HEADER - headLen, chunk.length);
+        head.set(chunk.subarray(0, take), headLen);
+        headLen += take;
+        chunk = chunk.subarray(take);
+        if (headLen === HEADER) {
+          const view = new DataView(head.buffer);
+          const isRiffWave = view.getUint32(0, false) === 0x52494646 && view.getUint32(8, false) === 0x57415645;
+          rate = view.getUint32(24, true);
+          streamable = isRiffWave && view.getUint16(22, true) === 1 && view.getUint16(34, true) === 16 && rate > 0;
+          if (!streamable) rawParts.push(head.slice());
+        }
+      }
+      if (headLen < HEADER || chunk.length === 0) continue;
+      if (!streamable) {
+        rawParts.push(chunk.slice());
+        continue;
+      }
+      const merged = new Uint8Array(carry.length + chunk.length);
+      merged.set(carry, 0);
+      merged.set(chunk, carry.length);
+      carry = merged;
+      cutBuffers(false);
+    }
+    if (streamable) {
+      cutBuffers(true);
+      return null;
+    }
+    const total = rawParts.reduce((sum, part) => sum + part.length, 0);
+    if (total === 0) return null;
+    const bytes = new Uint8Array(total);
+    let at = 0;
+    for (const part of rawParts) {
+      bytes.set(part, at);
+      at += part.length;
+    }
+    fixWavHeaderSize(bytes);
+    return this.audioContext.decodeAudioData(bytes.buffer as ArrayBuffer);
   }
 
   private joinAudioSession(): void {
