@@ -120,6 +120,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `frontend/src/apps/settings/RobotPasswordSection.tsx` | RobotPasswordRow, RobotPasswordSection |
 | `frontend/src/apps/settings/RobotSelfTests.tsx` | RobotSelfTests |
 | `frontend/src/apps/settings/RoutingStatsSection.tsx` | RoutingStatsSection |
+| `frontend/src/apps/settings/SignInSecretSection.tsx` | SignInSecretSection |
 | `frontend/src/apps/settings/SiteBlocksSection.tsx` | SiteBlocksSection |
 | `frontend/src/apps/settings/StackChanInstallDialog.tsx` | StackChanInstallDialog |
 | `frontend/src/apps/settings/UsersSection.tsx` | UsersSection |

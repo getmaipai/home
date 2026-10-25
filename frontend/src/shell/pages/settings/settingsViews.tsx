@@ -5,6 +5,7 @@ import { VoiceEnrollmentBody } from "@/apps/people/VoiceEnrollmentBody";
 import { ProfileForm } from "@/apps/people/ProfileForm";
 import { DevicesSection } from "@/apps/settings/DevicesSection";
 import { AwaySessionsSection } from "@/apps/settings/AwaySessionsSection";
+import { SignInSecretSection } from "@/apps/settings/SignInSecretSection";
 import { ChatSkillsSection } from "@/shell/pages/settings/ChatSkillsSection";
 import { ChatShortcutsView } from "@/shell/pages/settings/ChatShortcutsView";
 import { DeviceAppearanceControl } from "@/shell/pages/settings/DeviceAppearanceControl";
@@ -54,6 +55,10 @@ function AccountProfile({ person, onPersonChange }: SettingsViewProps) {
         <CardContent>
           <ProfileForm person={person} canEdit layout="page" onSaved={async (_saved: PersonRosterEntry) => { await Promise.all([queryClient.invalidateQueries({ queryKey: ["people"] }), onPersonChange()]); }} />
         </CardContent>
+      </Card>
+      <Card>
+        <CardHeader><CardTitle>PIN or password</CardTitle></CardHeader>
+        <CardContent><SignInSecretSection person={person} onPersonChange={onPersonChange} /></CardContent>
       </Card>
       <AwaySessionsSection />
       <DevicesSection />
