@@ -235,7 +235,7 @@ test("the Chats row counts and lists only this companion's chats, and opens the 
   ] as never;
   const view = open("/companions/lively-child", true);
   await waitFor(() => expect(view.getByRole("button", { name: /Chats/ })).toBeTruthy());
-  expect(view.getByRole("button", { name: /Chats/ }).textContent).toContain("1 chats");
+  expect(view.getByRole("button", { name: /Chats/ }).textContent).toContain("1 chat");
   fireEvent.click(view.getByRole("button", { name: /Chats/ }));
   expect(await view.findByRole("button", { name: /Animal facts/ })).toBeTruthy();
   expect(view.queryByText("Other companion")).toBeNull();
