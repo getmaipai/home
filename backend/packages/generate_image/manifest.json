@@ -36,7 +36,7 @@
         "minLength": 3,
         "maxLength": 1200,
         "grounded": false,
-        "description": "Only for a picture the person asks you to make, draw or design: for a real poster, photo, film, product or person use show_images instead, never this. What to draw, written as a full description in plain English: the subject, the setting, the style and the light or mood, built from what the person asked for. Keep their own words for names and for any text that must appear in the picture. Do not add people, objects or themes they did not ask for. When they ask for another one, one more or the same again, call this tool again with a fresh description of the same subject; never say a picture is coming, ready or on its way without calling it in this reply, and never describe a picture you did not make. When `change` is set, `prompt` is the instruction for the change instead, in plain English and in the person's own words (for example \"remove the man in the red jacket\" or \"make the sky clear blue with no clouds\"); say what to keep if it matters."
+        "description": "Only for a picture the person asks you to make, draw or design. For an adult's non-sexual request to depict a real person, call this tool and keep the person's own words for names; do not send that request to show_images or refuse it yourself. Never make sexual content of a real person. Home applies age rules and refuses teens and children. For a request to find or show an existing real poster, photo, film or product, use show_images instead. What to draw, written as a full description in plain English: the subject, the setting, the style and the light or mood, built from what the person asked for. Keep their own words for names and for any text that must appear in the picture. Do not add people, objects or themes they did not ask for. When they ask for another one, one more or the same again, call this tool again with a fresh description of the same subject; never say a picture is coming, ready or on its way without calling it in this reply, and never describe a picture you did not make. When `change` is set, `prompt` is the instruction for the change instead, in plain English and in the person's own words (for example \"remove the man in the red jacket\" or \"make the sky clear blue with no clouds\"); say what to keep if it matters."
       },
       "size": {
         "type": "string",
@@ -75,7 +75,7 @@
       "depicts_real_person": {
         "type": "boolean",
         "grounded": false,
-        "description": "Set true when the person asks for a picture that shows a real, named or identifiable person (a celebrity, a politician, someone they know). Home makes one only of an adult in this household who agreed, through their saved style or an attached photo (with `change` and `photo_subject`). Otherwise leave it out."
+        "description": "Set true when the person asks for a picture of a real, public or historical person, including a celebrity, politician, or someone they know. For an adult's non-sexual request, call the tool, even for satire, scenes, humor or an unflattering or hateful-history figure. Do not refuse it yourself. Never make sexual content of a real person. Home applies age rules and refuses teens and children."
       },
       "change": {
         "type": "string",

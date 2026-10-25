@@ -123,7 +123,7 @@ export type PromptRefusal = "minor_sexual" | "real_person" | "teen_content" | "c
 
 export const PROMPT_REFUSAL_LINE: Record<PromptRefusal, string> = {
   minor_sexual: "I can't make that. Pictures of children in sexual situations are never allowed.",
-  real_person: "I won't make a picture of a real person's likeness, because they haven't agreed to it. Ask for an invented person, a character or a place instead.",
+  real_person: "I won't make sexual pictures of a real person, because they can't agree to it. I can make it of an invented person or a character instead.",
   teen_content: TEEN_CONTENT_LINE,
   child_content: CHILD_CONTENT_LINE,
 };
@@ -142,8 +142,13 @@ export function refusePrompt(prompt: string, flags: { depictsRealPerson?: boolea
     if (flags.depictsRealPerson === true || childPromptUnsafe(prompt) || undressesSomeone(prompt)) return "child_content";
     return null;
   }
-  if (flags.lane === "teen" && (teenPromptUnsafe(prompt) || undressesSomeone(prompt))) return "teen_content";
-  if (flags.depictsRealPerson === true) return "real_person";
+  if (flags.lane === "teen") {
+    if (flags.depictsRealPerson === true) return "real_person";
+    if (teenPromptUnsafe(prompt) || undressesSomeone(prompt)) return "teen_content";
+  }
+  // Adults may ask for non-sexual depictions of real people (owner, 2026-10-25). Sexual content that shows a real person stays blocked;
+  // a request that names a household adult's own style is decided by the likeness consent flow, not by this flag.
+  if (flags.depictsRealPerson === true && (mentionsSexualContent(prompt) || undressesSomeone(prompt))) return "real_person";
   return null;
 }
 

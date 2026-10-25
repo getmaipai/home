@@ -33,7 +33,7 @@ describe("content policy", () => {
         expect(policy.check(SEXUAL_WORDS[0]!, field)?.kind ?? null).toBe(band === "adult" ? null : "sexual");
       }
       expect(policy.filters.has("minor_line")).toBe(true);
-      expect(policy.filters.has("real_person")).toBe(true);
+      expect(policy.filters.has("real_person")).toBe(band !== "adult");
     });
   }
   test("person additions tighten each band and an empty list cannot relax defaults", () => {
@@ -46,7 +46,7 @@ describe("content policy", () => {
   for (const role of ["adult", "owner", "admin", "guest", "teen", "child"]) {
     test(`${role} keeps role defaults for every birthdate`, () => {
       const expected: ProtectionKind[] = role === "child" ? ["minor_line", "real_person", "sexual", "swearing", "drugs", "gambling", "gore"]
-        : role === "teen" ? ["minor_line", "real_person", "sexual", "swearing", "gore"] : ["minor_line", "real_person"];
+        : role === "teen" ? ["minor_line", "real_person", "sexual", "swearing", "gore"] : ["minor_line"];
       for (const birthdate of [null, undefined, "", "invalid", "1990-01-01", "2011-01-01", "2020-01-01", "2026-02-30", "2099-01-01"]) {
         const p = { ...person(role), birthdate } as PersonRow;
         if (birthdate === undefined) delete (p as Partial<PersonRow>).birthdate;
@@ -62,7 +62,7 @@ describe("content policy", () => {
   test("band resolution never reads birthdate", () => {
     const p = person("adult");
     Object.defineProperty(p, "birthdate", { get() { throw new Error("Birthdate must not be read"); } });
-    expect([...resolver.filtersFor(p)]).toEqual(["minor_line", "real_person"]);
+    expect([...resolver.filtersFor(p)]).toEqual(["minor_line"]);
   });
   test("unknown identity or role uses child defaults", () => {
     const noId = { ...person("adult") } as Partial<PersonRow>;
@@ -117,10 +117,14 @@ describe("content policy", () => {
     expect(own.contentPolicyFor(audience).check(corpus[4]!.text, "prompt")?.kind).toBe("gore");
     expect(own.contentPolicyFor({ ...audience, band: "child" }).filters.size).toBe(7);
   });
-  test("trusted subject context enforces the real person line before optional kinds", () => {
+  test("trusted subject context blocks real people for minors and only sexual content for adults", () => {
     for (const context of ["outside", "public", "unresolved"]) {
       const own = createContentPolicyResolver({ readFilters: () => [], readRealPersonContext: () => context });
       expect(own.contentPolicyFor(person("child")).check(corpus[2]!.text, "prompt")?.kind).toBe("real_person");
+      expect(own.contentPolicyFor(person("teen")).check("Jon Stewart interviews Hitler on a talk show set", "prompt")?.kind).toBe("real_person");
+      expect(own.contentPolicyFor(person("adult")).check("Jon Stewart interviews Hitler on a talk show set", "prompt")).toBeNull();
+      expect(own.contentPolicyFor(person("adult")).check(`a sexual portrait of a public figure ${SEXUAL_WORDS[0]}`, "prompt")?.kind).toBe("real_person");
+      expect(own.contentPolicyFor(person("adult")).check(`${MINOR_MARKERS[0]} ${SEXUAL_WORDS[0]}`, "prompt")?.kind).toBe("minor_line");
     }
     const own = createContentPolicyResolver({ readFilters: () => [], readRealPersonContext: () => "household" });
     expect(own.contentPolicyFor(person("adult")).check("friendly garden", "title")).toBeNull();

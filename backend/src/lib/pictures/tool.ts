@@ -51,8 +51,9 @@ export function refusalFor(audience: PictureAudience, args: Record<string, unkno
   if (denial) return { kind: "denied", why: denial, line: PICTURE_DENIAL_LINE[denial] };
   const prompt = typeof args.prompt === "string" ? args.prompt : "";
   const style = typeof args.style === "string" ? args.style : "";
-  // A request that names a style may be a style of a household adult who agreed (LIKENESS-01): the tool decides that once it
-  // has matched the style, so the model's "real person" flag alone does not end the call here when a style was named.
+  // A request that names a style may be a style of a household adult who agreed (LIKENESS-01), including adult content they agreed to
+  // with the second consent switch: the tool decides that once it has matched the style, so the model's "real person" flag alone
+  // does not end the call here when a style was named.
   const refused = refusePrompt(`${prompt} ${style}`, { depictsRealPerson: args.depicts_real_person === true && style.trim() === "", lane: laneOf(audience) });
   if (refused) return { kind: "prompt", why: refused, line: promptRefusalLineFor(refused, "picture", audience.actor, audience.band, `${prompt} ${style}`, PROMPT_REFUSAL_LINE[refused]) };
   return null;

@@ -9,6 +9,7 @@ import { ensureStackTrust, mintProof, photoBind, PROOF_TTL_SECONDS } from "./pro
 import { getStyleSubject, type StyleMedium } from "./adapters";
 import type { JobLikeness } from "./guard";
 import type { PictureAudience } from "@/lib/pictures/policy";
+import { laneOf } from "@/lib/pictures/lane";
 import type { UseSource } from "./uses";
 
 export interface StyleRef { id: string; name: string; likeness_subject?: string | null; classification?: "all-ages" | "adult-only" }
@@ -44,8 +45,9 @@ export interface StyleInput {
 export async function prepareStyleUse(input: StyleInput): Promise<LikenessPrep> {
   const { subjectId, removed } = input.style ? subjectOfStyle(input.medium, input.style) : { subjectId: null, removed: false };
   if (!input.style || !subjectId) {
-    // No style of a person: a request for a real person's likeness is refused, as it has always been.
-    return input.depictsRealPerson ? { kind: "refused", why: "real_person", line: "" } : { kind: "none" };
+    // Non-sexual real-person requests are allowed for an adult on their own written screen (owner, 2026-10-25); the prompt policy
+    // already blocked the sexual ones. Everyone else (a child, a teen, a guest, a spoken turn, a shared screen) keeps the refusal.
+    return input.depictsRealPerson && laneOf(input.audience) !== "adult" ? { kind: "refused", why: "real_person", line: "" } : { kind: "none" };
   }
   if (removed) return { kind: "refused", why: "likeness", line: STYLE_REMOVED_LINE };
   const adultContent = isAdultContentRequest({ text: input.text });

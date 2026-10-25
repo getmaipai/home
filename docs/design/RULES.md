@@ -43,8 +43,9 @@ not refused (a heavy rock song about a scary Halloween becomes a happy, light ro
 and the result is checked as finished, and as sung for a song. Family: anyone in the household may make pictures, videos and songs
 with or of any household member, as a household option that is on by default. The age gate is not loosened by any of this: the
 finished-item check (nothing nude or sexual for a teen or a child whoever is in it, a cartoon and child-safe for a child, a check
-that cannot run withholds), the absolute lines (nothing sexual involving a minor, no real person outside the household, no public
-figure) and the surface gate stay fixed, and no setting, including `generation.people_prompts`, reaches them.
+that cannot run withholds), the absolute lines (nothing sexual involving a minor; nothing sexual that shows a real person outside the household or a public or historical figure, for anyone, and a photo
+of a real person never becomes adult content; a household adult's adult content only through their own style and their own adult-content
+consent, as before; teens and children never get a real person outside the household or a public figure at all) and the surface gate stay fixed, and no setting, including `generation.people_prompts`, reaches them. Owner-approved: 2026-10-25 (Jesse, chat: "everyone can do anything except teens and kids have filters blocking things like sexual"; record [content-policy-2026-10-18.md](content-policy-2026-10-18.md), Supersedes): an adult may make any non-sexual picture or video of a real person, a public figure or a historical person (satire, scenes, humor), where before the absolute line refused them; a teen or a child keeps the real-person block unchanged. The sexual and minor limits above are kept from the earlier rule, not new rulings.
 A robot's controls set the band for its unknown speaker, never its companion (owner's ruling, 2026-10-21; [record](dynamic-companions-2026-10-21.md)):
 a robot with a companion assigned takes the controls level the admin set (child, teen or adult), a robot with no companion, and every
 other unknown speaker on a shared surface, gets the child result. A companion declares an audience: `all` (dynamic, adapts to the

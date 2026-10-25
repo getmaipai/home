@@ -156,7 +156,7 @@ musicRoutes.openapi(coverRoute, async (c) => {
   const current = musicVersions(actor, root).sort((a, b) => (b.chosenAt ?? b.createdAt).localeCompare(a.chosenAt ?? a.createdAt) || b.id.localeCompare(a.id))[0] ?? root;
   if (current.state !== "done") return c.json({ error: "The song is still being made. Try New cover when it is ready." }, 409) as never;
   const { prompt } = c.req.valid("json");
-  if (prompt && refusePrompt(prompt, { lane: laneOf(musicRouteAudience(actor)), depictsRealPerson: current.request.imitates_real_voice === true })) return c.json({ error: "That cover request can't be used. Try a different description." }, 403) as never;
+  if (prompt && (current.request.imitates_real_voice === true || refusePrompt(prompt, { lane: laneOf(musicRouteAudience(actor)) }))) return c.json({ error: "That cover request can't be used. Try a different description." }, 403) as never;
   if (await startSongCover(actor, current, prompt ? { prompt: `${prompt}. Album cover art for ${current.request.title ?? "this song"}. No text, no letters.` } : {}) === "busy") return c.json({ error: "A cover is already being made. It will show in a moment." }, 409) as never;
   return c.json(await musicCardView(actor, getMusicJobFor(actor, root.id) ?? root), 200);
 });

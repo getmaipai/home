@@ -163,11 +163,16 @@ describe("a saved style of a household adult (pictures)", () => {
     expect(likenessUseLog(marlow.id)).toHaveLength(0);
   });
 
-  test("a real person with no style of a household adult is still refused", async () => {
+  test("a real person with no style: an adult on their own screen may make it (owner, 2026-10-25), sexual content and everyone else never", async () => {
     switchOn(marlow);
-    const outcome = await run(nadia, { prompt: "a portrait of a famous actor", depicts_real_person: true });
-    expect(refusedWith(outcome)).toBe("real_person");
-    expect(imageStack.submitted).toHaveLength(0);
+    const allowed = await run(nadia, { prompt: "a portrait of a famous actor", depicts_real_person: true });
+    expect(refusedWith(allowed)).toBeUndefined();
+    expect(imageStack.submitted).toHaveLength(1);
+    const sexual = await run(nadia, { prompt: "a sexual portrait of a famous actor", depicts_real_person: true });
+    expect(refusedWith(sexual)).toBe("real_person");
+    const guest = addPerson("Visitor 2", "guest");
+    expect(refusedWith(await run(guest, { prompt: "a portrait of a famous actor", depicts_real_person: true }))).toBeDefined();
+    expect(imageStack.submitted).toHaveLength(1);
   });
 
   test("when the Stack does not trust this Home or is too old, nothing is made", async () => {

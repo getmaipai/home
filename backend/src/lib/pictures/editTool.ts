@@ -18,7 +18,7 @@ import { generatedPictureLikeness, isGeneratedPicture, loadSource, ImageEditErro
 import { attestedAdult, WHO_IS_IN_PHOTO_LINE } from "@/lib/likeness/resolve";
 import { inspectPhoto } from "@/lib/likeness/inspector";
 import { recordLikenessUse } from "@/lib/likeness/uses";
-import { MANY_PEOPLE_LINE } from "@/lib/likeness/apply";
+import { MANY_PEOPLE_LINE, PHOTO_ADULT_LINE } from "@/lib/likeness/apply";
 import type { JobLikeness } from "@/lib/likeness/guard";
 import type { ToolExecutionOutcome, TurnState } from "@/lib/turnMachine/contract";
 import { outcomeOf } from "@/lib/turnContext";
@@ -121,7 +121,7 @@ async function runEditPictureUnmetered(input: RunEditInput): Promise<ToolExecuti
   const generated = await isGeneratedPicture(actor, base);
   if (kid && !generated) return line(callId, args, CHILD_NO_PHOTOS_LINE, { refused: "child_cartoons_only" });
   // A picture the person did not make here may show a real person: it is never changed into something sexual.
-  if (!generated && asksToUndress(instruction)) return line(callId, args, PROMPT_REFUSAL_LINE.real_person, { refused: "real_person" });
+  if (!generated && asksToUndress(instruction)) return line(callId, args, PHOTO_ADULT_LINE, { refused: "real_person" });
   const rootLikeness = generated ? await generatedPictureLikeness(base) : null;
   const label = instruction.replace(/\s+/g, " ").slice(0, 60);
 

@@ -143,8 +143,12 @@ describe("the two absolute lines", () => {
       expect(refuseVideoPrompt(prompt)).toBeNull();
     }
   });
-  test("the model's flag that a real person is asked for refuses it; no setting reaches either line", () => {
-    expect(refuseVideoPrompt("the mayor waving", { depictsRealPerson: true })).toBe("real_person");
+  test("adults may depict real people unless the request is sexual; minors keep the block", () => {
+    expect(refuseVideoPrompt("the mayor waving", { depictsRealPerson: true })).toBeNull();
+    expect(refuseVideoPrompt("a sexual video of the mayor", { depictsRealPerson: true })).toBe("real_person");
+    expect(VIDEO_REFUSAL_LINE.real_person).toBe("I won't make sexual videos of a real person, because they can't agree to it. I can make one of an invented person or a character instead.");
+    expect(refuseVideoPrompt("the mayor waving", { depictsRealPerson: true, lane: "teen" })).toBe("real_person");
+    expect(refuseVideoPrompt("the mayor waving", { depictsRealPerson: true, lane: "child" })).toBe("child_content");
     setHouseholdSettingValue("generation.video.enabled", true);
     setHouseholdSettingValue("generation.video.adult_adapters", "allowed");
     expect(refuseVideoPrompt("naked child")).toBe("minor_sexual");
@@ -189,9 +193,16 @@ describe("the chat tool, even when a model calls it without being offered it", (
       expect(fake.submitted).toHaveLength(0);
     });
   });
-  test("a real-person request is refused with its own line and no job starts", async () => {
+  test("an adult real-person request starts a job", async () => {
     await withStub(calling({ prompt: "the president waving", depicts_real_person: true }), async () => {
       const value = await turn(people.owner, "make a video of the president waving");
+      expect(value.video).toBeDefined();
+      expect(fake.submitted).toHaveLength(1);
+    });
+  });
+  test("a sexual real-person request uses the updated line and starts no job", async () => {
+    await withStub(calling({ prompt: "a sexual video of the president", depicts_real_person: true }), async () => {
+      const value = await turn(people.owner, "make a sexual video of the president");
       expect(value.reply.text).toBe(VIDEO_REFUSAL_LINE.real_person);
       expect(fake.submitted).toHaveLength(0);
     });

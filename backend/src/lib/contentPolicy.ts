@@ -44,7 +44,7 @@ function immutableSet(values: Iterable<ProtectionKind>): ReadonlySet<ProtectionK
   };
   return Object.freeze(wrapper);
 }
-const defaults = freeze({ child: ["minor_line", "real_person", "sexual", "swearing", "drugs", "gambling", "gore"], teen: ["minor_line", "real_person", "sexual", "swearing", "gore"], adult: ["minor_line", "real_person"] } satisfies Record<AgeBand, ProtectionKind[]>);
+const defaults = freeze({ child: ["minor_line", "real_person", "sexual", "swearing", "drugs", "gambling", "gore"], teen: ["minor_line", "real_person", "sexual", "swearing", "gore"], adult: ["minor_line"] } satisfies Record<AgeBand, ProtectionKind[]>);
 const fallback = Object.freeze({ kind: "minor_line" as const, line: "I couldn't check that safely. Try something different." });
 const ranks: Record<AgeBand, number> = { child: 0, teen: 1, adult: 2 };
 // Unknown identities stay in the child band; known people use their role only.
@@ -103,7 +103,7 @@ export function createContentPolicyResolver(options: { readFilters: (person: Per
         const block = (k: ProtectionKind) => ({ kind: k, line: compiled!.kinds.lines[k] });
         const shared = contentChecksForFold(fold);
         if (detectCsam(text).matched.length || shared.minorLine) return block("minor_line");
-        if (realPersonBlocked) return block("real_person");
+        if (realPersonBlocked && (band !== "adult" || shared.adultContent)) return block("real_person");
         if (filters.has("sexual") && shared.adultContent) return block("sexual");
         for (const k of ["swearing", "drugs", "gambling", "gore"] as const) {
           if (!filters.has(k)) continue;

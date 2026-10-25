@@ -6,6 +6,8 @@ All six slices require independent review because they touch minors. No lane ope
 
 ## Supersedes
 
+Owner ruling 2026-10-25 (Jesse, chat): RULES.md rule 0's absolute line "no real person outside the household, no public figure" no longer binds an adult for non-sexual pictures and videos (and, where the `real_person` content check runs, writing); it still binds teens and children, and sexual content that shows a real person outside the household or a public or historical figure stays blocked for everyone. The `real_person` row below is read that way.
+
 [RULES.md rule 0](RULES.md), owner-approved 2026-10-18 in `9ae5698a`, wins. Rule 6 keeps fixed policy lines;
 rule 6a limits logs; rules 9 and S4 require shipped kit parts and the Settings shell.
 
@@ -73,7 +75,7 @@ Freeze policy data and expose a set that cannot be mutated at runtime, not merel
 | `gore` | On | On | Own opt-in | Data terms and finished-item checks |
 | `sexual` | On, fixed | On, fixed | Own opt-in; adult lane only | Shared adult-content detection and generation checks |
 | `minor_line` | Always | Always | Always | Commons detector plus existing wider minor floor |
-| `real_person` | Outside-household/public figure line always | Same | Same | Trusted household identity context, not a names word list |
+| `real_person` | Outside-household/public figure line always | Same | Adults: only sexual content that shows a real person is blocked (owner, 2026-10-25); non-sexual pictures, videos and writing about public, historical and outside people are allowed | Trusted household identity context, not a names word list |
 
 Adult defaults are only the absolute lines. Adult acknowledgment, crisis resources, privacy floors and other existing safety
 architecture still apply. Teen defaults also keep every teen protection, not just these seven labels. An optional filter's

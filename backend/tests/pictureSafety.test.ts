@@ -157,8 +157,12 @@ describe("the two absolute lines", () => {
     }
   });
 
-  test("the model's own flag that a real person is asked for refuses it", () => {
-    expect(refusePrompt("a portrait of the mayor", { depictsRealPerson: true })).toBe("real_person");
+  test("adults may depict real people unless the request is sexual", () => {
+    expect(refusePrompt("Jon Stewart interviews Hitler on a talk show set", { depictsRealPerson: true })).toBeNull();
+    expect(refusePrompt("a sexual portrait of the mayor", { depictsRealPerson: true })).toBe("real_person");
+    expect(PROMPT_REFUSAL_LINE.real_person).toBe("I won't make sexual pictures of a real person, because they can't agree to it. I can make it of an invented person or a character instead.");
+    expect(refusePrompt("a portrait of the mayor", { depictsRealPerson: true, lane: "teen" })).toBe("real_person");
+    expect(refusePrompt("a portrait of the mayor", { depictsRealPerson: true, lane: "child" })).toBe("child_content");
     expect(promptViolatesMinorLine("a portrait of the mayor")).toBe(false);
   });
 
@@ -171,7 +175,7 @@ describe("the two absolute lines", () => {
       for (const value of values) {
         setHouseholdSettingValue(key, value);
         expect(refusePrompt("naked child")).toBe("minor_sexual");
-        expect(refusePrompt("a portrait of a real person", { depictsRealPerson: true })).toBe("real_person");
+        expect(refusePrompt("a portrait of a real person", { depictsRealPerson: true })).toBeNull();
       }
     }
   });
@@ -218,9 +222,17 @@ describe("the chat tool, even when a model calls it without being offered it", (
     });
   });
 
-  test("a real-person request is refused with its own line and no job starts", async () => {
+  test("an adult real-person request starts a job", async () => {
     await withStub({ calls: (r) => (isPhrasing(r) || r.tool_choice === "none" ? undefined : [call({ prompt: "the president smiling", depicts_real_person: true })]), reply: () => "ignored" }, async () => {
       const value = await turn(people.owner, "make me a picture of the president smiling");
+      expect(value.picture).toBeDefined();
+      expect(fake.submitted).toHaveLength(1);
+    });
+  });
+
+  test("a sexual real-person request uses the updated line and starts no job", async () => {
+    await withStub({ calls: (r) => (isPhrasing(r) || r.tool_choice === "none" ? undefined : [call({ prompt: "a sexual portrait of the president", depicts_real_person: true })]), reply: () => "ignored" }, async () => {
+      const value = await turn(people.owner, "make me a sexual picture of the president");
       expect(value.reply.text).toBe(PROMPT_REFUSAL_LINE.real_person);
       expect(fake.submitted).toHaveLength(0);
     });

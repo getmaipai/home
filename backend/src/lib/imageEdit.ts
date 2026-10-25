@@ -44,7 +44,7 @@ import { cancelOrDelete, fetchPicture, getGenerationJob, StackPicturesError, sub
 import { pictureEngineStatus } from "@/lib/pictures/ready";
 import { speakerAgeBand } from "@/lib/ageBand";
 import { prepareEditSource } from "@/lib/pictures/editSources";
-import { MANY_PEOPLE_LINE } from "@/lib/likeness/apply";
+import { MANY_PEOPLE_LINE, PHOTO_ADULT_LINE } from "@/lib/likeness/apply";
 import { likenessStillAllowed, type JobLikeness } from "@/lib/likeness/guard";
 import { recordLikenessUse } from "@/lib/likeness/uses";
 import { StackError } from "@/lib/stack/errors";
@@ -464,7 +464,7 @@ export async function startComment(actor: PersonRow, conversationId: string, id:
   if (refused) throw new ImageEditError(422, promptRefusalLineFor(refused, "picture", actor, editorAudience(actor).band, prompt, PROMPT_REFUSAL_LINE[refused]), `refused_${refused}`);
   // A picture the person did not generate here (an upload) may show a real person: it is never changed into something sexual.
   const generated = await isGeneratedPicture(actor, source);
-  if (!generated && asksToUndress(prompt)) throw new ImageEditError(422, PROMPT_REFUSAL_LINE.real_person, "refused_real_person");
+  if (!generated && asksToUndress(prompt)) throw new ImageEditError(422, PHOTO_ADULT_LINE, "refused_real_person");
   const comment = await commentState(actor);
   if (!comment.enabled) throw new ImageEditError(503, comment.reason ?? COMMENT_NOT_SET_UP, "not_set_up");
   const region = regionForStack(input.region);

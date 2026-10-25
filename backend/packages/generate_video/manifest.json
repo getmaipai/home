@@ -84,7 +84,7 @@
       "depicts_real_person": {
         "type": "boolean",
         "grounded": false,
-        "description": "Set true when the person asks for a video that shows a real, named or identifiable person (a celebrity, a politician, someone they know). Home makes one only of an adult in this household who agreed, through their saved style or an attached photo. Otherwise leave it out."
+        "description": "Set true when the person asks for a video of a real, public or historical person, including a celebrity, politician, or someone they know. For an adult's non-sexual request, call the tool, even for satire, scenes, humor or an unflattering or hateful-history figure. Do not refuse it yourself. Never make sexual content of a real person. Home applies age rules and refuses teens and children."
       }
     }
   },

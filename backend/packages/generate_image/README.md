@@ -23,10 +23,12 @@ Spoken answers and shared screens never make pictures.
 A picture model on this computer. An admin installs one in Settings, Pictures
 and videos.
 
-## Two things that are never made
+## Safety
 
-Nothing sexual that shows a child or anyone who looks like one. Nothing that
-shows the face of a real person who has not agreed to it.
+Nothing sexual that shows a child or anyone who looks like one. Nothing
+sexual that shows a real person. Adults may ask for non-sexual pictures of
+real, public or historical people, including satire, scenes and humor.
+Home refuses picture requests from children and teens.
 
 ## Offline
 
