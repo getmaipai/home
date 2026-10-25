@@ -96,10 +96,12 @@ export const duplexCounters = { reactionResumes: 0, interruptions: 0 };
 
 // Words that only ever react ("oh", "yeah", "nice", "wow"): up to four of them together are a reaction too ("oh yeah", "uh, nice", "yeah
 // right"). Nothing that stops, refuses or asks is in this set: no "no", "not", "stop", "wait", "but", question words or names.
+// rule: duplexReaction (docs/design/full-duplex-voice-2026-10-24.md) - FROZEN as of 2026-10-25: a further miss is a label for the end-of-turn
+// model's backchannel class (DUPLEX-02), never another entry here.
 const POSITIVE_REACTION_WORDS: ReadonlySet<string> = new Set([
   "m", "mm", "mhm", "hm", "hmm", "uh", "yeah", "yep", "yes", "okay", "ok", "right", "oh", "ohh", "ah", "ooh", "aw", "wow", "whoa", "really",
   "seriously", "cool", "nice", "great", "awesome", "amazing", "wild", "crazy", "interesting", "true", "exactly", "sure", "haha", "ha", "lol",
-  "yikes", "geez", "jeez", "my", "god", "gosh", "i", "see", "got", "it", "that", "is", "so", "good", "fun", "funny",
+  "yikes", "geez", "jeez", "my", "god", "gosh", "see", "so", "good", "fun", "funny",
 ]);
 
 // A drawn-out sound ("mmm", "hmmm", "woooow", "yeahhh") is the same reaction: a run of three or more of one letter counts as one. A

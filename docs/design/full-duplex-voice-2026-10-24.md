@@ -90,7 +90,7 @@ This section applies to every age band's session, with the band's gates and limi
    (the rule-budget lint). It resumes playback from the same
    sentence, as does noise with no words or no words within 2.0 s of the sound ending. The vocabulary is a starting list judged by
    ear, and a learned end-of-turn model with a backchannel class (Easy Turn) is measured in DUPLEX-02 as its replacement. The first
-   400 ms after Home starts speaking is not armed, as today.
+   400 ms after Home starts speaking starts no pause, and a final transcript that lands in it still counts.
 4. **Pause, then the transcript decides.** Playback pauses with `AudioContext.suspend()` (so what is heard stays exact), and either
    resumes (noise or a reaction) or stops (a real interruption). The unspoken remainder of the reply is a follow-up item (DUPLEX-06): pass it to the next turn as
    background so Home can pick the story back up after a real interruption (a question like "did he really do that"), instead of only knowing what was heard. A bare reaction resumes playback and never becomes a turn, so it never needs the remainder.
@@ -155,7 +155,7 @@ server had stopped managing (voice confirmed) now still sends `reply_resume` whe
 reaction is also any run of up to four words that only ever react ("oh yeah", "uh, nice", "yeah right"; the set holds no "no", "not",
 "stop", "wait", "but" or question word), and a reaction word said as a question ("really?", "seriously?") is a real question, decided
 by the transcript's own question mark, so Home answers it and carries on. (4) A final that lands in the first 400 ms of a reply is no longer
-dropped. Sources for "really?" being a request to confirm and carry on: the clarification and confirmation cases in section 3d.
+dropped. **The reaction rule is frozen as of this commit** (the org's rule: three phrasings in a week is a classifier, not a fourth regex): it went from an exact list to a letter collapse to a word set plus the question-mark rule in one day. A further miss becomes a label for DUPLEX-02's measurement of an end-of-turn model with a backchannel class (Easy Turn), recorded again with the demo voices and never taken from household transcripts; the next addition to the list is refused. Words like "is", "that" and "it" are not in the set, so a question the transcriber left without a question mark ("is it true", "that is it") still stops the reply. Sources for "really?" being a request to confirm and carry on: the clarification and confirmation cases in section 3d.
 
 **How it is built:** steps 1 and 2 are client and server timing (no model). Steps 3 to 7 are one guidance block outside the data wrapper
 (`messages.ts`), written as five labelled cases the model picks from, because a single sentence was ignored and a numbered list with a
