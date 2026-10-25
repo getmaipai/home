@@ -24,6 +24,7 @@
   <p id="status" role="status">Ready. Allow microphone access when your browser asks.</p>
   <p id="device"></p>
   <p id="settings" class="settings"></p>
+  <p id="control"></p>
   <table>
     <thead><tr><th>Playback path</th><th>Average above room noise</th><th>Worst 100 ms</th><th>Result</th></tr></thead>
     <tbody id="results"><tr><td colspan="4">No measurements yet</td></tr></tbody>
@@ -155,6 +156,22 @@
           `A: Web Audio | average ${statsA.meanDb.toFixed(1)} dB | worst 100 ms ${statsA.worstDb.toFixed(1)} dB | ${verdict(statsA.meanDb)}`,
           `B: local WebRTC audio player | average ${statsB.meanDb.toFixed(1)} dB | worst 100 ms ${statsB.worstDb.toFixed(1)} dB | ${verdict(statsB.meanDb)}`,
         ].join('\n');
+        status.textContent = 'Control run: echo cancellation off, so the speaker should be heard. Stay quiet.';
+        const rawStream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false } });
+        const rawAnalyser = context.createAnalyser(); rawAnalyser.fftSize = 2048;
+        context.createMediaStreamSource(rawStream).connect(rawAnalyser);
+        const rawFloorSamples = await capture(rawAnalyser, 2);
+        const rawFloor = rawFloorSamples.reduce((a, b) => a + b, 0) / rawFloorSamples.length;
+        const playC = playWebAudio(context, signal(context));
+        await wait(2000);
+        const statsC = summarize(await capture(rawAnalyser, 4), rawFloor);
+        await playC;
+        rawStream.getTracks().forEach(item => item.stop());
+        addResult('Control: Web Audio, echo cancellation off', statsC);
+        const audible = statsC.meanDb >= 6;
+        const note = audible ? 'The control was loud, so the test could hear the speaker and the results above are valid.' : 'The control was quiet, so the speaker sound barely reached the microphone. Raise the volume and run again; the results above prove nothing.';
+        document.querySelector('#control').textContent = note;
+        report += `\nControl (echo cancellation off): average ${statsC.meanDb.toFixed(1)} dB | worst 100 ms ${statsC.worstDb.toFixed(1)} dB | ${note}\nBrowser: ${navigator.userAgent}`;
         copyButton.disabled = false;
         status.textContent = 'Done. Lower numbers mean less speaker sound reached the microphone.';
         stream.getTracks().forEach(item => item.stop());
