@@ -13,7 +13,6 @@ import { PageNodeSchema } from "@maipai/ui/src/schema/types";
 import { cn } from "@maipai/ui/src/utils";
 import { ApiError, api, type Roster } from "@/lib/api";
 import { NotFoundPage } from "@/shell/pages/NotFoundPage";
-import { usePinnedApps } from "@/shell/usePinnedApps";
 import { useAppRows } from "@/shell/useAppCatalog";
 import { useTabItem } from "@/shell/tabIdentity";
 import { appHomeLabel, isMediaApp, isMediaPlayPage, playPageOf, usesFamilyHeader } from "@/shell/mediaApps";
@@ -183,9 +182,9 @@ export function PackageAppPage({ person }: { person: Roster }) {
   const inShellBar = phone && app !== undefined;
   useHeaderExtra(inShellBar ? PackageAppHeaderBar : undefined);
   useEffect(() => {
-    publishPackageAppHeader(inShellBar && app ? { personId: person.id, to: app.to, label: app.label, ...(app.settings_area?.id ? { settingsArea: app.settings_area.id } : {}) } : null);
+    publishPackageAppHeader(inShellBar && app ? { to: app.to, label: app.label, ...(app.settings_area?.id ? { settingsArea: app.settings_area.id } : {}) } : null);
     return () => publishPackageAppHeader(null);
-  }, [inShellBar, person.id, app?.to, app?.label, app?.settings_area?.id]); // eslint-disable-line react-hooks/exhaustive-deps -- app is read through its own fields
+  }, [inShellBar, app?.to, app?.label, app?.settings_area?.id]); // eslint-disable-line react-hooks/exhaustive-deps -- app is read through its own fields
   // Every package app reads its query as page state, so a reload or a shared link opens the same item.
   const urlState = packageId !== "";
   const queryState = useMemo<Record<string, string>>(() => (urlState ? Object.fromEntries(new URLSearchParams(location.search)) : {}), [urlState, location.search]);
@@ -229,7 +228,7 @@ export function PackageAppPage({ person }: { person: Roster }) {
   const content = (
     <div className={cn("flex min-h-0 min-w-0 flex-1 flex-col gap-2", (sidebarProps || media) && "py-4 lg:p-4 lg:ps-6")} data-testid="package-app" data-package={packageId}>
       {familyHeader ? null : <h1 className="sr-only">{app?.label ?? "App"}</h1>}
-      {app ? <AppToolbar inShellBar={inShellBar} hideSectionsOnWide={sidebar !== undefined} person={person} to={app.to} label={app.label} homeLabel={appHomeLabel(packageId, media)} settingsArea={app.settings_area?.id} sections={app.sections} current={pageId} familyHeader={familyHeader} title={contextTitle} titleSrOnly={sidebarProps ? ownHeader || contextTitle === undefined : false} /> : null}
+      {app ? <AppToolbar inShellBar={inShellBar} hideSectionsOnWide={sidebar !== undefined} to={app.to} label={app.label} homeLabel={appHomeLabel(packageId, media)} settingsArea={app.settings_area?.id} sections={app.sections} current={pageId} familyHeader={familyHeader} title={contextTitle} titleSrOnly={sidebarProps ? ownHeader || contextTitle === undefined : false} /> : null}
       <AsyncState
         data={page.isError ? null : page.data}
         error={page.isError}
@@ -302,20 +301,17 @@ export function PackageAppPage({ person }: { person: Roster }) {
   // section sidebar); its section tabs give way to it there, and a phone keeps them.
   const framed = sidebarProps ? (
     <div className="flex min-h-0 flex-1" data-workspace-fill="" data-slot="package-app-frame" data-testid="package-app-frame">
-      <SectionSidebar standalone density="compact" title={app?.label} headerActions={app ? <AppColumnActions person={person} to={app.to} label={app.label} settingsArea={app.settings_area?.id} /> : undefined} {...sidebarProps} />
+      <SectionSidebar standalone density="compact" title={app?.label} headerActions={app ? <AppColumnActions label={app.label} settingsArea={app.settings_area?.id} /> : undefined} {...sidebarProps} />
       {content}
     </div>
   ) : content;
   return media && hubActive ? <MediaHubFrame packageId={packageId}>{framed}</MediaHubFrame> : framed;
 }
 
-/** COLUMN-UNIFY-01 (owner, 2026-10-19): the app's settings and favorite controls sit in the column's header, after its title, the way
- * Chat's column carries Chat settings, so the page keeps one row of its own. Below the `lg` breakpoint the column is not drawn and
- * the toolbar keeps them. */
-function AppColumnActions({ person, to, label, settingsArea }: { person: Roster; to: string; label: string; settingsArea?: string }) {
-  const { isPinned, togglePin, isLoading, isSaving } = usePinnedApps(person.id);
-  const pinned = isPinned(to);
-  const StarIcon = getIcon("star");
+/** COLUMN-UNIFY-01 (owner, 2026-10-19): the app's settings control sits in the column's header, after its title, the way Chat's
+ * column carries Chat settings, so the page keeps one row of its own. Below the `lg` breakpoint the column is not drawn and the
+ * toolbar keeps it. The favorites star is gone (owner, 2026-10-25): pinning an app is done from the rail. */
+function AppColumnActions({ label, settingsArea }: { label: string; settingsArea?: string }) {
   const GearIcon = getIcon("settings");
   return (
     <>
@@ -324,19 +320,13 @@ function AppColumnActions({ person, to, label, settingsArea }: { person: Roster;
           <GearIcon aria-hidden="true" />
         </Button>
       ) : null}
-      <Button variant="ghost" size="icon" disabled={isLoading || isSaving} aria-pressed={pinned} aria-label={pinned ? "Remove from favorites" : "Add to favorites"} title={pinned ? "Remove from favorites" : "Add to favorites"} onClick={() => togglePin(to)}>
-        <StarIcon aria-hidden="true" fill={pinned ? "currentColor" : "none"} />
-      </Button>
     </>
   );
 }
 
-/** The app's own sections as tabs (when it has any) and the pin control. Pins are per person and private. */
-function AppToolbar({ inShellBar = false, hideSectionsOnWide = false, person, to, label, title, titleSrOnly = false, homeLabel, settingsArea, sections, current, familyHeader }: { inShellBar?: boolean; title?: string; titleSrOnly?: boolean; hideSectionsOnWide?: boolean; person: Roster; to: string; label: string; homeLabel: string; settingsArea?: string; sections: Array<{ page: string; label: string }>; current: string; familyHeader: boolean }) {
+/** The app's own sections as tabs (when it has any) and its settings button. */
+function AppToolbar({ inShellBar = false, hideSectionsOnWide = false, to, label, title, titleSrOnly = false, homeLabel, settingsArea, sections, current, familyHeader }: { inShellBar?: boolean; title?: string; titleSrOnly?: boolean; hideSectionsOnWide?: boolean; to: string; label: string; homeLabel: string; settingsArea?: string; sections: Array<{ page: string; label: string }>; current: string; familyHeader: boolean }) {
   const navigate = useNavigate();
-  const { isPinned, togglePin, isLoading, isSaving } = usePinnedApps(person.id);
-  const pinned = isPinned(to);
-  const StarIcon = getIcon("star");
   const GearIcon = getIcon("settings");
   // MEDIA-POLISH-01: a media app's own header, as the native app has it (YouTube's): its name large with its icon controls on the
   // end side, then its sections as chip tabs. The play page has no header: the picture starts the page.
@@ -365,9 +355,6 @@ function AppToolbar({ inShellBar = false, hideSectionsOnWide = false, person, to
               <GearIcon aria-hidden="true" />
             </Button>
           ) : null}
-          <Button variant="ghost" size="icon-lg" className={hideSectionsOnWide ? "lg:hidden" : undefined} disabled={isLoading || isSaving} aria-pressed={pinned} aria-label={pinned ? "Remove from favorites" : "Add to favorites"} onClick={() => togglePin(to)}>
-            <StarIcon aria-hidden="true" fill={pinned ? "currentColor" : "none"} />
-          </Button>
         </div>
         {tabs}
       </div>
@@ -409,16 +396,6 @@ function AppToolbar({ inShellBar = false, hideSectionsOnWide = false, person, to
           Settings
         </Button>
       ) : null}
-      <Button
-        variant="ghost"
-        size="sm"
-        disabled={isLoading || isSaving}
-        aria-pressed={pinned}
-        onClick={() => togglePin(to)}
-      >
-        <StarIcon aria-hidden="true" fill={pinned ? "currentColor" : "none"} />
-        {pinned ? "Remove from favorites" : "Add to favorites"}
-      </Button>
       </div>
     </div>
   );

@@ -196,13 +196,10 @@ describe("a package app at /apps/<id>", () => {
     await hidden.findByText(/That page does not exist/);
   });
 
-  test("adding to favorites writes the route to ui.pinned_apps; a stale pin is kept when the app is gone", async () => {
+  test("an app page has no favorites star (owner, 2026-10-25)", async () => {
     const view = open("/apps/demo");
-    const button = await view.findByRole("button", { name: "Add to favorites" });
-    await waitFor(() => expect((button as HTMLButtonElement).disabled).toBe(false));
-    await act(async () => { fireEvent.click(button); });
-    await waitFor(() => expect(home.puts.some((p) => p.key === "ui.pinned_apps" && p.value === JSON.stringify(["/apps/demo"]))).toBe(true));
-    await view.findByRole("button", { name: "Remove from favorites" });
+    await view.findByRole("tablist", { name: "Sections" });
+    expect(view.queryByRole("button", { name: /favorites/ })).toBeNull();
   });
 });
 

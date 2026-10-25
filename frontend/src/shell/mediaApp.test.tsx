@@ -251,7 +251,7 @@ describe("News draws its header in the media family without being a media app", 
     expect(view.getByRole("tab", { name: "Following" })).toBeTruthy();
     expect(view.getByRole("tablist", { name: "Sections" }).getAttribute("data-variant")).toBe("pill");
     expect(view.getByRole("link", { name: "News settings" })).toBeTruthy();
-    expect(view.getByRole("button", { name: "Add to favorites" })).toBeTruthy();
+    expect(view.queryByRole("button", { name: /favorites/ })).toBeNull();
     expect(view.queryByRole("button", { name: /Close the player/ })).toBeNull();
   });
 

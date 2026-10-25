@@ -108,9 +108,9 @@ describe("an app that declares a sidebar", () => {
     const side = await column(view);
     expect(side.getByRole("heading", { level: 2, name: "Demo news" })).toBeTruthy();
     expect(side.getByRole("link", { name: "Demo news settings" }).getAttribute("href")).toBe("/settings/demo");
-    expect(side.getByRole("button", { name: "Add to favorites" })).toBeTruthy();
+    expect(side.queryByRole("button", { name: /favorites/ })).toBeNull();
     // The page's own toolbar copies stay for a phone only (hidden from the `lg` breakpoint up).
-    const toolbarCopies = [...view.container.querySelectorAll<HTMLElement>('[data-testid="package-app"] a[aria-label="Demo news settings"], [data-testid="package-app"] button[aria-label="Add to favorites"]')];
+    const toolbarCopies = [...view.container.querySelectorAll<HTMLElement>('[data-testid="package-app"] a[aria-label="Demo news settings"]')];
     expect(toolbarCopies.length).toBeGreaterThan(0);
     for (const copy of toolbarCopies) expect(copy.closest(".lg\\:hidden")).not.toBeNull();
   });
