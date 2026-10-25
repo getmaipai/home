@@ -44,6 +44,18 @@ export function takeInterruptedReply(conversationId: string, personId: string, t
   return entry.remainder;
 }
 
+/** Whether a turn may carry the unheard part at all. Spoken turns only: it brings length guidance ("one short sentence"), which a written
+ * turn must never get (rule 5). Never on a crisis, safety or repair turn: a person who has just said something hard must not be offered
+ * the rest of a story (rule 0; the same turns the spoken cue is suppressed on). */
+export function mayCarryInterruptedReply(turn: { spokenSurface: boolean; crisis: boolean; crisisSignal: boolean; repair: string }): boolean {
+  return turn.spokenSurface && !turn.crisis && !turn.crisisSignal && turn.repair === "none";
+}
+
+/** A turn that may not carry it ends it: the moment has passed. */
+export function dropInterruptedReply(conversationId: string): void {
+  pending.delete(conversationId);
+}
+
 export function __clearInterruptedRepliesForTests(): void {
   pending.clear();
 }

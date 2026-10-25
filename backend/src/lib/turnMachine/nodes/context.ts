@@ -43,7 +43,9 @@ import { chatModelReadsPictures, loadPictureParts, picturePartsAllowed } from "@
 import type { LlmImagePart } from "@/lib/llm";
 import { chatCatalogEntry } from "@/lib/modelCatalog";
 import { sceneContextLine } from "@/lib/robotVision";
-import { takeInterruptedReply } from "@/lib/interruptedReply";
+import { dropInterruptedReply, mayCarryInterruptedReply, takeInterruptedReply } from "@/lib/interruptedReply";
+import { surfaceClassOf } from "@/lib/surfaceClass";
+import { carriesCrisisSignal } from "@/lib/safety";
 import { librarySnapshotDate } from "@/lib/retrieval/referenceReader";
 
 /** MEMORY-FLOOR-01: the floor on recall()'s own composite `score`
@@ -412,7 +414,9 @@ export const contextNode: Node<ContextInput, ContextOutput> = async (state, inpu
 
   // DUPLEX-06: the part of the last spoken reply this person cut in on before hearing it, once, for the next turn only (memory only,
   // never stored; it passed the output gate when released). Rides as labelled background, like the robot look above.
-  const unheard = takeInterruptedReply(conversation.id, state.actor.id, state.turnId);
+  const mayCarry = mayCarryInterruptedReply({ spokenSurface: surfaceClassOf(state.surface, state.spoken) === "spoken", crisis: state.crisis, crisisSignal: carriesCrisisSignal(state.safety), repair: state.signal.repair });
+  if (!mayCarry) dropInterruptedReply(conversation.id);
+  const unheard = mayCarry ? takeInterruptedReply(conversation.id, state.actor.id, state.turnId) : null;
   if (unheard) items.push({ id: "interrupted-reply", text: unheard, source: "interrupted", subjects: [], disclosure: "child_ok" });
 
   // The roster: who this household has, so "he"/"she"/a name resolves

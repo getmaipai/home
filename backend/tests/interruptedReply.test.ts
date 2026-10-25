@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, test } from "bun:test";
-import { __clearInterruptedRepliesForTests, noteInterruptedReply, takeInterruptedReply } from "@/lib/interruptedReply";
+import { __clearInterruptedRepliesForTests, dropInterruptedReply, mayCarryInterruptedReply, noteInterruptedReply, takeInterruptedReply } from "@/lib/interruptedReply";
 
 const RELEASED = "Once upon a time there were three little pigs. The first built a house of straw. The second built a house of sticks. The third built a house of bricks.";
 const HEARD = "Once upon a time there were three little pigs. The first built a house of straw.";
@@ -37,3 +37,28 @@ describe("the unheard part of an interrupted reply", () => {
     expect(takeInterruptedReply("conv-1", "person-a", "turn-1", 2000)!.length).toBeLessThanOrEqual(1200);
   });
 });
+
+describe("which turns may carry the unheard part", () => {
+  const spoken = { spokenSurface: true, crisis: false, crisisSignal: false, repair: "none" };
+
+  test("a plain spoken turn may", () => {
+    expect(mayCarryInterruptedReply(spoken)).toBe(true);
+  });
+
+  test("a written turn never does (rule 5: no length instructions on written chat)", () => {
+    expect(mayCarryInterruptedReply({ ...spoken, spokenSurface: false })).toBe(false);
+  });
+
+  test("a crisis turn, a turn carrying a crisis signal, or a repair turn never does (rule 0)", () => {
+    expect(mayCarryInterruptedReply({ ...spoken, crisis: true })).toBe(false);
+    expect(mayCarryInterruptedReply({ ...spoken, crisisSignal: true })).toBe(false);
+    expect(mayCarryInterruptedReply({ ...spoken, repair: "correction" })).toBe(false);
+  });
+
+  test("a turn that may not carry it ends it", () => {
+    noteInterruptedReply("conv-1", "person-a", RELEASED, HEARD, 1000);
+    dropInterruptedReply("conv-1");
+    expect(takeInterruptedReply("conv-1", "person-a", "turn-1", 2000)).toBeNull();
+  });
+});
+

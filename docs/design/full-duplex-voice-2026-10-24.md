@@ -146,6 +146,8 @@ the plan's assumptions decides whether to replan.
    (section 3b DUPLEX-06), so a long detour is not tracked; that is a measured gap, not a decision.
 9. **A long gap, or doubt that the person still wants it**: offer, do not resume (our inference).
 
+**Limits on where it applies (architect, 2026-10-25):** the unheard part and its guidance ride on **spoken turns only** (an adult who cuts in by voice and then types gets nothing, so written chat never receives length instructions: rule 5), and **never on a crisis, safety or repair turn** (the same turns the spoken cue is suppressed on; a person who has just said something hard is not offered the rest of a story: rule 0). A turn that may not carry it also ends it.
+
 **How it is built:** steps 1 and 2 are client and server timing (no model). Steps 3 to 7 are one guidance block outside the data wrapper
 (`messages.ts`), written as five labelled cases the model picks from, because a single sentence was ignored and a numbered list with a
 literal example ("anyway") made the model resume every time. **Measured on the local chat model (two runs, five cases, 2026-10-25):** the
