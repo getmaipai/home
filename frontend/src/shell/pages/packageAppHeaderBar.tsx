@@ -60,11 +60,14 @@ const iconOrNull = (name: string | null | undefined): string | null => (name && 
 export interface SectionsBarEntries {
   entries: Array<{ to: string; icon: string; label: string; exact?: boolean }>;
   trailing?: { to: string; icon: string; label: string };
+  more: Array<{ to: string; icon: string; label: string }>;
 }
-export function sectionsBarEntries(app: { to: string; icon?: string | null; sections: ReadonlyArray<{ page: string; label: string; icon?: string | null }> }, homeLabel: string, hasSearchPage: boolean): SectionsBarEntries {
+export function sectionsBarEntries(app: { to: string; label?: string; icon?: string | null; settings_area?: { id: string } | null; sections: ReadonlyArray<{ page: string; label: string; icon?: string | null }> }, homeLabel: string, hasSearchPage: boolean): SectionsBarEntries {
   const entries = [
     { to: app.to, icon: iconOrNull(app.icon) ?? "layout-grid", label: homeLabel, exact: true },
     ...app.sections.filter((section) => section.page !== "search").map((section) => ({ to: `${app.to}/${section.page}`, icon: SECTION_ICONS[section.page] ?? iconOrNull(section.icon) ?? "layout-grid", label: section.label })),
   ];
-  return hasSearchPage ? { entries, trailing: { to: `${app.to}/search`, icon: "search", label: "Search" } } : { entries };
+  // The last item is always the three-dot More button: the app's settings live under it, with anything that did not fit.
+  const more = app.settings_area?.id ? [{ to: `/settings/${app.settings_area.id}`, icon: "settings", label: `${app.label ?? "App"} settings` }] : [];
+  return hasSearchPage ? { entries, trailing: { to: `${app.to}/search`, icon: "search", label: "Search" }, more } : { entries, more };
 }
