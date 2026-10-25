@@ -2,9 +2,8 @@
 // thinking indicator, welcome, reasoning group, sources and message footer),
 // moved verbatim out of ChatPage.tsx (SHARED-THREAD-01). ChatThread.tsx
 // hands them to the kit Thread.
-import { CHAT_ART_HEIGHT, CHAT_ART_WIDTH, nextChatArt } from "@/apps/chat/chatArt";
 import { useReplyFeedbackForm } from "@/apps/chat/chatFeedbackDialog";
-import { SafeImage } from "@maipai/ui/src/primitives/SafeImage";
+import { CharacterHero } from "@maipai/ui/src/elements/character-hero";
 import { FeedbackDialog } from "@maipai/ui/src/elements/feedback-dialog";
 import { MemoryChips } from "@maipai/ui/src/elements/memory-chips";
 import { memoryChipsAllowed, useReplyMemoryChips } from "@/apps/chat/chatMemoryChips";
@@ -65,6 +64,9 @@ import { ComposerWakeWordControl } from "@/apps/chat/ComposerWakeWordControl";
 import { AdminContext, ChatAgeBandContext, ChatComposerNoticeContext, CompareOpenContext, SourcesOpenContext, DetailsOpenContext, ThinkingModeContext, ThinkingModeCapabilityContext, BareModeContext, TemporaryChatContext, WakeWordPersonContext } from "@/apps/chat/chatThreadContexts";
 import { ChatAvailabilityContext, useEngineDownReason } from "@/apps/chat/useChatAvailability";
 import { TurnErrorDetails, hasErrorFacts } from "@/shell/pages/TurnErrorDetails";
+import { useCompanionPresence } from "@/apps/chat/useCompanionPresence";
+import { CompanionAvatar } from "@maipai/ui/src/elements/companion-avatar";
+import { DraftConversationContext } from "@/apps/chat/chatThreadContexts";
 
 // ADMIN-COMPARE-01: no icon in the kit's own registry reads as "compare"
 // specifically - grid-2x2 (a two-pane split) is the closest already-
@@ -556,15 +558,26 @@ export function EngineStartingLoader({ Loader = GenerationLoader }: {
 // slot only reflects the shared state and does not add a second toggle.
 export function ChatWelcome() {
   const { on } = useContext(TemporaryChatContext);
+  const person = useContext(WakeWordPersonContext);
   const aui = useAui();
   const engineDown = useEngineDownReason();
-  const [art] = useState(() => nextChatArt());
+  const conversationId = useContext(DraftConversationContext);
+  const conversationQuery = useQuery({ queryKey: ["conversation", conversationId], queryFn: () => api.conversation(conversationId!), enabled: Boolean(conversationId) });
+  const settingsQuery = useQuery({ queryKey: ["settingsValues", `person:${person?.id ?? ""}`], queryFn: () => api.settingsValues(`person:${person!.id}`), enabled: Boolean(person?.id) });
+  const companionsQuery = useQuery({ queryKey: ["companions"], queryFn: api.companions });
+  const settings = Array.isArray(settingsQuery.data) ? settingsQuery.data : [];
+  const selectedId = settings.find((setting) => setting.key === "persona.active_id")?.value;
+  const fallbackId = typeof selectedId === "string" && companionsQuery.data?.companions?.some(({ id }) => id === selectedId) ? selectedId : companionsQuery.data?.default_id;
+  const companionId = conversationQuery.data?.companion_id ?? fallbackId ?? null;
+  const presence = useCompanionPresence(companionId);
+  const companion = companionsQuery.data?.companions?.find(({ id }) => id === companionId);
+  const name = presence?.name ?? companion?.name;
   return (
     <>
       <EngineStartingLoader />
-      <SafeImage src={art.src} alt={art.alt} kind="picture" width={CHAT_ART_WIDTH} height={CHAT_ART_HEIGHT} className="mx-auto mb-2 h-auto w-40 max-w-full sm:w-52" />
+      {name ? <CharacterHero name={name} seed={companionId} media={presence ? <CompanionAvatar name={presence.name} clips={presence.clips} wanted={presence.wanted} once={presence.once} size="lg" onFail={presence.onFail} /> : undefined} line="How can I help you today?" /> : null}
       <EmptyState>
-        <EmptyStateGreeting>{on ? "Temporary chat" : "How can I help you today?"}</EmptyStateGreeting>
+        {!name ? <EmptyStateGreeting>{on ? "Temporary chat" : "How can I help you today?"}</EmptyStateGreeting> : null}
         {on ? <p className="text-muted-foreground text-center text-sm">This chat won&apos;t be saved to your history.</p> : null}
         <EmptyStateSuggestions>
           {STARTER_SUGGESTIONS.map((suggestion, index) => (

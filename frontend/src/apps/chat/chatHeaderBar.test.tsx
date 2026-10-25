@@ -3,17 +3,18 @@ import { act, cleanup, fireEvent, render, waitFor } from "@testing-library/react
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { TooltipProvider } from "@maipai/ui/src/ui/tooltip";
 import { Button } from "@maipai/ui/src/ui/button";
-import * as realPresence from "@/apps/chat/useCompanionPresence";
+import * as avatarHookReal from "@/apps/chat/useCompanionAvatar";
 import * as realAvatar from "@maipai/ui/src/elements/companion-avatar";
-const presenceSnapshot = { ...realPresence };
+const avatarHookSnapshot = { ...avatarHookReal };
 const avatarSnapshot = { ...realAvatar };
 // mock.module outlives this file; put the real modules back for the files that run after it.
 afterAll(() => {
-  mock.module("@/apps/chat/useCompanionPresence", () => presenceSnapshot);
+  mock.module("@/apps/chat/useCompanionAvatar", () => avatarHookSnapshot);
   mock.module("@maipai/ui/src/elements/companion-avatar", () => avatarSnapshot);
 });
 let presenceMock: { name: string } | null = null;
-mock.module("@/apps/chat/useCompanionPresence", () => ({ useCompanionPresence: () => presenceMock && { ...presenceMock, clips: {}, wanted: undefined, once: null, size: "lg", hidden: false, onHiddenChange: () => {}, onFail: () => {} } }));
+let requestedCompanionId: string | null | undefined;
+mock.module("@/apps/chat/useCompanionAvatar", () => ({ ...avatarHookSnapshot, useCompanionAvatar: (id?: string | null) => { requestedCompanionId = id; return presenceMock ? { avatar: { name: presenceMock.name }, clips: {}, loading: false } : { avatar: null, clips: null, loading: false }; } }));
 mock.module("@maipai/ui/src/elements/companion-avatar", () => ({ CompanionAvatar: ({ name }: { name: string }) => <div role="img" aria-label={name} /> }));
 import { ChatHeaderBar } from "@/apps/chat/chatHeaderBar";
 import { ChatHeaderDataProvider, useSetChatHeaderData, type ChatHeaderData } from "@/apps/chat/chatHeaderData";
@@ -76,6 +77,15 @@ describe("ChatHeaderBar", () => {
   test("renders nothing with no data - the non-chat-page shape", () => {
     const view = renderBar(null);
     expect(view.container).toBeEmptyDOMElement();
+  });
+
+  test("a new chat with no companion yet shows the person's default companion", async () => {
+    presenceMock = { name: "Sprout" };
+    requestedCompanionId = undefined;
+    const view = renderBar(baseData({ companionId: null, defaultCompanionId: "sprout", companions: [{ id: "sprout", name: "Sprout" }] }));
+    expect(await view.findByRole("img", { name: "Sprout" })).toBeVisible();
+    expect(String(requestedCompanionId)).toBe("sprout");
+    presenceMock = null;
   });
 
   test("renders the conversation's own title", async () => {

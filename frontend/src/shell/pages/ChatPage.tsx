@@ -766,11 +766,12 @@ function ChatTitleCatchUp({ incognito }: { incognito: boolean }) {
  * pushes it into the data context. Same side-effect-mount shape as
  * ArtifactCacheInvalidator/ChatDocumentTitle above, just carrying data
  * instead of a DOM/browser-API side effect. */
-function ChatHeaderDataBridge({ autoReadReplies, setAutoReadReplies, ttsAvailable, pinnable, conversationId, sheetOpen, onToggleSheet, inShellBar }: {
+function ChatHeaderDataBridge({ autoReadReplies, setAutoReadReplies, ttsAvailable, pinnable, person, conversationId, sheetOpen, onToggleSheet, inShellBar }: {
   autoReadReplies: boolean;
   setAutoReadReplies: (enabled: boolean) => void;
   ttsAvailable: boolean;
   pinnable: boolean;
+  person: Roster;
   conversationId?: string;
   sheetOpen: boolean;
   onToggleSheet: () => void;
@@ -778,10 +779,15 @@ function ChatHeaderDataBridge({ autoReadReplies, setAutoReadReplies, ttsAvailabl
 }) {
   const aui = useAui();
   const queryClient = useQueryClient();
-  const companionList = useQuery({ queryKey: ["companions"], queryFn: api.companions, enabled: Boolean(conversationId && pinnable) });
+  const companionList = useQuery({ queryKey: ["companions"], queryFn: api.companions });
+  const personSettings = useQuery({ queryKey: ["settingsValues", `person:${person.id}`], queryFn: () => api.settingsValues(`person:${person.id}`) });
   const conversation = useQuery({ queryKey: ["conversation", conversationId], queryFn: () => api.conversation(conversationId!), enabled: Boolean(conversationId) });
   // Memoized: the header data hook re-sends on a changed reference, and a fresh array per render would loop.
   const companionChoices = useMemo(() => companionList.data?.companions?.map(({ id, name }) => ({ id, name })) ?? [], [companionList.data]);
+  const activeCompanionId = Array.isArray(personSettings.data) ? personSettings.data.find((setting) => setting.key === "persona.active_id")?.value : undefined;
+  const defaultCompanionId = (typeof activeCompanionId === "string" && companionList.data?.companions?.some(({ id }) => id === activeCompanionId) ? activeCompanionId : undefined)
+    ?? companionList.data?.default_id
+    ?? null;
   const title = useAuiState((s) => s.threadListItem.title) ?? "";
   const pinned = useAuiState((s) => isThreadPinned(s.threadListItem.custom));
   useEffect(() => {
@@ -799,6 +805,7 @@ function ChatHeaderDataBridge({ autoReadReplies, setAutoReadReplies, ttsAvailabl
     pinnable,
     pinned,
     companionId: conversation.data?.companion_id ?? null,
+    defaultCompanionId,
     companions: companionChoices,
     onCompanionChange: async (companionId) => {
       if (!conversationId || !pinnable) return;
@@ -1534,7 +1541,7 @@ export function ChatPage({ person }: { person: Roster }) {
               <ChatDocumentTitle person={person} />
         <ChatTitleCatchUp incognito={temporaryNext} />
         <ChatMemoryPoll incognito={temporaryNext} />
-        <ChatHeaderDataBridge autoReadReplies={autoReadReplies} setAutoReadReplies={setAutoReadReplies} ttsAvailable={ttsAvailable} pinnable={!temporaryNext} conversationId={temporaryNext ? undefined : draftConversationId} sheetOpen={sheetOpen} onToggleSheet={() => setSheetOpen((open) => !open)} inShellBar={barOnPhone} />
+        <ChatHeaderDataBridge autoReadReplies={autoReadReplies} setAutoReadReplies={setAutoReadReplies} ttsAvailable={ttsAvailable} pinnable={!temporaryNext} person={person} conversationId={temporaryNext ? undefined : draftConversationId} sheetOpen={sheetOpen} onToggleSheet={() => setSheetOpen((open) => !open)} inShellBar={barOnPhone} />
         <ProjectResultReload />
         {settingsDialog}
         <Dialog open={micGate.problem !== null} onOpenChange={(open) => { if (!open) micGate.dismiss(); }}>

@@ -186,7 +186,7 @@ export function ChatThreadExtras() {
 
   return (
     <>
-      {presence && shells !== true ? <CompanionAvatar placement="corner" {...presence} /> : null}
+      {presence && shells !== true && messages.length > 0 ? <CompanionAvatar placement="corner" {...presence} /> : null}
       {entries.length >= 8 && (
         <StableConversationMap
           entries={entries}
