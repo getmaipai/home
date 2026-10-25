@@ -501,7 +501,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/news/cards.ts` | storyIdOf, itemIdFrom, hostOf, publishedAtOf, cardEnv, publisherOf |
 | `backend/src/lib/news/childGate.ts` | sentencesOf, gateFor, inlineText, gateBlock, gateBlocks, SPEECH_CHUNK_MAX |
 | `backend/src/lib/news/contentQuality.ts` | MIN_ARTICLE_CHARS, FAILURE_TTL_MS, looksLikeStub, acceptArticleText, betterCopy, createFailureMemory |
-| `backend/src/lib/news/data.ts` | viewerOf, finishBlocks, blockBase, topicParam, withKicker, todayData |
+| `backend/src/lib/news/data.ts` | __releasedForBandForTests, viewerOf, finishBlocks, blockBase, topicParam, withKicker |
 | `backend/src/lib/news/dayParts.ts` | hubTimeZone, datelineOf, localDayKey, dayGroupOf |
 | `backend/src/lib/news/enrich.ts` | ENRICHMENT_NONE_MS, __setNewsEnrichClockForTests, __resetNewsEnrichForTests, enrichmentFresh, enrichItem |
 | `backend/src/lib/news/enrichmentStore.ts` | ENRICHMENT_SCHEMA, enrichmentStore |
@@ -685,7 +685,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/shelf/shelfNews.ts` | SHELF_EMPTY_TEXT, SHELF_NO_LISTS_TEXT, shelfNewsResult |
 | `backend/src/lib/shelf/shelfPolicy.ts` | BANDS, FEED_LISTS, isBand, audienceOf, bandOkAllowedFor, listIdForPackage |
 | `backend/src/lib/shelf/shelfPoller.ts` | MAX_BACKOFF_S, MAX_FEEDS_PER_TICK, MAX_FEEDS_PER_HOST_PER_TICK, backoffSeconds, RedirectLimitError, guardedGet |
-| `backend/src/lib/shelf/shelfRead.ts` | visibleFeedIds, feedIsOfferedTo, releaseShelfItems, releaseShelfItem |
+| `backend/src/lib/shelf/shelfRead.ts` | __resetFloorMemoForTests, visibleFeedIds, feedIsOfferedTo, releaseShelfItems, releaseShelfItem |
 | `backend/src/lib/shelf/shelfStore.ts` | openShelfStore, sharedShelfStore, __resetSharedShelfStoreForTests |
 | `backend/src/lib/sidecars.ts` | blockedPortReason, blockedPortDetails, stopBlockedPortHolder, blockedPortHolderAlive, __recordOwnedPortForTests, __blockPortForTests |
 | `backend/src/lib/sileroVad.ts` | getSileroStream, __resetSileroVadForTests, SileroVadStream |
