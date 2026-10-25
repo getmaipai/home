@@ -8,11 +8,13 @@ const scratch = mkdtempSync(join(tmpdir(), "maipai-lander-"));
 const origin = join(scratch, "origin.git");
 const main = join(scratch, "main");
 const data = join(scratch, "land-data");
+const pipelineBin = join(scratch, "pipeline-bin");
 const warm = join(scratch, "warm-checkout");
 const scriptNames = ["land.sh", "lander.sh", "pipeline.sh"];
 const env = {
   ...process.env,
   MAIPAI_LAND_DATA: data,
+  MAIPAI_PIPELINE_BIN: pipelineBin,
   MAIPAI_LAND_CHECKOUT: warm,
   MAIPAI_LAND_SKIP_INSTALL: "1",
   MAIPAI_LAND_GIT_ENV: "",
@@ -37,6 +39,17 @@ function commit(worktree: string, message: string) {
   git(worktree, "add", "-A");
   git(worktree, "commit", "-m", message);
   return git(worktree, "rev-parse", "HEAD");
+}
+function pushScriptChange(name: string, marker: string) {
+  git(main, "fetch", "origin");
+  const slug = marker.replace(/[^a-z0-9-]/gi, "-");
+  const worktree = join(scratch, `snapshot-${slug}`);
+  git(main, "worktree", "add", "-b", `wt/snapshot-${slug}`, worktree, "origin/main");
+  const path = join(worktree, "scripts", name);
+  writeFileSync(path, `${readFileSync(path, "utf8")}\n# ${marker}\n`);
+  git(worktree, "add", `scripts/${name}`);
+  git(worktree, "commit", "-m", marker);
+  git(worktree, "push", "origin", "HEAD:main");
 }
 function note(name: string): { branch: string; sha: string; status: string; reason: string; main_sha: string; check_tail: string; note?: string } {
   return JSON.parse(readFileSync(join(data, "notes", `wt-${name}.json`), "utf8"));
@@ -63,6 +76,24 @@ beforeAll(() => {
 }, 60_000);
 
 describe("lander pipeline", () => {
+  test("refresh snapshots atomically and pipeline status compares against origin/main", () => {
+    const first = run("lander.sh", ["refresh"]);
+    expect(first.status).toBe(0);
+    expect(first.stdout.trim()).toBe("changed");
+    const original = readFileSync(join(pipelineBin, "lander.sh"), "utf8");
+    expect(run("lander.sh", ["refresh"]).stdout.trim()).toBe("unchanged");
+
+    pushScriptChange("lander.sh", "snapshot lander update");
+    const updated = run("lander.sh", ["refresh"]);
+    expect(updated.stdout.trim()).toBe("changed");
+    expect(readFileSync(join(pipelineBin, "lander.sh"), "utf8")).toBe(`${git(main, "show", "origin/main:scripts/lander.sh")}\n`);
+    expect(readFileSync(join(pipelineBin, "lander.sh"), "utf8")).not.toBe(original);
+    expect(run("pipeline.sh", ["status"]).stdout).toContain("lander code: current");
+
+    pushScriptChange("lander.sh", "snapshot lander newer");
+    expect(run("pipeline.sh", ["status"]).stdout).toContain("lander code: older than origin/main");
+  }, 60_000);
+
   test("green landing fast-forwards main, writes a note and removes the remote branch", () => {
     const wt = makeWorktree("alpha");
     writeFileSync(join(wt, "file.txt"), "line one\nline two\nalpha third line\n");
@@ -230,6 +261,45 @@ describe("lander pipeline", () => {
     expect(run("land.sh", ["--detach"], unchanged).status).toBe(0);
     expect(run("lander.sh", ["run-once"]).status).toBe(0);
     expect(git(origin, "log", "main", "--format=%s").split("\n").filter((message) => message.startsWith("Generated:")).length).toBe(generatedCommitCount);
+  }, 60_000);
+
+  test("serve replaces its code between requests without changing pid and continues landing", async () => {
+    expect(run("lander.sh", ["refresh"]).status).toBe(0);
+    const serveEnv = { ...env, MAIPAI_LAND_POLL_SECONDS: "1", MAIPAI_PIPELINE_REFRESH_SECONDS: "1" };
+    const server = Bun.spawn(["bash", join(main, "scripts", "lander.sh"), "serve"], {
+      cwd: main,
+      env: serveEnv,
+      stdout: "pipe",
+      stderr: "pipe",
+    });
+    const pidfile = join(data, "lander.pid");
+    try {
+      const startupDeadline = Date.now() + 10_000;
+      while (!existsSync(pidfile) && Date.now() < startupDeadline) await Bun.sleep(25);
+      expect(existsSync(pidfile)).toBe(true);
+      const pid = readFileSync(pidfile, "utf8").trim();
+
+      pushScriptChange("lander.sh", "live lander replacement");
+      const refreshDeadline = Date.now() + 10_000;
+      while ((!existsSync(join(data, "lander.log")) || !readFileSync(join(data, "lander.log"), "utf8").includes("code refreshed from origin/main; restarting lander")) && Date.now() < refreshDeadline) await Bun.sleep(50);
+      expect(readFileSync(pidfile, "utf8").trim()).toBe(pid);
+      expect(readFileSync(join(data, "lander.log"), "utf8")).toContain("code refreshed from origin/main; restarting lander");
+
+      const wt = makeWorktree("after_snapshot_swap");
+      writeFileSync(join(wt, "file.txt"), "after swap\n");
+      const sha = commit(wt, "landing after snapshot swap");
+      expect(run("land.sh", ["--detach"], wt).status).toBe(0);
+      const landingDeadline = Date.now() + 15_000;
+      while (!existsSync(join(data, "notes", "wt-after_snapshot_swap.json")) && Date.now() < landingDeadline) await Bun.sleep(50);
+      expect(note("after_snapshot_swap").status).toBe("landed");
+      expect(note("after_snapshot_swap").sha).toBe(sha);
+
+      process.kill(Number(pid), "SIGTERM");
+      expect(await server.exited).toBe(0);
+      expect(existsSync(pidfile)).toBe(false);
+    } finally {
+      if (existsSync(pidfile)) process.kill(Number(readFileSync(pidfile, "utf8").trim()), "SIGTERM");
+    }
   }, 60_000);
 });
 

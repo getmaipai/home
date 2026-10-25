@@ -30,6 +30,7 @@ fast-forwards from origin first; a worktree leases a free 88xx port from `script
 Land with `bash scripts/land.sh` (pushes the branch to the lander's queue; the lander runs the 15 s static check and fast-forwards
 `main`; `wt.sh land` hands off to it). `bash scripts/pipeline.sh status | start | stop` shows the queue and the last landings
 and runs the lander (`scripts/lander.sh`, one per machine, warm checkout `../home-lander`).
+The lander and watcher run from copies of `scripts/lander.sh` and `scripts/watcher.sh` taken from `origin/main` into `data-scratch/pipeline-bin/` and replace themselves between runs, so landing a change to them updates the daemons without touching the main checkout.
 `bash scripts/pin.sh commons <pkg>-vX.Y.Z | stack <sha> | bot <version>` edits every file a pin lives in, reinstalls, commits and lands it.
 A landing names the backlog items it finishes (`bash scripts/land.sh --done ITEM-01`) and never edits `docs/BACKLOG.md` checkboxes or generated files by hand; the lander writes both.
 Lint: `tsc --noEmit` (backend); `tsc --noEmit && eslint .` (frontend). `bash scripts/check.sh --docs` for docs-only changes,

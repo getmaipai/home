@@ -6,11 +6,29 @@ error() { echo "lander.sh: $1" >&2; }
 common="$(git rev-parse --git-common-dir 2>/dev/null)" || { error "not inside a git checkout; run this from the main checkout."; exit 1; }
 [[ "$common" = /* ]] || common="$(cd "$(dirname "$common")" && pwd -P)/$(basename "$common")"
 main="$(cd "$(dirname "$common")" && pwd -P)"
+bin="${MAIPAI_PIPELINE_BIN:-$main/data-scratch/pipeline-bin}"
 data="${MAIPAI_LAND_DATA:-$main/data-scratch/land}"
 checkout="${MAIPAI_LAND_CHECKOUT:-$(cd "$main/.." && pwd -P)/home-lander}"
 mkdir -p "$data/queue" "$data/notes" "$data"
 git_env="${MAIPAI_LAND_GIT_ENV-$main/data-scratch/bin/https-git.env}"
 if [[ -n "$git_env" && -f "$git_env" ]]; then source "$git_env"; fi
+
+refresh_snapshot() {
+  local script="$1" current="$bin/$1" tmp="$bin/$1.new"
+  mkdir -p "$bin"
+  git -C "$main" fetch -q origin main >/dev/null 2>&1 || true
+  if ! git -C "$main" show "origin/main:scripts/$script" > "$tmp" 2>/dev/null || [[ ! -s "$tmp" ]]; then
+    rm -f "$tmp"
+    return 1
+  fi
+  if [[ ! -f "$current" ]] || ! cmp -s "$tmp" "$current"; then
+    mv -f "$tmp" "$current" || { rm -f "$tmp"; return 1; }
+    echo changed
+  else
+    rm -f "$tmp"
+    echo unchanged
+  fi
+}
 
 checkout_warm() {
   if [[ ! -e "$checkout/.git" ]]; then
@@ -228,9 +246,13 @@ run_once() {
 
 serve() {
   local pidfile="$data/lander.pid" poll="${MAIPAI_LAND_POLL_SECONDS:-2}" old
+  local refresh_seconds="${MAIPAI_PIPELINE_REFRESH_SECONDS:-60}" last_refresh=0 now refresh_result running_hash snapshot_hash
+  running_hash="$(git -C "$main" hash-object "$0" 2>/dev/null || true)"
+  [[ "$refresh_seconds" =~ ^[0-9]+$ ]] || refresh_seconds=60
+  (( refresh_seconds > 0 )) || refresh_seconds=1
   if [[ -f "$pidfile" ]]; then
     old="$(cat "$pidfile" 2>/dev/null || true)"
-    if [[ "$old" =~ ^[0-9]+$ ]] && kill -0 "$old" 2>/dev/null && ps -p "$old" -o command= 2>/dev/null | grep -Eq 'lander\.sh'; then error "already running as pid $old; stop it with bash scripts/pipeline.sh stop."; return 1; fi
+    if [[ "$old" =~ ^[0-9]+$ && "$old" != "$$" ]] && kill -0 "$old" 2>/dev/null && ps -p "$old" -o command= 2>/dev/null | grep -Eq 'lander\.sh'; then error "already running as pid $old; stop it with bash scripts/pipeline.sh stop."; return 1; fi
   fi
   echo "$$" > "$pidfile"
   local stop_requested=0 sleep_pid=""
@@ -238,6 +260,16 @@ serve() {
   trap 'rm -f "$data/lander.pid"' EXIT
   set +e
   while :; do
+    now="$(date +%s)"
+    if (( now - last_refresh >= refresh_seconds )); then
+      last_refresh="$now"
+      refresh_result="$(refresh_snapshot lander.sh)"
+      snapshot_hash="$(git -C "$main" hash-object "$bin/lander.sh" 2>/dev/null || true)"
+      if [[ "$refresh_result" == changed || ( -n "$running_hash" && "$snapshot_hash" != "$running_hash" ) ]]; then
+        echo "$(date -u +%Y-%m-%dT%H:%M:%SZ) code refreshed from origin/main; restarting lander" >> "$data/lander.log"
+        exec bash "$bin/lander.sh" "$@"
+      fi
+    fi
     run_once || echo "lander.sh: run-once failed; inspect the request and lander.log, then restart with bash scripts/pipeline.sh start." >&2
     if (( stop_requested )); then break; fi
     sleep "$poll" & sleep_pid=$!
@@ -251,8 +283,9 @@ serve() {
 }
 
 case "${1:-}" in
+  refresh) refresh_snapshot lander.sh || exit 1 ;;
   checkout) checkout_warm ;;
   run-once) checkout_warm && run_once ;;
-  serve) checkout_warm && serve ;;
-  *) error "usage: bash scripts/lander.sh run-once | serve | checkout"; exit 2 ;;
+  serve) checkout_warm && serve "$@" ;;
+  *) error "usage: bash scripts/lander.sh refresh | run-once | serve | checkout"; exit 2 ;;
 esac

@@ -5,6 +5,7 @@ import { join } from "node:path";
 import { spawnSync } from "node:child_process";
 
 const roots: string[] = [];
+let snapshotCount = 0;
 const sourceScripts = ["watcher.sh", "pipeline.sh"];
 
 function git(dir: string, ...args: string[]) {
@@ -19,10 +20,12 @@ function fixture() {
   const origin = join(scratch, "origin.git");
   const main = join(scratch, "main");
   const data = join(scratch, "watch-data");
+  const pipelineBin = join(scratch, "pipeline-bin");
   const warm = join(scratch, "home-watcher");
   const env: NodeJS.ProcessEnv = {
     ...process.env,
     MAIPAI_WATCH_DATA: data,
+    MAIPAI_PIPELINE_BIN: pipelineBin,
     MAIPAI_WATCH_CHECKOUT: warm,
     MAIPAI_WATCH_SKIP_INSTALL: "1",
     MAIPAI_WATCH_QUIET_MAX_SECONDS: "0",
@@ -46,7 +49,19 @@ function fixture() {
   git(main, "add", "-A");
   git(main, "commit", "-m", "fixture base");
   git(main, "push", "-u", "origin", "main");
-  return { scratch, origin, main, data, warm, env };
+  return { scratch, origin, main, data, warm, pipelineBin, env };
+}
+
+function pushScriptChange(f: ReturnType<typeof fixture>, marker: string) {
+  git(f.main, "fetch", "origin");
+  const id = ++snapshotCount;
+  const worktree = join(f.scratch, `snapshot-${id}`);
+  git(f.main, "worktree", "add", "-b", `wt/snapshot-${id}`, worktree, "origin/main");
+  const path = join(worktree, "scripts/watcher.sh");
+  writeFileSync(path, `${readFileSync(path, "utf8")}\n# ${marker}\n`);
+  git(worktree, "add", "scripts/watcher.sh");
+  git(worktree, "commit", "-m", marker);
+  git(worktree, "push", "origin", "HEAD:main");
 }
 
 function commit(f: ReturnType<typeof fixture>, message: string, files: Record<string, string>) {
@@ -72,6 +87,21 @@ function records(f: ReturnType<typeof fixture>) {
 }
 
 describe("main watcher", () => {
+  test("refresh copies watcher code from origin/main and status reports its age", () => {
+    const f = fixture();
+    expect(run(f, "watcher.sh", ["refresh"]).stdout.trim()).toBe("changed");
+    const original = readFileSync(join(f.pipelineBin, "watcher.sh"), "utf8");
+    expect(run(f, "watcher.sh", ["refresh"]).stdout.trim()).toBe("unchanged");
+    expect(run(f, "pipeline.sh", ["status"]).stdout).toContain("watcher code: current");
+
+    pushScriptChange(f, "snapshot watcher update");
+    expect(run(f, "watcher.sh", ["refresh"]).stdout.trim()).toBe("changed");
+    expect(readFileSync(join(f.pipelineBin, "watcher.sh"), "utf8")).toBe(`${git(f.main, "show", "origin/main:scripts/watcher.sh")}\n`);
+    expect(readFileSync(join(f.pipelineBin, "watcher.sh"), "utf8")).not.toBe(original);
+    pushScriptChange(f, "snapshot watcher newer");
+    expect(run(f, "pipeline.sh", ["status"]).stdout).toContain("watcher code: older than origin/main");
+  }, 60_000);
+
   test("waits for a queued landing, then runs and records the suite after the cap", () => {
     const f = fixture();
     mkdirSync(join(f.env.MAIPAI_LAND_DATA!, "queue"), { recursive: true });

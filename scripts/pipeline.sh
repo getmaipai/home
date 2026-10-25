@@ -12,8 +12,51 @@ pidfile="$data/lander.pid"
 watch_data="${MAIPAI_WATCH_DATA:-$main/data-scratch/watch}"
 mkdir -p "$watch_data/green" "$watch_data/reds"
 watch_pidfile="$watch_data/watcher.pid"
+bin="${MAIPAI_PIPELINE_BIN:-$main/data-scratch/pipeline-bin}"
 git_env="${MAIPAI_LAND_GIT_ENV-$main/data-scratch/bin/https-git.env}"
 if [[ -n "$git_env" && -f "$git_env" ]]; then source "$git_env"; fi
+
+refresh_snapshot() {
+  local script="$1" current="$bin/$1" tmp="$bin/$1.new"
+  mkdir -p "$bin"
+  git -C "$main" fetch -q origin main >/dev/null 2>&1 || true
+  if ! git -C "$main" show "origin/main:scripts/$script" > "$tmp" 2>/dev/null || [[ ! -s "$tmp" ]]; then
+    rm -f "$tmp"
+    return 1
+  fi
+  if [[ ! -f "$current" ]] || ! cmp -s "$tmp" "$current"; then
+    mv -f "$tmp" "$current" || { rm -f "$tmp"; return 1; }
+    echo changed
+  else
+    rm -f "$tmp"
+    echo unchanged
+  fi
+}
+
+ensure_snapshot() {
+  local script="$1"
+  if ! refresh_snapshot "$script"; then
+    echo "pipeline.sh: origin/main has no readable scripts/$script; using the main checkout copy." >&2
+    mkdir -p "$bin"
+    if [[ -r "$main/scripts/$script" && -s "$main/scripts/$script" ]]; then
+      cp "$main/scripts/$script" "$bin/$script.new"
+      mv -f "$bin/$script.new" "$bin/$script"
+    else
+      error "cannot find scripts/$script in origin/main or the main checkout."
+      return 1
+    fi
+  fi
+}
+
+code_status() {
+  local script="$1" label="${1%.sh}" hash
+  hash="$(git -C "$main" rev-parse "origin/main:scripts/$script" 2>/dev/null || true)"
+  if [[ -n "$hash" && -f "$bin/$script" ]] && [[ "$(git -C "$main" hash-object "$bin/$script" 2>/dev/null || true)" == "$hash" ]]; then
+    echo "$label code: current"
+  else
+    echo "$label code: older than origin/main"
+  fi
+}
 
 pid="$(cat "$pidfile" 2>/dev/null || true)"
 is_running() { [[ "$pid" =~ ^[0-9]+$ ]] && kill -0 "$pid" 2>/dev/null && ps -p "$pid" -o command= 2>/dev/null | grep -Eq 'lander\.sh'; }
@@ -58,8 +101,11 @@ PY
 }
 
 status() {
+  git -C "$main" fetch -q origin main >/dev/null 2>&1 || true
   if is_running; then echo "lander: running (pid $pid)"; else echo "lander: stopped"; fi
   if watch_is_running; then echo "watcher: running (pid $watch_pid)"; else echo "watcher: stopped"; fi
+  code_status lander.sh
+  code_status watcher.sh
   watch_main_status
   local f branch sha requested age now queue_count vals
   queue_count="$(find "$data/queue" -maxdepth 1 -type f -name '*.json' -print | wc -l | tr -d ' ')"
@@ -97,13 +143,16 @@ for line in sys.stdin:
 case "${1:-}" in
   status) status ;;
   start)
+    ensure_snapshot lander.sh || exit 1
+    ensure_snapshot watcher.sh || exit 1
+    cd "$main"
     if is_running; then echo "lander already running (pid $pid)"; else
-      nohup bash "$main/scripts/lander.sh" serve >>"$data/lander.log" 2>&1 </dev/null &
+      nohup bash "$bin/lander.sh" serve >>"$data/lander.log" 2>&1 </dev/null &
       pid=$!
       echo "lander started (pid $pid)"
     fi
     if watch_is_running; then echo "watcher already running (pid $watch_pid)"; else
-      nohup bash "$main/scripts/watcher.sh" serve >>"$watch_data/watcher.log" 2>&1 </dev/null &
+      nohup bash "$bin/watcher.sh" serve >>"$watch_data/watcher.log" 2>&1 </dev/null &
       watch_pid=$!
       echo "watcher started (pid $watch_pid)"
     fi

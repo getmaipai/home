@@ -9,11 +9,29 @@ error() { echo "watcher.sh: $1" >&2; }
 common="$(git rev-parse --git-common-dir 2>/dev/null)" || { error "not inside a git checkout; run this from the main checkout."; exit 1; }
 [[ "$common" = /* ]] || common="$(cd "$(dirname "$common")" && pwd -P)/$(basename "$common")"
 main="$(cd "$(dirname "$common")" && pwd -P)"
+bin="${MAIPAI_PIPELINE_BIN:-$main/data-scratch/pipeline-bin}"
 data="${MAIPAI_WATCH_DATA:-$main/data-scratch/watch}"
 checkout="${MAIPAI_WATCH_CHECKOUT:-$(cd "$main/.." && pwd -P)/home-watcher}"
 mkdir -p "$data/green" "$data/reds"
 git_env="${MAIPAI_LAND_GIT_ENV-$main/data-scratch/bin/https-git.env}"
 if [[ -n "$git_env" && -f "$git_env" ]]; then source "$git_env"; fi
+
+refresh_snapshot() {
+  local script="$1" current="$bin/$1" tmp="$bin/$1.new"
+  mkdir -p "$bin"
+  git -C "$main" fetch -q origin main >/dev/null 2>&1 || true
+  if ! git -C "$main" show "origin/main:scripts/$script" > "$tmp" 2>/dev/null || [[ ! -s "$tmp" ]]; then
+    rm -f "$tmp"
+    return 1
+  fi
+  if [[ ! -f "$current" ]] || ! cmp -s "$tmp" "$current"; then
+    mv -f "$tmp" "$current" || { rm -f "$tmp"; return 1; }
+    echo changed
+  else
+    rm -f "$tmp"
+    echo unchanged
+  fi
+}
 
 atomic_value() {
   local path="$1" value="$2" tmp
@@ -325,9 +343,13 @@ run_once() {
 
 serve() {
   local pidfile="$data/watcher.pid" poll="${MAIPAI_WATCH_POLL_SECONDS:-30}" old
+  local refresh_seconds="${MAIPAI_PIPELINE_REFRESH_SECONDS:-60}" last_refresh=0 now refresh_result running_hash snapshot_hash
+  running_hash="$(git -C "$main" hash-object "$0" 2>/dev/null || true)"
+  [[ "$refresh_seconds" =~ ^[0-9]+$ ]] || refresh_seconds=60
+  (( refresh_seconds > 0 )) || refresh_seconds=1
   if [[ -f "$pidfile" ]]; then
     old="$(cat "$pidfile" 2>/dev/null || true)"
-    if [[ "$old" =~ ^[0-9]+$ ]] && kill -0 "$old" 2>/dev/null && ps -p "$old" -o command= 2>/dev/null | grep -Eq 'watcher\.sh'; then error "already running as pid $old; stop it with bash scripts/pipeline.sh stop."; return 1; fi
+    if [[ "$old" =~ ^[0-9]+$ && "$old" != "$$" ]] && kill -0 "$old" 2>/dev/null && ps -p "$old" -o command= 2>/dev/null | grep -Eq 'watcher\.sh'; then error "already running as pid $old; stop it with bash scripts/pipeline.sh stop."; return 1; fi
   fi
   echo "$$" > "$pidfile"
   local stop_requested=0 sleep_pid=""
@@ -335,6 +357,16 @@ serve() {
   trap 'rm -f "$data/watcher.pid"' EXIT
   set +e
   while :; do
+    now="$(date +%s)"
+    if (( now - last_refresh >= refresh_seconds )); then
+      last_refresh="$now"
+      refresh_result="$(refresh_snapshot watcher.sh)"
+      snapshot_hash="$(git -C "$main" hash-object "$bin/watcher.sh" 2>/dev/null || true)"
+      if [[ "$refresh_result" == changed || ( -n "$running_hash" && "$snapshot_hash" != "$running_hash" ) ]]; then
+        echo "$(date -u +%Y-%m-%dT%H:%M:%SZ) code refreshed from origin/main; restarting watcher" >> "$data/watcher.log"
+        exec bash "$bin/watcher.sh" "$@"
+      fi
+    fi
     run_once || echo "watcher.sh: run-once failed; inspect watcher.log, then restart with bash scripts/pipeline.sh start." >&2
     if (( stop_requested )); then break; fi
     sleep "$poll" & sleep_pid=$!
@@ -348,8 +380,9 @@ serve() {
 }
 
 case "${1:-}" in
+  refresh) refresh_snapshot watcher.sh || exit 1 ;;
   checkout) checkout_warm ;;
   run-once) checkout_warm && run_once ;;
-  serve) checkout_warm && serve ;;
-  *) error "usage: bash scripts/watcher.sh run-once | serve | checkout"; exit 2 ;;
+  serve) checkout_warm && serve "$@" ;;
+  *) error "usage: bash scripts/watcher.sh refresh | run-once | serve | checkout"; exit 2 ;;
 esac
