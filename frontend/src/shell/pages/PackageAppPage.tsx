@@ -4,6 +4,8 @@ import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
 import { Button } from "@maipai/ui/src/dashboard/components/ui/button";
 import { Tabs, TabsList, TabsTrigger } from "@maipai/ui/src/dashboard/components/ui/tabs";
 import { getIcon } from "@maipai/ui/src/icons";
+import { useHeaderExtra } from "@maipai/ui/src/dashboard/layouts/full/vertical/header/HeaderExtraContext";
+import { useIsPhoneLayout } from "@maipai/ui/src/dashboard/layouts/full/FullLayout";
 import { AsyncState } from "@maipai/ui/src/primitives/AsyncState";
 import { SchemaPage } from "@maipai/ui/src/schema/SchemaPage";
 import { Player } from "@maipai/ui/src/primitives/Player";
@@ -21,6 +23,7 @@ import { WeatherForecastPage, dedupeLocations, type WeatherLocation } from "@mai
 import { useAppSidebar } from "@/shell/useAppSidebar";
 import { MediaHubFrame } from "@/shell/MediaHubFrame";
 import { useMediaHubActive } from "@/shell/mediaHubSession";
+import { PackageAppHeaderBar, publishPackageAppHeader } from "@/shell/pages/packageAppHeaderBar";
 import { FocalImageProvider } from "@maipai/ui/src/primitives/FocalImage";
 import { analyzeFocalImage, warmFocalModel } from "@/lib/focalImageAnalyzer";
 import "./packageAppNews.css";
@@ -175,6 +178,14 @@ export function PackageAppPage({ person }: { person: Roster }) {
   const media = isMediaApp(packageId);
   const hubActive = useMediaHubActive();
   const familyHeader = usesFamilyHeader(packageId);
+  // On a phone the app's name and its two icon buttons live in the shell's top bar, not in a row of the page.
+  const phone = useIsPhoneLayout();
+  const inShellBar = phone && app !== undefined;
+  useHeaderExtra(inShellBar ? PackageAppHeaderBar : undefined);
+  useEffect(() => {
+    publishPackageAppHeader(inShellBar && app ? { personId: person.id, to: app.to, label: app.label, ...(app.settings_area?.id ? { settingsArea: app.settings_area.id } : {}) } : null);
+    return () => publishPackageAppHeader(null);
+  }, [inShellBar, person.id, app?.to, app?.label, app?.settings_area?.id]); // eslint-disable-line react-hooks/exhaustive-deps -- app is read through its own fields
   // Every package app reads its query as page state, so a reload or a shared link opens the same item.
   const urlState = packageId !== "";
   const queryState = useMemo<Record<string, string>>(() => (urlState ? Object.fromEntries(new URLSearchParams(location.search)) : {}), [urlState, location.search]);
@@ -218,7 +229,7 @@ export function PackageAppPage({ person }: { person: Roster }) {
   const content = (
     <div className={cn("flex min-h-0 min-w-0 flex-1 flex-col gap-2", (sidebarProps || media) && "py-4 lg:p-4 lg:ps-6")} data-testid="package-app" data-package={packageId}>
       {familyHeader ? null : <h1 className="sr-only">{app?.label ?? "App"}</h1>}
-      {app ? <AppToolbar hideSectionsOnWide={sidebar !== undefined} person={person} to={app.to} label={app.label} homeLabel={appHomeLabel(packageId, media)} settingsArea={app.settings_area?.id} sections={app.sections} current={pageId} familyHeader={familyHeader} title={contextTitle} titleSrOnly={sidebarProps ? ownHeader || contextTitle === undefined : false} /> : null}
+      {app ? <AppToolbar inShellBar={inShellBar} hideSectionsOnWide={sidebar !== undefined} person={person} to={app.to} label={app.label} homeLabel={appHomeLabel(packageId, media)} settingsArea={app.settings_area?.id} sections={app.sections} current={pageId} familyHeader={familyHeader} title={contextTitle} titleSrOnly={sidebarProps ? ownHeader || contextTitle === undefined : false} /> : null}
       <AsyncState
         data={page.isError ? null : page.data}
         error={page.isError}
@@ -321,7 +332,7 @@ function AppColumnActions({ person, to, label, settingsArea }: { person: Roster;
 }
 
 /** The app's own sections as tabs (when it has any) and the pin control. Pins are per person and private. */
-function AppToolbar({ hideSectionsOnWide = false, person, to, label, title, titleSrOnly = false, homeLabel, settingsArea, sections, current, familyHeader }: { title?: string; titleSrOnly?: boolean; hideSectionsOnWide?: boolean; person: Roster; to: string; label: string; homeLabel: string; settingsArea?: string; sections: Array<{ page: string; label: string }>; current: string; familyHeader: boolean }) {
+function AppToolbar({ inShellBar = false, hideSectionsOnWide = false, person, to, label, title, titleSrOnly = false, homeLabel, settingsArea, sections, current, familyHeader }: { inShellBar?: boolean; title?: string; titleSrOnly?: boolean; hideSectionsOnWide?: boolean; person: Roster; to: string; label: string; homeLabel: string; settingsArea?: string; sections: Array<{ page: string; label: string }>; current: string; familyHeader: boolean }) {
   const navigate = useNavigate();
   const { isPinned, togglePin, isLoading, isSaving } = usePinnedApps(person.id);
   const pinned = isPinned(to);
@@ -331,11 +342,8 @@ function AppToolbar({ hideSectionsOnWide = false, person, to, label, title, titl
   // end side, then its sections as chip tabs. The play page has no header: the picture starts the page.
   if (familyHeader) {
     if (isMediaPlayPage(to.split("/")[2] ?? "", current)) return null;
-    // A page that draws its own header (News: the feed names itself) has no title to carry here: the tabs take the row with the two
-    // icon buttons, so a phone gives that row back to the stories.
-    const oneRow = titleSrOnly && sections.length > 0;
     const tabs = sections.length > 0 ? (
-      <div className={cn("min-w-0", oneRow && "flex-1 overflow-x-auto", hideSectionsOnWide && "lg:hidden")} data-slot="app-section-tabs">
+      <div className={cn("-mx-4 min-w-0 overflow-x-auto overflow-y-hidden overscroll-x-contain px-4 [scrollbar-width:none] touch-pan-x lg:mx-0 lg:px-0", hideSectionsOnWide && "lg:hidden")} data-slot="app-section-tabs">
         <Tabs value={current} onValueChange={(value) => navigate(value === "index" ? to : `${to}/${String(value)}`)}>
           <TabsList variant="pill" aria-label="Sections">
             <TabsTrigger value="index">{homeLabel}</TabsTrigger>
@@ -346,11 +354,12 @@ function AppToolbar({ hideSectionsOnWide = false, person, to, label, title, titl
         </Tabs>
       </div>
     ) : null;
+    // In the shell bar (a phone) the title and icon buttons are drawn there; only the section tabs stay in the page.
+    if (inShellBar) return tabs ? <div className="flex flex-col gap-2 px-4 lg:px-0">{tabs}</div> : null;
     return (
       <div className="flex flex-col gap-2 px-4 lg:px-0">
         <div className="flex items-center gap-1">
-          {oneRow ? <h1 className="sr-only">{title ?? label}</h1> : <h1 className={cn("min-w-0 flex-1 truncate text-2xl font-bold tracking-tight sm:text-3xl", titleSrOnly && "sr-only")}>{title ?? label}</h1>}
-          {oneRow ? tabs : null}
+          <h1 className={cn("min-w-0 flex-1 truncate text-2xl font-bold tracking-tight sm:text-3xl", titleSrOnly && "sr-only")}>{title ?? label}</h1>
           {settingsArea ? (
             <Button variant="ghost" size="icon-lg" className={hideSectionsOnWide ? "lg:hidden" : undefined} render={<Link to={`/settings/${settingsArea}`} aria-label={`${label} settings`} />}>
               <GearIcon aria-hidden="true" />
@@ -360,7 +369,22 @@ function AppToolbar({ hideSectionsOnWide = false, person, to, label, title, titl
             <StarIcon aria-hidden="true" fill={pinned ? "currentColor" : "none"} />
           </Button>
         </div>
-        {oneRow ? null : tabs}
+        {tabs}
+      </div>
+    );
+  }
+  if (inShellBar) {
+    if (sections.length === 0) return null;
+    return (
+      <div className="-mx-4 min-w-0 overflow-x-auto overflow-y-hidden overscroll-x-contain px-4 [scrollbar-width:none] touch-pan-x" data-slot="app-section-tabs">
+        <Tabs value={current} onValueChange={(value) => navigate(value === "index" ? to : `${to}/${String(value)}`)}>
+          <TabsList variant="pill" aria-label="Sections">
+            <TabsTrigger value="index">{homeLabel}</TabsTrigger>
+            {sections.map((section) => (
+              <TabsTrigger key={section.page} value={section.page}>{section.label}</TabsTrigger>
+            ))}
+          </TabsList>
+        </Tabs>
       </div>
     );
   }
