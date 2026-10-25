@@ -216,7 +216,7 @@ export function PackageAppPage({ person }: { person: Roster }) {
   const contextTitle = sidebarProps ? contextTitleFor(activeLabel, pageDoc?.title) : undefined;
 
   const content = (
-    <div className={cn("flex min-h-0 min-w-0 flex-1 flex-col gap-2", (sidebarProps || media) && "p-4 lg:ps-6")} data-testid="package-app" data-package={packageId}>
+    <div className={cn("flex min-h-0 min-w-0 flex-1 flex-col gap-2", (sidebarProps || media) && "py-4 lg:p-4 lg:ps-6")} data-testid="package-app" data-package={packageId}>
       {familyHeader ? null : <h1 className="sr-only">{app?.label ?? "App"}</h1>}
       {app ? <AppToolbar hideSectionsOnWide={sidebar !== undefined} person={person} to={app.to} label={app.label} homeLabel={appHomeLabel(packageId, media)} settingsArea={app.settings_area?.id} sections={app.sections} current={pageId} familyHeader={familyHeader} title={contextTitle} titleSrOnly={sidebarProps ? ownHeader || contextTitle === undefined : false} /> : null}
       <AsyncState
@@ -331,10 +331,26 @@ function AppToolbar({ hideSectionsOnWide = false, person, to, label, title, titl
   // end side, then its sections as chip tabs. The play page has no header: the picture starts the page.
   if (familyHeader) {
     if (isMediaPlayPage(to.split("/")[2] ?? "", current)) return null;
+    // A page that draws its own header (News: the feed names itself) has no title to carry here: the tabs take the row with the two
+    // icon buttons, so a phone gives that row back to the stories.
+    const oneRow = titleSrOnly && sections.length > 0;
+    const tabs = sections.length > 0 ? (
+      <div className={cn("min-w-0", oneRow && "flex-1 overflow-x-auto [mask-image:linear-gradient(to_right,black_88%,transparent)] lg:[mask-image:none]", hideSectionsOnWide && "lg:hidden")} data-slot="app-section-tabs">
+        <Tabs value={current} onValueChange={(value) => navigate(value === "index" ? to : `${to}/${String(value)}`)}>
+          <TabsList variant="pill" aria-label="Sections">
+            <TabsTrigger value="index">{homeLabel}</TabsTrigger>
+            {sections.map((section) => (
+              <TabsTrigger key={section.page} value={section.page}>{section.label}</TabsTrigger>
+            ))}
+          </TabsList>
+        </Tabs>
+      </div>
+    ) : null;
     return (
-      <div className="flex flex-col gap-2">
+      <div className="flex flex-col gap-2 px-4 lg:px-0">
         <div className="flex items-center gap-1">
-          <h1 className={cn("min-w-0 flex-1 truncate text-2xl font-bold tracking-tight sm:text-3xl", titleSrOnly && "sr-only")}>{title ?? label}</h1>
+          {oneRow ? <h1 className="sr-only">{title ?? label}</h1> : <h1 className={cn("min-w-0 flex-1 truncate text-2xl font-bold tracking-tight sm:text-3xl", titleSrOnly && "sr-only")}>{title ?? label}</h1>}
+          {oneRow ? tabs : null}
           {settingsArea ? (
             <Button variant="ghost" size="icon-lg" className={hideSectionsOnWide ? "lg:hidden" : undefined} render={<Link to={`/settings/${settingsArea}`} aria-label={`${label} settings`} />}>
               <GearIcon aria-hidden="true" />
@@ -344,18 +360,7 @@ function AppToolbar({ hideSectionsOnWide = false, person, to, label, title, titl
             <StarIcon aria-hidden="true" fill={pinned ? "currentColor" : "none"} />
           </Button>
         </div>
-        {sections.length > 0 ? (
-          <div className={hideSectionsOnWide ? "lg:hidden" : undefined} data-slot="app-section-tabs">
-            <Tabs value={current} onValueChange={(value) => navigate(value === "index" ? to : `${to}/${String(value)}`)}>
-              <TabsList variant="pill" aria-label="Sections">
-                <TabsTrigger value="index">{homeLabel}</TabsTrigger>
-                {sections.map((section) => (
-                  <TabsTrigger key={section.page} value={section.page}>{section.label}</TabsTrigger>
-                ))}
-              </TabsList>
-            </Tabs>
-          </div>
-        ) : null}
+        {oneRow ? null : tabs}
       </div>
     );
   }
