@@ -32,3 +32,11 @@
   outline: 2px solid var(--ring);
   outline-offset: 3px;
 }
+
+/* The section tabs of an app scroll sideways on a phone without a scrollbar. */
+[data-slot="app-section-tabs"] {
+  scrollbar-width: none;
+}
+[data-slot="app-section-tabs"]::-webkit-scrollbar {
+  display: none;
+}

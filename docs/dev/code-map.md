@@ -210,6 +210,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `frontend/src/shell/pages/dashboard/HomePlaceAsk.tsx` | label, HomePlaceAsk |
 | `frontend/src/shell/pages/dashboard/TodaySection.tsx` | TODAY_CARD_BUDGET, todaySlots, TodaySection |
 | `frontend/src/shell/pages/dataTableControls.tsx` | useDataTableControls |
+| `frontend/src/shell/pages/packageAppHeaderBar.tsx` | publishPackageAppHeader, PackageAppHeaderBar |
 | `frontend/src/shell/pages/performance/DiskHardwareBody.tsx` | DiskHardwareBody |
 | `frontend/src/shell/pages/performance/EnginesHealthBody.tsx` | EnginesHealthBody |
 | `frontend/src/shell/pages/performance/LabelsBody.tsx` | LabelsBody |

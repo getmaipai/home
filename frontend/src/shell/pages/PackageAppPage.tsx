@@ -343,7 +343,7 @@ function AppToolbar({ inShellBar = false, hideSectionsOnWide = false, person, to
   if (familyHeader) {
     if (isMediaPlayPage(to.split("/")[2] ?? "", current)) return null;
     const tabs = sections.length > 0 ? (
-      <div className={cn("-mx-4 min-w-0 overflow-x-auto overflow-y-hidden overscroll-x-contain px-4 [scrollbar-width:none] touch-pan-x lg:mx-0 lg:px-0", hideSectionsOnWide && "lg:hidden")} data-slot="app-section-tabs">
+      <div className={cn("-mx-4 min-w-0 overflow-x-auto overflow-y-hidden overscroll-x-contain px-4 touch-pan-x lg:mx-0 lg:px-0", hideSectionsOnWide && "lg:hidden")} data-slot="app-section-tabs">
         <Tabs value={current} onValueChange={(value) => navigate(value === "index" ? to : `${to}/${String(value)}`)}>
           <TabsList variant="pill" aria-label="Sections">
             <TabsTrigger value="index">{homeLabel}</TabsTrigger>
@@ -376,7 +376,7 @@ function AppToolbar({ inShellBar = false, hideSectionsOnWide = false, person, to
   if (inShellBar) {
     if (sections.length === 0) return null;
     return (
-      <div className="-mx-4 min-w-0 overflow-x-auto overflow-y-hidden overscroll-x-contain px-4 [scrollbar-width:none] touch-pan-x" data-slot="app-section-tabs">
+      <div className="-mx-4 min-w-0 overflow-x-auto overflow-y-hidden overscroll-x-contain px-4 touch-pan-x" data-slot="app-section-tabs">
         <Tabs value={current} onValueChange={(value) => navigate(value === "index" ? to : `${to}/${String(value)}`)}>
           <TabsList variant="pill" aria-label="Sections">
             <TabsTrigger value="index">{homeLabel}</TabsTrigger>
