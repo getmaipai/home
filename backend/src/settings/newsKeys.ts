@@ -13,9 +13,9 @@ export const NEWS_IMAGE_CACHE_MB_MIN = 32;
 
 export const NEWS_SETTINGS_KEYS: SettingsKey[] = [
   SettingsKey.parse({
-    key: NEWS_FULL_TEXT_PREFETCH_KEY, scope: "household", selector: "boolean", default: false,
+    key: NEWS_FULL_TEXT_PREFETCH_KEY, scope: "household", selector: "boolean", default: true,
     label: "Load News stories ahead of time",
-    help: "Keep full text ready for followed channels and the top stories in Today. Off by default. Home tries each item only once, at most one every 30 seconds and 150 per site in 24 hours. It follows each site's robots rules and pauses on the first block. Turn this off to load pages only when someone opens or saves a story.",
+    help: "Keep full text ready for followed channels and the top stories in Today. On by default. Home tries each item only once, at most one every 30 seconds for each site (so no one site is flooded) and 150 per site in 24 hours. It follows each site's robots rules and pauses on the first block. Turn this off to load pages only when someone opens or saves a story.",
     level: "advanced", secret: false, lives_in: "household.news", honoured_by: ["home"],
   }),
   SettingsKey.parse({
