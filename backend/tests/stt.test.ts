@@ -140,6 +140,28 @@ describe("GET /api/voice/stt/status", () => {
 // standard llmSupervisor.ts's own process tests hold to. Spun up fresh
 // per test (port 0 = OS-assigned) rather than shared, so a test that
 // leaves a socket open can't wedge a later one.
+describe("WS /api/stt/stream playback reports", () => {
+  test("malformed played_ms messages are ignored and keep the socket open", async () => {
+    const client = await owner();
+    const cookie = client.getCookie();
+    if (!cookie) throw new Error("no session cookie captured");
+    const server = Bun.serve({ hostname: "127.0.0.1", port: 0, fetch: app.fetch, websocket });
+    try {
+      const ws = new WebSocket("ws://127.0.0.1:" + server.port + "/api/stt/stream", { headers: { cookie } });
+      await new Promise<void>((resolve, reject) => { ws.onerror = reject; ws.onopen = () => resolve(); });
+      for (const message of [
+        { t: "played_ms", ms: 1 },
+        { t: "played_ms", reply_id: "reply", ms: NaN },
+        { t: "played_ms", reply_id: "reply", ms: -1 },
+        { t: "played_ms", reply_id: "reply", ms: 1, extra: true },
+      ]) ws.send(JSON.stringify(message));
+      await new Promise((resolve) => setTimeout(resolve, 50));
+      expect(ws.readyState).toBe(WebSocket.OPEN);
+      ws.close();
+    } finally { server.stop(true); }
+  });
+});
+
 describe("WS /api/stt/stream", () => {
   test("a malformed binary frame (not a multiple of 4 bytes) gets a wire error, not a dead connection", async () => {
     // A code review (2026-09-06) found this threw an uncaught RangeError

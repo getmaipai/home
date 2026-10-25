@@ -60,6 +60,13 @@ const MIN_SPEECH_SAMPLES_FRAC = 0.2; // ignore bursts shorter than 0.2s
 // the VAD offset threshold would otherwise grow the f32 buffer without
 // bound; force a finalize once this is hit so memory stays flat.
 const MAX_SPEECH_SECONDS = 30;
+// local-voice bargein.py: resume_after_s 0.4, max_pause_s 1.5, 0.1 s hangover, 2 unconfirmed pauses per 10 s.
+const REPLY_RESUME_S = 0.4;
+const REPLY_MAX_PAUSE_S = 1.5;
+const REPLY_HANGOVER_S = 0.1;
+const REPLY_PAUSE_BUDGET = 2;
+const REPLY_PAUSE_WINDOW_MS = 10_000;
+const PLAYBACK_FRESH_MS = 700;
 
 // The Stack recognizer sometimes transcribes non-speech
 // sounds as bracketed/parenthetical annotations - "[BLANK_AUDIO]",
@@ -111,15 +118,26 @@ export class SttSession {
   private endpointGeneration = 0;
   private endpointCheckScheduled = false;
   private chain: Promise<void> = Promise.resolve();
+  private now: () => number;
+  private playbackAt = 0;
+  private pauseSamples = 0;
+  private samplesSinceVoiced = 0;
+  private pauseOpen = false;
+  private unconfirmedPauses: number[] = [];
 
-  constructor(cfg: SttSessionConfig, send: (msg: SttWireEvent) => void) {
+  constructor(cfg: SttSessionConfig, send: (msg: SttWireEvent) => void, now: () => number = Date.now) {
     this.cfg = cfg;
     this.send = send;
+    this.now = now;
     if (cfg.sampleRate === 16_000) {
       void sileroLoader().then((s) => {
         if (!this.closed) this.silero = s;
       });
     }
+  }
+
+  notePlayback(_replyId: string, _ms: number, nowMs = this.now()): void {
+    this.playbackAt = nowMs;
   }
 
   pushPcm(samples: Float32Array): void {
@@ -149,6 +167,11 @@ export class SttSession {
     }
 
     if (voiced) {
+      this.samplesSinceVoiced = 0;
+      if (this.pauseOpen) {
+        this.pauseSamples += samples.length;
+        this.checkReplyPause();
+      }
       if (!this.speaking) {
         this.speaking = true;
         for (const p of this.preroll) {
@@ -159,6 +182,7 @@ export class SttSession {
         this.preroll = [];
         this.prerollLen = 0;
         this.send({ t: "vad", speaking: true, rms });
+        this.startReplyPause();
       }
       this.silenceSamples = 0;
       this.endpointCheckScheduled = false;
@@ -174,7 +198,13 @@ export class SttSession {
         this.samplesSincePartial = 0;
         void this.emitPartial();
       }
-    } else if (this.speaking) {
+    } else {
+      if (this.pauseOpen) {
+        this.pauseSamples += samples.length;
+        this.samplesSinceVoiced += samples.length;
+      }
+      this.checkReplyPause();
+      if (this.speaking) {
       const firstSilenceFrame = this.silenceSamples === 0;
       this.speech.push(samples.slice());
       this.speechLen += samples.length;
@@ -196,18 +226,58 @@ export class SttSession {
       } else if (this.silenceSamples >= baseSamples) {
         void this.finalize();
       }
-    } else if (silero) {
-      this.preroll.push(samples.slice());
-      this.prerollLen += samples.length;
-      const cap = PREROLL_S * this.cfg.sampleRate;
-      while (this.prerollLen > cap && this.preroll.length > 1) {
-        this.prerollLen -= this.preroll.shift()!.length;
+      } else if (silero) {
+        this.preroll.push(samples.slice());
+        this.prerollLen += samples.length;
+        const cap = PREROLL_S * this.cfg.sampleRate;
+        while (this.prerollLen > cap && this.preroll.length > 1) {
+          this.prerollLen -= this.preroll.shift()!.length;
+        }
       }
     }
 
     if (this.speaking && this.speechLen >= MAX_SPEECH_SECONDS * this.cfg.sampleRate) {
       void this.finalize();
     }
+  }
+
+  private startReplyPause(): void {
+    if (this.pauseOpen || this.now() - this.playbackAt > PLAYBACK_FRESH_MS) return;
+    this.unconfirmedPauses = this.unconfirmedPauses.filter((at) => this.now() - at < REPLY_PAUSE_WINDOW_MS);
+    if (this.unconfirmedPauses.length >= REPLY_PAUSE_BUDGET) return;
+    this.pauseOpen = true;
+    this.pauseSamples = 0;
+    this.samplesSinceVoiced = 0;
+    this.send({ t: "reply_pause" });
+  }
+
+  // After 0.4 s of audio: voice heard within the last 0.1 s confirms the speech (the client now waits for the transcript); no
+  // voice means the sound was not speech (a cough), so the reply resumes. A pause still open at 1.5 s counts as confirmed.
+  private checkReplyPause(): void {
+    if (!this.pauseOpen) return;
+    const rate = this.cfg.sampleRate;
+    if (this.pauseSamples >= REPLY_MAX_PAUSE_S * rate) {
+      this.pauseOpen = false;
+      return;
+    }
+    if (this.pauseSamples < REPLY_RESUME_S * rate) return;
+    this.pauseOpen = false;
+    if (this.samplesSinceVoiced <= REPLY_HANGOVER_S * rate) return;
+    this.resumeReply();
+  }
+
+  // The pause turned out not to be speech: tell the client to carry on, and remember it for the budget of unconfirmed pauses.
+  private resumeReply(): void {
+    const now = this.now();
+    this.unconfirmedPauses = this.unconfirmedPauses.filter((at) => now - at < REPLY_PAUSE_WINDOW_MS);
+    this.unconfirmedPauses.push(now);
+    this.send({ t: "reply_resume" });
+  }
+
+  private finishReplyPause(): void {
+    this.pauseOpen = false;
+    this.pauseSamples = 0;
+    this.samplesSinceVoiced = 0;
   }
 
   private scheduleEndpointCheck(): void {
@@ -319,7 +389,9 @@ export class SttSession {
 
     const minSamples = MIN_SPEECH_SAMPLES_FRAC * this.cfg.sampleRate;
     if (this.speechLen < minSamples) {
+      const wasPaused = this.pauseOpen;
       this.reset();
+      if (wasPaused) this.resumeReply();
       this.send({ t: "no_speech" });
       return;
     }
@@ -359,10 +431,15 @@ export class SttSession {
       }
     }
 
+    const wasPaused = this.pauseOpen;
+    this.finishReplyPause();
     this.reset();
     if (this.closed) return;
     if (text && isLikelySpeech(text)) this.send({ t: "final", v: text });
-    else this.send({ t: "no_speech" });
+    else {
+      if (wasPaused) this.resumeReply();
+      this.send({ t: "no_speech" });
+    }
   }
 
   private flatten(): Float32Array {
@@ -376,6 +453,7 @@ export class SttSession {
   }
 
   private reset(): void {
+    this.finishReplyPause();
     this.speech = [];
     this.speechLen = 0;
     this.prerollIncludedLen = 0;

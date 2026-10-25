@@ -4,6 +4,7 @@ import { __resetStackEngineForTests, __setStackClientForTests } from "@/lib/stac
 import { setHouseholdSettingValue } from "@/lib/settings";
 import { startStackFixture, type StackFixture } from "./stackFixture";
 import type { SttWireEvent } from "@maipai/spec/voice/ts/sttTypes.js";
+import type { SileroVadStream } from "@/lib/sileroVad";
 
 const SAMPLE_RATE = 16_000;
 const FRAME = 160; // 10ms @ 16kHz, a plausible mic frame size
@@ -85,6 +86,108 @@ function finals(events: SttWireEvent[]): SttWireEvent[] {
 function endpointConfig(endpointer: Endpointer, holdS = 0.8) {
   return { ...config(), endpointing: { endpointer, holdS } };
 }
+
+describe("SttSession reply pause", () => {
+  let voice = false;
+  async function voicedSession(now: () => number = () => 1000) {
+    const events: SttWireEvent[] = [];
+    voice = false;
+    __setSileroLoaderForTests(async () => ({
+      failed: false,
+      push: async () => [voice ? 0.9 : 0.1],
+      reset: () => {},
+    } as unknown as SileroVadStream));
+    const session = new SttSession(config({ silenceTimeoutS: 0.8 }), (event) => events.push(event), now);
+    await flush();
+    return { session, events };
+  }
+  async function frames(session: SttSession, count: number, voiced: boolean) {
+    voice = voiced;
+    for (let i = 0; i < count; i++) session.pushPcm(voiced ? loudFrame() : silenceFrame());
+    await flush();
+  }
+  const types = (events: SttWireEvent[]) => events.map((event) => event.t);
+
+  afterEach(() => __resetSileroLoaderForTests());
+
+  test("without played_ms, a voiced onset only emits vad", async () => {
+    const { session, events } = await voicedSession();
+    await frames(session, 1, true);
+    expect(types(events)).toEqual(["vad"]);
+    session.close();
+  });
+
+  test("a playing reply is paused right after the vad onset", async () => {
+    const { session, events } = await voicedSession();
+    session.notePlayback("reply", 0, 1000);
+    await frames(session, 1, true);
+    expect(types(events)).toEqual(["vad", "reply_pause"]);
+    session.close();
+  });
+
+  test("voice that continues past 0.4 s confirms the speech and sends no resume", async () => {
+    const { session, events } = await voicedSession();
+    session.notePlayback("reply", 0, 1000);
+    await frames(session, 60, true);
+    expect(types(events)).toEqual(["vad", "reply_pause"]);
+    session.close();
+  });
+
+  test("silence after a short burst resumes the reply once, after 0.4 s", async () => {
+    const { session, events } = await voicedSession();
+    session.notePlayback("reply", 0, 1000);
+    await frames(session, 1, true);
+    await frames(session, 30, false);
+    expect(types(events)).toEqual(["vad", "reply_pause"]);
+    await frames(session, 20, false);
+    expect(types(events).filter((type) => type === "reply_resume")).toHaveLength(1);
+    session.close();
+  });
+
+  test("a third unconfirmed burst within 10 s is not paused", async () => {
+    const { session, events } = await voicedSession();
+    session.notePlayback("reply", 0, 1000);
+    for (let burst = 0; burst < 3; burst++) {
+      await frames(session, 1, true);
+      await frames(session, 120, false); // resumes at 0.4 s, then the utterance ends and the state resets
+    }
+    expect(types(events).filter((type) => type === "reply_pause")).toHaveLength(2);
+    expect(types(events).filter((type) => type === "reply_resume")).toHaveLength(2);
+    session.close();
+  });
+
+  test("a pause still open at 1.5 s counts as confirmed and never resumes", async () => {
+    const { session, events } = await voicedSession();
+    session.notePlayback("reply", 0, 1000);
+    await frames(session, 1, true);
+    await frames(session, 12, true);
+    await frames(session, 3, false);
+    await frames(session, 140, true);
+    expect(types(events).filter((type) => type === "reply_resume")).toHaveLength(0);
+    session.close();
+  });
+
+  test("a short sound that ends the utterance while paused resumes the reply with no speech found", async () => {
+    const { session, events } = await voicedSession();
+    session.notePlayback("reply", 0, 1000);
+    session.close();
+    const second = await voicedSession();
+    second.session.notePlayback("reply", 0, 1000);
+    await frames(second.session, 1, true);
+    await frames(second.session, 100, false);
+    expect(types(second.events).filter((type) => type === "reply_resume")).toHaveLength(1);
+    void events;
+    second.session.close();
+  });
+
+  test("a playback report older than 700 ms does not count as playing", async () => {
+    const { session, events } = await voicedSession(() => 2000);
+    session.notePlayback("reply", 0, 1000);
+    await frames(session, 1, true);
+    expect(types(events)).toEqual(["vad"]);
+    session.close();
+  });
+});
 
 describe("SttSession - RMS fallback VAD (no Silero model installed in tests)", () => {
   test("a held mid-sentence pause that resumes produces one final carrying the whole utterance and nothing else", async () => {

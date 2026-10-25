@@ -71,8 +71,11 @@ sttRoutes.get(
         if (!session) return;
         if (typeof evt.data === "string") {
           try {
-            const parsed = JSON.parse(evt.data) as { t?: string };
+            const parsed = JSON.parse(evt.data) as { t?: string; reply_id?: unknown; ms?: unknown };
             if (parsed.t === "end") session.end();
+            else if (parsed.t === "played_ms" && typeof parsed.reply_id === "string" && parsed.reply_id.trim().length > 0 && typeof parsed.ms === "number" && Number.isFinite(parsed.ms) && parsed.ms >= 0 && Object.keys(parsed).length === 3) {
+              session.notePlayback(parsed.reply_id, parsed.ms, Date.now());
+            }
           } catch {
             ws.send(JSON.stringify({ t: "error", v: voiceFailureLine("listening_engine", { minor: false, canOpenRepairs: true }) }));
           }
