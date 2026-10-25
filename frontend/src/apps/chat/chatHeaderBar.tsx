@@ -74,6 +74,8 @@ import {
   DropdownMenuContent,
   DropdownMenuCheckboxItem,
   DropdownMenuItem,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@maipai/ui/src/ui/dropdown-menu";
@@ -151,8 +153,8 @@ function ChatHeaderRename({ title, onRename, onDone, commitOnBlur = true }: { ti
  * `trailing` (the agent/task activity toggle's slot, when there is one)
  * sit on the right. */
 /** DOTS-CHAT-01: reads the companion for the kit header. Its own component so the presence hooks (runtime and router) run only when the preview switch is on. */
-function WithCompanion({ children }: { children: (name: string, media: ReactNode) => ReactNode }) {
-  const presence = useCompanionPresence();
+function WithCompanion({ companionId, children }: { companionId: string | null; children: (name: string, media: ReactNode) => ReactNode }) {
+  const presence = useCompanionPresence(companionId);
   const name = presence?.name ?? "MaiPai";
   return children(name, presence
     ? <CompanionAvatar name={presence.name} clips={presence.clips} wanted={presence.wanted} once={presence.once} size="sm" onFail={presence.onFail} />
@@ -191,6 +193,14 @@ export function ChatHeaderBar({ phoneRow = false, trailing, shells = false, onMe
           <Button type="button" variant="ghost" size="icon" className="text-muted-foreground" aria-label="Conversation actions"><MoreIcon className="size-[18px]" /></Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end" density="compact">
+          {shells && data.pinnable ? <>
+            <div className="px-2 py-1.5 text-sm font-medium text-muted-foreground">Companion</div>
+            <DropdownMenuRadioGroup value={data.companionId ?? "default"} onValueChange={(value) => void data.onCompanionChange(value === "default" ? null : value)}>
+              <DropdownMenuRadioItem value="default">My default</DropdownMenuRadioItem>
+              {data.companions.map((companion) => <DropdownMenuRadioItem key={companion.id} value={companion.id}>{companion.name}</DropdownMenuRadioItem>)}
+            </DropdownMenuRadioGroup>
+            <DropdownMenuSeparator />
+          </> : null}
           {onHistory ? <><DropdownMenuItem onClick={onHistory}><HistoryIcon className="size-4" />Chat history</DropdownMenuItem><DropdownMenuSeparator /></> : null}
           <DropdownMenuItem onClick={() => setRenaming(true)}><PencilIcon className="size-4" />Rename</DropdownMenuItem>
           {data.pinnable ? <DropdownMenuItem onClick={() => void data.onPinChange(!data.pinned)}>{data.pinned ? <PinOffIcon className="size-4" /> : <PinIcon className="size-4" />}{data.pinned ? "Unpin" : "Pin"}</DropdownMenuItem> : null}
@@ -204,7 +214,7 @@ export function ChatHeaderBar({ phoneRow = false, trailing, shells = false, onMe
   if (shells) {
     return (
       <>
-        <WithCompanion>{(name, media) => <ChatHeader name={name} media={media} onMenu={onMenu} onCall={onCall} actions={actions} menuExpanded={menuExpanded} menuControls={menuControls} />}</WithCompanion>
+        <WithCompanion companionId={data.companionId}>{(name, media) => <ChatHeader name={name} media={media} onMenu={onMenu} onCall={onCall} actions={actions} menuExpanded={menuExpanded} menuControls={menuControls} />}</WithCompanion>
         <Dialog open={renaming} onOpenChange={setRenaming}>
           <DialogContent>
             <DialogHeader><DialogTitle>Rename</DialogTitle><DialogDescription>{title}</DialogDescription></DialogHeader>

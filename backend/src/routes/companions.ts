@@ -71,6 +71,7 @@ const AvatarState = z.object({ loop: z.boolean(), urls: z.object({ h264: z.strin
 const avatarRoute = createRoute({
   method: "get", path: "/avatar", tags: ["Companions"], summary: "Read the signed-in person's active video avatar",
   middleware: [requireAuth] as const,
+  request: { query: z.object({ companion: z.string().optional().describe("A companion id to read instead of the person's own pick (the chat's pick).") }) },
   responses: {
     200: { content: { "application/json": { schema: z.object({ avatar: z.object({ id: z.string(), name: z.string(), key: z.string(), version: z.string(), states: z.record(z.string(), AvatarState) }).nullable() }) } }, description: "The usable active companion's approved animation, or null when it has none." },
     304: { description: "The animation has not changed." },
@@ -78,7 +79,7 @@ const avatarRoute = createRoute({
   },
 });
 companionsRoutes.openapi(avatarRoute, (c) => {
-  const person = c.get("person"), persona = resolvePersona(getPersonSettingValue(person, "persona.active_id"));
+  const person = c.get("person"), asked = c.req.valid("query").companion, persona = resolvePersona(asked ?? getPersonSettingValue(person, "persona.active_id"));
   if (!mayUseCompanion(person, persona)) return c.json({ avatar: null }, 200);
   const household = getHouseholdCompanion(persona.id), loaded = household ? null : loadManifestOnly(persona.id), manifest = household ?? (loaded?.ok ? loaded.value : null);
   const animation = manifest?.companion?.animation;

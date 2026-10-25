@@ -8,7 +8,7 @@ import { mapCompanionClips, useCompanionAvatar } from "@/apps/chat/useCompanionA
 
 afterEach(cleanup);
 const states = { idle: { loop: true, urls: { h264: "/idle.mp4", av1: null, still: "/idle.png" } } };
-function Probe() { const value = useCompanionAvatar(); return createElement("output", null, JSON.stringify(value)); }
+function Probe({ companionId }: { companionId?: string }) { const value = useCompanionAvatar(companionId); return createElement("output", null, JSON.stringify(value)); }
 function setup(person: Roster | null) {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(createElement(QueryClientProvider, { client }, createElement(WakeWordPersonContext.Provider, { value: person }, createElement(Probe))));

@@ -1,12 +1,12 @@
 import { afterEach, expect, test } from "bun:test";
 import { act, cleanup, fireEvent, render, waitFor } from "@testing-library/react";
-import { MemoryRouter, Route, Routes } from "react-router-dom";
+import { MemoryRouter, Route, Routes, useLocation } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { api, ApiError, type CompanionCard, type CompanionDetail, type CompanionList } from "@/lib/api";
 import { CompanionDetailPage, CompanionsPage } from "@/shell/pages/CompanionsPage";
 import { CompanionShellViewer } from "@/lib/companionShells";
 
-const originals = { companions: api.companions, companion: api.companion, setDefaultCompanion: api.setDefaultCompanion, deleteCompanion: api.deleteCompanion, stackVoices: api.stackVoices, setSetting: api.setSetting, settingsValues: api.settingsValues };
+const originals = { companions: api.companions, companion: api.companion, createConversation: api.createConversation, setDefaultCompanion: api.setDefaultCompanion, deleteCompanion: api.deleteCompanion, stackVoices: api.stackVoices, setSetting: api.setSetting, settingsValues: api.settingsValues };
 afterEach(() => { cleanup(); Object.assign(api, originals); });
 
 function card(overrides: Partial<CompanionCard> = {}): CompanionCard {
@@ -22,8 +22,9 @@ function detail(overrides: Partial<CompanionDetail> = {}): CompanionDetail {
 function open(path: string, preview = false, viewer = { id: "viewer" } as never) {
   api.stackVoices = async () => ({ voices: [] });
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-  return render(<QueryClientProvider client={client}><CompanionShellViewer.Provider value={preview ? viewer : null}><MemoryRouter initialEntries={[path]}><Routes><Route path="/companions" element={<CompanionsPage />} /><Route path="/companions/:id" element={<CompanionDetailPage />} /></Routes></MemoryRouter></CompanionShellViewer.Provider></QueryClientProvider>);
+  return render(<QueryClientProvider client={client}><CompanionShellViewer.Provider value={preview ? viewer : null}><MemoryRouter initialEntries={[path]}><LocationProbe /><Routes><Route path="/companions" element={<CompanionsPage />} /><Route path="/companions/:id" element={<CompanionDetailPage />} /><Route path="/chat" element={<div>Chat route</div>} /></Routes></MemoryRouter></CompanionShellViewer.Provider></QueryClientProvider>);
 }
+function LocationProbe() { const location = useLocation(); return <output data-testid="location">{location.pathname}{location.search}</output>; }
 
 async function openCardActions(view: { findByRole: (role: string, opts: { name: string }) => Promise<HTMLElement> }) {
   const trigger = await view.findByRole("button", { name: "Companion actions" });
@@ -203,10 +204,18 @@ test("preview tabs show status and activity, and the detail page is a hero with 
   expect(detailView.queryByText(/Coming soon: (tasks|your chats)/)).toBeNull();
   expect(detailView.getByRole("link", { name: "All companions" }).getAttribute("href")).toBe("/companions");
   expect(detailView.queryByText("Sprout loves questions.")).toBeNull();
-  expect((detailView.getByRole("button", { name: "Chat" }) as HTMLButtonElement).disabled).toBe(true);
+  expect((detailView.getByRole("button", { name: "Chat" }) as HTMLButtonElement).disabled).toBe(false);
   expect(detailView.getByRole("button", { name: "Companion actions" })).toBeTruthy();
   fireEvent.click(detailView.getByRole("button", { name: /Recent activity/ }));
   expect(await detailView.findByText("Sample activity. Real activity is coming soon.")).toBeTruthy();
+  fireEvent.click(detailView.getByRole("button", { name: "Close" }));
+  const created: unknown[][] = [];
+  api.createConversation = async (_mode, _carryFrom, _folderId, companionId) => { created.push([_mode, _carryFrom, _folderId, companionId]); return { id: "conversation-new" } as never; };
+  fireEvent.click(detailView.getByRole("button", { name: "Chat" }));
+  await waitFor(() => expect(created.length).toBe(1));
+  expect(created[0]?.[3]).toBe("lively-child");
+  expect(await detailView.findByText("Chat route")).toBeTruthy();
+  expect(detailView.getByTestId("location").textContent).toBe("/chat?conversation=conversation-new");
 });
 
 test("preview discovery is hidden when the list says it is unavailable", async () => {

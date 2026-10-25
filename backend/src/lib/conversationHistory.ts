@@ -2158,6 +2158,19 @@ export function updateConversationMode(actor: PersonRow, id: string, mode: Conve
   return { ok: true, value: parsed.data };
 }
 
+/** PATCH /api/conversations/:id companion_id: the companion that speaks in this chat from now on (null returns to the person's own pick).
+ * The caller has already checked the person may use it. Temporary chats keep no row, so there is nothing to write. */
+export function updateConversationCompanion(actor: PersonRow, id: string, companionId: string | null): ConversationOpResult<Conversation> {
+  const found = getConversation(actor, id);
+  if (!found.ok) return found;
+  const now = new Date().toISOString();
+  const newHlc = nextHlc();
+  const parsed = Conversation.safeParse({ ...found.value, companion_id: companionId, updated_at: now, hlc: newHlc });
+  if (!parsed.success) return { ok: false, status: 400, error: parsed.error.issues.map((i) => i.message).join("; ") };
+  db.update(conversations).set({ companionId, updatedAt: now, hlc: newHlc }).where(eq(conversations.id, id)).run();
+  return { ok: true, value: parsed.data };
+}
+
 /** PATCH /api/conversations/:id settings. This is a key-wise patch so a
  * client that only knows about `thinking` cannot erase a newer client's
  * additional settings. A null value removes that key (used to return to

@@ -568,6 +568,8 @@ describe("household companion routes", () => {
     expect(body.avatar).toMatchObject({ id: ready.value.id, name: "Avatar fox", key: "#00FF00", version: expect.stringMatching(/^[a-f0-9]{12}$/) });
     expect(body.avatar?.states.idle?.urls.av1).toBeNull();
     expect(body.avatar?.states.listening?.urls.av1).toBe(`/api/companions/${ready.value.id}/animation/listening.av1.mp4`);
+    const explicit = await request(`companions/avatar?companion=${encodeURIComponent(ready.value.id)}`, adult);
+    expect((await explicit.json() as { avatar: { id: string } | null }).avatar?.id).toBe(ready.value.id);
     const etag = response.headers.get("etag")!;
     expect(response.headers.get("cache-control")).toBe("private, max-age=0, must-revalidate");
     const cached = await app.request("http://localhost/api/companions/avatar", { headers: { cookie: `session=${adult}`, "if-none-match": etag } }); expect(cached.status).toBe(304);
@@ -579,6 +581,8 @@ describe("household companion routes", () => {
     db.delete(settingsValues).where(and(eq(settingsValues.scope, "person:person-avatar-child"), eq(settingsValues.key, "persona.active_id"))).run();
     db.insert(settingsValues).values({ scope: "person:person-avatar-child", key: "persona.active_id", value: JSON.stringify(adultOnly.value.id), hlc: "3:0:test", source: "user", updatedAt: now }).run(); __resetSettingsCacheForTests();
     expect((await (await request("companions/avatar", child)).json() as { avatar: unknown }).avatar).toBeNull();
+    const refusedExplicit = await request(`companions/avatar?companion=${encodeURIComponent(adultOnly.value.id)}`, child);
+    expect((await refusedExplicit.json() as { avatar: unknown }).avatar).toBeNull();
 
     const draft = createHouseholdCompanion({ ...fixture(), display_name: "Draft avatar" }, { display_name: "Author", person_id: "person-avatar-adult" }); if (!draft.ok) throw new Error(draft.error);
     setHouseholdCompanionAnimation(draft.value.id, animation);

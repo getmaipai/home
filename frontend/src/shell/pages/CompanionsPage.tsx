@@ -232,14 +232,29 @@ function DetailBody({ companion, headerOnly = false, aboutOnly = false }: { comp
 
 function DetailSetup({ companion, saved, copy, save, headerOnly = false, aboutOnly = false }: { companion: CompanionDetail; saved: boolean; copy: UseMutationResult<unknown, Error, void>; save: UseMutationResult<unknown, Error, void>; headerOnly?: boolean; aboutOnly?: boolean }) {
   const preview = useCompanionShells() === true;
+  const navigate = useNavigate();
+  const [chatError, setChatError] = useState<string | null>(null);
+  const [startingChat, setStartingChat] = useState(false);
+  const startChat = async () => {
+    setStartingChat(true);
+    setChatError(null);
+    try {
+      const conversation = await api.createConversation(undefined, undefined, undefined, companion.id);
+      navigate(`/chat?conversation=${encodeURIComponent(conversation.id)}`);
+    } catch (error) {
+      setChatError(error instanceof ApiError ? `${error.message} Choose another companion or try again.` : "Could not start a chat with this companion. Check your connection and try again.");
+    } finally {
+      setStartingChat(false);
+    }
+  };
   return (
     <>
       {!aboutOnly ? <>
       <>
       <h1 className="sr-only">{companion.name}</h1>
       <CharacterHero name={companion.name} seed={companion.id} line={<><span>{companion.tagline}</span><div className="flex flex-wrap justify-center gap-2"><Badge>{companion.type_label}</Badge>{saved ? <Badge>Your default</Badge> : null}</div></>} actions={<>
+              <Button type="button" disabled={startingChat} onClick={() => void startChat()}>{startingChat ? "Starting chat…" : "Chat"}</Button>
               {preview ? <>
-            <Button type="button" disabled title="Coming soon">Chat</Button>
             <DropdownMenu>
               <DropdownMenuTrigger asChild><Button type="button" variant="ghost" size="icon" aria-label="Companion actions"><MoreIcon aria-hidden="true" /></Button></DropdownMenuTrigger>
               <DropdownMenuContent align="end">
@@ -256,6 +271,7 @@ function DetailSetup({ companion, saved, copy, save, headerOnly = false, aboutOn
       </>} />
       </>
       {save.isError ? <Alert variant="destructive"><AlertDescription>{save.error instanceof ApiError ? save.error.message : "Could not save this. Check your connection and try again."}</AlertDescription></Alert> : null}
+      {chatError ? <Alert variant="destructive"><AlertDescription>{chatError}</AlertDescription></Alert> : null}
       {copy.isError ? <Alert variant="destructive"><AlertDescription>{copy.error instanceof ApiError ? copy.error.message : "Could not reach Home. Check your connection and try again."}</AlertDescription></Alert> : null}
       </> : null}
       {!headerOnly ? <>

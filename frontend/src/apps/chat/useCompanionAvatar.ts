@@ -15,11 +15,11 @@ export function mapCompanionClips(states: Record<string, { loop: boolean; urls: 
   }])) as CompanionClips;
 }
 
-export function useCompanionAvatar() {
+export function useCompanionAvatar(companionId?: string | null) {
   const person = useContext(WakeWordPersonContext);
   const query = useQuery({
-    queryKey: [...COMPANION_AVATAR_QUERY_KEY, person?.id ?? null],
-    queryFn: () => api.companionAvatar(),
+    queryKey: [...COMPANION_AVATAR_QUERY_KEY, person?.id ?? null, companionId ?? null],
+    queryFn: () => api.companionAvatar(companionId ?? undefined),
     enabled: person !== null,
     staleTime: 5 * 60_000,
   });

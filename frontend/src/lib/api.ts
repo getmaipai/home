@@ -919,7 +919,7 @@ export type HealthChecks = {
 export interface MediaBudgetResponse { limit_min: number; used_min: number; left_min: number; exhausted: boolean; /** The kid time-up words when time is up (GET /api/media/budget only). */ line?: string | null }
 
 export const api = {
-  companionAvatar: () => request<CompanionAvatarView>("/api/companions/avatar"),
+  companionAvatar: (companionId?: string) => request<CompanionAvatarView>(`/api/companions/avatar${companionId ? `?companion=${encodeURIComponent(companionId)}` : ""}`),
   mediaBudget: () => request<MediaBudgetResponse>("/api/media/budget"),
   referenceBooks: () => request<ReferenceBookView[]>("/api/reference/books"),
   referenceSuggest: (book: string | undefined, q: string) => request<ReferenceSuggestion[]>(`/api/reference/suggest?${book ? `book=${encodeURIComponent(book)}&` : ""}q=${encodeURIComponent(q)}`),
@@ -1098,7 +1098,7 @@ export const api = {
     return request<{ discarded: number }>(`/api/conversations/incognito/discard${suffix}`, { method: "POST" });
   },
   // PROJECTS-01a: `folderId` starts the chat inside one of the person's projects.
-  createConversation: (mode?: Conversation["mode"], carryFrom?: string, folderId?: string) => request<Conversation>("/api/conversations", { method: "POST", body: JSON.stringify({ surface: "chat", ...(mode ? { mode } : {}), ...(carryFrom ? { carry_from: carryFrom } : {}), ...(folderId ? { folder_id: folderId } : {}) }) }),
+  createConversation: (mode?: Conversation["mode"], carryFrom?: string, folderId?: string, companionId?: string) => request<Conversation>("/api/conversations", { method: "POST", body: JSON.stringify({ surface: "chat", ...(mode ? { mode } : {}), ...(carryFrom ? { carry_from: carryFrom } : {}), ...(folderId ? { folder_id: folderId } : {}), ...(companionId ? { companion_id: companionId } : {}) }) }),
   // PROJECTS-01a: a person's projects (chat folders) in the chat column.
   chatFolders: (person?: string, options?: { scope?: "mine" | "shared" | "all"; sort?: "order" | "updated" }) => {
     const params = new URLSearchParams();
@@ -1120,6 +1120,8 @@ export const api = {
   deleteChatFolder: (id: string) => request<{ ok: true; chats_kept: number }>(`/api/chat-folders/${encodeURIComponent(id)}`, { method: "DELETE" }),
   setConversationFolder: (id: string, folderId: string | null) =>
     request<Conversation>(`/api/conversations/${encodeURIComponent(id)}`, { method: "PATCH", body: JSON.stringify({ folder_id: folderId }) }),
+  setConversationCompanion: (id: string, companionId: string | null) =>
+    request<Conversation>(`/api/conversations/${encodeURIComponent(id)}`, { method: "PATCH", body: JSON.stringify({ companion_id: companionId }) }),
   resumeConversation: (id: string) => request<Conversation>(`/api/conversations/${encodeURIComponent(id)}/resume`, { method: "POST" }),
   conversation: (id: string) => request<Conversation>(`/api/conversations/${encodeURIComponent(id)}`),
   setConversationSettings: (id: string, settings: Record<string, unknown>) =>

@@ -62,6 +62,9 @@ function baseData(overrides: Partial<ChatHeaderData> = {}): ChatHeaderData {
     pinned: false,
     onPinChange: async () => {},
     onArchive: async () => {},
+    companionId: null,
+    companions: [],
+    onCompanionChange: async () => {},
     ...overrides,
   };
 }
@@ -307,6 +310,25 @@ describe("ChatHeaderBar", () => {
       await openActionsMenu(view);
       fireEvent.click(await view.findByRole("menuitem", { name: "Chat history" }));
       expect(onHistory).toHaveBeenCalledTimes(1);
+    });
+
+    test("the stored chat offers companion radio choices and saves a selection", async () => {
+      presenceMock = { name: "Nova" };
+      const onCompanionChange = mock(async (_id: string | null) => {});
+      const view = renderShells(baseData({ companionId: "lively-child", companions: [{ id: "lively-child", name: "Sprout" }, { id: "lively-adult", name: "Rivet" }], onCompanionChange }));
+      await openActionsMenu(view);
+      expect(await view.findByText("Companion")).toBeTruthy();
+      expect(view.getByRole("menuitemradio", { name: "Sprout" }).getAttribute("aria-checked")).toBe("true");
+      fireEvent.click(view.getByRole("menuitemradio", { name: "Rivet" }));
+      await waitFor(() => expect(onCompanionChange).toHaveBeenCalledWith("lively-adult"));
+    });
+
+    test("temporary chats hide the companion choice", async () => {
+      presenceMock = null;
+      const view = renderShells(baseData({ pinnable: false, companions: [{ id: "lively-child", name: "Sprout" }] }));
+      await openActionsMenu(view);
+      expect(view.queryByText("Companion")).toBeNull();
+      expect(view.queryByRole("menuitemradio", { name: "Sprout" })).toBeNull();
     });
 
     test("Rename opens a dialog that saves on Enter and closes on Escape; the other actions stay in the menu", async () => {

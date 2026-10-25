@@ -9652,6 +9652,10 @@
                     "nullable": true,
                     "description": "A key-wise settings patch; null removes a key."
                   },
+                  "companion_id": {
+                    "nullable": true,
+                    "description": "The companion that speaks in this chat, or null for your own pick (COMPANIONS-PICK-01)."
+                  },
                   "folder_id": {
                     "nullable": true,
                     "description": "Move the chat into a project (chat folder) id, or out with null (PROJECTS-01a)."
@@ -54500,6 +54504,18 @@
           "Companions"
         ],
         "summary": "Read the signed-in person's active video avatar",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "description": "A companion id to read instead of the person's own pick (the chat's pick)."
+            },
+            "required": false,
+            "description": "A companion id to read instead of the person's own pick (the chat's pick).",
+            "name": "companion",
+            "in": "query"
+          }
+        ],
         "responses": {
           "200": {
             "description": "The usable active companion's approved animation, or null when it has none.",

@@ -1,4 +1,6 @@
 import { type Context } from "hono";
+import { resolvePersona } from "@/lib/persona";
+import { mayUseCompanion } from "@/lib/companionsApp";
 import { createRoute, z } from "@hono/zod-openapi";
 import { apiRouter, emptyJsonBodyAsObject, errorResponses, idParamSchema } from "@/lib/openapi";
 import { Conversation } from "@maipai/spec/gen/ts/conversation.js";
@@ -30,6 +32,7 @@ import {
   updateConversationArchived,
   updateConversationFolder,
   updateConversationMode,
+  updateConversationCompanion,
   updateConversationSettings,
   deleteConversationById,
   batchDeleteConversations,
@@ -181,6 +184,8 @@ conversationsRoutes.openapi(createConversationRoute, (c) => {
   if (mode && !mode.success) return c.json({ error: "invalid conversation mode" }, 400);
   if (body.carry_from !== undefined && body.carry_from !== null && typeof body.carry_from !== "string") return c.json({ error: "carry_from must be a conversation id" }, 400);
   if (body.folder_id !== undefined && body.folder_id !== null && typeof body.folder_id !== "string") return c.json({ error: "folder_id must be a project id" }, 400);
+  if (body.companion_id !== undefined && body.companion_id !== null && typeof body.companion_id !== "string") return c.json({ error: "Choose a companion from the list." }, 400);
+  if (typeof body.companion_id === "string" && (resolvePersona(body.companion_id).id !== body.companion_id || !mayUseCompanion(actor, resolvePersona(body.companion_id)))) return c.json({ error: "That companion is not available to you. Choose another from the list." }, 403);
   // THIN-3G: carry_from seeds the new chat with that chat's summary.
   // PROJECTS-01a: folder_id starts the chat inside one of the person's projects.
   const result = createConversation(actor, { surface: body.surface, companionId: body.companion_id, mode: mode?.data, carryFrom: (body.carry_from as string | null | undefined) ?? null, folderId: (body.folder_id as string | null | undefined) ?? null });
@@ -505,6 +510,7 @@ const PatchConversationBody = z.object({
   archived: z.unknown().optional().describe("Shelve or restore the chat (CONV-ARCHIVE-01)."),
   mode: z.unknown().optional().describe("chat, research or temporary."),
   settings: z.unknown().optional().describe("A key-wise settings patch; null removes a key."),
+  companion_id: z.unknown().optional().describe("The companion that speaks in this chat, or null for your own pick (COMPANIONS-PICK-01)."),
   folder_id: z.unknown().optional().describe("Move the chat into a project (chat folder) id, or out with null (PROJECTS-01a)."),
 });
 
@@ -523,8 +529,16 @@ const patchConversationRoute = createRoute({
 
 conversationsRoutes.openapi(patchConversationRoute, (c) => {
   const actor = c.get("person");
-  const body = (c.req.valid("json") ?? {}) as { title?: string | null; pinned?: boolean; archived?: boolean; mode?: Conversation["mode"]; settings?: unknown; folder_id?: unknown };
+  const body = (c.req.valid("json") ?? {}) as { title?: string | null; pinned?: boolean; archived?: boolean; mode?: Conversation["mode"]; settings?: unknown; folder_id?: unknown; companion_id?: unknown };
   const id = c.req.valid("param").id;
+  if (Object.hasOwn(body, "companion_id")) {
+    const picked = body.companion_id;
+    if (picked !== null && typeof picked !== "string") return c.json({ error: "Choose a companion from the list." }, 400);
+    if (picked !== null && (resolvePersona(picked).id !== picked || !mayUseCompanion(actor, resolvePersona(picked)))) return c.json({ error: "That companion is not available to you. Choose another from the list." }, 403);
+    const result = updateConversationCompanion(actor, id, picked);
+    if (!result.ok) return c.json({ error: result.error }, result.status as 400 | 403 | 404);
+    return c.json(result.value, 200);
+  }
   // PROJECTS-01a: move the chat into a project, or out of one with null.
   if (Object.hasOwn(body, "folder_id")) {
     const result = updateConversationFolder(actor, id, body.folder_id);

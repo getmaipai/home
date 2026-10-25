@@ -13,8 +13,8 @@ function readHidden(): boolean { try { return localStorage.getItem(HIDDEN_KEY) =
 function saveHidden(value: boolean) { try { if (value) localStorage.setItem(HIDDEN_KEY, "true"); else localStorage.removeItem(HIDDEN_KEY); } catch { /* UI state still works when storage is blocked. */ } }
 
 /** What the chat passes to the kit's CompanionAvatar, or null when nothing should be drawn (no ready animated companion, still loading, or its clips failed). */
-export function useCompanionPresence() {
-  const { avatar, clips, loading } = useCompanionAvatar();
+export function useCompanionPresence(companionId?: string | null) {
+  const { avatar, clips, loading } = useCompanionAvatar(companionId);
   const person = useContext(WakeWordPersonContext);
   const speech = useContext(CompanionSpeechContext);
   const activity = useChatActivity();

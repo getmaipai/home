@@ -78,7 +78,6 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `frontend/src/apps/chat/chatThreadSlots.tsx` | CompareIcon, DetailsIcon, ComposerExtraControls, ChatComposerNotice, ChatMessageQueue, MODEL_EFFORTS |
 | `frontend/src/apps/chat/chatToolUis.tsx` | SpecSheetToolRender, ArtifactCardToolRender, ProducedArtifactCard, ConfirmToolRender, ProjectFinishedArtifact, projectStages |
 | `frontend/src/apps/chat/companionComposerMentions.tsx` | CompanionComposerMentions |
-| `frontend/src/apps/chat/companionHeaderPicker.tsx` | CompanionHeaderPicker |
 | `frontend/src/apps/chat/composerAddMenu.tsx` | unwiredControlsAreEnabled, __setUnwiredControlsForTests, PackageScopeContext, PhotoUploadsContext, attachmentAddErrorMessage, ComposerAddMenu |
 | `frontend/src/apps/chat/composerDictationWaveform.tsx` | DictationLevelMeterProvider, ComposerDictationWaveform |
 | `frontend/src/apps/chat/composerDraftRestore.tsx` | useComposerDraftRestore |
@@ -773,7 +772,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/turnMachine/nodes/tool.ts` | modelFacingArgs, toolStatusMoment, toolNode |
 | `backend/src/lib/turnMachine/speaker.ts` | speakerIsAnonymous, turnAgeBand, touchesMemory |
 | `backend/src/lib/turnMachine/trace.ts` | TraceRecorder |
-| `backend/src/lib/turnMachine/turnNext.ts` | runTurnNext, runTurnNextStream |
+| `backend/src/lib/turnMachine/turnNext.ts` | conversationPersona, runTurnNext, runTurnNextStream |
 | `backend/src/lib/turnMachine/warmup.ts` | turnWarmupPrompt |
 | `backend/src/lib/turnShared.ts` | validateTurnInput, judgeStatusAtInsert, deriveCrisisResources, identityLine, PRIVACY_SENTENCE, PHOTO_IDENTITY_SENTENCE |
 | `backend/src/lib/turnSignal.ts` | EVERYDAY_IMPERATIVES, COMMAND_CONFIDENCE, fallbackSignal, classifyTurnSignal, freezeDirective, asBackchannelOnLiveSubject |
