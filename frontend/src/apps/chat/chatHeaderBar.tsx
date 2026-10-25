@@ -182,9 +182,9 @@ export function ChatHeaderBar({ phoneRow = false, trailing }: { phoneRow?: boole
           >
             <span className="min-w-0 truncate">{title}</span>
           </Button>
-          {shells === true ? <CompanionHeaderPicker /> : null}
           {phoneRow ? null : <span className="flex-1" aria-hidden />}
           {trailing}
+          {shells === true ? <CompanionHeaderPicker /> : null}
           <DropdownMenu open={open} onOpenChange={setOpen}>
             <DropdownMenuTrigger asChild>
               {/* Keep an 8px visual gap between the two independent

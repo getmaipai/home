@@ -2,7 +2,7 @@
 
 Owner's request (Jesse, 2026-10-24): review the product spec "MaiPai Companions: Product and UX Design Specification" (746 lines,
 with nine reference images: a Character.AI-style persona grid, a header companion selector, an agentic task card, a new chat with a
-companion, a companion detail page with Activity / Tasks / Chats / Setup, a Yours / Discover grid with state badges, a two-step
+companion, a companion detail page with Activity / About / Tasks / Chats, a Yours / Discover grid with state badges, a two-step
 "Create a Companion" wizard, a page with a collapsible floating assistant, and a one-question `@mention` switch) and come back with a
 design, no code. The plan must shell every new surface with "coming soon" placeholders first, so he can see and steer the look and
 feel before anyone spends time on the real build. Added the same day: the true agentic layer (a companion shopping online, reading
@@ -24,7 +24,7 @@ Riff, Rivet, Sprout, Buddy, Pal, The Tutor); the spec's Milo, Ada and Fin are no
    COMP-04's `companions.enabled` (person scope) is "the companions I hold"; nothing new is invented for Yours.
 3. **The Companions app grows two tabs and a detail with four tabs.** Yours is today's CardGrid plus the person's own latest
    activity line and two counts; a job's state stays on the job's own card (S6). Discover is a grid of companions the person does not hold yet, in the look of the first
-   reference image. Detail gets Activity / Tasks / Chats / Setup; Setup is the existing editor, reached by section.
+   reference image. Detail gets Activity / About / Tasks / Chats; About contains the existing companion information.
 4. **Creation is a two-step kit Wizard** (template, then name and look) that lands in the existing editor. Templates are
    personality starting points, never free-form system prompts or model picks (rules 1, 8 and 14).
 5. **Presence is one controller, two placements.** The chat corner avatar stays. Jesse chose the spec's floating launcher on
@@ -54,7 +54,7 @@ Riff, Rivet, Sprout, Buddy, Pal, The Tutor); the spec's Milo, Ada and Fin are no
 | 9 | Presence Controller; floating launcher; bottom sheet on phone | `useCompanionPresence` in Chat; corner `CompanionAvatar` with Hide; kit `LauncherBubble`; `InstallDock` is the shell's only fixed element | Lift the controller; launcher allowed by S2 since 2026-10-24, commons first |
 | 10 | Two-step wizard, six templates, Advanced (instructions, model, tools, memory policy) | `/companions/new` opens the editor directly; kit `Wizard` primitive | Wizard; templates as dial presets; Advanced trimmed by rules |
 | 11 | Yours cards (video, state, latest activity, counts, Open / New chat / Review); Discover entries with Add | One CardGrid of every ready companion the person may use | Two tabs; latest activity and counts (state stays on the job card, S6); a source for Discover |
-| 11.3 | Detail tabs Activity / Tasks / Chats / Setup | Detail page; editor with Identity / Voice and style / Look / States | Four tabs; Chats is a filtered conversation list |
+| 11.3 | Detail tabs Activity / About / Tasks / Chats | Detail page; editor with Identity / Voice and style / Look / States | Four tabs; Chats is a filtered conversation list |
 | 12 | Empty states | Kit `EmptyState` primitive and Elements; copy pattern "is not built yet" in `ChatSkillsSection.tsx` | Copy per surface (section 10) |
 | 13 | Explicit branch only | "Branch in new chat" menu item built (A7) | None |
 
@@ -182,7 +182,7 @@ and `persona.active_id` moves to the same `options_from` range so a household `h
 the fixed eight-id range in `settings.ts` and declares the key a second time in `personaKeys.ts`; that duplicate is reported in
 section 9, not fixed silently).
 
-## 5. The detail page: Activity, Tasks, Chats, Setup (spec 11.3)
+## 5. The detail page: Activity, About, Tasks, Chats (spec 11.3)
 
 `/companions/:id` keeps its header (poster or clip, name, tagline, audience, the Make this my default action) and gains four tabs.
 
@@ -192,8 +192,8 @@ section 9, not fixed silently).
   with the pause and cancel the records already support. It lists; it never defines a task kind.
 - **Chats**: the conversation list filtered by `companion_id` (plus conversations where this companion spoke a guest turn, marked
   "joined for one question"), each row opening the chat.
-- **Setup**: a list of the editor's sections (Identity, Voice and style, Look, States, Audience) with the current values summarised
-  and an Edit control that opens `/companions/:id/edit` on that tab. Nested tabs are avoided; the editor stays the one place that
+- **About**: the companion's description, voice, and current profile details, with a settings icon that opens `/companions/:id/edit`.
+  Nested tabs are avoided; the editor stays the one place that
   writes.
 
 ## 6. Tasks and the agentic layer (spec 6, 7)
@@ -321,7 +321,7 @@ setting `companions.preview_shells` (`level: basic`; written only by an owner or
 | 2 | `@` mention in the composer | The kit popover with the same list; the chip renders; the turn ignores it | `ComposerMentions`, `ComposerTriggerPopover` | toast "Coming soon: asking another companion one question" |
 | 3 | Who-answered marker | In the HTML mockup only (shell 8): the kit has no `SpeakerMarker` yet and a Home slot component would be a wrapper | none (mockup) | "Mockup: lands in the kit first." |
 | 4 | `/companions` tabs | Yours (today's grid plus "0 tasks · N chats", N real, and one summary line "Example: 1 working" on the first card, labelled like row 6); Discover (bundled companions not held, the chip row, Add disabled) | `Tabs`, `Chip`, `CardGrid`, `Badge` (audience only), `Status` | Discover footer: "Coming soon: add a companion to your set from here." |
-| 5 | Detail tabs | Setup real (links to the editor); Activity, Tasks, Chats as EmptyStates | `Tabs`, `EmptyState` | "Coming soon: what Nova has been doing." / "Coming soon: tasks Nova is working on." / "Coming soon: your chats with Nova." |
+| 5 | Detail tabs | About real (includes companion details); Activity, Tasks, Chats as EmptyStates | `Tabs`, `EmptyState` | "Coming soon: what Nova has been doing." / "Coming soon: tasks Nova is working on." / "Coming soon: your chats with Nova." |
 | 6 | Example task card | One `TaskCard` in the Tasks tab with sample steps, labelled Example | `TaskCard` | meta "Example" |
 | 7 | Create a companion wizard | Two real steps: template cards, then name and look; Finish opens the existing editor as a draft | `Wizard`, `CardGrid` | step 2 footer: "Finish opens the editor; templates set the dials, coming soon." |
 | 8 | Launcher mockup (not in the app) | A static HTML page beside this record: the bubble with a companion poster on a non-chat page, the open panel, the phone sheet, and the who-answered marker from row 3 | none (mockup) | "Mockup: the panel Element lands in the kit first." |

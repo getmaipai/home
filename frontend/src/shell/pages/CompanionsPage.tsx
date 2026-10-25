@@ -18,12 +18,26 @@ import { useTabItem } from "@/shell/tabIdentity";
 import { useCompanionShells } from "@/lib/companionShells";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@maipai/ui/src/ui/tabs";
 import { Chip } from "@maipai/ui/src/primitives/Chip";
+import { getIcon } from "@maipai/ui/src/icons";
 
 const listKey = ["companions"] as const;
 const ROBOT_SETTINGS = "/settings/apps?tab=robot";
+const SettingsIcon = getIcon("settings-2");
 
 /** The inside of one gallery card, shared by Yours and Discover. */
 function CompanionBody({ card, preview = false, discover = false }: { card: CompanionCard; preview?: boolean; discover?: boolean }) {
+  if (preview && !discover) {
+    return (
+      <div className="flex flex-col items-center gap-3 text-center">
+        <Avatar name={card.name} size="profile" />
+        <h2 className="text-base font-semibold">{card.name}</h2>
+        {card.is_default ? <Badge>Your default</Badge> : null}
+        <p className="text-sm text-muted-foreground">{card.who_can_use}</p>
+        <p className="text-sm text-muted-foreground">Voice: {card.voice}</p>
+        <p className="text-sm text-muted-foreground">{card.chats} chats</p>
+      </div>
+    );
+  }
   return (
     <div className="flex flex-col items-center gap-3 text-center">
       <Avatar name={card.name} size="profile" />
@@ -31,7 +45,8 @@ function CompanionBody({ card, preview = false, discover = false }: { card: Comp
         <h2 className="text-base font-semibold">{card.name}</h2>
         <p className="text-sm text-muted-foreground">{card.tagline}</p>
         <p className="text-sm text-muted-foreground">{card.who_can_use}</p>
-        {preview ? <p className="text-sm text-muted-foreground">0 tasks · {card.chats} chats</p> : null}
+        {preview && !discover ? <p className="text-sm text-muted-foreground">{card.chats} chats</p> : null}
+        {preview && !discover ? <p className="text-sm text-muted-foreground">Voice: {card.voice}</p> : null}
       </div>
       <div className="flex flex-wrap justify-center gap-2">
         <Badge>{card.type_label}</Badge>
@@ -57,9 +72,12 @@ export function CompanionsPage() {
   const [discoverFilter, setDiscoverFilter] = useState("All");
   return (
     <div className="flex flex-col gap-6" data-testid="companions">
-      <div className="flex flex-col gap-1">
-        <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">Companions</h1>
-        <p className="text-sm text-muted-foreground">A companion is how your assistant sounds. Pick one, read about it, and make it your default.</p>
+      <div className="flex flex-wrap items-center justify-between gap-4">
+        <div className="flex min-w-0 flex-col gap-1">
+          <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">Companions</h1>
+          <p className="text-sm text-muted-foreground">A companion is how your assistant sounds. Pick one, read about it, and make it your default.</p>
+        </div>
+        {query.data?.can_create ? <Link to={preview === true ? "/companions/start" : "/companions/new"}><Button>New companion</Button></Link> : null}
       </div>
       <AsyncState
         data={query.isError ? null : query.data}
@@ -71,7 +89,6 @@ export function CompanionsPage() {
       >
         {(data: CompanionList) => (
           <>
-            {data.can_create ? <div><Link to={preview === true ? "/companions/start" : "/companions/new"}><Button>New companion</Button></Link></div> : null}
             {!data.allowed ? (
               <EmptyState icon="user" text="Companions are turned off for you. Ask an owner or admin to turn them on." />
             ) : data.companions.length === 0 ? (
@@ -152,25 +169,28 @@ export function CompanionDetailPage() {
         loadingLabel="Loading companion"
       >
         {(companion: CompanionDetail) => <>
-          {preview === true ? <Tabs defaultValue="Setup">
+          {preview === true ? <>
+            <DetailBody companion={companion} headerOnly />
+            <Tabs defaultValue="Activity">
             <TabsList>
-              <TabsTrigger value="Setup">Setup</TabsTrigger>
               <TabsTrigger value="Activity">Activity</TabsTrigger>
+              <TabsTrigger value="About">About</TabsTrigger>
               <TabsTrigger value="Tasks">Tasks</TabsTrigger>
               <TabsTrigger value="Chats">Chats</TabsTrigger>
             </TabsList>
-            <TabsContent value="Setup"><DetailBody companion={companion} /></TabsContent>
             <TabsContent value="Activity"><EmptyState icon="clock" text={`Coming soon: what ${companion.name} has been doing.`} /></TabsContent>
+            <TabsContent value="About"><DetailBody companion={companion} aboutOnly /></TabsContent>
             <TabsContent value="Tasks"><EmptyState icon="check" text={`Coming soon: tasks ${companion.name} is working on.`} /></TabsContent>
             <TabsContent value="Chats"><EmptyState icon="message-circle" text={`Coming soon: your chats with ${companion.name}.`} /></TabsContent>
-          </Tabs> : <DetailBody companion={companion} />}
+          </Tabs>
+          </> : <DetailBody companion={companion} />}
         </>}
       </AsyncState>
     </div>
   );
 }
 
-function DetailBody({ companion }: { companion: CompanionDetail }) {
+function DetailBody({ companion, headerOnly = false, aboutOnly = false }: { companion: CompanionDetail; headerOnly?: boolean; aboutOnly?: boolean }) {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const copy = useMutation({ mutationFn: () => api.copyCompanion(companion.id), onSuccess: (result) => {
@@ -180,12 +200,13 @@ function DetailBody({ companion }: { companion: CompanionDetail }) {
   const save = useMutation({ mutationFn: () => api.setDefaultCompanion(companion.id), onSuccess: () => {
     void queryClient.invalidateQueries({ queryKey: listKey });
   } });
-  return <DetailSetup companion={companion} saved={save.isSuccess || companion.is_default} copy={copy} save={save} />;
+  return <DetailSetup companion={companion} saved={save.isSuccess || companion.is_default} copy={copy} save={save} headerOnly={headerOnly} aboutOnly={aboutOnly} />;
 }
 
-function DetailSetup({ companion, saved, copy, save }: { companion: CompanionDetail; saved: boolean; copy: UseMutationResult<unknown, Error, void>; save: UseMutationResult<unknown, Error, void> }) {
+function DetailSetup({ companion, saved, copy, save, headerOnly = false, aboutOnly = false }: { companion: CompanionDetail; saved: boolean; copy: UseMutationResult<unknown, Error, void>; save: UseMutationResult<unknown, Error, void>; headerOnly?: boolean; aboutOnly?: boolean }) {
   return (
     <>
+      {!aboutOnly ? <>
       <div className="flex flex-col items-start gap-4 sm:flex-row sm:items-center">
         <Avatar name={companion.name} size="profile" />
         <div className="flex min-w-0 flex-1 flex-col gap-1">
@@ -193,12 +214,14 @@ function DetailSetup({ companion, saved, copy, save }: { companion: CompanionDet
           <p className="text-muted-foreground">{companion.tagline}</p>
           <div className="flex flex-wrap gap-2"><Badge>{companion.type_label}</Badge>{saved ? <Badge>Your default</Badge> : null}</div>
         </div>
-        {companion.can_edit ? <Link to={`/companions/${encodeURIComponent(companion.id)}/edit`}><Button type="button" variant="outline">Edit</Button></Link> : null}
+        {companion.can_edit ? <Link to={`/companions/${encodeURIComponent(companion.id)}/edit`}><Button type="button" variant="ghost" size="icon" aria-label="Companion settings" title="Companion settings"><SettingsIcon /></Button></Link> : null}
         {companion.can_copy ? <Button type="button" variant="outline" disabled={copy.isPending} onClick={() => copy.mutate()}>{companion.is_household ? "Make a copy" : "Edit a copy"}</Button> : null}
         <Button type="button" disabled={saved || save.isPending} onClick={() => save.mutate()}>{saved ? "Your default" : "Set as my default"}</Button>
       </div>
       {save.isError ? <Alert variant="destructive"><AlertDescription>{save.error instanceof ApiError ? save.error.message : "Could not save this. Check your connection and try again."}</AlertDescription></Alert> : null}
       {copy.isError ? <Alert variant="destructive"><AlertDescription>{copy.error instanceof ApiError ? copy.error.message : "Could not reach Home. Check your connection and try again."}</AlertDescription></Alert> : null}
+      </> : null}
+      {!headerOnly ? <>
       {!companion.is_household && companion.can_copy ? <p>This companion comes with Home, so it can't be changed. Make a copy and edit that.</p> : null}
       <Section heading="About">
         <p>{companion.about}</p>
@@ -225,6 +248,7 @@ function DetailSetup({ companion, saved, copy, save }: { companion: CompanionDet
           <p>Robots: {companion.used_by.robots.length ? companion.used_by.robots.map((robot) => robot.name).join(", ") : "none yet"}. <Link to={ROBOT_SETTINGS} className="underline">Companion settings</Link></p>
         </Section>
       ) : null}
+      </> : null}
     </>
   );
 }

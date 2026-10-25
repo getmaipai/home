@@ -13,7 +13,7 @@ function card(overrides: Partial<CompanionCard> = {}): CompanionCard {
   return {
     id: "lively-child", name: "Sprout", type: "child", type_label: "Child companion", tagline: "A cheerful friend.", who_can_use: "Anyone in the family, including kids.",
     dials: [{ label: "How it talks", value: "Talks like a friend." }, { label: "Word choice", value: "Short, simple words." }, { label: "Questions back", value: "Asks you things back and wants to know more." }, { label: "Casual chatter", value: "A few casual words." }],
-    voice: "The voice you chose in Settings", is_default: false, is_household: false, status: "ready", chats: 0, can_edit: false, can_copy: false, ...overrides,
+    voice: "Alba", is_default: false, is_household: false, status: "ready", chats: 0, can_edit: false, can_copy: false, ...overrides,
   };
 }
 function detail(overrides: Partial<CompanionDetail> = {}): CompanionDetail {
@@ -52,7 +52,7 @@ test("when companions are off for the person the page says so", async () => {
   await waitFor(() => expect(view.getByText(/turned off for you/)).toBeTruthy());
 });
 
-test("the household detail shows its Edit and copy actions", async () => {
+test("the household detail shows settings icon and copy actions", async () => {
   api.companion = async () => detail({ is_household: true, can_edit: true, can_copy: true });
   api.copyCompanion = async () => ({ id: "copy-id" });
   const saved: string[] = [];
@@ -62,7 +62,10 @@ test("the household detail shows its Edit and copy actions", async () => {
   expect(view.getByText("Talks like a friend.")).toBeTruthy();
   expect(view.getByText(/Wow, a slushie/)).toBeTruthy();
   expect(view.getByRole("button", { name: "Play a sample" })).toBeTruthy();
-  expect(view.getByRole("link", { name: "Edit" }).getAttribute("href")).toBe("/companions/lively-child/edit");
+  const settingsButton = view.getByRole("button", { name: "Companion settings" });
+  const settingsLink = settingsButton.closest("a");
+  expect(settingsLink).toBeTruthy();
+  expect(settingsLink!.getAttribute("href")).toBe("/companions/lively-child/edit");
   expect(view.getByRole("button", { name: "Make a copy" })).toBeTruthy();
   expect(view.queryByText("Who uses it")).toBeNull();
   fireEvent.click(view.getByRole("button", { name: "Set as my default" }));
@@ -76,7 +79,7 @@ test("a bundled companion makes editing through a copy clear", async () => {
   await waitFor(() => expect(view.getByText("Sprout loves questions.")).toBeTruthy());
   expect(view.getByRole("button", { name: "Edit a copy" })).toBeTruthy();
   expect(view.getByText("This companion comes with Home, so it can't be changed. Make a copy and edit that.")).toBeTruthy();
-  expect(view.queryByRole("link", { name: "Edit" })).toBeNull();
+  expect(view.queryByRole("link", { name: "Companion settings" })).toBeNull();
 });
 
 test("a refused save shows the sentence from the hub", async () => {
@@ -128,7 +131,10 @@ test("preview tabs show counts, discovery excludes default, and detail tasks are
   api.companions = async () => ({ allowed: true, can_create: true, can_discover: true, default_id: "lively-teen", robots: null,
     companions: [card({ id: "lively-child", name: "Sprout", chats: 2 }), card({ id: "lively-teen", name: "Riff", is_default: true, chats: 0 })] });
   const yours = open("/companions", true);
-  await waitFor(() => expect(yours.getByText("0 tasks · 2 chats")).toBeTruthy());
+  await waitFor(() => expect(yours.getByText("2 chats")).toBeTruthy());
+  expect(yours.getAllByText("Voice: Alba")).toHaveLength(2);
+  expect(yours.queryByRole("button", { name: "Add" })).toBeNull();
+  expect(yours.getByRole("heading", { name: "Companions" }).parentElement?.parentElement?.contains(yours.getByRole("link", { name: "New companion" }))).toBe(true);
   const discover = yours.getByRole("tab", { name: "Discover" });
   fireEvent.mouseDown(discover, { button: 0 });
   fireEvent.click(discover);
@@ -136,12 +142,18 @@ test("preview tabs show counts, discovery excludes default, and detail tasks are
   expect(yours.queryByText("Riff")).toBeNull();
   expect((yours.getByRole("button", { name: "Add" }) as HTMLButtonElement).disabled).toBe(true);
   cleanup();
-  api.companion = async () => detail();
+  api.companion = async () => detail({ can_edit: true });
   const detailView = open("/companions/lively-child", true);
   await waitFor(() => expect(detailView.getByRole("tab", { name: "Tasks" })).toBeTruthy());
-  expect(detailView.getByRole("tab", { name: "Setup" })).toBeTruthy();
-  expect(detailView.getByRole("tab", { name: "Activity" })).toBeTruthy();
+  const activity = detailView.getByRole("tab", { name: "Activity" });
+  expect(activity.getAttribute("data-state")).toBe("active");
+  expect(detailView.getByRole("tab", { name: "About" })).toBeTruthy();
+  expect(detailView.getByRole("button", { name: "Set as my default" })).toBeTruthy();
+  expect(detailView.getByRole("button", { name: "Companion settings" }).closest("a")?.getAttribute("href")).toBe("/companions/lively-child/edit");
+  expect(detailView.queryByText("Sprout loves questions.")).toBeNull();
+  expect(detailView.getByText("Coming soon: what Sprout has been doing.")).toBeTruthy();
   expect(detailView.getByRole("tab", { name: "Chats" })).toBeTruthy();
+  expect(detailView.queryByText("Sprout loves questions.")).toBeNull();
   const tasks = detailView.getByRole("tab", { name: "Tasks" });
   fireEvent.mouseDown(tasks, { button: 0 });
   fireEvent.click(tasks);
