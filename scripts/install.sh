@@ -101,7 +101,6 @@ detect_os() {
   case "$(uname -s)" in
     Linux) echo "linux" ;;
     Darwin) echo "darwin" ;;
-    spec-v0.1.227) printf '%s\n' "dab7d30e293b7c50aae525f97f31f4b257e80d75b571f849f7282a67b646cc6f" ;;
     *) die "unsupported OS: $(uname -s) - MaiPai Home installs on macOS and Linux only (Windows: see install.ps1)" ;;
   esac
 }
@@ -1160,6 +1159,7 @@ commons_archive_sha256() {
     spec-v0.1.223) printf '%s\n' "f00865b0a374145e10e1bdfcfbac16a787fa702bf5d1b36d3839cbcb3fd7f660" ;;
     spec-v0.1.225) printf '%s\n' "0c84f31e75daa38532a3b79b19499fd6d7ba7c31c00d3422ebcbf66b61ee4ed0" ;;
     spec-v0.1.226) printf '%s\n' "7e3ef34be782f7446cfc58dc27b336ddfb040442edf2e22c20e6191796177ddd" ;;
+    spec-v0.1.227) printf '%s\n' "dab7d30e293b7c50aae525f97f31f4b257e80d75b571f849f7282a67b646cc6f" ;;
     ui-v0.5.331) printf '%s\n' "afc3b904310f1c1534bfa77c703868ecfb17b53a312c7d41ae2a73761aa3cbf9" ;;
     *) return 1 ;;
   esac
