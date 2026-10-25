@@ -1,11 +1,11 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { useMutation, useQuery, useQueryClient, type UseMutationResult } from "@tanstack/react-query";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { AsyncState } from "@maipai/ui/src/primitives/AsyncState";
 import { EmptyState } from "@maipai/ui/src/primitives/EmptyState";
 import { Section } from "@maipai/ui/src/primitives/Section";
 import { Avatar } from "@maipai/ui/src/primitives/Avatar";
-import { CardGrid } from "@maipai/ui/src/primitives/CardGrid";
+import { CharacterTile } from "@maipai/ui/src/primitives/CharacterTile";
 import { Badge } from "@maipai/ui/src/dashboard/components/ui/badge";
 import { Alert, AlertDescription } from "@maipai/ui/src/ui/alert";
 import { Button } from "@maipai/ui/src/ui/button";
@@ -29,67 +29,31 @@ const SettingsIcon = getIcon("settings-2");
 const ChevronRightIcon = getIcon("chevron-right");
 const MoreIcon = getIcon("more-horizontal");
 
-/** The inside of one gallery card, shared by Yours and Discover. */
-function CompanionBody({ card, preview = false, discover = false, onFailure, onDelete }: { card: CompanionCard; preview?: boolean; discover?: boolean; onFailure: (message: string) => void; onDelete: (card: CompanionCard) => void }) {
-  const queryClient = useQueryClient();
-  const save = useMutation({ mutationFn: () => api.setDefaultCompanion(card.id), onSuccess: () => { void queryClient.invalidateQueries({ queryKey: listKey }); }, onError: (error) => onFailure(error instanceof ApiError ? error.message : "Could not set your default. Check your connection and try again.") });
-  const title = <span className="font-semibold">{card.name}</span>;
-  const actions = <div className="flex justify-end"><DropdownMenu>
+/** Props for one companion tile, shared by Yours and Discover. */
+function companionTileProps({ card, preview = false, discover = false, onDelete, onSelect, onSetDefault }: { card: CompanionCard; preview?: boolean; discover?: boolean; onDelete: (card: CompanionCard) => void; onSelect: () => void; onSetDefault: (card: CompanionCard) => void }) {
+  const actions = <DropdownMenu>
     <DropdownMenuTrigger asChild>
       <Button type="button" variant="ghost" size="icon" aria-label="Companion actions" onClick={(event) => event.stopPropagation()} onPointerDown={(event) => event.stopPropagation()} onKeyDown={(event) => event.stopPropagation()}><MoreIcon aria-hidden="true" /></Button>
     </DropdownMenuTrigger>
     <DropdownMenuContent align="end" onClick={(event) => event.stopPropagation()} onPointerDown={(event) => event.stopPropagation()} onKeyDown={(event) => event.stopPropagation()}>
-      <DropdownMenuItem disabled={card.is_default || save.isPending} onSelect={() => save.mutate()}>{card.is_default ? "Your default" : "Set as my default"}</DropdownMenuItem>
+      <DropdownMenuItem disabled={card.is_default} onSelect={() => onSetDefault(card)}>Set as my default</DropdownMenuItem>
       {card.can_edit && card.is_household ? <DropdownMenuItem variant="destructive" onSelect={() => onDelete(card)}>Delete</DropdownMenuItem> : null}
     </DropdownMenuContent>
-  </DropdownMenu></div>;
+  </DropdownMenu>;
+  let status: ReactNode;
   if (preview && !discover) {
     const sample = companionPreviewSample(card.id);
-    // eslint-disable-next-line shadcn/no-arbitrary-values -- the teal and orange status hues have no scale token
-    const statusClass = sample.status === "Working" ? "bg-[color:var(--hue-teal)] text-foreground" : sample.status === "Needs approval" ? "bg-[color:var(--hue-orange)] text-foreground" : "bg-muted text-foreground";
-    return (
-      <div className="flex flex-col gap-3 text-left">
-        <div className="flex items-center justify-between gap-3">
-          <Avatar name={card.name} size="profile" />
-          <div className="ml-auto flex items-center gap-2">{actions}</div>
-          <span className={`rounded-full px-3 py-1 text-sm font-medium ${statusClass}`}>{sample.status}</span>
-        </div>
-        <div className="flex flex-col gap-1">
-          <h2 className="text-base">{title}</h2>
-          <p className="text-sm text-muted-foreground">{card.tagline}</p>
-          <p className="text-sm text-muted-foreground">{sample.activityLine}</p>
-        </div>
-        <div className="flex items-center justify-between gap-2 text-sm text-muted-foreground">
-          <span>{sample.tasks} tasks · {card.chats} chats</span>
-          <ChevronRightIcon aria-hidden="true" />
-        </div>
-      </div>
-    );
+    status = <Badge tone={sample.status === "Working" ? "success" : sample.status === "Needs approval" ? "warning" : "default"}>{sample.status}</Badge>;
   }
-  return (
-    <div className="relative flex flex-col items-center gap-3 text-center">
-      <div className="absolute right-0 top-0">{actions}</div>
-      <Avatar name={card.name} size="profile" />
-      <div className="flex flex-col gap-1">
-        <h2 className="text-base">{title}</h2>
-        <p className="text-sm text-muted-foreground">{card.tagline}</p>
-        <p className="text-sm text-muted-foreground">{card.who_can_use}</p>
-        {preview && !discover ? <p className="text-sm text-muted-foreground">{card.chats} chats</p> : null}
-        {preview && !discover ? <p className="text-sm text-muted-foreground">Voice: {card.voice}</p> : null}
-      </div>
-      <div className="flex flex-wrap justify-center gap-2">
-        <Badge>{card.type_label}</Badge>
-        {discover ? <Badge>{card.is_household ? "Made at home" : "Included"}</Badge> : null}
-        {!discover && card.is_household ? <Badge>Made at home</Badge> : null}
-        {!discover && card.status === "draft" ? <Badge>Draft</Badge> : null}
-        {!discover && card.is_default ? <Badge>Your default</Badge> : null}
-      </div>
-      {discover ? <Button disabled>Add</Button> : null}
-      {!discover ? <ul className="flex list-none flex-col gap-1 p-0 text-sm text-muted-foreground">
-        {card.dials.map((dial) => <li key={dial.label}>{dial.value}</li>)}
-      </ul> : null}
-    </div>
-  );
+  return {
+    name: card.name,
+    seed: card.id,
+    line: card.tagline,
+    status,
+    selected: card.is_default,
+    menu: actions,
+    onSelect,
+  };
 }
 
 /** /companions: the companions this person may use, as a card grid. An owner or admin also sees which companion each robot has. */
@@ -102,6 +66,7 @@ export function CompanionsPage() {
   const [actionError, setActionError] = useState<string | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<CompanionCard | null>(null);
   const queryClient = useQueryClient();
+  const saveDefault = useMutation({ mutationFn: (id: string) => api.setDefaultCompanion(id), onSuccess: () => { void queryClient.invalidateQueries({ queryKey: listKey }); }, onError: (error) => setActionError(error instanceof ApiError ? error.message : "Could not set your default. Check your connection and try again.") });
   const remove = useMutation({ mutationFn: (id: string) => api.deleteCompanion(id), onSuccess: () => { setDeleteTarget(null); void queryClient.invalidateQueries({ queryKey: listKey }); }, onError: (error) => setActionError(error instanceof ApiError ? error.message : "Could not delete this companion. Check your connection and try again.") });
   return (
     <div className="flex flex-col gap-6" data-testid="companions">
@@ -134,9 +99,13 @@ export function CompanionsPage() {
                   {data.can_discover ? <TabsTrigger value="Discover">Discover</TabsTrigger> : null}
                 </TabsList>
                 <TabsContent value="Yours">
-                  <CardGrid label="Companions" items={data.companions} getKey={(card) => card.id} getLabel={(card) => card.name}
-                    onSelect={(card) => navigate(`/companions/${encodeURIComponent(card.id)}`)}
-                    renderItem={(card) => <CompanionBody card={card} preview onFailure={setActionError} onDelete={setDeleteTarget} />} />
+                  <div className="grid grid-cols-2 justify-items-center gap-4 sm:grid-cols-3 lg:grid-cols-4">
+                    {data.companions.map((card) => <div key={card.id}>
+                      <CharacterTile {...companionTileProps({ card, preview: true, onDelete: setDeleteTarget, onSetDefault: (item) => saveDefault.mutate(item.id), onSelect: () => navigate(`/companions/${encodeURIComponent(card.id)}`) })} />
+                      <p className="mt-1 text-center text-sm text-muted-foreground">{companionPreviewSample(card.id).activityLine}</p>
+                    </div>)}
+                    {data.can_create ? <CharacterTile name="New companion" variant="add" onSelect={() => navigate("/companions/start")} /> : null}
+                  </div>
                   <p className="mt-4 text-sm text-muted-foreground">Sample activity. Real activity is coming soon.</p>
                 </TabsContent>
                 {data.can_discover ? <TabsContent value="Discover">
@@ -144,20 +113,20 @@ export function CompanionsPage() {
                     {["All", "Chat", "Research", "Shopping", "Stories", "Kids"].map((item) =>
                       <Chip key={item} selected={discoverFilter === item} onClick={() => setDiscoverFilter(item)}>{item}</Chip>)}
                   </div>
-                  <CardGrid label="Discover companions" items={data.companions.filter((card) => !card.is_default)}
-                    getKey={(card) => card.id} renderItem={(card) => <CompanionBody card={card} discover onFailure={setActionError} onDelete={setDeleteTarget} />} />
+                  <div className="grid grid-cols-2 justify-items-center gap-4 sm:grid-cols-3 lg:grid-cols-4">
+                    {data.companions.filter((card) => !card.is_default).map((card) => <div key={card.id}>
+                      <CharacterTile {...companionTileProps({ card, discover: true, onDelete: setDeleteTarget, onSetDefault: (item) => saveDefault.mutate(item.id), onSelect: () => navigate(`/companions/${encodeURIComponent(card.id)}`) })} />
+                      <div className="mt-2"><Button disabled>Add</Button></div>
+                    </div>)}
+                  </div>
                   <p className="mt-4 text-sm text-muted-foreground">Coming soon: add a companion to your set from here.</p>
                 </TabsContent> : null}
               </Tabs>
             ) : (
-              <CardGrid
-                label="Companions"
-                items={data.companions}
-                getKey={(card) => card.id}
-                getLabel={(card) => card.name}
-                onSelect={(card) => navigate(`/companions/${encodeURIComponent(card.id)}`)}
-                renderItem={(card) => <CompanionBody card={card} onFailure={setActionError} onDelete={setDeleteTarget} />}
-              />
+              <div className="grid grid-cols-2 justify-items-center gap-4 sm:grid-cols-3 lg:grid-cols-4">
+                {data.companions.map((card) => <CharacterTile key={card.id} {...companionTileProps({ card, onDelete: setDeleteTarget, onSetDefault: (item) => saveDefault.mutate(item.id), onSelect: () => navigate(`/companions/${encodeURIComponent(card.id)}`) })} />)}
+                {data.can_create ? <CharacterTile name="New companion" variant="add" onSelect={() => navigate("/companions/new")} /> : null}
+              </div>
             )}
             <AlertDialog open={deleteTarget !== null} onOpenChange={(open) => { if (!open) setDeleteTarget(null); }}>
               <AlertDialogContent onClick={(event) => event.stopPropagation()} onPointerDown={(event) => event.stopPropagation()} onKeyDown={(event) => event.stopPropagation()}>
