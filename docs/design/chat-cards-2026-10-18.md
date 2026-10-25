@@ -14,6 +14,13 @@ Read for this note: `RULES.md` rules 6, 9, 9b and S6; `AGENTS.md` rule 9 (Kit El
 `spec-v0.1.179` (`answer-block.schema.json`, `result.schema.json`, `manifest.schema.json`, `ui/schema.json`, `elements/answer-block.tsx`).
 Evidence below is from origin/main at `66664310` (v0.2.21).
 
+## Supersedes
+
+- NEWS-06's plan for a `TOOL_BINDINGS` entry for `news` (BACKLOG line 4291); CHAT-CARDS-01 uses the answer-block path.
+- The `composer.ts` structured-part switch and `SPEC_SHEET_BOUND`, and the `packageBlocks.ts` `blocksForRecipeRun` switch, retired by this note's rows. Stored rows keep their binding through the migration window (section 5.2).
+- The `news` prop on `AnswerBlockView`, replaced by the generic `actions` slot (section 2.3).
+- Trivia choice and any answer chips are left to QR-01/QR-02 and the open Fix trivia item; this note adds no choice kind. The `countdown` kind in CHAT-CARDS-05 is the one countdown definition; the Coming up page in [household-lists-reminders-2026-10-17.md](household-lists-reminders-2026-10-17.md) uses it.
+
 ## 1. Audit: what each tool draws in chat today
 
 ### 1.1 How a chat result reaches the screen (three paths, only one is generic)
@@ -138,11 +145,11 @@ New optional-by-kind manifest field `chat_card` (required for `plugin`, `app` an
 - `fallback`: `alt` (the block's one-sentence `alt`, which is what a robot says and a screen reader reads) or `reply` (the
   reply text is the whole fallback). The reply text is always present and complete; a card never carries information the
   prose lacks (rule 6, and the robot has no screen).
-- `native`: a closed list for the job and sources cards Home draws with polling wrappers today (`job_media` for picture,
+- `native`: deprecated from the start and removed by CHAT-CARDS-11. Until that slice, a closed list for the job and sources cards Home draws with polling wrappers today (`job_media` for picture,
   video and song; `project`; `artifact`; `confirm`; `sources`). A package cannot add a value. Section 5 slice CC-11 folds them
   into blocks later.
 - `none`: a one-line reason, 20 to 120 characters, not a placeholder. Allowed only for fire-and-forget or pure-prose tools
-  (lights, joke). **Refused** when the manifest has `contributes.pages` (an app must at least open its app) or a non-empty
+  (joke). **Refused** when the manifest has `contributes.pages` (an app must at least open its app) or a non-empty
   `returns_blocks`.
 
 How the block is produced:
@@ -152,7 +159,7 @@ How the block is produced:
   op: `"card": { "kind": "schedule_card", "alt": "Timer set: {label}", "props": { "name": "{label}", "nextRun": "{when_text}" } }`,
   placeholders resolved by the interpreter from step outputs, the result then goes through the same `filterAnswerBlocks`. The
   id-keyed switch and the `composer.ts` structured-part switch are retired (port before delete, rule 12: stored rows keep their
-  binding, see section 6).
+  binding, see section 5.2).
 
 ### 2.2 Block types per kind of tool
 
@@ -164,15 +171,19 @@ Existing kinds cover most tools (section 4 has the new ones).
 | One media thing (book, movie, artist, track, episode) | `media_card` (new) | book-lookup, media-lookup, music lookup |
 | Weather | `weather_card` | weather |
 | Place and map | `place_cards` + `map` (KIT-GENUI-05, GENUI-08) | place-lookup |
-| Facts as label and value | `spec_sheet` | almanac x5, currency, convert, math, translate |
+| Facts as label and value | `spec_sheet` | almanac x5, currency, translate; `convert` when it returns label/value facts (if `calculator` is its `chat_card.block`, `spec_sheet` is only an extra `returns_blocks` kind) |
+| Formula and inputs | `calculator` (GENUI-06) | math |
 | Table | `data_table` | sports scores (game, state, score) |
-| Timer or countdown | `countdown` (new); `schedule_card` for reminders | timer, remind |
-| Confirmation of an action done | `confirmation` (new) | list-add, remember, lights, locks, podcasts/videos "open" |
-| A question with choices | `choice` (new, over `option-list`) | trivia, and clarifying questions |
+| Timer or countdown | `countdown` (new), the single countdown kind also used by Coming up; `confirmation` for reminders (`schedule_card` may remain an extra `returns_blocks` kind) | timer, remind |
+| Confirmation of an action done | `confirmation` (new) | list-add, remind, lights, locks, podcasts/videos "open" |
 | Pictures | `image_gallery` | show_images, generate_image |
 | List of tasks | `todo_list` | list-view |
 | Long read | `article` | news (Read it), write_document summaries |
-| Headline number | `stat` (KIT-GENUI-02) | math, convert, currency |
+| Headline number | `stat` (KIT-GENUI-02) | `convert` and `currency` when they return a headline number; if `convert` uses `stat` as its `chat_card.block`, `spec_sheet` is only an extra `returns_blocks` kind |
+
+Clarifying questions use QR-01 follow-up chips. `remember` is not an answer-block kind: Home draws the shipped `MemoryChips` Element from each turn’s `memoryIds`, sourced by `memoryIdsByTurn` in `conversationHistory.ts` and read by `chatMemoryChips.ts` and `chatMemoryState.ts`; `remember` declares `chat_card: { "none": "The memory chips under the reply show what was saved." }`.
+
+Trivia and `choice` are deferred because a tapped label can match `AFFIRMATIVE_RE` in `backend/src/lib/consentVocab.ts` as consent, so a choice card needs the QR-01 style guard. Trivia also needs a Tier 1 handler and reviewed options; see the open “Fix trivia: it reveals the question and the answer in the same reply” item.
 
 ### 2.3 Standard actions
 
@@ -189,6 +200,8 @@ the person may use (role, band, app visible), computed by the hub into an `avail
 | `undo` | Undo | `POST .../actions/undo` with the record id the result created; hidden after 60 seconds or once the record changed; a gone record shows "Already done" | the tool made a record |
 | `copy` | Copy | Copies the card's text to the clipboard | none |
 | `listen`, `follow`, `feedback`, `summarize` | as in the News note | as in `news-app-2026-10-17.md` | News only for now |
+
+Undo failure uses S6's existing row: the kit destructive `Alert` in that form, with the next step from `lib/failureCopy.ts`.
 
 The single Home handler (`chatAnswerBlocks.tsx`) maps `name + ids` to the package's declared action and runs it. It replaces the
 `news` handler slot on `AnswerBlockView` with a generic `actions` slot (commons first, rule 9c); the old `news` prop stays as
@@ -272,13 +285,15 @@ Most tools are covered by Elements and kinds that ship. New work, in this order 
 |---|---|---|---|---|
 | `actions` slot on `AnswerBlockView` (generalizes the `news` prop) and `available` on the block envelope | every card | `answer-block.tsx` | S | Additive; `news` stays an alias one release. Spec: envelope gets optional `actions` (string list) and `as_of` |
 | `story_feed` `rows` layout in chat width | news | `StoryFeed` (exists, NEWS-01) | S | Needs a phone-width check at the chat column, not a new Element |
-| `media_card` | book-lookup, media-lookup, music, episode | `Card`, `Image`, `Button` primitives | M | Cover, title, subtitle, 3 facts, actions row. Needs a UI-DECISIONS row (Jesse) |
-| `confirmation` | list-add, remember, lights, locks, open-app replies | `Alert`/task-card style row | S | Icon, one sentence, optional Undo. UI-DECISIONS row |
-| `countdown` | timer | `schedule-card`, `number-ticker` | M | Live remaining time from `endsAt`, pause not needed; ends as "Time is up". UI-DECISIONS row |
-| `choice` | trivia, clarifying questions | `option-list`, `question-flow` | M | Answers fire a package action; result flips to correct/incorrect text |
+| `media_card` | book-lookup, media-lookup, music, episode | `Card`, `Image`, `Button` primitives | M | `media_list` is for multiple ranked rows and cannot express one item's cover, title, subtitle, facts and actions as one result; `spec_sheet` is label/value facts and has no media identity or cover. Cover, title, subtitle, 3 facts, actions row. Needs a UI-DECISIONS row (Jesse) |
+| `confirmation` | list-add, remind, lights, locks, open-app replies | `Alert`/task-card style row | S | Icon, one sentence, optional Undo. `remember` is not an answer block; the shipped `MemoryChips` Element (`memory-chips.tsx`) is drawn from each turn’s `memoryIds` (`memoryIdsByTurn` in `conversationHistory.ts`, read by `chatMemoryChips.ts` and `chatMemoryState.ts`). UI-DECISIONS row |
+| `countdown` | timer | `schedule-card`, `number-ticker` | M | CHAT-CARDS-05 defines the one `countdown` kind; the Coming up page uses it. HOUSEHOLD-03 has not built a countdown. Counts down from `endsAt` on the client with no polling loop. "Time is up" is the card's own state; timer firing stays a notification. UI-DECISIONS row |
 | `place_cards`, `map` | place-lookup | `map-answer` | S+S | Already KIT-GENUI-05; no network (schematic) |
-| `stat`, `media_list` | convert, math, currency; recents | kit `number-ticker`, `List` | S each | Already KIT-GENUI-02, -03 |
-| `job` block | picture, video, song, project, artifact | `job-progress`, players | L | Slice CC-11; until then `native` |
+| `stat`, `media_list` | `convert` and `currency` when they return a headline number; recents | kit `number-ticker`, `List` | S each | Already KIT-GENUI-02, -03; these are additional `returns_blocks` kinds when another kind is the manifest `chat_card.block`. |
+| `calculator` | math | GENUI-06 calculator | M | GENUI-06 ships the calculator Element and formula interpreter; this note uses its calculator for whichever package GENUI-06 leaves, `math` or `calculate`. GENUI-06 retains its own scope to whichever package its backlog row assigns. |
+| `job` block | picture, video, song, project, artifact | `job-progress`, players | L | CHAT-CARDS-11 is a placeholder row pending its own design pass and architect verdict. Reuse the MEMMGMT-2026-10-25 job-card copy table; add no polling beyond the job record's. Until then `native` is deprecated. |
+
+`remember` declares `chat_card: { "none": "The memory chips under the reply show what was saved." }`; the shipped `MemoryChips` Element (`memory-chips.tsx`) is drawn from each turn’s `memoryIds` (`memoryIdsByTurn` in `conversationHistory.ts`, read by `chatMemoryChips.ts` and `chatMemoryState.ts`), not an answer block. Locks get no Undo: undoing a lock unlocks a door; the lock-doors approval card and the age and surface gates in rule 0 keep that action controlled.
 
 No new Element is a Home wrapper; Home only supplies data and the action handler.
 
@@ -293,13 +308,13 @@ Priority: SETTINGS-IA-01 to -05 and the music verification rows (MUSIC-GEN-07, -
 | CC-02 spec | M | commons spec | `chat_card` manifest field, `actions`/`as_of` envelope fields, recipe `card` binding with interpreter tests in TS and Python, fixtures | CC-01 |
 | CC-03 declarations and lint | M | commons, catalog, home | `chatCardCheck(manifest)` in `spec/ui/chat-card-check.ts` (one definition) called by catalog `tools/src/lint.ts`, Home `backend/tests/bundledPackages.test.ts` and the install path; declare all 37 bundled and 10 catalog manifests; patch-bump each, refresh bundled hashes (`scripts/refresh-bundled-packages.ts`), re-sign the catalog | CC-02 |
 | CC-04 one action handler, image rule | S | home | `chatAnswerBlocks.tsx` runs `open_app`, `call`, `play`, `undo` from the manifest; generalize `hubImageSources`; CSP `img-src` | CC-01 |
-| CC-05 kinds A | M | commons | `media_card`, `confirmation`, `countdown` with tests and the UI-DECISIONS rows (Jesse approves the rows) | CC-02 |
-| CC-06 retire the structured-part switch | M | home | Almanac x5, media-lookup, music, currency, convert, math return `spec_sheet` blocks themselves; fixes the `math`/`convert` defect; delete the `composer.ts` switch and `SPEC_SHEET_BOUND` once the 90-day stored-row window and the history adapter keep rendering old rows | CC-02 |
+| CC-05 kinds A | M | commons | `media_card`, `confirmation`, and `countdown` with tests and the UI-DECISIONS rows (Jesse approves the rows) | CC-02 |
+| CC-06 retire the structured-part switch | M | home | Almanac x5, media-lookup, music and currency return `spec_sheet` blocks themselves; `convert` selects exactly one declared block (`spec_sheet`, `stat`, or `calculator`) as `chat_card.block`, with other returned kinds only in `returns_blocks`; `math` declares `chat_card.block: calculator` using the calculator Element and formula interpreter that GENUI-06 ships; delete the `composer.ts` switch and `SPEC_SHEET_BOUND` once the 90-day stored-row window and the history adapter keep rendering old rows. Each manifest declares one `chat_card.block`. | CC-02, GENUI-06 |
 | CC-07 weather, sports, almanac actions | S | home, catalog | weather gets `Open in Weather`; sports returns a `data_table`; almanac gets `Copy` | CC-04 |
 | CC-08 lookups | M | home, catalog | place-lookup `place_cards`+`map` (after KIT-GENUI-05, GENUI-08); book-lookup, media-lookup, music `media_card` with `Open in Music` | CC-05 |
-| CC-09 timers and confirmations | M | home | timer `countdown`; remind, list-add, remember with `Undo`; lights and locks `confirmation` | CC-05 |
-| CC-10 trivia, translate | S | home | `choice` for trivia; translate `spec_sheet` with Copy | CC-05 |
-| CC-11 fold the job cards | L | commons, home | One `job` block for picture, video, song, project, artifact; retire the five polling wrappers in `chatToolUis.tsx`. Needs its own design pass (polling vs events, Stack job ids) | CC-04 |
+| CC-09 timers and confirmations | M | home | timer returns the CC-05 `countdown`; remind and list-add return `confirmation` with `Undo` (remind may list `schedule_card` only as an extra `returns_blocks` kind); lights and locks return `confirmation` without Undo; `remember` declares `chat_card: { "none": "The memory chips under the reply show what was saved." }` and uses the shipped `MemoryChips` Element sourced from each turn’s `memoryIds` | CC-05 |
+| CC-10 translate | S | home | Translate returns a `spec_sheet` with Copy. Home-only. | CC-02 |
+| CC-11 fold the job cards | L | commons, home | Placeholder; own design pass and own architect verdict. One `job` block for picture, video, song, project, artifact; reuse the MEMMGMT-2026-10-25 job-card copy table; add no polling beyond the job record's; retire the six polling wrappers in `chatToolUis.tsx`. | CC-04 |
 | CC-12 conformance gate flips on | S | home, catalog | Shrink-only baseline of tools with a declaration but no producing fixture goes to zero; the conformance test becomes a hard fail | CC-06 to CC-10 |
 
 ### 5.1 Tests
@@ -337,7 +352,7 @@ Priority: SETTINGS-IA-01 to -05 and the music verification rows (MUSIC-GEN-07, -
 | The card repeats the reply text | Keep the existing `synthesis_hint`; the model writes one sentence beyond the card; conformance test compares alt and reply |
 | Kit kinds multiply | The list is additive and each new kind needs a UI-DECISIONS row; `stat`, `media_list`, `place_cards` are already queued |
 | Tier 0 recipe `card` step grows into a template language | Placeholders only (`{name}`), no loops or conditionals; a recipe needing more is a Tier 1 handler |
-| Home wrappers stay (job cards) | Named as debt with a slice (CC-11); `native` is closed so it cannot grow |
+| Home wrappers stay (job cards) | Named as debt with a slice (CC-11); `native` is deprecated from the start and removed by CC-11 |
 | Pin churn: three `commons` tags (kit, spec, tools) | CC-01 and CC-02 ship in one spec tag and one ui tag; PINNING.md applies |
 | Two sources of truth (page `actions` vs `chat_card.actions`) | Same vocabulary, same checker, same handler; `chat_card.actions` names only entries the package's own `actions` map or the standard set defines |
 
@@ -354,6 +369,13 @@ Priority: SETTINGS-IA-01 to -05 and the music verification rows (MUSIC-GEN-07, -
   `chat_card`, or the manifest says in one line why not." That is a `RULES.md` edit, so it would be **NEEDS-RULE-CHANGE**:
   only Jesse approves, with an `Owner-approved: <date>` commit.
 
+### Decision for Jesse
+
+1. Should this be a hard rule in `RULES.md` or packaging policy in org `PACKAGES.md`? Recommended: packaging policy in org `PACKAGES.md`.
+2. If it is a rule, should the wording allow the `native` closed list until CHAT-CARDS-11 removes it? Recommended: yes, explicitly allow that temporary closed list.
+
+This note does not change `RULES.md`. A commit that changes a rule carries `Owner-approved: <date>`.
+
 ### 6.1 Draft text for `getmaipai/.github` `docs/PACKAGES.md` (draft only; not applied)
 
 > ## Chat cards
@@ -366,8 +388,7 @@ Priority: SETTINGS-IA-01 to -05 and the music verification rows (MUSIC-GEN-07, -
 >
 > - `{ "block": "<kind>", "actions": [...], "open_page": "<page id>", "fallback": "alt" | "reply" }`, where the kind is also in
 >   `returns_blocks`;
-> - `{ "native": "<name>" }`, from the closed list Home draws itself (picture, video and song jobs, project, artifact, confirm,
->   sources); a package cannot add a name;
+> - `{ "native": "<name>" }`, deprecated and removed by CHAT-CARDS-11; until then it names a value from the closed list Home draws itself (picture, video and song jobs, project, artifact, confirm, sources); a package cannot add a name;
 > - `{ "none": "<20 to 120 characters, why the reply text alone is right>" }`, for fire-and-forget or prose-only tools. Refused
 >   when the package has pages or lists `returns_blocks`.
 >
@@ -391,9 +412,7 @@ Priority: SETTINGS-IA-01 to -05 and the music verification rows (MUSIC-GEN-07, -
 
 1. Approve the standard as written, and the optional one-sentence addition to rule 9 (section 6)?
 2. Approve UI-DECISIONS rows for `media_card`, `confirmation` and `countdown` (section 4)?
-3. Should lights and locks get a `confirmation` card, or stay `none`? Recommended: `confirmation` for locks (the person wants to
-   see it worked), `none` for lights.
-4. Is a card shown to a teen on the shared kitchen screen allowed to carry `Save`? Recommended: no, person-scoped actions need a
+3. Is a card shown to a teen on the shared kitchen screen allowed to carry `Save`? Recommended: no, person-scoped actions need a
    known speaker.
 
 ## 8. Evidence index
@@ -407,8 +426,6 @@ Priority: SETTINGS-IA-01 to -05 and the music verification rows (MUSIC-GEN-07, -
 - Read-only timer card: `chatAnswerBlocks.tsx` passes no `onScheduleToggle`.
 - Manifests: `returns_blocks` set on weather, list-view, remind, timer, show_images, news only.
 
-## 9. Architect verdict (proposed, not yet ruled)
+## 9. Architect verdict
 
-APPROVED-WITH-CONDITIONS expected: the standard reuses the shipped answer-block path, adds no Home wrapper and no new status
-UI, and needs no `RULES.md` change; the architect agent must rule on this note and the rows before CC-01 starts, the org
-`PACKAGES.md` edit needs `Owner-approved`, and the three new kit kinds need UI-DECISIONS rows from Jesse.
+The first architect verdict was REJECTED. Re-run after this revision. The architect must rule on this note and the rows before CC-01 starts; the org `PACKAGES.md` edit needs `Owner-approved`, and the new kit kinds need UI-DECISIONS rows from Jesse.
