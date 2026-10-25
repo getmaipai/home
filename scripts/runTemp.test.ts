@@ -1,10 +1,58 @@
 import { spawnSync } from "node:child_process";
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, utimesSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { describe, expect, test } from "bun:test";
+import { installRunTempRoot } from "./runTemp";
+
+function makeOldDirectory(parent: string, name: string): string {
+  const path = join(parent, name);
+  mkdirSync(path);
+  const old = new Date(Date.now() - 3 * 60 * 60 * 1000);
+  utimesSync(path, old, old);
+  return path;
+}
 
 describe("run temp root", () => {
+  test("sweeps only old directories with dead run pids and preserves the new root", () => {
+    const parent = mkdtempSync(join(tmpdir(), "maipai-run-temp-test-"));
+    const dead = makeOldDirectory(parent, "maipai-run-2147483647-stale");
+    const live = makeOldDirectory(parent, `maipai-run-${process.pid}-live`);
+    const young = join(parent, "maipai-run-2147483647-young");
+    mkdirSync(young);
+    const nonmatching = makeOldDirectory(parent, "maipai-other-2147483647-stale");
+    const youngTime = new Date();
+    utimesSync(young, youngTime, youngTime);
+
+    const previousRoot = process.env.MAIPAI_RUN_TEMP_ROOT;
+    const previousTmpdir = process.env.TMPDIR;
+    const previousTmp = process.env.TMP;
+    const previousTemp = process.env.TEMP;
+    process.env.MAIPAI_RUN_TEMP_SWEEP_MINUTES = "120";
+    delete process.env.MAIPAI_RUN_TEMP_ROOT;
+    let root = "";
+    try {
+      root = installRunTempRoot(parent);
+      expect(existsSync(dead)).toBe(false);
+      expect(existsSync(live)).toBe(true);
+      expect(existsSync(young)).toBe(true);
+      expect(existsSync(nonmatching)).toBe(true);
+      expect(existsSync(root)).toBe(true);
+    } finally {
+      rmSync(parent, { recursive: true, force: true });
+      if (previousRoot === undefined) delete process.env.MAIPAI_RUN_TEMP_ROOT;
+      else process.env.MAIPAI_RUN_TEMP_ROOT = previousRoot;
+      if (previousTmpdir === undefined) delete process.env.TMPDIR;
+      else process.env.TMPDIR = previousTmpdir;
+      if (previousTmp === undefined) delete process.env.TMP;
+      else process.env.TMP = previousTmp;
+      if (previousTemp === undefined) delete process.env.TEMP;
+      else process.env.TEMP = previousTemp;
+      delete process.env.MAIPAI_RUN_TEMP_SWEEP_MINUTES;
+    }
+  });
+
   test("removes its root when a process exits with an error", () => {
     const moduleUrl = pathToFileURL(fileURLToPath(new URL("./runTemp.ts", import.meta.url))).href;
     const child = spawnSync(process.execPath, ["-e", `delete process.env.MAIPAI_RUN_TEMP_ROOT; await import(${JSON.stringify(moduleUrl)}); const fs = await import("node:fs"); const os = await import("node:os"); const path = await import("node:path"); const root = process.env.MAIPAI_RUN_TEMP_ROOT; const nested = fs.mkdtempSync(path.join(os.tmpdir(), "maipai-regression-")); fs.writeFileSync(path.join(nested, "marker"), "created"); console.log(JSON.stringify({ root, nested })); process.exit(7);`], { encoding: "utf8" });
