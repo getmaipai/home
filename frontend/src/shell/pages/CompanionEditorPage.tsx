@@ -4,6 +4,7 @@ import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
 import { AsyncState } from "@maipai/ui/src/primitives/AsyncState";
 import { EmptyState } from "@maipai/ui/src/primitives/EmptyState";
 import { Section } from "@maipai/ui/src/primitives/Section";
+import { Avatar } from "@maipai/ui/src/primitives/Avatar";
 import { DestructiveConfirm } from "@maipai/ui/src/primitives/DestructiveConfirm";
 import { Badge } from "@maipai/ui/src/dashboard/components/ui/badge";
 import { Alert, AlertDescription } from "@maipai/ui/src/ui/alert";
@@ -74,9 +75,13 @@ export function CompanionEditorPage() {
   if (!isNew && query.isError && query.error instanceof ApiError && query.error.status === 404) return <EmptyState icon="user" text="That companion is not yours to edit. Open it from the Companions app, or make a copy." />;
   return <div className="flex flex-col gap-6" data-testid="companion-editor">
     <Link to="/companions" className="text-sm underline">All companions</Link>
+    <header className="flex flex-wrap items-center gap-3">
+      {!isNew && companion ? <Avatar name={companion.name} size="profile" /> : null}
+      <h1 className="mr-auto text-2xl font-bold">{form.name || "New companion"}</h1>
+    </header>
     <AsyncState data={isNew ? true : query.isError ? null : companion} error={!isNew && query.isError} isFetching={query.isFetching} onRetry={() => query.refetch()} errorMessage={query.error instanceof ApiError ? query.error.message : "Could not reach Home. Check your connection and try again."} loadingLabel="Loading companion">
       {() => <>
-        <header className="flex flex-wrap items-center gap-3"><h1 className="mr-auto text-2xl font-bold">{form.name || "New companion"}</h1>{companion ? <><Badge>{companion.status === "draft" ? "Draft" : "Ready"}</Badge><Badge>{audienceWords(form.audience)}</Badge>{companion.look?.sheet_state === "approved" ? <Badge>Look: Approved</Badge> : null}{companion.states ? <Badge>Clips: {companion.states.approved} of {companion.states.total}</Badge> : null}</> : null}
+        <header className="flex flex-wrap items-center gap-3">{companion ? <><Badge>{companion.status === "draft" ? "Draft" : "Ready"}</Badge><Badge>{audienceWords(form.audience)}</Badge>{companion.look?.sheet_state === "approved" ? <Badge>Look: Approved</Badge> : null}{companion.states ? <Badge>Clips: {companion.states.approved} of {companion.states.total}</Badge> : null}</> : null}
           {!isNew && companion?.can_copy ? <Button variant="outline" onClick={() => copy.mutate()}>Make a copy</Button> : null}
           {!isNew && companion?.status === "draft" ? <Button onClick={() => status.mutate("ready")}>Mark ready</Button> : null}
           {!isNew && companion?.status === "ready" ? <Button variant="outline" onClick={() => status.mutate("draft")}>Back to draft</Button> : null}
