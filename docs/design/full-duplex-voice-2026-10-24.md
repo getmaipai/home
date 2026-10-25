@@ -18,7 +18,7 @@ Architect verdict: see `data-scratch/architect/DUPLEX-DESIGN-2026-10-24.verdict`
 3. **iPhone and iPad PWA: pause-only until measured.** Open WebKit bugs describe crackling and degraded audio with the microphone open.
 4. **Robot: turn on what the firmware already has, then measure.** Section 4.
 5. **No new model is trained or hosted** (owner's answer, 2026-10-24: rules only). Two existing small components are adopted: Silero
-   (already in) and Smart Turn v3.2 (one pinned version, as STT-SMARTTURN-01 names it).
+   (already in) and Smart Turn v3.2, or whichever end-of-turn model wins the DUPLEX-02 TurnBench scoring (one pinned version).
 6. **Who gets it: everyone, children first in importance.** Jesse, 2026-10-24, in chat: "kids need full duplex because kids interrupt a
    lot and dont wait their turn." This matches his 2026-10-14 ruling (natural full duplex for adults, teens and children). Duplex
    changes when audio plays and stops, never what is said, so every age and surface gate, the child output gate and the spoken-turn
@@ -88,6 +88,10 @@ This section applies to every age band's session, with the band's gates and limi
 5. **Smart Turn v3.2 is the starting end-of-turn model, to be measured before it is locked in.** An independent benchmark ranks it 17th of 25 on [TurnBench](https://turnbench.sesame.com) (recall 0.752, false positives 0.047, median decision latency 1017 ms; VAP scores 0.845 at 368 ms) and TurnSense reports its English F1 near 71/64 against 94/94 for TEN-Turn. DUPLEX-02 therefore scores Smart Turn, VAP, TurnSense and TEN-Turn on TurnBench's development split first, keeps whichever wins, and keeps the existing silence timer as the fallback. It decides when the person has finished, replacing the silence timer, with the existing Silero VAD in front, and
    keeping STT-SMARTTURN-01's own parameters: an 800 ms reopen window, the Silero hysteresis it names, and the flag
    `stack.engines.stt.smart_turn`, off until measured.
+   **What a winner must pass before Home adopts it:** its licence is checked and compatible with AGPL-3.0 (VAP stays a measurement-only
+   candidate until its licence is checked); it is fetched at a pinned version and URL with a verified checksum
+   (RELEASES-AND-DEPENDENCIES.md); and it runs as a Stack component, since rule 11 says Home talks to the engines the Stack installs,
+   pins and tests, and to nothing else.
 6. **iPhone and iPad:** the open WebKit bugs [326286](https://bugs.webkit.org/show_bug.cgi?id=326286) (playback crackles with the
    microphone open and echo cancellation on; filed as an iOS 26.2 to 27 regression) and
    [311451](https://bugs.webkit.org/show_bug.cgi?id=311451) (audio degrades once the microphone is on) mean the iPhone PWA runs
@@ -183,7 +187,6 @@ child's or teen's spoken turn keeps its own limits.
 ## 6. Not in this design (no shipped example found)
 
 - Duplex speech models (Moshi, PersonaPlex, NemotronLabs VoiceChat, MiniCPM-o) as the voice, the timing signal or a conductor.
-- A voice-activity-projection model as the shipped end-of-turn model: TurnBench lists VAP as a baseline that beats Smart Turn, so it is a measured candidate in DUPLEX-02 (licence still unchecked), not a ruled-out one.
 - A 200 ms fade-and-pause threshold; hub-side echo cancellation against audio sent over Wi-Fi; a speaker level cap; resuming a held
   reply after a clarifying question.
 - Duplex on iPhone with the speaker (until the WebKit bugs are measured).
@@ -201,10 +204,10 @@ Each can come back as its own item if someone ships it or a measurement of ours 
    effects), and nothing is released, spoken or stored until the turn is confirmed (rules 9 and 10). Cancelling an in-flight tool on
    interruption uses the same existing cancel.
 6. **DUPLEX-05 (M, `bot`):** the robot spike.
-7. **DUPLEX-BENCH-01 (M):** built on existing benchmarks, not invented rows, run for local measurement only (their data is CC BY-NC or unlicensed, so it is never shipped): [Full-Duplex-Bench v1](https://arxiv.org/html/2503.04721) (pause handling, backchannel frequency and JSD against human timing, takeover, latency), [v1.5](https://arxiv.org/html/2507.23159) (four overlap cases, user interruption, user backchannel, talking to others, background speech, scored as Respond or Resume, with stop and response latency), [SID-bench](https://github.com/xkx-hub/SID-bench)'s Average Penalty Time for false and late stops, [v3](https://arxiv.org/abs/2604.04847)'s self-corrections ("no wait, Tuesday"), and the [TurnBench](https://turnbench.sesame.com) development split for end-of-turn. Home's own rows stay: children's speech (demo voices or a parent's consent, in `data-scratch`), robot echo, Home talking over the person, and the acknowledgement-timing row. One conflict is reported, not hidden: v1.5 scores a user "mm-hm" as "should keep talking", while Jesse's rule is that any words stop the reply, so that row is expected to score near zero by design and is excluded from the pass bar.
-8. **DUPLEX-08 (design first, not built):** other voices. "Any words stop the reply" also fires on a TV or a sibling talking to someone else; Full-Duplex-Bench v1.5 scores those as Resume. FireRedChat ([arXiv 2509.06502](https://arxiv.org/html/2509.06502)) cuts false barge-ins to 10.2% (LiveKit 33.4%, TEN 78.1%) with a personalized VAD keyed to the target speaker's voiceprint. A voiceprint is a biometric record, so this needs its own consent design (FACE-CONSENT rules) before any build; until then the app pauses on any voice, and a no-words transcript resumes.
+7. **DUPLEX-BENCH-01 (M):** built on existing benchmarks, not invented rows, run for local measurement only (their data is CC BY-NC or unlicensed, so it is never shipped; the report records each dataset's licence, a set with no licence is not used until its licence is known, and CC BY-NC sets are flagged to Jesse once before the first run, per LICENSING.md): [Full-Duplex-Bench v1](https://arxiv.org/html/2503.04721) (pause handling, backchannel frequency and JSD against human timing, takeover, latency), [v1.5](https://arxiv.org/html/2507.23159) (four overlap cases, user interruption, user backchannel, talking to others, background speech, scored as Respond or Resume, with stop and response latency), [SID-bench](https://github.com/xkx-hub/SID-bench)'s Average Penalty Time for false and late stops, [v3](https://arxiv.org/abs/2604.04847)'s self-corrections ("no wait, Tuesday"), and the [TurnBench](https://turnbench.sesame.com) development split for end-of-turn. Home's own rows stay: children's speech (demo voices or a parent's consent, in `data-scratch`), robot echo, Home talking over the person, and the acknowledgement-timing row. One conflict is reported, not hidden: v1.5 scores a user "mm-hm" as "should keep talking", while Jesse's rule is that any words stop the reply, so that row is expected to score near zero by design and is excluded from the pass bar.
+8. **DUPLEX-08 (design first, not built):** other voices. "Any words stop the reply" also fires on a TV or a sibling talking to someone else; Full-Duplex-Bench v1.5 scores those as Resume. FireRedChat ([arXiv 2509.06502](https://arxiv.org/html/2509.06502)) cuts false barge-ins to 10.2% (LiveKit 33.4%, TEN 78.1%) with a personalized VAD keyed to the target speaker's voiceprint. It reuses the existing biometric print store (`backend/src/lib/biometricPrints.ts`, FACE-01, which already holds voice prints encrypted at rest) and FACE-CONSENT-02's consent rule (a parent enrols a child, a teen confirms in their own session, a guest is never enrolled); no new store (platform principle 1). Rule 0: a voiceprint match used to ignore other voices is never speaker evidence for memory or account access; an unenrolled or unknown speaker keeps today's behavior, where any voice pauses the reply. The first deliverable is the consent design on the existing print store, architect-ruled, before any code.
 9. **DUPLEX-07 (M):** section 3b: the fixed clip list rendered per voice as a second cue pool, continuers at incomplete pauses, the acknowledgement as a `spoken_cue` with an interruption-turn delay, the spec-first on/off key; plus an acknowledgement-timing row in DUPLEX-BENCH-01.
-Order: 00 and 01, then 02 and 03, 05 in parallel, 07 after 02 (it needs Smart Turn), then the bench. Codex first for 02 and 03.
+Order: 00 and 01, then 02 and 03, 05 in parallel, 07 after 02 (it needs the end-of-turn model), then the bench. Codex first for 02 and 03.
 
 ## 8. Legacy verdicts (rule 8)
 
@@ -214,7 +217,7 @@ Order: 00 and 01, then 02 and 03, 05 in parallel, 07 after 02 (it needs Smart Tu
 ## Supersedes
 
 - `voiceBargeIn`'s rule in `liveVoiceSession.tsx` that any speech after a 400 ms arm delay stops the reply: **replaced** by section 3 (0.5 s of speech, then the transcript decides; any words stop the reply).
-- The silence-timer end of turn in `sttSession.ts`: **replaced** by Smart Turn v3.2 (section 3).
+- The silence-timer end of turn in `sttSession.ts`: **replaced as the primary end of turn** by Smart Turn v3.2 or the DUPLEX-02 TurnBench winner (section 3), and **kept as the fallback**.
 - STT-SMARTTURN-01: its endpointer half (Smart Turn v3.2, the 800 ms reopen window, the Silero hysteresis and the off-until-measured flag) **moves** to DUPLEX-02; its speculative start stays in the STT-SMARTTURN-01 backlog row, which keeps one owner for it.
 - VOICE-LOOP-01's barge-in numbers: 0.6 s confirm is **replaced** by 0.5 s (LiveKit's default, re-measured); "stop phrases bypass" and "backchannels never stop" are **dropped** (any words stop the reply); duck 0.35 and 0.75, the 0.7 s re-arm grace and the self-echo at 0.8 overlap are **dropped** for the browser (pause replaces duck; the bench measures the rest) and **kept** for the robot until its spike reports.
 - "Listen only after the reply ends": **dropped** once DUPLEX-03 lands.
