@@ -33,8 +33,32 @@ let defaultScriptedStack: StackFixture;
 // which is where it is always dialled; an explicit hostname or a fixed port is left untouched.
 {
   const realServe = Bun.serve.bind(Bun) as unknown as (options: Record<string, unknown>) => unknown;
-  (Bun as unknown as { serve: unknown }).serve = (options: Record<string, unknown>) =>
-    realServe(options && options.port === 0 && options.hostname === undefined && options.unix === undefined ? { ...options, hostname: "127.0.0.1" } : options);
+  if (process.env.MAIPAI_TEST_NO_PORTS === "1") {
+    // Keep port-0 test servers usable without a socket. Calls to their URL
+    // from this process are sent to the exact fetch handler Bun.serve would
+    // have called. Child processes still need a real listener by design.
+    const virtualServers = new Map<number, (request: Request) => Response | Promise<Response>>();
+    let nextVirtualPort = 30_000;
+    const nativeFetch = globalThis.fetch.bind(globalThis);
+    globalThis.fetch = (async (input: string | URL | Request, init?: RequestInit) => {
+      const request = input instanceof Request
+        ? init === undefined ? input : new Request(input, init)
+        : new Request(String(input), init);
+      const server = virtualServers.get(Number(new URL(request.url).port));
+      return server ? server(request) : nativeFetch(input, init);
+    }) as typeof fetch;
+    (Bun as unknown as { serve: unknown }).serve = (options: Record<string, unknown>) => {
+      if (options?.port === 0 && options.unix === undefined && typeof options.fetch === "function") {
+        const port = nextVirtualPort++;
+        virtualServers.set(port, options.fetch as (request: Request) => Response | Promise<Response>);
+        return { port, stop: () => { virtualServers.delete(port); return true; } };
+      }
+      return realServe(options && options.port === 0 && options.hostname === undefined && options.unix === undefined ? { ...options, hostname: "127.0.0.1" } : options);
+    };
+  } else {
+    (Bun as unknown as { serve: unknown }).serve = (options: Record<string, unknown>) =>
+      realServe(options && options.port === 0 && options.hostname === undefined && options.unix === undefined ? { ...options, hostname: "127.0.0.1" } : options);
+  }
 }
 
 // SINGLE-INSTANCE-02 (#196): a hub booted by a test (or by a script a test

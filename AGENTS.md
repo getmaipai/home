@@ -25,7 +25,7 @@ and only Jesse says yes to a new tag: [docs/PINNING.md](docs/PINNING.md) "Changi
 (`@maipai/spec`, pinned by tag). Stack standard: STACK.md in `getmaipai/.github`.
 
 From the repo root: `bun start` / `bun stop` / `bun restart` run the local app: the main checkout serves 8787 and `bun restart` there
-fast-forwards from origin first; a worktree leases a free 88xx port from `scripts/wt.sh port` (set `MAIPAI_MAIN_CHECKOUT=1` to take 8787). `bun test` in `backend/` or `frontend/`.
+fast-forwards from origin first; a worktree leases a free 88xx port from `scripts/wt.sh port` (set `MAIPAI_MAIN_CHECKOUT=1` to take 8787). `bun test` in `backend/` or `frontend/`. `MAIPAI_TEST_NO_PORTS=1 bun test` (set automatically in Codex runs) skips the port-binding probe so tests that start no server run in a sandbox that forbids binding; a test that does start a server fails there by design.
 `bun run dev` starts a seeded hot-reload Home for this worktree (`scripts/dev.sh`, see its header); `bun run dev:stop` stops it.
 Land with `bash scripts/land.sh` (pushes the branch to the lander's queue; the lander runs the 15 s static check and fast-forwards
 `main`; `wt.sh land` hands off to it). `bash scripts/pipeline.sh status | start | stop` shows the queue and the last landings

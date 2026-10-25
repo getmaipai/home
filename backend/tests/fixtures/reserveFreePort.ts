@@ -21,6 +21,11 @@ function bindable(port: number, hostname: "127.0.0.1" | "0.0.0.0"): boolean {
 }
 
 export function reserveFreePort(): number {
+  if (process.env.MAIPAI_TEST_NO_PORTS === "1") {
+    // Sandboxed runs cannot bind ports, and tests that start no server need only a placeholder.
+    return LOW + Math.floor(Math.random() * SPAN);
+  }
+
   for (let attempt = 0; attempt < 200; attempt++) {
     const port = LOW + Math.floor(Math.random() * SPAN);
     if (bindable(port, "127.0.0.1") && bindable(port, "0.0.0.0")) return port;

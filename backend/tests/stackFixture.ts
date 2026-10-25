@@ -12,6 +12,30 @@ export const SCRIPTED_EMBED_FILE = "scripted-embed.Q4_K_M.gguf";
 
 export type StackFixtureHandler = (req: Request) => Response | Promise<Response>;
 
+type FetchHandler = (req: Request) => Response | Promise<Response>;
+
+// A socket-backed local embedding stub completes after the erase request in
+// the people test. Preserve that ordering when no-ports mode calls handlers
+// directly, so its in-process embedding result remains in flight through erase.
+const IN_PROCESS_EMBEDDING_RESPONSE_DELAY_MS = 50;
+
+function inProcessFetch(baseUrl: string, handler: FetchHandler): typeof fetch {
+  const fetcher = async (input: string | URL | Request, init?: RequestInit): Promise<Response> => {
+    const request = input instanceof Request
+      ? init === undefined ? input : new Request(input, init)
+      : new Request(String(input), init);
+    // Fetch handlers normally receive a server URL. Keep the requested path,
+    // query, headers and body while avoiding the network transport entirely.
+    const url = new URL(request.url);
+    const target = new URL(`${url.pathname}${url.search}`, baseUrl);
+    if (request.method === "POST" && url.pathname === "/v1/embeddings") {
+      await new Promise((resolve) => setTimeout(resolve, IN_PROCESS_EMBEDDING_RESPONSE_DELAY_MS));
+    }
+    return handler(new Request(target.toString(), request));
+  };
+  return fetcher as typeof fetch;
+}
+
 export interface StackFixture {
   url: string;
   client: StackClient;
@@ -24,6 +48,7 @@ export interface StackFixture {
  * handler; an unmatched request 404s loudly rather than hanging, so a
  * missing route in a test reads as a clear failure. */
 export function startStackFixture(routes: Record<string, StackFixtureHandler>): StackFixture {
+  if (process.env.MAIPAI_TEST_NO_PORTS === "1") return startStackFixtureInProcess(routes);
   const calls: string[] = [];
   let aborted = 0;
   const server = Bun.serve({ hostname: "127.0.0.1", port: 0,
@@ -54,7 +79,11 @@ export function offlineResponse(role: string, offline_reason: string): Response 
  * same deterministic chat and embedding behavior as the deleted in-process
  * stubs, while the wrapper adds Stack identity headers. */
 export function startDefaultScriptedStack(): StackFixture {
+  // preload virtualizes port-0 Bun servers in no-ports mode. Keep the same
+  // fetch path in both modes so the socket stub and in-process stub use the
+  // exact same Request construction and route handler.
   const engine = startStubLlmServer(0);
+  const engineFetch = globalThis.fetch;
   const now = new Date().toISOString();
   const scriptedJob = (id: string, state: "queued" | "done" | "cancelled" = "done") => ({
     id, kind: "image", role: "image", state, percent: state === "done" ? 100 : 0,
@@ -91,7 +120,9 @@ export function startDefaultScriptedStack(): StackFixture {
     };
     let response: Response;
     try {
-      response = await fetch(`${legacyUpstream ?? engine.url}${path}`, request);
+      response = legacyUpstream
+        ? await fetch(`${legacyUpstream}${path}`, request)
+        : await engineFetch(`${engine.url}${path}`, request);
     } catch {
       // A test may stop its per-test upstream while a proxied request is
       // still winding down. Model the Stack's ordinary upstream failure.
@@ -103,7 +134,7 @@ export function startDefaultScriptedStack(): StackFixture {
     headers.set("x-maipai-revision", "scripted-test");
     return new Response(response.body, { status: response.status, headers });
   };
-  const fixture = startStackFixture({
+  const routes: Record<string, StackFixtureHandler> = {
     "POST /v1/chat/completions": async (req) => {
       const body = await req.clone().json().catch(() => null) as { messages?: Array<{ content?: unknown }> } | null;
       if (body?.messages?.some((message) => typeof message.content === "string" && message.content.includes("wait for me"))) return delayedStream(req);
@@ -149,8 +180,32 @@ export function startDefaultScriptedStack(): StackFixture {
       if (pathname.startsWith("/stack/v1/")) return Response.json({ ok: true });
       return Response.json({ error: `no scripted Stack route for ${method} ${pathname}` }, { status: 404 });
     },
-  });
+  };
+  const fixture = startStackFixture(routes);
   return { ...fixture, stop: () => { fixture.stop(); void engine.stop(); } };
+}
+
+/** Same fixture router and call recording as startStackFixture, with its
+ * handler called directly by StackClient when test sockets are unavailable. */
+function startStackFixtureInProcess(routes: Record<string, StackFixtureHandler>): StackFixture {
+  const calls: string[] = [];
+  let aborted = 0;
+  const url = "http://127.0.0.1:1";
+  const handler: FetchHandler = async (req) => {
+    req.signal.addEventListener("abort", () => { aborted++; }, { once: true });
+    const parsed = new URL(req.url);
+    calls.push(`${req.method} ${parsed.pathname}`);
+    const route = routes[`${req.method} ${parsed.pathname}`] ?? routes["*"];
+    if (!route) return Response.json({ error: `no fixture route for ${req.method} ${parsed.pathname}` }, { status: 404 });
+    return route(req);
+  };
+  return {
+    url,
+    client: createStackClient({ baseUrl: url, fetch: inProcessFetch(url, handler) }),
+    calls,
+    aborted: () => aborted,
+    stop: () => undefined,
+  };
 }
 
 let defaultStackClient: StackClient | null = null;
