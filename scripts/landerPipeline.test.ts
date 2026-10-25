@@ -130,7 +130,7 @@ describe("lander pipeline", () => {
     const wt = makeWorktree("epsilon");
     writeFileSync(join(wt, "file.txt"), "line one\nline two\nepsilon third line\n");
     commit(wt, "epsilon change");
-    const child = Bun.spawn(["bash", join(main, "scripts", "land.sh")], { cwd: wt, env, stdout: "pipe", stderr: "pipe" });
+    const child = Bun.spawn(["bash", join(main, "scripts", "land.sh"), "--queue-anyway"], { cwd: wt, env, stdout: "pipe", stderr: "pipe" });
     const queueDeadline = Date.now() + 10_000;
     while (queueFiles().length === 0 && Date.now() < queueDeadline) await Bun.sleep(50);
     expect(queueFiles()).toHaveLength(1);

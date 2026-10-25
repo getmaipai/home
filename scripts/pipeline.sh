@@ -12,6 +12,8 @@ pidfile="$data/lander.pid"
 watch_data="${MAIPAI_WATCH_DATA:-$main/data-scratch/watch}"
 mkdir -p "$watch_data/green" "$watch_data/reds"
 watch_pidfile="$watch_data/watcher.pid"
+agents_dir="${MAIPAI_LAUNCH_AGENTS_DIR:-$HOME/Library/LaunchAgents}"
+launchctl_cmd="${MAIPAI_LAUNCHCTL:-launchctl}"
 bin="${MAIPAI_PIPELINE_BIN:-$main/data-scratch/pipeline-bin}"
 git_env="${MAIPAI_LAND_GIT_ENV-$main/data-scratch/bin/https-git.env}"
 if [[ -n "$git_env" && -f "$git_env" ]]; then source "$git_env"; fi
@@ -62,6 +64,87 @@ pid="$(cat "$pidfile" 2>/dev/null || true)"
 is_running() { [[ "$pid" =~ ^[0-9]+$ ]] && kill -0 "$pid" 2>/dev/null && ps -p "$pid" -o command= 2>/dev/null | grep -Eq 'lander\.sh'; }
 watch_pid="$(cat "$watch_pidfile" 2>/dev/null || true)"
 watch_is_running() { [[ "$watch_pid" =~ ^[0-9]+$ ]] && kill -0 "$watch_pid" 2>/dev/null && ps -p "$watch_pid" -o command= 2>/dev/null | grep -Eq 'watcher\.sh'; }
+
+service_plist() {
+  local kind="$1"
+  if [[ "$kind" == lander ]]; then echo "$agents_dir/com.maipai.lander.plist"; else echo "$agents_dir/com.maipai.watcher.plist"; fi
+}
+
+service_state() {
+  local label="$1" pidfile_path="$2" pid_value="" plist_path="$3"
+  [[ -f "$plist_path" ]] || { echo "service: not installed"; return; }
+  pid_value="$(cat "$pidfile_path" 2>/dev/null || true)"
+  if [[ "$label" == com.maipai.lander ]]; then
+    if [[ "$pid_value" =~ ^[0-9]+$ ]] && kill -0 "$pid_value" 2>/dev/null && ps -p "$pid_value" -o command= 2>/dev/null | grep -Eq 'lander\.sh'; then echo "service: installed (running)"; else echo "service: installed (stopped)"; fi
+  else
+    if [[ "$pid_value" =~ ^[0-9]+$ ]] && kill -0 "$pid_value" 2>/dev/null && ps -p "$pid_value" -o command= 2>/dev/null | grep -Eq 'watcher\.sh'; then echo "service: installed (running)"; else echo "service: installed (stopped)"; fi
+  fi
+}
+
+launch_path() {
+  local found="" p
+  for p in bun git gh node python3; do
+    found="$(command -v "$p" 2>/dev/null || true)"
+    if [[ -n "$found" ]]; then printf '%s\n' "$(dirname "$found")"; fi
+  done | awk '!seen[$0]++' | paste -sd ':' -
+}
+
+write_service_plist() {
+  local kind="$1" label plist_path target_data script stdout_file path_value
+  if [[ "$kind" == lander ]]; then label=com.maipai.lander; target_data="$data"; script=lander.sh; stdout_file="$data/lander.log"; else label=com.maipai.watcher; target_data="$watch_data"; script=watcher.sh; stdout_file="$watch_data/watcher.log"; fi
+  plist_path="$(service_plist "$kind")"
+  path_value="$(launch_path):/usr/bin:/bin:/usr/sbin:/sbin"
+  mkdir -p "$agents_dir" "$target_data"
+  python3 - "$plist_path" "$label" "$bin/$script" "$main" "$path_value" "$HOME" "$stdout_file" <<'PY'
+import os, plistlib, sys, tempfile
+path, label, program, cwd, env_path, home, log = sys.argv[1:]
+value = {
+    "Label": label,
+    "ProgramArguments": ["/bin/bash", program, "serve"],
+    "WorkingDirectory": cwd,
+    "RunAtLoad": True,
+    "KeepAlive": True,
+    "ThrottleInterval": 10,
+    "EnvironmentVariables": {"PATH": env_path, "HOME": home},
+    "StandardOutPath": log,
+    "StandardErrorPath": log,
+}
+fd, tmp = tempfile.mkstemp(prefix=".service.", dir=os.path.dirname(path))
+try:
+    with os.fdopen(fd, "wb") as f: plistlib.dump(value, f, fmt=plistlib.FMT_XML, sort_keys=True)
+    os.replace(tmp, path)
+finally:
+    if os.path.exists(tmp): os.unlink(tmp)
+PY
+  echo "$plist_path"
+}
+
+install_service() {
+  local load=0 kind plist uid
+  [[ "${2:-}" == "--load" ]] && load=1
+  ensure_snapshot lander.sh || return 1
+  ensure_snapshot watcher.sh || return 1
+  uid="$(id -u)"
+  for kind in lander watcher; do
+    plist="$(write_service_plist "$kind")"
+    echo "$plist"
+    if [[ "$kind" == lander ]]; then echo "would run: /bin/bash $bin/lander.sh serve"; else echo "would run: /bin/bash $bin/watcher.sh serve"; fi
+    if (( load )); then "$launchctl_cmd" bootstrap "gui/$uid" "$plist"; fi
+  done
+}
+
+uninstall_service() {
+  local kind plist uid
+  uid="$(id -u)"
+  for kind in lander watcher; do
+    plist="$(service_plist "$kind")"
+    if [[ -f "$plist" ]]; then
+      "$launchctl_cmd" bootout "gui/$uid" "$plist" >/dev/null 2>&1 || true
+      rm -f "$plist"
+      echo "removed: $plist"
+    else echo "not installed: $plist"; fi
+  done
+}
 
 watch_main_status() {
   python3 - "$watch_data" <<'PY'
@@ -138,10 +221,14 @@ for line in sys.stdin:
  except Exception: pass'
   fi
   if git -C "$main" fetch origin >/dev/null 2>&1 && git -C "$main" log origin/main -1 --format='origin/main: %h %s' 2>/dev/null; then :; else echo "origin/main: unknown (fetch failed)"; fi
+  service_state com.maipai.lander "$pidfile" "$(service_plist lander)"
+  service_state com.maipai.watcher "$watch_pidfile" "$(service_plist watcher)"
 }
 
 case "${1:-}" in
   status) status ;;
+  install-service) install_service "$@" ;;
+  uninstall-service) uninstall_service ;;
   start)
     ensure_snapshot lander.sh || exit 1
     ensure_snapshot watcher.sh || exit 1
@@ -177,5 +264,5 @@ case "${1:-}" in
     else rm -f "$watch_pidfile"; echo "watcher already stopped"; fi
     (( failed == 0 ))
     ;;
-  *) error "usage: bash scripts/pipeline.sh status | start | stop"; exit 2 ;;
+  *) error "usage: bash scripts/pipeline.sh status | start | stop | install-service [--load] | uninstall-service"; exit 2 ;;
 esac

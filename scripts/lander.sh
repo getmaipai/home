@@ -77,6 +77,53 @@ with open(sys.argv[1], 'a') as f:
 PY
 }
 
+update_main_checkout() {
+  [[ "${MAIPAI_LAND_UPDATE_MAIN:-1}" == 0 ]] && return 0
+  local branch head origin_main lock_path reason
+  branch="$(git -C "$main" symbolic-ref --short -q HEAD 2>/dev/null || true)"
+  head="$(git -C "$main" rev-parse HEAD 2>/dev/null || true)"
+  if [[ -n "$branch" && "$branch" != main ]]; then reason="diverged (checked out $branch)"
+  elif [[ -n "$(git -C "$main" status --porcelain --untracked-files=no 2>/dev/null)" ]]; then reason="dirty tracked tree"
+  else
+    lock_path="$(git -C "$main" rev-parse --git-path index.lock 2>/dev/null || true)"
+    [[ "$lock_path" = /* ]] || lock_path="$main/$lock_path"
+    if [[ -e "$lock_path" ]]; then reason="index is locked"
+    elif ! git -C "$main" fetch origin main >/dev/null 2>&1; then reason="could not fetch origin/main"
+    else
+      origin_main="$(git -C "$main" rev-parse origin/main 2>/dev/null || true)"
+      if [[ -z "$branch" ]] && { [[ -z "$head" || -z "$origin_main" ]] || ! git -C "$main" merge-base --is-ancestor "$head" "$origin_main"; }; then reason="diverged (detached HEAD is not an ancestor of origin/main)"
+      elif git -C "$main" merge --ff-only origin/main >/dev/null 2>&1; then
+        echo "$(date -u +%Y-%m-%dT%H:%M:%SZ) main checkout fast-forwarded to $(git -C "$main" rev-parse --short HEAD)" >> "$data/lander.log"
+        return 0
+      else reason="fast-forward failed"; fi
+    fi
+  fi
+  echo "$(date -u +%Y-%m-%dT%H:%M:%SZ) main checkout update skipped: $reason" >> "$data/lander.log"
+}
+
+safety_surface_files() {
+  local changed="$1" glob regex file matches=""
+  local globs
+  globs="$(git -C "$checkout" show origin/main:scripts/wt.sh 2>/dev/null | sed -n 's/^export WT_T2_GLOBS="\(.*\)"$/\1/p' | head -n 1)"
+  [[ -n "$globs" ]] || return 0
+  for file in $changed; do
+    for glob in $globs; do
+      regex="$(printf '%s' "$glob" | sed -E 's/[][(){}.+?^$|\\]/\\&/g; s/\*/.*/g')"
+      if printf '%s\n' "$file" | grep -Eq "^${regex}$"; then
+        matches="${matches:+$matches
+}$file"
+        break
+      fi
+    done
+  done
+  printf '%s' "$matches"
+}
+
+run_t2_tests() {
+  local output="$1" command="${MAIPAI_LAND_T2_CMD:-bun scripts/gate/shardTests.ts --dir backend --root tests && bun scripts/gate/shardTests.ts --dir frontend --root .}"
+  (cd "$checkout" && eval "$command") >"$output" 2>&1
+}
+
 bounce() {
   local request="$1" branch="$2" sha="$3" reason="$4" started="$5" output="$6" main_sha seconds slug landing_note
   landing_note="$(python3 - "$request" <<'PY'
@@ -94,7 +141,7 @@ PY
 }
 
 run_one() {
-  local request="$1" branch sha started output origin_branch prev_sha conflict reason check_cmd main_sha seconds attempt changed before_rebase after_rebase intersect landing_note last_line changed_files changed_file generated_commit backlog_sha item line found
+  local request="$1" branch sha started output origin_branch prev_sha conflict reason check_cmd main_sha seconds attempt changed before_rebase after_rebase intersect landing_note last_line changed_files changed_file generated_commit backlog_sha item line found safety_files t2_started t2_seconds
   local -a done_items=() generated_paths=("docs/api/" "frontend/src/dev/elements-adoption.json" "docs/dev/code-map.md")
   started="$(date +%s)"; output="$(mktemp "$data/.check.XXXXXX")"
   if ! python3 - "$request" >"$data/.request-values" <<'PY'
@@ -201,6 +248,18 @@ PY
     (cd "$checkout" && export MAIPAI_COMMONS_DIR="$(cd "$main/.." && pwd -P)/commons" MAIPAI_STANDARDS_DIR="$(cd "$main/.." && pwd -P)/.github" && bash scripts/check.sh --pre && (cd frontend && bunx eslint . --cache --cache-location .eslintcache)) >"$output" 2>&1 || { bounce "$request" "$branch" "$sha" "static check failed" "$started" "$output"; rm -f "$output"; return 0; }
   fi
 
+  changed_files="$(git -C "$checkout" diff --name-only origin/main...HEAD 2>/dev/null || true)"
+  safety_files="$(safety_surface_files "$changed_files")"
+  if [[ -n "$safety_files" ]]; then
+    t2_started="$(date +%s)"
+    if ! run_t2_tests "$output"; then
+      reason="safety-surface tests failed: $(printf '%s' "$safety_files" | paste -sd ', ' -)"
+      bounce "$request" "$branch" "$sha" "$reason" "$started" "$output"; rm -f "$output"; return 0
+    fi
+    t2_seconds=$(( $(date +%s) - t2_started ))
+    landing_note="${landing_note:+$landing_note; }tier: T2; safety-surface tests took ${t2_seconds}s"
+  fi
+
   for attempt in 1 2 3; do
     if git -C "$checkout" push origin HEAD:refs/heads/main; then
       main_sha="$(git -C "$checkout" rev-parse HEAD)"
@@ -210,6 +269,7 @@ PY
       log_line "$data/landings.jsonl" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$branch" "$sha" "$main_sha" landed "$seconds" "landed"
       rm -f "$request" "$output"
       echo "landed: $branch at $sha"
+      update_main_checkout
       return 0
     fi
     if (( attempt == 3 )); then break; fi
@@ -258,6 +318,7 @@ serve() {
   local stop_requested=0 sleep_pid=""
   trap 'stop_requested=1; if [[ -n "$sleep_pid" ]]; then kill "$sleep_pid" 2>/dev/null || true; fi' TERM INT HUP
   trap 'rm -f "$data/lander.pid"' EXIT
+  if ! checkout_warm; then rm -f "$pidfile"; trap - EXIT; return 1; fi
   set +e
   while :; do
     now="$(date +%s)"
@@ -286,6 +347,6 @@ case "${1:-}" in
   refresh) refresh_snapshot lander.sh || exit 1 ;;
   checkout) checkout_warm ;;
   run-once) checkout_warm && run_once ;;
-  serve) checkout_warm && serve "$@" ;;
+  serve) serve "$@" ;;
   *) error "usage: bash scripts/lander.sh refresh | run-once | serve | checkout"; exit 2 ;;
 esac

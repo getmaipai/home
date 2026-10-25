@@ -2,7 +2,7 @@
 set -euo pipefail
 umask 077
 
-usage() { echo "usage: bash scripts/land.sh [--detach] [--timeout <seconds>] [--done <ITEM-ID>]... [--note <one line>] | wait" >&2; }
+usage() { echo "usage: bash scripts/land.sh [--detach] [--queue-anyway] [--timeout <seconds>] [--done <ITEM-ID>]... [--note <one line>] | wait" >&2; }
 die() { echo "land.sh: $1" >&2; exit "${2:-1}"; }
 
 mode=queue
@@ -10,9 +10,11 @@ timeout_seconds=900
 done_items=()
 done_arg=""
 landing_note=""
+queue_anyway=0
 while (($#)); do
   case "$1" in
     --detach) mode=detach; shift ;;
+    --queue-anyway) queue_anyway=1; shift ;;
     --timeout) (($# >= 2)) || { usage; exit 2; }; timeout_seconds="$2"; shift 2 ;;
     --done) (($# >= 2)) || { usage; exit 2; }; [[ "$2" =~ ^[A-Z0-9-]+-[0-9]+$ ]] || die "invalid backlog item id '$2'; expected ^[A-Z0-9-]+-[0-9]+$" 2; done_items+=("$2"); done_arg="${done_arg:+$done_arg }$2"; shift 2 ;;
     --note) (($# >= 2)) || { usage; exit 2; }; [[ "$2" != *$'\n'* && "$2" != *$'\r'* ]] || die "--note must be one line" 2; landing_note="$2"; shift 2 ;;
@@ -71,6 +73,13 @@ if [[ "$mode" == wait ]]; then
 fi
 
 [[ "$branch" == wt/* ]] || die "branch '$branch' is not wt/*; switch to a wt/* branch and run land.sh again."
+if (( ! queue_anyway )); then
+  pidfile="$data/lander.pid"
+  lander_pid="$(cat "$pidfile" 2>/dev/null || true)"
+  if [[ ! "$lander_pid" =~ ^[0-9]+$ ]] || ! kill -0 "$lander_pid" 2>/dev/null || ! ps -p "$lander_pid" -o command= 2>/dev/null | grep -Eq 'lander\.sh'; then
+    die "the lander is not running: start it with bash scripts/pipeline.sh start (or install-service)" 3
+  fi
+fi
 dirty="$(git status --porcelain --untracked-files=no)"
 [[ -z "$dirty" ]] || die "tracked changes are uncommitted; commit by file name or discard, then run land.sh again."
 git fetch origin || die "could not fetch origin; check network and git credentials, then run land.sh again."

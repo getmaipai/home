@@ -12,14 +12,15 @@ const data = join(scratch, "land-data");
 const watchData = join(scratch, "watch-data");
 const pipelineBin = join(scratch, "pipeline-bin");
 const warm = join(scratch, "warm-checkout");
-const scriptNames = ["land.sh", "lander.sh", "pipeline.sh"];
-const env = {
+const scriptNames = ["land.sh", "lander.sh", "pipeline.sh", "watcher.sh", "wt.sh"];
+const env: Record<string, string | undefined> = {
   ...process.env,
   MAIPAI_LAND_DATA: data,
   MAIPAI_WATCH_DATA: watchData,
   MAIPAI_PIPELINE_BIN: pipelineBin,
   MAIPAI_LAND_CHECKOUT: warm,
   MAIPAI_LAND_SKIP_INSTALL: "1",
+  MAIPAI_LAND_UPDATE_MAIN: "0",
   MAIPAI_LAND_GIT_ENV: "",
   MAIPAI_LAND_CHECK_CMD: "bash scripts/check.sh --pre",
   MAIPAI_LAND_GENERATE_CMD: "bash scripts/generate.sh",
@@ -30,8 +31,9 @@ function git(dir: string, ...args: string[]) {
   if (out.status !== 0) throw new Error(`git ${args.join(" ")} failed (${out.status}): ${out.stderr}`);
   return out.stdout.trim();
 }
-function run(script: string, args: string[], cwd = main) {
-  return spawnSync("bash", [join(main, "scripts", script), ...args], { cwd, env, encoding: "utf8", timeout: 60_000 });
+function run(script: string, args: string[], cwd = main, raw = false) {
+  const actualArgs = script === "land.sh" && !raw ? ["--queue-anyway", ...args] : args;
+  return spawnSync("bash", [join(main, "scripts", script), ...actualArgs], { cwd, env, encoding: "utf8", timeout: 60_000 });
 }
 function makeWorktree(name: string) {
   const path = join(scratch, name);

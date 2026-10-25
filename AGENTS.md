@@ -31,6 +31,7 @@ Land with `bash scripts/land.sh` (pushes the branch to the lander's queue; the l
 `main`; `wt.sh land` hands off to it). `bash scripts/pipeline.sh status | start | stop` shows the queue and the last landings
 and runs the lander (`scripts/lander.sh`, one per machine, warm checkout `../home-lander`).
 The lander and watcher run from copies of `scripts/lander.sh` and `scripts/watcher.sh` taken from `origin/main` into `data-scratch/pipeline-bin/` and replace themselves between runs, so landing a change to them updates the daemons without touching the main checkout.
+Use `bash scripts/pipeline.sh install-service --load` only when Jesse approves enabling the reboot-resilient LaunchAgents; `bash scripts/land.sh --queue-anyway` explicitly queues while the lander is stopped, and safety-surface changes receive backend and frontend sharded tests before landing.
 `bash scripts/pin.sh commons <pkg>-vX.Y.Z | stack <sha> | bot <version>` edits every file a pin lives in, reinstalls, commits and lands it.
 A landing names the backlog items it finishes (`bash scripts/land.sh --done ITEM-01`) and never edits `docs/BACKLOG.md` checkboxes or generated files by hand; the lander writes both.
 Lint: `tsc --noEmit` (backend); `tsc --noEmit && eslint .` (frontend). `bash scripts/check.sh --docs` for docs-only changes,
