@@ -402,6 +402,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/issues.ts` | __setReminderTimingForTests, __resetReminderTimersForTests, __setMaintenanceNowForTests, raiseIssue, resolveIssue, listIssues |
 | `backend/src/lib/jobProducers.ts` | mapStackJobToHomeJob, mapModelDownloadStackJob, modelDownloadJobsAsHomeJobs, listStackModelDownloadJobs, registerProducerJob, updateProducerJob |
 | `backend/src/lib/jobs.ts` | visibleJobFor, createJob, updateJob, listJobsForViewer, listJobsForViewerLive, canStopJob |
+| `backend/src/lib/jobs/householdQueue.ts` | order, writePositions, registerQueueProvider, refreshHouseholdQueue |
 | `backend/src/lib/keystore.ts` | getOrCreateHexKey, markKeychainProvisioned, wasKeychainProvisioned |
 | `backend/src/lib/kiwixCatalog.ts` | KIWIX_BINARIES, KIWIX_READY_MARKER, selectKiwixBinary |
 | `backend/src/lib/kiwixSidecar.ts` | KIWIX_SIDECAR_ID, KIWIX_SERVE_PORT, referenceLibraryDir, resolveReferenceLibraryLocation, ensureKiwixInstalled, regenerateLibrary |

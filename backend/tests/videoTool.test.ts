@@ -156,7 +156,8 @@ describe("VIDEO-GEN-05: the call, the job and the stored clip", () => {
       await until(() => getVideoJobFor(people.owner, value.video!.id)?.phase === "waiting for memory");
       const card = videoCardView(people.owner, getVideoJobFor(people.owner, value.video!.id)!, true);
       expect(card.items[0]!.label).toContain("Home is busy making another picture, video or song. It will start in a minute.");
-      expect(card.items[0]!.label).toContain("number 2 in line");
+      // The household queue is the one definition of the place in line (MEMMGMT slice 16): alone in the line this job is next, so no number is shown.
+      expect(card.items[0]!.label).not.toContain("in line");
       await until(() => getVideoJobFor(people.owner, value.video!.id)?.state === "done");
     });
   });

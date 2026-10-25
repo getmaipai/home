@@ -9,6 +9,7 @@ import { attachments, conversationTurns, people, videoJobs } from "@/db/schema";
 import { createAttachment, getTemporaryChatImage, latestGeneratedTemporaryImage, readAttachmentForConversation, registerTemporaryMedia } from "@/lib/attachments";
 import { newFileId, newVideoJobId } from "@/lib/id";
 import { nextHlc } from "@/lib/hlc";
+import { refreshHouseholdQueue, registerQueueProvider, type QueueJob } from "@/lib/jobs/householdQueue";
 import type { PersonRow } from "@/types";
 import { allVideoAdapters } from "./adapters";
 import { checkImages, isAdultOnlyJob } from "@/lib/pictures/ageCheck";
@@ -65,6 +66,8 @@ export interface VideoJob {
   percent: number;
   phase: string | null;
   position: number | null;
+  estimateSeconds?: number | null;
+  riseReason?: "higher_class" | "other_person_first" | null;
   prompt: string;
   request: VideoRequest;
   error: string | null;
@@ -123,7 +126,7 @@ function fromRow(row: Row): VideoJob {
   };
 }
 
-function save(job: VideoJob): void {
+function persistVideoJob(job: VideoJob): void {
   job.updatedAt = new Date().toISOString();
   if (job.temporary) { memory.set(job.id, job); return; }
   const values = {
@@ -132,6 +135,22 @@ function save(job: VideoJob): void {
   };
   db.insert(videoJobs).values({ id: job.id, createdAt: job.createdAt, ...values }).onConflictDoUpdate({ target: videoJobs.id, set: values }).run();
 }
+
+function saveVideoJob(job: VideoJob): void {
+  persistVideoJob(job);
+  refreshHouseholdQueue();
+}
+
+registerQueueProvider(() => {
+  const jobs = new Map<string, VideoJob>();
+  for (const job of [...memory.values(), ...liveJobs.values()]) if (job.state === "queued" || job.state === "running") jobs.set(job.id, job);
+  for (const row of db.select().from(videoJobs).where(inArray(videoJobs.state, ["queued", "running"])).all()) if (!jobs.has(row.id)) jobs.set(row.id, fromRow(row));
+  return [...jobs.values()].map((job) => {
+    const queued: QueueJob = { id: job.id, personId: job.personId, jobClass: "video", state: job.state, createdAt: job.createdAt,
+      position: job.position, estimateSeconds: job.estimateSeconds, riseReason: job.riseReason, typicalSeconds: 140 };
+    return { job: queued, save: () => { job.position = queued.position ?? null; job.estimateSeconds = queued.estimateSeconds; job.riseReason = queued.riseReason; persistVideoJob(job); } };
+  });
+});
 
 /** A job by id for its owner only: nobody sees another person's videos, a parent included. */
 export function getVideoJobFor(actor: PersonRow, id: string): VideoJob | null {
@@ -303,8 +322,8 @@ export async function startVideoJob(input: StartVideoInput): Promise<VideoJob> {
     request: { size: input.body.size ?? (model === "detailed" ? "768x448" : "832x480"), seconds: input.body.seconds ?? 5, quality: model === "detailed" ? "detailed" : "quick", seed: input.body.seed ?? null, loras: (input.body.loras ?? []).map((l) => l.id), source_file_id: input.sourceFileId ?? null, audience: input.body.audience, ...(input.likeness ? { likeness: input.likeness } : {}) },
     error: null, files: [], temporary: input.temporary, createdAt: now, updatedAt: now,
   };
-  save(job);
   liveJobs.set(job.id, job);
+  saveVideoJob(job);
   void watch(job, input.actor, submitted.done);
   return job;
 }
@@ -333,7 +352,7 @@ function stopForLikeness(job: VideoJob): boolean {
   job.state = "failed";
   job.error = now.line;
   job.files = [];
-  save(job);
+  saveVideoJob(job);
   watching.get(job.id)?.abort();
   watching.delete(job.id);
   if (job.stackJob) void cancelOrDeleteVideo(job.stackJob);
@@ -373,29 +392,28 @@ async function watch(job: VideoJob, actor: PersonRow, early: StackClip[] | null 
       try {
         status = await getVideoJob(job.stackJob);
       } catch (error) {
-        if (error instanceof StackVideoError && error.status === 404) { job.state = "failed"; job.error = `${VIDEO_FAILED_PREFIX} The engine lost track of it, most likely because it restarted. Try again.`; save(job); return; }
+        if (error instanceof StackVideoError && error.status === 404) { job.state = "failed"; job.error = `${VIDEO_FAILED_PREFIX} The engine lost track of it, most likely because it restarted. Try again.`; saveVideoJob(job); return; }
         // A single missed poll is not a failure; the next one decides.
         await sleep(POLL_MS * 2, controller.signal);
         continue;
       }
       if (controller.signal.aborted) return;
       if (status.state === "done") { if (stopForLikeness(job)) return; await finish(job, actor, status.data, controller.signal); return; }
-      if (status.state === "failed") { job.state = "failed"; job.error = plainVideoFailure(new StackVideoError(500, status.code ?? "failed", status.error ?? "")); save(job); return; }
-      if (status.state === "cancelled" && status.code === "no_memory") { job.state = "failed"; job.error = plainVideoFailure(new StackVideoError(503, "no_memory", status.error ?? "")); save(job); return; }
-      if (status.state === "cancelled") { job.state = "cancelled"; job.error = null; save(job); return; }
+      if (status.state === "failed") { job.state = "failed"; job.error = plainVideoFailure(new StackVideoError(500, status.code ?? "failed", status.error ?? "")); saveVideoJob(job); return; }
+      if (status.state === "cancelled" && status.code === "no_memory") { job.state = "failed"; job.error = plainVideoFailure(new StackVideoError(503, "no_memory", status.error ?? "")); saveVideoJob(job); return; }
+      if (status.state === "cancelled") { job.state = "cancelled"; job.error = null; saveVideoJob(job); return; }
       job.state = status.state === "queued" ? "queued" : "running";
       job.percent = Math.max(0, Math.min(99, Math.round(status.progress)));
       job.phase = status.phase;
-      job.position = status.position;
-      save(job);
+      saveVideoJob(job);
       await updateLive(job.id, status, () => fetchVideoPreview(job.stackJob!));
       await sleep(POLL_MS, controller.signal);
     }
-    if (!controller.signal.aborted) { job.state = "failed"; job.error = `${VIDEO_FAILED_PREFIX} It took longer than expected. Try again, or ask for something simpler.`; save(job); void cancelOrDeleteVideo(job.stackJob); }
+    if (!controller.signal.aborted) { job.state = "failed"; job.error = `${VIDEO_FAILED_PREFIX} It took longer than expected. Try again, or ask for something simpler.`; saveVideoJob(job); void cancelOrDeleteVideo(job.stackJob); }
   } catch {
     job.state = "failed";
     job.error = plainVideoFailure(null);
-    try { save(job); } catch { /* the job ends here either way */ }
+    try { saveVideoJob(job); } catch { /* the job ends here either way */ }
   } finally {
     watching.delete(job.id);
     clearLive(job.id);
@@ -428,12 +446,12 @@ async function finish(job: VideoJob, actor: PersonRow, clips: StackClip[], signa
   const stackJob = job.stackJob!;
   try {
     const clip = clips[0];
-    if (!clip) { job.state = "failed"; job.error = plainVideoFailure(null); save(job); return; }
+    if (!clip) { job.state = "failed"; job.error = plainVideoFailure(null); saveVideoJob(job); return; }
     // The Stack's bytes are stored unchanged: a poster that is re-encoded could never start a later clip.
     const video = await fetchClip(stackJob);
     const poster = await fetchPoster(stackJob);
     if (signal.aborted) return;
-    if (!looksLikeMp4(video) || !looksLikeJpeg(poster)) { job.state = "failed"; job.error = `${VIDEO_FAILED_PREFIX} The video engine sent a file I couldn't read. Try again.`; save(job); return; }
+    if (!looksLikeMp4(video) || !looksLikeJpeg(poster)) { job.state = "failed"; job.error = `${VIDEO_FAILED_PREFIX} The video engine sent a file I couldn't read. Try again.`; saveVideoJob(job); return; }
     // VIDEO-GEN / IMGGEN-SAFE-01: the finished-clip check, before anything is stored or shown. First, middle and last
     // keyframes go through the same local vision check as a picture; a Mac that cannot decode a clip checks the poster alone.
     const adult = await isAdultOnlyJob(job.prompt, job.request.loras, async (id) => (await allVideoAdapters()).find((a) => a.id === id)?.classification);
@@ -443,7 +461,7 @@ async function finish(job: VideoJob, actor: PersonRow, clips: StackClip[], signa
     if (!keyframes) checks.push({ ok: false, why: "unavailable" });
     if (signal.aborted) return;
     const decision = await gateFinished({ actor, kind: "video", jobId: job.id, adultOnly: adult, checks, images: keyframes ?? [poster], prompt: job.prompt });
-    if (decision.action === "withhold") { job.state = "failed"; job.error = decision.line; job.files = []; save(job); return; }
+    if (decision.action === "withhold") { job.state = "failed"; job.error = decision.line; job.files = []; saveVideoJob(job); return; }
     const conversationId = job.conversationId;
     if (!conversationId) throw new Error("no conversation");
     const width = clip.width ?? 832;
@@ -461,9 +479,9 @@ async function finish(job: VideoJob, actor: PersonRow, clips: StackClip[], signa
       if (!job.turnId || !(await waitForTurnRow(job.turnId))) throw new Error("turn row never appeared");
       if (signal.aborted) return;
       const made = createAttachment(actor, { conversationId, turnId: job.turnId, mediaType: "video/mp4", bytes: video, provenance: `video-gen:${JSON.stringify({ v: 1, audience: adult ? "adult-only" : "all-ages", job: job.id, ...meta })}`, deduplicate: false, retention: "conversation" });
-      if (!made.ok) { job.state = "failed"; job.error = saveFailureLine(made.status); save(job); return; }
+      if (!made.ok) { job.state = "failed"; job.error = saveFailureLine(made.status); saveVideoJob(job); return; }
       const madePoster = createAttachment(actor, { conversationId, turnId: job.turnId, mediaType: "image/jpeg", bytes: poster, provenance: `${CLIP_POSTER_NOTE}${JSON.stringify({ v: 1, audience: adult ? "adult-only" : "all-ages", job: job.id, width, height, ...(job.request.likeness ? { likeness: job.request.likeness.subject } : {}) })}`, deduplicate: false, retention: "conversation" });
-      if (!madePoster.ok) { job.state = "failed"; job.error = saveFailureLine(madePoster.status); save(job); return; }
+      if (!madePoster.ok) { job.state = "failed"; job.error = saveFailureLine(madePoster.status); saveVideoJob(job); return; }
       file = { id: made.value.id, poster_id: madePoster.value.id, width, height, seconds: meta.seconds, seed: meta.seed, model: meta.model, ms: meta.ms, bytes: video.byteLength, quality, audio: meta.audio };
     }
     job.files = [file];
@@ -471,7 +489,7 @@ async function finish(job: VideoJob, actor: PersonRow, clips: StackClip[], signa
     job.percent = 100;
     job.phase = "ready";
     job.error = null;
-    save(job);
+    saveVideoJob(job);
   } finally {
     // Done or not, Home has taken what it wanted: the Stack's copy goes (a failed save would otherwise leave a clip on its disk).
     void cancelOrDeleteVideo(stackJob);
@@ -488,7 +506,7 @@ export async function cancelVideoJob(actor: PersonRow, id: string): Promise<Vide
   if (job.stackJob) await cancelOrDeleteVideo(job.stackJob);
   job.state = "cancelled";
   job.error = null;
-  save(job);
+  saveVideoJob(job);
   return job;
 }
 
@@ -500,7 +518,7 @@ export function resumeVideoJobs(): void {
 
 async function resume(job: VideoJob): Promise<void> {
   const person = db.select().from(people).where(eq(people.id, job.personId)).get();
-  if (!person || !job.stackJob) { job.state = "failed"; job.error = `${VIDEO_FAILED_PREFIX} Home restarted before it finished. Try again.`; save(job); return; }
+  if (!person || !job.stackJob) { job.state = "failed"; job.error = `${VIDEO_FAILED_PREFIX} Home restarted before it finished. Try again.`; saveVideoJob(job); return; }
   liveJobs.set(job.id, job);
   void watch(job, person as PersonRow);
 }

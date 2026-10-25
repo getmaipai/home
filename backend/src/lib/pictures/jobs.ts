@@ -16,10 +16,24 @@ import { checkImages, isAdultOnlyJob } from "./ageCheck";
 import { gateFinished } from "./laneGate";
 import { likenessStillAllowed, type JobLikeness } from "@/lib/likeness/guard";
 import { clearLive, updateLive } from "@/lib/genLive";
+import { refreshHouseholdQueue, registerQueueProvider, type QueueJob } from "@/lib/jobs/householdQueue";
 import { cancelOrDelete, fetchPicture, fetchPicturePreview, getGenerationJob, StackPicturesError, submitGeneration, type GenerationBody, type StackPic } from "./stack";
 
 export { getPictureJob, pictureJobsForTurn, pictureJobIdsByTurn, plainFailure, PICTURE_FAILED_PREFIX, __clearPictureStoreForTests } from "./jobStore";
 export type { PictureFile, PictureJob, PictureJobKind, PictureJobState, PictureRequest } from "./jobStore";
+
+type QueuedPictureJob = PictureJob & { estimateSeconds?: number | null; riseReason?: "higher_class" | "other_person_first" | null };
+registerQueueProvider(() => unfinishedJobs().map((job) => {
+  const queuedJob = job as QueuedPictureJob;
+  const queued: QueueJob = { id: job.id, personId: job.personId, jobClass: "picture", state: job.state, createdAt: job.createdAt,
+    position: job.position, estimateSeconds: queuedJob.estimateSeconds, riseReason: queuedJob.riseReason, typicalSeconds: job.kind === "edit" ? 20 : 44 };
+  return { job: queued, save: () => { job.position = queued.position ?? null; Object.assign(queuedJob, { estimateSeconds: queued.estimateSeconds, riseReason: queued.riseReason }); saveJob(job); } };
+}));
+
+function savePictureJob(job: PictureJob): void {
+  saveJob(job);
+  refreshHouseholdQueue();
+}
 
 const watching = new Map<string, AbortController>();
 /** Turns with a job being submitted right now: two quick clicks never start two. */
@@ -72,7 +86,7 @@ export async function startPictureJob(input: StartPictureInput): Promise<Picture
       error: null, files: [], temporary: input.temporary, createdAt: now, updatedAt: now,
     };
     markLive(job);
-    saveJob(job);
+    savePictureJob(job);
     if (input.local) void watchLocal(job, input.actor, input.local);
     else void watch(job, input.actor, submitted!.done);
     return job;
@@ -106,7 +120,7 @@ function stopForLikeness(job: PictureJob, line?: string): boolean {
   job.state = "failed";
   job.error = now.line;
   job.files = [];
-  saveJob(job);
+  savePictureJob(job);
   watching.get(job.id)?.abort();
   if (job.stackJob) void cancelOrDelete(job.stackJob);
   return true;
@@ -145,31 +159,30 @@ async function watch(job: PictureJob, actor: PersonRow, early: StackPic[] | null
         status = await getGenerationJob(job.stackJob);
       } catch (error) {
         if (stopped(job) || controller.signal.aborted) return;
-        if (error instanceof StackPicturesError && error.status === 404) { job.state = "failed"; job.error = `${PICTURE_FAILED_PREFIX} The engine lost track of it, most likely because it restarted. Try again.`; saveJob(job); return; }
+        if (error instanceof StackPicturesError && error.status === 404) { job.state = "failed"; job.error = `${PICTURE_FAILED_PREFIX} The engine lost track of it, most likely because it restarted. Try again.`; savePictureJob(job); return; }
         // A single missed poll is not a failure; the next one decides.
         await sleep(POLL_MS * 2, controller.signal);
         continue;
       }
       if (stopped(job) || controller.signal.aborted) return;
       if (status.state === "done") { if (stopForLikeness(job)) return; await finish(job, actor, status.data); return; }
-      if (status.state === "failed") { job.state = "failed"; job.error = plainFailure(new StackPicturesError(500, status.code ?? "failed", status.error ?? "")); saveJob(job); return; }
+      if (status.state === "failed") { job.state = "failed"; job.error = plainFailure(new StackPicturesError(500, status.code ?? "failed", status.error ?? "")); savePictureJob(job); return; }
       // The Stack's memory watchdog stopped it (code no_memory): that is a pause the person should hear about, not a cancel they asked for.
-      if (status.state === "cancelled" && status.code === "no_memory") { job.state = "failed"; job.error = plainFailure(new StackPicturesError(503, "no_memory", status.error ?? "")); saveJob(job); return; }
-      if (status.state === "cancelled") { job.state = "cancelled"; job.error = null; saveJob(job); return; }
+      if (status.state === "cancelled" && status.code === "no_memory") { job.state = "failed"; job.error = plainFailure(new StackPicturesError(503, "no_memory", status.error ?? "")); savePictureJob(job); return; }
+      if (status.state === "cancelled") { job.state = "cancelled"; job.error = null; savePictureJob(job); return; }
       job.state = status.state === "queued" ? "queued" : "running";
       job.percent = Math.max(0, Math.min(99, Math.round(status.progress)));
       job.phase = status.phase;
-      job.position = status.position;
-      saveJob(job);
+      savePictureJob(job);
       await updateLive(job.id, status, () => fetchPicturePreview(job.stackJob!));
       await sleep(POLL_MS, controller.signal);
     }
-    if (!controller.signal.aborted && !stopped(job)) { job.state = "failed"; job.error = `${PICTURE_FAILED_PREFIX} It took longer than expected. Try again, or ask for something simpler.`; saveJob(job); void cancelOrDelete(job.stackJob); }
+    if (!controller.signal.aborted && !stopped(job)) { job.state = "failed"; job.error = `${PICTURE_FAILED_PREFIX} It took longer than expected. Try again, or ask for something simpler.`; savePictureJob(job); void cancelOrDelete(job.stackJob); }
   } catch {
     if (!stopped(job)) {
       job.state = "failed";
       job.error = plainFailure(null);
-      try { saveJob(job); } catch { /* the job ends here either way */ }
+      try { savePictureJob(job); } catch { /* the job ends here either way */ }
     }
   } finally {
     watching.delete(job.id);
@@ -187,7 +200,7 @@ async function watchLocal(job: PictureJob, actor: PersonRow, run: NonNullable<St
   try {
     const pics = await run((phase, percent) => {
       if (stopped(job) || controller.signal.aborted) return;
-      job.phase = phase; job.percent = Math.max(job.percent, Math.min(95, Math.round(percent))); saveJob(job);
+      job.phase = phase; job.percent = Math.max(job.percent, Math.min(95, Math.round(percent))); savePictureJob(job);
     }, controller.signal);
     if (stopped(job) || controller.signal.aborted) return;
     if (stopForLikeness(job)) return;
@@ -197,7 +210,7 @@ async function watchLocal(job: PictureJob, actor: PersonRow, run: NonNullable<St
       job.state = "failed";
       job.error = `${PICTURE_FAILED_PREFIX} ${error instanceof Error && error.message ? error.message : "Something went wrong. Try again."}`.replace(`${PICTURE_FAILED_PREFIX} ${PICTURE_FAILED_PREFIX}`, PICTURE_FAILED_PREFIX);
       job.files = [];
-      try { saveJob(job); } catch { /* the job ends here either way */ }
+      try { savePictureJob(job); } catch { /* the job ends here either way */ }
     }
   } finally {
     watching.delete(job.id);
@@ -232,7 +245,7 @@ async function finish(job: PictureJob, actor: PersonRow, pics: StackPic[]): Prom
   const stackJob = job.stackJob;
   const files: PictureFile[] = [];
   const storedIds: string[] = [];
-  const fail = (message: string) => { discardStored(storedIds); job.state = "failed"; job.error = message; job.files = []; saveJob(job); if (stackJob) void cancelOrDelete(stackJob); };
+  const fail = (message: string) => { discardStored(storedIds); job.state = "failed"; job.error = message; job.files = []; savePictureJob(job); if (stackJob) void cancelOrDelete(stackJob); };
   try {
     // Fetch and prove every picture first; nothing is stored until the safety check has seen all of them.
     const made: Array<{ raw: Uint8Array; width: number; height: number; meta: { seed: number | null; model: string | null; steps: number | null; ms: number | null } }> = [];
@@ -290,7 +303,7 @@ async function finish(job: PictureJob, actor: PersonRow, pics: StackPic[]): Prom
   job.percent = 100;
   job.phase = "ready";
   job.error = null;
-  saveJob(job);
+  savePictureJob(job);
   // A stored cover may update its song, but never changes this picture's outcome.
   try { const { finishSongCover } = await import("@/lib/music/cover"); finishSongCover(job); } catch { /* optional cover linkage */ }
   if (stackJob) void cancelOrDelete(stackJob);
@@ -303,7 +316,7 @@ export async function cancelPictureJob(actor: PersonRow, id: string): Promise<Pi
   if (job.state === "done" || job.state === "failed" || job.state === "cancelled") return job;
   job.state = "cancelled";
   job.error = null;
-  saveJob(job);
+  savePictureJob(job);
   watching.get(job.id)?.abort();
   if (job.stackJob) await cancelOrDelete(job.stackJob);
   return job;
@@ -313,7 +326,7 @@ export async function cancelPictureJob(actor: PersonRow, id: string): Promise<Pi
 export function resumePictureJobs(): void {
   for (const job of unfinishedStoredJobs()) {
     const person = db.select().from(people).where(eq(people.id, job.personId)).get();
-    if (!person || !job.stackJob) { job.state = "failed"; job.error = `${PICTURE_FAILED_PREFIX} Home restarted before it finished. Try again.`; saveJob(job); continue; }
+    if (!person || !job.stackJob) { job.state = "failed"; job.error = `${PICTURE_FAILED_PREFIX} Home restarted before it finished. Try again.`; savePictureJob(job); continue; }
     void watch(job, person as PersonRow);
   }
 }
