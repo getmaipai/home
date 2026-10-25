@@ -19,10 +19,12 @@ function fixture(name: string, gitKind: "file" | "directory") {
 
 const worktree = fixture("worktree", "file");
 const main = fixture("main", "directory");
-function run(root: string, ...args: string[]) {
-  return spawnSync("bash", [join(root, "scripts", "dev.sh"), ...args], {
+function run(root: string, ...args: (string | Record<string, string>)[]) {
+  const env = typeof args.at(-1) === "object" ? args.pop() as Record<string, string> : {};
+  const commandArgs = args.filter((arg): arg is string => typeof arg === "string");
+  return spawnSync("bash", [join(root, "scripts", "dev.sh"), ...commandArgs], {
     encoding: "utf8",
-    env: { ...process.env, MAIPAI_DEV_ROOT: root },
+    env: { ...process.env, MAIPAI_DEV_ROOT: root, ...env },
   });
 }
 
@@ -41,6 +43,15 @@ describe("scripts/dev.sh", () => {
     const out = run(main, "port");
     expect(out.status).toBe(0);
     expect(out.stdout.trim()).toBe("8787");
+  });
+
+  test("probes forward from a taken hashed slot", () => {
+    const sum = Number(spawnSync("cksum", [], { input: `${worktree}\n`, encoding: "utf8" }).stdout.split(/\s+/)[0]);
+    const hashed = 8800 + sum % 100;
+    const next = 8800 + ((hashed - 8800 + 1) % 100);
+    const out = run(worktree, "port", { MAIPAI_DEV_PROBE_CMD: '[[ "$1" == "$MAIPAI_DEV_TAKEN" ]]', MAIPAI_DEV_TAKEN: String(hashed) });
+    expect(out.status).toBe(0);
+    expect(out.stdout.trim()).toBe(String(next));
   });
 
   test("explicit port overrides checkout type and drives both URLs", () => {

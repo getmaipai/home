@@ -15,6 +15,7 @@ backend_log="$state/backend.log"
 vite_log="$state/vite.log"
 seed_marker="$state/seeded"
 seed_output="$state/seed.json"
+port_file="$state/port"
 umask 077
 
 action="${1:-}"
@@ -39,6 +40,8 @@ while (($#)); do
   esac
 done
 
+mkdir -p "$state"
+
 if [[ -n "$port_override" ]]; then
   if [[ ! "$port_override" =~ ^[0-9]+$ ]] || ((port_override < 1 || port_override > 64535)); then
     echo "Invalid development port '$port_override'. Pass a number from 1 to 64535." >&2; exit 2
@@ -48,13 +51,48 @@ elif [[ -d "$root/.git" ]]; then
   backend_port=8787
 elif [[ -f "$root/.git" ]]; then
   path_sum="$(cksum <<< "$root" | cut -d' ' -f1)"
-  backend_port=$((8800 + path_sum % 100))
+  hashed_port=$((8800 + path_sum % 100))
+  alive_port=""
+  for pid_file in "$backend_pid_file" "$vite_pid_file"; do
+    if [[ -f "$port_file" && -f "$pid_file" ]]; then
+      IFS= read -r saved_port < "$port_file" || true
+      IFS= read -r saved_pid < "$pid_file" || true
+      if [[ "$saved_port" =~ ^[0-9]+$ && "$saved_pid" =~ ^[0-9]+$ ]] && kill -0 "$saved_pid" 2>/dev/null; then
+        alive_port="$saved_port"; break
+      fi
+    fi
+  done
+  backend_port="${alive_port:-$hashed_port}"
 else
   echo "Cannot choose a development port because $root has no .git file or directory. Run this from a checkout." >&2; exit 1
 fi
 vite_port=$((backend_port + 1000))
 
-mkdir -p "$state"
+probe_taken() {
+  local probe_port="$1"
+  if [[ -n "${MAIPAI_DEV_PROBE_CMD:-}" ]]; then
+    bash -c "$MAIPAI_DEV_PROBE_CMD" _ "$probe_port"
+  elif command -v nc >/dev/null 2>&1; then
+    nc -z 127.0.0.1 "$probe_port" >/dev/null 2>&1
+  else
+    (exec 3<>"/dev/tcp/127.0.0.1/$probe_port") >/dev/null 2>&1
+  fi
+}
+
+choose_worktree_port() {
+  local offset candidate candidate_vite
+  for ((offset=0; offset<100; offset++)); do
+    candidate=$((8800 + ((hashed_port - 8800 + offset) % 100)))
+    candidate_vite=$((candidate + 1000))
+    if ! probe_taken "$candidate" && ! probe_taken "$candidate_vite"; then
+      backend_port="$candidate"
+      vite_port="$candidate_vite"
+      return 0
+    fi
+  done
+  echo "No free development port pair in 8800-8899 (or 9800-9899)." >&2
+  return 1
+}
 
 pid_value() {
   local file="$1" value
@@ -120,7 +158,12 @@ stop_one() {
 }
 
 case "$action" in
-  port) echo "$backend_port" ;;
+  port)
+    if [[ -z "$port_override" && -f "$root/.git" && -z "${alive_port:-}" ]]; then
+      choose_worktree_port || exit 1
+    fi
+    echo "$backend_port"
+    ;;
   url) print_urls ;;
   status)
     process_status backend "$backend_pid_file"
@@ -154,6 +197,11 @@ case "$action" in
       exit 1
     fi
     rm -f "$vite_pid_file"
+
+    if [[ -z "$port_override" && -f "$root/.git" ]]; then
+      choose_worktree_port || exit 1
+    fi
+    printf '%s\n' "$backend_port" > "$port_file"
 
     if [[ ! -d "$root/backend/node_modules" ]]; then
       if ! (cd "$root/backend" && bun install --frozen-lockfile); then

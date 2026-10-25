@@ -24,19 +24,3 @@ shared="$(mktemp)"
 trap 'rm -f "$shared"' EXIT
 git -C "$std" show origin/main:standards/bin/wt.sh > "$shared" 2>/dev/null || { echo "wt: .github has no standards/bin/wt.sh on origin/main; fetch it and retry." >&2; exit 1; }
 bash "$shared" "$@"
-# RELEASE-GATE-01: after a landing, gate the new main in the background so a release can
-# reuse that run (check.sh --release). The idle run only uses a free gate lock and yields
-# to any session that queues for it. MAIPAI_WT_NO_MAIN_GATE=1 turns it off for one call.
-if [[ "${1:-}" == land && -z "${MAIPAI_WT_NO_MAIN_GATE:-}" ]]; then
-  home="$(cd "$common/.." && pwd)"
-  gate_dir="$home/data-scratch/main-gate"
-  mkdir -p "$gate_dir"
-  # main's own copy, not the main checkout's working tree (it may be behind origin).
-  # Written to a new file and renamed, so a run still reading the old copy is not disturbed.
-  if git -C "$home" show origin/main:scripts/main-gate.sh > "$gate_dir/main-gate.sh.new" 2>/dev/null \
-    && mv -f "$gate_dir/main-gate.sh.new" "$gate_dir/main-gate.sh"; then
-    # Started from the main checkout: `land` removes the worktree this shell stands in.
-    (cd "$home" && MAIPAI_MAIN_GATE_ROOT="$home" nohup bash "$gate_dir/main-gate.sh" idle >> "$gate_dir/idle.log" 2>&1 < /dev/null &)
-    echo "wt: started a background full gate on the new main (log: data-scratch/main-gate/idle.log)"
-  fi
-fi
