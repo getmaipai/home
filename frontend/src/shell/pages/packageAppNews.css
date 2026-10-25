@@ -40,3 +40,23 @@
 [data-slot="app-section-tabs"]::-webkit-scrollbar {
   display: none;
 }
+
+/* Reading on a phone: no band of its own for the shell bar. The menu button floats at the top left and the reader's Back and action
+   pill sit in the same row, to its right. */
+@media (max-width: 639.98px) {
+  html[data-app-reading] [data-slot="rail-page-header"] {
+    position: fixed;
+    inset: 0 auto auto 0;
+    width: auto;
+    border: 0;
+    background: transparent;
+    padding-inline: 0.5rem;
+  }
+  html[data-app-reading] [data-slot="app-header-bar"] {
+    display: none;
+  }
+  html[data-app-reading] [data-testid="package-app"][data-package="news"] [data-slot="article-toolbar"] {
+    margin-top: -0.5rem;
+    padding-inline-start: 3.75rem;
+  }
+}
