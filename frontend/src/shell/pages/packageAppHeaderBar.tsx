@@ -51,3 +51,19 @@ function Bar({ state }: { state: PackageAppHeaderState }) {
     </div>
   );
 }
+
+// The sections of an app as the kit's phone bar entries (phone-minimal-2026-10-25 P2): the app's own index first (active only on its
+// own address), then each section, and a trailing Search item when the app has a search page. An icon the hub did not name falls back
+// to one of the kit's own.
+const SECTION_ICONS: Record<string, string> = { mix: "sparkles", following: "heart", saved: "bookmark", library: "library", history: "history", search: "search", channel: "hash" };
+export interface SectionsBarEntries {
+  entries: Array<{ to: string; icon: string; label: string; exact?: boolean }>;
+  trailing?: { to: string; icon: string; label: string };
+}
+export function sectionsBarEntries(app: { to: string; icon?: string | null; sections: ReadonlyArray<{ page: string; label: string; icon?: string | null }> }, homeLabel: string, hasSearchPage: boolean): SectionsBarEntries {
+  const entries = [
+    { to: app.to, icon: app.icon ?? "layout-grid", label: homeLabel, exact: true },
+    ...app.sections.filter((section) => section.page !== "search").map((section) => ({ to: `${app.to}/${section.page}`, icon: section.icon ?? SECTION_ICONS[section.page] ?? "layout-grid", label: section.label })),
+  ];
+  return hasSearchPage ? { entries, trailing: { to: `${app.to}/search`, icon: "search", label: "Search" } } : { entries };
+}

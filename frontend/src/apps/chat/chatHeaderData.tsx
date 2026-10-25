@@ -35,6 +35,8 @@ export interface ChatHeaderData {
   /** The history sheet's open state and toggle, for a phone, where the toggle sits in the shell bar beside the title. */
   sheetOpen?: boolean;
   onToggleSheet?: () => void;
+  /** True while the shell's top bar carries this header (a phone), so it draws as the phone row with the toggle first. */
+  inShellBar?: boolean;
 }
 
 const ChatHeaderDataContext = createContext<{
@@ -86,9 +88,10 @@ export function useSetChatHeaderData(data: ChatHeaderData | null): void {
   const pinnable = data?.pinnable;
   const pinned = data?.pinned;
   const sheetOpen = data?.sheetOpen;
+  const inShellBar = data?.inShellBar;
   useEffect(() => {
     setData(dataRef.current);
     return () => setData(null);
     // eslint-disable-next-line react-hooks/exhaustive-deps -- deliberately narrower than `data` itself; see this function's own comment above.
-  }, [data === null, title, ttsAvailable, autoReadReplies, pinnable, pinned, sheetOpen, setData]);
+  }, [data === null, title, ttsAvailable, autoReadReplies, pinnable, pinned, sheetOpen, inShellBar, setData]);
 }

@@ -178,6 +178,10 @@ export function ChatHeaderBar({ phoneRow = false, trailing, shells = false, onMe
   // uses (ThreadListItemPrimitive.Title's own `fallback="New Chat"`),
   // never a blank bar.
   const title = data.title || "New Chat";
+  // On a phone the conversation's header sits in the shell's top bar (one bar, not a second row): the bar then draws as the phone row
+  // does and starts with the history toggle.
+  const inBar = data.inShellBar === true;
+  if (inBar) phoneRow = true;
 
   const actions = (
     <>
@@ -212,6 +216,11 @@ export function ChatHeaderBar({ phoneRow = false, trailing, shells = false, onMe
   }
   return (
     <div data-chat-header-bar className={phoneRow ? "flex min-w-0 flex-1 items-center gap-1 overflow-hidden" : "hidden min-w-0 flex-1 items-center gap-1 overflow-hidden lg:flex"}>
+      {inBar && data.onToggleSheet ? (
+        <Button variant="ghost" size="icon-lg" aria-label={data.sheetOpen ? "Hide threads" : "Show threads"} aria-expanded={data.sheetOpen === true} aria-controls="next-chat-threads" onClick={data.onToggleSheet}>
+          <ColumnOpenIcon className="size-4.5" />
+        </Button>
+      ) : null}
       {renaming ? (
         <ChatHeaderRename title={data.title} onRename={data.onRename} onDone={() => setRenaming(false)} />
       ) : (
@@ -279,23 +288,6 @@ export function ChatHeaderBar({ phoneRow = false, trailing, shells = false, onMe
           </DropdownMenu>
         </>
       )}
-    </div>
-  );
-}
-
-/** On a phone the conversation's header lives in the shell's top bar (one bar, not a second row under it): the history toggle, then
- * the title and its actions. A stable component for `useHeaderExtra`; it reads everything from the header data bridge. */
-export function ChatPhoneHeaderBar() {
-  const data = useChatHeaderData();
-  if (!data) return null;
-  return (
-    <div className="flex min-w-0 flex-1 items-center gap-1">
-      {data.onToggleSheet ? (
-        <Button variant="ghost" size="icon-lg" aria-label={data.sheetOpen ? "Hide threads" : "Show threads"} aria-expanded={data.sheetOpen === true} aria-controls="next-chat-threads" onClick={data.onToggleSheet}>
-          <ColumnOpenIcon className="size-4.5" />
-        </Button>
-      ) : null}
-      <ChatHeaderBar phoneRow />
     </div>
   );
 }

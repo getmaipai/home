@@ -22,7 +22,8 @@ import { WeatherForecastPage, dedupeLocations, type WeatherLocation } from "@mai
 import { useAppSidebar } from "@/shell/useAppSidebar";
 import { MediaHubFrame } from "@/shell/MediaHubFrame";
 import { useMediaHubActive } from "@/shell/mediaHubSession";
-import { PackageAppHeaderBar, publishPackageAppHeader } from "@/shell/pages/packageAppHeaderBar";
+import { PackageAppHeaderBar, publishPackageAppHeader, sectionsBarEntries } from "@/shell/pages/packageAppHeaderBar";
+import { PhoneNav } from "@maipai/ui/src/PhoneNav";
 import { FocalImageProvider } from "@maipai/ui/src/primitives/FocalImage";
 import { analyzeFocalImage, warmFocalModel } from "@/lib/focalImageAnalyzer";
 import "./packageAppNews.css";
@@ -181,6 +182,9 @@ export function PackageAppPage({ person }: { person: Roster }) {
   const phone = useIsPhoneLayout();
   const inShellBar = phone && app !== undefined;
   useHeaderExtra(inShellBar ? PackageAppHeaderBar : undefined);
+  // An app with sections shows them in the kit's floating bottom bar on a phone (not as a row of pills), with Search last when the
+  // app has a search page; a page that plays something (a video, a book) draws no bar.
+  const sectionsBar = inShellBar && app && app.sections.length > 0 && !isMediaPlayPage(packageId, pageId) ? sectionsBarEntries(app, appHomeLabel(packageId, media), pagesOf(app).includes("search")) : null;
   useEffect(() => {
     publishPackageAppHeader(inShellBar && app ? { to: app.to, label: app.label, ...(app.settings_area?.id ? { settingsArea: app.settings_area.id } : {}) } : null);
     return () => publishPackageAppHeader(null);
@@ -226,9 +230,10 @@ export function PackageAppPage({ person }: { person: Roster }) {
   const contextTitle = sidebarProps ? contextTitleFor(activeLabel, pageDoc?.title) : undefined;
 
   const content = (
-    <div className={cn("flex min-h-0 min-w-0 flex-1 flex-col gap-2", (sidebarProps || media) && "py-4 lg:p-4 lg:ps-6")} data-testid="package-app" data-package={packageId}>
+    <div className={cn("flex min-h-0 min-w-0 flex-1 flex-col gap-2", (sidebarProps || media) && "py-4 lg:p-4 lg:ps-6", sectionsBar && "pb-24")} data-testid="package-app" data-package={packageId}>
+      {sectionsBar ? <PhoneNav variant="floating" label={`${app?.label ?? "App"} sections`} entries={sectionsBar.entries} {...(sectionsBar.trailing ? { trailing: sectionsBar.trailing } : {})} /> : null}
       {familyHeader ? null : <h1 className="sr-only">{app?.label ?? "App"}</h1>}
-      {app ? <AppToolbar inShellBar={inShellBar} hideSectionsOnWide={sidebar !== undefined} to={app.to} label={app.label} homeLabel={appHomeLabel(packageId, media)} settingsArea={app.settings_area?.id} sections={app.sections} current={pageId} familyHeader={familyHeader} title={contextTitle} titleSrOnly={sidebarProps ? ownHeader || contextTitle === undefined : false} /> : null}
+      {app ? <AppToolbar inShellBar={inShellBar} sectionsInBar={sectionsBar !== null} hideSectionsOnWide={sidebar !== undefined} to={app.to} label={app.label} homeLabel={appHomeLabel(packageId, media)} settingsArea={app.settings_area?.id} sections={app.sections} current={pageId} familyHeader={familyHeader} title={contextTitle} titleSrOnly={sidebarProps ? ownHeader || contextTitle === undefined : false} /> : null}
       <AsyncState
         data={page.isError ? null : page.data}
         error={page.isError}
@@ -237,7 +242,7 @@ export function PackageAppPage({ person }: { person: Roster }) {
         errorMessage="Could not open this app. Check your connection and try again."
         loadingLabel="Opening the app"
       >
-        {(doc) => (hasQuery && !sameQuery ? null : <>
+        {(shown) => { const doc = sectionsBar?.trailing && pageId !== "search" ? withoutSearchBox(shown) : shown; return (hasQuery && !sameQuery ? null : <>
           {packageId === "weather" && pageId === "index" ? null : packageId === "news" ? <FocalImageProvider analyze={analyzeFocalImage}><SchemaPage key={`${packageId}/${pageId}`} page={doc} packageId={packageId} hideTitle sidebar={sidebarProps !== null} /></FocalImageProvider> : <SchemaPage key={`${packageId}/${pageId}`} page={doc} packageId={packageId} hideTitle sidebar={sidebarProps !== null} />}
           {packageId === "videos" && pageId === "watch" ? <VideoDetails id={new URLSearchParams(location.search).get("id") ?? String((location.state as { pageState?: { id?: string } } | null)?.pageState?.id ?? "")} /> : null}
           {packageId === "weather" && pageId === "index" ? <>
@@ -270,7 +275,7 @@ export function PackageAppPage({ person }: { person: Roster }) {
               }).catch((error: unknown) => setWeatherMessage(error instanceof Error ? error.message : "Could not remove this place."));
             }} locale={navigator.language} unit={weatherUnit === "celsius" ? "C" : "F"} />
           </> : null}
-        </>)}
+        </>); }}
       </AsyncState>
       {docked ? (
         <Player
@@ -324,8 +329,14 @@ function AppColumnActions({ label, settingsArea }: { label: string; settingsArea
   );
 }
 
+/** A page document without its search box: on a phone the sections bar's Search item takes its place. */
+function withoutSearchBox(doc: unknown): unknown {
+  const page = doc as { body?: Array<{ type?: string }> };
+  return Array.isArray(page.body) ? { ...page, body: page.body.filter((node) => node.type !== "search") } : doc;
+}
+
 /** The app's own sections as tabs (when it has any) and its settings button. */
-function AppToolbar({ inShellBar = false, hideSectionsOnWide = false, to, label, title, titleSrOnly = false, homeLabel, settingsArea, sections, current, familyHeader }: { inShellBar?: boolean; title?: string; titleSrOnly?: boolean; hideSectionsOnWide?: boolean; to: string; label: string; homeLabel: string; settingsArea?: string; sections: Array<{ page: string; label: string }>; current: string; familyHeader: boolean }) {
+function AppToolbar({ inShellBar = false, sectionsInBar = false, hideSectionsOnWide = false, to, label, title, titleSrOnly = false, homeLabel, settingsArea, sections, current, familyHeader }: { inShellBar?: boolean; sectionsInBar?: boolean; title?: string; titleSrOnly?: boolean; hideSectionsOnWide?: boolean; to: string; label: string; homeLabel: string; settingsArea?: string; sections: Array<{ page: string; label: string }>; current: string; familyHeader: boolean }) {
   const navigate = useNavigate();
   const GearIcon = getIcon("settings");
   // MEDIA-POLISH-01: a media app's own header, as the native app has it (YouTube's): its name large with its icon controls on the
@@ -345,7 +356,7 @@ function AppToolbar({ inShellBar = false, hideSectionsOnWide = false, to, label,
       </div>
     ) : null;
     // In the shell bar (a phone) the title and icon buttons are drawn there; only the section tabs stay in the page.
-    if (inShellBar) return tabs ? <div className="flex flex-col gap-2 px-4 lg:px-0">{tabs}</div> : null;
+    if (inShellBar) return tabs && !sectionsInBar ? <div className="flex flex-col gap-2 px-4 lg:px-0">{tabs}</div> : null;
     return (
       <div className="flex flex-col gap-2 px-4 lg:px-0">
         <div className="flex items-center gap-1">
@@ -361,7 +372,7 @@ function AppToolbar({ inShellBar = false, hideSectionsOnWide = false, to, label,
     );
   }
   if (inShellBar) {
-    if (sections.length === 0) return null;
+    if (sections.length === 0 || sectionsInBar) return null;
     return (
       <div className="-mx-4 min-w-0 overflow-x-auto overflow-y-hidden overscroll-x-contain px-4 touch-pan-x" data-slot="app-section-tabs">
         <Tabs value={current} onValueChange={(value) => navigate(value === "index" ? to : `${to}/${String(value)}`)}>

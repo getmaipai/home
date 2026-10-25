@@ -161,7 +161,7 @@ describe("an app that declares a sidebar", () => {
     expect(side.queryByRole("searchbox")).toBeNull();
   });
 
-  test("the section tabs give way to the column from wide screens up, and a phone keeps them", async () => {
+  test("the section tabs give way to the column from wide screens up, and a phone shows them in the bottom bar", async () => {
     const view = open("/apps/demo");
     await view.findByText("Today's stories");
     const tabs = view.container.querySelector('[data-slot="app-section-tabs"]') as HTMLElement;
@@ -172,7 +172,9 @@ describe("an app that declares a sidebar", () => {
     cleanup();
     const phone = open("/apps/demo", 402);
     await phone.findByText("Today's stories");
-    expect(phone.container.querySelector('[data-slot="app-section-tabs"]')).not.toBeNull();
+    // A phone shows the sections in the floating bottom bar, not as a row of pills (phone-minimal-2026-10-25 P2).
+    expect(phone.container.querySelector('nav[aria-label$="sections"]')).not.toBeNull();
+    expect(phone.container.querySelector('[data-slot="app-section-tabs"]')).toBeNull();
   });
 
   test("an app with no sidebar draws no column and keeps its tabs as they were", async () => {
