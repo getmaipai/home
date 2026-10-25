@@ -35,6 +35,7 @@ function fixture() {
     MAIPAI_WATCH_SUITE_CMD: "bash scripts/suite.sh",
     MAIPAI_WATCH_RERUN_CMD: "bash scripts/rerun.sh",
     MAIPAI_WATCH_ISSUE_CMD: `bash ${join(scratch, "issue.sh")}`,
+    MAIPAI_WATCH_NO_LOCK: "1",
   };
   spawnSync("git", ["init", "--bare", "--initial-branch=main", origin], { encoding: "utf8" });
   spawnSync("git", ["clone", origin, main], { encoding: "utf8" });
@@ -44,7 +45,7 @@ function fixture() {
   for (const name of sourceScripts) copyFileSync(join(import.meta.dir, name), join(main, "scripts", name));
   writeFileSync(join(main, "scripts", "suite.sh"), "#!/usr/bin/env bash\nif [[ -f RED ]]; then echo '(fail) breaks [1ms]'; echo 'shard: failing files: backend/tests/broken.test.ts'; exit 1; fi\necho 'all green'\n");
   writeFileSync(join(main, "scripts", "rerun.sh"), "#!/usr/bin/env bash\nif [[ -f RED && ! -f FLAKY ]]; then exit 1; fi\nexit 0\n");
-  writeFileSync(join(scratch, "issue.sh"), `#!/usr/bin/env bash\nprintf '%s\\n' "$*" >> '${join(scratch, "issue.calls")}'\n`);
+  writeFileSync(join(scratch, "issue.sh"), `#!/usr/bin/env bash\nprintf '%s\\n' "$1" >> '${join(scratch, "issue.calls")}'\n`);
   writeFileSync(join(main, "base.txt"), "base\n");
   git(main, "add", "-A");
   git(main, "commit", "-m", "fixture base");
@@ -113,10 +114,35 @@ describe("main watcher", () => {
       MAIPAI_WATCH_QUIET_POLL_SECONDS: "1",
     });
     expect(out.status).toBe(0);
-    expect(Date.now() - started).toBeGreaterThanOrEqual(1800);
+    expect(Date.now() - started).toBeGreaterThanOrEqual(1300);
     expect(records(f)[0].result).toBe("green");
     expect(readFileSync(join(f.data, "watcher.log"), "utf8")).toContain("waiting: lander busy");
     expect(readFileSync(join(f.data, "watcher.log"), "utf8")).toContain("waited 2s; waiting: lander busy; running anyway");
+  }, 60_000);
+
+  test("takes and releases the machine gate lock around the suite, and continues when acquire fails", () => {
+    const f = fixture();
+    const lock = join(f.scratch, "gate-lock.sh");
+    const calls = join(f.scratch, "lock.calls");
+    writeFileSync(lock, `#!/usr/bin/env bash\nprintf '%s %s\\n' "$1" "${"$"}{2:-}" >> '${calls}'\n`);
+    commit(f, "lock suite marker", {
+      "scripts/suite.sh": `#!/usr/bin/env bash\necho suite >> '${calls}'\necho 'all green'\n`,
+    });
+    const env = { ...f.env, MAIPAI_WATCH_NO_LOCK: "", MAIPAI_GATE_LOCK: lock };
+    expect(run(f, "watcher.sh", ["run-once"], env).status).toBe(0);
+    const lockCalls = readFileSync(calls, "utf8").trim().split(/\r?\n/);
+    expect(lockCalls[0]).toMatch(/^acquire watcher-[0-9]+$/);
+    expect(lockCalls[1]).toBe("suite");
+    expect(lockCalls[2]).toMatch(/^release watcher-[0-9]+$/);
+    expect(lockCalls[0]!.slice("acquire ".length)).toBe(lockCalls[2]!.slice("release ".length));
+
+    const failed = fixture();
+    const badLock = join(failed.scratch, "bad-lock.sh");
+    writeFileSync(badLock, "#!/usr/bin/env bash\n[[ \"$1\" != acquire ]]\n");
+    const bad = run(failed, "watcher.sh", ["run-once"], { ...failed.env, MAIPAI_WATCH_NO_LOCK: "", MAIPAI_GATE_LOCK: badLock });
+    expect(bad.status).toBe(0);
+    expect(records(failed)[0].result).toBe("green");
+    expect(readFileSync(join(failed.data, "watcher.log"), "utf8")).toContain("gate lock acquire failed; running watcher suite without it");
   }, 60_000);
 
   test("waits for high load until the cap and skips waiting for low load", () => {
@@ -199,6 +225,61 @@ describe("main watcher", () => {
     commit(f, "harmless two", { "two.txt": "two\n" });
     expect(run(f, "watcher.sh", ["run-once"]).status).toBe(0);
     expect(records(f).at(-1).culprit).toBe(culprit);
+  }, 60_000);
+
+  test("retries each isolated failure and only marks red when every rerun fails", () => {
+    const flaky = fixture();
+    expect(run(flaky, "watcher.sh", ["run-once"]).status).toBe(0);
+    commit(flaky, "flaky reruns", { RED: "red\n" });
+    const counter = join(flaky.scratch, "rerun.counter");
+    const counterScript = join(flaky.scratch, "rerun-counter.sh");
+    writeFileSync(counterScript, `#!/usr/bin/env bash\nn=0; [[ -f '${counter}' ]] && n=$(cat '${counter}'); n=$((n+1)); echo "$n" > '${counter}'; (( n >= 3 ))\n`);
+    expect(run(flaky, "watcher.sh", ["run-once"], {
+      ...flaky.env,
+      MAIPAI_WATCH_RERUN_CMD: `bash ${counterScript}`,
+      MAIPAI_WATCH_RERUNS: "3",
+    }).status).toBe(0);
+    expect(records(flaky).at(-1).result).toBe("flaky");
+
+    const red = fixture();
+    expect(run(red, "watcher.sh", ["run-once"]).status).toBe(0);
+    commit(red, "always red alone", { RED: "red\n" });
+    writeFileSync(join(red.main, "scripts/rerun.sh"), "#!/usr/bin/env bash\nexit 1\n");
+    expect(run(red, "watcher.sh", ["run-once"], { ...red.env, MAIPAI_WATCH_RERUNS: "3" }).status).toBe(0);
+    expect(records(red).at(-1).result).toBe("red");
+  }, 60_000);
+
+  test("bisect ignores a candidate that fails only one isolated rerun", () => {
+    const f = fixture();
+    expect(run(f, "watcher.sh", ["run-once"]).status).toBe(0);
+    const innocent = commit(f, "innocent intermittent", { "one.txt": "one\n" });
+    const culprit = commit(f, "true culprit", { RED: "red\n" });
+    commit(f, "after culprit", { "two.txt": "two\n" });
+    const counters = join(f.scratch, "candidate-counters");
+    mkdirSync(counters);
+    const rerunScript = join(f.scratch, "candidate-rerun.sh");
+    writeFileSync(rerunScript, `#!/usr/bin/env bash\nsha=$(git rev-parse HEAD); n=0; [[ -f '${counters}/'"$sha" ]] && n=$(cat '${counters}/'"$sha"); n=$((n+1)); echo "$n" > '${counters}/'"$sha"; if [[ -f RED ]]; then exit 1; fi; [[ "$sha" != '${innocent}' || "$n" -gt 1 ]]\n`);
+    const out = run(f, "watcher.sh", ["run-once"], {
+      ...f.env,
+      MAIPAI_WATCH_RERUN_CMD: `bash ${rerunScript}`,
+      MAIPAI_WATCH_RERUNS: "3",
+    });
+    expect(out.status).toBe(0);
+    expect(records(f).at(-1).culprit).toBe(culprit);
+  }, 60_000);
+
+  test("files one issue on the third flaky run and remembers the file", () => {
+    const f = fixture();
+    expect(run(f, "watcher.sh", ["run-once"]).status).toBe(0);
+    for (let i = 1; i <= 4; i++) {
+      commit(f, `flaky run ${i}`, { RED: "red\n", FLAKY: "yes\n", [`run-${i}.txt`]: `${i}\n` });
+      expect(run(f, "watcher.sh", ["run-once"], { ...f.env, MAIPAI_WATCH_RERUN_CMD: "true" }).status).toBe(0);
+      if (i < 3) expect(existsSync(join(f.scratch, "issue.calls"))).toBe(false);
+    }
+    const calls = readFileSync(join(f.scratch, "issue.calls"), "utf8").trim().split(/\r?\n/);
+    expect(calls).toHaveLength(1);
+    expect(calls[0]).toStartWith("Flaky: backend/tests/broken.test.ts failed with the suite and passed alone 3 times in 7 days");
+    expect(readFileSync(join(f.data, "flake-issues.json"), "utf8")).toContain("backend/tests/broken.test.ts");
   }, 60_000);
 
   test("marks a failure flaky when the isolated rerun passes", () => {

@@ -76,6 +76,52 @@ dirty="$(git status --porcelain --untracked-files=no)"
 git fetch origin || die "could not fetch origin; check network and git credentials, then run land.sh again."
 ahead="$(git rev-list --count origin/main..HEAD)" || die "could not compare your branch with origin/main; fetch and repair the checkout, then retry."
 (( ahead > 0 )) || die "branch has no commit over origin/main; make and commit a change, then run land.sh again."
+watch_data="${MAIPAI_WATCH_DATA:-$main/data-scratch/watch}"
+if [[ -f "$watch_data/last-run" ]]; then
+  watch_sha="$(cat "$watch_data/last-run" 2>/dev/null || true)"
+  watch_record="$(python3 - "$watch_data/runs.jsonl" "$watch_sha" <<'PY'
+import json, sys
+path, sha = sys.argv[1:]
+records=[]
+try:
+    with open(path) as f:
+        for line in f:
+            try: record=json.loads(line)
+            except Exception: continue
+            if record.get('sha') == sha: records.append(record)
+except OSError: pass
+if records:
+    record=records[-1]
+    print(record.get('result',''))
+    print(' '.join(record.get('failing',[])))
+    print(record.get('culprit') or '')
+PY
+)"
+  if [[ -n "$watch_sha" && -n "$watch_record" ]]; then
+    watch_result="$(printf '%s\n' "$watch_record" | sed -n '1p')"
+    watch_files="$(printf '%s\n' "$watch_record" | sed -n '2p')"
+    watch_culprit="$(printf '%s\n' "$watch_record" | sed -n '3p')"
+    watch_culprit="${watch_culprit:-unknown}"
+    case "$watch_result" in
+      green) echo "main: green at ${watch_sha:0:7}" ;;
+      flaky) echo "main: flaky at ${watch_sha:0:7}: ${watch_files:-unknown}" ;;
+      red)
+        echo "main: red at ${watch_sha:0:7}: ${watch_files:-unknown} (culprit ${watch_culprit:0:7})"
+        changed_files="$(git diff --name-only origin/main...HEAD 2>/dev/null || true)"
+        for failing_file in $watch_files; do
+          failing_dir="${failing_file%/*}"
+          for changed_file in $changed_files; do
+            changed_dir="${changed_file%/*}"
+            if [[ "$changed_file" == "$failing_file" || "$changed_dir" == "$failing_dir" ]]; then
+              echo "warning: main is red in $failing_file; your branch changes $changed_file"
+              break
+            fi
+          done
+        done
+        ;;
+    esac
+  fi
+fi
 git push --force-with-lease -u origin "HEAD:refs/heads/$branch" || die "could not push $branch to origin; resolve the push error, then run land.sh again."
 sha="$(git rev-parse HEAD)"
 requested_at="$(date -u +%Y-%m-%dT%H:%M:%SZ)"

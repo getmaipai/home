@@ -8,12 +8,14 @@ const scratch = mkdtempSync(join(tmpdir(), "maipai-lander-"));
 const origin = join(scratch, "origin.git");
 const main = join(scratch, "main");
 const data = join(scratch, "land-data");
+const watchData = join(scratch, "watch-data");
 const pipelineBin = join(scratch, "pipeline-bin");
 const warm = join(scratch, "warm-checkout");
 const scriptNames = ["land.sh", "lander.sh", "pipeline.sh"];
 const env = {
   ...process.env,
   MAIPAI_LAND_DATA: data,
+  MAIPAI_WATCH_DATA: watchData,
   MAIPAI_PIPELINE_BIN: pipelineBin,
   MAIPAI_LAND_CHECKOUT: warm,
   MAIPAI_LAND_SKIP_INSTALL: "1",
@@ -158,6 +160,39 @@ describe("lander pipeline", () => {
     const cleanOut = run("land.sh", ["--detach"], clean);
     expect(cleanOut.status).toBe(1);
     expect(cleanOut.stderr).toContain("no commit over origin/main");
+  }, 60_000);
+
+  test("land.sh reports the recorded main state and warns on a red directory overlap", () => {
+    const wt = makeWorktree("watch_status");
+    writeFileSync(join(wt, "scripts", "branch-change.ts"), "branch change\n");
+    commit(wt, "branch while main red");
+    mkdirSync(watchData, { recursive: true });
+    const sha = git(main, "rev-parse", "origin/main");
+    const culprit = "1234567890abcdef1234567890abcdef12345678";
+    const runLand = () => run("land.sh", ["--detach"], wt);
+    const record = (result: string, failing: string[] = [], badSha = "") => {
+      writeFileSync(join(watchData, "last-run"), `${sha}\n`);
+      writeFileSync(join(watchData, "runs.jsonl"), `${JSON.stringify({ sha, result, failing, culprit: badSha })}\n`);
+      const out = runLand();
+      expect(out.status).toBe(0);
+      expect(queueFiles().length).toBeGreaterThan(0);
+      for (const file of queueFiles()) rmSync(join(data, "queue", file), { force: true });
+      return out.stdout;
+    };
+
+    expect(record("green")).toContain(`main: green at ${sha.slice(0, 7)}`);
+    const red = record("red", ["scripts/checks.test.ts"], culprit);
+    expect(red).toContain(`main: red at ${sha.slice(0, 7)}: scripts/checks.test.ts (culprit ${culprit.slice(0, 7)})`);
+    expect(red).toContain("warning: main is red in scripts/checks.test.ts; your branch changes scripts/branch-change.ts");
+    expect(record("flaky", ["backend/tests/flaky.test.ts"])).toContain(`main: flaky at ${sha.slice(0, 7)}: backend/tests/flaky.test.ts`);
+
+    rmSync(join(watchData, "last-run"), { force: true });
+    writeFileSync(join(watchData, "runs.jsonl"), "");
+    const empty = runLand();
+    expect(empty.status).toBe(0);
+    expect(empty.stdout).not.toContain("main:");
+    expect(empty.stdout).toContain("queued: wt/watch_status at");
+    for (const file of queueFiles()) rmSync(join(data, "queue", file), { force: true });
   }, 60_000);
 
   test("waiting form returns the landing note after run-once", async () => {

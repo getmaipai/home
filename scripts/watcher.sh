@@ -12,6 +12,8 @@ main="$(cd "$(dirname "$common")" && pwd -P)"
 bin="${MAIPAI_PIPELINE_BIN:-$main/data-scratch/pipeline-bin}"
 data="${MAIPAI_WATCH_DATA:-$main/data-scratch/watch}"
 checkout="${MAIPAI_WATCH_CHECKOUT:-$(cd "$main/.." && pwd -P)/home-watcher}"
+gate_lock="${MAIPAI_GATE_LOCK:-$(cd "$main/.." && pwd -P)/.github/standards/bin/gate-lock.sh}"
+watcher_lock_held=0
 mkdir -p "$data/green" "$data/reds"
 git_env="${MAIPAI_LAND_GIT_ENV-$main/data-scratch/bin/https-git.env}"
 if [[ -n "$git_env" && -f "$git_env" ]]; then source "$git_env"; fi
@@ -165,12 +167,74 @@ rerun_file() {
 }
 
 candidate_is_red() {
-  local candidate="$1" files="$2" file
+  local candidate="$1" files="$2" file reruns="${MAIPAI_WATCH_RERUNS:-3}" attempt
+  [[ "$reruns" =~ ^[1-9][0-9]*$ ]] || reruns=3
   git -C "$checkout" checkout --detach "$candidate" >/dev/null 2>&1 || return 1
   for file in $files; do
-    rerun_file "$file" >/dev/null 2>&1 || return 0
+    for (( attempt=1; attempt<=reruns; attempt++ )); do
+      wait_for_quiet || return 1
+      if rerun_file "$file" >/dev/null 2>&1; then break; fi
+      if (( attempt == reruns )); then return 0; fi
+    done
   done
   return 1
+}
+
+file_is_red() {
+  local file="$1" reruns="${MAIPAI_WATCH_RERUNS:-3}" attempt
+  [[ "$reruns" =~ ^[1-9][0-9]*$ ]] || reruns=3
+  for (( attempt=1; attempt<=reruns; attempt++ )); do
+    wait_for_quiet || return 2
+    if rerun_file "$file" >/dev/null 2>&1; then return 1; fi
+  done
+  return 0
+}
+
+file_flake_issue() {
+  local file="$1" issue_file="$data/flake-issues.json" details title body
+  details="$(python3 - "$data/runs.jsonl" "$issue_file" "$file" <<'PY'
+import datetime, json, os, sys
+runs_path, issues_path, target = sys.argv[1:]
+try:
+    issues=json.load(open(issues_path))
+    if not isinstance(issues, dict): issues={}
+except Exception: issues={}
+if target in issues: raise SystemExit(0)
+now=datetime.datetime.now(datetime.timezone.utc)
+since=now-datetime.timedelta(days=7)
+matches=[]
+try:
+    with open(runs_path) as f:
+        for line in f:
+            try: run=json.loads(line)
+            except Exception: continue
+            if run.get('result') != 'flaky' or target not in run.get('failing', []): continue
+            try: ts=datetime.datetime.fromisoformat(run['ts'].replace('Z','+00:00'))
+            except Exception: continue
+            if since <= ts <= now: matches.append((ts, run))
+except OSError: pass
+if len(matches) >= 3:
+    for _, run in matches[-3:]: print('%s %s' % (run.get('ts','unknown'), run.get('sha','unknown')))
+PY
+)"
+  [[ -n "$details" ]] || return 0
+  title="Flaky: $file failed with the suite and passed alone 3 times in 7 days"
+  body="$(printf 'The last three flaky suite runs for %s were:\n%s\n\nMove this file to scripts/gate/flakes.json as bench or serial, with the cause.\n\nfiled by the watcher' "$file" "$details")"
+  file_issue "$title" "$file" "$body"
+  python3 - "$issue_file" "$file" <<'PY'
+import json, os, sys, tempfile, datetime
+path, target = sys.argv[1:]
+try:
+    value=json.load(open(path))
+    if not isinstance(value, dict): value={}
+except Exception: value={}
+if target not in value:
+    value[target]=datetime.datetime.now(datetime.timezone.utc).isoformat().replace('+00:00','Z')
+    fd, tmp=tempfile.mkstemp(prefix='.flake-issues.', dir=os.path.dirname(path))
+    with os.fdopen(fd,'w') as f:
+        json.dump(value,f,indent=2,sort_keys=True); f.write('\n')
+    os.replace(tmp,path)
+PY
 }
 
 find_culprit() {
@@ -278,7 +342,7 @@ file_issue() {
 }
 
 run_once() {
-  local head last_run last_green previous started output seconds rc files file all_pass=1 result culprit subject title note_tmp note
+  local head last_run last_green previous started output seconds rc files file all_pass=1 result culprit subject title note_tmp note rerun_rc
   git -C "$checkout" fetch origin || { echo "watcher.sh: fetch failed" >> "$data/watcher.log"; return 0; }
   head="$(git -C "$checkout" rev-parse origin/main)"
   last_run="$(cat "$data/last-run" 2>/dev/null || true)"
@@ -294,10 +358,17 @@ run_once() {
   git -C "$checkout" checkout --detach "$head" >/dev/null 2>&1
   install_if_needed "$previous"
   started="$(date +%s)"; output="$(mktemp "$data/.suite.XXXXXX")"
+  if [[ "${MAIPAI_WATCH_NO_LOCK:-}" == 1 ]]; then :
+  elif [[ ! -f "$gate_lock" ]]; then
+    echo "$(date -u +%Y-%m-%dT%H:%M:%SZ) gate lock missing at $gate_lock; running watcher suite without it" >> "$data/watcher.log"
+  elif bash "$gate_lock" acquire "watcher-$$" main; then watcher_lock_held=1
+  else echo "$(date -u +%Y-%m-%dT%H:%M:%SZ) gate lock acquire failed; running watcher suite without it" >> "$data/watcher.log"
+  fi
   set +e
   run_suite "$output"
   rc=$?
   set -e
+  if (( watcher_lock_held )); then bash "$gate_lock" release "watcher-$$" || true; watcher_lock_held=0; fi
   seconds=$(( $(date +%s) - started ))
   if (( rc == 0 )); then
     mark_green "$head"
@@ -309,12 +380,17 @@ run_once() {
     return 0
   fi
   files="$(failing_files "$output")"
-  for file in $files; do if ! rerun_file "$file" >/dev/null 2>&1; then all_pass=0; fi; done
+  for file in $files; do
+    if file_is_red "$file"; then rerun_rc=0; else rerun_rc=$?; fi
+    if (( rerun_rc == 0 )); then all_pass=0
+    elif (( rerun_rc == 2 )); then all_pass=0; fi
+  done
   if [[ -n "$files" && "$all_pass" -eq 1 ]]; then
     mark_green "$head"
     atomic_value "$data/last-green" "$head"
     atomic_value "$data/last-run" "$head"
     append_run "$head" flaky "$seconds" "$files" ""
+    for file in $files; do file_flake_issue "$file"; done
     echo "$(date -u +%Y-%m-%dT%H:%M:%SZ) flaky at $head; isolated reruns passed: $files" >> "$data/watcher.log"
     rm -f "$output" "$output.backend" "$output.frontend" "$output.scripts"
     echo "flaky at ${head:0:7}: $files"
@@ -354,7 +430,7 @@ serve() {
   echo "$$" > "$pidfile"
   local stop_requested=0 sleep_pid=""
   trap 'stop_requested=1; if [[ -n "$sleep_pid" ]]; then kill "$sleep_pid" 2>/dev/null || true; fi' TERM INT HUP
-  trap 'rm -f "$data/watcher.pid"' EXIT
+  trap 'if (( watcher_lock_held )); then bash "$gate_lock" release "watcher-$$" || true; watcher_lock_held=0; fi; rm -f "$data/watcher.pid"' EXIT
   set +e
   while :; do
     now="$(date +%s)"
