@@ -40,11 +40,3 @@
 [data-slot="app-section-tabs"]::-webkit-scrollbar {
   display: none;
 }
-
-/* Reading on a phone: the app's own name and settings button give way to the reader's row (the kit folds the shell bar). */
-@media (max-width: 639.98px) {
-  html[data-app-reading] [data-slot="app-header-bar"],
-  html:has([data-slot="story-feed"] > [data-slot="tabs"] [data-slot="story-filters"]) [data-slot="app-header-bar"] {
-    display: none;
-  }
-}

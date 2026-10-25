@@ -41,7 +41,7 @@ export function PackageAppHeaderBar() {
 
 function Bar({ state }: { state: PackageAppHeaderState }) {
   return (
-    <div data-slot="app-header-bar" className="flex min-w-0 flex-1 items-center gap-1">
+    <div data-top-row-hide="" className="flex min-w-0 flex-1 items-center gap-1">
       <span className="min-w-0 flex-1 truncate text-base font-semibold">{state.label}</span>
       {state.settingsArea ? (
         <Button variant="ghost" size="icon-lg" render={<Link to={`/settings/${state.settingsArea}`} aria-label={`${state.label} settings`} />}>
