@@ -414,7 +414,7 @@ export const contextNode: Node<ContextInput, ContextOutput> = async (state, inpu
 
   // DUPLEX-06: the part of the last spoken reply this person cut in on before hearing it, once, for the next turn only (memory only,
   // never stored; it passed the output gate when released). Rides as labelled background, like the robot look above.
-  const mayCarry = mayCarryInterruptedReply({ spokenSurface: surfaceClassOf(state.surface, state.spoken) === "spoken", crisis: state.crisis, crisisSignal: carriesCrisisSignal(state.safety), repair: state.signal.repair });
+  const mayCarry = mayCarryInterruptedReply({ spokenSurface: surfaceClassOf(state.surface, state.spoken) === "spoken", crisis: state.crisis === true, crisisSignal: state.safety ? carriesCrisisSignal(state.safety) : false, repair: state.signal?.repair ?? "none" });
   if (!mayCarry) dropInterruptedReply(conversation.id);
   const unheard = mayCarry ? takeInterruptedReply(conversation.id, state.actor.id, state.turnId) : null;
   if (unheard) items.push({ id: "interrupted-reply", text: unheard, source: "interrupted", subjects: [], disclosure: "child_ok" });
