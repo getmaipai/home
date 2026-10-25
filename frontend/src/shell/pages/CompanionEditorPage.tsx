@@ -20,6 +20,7 @@ import { CompanionStatesTab } from "@/shell/pages/CompanionStatesTab";
 import { playableVoices, previewIdFor, voiceChoices } from "@/lib/voice/voiceBrowserRows";
 import { voicePreviewPlayer, type VoicePreviewState } from "@/lib/voice/voicePreviewPlayer";
 import { useTabItem } from "@/shell/tabIdentity";
+import { companionTemplates } from "@/shell/pages/companionTemplates";
 
 const key = ["companions"] as const;
 type Form = CompanionFields & Pick<CompanionEditable, "name" | "audience">;
@@ -41,7 +42,12 @@ export function CompanionEditorPage() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const query = useQuery({ queryKey: [...key, "edit", id], queryFn: () => api.editCompanion(id!), enabled: !isNew, retry: false });
-  const [form, setForm] = useState<Form>(() => isNew && typeof location.state?.name === "string" ? { ...blank, name: location.state.name } : blank);
+  const [form, setForm] = useState<Form>(() => {
+    if (!isNew) return blank;
+    const name = typeof location.state?.name === "string" ? location.state.name : "";
+    const template = companionTemplates.find((entry) => entry.id === location.state?.template);
+    return { ...blank, ...template?.preset, name };
+  });
   const [pronounRows, setPronounRows] = useState<string[]>([]);
   const [initial, setInitial] = useState("");
   const [savedFlash, setSavedFlash] = useState(false);

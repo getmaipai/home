@@ -9,15 +9,8 @@ import { getIcon } from "@maipai/ui/src/icons";
 import { Button } from "@maipai/ui/src/ui/button";
 import { Input } from "@maipai/ui/src/ui/input";
 import { useCompanionShells } from "@/lib/companionShells";
-
-const templates = [
-  { id: "chat-buddy", name: "Chat buddy", tagline: "A friendly voice for everyday questions." },
-  { id: "research", name: "Research", tagline: "Find useful facts and explain where they came from." },
-  { id: "shopping", name: "Shopping", tagline: "Compare options and keep track of what you need. (coming soon)" },
-  { id: "homework-helper", name: "Homework helper", tagline: "Work through school questions one step at a time." },
-  { id: "storyteller", name: "Storyteller", tagline: "Make up characters, worlds, and stories together." },
-  { id: "custom", name: "Custom", tagline: "Choose the style and interests yourself." },
-] as const;
+import { companionTemplates } from "@/shell/pages/companionTemplates";
+const templates = companionTemplates;
 const steps = [
   { id: "template", title: "Pick a template" },
   { id: "name", title: "Name and look" },
@@ -35,7 +28,7 @@ export function CompanionWizardPage() {
   const enabled = useCompanionShells();
   const [stage, setStage] = useState<"intro" | "wizard">("intro");
   const [step, setStep] = useState<string>(steps[0].id);
-  const [template, setTemplate] = useState<string>(templates[0].id);
+  const [template, setTemplate] = useState<string>("chat-buddy");
   const [name, setName] = useState("");
   if (enabled === undefined) return null;
   if (enabled === false) return <Navigate to="/companions/new" replace />;
@@ -65,7 +58,7 @@ export function CompanionWizardPage() {
       </div>
     </>
   );
-  const selected = templates.find((entry) => entry.id === template)!;
+  const selected = templates.find((entry) => entry.id === template) ?? templates[0]!;
   return (
     <Wizard
       steps={[...steps]}
@@ -100,7 +93,7 @@ export function CompanionWizardPage() {
           <div className="flex flex-col gap-4">
             <label htmlFor="companion-wizard-name">Name</label>
             <Input id="companion-wizard-name" value={name} onChange={(event) => setName(event.target.value)} />
-            <p>Finish opens the editor; templates set the dials, coming soon.</p>
+            <p>Finish opens the editor with this template&apos;s style filled in. You can change anything.</p>
           </div>
         )}
         <span className="sr-only">{selected.name}</span>
