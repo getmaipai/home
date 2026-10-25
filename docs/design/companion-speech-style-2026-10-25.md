@@ -7,7 +7,11 @@ Architect verdict: not yet run. Needs one before any slice is built.
 
 ## Answer
 
-1. **Each companion gets a speech style: a rate and its own small vocabulary.** The vocabulary has three kinds of sound: fillers
+1. **One master list of speech sounds, and each companion gets a speech style that picks from it: a rate plus its chosen sounds.** The words
+   named below ("like", "no way", "get out", "um") are examples, not the list. The master list is a curated, versioned data file with
+   every sound Home knows how to say (section 2a); a companion picks entries from it and sets how often, and a household may add its own
+   custom entries, which are checked when they are saved.
+   Each style has a rate and a vocabulary. The vocabulary has three kinds of sound: fillers
    ("um", "like", "you know", "well"), interjections ("no way", "get out", "oh my gosh", "seriously?") and nonverbal tags (the six the
    voice engine honors: laugh, chuckle, cough, sigh, clear throat, gasp). A companion with no style (the professor, a news anchor)
    speaks exactly as written.
@@ -51,7 +55,7 @@ A companion definition (the package manifest of a catalog companion, and the bun
 |---|---|
 | `rate` | `none`, `sparse`, `light`, `natural`, `lively`. Maps to the knobs below. Missing means today's household level. |
 | `fillers` | Up to eight entries `{ text, weight, where }`. `where` is `start` (opens a sentence: "Um,", "Well,") or `inline` (inside a sentence at a clause boundary: "like,", "you know,"). |
-| `interjections` | Up to eight entries `{ text, on }`. `on` is the situation it answers: `surprise`, `agreement`, `humor`, `sympathy`, `excitement`. Each is a whole short utterance placed before or after a sentence ("No way!", "Get out!"). |
+| `interjections` | Up to eight entries `{ text, on }`. `on` is the situation it answers: `surprise`, `agreement`, `humor`, `sympathy`, `excitement`. Each is a whole short utterance placed before or after a sentence ("No way", "Get out"). |
 | `tags` | A subset of the six engine tags this companion may use, in order of preference. |
 
 Rates, as numbers the planner already has (a new `lively`, and a `sparse` between none and light):
@@ -69,10 +73,36 @@ Examples (authoring defaults, judged by ear per voice before they ship):
 | Companion | Rate | Fillers | Interjections | Tags |
 |---|---|---|---|---|
 | English professor | `none` | none | none | none |
-| Valley girl | `lively` | "like," inline (weight 6), "you know," inline (2), "oh my gosh," start (2) | "No way!" and "Get out!" on surprise, "Seriously?" on surprise, "Totally!" on agreement | laugh, gasp, sigh |
-| Kid character | `natural` | "um," start and inline (6), "uh," (2), "like," inline (1) | "Whoa!" on surprise, "Cool!" on excitement | laugh |
+| Valley girl | `lively` | "like," inline (weight 6), "you know," inline (2), "oh my gosh," start (2) | "No way" and "Get out" on surprise, "Seriously?" on surprise, "Totally" on agreement | laugh, gasp, sigh |
+| Kid character | `natural` | "um," start and inline (6), "uh," (2), "like," inline (1) | "Whoa" on surprise, "Cool" on excitement | laugh |
 | Grandfather | `light` | "well," start (4), "uh," (2) | "Is that so." on surprise | chuckle, cough, clear throat |
 | Calm tutor | `sparse` | "hmm," start (1) | none | none |
+
+## 2a. The master list, and custom sounds
+
+The words in section 2 are examples. The real vocabulary is one master list that ships as spec data (`spec/voice/speech-sounds.json`, spec
+first, versioned like the speech normalizer), so every companion, every voice and every household reads the same definition (principles
+1 and 4). Each entry is plain data:
+
+| Field | Meaning |
+|---|---|
+| `id` | Stable name (`like`, `um`, `uh`, `you-know`, `well`, `hmm`, `no-way`, `get-out`, `oh-my-gosh`, `seriously`, `totally`, `whoa`, `laugh`, `sigh`, ...). A companion refers to an entry by id and sets a weight. |
+| `kind` | `filler`, `interjection` or `tag`. |
+| `text` | What is handed to the speech engine (for a tag, the engine tag; for a filler or interjection, the spelling that reads best, which may differ from how it is written: "um" and "umm", "like,"). |
+| `where` | For a filler, `start` or `inline` or both; for an interjection, `before` or `after` a sentence. |
+| `on` | For an interjection, the situation it answers (surprise, agreement, humor, sympathy, excitement). |
+| `voices` | Which voices say it well, from listening (a voice that says an entry badly, or an engine without the tag, skips it, never a mangled line). |
+| `floor` | Reviewed against the child floor when added, and a unit test keeps every entry passing for every band. |
+
+- **A companion's style is a list of ids with weights**, plus the rate. A companion author can write a very short style ("um, uh, like at
+  a low weight, laugh") or a long one, and never has to spell a sound.
+- **Custom sounds are allowed.** A household (an adult, in the Companions app form) may add its own filler or interjection for one
+  companion, with the same fields. A custom entry is household data on that companion only: it is checked against the output floor for
+  every band when the form is saved, refused with a plain reason if it fails, never logged, and never shared with another household
+  unless it is added to the master list by a spec release. A custom entry cannot be a tag, since only the engine's own tags exist.
+- **The master list grows by a spec release, not by a patch**: adding "get out" for everyone is a data change, reviewed once, with a
+  listening pass on the shipped voices (SPEECH-STYLE-04).
+- **No word list of household speech:** the list is authored data about what a character says, not a rule that reads what people say.
 
 ## 3. Where it is authored and who can change it
 
@@ -87,7 +117,7 @@ Examples (authoring defaults, judged by ear per voice before they ship):
 ## 4. How the words are placed
 
 - **Sentence-edge sounds** (a start filler, an interjection, a tag) use the existing boundary rule and triggers. Interjections get their
-  own trigger pattern per `on` category, from the same fixed patterns the tags use today (humor, surprise, agreement words), so "no way!"
+  own trigger pattern per `on` category, from the same fixed patterns the tags use today (humor, surprise, agreement words), so "no way"
   follows a surprising sentence and not a flat one. Each new pattern (agreement, sympathy, excitement) reads Home's own reply, not the
   household's words, and still carries a `rule:` marker naming this note, a counts-only counter and a test case that fires it (the
   learned-components rule: no rule without a counter and a row).
@@ -132,12 +162,12 @@ Evidence is thin and mostly from blog analyses and abstracts, so the table in se
 
 ## 7. Slices
 
-1. **SPEECH-STYLE-01 (S, spec first):** `speech_style` on the companion manifest and the `companion.speech_rate.<id>` key family
+1. **SPEECH-STYLE-01 (S, spec first):** the master list `spec/voice/speech-sounds.json` (seeded with the examples above, floor-tested), `speech_style` (ids, weights and rate) on the companion manifest and the `companion.speech_rate.<id>` key family
    with the `companion.voice.<id>` family, absorbing COMPANION-VOICE-SPEC, with the floor test over every entry; spec tag, pin.
 2. **SPEECH-STYLE-02 (M):** the planner: the `sparse` and `lively` rates, per-companion vocabulary, interjection triggers, the inline
    placement rules, the master cap. Tests for every gate in section 5 and for the inline rules on a fixture of sentences (numbers,
    names, lists, short sentences) so nothing lands inside a protected span.
-3. **SPEECH-STYLE-03 (S):** the per-companion rate control in Settings and in the Companions app (kit parts only), and the author form.
+3. **SPEECH-STYLE-03 (S):** the per-companion rate control in Settings and in the Companions app (kit parts only), and the author form that picks sounds from the master list and adds custom ones with the save-time floor check.
 4. **SPEECH-STYLE-04 (M, by ear):** author the bundled companions' styles, render every preset sample through each shipped voice, and
    listen; a voice that says an inline filler badly turns inline off. Jesse judges the valley girl and the kid.
 5. **SPEECH-STYLE-05 (S):** DUPLEX-07's continuers and acknowledgement clips come from the companion's own filler list when it has one
