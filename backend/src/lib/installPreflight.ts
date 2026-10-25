@@ -1,4 +1,4 @@
-import { readFileSync } from "node:fs";
+import { readFileSync, unlinkSync } from "node:fs";
 import { freemem, totalmem } from "node:os";
 import { createConnection } from "node:net";
 import { hubLockPath } from "./instanceLock";
@@ -73,7 +73,16 @@ function diskRow(opts: InstallPreflightOptions): InstallPreflightRow {
 function defaultLockInfo(path: string): { pid: number; port?: number } | null {
   try {
     const value = JSON.parse(readFileSync(path, "utf8")) as { pid?: unknown; port?: unknown };
-    return typeof value.pid === "number" ? { pid: value.pid, port: typeof value.port === "number" ? value.port : undefined } : null;
+    if (typeof value.pid !== "number") return null;
+    try { process.kill(value.pid, 0); return { pid: value.pid, port: typeof value.port === "number" ? value.port : undefined }; }
+    catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== "ESRCH") return { pid: value.pid, port: typeof value.port === "number" ? value.port : undefined };
+      const port = typeof value.port === "number" ? value.port : undefined;
+      if (port === undefined) { try { unlinkSync(path); } catch { /* already gone */ } return null; }
+      // The port check is performed by the caller; a dead pid lock remains
+      // harmless only when no process is listening on its recorded port.
+      return { pid: -value.pid, port };
+    }
   } catch { return null; }
 }
 
@@ -102,12 +111,19 @@ export async function checkInstallPreflight(opts: InstallPreflightOptions = {}):
   const releaseHost = opts.releaseHost ?? RELEASE_HOST;
   const mem = (opts.memoryBytes ?? (() => ({ free: freemem(), total: totalmem() })))();
   const version = (opts.systemVersion ?? (() => `${platform} ${process.arch}`))();
-  const lock = (opts.lockInfo ?? (() => defaultLockInfo(opts.lockPath ?? hubLockPath())))();
+  const lockPath = opts.lockPath ?? hubLockPath();
+  let lock = (opts.lockInfo ?? (() => defaultLockInfo(lockPath)))();
   const port = opts.port ?? homePort();
-  const [busy, reachable] = await Promise.all([
+  const [portBusy, reachable] = await Promise.all([
     (opts.portBusy ?? tcpBusy)(port),
     (opts.reachReleaseHost ?? plainHostReach)(releaseHost),
   ]);
+  const staleLockBusy = lock?.pid !== undefined && lock.pid < 0 && portBusy;
+  const busy = portBusy || staleLockBusy;
+  if (lock && lock.pid < 0 && !portBusy) {
+    try { unlinkSync(lockPath); } catch { /* already gone */ }
+    lock = null;
+  }
   return [
     diskRow(opts),
     mem.total < 4 * GB
@@ -120,7 +136,7 @@ export async function checkInstallPreflight(opts: InstallPreflightOptions = {}):
       : row(opts, "system.unsupported", "error", "This system is not supported", `${version} is not supported by the Home installer.`, `Installer platform is ${platform}${platform === "darwin" ? ` ${architecture}` : ""}.`, "Use a supported Apple silicon Mac, Linux, or Windows computer."),
     lock
       ? row(opts, "instance.running", "error", "Home is already running", `Another Home instance is recorded in the lock file (PID ${lock.pid}).`, "The Home instance lock file is present.", "Stop that Home instance, then try again.")
-      : row(opts, "instance.ok", null, "Running instance", "No Home instance is recorded in the lock file.", "No active lock file was found.", ""),
+      : row(opts, "instance.ok", null, "Running instance", "No Home instance is recorded in the lock file; a stale lock was removed.", "No active lock file was found.", ""),
     busy
       ? row(opts, "port.busy", "warning", "The Home port is busy", `Port ${port} is already in use. The installer can select another port.`, `A process accepted a connection on port ${port}.`, "Stop the program using this port or let the installer choose another port.")
       : row(opts, "port.ok", null, "Home port", `Port ${port} is available.`, `No listener accepted a connection on port ${port}.`, ""),

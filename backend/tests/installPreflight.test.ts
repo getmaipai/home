@@ -1,4 +1,7 @@
 import { describe, expect, test } from "bun:test";
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { checkInstallPreflight, type InstallPreflightOptions } from "../src/lib/installPreflight";
 
 const fixed = (patch: Partial<InstallPreflightOptions> = {}): InstallPreflightOptions => ({
@@ -25,6 +28,19 @@ const outcome = async (patch: Partial<InstallPreflightOptions>) => {
 };
 
 describe("checkInstallPreflight", () => {
+  test("ignores a dead pid lock when its port is free and keeps refusing a live pid", async () => {
+    const root = mkdtempSync(join(tmpdir(), "preflight-lock-"));
+    const lockPath = join(root, "hub.lock");
+    mkdirSync(root, { recursive: true });
+    try {
+      writeFileSync(lockPath, JSON.stringify({ pid: 99999999, port: 3000 }));
+      const staleRows = await checkInstallPreflight(fixed({ lockPath, portBusy: async () => false }));
+      expect(staleRows.find((row) => row.code === "install.instance.ok")?.text).toContain("stale");
+      writeFileSync(lockPath, JSON.stringify({ pid: 99999999, port: 3000 }));
+      const liveRows = await checkInstallPreflight(fixed({ lockPath, portBusy: async () => true, lockInfo: () => ({ pid: process.pid, port: 3000 }) }));
+      expect(liveRows.find((row) => row.code === "install.instance.running")?.severity).toBe("error");
+    } finally { rmSync(root, { recursive: true, force: true }); }
+  });
   test("returns six health-item-shaped rows in stable order", async () => {
     const rows = await checkInstallPreflight(fixed());
     expect(rows.map((row) => row.code)).toEqual([

@@ -1,8 +1,10 @@
 #!/usr/bin/env bash
-# Promote a landed commit to the live hub. --tag labels a shipped commit afterwards;
+# Promote a landed commit to the live hub. --adopt-empty-live allows replacing an install
+# when the running Home uses other data; migrate that data first whenever possible.
+# --tag labels a shipped commit afterwards;
 # the live .installed-tag remains sha-<first 7> so update checks do not treat it as a release.
 set -euo pipefail
-usage() { echo "usage: bash scripts/ship.sh [<sha>|main] [--before-green] [--tag] [--dry-run]" >&2; }
+usage() { echo "usage: bash scripts/ship.sh [<sha>|main] [--before-green] [--tag] [--dry-run] [--adopt-empty-live]" >&2; }
 die() { echo "ship.sh: $1" >&2; exit "${2:-1}"; }
 common="$(git rev-parse --git-common-dir 2>/dev/null)" || die "run this inside a Home checkout."
 [[ "$common" = /* ]] || common="$(cd "$(dirname "$common")" && pwd -P)/$(basename "$common")"
@@ -22,8 +24,8 @@ stack_url="${MAIPAI_SHIP_STACK_URL:-http://127.0.0.1:8770/healthz}"
 migrations_cmd="${MAIPAI_SHIP_MIGRATIONS_CMD:-sqlite3 -readonly $live/data/hub.db 'select count(*) from __drizzle_migrations'}"
 publish_cmd="${MAIPAI_PUBLISH_CMD:-bash scripts/publish-release.sh TAG --latest NOTES}"
 health_timeout="${MAIPAI_SHIP_HEALTH_TIMEOUT:-90}"
-before_green=0; tag_after=0; dry=0; target=main
-while (($#)); do case "$1" in --before-green) before_green=1;; --tag) tag_after=1;; --dry-run) dry=1;; main) target=main;; --*) usage; exit 2;; *) target="$1";; esac; shift; done
+before_green=0; tag_after=0; dry=0; adopt_empty_live=0; target=main
+while (($#)); do case "$1" in --before-green) before_green=1;; --tag) tag_after=1;; --dry-run) dry=1;; --adopt-empty-live) adopt_empty_live=1;; main) target=main;; --*) usage; exit 2;; *) target="$1";; esac; shift; done
 [[ "$target" == main || "$target" =~ ^[0-9a-f]{7,40}$ ]] || { usage; exit 2; }
 git fetch origin || die "could not fetch origin; check network access and retry."
 if [[ "$target" == main ]]; then sha="$(git rev-parse --verify 'origin/main^{commit}')" || die "could not resolve origin/main; fetch and retry."
@@ -31,6 +33,43 @@ else sha="$(git rev-parse --verify "$target^{commit}" 2>/dev/null)" || die "coul
 git merge-base --is-ancestor "$sha" origin/main || die "${sha:0:7} is not on origin/main; land it first with bash scripts/land.sh"
 label="sha-${sha:0:7}"
 if (( ! before_green )) && [[ ! -f "$watch/green/$sha" ]]; then die "watcher has no green run for $sha; pass --before-green to ship anyway and record it."; fi
+lock_path="${MAIPAI_HUB_LOCK_PATH:-$HOME/.maipai/home/hub.lock}"
+live_data="$live/data"
+lock_pid= lock_data= lock_port=
+if [[ -f "$lock_path" ]]; then
+  lock_pid="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1])).get("pid", ""))' "$lock_path" 2>/dev/null || true)"
+  lock_data="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1])).get("dataDir", ""))' "$lock_path" 2>/dev/null || true)"
+  lock_port="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1])).get("port", ""))' "$lock_path" 2>/dev/null || true)"
+fi
+pid_alive=0; [[ "$lock_pid" =~ ^[0-9]+$ ]] && kill -0 "$lock_pid" 2>/dev/null && pid_alive=1 || true
+web_listening=0
+if [[ -n "${MAIPAI_SHIP_TEST_WEB_LISTENER:-}" ]]; then web_listening=1
+elif command -v lsof >/dev/null && lsof -nP -iTCP:"${MAIPAI_SHIP_WEB_PORT:-3000}" -sTCP:LISTEN >/dev/null 2>&1; then web_listening=1; fi
+if [[ -n "${MAIPAI_SHIP_TEST_PID_ALIVE:-}" ]]; then pid_alive=1; fi
+other_data=0
+if (( pid_alive || web_listening )); then
+  if [[ -n "$lock_data" && -d "$lock_data" && -d "$live_data" ]]; then [[ "$(cd "$lock_data" && pwd -P)" != "$(cd "$live_data" && pwd -P)" ]] && other_data=1 || true; elif [[ -n "$lock_data" && "$lock_data" != "$live_data" ]]; then other_data=1; fi
+fi
+live_people=0; other_people=0; live_migrations=0; other_migrations=0
+if command -v sqlite3 >/dev/null; then
+  [[ -f "$live_data/hub.db" ]] && live_people="$(sqlite3 -readonly "$live_data/hub.db" 'select count(*) from people' 2>/dev/null || echo 0)" || true
+  [[ -f "$live_data/hub.db" ]] && live_migrations="$(sqlite3 -readonly "$live_data/hub.db" 'select count(*) from __drizzle_migrations' 2>/dev/null || echo 0)" || true
+  if [[ -n "$lock_data" && -f "$lock_data/hub.db" ]]; then
+    other_people="$(sqlite3 -readonly "$lock_data/hub.db" 'select count(*) from people' 2>/dev/null || echo 0)"
+    other_migrations="$(sqlite3 -readonly "$lock_data/hub.db" 'select count(*) from __drizzle_migrations' 2>/dev/null || echo 0)"
+  fi
+fi
+guard_finding=0
+if (( other_data )); then
+  if [[ ! -f "$live_data/hub.db" ]]; then guard_finding=1
+  elif (( live_people < other_people || live_migrations < other_migrations )); then guard_finding=1
+  fi
+fi
+if (( guard_finding )); then
+  finding="A Home is running on port ${lock_port:-${MAIPAI_SHIP_WEB_PORT:-3000}} using data directory $lock_data. Shipping would start an empty Home from $live_data. Migrate the data into the live install first, or ship to a machine whose live install already holds the data."
+  if (( dry )); then echo "ship.sh: $finding" >&2; exit 1; fi
+  (( adopt_empty_live )) || die "$finding Pass --adopt-empty-live only to override this guard."
+fi
 before_tag="$(cat "$live/.installed-tag" 2>/dev/null || echo none)"
 if (( dry )); then printf 'plan: sha=%s label=%s live=%s current=%s before-green=%s tag=%s\n' "$sha" "$label" "$live" "$before_tag" "$([[ $before_green == 1 ]] && echo yes || echo no)" "$([[ $tag_after == 1 ]] && echo yes || echo no)"; exit 0; fi
 if [[ ! -x "$promote" ]] || [[ "$(eval "$sudo_cmd \"$promote\" --check" 2>/dev/null || true)" != ok ]]; then die "promotion helper is not ready; run: sudo bash $main/scripts/install-promote.sh" 2; fi
@@ -55,7 +94,12 @@ if (( tag_after == 0 )) || [[ "$before_tag" != "$label" ]]; then
   result=shipped
   if (( promote_status != 0 )) || ! wait_health; then
     expected_live_tag="$before_tag"
-    if eval "$sudo_cmd \"$promote\" --rollback" >>"$log" 2>&1 && wait_health; then result=rolled_back; outcome="rolled back to $(cat "$live/.installed-tag" 2>/dev/null || echo unknown)"; else result=rollback_failed; outcome="rollback failed: check $log and repair the live hub"; fi
+    if eval "$sudo_cmd \"$promote\" --rollback" >>"$log" 2>&1 && wait_health; then result=rolled_back; outcome="rolled back to $(cat "$live/.installed-tag" 2>/dev/null || echo unknown)"; else
+      result=rollback_failed
+      if curl -fsS "$web_url" >/dev/null 2>&1; then answering="answering"; else answering="not answering"; fi
+      active_data="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1])).get("dataDir", "unknown"))' "$lock_path" 2>/dev/null || echo unknown)"
+      outcome="Rollback failed. The live hub is $answering at $web_url and uses data directory $active_data. Check the install log at $log."
+    fi
     finish="$(date +%s)"; seconds=$((finish-start)); printf '{"ts":%s,"sha":"%s","label":"%s","before_tag":"%s","result":"%s","before_green":%s,"seconds":%s}\n' "$finish" "$sha" "$label" "$before_tag" "$result" "$([[ $before_green == 1 ]] && echo true || echo false)" "$seconds" >> "$data/shipped.jsonl"
     echo "$outcome"; exit 1
   fi

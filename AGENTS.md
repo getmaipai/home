@@ -53,3 +53,5 @@ Never hand Jesse a UI change you have not opened yourself. One command gives bot
 - **Then land it:** `bash scripts/land.sh`. A change reaches the live hub only through `bash scripts/ship.sh`, and only when Jesse says so in that turn.
 
 **Releases (one releaser).** Ship with `bash scripts/ship.sh [sha] [--before-green] [--tag]` after the owner said yes in that turn. It promotes a landed commit to the live hub through `/usr/local/libexec/maipai-promote`, checks it and rolls back on failure; `--tag` cuts and publishes the next patch tag from what is live. One session owns releases at a time: the StackChan firmware session on the Studio (2026-10-20).
+
+`ship.sh` refuses, before it stops or installs anything, when the running Home uses a data directory other than the live install's `data/` and the live install holds less data (2026-10-25: a ship replaced the Home Jesse uses with an empty install). `--dry-run` reports the same finding. Migrate the data first; `--adopt-empty-live` overrides only when Jesse says so.

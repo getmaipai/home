@@ -21,7 +21,7 @@ beforeAll(() => {
   chmodSync(promote, 0o755);
   writeFileSync(join(scratch, "health-check"), "#!/usr/bin/env bash\n[[ ! -f '" + join(scratch, "health.fail") + "' ]]\n"); chmodSync(join(scratch, "health-check"), 0o755);
   writeFileSync(join(scratch, "publish"), "#!/usr/bin/env bash\nprintf '%s\\n' \"$@\" >> '" + join(scratch, "publish.calls") + "'\nwhile (($#)); do if [[ \"$1\" == --notes-file ]]; then echo \"$2\" > '" + join(scratch, "publish.notes.path") + "'; cat \"$2\" > '" + join(scratch, "publish.notes") + "'; shift 2; else shift; fi; done\n"); chmodSync(join(scratch, "publish"), 0o755);
-  Object.assign(baseEnv, { MAIPAI_SHIP_DATA: data, MAIPAI_WATCH_DATA: watch, MAIPAI_SHIP_LIVE: live, MAIPAI_PROMOTE_BIN: promote, MAIPAI_SHIP_SUDO: "", MAIPAI_SHIP_STOP_DEV_CMD: "true", MAIPAI_SHIP_HEALTH_CMD: join(scratch, "health-check"), MAIPAI_SHIP_HEALTH_TIMEOUT: "1", MAIPAI_SHIP_MIGRATIONS_CMD: "echo 3", MAIPAI_PUBLISH_CMD: join(scratch, "publish") + " TAG NOTES", MAIPAI_LAND_GIT_ENV: "" });
+  Object.assign(baseEnv, { MAIPAI_SHIP_DATA: data, MAIPAI_WATCH_DATA: watch, MAIPAI_SHIP_LIVE: live, MAIPAI_PROMOTE_BIN: promote, MAIPAI_SHIP_SUDO: "", MAIPAI_SHIP_STOP_DEV_CMD: "true", MAIPAI_SHIP_HEALTH_CMD: join(scratch, "health-check"), MAIPAI_SHIP_HEALTH_TIMEOUT: "1", MAIPAI_SHIP_MIGRATIONS_CMD: "echo 3", MAIPAI_PUBLISH_CMD: join(scratch, "publish") + " TAG NOTES", MAIPAI_LAND_GIT_ENV: "", MAIPAI_HUB_LOCK_PATH: join(scratch, "not-running.lock"), MAIPAI_SHIP_WEB_PORT: "45991" });
 });
 describe("ship pipeline", () => {
   test("rejects side branch commits before calling helper", () => {
@@ -30,7 +30,7 @@ describe("ship pipeline", () => {
   }, 60_000);
   test("requires a green marker or records the before-green override", () => {
     const missing = run([sha]); expect(missing.status).toBe(1); expect(missing.stderr).toContain("--before-green");
-    mkdirSync(join(watch, "green"), { recursive: true }); writeFileSync(join(watch, "green", sha), "green\n"); const green = run([sha]); expect(green.status).toBe(0); expect(green.stdout).toContain("shipped:");
+    mkdirSync(join(watch, "green"), { recursive: true }); writeFileSync(join(watch, "green", sha), "green\n"); const green = run([sha]); if (green.status !== 0) throw new Error(green.stderr + green.stdout); expect(green.status).toBe(0); expect(green.stdout).toContain("shipped:");
     rmSync(join(watch, "green", sha)); const override = run([sha, "--before-green"]); expect(override.status).toBe(0); expect(readFileSync(join(data, "shipped.jsonl"), "utf8")).toContain('"before_green":true');
   }, 60_000);
   test("success promotes full SHA and records shipped", () => {
@@ -65,6 +65,21 @@ describe("ship pipeline", () => {
   }, 60_000);
   test("dry run prints plan and never promotes", () => {
     const calls = join(scratch, "promote.calls"); rmSync(calls, { force: true }); const out = run([sha, "--before-green", "--dry-run"]); expect(out.status).toBe(0); expect(out.stdout).toContain("sha=" + sha); expect(out.stdout).toContain("before-green=yes"); expect(existsSync(calls)).toBe(false);
+  }, 60_000);
+  test("refuses other live data, allows explicit adoption, reports the finding in dry run, and keeps the clean case", () => {
+    const otherData = join(scratch, "other-data"); mkdirSync(otherData, { recursive: true });
+    writeFileSync(join(otherData, "hub.db"), "fixture");
+    const lockPath = join(scratch, "hub.lock");
+    writeFileSync(lockPath, JSON.stringify({ pid: 99999999, port: 3000, dataDir: otherData }));
+    const injected = { MAIPAI_HUB_LOCK_PATH: lockPath, MAIPAI_SHIP_TEST_PID_ALIVE: "1", MAIPAI_SHIP_TEST_WEB_LISTENER: "1" };
+    const refused = run([sha, "--before-green"], injected);
+    expect(refused.status).toBe(1); expect(refused.stderr).toContain("empty Home"); expect(refused.stderr).toContain(otherData); expect(refused.stderr).toContain("Migrate the data");
+    const dry = run([sha, "--before-green", "--dry-run"], injected);
+    expect(dry.status).toBe(1); expect(dry.stderr).toContain("empty Home");
+    const adopted = run([sha, "--before-green", "--adopt-empty-live"], injected);
+    expect(adopted.status).toBe(0);
+    const clean = run([sha, "--before-green"], { MAIPAI_HUB_LOCK_PATH: join(scratch, "missing.lock") });
+    expect(clean.status).toBe(0); expect(clean.stdout).toContain("shipped:");
   }, 60_000);
   test("preflight names one-time setup when helper is missing", () => {
     const out = run([sha, "--before-green"], { MAIPAI_PROMOTE_BIN: join(scratch, "missing-helper") }); expect(out.status).toBe(2); expect(out.stderr).toContain("install-promote.sh");
