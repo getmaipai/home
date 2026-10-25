@@ -312,9 +312,8 @@ unknown memory scope as household; POST `/api/conversations` does not check `com
 
 Purpose: Jesse steers the look and feel before the real build. Rules for every shell: a kit primitive or Element as shipped, no
 Home wrapper, no className that changes shape; the copy is one sentence in the existing pattern ("Coming soon: what it will do.");
-nothing writes a record; a shell never shows a child anything a built feature could not. All shells sit behind one person-scope
-setting `companions.preview_shells` (`level: expert`; written only by an admin and only for their own profile, as a write gate in
-`settings.ts` following the STORE-CAP-01 admin-set person key; off by default; copy through `describeSetting`, S5), so only the viewer who turned it on sees them and the family never does.
+nothing writes a record; a shell never shows a child anything a built feature could not. All shells sit behind one household-scope
+setting `companions.preview_shells` (`level: basic`; written only by an owner or admin and shared by everyone in the home, under Settings > The home > General > Household; off by default; copy through `describeSetting`, S5).
 
 | # | Surface | What shows in phase 0 | Kit parts | Copy |
 |---|---|---|---|---|

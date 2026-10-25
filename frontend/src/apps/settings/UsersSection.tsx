@@ -350,9 +350,6 @@ export function UsersSection({ person }: UsersSectionProps) {
                     </div>
                   </div>
                   <SettingsRenderer scope="person" scopeValue={`person:${p.id}`} settingKey="companions.allowed" only={["person.companions"]} plainRows />
-                  {p.id === person.id && (actorRole === "owner" || actorRole === "admin") ? (
-                    <SettingsRenderer scope="person" scopeValue={`person:${p.id}`} settingKey="companions.preview_shells" only={["person.companions"]} includeExpert plainRows />
-                  ) : null}
                 </div>
               );
             }}

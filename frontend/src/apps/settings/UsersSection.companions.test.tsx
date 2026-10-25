@@ -13,8 +13,8 @@ const companionKey = SettingsKey.parse({
   default: true, label: "AI companions", help: "AI companions are on by default.", level: "basic", lives_in: "person.companions", honoured_by: ["home"],
 });
 const previewShellKey = SettingsKey.parse({
-  key: "companions.preview_shells", scope: "person", selector: "boolean", layers: ["person"], merge: "override",
-  default: false, label: "Preview the coming companion features", help: "Only you see them.", level: "expert", lives_in: "person.companions", honoured_by: ["home"],
+  key: "companions.preview_shells", scope: "household", selector: "boolean",
+  default: false, label: "Preview the coming companion features", help: "Everyone in the home sees them.", level: "basic", lives_in: "household.system", honoured_by: ["home"],
 });
 
 function rosterEntry(id: string, role: string, display_name: string): PersonRosterEntry {
@@ -66,7 +66,7 @@ test("the person-editor switch is shown to owner and admin for every role, inclu
   } finally { people.mockRestore(); registry.mockRestore(); values.mockRestore(); siteBlocks.mockRestore(); }
 });
 
-test("preview shells appears only on an owner or admin's own Settings row", async () => {
+test("preview shells does not appear on the Users card", async () => {
   const rows = [rosterEntry("owner", "owner", "Sage"), rosterEntry("admin", "admin", "Avery"), rosterEntry("adult", "adult", "Jordan")];
   const people = spyOn(api, "people").mockResolvedValue(rows as never);
   const siteBlocks = noSiteBlocks();
@@ -74,25 +74,13 @@ test("preview shells appears only on an owner or admin's own Settings row", asyn
   const values = spyOn(api, "settingsValues").mockImplementation(async (scope, key) => {
     if (scope === "household") return [{ key: "companions.allowed", value: true, source: "default", label: companionKey.label, help: companionKey.help, level: "basic", secret: false }];
     if (key === "companions.allowed") return [{ key, value: true, source: "default", label: companionKey.label, help: companionKey.help, level: "basic", secret: false }];
-    if (key === "companions.preview_shells") return [{ key, value: false, source: "default", label: previewShellKey.label, help: previewShellKey.help, level: "expert", secret: false }];
     return [];
   });
   try {
-    for (const actor of [
-      { id: "owner", role: "owner", visible: true },
-      { id: "admin", role: "admin", visible: true },
-      { id: "adult", role: "adult", visible: false },
-      { id: "another-admin", role: "admin", visible: false },
-    ] as const) {
-      const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-      const view = render(<QueryClientProvider client={client}><MemoryRouter><UsersSection person={{ id: actor.id, role: actor.role, display_name: "Sage" } as Roster} /></MemoryRouter></QueryClientProvider>);
-      if (actor.visible) await waitFor(() => expect(view.getAllByRole("switch", { name: previewShellKey.label })).toHaveLength(1));
-      else {
-        await waitFor(() => expect(view.getAllByRole("switch", { name: "AI companions" })).toHaveLength(rows.length + 1));
-        expect(view.queryByRole("switch", { name: previewShellKey.label })).toBeNull();
-      }
-      view.unmount();
-    }
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    const view = render(<QueryClientProvider client={client}><MemoryRouter><UsersSection person={{ id: "owner", role: "owner", display_name: "Sage" } as Roster} /></MemoryRouter></QueryClientProvider>);
+    await waitFor(() => expect(view.getAllByRole("switch", { name: "AI companions" })).toHaveLength(rows.length + 1));
+    expect(view.queryByRole("switch", { name: previewShellKey.label })).toBeNull();
   } finally { people.mockRestore(); registry.mockRestore(); values.mockRestore(); siteBlocks.mockRestore(); }
 });
 

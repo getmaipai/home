@@ -10,10 +10,21 @@ import { api } from "@/lib/api";
 afterEach(cleanup);
 
 const home = SettingsKey.parse({ key: "household.home", scope: "household", selector: "location", range: { multiple: false, allow_current: false }, default: null, label: "Home location", help: "The household place used as the fallback for location-based answers.", level: "basic", lives_in: "household.system", honoured_by: ["home", "bot"] });
+const previewShells = SettingsKey.parse({ key: "companions.preview_shells", scope: "household", selector: "boolean", default: false, label: "Preview the coming companion features", help: "Everyone in the home sees them.", level: "basic", lives_in: "household.system", honoured_by: ["home"] });
 const weatherPlaces = SettingsKey.parse({ key: "weather.places", scope: "person", selector: "location", range: { multiple: true, allow_current: false }, default: [], label: "Weather places", level: "basic", lives_in: "weather.places", honoured_by: ["home"] });
 
 test("only the household home location key reaches the generic cards", () => {
   expect(visibleRegistry([home, weatherPlaces], "adult").map((k) => k.key)).toEqual(["household.home"]);
+});
+
+test("the standard household preview switch renders in the Household card", async () => {
+  const registry = spyOn(api, "settingsRegistry").mockResolvedValue([previewShells] as never);
+  const values = spyOn(api, "settingsValues").mockResolvedValue([{ key: previewShells.key, value: false, source: "default", label: previewShells.label, help: previewShells.help, level: previewShells.level, secret: false }] as never);
+  try {
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    const view = render(<QueryClientProvider client={client}><MemoryRouter><SettingsRenderer scope="household" scopeValue="household" only={["household.system"]} /></MemoryRouter></QueryClientProvider>);
+    expect(await view.findByRole("switch", { name: previewShells.label })).toBeTruthy();
+  } finally { registry.mockRestore(); values.mockRestore(); }
 });
 
 test("a location key is drawn only when a package area's card draws its group; a minor sees it too", () => {

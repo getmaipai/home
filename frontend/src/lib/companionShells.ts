@@ -9,8 +9,8 @@ export function useCompanionShells(): boolean | undefined {
   const person = useContext(CompanionShellViewer);
   const id = person?.id;
   const query = useQuery({
-    queryKey: ["settings-values", `person:${id ?? ""}`, "companions.preview_shells"],
-    queryFn: () => api.settingsValues(`person:${id}`, "companions.preview_shells"),
+    queryKey: ["settings-values", "household", "companions.preview_shells"],
+    queryFn: () => api.settingsValues("household", "companions.preview_shells"),
     enabled: Boolean(id),
     retry: false,
   });

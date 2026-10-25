@@ -124,7 +124,7 @@ test("a person who is not an admin gets no voice picker", async () => {
 
 
 test("preview tabs show counts, discovery excludes default, and detail tasks are named", async () => {
-  api.settingsValues = async () => [{ key: "companions.preview_shells", value: true, source: "user", label: "Preview", level: "expert", secret: false }] as never;
+  api.settingsValues = async () => [{ key: "companions.preview_shells", value: true, source: "user", label: "Preview", level: "basic", secret: false }] as never;
   api.companions = async () => ({ allowed: true, can_create: true, can_discover: true, default_id: "lively-teen", robots: null,
     companions: [card({ id: "lively-child", name: "Sprout", chats: 2 }), card({ id: "lively-teen", name: "Riff", is_default: true, chats: 0 })] });
   const yours = open("/companions", true);
@@ -149,7 +149,7 @@ test("preview tabs show counts, discovery excludes default, and detail tasks are
 });
 
 test("preview discovery is hidden when the list says it is unavailable", async () => {
-  api.settingsValues = async () => [{ key: "companions.preview_shells", value: true, source: "user", label: "Preview", level: "expert", secret: false }] as never;
+  api.settingsValues = async () => [{ key: "companions.preview_shells", value: true, source: "user", label: "Preview", level: "basic", secret: false }] as never;
   api.companions = async () => ({ allowed: true, can_create: false, can_discover: false, default_id: "lively-child", companions: [card()], robots: null });
   const view = open("/companions", true);
   await waitFor(() => expect(view.getByRole("tab", { name: "Yours" })).toBeTruthy());
