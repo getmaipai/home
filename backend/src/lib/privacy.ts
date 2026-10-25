@@ -192,8 +192,8 @@ export function platformConnections(): PrivacyConnection[] {
       what: "a request for the show's feed file that asks only for what changed since last time (a plain conditional request). Feed, episode and picture hosts, including CDNs and redirect hosts, receive the requested address and your home's internet address. No name, device ID or cookie goes with it. No chat or listening history is sent.",
     }),
     row("platform:news-full-text-prefetch", shelfEnabled() && getHouseholdSettingValue(NEWS_FULL_TEXT_PREFETCH_KEY) === true ? "the publishers of followed channels and the top stories in Today" : null, {
-      when: "only when Load News stories ahead of time is on and nobody is using MaiPai. Each item is tried once, at most one every 30 seconds and 150 pages per site in 24 hours. Home follows robots rules and pauses on the first block.",
-      what: "a request for that story page and the site's robots rules, plus your home's internet address. No name, question, follow list, cookie or reading history is sent. Background requests never ask the Internet Archive.",
+      when: "only when Load News stories ahead of time is on and nobody is using MaiPai. Each item is tried once, at most one every 30 seconds for each site and 150 pages per site in 24 hours; story pictures follow the same pace. Home follows robots rules and pauses on the first block.",
+      what: "a request for that story page and the site's robots rules, plus your home's internet address. Nothing anyone in the house said or saved is sent: no name, question, follow list, cookie or reading history. Background requests never ask the Internet Archive.",
     }),
     row("platform:hosted-search", hostedSearchKey() ? HOSTED_SEARCH_HOST : null, {
       when: "when an adult asks something that needs a web search, and only while a Brave Search key is saved under Household, Integrations. Never for a child or teen.",
