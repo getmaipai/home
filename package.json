@@ -12,6 +12,7 @@
     "restart": "bash scripts/app.sh pull && bun run stop && bun run start",
     "screenshots": "bun run scripts/screenshot.ts",
     "a11y": "bun run scripts/screenshot.ts --a11y-only",
+    "duplex:echo": "bun scripts/duplex-echo-test/serve.ts",
     "smoke:chat": "bun run --cwd backend scripts/smoke/chat.ts",
     "verify:tokens-cascade": "bun run scripts/verifyTokensCascade.ts",
     "elements:scan": "bun run scripts/elementsAdoption.ts",
