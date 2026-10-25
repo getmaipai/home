@@ -6,6 +6,8 @@ import { setHouseholdSettingValue } from "@/lib/settings";
 import { __resetRateLimiterForTests } from "@/lib/rateLimiter";
 import { __setPageFetchForTests } from "@/lib/packageHost";
 import { prefetchNewsText } from "@/lib/news/prefetch";
+import { prefetchNewsPictures } from "@/lib/news/prefetchPictures";
+import { newsPictureCached } from "@/lib/news/pictures";
 import { setFollow } from "@/lib/news/records";
 import { fullTextCandidates, storyData } from "@/lib/news/data";
 import { sharedShelfStore } from "@/lib/shelf/shelfStore";
@@ -128,4 +130,22 @@ test("followed channels add stories beyond Today, unfollow removes them, stale i
   expect(fullTextCandidates(row).map((item) => item.id)).toEqual(before);
   const stale = putItem(feeds.household, ADULT_HOST, { ageHours: 72 });
   expect(fullTextCandidates(row).some((item) => item.id === stale.id)).toBe(false);
+});
+
+test("pictures are fetched ahead of time: one per picture host per pass, only with the setting on, and a cached picture is not fetched again", async () => {
+  await owner(); noDefaultTopics();
+  const first = putItem(feeds.household, ADULT_HOST, { path: "/story/a", topics: ["world"] });
+  const second = putItem(feeds.household, ADULT_HOST, { path: "/story/b", topics: ["world"] });
+  publisher = await startPublisher({}); publisher.attach();
+  setHouseholdSettingValue("news.full_text_prefetch", false);
+  expect(await prefetchNewsPictures({ now: () => NOW, busy: () => false })).toBe(0);
+  expect(publisher.requests.filter((path) => path.startsWith("/img/"))).toEqual([]);
+  enabled();
+  expect(await prefetchNewsPictures({ now: () => NOW, busy: () => true })).toBe(0);
+  expect(await prefetchNewsPictures({ now: () => NOW, busy: () => false })).toBe(1);
+  expect(publisher.requests.filter((path) => path.startsWith("/img/"))).toHaveLength(1);
+  expect([first, second].filter((item) => newsPictureCached(item.id))).toHaveLength(1);
+  expect(await prefetchNewsPictures({ now: () => NOW + 31_000, busy: () => false })).toBe(1);
+  expect([first, second].every((item) => newsPictureCached(item.id))).toBe(true);
+  expect(await prefetchNewsPictures({ now: () => NOW + 62_000, busy: () => false })).toBe(0);
 });

@@ -510,6 +510,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/news/pictures.ts` | NEWS_PICTURE_WIDTHS, newsPictureDir, pictureRefOf, figureRefOf, newsImagesOn, newsImageCacheBytes |
 | `backend/src/lib/news/prefetch.ts` | prefetchNewsText |
 | `backend/src/lib/news/prefetchBudget.ts` | PREFETCH_SCHEMA, prefetchBudget |
+| `backend/src/lib/news/prefetchPictures.ts` | prefetchNewsPictures |
 | `backend/src/lib/news/rankStories.ts` | HALF_LIFE_HOURS, PICTURE_BONUS, CHANNEL_BONUS, FEATURED_COUNT, FEATURED_PER_TOPIC, isFollowed |
 | `backend/src/lib/news/records.ts` | defaultTopicsFor, followedChannels, isFollowing, setFollow, resetMix, interestRowsOf |
 | `backend/src/lib/news/search.ts` | SEARCH_ALL, SEARCH_SAVED, SEARCH_TODAY, searchData, recentRows |

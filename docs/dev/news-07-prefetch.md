@@ -15,3 +15,7 @@ The first failure or unusable page quiets that site's background full text for o
 The budget tests passed: 3 tests, 0 failures. A third test checks that two database handles share receipts, pacing and quiet state. They ran with an empty test-preload config because they import only Bun SQLite and the budget module, with no app or network dependencies.
 
 `newsPrefetch.test.ts` covers default-off, explicit open, idle checks, child, teen, adult and guest selection, a child's prefetched release, no inferred records, robots refusal, first-block quiet mode, no Archive expansion and privacy visibility. Two attempts to run this file stopped in the shared preload, before the tests: `reserveFreePort` found no usable port in 200 tries. These integration checks remain unverified in this environment. No live publisher was contacted. The preflight and full gate were not run under this task's narrow-test restriction.
+
+## Pictures (NEWS-PICTURES-01, owner 2026-10-25)
+
+The same job and switch also fetch pictures ahead of time: `prefetchPictures.ts` takes the newest forty released stories with a feed picture (`pictureCandidates`), skips cached ones and runs the route's own `newsPicture` for at most one picture per picture host per pass, on the same receipt, 150 a day and quiet tables, keyed by the picture host.

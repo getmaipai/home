@@ -12,7 +12,7 @@ type Rows = NonNullable<Sidebar["groups"][number]["rows"]>;
  * reduced by the hub to what this person may open). It fetches each group's rows through the package's own data route, fills an
  * entry's `navigate` from its row, and returns props only: the page renders the kit part with them (from wide screens up; a phone
  * gets the same entries in the shell's drawer). Home holds no per-app code. Null when the app declares no column. */
-export function useAppSidebar(app: Pick<AppRow, "package" | "to" | "label"> | undefined, sidebar: Sidebar | undefined, current: string, pageState: Record<string, unknown>): Pick<SectionSidebarProps, "groups" | "search"> | null {
+export function useAppSidebar(app: Pick<AppRow, "package" | "to" | "label"> | undefined, sidebar: Sidebar | undefined, current: string, pageState: Record<string, unknown>, ownerId = ""): Pick<SectionSidebarProps, "groups" | "search"> | null {
   const navigate = useNavigate();
   const location = useLocation();
   const queryClient = useQueryClient();
@@ -26,7 +26,14 @@ export function useAppSidebar(app: Pick<AppRow, "package" | "to" | "label"> | un
   const results = useQueries({
     queries: rowGroups.map((group) => ({
       queryKey: ["app-sidebar", app?.package, String((group.rows as Rows).bind.path)],
-      queryFn: () => api.appData<Row[] | { rows?: Row[] }>(app!.package, String((group.rows as Rows).bind.path)),
+      queryFn: async () => {
+        const data = await api.appData<Row[] | { rows?: Row[] }>(app!.package, String((group.rows as Rows).bind.path));
+        rememberRows(ownerId, app!.package, String((group.rows as Rows).bind.path), data);
+        return data;
+      },
+      // The column's rows from this browser's last visit draw at once while the fresh rows load behind them.
+      initialData: app ? storedRows(ownerId, app.package, String((group.rows as Rows).bind.path)) : undefined,
+      initialDataUpdatedAt: 0,
       enabled: app !== undefined,
       placeholderData: keepPreviousData,
       retry: false,
@@ -116,6 +123,16 @@ export function useAppSidebar(app: Pick<AppRow, "package" | "to" | "label"> | un
       ...(focused && query === "" && recentRows.length > 0 ? { recents: recentRows.map((row) => ({ key: String(row.key ?? row.label), label: String(row.label ?? "") })), onRecent: (recent: string) => { setQuery(recent); go(search.submit, { q: recent }); } } : {}),
     } : undefined,
   };
+}
+
+const rowsKey = (owner: string, packageId: string, path: string): string => `maipai.sidebar.v1:${owner}:${packageId}:${path}`;
+function storedRows(owner: string, packageId: string, path: string): Row[] | { rows?: Row[] } | undefined {
+  if (!owner) return undefined;
+  try { const raw = localStorage.getItem(rowsKey(owner, packageId, path)); return raw ? JSON.parse(raw) as Row[] | { rows?: Row[] } : undefined; } catch { return undefined; }
+}
+function rememberRows(owner: string, packageId: string, path: string, data: unknown): void {
+  if (!owner) return;
+  try { localStorage.setItem(rowsKey(owner, packageId, path), JSON.stringify(data)); } catch { /* a full or blocked store only means the next visit waits */ }
 }
 
 /** `{field}` placeholders in a string fill from the row, as an action's own state does on a list. */

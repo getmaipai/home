@@ -203,7 +203,7 @@ export function PackageAppPage({ person }: { person: Roster }) {
 
   const sidebar = app?.sidebar;
   const arrivedState = (location.state as { pageState?: Record<string, unknown> } | null)?.pageState ?? {};
-  const sidebarProps = useAppSidebar(app, sidebar, pageId, arrivedState);
+  const sidebarProps = useAppSidebar(app, sidebar, pageId, arrivedState, person.id);
 
   if (packageId === "" || (page.error instanceof ApiError && page.error.status === 404)) return <NotFoundPage />;
 

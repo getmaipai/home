@@ -342,6 +342,17 @@ export function savedRows(person: PersonRow, now = new Date()): RowsData {
   return rows;
 }
 
+/** NEWS-PICTURES-01: the stories a person's screens will draw first, newest first (a Today page and a topic page show about forty pictures). */
+export function pictureCandidates(person: PersonRow, now = new Date()): ShelfItem[] {
+  if (person.role === "guest" || !person.enabled || person.deletedAt || person.memorializedAt || !shelfEnabled()) return [];
+  const env = cardEnv(viewerOf(person, now));
+  if (!env) return [];
+  return releaseShelfItems(env.viewer.band, CANDIDATES, env.store)
+    .filter((item) => !!item.image_url && ageMs(item, now) <= TODAY_WINDOW_H * HOUR_MS)
+    .sort((a, b) => publishedAtOf(b).localeCompare(publishedAtOf(a)))
+    .slice(0, 40);
+}
+
 /** NEWS-07: only explicit follows and the Today lead set, through the same card and source gates as Today. */
 export function fullTextCandidates(person: PersonRow, now = new Date()): ShelfItem[] {
   if (person.role === "guest" || !person.enabled || person.deletedAt || person.memorializedAt || !shelfEnabled()) return [];

@@ -60,6 +60,7 @@ import { sweepAnswerImages } from "@/lib/answerImages/cache";
 import { sweepFetchCache } from "@/lib/retrieval/fetchCache";
 import { sweepPackageCache } from "@/lib/packageCache";
 import { prefetchNewsText } from "@/lib/news/prefetch";
+import { prefetchNewsPictures } from "@/lib/news/prefetchPictures";
 import { runShelfTick, pruneShelf } from "@/lib/shelf/shelfJobs";
 import { withTimeout } from "@maipai/core/src/withTimeout";
 import type { PluginOpResult } from "@/lib/plugins";
@@ -315,7 +316,7 @@ const CORE_JOBS: Record<string, CoreJobHandler> = {
   // KS-05: the news shelf. A poll tick that fetches only what is due and only
   // while the house is quiet (lib/shelf/shelfPoller.ts), and a daily prune
   // to the household's retention (news.retention_days).
-  "news.full_text.prefetch": async () => { await prefetchNewsText(); },
+  "news.full_text.prefetch": async () => { await prefetchNewsText(); await prefetchNewsPictures(); },
   "news.shelf.summaries": async () => { await runNewsSummaryTick(); },
   "news.shelf.poll": async () => {
     await runShelfTick();

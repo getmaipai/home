@@ -1,7 +1,7 @@
 // The News picture route's cache and guarded download, with a story-page fallback for a missing or failed feed picture.
 //
-// Nothing here runs in the background. `newsPicture` is called only from `GET /api/plugins/news/images/:item`, i.e. when a
-// person's screen shows that story. The first request for an item fetches the feed's own `image_url` once, through the SSRF
+// `newsPicture` is called from `GET /api/plugins/news/images/:item`, i.e. when a person's screen shows that story, and from the
+// idle picture prefetch (prefetchPictures.ts, NEWS-PICTURES-01) under the same switch and per-site pace as NEWS-07. The first request for an item fetches the feed's own `image_url` once, through the SSRF
 // guard (10 second timeout, 8 MB cap, one request to a host at a time, a pace ceiling per host, the first 429 or 403 puts the
 // host quiet for an hour), resizes it to 1280 and 480 pixels wide as WebP and stores both under the cache folder. Every later
 // request is the cache. The publisher's address never leaves this file: callers get bytes, never the address.
