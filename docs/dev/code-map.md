@@ -322,7 +322,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/contentPolicy/dataSchema.ts` | policyWord, lanesSchema, floorsSchema |
 | `backend/src/lib/continue/providers.ts` | mediaContinueRows |
 | `backend/src/lib/continue/registry.ts` | CONTINUE_BUDGET, registerContinueProvider, __clearContinueProvidersForTests, continueRows |
-| `backend/src/lib/conversationHistory.ts` | shownPicturesIn, turnOwnerId, outcomesForConversation, packageLatencyFromRecentOutcomes, insertProvisionalTurn, resolveSupersedes |
+| `backend/src/lib/conversationHistory.ts` | shownPicturesIn, turnOwnerId, applyHeardPrefix, __temporaryReplyForTests, outcomesForConversation, packageLatencyFromRecentOutcomes |
 | `backend/src/lib/conversationTitle.ts` | DEFAULT_CHAT_TITLE, provisionalTitleFrom, ensureProvisionalTitle, refreshProvisionalTitle, cleanTitle, generateConversationTitle |
 | `backend/src/lib/credentialLockout.ts` | LOCKOUT_THRESHOLD, lockoutDurationMs, ensureCredentialRowExists, clearFailedAttempts, currentLockout, recordFailedAttempt |
 | `backend/src/lib/dashboard.ts` | getDashboard |
@@ -396,6 +396,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/instanceLock.ts` | LEGACY_LOCK_FILE_NAME, OPT_OUT_ENV, hubLockPath, HubAlreadyRunningError, DataDirPlacementError, readProcessFacts |
 | `backend/src/lib/integrations/homeAssistant.ts` | isLanHomeAssistantUrl, subscribeHomeAssistantEntities, homeAssistantEventsHealth, readHomeAssistantEntityState, refreshHomeAssistantEvents, __resetHomeAssistantEventsForTests |
 | `backend/src/lib/internetProbe.ts` | classifyInternetFailures, probeInternet, runConfiguredInternetProbe, __resetInternetProbeForTests |
+| `backend/src/lib/interruptedReply.ts` | noteInterruptedReply, takeInterruptedReply, __clearInterruptedRepliesForTests |
 | `backend/src/lib/issues.ts` | __setReminderTimingForTests, __resetReminderTimersForTests, __setMaintenanceNowForTests, raiseIssue, resolveIssue, listIssues |
 | `backend/src/lib/jobProducers.ts` | mapStackJobToHomeJob, mapModelDownloadStackJob, modelDownloadJobsAsHomeJobs, listStackModelDownloadJobs, registerProducerJob, updateProducerJob |
 | `backend/src/lib/jobs.ts` | visibleJobFor, createJob, updateJob, listJobsForViewer, listJobsForViewerLive, canStopJob |
