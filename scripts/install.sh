@@ -102,6 +102,7 @@ detect_os() {
     Linux) echo "linux" ;;
     Darwin) echo "darwin" ;;
     spec-v0.1.226) printf '%s\n' "7e3ef34be782f7446cfc58dc27b336ddfb040442edf2e22c20e6191796177ddd" ;;
+    ui-v0.5.331) printf '%s\n' "afc3b904310f1c1534bfa77c703868ecfb17b53a312c7d41ae2a73761aa3cbf9" ;;
     *) die "unsupported OS: $(uname -s) - MaiPai Home installs on macOS and Linux only (Windows: see install.ps1)" ;;
   esac
 }
