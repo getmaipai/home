@@ -29,7 +29,8 @@ function createFixture() {
   const files: Record<string, string> = {
     "backend/package.json": '{\n  "dependencies": {\n    "@maipai/ui": "file:../../commons-tags/ui-ui-v1.0.0/ui"\n  }\n}\n',
     "frontend/package.json": '{\n  "dependencies": {\n    "@maipai/ui": "file:../../commons-tags/ui-ui-v1.0.0/ui"\n  }\n}\n',
-    "scripts/install.sh": 'STACK_TAG="1111111111111111111111111111111111111111"\ncommons_archive_sha256() {\n  case "$1" in\n    ui-v1.0.0) printf \'%s\\n\' "old" ;;\n    *) return 1 ;;\n  esac\n}\n',
+    "scripts/check.sh": '  CORE_TAG="core-v0.1.5"\n  UI_TAG="ui-v1.0.0"\n  SPEC_TAG="spec-v0.1.226"\n',
+    "scripts/install.sh": 'STACK_TAG="1111111111111111111111111111111111111111"\nearlier() {\n  case "$1" in\n    x) echo x ;;\n    *) echo other ;;\n  esac\n}\ncommons_archive_sha256() {\n  case "$1" in\n    ui-v1.0.0) printf \'%s\\n\' "old" ;;\n    *) return 1 ;;\n  esac\n}\n',
     "scripts/engine-computer/maipai-engine": 'STACK_TAG=1111111111111111111111111111111111111111\ncommons_archive_sha256() {\n  case "$1" in\n    ui-v1.0.0) printf \'%s\\n\' "old" ;;\n    *) return 1 ;;\n  esac\n}\n',
     "shared/diskPlan.json": '{\n  "old": true\n}\n',
     "backend/src/lib/botReleasePin.json": JSON.stringify({
@@ -81,10 +82,23 @@ describe.serial("pin.sh", () => {
     for (const path of ["scripts/install.sh", "scripts/engine-computer/maipai-engine"]) {
       expect(read(path)).toContain(`ui-v9.9.9) printf '%s\\n' "${fixedSha}" ;;`);
     }
+    expect(read("scripts/check.sh")).toContain('  UI_TAG="ui-v9.9.9"');
+    expect(read("scripts/check.sh")).toContain('SPEC_TAG="spec-v0.1.226"');
+    const install = read("scripts/install.sh");
+    expect(install.indexOf("ui-v9.9.9)")).toBeGreaterThan(install.indexOf("commons_archive_sha256()"));
     expect(readFileSync(fixture.calls, "utf8")).toContain("ensure:ui:ui-v9.9.9");
     expect(readFileSync(fixture.calls, "utf8").match(/install:/g)).toHaveLength(2);
     expect(gitRepo("log", "-1", "--format=%s")).toBe("Pin ui-v9.9.9");
     expect(readFileSync(fixture.calls, "utf8")).toContain("land");
+  }, 60_000);
+
+  test("the default ensure-tag command receives the package and tag", () => {
+    mkdirSync(join(fixture.base, "commons/scripts"), { recursive: true });
+    writeFileSync(join(fixture.base, "commons/scripts/ensure-tag.sh"), 'echo "args:$#:$1:$2" >> "$CALLS"\n');
+    const env = { ...fixture.env }; delete env.MAIPAI_PIN_ENSURE_TAG_CMD;
+    const out = command("bash", [join(fixture.repo, "scripts/pin.sh"), "commons", "ui-v9.9.9", "--no-land"], fixture.repo, env);
+    expect(out.status).toBe(0);
+    expect(readFileSync(fixture.calls, "utf8")).toContain("args:2:ui:ui-v9.9.9");
   }, 60_000);
 
   test("commons repeat is refused without another commit", () => {

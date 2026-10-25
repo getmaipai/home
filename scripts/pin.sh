@@ -14,7 +14,7 @@ branch="$(git branch --show-current)"
 [[ "$branch" == wt/* ]] || die "branch '$branch' is not wt/*; switch to a wt/* worktree and run pin.sh again."
 [[ -z "$(git status --porcelain --untracked-files=no)" ]] || die "tracked changes are uncommitted; commit or discard them, then run pin.sh again."
 sha_cmd="${MAIPAI_PIN_SHA256_CMD:-curl -fsSL \$1 | shasum -a 256 | cut -d' ' -f1}"
-ensure_cmd="${MAIPAI_PIN_ENSURE_TAG_CMD:-bash ../commons/scripts/ensure-tag.sh}"
+ensure_cmd="${MAIPAI_PIN_ENSURE_TAG_CMD:-bash ../commons/scripts/ensure-tag.sh \"\$@\"}"
 install_cmd="${MAIPAI_PIN_INSTALL_CMD:-bun install --force}"
 stack_dir="${MAIPAI_PIN_STACK_DIR:-../stack}"
 gh_cmd="${MAIPAI_PIN_GH_CMD:-gh}"
@@ -34,9 +34,9 @@ case "$kind" in
       fi
     done
     ((${#package_files[@]} > 0)) || die "no package.json pin found for @maipai/$pkg; add the dependency first."
-    for file in scripts/install.sh scripts/engine-computer/maipai-engine; do rg -q '^[[:space:]]*\*\)' "$file" || die "could not find commons_archive_sha256 default in $file; inspect it before retrying."; done
+    for file in scripts/install.sh scripts/engine-computer/maipai-engine; do rg -U -q 'commons_archive_sha256\(\) \{[^}]*\n[[:space:]]*\*\)' "$file" || die "could not find commons_archive_sha256 default in $file; inspect it before retrying."; done
     digest_url="https://github.com/getmaipai/commons/archive/refs/tags/${tag}.tar.gz"
-    add_changed scripts/install.sh; add_changed scripts/engine-computer/maipai-engine
+    add_changed scripts/install.sh; add_changed scripts/engine-computer/maipai-engine; add_changed scripts/check.sh
     for file in "${package_files[@]}"; do add_changed "$file"; done
     if ((dry_run)); then
       printf 'Would change:\n'; printf '  %s\n' "${changed[@]}"
@@ -64,13 +64,16 @@ PY
 import os, re
 path, tag, digest = os.environ["PIN_FILE"], os.environ["PIN_TAG"], os.environ["PIN_DIGEST"]
 text = open(path).read()
-pattern = re.compile(r'(?m)^(\s*)\*\)')
-updated, count = pattern.subn(lambda m: f'{m.group(1)}{tag}) printf \'%s\\n\' "{digest}" ;;\n{m.group(0)}', text, count=1)
+pattern = re.compile(r'(commons_archive_sha256\(\) \{.*?)(?m:^(\s*)\*\))', re.S)
+updated, count = pattern.subn(lambda m: f'{m.group(1)}{m.group(2)}{tag}) printf \'%s\\n\' "{digest}" ;;\n{m.group(2)}*)', text, count=1)
 if count != 1: raise SystemExit(f"could not add {tag} digest to {path}")
 open(path, "w").write(updated)
 PY
         fi
       done
+      var="$(printf '%s' "$pkg" | tr '[:lower:]' '[:upper:]')_TAG"
+      rg -q "^[[:space:]]*${var}=\"" scripts/check.sh || die "could not find ${var} in scripts/check.sh; inspect it before retrying."
+      sed -E "s/^([[:space:]]*${var}=)\"[^\"]*\"/\1\"${tag}\"/" scripts/check.sh > scripts/check.sh.tmp && cat scripts/check.sh.tmp > scripts/check.sh && rm scripts/check.sh.tmp
       for dir in backend frontend; do (cd "$dir" && run_cmd "$install_cmd") || die "install command failed in $dir; fix the install and retry."; done
     fi
     message="Pin $tag"
