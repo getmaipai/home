@@ -192,6 +192,8 @@ export function useLiveVoiceSession({ composer, open, onOpenChange, onProblem, i
     let connectionFailureHandled = false;
     let terminalServerError = false;
     if (modeRef.current === "listening" || modeRef.current === "connecting") setCurrentMode("connecting");
+    // Full-duplex: while a reply plays, report how much has played every 250 ms so the server knows to pause it on the first voiced frame.
+    let playedTimer: ReturnType<typeof setInterval> | undefined;
     const socket = createSocket({
       onMessage(message) {
         if (cancelled) return;
@@ -203,6 +205,12 @@ export function useLiveVoiceSession({ composer, open, onOpenChange, onProblem, i
         switch (message.t) {
           case "ready":
             retryCountRef.current = 0;
+            if (voiceBargeIn && !playedTimer) {
+              playedTimer = setInterval(() => {
+                const scheduler = turnSchedulerRef.current;
+                if (scheduler && isReplySpeaking()) socket.sendPlayed?.(activeTurnRef.current?.turnId ?? "reply", scheduler.playedMs());
+              }, 250);
+            }
             if (modeRef.current === "listening" || modeRef.current === "connecting") setCurrentMode("listening");
             if (voiceBargeIn || (!isSpeakingRef.current && modeRef.current !== "thinking" && modeRef.current !== "speaking")) void startCapture({
               onFrame: (frame) => {
@@ -229,6 +237,23 @@ export function useLiveVoiceSession({ composer, open, onOpenChange, onProblem, i
                   onOpenChange(false);
                 }
               });
+            break;
+          case "reply_pause":
+            // The server heard the first voiced frame while a reply plays (DUPLEX-02a): pause at once; the transcript, or a later
+            // reply_resume, decides what happens next.
+            if (voiceBargeIn && !mutedRef.current && isReplySpeaking() && Date.now() - speakingStartedAtRef.current >= BARGE_IN_ARM_DELAY_MS) {
+              turnSchedulerRef.current?.pause();
+              overlapPausedRef.current = true;
+            }
+            break;
+          case "reply_resume":
+            // The sound was not speech: carry on from the same spot.
+            if (overlapPausedRef.current) {
+              if (overlapPauseTimerRef.current) clearTimeout(overlapPauseTimerRef.current);
+              overlapPauseTimerRef.current = null;
+              turnSchedulerRef.current?.resume();
+              overlapPausedRef.current = false;
+            }
             break;
           case "partial":
             activeSpeechRef.current = true;
@@ -371,6 +396,7 @@ export function useLiveVoiceSession({ composer, open, onOpenChange, onProblem, i
       if (falseInterruptionTimerRef.current) clearTimeout(falseInterruptionTimerRef.current);
       clearTimeout(retryTimer);
       clearInterval(levelTimer);
+      if (playedTimer) clearInterval(playedTimer);
       micHandle?.stop();
       levelMeter?.stop();
       socket.close();

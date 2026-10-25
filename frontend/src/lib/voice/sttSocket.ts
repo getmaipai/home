@@ -12,6 +12,9 @@ export interface SttSocket {
    * sent as binary f32le per the contract - never JSON-wrapped, since
    * every audio frame at 16 kHz would make that a real overhead. */
   sendAudio: (frame: Float32Array) => void;
+  /** Full-duplex: tells the server how much of the current reply has played, about every 250 ms while it plays (the server
+   * treats a report under 700 ms old as "a reply is playing"). A no-op when the socket is not open. */
+  sendPlayed?: (replyId: string, ms: number) => void;
   close: () => void;
 }
 
@@ -68,6 +71,10 @@ export function createSttSocket(handlers: SttSocketHandlers): SttSocket {
       // the moment any caller passes a subarray view (a code review,
       // 2026-09-06 - nothing in the type enforces offset 0).
       socket.send(frame.buffer.slice(frame.byteOffset, frame.byteOffset + frame.byteLength));
+    },
+    sendPlayed(replyId, ms) {
+      if (socket.readyState !== WebSocket.OPEN) return;
+      socket.send(JSON.stringify({ t: "played_ms", reply_id: replyId, ms: Math.max(0, Math.round(ms)) }));
     },
     close() {
       closedByUs = true;

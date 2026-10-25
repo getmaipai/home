@@ -99,6 +99,14 @@ export class SentenceSpeechScheduler {
     return this.stopped ? 0 : this.meter.read();
   }
 
+  /** Milliseconds of the reply that have actually played: the audio clock since the first sentence started, which freezes while
+   * the context is suspended (a pause), so it is the position a resume continues from. */
+  playedMs(): number {
+    const first = this.scheduledSentences[0];
+    if (!first) return 0;
+    return Math.max(0, (this.audioContext.currentTime - first.startTime) * 1000);
+  }
+
   heardVisibleEnd(): number {
     if (this.heardEndAtStop !== undefined) return this.heardEndAtStop;
     const currentTime = this.audioContext.currentTime;

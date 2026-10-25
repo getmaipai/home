@@ -37,13 +37,15 @@ function fakeStartCapture(): (options: MicCaptureOptions) => Promise<MicCaptureH
 
 function controlledSocket() {
   const handlers = new Set<SttSocketHandlers["onMessage"]>();
+  const played: Array<{ replyId: string; ms: number }> = [];
   return {
     createSocket: (socketHandlers: SttSocketHandlers) => {
       handlers.add(socketHandlers.onMessage);
       setTimeout(() => socketHandlers.onMessage({ t: "ready" }), 0);
-      return { sendAudio: () => {}, close: () => { handlers.delete(socketHandlers.onMessage); } };
+      return { sendAudio: () => {}, sendPlayed: (replyId: string, ms: number) => { played.push({ replyId, ms }); }, close: () => { handlers.delete(socketHandlers.onMessage); } };
     },
     send: (message: SttServerMessage) => { for (const handler of handlers) handler(message); },
+    played,
   };
 }
 
@@ -66,7 +68,7 @@ function Harness({ open, onOpenChange, onProblem = () => {}, isSpeaking, speakin
   const activeTurnRef = useRef<{ turnId: string; heardVisibleEnd: () => number } | null>(activeTurn);
   const firstSocketHandlers = useRef<SttSocketHandlers | null>(null);
   activeTurnRef.current = activeTurn;
-  turnSchedulerRef.current = { stop: stopScheduler, pause: pauseScheduler, resume: resumeScheduler, readLevel: () => 0 } as unknown as SentenceSpeechScheduler;
+  turnSchedulerRef.current = { stop: stopScheduler, pause: pauseScheduler, resume: resumeScheduler, readLevel: () => 0, playedMs: () => 1234 } as unknown as SentenceSpeechScheduler;
   const connectionCount = useRef(0);
   const session = useLiveVoiceSession({
     composer: runtime.thread.composer,
@@ -390,6 +392,35 @@ describe("live voice session", () => {
     void view;
   });
 
+
+  test("the server's reply_pause pauses at once and reply_resume carries on without cancelling", async () => {
+    const pause = mock(); const resume = mock(); const stop = mock(); const cancel = spyOn(api, "cancelTurn").mockResolvedValue({ cancelled: true });
+    const socket = controlledSocket();
+    const sent: string[] = [];
+    const view = render(<Harness open onOpenChange={() => {}} isSpeaking={false} speakingEndedAt={0} fixture={[]} sentTexts={sent} pauseScheduler={pause} resumeScheduler={resume} stopScheduler={stop} socketFactory={socket.createSocket} />);
+    await waitFor(() => expect(view.getByText("Listening")).toBeTruthy());
+    act(() => view.rerender(<Harness open onOpenChange={() => {}} isSpeaking={true} speakingEndedAt={0} fixture={[]} sentTexts={sent} pauseScheduler={pause} resumeScheduler={resume} stopScheduler={stop} socketFactory={socket.createSocket} />));
+    await waitFor(() => expect(view.getByText("Speaking")).toBeTruthy());
+    await new Promise((resolve) => setTimeout(resolve, 500));
+    act(() => socket.send({ t: "reply_pause" }));
+    expect(pause).toHaveBeenCalledTimes(1);
+    act(() => socket.send({ t: "reply_resume" }));
+    expect(resume).toHaveBeenCalledTimes(1);
+    expect(cancel).not.toHaveBeenCalled(); expect(stop).not.toHaveBeenCalled(); expect(sent).toEqual([]);
+    cancel.mockRestore();
+  });
+
+  test("while a reply speaks the socket is told how much has played every 250 ms", async () => {
+    const socket = controlledSocket();
+    const view = render(<Harness open onOpenChange={() => {}} isSpeaking={false} speakingEndedAt={0} fixture={[]} sentTexts={[]} socketFactory={socket.createSocket} />);
+    await waitFor(() => expect(view.getByText("Listening")).toBeTruthy());
+    expect(socket.played).toEqual([]);
+    act(() => view.rerender(<Harness open onOpenChange={() => {}} isSpeaking={true} speakingEndedAt={0} fixture={[]} sentTexts={[]} socketFactory={socket.createSocket} />));
+    await waitFor(() => expect(view.getByText("Speaking")).toBeTruthy());
+    await new Promise((resolve) => setTimeout(resolve, 600));
+    expect(socket.played.length).toBeGreaterThanOrEqual(2);
+    expect(socket.played[0]).toEqual({ replyId: "turn-test", ms: 1234 });
+  });
 
   test("a transcript after pause interrupts with the heard prefix and becomes the next turn", async () => {
     const pause = mock(); const stop = mock(); const cancel = spyOn(api, "cancelTurn").mockResolvedValue({ cancelled: true });

@@ -96,6 +96,16 @@ describe("sentence speech scheduler", () => {
     expect(scheduler.heardVisibleEnd()).toBe(12);
   });
 
+  test("playedMs is 0 before any sentence plays and follows the audio clock after", async () => {
+    const context = new FakeAudioContext();
+    const scheduler = new SentenceSpeechScheduler(context as unknown as AudioContext, async () => new Response(new Uint8Array(44)));
+    expect(scheduler.playedMs()).toBe(0);
+    scheduler.enqueueSentence("first", { visibleEnd: 5 });
+    await settle(); await settle(); await settle(); await settle();
+    context.currentTime = 1.5;
+    expect(scheduler.playedMs()).toBeCloseTo(1500, 0);
+  });
+
   test("heardVisibleEnd ignores a cue with no visibleEnd", async () => {
     const context = new FakeAudioContext();
     const scheduler = new SentenceSpeechScheduler(context as unknown as AudioContext, async () => new Response(new Uint8Array(44)));
