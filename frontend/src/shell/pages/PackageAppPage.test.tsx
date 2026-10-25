@@ -206,7 +206,7 @@ describe("a package app at /apps/<id>", () => {
   });
 });
 
-describe("a News page has an address of its own", () => {
+describe("a package app page has an address of its own (News here)", () => {
   beforeEach(() => { rows = [newsRow]; });
 
   test("a story opened by navigation writes its id into the address, keeping the page's state", async () => {
@@ -222,6 +222,14 @@ describe("a News page has an address of its own", () => {
     expect(view.getByTestId("where").textContent).toBe("/apps/news/story?id=item-9");
     expect(calls.length).toBeGreaterThan(0);
     expect(calls.every((body) => JSON.parse(body).id === "item-9")).toBe(true);
+  });
+});
+
+describe("every package app mirrors a page's arrival state into its address", () => {
+  test("a page of another app opened with state names that state in its address", async () => {
+    const view = open({ pathname: "/apps/demo/week", state: { pageState: { place: "pl1" } } });
+    await waitFor(() => expect(view.getByTestId("where").textContent).toBe("/apps/demo/week?place=pl1"));
+    await view.findByText("The week ahead is quiet.");
   });
 });
 

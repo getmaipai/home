@@ -174,8 +174,8 @@ export function PackageAppPage({ person }: { person: Roster }) {
   const media = isMediaApp(packageId);
   const hubActive = useMediaHubActive();
   const familyHeader = usesFamilyHeader(packageId);
-  // A media app and News read their query as page state, so a reload or a shared link opens the same item.
-  const urlState = media || packageId === "news";
+  // Every package app reads its query as page state, so a reload or a shared link opens the same item.
+  const urlState = packageId !== "";
   const queryState = useMemo<Record<string, string>>(() => (urlState ? Object.fromEntries(new URLSearchParams(location.search)) : {}), [urlState, location.search]);
   const hasQuery = Object.keys(queryState).length > 0;
   const arrived = (location.state as { pageState?: Record<string, unknown> } | null)?.pageState;
@@ -183,10 +183,10 @@ export function PackageAppPage({ person }: { person: Roster }) {
   useEffect(() => {
     if (hasQuery && !sameQuery) navigate(`${location.pathname}${location.search}`, { replace: true, state: { pageState: { ...arrived, ...queryState } } });
   }, [hasQuery, sameQuery, location.pathname, location.search, arrived, queryState, navigate]);
-  // NEWS-URL-01: a page a `navigate` action opened with state (a story's id, a channel's kind and key, a search's text) writes that state
+  // APP-URL-01: a page a `navigate` action opened with state (a story's id, a channel's kind and key, a search's text) writes that state
   // into its own address, replacing the entry in place, so the address bar always names the item: it reloads, shares and goes back to it.
   useEffect(() => {
-    if (packageId !== "news" || location.search !== "" || arrived === undefined) return;
+    if (packageId === "" || location.search !== "" || arrived === undefined) return;
     const params = new URLSearchParams();
     for (const [name, value] of Object.entries(arrived)) if (typeof value === "string" && value !== "") params.set(name, value);
     const search = params.toString();
