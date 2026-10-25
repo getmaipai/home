@@ -24,6 +24,12 @@ describe("createChatSuggestionAdapter", () => {
     expect(suggestions).toEqual([{ prompt: "What would change in winter?" }]);
   });
 
+  test("answer chips (QR-02) come through as sendable prompts, one-word labels intact", async () => {
+    spyOn(api, "followUpSuggestions").mockResolvedValue({ kind: "answers", suggestions: [{ prompt: "Yes" }, { prompt: "No, cancel" }] });
+    const suggestions = await createChatSuggestionAdapter().generate({ messages: [reply("turn-q")], signal: undefined });
+    expect(suggestions).toEqual([{ prompt: "Yes" }, { prompt: "No, cancel" }]);
+  });
+
   test("does not request suggestions in Incognito", async () => {
     const fetch = spyOn(api, "followUpSuggestions");
     const suggestions = await createChatSuggestionAdapter(() => true).generate({ messages: [reply("turn-incognito")], signal: undefined });

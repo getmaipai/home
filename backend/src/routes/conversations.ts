@@ -25,6 +25,7 @@ import {
   getConversation,
   listConversationTurns,
   isTemporaryConversation,
+  getPendingAsk,
   updateConversationTitle,
   updateConversationArchived,
   updateConversationFolder,
@@ -103,7 +104,7 @@ conversationsRoutes.get("/turns", requireAuth, async (c) => {
   return c.json(list(actor, person));
 });
 
-const followUpSuggestionsResponse = z.object({ suggestions: z.array(z.object({ prompt: z.string() })) });
+const followUpSuggestionsResponse = z.object({ kind: z.enum(["answers", "followups"]).default("followups"), suggestions: z.array(z.object({ prompt: z.string() })) });
 const followUpSuggestionsRoute = createRoute({
   method: "post",
   path: "/turns/{id}/follow-up-suggestions",
@@ -123,9 +124,10 @@ conversationsRoutes.openapi(followUpSuggestionsRoute, async (c) => {
   // An administrator may inspect a household member's turns, but must not
   // trigger a model call over another person's words.
   if (!turn || turn.personId !== actor.id) return c.json({ error: "turn not found" }, 404);
-  if (!turn.conversationId || isTemporaryConversation(turn.conversationId) || !canGenerateFollowUpSuggestions(actor, turn)) return c.json({ suggestions: [] }, 200);
-  const suggestions = await generateFollowUpSuggestions(turn.userText, turn.replyText);
-  return c.json({ suggestions }, 200);
+  if (!turn.conversationId || isTemporaryConversation(turn.conversationId) || !canGenerateFollowUpSuggestions(actor, turn)) return c.json({ kind: "followups" as const, suggestions: [] }, 200);
+  // A parked confirmation is answered only on its approval card; a model-written "Yes" chip must never resume it.
+  const result = await generateFollowUpSuggestions(turn.userText, turn.replyText, undefined, getPendingAsk(turn.conversationId) === null);
+  return c.json(result, 200);
 });
 
 conversationsRoutes.post("/turns/:id/choose", requireAuth, async (c) => {

@@ -8406,6 +8406,14 @@
                 "schema": {
                   "type": "object",
                   "properties": {
+                    "kind": {
+                      "type": "string",
+                      "enum": [
+                        "answers",
+                        "followups"
+                      ],
+                      "default": "followups"
+                    },
                     "suggestions": {
                       "type": "array",
                       "items": {

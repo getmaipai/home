@@ -45,9 +45,9 @@ describe("POST /api/conversations/turns/:id/follow-up-suggestions", () => {
     const childResponse = await childAccount.client.post("/api/conversations/turns/turn-child-followup/follow-up-suggestions");
     const teenResponse = await teenClient.post("/api/conversations/turns/turn-teen-followup/follow-up-suggestions");
     expect(childResponse.status).toBe(200);
-    expect(await childResponse.json()).toEqual({ suggestions: [] });
+    expect(await childResponse.json()).toEqual({ kind: "followups", suggestions: [] });
     expect(teenResponse.status).toBe(200);
-    expect(await teenResponse.json()).toEqual({ suggestions: [] });
+    expect(await teenResponse.json()).toEqual({ kind: "followups", suggestions: [] });
   });
 
   test("Incognito turns have no route-visible row, and an adult cannot request another person's turn", async () => {

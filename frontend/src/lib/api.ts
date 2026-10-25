@@ -1155,7 +1155,7 @@ export const api = {
   clearConversationFeedback: (id: string) =>
     request<null>(`/api/conversations/turns/${encodeURIComponent(id)}/feedback`, { method: "DELETE" }),
   followUpSuggestions: (id: string, signal?: AbortSignal) =>
-    request<{ suggestions: { prompt: string }[] }>(`/api/conversations/turns/${encodeURIComponent(id)}/follow-up-suggestions`, { method: "POST", signal }),
+    request<{ kind?: "answers" | "followups"; suggestions: { prompt: string }[] }>(`/api/conversations/turns/${encodeURIComponent(id)}/follow-up-suggestions`, { method: "POST", signal }),
   renameConversation: (id: string, title: string | null, pinned?: boolean) =>
     request<Conversation>(`/api/conversations/${encodeURIComponent(id)}`, {
       method: "PATCH",
