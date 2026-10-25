@@ -273,6 +273,8 @@ export class SentenceSpeechScheduler {
       cutBuffers(true);
       return null;
     }
+    // The body ended inside the 44-byte header: whatever arrived goes to the decoder as it always did.
+    if (headLen > 0 && headLen < HEADER) rawParts.push(head.slice(0, headLen));
     const total = rawParts.reduce((sum, part) => sum + part.length, 0);
     if (total === 0) return null;
     const bytes = new Uint8Array(total);

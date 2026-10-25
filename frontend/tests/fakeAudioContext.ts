@@ -59,11 +59,11 @@ export class FakeAudioContext {
   }
 }
 
-/** A minimal, real 44-byte WAV header (no PCM samples needed) - a
- * response body streamingWavPlayer.ts/sentenceSpeechScheduler.ts can
- * parse without throwing. */
+/** A real 44-byte WAV header plus 0.2 s of silence (the sentence scheduler plays a sentence as its PCM arrives, so a body with no samples
+ * schedules nothing) - a response body streamingWavPlayer.ts/sentenceSpeechScheduler.ts can parse without throwing. */
 export function fakeWavBody(): Uint8Array {
-  const header = new Uint8Array(44);
+  const body = new Uint8Array(44 + 9_600);
+  const header = body;
   const view = new DataView(header.buffer);
   const writeString = (offset: number, s: string) => {
     for (let i = 0; i < s.length; i++) view.setUint8(offset + i, s.charCodeAt(i));
@@ -76,5 +76,5 @@ export function fakeWavBody(): Uint8Array {
   view.setUint32(24, 24_000, true);
   view.setUint16(34, 16, true);
   writeString(36, "data");
-  return header;
+  return body;
 }
