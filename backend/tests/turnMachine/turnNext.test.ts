@@ -31,7 +31,7 @@ import * as llm from "@/lib/llm";
 import { streamTurnEvents, THINKING_CUE_DELAY_MS } from "@/routes/turn";
 import { streamEventForViewer } from "@/lib/turnErrorDetail";
 import type { TurnStreamEvent } from "@/wire";
-import { getPendingAsk, resolveOrCreateConversation, setPendingAsk } from "@/lib/conversationHistory";
+import { createConversation, getPendingAsk, resolveOrCreateConversation, setPendingAsk } from "@/lib/conversationHistory";
 import { listPending } from "@/lib/notifications";
 import { db } from "@/db";
 import { conversationTurns, conversations, memoryRecords, people as people_ } from "@/db/schema";
@@ -3894,7 +3894,10 @@ describe("turnNext.ts: THIN-0I, per-companion confirmation and refusal pools on 
 
   async function rememberAs(personaId: string): Promise<string> {
     expect(setValue(people.owner, `person:${people.owner.id}`, "persona.active_id", personaId).ok).toBe(true);
-    const result = await withStub({ reply: () => "unused" }, () => runTurnNext(people.owner, "chat", "remember that pizza night is Friday"));
+    // A chat keeps the companion it started with (COMP-04a), so each persona gets its own new chat.
+    const fresh = createConversation(people.owner);
+    if (!fresh.ok) throw new Error("expected a new conversation");
+    const result = await withStub({ reply: () => "unused" }, () => runTurnNext(people.owner, "chat", "remember that pizza night is Friday", { conversationId: fresh.value.id }));
     expect(result.ok).toBe(true);
     if (!result.ok || result.kind !== "immediate") throw new Error("expected an immediate result");
     expect(result.value.source).toBe("plugin");
