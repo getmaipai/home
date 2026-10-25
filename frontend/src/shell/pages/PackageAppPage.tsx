@@ -22,7 +22,7 @@ import { useAppSidebar } from "@/shell/useAppSidebar";
 import { MediaHubFrame } from "@/shell/MediaHubFrame";
 import { useMediaHubActive } from "@/shell/mediaHubSession";
 import { FocalImageProvider } from "@maipai/ui/src/primitives/FocalImage";
-import { analyzeFocalImage } from "@/lib/focalImageAnalyzer";
+import { analyzeFocalImage, warmFocalModel } from "@/lib/focalImageAnalyzer";
 import "./packageAppNews.css";
 
 
@@ -160,6 +160,7 @@ export function PackageAppPage({ person }: { person: Roster }) {
   // A page document is static until the package changes, so every page this app can open is fetched once, up front: moving between its
   // pages then shows the next page at once instead of replacing the whole panel with a loading skeleton while its document loads.
   const queryClient = useQueryClient();
+  useEffect(() => { if (packageId === "news") warmFocalModel(); }, [packageId]);
   const preload = app ? pagesOf(app).join(",") : "";
   useEffect(() => {
     if (packageId === "" || preload === "") return;
