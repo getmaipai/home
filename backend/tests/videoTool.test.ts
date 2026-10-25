@@ -183,12 +183,15 @@ describe("VIDEO-GEN-05: the call, the job and the stored clip", () => {
     });
   });
 
-  test("a clip the Stack's memory watchdog stopped is a failed card that says paused, not a silent cancel", async () => {
+  test("a clip cancelled by the memory watchdog is retried twice, then fails with the memory line", async () => {
     fake.pausedForMemory = true;
     await withStub(script(BOAT, "I started it for you."), async () => {
       const { value } = await streamValue(people.owner, "make a short video of a paper boat");
       expect(value.reply.text).toBe("I started it for you.");
+      const createdAt = getVideoJobFor(people.owner, value.video!.id)!.createdAt;
       await until(() => getVideoJobFor(people.owner, value.video!.id)?.state === "failed");
+      expect(fake.submitted).toHaveLength(3);
+      expect(getVideoJobFor(people.owner, value.video!.id)!.createdAt).toBe(createdAt);
       expect(getVideoJobFor(people.owner, value.video!.id)!.error).toContain("The computer ran low on memory, so the job stopped. Try again when there is room.");
     });
   });
@@ -205,12 +208,13 @@ describe("VIDEO-GEN-05: the call, the job and the stored clip", () => {
     });
   });
 
-  test("a Stack that cannot hold the clip refuses the submit: a failed tool, not a failed answer (rule 6)", async () => {
+  test("a Stack refusal is stored on the queued card after Home submits it (rule 6)", async () => {
     fake.refuseSubmit = { status: 503, code: "no_memory", error: "Not enough free memory for video right now." };
     await withStub({ calls: (r) => (isPhrasing(r) || r.tool_choice === "none" ? undefined : [BOAT]), reply: () => "I couldn't start that one just now; try again in a few minutes." }, async () => {
       const { value } = await streamValue(people.owner, "make a short video of a paper boat");
-      expect(value.reply.text).toContain("couldn't start");
-      expect(value.video).toBeUndefined();
+      expect(value.video).toBeDefined();
+      await until(() => getVideoJobFor(people.owner, value.video!.id)?.state === "failed");
+      expect(getVideoJobFor(people.owner, value.video!.id)?.error).toContain("low on memory");
     });
   });
 

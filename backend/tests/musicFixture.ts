@@ -39,6 +39,7 @@ export function installFakeMusicStack() {
       if (method === "DELETE") { fake.deleted.push(id); return json({ ok: true }); }
       if (match[2]) return new Response(testM4a(), { headers: { "content-type": "audio/mp4" } });
       const polls = (fake.polls.get(id) ?? 0) + 1; fake.polls.set(id, polls);
+      if (fake.fail?.code === "no_memory") return json({ state: "cancelled", ...fake.fail });
       if (fake.fail) return json({ state: "failed", ...fake.fail });
       const body = fake.submitted[Number(id.split("-")[1]) - 1]!;
       const result: StackMusicJob = fake.queued ? { state: "queued", stage: "queued", progress_fraction: 0, eta_seconds: 15, position: 2 } : polls >= fake.pollsToFinish

@@ -85,6 +85,7 @@ export function installFakeImageStack(options: { pollsToFinish?: number } = {}):
       if (jobMatch[2] !== undefined) return new Response(await testPng(), { status: 200, headers: { "content-type": "image/png" } });
       job.polls += 1;
       if (job.state === "cancelled") return json({ job: job.id, state: "cancelled", phase: null, progress: 0, phase_progress: null, position: null, error: null, code: null, data: [] });
+      if (fake.failWith?.code === "no_memory") { job.state = "cancelled"; return json({ job: job.id, state: "cancelled", phase: "paused: low memory", progress: 0, phase_progress: null, position: null, error: fake.failWith.error, code: "no_memory", data: [] }); }
       if (fake.failWith) { job.state = "failed"; return json({ job: job.id, state: "failed", phase: null, progress: 0, phase_progress: null, position: null, error: fake.failWith.error, code: fake.failWith.code, data: [] }); }
       if (job.polls >= fake.pollsToFinish) {
         job.state = "done";

@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import { db } from "../src/db";
 import { notificationDeliveries } from "../src/db/schema";
-import { order, writePositions, type QueueJob } from "../src/lib/jobs/householdQueue";
+import { order, registerQueueProvider, releaseHouseholdQueue, writePositions, type QueueJob } from "../src/lib/jobs/householdQueue";
 
 const now = Date.parse("2026-10-25T12:00:00.000Z");
 function job(id: string, personId: string, jobClass: QueueJob["jobClass"], createdAt: number, extra: Partial<QueueJob> = {}): QueueJob {
@@ -12,6 +12,47 @@ describe("household queue", () => {
   test("interleaves people within a class", () => {
     const jobs = [job("a1", "A", "picture", now - 4000), job("a2", "A", "picture", now - 3000), job("a3", "A", "picture", now - 2000), job("b1", "B", "picture", now - 1000)];
     expect(order(jobs, now)).toEqual([{ id: "a1", position: 1 }, { id: "b1", position: 2 }, { id: "a2", position: 3 }, { id: "a3", position: 4 }]);
+  });
+
+  test("releases Stack submissions in round-robin order, one unstarted job per kind", async () => {
+    const entries = [
+      { job: job("a1", "A", "picture", now - 4000), waiting: false },
+      { job: job("a2", "A", "picture", now - 3000), waiting: false },
+      { job: job("a3", "A", "picture", now - 2000), waiting: false },
+      { job: job("b1", "B", "picture", now - 1000), waiting: false },
+    ];
+    const submitted: string[] = [];
+    const remove = registerQueueProvider(() => entries.map((entry) => ({
+      job: entry.job,
+      stackWaiting: entry.waiting,
+      release: entry.job.state === "queued" && !entry.waiting ? async () => { entry.waiting = true; submitted.push(entry.job.id); } : undefined,
+      save: () => undefined,
+    })));
+    try {
+      await releaseHouseholdQueue();
+      entries[0]!.job.state = "running";
+      entries[0]!.waiting = false;
+      await releaseHouseholdQueue();
+      entries[0]!.job.state = "done";
+      entries[3]!.job.state = "running";
+      entries[3]!.waiting = false;
+      await releaseHouseholdQueue();
+      entries[1]!.job.state = "done";
+      entries[1]!.waiting = false;
+      entries[3]!.job.state = "done";
+      await releaseHouseholdQueue();
+      expect(submitted).toEqual(["a1", "b1", "a2", "a3"]);
+    } finally { remove(); }
+  });
+
+  test("a cancelled held job is never released to Stack", async () => {
+    const held = job("held", "A", "video", now - 1000);
+    held.state = "cancelled";
+    let submits = 0;
+    const remove = registerQueueProvider(() => [{ job: held, save: () => undefined,
+      release: held.state === "queued" ? async () => { submits += 1; } : undefined }]);
+    try { await releaseHouseholdQueue(); expect(submits).toBe(0); }
+    finally { remove(); }
   });
 
   test("promotes a video to picture class after ten minutes", () => {

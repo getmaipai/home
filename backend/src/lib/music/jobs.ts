@@ -17,13 +17,41 @@ import { modelStampFor } from "./models";
 import { provenanceFor } from "./commercial";
 import { refuseMusicPrompt } from "./policy";
 import { jobQueueCopy } from "@/lib/jobQueueCopy";
-import { activeMusicJobsFor, dropMusicJob, dropTemporaryMusicConversation, getMusicJobFor, jobsForConversation, forgetRemovedMusicJob, liveJobs, memory, pendingMusicJobs, pruneMusicJobs, saveMusicJob, temporarySongs, watching } from "./store";
+import { refreshHouseholdQueue, registerQueueProvider, releaseHouseholdQueue, type QueueJob } from "@/lib/jobs/householdQueue";
+import { activeMusicJobsFor, dropMusicJob, dropTemporaryMusicConversation, getMusicJobFor, jobsForConversation, forgetRemovedMusicJob, liveJobs, memory, pendingMusicJobs, pruneMusicJobs, saveMusicJob as persistMusicJob, temporarySongs, watching } from "./store";
 export { getMusicJobFor, musicJobIdsByTurn, __resetMusicJobsForTests } from "./store";
 export type { MusicJob, MusicRequest } from "./types";
 
 let POLL_MS = 1000;
 export function __setMusicPollMsForTests(ms: number | null): void { POLL_MS = ms ?? 1000; }
 const starting = new Set<string>();
+function saveMusicJob(job: MusicJob): void { persistMusicJob(job); refreshHouseholdQueue(); }
+registerQueueProvider(() => {
+  const jobs = new Map<string, MusicJob>();
+  for (const job of [...memory.values(), ...liveJobs.values()]) if (["queued", "running"].includes(job.state)) jobs.set(job.id, job);
+  for (const job of pendingMusicJobs()) if (!jobs.has(job.id)) jobs.set(job.id, job);
+  return [...jobs.values()].map((job) => {
+    const request = job.request as MusicRequest & { memoryRequeues?: number };
+    const queued: QueueJob = { id: job.id, personId: job.personId, jobClass: "other", state: job.state === "running" ? "running" : "queued", createdAt: job.createdAt,
+      position: job.position, estimateSeconds: job.etaSeconds, typicalSeconds: 180, headOfClass: (request.memoryRequeues ?? 0) > 0 };
+    return { job: queued, stackWaiting: job.state === "queued" && !!job.stackJob,
+      release: job.state === "queued" && !job.stackJob ? () => releaseMusic(job) : undefined,
+      save: () => { job.position = queued.position ?? null; persistMusicJob(job); } };
+  });
+});
+async function releaseMusic(job: MusicJob): Promise<void> {
+  if (job.state !== "queued" || job.stackJob) return;
+  try {
+    const storedBody = (job.request as MusicRequest & { stackBody?: Omit<MusicBody, "timeout_ms"> }).stackBody;
+    const submitted = await submitMusic({ ...(storedBody ?? musicBody(job.request, "text2music")), timeout_ms: 1 });
+    if (job.state !== "queued" || !liveJobs.has(job.id)) { void cancelOrDeleteMusic(submitted.job); return; }
+    job.stackJob = submitted.job; saveMusicJob(job);
+    const actor = db.select().from(people).where(eq(people.id, job.personId)).get();
+    if (!actor) { await cancelOrDeleteMusic(submitted.job); job.state = "failed"; fail(job, "lost_job"); return; }
+    void watch(job, actor, submitted.done);
+    void startSongCover(actor, job).catch(() => {});
+  } catch (error) { fail(job, error instanceof StackMusicError ? error.code : "failed"); }
+}
 export function plainMusicFailure(code: string): string {
   const prefix = "I couldn't make that song.";
   switch (code) {
@@ -71,18 +99,12 @@ export async function startMusicJob(input: StartMusicInput): Promise<MusicJob> {
     coverJobId: null, coverFileId: null, errorCode: null, errorLine: null, fileId: null, parentFileId: input.parentFileId ?? null,
     seed: null, durationS: null, lrc: null, chosenAt: null, createdAt: now, updatedAt: now, temporary: input.temporary,
   };
+  (job.request as MusicRequest & { stackBody?: Omit<MusicBody, "timeout_ms"> }).stackBody = input.body;
   // Reserve before the network await: forgetting the turn during submit can abort admission too.
   liveJobs.set(job.id, job);
   try {
-    const submitted = await submitMusic({ ...input.body, timeout_ms: 1 });
-    // A stop (or a forget) that landed during the submit sticks: the Stack's copy is freed and no watcher starts.
-    if (!liveJobs.has(job.id) || stopped(job)) { void cancelOrDeleteMusic(submitted.job); throw new StackMusicError(409, "cancelled"); }
-    job.stackJob = submitted.job;
-    try { saveMusicJob(job); } catch (error) { void cancelOrDeleteMusic(submitted.job); throw error; }
-    if (stopped(job)) { void cancelOrDeleteMusic(submitted.job); throw new StackMusicError(409, "cancelled"); }
-    void watch(job, input.actor, submitted.done);
-    // The picture job takes its normal governor/admission path and remains optional to the song.
-    void startSongCover(input.actor, job).catch(() => {});
+    saveMusicJob(job);
+    void releaseHouseholdQueue();
     return job;
   } catch (error) { liveJobs.delete(job.id); forgetRemovedMusicJob(job.id); throw error; }
   finally { starting.delete(input.actor.id); }
@@ -109,12 +131,18 @@ async function watch(job: MusicJob, actor: PersonRow, early: StackSong[] | null 
         if (await finish(job, actor, status.data ?? [], controller.signal) === false) continue;
         return;
       }
-      if (status.state === "failed" || (status.state === "cancelled" && status.code === "no_memory")) { fail(job, status.code ?? "failed"); return; }
+      if (status.state === "cancelled" && status.code === "no_memory") {
+        const request = job.request as MusicRequest & { memoryRequeues?: number };
+        const retries = request.memoryRequeues ?? 0;
+        if (retries < 2) { request.memoryRequeues = retries + 1; job.state = "queued"; job.stackJob = null; job.stage = "requeued_memory"; job.progress = 0; saveMusicJob(job); return; }
+        fail(job, "no_memory"); return;
+      }
+      if (status.state === "failed") { fail(job, status.code ?? "failed"); return; }
       if (status.state === "cancelled") { job.state = "cancelled"; saveMusicJob(job); return; }
       job.state = status.state === "queued" ? "queued" : "running";
       // Stage labels come from a closed map at the card boundary, never from arbitrary Stack text.
       job.stage = job.request.retried && status.state === "queued" ? "longer" : status.stage ?? null; job.progress = Math.max(0, Math.min(0.99, status.progress_fraction ?? 0));
-      job.etaSeconds = status.eta_seconds ?? null; job.position = status.position ?? null;
+      job.etaSeconds = status.eta_seconds ?? null;
       saveMusicJob(job);
       if (stopped(job)) return; // a stop stored by another writer is adopted by saveMusicJob
       await sleep(POLL_MS, controller.signal);
@@ -122,8 +150,9 @@ async function watch(job: MusicJob, actor: PersonRow, early: StackSong[] | null 
     if (!controller.signal.aborted) fail(job, "timeout");
   } catch (error) { if (!controller.signal.aborted) fail(job, error instanceof StackMusicError ? error.code : "failed"); }
   finally {
-    watching.delete(job.id); liveJobs.delete(job.id); forgetRemovedMusicJob(job.id);
-    await cancelOrDeleteMusic(job.stackJob);
+    watching.delete(job.id); if (job.state !== "queued") liveJobs.delete(job.id); forgetRemovedMusicJob(job.id);
+    if (job.stackJob) await cancelOrDeleteMusic(job.stackJob);
+    refreshHouseholdQueue();
   }
 }
 async function finish(job: MusicJob, actor: PersonRow, songs: StackSong[], signal: AbortSignal): Promise<false | void> {
@@ -194,9 +223,11 @@ export async function cancelMusicJob(actor: PersonRow, id: string): Promise<Musi
 export function resumeMusicJobs(): void {
   for (const job of pendingMusicJobs()) {
     const person = db.select().from(people).where(eq(people.id, job.personId)).get();
-    if (!person || !job.stackJob) { fail(job, "lost_job"); continue; }
-    liveJobs.set(job.id, job); void watch(job, person);
+    if (!person) { fail(job, "lost_job"); continue; }
+    liveJobs.set(job.id, job);
+    if (job.stackJob) void watch(job, person);
   }
+  void releaseHouseholdQueue();
 }
 export function readMusicFile(actor: PersonRow, job: MusicJob, fileId: string): { bytes: Uint8Array; mediaType: string; sha256: string } | null {
   if (job.personId !== actor.id || job.fileId !== fileId || !job.conversationId) return null;

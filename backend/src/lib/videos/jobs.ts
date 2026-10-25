@@ -9,7 +9,7 @@ import { attachments, conversationTurns, people, videoJobs } from "@/db/schema";
 import { createAttachment, getTemporaryChatImage, latestGeneratedTemporaryImage, readAttachmentForConversation, registerTemporaryMedia } from "@/lib/attachments";
 import { newFileId, newVideoJobId } from "@/lib/id";
 import { nextHlc } from "@/lib/hlc";
-import { refreshHouseholdQueue, registerQueueProvider, type QueueJob } from "@/lib/jobs/householdQueue";
+import { refreshHouseholdQueue, registerQueueProvider, releaseHouseholdQueue, type QueueJob } from "@/lib/jobs/householdQueue";
 import { jobQueueCopy } from "@/lib/jobQueueCopy";
 import type { PersonRow } from "@/types";
 import { allVideoAdapters } from "./adapters";
@@ -68,7 +68,7 @@ export interface VideoJob {
   phase: string | null;
   position: number | null;
   estimateSeconds?: number | null;
-  riseReason?: "higher_class" | "other_person_first" | null;
+  riseReason?: "higher_class" | "other_person_first" | "requeued_memory" | null;
   prompt: string;
   request: VideoRequest;
   error: string | null;
@@ -114,10 +114,12 @@ const liveJobs = new Map<string, VideoJob>();
 
 type Row = typeof videoJobs.$inferSelect;
 function fromRow(row: Row): VideoJob {
+  const request = JSON.parse(row.request) as VideoRequest & { memoryRequeues?: number };
   return {
     id: row.id, personId: row.personId, conversationId: row.conversationId, turnId: row.turnId, kind: row.kind as VideoJobKind, state: row.state as VideoJobState,
     stackJob: row.stackJob, percent: row.percent, phase: row.phase, position: row.position, prompt: row.prompt, request: JSON.parse(row.request) as VideoRequest,
     error: row.error, files: JSON.parse(row.files) as VideoFile[], temporary: false, createdAt: row.createdAt, updatedAt: row.updatedAt,
+    ...((request.memoryRequeues ?? 0) > 0 ? { riseReason: "requeued_memory" as const } : {}),
   };
 }
 
@@ -142,10 +144,28 @@ registerQueueProvider(() => {
   for (const row of db.select().from(videoJobs).where(inArray(videoJobs.state, ["queued", "running"])).all()) if (!jobs.has(row.id)) jobs.set(row.id, fromRow(row));
   return [...jobs.values()].map((job) => {
     const queued: QueueJob = { id: job.id, personId: job.personId, jobClass: "video", state: job.state, createdAt: job.createdAt,
-      position: job.position, estimateSeconds: job.estimateSeconds, riseReason: job.riseReason, typicalSeconds: 140 };
-    return { job: queued, save: () => { job.position = queued.position ?? null; job.estimateSeconds = queued.estimateSeconds; job.riseReason = queued.riseReason; persistVideoJob(job); } };
+      position: job.position, estimateSeconds: job.estimateSeconds, riseReason: ((job.request as VideoRequest & { memoryRequeues?: number }).memoryRequeues ?? 0) > 0 ? "requeued_memory" : job.riseReason, typicalSeconds: 140,
+      headOfClass: ((job.request as VideoRequest & { memoryRequeues?: number }).memoryRequeues ?? 0) > 0 };
+    return { job: queued, stackWaiting: job.state === "queued" && !!job.stackJob,
+      release: job.state === "queued" && !job.stackJob ? () => releaseVideo(job) : undefined,
+      save: () => { job.position = queued.position ?? null; job.estimateSeconds = queued.estimateSeconds; job.riseReason = queued.riseReason; persistVideoJob(job); } };
   });
 });
+
+async function releaseVideo(job: VideoJob): Promise<void> {
+  if (job.state !== "queued" || job.stackJob) return;
+  try {
+    const storedBody = (job.request as VideoRequest & { stackBody?: Omit<VideoBody, "timeout_ms"> }).stackBody;
+    const submitted = await submitVideo({ ...(storedBody ?? { prompt: job.prompt, audience: job.request.audience, size: job.request.size, seconds: job.request.seconds }), timeout_ms: 1 });
+    if (job.state !== "queued") { void cancelOrDeleteVideo(submitted.job); return; }
+    job.stackJob = submitted.job; liveJobs.set(job.id, job); persistVideoJob(job);
+    void ensureKeyframeHelper();
+    const actor = db.select().from(people).where(eq(people.id, job.personId)).get();
+    if (actor) void watch(job, actor as PersonRow, submitted.done);
+  } catch (error) {
+    job.state = "failed"; job.error = plainVideoFailure(error); persistVideoJob(job); refreshHouseholdQueue();
+  }
+}
 
 /** A job by id for its owner only: nobody sees another person's videos, a parent included. */
 export function getVideoJobFor(actor: PersonRow, id: string): VideoJob | null {
@@ -307,19 +327,16 @@ export async function startVideoJob(input: StartVideoInput): Promise<VideoJob> {
   if (activeVideoJobsFor(input.actor) > 0) throw new StackVideoError(429, "already_making", "You already have a video being made. Wait for it to finish, or stop it first.");
   // Whoever calls, a teen or a child is on an allowed model (Quick, silent); only an adult's own choice reaches the engine.
   const model = videoModelForLane(laneOfPerson(input.actor), input.body.model);
-  const submitted = await submitVideo({ ...input.body, ...(model ? { model } : {}), timeout_ms: 1 });
-  // The finished-clip check needs the keyframe helper; compile it now, while the clip renders, so it is ready when the clip is.
-  void ensureKeyframeHelper();
   const now = new Date().toISOString();
   const job: VideoJob = {
-    id: newVideoJobId(), personId: input.actor.id, conversationId: input.conversationId, turnId: input.turnId, kind: input.kind, state: "queued", stackJob: submitted.job,
+    id: newVideoJobId(), personId: input.actor.id, conversationId: input.conversationId, turnId: input.turnId, kind: input.kind, state: "queued", stackJob: null,
     percent: 0, phase: "queued", position: null, prompt: input.prompt,
-    request: { size: input.body.size ?? (model === "detailed" ? "768x448" : "832x480"), seconds: input.body.seconds ?? 5, quality: model === "detailed" ? "detailed" : "quick", seed: input.body.seed ?? null, loras: (input.body.loras ?? []).map((l) => l.id), source_file_id: input.sourceFileId ?? null, audience: input.body.audience, ...(input.likeness ? { likeness: input.likeness } : {}) },
+    request: ({ size: input.body.size ?? (model === "detailed" ? "768x448" : "832x480"), seconds: input.body.seconds ?? 5, quality: model === "detailed" ? "detailed" : "quick", seed: input.body.seed ?? null, loras: (input.body.loras ?? []).map((l) => l.id), source_file_id: input.sourceFileId ?? null, audience: input.body.audience, stackBody: { ...input.body, ...(model ? { model } : {}) }, ...(input.likeness ? { likeness: input.likeness } : {}) } as VideoRequest),
     error: null, files: [], temporary: input.temporary, createdAt: now, updatedAt: now,
   };
   liveJobs.set(job.id, job);
   saveVideoJob(job);
-  void watch(job, input.actor, submitted.done);
+  void releaseHouseholdQueue();
   return job;
 }
 
@@ -395,7 +412,12 @@ async function watch(job: VideoJob, actor: PersonRow, early: StackClip[] | null 
       if (controller.signal.aborted) return;
       if (status.state === "done") { if (stopForLikeness(job)) return; await finish(job, actor, status.data, controller.signal); return; }
       if (status.state === "failed") { job.state = "failed"; job.error = plainVideoFailure(new StackVideoError(500, status.code ?? "failed", status.error ?? "")); saveVideoJob(job); return; }
-      if (status.state === "cancelled" && status.code === "no_memory") { job.state = "failed"; job.error = plainVideoFailure(new StackVideoError(503, "no_memory", status.error ?? "")); saveVideoJob(job); return; }
+      if (status.state === "cancelled" && status.code === "no_memory") {
+        const request = job.request as VideoRequest & { memoryRequeues?: number };
+        const retries = request.memoryRequeues ?? 0;
+        if (retries < 2) { request.memoryRequeues = retries + 1; job.state = "queued"; job.stackJob = null; job.phase = "requeued_memory"; job.percent = 0; saveVideoJob(job); return; }
+        job.state = "failed"; job.error = `${VIDEO_FAILED_PREFIX} ${jobQueueCopy("failed_memory", "low_memory_failure", null, null, "adult")}`; saveVideoJob(job); return;
+      }
       if (status.state === "cancelled") { job.state = "cancelled"; job.error = null; saveVideoJob(job); return; }
       job.state = status.state === "queued" ? "queued" : "running";
       job.percent = Math.max(0, Math.min(99, Math.round(status.progress)));
@@ -413,6 +435,7 @@ async function watch(job: VideoJob, actor: PersonRow, early: StackClip[] | null 
     watching.delete(job.id);
     clearLive(job.id);
     liveJobs.delete(job.id);
+    refreshHouseholdQueue();
   }
 }
 
@@ -509,12 +532,14 @@ export async function cancelVideoJob(actor: PersonRow, id: string): Promise<Vide
 export function resumeVideoJobs(): void {
   const rows = db.select().from(videoJobs).where(inArray(videoJobs.state, ["queued", "running"])).all();
   for (const row of rows) void resume(fromRow(row));
+  void releaseHouseholdQueue();
 }
 
 async function resume(job: VideoJob): Promise<void> {
   const person = db.select().from(people).where(eq(people.id, job.personId)).get();
-  if (!person || !job.stackJob) { job.state = "failed"; job.error = `${VIDEO_FAILED_PREFIX} Home restarted before it finished. Try again.`; saveVideoJob(job); return; }
+  if (!person) { job.state = "failed"; job.error = `${VIDEO_FAILED_PREFIX} Home restarted before it finished. Try again.`; saveVideoJob(job); return; }
   liveJobs.set(job.id, job);
+  if (!job.stackJob) return;
   void watch(job, person as PersonRow);
 }
 

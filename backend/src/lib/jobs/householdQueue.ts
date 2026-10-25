@@ -10,7 +10,7 @@ export interface QueueJob {
   createdAt: string | number;
   position?: number | null;
   estimateSeconds?: number | null;
-  riseReason?: "higher_class" | "other_person_first" | null;
+  riseReason?: "higher_class" | "other_person_first" | "requeued_memory" | null;
   /** The job can use otherwise idle room while the head waits. */
   backfillFits?: boolean;
   typicalSeconds?: number;
@@ -18,10 +18,11 @@ export interface QueueJob {
   /** Marks a queued record whose worker is paused and is the head's blocker. */
   resourcePaused?: boolean;
   childDailyCapReached?: boolean;
+  headOfClass?: boolean;
 }
 
 export interface QueuePosition { id: string; position: number }
-export interface QueueStoreEntry { job: QueueJob; save: () => void }
+export interface QueueStoreEntry { job: QueueJob; save: () => void; stackWaiting?: boolean; release?: () => Promise<void> }
 type QueueProvider = () => QueueStoreEntry[];
 
 const CLASS_RANK: Record<QueueClass, number> = { picture: 0, video: 1, other: 2 };
@@ -49,12 +50,12 @@ export function order(jobs: readonly QueueJob[], now: number): QueuePosition[] {
   for (const rank of classes) {
     const inClass = waiting.filter((job) => effectiveClass(job, now) === rank);
     const byPerson = new Map<string, QueueJob[]>();
-    for (const job of inClass.sort((a, b) => createdAt(a) - createdAt(b) || a.id.localeCompare(b.id))) {
+    for (const job of inClass.sort((a, b) => Number(!!b.headOfClass) - Number(!!a.headOfClass) || createdAt(a) - createdAt(b) || a.id.localeCompare(b.id))) {
       const personJobs = byPerson.get(job.personId) ?? [];
       personJobs.push(job);
       byPerson.set(job.personId, personJobs);
     }
-    const people = [...byPerson.keys()].sort((a, b) => createdAt(byPerson.get(a)![0]!) - createdAt(byPerson.get(b)![0]!) || a.localeCompare(b));
+    const people = [...byPerson.keys()].sort((a, b) => Number(!!byPerson.get(b)![0]!.headOfClass) - Number(!!byPerson.get(a)![0]!.headOfClass) || createdAt(byPerson.get(a)![0]!) - createdAt(byPerson.get(b)![0]!) || a.localeCompare(b));
     for (let round = 0; ; round += 1) {
       let added = false;
       for (const person of people) {
@@ -87,7 +88,7 @@ export function writePositions<T extends QueueJob>(jobs: readonly T[], now: numb
   for (const job of jobs) {
     const next = byId.get(job.id) ?? null;
     const old = previous.get(job.id) ?? null;
-    let riseReason: QueueJob["riseReason"] = null;
+    let riseReason: QueueJob["riseReason"] = job.riseReason === "requeued_memory" ? "requeued_memory" : null;
     if (next !== null && old !== null && next > old) {
       const preceding = positions.filter((item) => item.position < next).map((item) => jobs.find((candidate) => candidate.id === item.id)!);
       const higherClass = preceding.some((candidate) => effectiveClass(candidate, now) < effectiveClass(job, now));
@@ -117,6 +118,8 @@ function estimate(jobs: readonly QueueJob[], positions: readonly QueuePosition[]
 }
 
 const providers = new Set<QueueProvider>();
+let releasing = false;
+let releaseAgain = false;
 
 export function registerQueueProvider(provider: QueueProvider): () => void {
   providers.add(provider);
@@ -126,5 +129,30 @@ export function registerQueueProvider(provider: QueueProvider): () => void {
 /** Recomputes the shared number after an existing job-store change. */
 export function refreshHouseholdQueue(now = Date.now()): QueuePosition[] {
   const entries = [...providers].flatMap((provider) => provider());
-  return writePositions(entries.map((entry) => entry.job), now, (job) => entries.find((entry) => entry.job === job)?.save());
+  const positions = writePositions(entries.map((entry) => entry.job), now, (job) => entries.find((entry) => entry.job === job)?.save());
+  void releaseHouseholdQueue();
+  return positions;
+}
+
+/** Submit held Home jobs in household order, keeping at most one not-yet-started job of each kind in Stack. */
+export async function releaseHouseholdQueue(): Promise<void> {
+  if (releasing) { releaseAgain = true; return; }
+  releasing = true;
+  try {
+    do {
+      releaseAgain = false;
+      const entries = [...providers].flatMap((provider) => provider());
+      const jobs = entries.map((entry) => entry.job);
+      const positions = order(jobs, Date.now());
+      const byId = new Map(entries.map((entry) => [entry.job.id, entry]));
+      const blockedClasses = new Set(entries.filter((entry) => entry.stackWaiting).map((entry) => entry.job.jobClass));
+      const runningPeople = new Set(entries.filter((entry) => entry.job.state === "running").map((entry) => entry.job.personId));
+      for (const item of positions) {
+        const entry = byId.get(item.id);
+        if (!entry?.release || blockedClasses.has(entry.job.jobClass) || runningPeople.has(entry.job.personId)) continue;
+        blockedClasses.add(entry.job.jobClass);
+        try { await entry.release(); } catch { /* The job store records a submit failure; other kinds can proceed. */ }
+      }
+    } while (releaseAgain);
+  } finally { releasing = false; }
 }

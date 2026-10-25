@@ -16,19 +16,42 @@ import { checkImages, isAdultOnlyJob } from "./ageCheck";
 import { gateFinished } from "./laneGate";
 import { likenessStillAllowed, type JobLikeness } from "@/lib/likeness/guard";
 import { clearLive, updateLive } from "@/lib/genLive";
-import { refreshHouseholdQueue, registerQueueProvider, type QueueJob } from "@/lib/jobs/householdQueue";
+import { refreshHouseholdQueue, registerQueueProvider, releaseHouseholdQueue, type QueueJob } from "@/lib/jobs/householdQueue";
+import { jobQueueCopy } from "@/lib/jobQueueCopy";
 import { cancelOrDelete, fetchPicture, fetchPicturePreview, getGenerationJob, StackPicturesError, submitGeneration, type GenerationBody, type StackPic } from "./stack";
 
 export { getPictureJob, pictureJobsForTurn, pictureJobIdsByTurn, plainFailure, PICTURE_FAILED_PREFIX, __clearPictureStoreForTests } from "./jobStore";
 export type { PictureFile, PictureJob, PictureJobKind, PictureJobState, PictureRequest } from "./jobStore";
 
 type QueuedPictureJob = PictureJob & { estimateSeconds?: number | null; riseReason?: "higher_class" | "other_person_first" | null };
+const queuedPictureSubmits = new Map<string, () => Promise<{ job: string; done: StackPic[] | null }>>();
 registerQueueProvider(() => unfinishedJobs().map((job) => {
   const queuedJob = job as QueuedPictureJob;
-  const queued: QueueJob = { id: job.id, personId: job.personId, jobClass: "picture", state: job.state, createdAt: job.createdAt,
+  const queued: QueueJob = { id: job.id, personId: job.personId, jobClass: "picture", state: job.state, createdAt: job.createdAt, headOfClass: ((job.request as PictureJob["request"] & { memoryRequeues?: number }).memoryRequeues ?? 0) > 0,
     position: job.position, estimateSeconds: queuedJob.estimateSeconds, riseReason: queuedJob.riseReason, typicalSeconds: job.kind === "edit" ? 20 : 44 };
-  return { job: queued, save: () => { job.position = queued.position ?? null; Object.assign(queuedJob, { estimateSeconds: queued.estimateSeconds, riseReason: queued.riseReason }); saveJob(job); } };
+  return { job: queued, stackWaiting: job.state === "queued" && !!job.stackJob,
+    release: job.state === "queued" && !job.stackJob ? () => releasePicture(job) : undefined,
+    save: () => { job.position = queued.position ?? null; Object.assign(queuedJob, { estimateSeconds: queued.estimateSeconds, riseReason: queued.riseReason }); saveJob(job); } };
 }));
+
+async function releasePicture(job: PictureJob): Promise<void> {
+  if (job.state !== "queued" || job.stackJob) return;
+  try {
+    const submit = queuedPictureSubmits.get(job.id);
+    const submitted = submit ? await submit() : await submitGeneration({ ...((job.request as PictureJob["request"] & { stackBody?: Omit<GenerationBody, "timeout_ms"> }).stackBody ?? {
+      prompt: job.prompt, size: job.request.size, n: job.request.n, audience: job.request.audience,
+      ...(job.request.seed !== null ? { seed: job.request.seed } : {}),
+    }), timeout_ms: 1 });
+    if (job.state !== "queued") { void cancelOrDelete(submitted.job); return; }
+    job.stackJob = submitted.job;
+    queuedPictureSubmits.delete(job.id);
+    markLive(job);
+    savePictureJob(job);
+    void watch(job, db.select().from(people).where(eq(people.id, job.personId)).get() as PersonRow, submitted.done);
+  } catch (error) {
+    job.state = "failed"; job.error = plainFailure(error); queuedPictureSubmits.delete(job.id); savePictureJob(job);
+  }
+}
 
 function savePictureJob(job: PictureJob): void {
   saveJob(job);
@@ -44,6 +67,7 @@ export function __resetPictureJobsForTests(): void {
   for (const controller of watching.values()) controller.abort();
   watching.clear();
   starting.clear();
+  queuedPictureSubmits.clear();
   __clearPictureStoreForTests();
 }
 
@@ -77,18 +101,18 @@ export async function startPictureJob(input: StartPictureInput): Promise<Picture
     starting.add(key);
   }
   try {
-    const submitted = input.local ? null : input.submit ? await input.submit() : await submitGeneration({ ...input.body, timeout_ms: 1 });
     const now = new Date().toISOString();
     const job: PictureJob = {
-      id: newPictureJobId(), personId: input.actor.id, conversationId: input.conversationId, turnId: input.turnId, purpose: input.purpose ?? null, kind: input.kind, state: input.local ? "running" : "queued", stackJob: submitted?.job ?? null,
+      id: newPictureJobId(), personId: input.actor.id, conversationId: input.conversationId, turnId: input.turnId, purpose: input.purpose ?? null, kind: input.kind, state: input.local ? "running" : "queued", stackJob: null,
       percent: 0, phase: input.local ? "starting" : "queued", position: null, prompt: input.prompt,
-      request: { size: input.body.size ?? "1024x1024", n: input.body.n ?? 1, seed: input.body.seed ?? null, loras: (input.body.loras ?? []).map((l) => l.id), source_file_id: input.sourceFileId ?? input.edit?.sourceId ?? null, audience: input.body.audience, quality: qualityOfModel(input.body.model) ?? "quick", ...(input.likeness ? { likeness: input.likeness } : {}), ...(input.edit ? { edit: { source_id: input.edit.sourceId, label: input.edit.label, method: input.edit.method } } : {}) },
+      request: ({ size: input.body.size ?? "1024x1024", n: input.body.n ?? 1, seed: input.body.seed ?? null, loras: (input.body.loras ?? []).map((l) => l.id), source_file_id: input.sourceFileId ?? input.edit?.sourceId ?? null, audience: input.body.audience, quality: qualityOfModel(input.body.model) ?? "quick", stackBody: Object.fromEntries(Object.entries(input.body).filter(([key]) => key !== "timeout_ms")) as Omit<GenerationBody, "timeout_ms">, ...(input.likeness ? { likeness: input.likeness } : {}), ...(input.edit ? { edit: { source_id: input.edit.sourceId, label: input.edit.label, method: input.edit.method } } : {}) } as PictureJob["request"]),
       error: null, files: [], temporary: input.temporary, createdAt: now, updatedAt: now,
     };
     markLive(job);
+    if (input.submit) queuedPictureSubmits.set(job.id, input.submit);
     savePictureJob(job);
     if (input.local) void watchLocal(job, input.actor, input.local);
-    else void watch(job, input.actor, submitted!.done);
+    else void releaseHouseholdQueue();
     return job;
   } finally {
     if (key) starting.delete(key);
@@ -168,7 +192,12 @@ async function watch(job: PictureJob, actor: PersonRow, early: StackPic[] | null
       if (status.state === "done") { if (stopForLikeness(job)) return; await finish(job, actor, status.data); return; }
       if (status.state === "failed") { job.state = "failed"; job.error = plainFailure(new StackPicturesError(500, status.code ?? "failed", status.error ?? "")); savePictureJob(job); return; }
       // The Stack's memory watchdog stopped it (code no_memory): that is a pause the person should hear about, not a cancel they asked for.
-      if (status.state === "cancelled" && status.code === "no_memory") { job.state = "failed"; job.error = plainFailure(new StackPicturesError(503, "no_memory", status.error ?? "")); savePictureJob(job); return; }
+      if (status.state === "cancelled" && status.code === "no_memory") {
+        const request = job.request as PictureJob["request"] & { memoryRequeues?: number };
+        const retries = request.memoryRequeues ?? 0;
+        if (retries < 2) { request.memoryRequeues = retries + 1; job.state = "queued"; job.stackJob = null; job.phase = "requeued_memory"; job.percent = 0; savePictureJob(job); return; }
+        job.state = "failed"; job.error = `${PICTURE_FAILED_PREFIX} ${jobQueueCopy("failed_memory", "low_memory_failure", null, null, "adult")}`; savePictureJob(job); return;
+      }
       if (status.state === "cancelled") { job.state = "cancelled"; job.error = null; savePictureJob(job); return; }
       job.state = status.state === "queued" ? "queued" : "running";
       job.percent = Math.max(0, Math.min(99, Math.round(status.progress)));
@@ -188,6 +217,7 @@ async function watch(job: PictureJob, actor: PersonRow, early: StackPic[] | null
     watching.delete(job.id);
     clearLive(job.id);
     markSettled(job);
+    refreshHouseholdQueue();
   }
 }
 
@@ -303,6 +333,7 @@ async function finish(job: PictureJob, actor: PersonRow, pics: StackPic[]): Prom
   job.percent = 100;
   job.phase = "ready";
   job.error = null;
+  queuedPictureSubmits.delete(job.id);
   savePictureJob(job);
   // A stored cover may update its song, but never changes this picture's outcome.
   try { const { finishSongCover } = await import("@/lib/music/cover"); finishSongCover(job); } catch { /* optional cover linkage */ }
@@ -316,6 +347,7 @@ export async function cancelPictureJob(actor: PersonRow, id: string): Promise<Pi
   if (job.state === "done" || job.state === "failed" || job.state === "cancelled") return job;
   job.state = "cancelled";
   job.error = null;
+  queuedPictureSubmits.delete(job.id);
   savePictureJob(job);
   watching.get(job.id)?.abort();
   if (job.stackJob) await cancelOrDelete(job.stackJob);
@@ -326,9 +358,11 @@ export async function cancelPictureJob(actor: PersonRow, id: string): Promise<Pi
 export function resumePictureJobs(): void {
   for (const job of unfinishedStoredJobs()) {
     const person = db.select().from(people).where(eq(people.id, job.personId)).get();
-    if (!person || !job.stackJob) { job.state = "failed"; job.error = `${PICTURE_FAILED_PREFIX} Home restarted before it finished. Try again.`; savePictureJob(job); continue; }
+    if (!person) { job.state = "failed"; job.error = `${PICTURE_FAILED_PREFIX} Home restarted before it finished. Try again.`; savePictureJob(job); continue; }
+    if (!job.stackJob) { markLive(job); continue; }
     void watch(job, person as PersonRow);
   }
+  void releaseHouseholdQueue();
 }
 
 /** What the file's owner may fetch: the picture's address inside its conversation. */

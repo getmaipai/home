@@ -17,7 +17,7 @@ import { useDefaultScriptedStack } from "./stackFixture";
 import { withStub } from "./turnMachine/toolHarness";
 import { db } from "@/db";
 import { attachments, people as peopleTable } from "@/db/schema";
-import { cancelPictureJob, getPictureJob, startPictureJob } from "@/lib/pictures/jobs";
+import { cancelPictureJob, getPictureJob, startPictureJob, __setPicturePollMsForTests } from "@/lib/pictures/jobs";
 import { deleteAttachmentsForTurns } from "@/lib/attachments";
 import { pictureJobs } from "@/db/schema";
 import { saveJob, type PictureJob } from "@/lib/pictures/jobStore";
@@ -195,12 +195,25 @@ describe("IMGGEN-HOME-01: the call, the job and the stored picture", () => {
     });
   });
 
-  test("a Stack that refuses the submit is a failed tool, not a failed answer (rule 6)", async () => {
+  test("a picture cancelled by the memory watchdog is retried twice without changing its creation time", async () => {
+    fake.failWith = { code: "no_memory", error: "PRIVATE_MEMORY_DETAIL" };
+    const conv = (await import("@/lib/conversationHistory")).resolveOrCreateConversation(people.owner, "chat", undefined, {});
+    if (!conv.ok) throw new Error("no conversation");
+    const job = await startPictureJob({ actor: people.owner, conversationId: conv.value.id, turnId: null, temporary: true, kind: "generate", prompt: "a red fox", body: { prompt: "a red fox", audience: "adult" } });
+    const createdAt = job.createdAt;
+    await until(() => getPictureJob(people.owner, job.id)?.state === "failed");
+    expect(fake.jobs).toHaveLength(3);
+    expect(getPictureJob(people.owner, job.id)?.createdAt).toBe(createdAt);
+    expect(getPictureJob(people.owner, job.id)?.error).toContain("computer ran low on memory");
+  });
+
+  test("a Stack refusal is stored on the queued card after Home submits it (rule 6)", async () => {
     fake.refuseSubmit = { status: 429, code: "queue_full", error: "The queue is full." };
     await withStub({ calls: (r) => (isPhrasing(r) || r.tool_choice === "none" ? undefined : [FOX]), reply: () => "I couldn't start that one just now; try again in a minute." }, async () => {
       const { value } = await streamValue(people.owner, "make me a picture of a red fox");
-      expect(value.reply.text).toContain("couldn't start");
-      expect(value.picture).toBeUndefined();
+      expect(value.picture).toBeDefined();
+      await until(() => getPictureJob(people.owner, value.picture!.id)?.state === "failed");
+      expect(getPictureJob(people.owner, value.picture!.id)?.error).toContain("full line");
     });
   });
 
@@ -250,6 +263,20 @@ describe("IMGGEN-HOME-01: jobs that are stopped, forgotten or broken", () => {
       expect(fake.submitted).toHaveLength(1);
       await cancelPictureJob(people.owner, first.id);
     });
+  });
+
+  test("cancelling a picture held behind the Stack's unstarted slot never submits it", async () => {
+    fake.pollsToFinish = 50;
+    __setPicturePollMsForTests(5000);
+    const conv = (await import("@/lib/conversationHistory")).resolveOrCreateConversation(people.owner, "chat", undefined, {});
+    if (!conv.ok) throw new Error("no conversation");
+    const first = await startPictureJob({ actor: people.owner, conversationId: conv.value.id, turnId: null, temporary: true, kind: "generate", prompt: "first", body: { prompt: "first", audience: "adult" } });
+    await until(() => fake.jobs[0]?.polls === 1);
+    const held = await startPictureJob({ actor: people.owner, conversationId: conv.value.id, turnId: null, temporary: true, kind: "generate", prompt: "held", body: { prompt: "held", audience: "adult" } });
+    expect(held.stackJob).toBeNull();
+    await cancelPictureJob(people.owner, held.id);
+    expect(fake.submitted).toHaveLength(1);
+    await cancelPictureJob(people.owner, first.id);
   });
 
   test("only changes are written: a save of the same state writes no row and bumps no hlc", () => {

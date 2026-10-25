@@ -105,14 +105,14 @@ describe("music routes", () => {
     const out = await runGenerateMusic({ state: musicState(actor, true), args: { description: "a folk tune" }, callId: "g", spoken: false });
     const id = musicForOutcomes([out])!.id;
     const queued = await (await client.get(`/api/music/jobs/${id}`)).json() as { stage_label: string; stages: Array<{ id: string; label: string }> };
-    expect(queued.stage_label).toContain("You are number");
+    expect(queued.stage_label).toBe("You are next.");
     expect(queued.stages).toEqual([
       { id: "queued", label: "Queued" }, { id: "model", label: "Loading" }, { id: "planning", label: "Planning" },
       { id: "making", label: "Making" }, { id: "mixing", label: "Mixing" }, { id: "finishing", label: "Finishing" },
     ]);
     fake.queued = false;
     await waitForMusic(() => getMusicJobFor(actor, id)?.state === "running");
-    expect(await (await client.get(`/api/music/jobs/${id}`)).json()).toMatchObject({ state: "running", stage_label: "Planning", progress: 0.25, eta_seconds: 15, position: 2 });
+    expect(await (await client.get(`/api/music/jobs/${id}`)).json()).toMatchObject({ state: "running", stage_label: "Planning", progress: 0.25, eta_seconds: 15, position: null });
     await client.request(`/api/music/jobs/${id}`, { method: "DELETE" });
   });
   test("Stop cancels the job and the Stack copy, while a finished job stays done", async () => {

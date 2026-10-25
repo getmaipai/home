@@ -18,6 +18,7 @@ import { __setMusicStatusForTests, readyMusicStatusForTests } from "@/lib/music/
 import { attachmentFilePath } from "@/lib/attachments";
 import { musicForOutcomes } from "@/lib/composer";
 import { __resetThrottleForTests } from "@/lib/secretThrottle";
+import { releaseHouseholdQueue } from "@/lib/jobs/householdQueue";
 import type { PersonRow } from "@/types";
 let owner: ReturnType<typeof createBenchPeople>;
 let fake: ReturnType<typeof installFakeMusicStack>;
@@ -72,11 +73,12 @@ describe("a stop during the submit sticks", () => {
     let release!: () => void;
     fake.beforeSubmit = () => new Promise<void>((resolve) => { release = resolve; });
     const promise = runGenerateMusic({ state, args: { description: "an original folk song" }, callId: "c", spoken: false });
+    await releaseHouseholdQueue();
     await waitForMusic(() => !!release);
     const live = [...liveJobs.values()][0]!;
     expect((await cancelMusicJob(owner.owner, live.id))?.state).toBe("cancelled");
     release();
-    expect((await promise).status).toBe("failed");
+    expect((await promise).status).toBe("succeeded");
     await waitForMusic(() => fake.deleted.includes("mjob-1"));
     await new Promise((r) => setTimeout(r, 30));
     expect(fake.polls.get("mjob-1")).toBe(0);
@@ -98,6 +100,8 @@ describe("a stop during the submit sticks", () => {
     const state = musicState(owner.owner, true);
     const out = await runGenerateMusic({ state, args: { description: "an original folk song" }, callId: "c", spoken: false });
     const id = musicForOutcomes([out])!.id;
+    await releaseHouseholdQueue();
+    await waitForMusic(() => (fake.polls.get("mjob-1") ?? 0) > 0);
     deleteMusicJobsForTurns([state.turnId]);
     await waitForMusic(() => liveJobs.size === 0 && __removedMusicJobCountForTests() === 0);
     expect(getMusicJobFor(owner.owner, id)).toBeNull();
