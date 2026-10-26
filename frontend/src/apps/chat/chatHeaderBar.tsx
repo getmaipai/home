@@ -197,14 +197,6 @@ export function ChatHeaderBar({ phoneRow = false, trailing, shells = false, onMe
           <Button type="button" variant="ghost" size="icon" className="text-muted-foreground" aria-label="Conversation actions"><MoreIcon className="size-[18px]" /></Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end" density="compact">
-          {shells && data.pinnable ? <>
-            <div className="px-2 py-1.5 text-sm font-medium text-muted-foreground">Companion</div>
-            <DropdownMenuRadioGroup value={data.companionId ?? "default"} onValueChange={(value) => void data.onCompanionChange(value === "default" ? null : value)}>
-              <DropdownMenuRadioItem value="default">My default</DropdownMenuRadioItem>
-              {data.companions.map((companion) => <DropdownMenuRadioItem key={companion.id} value={companion.id}>{companion.name}</DropdownMenuRadioItem>)}
-            </DropdownMenuRadioGroup>
-            <DropdownMenuSeparator />
-          </> : null}
           {onHistory ? <><DropdownMenuItem onClick={onHistory}><HistoryIcon className="size-4" />Chat history</DropdownMenuItem><DropdownMenuSeparator /></> : null}
           <DropdownMenuItem onClick={() => setRenaming(true)}><PencilIcon className="size-4" />Rename</DropdownMenuItem>
           {data.pinnable ? <DropdownMenuItem onClick={() => void data.onPinChange(!data.pinned)}>{data.pinned ? <PinOffIcon className="size-4" /> : <PinIcon className="size-4" />}{data.pinned ? "Unpin" : "Pin"}</DropdownMenuItem> : null}
@@ -216,10 +208,16 @@ export function ChatHeaderBar({ phoneRow = false, trailing, shells = false, onMe
     </>
   );
   const companionId = data.companionId ?? data.defaultCompanionId ?? null;
+  const identityMenu = data.pinnable ? (
+    <DropdownMenuRadioGroup value={data.companionId ?? "default"} onValueChange={(value) => void data.onCompanionChange(value === "default" ? null : value)}>
+      <DropdownMenuRadioItem value="default">My default</DropdownMenuRadioItem>
+      {data.companions.map((companion) => <DropdownMenuRadioItem key={companion.id} value={companion.id}>{companion.name}</DropdownMenuRadioItem>)}
+    </DropdownMenuRadioGroup>
+  ) : undefined;
   if (shells || companionId) {
     return (
       <>
-        <WithCompanion companionId={companionId} fallbackName={data.companions.find(({ id }) => id === companionId)?.name}>{(name, media) => <ChatHeader name={name} media={media} onMenu={onMenu} onCall={onCall} actions={actions} menuExpanded={menuExpanded} menuControls={menuControls} />}</WithCompanion>
+        <WithCompanion companionId={companionId} fallbackName={data.companions.find(({ id }) => id === companionId)?.name}>{(name, media) => <ChatHeader name={name} media={media} identityMenu={identityMenu} onMenu={onMenu} onCall={onCall} actions={actions} menuExpanded={menuExpanded} menuControls={menuControls} />}</WithCompanion>
         <Dialog open={renaming} onOpenChange={setRenaming}>
           <DialogContent>
             <DialogHeader><DialogTitle>Rename</DialogTitle><DialogDescription>{title}</DialogDescription></DialogHeader>

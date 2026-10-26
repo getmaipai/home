@@ -326,9 +326,12 @@ describe("ChatHeaderBar", () => {
       presenceMock = { name: "Nova" };
       const onCompanionChange = mock(async (_id: string | null) => {});
       const view = renderShells(baseData({ companionId: "lively-child", companions: [{ id: "lively-child", name: "Sprout" }, { id: "lively-adult", name: "Rivet" }], onCompanionChange }));
-      await openActionsMenu(view);
-      expect(await view.findByText("Companion")).toBeTruthy();
-      expect(view.getByRole("menuitemradio", { name: "Sprout" }).getAttribute("aria-checked")).toBe("true");
+      const picker = await view.findByRole("button", { name: "Change companion" });
+      act(() => {
+        fireEvent.pointerDown(picker, { button: 0, ctrlKey: false, pointerId: 1 });
+        fireEvent.click(picker);
+      });
+      expect((await view.findByRole("menuitemradio", { name: "Sprout" })).getAttribute("aria-checked")).toBe("true");
       fireEvent.click(view.getByRole("menuitemradio", { name: "Rivet" }));
       await waitFor(() => expect(onCompanionChange).toHaveBeenCalledWith("lively-adult"));
     });
@@ -336,8 +339,7 @@ describe("ChatHeaderBar", () => {
     test("temporary chats hide the companion choice", async () => {
       presenceMock = null;
       const view = renderShells(baseData({ pinnable: false, companions: [{ id: "lively-child", name: "Sprout" }] }));
-      await openActionsMenu(view);
-      expect(view.queryByText("Companion")).toBeNull();
+      expect(view.queryByRole("button", { name: "Change companion" })).toBeNull();
       expect(view.queryByRole("menuitemradio", { name: "Sprout" })).toBeNull();
     });
 

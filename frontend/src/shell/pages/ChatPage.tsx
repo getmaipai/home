@@ -808,8 +808,18 @@ function ChatHeaderDataBridge({ autoReadReplies, setAutoReadReplies, ttsAvailabl
     defaultCompanionId,
     companions: companionChoices,
     onCompanionChange: async (companionId) => {
-      if (!conversationId || !pinnable) return;
+      if (!pinnable) return;
       try {
+        if (!conversationId) {
+          // A new chat has no stored conversation yet: the choice becomes the person's own companion, which the empty chat and the first message follow.
+          if (companionId === null) return;
+          await api.setSetting(`person:${person.id}`, "persona.active_id", companionId);
+          await Promise.all([
+            queryClient.invalidateQueries({ queryKey: ["settingsValues", `person:${person.id}`] }),
+            queryClient.invalidateQueries({ queryKey: ["companion-avatar"] }),
+          ]);
+          return;
+        }
         const updated = await api.setConversationCompanion(conversationId, companionId);
         queryClient.setQueryData(["conversation", conversationId], updated);
         await Promise.all([
