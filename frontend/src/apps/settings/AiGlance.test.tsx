@@ -37,4 +37,26 @@ describe("AiGlance Apply", () => {
     expect(view.queryByRole("heading", { name: "AI & Models" })).toBeNull();
     release();
   });
+
+  test("a row whose model is downloading shows the progress, and a failed one says so", async () => {
+    const serve = (choice: object) => {
+      globalThis.fetch = ((input: RequestInfo | URL) => {
+        const path = (typeof input === "string" ? input : input.toString()).split("?")[0]!;
+        if (path.endsWith("/api/ai/choices")) return Promise.resolve(Response.json({ ...overview, cards: [{ ...overview.cards[0]!, choices: [choice] }] }));
+        if (path.endsWith("/api/host/hardware")) return Promise.resolve(Response.json({ platform: "darwin", totalRamGb: 24, cpuCount: 8, isAppleSilicon: true, unifiedMemoryGb: 24, cudaDevices: [] }));
+        if (path.includes("/api/settings")) return Promise.resolve(Response.json([]));
+        return Promise.resolve(Response.json({}));
+      }) as typeof fetch;
+    };
+    const card = { card: { copy: {} } } as unknown as Parameters<typeof AiGlance>[0];
+    serve({ ...wakeChoice, state: "installing", percent: 40 });
+    const downloading = renderWithQueryClient(<MemoryRouter><AiGlance {...card} /></MemoryRouter>);
+    const bar = await downloading.findByTestId("ai-progress-wakeword");
+    expect(bar.textContent).toContain("Hey Jarvis");
+    expect(bar.textContent).toContain("40%");
+    cleanup();
+    serve({ ...wakeChoice, current: true, state: "failed", failure: "The download stopped. Try again." });
+    const failed = renderWithQueryClient(<MemoryRouter><AiGlance {...card} /></MemoryRouter>);
+    expect(await failed.findByText("The download stopped. Try again.")).toBeTruthy();
+  });
 });

@@ -7,6 +7,7 @@ import { useMutation, useQuery } from "@tanstack/react-query";
 import { Alert, AlertDescription, AlertTitle } from "@maipai/ui/src/ui/alert";
 import { Badge } from "@maipai/ui/src/ui/badge";
 import { Button } from "@maipai/ui/src/ui/button";
+import { Progress } from "@maipai/ui/src/ui/progress";
 import { RouteSkeleton } from "@maipai/ui/src/primitives/RouteSkeleton";
 import { Switch } from "@maipai/ui/src/ui/switch";
 import { StorageBar } from "@maipai/ui/src/primitives/StorageBar";
@@ -45,6 +46,7 @@ export function AiGlance({ card }: SettingsViewProps) {
   const [resetting, setResetting] = useState<GlanceRow | null>(null);
   const [cleanup, setCleanup] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [step, setStep] = useState<string | null>(null);
 
   const data = query.data;
   const offJobs = useMemo(() => {
@@ -80,6 +82,7 @@ export function AiGlance({ card }: SettingsViewProps) {
   const apply = useMutation({
     mutationFn: async () => {
       for (const row of rows.filter((entry) => entry.staged)) {
+        setStep(`${row.shownEnabled ? "Setting up" : "Turning off"} ${row.title}…`);
         const role = ENGINE_ROLE[row.job];
         const single = row.options.length === 1 && row.options[0]!.kind === "switch" ? row.options[0]! : null;
         if (!row.shownEnabled) {
@@ -94,8 +97,8 @@ export function AiGlance({ card }: SettingsViewProps) {
         }
       }
     },
-    onSuccess: () => { setStaged({}); setError(null); refresh(); void settings.refetch(); },
-    onError: (e) => { setError(messageOf(e, "Could not apply the changes. Check that the engine is running, then try again.")); refresh(); void settings.refetch(); },
+    onSuccess: () => { setStep(null); setStaged({}); setError(null); refresh(); void settings.refetch(); },
+    onError: (e) => { setStep(null); setError(messageOf(e, "Could not apply the changes. Check that the engine is running, then try again.")); refresh(); void settings.refetch(); },
   });
 
   if (query.isLoading) return <RouteSkeleton label="Loading your AI setup" />;
@@ -175,6 +178,7 @@ export function AiGlance({ card }: SettingsViewProps) {
         <Alert data-testid="ai-staged">
           <AlertTitle>{fill(copy.staged ?? "", { count: stagedCount })}</AlertTitle>
           <AlertDescription>
+            {apply.isPending && step ? <p className="text-base">{step}</p> : null}
             <div className="flex gap-2">
               <Button type="button" variant="outline" size="sm" disabled={apply.isPending} onClick={() => setStaged({})}>{copy.discard}</Button>
               <Button type="button" size="sm" disabled={apply.isPending} onClick={() => apply.mutate()}>{apply.isPending ? "Applying…" : copy.apply}</Button>
@@ -208,6 +212,10 @@ function glanceRow({ row, copy, onSwitch, onEdit, onReset, onDownload }: { row: 
   const Gear = getIcon("settings");
   const Down = getIcon("download");
   const model = row.shown;
+  // What the engine is doing for this row right now: a download or install in flight (any of its models), or the chosen model's failure.
+  const busy = row.options.find((option) => option.state === "installing") ?? null;
+  const progress = busy ? { text: busy.percent !== null ? `${fill(copy.installing ?? "Downloading and installing {name}", { name: busy.label })}: ${Math.round(busy.percent)}%` : fill(copy.installing ?? "Downloading and installing {name}", { name: busy.label }), percent: busy.percent } : null;
+  const failed = !busy && model?.state === "failed" ? model : null;
   const line = !row.offered ? (copy.not_offered ?? "") : model?.description ?? row.summary;
   return (
     <Item key={row.job} data-testid={`ai-row-${row.job}`} data-missing={row.missing ? "true" : undefined}>
@@ -220,6 +228,13 @@ function glanceRow({ row, copy, onSwitch, onEdit, onReset, onDownload }: { row: 
         <ItemDescription clamp={false}>{model && row.offered ? `${model.label}. ` : ""}{line}</ItemDescription>
         {model && row.offered ? <ItemDescription clamp={false}>{model.details.map((part) => part.name).join(", ")}</ItemDescription> : null}
         {row.job === "wakeword" && row.offered ? <ItemDescription clamp={false}>{copy.wakeword_note}</ItemDescription> : null}
+        {progress ? (
+          <div className="flex flex-col gap-1" data-testid={`ai-progress-${row.job}`}>
+            <ItemDescription clamp={false}>{progress.text}</ItemDescription>
+            {progress.percent !== null ? <Progress value={progress.percent} aria-label={progress.text} /> : null}
+          </div>
+        ) : null}
+        {failed ? <p className="text-base text-destructive">{failed.failure ?? failed.stateText}</p> : null}
       </ItemContent>
       <ItemActions>
         {model && row.offered && row.shownEnabled ? <span className="text-base text-muted-foreground">{sizeGb(model.installedBytes)} · {fill(copy.ram_estimate ?? "", { size: sizeGb(model.ramBytes) })}</span> : null}
