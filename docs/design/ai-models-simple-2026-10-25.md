@@ -237,11 +237,12 @@ glance, one Recommended per card, no model name outside Details, no horizontal s
 
 Jesse ruled 2026-10-26: the settings move to this page. Spec first, in `commons/spec`:
 
-- `generation.picture_quality`, `generation.video_quality` and `generation.music.enabled` leave `household.pictures` and get a group placed only in the AI and models job cards. The "Pictures, videos and music" card drops them (its other keys stay).
+- `generation.picture_quality`, `generation.video_quality` and `generation.music.enabled` leave `household.pictures`. Each job card declares exactly one new group that holds only that job's keys (`household.ai_pictures` holds `generation.picture_quality`; likewise videos, music, chat, voice and coding), and that card's `AiJobChoices` body is the only thing that draws the group, so no default renderer runs for it. The Search and memory and Always on cards carry no group, like the link cards. The "Pictures, videos and music" card drops them (its other keys stay).
 - The chat, voice and coding `engines.<role>.choice` rows leave "Model per job" (`household.ai_models`) and are placed only in their job card. "Model per job" keeps the roles that have no job card.
 - The seven job cards and Always on are declared in `areas.json` as `SettingsShell` cards, each body the `AiJobChoices` view for one job. Card titles and sentences are `areas.json` card copy.
 - Switches that set no setting (picture tools, picture naming, Chat can look at pictures, Coding helper, Standard voice) carry their label and description as per-choice card copy in the same `areas.json` card, read through the spec copy helper. Neither `aiChoices.ts` nor the view holds them.
 - The landed interim copy (`AI_COPY`, card summaries, `SHORT_WORDS`, `PLAIN_ROW_NAMES`, `JOB_WORDS`) is deleted when the spec tag is pinned. The landed frames (section, heading and summary in `AiJobChoices`, the Always on box and the button row in `AiOverview`) and the 2 s and 30 s refetch loop go too: choices refresh when the `/api/install` job list `InstallStrip` reads changes. The Stack-unreachable message goes through `lib/failureCopy.ts`. The Search and memory card renders its one line and the link.
+- A view-bodied card is a new spec card kind; if the kit's settings renderer must draw its frame, that is a `commons` change first (rule 9c), named in slice 5.
 - A new `commons` spec tag needs Jesse's yes in that turn.
 
 ## Supersedes
@@ -251,7 +252,7 @@ Jesse ruled 2026-10-26: the settings move to this page. Spec first, in `commons/
 - The "Install the recommended extras" button (LICENCE-ACK-01 `installExtras`) on the licence prompt and its use as a second way to get recommended parts: the new button replaces it as the one way (the licence acceptance itself stays; `install.recommended_auto_on_upgrade` keeps its meaning and is read by the new button's list, not duplicated).
 - `video-generation-2026-10-17.md` section 15 and VIDEO-LTX-07 (owner ruling 2026-10-17, Detailed video Recommended on 128 GB): replaced by owner answer 3 (2026-10-25). Quick video is recommended, `video-detailed` is optional, and the Recommended free-space figure for that tier and the setup default change with it. The sizes in the examples above are illustrations; slice 1 recomputes them from `diskVerdict`.
 - In setup, `PlanDiskList` as a checkbox list (its footer stays).
-- Nothing in the image-model decision (ERNIE Quick, Klein edits, Z-Image Detailed), `generation.picture_quality`, the Pictures page, or any rule.
+- Nothing in the image-model decision (ERNIE Quick, Klein edits, Z-Image Detailed), the values and meaning of `generation.picture_quality`, the Pictures page, or any rule.
 
 Fits inside SETTINGS-IA-04 (the household AI and models page structure and its summary strip); no item covers job cards, set-to-recommended or cleanup of unused models.
 
