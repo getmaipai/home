@@ -3,7 +3,8 @@ import "../runTemp";
 // processes ("shards"), split by measured duration, with the same pass/fail
 // meaning as a single `bun test`: exit 0 only if every file passed, otherwise
 // the first failing shard's exit code, one printed summary, and the failing
-// test named. Fail fast: the first failure stops the other shards.
+// test named. A parsable unlisted test failure waits for every shard and gets
+// one isolated file rerun before it is treated as real.
 //
 // Why processes and not bun's own concurrency: a test file's preload
 // (backend/tests/preload.ts) sets process-wide env (data dir, ports) at
@@ -449,6 +450,8 @@ export async function run(opts: RunOptions): Promise<number> {
   let firstFail: { shard: Live; code: number; line?: string } | null = null;
   let maxObservedPeakGb = 0;
   const flakyCandidates = new Map<string, { entry: FlakeEntry; line: string }>();
+  const unlistedFailures = new Map<string, { line: string; shard: Live }>();
+  const serialUnlistedFailures = new Map<string, { line: string; file: string }>();
   const liveEntries = ledger.flakes.filter((entry) => entry.deadline >= new Date().toISOString().slice(0, 10));
   const changedFiles = opts.changedFiles ?? changedTestFiles(dir, liveEntries);
   const eligible = (entry: FlakeEntry) => entry.workspace === label && !changedFiles.includes(entry.file);
@@ -511,22 +514,19 @@ export async function run(opts: RunOptions): Promise<number> {
           if (!line.startsWith("(fail)")) continue;
           const entry = isListed(line, shardFiles);
           if (entry) flakyCandidates.set(`${entry.workspace}/${entry.file}\0${entry.test}`, { entry, line });
-          else if (!firstFail) {
-            firstFail = { shard, code: 1, line };
-            stopAll(shard);
-          }
+          else if (!unlistedFailures.has(`${shard.index}\0${line}`)) unlistedFailures.set(`${shard.index}\0${line}`, { line, shard });
         }
       }
       if (pending.startsWith("(fail)")) {
         const entry = isListed(pending, shardFiles);
         if (entry) flakyCandidates.set(`${entry.workspace}/${entry.file}\0${entry.test}`, { entry, line: pending });
-        else if (!firstFail) { firstFail = { shard, code: 1, line: pending }; stopAll(shard); }
+        else if (!unlistedFailures.has(`${shard.index}\0${pending}`)) unlistedFailures.set(`${shard.index}\0${pending}`, { line: pending, shard });
       }
     };
     shard.done = Promise.all([drain(proc.stdout, `${logPath}.out`), drain(proc.stderr, logPath), proc.exited]).then(([, , code]) => {
       const failures = failedTests(readShardLog(logPath));
       const allListed = failures.length > 0 && failures.every((line) => isListed(line, shardFiles));
-      if (code !== 0 && !allListed && !firstFail) { firstFail = { shard, code }; stopAll(shard); }
+      if (code !== 0 && failures.length === 0 && !allListed && !firstFail) { firstFail = { shard, code }; }
       return code;
     }).finally(() => {
       clearInterval(sampler);
@@ -583,9 +583,13 @@ export async function run(opts: RunOptions): Promise<number> {
   };
   let nextShard = 0;
   while (nextShard < plan.length || active.size > 0) {
-    if (firstFail) break;
+    if (firstFail) {
+      nextShard = plan.length;
+      if (active.size === 0) break;
+      await Promise.race([...active].map((shard) => shard.done));
+      continue;
+    }
     const resources = await probe();
-    if (firstFail) break;
     const currentCap = chooseShardCount({
       cores: cpus().length,
       freeGb: resources.reclaimableGb + (workerSlotsDir ? workerSlotCount(workerSlotsDir) * shardPeakGb : 0),
@@ -610,6 +614,8 @@ export async function run(opts: RunOptions): Promise<number> {
       } else if (nextShard < plan.length) {
         console.log(`shard: pressure ${resources.pressureLevel}; pausing new workers`);
         await pause(1000);
+      } else {
+        break;
       }
       continue;
     }
@@ -624,6 +630,19 @@ export async function run(opts: RunOptions): Promise<number> {
     nextShard += 1;
   }
   await Promise.all(live.map((s) => s.done));
+
+  // Any shard that failed without a parsable test name is a compile/crash
+  // failure. Preserve the existing fast failure behavior for that case.
+  if (!firstFail) {
+    for (const shard of live) {
+      const code = await shard.proc.exited;
+      const out = readShardLog(shard.logPath);
+      if (code !== 0 && failedTests(out).length === 0 && failedFiles(out).length === 0) {
+        firstFail = { shard, code };
+        break;
+      }
+    }
+  }
 
   // Real network tests and UI fetch mocks run alone after parallel shards to
   // avoid cross-file multicast and process-global fetch interference.
@@ -654,8 +673,16 @@ export async function run(opts: RunOptions): Promise<number> {
       const failures = failedTests(`${stdout}\n${stderr}`);
       const allListed = failures.length > 0 && failures.every((line) => isListed(line, [file]));
       if (allListed) for (const line of failures) { const entry = isListed(line, [file]); if (entry) flakyCandidates.set(`${entry.workspace}/${entry.file}\0${entry.test}`, { entry, line }); }
-      else firstFail = { shard: { index: plan.length, proc, logPath: "", junit: "", files: [file], done: Promise.resolve(code) }, code, line: failures[0] };
+      else if (failures.length > 0) for (const line of failures) serialUnlistedFailures.set(`${file}\0${line}`, { file, line });
+      else firstFail = { shard: { index: plan.length, proc, logPath: "", junit: "", files: [file], done: Promise.resolve(code) }, code };
     }
+  }
+
+  for (const { file, line } of serialUnlistedFailures.values()) {
+    unlistedFailures.set(`serial\0${file}\0${line}`, {
+      line,
+      shard: { index: plan.length, proc: {} as ReturnType<typeof Bun.spawn>, logPath: "", junit: "", files: [file], done: Promise.resolve(1) },
+    });
   }
 
   // Rerun each listed, unchanged test once, by its exact name, after all
@@ -680,6 +707,33 @@ export async function run(opts: RunOptions): Promise<number> {
     }
     console.log(`FLAKY ${entry.workspace}/${entry.file} > ${entry.test} (passed on one isolated rerun)`);
     recordFlaky(entry, line);
+  }
+
+  // Rerun each unlisted failing file once, by itself. A repeat failure is a
+  // real failure; a pass is recorded in the same event log used by stats.
+  if (!firstFail) {
+    const unlistedFiles = new Map<string, { shard: Live; line: string }>();
+    for (const { line, shard } of unlistedFailures.values()) {
+      const parsed = shard.logPath ? failedFiles(readShardLog(shard.logPath)) : [];
+      const fallback = parsed.length ? parsed : shard.files;
+      for (const file of fallback) if (!unlistedFiles.has(file)) unlistedFiles.set(file, { shard, line });
+    }
+    for (const [file, failure] of unlistedFiles) {
+      const slot = await reserveForSingleWorker();
+      const proc = Bun.spawn(["bun", "test", "--timeout", String(TEST_TIMEOUT_MS), file.startsWith("./") ? file : `./${file}`], { cwd: dir, env: process.env, stdout: "pipe", stderr: "pipe" });
+      setSlotOwner(slot, proc.pid);
+      const [stdout, stderr] = await Promise.all([new Response(proc.stdout).text(), new Response(proc.stderr).text()]);
+      const rerunCode = await proc.exited;
+      releaseSlot(slot);
+      if (rerunCode !== 0) {
+        process.stdout.write(stdout);
+        process.stderr.write(stderr);
+        firstFail = { shard: failure.shard, code: rerunCode, line: failure.line };
+        break;
+      }
+      console.log(`FLAKY-UNLISTED ${label}/${file} (failed in the shard, passed on one isolated rerun)`);
+      if (opts.failureLog ?? process.env.GATE_FAILURE_LOG) appendFileSync(opts.failureLog ?? process.env.GATE_FAILURE_LOG as string, `flaky\t${label}/${file} > ${cleanFailureName(failure.line)}\tgate\t\t${failure.line}\n`);
+    }
   }
 
   if (peakFile && maxObservedPeakGb > 0) {

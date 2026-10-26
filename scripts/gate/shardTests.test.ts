@@ -260,15 +260,43 @@ describe("run: the gate's pass/fail meaning", () => {
     }
   });
 
-  test("an unlisted failure stops the other shards", async () => {
+  test("an unlisted failure lets the other shards finish", async () => {
     const dir = fixture({ "a.test.ts": "", "b.test.ts": "" });
     const marker = join(dir, "sibling-finished");
     writeFileSync(join(dir, "tests/a.test.ts"), `import {test,expect} from "bun:test"; test("unlisted red",()=>expect(1).toBe(2));`);
     writeFileSync(join(dir, "tests/b.test.ts"), `import {test} from "bun:test"; import {writeFileSync} from "node:fs"; test("long sibling",async()=>{await Bun.sleep(1000);writeFileSync(${JSON.stringify(marker)},"done")});`);
     try {
       expect(await quietRun({ dir, root: "tests", shards: 2, timingsPath: join(dir, "t.json"), changedFiles: [] })).not.toBe(0);
-      expect(existsSync(marker)).toBe(false);
+      expect(existsSync(marker)).toBe(true);
     } finally { rmSync(dir, { recursive: true, force: true }); }
+  });
+
+  test("an unlisted shard failure that passes alone is recorded and green", async () => {
+    const dir = fixture({ "a.test.ts": "", "b.test.ts": "" });
+    const marker = join(dir, "first-run");
+    const aPath = join(dir, "tests/a.test.ts");
+    writeFileSync(aPath, `import {test,expect} from "bun:test"; import {existsSync,writeFileSync} from "node:fs"; test("unlisted once",()=>{if(!existsSync(${JSON.stringify(marker)})){writeFileSync(${JSON.stringify(marker)},"seen"); expect(1).toBe(2)} expect(1).toBe(1)});`);
+    writeFileSync(join(dir, "tests/b.test.ts"), `import {test,expect} from "bun:test"; test("sibling",()=>expect(1).toBe(1));`);
+    const log = join(dir, "events.tsv");
+    const messages: string[] = [];
+    const originalLog = console.log;
+    console.log = (...args: unknown[]) => messages.push(args.join(" "));
+    try {
+      expect(await run({ ...fixtureBudget, dir, root: "tests", shards: 2, timingsPath: join(dir, "t.json"), ledger: { version: 2, flakes: [], serial: {}, skipped: [] }, changedFiles: [], failureLog: log })).toBe(0);
+      expect(messages.join("\n")).toContain("FLAKY-UNLISTED ");
+      expect(readFileSync(log, "utf8")).toContain("flaky\t");
+    } finally { console.log = originalLog; rmSync(dir, { recursive: true, force: true }); }
+  });
+
+  test("an unlisted file that fails alone remains red", async () => {
+    const dir = fixture({ "a.test.ts": `import {test,expect} from "bun:test"; test("always red",()=>expect(1).toBe(2));` });
+    const output: string[] = [];
+    const write = process.stderr.write;
+    process.stderr.write = ((chunk: string | Uint8Array) => { output.push(String(chunk)); return true; }) as typeof process.stderr.write;
+    try {
+      expect(await run({ ...fixtureBudget, dir, root: "tests", shards: 1, timingsPath: join(dir, "t.json"), ledger: { version: 2, flakes: [], serial: {}, skipped: [] }, changedFiles: [] })).not.toBe(0);
+      expect(output.join("")).toContain("always red");
+    } finally { process.stderr.write = write; rmSync(dir, { recursive: true, force: true }); }
   });
 
   test("a listed failure lets all shards finish, reruns that test once, and records FLAKY", async () => {
