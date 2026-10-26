@@ -122,6 +122,20 @@ describe("what a scan reads from each kind", () => {
     expect(itemFromRow(byPath("Home videos/Hardcore porn compilation.mp4")).band_ok).toBe("adult");
     expect(itemFromRow(byPath("Home videos/Sprout at the beach.mp4")).band_ok).toBe("child");
   });
+
+  test("lyrics trip the child floor and made lyrics survive a rescan without source lyrics", async () => {
+    const tree = buildMediaTree();
+    const root = addRoot(tree.videos, ["video"]);
+    await scanRoot(root.id, noProber);
+    const { bandOkAtIngest } = await import("@/lib/media/band");
+    expect(bandOkAtIngest({ explicit: false, title: "Song", lyrics: "explicit porn" }).band).toBe("adult");
+
+    const made = byPath("Bramble Workshop/Building a birdhouse [bw-001].mp4");
+    db.update(mediaItems).set({ lyrics: JSON.stringify({ source: "made", text: "Generated verse" }) }).where(eq(mediaItems.id, made.id)).run();
+    writeFileSync(join(tree.videos, "Bramble Workshop", "Building a birdhouse [bw-001].mp4"), "changed file");
+    await scanRoot(root.id, noProber);
+    expect(itemFromRow(byPath("Bramble Workshop/Building a birdhouse [bw-001].mp4")).lyrics).toEqual({ source: "made", text: "Generated verse" });
+  });
 });
 
 describe("the fast path and changes", () => {

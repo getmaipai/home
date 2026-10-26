@@ -2065,6 +2065,7 @@ export const mediaItems = sqliteTable(
     seriesIndex: real("series_index"),
     locatorKind: text("locator_kind").notNull().default("none"),
     external: text("external"), // JSON (spec MediaItem.external)
+    lyrics: text("lyrics_json"), // JSON (spec MediaItem.lyrics)
     externalId: text("external_id"), // external.id lifted for the (source_id, external id) identity
     advisoryExplicit: integer("advisory_explicit", { mode: "boolean" }).notNull().default(false),
     advisorySource: text("advisory_source").notNull().default("tag"),

@@ -6,7 +6,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { parseTvName, seasonFolderNumber, findFolderArt } from "@/lib/media/parsers/tv";
 import { parseFilmName, parseNfo, readNfoFor, filmNameHasYear } from "@/lib/media/parsers/film";
-import { readAudioTags, readEmbeddedCover } from "@/lib/media/parsers/audioTags";
+import { readAudioTags, readEmbeddedCover, readSidecarLyrics } from "@/lib/media/parsers/audioTags";
 import { readEpubMeta, readEpubCover, parseOpf } from "@/lib/media/parsers/epub";
 import { parsePdf, readPdfMeta } from "@/lib/media/parsers/pdf";
 import { openZip } from "@/lib/media/parsers/zip";
@@ -87,6 +87,20 @@ describe("audio tags", () => {
     expect(await read(0)).toBe(false);
     expect((await readAudioTags(fixture("plain.m4a")))!.explicit).toBe(false);
     expect((await readAudioTags(fixture("advisory.mp3")))!.explicit).toBe(true);
+  });
+  test("USLT ID3 lyrics are read and LRC sidecars retain timed line order", async () => {
+    const dir = scratch();
+    const mp3 = join(dir, "song.mp3");
+    const source = new Uint8Array(readFileSync(fixture("tagged-cover.mp3")));
+    const frameBody = new Uint8Array([0x00, ...new TextEncoder().encode("eng"), 0, ...new TextEncoder().encode("A tagged lyric")]);
+    const syncSafe = (n: number) => [(n >> 21) & 0x7f, (n >> 14) & 0x7f, (n >> 7) & 0x7f, n & 0x7f];
+    const frame = new Uint8Array([...new TextEncoder().encode("USLT"), ...syncSafe(frameBody.length), 0, 0, ...frameBody]);
+    const tag = new Uint8Array([...new TextEncoder().encode("ID3\x03\x00\x00"), ...syncSafe(frame.length), ...frame]);
+    writeFileSync(mp3, new Uint8Array([...tag, ...source]));
+    expect((await readAudioTags(mp3))?.lyrics).toEqual({ text: "A tagged lyric" });
+
+    writeFileSync(join(dir, "song.lrc"), "[00:02.50]Second\n[00:01.00]First\n");
+    expect(await readSidecarLyrics(mp3)).toEqual({ text: "Second\nFirst", timed: [{ t: 2.5, line: "Second" }, { t: 1, line: "First" }] });
   });
   test("m4b chapters become start seconds and titles", async () => {
     const tags = await readAudioTags(fixture("book.m4b"));

@@ -3,6 +3,8 @@
 // track needs no Stack probe.
 import { parseFile } from "music-metadata";
 import type { IAudioMetadata, ITag } from "music-metadata";
+import { readFile } from "node:fs/promises";
+import { basename, dirname, extname, join } from "node:path";
 
 export interface AudioChapter {
   start_s: number;
@@ -10,6 +12,7 @@ export interface AudioChapter {
 }
 
 export interface AudioTags {
+  lyrics?: { text: string; timed?: { t: number; line: string; section?: string | null }[] };
   title: string | null;
   artist: string | null;
   album: string | null;
@@ -58,7 +61,9 @@ export function tagsFromMetadata(meta: IAudioMetadata): AudioTags {
     .map((chapter, index) => ({ start_s: chapter.start / (chapter.timeScale || 1000), title: text(chapter.title) ?? `Chapter ${index + 1}` }))
     .filter((chapter) => Number.isFinite(chapter.start_s) && chapter.start_s >= 0)
     .sort((a, b) => a.start_s - b.start_s);
+  const lyricsText = (common.lyrics ?? []).map((line) => typeof line === "string" ? line : line?.text ?? "").join("\n").trim();
   return {
+    ...(lyricsText ? { lyrics: { text: lyricsText } } : {}),
     title: text(common.title),
     artist: text(common.artist) ?? text(common.artists?.[0]),
     album: text(common.album),
@@ -76,6 +81,34 @@ export function tagsFromMetadata(meta: IAudioMetadata): AudioTags {
     hasEmbeddedArt: (common.picture?.length ?? 0) > 0,
     chapters,
   };
+}
+
+/** Read same-basename LRC then TXT lyrics beside an audio file. */
+export async function readSidecarLyrics(absAudioPath: string): Promise<{ text: string; timed?: { t: number; line: string; section?: string | null }[] } | null> {
+  const stem = basename(absAudioPath, extname(absAudioPath));
+  for (const ext of [".lrc", ".txt"]) {
+    let raw: string;
+    try { raw = await readFile(join(dirname(absAudioPath), `${stem}${ext}`), "utf8"); } catch { continue; }
+    const content = raw.trim();
+    if (!content) continue;
+    if (ext === ".txt") return { text: content };
+    const timed: { t: number; line: string }[] = [];
+    const plain: string[] = [];
+    for (const sourceLine of content.split(/\r?\n/)) {
+      const matches = [...sourceLine.matchAll(/\[(\d{1,2}):(\d{2})(?:\.(\d{1,3}))?\]\s*/g)];
+      if (!matches.length) { if (sourceLine.trim()) plain.push(sourceLine.trim()); continue; }
+      const line = sourceLine.replace(/(?:\[\d{1,2}:\d{2}(?:\.\d{1,3})?\]\s*)+/g, "").trim();
+      for (const match of matches) {
+        const fraction = match[3] ? Number(`0.${match[3]}`) : 0;
+        const t = Number(match[1]) * 60 + Number(match[2]) + fraction;
+        timed.push({ t, line });
+        plain.push(line);
+      }
+    }
+    const lyricsText = plain.join("\n").trim();
+    if (lyricsText) return { text: lyricsText, ...(timed.length ? { timed } : {}) };
+  }
+  return null;
 }
 
 /** Tags of an audio file, or null when the file is not readable audio (the item is then made from its name). */

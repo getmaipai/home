@@ -16,6 +16,7 @@ export interface BandInput {
   description?: string | null;
   /** Other words shown with the item (artist, album, series, show) are held to the same floor. */
   also?: ReadonlyArray<string | null | undefined>;
+  lyrics?: string | null;
 }
 
 export interface BandVerdict {
@@ -23,8 +24,8 @@ export interface BandVerdict {
   advisorySource: "tag" | "classifier";
 }
 
-function floorText(item: Pick<BandInput, "title" | "description" | "also">): string {
-  return [item.title, ...(item.also ?? []), item.description].filter((part): part is string => typeof part === "string" && part.trim().length > 0).join(". ");
+function floorText(item: Pick<BandInput, "title" | "description" | "also" | "lyrics">): string {
+  return [item.title, ...(item.also ?? []), item.description, item.lyrics].filter((part): part is string => typeof part === "string" && part.trim().length > 0).join(". ");
 }
 
 /** The floor KS-05 uses, plus the household's one list of sexual words (lib/pictures/minorLine.ts): a library file is not a news
@@ -52,10 +53,10 @@ export function allowedBandsFor(actor: PersonRow): Band[] {
 }
 
 /** Whether `actor` may see this item's band: the stored value, and for a minor the floor again on the words. */
-export function bandAllows(actor: PersonRow, item: Pick<MediaItem, "band_ok" | "title" | "description" | "subtitle" | "advisory"> & Partial<Pick<MediaItem, "artist" | "album" | "album_artist" | "genre">>): boolean {
+export function bandAllows(actor: PersonRow, item: Pick<MediaItem, "band_ok" | "title" | "description" | "subtitle" | "advisory"> & Partial<Pick<MediaItem, "artist" | "album" | "album_artist" | "genre" | "lyrics">>): boolean {
   const band = mediaBandOf(actor);
   if (!bandOkAllowedFor(band).includes(item.band_ok)) return false;
   if (band === "adult") return true;
   if (item.advisory.explicit) return false;
-  return !trips(floorText({ title: item.title, description: item.description, also: [item.subtitle, item.artist, item.album, item.album_artist, item.genre] }));
+  return !trips(floorText({ title: item.title, description: item.description, lyrics: item.lyrics?.text, also: [item.subtitle, item.artist, item.album, item.album_artist, item.genre] }));
 }

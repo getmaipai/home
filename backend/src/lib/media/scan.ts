@@ -105,7 +105,9 @@ function rootAttributable(row: typeof mediaSources.$inferSelect): boolean {
 }
 
 function recordFor(draft: Draft, source: MediaSource, existing: MediaItemRow | undefined, parentId: string | null, bandFloor: MediaItem["band_ok"] | null, now: string): { item: MediaItem; extras: { pages: number | null; probeFailedFp: string | null } } {
-  const verdict = bandOkAtIngest({ explicit: draft.explicit, title: draft.title, description: draft.description, also: [draft.subtitle, draft.artist, draft.album, draft.series, draft.author] });
+  const oldLyrics = existing?.lyrics ? JSON.parse(existing.lyrics) as MediaItem["lyrics"] : null;
+  const lyrics = draft.lyrics ?? (oldLyrics && ["made", "lrclib"].includes(oldLyrics.source) ? oldLyrics : null);
+  const verdict = bandOkAtIngest({ explicit: draft.explicit, title: draft.title, description: draft.description, lyrics: lyrics?.text, also: [draft.subtitle, draft.artist, draft.album, draft.series, draft.author] });
   let band = verdict.band;
   if (bandFloor === "adult") band = "adult"; // a chapter file is never lower than its book
   if (existing?.verifiedByPersonId) band = existing.bandOk as MediaItem["band_ok"]; // an adult marked it
@@ -115,7 +117,7 @@ function recordFor(draft: Draft, source: MediaSource, existing: MediaItemRow | u
     video_codec: draft.videoCodec, audio_codec: draft.audioCodec, playable: draft.playable, artwork: draft.artworkPath ? { path: draft.artworkPath } : null, previews: null,
     chapters: draft.chapters, subtitles: [], series: draft.series, season: draft.season, episode: draft.episode, artist: draft.artist, album: draft.album, album_artist: draft.albumArtist,
     track_no: draft.trackNo, disc_no: draft.discNo, year: draft.year, genre: draft.genre, author: draft.author, narrator: draft.narrator, series_index: draft.seriesIndex,
-    locator_kind: draft.locatorKind, external: null, advisory: { explicit: draft.explicit, source: verdict.advisorySource }, band_ok: band,
+    locator_kind: draft.locatorKind, external: null, lyrics, advisory: { explicit: draft.explicit, source: verdict.advisorySource }, band_ok: band,
     verified_by_person_id: existing?.verifiedByPersonId ?? null, added_at: existing?.addedAt ?? now, fingerprint: draft.fingerprint || null, hidden: existing?.hidden ?? false,
     deleted_at: existing?.deletedAt && existing.missingSince === null ? existing.deletedAt : null, trash_until: existing?.deletedAt && existing.missingSince === null ? existing.trashUntil : null,
     created_at: existing?.createdAt ?? now, hlc: nextHlc(), provenance: `scan:${source.id}`,

@@ -4,7 +4,7 @@
 import { basename } from "node:path";
 import { classOfExtension, mediaTypeOfExtension, audioPlayableByExtension } from "./kinds";
 import type { MediaKind } from "./model";
-import { readAudioTags, type AudioTags } from "./parsers/audioTags";
+import { readAudioTags, readSidecarLyrics, type AudioTags } from "./parsers/audioTags";
 import { readEpubMeta } from "./parsers/epub";
 import { filmNameHasYear, parseFilmName, readNfoFor } from "./parsers/film";
 import { readPdfMeta } from "./parsers/pdf";
@@ -57,6 +57,7 @@ export interface Draft {
   seriesIndex: number | null;
   locatorKind: "cfi" | "page" | "none";
   explicit: boolean;
+  lyrics: { source: "file" | "sidecar"; text: string; timed?: { t: number; line: string; section?: string | null }[] } | null;
   pages: number | null;
   fingerprint: string;
   children: Draft[];
@@ -78,7 +79,7 @@ function blank(kind: MediaKind, title: string, rel: string, file: FileEntry | nu
     kind, title, subtitle: null, description: null, rel, mediaType: mediaTypeOfExtension(ext), size: file?.size ?? null, durationS: null, width: null, height: null,
     videoCodec: null, audioCodec: null, playable: "unknown", artworkPath: null, chapters: [], series: null, season: null, episode: null, artist: null, album: null,
     albumArtist: null, trackNo: null, discNo: null, year: null, genre: null, author: null, narrator: null, seriesIndex: null, locatorKind: "none", explicit: false,
-    pages: null, fingerprint: file ? fingerprintOf(file) : "", children: [],
+    pages: null, fingerprint: file ? fingerprintOf(file) : "", lyrics: null, children: [],
   };
 }
 
@@ -174,6 +175,7 @@ function trackDraft(file: FileEntry, relDir: string, tags: AudioTags | null, ctx
   const ext = extensionOf(file.name);
   draft.playable = audioPlayableByExtension(ext);
   if (tags) {
+    if (tags.lyrics) draft.lyrics = { source: "file", ...tags.lyrics };
     draft.artist = tags.artist;
     draft.album = tags.album;
     draft.albumArtist = tags.albumArtist;
@@ -271,9 +273,18 @@ export async function draftsForDirectory(listing: DirListing, ctx: IngestContext
     if (cls === "video") return videoDraft(file, listing.rel, ctx);
     if (cls === "audio") {
       const tags = await readAudioTags(file.abs);
+      const sidecarLyrics = tags?.lyrics?.timed?.length ? null : await readSidecarLyrics(file.abs);
       const wantsBook = ctx.kinds.has("audiobook") && (ext === "m4b" || (tags?.chapters.length ?? 0) >= 2 || isSpokenGenre(tags?.genre ?? null) || !ctx.kinds.has("track"));
-      if (wantsBook) return singleAudiobookDraft(file, listing.rel, tags, ctx);
-      if (ctx.kinds.has("track")) return trackDraft(file, listing.rel, tags, ctx);
+      if (wantsBook) {
+        const draft = singleAudiobookDraft(file, listing.rel, tags, ctx);
+        draft.lyrics = sidecarLyrics ? { source: "sidecar", ...sidecarLyrics } : tags?.lyrics ? { source: "file", ...tags.lyrics } : null;
+        return draft;
+      }
+      if (ctx.kinds.has("track")) {
+        const draft = trackDraft(file, listing.rel, tags, ctx);
+        draft.lyrics = sidecarLyrics ? { source: "sidecar", ...sidecarLyrics } : tags?.lyrics ? { source: "file", ...tags.lyrics } : null;
+        return draft;
+      }
       return null;
     }
     if (cls === "book" && ctx.kinds.has("book")) return bookDraftFor(file, listing.rel, ctx);
