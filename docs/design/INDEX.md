@@ -30,6 +30,7 @@ and a proposed design; otherwise the household IP gets blocked.
 | [companion-speech-style-2026-10-25.md](companion-speech-style-2026-10-25.md) | proposed, design only; architect ruling in `data-scratch/architect/SPEECH-STYLE-2026-10-25.verdict` | SPEECH-STYLE-01 to -05 |
 | [quick-reply-chips-2026-10-25.md](quick-reply-chips-2026-10-25.md) | current, design only; architect APPROVED 2026-10-25 (QR-DESIGN-2026-10-25) | QR-01, QR-02 |
 | [full-duplex-voice-2026-10-24.md](full-duplex-voice-2026-10-24.md) | proposed, design only; architect ruling in `data-scratch/architect/DUPLEX-DESIGN-2026-10-24.verdict` | DUPLEX-00 to -03, -05, DUPLEX-BENCH-01 (rows added after the verdict) |
+| [parakeet-stt-tier-2026-10-25.md](parakeet-stt-tier-2026-10-25.md) | proposed, design only; architect verdict in `data-scratch/architect/PARAKEET-STT-2026-10-25.verdict` | STT-PARAKEET-01 to -04, STT-WORDS-01 (named in the note, not yet backlog rows) |
 | [RULES.md](RULES.md) | the rulebook; only Jesse changes it | n/a |
 | [ELEMENTS-DECISIONS.md](ELEMENTS-DECISIONS.md) | ledger, current | ELEMENTS-ADOPT-01, -02; the ELT-T1 rows |
 | [UI-DECISIONS.md](UI-DECISIONS.md) | ledger, current | KIT-ALERT-01, KIT-CAROUSEL-01, KIT-TOUR-01 |
