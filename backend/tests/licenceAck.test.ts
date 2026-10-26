@@ -61,7 +61,7 @@ describe("the wizard's acknowledgement", () => {
   test("a covered licence installs with no individual accept, and the Stack still gets the notice id", async () => {
     const stack = ltxStack(); __setComponentsFetchForTests(stack.fetch);
     await new TestClient().post("/api/setup/licences/accept", {});
-    expect((await new TestClient().post("/api/setup/install", {})).status).toBe(202);
+    expect((await new TestClient().post("/api/setup/install", { components: ["video-detailed"] })).status).toBe(202);
     await settle();
     expect(stack.installs).toEqual([{ id: "ltx-2-3-distilled-mlx", accepted_licence: LTX.id }]);
   });
@@ -75,7 +75,7 @@ describe("the wizard's acknowledgement", () => {
 
   test("no acknowledgement keeps the per-item flow: the install asks for the accept", async () => {
     const stack = ltxStack(); __setComponentsFetchForTests(stack.fetch);
-    const refused = await new TestClient().post("/api/setup/install", {});
+    const refused = await new TestClient().post("/api/setup/install", { components: ["video-detailed"] });
     expect(refused.status).toBe(409);
     expect((await refused.json() as { error: string }).error).toMatch(/needs your accept/);
     expect(stack.installs).toEqual([]);
@@ -126,11 +126,11 @@ describe("an install that never saw the wizard wording", () => {
     expect(after.needs_prompt).toBe(false);
     const again = await (await client.get("/api/repairs")).json() as Array<{ key: string }>;
     expect(again.filter((issue) => issue.key === "licences.accept").length).toBe(0);
-    expect((await (await client.get("/api/install/licences")).json() as { extras: { ids: string[] } | null }).extras?.ids).toContain("video-detailed");
-    // The one extras button installs them, with no further licence click.
+    // Detailed video is optional (AIMODELS-DATA-01), so it is no longer one of the recommended extras and the extras button never asks for its licence.
+    expect((await (await client.get("/api/install/licences")).json() as { extras: { ids: string[] } | null }).extras?.ids).not.toContain("video-detailed");
     expect((await client.post("/api/install/licences/install-extras", {})).status).toBe(202);
     await settle();
-    expect(stack.installs).toEqual([{ id: "ltx-2-3-distilled-mlx", accepted_licence: LTX.id, accepted_by: actor.id }]);
+    expect(stack.installs).toEqual([]);
   });
 
   test("extras need the acknowledgement first, and a component install after it needs no click", async () => {

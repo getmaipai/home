@@ -38,7 +38,9 @@ describe("the plan step's disk list", () => {
   test("optional extras start off, recommended ones on, and required ones have no checkbox", async () => {
     const view = render(<PlanStep readPlan={async () => ({ wording: wording("p128", 800 * GIB) })} start={async () => ({})} onInstalled={() => {}} />);
     await view.findByText("What gets installed");
-    expect((view.getByRole("checkbox", { name: /Make videos/ }) as HTMLElement).getAttribute("aria-checked")).toBe("false");
+    expect((view.getByRole("checkbox", { name: /Make videos/ }) as HTMLElement).getAttribute("aria-checked")).toBe("true");
+    expect((view.getByRole("checkbox", { name: /Detailed videos/ }) as HTMLElement).getAttribute("aria-checked")).toBe("false");
+    expect(view.queryByRole("checkbox", { name: /Change pictures/ })).toBeNull();
     expect((view.getByRole("checkbox", { name: /More picture styles/ }) as HTMLElement).getAttribute("aria-checked")).toBe("false");
     expect((view.getByRole("checkbox", { name: /Make pictures/ }) as HTMLElement).getAttribute("aria-checked")).toBe("true");
     expect(view.queryByRole("checkbox", { name: /Chat AI/ })).toBeNull();
@@ -51,17 +53,17 @@ describe("the plan step's disk list", () => {
     await view.findByText("What gets installed");
     const before = selectionTotals(plan, plan.default_selected);
     expect(view.getByText(sizeGb(before.installed_bytes))).toBeTruthy();
-    fireEvent.click(view.getByRole("checkbox", { name: /Make videos/ }));
-    const withVideo = selectionTotals(plan, [...plan.default_selected, "video"]);
+    fireEvent.click(view.getByRole("checkbox", { name: /More picture styles/ }));
+    const withVideo = selectionTotals(plan, [...plan.default_selected, "pictures-zimage"]);
     await waitFor(() => expect(view.getByText(sizeGb(withVideo.installed_bytes))).toBeTruthy());
     expect(view.getByText(new RegExp(`Free space needed while it installs: about ${needGb(withVideo.required_free_bytes + 2 * GIB)} GB`))).toBeTruthy();
-    fireEvent.click(view.getByRole("checkbox", { name: /Make videos/ }));
+    fireEvent.click(view.getByRole("checkbox", { name: /More picture styles/ }));
     await waitFor(() => expect(view.getByText(sizeGb(before.installed_bytes))).toBeTruthy());
   });
 
   test("a red check blocks Install and says how much is needed; turning an extra off can make it pass", async () => {
     const plan = plans.p64!;
-    const withoutPictures = plan.default_selected.filter((id) => id !== "pictures");
+    const withoutPictures = plan.default_selected.filter((id) => id !== "pictures-ernie");
     const fits = selectionTotals(plan, withoutPictures).required_free_bytes + 2 * GIB + plan.headroom_warn_bytes + GIB;
     const start = mock(async () => ({}));
     const done = mock(() => {});
@@ -76,7 +78,7 @@ describe("the plan step's disk list", () => {
     fireEvent.click(button);
     await waitFor(() => expect(done).toHaveBeenCalledTimes(1));
     expect(start).toHaveBeenCalledWith(undefined, expect.arrayContaining(withoutPictures), []);
-    expect((start.mock.calls[0] as unknown[])[1]).not.toContain("pictures");
+    expect((start.mock.calls[0] as unknown[])[1]).not.toContain("pictures-ernie");
   });
 
   test("a tight disk warns and still installs; the check names the space left", async () => {
@@ -93,18 +95,18 @@ describe("the plan step's disk list", () => {
     const start = mock(async () => ({}));
     const view = render(<PlanStep readPlan={async () => ({ wording: wording("p128", 800 * GIB) })} start={start} onInstalled={() => {}} />);
     await view.findByText("What gets installed");
-    fireEvent.click(view.getByRole("checkbox", { name: /Make videos/ }));
+    fireEvent.click(view.getByRole("checkbox", { name: /More picture styles/ }));
     fireEvent.click(view.getByRole("button", { name: "Install and continue" }));
     await waitFor(() => expect(start).toHaveBeenCalledTimes(1));
     const sent = (start.mock.calls[0] as unknown[])[1] as string[];
     expect(sent).toContain("video");
     expect(sent).toContain("pictures");
-    expect(sent).not.toContain("pictures-zimage");
-    expect(new Set(sent)).toEqual(new Set([...plan.default_selected, "video"]));
+    expect(sent).not.toContain("video-detailed");
+    expect(new Set(sent)).toEqual(new Set([...plan.default_selected, "pictures-zimage"]));
   });
 
   test("a row already on this computer says so instead of a size", async () => {
-    const plan: DiskPlan = { ...plans.p64!, rows: plans.p64!.rows.map((row) => row.id === "pictures" ? { ...row, installed: true } : row) };
+    const plan: DiskPlan = { ...plans.p64!, rows: plans.p64!.rows.map((row) => row.id === "pictures-ernie" ? { ...row, installed: true } : row) };
     const view = render(<PlanStep readPlan={async () => ({ wording: wording("p64", 800 * GIB, { plan, source: "stack" }) })} start={async () => ({})} onInstalled={() => {}} />);
     await view.findByText("What gets installed");
     const picturesItem = view.getByRole("checkbox", { name: /Make pictures/ }).closest("li")!;
@@ -113,11 +115,14 @@ describe("the plan step's disk list", () => {
 
   const licence = { row_id: "video-detailed", component: "ltx-2-3-distilled-mlx", id: "ltx-2.x-community-2026-08-11", name: "LTX-2 Community License", url: "https://example.com/licence", summary: ["It is free for a person or a business that earns under $10 million a year.", "The markings the model puts in a clip are never removed."], accepted_at: null };
 
-  test("Detailed videos are checked by default on the 128 GB plan, the licence is shown plainly and Install waits for the accept", async () => {
+  test("Detailed videos are optional on the 128 GB plan; ticking them shows the licence plainly and Install waits for the accept", async () => {
     const start = mock(async () => ({}));
     const view = render(<PlanStep readPlan={async () => ({ wording: wording("p128", 800 * GIB), licences: [licence] })} start={start} onInstalled={() => {}} />);
     await view.findByText("What gets installed");
     const detailed = view.getByRole("checkbox", { name: /Detailed videos/ });
+    expect(detailed.getAttribute("aria-checked")).toBe("false");
+    expect(view.queryByTestId("plan-licence")).toBeNull();
+    fireEvent.click(detailed);
     expect(detailed.getAttribute("aria-checked")).toBe("true");
     expect(view.getByText(/under \$10 million a year/)).toBeTruthy();
     expect(view.getByText(/never removed/)).toBeTruthy();
@@ -132,10 +137,11 @@ describe("the plan step's disk list", () => {
     expect(call[2]).toEqual([licence.id]);
   });
 
-  test("a covered licence is information: LTX is checked by default and Install needs no accept", async () => {
+  test("a covered licence is information: ticking LTX needs no accept", async () => {
     const start = mock(async () => ({}));
     const view = render(<PlanStep readPlan={async () => ({ wording: wording("p128", 800 * GIB), licences: [{ ...licence, covered: true }] })} start={start} onInstalled={() => {}} />);
     await view.findByText("What gets installed");
+    fireEvent.click(view.getByRole("checkbox", { name: /Detailed videos/ }));
     expect(view.getByRole("checkbox", { name: /Detailed videos/ }).getAttribute("aria-checked")).toBe("true");
     expect(view.queryByTestId("plan-licence")).toBeNull();
     expect(view.getByTestId("plan-licence-info").textContent).toMatch(/You accepted its licence at the start/);
@@ -150,6 +156,7 @@ describe("the plan step's disk list", () => {
     const start = mock(async () => ({ started: true, models: 1 }));
     const view = render(<PlanStep readPlan={async () => ({ wording: wording("p128", 800 * GIB), licences: [licence] })} start={start} onInstalled={() => {}} />);
     await view.findByText("What gets installed");
+    fireEvent.click(view.getByRole("checkbox", { name: /Detailed videos/ }));
     expect(view.getByTestId("plan-accept-hint").textContent).toMatch(/waiting for you to accept the maker's licence/);
     expect(view.queryByRole("status")).toBeNull();
     fireEvent.click(view.getByRole("checkbox", { name: /I have read it and I accept it/ }));
@@ -179,6 +186,8 @@ describe("the plan step's disk list", () => {
     const view = render(<PlanStep readPlan={async () => ({ wording: wording("p128", 800 * GIB), licences: [licence] })} start={start} onInstalled={() => {}} />);
     await view.findByText("What gets installed");
     fireEvent.click(view.getByRole("checkbox", { name: /Detailed videos/ }));
+    expect(view.queryByTestId("plan-licence")).not.toBeNull();
+    fireEvent.click(view.getByRole("checkbox", { name: /Detailed videos/ }));
     expect(view.queryByTestId("plan-licence")).toBeNull();
     fireEvent.click(view.getByRole("button", { name: "Install and continue" }));
     await waitFor(() => expect(start).toHaveBeenCalledTimes(1));
@@ -187,13 +196,14 @@ describe("the plan step's disk list", () => {
     expect(call[2]).toEqual([]);
   });
 
-  test("with Detailed videos checked and too little free space the check goes red; unticking them updates the total and clears it", async () => {
+  test("with Detailed videos ticked and too little free space the check goes red; unticking them updates the total and clears it", async () => {
     const plan = plans.p128!;
-    const without = plan.default_selected.filter((id) => id !== "video-detailed");
-    const free = selectionTotals(plan, without).required_free_bytes + 2 * GIB + plan.headroom_warn_bytes + GIB;
+    const free = selectionTotals(plan, plan.default_selected).required_free_bytes + 2 * GIB + plan.headroom_warn_bytes + GIB;
     const view = render(<PlanStep readPlan={async () => ({ wording: wording("p128", free), licences: [licence] })} start={async () => ({})} onInstalled={() => {}} />);
     await view.findByText("What gets installed");
-    expect(view.getByText(/This computer needs about \d+ GB free/)).toBeTruthy();
+    await view.findByRole("button", { name: "Install and continue" });
+    fireEvent.click(view.getByRole("checkbox", { name: /Detailed videos/ }));
+    expect(await view.findByText(/This computer needs about \d+ GB free/)).toBeTruthy();
     expect(view.queryByRole("button", { name: "Install and continue" })).toBeNull();
     fireEvent.click(view.getByRole("checkbox", { name: /Detailed videos/ }));
     await view.findByRole("button", { name: "Install and continue" });

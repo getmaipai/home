@@ -55,7 +55,7 @@ describe("install with a choice of components", () => {
     expect(saved).not.toContain("video");
   });
 
-  test("no choice sent means the plan's defaults: pictures and Detailed video (once its licence is accepted), the optional extras not", async () => {
+  test("no choice sent means the plan's defaults: the picture model is pulled and Detailed video (optional) is not installed", async () => {
     const pulls: string[] = [];
     __setStackClientForTests(stackWith(10 ** 13, pulls));
     const stack = ltxStack(null);
@@ -64,30 +64,31 @@ describe("install with a choice of components", () => {
     await settle();
     expect(pulls).toContain(klein[0]!);
     expect(getInstallSelection()).toEqual(sanitizeSelection(disk, disk.default_selected));
-    expect(stack.installs).toEqual([{ id: "ltx-2-3-distilled-mlx", accepted_licence: LICENCE.id }]);
+    expect(stack.installs).toEqual([]);
   });
 
-  test("Detailed video is recommended, on by default, and the install does not start without its licence accepted", async () => {
-    expect(disk.rows.find((row) => row.id === "video-detailed")).toMatchObject({ need: "recommended" });
-    expect(disk.default_selected).toContain("video-detailed");
+  test("Detailed video is optional and off by default; picking it needs its licence accepted before anything starts", async () => {
+    expect(disk.rows.find((row) => row.id === "video-detailed")).toMatchObject({ need: "optional" });
+    expect(disk.default_selected).not.toContain("video-detailed");
+    const picked = [...disk.default_selected, "video-detailed"];
     const pulls: string[] = [];
     __setStackClientForTests(stackWith(10 ** 13, pulls));
     const stack = ltxStack(null);
     __setComponentsFetchForTests(stack.fetch);
-    const refused = await new TestClient().post("/api/setup/install", {});
+    const refused = await new TestClient().post("/api/setup/install", { components: picked });
     expect(refused.status).toBe(409);
     expect((await refused.json() as { error: string }).error).toMatch(/licence.*needs your accept/);
     await settle();
     expect(pulls).toEqual([]);
     expect(stack.installs).toEqual([]);
-    // Unticked: nothing of it installs and no accept is needed.
-    expect((await new TestClient().post("/api/setup/install", { components: disk.default_selected.filter((id) => id !== "video-detailed") })).status).toBe(202);
+    // Not picked: nothing of it installs and no accept is needed.
+    expect((await new TestClient().post("/api/setup/install", {})).status).toBe(202);
     await settle();
     expect(stack.installs).toEqual([]);
     // Already accepted earlier: no accept is asked again.
     const known = ltxStack("2026-10-17T00:00:00.000Z");
     __setComponentsFetchForTests(known.fetch);
-    expect((await new TestClient().post("/api/setup/install", {})).status).toBe(202);
+    expect((await new TestClient().post("/api/setup/install", { components: picked })).status).toBe(202);
     await settle();
     expect(known.installs.length).toBe(1);
   });
@@ -123,9 +124,9 @@ describe("install with a choice of components", () => {
     expect(stack.installs.length).toBe(1);
   });
 
-  test("a disk too small for the default choice refuses, and turning off the pictures makes it fit", async () => {
-    const withoutPictures = disk.default_selected.filter((id) => id !== "pictures");
-    const fits = selectionTotals(disk, withoutPictures).required_free_bytes + 2 * GIB + disk.headroom_warn_bytes + 1;
+  test("a disk too small for the default choice refuses, and turning off Quick video makes it fit", async () => {
+    const withoutVideo = disk.default_selected.filter((id) => id !== "video");
+    const fits = selectionTotals(disk, withoutVideo).required_free_bytes + 2 * GIB + disk.headroom_warn_bytes + 1;
     expect(fits).toBeLessThan(selectionTotals(disk, disk.default_selected).required_free_bytes + 2 * GIB);
     __setStackClientForTests(stackWith(fits, []));
     const refused = await new TestClient().post("/api/setup/install", {});
@@ -133,7 +134,7 @@ describe("install with a choice of components", () => {
     const body = await refused.json() as { error: string; next: string };
     expect(body.error).toMatch(/^This computer needs about \d+ GB free for the recommended setup; it has \d+ GB\./);
     expect(body.next).toContain("turn off an extra");
-    expect((await new TestClient().post("/api/setup/install", { components: withoutPictures.filter((id) => id !== "video-detailed") })).status).toBe(202);
+    expect((await new TestClient().post("/api/setup/install", { components: withoutVideo })).status).toBe(202);
   });
 
   test("required rows cannot be left off and unknown ids are dropped", () => {
