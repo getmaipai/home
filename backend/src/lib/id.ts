@@ -250,6 +250,11 @@ export function newLikenessAdapterId(): string {
   return `la-${randomSuffix(10)}`;
 }
 
+// PERUSE-2026-10-25: one per-use consent ask (spec LikenessAsk).
+export function newLikenessAskId(): string {
+  return `ask-${randomSuffix(10)}`;
+}
+
 // MEDIA-LIB-01 / MEDIA-PROGRESS-01: the four media records (spec MediaItem, MediaSource, MediaProgress, MediaCollection).
 export function newMediaItemId(): string {
   return `media-${randomSuffix(10)}`;

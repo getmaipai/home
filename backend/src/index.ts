@@ -8,6 +8,7 @@ import { startMediaScanner } from "@/lib/media/scan";
 import { resumePictureJobs } from "@/lib/pictures/jobs";
 import { resumeVideoJobs } from "@/lib/videos/jobs";
 import { drainStyleRemovals } from "@/lib/likeness/adapters";
+import { expireAsks } from "@/lib/likeness/ask";
 import { app } from "@/app";
 import { ensureCoreJob, runDueJobs } from "@/lib/scheduler";
 import { warmHostIndex } from "@/lib/blocklists/hostLists";
@@ -224,6 +225,9 @@ resumeMusicJobs();
 // LIKENESS-01: a style bound to a person who is no longer eligible is removed now and retried until the engine has answered.
 void drainStyleRemovals();
 const styleRemovalInterval = setInterval(() => void drainStyleRemovals(), 5 * 60_000);
+// PERUSE-2026-10-25: a consent ask that ran out of time (or can no longer proceed) ends now, and again every minute; reads end them too.
+expireAsks();
+const askExpiryInterval = setInterval(() => { try { expireAsks(); } catch { /* the next pass tries again */ } }, 60_000);
 migratePendingAsksThroughGate();
 // KS-MODE-01: a stored search.wikipedia_fallback becomes the source-mode override, once.
 migrateWikipediaFallbackToSourceMode();
@@ -329,6 +333,7 @@ internetProbeInterval.unref();
 const statusPruneInterval = setInterval(() => pruneStatusEvents(), 6 * 60 * 60_000);
 statusPruneInterval.unref();
 styleRemovalInterval.unref();
+askExpiryInterval.unref();
 // lib/householdCa.ts's own "rotation as a Repairs item" - once a day is
 // plenty for a 30-day warning window; the job itself is idempotent and
 // cheap (a single file read and a date comparison) when nothing's close
