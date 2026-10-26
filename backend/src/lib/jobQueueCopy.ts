@@ -4,7 +4,7 @@ export type JobQueueKind = "picture" | "video" | "song";
 export type JobQueueReason =
   | "queue" | "higher_class" | "other_person_first" | "moved_up" | "waiting_long"
   | "behind_chat" | "making_room" | "memory_elsewhere" | "requeued_memory" | "low_memory_failure" | "started"
-  | "paused_chat" | "coding_mode"
+  | "paused_chat" | "coding_mode" | "awaiting_approval"
   | { kind: "never_fit"; job: JobQueueKind; neededGb: number; availableGb: number; smallerOption?: string };
 
 type Pair = { adult: string; child: string };
@@ -46,6 +46,8 @@ export const JOB_QUEUE_COPY: Record<Exclude<JobQueueReason, { kind: "never_fit" 
     child: "The computer ran low on memory, so the job stopped. Try again later.",
   },
   started: { adult: "Starting.", child: "Starting now." },
+  // PERUSE-2026-10-25: a picture or video held for the pictured adult's yes. Only adults ever see it (a child cannot make one).
+  awaiting_approval: { adult: "Waiting for the person pictured to say yes. It starts as soon as they do.", child: "Waiting for a yes. It starts as soon as there is one." },
   paused_chat: { adult: "Paused while chat is working.", child: "Paused while chat is working." },
   coding_mode: {
     adult: "Home is in coding mode. Your job starts by itself when it is back to normal, or tap Cancel.",

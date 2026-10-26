@@ -55,6 +55,18 @@ describe("household queue", () => {
     finally { remove(); }
   });
 
+  test("a job awaiting a consent approval takes no place in line and is never released", async () => {
+    const held = job("held", "A", "picture", now - 5000, { awaitingApproval: true });
+    const ready = job("ready", "B", "picture", now - 1000);
+    expect(order([held, ready], now)).toEqual([{ id: "ready", position: 1 }]);
+    const released: string[] = [];
+    const remove = registerQueueProvider(() => [held, ready].map((entry) => ({ job: entry, save: () => undefined, release: entry.state === "queued" ? async () => { released.push(entry.id); } : undefined })));
+    try { await releaseHouseholdQueue(); expect(released).toEqual(["ready"]); }
+    finally { remove(); }
+    held.awaitingApproval = false;
+    expect(order([held, ready], now).map((item) => item.id)).toEqual(["held", "ready"]);
+  });
+
   test("promotes a video to picture class after ten minutes", () => {
     const picture = job("picture", "A", "picture", now - 1000);
     const video = job("video", "B", "video", now - 10 * 60_000 + 1);
