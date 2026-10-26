@@ -15,10 +15,12 @@ export interface LikenessAsk {
   requester: PictureAudience;
   subjectPersonId: string | null | undefined;
   adultContent: boolean;
+  /** The caller can hold the job and ask the pictured adult (a style path with its exact prompt). Without it adult content of another person is refused. */
+  allowAsk?: boolean;
 }
 
 export type LikenessDecision =
-  | { ok: true; subject: PersonRow; self: boolean }
+  | { ok: true; subject: PersonRow; self: boolean; needsAsk: boolean }
   | { ok: false; denial: LikenessDenial; line: string };
 
 export function subjectName(person: PersonRow): string { return person.nickname?.trim() || person.displayName; }
@@ -41,12 +43,19 @@ export const LIKENESS_LINES = {
 } as const;
 
 export const HOUSEHOLD_LIKENESS_KEY = "generation.household_likeness";
+/** PERUSE-2026-10-25: adult content of another household adult needs that adult's per-use consent; off (the default) keeps it refused. */
+export const PER_USE_KEY = "likeness.per_use";
 /** Engine-side protection for another adult's likeness until per-use approval ships. */
 export const NO_ADULT_CONTENT_NEGATIVE = "nude, naked, nudity, topless, nsfw, explicit, sexual, lingerie, underwear";
 
 /** Default-on household option from the shared settings registry. */
 export function householdLikenessOn(): boolean {
   try { return getHouseholdSettingValue(HOUSEHOLD_LIKENESS_KEY) !== false; } catch { return true; }
+}
+
+/** The per-use consent switch (default off, so adult content of another person stays refused until an admin turns it on). */
+export function perUseOn(): boolean {
+  try { return getHouseholdSettingValue(PER_USE_KEY) === true; } catch { return false; }
 }
 
 export function isAdultContentRequest(input: { text: string; otherAdultOnlyStyle?: boolean }): boolean {
@@ -61,8 +70,11 @@ export function decideLikeness(ask: LikenessAsk): LikenessDecision {
   const subject = eligible.person;
   const self = subject.id === ask.requester.actor.id;
   if (!self && !householdLikenessOn()) return { ok: false, denial: "household_off", line: LIKENESS_LINES.household_off };
-  if (!self && ask.adultContent) return { ok: false, denial: "adult_content_other_subject", line: ADULT_CONTENT_OTHER_SUBJECT_LINE };
-  return { ok: true, subject, self };
+  if (!self && ask.adultContent) {
+    if (ask.allowAsk === true && perUseOn()) return { ok: true, subject, self, needsAsk: true };
+    return { ok: false, denial: "adult_content_other_subject", line: ADULT_CONTENT_OTHER_SUBJECT_LINE };
+  }
+  return { ok: true, subject, self, needsAsk: false };
 }
 
 export { householdAdults, subjectEligibility };

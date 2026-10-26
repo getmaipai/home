@@ -12,7 +12,8 @@ import { outcomeOf } from "@/lib/turnContext";
 import { turnAgeBand } from "@/lib/turnMachine/speaker";
 import { videoAdaptersFor, matchVideoAdapter, withVideoTriggerWords } from "./adapters";
 import { CLIP_POSTER_NOTE, GENERATED_PICTURE_NOTE, latestTemporaryPosterId, loadGeneratedReference, loadUploadedPhoto, plainVideoFailure, startVideoJob } from "./jobs";
-import { preparePhotoUse, prepareStyleUse } from "@/lib/likeness/apply";
+import { PHOTO_ADULT_LINE, preparePhotoUse, prepareStyleUse } from "@/lib/likeness/apply";
+import { ASK_WAITING_LINE, attachJob, dropAsk } from "@/lib/likeness/ask";
 import { attestedAdult, WHO_IS_IN_PHOTO_LINE } from "@/lib/likeness/resolve";
 import { singleAdultPhoto } from "@/lib/likeness/inspector";
 import { promptRefusalLineFor, screenInputImage, viewerOf } from "@/lib/pictures/ageCheck";
@@ -183,8 +184,10 @@ export async function runGenerateVideo(input: RunGenerateVideoInput): Promise<To
   const longSpeechNote = choice.quality === "detailed" && seconds > 5 ? " Spoken words are clearest in a clip of 5 seconds or less; if the person wanted a line spoken and it does not come out clearly, offer a 5 second one." : "";
   const soundNote = choice.quality === "quick" ? " A Quick video has no sound; if they wanted sound or spoken words, offer to make a Detailed one." : "";
   // A style of a household adult is made only while the household option is on; a real person with no such style or photo is refused.
-  const stylePrep = await prepareStyleUse({ medium: "video", audience, style: adapter, text: `${prompt} ${adapter?.name ?? named}`, depictsRealPerson: args.depicts_real_person === true && !photoLikeness, source: "chat" });
+  const stylePrep = await prepareStyleUse({ medium: "video", audience, style: adapter, text: `${prompt} ${adapter?.name ?? named}`, depictsRealPerson: args.depicts_real_person === true && !photoLikeness, source: "chat", held: { prompt: withVideoTriggerWords(prompt, adapter), count: 1, temporary } });
   if (stylePrep.kind === "refused") return stylePrep.why === "real_person" ? refused(callId, args, { kind: "prompt", why: "real_person", line: VIDEO_REFUSAL_LINE.real_person }) : refuseWith("likeness", stylePrep.line);
+  // A picture or photo never rides along with adult content of another person: refuse and end the ask just opened.
+  if (stylePrep.kind === "likeness" && stylePrep.askId && image !== undefined) { dropAsk(stylePrep.askId); return refuseWith("likeness", PHOTO_ADULT_LINE); }
   if (stylePrep.kind === "likeness" && photoLikeness && stylePrep.subjectId !== photoLikeness.subjectId) return refuseWith("likeness", "I can make something that looks like one person at a time. Use a style and a photo of the same adult, or leave one out.");
   const likeness: JobLikeness | null = stylePrep.kind === "likeness" ? { ...stylePrep.job, adult_content: stylePrep.adultContent || (photoLikeness?.adultContent ?? false) } : photoLikeness ? photoLikeness.job : null;
   if (stylePrep.kind === "likeness" && stylePrep.negativePrompt) negativePrompt = stylePrep.negativePrompt;
@@ -210,11 +213,23 @@ export async function runGenerateVideo(input: RunGenerateVideoInput): Promise<To
         audience: likeness ? "adult" as const : stackAudienceFor(audience),
         ...(lane === "adult" ? {} : { model: videoModelForLane(lane) }),
         ...(image ? { image, image_source: imageSource, ...(consentProof ? { consent_proof: consentProof } : {}) } : {}),
-        ...(adapter ? { loras: [{ id: adapter.id, strength: adapter.strength_default, ...(stylePrep.kind === "likeness" ? { likeness_proof: stylePrep.proof } : {}) }] } : {}),
+        ...(adapter ? { loras: [{ id: adapter.id, strength: adapter.strength_default, ...(stylePrep.kind === "likeness" && stylePrep.proof ? { likeness_proof: stylePrep.proof } : {}) }] } : {}),
         ...(kid ? { negative_prompt: CHILD_NEGATIVE_PROMPT } : negativePrompt ? { negative_prompt: negativePrompt } : {}),
       },
       ...(likeness ? { likeness } : {}),
     });
+    const askId = stylePrep.kind === "likeness" ? stylePrep.askId : undefined;
+    if (askId) {
+      attachJob(askId, job.id);
+      return outcomeOf({
+        callId, packageId: GENERATE_VIDEO_TOOL_ID, status: "succeeded", via: "tool_call", args, durationMs: 0,
+        result: {
+          reply: { text: `Nothing has been made yet. ${ASK_WAITING_LINE(stylePrep.kind === "likeness" ? stylePrep.subjectName : "They")} A card below shows them exactly what would be made, with Consent and Decline buttons. Tell the person in one or two short sentences to show that person the screen and that it starts when they say yes. You have not seen any video: do not describe how it looks.` },
+          data: { videoJobId: job.id },
+          actions: [],
+        },
+      });
+    }
     return outcomeOf({
       callId, packageId: GENERATE_VIDEO_TOOL_ID, status: "succeeded", via: "tool_call", args, durationMs: 0,
       result: {
@@ -225,6 +240,7 @@ export async function runGenerateVideo(input: RunGenerateVideoInput): Promise<To
     });
   } catch (error) {
     releaseKid(slot);
+    if (stylePrep.kind === "likeness" && stylePrep.askId) dropAsk(stylePrep.askId);
     if (error instanceof StackVideoError && error.code === "already_making") {
       return outcomeOf({ callId, packageId: GENERATE_VIDEO_TOOL_ID, status: "succeeded", via: "tool_call", args, durationMs: 0, result: { reply: { text: `No new video was started. Say this to the person in your own words and keep its meaning: ${error.message}` }, data: { refused: "already_making" }, actions: [] } });
     }

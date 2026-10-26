@@ -21,6 +21,10 @@ import { ApiError } from "@/lib/api";
 import { picturesAdminApi, type AdminAdapter, type AdminOverview } from "@/lib/picturesApi";
 import { LooksLikePicker, NOBODY } from "@/apps/settings/LooksLikePicker";
 import { SettingsRenderer } from "@/shell/pages/settings/SettingsRenderer";
+import { ApprovalCard } from "@maipai/ui/src/elements/approval-card";
+import { getIcon } from "@maipai/ui/src/icons";
+import { askCardProps } from "@/apps/likeness/askCardProps";
+import { likenessAsksApi, type LikenessAsk } from "@/lib/likenessAsksApi";
 
 const OVERVIEW_KEY = ["pictures-admin"] as const;
 /** Home takes a request body of at most 128 MiB (the server's own limit); a bigger style comes by its Hugging Face link. */
@@ -325,6 +329,43 @@ function AddStyle({ refresh }: { refresh: () => void }) {
   );
 }
 
+function askLine(ask: LikenessAsk): string {
+  const what = ask.medium === "video" ? "a video" : "a picture";
+  if (ask.as === "requester") {
+    const outcome = ask.state === "declined" ? "they said no" : ask.state === "approved" || ask.state === "consumed" ? "they said yes" : ask.state === "waiting" ? "waiting for a yes" : ask.state === "expired" ? "no answer in time" : "ended";
+    return `You asked ${ask.subject_name} for ${what}: ${outcome}.`;
+  }
+  const outcome = ask.state === "declined" ? "you said no" : ask.state === "approved" || ask.state === "consumed" ? "you said yes" : ask.state === "waiting" ? "waiting for your answer" : ask.state === "expired" ? "no answer in time" : "ended";
+  return `${ask.requester_name} asked for ${what} that looks like you: ${outcome}.`;
+}
+
+/** The asks you are part of. An open one about you is the kit approval card with the same Consent and Decline; ended ones are one plain line. */
+export function LikenessAsks() {
+  const client = useQueryClient();
+  const query = useQuery({ queryKey: ["likeness-asks"], queryFn: likenessAsksApi.list, refetchInterval: 5_000 });
+  const [busy, setBusy] = useState<string | null>(null);
+  const ShieldCheckIcon = getIcon("shield-check");
+  const asks = query.data?.asks ?? [];
+  if (asks.length === 0) return null;
+  const decide = (id: string, decision: "consent" | "decline") => {
+    setBusy(id);
+    void likenessAsksApi.decide(id, decision).catch(() => undefined).finally(() => { setBusy(null); void client.invalidateQueries({ queryKey: ["likeness-asks"] }); });
+  };
+  const open = asks.filter((ask) => ask.state === "waiting" && ask.as === "subject");
+  const rest = asks.filter((ask) => !open.includes(ask));
+  return (
+    <>
+      <h2 className="text-sm font-medium">Requests to make pictures and videos that look like you</h2>
+      {open.map((ask) => <ApprovalCard key={ask.id} {...askCardProps(ask)} icon={<ShieldCheckIcon aria-hidden />} {...(busy === ask.id ? {} : { onAllowOnce: () => decide(ask.id, "consent"), onDeny: () => decide(ask.id, "decline") })} />)}
+      {rest.length > 0 ? (
+        <ul className="flex flex-col gap-1 text-sm text-muted-foreground">
+          {rest.slice(0, 20).map((ask) => <li key={ask.id}>{new Date(ask.created_at).toLocaleString([], { dateStyle: "medium", timeStyle: "short" })}: {askLine(ask)}</li>)}
+        </ul>
+      ) : null}
+    </>
+  );
+}
+
 export function PicturesLibrary() {
   const client = useQueryClient();
   const overview = useQuery({ queryKey: OVERVIEW_KEY, queryFn: picturesAdminApi.overview, refetchInterval: 15_000 });
@@ -335,7 +376,8 @@ export function PicturesLibrary() {
   const data = overview.data;
   return (
     <div className="flex min-w-0 flex-col gap-10">
-      <SettingsRenderer scope="household" scopeValue="household" includeKeys={["generation.household_likeness"]} />
+      <SettingsRenderer scope="household" scopeValue="household" includeKeys={["generation.household_likeness", "likeness.per_use"]} />
+      <LikenessAsks />
       <PictureModelSection overview={data} refresh={refresh} />
       <WhoMakesPicturesSection overview={data} />
       <section aria-label="Styles" className="flex flex-col gap-3">

@@ -7,6 +7,8 @@ export interface VideoItem {
   state: "queued" | "running" | "done" | "failed" | "cancelled";
   percent: number;
   label: string;
+  /** Set while the clip is held for the pictured adult's consent; the card shows that ask instead of the player. */
+  likeness_ask_id?: string | null;
   position: number | null;
   /** While running (GENPREVIEW-01): seconds left from earlier clips, and the first frame once the motion is done. */
   eta_seconds: number | null;

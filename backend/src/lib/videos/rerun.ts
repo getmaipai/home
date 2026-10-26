@@ -2,7 +2,8 @@
 // chat tool's (tool.ts): a picture made to look like a household adult, an attached photo of one, or a saved style of one
 // is used only if that adult agrees now, the photo shows exactly them, and the Stack gets a proof signed for that one
 // clip. A route is never a way around the tool's gates.
-import { preparePhotoUse, prepareStylesUse } from "@/lib/likeness/apply";
+import { PHOTO_ADULT_LINE, preparePhotoUse, prepareStylesUse } from "@/lib/likeness/apply";
+import { dropAsk } from "@/lib/likeness/ask";
 import { singleAdultPhoto } from "@/lib/likeness/inspector";
 import { subjectEligibility } from "@/lib/likeness/resolve";
 import type { JobLikeness } from "@/lib/likeness/guard";
@@ -27,6 +28,8 @@ export interface RerunInput {
   adapters: readonly VideoAdapter[];
   /** The styles the earlier request used, by id. */
   styleIds: readonly string[];
+  /** The exact prompt the clip will be sent with, so adult content of another household adult can wait for that adult's consent (PERUSE-2026-10-25). Left out, such a request is refused. */
+  heldPrompt?: string;
 }
 
 export type RerunResult =
@@ -39,6 +42,8 @@ export type RerunResult =
     loras: Array<{ id: string; strength: number; likeness_proof?: string }>;
     negativePrompt: string | null;
     likeness: JobLikeness | null;
+    /** Set when the clip must wait for the pictured adult's consent; the route attaches the job to it and shows its card. */
+    askId?: string;
     width: number | null;
     height: number | null;
     subject: { id: string; adultContent: boolean; way: "style" | "photo" } | null;
@@ -77,8 +82,9 @@ export async function prepareVideoRerun(input: RerunInput): Promise<RerunResult>
     }
   }
   const used = input.styleIds.flatMap((id) => { const adapter = input.adapters.find((a) => a.id === id); return adapter ? [adapter] : []; });
-  const stylePrep = await prepareStylesUse({ medium: "video", audience: input.audience, styles: used, text: `${input.prompt} ${used.map((a) => a.name).join(" ")}`, source: "chat" });
+  const stylePrep = await prepareStylesUse({ medium: "video", audience: input.audience, styles: used, text: `${input.prompt} ${used.map((a) => a.name).join(" ")}`, source: "chat", ...(input.heldPrompt !== undefined ? { held: { prompt: input.heldPrompt, count: 1, temporary: input.temporary } } : {}) });
   if (stylePrep.kind === "refused") return { ok: false, line: stylePrep.line, code: "likeness" };
+  if (stylePrep.kind === "likeness" && stylePrep.askId && image !== undefined) { dropAsk(stylePrep.askId); return { ok: false, line: PHOTO_ADULT_LINE, code: "likeness" }; }
   if (stylePrep.kind === "likeness" && photo && stylePrep.subjectId !== photo.subjectId) return { ok: false, line: "I can make something that looks like one person at a time. Use a style and a photo of the same adult, or leave one out.", code: "likeness" };
   if (stylePrep.kind === "likeness" && stylePrep.negativePrompt) negativePrompt = stylePrep.negativePrompt;
   const likeness: JobLikeness | null = stylePrep.kind === "likeness" ? { ...stylePrep.job, adult_content: stylePrep.adultContent || (photo?.adultContent ?? false) } : photo ? photo.job : null;
@@ -87,6 +93,7 @@ export async function prepareVideoRerun(input: RerunInput): Promise<RerunResult>
     ok: true, image, imageSource, consentProof,
     loras: used.map((a) => ({ id: a.id, strength: a.strength_default, ...(stylePrep.kind === "likeness" && stylePrep.proofs.has(a.id) ? { likeness_proof: stylePrep.proofs.get(a.id)! } : {}) })),
     negativePrompt, likeness, width, height,
+    ...(stylePrep.kind === "likeness" && stylePrep.askId ? { askId: stylePrep.askId } : {}),
     subject: subjectPrep ? { id: subjectPrep.subjectId, adultContent: likeness?.adult_content ?? false, way: photo ? "photo" : "style" } : null,
   };
 }

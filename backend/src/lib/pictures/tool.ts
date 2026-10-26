@@ -15,6 +15,7 @@ import { pictureEngineStatus } from "./ready";
 import { chooseQuality, isPictureQuality, QUALITY_NOTE_LINE } from "./quality";
 import { StackPicturesError } from "./stack";
 import { prepareStyleUse } from "@/lib/likeness/apply";
+import { ASK_WAITING_LINE, attachJob, dropAsk } from "@/lib/likeness/ask";
 
 import { GENERATE_IMAGE_TOOL_ID, runEditPicture } from "./editTool";
 import { CHILD_LIMIT_LINE, CHILD_NEGATIVE_PROMPT, forceCartoon, kidsDailyPictures, laneOf, picturesMadeToday, releaseKid, reserveKid } from "./lane";
@@ -120,7 +121,8 @@ export async function runGenerateImage(input: RunGenerateImageInput): Promise<To
   const qualityNote = choice.note ? ` ${QUALITY_NOTE_LINE[choice.note]}` : choice.announce ? " This one is a Detailed picture, which takes longer than a Quick one; say so in one short sentence." : "";
   const styleNote = named && !adapter ? " The style they named is not in the library, so the picture was made without it; say so briefly." : "";
   // A style of a household adult is made only when the household option is on; other real people are refused.
-  const prep = await prepareStyleUse({ medium: "picture", audience, style: adapter, text: `${sentPrompt} ${adapter?.name ?? named}`, depictsRealPerson: args.depicts_real_person === true, source: "chat" });
+  // Adult content of another household adult waits for that adult's consent (lib/likeness/ask.ts): the exact prompt sent is what they read.
+  const prep = await prepareStyleUse({ medium: "picture", audience, style: adapter, text: `${sentPrompt} ${adapter?.name ?? named}`, depictsRealPerson: args.depicts_real_person === true, source: "chat", held: { prompt: sentPrompt, count, temporary: state.temporary === true || state.ephemeral === true } });
   if (prep.kind === "refused") return refused(callId, args, prep.why === "real_person" ? { kind: "prompt", why: "real_person", line: PROMPT_REFUSAL_LINE.real_person } : { kind: "likeness", why: "likeness", line: prep.line });
 
   // The allowance is taken now, in one step with the check, so two asks at once cannot both pass; it goes back only if nothing started.
@@ -143,11 +145,23 @@ export async function runGenerateImage(input: RunGenerateImageInput): Promise<To
         ...(choice.model ? { model: choice.model } : {}),
         // Only an adult whose household allows adult-only styles is ever sent as `adult`: a teen and a child are always `all-ages`.
         audience: lane === "adult" && adultAdaptersAllowed() ? "adult" : "all-ages",
-        ...(adapter ? { loras: [{ id: adapter.id, scale: adapter.strength_default, ...(prep.kind === "likeness" ? { likeness_proof: prep.proof } : {}) }] } : {}),
+        ...(adapter ? { loras: [{ id: adapter.id, scale: adapter.strength_default, ...(prep.kind === "likeness" && prep.proof ? { likeness_proof: prep.proof } : {}) }] } : {}),
         ...(kid ? { negative_prompt: CHILD_NEGATIVE_PROMPT } : prep.kind === "likeness" && prep.negativePrompt ? { negative_prompt: prep.negativePrompt } : {}),
       },
       ...(prep.kind === "likeness" ? { likeness: prep.job } : {}),
     });
+    const askId = prep.kind === "likeness" ? prep.askId : undefined;
+    if (askId) {
+      attachJob(askId, job.id);
+      return outcomeOf({
+        callId, packageId: GENERATE_IMAGE_TOOL_ID, status: "succeeded", via: "tool_call", args, durationMs: 0,
+        result: {
+          reply: { text: `Nothing has been made yet. ${ASK_WAITING_LINE(prep.kind === "likeness" ? prep.subjectName : "They")} A card below shows them exactly what would be made, with Consent and Decline buttons. Tell the person in one or two short sentences to show that person the screen and that it starts when they say yes. You have not seen any picture: do not describe how it looks.` },
+          data: { pictureJobId: job.id },
+          actions: [],
+        },
+      });
+    }
     const many = count > 1 ? ` ${count} pictures are` : " The picture is";
     return outcomeOf({
       callId, packageId: GENERATE_IMAGE_TOOL_ID, status: "succeeded", via: "tool_call", args, durationMs: 0,
@@ -159,6 +173,7 @@ export async function runGenerateImage(input: RunGenerateImageInput): Promise<To
     });
   } catch (error) {
     releaseKid(slot);
+    if (prep.kind === "likeness" && prep.askId) dropAsk(prep.askId);
     if (error instanceof StackPicturesError && (error.code === "unreachable" || error.code === "no_stack" || error.code === "not_installed" || error.code === "unsupported" || error.code === "no_memory" || error.code === "queue_full")) {
       return failed(callId, args, error.code, "unavailable", plainFailure(error));
     }
