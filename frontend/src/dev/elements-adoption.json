@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-10-26T04:17:04.404Z",
+  "generatedAt": "2026-10-26T10:00:39.286Z",
   "kitTag": "ui-v0.5.356",
   "items": [
     {
@@ -567,7 +567,7 @@
       "group": "reasoning/tools",
       "verdict": "wire-after",
       "verdictReason": "Deferred until tool elicitation event (docs/plans/tools-ecosystem-design T-series).",
-      "implemented": false
+      "implemented": true
     },
     {
       "file": "empty-state.tsx",

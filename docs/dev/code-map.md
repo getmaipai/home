@@ -76,7 +76,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `frontend/src/apps/chat/chatHeaderData.tsx` | ChatHeaderDataProvider, useChatHeaderData, useSetChatHeaderData |
 | `frontend/src/apps/chat/chatProjects.tsx` | chatFoldersQueryKey, useChatProjects |
 | `frontend/src/apps/chat/chatThreadSlots.tsx` | CompareIcon, DetailsIcon, ComposerExtraControls, ChatComposerNotice, ChatMessageQueue, MODEL_EFFORTS |
-| `frontend/src/apps/chat/chatToolUis.tsx` | SpecSheetToolRender, ArtifactCardToolRender, ProducedArtifactCard, ConfirmToolRender, ProjectFinishedArtifact, projectStages |
+| `frontend/src/apps/chat/chatToolUis.tsx` | SpecSheetToolRender, ArtifactCardToolRender, ProducedArtifactCard, ConfirmToolRender, AskToolRender, ProjectFinishedArtifact |
 | `frontend/src/apps/chat/companionComposerMentions.tsx` | CompanionComposerMentions |
 | `frontend/src/apps/chat/composerAddMenu.tsx` | unwiredControlsAreEnabled, __setUnwiredControlsForTests, PackageScopeContext, PhotoUploadsContext, attachmentAddErrorMessage, ComposerAddMenu |
 | `frontend/src/apps/chat/composerDictationWaveform.tsx` | DictationLevelMeterProvider, ComposerDictationWaveform |
