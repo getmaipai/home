@@ -95,6 +95,8 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `frontend/src/apps/settings/AddRobotSection.tsx` | AddRobotSection |
 | `frontend/src/apps/settings/AddVoiceForm.tsx` | AddVoiceForm |
 | `frontend/src/apps/settings/AdminGatedContent.tsx` | AdminGatedContent |
+| `frontend/src/apps/settings/AiJobChoices.tsx` | AiJobChoices |
+| `frontend/src/apps/settings/AiOverview.tsx` | AiOverview |
 | `frontend/src/apps/settings/AssistantKeysSettings.tsx` | AssistantKeysSettings |
 | `frontend/src/apps/settings/AwaySessionsSection.tsx` | AwaySessionsSection |
 | `frontend/src/apps/settings/BackupsSection.tsx` | EMERGENCY_KIT_SAVED_KEY, BackupsSection |
@@ -102,9 +104,9 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `frontend/src/apps/settings/CommandsSection.tsx` | CommandsSection |
 | `frontend/src/apps/settings/DevicesSection.tsx` | DevicesSection |
 | `frontend/src/apps/settings/EngineLinkCredentialSection.tsx` | addressProblem, groupCode, pairCommand, EngineLinkCredentialSection |
+| `frontend/src/apps/settings/FreeUpSpaceDialog.tsx` | FreeUpSpaceDialog |
 | `frontend/src/apps/settings/HouseholdRobotsSection.tsx` | HouseholdRobotsSection |
 | `frontend/src/apps/settings/HuggingFaceTokenSection.tsx` | HuggingFaceTokenSection |
-| `frontend/src/apps/settings/InstallPlanSection.tsx` | InstallPlanSection |
 | `frontend/src/apps/settings/LooksLikePicker.tsx` | NOBODY, LooksLikePicker |
 | `frontend/src/apps/settings/MicrophoneSection.tsx` | MicrophoneSection |
 | `frontend/src/apps/settings/ModelsAndStorageSection.tsx` | sizeWords, lastUsedWords, ModelsAndStorageSection |
@@ -245,6 +247,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 |---|---|
 | `backend/src/lib/access.ts` | isOwnerOrAdmin, canHaveTemporaryChat, rolesById, getPersonRole, canAccessPerson, listActivePeople |
 | `backend/src/lib/ageBand.ts` | speakerAgeBand |
+| `backend/src/lib/aiUnused.ts` | plainPartName, notUsedSince, whyKept, findUnused |
 | `backend/src/lib/allowance.ts` | dailyMinutesAllowed |
 | `backend/src/lib/almanacCompute.ts` | WEEKDAYS, parseDateQuestion, computeDateAnswer, dateRelation |
 | `backend/src/lib/answerBlocks.ts` | filterAnswerBlocks |
