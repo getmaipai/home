@@ -33,9 +33,9 @@ export function useSongByline(card: MusicCard, me: Roster | null) {
     shared_with: mine ? { count: shareList.length, household: shareList.some((share) => share.to === "household") } : { count: 1, household: false },
     retention: file.retention, chat_id: null, can_edit: false, audience: null, duration_seconds: null, thumb_url: "", expires_at: null, version_count: 1,
   };
-  const creation = creationOf(item, me, sharedWith);
+  const creation = creationOf(item, me, sharedWith, seeds);
   return {
-    creator: { name: creation.creator.name, href: creation.creator.href, avatarSeed: seeds[file.owner_person_id] ?? null },
+    creator: creation.creator,
     madeAt: creation.madeAt,
     visibility: { mode: creation.mode, people: creation.people, canManage: creation.canManage, onOpen: () => navigate(`/files?file=${encodeURIComponent(fileId)}`) },
   };
