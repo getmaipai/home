@@ -82,7 +82,7 @@ function bytesGb(n: number): string {
  * `GlobalMemoryStatusEx` (what `os.freemem()` calls there) already counts
  * the reclaimable standby list as available, so raw freemem is a sound
  * signal there with no extra work. */
-async function systemAvailableBytes(): Promise<{ available: number; total: number } | null> {
+export async function systemAvailableBytes(): Promise<{ available: number; total: number } | null> {
   const total = os.totalmem();
   if (process.platform !== "darwin") {
     return { available: os.freemem(), total };

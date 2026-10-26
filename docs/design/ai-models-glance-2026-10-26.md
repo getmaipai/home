@@ -138,8 +138,9 @@ The setup wizard step (AIMODELS-SETUP-01) reuses the rows later. Stack-unreachab
 ## 11. As built (2026-10-26)
 
 - Files: `AiGlance.tsx` (the `ai.glance` view), `AiModelDialog.tsx` (the gear dialog body), `aiGlanceRows.ts` (rows, staging, projection).
-- **Memory bar:** Home's models, the staged change and free memory. The hub has no reading for memory used by other apps, so
-  there is no "in use by others" segment. Each model's RAM is the disk plan's estimate and reads "about X GB RAM" until measured.
+- **Memory bar:** Home's models, an "Other apps" segment, the staged change and free memory. "Other apps" is the computer's total
+  memory, less what it reports free, less Home's models; the hub sends the free reading as `memory_available_bytes` and the
+  segment is hidden when the reading is missing or the result is zero. It is an estimate. Each model's RAM is the disk plan's estimate and reads "about X GB RAM" until measured.
 - **Storage bar:** the disk total is installed models plus free space. "Free up space" opens the existing dialog.
 - **Closest shipped variants** (section 7 gaps stay open): the staged banner is the default Alert, "Download missing" the default
   Button, the staged Memory and Storage segment uses the orange hue, and an unavailable model shows as the amber banner plus the

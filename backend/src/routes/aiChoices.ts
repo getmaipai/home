@@ -16,6 +16,7 @@ import { findUnused, plainPartName, qualified, whyKept, type UnusedInput } from 
 import { installStackComponent, listStackComponents, StackComponentError, uninstallStackComponent, type StackComponent, type StackComponentList } from "@/lib/stackComponents";
 import { previewPlan } from "@/lib/installActions";
 import { recordedLevel, shippedPlanForLevel } from "@/lib/diskPlan";
+import { systemAvailableBytes } from "@/lib/resourceGovernor";
 import { ensureWakewordAssets, removeWakewordAssets, wakewordAssetState } from "@/lib/wakewordAssets";
 import { getHouseholdSettingValue, setHouseholdSettingValue } from "@/lib/settings";
 import { resetInstallStatusCache } from "@/lib/installStatus";
@@ -169,7 +170,7 @@ const choicesRoute = createRoute({
     200: { content: { "application/json": { schema: z.object({
       stack: z.enum(["ok", "unreachable"]), message: z.string().nullable(),
       tier: z.string().nullable(), free_disk_bytes: z.number().nullable(), installed_bytes: z.number(),
-      cards: z.array(CardSchema), alwaysOn: AlwaysOnSchema, recommended: PlanSchema.nullable(), unused_bytes: z.number(),
+      cards: z.array(CardSchema), alwaysOn: AlwaysOnSchema, recommended: PlanSchema.nullable(), unused_bytes: z.number(), memory_available_bytes: z.number().nullable(),
     }) } }, description: "The cards, the Always on line, the set-to-recommended plan and how much Free up space can find. With the engine down the cards are empty and the message says what to do." },
     ...refusals,
   },
@@ -182,13 +183,13 @@ aiChoicesRoutes.openapi(choicesRoute, async (c) => {
     else throw error;
   }
   if (list === null) {
-    return c.json({ stack: "unreachable" as const, message, tier: null, free_disk_bytes: null, installed_bytes: 0, cards: [], alwaysOn: { bytes: 0, rowIds: [] }, recommended: null, unused_bytes: 0 }, 200);
+    return c.json({ stack: "unreachable" as const, message, tier: null, free_disk_bytes: null, installed_bytes: 0, cards: [], alwaysOn: { bytes: 0, rowIds: [] }, recommended: null, unused_bytes: 0, memory_available_bytes: null }, 200);
   }
   const state: AiState = { plan: await loadPlan(), components: list.components, settings: readSettings(), freeBytes: list.free_disk_bytes, list };
   const { cards, alwaysOn } = buildAiCards(choicesInput(state));
   return c.json({
     stack: "ok" as const, message: null, tier: list.tier, free_disk_bytes: list.free_disk_bytes, installed_bytes: list.installed_bytes,
-    cards, alwaysOn, recommended: recommendedPlan(choicesInput(state)), unused_bytes: findUnused(unusedInput(state)).totalBytes,
+    cards, alwaysOn, recommended: recommendedPlan(choicesInput(state)), unused_bytes: findUnused(unusedInput(state)).totalBytes, memory_available_bytes: (await systemAvailableBytes())?.available ?? null,
   }, 200);
 });
 

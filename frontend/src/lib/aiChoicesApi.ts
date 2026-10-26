@@ -6,7 +6,7 @@ import type { AiAlwaysOn, AiCard, AiRecommendedPlan } from "../../../shared/aiCh
 export interface AiChoicesOverview {
   stack: "ok" | "unreachable"; message: string | null; tier: string | null;
   free_disk_bytes: number | null; installed_bytes: number;
-  cards: AiCard[]; alwaysOn: AiAlwaysOn; recommended: AiRecommendedPlan | null; unused_bytes: number;
+  cards: AiCard[]; alwaysOn: AiAlwaysOn; recommended: AiRecommendedPlan | null; unused_bytes: number; memory_available_bytes?: number | null;
 }
 export interface UnusedModel { id: string; name: string; bytes: number; reason: string; lastUsedAt: string | null }
 export interface UnusedList { items: UnusedModel[]; total_bytes: number }

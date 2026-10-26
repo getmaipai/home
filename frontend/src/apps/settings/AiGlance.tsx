@@ -105,8 +105,11 @@ export function AiGlance({ card }: SettingsViewProps) {
   const totalRam = (hardware.data?.totalRamGb ?? 0) * GB;
   const installed = data.installed_bytes;
   const freeDisk = data.free_disk_bytes ?? hardware.data?.freeDiskBytes ?? null;
+  // What the computer reports as not free, less Home's own models: an estimate, shown only when the hub could read it.
+  const otherApps = totalRam > 0 && data.memory_available_bytes != null ? Math.max(0, totalRam - data.memory_available_bytes - projection.ramNow) : 0;
   const memorySegments = [
     { id: "home", label: "Home", bytes: Math.min(projection.ramNow, projection.ramAfter), hue: "--hue-violet" },
+    ...(otherApps > 0 ? [{ id: "other", label: "Other apps", bytes: otherApps, hue: "--hue-teal" }] : []),
     ...(projection.ramAfter > projection.ramNow ? [{ id: "pending", label: copy.staged_label ?? "Staged", bytes: projection.ramAfter - projection.ramNow, hue: "--hue-orange" }] : []),
   ];
   const storageSegments = [
