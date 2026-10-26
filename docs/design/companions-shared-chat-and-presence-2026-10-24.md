@@ -1,5 +1,7 @@
 # Companions: many per person, one shared chat, presence across the app (2026-10-24)
 
+> **Superseded in part (Jesse, 2026-10-26, [companions-handoff-revamp-2026-10-26.md](companions-handoff-revamp-2026-10-26.md) sections 3 and 6):** every reply carries a 28px face (not a marker only on change), and decision 13.6 is reversed: each reply's portrait is kept per look version. The rest stands.
+
 Owner's request (Jesse, 2026-10-24): review the product spec "MaiPai Companions: Product and UX Design Specification" (746 lines,
 with nine reference images: a Character.AI-style persona grid, a header companion selector, an agentic task card, a new chat with a
 companion, a companion detail page with Activity / About / Tasks / Chats, a Yours / Discover grid with state badges, a two-step

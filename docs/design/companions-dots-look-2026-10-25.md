@@ -1,5 +1,7 @@
 # Companions: the dots look and feel (2026-10-25)
 
+> **Superseded in part (Jesse, 2026-10-26, [companions-handoff-revamp-2026-10-26.md](companions-handoff-revamp-2026-10-26.md) section 4):** the gallery, detail page and header follow the handoff mockup, not the round-character look. The Look and States tab restyle and the chat header still stand.
+
 Owner's request (Jesse, 2026-10-25): update the companion design to look and feel like ChatGPT dots, researched from public
 screenshots. Scope he chose: every companion screen, including the Look and States tabs. The character stays a generated picture
 or video (no parts builder). This is a restyle of what exists (COMPANIONS-APP-01, COMPANIONS-STUDIO-01, COMPANIONS-SHELL-01);
