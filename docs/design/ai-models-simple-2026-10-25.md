@@ -86,7 +86,7 @@ picture and video option texts are rewritten there: Quick no longer says "a few 
 | Music | Make songs and tunes. | Switch: Make music. | Off until asked for (plan says optional) | `music` |
 | Voice and speaking | Choose how Home sounds when it talks. | Standard voice (always installed). Better voice: "Warmer and more natural, uses more space." | Better voice | `voice` (always on), `voice-better` |
 | Coding | Help with code in the Code app and in chat. | Switch: Coding helper. | On | `coding` |
-| Search and memory | Look things up on the web and remember what you tell Home. | No choice: both are needed, so this card is only a line and the web search switch that already exists (`WebSearchSettings`). | n/a | `search`, `embed` (always on) |
+| Search and memory | Look things up on the web and remember what you tell Home. | No choice: both are needed, so this card is one line and a link to Settings > Search and web, where the web search controls already live (rule S4: a group is placed once). | n/a | `search`, `embed` (always on) |
 
 Always on (one line, Details lists them): "Always on: Home itself, the helper that checks answers, listening, the standard voice,
 memory search and web search help. About 3.1 GB. They are needed, so they cannot be turned off." The sum comes from the plan rows with
