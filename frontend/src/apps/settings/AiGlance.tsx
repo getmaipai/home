@@ -215,6 +215,7 @@ function glanceRow({ row, copy, onSwitch, onEdit, onReset, onDownload }: { row: 
           {row.offered ? <Badge tone={row.badge === "recommended" ? "success" : undefined} variant={row.badge === "disabled" ? "secondary" : "default"}>{copy[row.badge]}</Badge> : null}
         </ItemTitle>
         <ItemDescription clamp={false}>{model && row.offered ? `${model.label}. ` : ""}{line}</ItemDescription>
+        {model && row.offered ? <ItemDescription clamp={false}>{model.details.map((part) => part.name).join(", ")}</ItemDescription> : null}
       </ItemContent>
       <ItemActions>
         {model && row.offered && row.shownEnabled ? <span className="text-base text-muted-foreground">{sizeGb(model.installedBytes)} · {fill(copy.ram_estimate ?? "", { size: sizeGb(model.ramBytes) })}</span> : null}

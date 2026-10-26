@@ -617,6 +617,17 @@ header nav a:has(> img[alt="logo"]) {
   }
 }
 
+/* The kit's success badge is the bright teal fill with theme-foreground text, which is near-white on bright teal in dark mode
+ * (about 1.4:1, unreadable). Dark mode gets a deep green for badges only; light mode keeps the kit's teal. Tokens only. */
+.dark [data-slot="badge"] {
+  --hue-teal: #11704a;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not(.light) [data-slot="badge"] {
+    --hue-teal: #11704a;
+  }
+}
+
 /* CHAT-UI-01 finding 2: FullLayout.tsx's own `.container` (globals.css's
  * `@utility container { max-w-[1367px] mx-auto }`) wraps every shell
  * page's <Outlet/>, a fixed cap that's fine for a form or a table but

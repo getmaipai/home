@@ -46,7 +46,8 @@ export function FreeUpSpaceDialog({ open, onOpenChange, onChanged }: FreeUpSpace
   const chosenBytes = chosen.reduce((sum, item) => sum + item.bytes, 0);
   const allPicked = items.length > 0 && chosen.length === items.length;
   const toggle = (id: string, on: boolean) => setPicked((previous) => { const next = new Set(previous); if (on) next.add(id); else next.delete(id); return next; });
-  const close = (next: boolean) => { if (!next) { setResult(null); setConfirm(false); setPicked(new Set()); remove.reset(); } onOpenChange(next); };
+  // The confirm sits outside this dialog's DOM, so a click on it reads as an outside click; ignore that dismissal while it is open.
+  const close = (next: boolean) => { if (!next && confirm) return; if (!next) { setResult(null); setConfirm(false); setPicked(new Set()); remove.reset(); } onOpenChange(next); };
   const keptNames = (result?.results ?? []).filter((entry) => entry.status === "kept").map((entry) => entry.message);
 
   return (

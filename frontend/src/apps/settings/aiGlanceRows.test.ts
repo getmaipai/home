@@ -34,6 +34,11 @@ describe("buildRows", () => {
     expect(rows.find((row) => row.job === "wakeword")?.offered).toBe(false);
   });
 
+  test("the only model a job has reads recommended, not custom, when it is on", () => {
+    const only = [card("music", [choice("music.make", { kind: "switch", recommended: false, current: true })])];
+    expect(buildRows(only, none, {})[0]!.badge).toBe("recommended");
+  });
+
   test("a job switched off reads disabled", () => {
     const rows = buildRows(cards, new Set<AiJobId>(["chat"]), {});
     expect(rows[0]!.badge).toBe("disabled");

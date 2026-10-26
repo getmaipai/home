@@ -71,6 +71,24 @@ describe("Free up space", () => {
     v.restore();
   });
 
+  test("a press on the confirm (outside the first dialog) does not dismiss it, so Remove and Keep them work", async () => {
+    const onOpenChange = mock(() => {});
+    const original = { ...aiChoicesApi };
+    aiChoicesApi.unused = mock(async () => list());
+    aiChoicesApi.cleanup = mock(async (ids: string[]) => ({ results: ids.map((id) => ({ id, status: "removed" as const, freed_bytes: 1, message: "" })), freed_bytes: 1, kept: 0, failed: 0 }));
+    const v = renderWithQueryClient(<FreeUpSpaceDialog open onOpenChange={onOpenChange} />);
+    await v.findByText(/You can free/);
+    fireEvent.click(within(v.getByTestId("unused-zimage")).getByRole("checkbox"));
+    fireEvent.click(await v.findByRole("button", { name: /^Remove 1 and free/ }));
+    const remove = await v.findByRole("button", { name: "Remove" });
+    fireEvent.pointerDown(remove);
+    fireEvent.click(remove);
+    expect(await v.findByText(/Freed/)).toBeTruthy();
+    expect((aiChoicesApi.cleanup as ReturnType<typeof mock>).mock.calls.length).toBe(1);
+    expect(onOpenChange).not.toHaveBeenCalled();
+    Object.assign(aiChoicesApi, original);
+  });
+
   test("a partial result says what was kept because it is in use now, and what did not finish", async () => {
     const v = mount(list(), { results: [{ id: "ltx", status: "kept", freed_bytes: 0, message: "Detailed videos is in use now, so it was kept." }, { id: "zimage", status: "failed", freed_bytes: 0, message: "x" }], freed_bytes: 0, kept: 1, failed: 1 });
     await v.findByText(/You can free/);

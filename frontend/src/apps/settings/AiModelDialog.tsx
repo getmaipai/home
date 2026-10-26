@@ -6,7 +6,6 @@ import { Button } from "@maipai/ui/src/ui/button";
 import { DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@maipai/ui/src/ui/dialog";
 import { RadioGroup, RadioGroupItem } from "@maipai/ui/src/dashboard/components/ui/radio-group";
 import { Field, FieldContent, FieldDescription, FieldLabel, FieldTitle } from "@maipai/ui/src/dashboard/components/ui/field";
-import { getIcon } from "@maipai/ui/src/icons";
 import { sizeGb } from "../../../../shared/diskPlanMath";
 import { OFF, fill, type GlanceRow } from "@/apps/settings/aiGlanceRows";
 
@@ -21,8 +20,6 @@ export interface AiModelChoicesProps {
 export function AiModelChoices({ row, copy, onClose, onSave }: AiModelChoicesProps) {
   const start = !row.shownEnabled ? OFF : row.shown?.id ?? OFF;
   const [pick, setPick] = useState(start);
-  const [info, setInfo] = useState<string | null>(null);
-  const Info = getIcon("info");
   return (
     <>
       <DialogHeader>
@@ -48,12 +45,11 @@ export function AiModelChoices({ row, copy, onClose, onSave }: AiModelChoicesPro
                       {sizeGb(option.installedBytes)} · {fill(copy.ram_estimate ?? "", { size: sizeGb(option.ramBytes) })}
                       {" · "}{option.blockedReason ?? copy.fits}
                     </FieldDescription>
-                    {info === option.id ? <FieldDescription>{option.details.map((part) => `${part.name} (${sizeGb(part.sizeBytes)})`).join(", ")}</FieldDescription> : null}
+                    <FieldDescription>{option.details.map((part) => `${part.name} (${sizeGb(part.sizeBytes)})`).join(", ")}</FieldDescription>
                   </FieldContent>
                   <RadioGroupItem value={option.id} id={id} disabled={blocked} />
                 </Field>
               </FieldLabel>
-              <Button type="button" variant="ghost" size="icon-sm" aria-label={`${option.label} details`} aria-expanded={info === option.id} onClick={() => setInfo(info === option.id ? null : option.id)}><Info /></Button>
             </div>
           );
         })}

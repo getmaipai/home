@@ -49,7 +49,7 @@ export function buildRows(cards: AiCard[], offJobs: ReadonlySet<AiJobId>, staged
     const shown = picked ?? live;
     const shownEnabled = offered && (change?.enabled ?? (picked ? true : liveEnabled));
     const recommended = options.find((option) => option.recommended) ?? null;
-    const badge: Badge = !shownEnabled ? "disabled" : shown && shown.recommended ? "recommended" : "custom";
+    const badge: Badge = !shownEnabled ? "disabled" : shown && (shown.recommended || options.length === 1) ? "recommended" : "custom";
     return [{
       job, title: card.title, summary: card.summary, offered, options, live, liveEnabled, shown, shownEnabled, recommended, badge,
       staged: change !== undefined,
