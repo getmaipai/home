@@ -198,7 +198,7 @@ export async function runGenerateVideo(input: RunGenerateVideoInput): Promise<To
       actor,
       conversationId: state.conversationId,
       turnId: state.turnId,
-      companionId: state.persona.id,
+      companionId: state.persona?.id ?? null,
       temporary,
       kind: image ? "animate" : "generate",
       prompt,

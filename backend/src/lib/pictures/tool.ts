@@ -133,7 +133,7 @@ export async function runGenerateImage(input: RunGenerateImageInput): Promise<To
       actor: state.actor as PersonRow,
       conversationId: state.conversationId,
       turnId: state.turnId,
-      companionId: state.persona.id,
+      companionId: state.persona?.id ?? null,
       temporary,
       kind: "generate",
       prompt,

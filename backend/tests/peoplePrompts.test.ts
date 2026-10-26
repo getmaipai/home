@@ -122,10 +122,10 @@ describe("the hard lines hold with the switch off and on", () => {
         expect(video.submitted).toHaveLength(0);
       });
 
-      test("nothing sexual involving a minor, and no real person without consent", async () => {
+      test("nothing sexual involving a minor, and nothing sexual that shows a real person (owner, 2026-10-25)", async () => {
         expect(text(await pic(nadia, { prompt: "a naked child on a beach" }))).toContain("never allowed");
-        expect(text(await pic(nadia, { prompt: "a portrait of a famous senator", depicts_real_person: true }))).toContain("real person");
-        expect(text(await vid(nadia, { prompt: "a famous senator waving", depicts_real_person: true }))).toContain("real person");
+        expect(text(await pic(nadia, { prompt: "a sexual portrait of a famous senator", depicts_real_person: true }))).toContain("real person");
+        expect(text(await vid(nadia, { prompt: "a sexual video of a famous senator", depicts_real_person: true }))).toContain("real person");
         expect(image.submitted).toHaveLength(0);
         expect(video.submitted).toHaveLength(0);
       });
