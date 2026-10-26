@@ -1,6 +1,6 @@
 {
-  "generatedAt": "2026-10-26T01:59:50.157Z",
-  "kitTag": "ui-v0.5.349",
+  "generatedAt": "2026-10-26T02:22:32.019Z",
+  "kitTag": "ui-v0.5.351",
   "items": [
     {
       "file": "ActivityCardsShowcase.tsx",
@@ -153,8 +153,8 @@
       "file": "__snapshots__/answer-block-cc05.test.tsx.snap",
       "name": "__snapshots__/answer-block-cc05.test.tsx",
       "group": "__snapshots__/answer",
-      "verdict": "unassessed",
-      "verdictReason": "Recorded unassessed verdict in elements-plan.json; see the plan entry for its dependency or scope.",
+      "verdict": "support",
+      "verdictReason": "Test snapshot file of the kit's answer block; not a Home adoption target.",
       "implemented": false
     },
     {
@@ -428,8 +428,8 @@
       "file": "confirmation.tsx",
       "name": "confirmation",
       "group": "confirmation",
-      "verdict": "unassessed",
-      "verdictReason": "Recorded unassessed verdict in elements-plan.json; see the plan entry for its dependency or scope.",
+      "verdict": "later",
+      "verdictReason": "New kit element; Home has no confirmation surface that needs it yet, so it is recorded for when one does.",
       "implemented": false
     },
     {
@@ -484,8 +484,8 @@
       "file": "countdown.tsx",
       "name": "countdown",
       "group": "countdown",
-      "verdict": "unassessed",
-      "verdictReason": "Recorded unassessed verdict in elements-plan.json; see the plan entry for its dependency or scope.",
+      "verdict": "later",
+      "verdictReason": "New kit element; Home has no countdown surface yet, so it is recorded for when one is built.",
       "implemented": false
     },
     {
@@ -781,9 +781,9 @@
     {
       "file": "lyrics-list.tsx",
       "name": "lyrics-list",
-      "group": "lyrics",
-      "verdict": "unassessed",
-      "verdictReason": "Recorded unassessed verdict in elements-plan.json; see the plan entry for its dependency or scope.",
+      "group": "lyrics-list",
+      "verdict": "later",
+      "verdictReason": "Kit lyrics list for the media detail work (MEDIA-DETAIL-02); Home wires it with the audio detail page.",
       "implemented": false
     },
     {
@@ -830,9 +830,9 @@
     {
       "file": "media-card.tsx",
       "name": "media-card",
-      "group": "media",
-      "verdict": "unassessed",
-      "verdictReason": "Recorded unassessed verdict in elements-plan.json; see the plan entry for its dependency or scope.",
+      "group": "media-card",
+      "verdict": "later",
+      "verdictReason": "New kit media card; Home adopts it when the media shelves are rebuilt on the kit.",
       "implemented": false
     },
     {
