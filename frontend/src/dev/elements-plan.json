@@ -1688,6 +1688,23 @@
       "verdictReason": "Supporting file for the shipped kit UI; it is not a standalone Home adoption target."
     },
     {
+      "file": "light-markdown.tsx",
+      "name": "LightMarkdown",
+      "group": "light",
+      "verdict": "support",
+      "backendNeeded": null,
+      "effort": null,
+      "specTagNeeded": false,
+      "newDependency": false,
+      "bindings": [],
+      "size": "S",
+      "showcaseScenario": null,
+      "batch": null,
+      "replacesHandBuilt": [],
+      "realTurnToday": null,
+      "verdictReason": "The short-text formatter inside the creation header's collapsible description, which the Library viewer adopts through CreationHeader; no separate Home surface."
+    },
+    {
       "file": "markdown-text.test.tsx",
       "name": "markdown-text.test",
       "group": "other",

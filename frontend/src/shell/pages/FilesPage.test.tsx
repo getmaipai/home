@@ -337,7 +337,8 @@ describe("viewer, menu, sharing and roles", () => {
       page("owner", "/files?file=f2");
       const dialog = await waitFor(() => { const el = document.querySelector('[role="dialog"]'); expect(el).not.toBeNull(); return el as HTMLElement; });
       await waitFor(() => expect(dialog.textContent).toContain("Garden at dawn"), { timeout: 5000 });
-      await waitFor(() => expect(dialog.textContent).toContain("Everyone in the home can see this."));
+      // 22c77aa74 moved the sharing state into the creation header's Private/Shared chip.
+      await waitFor(() => expect(dialog.textContent).toContain("Shared"));
       expect(dialog.textContent).toContain("Kept until you delete it.");
       fireEvent.click(within(dialog).getByRole("button", { name: "Close" }));
       await waitFor(() => expect(where()).toBe(""));
