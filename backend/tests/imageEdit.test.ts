@@ -388,10 +388,12 @@ describe("picture editor routes", () => {
         __setAgeCheckRunnerForTests(async (images) => images.map(() => ({ ok: true as const, verdict: none })));
         const cue = await commented(client, conversation.value.id, picture.id, { prompt: "make the person look like a child", region: null });
         expect(cue.status).toBe(200);
+        // The ordinary child mention above reached the engine; the refused ask below adds no second edit.
+        expect(fake.edits).toHaveLength(1);
         __setAgeCheckRunnerForTests(async (images) => images.map(() => ({ ok: true as const, verdict: { ...none, people_count: 1, apparent_min_age_estimate: 9, label: "child" as const } })));
         const sexualAsk = await commented(client, conversation.value.id, picture.id, { prompt: "make child porn", region: null });
         expect(sexualAsk.status).toBe(422);
-        expect(fake.edits).toHaveLength(0);
+        expect(fake.edits).toHaveLength(1);
       } finally {
         __setAgeCheckRunnerForTests(async (images) => images.map(() => ({ ok: true as const, verdict: none })));
       }
