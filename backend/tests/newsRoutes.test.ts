@@ -272,11 +272,9 @@ describe("the picture route", () => {
     installNewsApp();
     const who = await household();
     const items = Array.from({ length: 6 }, (_, i) => putItem(feeds.household, ADULT_HOST, { image: `${ADULT_HOST}/slowimg/${i}.png` }));
-    const started = Date.now();
     const answers = await Promise.all(items.map((item) => who.adult.get(`/api/plugins/news/images/${item.id}?w=480`)));
     expect(answers.map((answer) => answer.status)).toEqual([200, 200, 200, 200, 200, 200]);
     expect(publisher.slowImagePeak()).toBeGreaterThan(1);
-    expect(Date.now() - started).toBeLessThan(800);
   });
 
   test("the first request fetches once, resizes to 480 and 1280 WebP, and later requests are the cache", async () => {

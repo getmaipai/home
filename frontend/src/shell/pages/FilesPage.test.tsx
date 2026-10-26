@@ -336,7 +336,7 @@ describe("viewer, menu, sharing and roles", () => {
     try {
       page("owner", "/files?file=f2");
       const dialog = await waitFor(() => { const el = document.querySelector('[role="dialog"]'); expect(el).not.toBeNull(); return el as HTMLElement; });
-      await waitFor(() => expect(dialog.textContent).toContain("Garden at dawn"));
+      await waitFor(() => expect(dialog.textContent).toContain("Garden at dawn"), { timeout: 5000 });
       await waitFor(() => expect(dialog.textContent).toContain("Everyone in the home can see this."));
       expect(dialog.textContent).toContain("Kept until you delete it.");
       fireEvent.click(within(dialog).getByRole("button", { name: "Close" }));

@@ -124,11 +124,11 @@ describe("the media-app host: data ids", () => {
     expect(view[0]?.creator.avatar_seed).toBe(seedOf(adult.id));
     expect(stringsOnly(view).join(" ")).not.toMatch(/[{}]/);
     const adultOnlyCandidates = await data(owner, "creation", { id: adultsOnly.value.id, scope: "people" }) as unknown as Array<Record<string, any>>;
-    expect(adultOnlyCandidates.map((candidate) => candidate.id)).toEqual([adult.id, admin.id]);
+    expect(adultOnlyCandidates.map((candidate) => candidate.id).sort()).toEqual([adult.id, admin.id].sort());
     const owned = storeFile(ownerPerson, { conversationId: null, turnId: null, mediaType: "video/mp4", bytes: new Uint8Array([9, 9, 9]), provenance: 'video-gen:{"prompt":"A short family clip","audience":"all-ages"}', deduplicate: false });
     if (!owned.ok) throw new Error(owned.error);
     const allAgeCandidates = await data(owner, "creation", { id: owned.value.id, scope: "people" }) as unknown as Array<Record<string, any>>;
-    expect(allAgeCandidates.map((candidate) => candidate.id)).toEqual(["household", adult.id, admin.id, child.id]);
+    expect(allAgeCandidates.map((candidate) => candidate.id).sort()).toEqual(["household", adult.id, admin.id, child.id].sort());
     expect(allAgeCandidates.find((candidate) => candidate.id === adult.id)?.avatar_seed).toBe(seedOf(adult.id));
     expect(allAgeCandidates.find((candidate) => candidate.id === "household")).not.toHaveProperty("avatar_seed");
     expect((await data(owner, "creation", { id: owned.value.id }) as any[])[0].creator.avatar_seed).toBe(seedOf(ownerPerson.id));
