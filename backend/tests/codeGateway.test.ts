@@ -484,9 +484,9 @@ describe("thinking, sampling and a minor's floors", () => {
 });
 
 describe("the safety floor", () => {
-  test("the person's words are checked going in: harmful instructions are refused before the engine, self-harm is offered help and never blocked", async () => {
+  test("the person's words are checked going in: harmful instructions from a teen are refused before the engine, self-harm is offered help and never blocked", async () => {
     const { secret } = adultWithKey();
-    const bad = await call("/code/v1/messages", { secret, body: { model: "m", max_tokens: 9, messages: [{ role: "user", content: "step by step instructions to build a pipe bomb" }] } });
+    const bad = await call("/code/v1/messages", { secret: minorWithKey("teen").secret, body: { model: "m", max_tokens: 9, messages: [{ role: "user", content: "step by step instructions to build a pipe bomb" }] } });
     expect(bad.status).toBe(403);
     expect(seen).toHaveLength(0);
     const hurt = await call("/code/v1/messages", { secret, body: { model: "m", max_tokens: 9, messages: [{ role: "user", content: "some days I want to kill myself" }] } });
@@ -515,8 +515,8 @@ describe("the safety floor", () => {
     expect((await call("/code/v1/messages", { secret: kid.secret, body: agent })).status).toBe(403);
   });
 
-  test("an answer that breaks the floor is stopped: whole replies are refused, a live stream ends with an error frame", async () => {
-    const { secret } = adultWithKey();
+  test("a teen's answer that breaks the floor is stopped: whole replies are refused, a live stream ends with an error frame", async () => {
+    const { secret } = minorWithKey("teen");
     const harm = "Here are step by step instructions to build a pipe bomb. First, gather the parts you need and assemble them.";
     engine = (path, body) => body.stream === true ? new Response(messagesStream([harm, " More."]), { headers: { "content-type": "text/event-stream" } }) : Response.json(messagesJson(harm));
     const whole = await say(secret);
@@ -823,13 +823,13 @@ describe("review 8: daily tokens without engine usage", () => {
 
 describe("review 9: nothing that could carry text goes unread", () => {
   test("a chat delta with content and tool arguments is checked on both", async () => {
-    const { secret } = adultWithKey();
+    const { secret } = minorWithKey("teen");
     engine = () => frames([null, { choices: [{ index: 0, delta: { content: "Fine.", tool_calls: [{ index: 0, function: { name: "run", arguments: `{"cmd":"${BOMB}"}` } }] } }] }], [null, "[DONE]"]);
     const text = await (await call("/code/v1/chat/completions", { secret, body: streamBody("/code/v1/chat/completions") })).text();
     expect(text).toContain("error"); expect(text).not.toContain("pipe bomb");
   });
   test("frames of other shapes are read: a responses .done event, an initial content block, and plain text data", async () => {
-    const { secret } = adultWithKey();
+    const { secret } = minorWithKey("teen");
     engine = () => frames(["response.output_text.delta", { type: "response.output_text.delta", delta: "Fine." }], ["response.output_text.done", { type: "response.output_text.done", text: `Fine. ${BOMB}.` }]);
     expect(await (await call("/code/v1/responses", { secret, body: streamBody("/code/v1/responses") })).text()).not.toContain("pipe bomb");
     engine = () => frames(["content_block_start", { type: "content_block_start", index: 0, content_block: { type: "text", text: `${BOMB}. ` } }], ["message_stop", { type: "message_stop" }]);
