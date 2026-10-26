@@ -20,7 +20,7 @@ This design applies that pattern to every job.
 
 Route `/settings/ai`, tab Overview (the other four tabs stay, section 9). Top to bottom:
 
-1. **Header line.** "Using 41 GB. 612 GB free. Everything recommended is 96 GB to download." Two buttons beside it: the primary
+1. **Header line.** "Using 41 GB. 612 GB free. Everything recommended is 62 GB to download." Two buttons beside it: the primary
    "Set everything to recommended and download" (section 5) and the quiet "Free up space" (section 6).
 2. **One card per job**, in this order: Chat, Pictures, Videos, Music, Voice and speaking, Coding, Search and memory. Listening has no
    choice on any tier (speech to text is needed, one model), so it is a line in Always on, not a card. Every card has the same
@@ -82,7 +82,7 @@ picture and video option texts are rewritten there: Quick no longer says "a few 
 |---|---|---|---|---|
 | Chat | Talk with Home, and let it look at pictures you send. | Standard chat AI. Faster on Apple chips (shown only where the tier lists it). Switch: Chat can look at pictures. | Standard; looking at pictures on | `chat`, `chat-mlx`, `reads-pictures` |
 | Pictures | Make pictures in chat and change the ones you have. | Quick: "Pictures in a few seconds. Draws words correctly." Detailed: "Slower, with finer detail and more looks to add." Changing pictures (fixed): "Needed to change a picture and as the backup." Tools switch: "Take out a background, erase something, make a picture bigger." Switch: "Name things in a picture." | Quick; tools on | Quick = the ERNIE row, Detailed = `pictures-zimage`, Changing = `pictures` (Klein), `image-tools`, `tool-look` |
-| Videos | Make short videos in chat. | Quick videos: "A short clip in a few minutes." Detailed videos with sound: "Longer wait, sharper, with sound." | Detailed on a computer with room, else Quick | `video`, `video-detailed` |
+| Videos | Make short videos in chat. | Quick videos: "A short clip in a few minutes." Detailed videos with sound: "Longer wait, sharper, with sound." | Quick videos (owner, 2026-10-25); Detailed with sound is one click away and not recommended | `video` (recommended), `video-detailed` (optional) |
 | Music | Make songs and tunes. | Switch: Make music. | Off until asked for (plan says optional) | `music` |
 | Voice and speaking | Choose how Home sounds when it talks. | Standard voice (always installed). Better voice: "Warmer and more natural, uses more space." | Better voice | `voice` (always on), `voice-better` |
 | Coding | Help with code in the Code app and in chat. | Switch: Coding helper. | On | `coding` |
@@ -113,7 +113,7 @@ cannot start, the setting is not written. A setting that points at something not
 card says "Chosen, not ready".
 
 Disk plan changes this design needs (Stack, slice 1): the ERNIE row (added by the separate change) is the `need: "recommended"`
-Quick row, and Klein's `pictures` row moves from `recommended` to `required` on tiers that make pictures, because edits and the
+Quick row, the `video` row becomes `recommended` and `video-detailed` becomes `optional` (owner answer 3), and Klein's `pictures` row moves from `recommended` to `required` on tiers that make pictures, because edits and the
 Quick fallback need it. Z-Image stays `optional`. The disk plan JSON is regenerated, not hand-edited.
 
 ## 5. Set everything to recommended and download
@@ -123,13 +123,13 @@ One button at the top: "Set everything to recommended and download".
 Before it is pressed, the header shows the numbers it will act on, from `diskVerdict` with the recommended rows selected and
 `missingOnly` true:
 
-- "Download 96 GB. Free on this computer: 612 GB." (total of missing recommended rows plus the engine tools they run on.)
-- Too small: "This computer has room for 4 of the 6 recommended choices. Detailed videos (74 GB) will be skipped." The button stays
+- "Download 62 GB. Free on this computer: 612 GB." (total of missing recommended rows plus the engine tools they run on.)
+- Too small: "This computer has room for 4 of the 6 recommended choices. The Coding helper (20 GB) will be skipped." The button stays
   enabled and applies what fits; the skipped choices are listed with their reasons. If nothing fits, the button is disabled and the
   line says why and what to free ("Free up 20 GB first. Free up space can find about 28 GB.").
 - Nothing to do: the button reads "Everything is set to recommended" and is disabled.
 
-Press: a confirm dialog (kit AlertDialog) lists what changes: "Pictures: Detailed to Quick", "Voice: Standard to Better", "Download 96 GB".
+Press: a confirm dialog (kit AlertDialog) lists what changes: "Pictures: Detailed to Quick", "Voice: Standard to Better", "Download 62 GB".
 Setting a card away from what the household picked is listed in plain words, so it is never a surprise. Confirm does, in one
 server call: write each card's recommended choice (the setting) and start the missing installs.
 
@@ -237,6 +237,7 @@ glance, one Recommended per card, no model name outside Details, no horizontal s
 
 - The flat checkbox list as the Overview (`ModelsAndStorageSection` Overview use and `InstallPlanSection` in Settings): replaced by the cards; the list lives on as "All parts" in Models.
 - The "Install the recommended extras" button (LICENCE-ACK-01 `installExtras`) on the licence prompt and its use as a second way to get recommended parts: the new button replaces it as the one way (the licence acceptance itself stays; `install.recommended_auto_on_upgrade` keeps its meaning and is read by the new button's list, not duplicated).
+- `video-generation-2026-10-17.md` section 15 and VIDEO-LTX-07 (owner ruling 2026-10-17, Detailed video Recommended on 128 GB): replaced by owner answer 3 (2026-10-25). Quick video is recommended, `video-detailed` is optional, and the Recommended free-space figure for that tier and the setup default change with it. The sizes in the examples above are illustrations; slice 1 recomputes them from `diskVerdict`.
 - In setup, `PlanDiskList` as a checkbox list (its footer stays).
 - Nothing in the image-model decision (ERNIE Quick, Klein edits, Z-Image Detailed), `generation.picture_quality`, the Pictures page, or any rule.
 
@@ -248,17 +249,19 @@ in-use guard), `ComponentRow`, `lastUsedWords`, the existing settings `generatio
 progress (rule S6), the licence prompt, and the kit Elements in section 10. New: `shared/aiChoices.ts`, `aiUnused.ts`, the apply
 and cleanup routes, and the card views. No new setting, status surface, store or engine.
 
-## Open questions for Jesse (real taste calls)
+## Decisions (Jesse's answers, 2026-10-25, closing the open questions)
 
-1. "Set everything to recommended" when a card already holds a different choice (the household picked Detailed pictures): flip it to Quick, listed in the confirm (recommended), or only fill what is empty and never change a choice?
-2. Klein ("Changing pictures") becomes always on, about 16 GB more on a 64 GB computer and needed from then on. Accept, or keep it optional where space is tight?
-3. On big computers the plan marks Detailed videos with sound (74 GB) as recommended, so the one button downloads it. Keep it recommended, or make Quick videos the recommended video choice and Detailed an extra?
+1. Set-to-recommended does change a choice the household already made (Detailed pictures to Quick); the confirm dialog lists those changes first, before the download size.
+2. Klein, the editor (about 16 GB), is always on (`required`), as section 4 says.
+3. Quick video is the recommended video. Detailed videos with sound (74 GB) stay one click away on the Videos card, marked not recommended, so the one button no longer downloads it.
+
+No open questions remain.
 
 ## Build slices
 
 Backend data first. Each slice is 1 to 3 files with its test; Codex or the local lane per the routing order, the dispatcher reads each diff.
 
-1. **AIMODELS-DATA-01**: `shared/aiChoices.ts`, `shared/aiChoices.test.ts`. Pure function: plan rows, component rows and settings in; cards out (choices, current, Recommended, state, size, blocked reason, Details, Always on sum). Tests per tier p16 to p128, ERNIE row present and absent, a too-small choice, the picture mapping to `generation.picture_quality`. Also the Stack plan edits (Klein required) via the generator, if the separate ERNIE change has landed.
+1. **AIMODELS-DATA-01**: `shared/aiChoices.ts`, `shared/aiChoices.test.ts`, and the Stack disk plan data (regenerated `shared/diskPlan.json`: Klein required, `video` recommended, `video-detailed` optional). Pure function: plan rows, component rows and settings in; cards out (choices, current, Recommended, state, size, blocked reason, Details, Always on sum). Tests per tier p16 to p128, ERNIE row present and absent, a too-small choice, the picture mapping to `generation.picture_quality`. Also the Stack plan edits (Klein required) via the generator, if the separate ERNIE change has landed.
 2. **AIMODELS-UNUSED-01**: `backend/src/lib/aiUnused.ts`, `backend/src/lib/aiUnused.test.ts`. The seven-point unused rule and its plain reasons. Tests: each exclusion (always on, selected, Klein, engine dependency, running job, saved style) and the leftover-version case.
 3. **AIMODELS-ROUTES-01**: `backend/src/routes/aiChoices.ts` (+ its test). `GET /api/ai/choices`, `GET /api/ai/unused`, `POST /api/ai/choices/:job` (install then setting), `POST /api/ai/recommended` (idempotent, never removes), `POST /api/ai/cleanup` (per-id guard re-check, partial results). Owner and admin only. Risky surface (deletes data): `code-review` at medium. Checks the backup sentence against `docs/BACKUPS.md`.
 4. **AIMODELS-CHOICES-01**: `frontend/src/apps/settings/AiJobChoices.tsx`, `AiJobChoices.test.tsx`, `frontend/src/lib/aiChoicesApi.ts`. The one card-body view (no frame, no wrapper name) (radio and switch variants, every state in section 7). Dev app render at 390 and 1440 opened and judged before slice 5.
