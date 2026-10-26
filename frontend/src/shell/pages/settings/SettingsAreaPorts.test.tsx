@@ -151,7 +151,7 @@ describe("ported from the old settings page", () => {
     expect(links).toEqual(expect.arrayContaining(["/storage", "/privacy"]));
   });
 
-  test("Home settings links to every page it used to: users, family, models, engines, backups, storage, updates, repairs, performance, status, privacy", async () => {
+  test("Home settings links to every page it used to: users, family, engines, backups, storage, updates, repairs, performance, status, privacy", async () => {
     const owner = makePerson("owner");
     const view = open(owner, "/settings/household?tab=people");
     const hrefs = new Set<string>();
@@ -163,7 +163,7 @@ describe("ported from the old settings page", () => {
       within(document.body).getAllByRole("link").forEach((a) => hrefs.add(a.getAttribute("href") ?? ""));
     }
     void view;
-    for (const href of ["/users", "/people", "/models", "/engines", "/backups", "/storage", "/updates", "/repairs", "/performance", "/status", "/privacy"]) expect(hrefs).toContain(href);
+    for (const href of ["/users", "/people", "/settings/ai?tab=engines", "/backups", "/storage", "/updates", "/repairs", "/performance", "/status", "/privacy"]) expect(hrefs).toContain(href);
   });
 
   test("Chat settings > Skills draws the registered Skills view, and Keyboard shortcuts the chat's own list", async () => {
