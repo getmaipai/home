@@ -1,6 +1,6 @@
 {
-  "generatedAt": "2026-10-26T10:24:08.450Z",
-  "kitTag": "ui-v0.5.357",
+  "generatedAt": "2026-10-26T14:32:52.634Z",
+  "kitTag": "ui-v0.5.359",
   "items": [
     {
       "file": "ActivityCardsShowcase.tsx",
@@ -768,6 +768,14 @@
       "group": "other",
       "verdict": "no-fit",
       "verdictReason": "No current Home feature needs this Element’s specific data and interaction; the audit records the current scope decision.",
+      "implemented": false
+    },
+    {
+      "file": "light-markdown.tsx",
+      "name": "light-markdown",
+      "group": "light",
+      "verdict": "unassessed",
+      "verdictReason": "Recorded unassessed verdict in elements-plan.json; see the plan entry for its dependency or scope.",
       "implemented": false
     },
     {
