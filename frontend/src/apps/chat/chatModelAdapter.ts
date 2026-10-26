@@ -733,8 +733,8 @@ export function createChatModelAdapter(deps: ChatModelAdapterDeps): ChatModelAda
                 // landed - the live and reload paths now agree on the
                 // one position from the start, so nothing has to jump.
                 ...(project ? [toolCallPart(`${event.value.turn_id}-project`, "project", project)] : []),
-                ...(picture ? [toolCallPart(`${event.value.turn_id}-picture-progress`, "picture_progress", picture), toolCallPart(`${event.value.turn_id}-picture`, "picture", picture)] : []),
-                ...(video ? [toolCallPart(`${event.value.turn_id}-video`, "video", video)] : []),
+                ...(picture ? [toolCallPart(`${event.value.turn_id}-picture-progress`, "picture_progress", picture), toolCallPart(`${event.value.turn_id}-picture`, "picture", picture), toolCallPart(`${event.value.turn_id}-picture-ask`, "likeness_ask", { kind: "picture", id: picture.id })] : []),
+                ...(video ? [toolCallPart(`${event.value.turn_id}-video`, "video", video), toolCallPart(`${event.value.turn_id}-video-ask`, "likeness_ask", { kind: "video", id: video.id })] : []),
                 ...(musicPart ? [musicPart] : []),
                 ...sourceParts,
               ],

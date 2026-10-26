@@ -3,7 +3,7 @@
 // (SHARED-THREAD-01). elementBindings.ts maps tool ids to these.
 import { useCallback, useContext, useEffect, useState, type MutableRefObject, type ReactNode } from "react";
 import { useNavigate } from "react-router-dom";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useAui, useAuiState, type ToolCallMessagePartComponent } from "@assistant-ui/react";
 import { ApprovalCard } from "@maipai/ui/src/elements/approval-card";
 import { SpecSheet } from "@maipai/ui/src/elements/spec-sheet";
@@ -15,6 +15,8 @@ import { ErrorState } from "@maipai/ui/src/elements/error-state";
 import { ImageGallery } from "@maipai/ui/src/elements/image-gallery";
 import { ImageEditContext } from "@maipai/ui/src/elements/attachment.aui";
 import { picturesApi, type PictureCard } from "@/lib/picturesApi";
+import { askCardProps, askKey, askOpen, ASK_POLL_MS } from "@/apps/likeness/askCardProps";
+import { likenessAsksApi } from "@/lib/likenessAsksApi";
 import { etaLabel } from "@/lib/etaLabel";
 import { VideoPlayer } from "@maipai/ui/src/elements/video-player";
 import { videosApi, type VideoItem } from "@/lib/videosApi";
@@ -628,4 +630,32 @@ export const MusicToolRender: ToolCallMessagePartComponent<Record<string, never>
   if (!result) return null;
   if (!query.data) return query.isError ? <ErrorState layout="inline" title="I couldn't check on that song" detail="Reload the chat to try again." retrying={false} /> : <MusicTrack status="queued" title="Your song" waitingForMemory copy={{ waitingForMemory: "Waiting for memory, your song starts when there is room" }} />;
   return <MusicTrack {...trackProps} />;
+};
+
+// PERUSE-2026-10-25: the consent card for a picture or video held for the pictured adult's yes. The part rides beside the
+// picture or video part (same job id); it draws the kit ApprovalCard only while the job names an ask that is still open, and the
+// job's own card draws everything else. The pictured adult reads the exact prompt here and clicks Consent or Decline.
+export const LikenessAskToolRender: ToolCallMessagePartComponent<Record<string, never>, { kind: "picture" | "video"; id: string }> = ({ result }) => {
+  const picture = usePictureCard(result?.kind === "picture" ? result.id : undefined);
+  const video = useVideoCard(result?.kind === "video" ? result.id : undefined);
+  const askId = result?.kind === "video" ? video.data?.items[video.data.items.length - 1]?.likeness_ask_id : picture.data?.likeness_ask_id;
+  const client = useQueryClient();
+  const [busy, setBusy] = useState(false);
+  const query = useQuery({
+    queryKey: askKey(askId ?? ""),
+    queryFn: ({ signal }) => likenessAsksApi.get(askId!, signal),
+    enabled: !!askId,
+    refetchInterval: (q) => (q.state.status === "error" || (q.state.data && !askOpen(q.state.data)) ? false : ASK_POLL_MS),
+  });
+  const ask = query.data;
+  if (!ask || ask.state === "consumed") return null;
+  const ShieldCheckIcon = getIcon("shield-check");
+  const decide = (decision: "consent" | "decline") => {
+    setBusy(true);
+    void likenessAsksApi.decide(ask.id, decision)
+      .catch(() => undefined)
+      .finally(() => { setBusy(false); void client.invalidateQueries({ queryKey: askKey(ask.id) }); void client.invalidateQueries({ queryKey: ["picture"] }); void client.invalidateQueries({ queryKey: ["video"] }); });
+  };
+  const open = ask.state === "waiting" && !busy;
+  return <ApprovalCard {...askCardProps(ask)} icon={<ShieldCheckIcon aria-hidden />} {...(open ? { onAllowOnce: () => decide("consent"), onDeny: () => decide("decline") } : {})} />;
 };

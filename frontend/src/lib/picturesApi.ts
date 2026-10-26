@@ -27,6 +27,8 @@ export interface PictureCard {
   switch_to: "quick" | "detailed" | null;
   size: string;
   stop_id: string;
+  /** Set while the picture is held for the pictured adult's consent; the card shows that ask instead of progress. */
+  likeness_ask_id?: string | null;
 }
 export interface PictureStatus { can_make: boolean; reason: string | null; engine_ready: boolean; adult_styles: boolean; styles: Array<{ id: string; name: string }> }
 
