@@ -9,7 +9,16 @@ import type { DiskPlan, DiskRow } from "../../../shared/diskPlanMath";
 
 export interface UnusedItem { id: string; name: string; bytes: number; reason: string; lastUsedAt: string | null }
 export interface UnusedResult { items: UnusedItem[]; totalBytes: number }
-export interface UnusedComponent extends AiComponentLike { kind: "model" | "lora"; depends_on: string[]; plan_need: "required" | "recommended" | "optional" | null }
+export interface UnusedComponent extends AiComponentLike { kind: "model" | "lora"; depends_on: string[]; plan_need: "required" | "recommended" | "optional" | null; group?: string }
+
+// A part no job card offers (a second chat model, an offline coder) is named by what it does, never by its model name:
+// model names belong under Details only.
+const GROUP_NAMES: Record<string, string> = {
+  chat: "Extra chat model", voice: "Extra voice", pictures: "Extra picture model", video: "Extra video model", music: "Extra music model", tools: "Extra picture tool",
+};
+export function plainPartName(component: { group?: string }): string {
+  return (component.group ? GROUP_NAMES[component.group] : undefined) ?? "Extra model";
+}
 export interface UnusedInput extends Omit<AiChoicesInput, "components"> { components: UnusedComponent[]; now?: number }
 
 const KEPT_REASONS = {
@@ -140,7 +149,7 @@ function matchingChoice(context: UnusedContext, component: UnusedComponent): { c
 
 function nameFor(context: UnusedContext, component: UnusedComponent): string {
   const match = matchingChoice(context, component);
-  return match?.choice.name ?? component.label;
+  return match?.choice.name ?? plainPartName(component);
 }
 
 function reasonFor(context: UnusedContext, component: UnusedComponent): string {

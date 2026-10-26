@@ -51,6 +51,7 @@ import { devUiRoutes } from "@/routes/devUi";
 import { setupRoutes } from "@/routes/setup";
 import { installRoutes } from "@/routes/install";
 import { componentsRoutes } from "@/routes/components";
+import { aiChoicesRoutes } from "@/routes/aiChoices";
 import { stackCodingRoutes } from "@/routes/stackCoding";
 import { installGate } from "@/middleware/installGate";
 import { chatPauseGate } from "@/middleware/chatPauseGate";
@@ -253,6 +254,7 @@ app.route("/api/dev/ui-fixtures", devUiRoutes);
 app.route("/api/setup", setupRoutes);
 app.route("/api/install", installRoutes);
 app.route("/api/components", componentsRoutes);
+app.route("/api/ai", aiChoicesRoutes);
 app.route("/api/coding-setup", stackCodingRoutes);
 // Public API name introduced with coding mode. Keep the earlier settings
 // path mounted for clients already using /api/coding-setup.

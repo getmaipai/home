@@ -103,7 +103,7 @@ interface RowState { state: AiChoice["state"]; percent: number | null; failure: 
 // The state a row reads from its Stack components: installed only when every
 // matching part is installed, installing when any is, failed when any is.
 // With no component list or no match, the plan row's own installed flag rules.
-function rowState(plan: DiskPlan, row: DiskRow, components: AiComponentLike[] | null): RowState {
+function rowState(row: DiskRow, components: AiComponentLike[] | null): RowState {
   const matches = matchingComponents(components, row);
   const unsupported = matches.find((component) => component.requirement === "unsupported") ?? null;
   if (matches.length === 0) {
@@ -117,6 +117,15 @@ function rowState(plan: DiskPlan, row: DiskRow, components: AiComponentLike[] | 
     return { state: "installed", percent: null, failure: null, unsupported };
   }
   return { state: "notInstalled", percent: null, failure: null, unsupported };
+}
+
+// The plan with each row's installed flag read from the Stack's component list when it answers, so the sizes of what is
+// still missing (and the engine environments that come with a part) are measured against what is really on this computer.
+function withLiveInstalled(plan: DiskPlan, components: AiComponentLike[] | null): DiskPlan {
+  if (!components) return plan;
+  const modelRows = plan.rows.map((row) => (row.kind === "engine" ? row : { ...row, installed: rowState(row, components).state === "installed" || (matchingComponents(components, row).length === 0 && row.installed) }));
+  const engineInstalled = new Set(modelRows.filter((row) => row.kind !== "engine" && row.installed).flatMap((row) => row.engines));
+  return { ...plan, rows: modelRows.map((row) => (row.kind === "engine" ? { ...row, installed: row.installed || engineInstalled.has(row.id) } : row)) };
 }
 
 // The free space this choice needs to install: the row and the engine rows it
@@ -153,7 +162,7 @@ interface ChoiceSpec {
 
 function buildChoice(plan: DiskPlan, components: AiComponentLike[] | null, freeBytes: number | null, spec: ChoiceSpec): AiChoice {
   const rows = [spec.row, ...engineRowsOf(plan, spec.row)];
-  const state = rowState(plan, spec.row, components);
+  const state = rowState(spec.row, components);
   const blockedReason = blockedReasonFor(plan, spec.row, state, freeBytes);
   const downloadBytes = rows.reduce((total, row) => total + row.download_bytes, 0);
   const installedBytes = rows.reduce((total, row) => total + row.installed_bytes, 0);
@@ -218,7 +227,8 @@ function chipFor(card: { id: AiJobId; rows: string[] }, present: boolean, choice
 }
 
 export function buildAiCards(input: AiChoicesInput): AiChoicesResult {
-  const { plan, components, settings, freeBytes } = input;
+  const { components, settings, freeBytes } = input;
+  const plan = withLiveInstalled(input.plan, components);
   const rows = byRowId(plan);
   const has = (id: string): boolean => rows.has(id);
   const need = (id: string): DiskNeedLike => rows.get(id)?.need ?? "optional";
@@ -234,8 +244,8 @@ export function buildAiCards(input: AiChoicesInput): AiChoicesResult {
     switch (meta.id) {
       case "chat": {
         if (has("chat")) specs.push({ id: "chat.standard", job: "chat", kind: "fixed", row: rows.get("chat")!, current: true, recommended: true, setting: null });
-        if (has("chat-mlx")) specs.push({ id: "chat.mlx", job: "chat", kind: "switch", row: rows.get("chat-mlx")!, current: rowIsInstalled(plan, rows.get("chat-mlx")!, components), recommended: need("chat-mlx") === "recommended", setting: null });
-        if (has("reads-pictures")) specs.push({ id: "chat.pictures", job: "chat", kind: "switch", row: rows.get("reads-pictures")!, current: rowIsInstalled(plan, rows.get("reads-pictures")!, components), recommended: need("reads-pictures") === "recommended", setting: null });
+        if (has("chat-mlx")) specs.push({ id: "chat.mlx", job: "chat", kind: "switch", row: rows.get("chat-mlx")!, current: rowIsInstalled(rows.get("chat-mlx")!, components), recommended: need("chat-mlx") === "recommended", setting: null });
+        if (has("reads-pictures")) specs.push({ id: "chat.pictures", job: "chat", kind: "switch", row: rows.get("reads-pictures")!, current: rowIsInstalled(rows.get("reads-pictures")!, components), recommended: need("reads-pictures") === "recommended", setting: null });
         break;
       }
       case "pictures": {
@@ -245,30 +255,30 @@ export function buildAiCards(input: AiChoicesInput): AiChoicesResult {
         if (quickRowId) specs.push({ id: "pictures.quick", job: "pictures", kind: "radio", row: rows.get(quickRowId)!, current: !preferDetailed, recommended: true, setting: { key: "generation.picture_quality", value: "quick" } });
         if (hasDetailed) specs.push({ id: "pictures.detailed", job: "pictures", kind: "radio", row: rows.get("pictures-zimage")!, current: preferDetailed, recommended: quickRowId === null, setting: { key: "generation.picture_quality", value: "detailed" } });
         if (has("pictures") && quickRowId === "pictures-ernie") specs.push({ id: "pictures.edit", job: "pictures", kind: "fixed", row: rows.get("pictures")!, current: true, recommended: false, setting: null });
-        if (has("image-tools")) specs.push({ id: "pictures.tools", job: "pictures", kind: "switch", row: rows.get("image-tools")!, current: rowIsInstalled(plan, rows.get("image-tools")!, components), recommended: need("image-tools") === "recommended", setting: null });
-        if (has("tool-look")) specs.push({ id: "pictures.look", job: "pictures", kind: "switch", row: rows.get("tool-look")!, current: rowIsInstalled(plan, rows.get("tool-look")!, components), recommended: need("tool-look") === "recommended", setting: null });
+        if (has("image-tools")) specs.push({ id: "pictures.tools", job: "pictures", kind: "switch", row: rows.get("image-tools")!, current: rowIsInstalled(rows.get("image-tools")!, components), recommended: need("image-tools") === "recommended", setting: null });
+        if (has("tool-look")) specs.push({ id: "pictures.look", job: "pictures", kind: "switch", row: rows.get("tool-look")!, current: rowIsInstalled(rows.get("tool-look")!, components), recommended: need("tool-look") === "recommended", setting: null });
         break;
       }
       case "videos": {
         const hasQuick = has("video");
         const hasDetailed = has("video-detailed");
         const preferDetailed = settings.videoQuality === "detailed" && hasDetailed;
-        if (hasQuick) specs.push({ id: "videos.quick", job: "videos", kind: "radio", row: rows.get("video")!, current: !preferDetailed, recommended: need("video") === "recommended", setting: { key: "generation.video_quality", value: "quick" } });
-        if (hasDetailed) specs.push({ id: "videos.detailed", job: "videos", kind: "radio", row: rows.get("video-detailed")!, current: preferDetailed, recommended: !hasQuick || (need("video") !== "recommended" && need("video-detailed") === "recommended"), setting: { key: "generation.video_quality", value: "detailed" } });
+        if (hasQuick) specs.push({ id: "videos.quick", job: "videos", kind: "radio", row: rows.get("video")!, current: !preferDetailed, recommended: true, setting: { key: "generation.video_quality", value: "quick" } });
+        if (hasDetailed) specs.push({ id: "videos.detailed", job: "videos", kind: "radio", row: rows.get("video-detailed")!, current: preferDetailed, recommended: !hasQuick, setting: { key: "generation.video_quality", value: "detailed" } });
         break;
       }
       case "music": {
-        if (has("music")) specs.push({ id: "music.make", job: "music", kind: "switch", row: rows.get("music")!, current: settings.musicEnabled && rowIsInstalled(plan, rows.get("music")!, components), recommended: need("music") === "recommended", setting: { key: "generation.music.enabled", value: true } });
+        if (has("music")) specs.push({ id: "music.make", job: "music", kind: "switch", row: rows.get("music")!, current: settings.musicEnabled && rowIsInstalled(rows.get("music")!, components), recommended: need("music") === "recommended", setting: { key: "generation.music.enabled", value: true } });
         break;
       }
       case "voice": {
-        const betterInstalled = has("voice-better") && rowIsInstalled(plan, rows.get("voice-better")!, components);
+        const betterInstalled = has("voice-better") && rowIsInstalled(rows.get("voice-better")!, components);
         if (has("voice")) specs.push({ id: "voice.standard", job: "voice", kind: "fixed", row: rows.get("voice")!, current: !betterInstalled, recommended: !has("voice-better") || need("voice-better") !== "recommended", setting: null });
         if (has("voice-better")) specs.push({ id: "voice.better", job: "voice", kind: "radio", row: rows.get("voice-better")!, current: betterInstalled, recommended: need("voice-better") === "recommended", setting: null });
         break;
       }
       case "coding": {
-        if (has("coding")) specs.push({ id: "coding.helper", job: "coding", kind: "switch", row: rows.get("coding")!, current: rowIsInstalled(plan, rows.get("coding")!, components), recommended: need("coding") === "recommended", setting: null });
+        if (has("coding")) specs.push({ id: "coding.helper", job: "coding", kind: "switch", row: rows.get("coding")!, current: rowIsInstalled(rows.get("coding")!, components), recommended: need("coding") === "recommended", setting: null });
         break;
       }
       case "search":
@@ -301,12 +311,13 @@ export function buildAiCards(input: AiChoicesInput): AiChoicesResult {
 
 type DiskNeedLike = "required" | "recommended" | "optional";
 
-function rowIsInstalled(plan: DiskPlan, row: DiskRow, components: AiComponentLike[] | null): boolean {
-  return rowState(plan, row, components).state === "installed";
+function rowIsInstalled(row: DiskRow, components: AiComponentLike[] | null): boolean {
+  return rowState(row, components).state === "installed";
 }
 
 export function recommendedPlan(input: AiChoicesInput): AiRecommendedPlan {
-  const { plan, components, freeBytes } = input;
+  const { components, freeBytes } = input;
+  const plan = withLiveInstalled(input.plan, components);
   const rows = byRowId(plan);
   const { cards } = buildAiCards(input);
 
@@ -366,9 +377,9 @@ export function recommendedPlan(input: AiChoicesInput): AiRecommendedPlan {
   const nothingToDo = changes.length === 0 && installRowIds.length === 0;
 
   let text: string;
-  if (nothingToDo) text = freeBytes !== null ? `No download is needed. Free on this computer: ${freeGb(freeBytes)} GB.` : "No download is needed.";
+  if (nothingToDo) text = "Everything recommended is already here.";
   else if (freeBytes === null) text = `Download ${needGb(downloadBytes)} GB. The free space could not be read.`;
-  else if (fits === "all") text = `Download ${needGb(downloadBytes)} GB. Free on this computer: ${freeGb(freeBytes)} GB.`;
+  else if (fits === "all") text = `Everything recommended is ${needGb(downloadBytes)} GB to download.`;
   else if (fits === "some") {
     const words = skipped.map((item) => {
       const row = rows.get(item.rowId);

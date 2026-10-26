@@ -1,0 +1,356 @@
+// AIMODELS-ROUTES-01: the five calls of the AI and models page (docs/design/ai-models-simple-2026-10-25.md,
+// sections 4 to 6). The seven job cards and the set-to-recommended plan are the pure shared/aiChoices.ts
+// functions over three inputs that already exist: the tier's disk plan, the Stack component list and the
+// household settings. Picking a choice downloads first and writes the setting second, so a choice is never
+// set to something missing. "Set everything to recommended" is safe to press twice and never removes
+// anything. Free up space re-runs the unused test per id at removal time (lib/aiUnused.ts) and reports each
+// id separately, so one failure never stops the rest. Owner and admin only; the Stack's own refusals pass
+// through as its sentences, like routes/components.ts does.
+import { createRoute, z } from "@hono/zod-openapi";
+import { apiRouter, errorResponses } from "@/lib/openapi";
+import { requireRole } from "@/middleware/auth";
+import { buildAiCards, recommendedPlan, type AiChoicesInput, type AiChoice } from "../../../shared/aiChoices";
+import type { DiskPlan } from "../../../shared/diskPlanMath";
+import { findUnused, plainPartName, whyKept, type UnusedInput } from "@/lib/aiUnused";
+import { installStackComponent, listStackComponents, StackComponentError, uninstallStackComponent, type StackComponent, type StackComponentList } from "@/lib/stackComponents";
+import { previewPlan } from "@/lib/installActions";
+import { recordedLevel, shippedPlanForLevel } from "@/lib/diskPlan";
+import { getHouseholdSettingValue, setHouseholdSettingValue } from "@/lib/settings";
+import { resetInstallStatusCache } from "@/lib/installStatus";
+import { dropPictureStatusCache } from "@/lib/pictures/ready";
+import { dropVideoStatusCache } from "@/lib/videos/ready";
+import { dropMusicStatusCache } from "@/lib/music/ready";
+
+export const aiChoicesRoutes = apiRouter();
+
+const JOBS = ["chat", "pictures", "videos", "music", "voice", "coding", "search"] as const;
+type JobId = (typeof JOBS)[number];
+const JOB_WORDS: Record<JobId, string> = { chat: "Chat", pictures: "Pictures", videos: "Videos", music: "Music", voice: "Voice", coding: "Coding", search: "Search" };
+
+// The state every route reads: the disk plan, the Stack's component list and the three household settings
+// the cards are built from.
+interface AiState {
+  plan: DiskPlan;
+  components: StackComponent[];
+  settings: AiChoicesInput["settings"];
+  freeBytes: number | null;
+  list: StackComponentList;
+}
+
+function choicesInput(state: AiState): AiChoicesInput {
+  return { plan: state.plan, components: state.components, settings: state.settings, freeBytes: state.freeBytes };
+}
+
+function unusedInput(state: AiState): UnusedInput {
+  return { plan: state.plan, components: state.components, settings: state.settings, freeBytes: state.freeBytes };
+}
+
+// The disk plan this computer's AI runs on: the Stack's own rows when it answers (previewPlan never throws;
+// with no plan it says so), the shipped table of the recorded plan level before a Stack can answer.
+async function loadPlan(): Promise<DiskPlan> {
+  const preview = await previewPlan();
+  return preview.wording.disk?.plan ?? shippedPlanForLevel(recordedLevel());
+}
+
+function readSettings(): AiChoicesInput["settings"] {
+  const picture = getHouseholdSettingValue("generation.picture_quality");
+  const video = getHouseholdSettingValue("generation.video_quality");
+  const music = getHouseholdSettingValue("generation.music.enabled");
+  return {
+    pictureQuality: picture === "detailed" ? "detailed" : "quick",
+    videoQuality: video === "detailed" ? "detailed" : "quick",
+    musicEnabled: typeof music === "boolean" ? music : true,
+  };
+}
+
+async function loadAiState(): Promise<AiState> {
+  const [plan, list] = await Promise.all([loadPlan(), listStackComponents()]);
+  return { plan, components: list.components, settings: readSettings(), freeBytes: list.free_disk_bytes, list };
+}
+
+// The Stack's refusal, passed through as its own sentence (routes/components.ts does the same mapping).
+function failure(c: { json: (body: unknown, status: never) => Response }, error: unknown): Response {
+  if (error instanceof StackComponentError) {
+    const status = error.status === 404 ? 404 : error.status === 409 ? 409 : 503;
+    return c.json({ error: error.message, code: error.code }, status as never);
+  }
+  throw error;
+}
+
+// The Stack's own in-use guard is the removal guard; after a part moves, the readiness and install reads
+// that cache the Stack's answer must see it gone (or back) on the next read.
+function dropModelCaches(): void {
+  resetInstallStatusCache();
+  dropPictureStatusCache();
+  dropVideoStatusCache();
+  dropMusicStatusCache();
+}
+
+function writeSetting(key: string, value: unknown): { status: 400 | 403; error: string } | null {
+  const written = setHouseholdSettingValue(key, value);
+  return written.ok ? null : { status: written.status, error: written.error };
+}
+
+// The Stack components a choice's rows hold: the list's entry for the row (by row id or one of the row's
+// models) when the list names one, or the row's first model when it does not yet.
+function componentIdsFor(state: AiState, choice: AiChoice, match: (component: StackComponent) => boolean): string[] {
+  const rows = new Map(state.plan.rows.map((row) => [row.id, row] as const));
+  const ids: string[] = [];
+  for (const rowId of choice.rowIds) {
+    const row = rows.get(rowId);
+    if (!row || row.kind !== "model" || row.model_ids.length === 0) continue;
+    const matches = state.components.filter((component) => component.id === row.id || row.model_ids.includes(component.id));
+    if (matches.length === 0) { ids.push(row.model_ids[0] ?? row.id); continue; }
+    for (const component of matches.filter(match)) ids.push(component.id);
+  }
+  return ids;
+}
+
+// The plain name the page shows for a component (the card choice it appears in, walking the cards in their
+// shown order), so the kept line says "Detailed pictures", never a model name.
+function plainName(state: AiState, id: string): string {
+  const rows = new Map(state.plan.rows.map((row) => [row.id, row] as const));
+  const { cards } = buildAiCards(choicesInput(state));
+  for (const card of cards) for (const choice of card.choices) {
+    if (choice.rowIds.some((rowId) => id === rowId || (rows.get(rowId)?.model_ids.includes(id) ?? false))) return choice.name;
+  }
+  return plainPartName(state.components.find((component) => component.id === id) ?? {});
+}
+
+function keptMessage(name: string, reason: string): string {
+  switch (reason) {
+    case "You use it now.":
+    case "It is in use right now.":
+      return `${name} is in use now, so it was kept.`;
+    case "Home needs it.":
+      return `${name} is always on, so it was kept.`;
+    case "Another part needs it.":
+      return `Another part needs ${name}, so it was kept.`;
+    case "A saved style needs it.":
+      return `A saved style needs ${name}, so it was kept.`;
+    default:
+      return `${name} cannot be removed right now, so it was kept.`;
+  }
+}
+
+const SettingRefSchema = z.object({ key: z.string(), value: z.unknown() }).nullable();
+const ChoiceSchema = z.object({
+  id: z.string(), job: z.enum(JOBS), kind: z.enum(["radio", "switch", "fixed"]), label: z.string(), description: z.string(), name: z.string(),
+  rowIds: z.array(z.string()), recommended: z.boolean(), current: z.boolean(),
+  state: z.enum(["installed", "installing", "notInstalled", "failed"]), percent: z.number().nullable(), failure: z.string().nullable(),
+  downloadBytes: z.number(), installedBytes: z.number(), stateText: z.string(), blockedReason: z.string().nullable(),
+  action: z.enum(["none", "use", "get", "remove"]), setting: SettingRefSchema, chosenNotReady: z.boolean(),
+  details: z.array(z.object({ name: z.string(), sizeBytes: z.number() })),
+});
+const CardSchema = z.object({ id: z.enum(JOBS), title: z.string(), summary: z.string(), chip: z.string(), choices: z.array(ChoiceSchema), notReady: z.boolean(), unavailable: z.string().nullable() });
+const AlwaysOnSchema = z.object({ text: z.string(), bytes: z.number(), rowIds: z.array(z.string()) });
+const SkippedSchema = z.object({ rowId: z.string(), label: z.string(), reason: z.string() });
+const PlanSchema = z.object({
+  changes: z.array(z.object({ job: z.enum(JOBS), from: z.string(), to: z.string(), setting: SettingRefSchema })),
+  installRowIds: z.array(z.string()), installComponentIds: z.array(z.string()), skipped: z.array(SkippedSchema),
+  downloadBytes: z.number(), fits: z.enum(["all", "some", "none"]), nothingToDo: z.boolean(), text: z.string(),
+});
+
+const refusals = errorResponses({ 401: "Not signed in", 403: "Admins only", 404: "No such job or choice", 409: "It cannot be installed or removed right now (the message says why)", 503: "The engine is not answering" });
+
+const choicesRoute = createRoute({
+  method: "get", path: "/choices", tags: ["AI"], summary: "The seven job cards: every choice, which one is the household's now, which is recommended",
+  middleware: [requireRole("owner", "admin")] as const,
+  responses: {
+    200: { content: { "application/json": { schema: z.object({
+      stack: z.enum(["ok", "unreachable"]), message: z.string().nullable(),
+      tier: z.string().nullable(), free_disk_bytes: z.number().nullable(), installed_bytes: z.number(),
+      cards: z.array(CardSchema), alwaysOn: AlwaysOnSchema, recommended: PlanSchema.nullable(), unused_bytes: z.number(),
+    }) } }, description: "The cards, the Always on line, the set-to-recommended plan and how much Free up space can find. With the engine down the cards are empty and the message says what to do." },
+    ...refusals,
+  },
+});
+aiChoicesRoutes.openapi(choicesRoute, async (c) => {
+  let list: StackComponentList | null = null;
+  let message: string | null = null;
+  try { list = await listStackComponents(); } catch (error) {
+    if (error instanceof StackComponentError) message = error.message;
+    else throw error;
+  }
+  if (list === null) {
+    return c.json({ stack: "unreachable" as const, message, tier: null, free_disk_bytes: null, installed_bytes: 0, cards: [], alwaysOn: { text: "", bytes: 0, rowIds: [] }, recommended: null, unused_bytes: 0 }, 200);
+  }
+  const state: AiState = { plan: await loadPlan(), components: list.components, settings: readSettings(), freeBytes: list.free_disk_bytes, list };
+  const { cards, alwaysOn } = buildAiCards(choicesInput(state));
+  return c.json({
+    stack: "ok" as const, message: null, tier: list.tier, free_disk_bytes: list.free_disk_bytes, installed_bytes: list.installed_bytes,
+    cards, alwaysOn, recommended: recommendedPlan(choicesInput(state)), unused_bytes: findUnused(unusedInput(state)).totalBytes,
+  }, 200);
+});
+
+const unusedRoute = createRoute({
+  method: "get", path: "/unused", tags: ["AI"], summary: "The installed parts nothing uses, the space they free and the plain reason",
+  middleware: [requireRole("owner", "admin")] as const,
+  responses: {
+    200: { content: { "application/json": { schema: z.object({
+      items: z.array(z.object({ id: z.string(), name: z.string(), bytes: z.number(), reason: z.string(), lastUsedAt: z.string().nullable() })),
+      total_bytes: z.number(),
+    }) } }, description: "The Free up space list, largest first. A saved style is never listed." },
+    ...refusals,
+  },
+});
+aiChoicesRoutes.openapi(unusedRoute, async (c) => {
+  try {
+    const { items, totalBytes } = findUnused(unusedInput(await loadAiState()));
+    return c.json({ items, total_bytes: totalBytes }, 200);
+  } catch (error) { return failure(c, error) as never; }
+});
+
+const chooseRoute = createRoute({
+  method: "post", path: "/choices/{job}", tags: ["AI"], summary: "Make one choice the household's: download it first when it is missing, then write the setting",
+  middleware: [requireRole("owner", "admin")] as const,
+  request: {
+    params: z.object({ job: z.string().min(1).max(20) }),
+    body: { required: true, content: { "application/json": { schema: z.object({ choice: z.string().min(1).max(120) }) } } },
+  },
+  responses: {
+    200: { content: { "application/json": { schema: z.object({ ok: z.literal(true), started: z.array(z.string()), removed: z.array(z.string()) }) } }, description: "What started downloading (a job or a part), or what was removed. The setting is written only after the install can start." },
+    ...refusals,
+  },
+});
+aiChoicesRoutes.openapi(chooseRoute, async (c) => {
+  const job = c.req.valid("param").job;
+  const { choice: choiceId } = c.req.valid("json");
+  if (!JOBS.includes(job as JobId)) return c.json({ error: `No such job: ${job}.`, code: "unknown_job" }, 404);
+  try {
+    const state = await loadAiState();
+    const { cards } = buildAiCards(choicesInput(state));
+    const choice = cards.find((card) => card.id === (job as JobId))?.choices.find((item) => item.id === choiceId);
+    if (!choice) return c.json({ error: `There is no choice called "${choiceId}" on this computer.`, code: "unknown_choice" }, 404);
+    if (choice.action === "get") {
+      // Download first, then the setting: a choice is never set to something that is missing.
+      const started: string[] = [];
+      for (const id of componentIdsFor(state, choice, (part) => part.state !== "installed")) {
+        started.push((await installStackComponent(id)).job ?? id);
+      }
+      if (choice.setting) {
+        const error = writeSetting(choice.setting.key, choice.setting.value);
+        if (error) return c.json({ error: error.error, code: "setting" }, error.status) as never;
+      }
+      if (started.length > 0) dropModelCaches();
+      return c.json({ ok: true as const, started, removed: [] }, 200);
+    }
+    if (choice.action === "use") {
+      if (choice.setting) {
+        const error = writeSetting(choice.setting.key, choice.setting.value);
+        if (error) return c.json({ error: error.error, code: "setting" }, error.status) as never;
+      }
+      return c.json({ ok: true as const, started: [], removed: [] }, 200);
+    }
+    if (choice.action === "remove") {
+      // A person turned their own switch off (music): it stays on the computer, only the setting changes.
+      if (choice.id === "music.make") {
+        const error = writeSetting("generation.music.enabled", false);
+        if (error) return c.json({ error: error.error, code: "setting" }, error.status) as never;
+        return c.json({ ok: true as const, started: [], removed: [] }, 200);
+      }
+      const removed: string[] = [];
+      for (const id of componentIdsFor(state, choice, (part) => part.state === "installed")) {
+        if ((await uninstallStackComponent(id)).removed) removed.push(id);
+      }
+      if (removed.length > 0) dropModelCaches();
+      return c.json({ ok: true as const, started: [], removed }, 200);
+    }
+    return c.json({ error: choice.blockedReason ?? (choice.state === "installing" ? "It is still installing." : "It is already the choice."), code: "no_action" }, 409);
+  } catch (error) { return failure(c, error) as never; }
+});
+
+const recommendedRoute = createRoute({
+  method: "post", path: "/recommended", tags: ["AI"], summary: "Set everything to recommended: write the choices and start the missing downloads, never remove",
+  middleware: [requireRole("owner", "admin")] as const,
+  request: { body: { required: false, content: { "application/json": { schema: z.object({}) } } } },
+  responses: {
+    200: { content: { "application/json": { schema: z.object({
+      ok: z.literal(true),
+      changed: z.array(z.string()),
+      started: z.array(z.string()),
+      already: z.array(z.string()),
+      skipped: z.array(SkippedSchema),
+      needs_licence: z.array(z.object({ id: z.string(), label: z.string() })),
+    }) } }, description: "The choice changes made, the downloads started, the parts already installed or downloading, the skipped ones and the parts that wait for a licence click. Safe to press twice; it never removes anything." },
+    ...refusals,
+  },
+});
+aiChoicesRoutes.openapi(recommendedRoute, async (c) => {
+  try {
+    const state = await loadAiState();
+    const plan = recommendedPlan(choicesInput(state));
+    const changed: string[] = [];
+    for (const change of plan.changes) {
+      if (!change.setting) continue;
+      const error = writeSetting(change.setting.key, change.setting.value);
+      if (error) return c.json({ error: error.error, code: "setting" }, error.status) as never;
+      changed.push(`${JOB_WORDS[change.job]}: ${change.from} to ${change.to}`);
+    }
+    const started: string[] = [];
+    const already: string[] = [];
+    const needsLicence: Array<{ id: string; label: string }> = [];
+    for (const id of plan.installComponentIds) {
+      const part = state.components.find((component) => component.id === id);
+      // Safe to press twice: an install is started only for a part that is not installed and has no job running.
+      if (part && (part.state === "installed" || part.state === "installing" || part.job !== null)) { already.push(id); continue; }
+      try {
+        started.push((await installStackComponent(id)).job ?? id);
+      } catch (error) {
+        // A part whose licence needs a click stops that one item at the existing licence prompt; the rest continue.
+        if (error instanceof StackComponentError && part?.licence) { needsLicence.push({ id, label: part.label }); continue; }
+        throw error;
+      }
+    }
+    if (started.length > 0) dropModelCaches();
+    return c.json({ ok: true as const, changed, started, already, skipped: plan.skipped, needs_licence: needsLicence }, 200);
+  } catch (error) { return failure(c, error) as never; }
+});
+
+const cleanupRoute = createRoute({
+  method: "post", path: "/cleanup", tags: ["AI"], summary: "Remove the chosen unused parts and free their space; one failure never stops the rest",
+  middleware: [requireRole("owner", "admin")] as const,
+  request: { body: { required: true, content: { "application/json": { schema: z.object({ ids: z.array(z.string().min(1).max(200)).min(1).max(20) }) } } } },
+  responses: {
+    200: { content: { "application/json": { schema: z.object({
+      results: z.array(z.object({ id: z.string(), status: z.enum(["removed", "kept", "failed"]), freed_bytes: z.number(), message: z.string() })),
+      freed_bytes: z.number(), kept: z.number(), failed: z.number(),
+    }) } }, description: "One line per id, in the order sent: removed with its bytes, kept with the plain reason, failed with the engine's sentence." },
+    ...refusals,
+  },
+});
+aiChoicesRoutes.openapi(cleanupRoute, async (c) => {
+  const { ids } = c.req.valid("json");
+  let state: AiState;
+  const results: Array<{ id: string; status: "removed" | "kept" | "failed"; freed_bytes: number; message: string }> = [];
+  let freed = 0;
+  let kept = 0;
+  let failed = 0;
+  for (const id of ids) {
+    // Fresh state for every id: the one before it may have moved a part, and a part that became used since
+    // the list was read must be seen as used.
+    try { state = await loadAiState(); } catch (error) { return failure(c, error) as never; }
+    // The unused test runs again per id at removal time: a part that became used since the list was read
+    // is kept, and said so.
+    const reason = whyKept(unusedInput(state), id);
+    if (reason !== null) {
+      results.push({ id, status: "kept", freed_bytes: 0, message: keptMessage(plainName(state, id), reason) });
+      kept += 1;
+      continue;
+    }
+    try {
+      const removed = await uninstallStackComponent(id);
+      if (removed.removed) freed += removed.freed_bytes;
+      results.push({ id, status: "removed", freed_bytes: removed.freed_bytes, message: "" });
+    } catch (error) {
+      if (error instanceof StackComponentError) {
+        results.push({ id, status: "failed", freed_bytes: 0, message: error.message });
+        failed += 1;
+        continue;
+      }
+      throw error;
+    }
+  }
+  if (freed > 0) dropModelCaches();
+  return c.json({ results, freed_bytes: freed, kept, failed }, 200);
+});

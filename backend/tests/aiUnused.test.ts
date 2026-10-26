@@ -221,3 +221,11 @@ test("real p128 plan with everything installed and Quick chosen: Detailed pictur
   expect(result.totalBytes).toBe(result.items.reduce((total, item) => total + item.bytes, 0));
   for (const id of [...klein.model_ids, "judge", "embed", "stt", "search", "home"]) expect(result.items.map((item) => item.id)).not.toContain(id);
 });
+
+test("a part no card offers is named by what it does, never by its model name", () => {
+  const p = plan([{ id: "chat", need: "required", model_ids: ["chat-m"] }]);
+  const input = unusedInput(p, [part({ id: "chat-m" }), part({ id: "ornith-1-5-122b-mlx-4bit", label: "Ornith 1.5 122B", size_bytes: 70_000, group: "chat" }), part({ id: "mystery-model", label: "Mystery 9B", size_bytes: 10 })]);
+  const items = findUnused(input).items;
+  expect(items.map((item) => item.name)).toEqual(["Extra chat model", "Extra model"]);
+  expect(JSON.stringify(items.map((item) => [item.name, item.reason]))).not.toMatch(/Ornith|Mystery|122b/);
+});
