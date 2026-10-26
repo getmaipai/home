@@ -134,6 +134,7 @@ describe("turnNext.ts: a plain question, no tools", () => {
     if (!result.ok || result.kind !== "immediate") throw new Error("expected an immediate result");
     expect(result.value.reply.text.length).toBeGreaterThan(0);
     expect(result.value.source).toBe("model");
+    expect(result.value.answered_by?.via).toBe("conversation");
     const row = db.select().from(conversationTurns).where(eq(conversationTurns.id, result.value.turn_id)).get();
     expect(row).toBeDefined();
     const stats = JSON.parse(row!.stats as unknown as string) as { nodes?: { node: string }[] };
@@ -145,6 +146,15 @@ describe("turnNext.ts: a plain question, no tools", () => {
     for (const expected of ["safety", "commands", "context", "model", "policy", "tool", "answer", "output_gate"]) {
       expect(nodeNames).toContain(expected);
     }
+  });
+
+  test("a valid mention stamps the answerer as a mention", async () => {
+    const companion = (await import("@/lib/persona")).PERSONAS.find((persona) => persona.id !== "default");
+    if (!companion) return;
+    const result = await withStub({ reply: () => "Hello" }, () => runTurnNext(people.owner, "chat", "hi", { mentionCompanionId: companion.id }));
+    expect(result.ok).toBe(true);
+    if (!result.ok || result.kind !== "immediate") throw new Error("expected an immediate result");
+    expect(result.value.answered_by?.via).toBe("mention");
   });
 });
 

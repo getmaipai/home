@@ -18,11 +18,8 @@ import { musicJobIdsByTurn, deleteMusicJobsForConversation, musicJobStateByTurnI
 //
 // The conversation THREAD is a real spec-shaped record as of step 3
 // (spec/schemas/conversation.schema.json, with a real hlc, specifically
-// because it's meant to sync); the individual TURNS
-// (conversation_turns, ConversationTurnRow below) remain hub-internal,
-// the same "revisit for robot parity later" call lib/scheduler.ts's Job
-// made - a robot's own conversation records sync, its raw utterance log
-// never does (4.14).
+// because it's meant to sync); individual turns carry the public
+// ConversationTurn shape from spec 4.5 alongside Home's private fields.
 //
 // 90-day summarization instead of a hard delete (2026-09-04) is real
 // now: runRetention() best-effort summarizes each person's about-to-
@@ -135,6 +132,16 @@ function mediaFields(raw: string | null): { media?: Media; media_items?: Media[]
   } catch {
     return {};
   }
+}
+
+function parseAnsweredBy(raw: string | null): import("@/wire").AnsweredBy | null {
+  if (!raw) return null;
+  try {
+    const value = JSON.parse(raw) as Partial<import("@/wire").AnsweredBy>;
+    return typeof value.companion_id === "string" && typeof value.name === "string" && (typeof value.look === "string" || value.look === null) && ["conversation", "mention", "device", "fallback"].includes(value.via ?? "")
+      ? value as import("@/wire").AnsweredBy
+      : null;
+  } catch { return null; }
 }
 import { TurnSignal as TurnSignalSchema, type TurnSignal } from "@maipai/spec/gen/ts/turn-signal.js";
 import { ReplyPlan as ReplyPlanSchema, type ReplyPlan } from "@maipai/spec/gen/ts/reply-plan.js";
@@ -482,7 +489,7 @@ export function resolveSupersedes(supersedes: string | null | undefined, convers
   return superseded && superseded.conversationId === conversationId && superseded.personId === conversation?.personId ? supersedes : null;
 }
 
-export type LogTurnOpts = { guardReasons?: readonly string[]; supersedes?: string | null; branchFrom?: string | null; outcomes?: readonly ToolExecutionOutcome[]; document?: TurnArtifactValue | null; signal?: TurnSignal | null; plan?: ReplyPlan | null; judgeStatus?: "skipped" | null; subjects?: readonly SubjectRef[] | null; crisisSignal?: boolean; images?: import("@/wire").ChatImagePart[]; speakerEvidence?: SpeakerEvidence | null; present?: readonly PresentPerson[] | null; rung?: Rung | null; rules?: readonly string[] | null; bare?: boolean; status?: "done" | "failed" };
+export type LogTurnOpts = { guardReasons?: readonly string[]; supersedes?: string | null; branchFrom?: string | null; outcomes?: readonly ToolExecutionOutcome[]; document?: TurnArtifactValue | null; signal?: TurnSignal | null; plan?: ReplyPlan | null; judgeStatus?: "skipped" | null; subjects?: readonly SubjectRef[] | null; crisisSignal?: boolean; images?: import("@/wire").ChatImagePart[]; speakerEvidence?: SpeakerEvidence | null; present?: readonly PresentPerson[] | null; rung?: Rung | null; rules?: readonly string[] | null; bare?: boolean; answeredBy?: import("@/wire").AnsweredBy | null; status?: "done" | "failed" };
 
 /** The row a completed turn would produce, with no persistence of its
  * own - pulled out of logTurn() (TEMP-CHAT-01) so a temporary
@@ -572,6 +579,7 @@ function buildTurnRow(
     // visibleText() strips a prose reply's own think block first (a no-op
     // for every other shape) - the stored row never carries it.
     replyText: visibleText(redactedReply),
+    answeredBy: opts.bare || opts.status === "failed" ? null : opts.answeredBy ? JSON.stringify(opts.answeredBy) : null,
     source: value.source,
     pluginId: value.plugin_id ?? null,
     commandId: value.command_id ?? null,
@@ -2050,7 +2058,8 @@ export function listConversationTurns(
   const bandOut = speakerAgeBand(actor, new Date());
   const forBand = (text: string) => (bandOut === "child" ? stripLinksForChild(text) : text);
   return { ok: true, value: rows.map((r) => {
-    const { media: rawMedia, reasoning: _reasoning, structuredPart, confirm, outcomes: rawOutcomes, images: rawImages, answerImages: rawAnswerImages, blocks: rawBlocks, ...row } = r;
+    const { media: rawMedia, reasoning: _reasoning, structuredPart, confirm, outcomes: rawOutcomes, images: rawImages, answerImages: rawAnswerImages, blocks: rawBlocks, answeredBy: rawAnsweredBy, ...row } = r;
+    const answered_by = parseAnsweredBy(rawAnsweredBy);
     // Named once, read by both fields below (a code review's own
     // finding: two separately-inlined copies of the identical condition
     // is exactly the kind of thing a later rule change updates in one
@@ -2073,7 +2082,7 @@ export function listConversationTurns(
     // side comment in buildTurnRow() for why. APPROVE-CARD-01's confirm
     // is the same: the card names which package is asking, not the
     // reasoning behind it.
-    return { ...row, outcomes: readsErrorDetail ? rawOutcomes : null, replyText: forBand(visibleText(r.replyText)), sources: r.sources ? sourcesForBand(JSON.parse(r.sources), bandOut) : undefined, ...(rawImages ? { images: JSON.parse(rawImages) as import("@/wire").ChatImagePart[] } : {}), ...blocksOut(blocksFor(r, rawBlocks, rawAnswerImages), bandOut), ...mediaFields(rawMedia), stats: r.stats ? statsForViewer(JSON.parse(r.stats) as TurnStats, actor) : undefined, ...(reasoning !== undefined ? { reasoning } : {}), ...(artifact ? { artifact } : {}), ...(project ? { project } : {}), ...(pictureByTurn.has(r.id) && !hideForRefusedChildTurn ? { picture: { id: pictureByTurn.get(r.id)! } } : {}), ...(musicByTurn.has(r.id) && !hideForRefusedChildTurn ? { music: { id: musicByTurn.get(r.id)! } } : {}), ...(videoByTurn.has(r.id) && !hideForRefusedChildTurn ? { video: { id: videoByTurn.get(r.id)! } } : {}), ...(structuredPart ? { structured_part: structuredPartForBand(JSON.parse(structuredPart) as StructuredPart, bandOut) } : {}), ...(confirm ? { confirm: { ...(JSON.parse(confirm) as { package_id: string; open: boolean }), open: pendingAsk?.turnId === r.id } } : {}), ...(crisisTurns.has(r.id) ? { crisis_support: crisisSupportFor(CRISIS_RESOURCES_TEXT, bandOut) } : {}), memory_ids: byTurn.get(r.id) ?? [] };
+    return { ...row, answered_by, outcomes: readsErrorDetail ? rawOutcomes : null, replyText: forBand(visibleText(r.replyText)), sources: r.sources ? sourcesForBand(JSON.parse(r.sources), bandOut) : undefined, ...(rawImages ? { images: JSON.parse(rawImages) as import("@/wire").ChatImagePart[] } : {}), ...blocksOut(blocksFor(r, rawBlocks, rawAnswerImages), bandOut), ...mediaFields(rawMedia), stats: r.stats ? statsForViewer(JSON.parse(r.stats) as TurnStats, actor) : undefined, ...(reasoning !== undefined ? { reasoning } : {}), ...(artifact ? { artifact } : {}), ...(project ? { project } : {}), ...(pictureByTurn.has(r.id) && !hideForRefusedChildTurn ? { picture: { id: pictureByTurn.get(r.id)! } } : {}), ...(musicByTurn.has(r.id) && !hideForRefusedChildTurn ? { music: { id: musicByTurn.get(r.id)! } } : {}), ...(videoByTurn.has(r.id) && !hideForRefusedChildTurn ? { video: { id: videoByTurn.get(r.id)! } } : {}), ...(structuredPart ? { structured_part: structuredPartForBand(JSON.parse(structuredPart) as StructuredPart, bandOut) } : {}), ...(confirm ? { confirm: { ...(JSON.parse(confirm) as { package_id: string; open: boolean }), open: pendingAsk?.turnId === r.id } } : {}), ...(crisisTurns.has(r.id) ? { crisis_support: crisisSupportFor(CRISIS_RESOURCES_TEXT, bandOut) } : {}), memory_ids: byTurn.get(r.id) ?? [] };
   }) };
 }
 
@@ -3066,12 +3075,13 @@ export function list(actor: PersonRow, personId?: string): ConversationTurnWithM
     return pendingAskCache.get(conversationId) ?? null;
   };
   return capped.map((r) => {
-    const { media: rawMedia, reasoning: _reasoning, structuredPart, confirm, outcomes: rawOutcomes, images: rawImages, answerImages: rawAnswerImages, blocks: rawBlocks, ...row } = r;
+    const { media: rawMedia, reasoning: _reasoning, structuredPart, confirm, outcomes: rawOutcomes, images: rawImages, answerImages: rawAnswerImages, blocks: rawBlocks, answeredBy: rawAnsweredBy, ...row } = r;
+    const answered_by = parseAnsweredBy(rawAnsweredBy);
     const reasoning = effectiveReasoningFor(r, dropReasoningForActor);
     // getmaipai/home#130: no age gate, same call listConversationTurns()
     // above makes - the card is the reply itself. APPROVE-CARD-01's
     // confirm gets the same treatment.
-    return { ...row, outcomes: readsErrorDetail ? rawOutcomes : null, replyText: forBand(visibleText(r.replyText)), sources: r.sources ? sourcesForBand(JSON.parse(r.sources), bandOut) : undefined, ...(rawImages ? { images: JSON.parse(rawImages) as import("@/wire").ChatImagePart[] } : {}), ...blocksOut(blocksFor(r, rawBlocks, rawAnswerImages), bandOut), ...mediaFields(rawMedia), stats: r.stats ? statsForViewer(JSON.parse(r.stats) as TurnStats, actor) : undefined, ...(reasoning !== undefined ? { reasoning } : {}), ...(structuredPart ? { structured_part: structuredPartForBand(JSON.parse(structuredPart) as StructuredPart, bandOut) } : {}), ...(confirm ? { confirm: { ...(JSON.parse(confirm) as { package_id: string; open: boolean }), open: pendingAskForConversation(r.conversationId)?.turnId === r.id } } : {}), ...(crisisTurns.has(r.id) ? { crisis_support: crisisSupportFor(CRISIS_RESOURCES_TEXT, bandOut) } : {}), memory_ids: byTurn.get(r.id) ?? [] };
+    return { ...row, answered_by, outcomes: readsErrorDetail ? rawOutcomes : null, replyText: forBand(visibleText(r.replyText)), sources: r.sources ? sourcesForBand(JSON.parse(r.sources), bandOut) : undefined, ...(rawImages ? { images: JSON.parse(rawImages) as import("@/wire").ChatImagePart[] } : {}), ...blocksOut(blocksFor(r, rawBlocks, rawAnswerImages), bandOut), ...mediaFields(rawMedia), stats: r.stats ? statsForViewer(JSON.parse(r.stats) as TurnStats, actor) : undefined, ...(reasoning !== undefined ? { reasoning } : {}), ...(structuredPart ? { structured_part: structuredPartForBand(JSON.parse(structuredPart) as StructuredPart, bandOut) } : {}), ...(confirm ? { confirm: { ...(JSON.parse(confirm) as { package_id: string; open: boolean }), open: pendingAskForConversation(r.conversationId)?.turnId === r.id } } : {}), ...(crisisTurns.has(r.id) ? { crisis_support: crisisSupportFor(CRISIS_RESOURCES_TEXT, bandOut) } : {}), memory_ids: byTurn.get(r.id) ?? [] };
   });
 }
 

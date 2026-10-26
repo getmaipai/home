@@ -466,13 +466,7 @@ export const conversations = sqliteTable(
   ],
 );
 
-// Conversation history (4.14, split): one row per completed the retired turn engine
-// turn, kept per person and per surface. Not a spec 3.1 record type
-// today (chapter 3's record table has no Conversation-turn entry either,
-// distinct from the `conversations` thread record above), the same
-// "hub-internal, revisit for robot parity later" call scheduledJobs
-// made; see lib/conversationHistory.ts for the visibility and retention
-// rules built on top of this table.
+// Conversation history (4.14, split): one row per completed turn, kept per person and surface.
 export const conversationTurns = sqliteTable(
   "conversation_turns",
   {
@@ -491,6 +485,8 @@ export const conversationTurns = sqliteTable(
     // Contains only attachment ids and display metadata, never image bytes.
     images: text("images"),
     replyText: text("reply_text").notNull(),
+    // Spec 4.5: point-in-time identity of the persona that answered; null for old and bare turns.
+    answeredBy: text("answered_by"),
     // ANSWER-IMG-02, legacy since GENUI-05 (read only, never written): the pictures shown with a reply stored before
     // the gallery became an `image_gallery` block (wire.ts's AnswerImageSet as JSON). conversationHistory.ts reads it
     // as that block; new turns store the gallery in `blocks` and leave this null.

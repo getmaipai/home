@@ -1,0 +1,1 @@
+ALTER TABLE `conversation_turns` ADD `answered_by` text;

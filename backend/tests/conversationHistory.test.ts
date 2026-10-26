@@ -191,6 +191,24 @@ describe("logTurn's supersedes option (getmaipai/home#60)", () => {
     expect(row.supersedes).toBeNull();
     expect(row.parentTurnId).toBeNull();
     expect(row.branchChosen).toBe(true);
+    expect(row.answeredBy).toBeNull();
+  });
+
+  test("persists answered_by and returns it in history; malformed and old values read as null", async () => {
+    const { actor } = await owner();
+    const conv = resolveOrCreateConversation(actor, "chat");
+    if (!conv.ok) throw new Error(conv.error);
+    const answered_by = { companion_id: "default", name: "MaiPai", look: null, via: "conversation" as const };
+    logTurn(actor, "chat", "hello", { reply: { text: "hi" }, source: "model", safety: SAFE, conversation_id: conv.value.id, turn_id: "turn-answered", answered_by }, { answeredBy: answered_by });
+    const stored = db.select().from(conversationTurns).where(eq(conversationTurns.id, "turn-answered")).get()!;
+    expect(JSON.parse(stored.answeredBy!)).toEqual(answered_by);
+    const history = listConversationTurns(actor, conv.value.id);
+    expect(history.ok && history.value[0]!.answered_by).toEqual(answered_by);
+    const old = db.select().from(conversationTurns).where(eq(conversationTurns.id, "turn-original")).get();
+    expect(old?.answeredBy ?? null).toBeNull();
+    db.update(conversationTurns).set({ answeredBy: "{" }).where(eq(conversationTurns.id, "turn-answered")).run();
+    const malformed = listConversationTurns(actor, conv.value.id);
+    expect(malformed.ok && malformed.value[0]!.answered_by).toBeNull();
   });
 
   test("stores additive chat image parts on the user's turn row and returns them as structured metadata", async () => {

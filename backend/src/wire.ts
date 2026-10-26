@@ -328,6 +328,7 @@ export interface CrisisSupport {
 }
 
 export interface TurnValue {
+  answered_by?: AnsweredBy | null;
   reply: TurnReply;
   // "confirm" (Session C step 2): a pendingAsk resolved to "no" - the
   // person declined, nothing ran. A "yes" instead runs the pending
@@ -489,6 +490,7 @@ export interface ChatImagePart {
    * later window names it as shown then, not as never seen. */
   shown_to_model?: true;
 }
+export interface AnsweredBy { companion_id: string; name: string; look: string | null; via: "conversation" | "mention" | "device" | "fallback" }
 export const MAX_CHAT_IMAGES = 4;
 export const MAX_CHAT_IMAGE_BYTES = 10 * 1024 * 1024;
 export const CHAT_IMAGE_REFUSAL = "You can add up to 4 pictures, each up to 10 MB.";
@@ -527,7 +529,7 @@ export interface Media { kind: "image"; url: string; thumbnail: string | null; s
 // listConversationTurns()/list()) drops the raw column entirely for a
 // minor's own turn rather than sending `null`, matching the write-side
 // gate `reasoning`'s own wire event and POST /api/turn already apply.
-export type ConversationTurnWithMemoryIds = Omit<ConversationTurnRow, "sources" | "media" | "stats" | "reasoning" | "structuredPart" | "confirm" | "images" | "answerImages" | "blocks"> & { sources?: Source[]; media?: TurnValue["media"]; media_items?: Media[]; images?: ChatImagePart[]; blocks?: AnswerBlock[]; stats?: TurnStats; reasoning?: string; memory_ids: string[]; crisis_support?: CrisisSupport; artifact?: { id: string; version: number }; project?: { id: string }; picture?: { id: string }; video?: { id: string }; music?: { id: string }; structured_part?: StructuredPart; confirm?: { package_id: string; open: boolean } };
+export type ConversationTurnWithMemoryIds = Omit<ConversationTurnRow, "sources" | "media" | "stats" | "reasoning" | "structuredPart" | "confirm" | "images" | "answerImages" | "blocks" | "answeredBy"> & { answered_by: AnsweredBy | null; sources?: Source[]; media?: TurnValue["media"]; media_items?: Media[]; images?: ChatImagePart[]; blocks?: AnswerBlock[]; stats?: TurnStats; reasoning?: string; memory_ids: string[]; crisis_support?: CrisisSupport; artifact?: { id: string; version: number }; project?: { id: string }; picture?: { id: string }; video?: { id: string }; music?: { id: string }; structured_part?: StructuredPart; confirm?: { package_id: string; open: boolean } };
 
 // POST /api/turn/stream's real wire shape (2026-09-04): newline-delimited
 // JSON, one event per line (the same shape the legacy hub's own

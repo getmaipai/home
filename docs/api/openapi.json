@@ -12751,6 +12751,23 @@
                             }
                           ]
                         },
+                        "companion_id": {
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "description": "The companion that asked for the project, recording who worked."
+                            },
+                            {
+                              "nullable": true,
+                              "description": "The companion that asked for the project, recording who worked."
+                            },
+                            {
+                              "nullable": true
+                            }
+                          ],
+                          "default": null,
+                          "description": "The companion that asked for the project, recording who worked."
+                        },
                         "planSource": {
                           "type": "string",
                           "enum": [
@@ -13092,6 +13109,23 @@
                               "nullable": true
                             }
                           ]
+                        },
+                        "companion_id": {
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "description": "The companion that asked for the project, recording who worked."
+                            },
+                            {
+                              "nullable": true,
+                              "description": "The companion that asked for the project, recording who worked."
+                            },
+                            {
+                              "nullable": true
+                            }
+                          ],
+                          "default": null,
+                          "description": "The companion that asked for the project, recording who worked."
                         },
                         "planSource": {
                           "type": "string",

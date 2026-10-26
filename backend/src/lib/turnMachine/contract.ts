@@ -157,6 +157,7 @@ export interface TurnState {
    * compute it as an elapsed value rather than an absolute one. */
   startedAt: number;
   conversationId: string;
+  answerVia?: import("@/wire").AnsweredBy["via"];
   deviceId?: string;
   actor: PersonRow;
   surface: Surface;

@@ -2,6 +2,9 @@ import { isLookupPackage } from "@/lib/ruleNames";
 import { musicsAllowed } from "@/lib/music/policy";
 import { musicEngineReady } from "@/lib/music/ready";
 import { conversationHasMusic } from "@/lib/music/jobs";
+import { db } from "@/db";
+import { conversations } from "@/db/schema";
+import { eq } from "drizzle-orm";
 // U2b/c (docs/plans/turn-machine-state-record-2026-09-22.md, "Files"):
 // the entry `routes/turn.ts` calls, with the same TurnStreamResult shape
 // runTurnStream() already returns (the old engine file, imported here, never
@@ -29,6 +32,9 @@ import { classifyTurnSignal } from "@/lib/turnSignal";
 import { speakerIsAnonymous, turnAgeBand } from "./speaker";
 import { carriesCrisisSignal } from "@/lib/safety";
 import { resolvePersona, adaptPersonaToBand, DEFAULT_PERSONA, type Persona } from "@/lib/persona";
+import { createHash } from "node:crypto";
+import { loadManifestOnly } from "@/lib/plugins";
+import { getHouseholdCompanion } from "@/lib/householdCompanions";
 import { companionAreaOn, mayUseCompanion } from "@/lib/companionsApp";
 import { companionFits, robotCompanionOf } from "@/lib/robotCompanion";
 import { isOwnerOrAdmin } from "@/lib/access";
@@ -186,6 +192,7 @@ function buildTurnValue(state: TurnState, startedAt: number, source: TurnValue["
     safety: safety ?? state.safety,
     conversation_id: state.conversationId,
     turn_id: state.turnId,
+    answered_by: state.ephemeral ? null : answeredByFor(state),
     ...(state.offer ? { offer_id: state.offer.id } : {}),
     ...(state.images?.length ? { images: state.images } : {}),
     ...(state.toolEvents.some((event) => event.t === "block")
@@ -222,6 +229,17 @@ function buildTurnValue(state: TurnState, startedAt: number, source: TurnValue["
     // MINOR-SEARCH-01m: a child's sources keep title and site but not the page address.
     ...(sources && sources.length > 0 ? { sources: valueBand === "child" ? sourcesForChild(sources) : sources } : {}),
   } as TurnValue;
+}
+
+function answeredByFor(state: TurnState): import("@/wire").AnsweredBy {
+  const via = state.surface === "robot" ? "device" : state.answerVia ?? "conversation";
+  let look: string | null = null;
+  try {
+    const manifest = getHouseholdCompanion(state.persona.id) ?? (() => { const loaded = loadManifestOnly(state.persona.id); return loaded.ok ? loaded.value : null; })();
+    const animation = manifest?.companion?.animation;
+    if (animation?.states.idle && (!manifest?.companion?.status || manifest.companion.status === "ready")) look = createHash("sha256").update(JSON.stringify(animation)).digest("hex").slice(0, 12);
+  } catch { /* identity metadata must never fail an answer */ }
+  return { companion_id: state.persona.id, name: state.persona.display_name, look, via };
 }
 
 /** THIN-3E: count growing prefixes of the one real prompt builder after
@@ -293,7 +311,7 @@ function logResult(state: TurnState, actor: PersonRow, surface: Surface, text: s
   // VISION-02d (ATT-01's rule): a child's or teen's picture turn never
   // enters the memory judge; an adult's follows the existing policy.
   const minorPictureTurn = (state.images?.length ?? 0) > 0 && state.plan.age_band !== "adult";
-  logTurn(actor, surface, text, value, { ...opts, judgeStatus: state.bare || minorPictureTurn ? "skipped" : judgeStatusAtInsert(value, state.signal) });
+  logTurn(actor, surface, text, value, { ...opts, answeredBy: value.answered_by ?? null, judgeStatus: state.bare || minorPictureTurn ? "skipped" : judgeStatusAtInsert(value, state.signal) });
   // THIN-7E (ASK-01): the question the reply ended with stands as the conversation's pending ask only
   // now that the delivered text is known to carry it (a refusal that lost it commits nothing).
   state.askCommit?.(value.reply.text);
@@ -534,6 +552,7 @@ async function beginTurn(actor: PersonRow, surface: Surface, text: string, opts:
     ? mentionedConversationPersona(actor, opts.mentionCompanionId)
     : null;
   const persona = adaptPersonaToBand(robotCompanion ?? (temporary || bare ? DEFAULT_PERSONA : mentionedPersona ?? conversationPersona(actor, conversation.companion_id)), band);
+  const answerVia: import("@/wire").AnsweredBy["via"] = surface === "robot" ? "device" : temporary || bare ? "conversation" : opts.mentionCompanionId ? mentionedPersona ? "mention" : "fallback" : conversation.companion_id && persona.id !== conversation.companion_id ? "fallback" : "conversation";
   // U4/RESP-01: computed once, the register's only length authority -
   // never recomputed by a later node, the same "decided once" shape
   // `reasoning.emit` already follows in `context`. U4c: everything
@@ -607,6 +626,7 @@ async function beginTurn(actor: PersonRow, surface: Surface, text: string, opts:
     signal,
     budget,
     persona,
+    answerVia,
     topicBlock: topicBlockForTurn(actor, band),
     plan,
     planBasis,
