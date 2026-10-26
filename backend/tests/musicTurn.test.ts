@@ -91,7 +91,7 @@ test("the music household switch and Stack readiness close the live turn gate", 
   }
 });
 test("the music key is in Home's settings registry and the household switch reads false when off", () => {
-  expect(getRegistryKey("generation.music.enabled")?.lives_in).toBe("household.pictures");
+  expect(getRegistryKey("generation.music.enabled")?.lives_in).toBe("household.ai_music");
   expect(householdAllowsMusic()).toBe(true);
   setHouseholdSettingValue("generation.music.enabled", false);
   expect(householdAllowsMusic()).toBe(false);
