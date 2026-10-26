@@ -1,0 +1,396 @@
+// The seven job cards for the AI and models page, and the one
+// "set everything to recommended" plan. Pure and side-effect free: the tier's
+// disk plan, the Stack component list, three household settings and the free
+// disk bytes in, the cards, the Always on line and the recommended plan out.
+// Home's backend and the setup wizard share it, so it imports only
+// ./diskPlanMath and nothing from backend/ or frontend/.
+
+import { sizeGb, needGb, freeGb, selectionTotals, type DiskPlan, type DiskRow } from "./diskPlanMath";
+
+export type AiJobId = "chat" | "pictures" | "videos" | "music" | "voice" | "coding" | "search";
+export interface AiComponentLike { id: string; label: string; state: "installed"|"installing"|"notInstalled"|"failed"; size_bytes: number|null; download_bytes: number; requirement: "required"|"optional"|"unsupported"; requirement_reason: string|null; percent: number|null; job: string|null; failure: string|null; can_install: boolean; can_uninstall: boolean; last_used_at: string|null; used_by: string[] }
+export interface AiSettingsInput { pictureQuality: "quick"|"detailed"; videoQuality: "quick"|"detailed"; musicEnabled: boolean }
+export interface AiChoicesInput { plan: DiskPlan; components: AiComponentLike[] | null; settings: AiSettingsInput; freeBytes: number | null }
+export interface AiChoice {
+  id: string;
+  job: AiJobId; kind: "radio" | "switch" | "fixed";
+  label: string; description: string;
+  name: string;
+  rowIds: string[];
+  recommended: boolean; current: boolean;
+  state: "installed"|"installing"|"notInstalled"|"failed"; percent: number|null; failure: string|null;
+  downloadBytes: number; installedBytes: number;
+  stateText: string;
+  blockedReason: string|null;
+  action: "none" | "use" | "get" | "remove";
+  setting: { key: string; value: unknown } | null;
+  chosenNotReady: boolean;
+  details: Array<{ name: string; sizeBytes: number }>;
+}
+export interface AiCard { id: AiJobId; title: string; summary: string; chip: string; choices: AiChoice[]; notReady: boolean; unavailable: string | null }
+export interface AiAlwaysOn { text: string; bytes: number; rowIds: string[] }
+export interface AiChoicesResult { cards: AiCard[]; alwaysOn: AiAlwaysOn }
+export interface AiRecommendedPlan {
+  changes: Array<{ job: AiJobId; from: string; to: string; setting: { key: string; value: unknown } | null }>;
+  installRowIds: string[]; installComponentIds: string[];
+  skipped: Array<{ rowId: string; label: string; reason: string }>;
+  downloadBytes: number; fits: "all" | "some" | "none"; nothingToDo: boolean;
+  text: string;
+}
+
+// interim: moves to spec copy.options in AIMODELS-PAGE-01
+const AI_COPY = {
+  "chat.standard": { label: "Standard chat AI", description: "The AI that answers in chat.", name: "Standard chat AI" },
+  "chat.mlx": { label: "Faster on Apple chips", description: "Runs on the Apple chip for faster answers.", name: "Faster chat on Apple chips" },
+  "chat.pictures": { label: "Chat can look at pictures", description: "Lets Home see the pictures you send.", name: "Chat can look at pictures" },
+  "pictures.quick": { label: "Quick", description: "Pictures in a few seconds. Draws words correctly.", name: "Quick pictures" },
+  "pictures.detailed": { label: "Detailed", description: "Slower, with finer detail and more looks to add.", name: "Detailed pictures" },
+  "pictures.edit": { label: "Changing pictures", description: "Needed to change a picture and as the backup.", name: "Picture editor" },
+  "pictures.tools": { label: "Tools", description: "Take out a background, erase something, make a picture bigger.", name: "Picture tools" },
+  "pictures.look": { label: "Name things in a picture", description: "Names the things in a picture, so you can find them.", name: "Picture naming" },
+  "videos.quick": { label: "Quick videos", description: "A short clip in a few minutes.", name: "Quick videos" },
+  "videos.detailed": { label: "Detailed videos", description: "Longer wait, sharper, with sound.", name: "Detailed videos" },
+  "music.make": { label: "Make music", description: "Makes songs and tunes to share.", name: "Music maker" },
+  "voice.standard": { label: "Standard voice", description: "The voice that always comes with Home.", name: "Standard voice" },
+  "voice.better": { label: "Better voice", description: "Warmer and more natural, uses more space.", name: "Better voice" },
+  "coding.helper": { label: "Coding helper", description: "Helps with code in the Code app and in chat.", name: "Coding helper" },
+} as const;
+type AiCopyKey = keyof typeof AI_COPY;
+
+const CARDS: Array<{ id: AiJobId; title: string; summary: string; unavailable: string; rows: string[] }> = [
+  { id: "chat", title: "Chat", summary: "Talk with Home, and let it look at pictures you send.", unavailable: "Chat is not on this computer. It needs more memory.", rows: ["chat", "chat-mlx", "reads-pictures"] },
+  { id: "pictures", title: "Pictures", summary: "Make pictures in chat and change the ones you have.", unavailable: "Pictures are not on this computer. It needs more memory.", rows: ["pictures", "pictures-ernie", "pictures-zimage", "image-tools", "tool-look"] },
+  { id: "videos", title: "Videos", summary: "Make short videos in chat.", unavailable: "Videos are not on this computer. It needs more memory.", rows: ["video", "video-detailed"] },
+  { id: "music", title: "Music", summary: "Make songs and tunes.", unavailable: "Music is not on this computer. It needs more memory.", rows: ["music"] },
+  { id: "voice", title: "Voice and speaking", summary: "Choose how Home sounds when it talks.", unavailable: "The voice is not on this computer. It needs more memory.", rows: ["voice", "voice-better"] },
+  { id: "coding", title: "Coding", summary: "Help with code in the Code app and in chat.", unavailable: "The coding helper is not on this computer. It needs more memory.", rows: ["coding"] },
+  { id: "search", title: "Search and memory", summary: "Look things up on the web and remember what you tell Home.", unavailable: "Search and memory are not on this computer. It needs more memory.", rows: ["search", "embed"] },
+];
+
+// The short words the confirm dialog uses for a radio card change.
+const SHORT_WORDS: Record<string, string> = {
+  "pictures.quick": "Quick", "pictures.detailed": "Detailed",
+  "videos.quick": "Quick", "videos.detailed": "Detailed",
+  "voice.standard": "Standard", "voice.better": "Better",
+};
+
+// Plain names for rows that may be skipped by the recommended plan.
+const PLAIN_ROW_NAMES: Record<string, string> = {
+  home: "Home itself", judge: "The answer checker", stt: "Listening", embed: "Memory search", search: "Web search help",
+  chat: "Standard chat AI", "chat-mlx": "Faster chat on Apple chips", "reads-pictures": "Chat looking at pictures",
+  pictures: "Changing pictures", "pictures-ernie": "Quick pictures", "pictures-zimage": "Detailed pictures",
+  "image-tools": "Picture tools", "tool-look": "Picture naming",
+  video: "Quick videos", "video-detailed": "Detailed videos",
+  music: "Music maker", voice: "Standard voice", "voice-better": "Better voice", coding: "Coding helper",
+};
+
+function byRowId(plan: DiskPlan): Map<string, DiskRow> {
+  return new Map(plan.rows.map((row) => [row.id, row] as const));
+}
+
+function engineRowsOf(plan: DiskPlan, row: DiskRow): DiskRow[] {
+  const ids = new Set(row.engines);
+  return plan.rows.filter((candidate) => candidate.kind === "engine" && ids.has(candidate.id));
+}
+
+function matchingComponents(components: AiComponentLike[] | null, row: DiskRow): AiComponentLike[] {
+  if (!components) return [];
+  return components.filter((component) => component.id === row.id || row.model_ids.includes(component.id));
+}
+
+interface RowState { state: AiChoice["state"]; percent: number | null; failure: string | null; unsupported: AiComponentLike | null }
+
+// The state a row reads from its Stack components: installed only when every
+// matching part is installed, installing when any is, failed when any is.
+// With no component list or no match, the plan row's own installed flag rules.
+function rowState(plan: DiskPlan, row: DiskRow, components: AiComponentLike[] | null): RowState {
+  const matches = matchingComponents(components, row);
+  const unsupported = matches.find((component) => component.requirement === "unsupported") ?? null;
+  if (matches.length === 0) {
+    return { state: row.installed ? "installed" : "notInstalled", percent: null, failure: null, unsupported: null };
+  }
+  const failed = matches.find((component) => component.state === "failed");
+  if (failed) return { state: "failed", percent: null, failure: failed.failure, unsupported };
+  const installing = matches.find((component) => component.state === "installing");
+  if (installing) return { state: "installing", percent: installing.percent, failure: null, unsupported };
+  if (matches.every((component) => component.state === "installed")) {
+    return { state: "installed", percent: null, failure: null, unsupported };
+  }
+  return { state: "notInstalled", percent: null, failure: null, unsupported };
+}
+
+// The free space this choice needs to install: the row and the engine rows it
+// names that are not yet on the computer, each with its 20 percent margin and
+// its temporary space.
+function needBytesForRow(plan: DiskPlan, row: DiskRow): number {
+  const rows = [row, ...engineRowsOf(plan, row)].filter((candidate) => !candidate.installed);
+  return rows.reduce((total, candidate) => total + Math.ceil(candidate.installed_bytes * 1.2) + candidate.peak_temp_bytes, 0);
+}
+
+function blockedReasonFor(plan: DiskPlan, row: DiskRow, state: RowState, freeBytes: number | null): string | null {
+  if (state.unsupported) return state.unsupported.requirement_reason ?? "This computer does not have the memory for it.";
+  if (freeBytes === null || state.state === "installed" || state.state === "installing") return null;
+  const need = needBytesForRow(plan, row);
+  if (need > freeBytes) return `Needs about ${needGb(need)} GB free. This computer has ${freeGb(freeBytes)} GB free.`;
+  return null;
+}
+
+// The size a person reads on a state line, never an MB figure.
+function stateSize(bytes: number): string {
+  const size = sizeGb(bytes);
+  return size.endsWith(" MB") ? "under 1 GB" : size;
+}
+
+interface ChoiceSpec {
+  id: AiCopyKey;
+  job: AiJobId;
+  kind: AiChoice["kind"];
+  row: DiskRow;
+  current: boolean;
+  recommended: boolean;
+  setting: { key: string; value: unknown } | null;
+}
+
+function buildChoice(plan: DiskPlan, components: AiComponentLike[] | null, freeBytes: number | null, spec: ChoiceSpec): AiChoice {
+  const rows = [spec.row, ...engineRowsOf(plan, spec.row)];
+  const state = rowState(plan, spec.row, components);
+  const blockedReason = blockedReasonFor(plan, spec.row, state, freeBytes);
+  const downloadBytes = rows.reduce((total, row) => total + row.download_bytes, 0);
+  const installedBytes = rows.reduce((total, row) => total + row.installed_bytes, 0);
+  const stateText = state.state === "installed" ? "Installed" : state.state === "installing" ? "Installing" : state.state === "failed" ? "Did not finish. Try again." : `Not installed, ${stateSize(downloadBytes)}`;
+  let action: AiChoice["action"];
+  if (blockedReason !== null) action = "none";
+  else if (state.state === "installing") action = "none";
+  else if (state.state === "installed") action = spec.current ? (spec.kind === "switch" ? "remove" : "none") : "use";
+  else action = "get";
+  const copy = AI_COPY[spec.id];
+  return {
+    id: spec.id,
+    job: spec.job,
+    kind: spec.kind,
+    label: copy.label,
+    description: copy.description,
+    name: copy.name,
+    rowIds: rows.map((row) => row.id),
+    recommended: spec.recommended,
+    current: spec.current,
+    state: state.state,
+    percent: state.percent,
+    failure: state.failure,
+    downloadBytes,
+    installedBytes,
+    stateText,
+    blockedReason,
+    action,
+    setting: spec.setting,
+    chosenNotReady: spec.current && state.state !== "installed",
+    details: rows.map((row) => ({ name: row.label, sizeBytes: row.installed_bytes })),
+  };
+}
+
+function chipFor(card: { id: AiJobId; rows: string[] }, present: boolean, choices: AiChoice[]): string {
+  if (!present) return "Not on this computer";
+  switch (card.id) {
+    case "chat":
+      return "Using Standard";
+    case "search":
+      return "Always on";
+    case "pictures":
+    case "videos": {
+      const current = choices.find((choice) => choice.kind === "radio" && choice.current);
+      if (!current) return choices.some((choice) => choice.state === "installed") ? "On" : "Off";
+      if (current.state !== "installed") return "Chosen, not ready";
+      const quickId = card.id === "pictures" ? "pictures.quick" : "videos.quick";
+      return current.id === quickId ? "Using Quick" : "Using Detailed";
+    }
+    case "voice": {
+      const better = choices.find((choice) => choice.id === "voice.better");
+      if (better && better.current) return better.state === "installed" ? "Using Better" : "Chosen, not ready";
+      return "Using Standard";
+    }
+    case "music":
+    case "coding": {
+      const toggle = choices.find((choice) => choice.kind === "switch");
+      if (!toggle || !toggle.current) return "Off";
+      return toggle.state === "installed" ? "On" : "Chosen, not ready";
+    }
+  }
+}
+
+export function buildAiCards(input: AiChoicesInput): AiChoicesResult {
+  const { plan, components, settings, freeBytes } = input;
+  const rows = byRowId(plan);
+  const has = (id: string): boolean => rows.has(id);
+  const need = (id: string): DiskNeedLike => rows.get(id)?.need ?? "optional";
+
+  const cards: AiCard[] = [];
+  for (const meta of CARDS) {
+    const present = meta.rows.some((id) => has(id));
+    if (!present) {
+      cards.push({ id: meta.id, title: meta.title, summary: meta.summary, chip: "Not on this computer", choices: [], notReady: false, unavailable: meta.unavailable });
+      continue;
+    }
+    const specs: ChoiceSpec[] = [];
+    switch (meta.id) {
+      case "chat": {
+        if (has("chat")) specs.push({ id: "chat.standard", job: "chat", kind: "fixed", row: rows.get("chat")!, current: true, recommended: true, setting: null });
+        if (has("chat-mlx")) specs.push({ id: "chat.mlx", job: "chat", kind: "switch", row: rows.get("chat-mlx")!, current: rowIsInstalled(plan, rows.get("chat-mlx")!, components), recommended: need("chat-mlx") === "recommended", setting: null });
+        if (has("reads-pictures")) specs.push({ id: "chat.pictures", job: "chat", kind: "switch", row: rows.get("reads-pictures")!, current: rowIsInstalled(plan, rows.get("reads-pictures")!, components), recommended: need("reads-pictures") === "recommended", setting: null });
+        break;
+      }
+      case "pictures": {
+        const quickRowId = has("pictures-ernie") ? "pictures-ernie" : has("pictures") ? "pictures" : null;
+        const hasDetailed = has("pictures-zimage");
+        const preferDetailed = settings.pictureQuality === "detailed" && hasDetailed;
+        if (quickRowId) specs.push({ id: "pictures.quick", job: "pictures", kind: "radio", row: rows.get(quickRowId)!, current: !preferDetailed, recommended: true, setting: { key: "generation.picture_quality", value: "quick" } });
+        if (hasDetailed) specs.push({ id: "pictures.detailed", job: "pictures", kind: "radio", row: rows.get("pictures-zimage")!, current: preferDetailed, recommended: quickRowId === null, setting: { key: "generation.picture_quality", value: "detailed" } });
+        if (has("pictures") && quickRowId === "pictures-ernie") specs.push({ id: "pictures.edit", job: "pictures", kind: "fixed", row: rows.get("pictures")!, current: true, recommended: false, setting: null });
+        if (has("image-tools")) specs.push({ id: "pictures.tools", job: "pictures", kind: "switch", row: rows.get("image-tools")!, current: rowIsInstalled(plan, rows.get("image-tools")!, components), recommended: need("image-tools") === "recommended", setting: null });
+        if (has("tool-look")) specs.push({ id: "pictures.look", job: "pictures", kind: "switch", row: rows.get("tool-look")!, current: rowIsInstalled(plan, rows.get("tool-look")!, components), recommended: need("tool-look") === "recommended", setting: null });
+        break;
+      }
+      case "videos": {
+        const hasQuick = has("video");
+        const hasDetailed = has("video-detailed");
+        const preferDetailed = settings.videoQuality === "detailed" && hasDetailed;
+        if (hasQuick) specs.push({ id: "videos.quick", job: "videos", kind: "radio", row: rows.get("video")!, current: !preferDetailed, recommended: need("video") === "recommended", setting: { key: "generation.video_quality", value: "quick" } });
+        if (hasDetailed) specs.push({ id: "videos.detailed", job: "videos", kind: "radio", row: rows.get("video-detailed")!, current: preferDetailed, recommended: !hasQuick || (need("video") !== "recommended" && need("video-detailed") === "recommended"), setting: { key: "generation.video_quality", value: "detailed" } });
+        break;
+      }
+      case "music": {
+        if (has("music")) specs.push({ id: "music.make", job: "music", kind: "switch", row: rows.get("music")!, current: settings.musicEnabled && rowIsInstalled(plan, rows.get("music")!, components), recommended: need("music") === "recommended", setting: { key: "generation.music.enabled", value: true } });
+        break;
+      }
+      case "voice": {
+        const betterInstalled = has("voice-better") && rowIsInstalled(plan, rows.get("voice-better")!, components);
+        if (has("voice")) specs.push({ id: "voice.standard", job: "voice", kind: "fixed", row: rows.get("voice")!, current: !betterInstalled, recommended: !has("voice-better") || need("voice-better") !== "recommended", setting: null });
+        if (has("voice-better")) specs.push({ id: "voice.better", job: "voice", kind: "radio", row: rows.get("voice-better")!, current: betterInstalled, recommended: need("voice-better") === "recommended", setting: null });
+        break;
+      }
+      case "coding": {
+        if (has("coding")) specs.push({ id: "coding.helper", job: "coding", kind: "switch", row: rows.get("coding")!, current: rowIsInstalled(plan, rows.get("coding")!, components), recommended: need("coding") === "recommended", setting: null });
+        break;
+      }
+      case "search":
+        break;
+    }
+    const choices = specs.map((spec) => buildChoice(plan, components, freeBytes, spec));
+    cards.push({
+      id: meta.id,
+      title: meta.title,
+      summary: meta.summary,
+      chip: chipFor(meta, present, choices),
+      choices,
+      notReady: choices.some((choice) => choice.chosenNotReady),
+      unavailable: null,
+    });
+  }
+
+  const alwaysOnIds = ["home", "judge", "stt", "voice", "embed", "search"];
+  const base = alwaysOnIds.map((id) => rows.get(id)).filter((row): row is DiskRow => row !== undefined);
+  const engineIds = new Set<string>();
+  for (const row of base) for (const engine of row.engines) if (rows.has(engine)) engineIds.add(engine);
+  const alwaysOnRows = [...base, ...[...engineIds].map((id) => rows.get(id)!).filter((row) => row !== undefined)];
+  const alwaysOn: AiAlwaysOn = {
+    text: `Always on: Home itself, the helper that checks answers, listening, the standard voice, memory search and web search help. About ${needGb(alwaysOnRows.reduce((total, row) => total + row.installed_bytes, 0))} GB. They are needed, so they cannot be turned off.`,
+    bytes: alwaysOnRows.reduce((total, row) => total + row.installed_bytes, 0),
+    rowIds: alwaysOnRows.map((row) => row.id),
+  };
+  return { cards, alwaysOn };
+}
+
+type DiskNeedLike = "required" | "recommended" | "optional";
+
+function rowIsInstalled(plan: DiskPlan, row: DiskRow, components: AiComponentLike[] | null): boolean {
+  return rowState(plan, row, components).state === "installed";
+}
+
+export function recommendedPlan(input: AiChoicesInput): AiRecommendedPlan {
+  const { plan, components, freeBytes } = input;
+  const rows = byRowId(plan);
+  const { cards } = buildAiCards(input);
+
+  // The radio cards whose current choice differs from the recommended one.
+  const changes: AiRecommendedPlan["changes"] = [];
+  for (const card of cards) {
+    if (card.id !== "pictures" && card.id !== "videos" && card.id !== "voice") continue;
+    const target = card.choices.find((choice) => choice.recommended);
+    if (!target) continue;
+    const current = card.choices.find((choice) => choice.kind === "radio" && choice.current) ?? (card.id === "voice" ? card.choices.find((choice) => choice.id === "voice.standard") : undefined);
+    if (!current || current.id === target.id) continue;
+    changes.push({ job: card.id, from: SHORT_WORDS[current.id] ?? current.label, to: SHORT_WORDS[target.id] ?? target.label, setting: target.setting });
+  }
+
+  // The rows the recommended plan ends with: every required row and every row
+  // the recommended choices and recommended switches turn on. Optional rows are
+  // left as they are, and nothing installed is removed.
+  // Rows with no model of their own (Home itself, the search helper) are never a download here.
+  const candidates = plan.rows.filter((row) => row.kind === "model" && row.model_ids.length > 0 && !row.installed && (row.need === "required" || row.need === "recommended"));
+  const ordered = [...candidates].sort((a, b) => (a.need === b.need ? a.download_bytes - b.download_bytes : a.need === "required" ? -1 : 1));
+  const accepted: DiskRow[] = [];
+  const skipped: AiRecommendedPlan["skipped"] = [];
+  if (freeBytes !== null) {
+    for (const row of ordered) {
+      const totals = selectionTotals(plan, [...accepted.map((r) => r.id), row.id], { missingOnly: true });
+      if (totals.required_free_bytes <= freeBytes) accepted.push(row);
+      else {
+        // The reason a skipped row says is the space left after the choices
+        // that did fit, since the row's own need is measured against that.
+        const taken = selectionTotals(plan, accepted.map((r) => r.id), { missingOnly: true }).required_free_bytes;
+        const left = Math.max(0, freeBytes - taken);
+        for (const rest of ordered.slice(ordered.indexOf(row))) {
+          if (rest.installed) continue;
+          skipped.push({ rowId: rest.id, label: rest.label, reason: blockedReasonFor(plan, rest, { state: "notInstalled", percent: null, failure: null, unsupported: null }, left) ?? "It does not fit on this computer." });
+        }
+        break;
+      }
+    }
+  } else {
+    accepted.push(...ordered);
+  }
+
+  // The engine environments come with the parts that name them (selectionTotals counts them once), so only model rows are installed.
+  const installRows = [...accepted].sort((a, b) => (a.need === b.need ? a.download_bytes - b.download_bytes : a.need === "required" ? -1 : 1));
+  const installRowIds = installRows.map((row) => row.id);
+  const installComponentIds = installRows.map((row) => {
+    const match = components?.find((component) => component.id === row.id || row.model_ids.includes(component.id));
+    if (match) return match.id;
+    return row.model_ids[0] ?? row.id;
+  });
+
+  const totals = selectionTotals(plan, installRowIds, { missingOnly: true });
+  const downloadBytes = totals.download_bytes;
+  const kept = accepted.length;
+  const total = ordered.length;
+  const fits: AiRecommendedPlan["fits"] = skipped.length === 0 ? "all" : kept > 0 ? "some" : "none";
+  const nothingToDo = changes.length === 0 && installRowIds.length === 0;
+
+  let text: string;
+  if (nothingToDo) text = freeBytes !== null ? `No download is needed. Free on this computer: ${freeGb(freeBytes)} GB.` : "No download is needed.";
+  else if (freeBytes === null) text = `Download ${needGb(downloadBytes)} GB. The free space could not be read.`;
+  else if (fits === "all") text = `Download ${needGb(downloadBytes)} GB. Free on this computer: ${freeGb(freeBytes)} GB.`;
+  else if (fits === "some") {
+    const words = skipped.map((item) => {
+      const row = rows.get(item.rowId);
+      const name = row ? PLAIN_ROW_NAMES[row.id] ?? row.label : item.label;
+      return `The ${name} (${row ? stateSizeSafe(row.download_bytes) : "?"})`;
+    });
+    text = `This computer has room for ${kept} of the ${total} recommended choices. ${joinWords(words)} will be skipped.`;
+  } else {
+    text = `No room for the ${total} recommended choices. Free up space first.`;
+  }
+
+  return { changes, installRowIds, installComponentIds, skipped, downloadBytes, fits, nothingToDo, text };
+}
+
+// A size word for the skipped line, where MB figures are allowed.
+function stateSizeSafe(bytes: number): string {
+  return sizeGb(bytes);
+}
+
+function joinWords(words: string[]): string {
+  if (words.length === 0) return "";
+  if (words.length === 1) return words[0] ?? "";
+  const last = words[words.length - 1] ?? "";
+  return `${words.slice(0, -1).join(", ")} and ${last}`;
+}
