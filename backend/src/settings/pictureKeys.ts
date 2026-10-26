@@ -18,6 +18,18 @@ export const PICTURE_SETTINGS_KEYS: SettingsKey[] = [
     honoured_by: ["home"],
   }),
   SettingsKey.parse({
+    key: "likeness.per_use",
+    scope: "household",
+    selector: "boolean",
+    default: false,
+    label: "Ask before adult pictures and videos of another adult",
+    help: "When on, a picture or video that shows another household adult in adult content waits until that adult says yes on the screen. Off means such requests are refused.",
+    level: "advanced",
+    copy: { does: "Makes Home ask the person pictured for a yes before it makes this kind of picture." },
+    lives_in: "household.pictures",
+    honoured_by: ["home"],
+  }),
+  SettingsKey.parse({
     key: "generation.adults",
     scope: "household",
     selector: "boolean",
