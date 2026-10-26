@@ -262,8 +262,9 @@ file by file (`orchestrator/local_voice/bargein.py`, `echo_guard.py`, `turn_star
    question; punctuation-based holds were measured harmful (mid-sentence cut-offs rose from 31 to 37-44 of 80) and are off.
 6. **Streaming speech-to-text is mostly a fast final.** Partials come about once a second (the encoder chunk); the final lands 53 ms
    after the audio ends. The recipe: one session per VAD segment, 1.0 s of preroll, 0.3 s of zero padding at the end (it fixed dropped
-   last words), a segment with no words is decoded again with the next. A fast model (Parakeet: 23 ms for a 2.5 s clip) makes a 0.5 s
-   interim cycle cheap.
+   last words), a segment with no words is decoded again with the next. A fast model makes a 0.5 s
+   interim cycle cheap (Parakeet v2 on CPU: about 150 ms for a 2.5 s clip, measured 2026-10-25 under heavy load; the 23 ms
+   figure did not reproduce, see parakeet-stt-tier-2026-10-25.md).
 7. **Bench method:** `bargein_bench` scores each 20 ms frame once, then replays the VAD state machine for each setting; interruptions are
    macOS `say` phrases in several voices, controls are ESC-50 clips scaled to the median interruption level plus noise and backchannels
    (ESC-50 is CC BY-NC: local measurement only). `turn_end_bench` splices 0.8 and 1.5 s pauses at word boundaries into finished requests.
