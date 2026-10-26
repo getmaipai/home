@@ -157,7 +157,7 @@ export async function runGenerateImage(input: RunGenerateImageInput): Promise<To
         callId, packageId: GENERATE_IMAGE_TOOL_ID, status: "succeeded", via: "tool_call", args, durationMs: 0,
         result: {
           reply: { text: `Nothing has been made yet. ${ASK_WAITING_LINE(prep.kind === "likeness" ? prep.subjectName : "They")} A card below shows them exactly what would be made, with Consent and Decline buttons. Tell the person in one or two short sentences to show that person the screen and that it starts when they say yes. You have not seen any picture: do not describe how it looks.` },
-          data: { pictureJobId: job.id, likenessAskId: askId },
+          data: { pictureJobId: job.id },
           actions: [],
         },
       });

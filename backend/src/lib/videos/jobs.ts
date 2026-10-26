@@ -126,7 +126,16 @@ function fromRow(row: Row): VideoJob {
   };
 }
 
+/** PERUSE-2026-10-25: a held job that ended keeps no prompt text (failed or stopped) and no signed proof (any end). Runs on every save. */
+function scrubEndedHeld(job: VideoJob): void {
+  if (!job.request.likeness?.ask || job.state === "queued" || job.state === "running") return;
+  const body = (job.request as unknown as { stackBody?: { prompt?: string; loras?: Array<{ likeness_proof?: string }> } }).stackBody;
+  for (const lora of body?.loras ?? []) delete lora.likeness_proof;
+  if (job.state === "failed" || job.state === "cancelled") { job.prompt = ""; if (body) body.prompt = ""; }
+}
+
 function persistVideoJob(job: VideoJob): void {
+  scrubEndedHeld(job);
   job.updatedAt = new Date().toISOString();
   if (job.temporary) { memory.set(job.id, job); return; }
   const values = {

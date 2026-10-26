@@ -12,7 +12,7 @@ import { outcomeOf } from "@/lib/turnContext";
 import { turnAgeBand } from "@/lib/turnMachine/speaker";
 import { videoAdaptersFor, matchVideoAdapter, withVideoTriggerWords } from "./adapters";
 import { CLIP_POSTER_NOTE, GENERATED_PICTURE_NOTE, latestTemporaryPosterId, loadGeneratedReference, loadUploadedPhoto, plainVideoFailure, startVideoJob } from "./jobs";
-import { preparePhotoUse, prepareStyleUse } from "@/lib/likeness/apply";
+import { PHOTO_ADULT_LINE, preparePhotoUse, prepareStyleUse } from "@/lib/likeness/apply";
 import { ASK_WAITING_LINE, attachJob, dropAsk } from "@/lib/likeness/ask";
 import { attestedAdult, WHO_IS_IN_PHOTO_LINE } from "@/lib/likeness/resolve";
 import { singleAdultPhoto } from "@/lib/likeness/inspector";
@@ -186,6 +186,8 @@ export async function runGenerateVideo(input: RunGenerateVideoInput): Promise<To
   // A style of a household adult is made only while the household option is on; a real person with no such style or photo is refused.
   const stylePrep = await prepareStyleUse({ medium: "video", audience, style: adapter, text: `${prompt} ${adapter?.name ?? named}`, depictsRealPerson: args.depicts_real_person === true && !photoLikeness, source: "chat", held: { prompt: withVideoTriggerWords(prompt, adapter), count: 1, temporary } });
   if (stylePrep.kind === "refused") return stylePrep.why === "real_person" ? refused(callId, args, { kind: "prompt", why: "real_person", line: VIDEO_REFUSAL_LINE.real_person }) : refuseWith("likeness", stylePrep.line);
+  // A picture or photo never rides along with adult content of another person: refuse and end the ask just opened.
+  if (stylePrep.kind === "likeness" && stylePrep.askId && image !== undefined) { dropAsk(stylePrep.askId); return refuseWith("likeness", PHOTO_ADULT_LINE); }
   if (stylePrep.kind === "likeness" && photoLikeness && stylePrep.subjectId !== photoLikeness.subjectId) return refuseWith("likeness", "I can make something that looks like one person at a time. Use a style and a photo of the same adult, or leave one out.");
   const likeness: JobLikeness | null = stylePrep.kind === "likeness" ? { ...stylePrep.job, adult_content: stylePrep.adultContent || (photoLikeness?.adultContent ?? false) } : photoLikeness ? photoLikeness.job : null;
   if (stylePrep.kind === "likeness" && stylePrep.negativePrompt) negativePrompt = stylePrep.negativePrompt;
@@ -223,7 +225,7 @@ export async function runGenerateVideo(input: RunGenerateVideoInput): Promise<To
         callId, packageId: GENERATE_VIDEO_TOOL_ID, status: "succeeded", via: "tool_call", args, durationMs: 0,
         result: {
           reply: { text: `Nothing has been made yet. ${ASK_WAITING_LINE(stylePrep.kind === "likeness" ? stylePrep.subjectName : "They")} A card below shows them exactly what would be made, with Consent and Decline buttons. Tell the person in one or two short sentences to show that person the screen and that it starts when they say yes. You have not seen any video: do not describe how it looks.` },
-          data: { videoJobId: job.id, likenessAskId: askId },
+          data: { videoJobId: job.id },
           actions: [],
         },
       });

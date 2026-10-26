@@ -17,7 +17,9 @@ import { getPictureJob } from "@/lib/pictures/jobs";
 import { cardView } from "@/routes/pictures";
 import { runGenerateVideo } from "@/lib/videos/tool";
 import { getVideoJobFor } from "@/lib/videos/jobs";
-import { installFakeImageStack, until, type FakeImageStack } from "./pictureFixture";
+import { installFakeImageStack, until, testPng, type FakeImageStack } from "./pictureFixture";
+import { storeTemporaryChatImage } from "@/lib/attachments";
+import { __setPhotoInspectorForTests } from "@/lib/likeness/inspector";
 import { installFakeVideoStack, type FakeVideoStack } from "./videoFixture";
 import type { PersonRow } from "@/types";
 import type { ToolExecutionOutcome } from "@/lib/turnMachine/contract";
@@ -42,7 +44,14 @@ function stateFor(actor: PersonRow, temporary = false) {
   return { actor, surface: "chat", speakerEvidence: undefined, planBasis: { surfaceClass: "written" }, plan: undefined, conversationId: null, turnId: null, temporary, ephemeral: false, images: undefined, utterance: "" } as never;
 }
 const text = (outcome: ToolExecutionOutcome) => (outcome.result?.reply as { text?: string } | undefined)?.text ?? "";
-const data = (outcome: ToolExecutionOutcome) => (outcome.result?.data ?? {}) as { pictureJobId?: string; videoJobId?: string; likenessAskId?: string; refused?: string };
+// The ask id never rides in the outcome data (rule 6a); it is read from the held job, as the card does.
+const data = (outcome: ToolExecutionOutcome) => {
+  const raw = (outcome.result?.data ?? {}) as { pictureJobId?: string; videoJobId?: string; refused?: string };
+  const job = raw.pictureJobId ? getPictureJob(sage, raw.pictureJobId) : raw.videoJobId ? getVideoJobFor(sage, raw.videoJobId) : null;
+  const likenessAskId = job?.request.likeness?.ask;
+  expect((raw as Record<string, unknown>).likenessAskId).toBeUndefined();
+  return { ...raw, ...(likenessAskId ? { likenessAskId } : {}) };
+};
 const ask = (id: string) => db.select().from(likenessAsks).where(eq(likenessAsks.id, id)).get()!;
 const imageCall = (over: Record<string, unknown> = {}) => ({ state: stateFor(sage), args: { prompt: PROMPT, style: "Iris portrait", depicts_real_person: true, ...over }, callId: "c-img", spoken: false });
 
@@ -58,7 +67,7 @@ beforeEach(() => {
   __setStackTrustForTests({ ok: true });
   perUse(true);
 });
-afterEach(() => { imageStack.restore(); videoStack.restore(); __setStackTrustForTests(null); });
+afterEach(() => { __setPhotoInspectorForTests(undefined); imageStack.restore(); videoStack.restore(); __setStackTrustForTests(null); });
 
 describe("a held picture", () => {
   test("is not sent to the Stack until the pictured adult consents, then goes with a proof and no nudity negative", async () => {
@@ -188,6 +197,18 @@ describe("a held picture", () => {
 });
 
 describe("a held video", () => {
+  test("a starting picture never rides along with adult content of another person", async () => {
+    const png = await testPng();
+    storeTemporaryChatImage({ id: "photo-1", turnId: "turn-1", conversationId: "conv-1", ownerPersonId: sage.id, name: "photo.png", mediaType: "image/png", width: 64, height: 64, bytes: png });
+    __setPhotoInspectorForTests(async () => ({ people: 1, faces: 1, under18: "no" }));
+    videoStack.loras.find((l) => l.id === VID_STYLE)!.classification = "adult-only";
+    const state = { ...(stateFor(sage, true) as object), conversationId: "conv-1", turnId: "turn-1", images: [{ id: "photo-1", name: "photo.png", width: 64, height: 64, media_type: "image/png" }], utterance: "animate this photo, it is Iris" } as never;
+    const out = await runGenerateVideo({ state, args: { prompt: "gentle motion", style: "Iris motion", from_picture: "attached", photo_subject: "Iris" }, callId: "c-ph", spoken: false });
+    expect(videoStack.submitted).toHaveLength(0);
+    expect(db.select().from(likenessAsks).all().filter((r) => r.state === "waiting")).toHaveLength(0);
+    expect(typeof text(out)).toBe("string");
+  });
+
   const videoCall = () => ({ state: stateFor(sage), args: { prompt: PROMPT, style: "Iris motion", depicts_real_person: true }, callId: "c-vid", spoken: false });
 
   test("waits for the consent and then goes to the Stack with a proof", async () => {

@@ -111,6 +111,8 @@ export async function prepareStylesUse(input: Omit<StyleInput, "style" | "depict
   if (decision.needsAsk) {
     // One ask covers every style of this person the job applies; each gets its own proof on release.
     if (!input.held || input.held.temporary) return { kind: "refused", line: input.held ? ASK_TEMPORARY_LINE : LIKENESS_LINES.adult_content_other_subject };
+    // The card shows only this person's styles, so no other style may ride along unseen.
+    if (input.styles.length !== likenessStyles.length) return { kind: "refused", line: "Use only the saved style of that person for this, so they can see exactly what they are saying yes to." };
     const opened = openAsk({ subjectId: decision.subject.id, requesterId: requester.id, medium: input.medium, prompt: input.held.prompt, count: input.held.count, styleName: likenessStyles.map((s) => s.name).join(", "), styleIds: likenessStyles.map((s) => s.id), source: input.source });
     if (!opened.ok) return { kind: "refused", line: opened.line };
     return {

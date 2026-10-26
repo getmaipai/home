@@ -269,7 +269,7 @@ export async function releaseAsk(input: ReleaseInput): Promise<ReleaseResult> {
   if (why) { finish(first, "cancelled", why); return { ok: false, line: askOutcomeLine(why, subjectLabel) }; }
   const shown = new Set<string>(JSON.parse(first.styleIds) as string[]);
   const same = first.subjectPersonId === input.subjectId && first.requesterPersonId === input.requesterId && first.medium === input.medium && first.promptSha256 === promptHash(input.prompt)
-    && [...shown].every((s) => input.styleIds.includes(s)) && (first.jobId === null || first.jobId === input.jobId);
+    && input.styleIds.length === shown.size && [...shown].every((s) => input.styleIds.includes(s)) && (first.jobId === null || first.jobId === input.jobId);
   if (!same) { if (first.state === "approved") finish(first, "cancelled", "mismatch"); return { ok: false, line: askOutcomeLine("mismatch", subjectLabel) }; }
   const trust = await ensureStackTrust();
   if (!trust.ok) return { ok: false, line: trust.line };
