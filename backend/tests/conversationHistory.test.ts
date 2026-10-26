@@ -2580,7 +2580,7 @@ describe("GET /api/conversations/:id/turns (step 3: memory_ids, since)", () => {
     if (!conv.ok) throw new Error(conv.error);
     const turnId = newConversationTurnId();
     logTurn(actor, "chat", "write me a bedtime story", { reply: { text: "Starting a bedtime story now." }, source: "model", safety: SAFE, conversation_id: conv.value.id, turn_id: turnId });
-    const project = createProject({ type: "bedtime-story", title: "A bedtime story", plan: minimalPlan(), provenance: { person: actor.id, conversationId: conv.value.id, turnId, planSource: "package" } });
+    const project = createProject({ type: "bedtime-story", title: "A bedtime story", plan: minimalPlan(), provenance: { person: actor.id, conversationId: conv.value.id, turnId, companion_id: null, planSource: "package" } });
 
     const result = listConversationTurns(actor, conv.value.id);
     expect(result.ok).toBe(true);
@@ -2604,7 +2604,7 @@ describe("GET /api/conversations/:id/turns (step 3: memory_ids, since)", () => {
     if (!conv.ok) throw new Error(conv.error);
     const turnId = newConversationTurnId();
     logTurn(actor, "chat", "write me a bedtime story", { reply: { text: "Starting a bedtime story now." }, source: "model", safety: SAFE, conversation_id: conv.value.id, turn_id: turnId });
-    createProject({ type: "bedtime-story", title: "A bedtime story", plan: minimalPlan(), provenance: { person: actor.id, conversationId: conv.value.id, turnId, planSource: "package" } });
+    createProject({ type: "bedtime-story", title: "A bedtime story", plan: minimalPlan(), provenance: { person: actor.id, conversationId: conv.value.id, turnId, companion_id: null, planSource: "package" } });
     const v1 = createArtifact({ conversationId: conv.value.id, turnId, kind: "markdown", title: "A bedtime story", body: "Once upon a time.", createdBy: actor.id, provenance: "project:proj-example123" });
 
     const result = listConversationTurns(actor, conv.value.id);

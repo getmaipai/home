@@ -221,8 +221,8 @@ export function runStartProjectTool(input: RunStartProjectInput): ToolExecutionO
   }
   const plan = projectType.buildPlan(params);
   const provenance = input.temporary
-    ? { person: input.actor.id, conversationId: null, turnId: null, planSource: "package" as const }
-    : { person: input.actor.id, conversationId: input.conversationId, turnId: input.turnId, planSource: "package" as const };
+    ? { person: input.actor.id, conversationId: null, turnId: null, companion_id: null, planSource: "package" as const }
+    : { person: input.actor.id, conversationId: input.conversationId, turnId: input.turnId, companion_id: null, planSource: "package" as const };
   const project = startProject({ type: projectType.id, title: projectType.title, plan, provenance });
   if (project.state === "failed") {
     return outcomeOf({

@@ -43,7 +43,7 @@ function adult(displayName = "Sage") {
 }
 
 function provenanceFor(personId: string): ProjectProvenance {
-  return { person: personId, conversationId: null, turnId: null, planSource: "package" };
+  return { person: personId, conversationId: null, turnId: null, companion_id: null, planSource: "package" };
 }
 
 describe("the runner (text and assemble steps, resumable)", () => {
