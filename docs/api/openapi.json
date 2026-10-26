@@ -27168,6 +27168,7 @@
                               "videos",
                               "music",
                               "voice",
+                              "wakeword",
                               "coding"
                             ]
                           },
@@ -27196,6 +27197,7 @@
                                     "videos",
                                     "music",
                                     "voice",
+                                    "wakeword",
                                     "coding"
                                   ]
                                 },
@@ -27250,6 +27252,16 @@
                                 },
                                 "installedBytes": {
                                   "type": "number"
+                                },
+                                "ramBytes": {
+                                  "type": "number"
+                                },
+                                "ramBasis": {
+                                  "type": "string",
+                                  "enum": [
+                                    "estimate",
+                                    "measured"
+                                  ]
                                 },
                                 "stateText": {
                                   "type": "string"
@@ -27319,6 +27331,8 @@
                                 "failure",
                                 "downloadBytes",
                                 "installedBytes",
+                                "ramBytes",
+                                "ramBasis",
                                 "stateText",
                                 "blockedReason",
                                 "action",
@@ -27382,6 +27396,7 @@
                                   "videos",
                                   "music",
                                   "voice",
+                                  "wakeword",
                                   "coding"
                                 ]
                               },
