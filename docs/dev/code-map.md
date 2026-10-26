@@ -450,6 +450,9 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/media/ingest.ts` | fingerprintOf, isSpokenGenre, bookPathHints, draftsForDirectory, folderFingerprint |
 | `backend/src/lib/media/items.ts` | KINDS, visibleSourceIds, listItems, linkedItems, itemDetail, listGroups |
 | `backend/src/lib/media/kinds.ts` | VIDEO_TYPES, AUDIO_TYPES, BOOK_TYPES, IMAGE_TYPES, classOfExtension, mediaTypeOfExtension |
+| `backend/src/lib/media/lyricsAction.ts` | lookupLyricsFor |
+| `backend/src/lib/media/lyricsLookup.ts` | lrclibUrl, parseSyncedLyrics, lookupLyrics |
+| `backend/src/lib/media/lyricsReceipts.ts` | hasReceipt, recordReceipt, isPaused, recordRefusal, recordSuccess |
 | `backend/src/lib/media/model.ts` | itemFromRow, itemToRow, MADE_SOURCE_PREFIX, LEGACY_MADE_SOURCE_PREFIX, madeSourceId, sourceFromRow |
 | `backend/src/lib/media/music.ts` | albumKey, artistKey, albumOrder, groupTracks, radioTracks, shuffled |
 | `backend/src/lib/media/parsers/audioTags.ts` | explicitFromNative, tagsFromMetadata, readSidecarLyrics, readAudioTags, readEmbeddedCover |
