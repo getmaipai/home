@@ -75,10 +75,10 @@ export const PICTURE_SETTINGS_KEYS: SettingsKey[] = [
       does: "Decides how chat makes a picture when nobody asks for a kind.",
       options: {
         quick: "A few seconds a picture, best for most requests.",
-        detailed: "About 15 to 30 seconds a picture, with finer detail and more styles.",
+        detailed: "Slower, with finer detail and more looks to add.",
       },
     },
-    lives_in: "household.pictures",
+    lives_in: "household.ai_pictures",
     honoured_by: ["home"],
   }),
   // PEOPLE-PROMPTS-01 (owner ruling 2026-10-17: "it's annoying"): the extra questions and warnings about people in pictures and videos

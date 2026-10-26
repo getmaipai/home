@@ -20,7 +20,7 @@ export const MUSIC_SETTINGS_KEYS: SettingsKey[] = [
     help: "Adults can ask chat to write and make songs, and change them. Children and teens cannot, whatever this says.",
     level: "basic",
     copy: { does: "Turns song making on or off for the grown-ups here." },
-    lives_in: "household.pictures",
+    lives_in: "household.ai_music",
     honoured_by: ["home"],
   }),
   SettingsKey.parse({

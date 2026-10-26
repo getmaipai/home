@@ -54,7 +54,7 @@ export const VIDEO_SETTINGS_KEYS: SettingsKey[] = [
         detailed: "A clip up to 10 seconds with sound and speech, made from words, with many more styles.",
       },
     },
-    lives_in: "household.pictures",
+    lives_in: "household.ai_videos",
     honoured_by: ["home"],
   }),
 ];
