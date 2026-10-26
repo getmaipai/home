@@ -245,11 +245,6 @@ export function newVideoJobId(): string {
   return `vid-${randomSuffix(10)}`;
 }
 
-// The saved style subject binding is the remaining likeness record.
-export function newLikenessAdapterId(): string {
-  return `la-${randomSuffix(10)}`;
-}
-
 // MEDIA-LIB-01 / MEDIA-PROGRESS-01: the four media records (spec MediaItem, MediaSource, MediaProgress, MediaCollection).
 export function newMediaItemId(): string {
   return `media-${randomSuffix(10)}`;

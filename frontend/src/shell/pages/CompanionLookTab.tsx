@@ -1,10 +1,9 @@
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { Alert, AlertDescription } from "@maipai/ui/src/ui/alert";
 import { Badge } from "@maipai/ui/src/dashboard/components/ui/badge";
 import { Button } from "@maipai/ui/src/ui/button";
-import { Checkbox } from "@maipai/ui/src/ui/checkbox";
+import { Alert, AlertDescription } from "@maipai/ui/src/ui/alert";
 import { Input } from "@maipai/ui/src/ui/input";
 import { Label } from "@maipai/ui/src/ui/label";
 import { Textarea } from "@maipai/ui/src/ui/textarea";
@@ -29,8 +28,6 @@ export function CompanionLookTab({ id, prompt, promptError, onPromptChange, acti
   const jobQuery = useQuery<CompanionLookJob>({ queryKey: [...queryKey(id), "job", jobId], queryFn: () => api.companionLookJob(id, jobId!), enabled: active && jobId !== null, retry: false, refetchInterval: (q) => q.state.data?.state === "queued" || q.state.data?.state === "running" || q.state.data === undefined ? 1500 : false });
   const [formOpen, setFormOpen] = useState(false);
   const [file, setFile] = useState<File | null>(null);
-  const [rights, setRights] = useState(false);
-  const [realPerson, setRealPerson] = useState(false);
   const [editId, setEditId] = useState<string | null>(null);
   const [instruction, setInstruction] = useState("");
   const [cardText, setCardText] = useState("");
@@ -47,7 +44,7 @@ export function CompanionLookTab({ id, prompt, promptError, onPromptChange, acti
   useEffect(() => { if (data?.sheet?.card) setCardText(data.sheet.card.text); }, [data?.sheet?.card]);
   async function perform(action: () => Promise<unknown>) { setError(""); setNotice(""); setBusy(true); try { await action(); await client.invalidateQueries({ queryKey: queryKey(id) }); } catch (e) { setError(errorText(e)); } finally { setBusy(false); } }
   async function startJob(action: () => Promise<{ job: string }>) { setError(""); try { setJobId((await action()).job); } catch (e) { setError(errorText(e)); } }
-  async function upload() { if (!file || !rights || realPerson) return; const body = new FormData(); body.append("image", file); body.append("rights_confirmed", "true"); body.append("shows_real_person", "false"); await perform(async () => { await api.uploadCompanionLook(id, body); setFormOpen(false); setFile(null); setRights(false); }); }
+  async function upload() { if (!file) return; const body = new FormData(); body.append("image", file); await perform(async () => { await api.uploadCompanionLook(id, body); setFormOpen(false); setFile(null); }); }
   async function copyPrompt() {
     setCopyFallback("");
     try {
@@ -63,7 +60,7 @@ export function CompanionLookTab({ id, prompt, promptError, onPromptChange, acti
   return <div className="flex flex-col gap-4">
     <Section heading="Look prompt"><div className="flex flex-col gap-2"><p className="text-sm text-muted-foreground">Describe how the character looks: species, colours, clothes. Keep it simple and friendly.</p><Label htmlFor="look-prompt">Look prompt ({prompt.length}/600)</Label><Textarea id="look-prompt" aria-label="Look prompt" aria-invalid={Boolean(promptError)} maxLength={600} value={prompt} onChange={(e) => onPromptChange(e.target.value)} />{promptError ? <p role="alert" className="text-sm text-destructive">{promptError}</p> : null}</div></Section>
     <Section heading="Start"><div className="flex flex-wrap gap-2"><Button disabled={running || busy || !prompt.trim() || !data.can_generate} onClick={() => void startJob(() => api.generateCompanionLook(id, { prompt, count: 4 }))}>Generate 4 pictures</Button><Button type="button" variant="outline" disabled={running || busy} onClick={() => setFormOpen((v) => !v)}>Upload a picture</Button><Button type="button" variant="outline" onClick={() => void copyPrompt()}>Copy prompt</Button></div>{copyFallback ? <div className="flex flex-col gap-2"><Label htmlFor="copy-picture-prompt">Copy this text yourself.</Label><Textarea id="copy-picture-prompt" readOnly value={copyFallback} onFocus={(event) => event.currentTarget.select()} /></div> : null}{!data.can_generate && data.generate_reason ? <p className="text-sm text-muted-foreground">{data.generate_reason}</p> : null}{!prompt.trim() ? <p className="text-sm text-muted-foreground">Write a look prompt before generating pictures.</p> : null}
-      {formOpen ? <div className="flex flex-col gap-3"><div className="flex flex-col gap-1"><Label htmlFor="look-upload">Picture (PNG, JPEG or WebP)</Label><Input id="look-upload" type="file" accept="image/png,image/jpeg,image/webp" disabled={running || busy} onChange={(e) => setFile(e.target.files?.[0] ?? null)} /></div><div className="flex items-center gap-2"><Checkbox id="look-rights" checked={rights} disabled={running || busy} onCheckedChange={(v) => setRights(v === true)} /><Label htmlFor="look-rights">I made this picture or have the right to use it</Label></div><div className="flex items-center gap-2"><Checkbox id="look-real-person" checked={realPerson} disabled={running || busy} onCheckedChange={(v) => setRealPerson(v === true)} /><Label htmlFor="look-real-person">This is a picture of a real person</Label></div>{realPerson ? <Alert><AlertDescription>Pictures of real people are not supported here yet. Use a drawing or a character instead.</AlertDescription></Alert> : null}<Button disabled={!file || !rights || realPerson || running || busy} onClick={() => void upload()}>Upload</Button></div> : null}
+      {formOpen ? <div className="flex flex-col gap-3"><div className="flex flex-col gap-1"><Label htmlFor="look-upload">Picture (PNG, JPEG or WebP)</Label><Input id="look-upload" type="file" accept="image/png,image/jpeg,image/webp" disabled={running || busy} onChange={(e) => setFile(e.target.files?.[0] ?? null)} /></div><Button disabled={!file || running || busy} onClick={() => void upload()}>Upload</Button></div> : null}
     </Section>
     {running ? <Section heading="Picture progress"><p>{job?.label ?? "Starting picture"}</p><Progress value={job?.percent ?? 0} aria-label={job?.label ?? "Picture progress"} /><Button variant="outline" onClick={() => void perform(async () => { await api.cancelCompanionLookJob(id, jobId!); setJobId(null); })}>Stop</Button></Section> : null}
     <Section heading="Pictures">

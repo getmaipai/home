@@ -19,7 +19,8 @@ another, or make it again as the other kind.
 
 ## Who can make videos
 
-Adults, on their own screen, in a written chat. Children and teens cannot.
+Adults and teens can make videos in a written chat on their own screen.
+Children can make short cartoon videos when the family has them enabled.
 Spoken answers and shared screens never make videos.
 
 ## What it needs
@@ -29,11 +30,11 @@ and videos. It needs a Mac with 128 GB of memory.
 
 ## Safety
 
-Nothing sexual that shows a child or anyone who looks like one. Nothing
-sexual that shows a real person. Adults may ask for non-sexual videos of
-real, public or historical people, including satire, scenes and humor.
-Home refuses video requests from children and teens. Only a picture that
-chat made can be animated, never a photo you uploaded.
+Home blocks CSAM. The model decides whether to make other adult content and
+may refuse under its own rules. Children and teens keep their age-specific
+content filters. Home also applies age and surface access rules. An uploaded
+photo is screened for CSAM and age-specific media rules before it is sent to
+the video model. Home does not identify the people in it.
 
 ## Offline
 

@@ -1,15 +1,12 @@
-// PEOPLE-PROMPTS-01 and KIDS-CREATE-01 (owner rulings, 2026-10-17): who makes what, and how much Home says about it.
+// KIDS-CREATE-01 (owner ruling, 2026-10-17): who makes what.
 //
 // Three lanes, decided by the stricter of the turn's band and the person's own band (never the looser):
-//   - adult: pictures and videos with no filter beyond the absolute lines (policy.ts, minorLine.ts);
-//   - teen:  pictures, videos and edits too, with nothing adult or sexual: the prompt gate and the finished-picture check refuse it
-//            in ONE short plain line, adult-only styles are never offered, another household adult's likeness follows the household setting;
+//   - adult: content is decided by the model, with Home's CSAM prevention checks;
+//   - teen:  pictures, videos and edits too, with age-based content filtering and the finished-picture check; adult-only styles are never offered;
 //   - child: a strict lane of cartoon pictures and videos of safe things: a child-safe topic gate on the words, the cartoon look forced,
-//            Quick only, no photos, no references, no real people, edits only of their own generated cartoons, a daily limit, and a
+//            Quick only, no photos, no references, edits only of their own generated cartoons, a daily limit, and a
 //            child-safety check on every finished picture or clip that fails closed.
-// None of these lanes makes the absolute lines optional, and no setting reaches them. The one friction setting
-// (`generation.people_prompts`) touches only the adult lane: a teen or a child never gets hedging, lecturing, a clarifying question with a
-// safe default or an extra confirmation.
+// CSAM prevention applies across lanes.
 import { CHILD_UNSAFE_TERMS, CHILD_IP_NAMES } from "@/lib/contentPolicy";
 export { CHILD_UNSAFE_TERMS, CHILD_IP_NAMES } from "@/lib/contentPolicy";
 import { speakerAgeBand, type AgeBand } from "@/lib/ageBand";
@@ -93,7 +90,7 @@ export function teenPromptUnsafe(text: string): boolean {
 /** Put in front of every child prompt (a child never sees it): the look is forced, not asked for. */
 export const CHILD_PROMPT_PREFIX = "A friendly, colourful children's cartoon illustration, flat shapes and soft outlines, clearly drawn and not a photograph, safe for young children: ";
 /** What the child lane steers the engine away from, whatever the words say. */
-export const CHILD_NEGATIVE_PROMPT = "photograph, photorealistic, realistic, real person, real face, celebrity, logo, brand, text, watermark, nude, naked, nsfw, sexual, violence, blood, gore, weapon, scary, horror, drugs, alcohol, cigarette";
+export const CHILD_NEGATIVE_PROMPT = "photograph, photorealistic, realistic, logo, brand, text, watermark, nude, naked, nsfw, sexual, violence, blood, gore, weapon, scary, horror, drugs, alcohol, cigarette";
 
 export function forceCartoon(prompt: string): string {
   return `${CHILD_PROMPT_PREFIX}${prompt.trim()}`;

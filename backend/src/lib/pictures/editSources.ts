@@ -1,74 +1,26 @@
-// IMGEDIT-01 (built on LIKENESS-01): what a picture the person wants changed is, as far as the Stack must be told, and
-// whether it may be changed at all. One function for every door into a generative edit (the editor's Comment, the chat
-// tool): the picture is one this home made (its own), one made to look like a household adult (decided again against
-// current settings), an upload that shows no one (checked by the household's own picture-reading model), or an upload that shows
-// exactly one household adult (named by the person, checked, and given a signed proof). Anything else is
-// refused with a sentence that says what to do. Nothing here asks the Stack; the caller attaches the answer to its request.
-import { preparePhotoUse } from "@/lib/likeness/apply";
-import { inspectPhotoResult, PHOTO_LINES, photoShowsNoPerson, singleAdultPhoto } from "@/lib/likeness/inspector";
-import { asksToUndress } from "./policy";
-import { TEEN_CONTENT_LINE, laneOf, noteTeenPhotoEdit } from "./lane";
-import { subjectEligibility } from "@/lib/likeness/resolve";
-import type { JobLikeness } from "@/lib/likeness/guard";
-import type { UseSource } from "@/lib/likeness/apply";
+// Source validation for generative edits. Home checks uploaded pixels for the
+// CSAM boundary and applies the child's own-photo rule; it does not classify
+// or gate a photo because of the person's identity or likeness.
 import type { PictureAudience } from "./policy";
 import { screenInputImage, viewerOf } from "./ageCheck";
 
-export type EditImageSource = "generated" | "uploaded" | "household_photo";
+export type EditImageSource = "generated" | "uploaded";
 
 export interface PrepareEditSourceInput {
   audience: PictureAudience;
   bytes: Uint8Array;
-  /** The picture is one this home's picture engine made (Home marked it so; a file name proves nothing). */
   generated: boolean;
-  /** The household adult a generated picture was made to look like, from its provenance, or null. */
-  rootLikeness: string | null;
-  /** The household adult the person says an upload shows (already resolved to an id), or null. */
-  declaredSubjectId: string | null;
-  /** Everything the person asked for in words (a teen's own-photo edit is read for undressing). */
   text: string;
-  source: UseSource;
 }
 
 export type EditSourcePrep =
-  | { ok: true; imageSource: EditImageSource; proof?: string; likeness?: JobLikeness; subjectId: string | null }
-  | { ok: false; status: 403 | 422; code: string; line: string };
-
-export const TEEN_PHOTO_LINE = "That photo doesn't look like it is of you. I only change a photo of yourself that you upload. Try another photo of you.";
-export const SUBJECT_NOT_ALLOWED_LINE = "I can only change a photo of a living adult who lives in this household. Choose that adult from the list, or a photo with no one in it.";
+  | { ok: true; imageSource: EditImageSource }
+  | { ok: false; status: 422; code: string; line: string };
 
 export async function prepareEditSource(input: PrepareEditSourceInput): Promise<EditSourcePrep> {
-  // A picture this home did not make is screened before anything else is asked of it (ageCheck.screenInputImage).
-  if (!input.generated && !input.rootLikeness) {
+  if (!input.generated) {
     const screen = await screenInputImage(input.bytes, input.text, viewerOf(input.audience.actor, input.audience.band));
     if (!screen.ok) return { ok: false, status: 422, code: screen.code, line: screen.line };
   }
-  // A teen's own photo: allowed for a non-sexual edit (the words and the finished picture are checked elsewhere). Exactly one person, one face, and
-  // the teen said it is them; no proof and no household person is involved, and nobody else's likeness is ever made this way.
-  if (input.declaredSubjectId && input.declaredSubjectId === input.audience.actor.id && laneOf(input.audience) === "teen") {
-    if (asksToUndress(input.text)) return { ok: false, status: 422, code: "refused_real_person", line: TEEN_CONTENT_LINE };
-    const { facts, line } = await inspectPhotoResult(input.bytes);
-    if (!facts) return { ok: false, status: 422, code: "photo_check_unavailable", line: line ?? PHOTO_LINES.unreadable };
-    if (facts.people !== 1 || facts.faces !== 1) return { ok: false, status: 422, code: "photo_not_single_adult", line: PHOTO_LINES.count };
-    // "It's me" is the teen's word, and a word is not a proof (lane review, 2026-10-17): the photo must also plausibly show someone of a teen's age, so a
-    // stranger's adult photo cannot be claimed. "unsure" is not enough. Either way the edit is in the admins' activity list.
-    if (facts.under18 !== "yes") { noteTeenPhotoEdit(input.audience.actor, input.text, "withheld"); return { ok: false, status: 422, code: "photo_not_teen", line: TEEN_PHOTO_LINE }; }
-    noteTeenPhotoEdit(input.audience.actor, input.text, "asked");
-    return { ok: true, imageSource: "uploaded", subjectId: null };
-  }
-  const declared = input.rootLikeness ?? input.declaredSubjectId;
-  if (!declared && input.generated) return { ok: true, imageSource: "generated", subjectId: null };
-  if (!declared) {
-    const verdict = await photoShowsNoPerson(input.bytes);
-    if (!verdict.ok) return { ok: false, status: 422, code: verdict.reason === "unavailable" ? "photo_check_unavailable" : "photo_has_person", line: verdict.line };
-    return { ok: true, imageSource: "uploaded", subjectId: null };
-  }
-  if (!subjectEligibility(declared).ok) return { ok: false, status: 422, code: "subject_not_allowed", line: SUBJECT_NOT_ALLOWED_LINE };
-  if (!input.rootLikeness) {
-    const verdict = await singleAdultPhoto(input.bytes);
-    if (!verdict.ok) return { ok: false, status: 422, code: verdict.reason === "unavailable" ? "photo_check_unavailable" : "photo_not_single_adult", line: verdict.line };
-  }
-  const prep = await preparePhotoUse({ medium: "picture", audience: input.audience, declaredSubjectId: declared, bytes: input.bytes, source: input.source });
-  if (prep.kind === "refused") return { ok: false, status: 403, code: "likeness_refused", line: prep.line };
-  return { ok: true, imageSource: "household_photo", proof: prep.proof, likeness: prep.job, subjectId: prep.subjectId };
+  return { ok: true, imageSource: input.generated ? "generated" : "uploaded" };
 }

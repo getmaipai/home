@@ -15,7 +15,8 @@ picture appears in the chat. Tap Edit to change a part of it.
 
 ## Who can make pictures
 
-Adults, on their own screen, in a written chat. Children and teens cannot.
+Adults and teens can make pictures in a written chat on their own screen.
+Children can make friendly cartoon pictures when the family has them enabled.
 Spoken answers and shared screens never make pictures.
 
 ## What it needs
@@ -25,10 +26,9 @@ and videos.
 
 ## Safety
 
-Nothing sexual that shows a child or anyone who looks like one. Nothing
-sexual that shows a real person. Adults may ask for non-sexual pictures of
-real, public or historical people, including satire, scenes and humor.
-Home refuses picture requests from children and teens.
+Home blocks CSAM. The model decides whether to make other adult content and
+may refuse under its own rules. Children and teens keep their age-specific
+content filters. Home also applies age and surface access rules.
 
 ## Offline
 

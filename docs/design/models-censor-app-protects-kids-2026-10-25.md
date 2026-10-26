@@ -1,5 +1,7 @@
 # Models censor, the app filters only to protect kids (2026-10-25)
 
+Superseded on 2026-10-26 by [adult-content-model-decides-2026-10-26.md](adult-content-model-decides-2026-10-26.md) for adult content blocks beyond CSAM. Child and teen protections and non-content security protections remain.
+
 Status: owner ruling, recorded; architect verdict below. Design and rules only; no code. Items: MODELS-CENSOR-01 to 05 in `docs/BACKLOG.md`.
 
 Jesse, 2026-10-25, chat: "we will let the models do that" (on who decides what an adult may make), then: "review and update all our rules as

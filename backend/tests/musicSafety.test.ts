@@ -65,22 +65,20 @@ describe("the absolute lines before a job exists", () => {
     expect(refuseMusicPrompt("a song about children making pancakes")).toBeNull();
     expect(refuseMusicPrompt("a sexy song about adults")).toBeNull();
   });
-  test("a real voice flag refuses generation and every edit, with no singer-name word list", async () => {
-    expect(refuseMusicPrompt("an original folk voice", { imitatesRealVoice: true })).toBe("real_voice");
-    for (const run of [runGenerateMusic, runEditMusic]) {
-      const result = await run({ state: musicState(people.owner, true), args: { description: "a jazz song", track: "latest", change: "remake", imitates_real_voice: true }, callId: "v", spoken: false });
-      expect(result.result?.reply?.text).toContain(MUSIC_REFUSAL_LINE.real_voice);
-    }
-    expect(fake.submitted).toHaveLength(0);
+  test("voice imitation is left to the model for generation and edits", async () => {
+    expect(refuseMusicPrompt("an original folk voice")).toBeNull();
+    const result = await runGenerateMusic({ state: musicState(people.owner, true), args: { description: "a jazz song in a famous singer's voice" }, callId: "v", spoken: false });
+    expect(result.result?.reply?.text).toContain("started");
+    expect(fake.submitted).toHaveLength(1);
   });
-  test("the policy node refuses forged calls for both tools when gated, including the voice and minor lines", async () => {
+  test("the policy node gates both tools and keeps the minor line", async () => {
     for (const tool of ["generate_music", "edit_music"]) {
       const state = musicState(people.owner, true);
       state.musicAllowed = false; state.musicEditAllowed = false;
       let result = await policyNode(state, { calls: [{ id: "c", tool, args: { description: "a folk tune" } }] }, new AbortController().signal);
       expect(result.output.entries[0]?.decision).toEqual({ allow: false, reason: "music_not_here" });
       state.musicAllowed = true; state.musicEditAllowed = true;
-      for (const [args, reason] of [[{ description: "a folk tune", imitates_real_voice: true }, "music_refused_voice"], [{ lyrics: "naked child" }, "music_refused_minor"]] as const) {
+      for (const [args, reason] of [[{ lyrics: "naked child" }, "music_refused_minor"]] as const) {
         result = await policyNode(state, { calls: [{ id: "c", tool, args }] }, new AbortController().signal);
         expect(result.output.entries[0]?.decision).toEqual({ allow: false, reason });
       }

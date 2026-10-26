@@ -37,12 +37,11 @@ export function musicDenial(audience: MusicAudience): MusicDenial | null {
   return musicViewDenial(audience) ?? (householdAllowsMusic() ? null : "household_off");
 }
 export function musicsAllowed(audience: MusicAudience): boolean { return musicDenial(audience) === null; }
-export type MusicRefusal = "minor_sexual" | "real_voice";
+export type MusicRefusal = "minor_sexual";
 export const MUSIC_REFUSAL_LINE: Record<MusicRefusal, string> = {
   minor_sexual: "I can't make that. Songs with sexual content about children are never allowed.",
-  real_voice: "I can't make a song that copies a real person's voice. I can make one in a similar style with an original voice instead.",
 };
-export function refuseMusicPrompt(text: string, flags: { imitatesRealVoice?: boolean } = {}): MusicRefusal | null {
-  if (promptViolatesMinorLine(text)) return "minor_sexual";
-  return flags.imitatesRealVoice === true ? "real_voice" : null;
+export function refuseMusicPrompt(text: string): MusicRefusal | null {
+  if (promptViolatesMinorLine(text, "adult")) return "minor_sexual";
+  return null;
 }

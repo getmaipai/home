@@ -86,12 +86,11 @@ export function stackAudienceFor(input: VideoAudience): "all-ages" | "adult" {
 
 export const VIDEO_REFUSAL_LINE: Record<PromptRefusal, string> = {
   minor_sexual: "I can't make that. Videos of children in sexual situations are never allowed.",
-  real_person: "I won't make sexual videos of a real person, because they can't agree to it. I can make one of an invented person or a character instead.",
   teen_content: TEEN_CONTENT_LINE,
   child_content: CHILD_CONTENT_LINE,
 };
 
-/** The prompt-level refusal, or null when the request may proceed. The minor line is the picture policy's check (one list), applied to the clip's prompt for everyone. `depictsRealPerson` is the model's own statement in the tool call; there is no word list of names. */
-export function refuseVideoPrompt(prompt: string, flags: { depictsRealPerson?: boolean; lane?: Lane } = {}): PromptRefusal | null {
+/** The prompt-level refusal, or null when the request may proceed. */
+export function refuseVideoPrompt(prompt: string, flags: { lane?: Lane } = {}): PromptRefusal | null {
   return refusePrompt(prompt, flags);
 }

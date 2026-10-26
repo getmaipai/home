@@ -18,7 +18,7 @@ import { CHILD_CONTENT_LINE, laneOf, markKidWithheld, type Lane } from "./lane";
 export interface ChildSafetyVerdict {
   is_cartoon: boolean;
   looks_like_photo: boolean;
-  real_person_or_brand: boolean;
+  brand_or_licensed_character: boolean;
   violent_or_scary: boolean;
   sexual_or_romantic: boolean;
   weapons_drugs_or_alcohol: boolean;
@@ -32,9 +32,9 @@ export const CHILD_SAFETY_SCHEMA = {
   schema: {
     type: "object",
     additionalProperties: false,
-    required: ["is_cartoon", "looks_like_photo", "real_person_or_brand", "violent_or_scary", "sexual_or_romantic", "weapons_drugs_or_alcohol", "confidence"],
+    required: ["is_cartoon", "looks_like_photo", "brand_or_licensed_character", "violent_or_scary", "sexual_or_romantic", "weapons_drugs_or_alcohol", "confidence"],
     properties: {
-      is_cartoon: { type: "boolean" }, looks_like_photo: { type: "boolean" }, real_person_or_brand: { type: "boolean" },
+      is_cartoon: { type: "boolean" }, looks_like_photo: { type: "boolean" }, brand_or_licensed_character: { type: "boolean" },
       violent_or_scary: { type: "boolean" }, sexual_or_romantic: { type: "boolean" }, weapons_drugs_or_alcohol: { type: "boolean" },
       confidence: { type: "number", minimum: 0, maximum: 1 },
     },
@@ -45,12 +45,12 @@ export const CHILD_SAFETY_SYSTEM_PROMPT = [
   "You are a safety classifier inside a family's private home computer. You are given ONE image that was made for a young child. Answer with a single JSON object and nothing else.",
   "Never describe the image, never name anyone, and never refuse: only classify.",
   "is_cartoon is true only when the image is clearly a drawn, painted or animated cartoon or illustration in a friendly style. looks_like_photo is true when it looks like a photograph or a realistic render.",
-  "real_person_or_brand is true when a real, recognisable person, a celebrity, a logo or a brand or a famous licensed character appears. violent_or_scary is true for violence, blood, gore, fear, horror or menace.",
+  "brand_or_licensed_character is true when a logo, brand or famous licensed character appears. Do not classify people or likenesses. violent_or_scary is true for violence, blood, gore, fear, horror or menace.",
   "sexual_or_romantic is true for anything nude, sexual, romantic or suggestive. weapons_drugs_or_alcohol is true when a weapon, a drug, alcohol or tobacco appears.",
   "When unsure, answer the unsafe way. confidence is your confidence in the whole answer, from 0 to 1.",
 ].join(" ");
 
-const FLAGS = ["is_cartoon", "looks_like_photo", "real_person_or_brand", "violent_or_scary", "sexual_or_romantic", "weapons_drugs_or_alcohol"] as const;
+const FLAGS = ["is_cartoon", "looks_like_photo", "brand_or_licensed_character", "violent_or_scary", "sexual_or_romantic", "weapons_drugs_or_alcohol"] as const;
 export const MIN_CHILD_CONFIDENCE = 0.5;
 
 export function parseChildSafety(text: string): ChildSafetyVerdict | null {
@@ -66,7 +66,7 @@ export function parseChildSafety(text: string): ChildSafetyVerdict | null {
   for (const flag of FLAGS) if (typeof o[flag] !== "boolean") return null;
   if (typeof o.confidence !== "number" || !Number.isFinite(o.confidence)) return null;
   return {
-    is_cartoon: o.is_cartoon as boolean, looks_like_photo: o.looks_like_photo as boolean, real_person_or_brand: o.real_person_or_brand as boolean,
+    is_cartoon: o.is_cartoon as boolean, looks_like_photo: o.looks_like_photo as boolean, brand_or_licensed_character: o.brand_or_licensed_character as boolean,
     violent_or_scary: o.violent_or_scary as boolean, sexual_or_romantic: o.sexual_or_romantic as boolean, weapons_drugs_or_alcohol: o.weapons_drugs_or_alcohol as boolean,
     confidence: Math.max(0, Math.min(1, o.confidence)),
   };
@@ -76,7 +76,7 @@ export function parseChildSafety(text: string): ChildSafetyVerdict | null {
 export function childSafetyOk(check: ChildSafetyCheck): boolean {
   if (!check.ok) return false;
   const v = check.verdict;
-  return v.is_cartoon && !v.looks_like_photo && !v.real_person_or_brand && !v.violent_or_scary && !v.sexual_or_romantic && !v.weapons_drugs_or_alcohol && v.confidence >= MIN_CHILD_CONFIDENCE;
+  return v.is_cartoon && !v.looks_like_photo && !v.brand_or_licensed_character && !v.violent_or_scary && !v.sexual_or_romantic && !v.weapons_drugs_or_alcohol && v.confidence >= MIN_CHILD_CONFIDENCE;
 }
 
 let runnerForTests: ((images: readonly Uint8Array[]) => Promise<ChildSafetyCheck[]>) | null = null;

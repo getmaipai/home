@@ -98,14 +98,14 @@ describe("song covers", () => {
     expect(getPictureJob(actor, done.coverJobId!)).toMatchObject({ purpose: "cover" });
     expect(db.select().from(attachments).where(eq(attachments.id, done.coverFileId!)).get()).toMatchObject({ conversationId: job.conversationId });
   });
-  test("a stored real-person flag withholds the cover", async () => {
+  test("a voice imitation request does not withhold the cover", async () => {
     const { actor } = await owner(); setHouseholdSettingValue("generation.adults", false);
     const job = await song(actor); setHouseholdSettingValue("generation.adults", true);
-    job.request = { ...job.request, imitates_real_voice: true };
+    job.request = { ...job.request, description: "a cover in the original singer's voice" };
     saveMusicJob(job);
     await startSongCover(actor, getMusicJobFor(actor, job.id)!);
-    expect(pictures.submitted).toHaveLength(0);
-    expect(getMusicJobFor(actor, job.id)?.coverJobId).toBeNull();
+    expect(pictures.submitted).toHaveLength(1);
+    expect(getMusicJobFor(actor, job.id)?.coverJobId).not.toBeNull();
   });
   test("New cover explains when the song is still being made", async () => {
     const { actor, client } = await owner(); music.pollsToFinish = 1000;

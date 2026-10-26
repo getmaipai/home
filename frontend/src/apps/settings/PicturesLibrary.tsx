@@ -19,8 +19,6 @@ import { Item, ItemActions, ItemContent, ItemDescription, ItemFooter, ItemGroup,
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@maipai/ui/src/dashboard/components/ui/alert-dialog";
 import { ApiError } from "@/lib/api";
 import { picturesAdminApi, type AdminAdapter, type AdminOverview } from "@/lib/picturesApi";
-import { LooksLikePicker, NOBODY } from "@/apps/settings/LooksLikePicker";
-import { SettingsRenderer } from "@/shell/pages/settings/SettingsRenderer";
 
 const OVERVIEW_KEY = ["pictures-admin"] as const;
 /** Home takes a request body of at most 128 MiB (the server's own limit); a bigger style comes by its Hugging Face link. */
@@ -160,7 +158,7 @@ function WhoMakesPicturesSection({ overview }: { overview: AdminOverview }) {
           </Item>
         ))}
       </ItemGroup>
-      <p className="text-sm text-muted-foreground">Adults are switched on or off in the settings above. Nothing here ever allows a picture that is sexual and shows a child, or anyone who looks like one.</p>
+      <p className="text-sm text-muted-foreground">Adults are switched on or off in the settings above. Home blocks CSAM and keeps the child and teen safeguards in place.</p>
     </section>
   );
 }
@@ -184,7 +182,7 @@ function StyleRow({ a, refresh, setError }: { a: AdminAdapter; refresh: () => vo
         <ItemContent>
           <ItemTitle>{a.name} <Badge variant={a.classification === "adult-only" ? "destructive" : "secondary"}>{a.classification === "adult-only" ? "Adults only" : "All ages"}</Badge></ItemTitle>
           <ItemDescription clamp={false}>
-            {a.licence} · {size(a.bytes)} · made for {kindOfModel(a.base_model).toLowerCase()}{a.trigger_words.length ? ` · adds: ${a.trigger_words.join(", ")}` : ""}{a.looks_like ? ` · looks like ${a.looks_like.name}` : ""}
+            {a.licence} · {size(a.bytes)} · made for {kindOfModel(a.base_model).toLowerCase()}{a.trigger_words.length ? ` · adds: ${a.trigger_words.join(", ")}` : ""}
           </ItemDescription>
           {a.needs_confirmation ? (
             <Alert>
@@ -232,7 +230,6 @@ function AddStyle({ refresh }: { refresh: () => void }) {
   const [read, setRead] = useState(false);
   const [allAges, setAllAges] = useState<"yes" | "no" | "unsure">("unsure");
   const [words, setWords] = useState("");
-  const [looksLike, setLooksLike] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [job, setJob] = useState<string | null>(null);
@@ -252,7 +249,6 @@ function AddStyle({ refresh }: { refresh: () => void }) {
     form.append("licence_acknowledged", read ? "true" : "false");
     form.append("all_ages", allAges);
     form.append("trigger_words", words);
-    form.append("looks_like", looksLike);
     if (source === "link") form.append("url", url.trim());
     else if (source === "path") form.append("path", path.trim());
     else if (file) form.append("file", file, file.name);
@@ -260,7 +256,7 @@ function AddStyle({ refresh }: { refresh: () => void }) {
       const reply = await picturesAdminApi.addAdapter(form);
       if ("job" in reply) setJob(reply.job);
       else { refresh(); }
-      setName(""); setUrl(""); setFile(null); setPath(""); setLicence(""); setRead(false); setWords(""); setLooksLike(""); setAllAges("unsure");
+      setName(""); setUrl(""); setFile(null); setPath(""); setLicence(""); setRead(false); setWords(""); setAllAges("unsure");
     } catch (e) { setError(messageOf(e, "The style could not be added. Check that the engine is running, then try again.")); }
     finally { setBusy(false); }
   }
@@ -274,9 +270,9 @@ function AddStyle({ refresh }: { refresh: () => void }) {
           <Input id="style-name" value={name} onChange={(e) => setName(e.target.value)} placeholder="Ink wash" required maxLength={80} disabled={busy} />
         </div>
         <RadioGroup value={source} onValueChange={(v) => setSource(v as "link" | "file" | "path")} aria-label="Where the style is">
-          <div className="flex items-center gap-2"><RadioGroupItem value="link" id="style-src-link" disabled={looksLike !== "" && looksLike !== NOBODY} /><Label htmlFor="style-src-link">Hugging Face link</Label></div>
+          <div className="flex items-center gap-2"><RadioGroupItem value="link" id="style-src-link" /><Label htmlFor="style-src-link">Hugging Face link</Label></div>
           <div className="flex items-center gap-2"><RadioGroupItem value="file" id="style-src-file" /><Label htmlFor="style-src-file">A file from this computer</Label></div>
-          <div className="flex items-center gap-2"><RadioGroupItem value="path" id="style-src-path" disabled={looksLike !== "" && looksLike !== NOBODY} /><Label htmlFor="style-src-path">A file already on this computer (for big files)</Label></div>
+          <div className="flex items-center gap-2"><RadioGroupItem value="path" id="style-src-path" /><Label htmlFor="style-src-path">A file already on this computer (for big files)</Label></div>
         </RadioGroup>
         {source === "link" ? (
           <div className="flex flex-col gap-2">
@@ -313,13 +309,11 @@ function AddStyle({ refresh }: { refresh: () => void }) {
           <Label htmlFor="style-words">Words that switch the style on (optional, separated by commas)</Label>
           <Input id="style-words" value={words} onChange={(e) => setWords(e.target.value)} maxLength={400} disabled={busy} />
         </div>
-        <LooksLikePicker id="style-looks-like" label="Who does this style look like?" value={looksLike} onChange={(v) => { setLooksLike(v); if (v !== NOBODY && source === "link") setSource("file"); }} disabled={busy}
-          help="A style of a child, a teen, a guest or anyone outside the household is never added. A style of an adult here is always adults only." />
-        <p className="text-sm text-muted-foreground">The picture engine also checks the file and refuses styles of public figures and anything that puts a child in an adult scene. It cannot catch everything, so only add styles you trust.</p>
+        <p className="text-sm text-muted-foreground">The picture engine checks that the file can be used. Content decisions belong to the model; Home keeps its CSAM and age protections.</p>
         {error ? <p role="alert" className="text-sm text-destructive">{error}</p> : null}
         {job ? <Progress value={progress?.percent ?? 0} aria-label="Fetching the style" /> : null}
         {progress?.state === "failed" ? <p role="alert" className="text-sm text-destructive">{progress.error}</p> : null}
-        <div><Button type="submit" disabled={busy || job !== null || looksLike === ""}>{busy ? "Adding…" : "Add style"}</Button></div>
+        <div><Button type="submit" disabled={busy || job !== null}>{busy ? "Adding…" : "Add style"}</Button></div>
       </form>
     </section>
   );
@@ -335,7 +329,6 @@ export function PicturesLibrary() {
   const data = overview.data;
   return (
     <div className="flex min-w-0 flex-col gap-10">
-      <SettingsRenderer scope="household" scopeValue="household" includeKeys={["generation.household_likeness"]} />
       <PictureModelSection overview={data} refresh={refresh} />
       <WhoMakesPicturesSection overview={data} />
       <section aria-label="Styles" className="flex flex-col gap-3">

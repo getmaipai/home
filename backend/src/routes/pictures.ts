@@ -12,7 +12,6 @@ import { adaptersFor, withTriggerWords } from "@/lib/pictures/adapters";
 import { pictureEngineStatus, pictureEngineReady, pictureNotReadyReason } from "@/lib/pictures/ready";
 import { chooseQuality, detailedReady, isPictureQuality } from "@/lib/pictures/quality";
 import { StackPicturesError } from "@/lib/pictures/stack";
-import { prepareStylesUse } from "@/lib/likeness/apply";
 import { laneOfPerson } from "@/lib/pictures/laneGate";
 import { CHILD_LIMIT_LINE, CHILD_NEGATIVE_PROMPT, forceCartoon, kidsDailyPictures, laneOf, picturesMadeToday, releaseKid, reserveKid } from "@/lib/pictures/lane";
 import { getLive, liveCardFields } from "@/lib/genLive";
@@ -183,20 +182,16 @@ picturesRoutes.openapi(variationRoute, async (c) => {
   // KIDS-CREATE-01: a child's another-one is also a cartoon, Quick, within the daily limit, and never with a style.
   if (kid && picturesMadeToday(actor) + 1 > kidsDailyPictures()) return c.json({ error: CHILD_LIMIT_LINE, code: "daily_limit" }, 422) as never;
   if (!(await pictureEngineReady())) return c.json({ error: pictureNotReadyReason(await pictureEngineStatus()), code: "not_installed" }, 503) as never;
-  // A picture in a style of a household adult is decided again against current eligibility and household settings.
-  const prep = await prepareStylesUse({ medium: "picture", audience: routeAudience(actor), styles: used, source: "chat" });
-  if (prep.kind === "refused") return c.json({ error: prep.line || PROMPT_REFUSAL_LINE.real_person, code: "likeness" }, 403) as never;
   // IMGGEN-QUALITY-01: Quick or Detailed again. Left out, the picture keeps its own kind; a style made for one maker decides.
   const asked = (await c.req.json().catch(() => ({}))) as { quality?: unknown };
   const choice = kid ? { quality: "quick" as const, model: "flux2-klein-4b", note: null, announce: false } : chooseQuality({ requested: isPictureQuality(asked.quality) ? asked.quality : source.request.quality ?? "quick", style: used[0] ?? null, engine: await pictureEngineStatus() });
-  const loras = used.map((a) => ({ id: a.id, scale: a.strength_default, ...(prep.kind === "likeness" && prep.proofs.has(a.id) ? { likeness_proof: prep.proofs.get(a.id)! } : {}) }));
+  const loras = used.map((a) => ({ id: a.id, scale: a.strength_default }));
   const slot = kid ? reserveKid(actor, "picture", 1, source.prompt) : null;
   if (kid && !slot) return c.json({ error: CHILD_LIMIT_LINE, code: "daily_limit" }, 422) as never;
   try {
     const job = await startPictureJob({
       actor, conversationId: source.conversationId, turnId: source.turnId, temporary: source.temporary, kind: group.some((j) => j.state === "done") ? "variation" : "generate", prompt: source.prompt,
       body: { prompt: kid ? forceCartoon(prompt) : prompt, size: source.request.size, n: 1, ...(choice.model ? { model: choice.model } : {}), audience: lane === "adult" && adultAdaptersAllowed() ? "adult" : "all-ages", ...(kid ? { negative_prompt: CHILD_NEGATIVE_PROMPT } : {}), ...(loras.length ? { loras } : {}) }, sourceFileId: source.files[0]?.id ?? null,
-      ...(prep.kind === "likeness" ? { likeness: prep.job } : {}),
     });
     void job;
     return c.json(cardView(actor, source, true, detailedReady(await pictureEngineStatus())), 200);

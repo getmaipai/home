@@ -32,15 +32,26 @@ function isMinorBand(band: AgeBand): boolean {
  * turn-engine caller. */
 export type SafetyDirection = "message" | "reply";
 
-/** CSAM-TEXT-01 (docs/design/child-safety-text-2026-10-19.md, owner's ruling 2026-10-19): `direction` says the text is an adult's chat
- * ("message", what the adult typed) or ("reply", what the assistant says to the adult). For an ADULT's chat text, in either direction,
- * the `csam` category has no word rule (owner's ruling 2026-10-19, after the explicit-term and request checks refused "what does X
- * mean" and a code question): the leading providers stop production by the model's own refusal and by output and generation checks,
- * not by matching an adult's words, so discussion, news, fiction and advice are not filtered. With no direction (every non-chat caller, a generation prompt
- * path) and for a teen, a child or the robot, the full floor applies exactly as before. */
+/** Adults use request-aware CSAM screening on input and direct CSAM detection
+ * on replies. Other content decisions belong to the model/provider. */
 export function evaluateSafety(text: string, speakerBand: AgeBand, direction?: SafetyDirection): SafetyResult {
-  const csamMode = speakerBand === "adult" && direction !== undefined ? "adult_reply" : "floor";
-  const result = checkSafety(text, { isMinor: isMinorBand(speakerBand), csamMode });
+  const csamMode = speakerBand === "adult"
+    ? direction === "reply" ? "adult_reply" : "adult_message"
+    : "floor";
+  const checked = checkSafety(text, { isMinor: isMinorBand(speakerBand), csamMode });
+  // An adult's content is the model's decision. Keep the CSAM detector,
+  // crisis signal, and non-content security checks; do not turn other
+  // content categories into Home-side adult refusals.
+  const result = speakerBand === "adult" && direction !== undefined
+    ? (() => {
+      const allowed = new Set(["csam", "self_harm", "pii_extraction", "prompt_injection", "jailbreak"]);
+      const categories = checked.categories.filter((category) => allowed.has(category));
+      const action: SafetyResult["action"] = categories.includes("csam") || categories.some((category) => category !== "self_harm")
+        ? "refuse"
+        : categories.includes("self_harm") ? "allow_with_resources" : "allow";
+      return { ...checked, flagged: categories.length > 0, categories, action, notify_parent: false };
+    })()
+    : checked;
   if (result.flagged) {
     // 4.3: "logged with the fact, never the transcript." No structured
     // host.log exists yet (that's 4.9's package host); this is a

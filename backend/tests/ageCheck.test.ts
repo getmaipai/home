@@ -50,9 +50,9 @@ describe("the decision, with scripted verdicts", () => {
     expect(decideAgeCheck([ok("possibly_minor", false)], false, "picture")).toEqual({ action: "allow" });
     expect(decideAgeCheck([ok("child", false)], false, "picture")).toEqual({ action: "allow" });
   });
-  test("a possible minor in an ADULT-ONLY job is withheld even when the check did not call it sexual", () => {
-    expect(decideAgeCheck([ok("possibly_minor", false)], true, "picture")).toMatchObject({ action: "withhold", reason: "minor_sexual" });
-    expect(decideAgeCheck([ok("child", false)], true, "picture")).toMatchObject({ action: "withhold", reason: "minor_sexual" });
+  test("a possible minor in a nonsexual adult-only job is allowed", () => {
+    expect(decideAgeCheck([ok("possibly_minor", false)], true, "picture")).toEqual({ action: "allow" });
+    expect(decideAgeCheck([ok("child", false)], true, "picture")).toEqual({ action: "allow" });
   });
   test("nobody in the picture is allowed", () => {
     expect(decideAgeCheck([ok("none", false)], true, "picture")).toEqual({ action: "allow" });
@@ -239,15 +239,15 @@ describe("a picture job", () => {
     expect((await run("a cartoon girl about 8 years old holding a balloon")).state).toBe("done");
   });
 
-  test("an adult-only style makes the job adult-only: a possible minor is withheld even when not called sexual, and a failed check fails closed", async () => {
+  test("an adult-only style permits nonsexual media; a failed CSAM check still fails closed", async () => {
     const adultStyle = TEST_LORAS.find((l) => l.classification === "adult-only")!;
     __setAgeCheckRunnerForTests(async (images) => images.map(() => ok("possibly_minor", false)));
-    expect((await run("a portrait", [{ id: adultStyle.id, scale: 0.9 }])).error).toBe("I can't show that picture. It may show a child in a sexual situation, and that is never allowed.");
+    expect((await run("a portrait", [{ id: adultStyle.id, scale: 0.9 }])).state).toBe("done");
     __setAgeCheckRunnerForTests(async (images) => images.map((): ImageCheck => ({ ok: false, why: "unavailable" })));
     const closed = await run("a portrait", [{ id: adultStyle.id, scale: 0.9 }]);
     expect(closed.state).toBe("failed");
     expect(closed.error).toBe("I couldn't check that picture, so I can't show it. Try again in a minute.");
-    expect(listPending(people.owner).filter((n) => n.typeId === "safety.picture_withheld")).toHaveLength(1);
+    expect(listPending(people.owner).filter((n) => n.typeId === "safety.picture_withheld")).toHaveLength(0);
   });
 
   test("a sexual word in the prompt makes the job adult-only (a failed check fails closed); an ordinary prompt fails open", async () => {

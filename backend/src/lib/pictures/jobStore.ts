@@ -8,7 +8,6 @@ import { db } from "@/db";
 import { attachments, pictureJobs } from "@/db/schema";
 import { nextHlc } from "@/lib/hlc";
 import type { PersonRow } from "@/types";
-import type { JobLikeness } from "@/lib/likeness/guard";
 import { StackPicturesError } from "./stack";
 
 export type PictureJobKind = "generate" | "variation" | "edit";
@@ -35,10 +34,8 @@ export interface PictureRequest {
   audience: "all-ages" | "adult";
   /** IMGGEN-QUALITY-01: which maker made it (absent on a job stored before the choice existed: Quick). */
   quality?: "quick" | "detailed";
-  /** LIKENESS-01: set when the picture looks like a household adult. Checked again on every poll while the job waits. */
-  likeness?: JobLikeness | null;
   /** IMGEDIT-01: an edit of a picture already in this chat. The result is saved as the next version of that picture (so the editor shows Original and Undo), and its source is never changed. */
-  edit?: { source_id: string; label: string; method: "instruct" | "erase_people" | "tool" };
+  edit?: { source_id: string; label: string; method: "instruct" | "tool" };
 }
 
 export interface PictureJob {

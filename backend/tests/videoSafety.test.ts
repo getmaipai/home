@@ -143,13 +143,12 @@ describe("the two absolute lines", () => {
       expect(refuseVideoPrompt(prompt)).toBeNull();
     }
   });
-  test("adults may depict real people (models censor); a teen and a child keep the block", () => {
-    expect(refuseVideoPrompt("the mayor waving", { depictsRealPerson: true })).toBeNull();
-    expect(refuseVideoPrompt("a sexual video of the mayor", { depictsRealPerson: true })).toBeNull();
-    expect(refuseVideoPrompt("a sexual video of the mayor", { depictsRealPerson: true, lane: "teen" })).toBe("real_person");
-    expect(VIDEO_REFUSAL_LINE.real_person).toBe("I won't make sexual videos of a real person, because they can't agree to it. I can make one of an invented person or a character instead.");
-    expect(refuseVideoPrompt("the mayor waving", { depictsRealPerson: true, lane: "teen" })).toBe("real_person");
-    expect(refuseVideoPrompt("the mayor waving", { depictsRealPerson: true, lane: "child" })).toBe("child_content");
+  test("adult real-person content decisions belong to the model; minor lanes keep their age filters", () => {
+    expect(refuseVideoPrompt("the mayor waving", { lane: "adult" })).toBeNull();
+    expect(refuseVideoPrompt("a sexual video of the mayor", { lane: "adult" })).toBeNull();
+    expect(refuseVideoPrompt("a sexual video of the mayor", { lane: "teen" })).toBe("teen_content");
+    expect(refuseVideoPrompt("the mayor waving", { lane: "teen" })).toBeNull();
+    expect(refuseVideoPrompt("the mayor waving", { lane: "child" })).toBeNull();
     setHouseholdSettingValue("generation.video.enabled", true);
     setHouseholdSettingValue("generation.video.adult_adapters", "allowed");
     expect(refuseVideoPrompt("naked child")).toBe("minor_sexual");
@@ -186,28 +185,32 @@ describe("the chat tool, even when a model calls it without being offered it", (
     }
     expect(fake.submitted).toHaveLength(0);
   });
-  test("an absolute-line prompt on an adult's own screen is refused in plain words and no job starts", async () => {
-    await withStub(calling({ prompt: "a topless teen dancing by the sea" }), async () => {
-      const value = await turn(people.owner, "make a video of a girl by the sea");
+  test("a CSAM prompt on an adult's own screen is refused in plain words and no job starts", async () => {
+    await withStub(calling({ prompt: "child porn video" }), async () => {
+      const value = await turn(people.owner, "make a video of child porn");
       expect(value.reply.text).toBe(VIDEO_REFUSAL_LINE.minor_sexual);
       expect(value.video).toBeUndefined();
       expect(fake.submitted).toHaveLength(0);
     });
   });
+  test("the adult prompt gate blocks direct CSAM, while a mere child mention is allowed", async () => {
+    const { videoRefusalFor } = await import("@/lib/videos/tool");
+    const adult = { actor: people.owner, band: "adult" as const, surface: "chat" as const, surfaceClass: "written" as const, spoken: false } as never;
+    expect(videoRefusalFor(adult, { prompt: "child porn video" })).not.toBeNull();
+    expect(videoRefusalFor(adult, { prompt: "a girl by the sea" })).toBeNull();
+  });
   test("an adult real-person request starts a job", async () => {
-    await withStub(calling({ prompt: "the president waving", depicts_real_person: true }), async () => {
+    await withStub(calling({ prompt: "the president waving" }), async () => {
       const value = await turn(people.owner, "make a video of the president waving");
       expect(value.video).toBeDefined();
       expect(fake.submitted).toHaveLength(1);
     });
   });
-  test("a sexual real-person request from an adult is not refused by the tool gate (the model decides); a teen's is", async () => {
+  test("adult sexual real-person requests are left to the model", async () => {
     const { videoRefusalFor } = await import("@/lib/videos/tool");
-    const args = { prompt: "a sexual video of the president", depicts_real_person: true };
+    const args = { prompt: "a sexual video of the president" };
     const adult = { actor: people.owner, band: "adult" as const, surface: "chat" as const, surfaceClass: "written" as const, spoken: false } as never;
     expect(videoRefusalFor(adult, args)).toBeNull();
-    const teen = { actor: people.owner, band: "teen" as const, surface: "chat" as const, surfaceClass: "written" as const, spoken: false } as never;
-    expect(videoRefusalFor(teen, args)).not.toBeNull();
   });
   test("a call on a turn that was never offered the tool (no video model) is refused", async () => {
     __setVideoStatusForTests(null);

@@ -64,24 +64,19 @@ describe("video settings view", () => {
     v.restore();
   });
 
-  test("an unsure answer adds the style as adults only", async () => {
+  test("a style with no age claim is adults only by default", async () => {
     const v = mount(settings({ adapters: [] }));
     await waitFor(() => expect(v.getByText("Add a video style")).toBeTruthy());
     fireEvent.change(v.getByLabelText("Name"), { target: { value: "Ink" } });
     const input = v.getByLabelText(/The \.safetensors file/) as HTMLInputElement;
     Object.defineProperty(input, "files", { value: [new File([new Uint8Array(8)], "ink.safetensors")], configurable: true });
     fireEvent.change(input);
-    // The add button waits for the answer to "Who does this style look like?".
-    expect(v.getByRole("button", { name: "Add video style" })).toBeDisabled();
-    fireEvent.click(v.getByRole("combobox", { name: "Who does this style look like?" }));
-    fireEvent.click(await v.findByRole("option", { name: "Nobody (not a real person)" }));
-    await waitFor(() => expect(v.getByRole("button", { name: "Add video style" })).not.toBeDisabled());
     fireEvent.submit(input.closest("form")!);
     await waitFor(() => expect(videosApi.addAdapter).toHaveBeenCalled());
     const form = (videosApi.addAdapter as unknown as { mock: { calls: FormData[][] } }).mock.calls[0]![0]!;
     expect(form.get("classification")).toBe("adult-only");
     expect(form.get("name")).toBe("Ink");
-    expect(form.get("looks_like")).toBe("nobody");
+    expect(form.get("looks_like")).toBeNull();
     v.restore();
   });
 

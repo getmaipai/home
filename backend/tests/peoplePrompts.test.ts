@@ -1,24 +1,14 @@
-// PEOPLE-PROMPTS-01 (owner ruling 2026-10-17: "it's annoying"): the household switch `generation.people_prompts` (default off) takes away the
-// extra friction (hedging guidance to the model, the second ask about who is in a photo) and nothing else. Every safety line is asserted
-// with the switch OFF and ON: a child is refused, nothing sexual involving a minor, the household's real-person limits, a photo that may show a child, the fail-closed freeze. And the model can never attest who is in a photo.
+// Adult real-person and likeness requests pass through Home; CSAM checks and child-lane rules remain in effect.
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
-import sharp from "sharp";
 import { resetDb } from "./reset-db";
 import { db } from "@/db";
 import { people as peopleTable } from "@/db/schema";
-import { setHouseholdSettingValue, setValue } from "@/lib/settings";
+import { setHouseholdSettingValue } from "@/lib/settings";
 import { createBenchPeople, type BenchPeople } from "../scripts/bench/conversationRunner";
 import { removeTemporaryChatImages, storeTemporaryChatImage } from "@/lib/attachments";
-import { __setAgeCheckRunnerForTests } from "@/lib/pictures/ageCheck";
 import { runGenerateImage } from "@/lib/pictures/tool";
 import { runGenerateVideo } from "@/lib/videos/tool";
-import { getPictureJob } from "@/lib/pictures/jobs";
-import { __setPhotoInspectorForTests } from "@/lib/likeness/inspector";
-import { __setStackTrustForTests } from "@/lib/likeness/proof";
-import { __resetAttestationsForTests } from "@/lib/likeness/resolve";
-import { toolSpecFor } from "@/lib/turnMachine/nodes/model";
 import { __setStackClientForTests, __resetStackEngineForTests } from "@/lib/stackEngine";
-import type { StackClient } from "@/lib/stack/client";
 import { installFakeImageStack, testPng, until, type FakeImageStack } from "./pictureFixture";
 import { installFakeVideoStack, type FakeVideoStack } from "./videoFixture";
 import { eq } from "drizzle-orm";
@@ -45,12 +35,8 @@ beforeEach(() => {
   child = addPerson("Pippa", "child");
   image = installFakeImageStack();
   video = installFakeVideoStack();
-  __setStackTrustForTests({ ok: true });
-  __setPhotoInspectorForTests(async () => ({ people: 1, faces: 1, under18: "no" }));
-  __resetAttestationsForTests();
-  __setAgeCheckRunnerForTests(async (images) => images.map(() => ({ ok: true as const, verdict: { people_count: 0, apparent_min_age_estimate: null, label: "none" as const, is_nude_or_sexual: false, confidence: 1 } })));
 });
-afterEach(() => { removeTemporaryChatImages("conv-1"); image.restore(); video.restore(); __setStackTrustForTests(null); __setPhotoInspectorForTests(undefined); __setStackClientForTests(null); __resetStackEngineForTests(); setHouseholdSettingValue("generation.people_prompts", false); });
+afterEach(() => { removeTemporaryChatImages("conv-1"); image.restore(); video.restore(); __setStackClientForTests(null); __resetStackEngineForTests(); });
 
 type Img = { id: string; name: string; width: number; height: number; media_type: string };
 async function put(owner: PersonRow, id: string): Promise<Img> {
@@ -63,105 +49,19 @@ function stateFor(actor: PersonRow, images: Img[] = [], utterance = "") {
 const pic = (actor: PersonRow, args: Record<string, unknown>, images: Img[] = [], utterance = "") => runGenerateImage({ state: stateFor(actor, images, utterance), args, callId: "c1", spoken: false });
 const vid = (actor: PersonRow, args: Record<string, unknown>, images: Img[] = [], utterance = "") => runGenerateVideo({ state: stateFor(actor, images, utterance), args, callId: "c2", spoken: false });
 const text = (o: ToolExecutionOutcome) => (o.result?.reply as { text?: string } | undefined)?.text ?? "";
-const refusedWith = (o: ToolExecutionOutcome) => (o.result?.data as { refused?: string } | undefined)?.refused;
-const jobId = (o: ToolExecutionOutcome) => (o.result?.data as { pictureJobId?: string }).pictureJobId!;
 
-const BOTH = [false, true] as const;
-
-describe("the switch takes away friction only", () => {
-  test("off by default; while off the model is told not to hedge, while on it is not", async () => {
-    const off = toolSpecFor("generate_image")!;
-    expect(off.description).toContain("Do not add warnings");
-    expect(toolSpecFor("generate_video")!.description).toContain("Do not add warnings");
-    const ok = await pic(nadia, { prompt: "a red fox in the snow" });
-    expect(text(ok)).toContain("Do not add warnings");
-    await until(() => ["done", "failed"].includes(getPictureJob(nadia, jobId(ok))?.state ?? ""));
-    setHouseholdSettingValue("generation.people_prompts", true);
-    expect(toolSpecFor("generate_image")!.description).not.toContain("Do not add warnings");
-    expect(text(await pic(nadia, { prompt: "a blue whale at dusk" }))).not.toContain("Do not add warnings");
+describe("adult media requests", () => {
+  test("CSAM requests remain blocked while real-person requests pass through", async () => {
+    expect(text(await pic(nadia, { prompt: "a naked child on a beach" }))).toContain("never allowed");
+    expect(text(await pic(nadia, { prompt: "a portrait of a famous senator" }))).not.toContain("No picture was made");
   });
 
-  test("ask at most once: what a person said about a photo is remembered while the switch is off, and asked again while it is on; the model never writes to it", async () => {
+  test("adult media edits and video can use an attached photo without a Home identity check", async () => {
     const photo = await put(nadia, "photo-1");
-    const ask = { prompt: "change her dress to red", change: "attached", affects_people: true, photo_subject: "me" };
-    expect(refusedWith(await pic(nadia, ask, [photo], "change her dress to red"))).toBe("who_is_in_photo");
-    const first = await pic(nadia, ask, [photo], "this is a photo of me, change my dress to red");
-    expect(first.status).toBe("succeeded");
-    await until(() => ["done", "failed"].includes(getPictureJob(nadia, jobId(first))?.state ?? ""));
-    // Later, no claim in the message: remembered (off).
-    const again = await pic(nadia, ask, [photo], "now make it blue");
-    expect(refusedWith(again)).toBeUndefined();
-    expect(again.status).toBe("succeeded");
-    await until(() => ["done", "failed"].includes(getPictureJob(nadia, jobId(again))?.state ?? ""));
-    // On: asked again whenever the message does not say.
-    setHouseholdSettingValue("generation.people_prompts", true);
-    expect(refusedWith(await pic(nadia, ask, [photo], "now make it green"))).toBe("who_is_in_photo");
-    // Another person's own photo is not covered by Nadia's answer: the memory is per person and per photo.
-    setHouseholdSettingValue("generation.people_prompts", false);
-    const other = await put(marlow, "photo-2");
-    expect(refusedWith(await pic(marlow, { ...ask, photo_subject: "me" }, [other], "make it blue"))).toBe("who_is_in_photo");
+    const edit = await pic(nadia, { prompt: "change her dress to red", change: "attached" }, [photo]);
+    expect(edit.status).toBe("succeeded");
+    expect(image.edits[0]).toMatchObject({ image_source: "uploaded", audience: "adult" });
+    const videoResult = await vid(nadia, { prompt: "she waves", from_picture: "attached" }, [photo]);
+    expect(videoResult.status).toBe("succeeded");
   });
-});
-
-describe("the hard lines hold with the switch off and on", () => {
-  for (const on of BOTH) {
-    describe(`people_prompts = ${on}`, () => {
-      beforeEach(() => setHouseholdSettingValue("generation.people_prompts", on));
-
-      test("a child is held to the cartoon lane whatever this says: refused with the home switch off, never a photo or a real person", async () => {
-        setHouseholdSettingValue("generation.kids", false);
-        expect(text(await pic(child, { prompt: "a friendly dragon" }))).toContain("Making pictures is off for this profile");
-        expect(text(await vid(child, { prompt: "a friendly dragon waving" }))).toContain("Making videos is off for this profile");
-        setHouseholdSettingValue("generation.kids", true);
-        const real = await pic(child, { prompt: "a picture of a famous singer", depicts_real_person: true });
-        expect(text(real)).toContain("how about a friendly dragon");
-        const photo = await put(child, "photo-1");
-        expect(text(await pic(child, { prompt: "make it pink", change: "attached" }, [photo]))).toContain("not from photos");
-        expect(image.submitted).toHaveLength(0);
-        expect(video.submitted).toHaveLength(0);
-      });
-
-      test("nothing sexual involving a minor, while an adult may make a public figure (models censor)", async () => {
-        expect(text(await pic(nadia, { prompt: "a naked child on a beach" }))).toContain("never allowed");
-        expect(refusedWith(await pic(nadia, { prompt: "a portrait of a famous senator", depicts_real_person: true }))).toBeUndefined();
-        expect(refusedWith(await pic(nadia, { prompt: "a nude portrait of a famous senator", depicts_real_person: true }))).toBeUndefined();
-        expect(refusedWith(await vid(nadia, { prompt: "a nude famous senator waving", depicts_real_person: true }))).toBeUndefined();
-      });
-
-      test("an ordinary household photo uses the household option and signed proof", async () => {
-        const photo = await put(nadia, "photo-1");
-        const ok = await pic(nadia, { prompt: "change her dress to red", change: "attached", affects_people: true, photo_subject: "Marlow" }, [photo], "the photo is Marlow");
-        expect(ok.status).toBe("succeeded");
-        expect(image.edits[0]).toMatchObject({ image_source: "household_photo", audience: "adult" });
-        expect(String(image.edits[0]!.consent_proof).split(".")).toHaveLength(2);
-        const videoOk = await vid(nadia, { prompt: "she waves", from_picture: "attached", photo_subject: "Marlow" }, [photo], "animate this, it is Marlow");
-        expect(videoOk.status).toBe("succeeded");
-      });
-
-      test("a photo that may show a child is never used for a person", async () => {
-        const photo = await put(nadia, "photo-1");
-        __setPhotoInspectorForTests(async () => ({ people: 1, faces: 1, under18: "yes" }));
-        expect(text(await pic(nadia, { prompt: "change her dress", change: "attached", affects_people: true, photo_subject: "me" }, [photo], "a photo of me, change my dress"))).toContain("may show a child");
-        expect(image.edits).toHaveLength(0);
-      });
-
-      test("the freeze fails closed: a finder that misses a person changes nothing", async () => {
-        const photo = await put(nadia, "photo-1");
-        __setPhotoInspectorForTests(async () => ({ people: 3, faces: 3, under18: "no" }));
-        const mask = (await sharp({ create: { width: 64, height: 64, channels: 3, background: { r: 255, g: 255, b: 255 } } }).png().toBuffer()).toString("base64");
-        __setStackClientForTests({ imageTools: async () => ({}), roles: async () => ({ roles: [] }), imageEdit: async () => ({ kind: "done", job: "j", item: { b64_json: mask, width: 64, height: 64, content_type: "image/png", operation: "people_mask", people: [{ id: 1, x: 0, y: 0, w: 1, h: 1, area: 0.5 }] } }) } as unknown as StackClient);
-        const o = await pic(nadia, { prompt: "make the sky clear", change: "attached" }, [photo]);
-        await until(() => ["done", "failed"].includes(getPictureJob(nadia, jobId(o))?.state ?? ""));
-        expect(getPictureJob(nadia, jobId(o))!.state).toBe("failed");
-        expect(image.edits).toHaveLength(0);
-      });
-
-      test("the model's photo_subject never attests a stranger as the speaker", async () => {
-        const photo = await put(nadia, "stranger");
-        const o = await pic(nadia, { prompt: "change her dress", change: "attached", affects_people: true, photo_subject: "me" }, [photo], "change her dress");
-        expect(refusedWith(o)).toBe("who_is_in_photo");
-        expect(image.edits).toHaveLength(0);
-      });
-    });
-  }
 });

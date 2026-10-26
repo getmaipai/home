@@ -103,7 +103,7 @@ export type PolicyDecision =
       // actually have that in this conversation") covers it, the same
       // closed set of named-then-defaulted reasons `ungrounded_args`/
       // `unknown_tool` already are.
-      reason: "min_role" | "consent_needed" | "confirm_needed" | "parent_required" | "ungrounded_args" | "unknown_tool" | "manifest_invalid" | "temporary_mode" | "crisis_state" | "anonymous_speaker" | "unknown_project_type" | "household_subject_never" | "picture_not_here" | "picture_refused_minor" | "picture_refused_person" | "video_not_here" | "video_refused_minor" | "video_refused_person" | "music_not_here" | "music_refused_minor" | "music_refused_voice";
+      reason: "min_role" | "consent_needed" | "confirm_needed" | "parent_required" | "ungrounded_args" | "unknown_tool" | "manifest_invalid" | "temporary_mode" | "crisis_state" | "anonymous_speaker" | "unknown_project_type" | "household_subject_never" | "picture_not_here" | "picture_refused_minor" | "video_not_here" | "video_refused_minor" | "music_not_here" | "music_refused_minor";
       ask?: PendingAskInfo;
     };
 

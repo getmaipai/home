@@ -129,7 +129,7 @@ describe("the migration chain (architecture review 4.4)", () => {
     });
   }, 60_000);
 
-  test("restoring a 0123 backup drops likeness agreements and ignores their stored permissions", () => {
+  test("restoring a 0123 backup drops retired likeness tables and settings", () => {
     withTempDir((dir) => {
       const oldFolder = join(dir, "old-migrations");
       cpSync(MIGRATIONS, oldFolder, { recursive: true });
@@ -155,7 +155,7 @@ describe("the migration chain (architecture review 4.4)", () => {
         expect(tables).not.toContain("likeness_consent_events");
         expect(tables).not.toContain("likeness_uses");
         expect(restored.query("SELECT key FROM settings_values WHERE key LIKE 'likeness.%'").all()).toEqual([]);
-        expect(tables).toContain("likeness_adapters");
+        expect(tables).not.toContain("likeness_adapters");
         expect(restored.query("PRAGMA integrity_check").get()).toEqual({ integrity_check: "ok" });
       } finally { restored.close(); }
     });

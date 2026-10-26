@@ -44,8 +44,8 @@ function headers(token: string) { return { "content-type": "application/json", c
 async function request(path: string, token: string, method = "GET", body?: unknown) {
   return app.request(`http://localhost/api/${path}`, { method, headers: headers(token), ...(body === undefined ? {} : { body: JSON.stringify(body) }) });
 }
-async function upload(path: string, token: string, png: Uint8Array, rights: string, realPerson: string) {
-  const form = new FormData(); form.append("image", new File([new Uint8Array(png)], "Mascot.png", { type: "image/png" })); form.append("rights_confirmed", rights); form.append("shows_real_person", realPerson);
+async function upload(path: string, token: string, png: Uint8Array) {
+  const form = new FormData(); form.append("image", new File([new Uint8Array(png)], "Mascot.png", { type: "image/png" }));
   return app.request(`http://localhost/api/${path}`, { method: "POST", headers: { cookie: `session=${token}` }, body: form });
 }
 async function transparentPng() {
@@ -223,7 +223,7 @@ describe("companion look generation jobs", () => {
     const adult = addPerson("person-look-sheet-fail", "adult");
     const created = createHouseholdCompanion({ ...fixture(), display_name: "Sheet failure", look_prompt: "a blue bird" }, { display_name: "Author", person_id: "person-look-sheet-fail" });
     if (!created.ok) throw new Error(created.error);
-    const uploaded = await upload(`companions/${created.value.id}/look/upload`, adult, await transparentPng(), "true", "false");
+    const uploaded = await upload(`companions/${created.value.id}/look/upload`, adult, await transparentPng());
     __setPictureStatusForTests(readyStatusForTests()); __setCharacterPictureCapabilityForTests({ imageParts: false, pictureTokensMax: null });
     __setPicturesFetchForTests((async (input, init) => {
       const url = String(input);
@@ -239,15 +239,13 @@ describe("companion look generation jobs", () => {
 });
 
 describe("household companion routes", () => {
-  test("look upload requires rights confirmation and refuses real people", async () => {
+  test("look upload accepts real person photos without a content consent prompt", async () => {
     const adult = addPerson("person-look-adult", "adult");
     const created = createHouseholdCompanion({ ...fixture(), display_name: "Look upload" }, { display_name: "Author", person_id: "person-look-adult" });
     if (!created.ok) throw new Error(created.error);
     const png = await transparentPng();
-    const missingRights = await upload(`companions/${created.value.id}/look/upload`, adult, png, "false", "false");
-    expect(missingRights.status).toBe(400); expect((await missingRights.json() as { error: string }).error).toBe("Tick the box to say you made this picture or have the right to use it.");
-    const real = await upload(`companions/${created.value.id}/look/upload`, adult, png, "true", "true");
-    expect(real.status).toBe(400); expect((await real.json() as { error: string }).error).toBe("Pictures of real people are not supported here yet. Use a drawing or a character instead.");
+    const real = await upload(`companions/${created.value.id}/look/upload`, adult, png);
+    expect(real.status).toBe(201);
   });
 
   test("look upload, GET image and rest management are limited to the author or an admin", async () => {
@@ -255,8 +253,8 @@ describe("household companion routes", () => {
     const created = createHouseholdCompanion({ ...fixture(), display_name: "Look owner" }, { display_name: "Author", person_id: "person-look-owner" });
     if (!created.ok) throw new Error(created.error);
     const path = `companions/${created.value.id}/look/upload`, png = await transparentPng();
-    for (const token of [other, child, teen]) expect((await upload(path, token, png, "true", "false")).status).toBe(403);
-    const added = await upload(path, author, png, "true", "false"); expect(added.status).toBe(201);
+    for (const token of [other, child, teen]) expect((await upload(path, token, png)).status).toBe(403);
+    const added = await upload(path, author, png); expect(added.status).toBe(201);
     const { id: version } = await added.json() as { id: string }; expect(version).toBe("v-1");
     const look = await request(`companions/${created.value.id}/look`, author);
     expect(await look.json()).toMatchObject({ rest: version, can_generate: false, versions: [{ id: version, label: "Mascot", source: "upload" }] });
@@ -265,7 +263,7 @@ describe("household companion routes", () => {
     expect(new Uint8Array(await image.arrayBuffer()).byteLength).toBeGreaterThan(100);
     expect((await request(`companions/${created.value.id}/look/${version}/image`, admin)).status).toBe(200);
     expect((await request(`companions/${created.value.id}/look/${version}/image`, other)).status).toBe(403);
-    const second = await upload(path, author, png, "true", "false"); const secondId = (await second.json() as { id: string }).id;
+    const second = await upload(path, author, png); const secondId = (await second.json() as { id: string }).id;
     const set = await request(`companions/${created.value.id}/look/rest`, author, "PUT", { version_id: secondId }); expect(set.status).toBe(200);
     const refused = await request(`companions/${created.value.id}/look/${secondId}`, author, "DELETE"); expect(refused.status).toBe(409);
     const removed = await request(`companions/${created.value.id}/look/${version}`, author, "DELETE"); expect(removed.status).toBe(204);
@@ -398,18 +396,18 @@ describe("household companion routes", () => {
     expect((await request("companions/rivet/states", adult)).status).toBe(403);
   });
 
-  test("state upload checks rights and signature, finishes with the fake Stack, and approval writes validated animation assets", async () => {
+  test("state upload validates the file and approval writes animation assets", async () => {
     const adult = addPerson("person-state-upload", "adult"), created = createHouseholdCompanion({ ...fixture(), display_name: "State upload" }, { display_name: "Author", person_id: "person-state-upload" });
     if (!created.ok) throw new Error(created.error);
     const companionId = created.value.id;
     const rest = addVersion(companionId, new Uint8Array([1]), { source: "upload", label: "rest", width: 1024, height: 1024, from: null }); setRest(companionId, rest.id);
     updateSheet(companionId, { views: { left: null, right: null, mouth: null }, card: { text: "red fox", species: "fox", colours: ["#CC3322"] }, key: "#00FF00", state: "needs_review", approved_by: null, approved_at: null }); approveSheet(companionId, "Author");
     const videoBytes = new Uint8Array([0, 0, 0, 24, 102, 116, 121, 112, 105, 115, 111, 109, 0, 0, 0, 0]);
-    async function uploadVideo(rights: string, real: string, bytes = videoBytes) { const form = new FormData(); form.append("video", new File([bytes], "clip.mp4", { type: "video/mp4" })); form.append("rights_confirmed", rights); form.append("shows_real_person", real); return app.request(`http://localhost/api/companions/${companionId}/states/idle/upload`, { method: "POST", headers: { cookie: `session=${adult}` }, body: form }); }
-    expect((await uploadVideo("false", "false")).status).toBe(400); expect((await uploadVideo("true", "true")).status).toBe(400); expect((await uploadVideo("true", "false", new Uint8Array([1, 2, 3]))).status).toBe(400);
+    async function uploadVideo(bytes = videoBytes) { const form = new FormData(); form.append("video", new File([bytes], "clip.mp4", { type: "video/mp4" }));   return app.request(`http://localhost/api/companions/${companionId}/states/idle/upload`, { method: "POST", headers: { cookie: `session=${adult}` }, body: form }); }
+    expect((await uploadVideo(new Uint8Array([1, 2, 3]))).status).toBe(400);
     let submitted: any; let waitForFinish: (() => void) | undefined;
     __setStackClientForTests({ mediaRoots: async () => ({ read: [companionRoot], write: [companionRoot] }), setMediaRoots: async () => ({ read: [], write: [] }), submitJob: async (request: any) => { submitted = request; const out = join(request.input.output_dir, request.input.output_name); mkdirSync(out, { recursive: true }); writeFileSync(join(out, "clip.h264.mp4"), "h264"); writeFileSync(join(out, "still.png"), "png"); waitForFinish?.(); return { id: "state-job", state: "done", result: { ok: true, reasons: [], seconds: 3, files: [{ name: "clip.h264.mp4", bytes: 4 }], av1: false, colour_distance: 1, area_ratio: 1, loop_gap: 0, opaque_share: { min: .5, max: .8 } } }; }, job: async () => { throw Error("unexpected poll"); } } as never);
-    const uploaded = await uploadVideo("true", "false"); expect(uploaded.status).toBe(202); const { take_id } = await uploaded.json() as { take_id: string };
+    const uploaded = await uploadVideo(); expect(uploaded.status).toBe(202); const { take_id } = await uploaded.json() as { take_id: string };
     await new Promise<void>((resolve) => { waitForFinish = resolve; setTimeout(resolve, 20); });
     expect(submitted.input).toMatchObject({ key: "#00FF00", output_name: "finished", max_bytes: media.ship.max_bytes_per_clip });
     const approval = await request(`companions/${companionId}/states/idle/approve`, adult, "PUT", { take_id }); expect(approval.status).toBe(200);
@@ -419,7 +417,7 @@ describe("household companion routes", () => {
 
   test("state upload asks for an approved character sheet before accepting a clip", async () => {
     const adult = addPerson("person-state-no-sheet", "adult"), created = createHouseholdCompanion({ ...fixture(), display_name: "No state sheet" }, { display_name: "Author", person_id: "person-state-no-sheet" }); if (!created.ok) throw new Error(created.error);
-    const form = new FormData(); form.append("video", new File([new Uint8Array([0, 0, 0, 24, 102, 116, 121, 112, 105, 115, 111, 109, 0, 0, 0, 0])], "clip.mp4", { type: "video/mp4" })); form.append("rights_confirmed", "true"); form.append("shows_real_person", "false");
+    const form = new FormData(); form.append("video", new File([new Uint8Array([0, 0, 0, 24, 102, 116, 121, 112, 105, 115, 111, 109, 0, 0, 0, 0])], "clip.mp4", { type: "video/mp4" }));
     const response = await app.request(`http://localhost/api/companions/${created.value.id}/states/idle/upload`, { method: "POST", headers: { cookie: `session=${adult}` }, body: form });
     expect(response.status).toBe(409); expect(await response.json()).toEqual({ error: "Approve the character sheet first, so every clip starts from the same character." });
   });
@@ -559,7 +557,7 @@ describe("household companion routes", () => {
       for (const [path, method, body] of [[`companions/${created.value.id}/states`, "GET", undefined], [`companions/${created.value.id}/states/idle/motion`, "PUT", { motion: "wave" }], [`companions/${created.value.id}/states/idle/approve`, "PUT", { take_id: "take-1" }], [`companions/${created.value.id}/states/idle/take-1`, "DELETE", undefined], [`companions/${created.value.id}/states/idle/take-1/clip.h264.mp4`, "GET", undefined]] as const) expect((await request(path, token, method, body)).status).toBe(403);
     }
     for (const token of [other, child, teen]) {
-      const form = new FormData(); form.append("video", new File([new Uint8Array([0, 0, 0, 24])], "clip.mp4", { type: "video/mp4" })); form.append("rights_confirmed", "true"); form.append("shows_real_person", "false");
+      const form = new FormData(); form.append("video", new File([new Uint8Array([0, 0, 0, 24])], "clip.mp4", { type: "video/mp4" }));
       expect((await app.request(`http://localhost/api/companions/${created.value.id}/states/idle/upload`, { method: "POST", headers: { cookie: `session=${token}` }, body: form })).status).toBe(403);
     }
     expect((await request("companions/rivet/states", author)).status).toBe(403);

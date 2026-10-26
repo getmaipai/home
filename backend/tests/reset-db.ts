@@ -50,7 +50,6 @@ import {
   kidUsage,
   pictureAdapterPrefs,
   videoJobs,
-  likenessAdapters,
   mediaCollections,
   mediaProgress,
   mediaWatchDays,
@@ -205,7 +204,6 @@ export function resetDb(): void {
   db.delete(musicJobs).run();
   db.delete(videoJobs).run(); // VIDEO-GEN-05: references people
   db.delete(videoAdapterPrefs).run();
-  db.delete(likenessAdapters).run();
   db.delete(mediaCollections).run(); // MEDIA-LIB-01: progress and collections reference people and items, items reference sources
   db.delete(mediaProgress).run();
   db.delete(mediaWatchSessions).run();

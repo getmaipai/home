@@ -1,5 +1,5 @@
 // NEWS-02 and NEWS-07 (news design sections 7 and 8): household picture and full-text settings. Declared
-// here ahead of the pinned spec tag, like the likeness and picture keys, and written to the spec registry by
+// here ahead of the pinned spec tag, like the picture keys, and written to the spec registry by
 // `scripts/gen-settings-registry.ts`; scripts/check.sh lists them as ahead of the spec until a tag carries them.
 import { SettingsKey } from "@maipai/spec/gen/ts/settings-key.js";
 import { TOPICS } from "@/lib/news/topics";

@@ -7,8 +7,8 @@ import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { eq } from "drizzle-orm";
 import { resetDb } from "./reset-db";
 import { db } from "@/db";
-import { kidUsage, people as peopleTable } from "@/db/schema";
-import { setHouseholdSettingValue, setValue } from "@/lib/settings";
+import { people as peopleTable } from "@/db/schema";
+import { setHouseholdSettingValue } from "@/lib/settings";
 import { createBenchPeople } from "../scripts/bench/conversationRunner";
 import { removeTemporaryChatImages, storeTemporaryChatImage } from "@/lib/attachments";
 import { runGenerateImage } from "@/lib/pictures/tool";
@@ -19,11 +19,6 @@ import { adapterAudiencesFor } from "@/lib/pictures/policy";
 import { videoAdapterAudiencesFor } from "@/lib/videos/policy";
 import { TEEN_CONTENT_LINE, laneOf } from "@/lib/pictures/lane";
 import { editToolsStatus, startComment } from "@/lib/imageEdit";
-import { TEEN_PHOTO_LINE } from "@/lib/pictures/editSources";
-import { __setPhotoInspectorForTests } from "@/lib/likeness/inspector";
-import { __setStackTrustForTests } from "@/lib/likeness/proof";
-import { __resetAttestationsForTests } from "@/lib/likeness/resolve";
-import { toolSpecFor } from "@/lib/turnMachine/nodes/model";
 import { installFakeImageStack, testPng, until, type FakeImageStack } from "./pictureFixture";
 import { installFakeVideoStack, type FakeVideoStack } from "./videoFixture";
 import type { PersonRow } from "@/types";
@@ -48,12 +43,9 @@ beforeEach(() => {
   child = addPerson("Pippa", "child");
   image = installFakeImageStack();
   video = installFakeVideoStack();
-  __setStackTrustForTests({ ok: true });
-  __setPhotoInspectorForTests(async () => ({ people: 1, faces: 1, under18: "yes" }));
-  __resetAttestationsForTests();
   __setAgeCheckRunnerForTests(async (images) => images.map(() => ({ ok: true as const, verdict: { people_count: 0, apparent_min_age_estimate: null, label: "none" as const, is_nude_or_sexual: false, confidence: 1 } })));
 });
-afterEach(() => { __setAgeCheckRunnerForTests(async (images) => images.map(() => ({ ok: true as const, verdict: { people_count: 0, apparent_min_age_estimate: null, label: "none" as const, is_nude_or_sexual: false, confidence: 1 } }))); setHouseholdSettingValue("generation.kids", true); removeTemporaryChatImages("conv-1"); image.restore(); video.restore(); __setStackTrustForTests(null); __setPhotoInspectorForTests(undefined); setHouseholdSettingValue("generation.people_prompts", false); });
+afterEach(() => { __setAgeCheckRunnerForTests(async (images) => images.map(() => ({ ok: true as const, verdict: { people_count: 0, apparent_min_age_estimate: null, label: "none" as const, is_nude_or_sexual: false, confidence: 1 } }))); setHouseholdSettingValue("generation.kids", true); removeTemporaryChatImages("conv-1"); image.restore(); video.restore(); });
 
 type Img = { id: string; name: string; width: number; height: number; media_type: string };
 async function put(owner: PersonRow, id: string, generated = false): Promise<Img> {
@@ -66,7 +58,6 @@ function stateFor(actor: PersonRow, images: Img[] = [], utterance = "") {
 const pic = (actor: PersonRow, args: Record<string, unknown>, images: Img[] = [], utterance = "") => runGenerateImage({ state: stateFor(actor, images, utterance), args, callId: "c1", spoken: false });
 const vid = (actor: PersonRow, args: Record<string, unknown>, images: Img[] = [], utterance = "") => runGenerateVideo({ state: stateFor(actor, images, utterance), args, callId: "c2", spoken: false });
 const text = (o: ToolExecutionOutcome) => (o.result?.reply as { text?: string } | undefined)?.text ?? "";
-const refusedWith = (o: ToolExecutionOutcome) => (o.result?.data as { refused?: string } | undefined)?.refused;
 const jobId = (o: ToolExecutionOutcome) => (o.result?.data as { pictureJobId?: string }).pictureJobId!;
 const finish = async (actor: PersonRow, o: ToolExecutionOutcome) => { await until(() => ["done", "failed"].includes(getPictureJob(actor, jobId(o))?.state ?? "")); return getPictureJob(actor, jobId(o))!; };
 
@@ -83,15 +74,10 @@ describe("a teen makes pictures", () => {
     expect(video.submitted).toHaveLength(0);
   });
 
-  test("creating a picture works, all-ages only, with no hedging whatever the household says", async () => {
-    for (const on of [false, true]) {
-      setHouseholdSettingValue("generation.people_prompts", on);
+  test("creating a picture works, all-ages only", async () => {
       const o = await pic(teen, { prompt: "a red fox in the snow" });
       expect(o.status).toBe("succeeded");
-      expect(text(o)).toContain("Do not add warnings");
-      expect(toolSpecFor("generate_image", "teen")!.description).toContain("Do not add warnings");
       await finish(teen, o);
-    }
     expect(image.submitted.every((s) => s.audience === "all-ages")).toBe(true);
   });
 
@@ -143,7 +129,7 @@ describe("a teen edits pictures", () => {
     expect(status.tools.markup.enabled).toBe(true);
   });
 
-  test("an instruction edit of a picture made here goes through; a sexual instruction is one short line; a photo of another person is not used", async () => {
+  test("an instruction edit of a picture made here goes through; a sexual instruction is one short line", async () => {
     const made = await put(teen, "made-1", true);
     const ok = await pic(teen, { prompt: "make the sky pink", change: "latest" });
     expect(ok.status).toBe("succeeded");
@@ -151,17 +137,11 @@ describe("a teen edits pictures", () => {
     expect(String(image.edits[0]!.audience ?? "all-ages")).not.toBe("adult");
     await finish(teen, ok);
     expect(text(await pic(teen, { prompt: "take off her clothes", change: "latest" }))).toContain(TEEN_CONTENT_LINE);
-    // Another person's likeness remains unavailable to a teen.
-    const photo = await put(teen, "photo-1");
-    __setPhotoInspectorForTests(async () => ({ people: 1, faces: 1, under18: "no" }));
-    const other = await pic(teen, { prompt: "change her dress to red", change: "attached", affects_people: true, photo_subject: "Marlow" }, [photo], "the photo is Marlow");
-    expect(text(other)).toContain("only be made by an adult");
     void made;
   });
 
   test("a teen never has an uploaded photo changed toward swimwear or undressing, in chat or in the editor (the adult exemption does not reach a teen)", async () => {
     const photo = await put(teen, "photo-2");
-    __setPhotoInspectorForTests(async () => ({ people: 0, faces: 0, under18: "no" }));
     const chat = await pic(teen, { prompt: "put her in a bikini", change: "attached" }, [photo]);
     expect(text(chat)).toContain(TEEN_CONTENT_LINE);
     expect(image.edits).toHaveLength(0);
@@ -177,15 +157,13 @@ describe("a teen edits pictures", () => {
     await expect(startComment(teen, "conv-1", "made-1", { prompt: "make her naked" })).rejects.toMatchObject({ status: 422, message: TEEN_CONTENT_LINE });
   });
 
-  test("a teen's own photo can be edited for something ordinary, never something sexual; the teen has to say it is them, once", async () => {
+  test("a teen's uploaded photo can be edited for something ordinary, never something sexual", async () => {
     const photo = await put(teen, "me-1");
-    const args = { prompt: "change my sweater to blue", change: "attached", affects_people: true, photo_subject: "me" };
-    expect(refusedWith(await pic(teen, args, [photo], "change my sweater to blue"))).toBe("who_is_in_photo");
-    const ok = await pic(teen, args, [photo], "this is a photo of me, change my sweater to blue");
+    const args = { prompt: "change my sweater to blue", change: "attached" };
+    const ok = await pic(teen, args, [photo]);
     expect(ok.status).toBe("succeeded");
     expect(image.edits[0]).toMatchObject({ image_source: "uploaded" });
     await finish(teen, ok);
-    // remembered: no second question for the same photo
     const again = await pic(teen, args, [photo], "now make it green");
     expect(again.status).toBe("succeeded");
     await finish(teen, again);
@@ -195,21 +173,4 @@ describe("a teen edits pictures", () => {
     expect(image.edits).toHaveLength(0);
   });
 
-  test("lane review: a photo that looks like an adult (a stranger's) cannot be claimed as the teen's own; both outcomes are in the admins' list", async () => {
-    const args = { prompt: "change the sweater to blue", change: "attached", affects_people: true, photo_subject: "me" };
-    for (const under18 of ["no", "unsure"] as const) {
-      __setPhotoInspectorForTests(async () => ({ people: 1, faces: 1, under18 }));
-      const photo = await put(teen, `stranger-${under18}`);
-      const o = await pic(teen, args, [photo], "this is a photo of me, change the sweater to blue");
-      expect([under18, text(o).includes(TEEN_PHOTO_LINE)]).toEqual([under18, true]);
-    }
-    expect(image.edits).toHaveLength(0);
-    // A photo that plausibly shows a teen goes through.
-    __setPhotoInspectorForTests(async () => ({ people: 1, faces: 1, under18: "yes" }));
-    const mine = await put(teen, "mine-1");
-    expect((await pic(teen, args, [mine], "this is a photo of me, change the sweater to blue")).status).toBe("succeeded");
-    expect(image.edits).toHaveLength(1);
-    const rows = db.select().from(kidUsage).where(eq(kidUsage.kind, "photo")).all();
-    expect(rows.map((r) => [r.personId, r.outcome, r.units]).sort()).toEqual([[teen.id, "asked", 0], [teen.id, "withheld", 0], [teen.id, "withheld", 0]]);
-  });
 });

@@ -9,7 +9,6 @@ import { Alert, AlertDescription, AlertTitle } from "@maipai/ui/src/ui/alert";
 import { Badge } from "@maipai/ui/src/ui/badge";
 import { Button } from "@maipai/ui/src/ui/button";
 import { Checkbox } from "@maipai/ui/src/ui/checkbox";
-import { LooksLikePicker } from "@/apps/settings/LooksLikePicker";
 import { Input } from "@maipai/ui/src/ui/input";
 import { Label } from "@maipai/ui/src/ui/label";
 import { Switch } from "@maipai/ui/src/ui/switch";
@@ -182,7 +181,7 @@ function StyleRow({ a, refresh, setError }: { a: VideoAdapterRow; refresh: () =>
       <Item>
         <ItemContent>
           <ItemTitle>{a.name} <Badge variant={a.classification === "adult-only" ? "destructive" : "secondary"}>{a.classification === "adult-only" ? "Adults only" : "All ages"}</Badge></ItemTitle>
-          <ItemDescription clamp={false}>{a.licence} · {size(a.bytes)} · made for {kindOfBase(a.base_model).toLowerCase()}{a.trigger_words.length ? ` · adds: ${a.trigger_words.join(", ")}` : ""}{a.looks_like ? ` · looks like ${a.looks_like.name}` : ""}</ItemDescription>
+          <ItemDescription clamp={false}>{a.licence} · {size(a.bytes)} · made for {kindOfBase(a.base_model).toLowerCase()}{a.trigger_words.length ? ` · adds: ${a.trigger_words.join(", ")}` : ""}</ItemDescription>
           {a.needs_confirmation ? (
             <Alert>
               <AlertTitle>Check this before you turn it on</AlertTitle>
@@ -222,7 +221,6 @@ function AddStyle({ refresh }: { refresh: () => void }) {
   const [read, setRead] = useState(false);
   const [allAges, setAllAges] = useState<"yes" | "no" | "unsure">("unsure");
   const [words, setWords] = useState("");
-  const [looksLike, setLooksLike] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -238,12 +236,11 @@ function AddStyle({ refresh }: { refresh: () => void }) {
     // Not sure means adults only: the stricter class wins.
     form.append("classification", allAges === "yes" ? "all-ages" : "adult-only");
     form.append("trigger_words", words);
-    form.append("looks_like", looksLike);
     form.append("file", file, file.name);
     try {
       await videosApi.addAdapter(form);
       refresh();
-      setName(""); setFile(null); setLicence(""); setRead(false); setWords(""); setLooksLike(""); setAllAges("unsure");
+      setName(""); setFile(null); setLicence(""); setRead(false); setWords(""); setAllAges("unsure");
     } catch (e) { setError(messageOf(e, "The style could not be added. Check that the engine is running, then try again.")); }
     finally { setBusy(false); }
   }
@@ -278,11 +275,9 @@ function AddStyle({ refresh }: { refresh: () => void }) {
           <Label htmlFor="vstyle-words">Words that switch the style on (optional, separated by commas)</Label>
           <Input id="vstyle-words" value={words} onChange={(e) => setWords(e.target.value)} maxLength={400} disabled={busy} />
         </div>
-        <LooksLikePicker id="vstyle-looks-like" label="Who does this style look like?" value={looksLike} onChange={setLooksLike} disabled={busy}
-          help="A style of a child, a teen, a guest or anyone outside the household is never added. A style of an adult here is always adults only." />
-        <p className="text-sm text-muted-foreground">The video engine also checks the file and refuses any style that puts a child in an adult scene or names a public figure. It cannot catch everything, so only add styles you trust.</p>
+        <p className="text-sm text-muted-foreground">The video engine checks that the file can be used. Content decisions belong to the model; Home keeps its CSAM and age protections.</p>
         {error ? <p role="alert" className="text-sm text-destructive">{error}</p> : null}
-        <div><Button type="submit" disabled={busy || !file || looksLike === ""}>{busy ? "Adding…" : "Add video style"}</Button></div>
+        <div><Button type="submit" disabled={busy || !file}>{busy ? "Adding…" : "Add video style"}</Button></div>
       </form>
     </section>
   );

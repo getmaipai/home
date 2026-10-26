@@ -1,14 +1,10 @@
 // IMGGEN-SET-01: the Pictures and videos settings view.
-import { afterEach, describe, expect, mock, spyOn, test } from "bun:test";
+import { afterEach, describe, expect, mock, test } from "bun:test";
 import { cleanup, fireEvent, waitFor } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { renderWithQueryClient } from "../../../tests/renderWithQueryClient";
 import { PicturesLibrary } from "@/apps/settings/PicturesLibrary";
-import { likenessApi } from "@/lib/likenessApi";
 import { picturesAdminApi, type AdminAdapter, type AdminOverview } from "@/lib/picturesApi";
-import { api } from "@/lib/api";
-import { SettingsKey } from "@maipai/spec/gen/ts/settings-key.js";
-import { REGISTRY } from "@/shell/pages/settings/settingsTestKit";
 
 afterEach(cleanup);
 
@@ -36,16 +32,6 @@ function mount(data: AdminOverview) {
 }
 
 describe("Pictures and videos settings view", () => {
-  test("renders the household likeness option with the shared settings key renderer", async () => {
-    const setting = SettingsKey.parse(REGISTRY.find((key) => key.key === "generation.household_likeness"));
-    const registry = spyOn(api, "settingsRegistry").mockResolvedValue([setting] as never);
-    const values = spyOn(api, "settingsValues").mockResolvedValue([{ key: setting.key, value: true, source: "default", label: setting.label, help: setting.help, level: setting.level, secret: false }] as never);
-    try {
-      const v = mount(overview());
-      expect(await v.findByRole("switch", { name: setting.label })).toBeTruthy();
-      v.restore();
-    } finally { registry.mockRestore(); values.mockRestore(); }
-  });
 
   test("shows the model, the three ages with children and teens locked off, and each style with its age badge and licence", async () => {
     const v = mount(overview());
@@ -105,38 +91,6 @@ describe("Pictures and videos settings view", () => {
     v.restore();
   });
 
-  test("the add form needs the answer to 'Who does this style look like?', then sends it and not sure as unsure", async () => {
-    const original = { ...likenessApi };
-    likenessApi.adults = mock(async () => [{ id: "p-marlow", name: "Marlow", self: false }, { id: "p-nadia", name: "Nadia", self: false }]);
-    const v = mount(overview({ adapters: [] }));
-    await waitFor(() => expect(v.getByLabelText("Name")).toBeTruthy());
-    fireEvent.change(v.getByLabelText("Name"), { target: { value: "Ink Wash" } });
-    fireEvent.change(v.getByLabelText("Link to the .safetensors file"), { target: { value: "https://huggingface.co/x/y/resolve/main/a.safetensors" } });
-    // Nothing is sent until the question is answered.
-    expect(v.getByRole("button", { name: "Add style" })).toBeDisabled();
-    fireEvent.click(v.getByRole("combobox", { name: "Who does this style look like?" }));
-    fireEvent.click(await v.findByRole("option", { name: "Nobody (not a real person)" }));
-    await waitFor(() => expect(v.getByRole("button", { name: "Add style" })).not.toBeDisabled());
-    fireEvent.click(v.getByRole("button", { name: "Add style" }));
-    await waitFor(() => expect(picturesAdminApi.addAdapter).toHaveBeenCalled());
-    const sent = (picturesAdminApi.addAdapter as unknown as { mock: { calls: Array<[FormData]> } }).mock.calls[0]![0];
-    expect(sent.get("all_ages")).toBe("unsure");
-    expect(sent.get("looks_like")).toBe("nobody");
-    Object.assign(likenessApi, original);
-    v.restore();
-  });
-
-  test("every living adult subject is available in the picker", async () => {
-    const original = { ...likenessApi };
-    likenessApi.adults = mock(async () => [{ id: "p-marlow", name: "Marlow", self: false }, { id: "p-nadia", name: "Nadia", self: false }]);
-    const v = mount(overview({ adapters: [] }));
-    await waitFor(() => expect(v.getByLabelText("Name")).toBeTruthy());
-    fireEvent.click(v.getByRole("combobox", { name: "Who does this style look like?" }));
-    expect((await v.findByRole("option", { name: "Marlow" })).getAttribute("aria-disabled")).not.toBe("true");
-    expect((await v.findByRole("option", { name: "Nadia" })).getAttribute("aria-disabled")).not.toBe("true");
-    Object.assign(likenessApi, original);
-    v.restore();
-  });
 
   test("a big style file already on this computer is added by its path, with no link and no upload", async () => {
     const v = mount(overview({ adapters: [] }));
@@ -144,8 +98,6 @@ describe("Pictures and videos settings view", () => {
     fireEvent.change(v.getByLabelText("Name"), { target: { value: "Ink Wash" } });
     fireEvent.click(v.getByRole("radio", { name: "A file already on this computer (for big files)" }));
     fireEvent.change(v.getByLabelText("Where the .safetensors file is saved on this computer"), { target: { value: " /Users/you/Downloads/ink.safetensors " } });
-    fireEvent.click(v.getByRole("combobox", { name: "Who does this style look like?" }));
-    fireEvent.click(await v.findByRole("option", { name: "Nobody (not a real person)" }));
     await waitFor(() => expect(v.getByRole("button", { name: "Add style" })).not.toBeDisabled());
     fireEvent.click(v.getByRole("button", { name: "Add style" }));
     await waitFor(() => expect(picturesAdminApi.addAdapter).toHaveBeenCalled());

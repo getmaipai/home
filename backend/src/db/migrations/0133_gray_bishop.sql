@@ -1,0 +1,1 @@
+DROP TABLE `likeness_adapters`;

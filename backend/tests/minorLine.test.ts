@@ -57,18 +57,18 @@ describe("the refusal text and the other lines", () => {
   test("a sex reveal party is not a sexual word on its own", () => {
     expect(minorSexualMatch("a gender reveal and sex reveal party for the baby")).toBe(false);
   });
-  test("the real-person flag never refuses an adult (models censor), and still refuses everything for a teen and a child", () => {
-    expect(refusePrompt("a portrait of the mayor", { depictsRealPerson: true })).toBeNull();
-    expect(refusePrompt("a sexual portrait of the mayor", { depictsRealPerson: true })).toBeNull();
-    expect(refusePrompt("a portrait of the mayor", { depictsRealPerson: true, lane: "teen" })).toBe("real_person");
-    expect(refusePrompt("a sexual portrait of the mayor", { depictsRealPerson: true, lane: "teen" })).toBe("real_person");
-    expect(refusePrompt("a sexual portrait of the mayor", { depictsRealPerson: true, lane: "child" })).toBe("child_content");
+  test("the real-person flag does not create a Home content block", () => {
+    expect(refusePrompt("a portrait of the mayor", {})).toBeNull();
+    expect(refusePrompt("a sexual portrait of the mayor", {})).toBeNull();
+    expect(refusePrompt("a portrait of the mayor", { lane: "teen" })).toBeNull();
+    expect(refusePrompt("a sexual portrait of the mayor", { lane: "teen" })).toBeNull();
+    expect(refusePrompt("a sexual portrait of the mayor", { lane: "child" })).toBeNull();
     expect(refusePrompt("she undresses slowly", { lane: "teen" })).toBe("teen_content");
     expect(refusePrompt("she undresses slowly", { lane: "child" })).toBe("child_content");
     // The minor line holds for an adult's request too.
-    expect(refusePrompt("a naked 12 year old girl", { depictsRealPerson: true })).toBe("minor_sexual");
+    expect(refusePrompt("a naked 12 year old girl", {})).toBe("minor_sexual");
   });
-  test("an uploaded photo is still not dressed in swimwear or undressed", () => {
+  test("the model may decide what to do with an uploaded photo", () => {
     expect(asksToUndress("put her in a bikini")).toBe(true);
     expect(asksToUndress("change her sweater to blue")).toBe(false);
   });

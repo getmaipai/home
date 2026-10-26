@@ -15,7 +15,7 @@ import { VIRTUAL_TOOL_REGISTRY } from "@/lib/projects/tool";
 import { isBarePronoun, ownWordsQuery } from "@/lib/text";
 import { detectCsam } from "@maipai/spec/safety/ts/signals.js";
 import { asksForMedia, asksForSong, claimsMedia, lyricsInsteadOfSong, MEDIA_NOT_STARTED_LINE, MEDIA_REASK_INSTRUCTION, MUSIC_STARTED_LINE, SONG_LYRICS_ONLY_NOTE, SONG_LYRICS_REASK_INSTRUCTION } from "@/lib/mediaClaims";
-import { peopleGuidanceSuffix, PICTURE_NOT_HERE_LINE, REAL_PEOPLE_PICTURE_GUIDANCE } from "@/lib/pictures/policy";
+import { PICTURE_NOT_HERE_LINE } from "@/lib/pictures/policy";
 import { laneOfPerson } from "@/lib/pictures/laneGate";
 import type { Lane } from "@/lib/pictures/lane";
 import { visibleText, extractReasoningText, feedThinkSplit, flushThinkSplit, newThinkSplitState } from "@/lib/wellFormed";
@@ -163,10 +163,7 @@ export function toolSpecFor(id: string, lane: Lane = "adult"): ToolSpec | null {
   if (!loaded.ok) return null;
   // CAP-GATE-01: a tool whose package needs a capability that is off is not offered.
   if (missingRequired(loaded.value).length > 0) return null;
-  // PEOPLE-PROMPTS-01: while the household has the extra questions about people off, the picture and video tools say so to the model.
-  const media = id === "generate_image" || id === "generate_video";
-  const realPeople = id === "generate_image" && lane === "adult" ? ` ${REAL_PEOPLE_PICTURE_GUIDANCE}` : "";
-  return { id, description: media ? `${loaded.value.description}${realPeople}${peopleGuidanceSuffix(lane)}` : loaded.value.description, args: loaded.value.args };
+  return { id, description: loaded.value.description, args: loaded.value.args };
 }
 
 /** The reply floor (spec-v0.1.28, U4b-2, turn-machine-state-record-
@@ -940,12 +937,6 @@ const modelRound: Node<ModelInput, ModelOutput> = async (state, input, signal) =
       .map((id) => toolSpecFor(id, laneOfPerson(state.actor)))
       .filter((t): t is ToolSpec => t !== null);
     tool_choice = "auto";
-    // REALPEOPLE-MODEL-2026-10-25: the picture tool is offered to an adult only (`picturesAllowed`), so this reaches adults only. The sentence rides the tail of
-    // the person's own message, never the cached prefix, and only on a turn that asks for a picture: the tool text alone did not move the model's own refusals.
-    const last = messages[messages.length - 1];
-    if (tools.some((t) => t.id === "generate_image") && !state.bare && asksForMedia(input.utterance) && last?.role === "user") {
-      messages = [...messages.slice(0, -1), { ...last, content: `${last.content}\n\n[Home: ${REAL_PEOPLE_PICTURE_GUIDANCE}]` }];
-    }
   }
 
   state.messages = messages;

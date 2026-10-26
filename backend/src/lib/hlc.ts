@@ -59,7 +59,6 @@ export const HLC_BEARING_TABLES = [
   "picture_jobs",
   "video_jobs",
   "music_jobs",
-  "likeness_adapters",
   "media_sources",
   "media_items",
   "media_progress",

@@ -68,7 +68,7 @@ export interface StackVideoStatus {
   loras_supported: boolean;
   lora_count: number;
   audio: boolean;
-  reference_images?: { generated: boolean; uploaded: boolean; household_photo?: boolean; reason: string };
+  reference_images?: { generated: boolean; uploaded: boolean; reason: string };
   /** VIDEO-LTX-01: the two models. An older Stack has none: Quick only, from the fields above. */
   qualities?: { quick: StackVideoQuality; detailed: StackVideoQuality };
 }
@@ -90,8 +90,6 @@ export interface StackVideoLora {
   trigger_words: string[];
   added_by?: string | null;
   added_at: string;
-  /** LIKENESS-01: the household adult this style looks like (an opaque id Home gave with a signed proof), or null. */
-  likeness_subject?: string | null;
 }
 
 export interface VideoBody {
@@ -101,10 +99,8 @@ export interface VideoBody {
   seconds?: number;
   seed?: number;
   image?: string;
-  image_source?: "generated" | "household_photo";
-  /** LIKENESS-01: with `image_source: household_photo`, Home's signed proof bound to this exact picture. */
-  consent_proof?: string;
-  loras?: Array<{ id: string; strength: number; likeness_proof?: string }>;
+  image_source?: "generated" | "uploaded";
+  loras?: Array<{ id: string; strength: number }>;
   audience: "all-ages" | "adult";
   /** The video model, when the caller picks one: "detailed" is the sound-and-speech model (VIDEO-LTX-01, adults only), left out is Quick; a teen or a child is always sent the Quick one (lib/pictures/lane.ts, videoModelForLane). */
   model?: string;

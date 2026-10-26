@@ -1,22 +1,7 @@
-// IMGGEN-SET-01: the household's picture controls (docs/design/image-generation-2026-10-17.md, "Policy"). Declared
-// here and written to the spec registry by `scripts/gen-settings-registry.ts`, like the reference keys. Children and
-// teens never make pictures whatever these say (lib/pictures/policy.ts): they are controls for adults only, and
-// the absolute lines (nothing sexual involving a minor, no adult content of another household adult) have no key.
+// IMGGEN-SET-01: household picture controls. CSAM prevention and age-specific child and teen floors have no key.
 import { SettingsKey } from "@maipai/spec/gen/ts/settings-key.js";
 
 export const PICTURE_SETTINGS_KEYS: SettingsKey[] = [
-  SettingsKey.parse({
-    key: "generation.household_likeness",
-    scope: "household",
-    selector: "boolean",
-    default: true,
-    label: "Family can make pictures and videos of each other",
-    help: "Anyone in the household may make pictures, videos and songs with or of any household member. An admin can turn this off.",
-    level: "basic",
-    copy: { does: "Sets whether household members may include one another in things made here." },
-    lives_in: "household.pictures",
-    honoured_by: ["home"],
-  }),
   SettingsKey.parse({
     key: "generation.adults",
     scope: "household",
@@ -69,22 +54,6 @@ export const PICTURE_SETTINGS_KEYS: SettingsKey[] = [
     lives_in: "household.ai_pictures",
     honoured_by: ["home"],
   }),
-  // PEOPLE-PROMPTS-01 (owner ruling 2026-10-17: "it's annoying"): the extra questions and warnings about people in pictures and videos
-  // are one household switch, off by default. It never reaches a safety rule: nothing sexual involving a minor, a real person's
-  // are one household switch, off by default. It never reaches a safety rule: children, nothing sexual involving a minor, a real person's
-  // likeness outside the household option, the finished-picture check and the fail-closed freeze have no key at all.
-  SettingsKey.parse({
-    key: "generation.people_prompts",
-    scope: "household",
-    selector: "boolean",
-    default: false,
-    label: "Ask me before making pictures and videos of people",
-    help: "When off, Home makes what you ask for without extra questions or warnings. Safety rules for children and for real people never turn off.",
-    level: "basic",
-    copy: { does: "Turns the extra questions and warnings about people in pictures and videos on or off." },
-    lives_in: "household.pictures",
-    honoured_by: ["home"],
-  }),
   // KIDS-CREATE-01 (owner ruling 2026-10-17: "Kids can make cartoon images and videos of safe content"): a strict child lane, on by
   // default, with a switch for the home, a switch for one child and two daily limits. Everything a child makes is cartoon-only and passes
   // the child-safety check; real people, photos and adult content are never part of it (lib/pictures/lane.ts).
@@ -135,7 +104,7 @@ export const PICTURE_SETTINGS_KEYS: SettingsKey[] = [
     copy: { does: "Turns cartoon making on or off for this one person." },
     control: { child: "guardian", teen: "self", adult: "self" },
     band_default: { child: true, teen: true, adult: true },
-    lives_in: "person.likeness",
+    lives_in: "person.limits",
     honoured_by: ["home"],
   }),
 ];

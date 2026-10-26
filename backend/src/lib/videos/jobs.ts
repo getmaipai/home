@@ -17,7 +17,6 @@ import { checkImages, isAdultOnlyJob } from "@/lib/pictures/ageCheck";
 import { gateFinished, laneOfPerson } from "@/lib/pictures/laneGate";
 import { videoModelForLane } from "@/lib/pictures/lane";
 import { ensureKeyframeHelper, extractKeyframes } from "@/lib/pictures/keyframes";
-import { likenessStillAllowed, type JobLikeness } from "@/lib/likeness/guard";
 import { clearLive, updateLive } from "@/lib/genLive";
 import { cancelOrDeleteVideo, fetchClip, fetchPoster, fetchVideoPreview, getVideoJob, StackVideoError, submitVideo, type StackClip, type VideoBody } from "./stack";
 
@@ -52,8 +51,6 @@ export interface VideoRequest {
   audience: "all-ages" | "adult";
   /** VIDEO-LTX-01: Quick or Detailed (absent on a job stored before the choice existed: Quick). */
   quality?: "quick" | "detailed";
-  /** LIKENESS-01: set when the clip looks like a household adult. Checked again on every poll while the job waits. */
-  likeness?: JobLikeness | null;
 }
 
 export interface VideoJob {
@@ -155,10 +152,6 @@ registerQueueProvider(() => {
 
 async function releaseVideo(job: VideoJob): Promise<void> {
   if (job.state !== "queued" || job.stackJob) return;
-  if (job.request.likeness) {
-    const allowed = likenessStillAllowed(job.request.likeness);
-    if (!allowed.ok) { job.state = "failed"; job.error = allowed.line; persistVideoJob(job); refreshHouseholdQueue(); return; }
-  }
   try {
     const storedBody = (job.request as VideoRequest & { stackBody?: Omit<VideoBody, "timeout_ms"> }).stackBody;
     const submitted = await submitVideo({ ...(storedBody ?? { prompt: job.prompt, audience: job.request.audience, size: job.request.size, seconds: job.request.seconds }), timeout_ms: 1 });
@@ -202,7 +195,7 @@ export function videoJobIdsByTurn(actor: PersonRow, turnIds: readonly string[]):
 
 // ---------------------------------------------------------------- temporary clips (memory only)
 
-interface TemporaryClip { id: string; conversationId: string; ownerPersonId: string; mediaType: string; bytes: Uint8Array; createdAt: number; /** LIKENESS-01: the poster of a clip that looks like a person is not a free starting picture. */ noReference?: true }
+interface TemporaryClip { id: string; conversationId: string; ownerPersonId: string; mediaType: string; bytes: Uint8Array; createdAt: number }
 const TEMP_MS = 2 * 60 * 60 * 1000;
 const temporaryClips = new Map<string, TemporaryClip>();
 function storeTemporaryClip(clip: Omit<TemporaryClip, "createdAt">): void {
@@ -243,7 +236,7 @@ export function __resetVideoJobsForTests(): void {
 export const GENERATED_PICTURE_NOTE = "picture-gen:";
 export const CLIP_POSTER_NOTE = "video-poster:";
 
-export type ReferenceResult = { ok: true; id: string; base64: string; bytes: Uint8Array; width: number | null; height: number | null; /** The person this picture looks like, if Home recorded a household subject. */ likenessSubject: string | null } | { ok: false; line: string };
+export type ReferenceResult = { ok: true; id: string; base64: string; bytes: Uint8Array; width: number | null; height: number | null } | { ok: false; line: string };
 const NOT_GENERATED_LINE = "I can only animate a picture that was made here in this home. Ask me to make a picture first, then animate that one.";
 
 /** The newest picture of this temporary chat the Stack made: a generated picture or the poster of a clip, whichever is newer. */
@@ -259,11 +252,11 @@ export function latestTemporaryPosterId(actor: PersonRow, conversationId: string
 export function loadGeneratedReference(actor: PersonRow, conversationId: string, fileId: string, temporary: boolean): ReferenceResult {
   if (temporary) {
     const clip = temporaryClips.get(fileId);
-    if (clip && clip.ownerPersonId === actor.id && clip.conversationId === conversationId && clip.mediaType === "image/jpeg" && clip.noReference !== true) return { ok: true, id: fileId, base64: Buffer.from(clip.bytes).toString("base64"), bytes: clip.bytes, width: null, height: null, likenessSubject: null };
+    if (clip && clip.ownerPersonId === actor.id && clip.conversationId === conversationId && clip.mediaType === "image/jpeg") return { ok: true, id: fileId, base64: Buffer.from(clip.bytes).toString("base64"), bytes: clip.bytes, width: null, height: null };
     // A temporary picture counts only when Home marked it `generated` when the picture engine made it (a field no upload
     // can set; a file name proves nothing). The Stack still checks the bytes' hash.
     const image = getTemporaryChatImage(actor, conversationId, fileId);
-    if (image && (image.generated === true || image.likeness)) return { ok: true, id: fileId, base64: Buffer.from(image.bytes).toString("base64"), bytes: image.bytes, width: image.width, height: image.height, likenessSubject: image.likeness ?? null };
+    if (image && (image.generated === true)) return { ok: true, id: fileId, base64: Buffer.from(image.bytes).toString("base64"), bytes: image.bytes, width: image.width, height: image.height };
     return { ok: false, line: NOT_GENERATED_LINE };
   }
   const row = db.select().from(attachments).where(eq(attachments.id, fileId)).get();
@@ -274,20 +267,18 @@ export function loadGeneratedReference(actor: PersonRow, conversationId: string,
   if (!read.ok) return { ok: false, line: NOT_GENERATED_LINE };
   let width: number | null = null;
   let height: number | null = null;
-  let likenessSubject: string | null = null;
   try {
-    const meta = JSON.parse(note.slice(note.indexOf(":") + 1)) as { width?: number; height?: number; likeness?: string | null; audience?: string };
+    const meta = JSON.parse(note.slice(note.indexOf(":") + 1)) as { width?: number; height?: number; audience?: string };
     width = typeof meta.width === "number" ? meta.width : null;
     height = typeof meta.height === "number" ? meta.height : null;
-    likenessSubject = typeof meta.likeness === "string" && meta.likeness ? meta.likeness : null;
   } catch { /* the size is only a hint for the clip's shape */ }
-  return { ok: true, id: fileId, base64: Buffer.from(read.value.bytes).toString("base64"), bytes: read.value.bytes, width, height, likenessSubject };
+  return { ok: true, id: fileId, base64: Buffer.from(read.value.bytes).toString("base64"), bytes: read.value.bytes, width, height };
 }
 
 export type PhotoResult = { ok: true; id: string; base64: string; bytes: Uint8Array; width: number | null; height: number | null } | { ok: false; line: string };
 const NOT_A_PHOTO_LINE = "I can't find that photo any more. Attach it again and ask once more.";
 
-/** A photo a person attached in this conversation (not one this home made), as its stored bytes, unchanged. It starts a clip only for a declared household adult, after the photo is checked to show exactly that one person. */
+/** A photo the person attached in this conversation, as its stored bytes, unchanged. */
 export function loadUploadedPhoto(actor: PersonRow, conversationId: string, fileId: string, temporary: boolean): PhotoResult {
   const typeOk = (type: string) => type === "image/png" || type === "image/jpeg" || type === "image/webp";
   if (temporary) {
@@ -323,8 +314,6 @@ export interface StartVideoInput {
   prompt: string;
   body: Omit<VideoBody, "timeout_ms">;
   sourceFileId?: string | null;
-  /** LIKENESS-01: the clip looks like this household adult (already decided by lib/likeness/decide.ts). */
-  likeness?: JobLikeness | null;
 }
 
 /** Submits to the Stack and returns the job once the Stack has it; throws `StackVideoError` when the Stack refuses. */
@@ -337,7 +326,7 @@ export async function startVideoJob(input: StartVideoInput): Promise<VideoJob> {
   const job: VideoJob = {
     id: newVideoJobId(), personId: input.actor.id, conversationId: input.conversationId, turnId: input.turnId, companionId: input.companionId ?? null, kind: input.kind, state: "queued", stackJob: null,
     percent: 0, phase: "queued", position: null, prompt: input.prompt,
-    request: ({ size: input.body.size ?? (model === "detailed" ? "768x448" : "832x480"), seconds: input.body.seconds ?? 5, quality: model === "detailed" ? "detailed" : "quick", seed: input.body.seed ?? null, loras: (input.body.loras ?? []).map((l) => l.id), source_file_id: input.sourceFileId ?? null, audience: input.body.audience, stackBody: { ...input.body, ...(model ? { model } : {}) }, ...(input.likeness ? { likeness: input.likeness } : {}) } as VideoRequest),
+    request: ({ size: input.body.size ?? (model === "detailed" ? "768x448" : "832x480"), seconds: input.body.seconds ?? 5, quality: model === "detailed" ? "detailed" : "quick", seed: input.body.seed ?? null, loras: (input.body.loras ?? []).map((l) => l.id), source_file_id: input.sourceFileId ?? null, audience: input.body.audience, stackBody: { ...input.body, ...(model ? { model } : {}) },  } as VideoRequest),
     error: null, files: [], temporary: input.temporary, createdAt: now, updatedAt: now,
   };
   liveJobs.set(job.id, job);
@@ -361,36 +350,6 @@ function sleep(ms: number, signal: AbortSignal): Promise<void> {
   });
 }
 
-/** LIKENESS-01: ends the job (and the Stack's copy) when its subject no longer agrees. True when it did. */
-function stopForLikeness(job: VideoJob): boolean {
-  const likeness = job.request.likeness;
-  if (!likeness) return false;
-  const now = likenessStillAllowed(likeness);
-  if (now.ok) return false;
-  job.state = "failed";
-  job.error = now.line;
-  job.files = [];
-  saveVideoJob(job);
-  watching.get(job.id)?.abort();
-  watching.delete(job.id);
-  if (job.stackJob) void cancelOrDeleteVideo(job.stackJob);
-  return true;
-}
-
-/** Stop every unfinished clip job when its subject leaves the household. */
-export function stopLikenessVideoJobs(subjectPersonId: string): number {
-  let count = 0;
-  const jobs = new Map<string, VideoJob>();
-  for (const job of [...memory.values(), ...liveJobs.values()]) if (job.state === "queued" || job.state === "running") jobs.set(job.id, job);
-  for (const row of db.select().from(videoJobs).where(inArray(videoJobs.state, ["queued", "running"])).all()) if (!jobs.has(row.id)) jobs.set(row.id, fromRow(row));
-  for (const job of jobs.values()) {
-    const likeness = job.request.likeness;
-    if (!likeness || likeness.subject !== subjectPersonId || likeness.subject === likeness.requester) continue;
-    if (stopForLikeness(job)) count += 1;
-  }
-  return count;
-}
-
 async function watch(job: VideoJob, actor: PersonRow, early: StackClip[] | null = null): Promise<void> {
   if (!job.stackJob || watching.has(job.id)) return;
   const controller = new AbortController();
@@ -398,13 +357,10 @@ async function watch(job: VideoJob, actor: PersonRow, early: StackClip[] | null 
   const deadline = Date.now() + MAX_WATCH_MS;
   try {
     if (early) {
-      if (stopForLikeness(job)) return;
       await finish(job, actor, early, controller.signal);
       return;
     }
     while (!controller.signal.aborted && Date.now() < deadline) {
-      // The household option and subject eligibility are checked on every poll, so a queued clip is stopped after a stricter change.
-      if (stopForLikeness(job)) return;
       let status;
       try {
         status = await getVideoJob(job.stackJob);
@@ -415,7 +371,7 @@ async function watch(job: VideoJob, actor: PersonRow, early: StackClip[] | null 
         continue;
       }
       if (controller.signal.aborted) return;
-      if (status.state === "done") { if (stopForLikeness(job)) return; await finish(job, actor, status.data, controller.signal); return; }
+      if (status.state === "done") { await finish(job, actor, status.data, controller.signal); return; }
       if (status.state === "failed") { job.state = "failed"; job.error = plainVideoFailure(new StackVideoError(500, status.code ?? "failed", status.error ?? "")); saveVideoJob(job); return; }
       if (status.state === "cancelled" && status.code === "no_memory") {
         const request = job.request as VideoRequest & { memoryRequeues?: number };
@@ -496,14 +452,14 @@ async function finish(job: VideoJob, actor: PersonRow, clips: StackClip[], signa
       const id = newFileId();
       const posterId = newFileId();
       storeTemporaryClip({ id, conversationId, ownerPersonId: actor.id, mediaType: "video/mp4", bytes: video });
-      storeTemporaryClip({ id: posterId, conversationId, ownerPersonId: actor.id, mediaType: "image/jpeg", bytes: poster, ...(job.request.likeness ? { noReference: true as const } : {}) });
+      storeTemporaryClip({ id: posterId, conversationId, ownerPersonId: actor.id, mediaType: "image/jpeg", bytes: poster,  });
       file = { id, poster_id: posterId, width, height, seconds: meta.seconds, seed: meta.seed, model: meta.model, ms: meta.ms, bytes: video.byteLength, quality, audio: meta.audio };
     } else {
       if (!job.turnId || !(await waitForTurnRow(job.turnId))) throw new Error("turn row never appeared");
       if (signal.aborted) return;
       const made = createAttachment(actor, { conversationId, turnId: job.turnId, mediaType: "video/mp4", bytes: video, provenance: `video-gen:${JSON.stringify({ v: 1, audience: adult ? "adult-only" : "all-ages", job: job.id, ...meta })}`, deduplicate: false, retention: "conversation" });
       if (!made.ok) { job.state = "failed"; job.error = saveFailureLine(made.status); saveVideoJob(job); return; }
-      const madePoster = createAttachment(actor, { conversationId, turnId: job.turnId, mediaType: "image/jpeg", bytes: poster, provenance: `${CLIP_POSTER_NOTE}${JSON.stringify({ v: 1, audience: adult ? "adult-only" : "all-ages", job: job.id, width, height, ...(job.request.likeness ? { likeness: job.request.likeness.subject } : {}) })}`, deduplicate: false, retention: "conversation" });
+      const madePoster = createAttachment(actor, { conversationId, turnId: job.turnId, mediaType: "image/jpeg", bytes: poster, provenance: `${CLIP_POSTER_NOTE}${JSON.stringify({ v: 1, audience: adult ? "adult-only" : "all-ages", job: job.id, width, height,  })}`, deduplicate: false, retention: "conversation" });
       if (!madePoster.ok) { job.state = "failed"; job.error = saveFailureLine(madePoster.status); saveVideoJob(job); return; }
       file = { id: made.value.id, poster_id: madePoster.value.id, width, height, seconds: meta.seconds, seed: meta.seed, model: meta.model, ms: meta.ms, bytes: video.byteLength, quality, audio: meta.audio };
     }

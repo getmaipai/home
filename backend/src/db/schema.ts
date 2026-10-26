@@ -1920,27 +1920,6 @@ export const videoAdapterPrefs = sqliteTable("video_adapter_prefs", {
   updatedBy: text("updated_by"),
 });
 
-// LIKENESS-01: who a saved style (LoRA) looks like, declared when it was added (spec LikenessAdapter). The Stack owns the
-// file; this row is Home's record of whom it depicts, so eligibility and the household setting can be checked at request time.
-// `subject_person_id` is null for "Nobody (not a real person)".
-export const likenessAdapters = sqliteTable(
-  "likeness_adapters",
-  {
-    id: text("id").primaryKey(),
-    adapterId: text("adapter_id").notNull(),
-    medium: text("medium").notNull(),
-    subjectPersonId: text("subject_person_id").references(() => people.id),
-    classification: text("classification").notNull(),
-    state: text("state").notNull(),
-    declaredBy: text("declared_by").notNull().references(() => people.id),
-    source: text("source").notNull(),
-    createdAt: text("created_at").notNull(),
-    updatedAt: text("updated_at").notNull(),
-    hlc: text("hlc").notNull(),
-  },
-  (table) => [index("likeness_adapters_subject_idx").on(table.subjectPersonId), uniqueIndex("likeness_adapters_medium_adapter_idx").on(table.medium, table.adapterId)],
-);
-
 // MEDIA-LIB-01 / MEDIA-PROGRESS-01 (docs/design/media-apps-blend-2026-10-17.md, section 7): the four media records of
 // spec-v0.1.163 (MediaSource, MediaItem, MediaProgress, MediaCollection) in one migration so no later media slice needs
 // one. Each spec object field is stored as JSON text; the fields the app filters or joins on are real columns.

@@ -4,7 +4,7 @@ export const CONTENT_SETTINGS_KEYS: SettingsKey[] = [SettingsKey.parse({
   key: "content.filters",
   scope: "person",
   selector: "select",
-  range: { multiple: true, options: ["swearing", "drugs", "gambling", "gore", "sexual", "minor_line", "real_person"] },
+  range: { multiple: true, options: ["swearing", "drugs", "gambling", "gore", "sexual", "minor_line"] },
   default: [],
   label: "Content filters",
   help: "Choose more content to block. The filters for your age stay on.",

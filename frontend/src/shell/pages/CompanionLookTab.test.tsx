@@ -46,12 +46,11 @@ test("Copy prompt shows selectable text when clipboard access is denied", async 
   expect((await view.findByLabelText("Copy this text yourself.")).getAttribute("readonly")).not.toBeNull(); expect((view.getByLabelText("Copy this text yourself.") as HTMLTextAreaElement).value).toBe(text);
 });
 
-test("upload sends rights and likeness fields and shows Home's 400 sentence", async () => {
+test("upload sends the picture without content or rights confirmation fields", async () => {
   let sent: FormData | undefined; api.uploadCompanionLook = async (_id, body) => { sent = body; throw new ApiError("Use a PNG, JPEG or WebP picture.", 400); };
-  const view = open(); await showLook(view); fireEvent.click(view.getByRole("button", { name: "Upload a picture" })); fireEvent.change(view.getByLabelText("Picture (PNG, JPEG or WebP)"), { target: { files: [new File(["png"], "fox.png", { type: "image/png" })] } }); fireEvent.click(view.getByLabelText("I made this picture or have the right to use it")); fireEvent.click(view.getByRole("button", { name: "Upload" })); await waitFor(() => expect(view.getByText("Use a PNG, JPEG or WebP picture.")).toBeTruthy()); expect(sent?.get("rights_confirmed")).toBe("true"); expect(sent?.get("shows_real_person")).toBe("false"); expect(sent?.get("image")).toBeTruthy();
+  const view = open(); await showLook(view); fireEvent.click(view.getByRole("button", { name: "Upload a picture" })); fireEvent.change(view.getByLabelText("Picture (PNG, JPEG or WebP)"), { target: { files: [new File(["png"], "fox.png", { type: "image/png" })] } }); fireEvent.click(view.getByRole("button", { name: "Upload" })); await waitFor(() => expect(view.getByText("Use a PNG, JPEG or WebP picture.")).toBeTruthy()); expect(sent?.get("rights_confirmed")).toBeNull(); expect(sent?.get("shows_real_person")).toBeNull(); expect(sent?.get("image")).toBeTruthy();
 });
 
-test("real person choice shows the line and disables upload", async () => { const view = open(); await showLook(view); fireEvent.click(view.getByRole("button", { name: "Upload a picture" })); fireEvent.click(view.getByLabelText("This is a picture of a real person")); expect(view.getByText("Pictures of real people are not supported here yet. Use a drawing or a character instead.")).toBeTruthy(); expect(view.getByRole("button", { name: "Upload" }).hasAttribute("disabled")).toBe(true); });
 
 test("running generation polls, shows progress, and refreshes new pictures", async () => {
   let resolveJob!: (job: CompanionLookJob) => void; let completed = false;

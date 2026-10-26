@@ -1,5 +1,5 @@
 // IMGGEN-SET-01: the admin side of pictures. Owner and admin only; a style starts switched off until confirmed;
-// uncertain means adult-only; the likeness box and the licence are required; the household's restriction hides
+// uncertain means adult-only; the licence is required; the household's restriction hides
 // adult-only styles from everyone; children and teens show as locked off.
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { eq } from "drizzle-orm";
@@ -29,7 +29,7 @@ function form(fields: Record<string, string>, file = true): FormData {
   if (file) f.append("file", new File([new Uint8Array([1, 2, 3, 4])], "style.safetensors"));
   return f;
 }
-const GOOD = { name: "Ink Wash", licence: "apache-2.0", not_real_person: "true", all_ages: "yes", trigger_words: "inkwash, sumi" };
+const GOOD = { name: "Ink Wash", licence: "apache-2.0", all_ages: "yes", trigger_words: "inkwash, sumi" };
 
 describe("overview", () => {
   test("lists the engine, every style with its switch and the three bands", async () => {
@@ -88,14 +88,6 @@ describe("adding a style", () => {
     expect(fake.loraAdds.map((a) => a.classification)).toEqual(["adult-only", "adult-only"]);
   });
 
-  test("the likeness box is required", async () => {
-    const { client } = await owner();
-    const res = await client.postForm("/api/pictures/admin/adapters", form({ ...GOOD, not_real_person: "false" }));
-    expect(res.status).toBe(422);
-    expect(((await res.json()) as { code: string }).code).toBe("likeness_unconfirmed");
-    expect(fake.loraAdds).toHaveLength(0);
-  });
-
   test("a licence that is not plainly free needs the person to say they read it", async () => {
     const { client } = await owner();
     const res = await client.postForm("/api/pictures/admin/adapters", form({ ...GOOD, licence: "custom community licence" }));
@@ -105,7 +97,7 @@ describe("adding a style", () => {
     expect(ok.status).toBe(200);
   });
 
-  test("the Stack's refusal of a minor or a real person's likeness reaches the admin in its own words", async () => {
+  test("the Stack's refusal reaches the admin in its own words", async () => {
     fake.loraRefusal = { code: "lora_refused", error: "This style was refused: its description names a real person's likeness." };
     const { client } = await owner();
     const res = await client.postForm("/api/pictures/admin/adapters", form(GOOD));

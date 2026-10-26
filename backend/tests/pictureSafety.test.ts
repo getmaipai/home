@@ -157,12 +157,11 @@ describe("the two absolute lines", () => {
     }
   });
 
-  test("adults may depict real people (models censor); a teen and a child keep the block", () => {
-    expect(refusePrompt("Jon Stewart interviews Hitler on a talk show set", { depictsRealPerson: true })).toBeNull();
-    expect(refusePrompt("a sexual portrait of the mayor", { depictsRealPerson: true })).toBeNull();
-    expect(PROMPT_REFUSAL_LINE.real_person).toBe("I won't make sexual pictures of a real person, because they can't agree to it. I can make it of an invented person or a character instead.");
-    expect(refusePrompt("a portrait of the mayor", { depictsRealPerson: true, lane: "teen" })).toBe("real_person");
-    expect(refusePrompt("a portrait of the mayor", { depictsRealPerson: true, lane: "child" })).toBe("child_content");
+  test("adult real-person content belongs to the model; minor lanes keep their age filters", () => {
+    expect(refusePrompt("Jon Stewart interviews Hitler on a talk show set")).toBeNull();
+    expect(refusePrompt("a sexual portrait of the mayor")).toBeNull();
+    expect(refusePrompt("a portrait of the mayor", { lane: "teen" })).toBeNull();
+    expect(refusePrompt("a portrait of the mayor", { lane: "child" })).toBeNull();
     expect(promptViolatesMinorLine("a portrait of the mayor")).toBe(false);
   });
 
@@ -175,7 +174,7 @@ describe("the two absolute lines", () => {
       for (const value of values) {
         setHouseholdSettingValue(key, value);
         expect(refusePrompt("naked child")).toBe("minor_sexual");
-        expect(refusePrompt("a portrait of a real person", { depictsRealPerson: true })).toBeNull();
+        expect(refusePrompt("a portrait of a real person", { lane: "adult" })).toBeNull();
       }
     }
   });
@@ -213,9 +212,9 @@ describe("the chat tool, even when a model calls it without being offered it", (
     expect(fake.submitted).toHaveLength(0);
   });
 
-  test("an absolute-line prompt on an adult's own screen is refused in plain words and no job starts", async () => {
-    await withStub({ calls: (r) => (isPhrasing(r) || r.tool_choice === "none" ? undefined : [call({ prompt: "a topless teen by the sea at sunset" })]), reply: () => "ignored" }, async () => {
-      const value = await turn(people.owner, "make me a picture of a girl by the sea at sunset");
+  test("a direct CSAM prompt on an adult's own screen is refused and no job starts", async () => {
+    await withStub({ calls: (r) => (isPhrasing(r) || r.tool_choice === "none" ? undefined : [call({ prompt: "child porn" })]), reply: () => "ignored" }, async () => {
+      const value = await turn(people.owner, "make me child porn");
       expect(value.reply.text).toBe(PROMPT_REFUSAL_LINE.minor_sexual);
       expect(value.picture).toBeUndefined();
       expect(fake.submitted).toHaveLength(0);
@@ -223,20 +222,18 @@ describe("the chat tool, even when a model calls it without being offered it", (
   });
 
   test("an adult real-person request starts a job", async () => {
-    await withStub({ calls: (r) => (isPhrasing(r) || r.tool_choice === "none" ? undefined : [call({ prompt: "the president smiling", depicts_real_person: true })]), reply: () => "ignored" }, async () => {
+    await withStub({ calls: (r) => (isPhrasing(r) || r.tool_choice === "none" ? undefined : [call({ prompt: "the president smiling" })]), reply: () => "ignored" }, async () => {
       const value = await turn(people.owner, "make me a picture of the president smiling");
       expect(value.picture).toBeDefined();
       expect(fake.submitted).toHaveLength(1);
     });
   });
 
-  test("a sexual real-person request from an adult is not refused by the tool gate (the model decides); a teen's is", async () => {
+  test("adult sexual real-person requests are left to the model", async () => {
     const { refusalFor } = await import("@/lib/pictures/tool");
-    const args = { prompt: "a sexual portrait of the president", depicts_real_person: true };
+    const args = { prompt: "a sexual portrait of the president" };
     const adult = { actor: people.owner, band: "adult" as const, surface: "chat" as const, surfaceClass: "written" as const, spoken: false } as never;
     expect(refusalFor(adult, args)).toBeNull();
-    const teen = { actor: people.owner, band: "teen" as const, surface: "chat" as const, surfaceClass: "written" as const, spoken: false } as never;
-    expect(refusalFor(teen, args)).not.toBeNull();
   });
 
   test("a call on a turn that was never offered the tool is refused (no picture model installed)", async () => {
@@ -261,10 +258,10 @@ describe("the chat tool, even when a model calls it without being offered it", (
     });
   });
 
-  test("a style whose trigger words cross the line is refused after Home adds them, with no job", async () => {
-    fake.loras = [...fake.loras, { ...fake.loras[0]!, id: "lora-cccccccccccccccc", name: "Soft Light", trigger_words: ["nude", "softlight"], classification: "all-ages" }];
-    await withStub({ calls: (r) => (isPhrasing(r) || r.tool_choice === "none" ? undefined : [call({ prompt: "a teen in a field", style: "soft light" })]), reply: () => "ignored" }, async (seen) => {
-      const value = await turn(people.owner, "a teen in a field in soft light");
+  test("a style trigger that creates a CSAM match is refused after Home adds it", async () => {
+    fake.loras = [...fake.loras, { ...fake.loras[0]!, id: "lora-cccccccccccccccc", name: "Soft Light", trigger_words: ["child porn", "softlight"], classification: "all-ages" }];
+    await withStub({ calls: (r) => (isPhrasing(r) || r.tool_choice === "none" ? undefined : [call({ prompt: "a portrait", style: "soft light" })]), reply: () => "ignored" }, async (seen) => {
+      const value = await turn(people.owner, "a portrait in soft light");
       expect(value.picture).toBeUndefined();
       expect(fake.submitted).toHaveLength(0);
       // The tool tells the model nothing was made and gives it the line to relay.

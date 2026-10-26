@@ -29,23 +29,10 @@ ruling, 2026-10-12): an admin may override them in either direction, globally (g
 user override), and the kid or teen never can. Precedence is user overrides > global defaults > user defaults. Except web
 sources (`search.web_sources`), which are one household setting only an admin sets, with no per-person override
 ([record](../plans/web-sources-household-2026-10-12.md)). The
-adult-site host list (locked on for every kid and teen, a custom allow never lifts it) and the output gate stay fixed
-and no setting reaches them. Web search runs without a parent's approval when the household has it on for their controls.
-Picture, video and song generation under this rule (owner's rulings, 2026-10-17 and 2026-10-18): one set of content protections
-per person, set by age, covers everything Home makes (chat, search, pictures, videos and songs), so a person who has swearing,
-drugs, gambling or gore filtered gets none of it in a reply, a song, a picture or a video, including a picture of themselves and
-friends doing it. Nothing sexual involving a minor is allowed anywhere, and that is not negotiable. Sexual content, gore and other
-adult content are adult only. A teen makes pictures, videos and songs and edits pictures with nothing adult or sexual. A child
-makes cartoon pictures and videos and kid-friendly songs of safe things in a strict lane (the cartoon look forced, a child-safe
-topic gate, no photos, no references, no real people, edits only of their own cartoons, a daily limit, on by default with a switch
-for the home and one per child). A child's request that is too scary or too adult is rewritten into a kid-friendly version and
-not refused (a heavy rock song about a scary Halloween becomes a happy, light rock song about Halloween that is not too scary),
-and the result is checked as finished, and as sung for a song. Family: anyone in the household may make pictures, videos and songs
-with or of any household member, as a household option that is on by default. The age gate is not loosened by any of this: the
-finished-item check (nothing nude or sexual for a teen or a child whoever is in it, a cartoon and child-safe for a child, a check
-that cannot run withholds), the absolute line (nothing sexual involving a minor, anywhere, for anyone; teens and children never get a real person outside the household or a public figure at all) and the surface gate stay fixed, and no setting, including `generation.people_prompts`, reaches them. Owner-approved: 2026-10-25 (Jesse, chat: "everyone can do anything except teens and kids have filters blocking things like sexual"; record [content-policy-2026-10-18.md](content-policy-2026-10-18.md), Supersedes): an adult may make any picture or video of a real person, a public figure or a historical person (satire, scenes, humor), where before the absolute line refused them; a teen or a child keeps the real-person block unchanged.
+adult-site host list (locked on for every kid and teen, a custom allow never lifts it) stays fixed and no setting reaches it. Web search runs without a parent's approval when the household has it on for their controls. Picture, video and song generation access remains governed by age and surface gates. Children and teens retain their age-based content filters and finished-item checks. For an adult, Home blocks content only to prevent CSAM; all other content decisions belong to the model, including its own refusal. This applies to written and spoken chat, pictures, video, music, edits and companion media. The adult CSAM check uses direct CSAM detection, not a broad minor-word plus sexual-word rule. A possible minor in nude or sexual generated media is treated as a CSAM candidate and withheld; an ordinary mention of a minor, or a nonsexual depiction, is not by itself blocked for an adult. Family: anyone in the household may make pictures, videos and songs with or of any household member, as a household option that is on by default. Owner-approved: Jesse, 2026-10-26; record [adult-content-model-decides-2026-10-26.md](adult-content-model-decides-2026-10-26.md).
 
-**Models censor; the app filters only to protect kids (Owner-approved: 2026-10-25, Jesse in chat: "models do censorship, our app does filtering - and the only filtering we do is for kid protection"; record [models-censor-app-protects-kids-2026-10-25.md](models-censor-app-protects-kids-2026-10-25.md)).** For an adult on their own written screen the app adds no content filter, no word list, no classifier refusal on content, no consent step for content and no fail-closed content check; whether something is made is the model's own judgment. A person's own opt-in filter for themselves stays; the app imposes none. The app's content filtering is only for a child or a teen, plus the one line that holds for everyone: nothing sexual involving a minor, which includes the finished-item check that withholds an image or clip showing a possible minor in nude or sexual content, and the minor checks fail closed for everyone on adult-only or sexual work: when the check cannot run, the work is withheld. What also stays, because it is not content censorship: the age and surface gates, the credential catch, prompt-injection, jailbreak and PII-extraction handling, crisis handling, the one-time adult acknowledgment, a household's feature switches and quotas. This supersedes every earlier adult-side absolute line (sexual content of a real person, a photo of a real person becoming adult content, the household adult's per-use consent) and the real-voice song limit.
+**Adult content is the model's decision; CSAM is Home's only content block (Owner-approved: Jesse, 2026-10-26).** Home does not use content classifiers, word lists, consent prompts, or category rules to block adult requests or replies, except dedicated CSAM prevention. Adult input uses request-aware CSAM screening; adult model replies and adult media use direct CSAM detection. For generated images and video, possible-minor plus nudity or sexualization is treated as a CSAM candidate. An unrun check on an adult-only media job fails closed because the output remains an unchecked CSAM candidate. The model and its provider may refuse other content under their own policies; Home passes those decisions through. Content filtering for children and teens remains. Non-content protections remain for credentials, prompt injection, jailbreaks, private-data extraction, crisis response, age and surface access, feature switches, quotas, and technical validation. A classifier that blocks an adult for sexual content, violence, hate, real-person likeness, a threat, or another non-CSAM category violates this rule.
+
 A robot's controls set the band for its unknown speaker, never its companion (owner's ruling, 2026-10-21; [record](dynamic-companions-2026-10-21.md)):
 a robot with a companion assigned takes the controls level the admin set (child, teen or adult), a robot with no companion, and every
 other unknown speaker on a shared surface, gets the child result. A companion declares an audience: `all` (dynamic, adapts to the
@@ -304,24 +291,8 @@ companion. Owner-approved: 2026-10-21 (chat).
     needs a row in `docs/design/ELEMENTS-DECISIONS.md` with its reason,
     who decided and the slice that removes it. Upstream upgrades are taken
     only in the monthly sweep (`shadcn add --diff`).
-10. **The safety gate stays, and its strictness follows the person.**
-    The output gate is the safety floor and is not a formatting step.
-    For a child, and for every spoken turn, every sentence is checked
-    before it is released, and no setting loosens that. For an adult's
-    written chat, text streams as it is generated and the gate checks it
-    as it arrives; released text is never retracted. For a teen, an
-    admin setting picks one of those two (owner's ruling, 2026-10-02).
-    Those fixed clips (rule 6) are gated at authoring time, not at
-    playback.
-    For an adult's chat, a minor word beside a sexual word is not a
-    refusal by itself: discussion, news, fiction, health and advice are
-    not filtered, and an adult's typed message has no word rule at all
-    (producing such content is stopped by the model's own refusal and by
-    the generation checks, as the leading providers do); every generation prompt and finished
-    picture or clip keeps the minor check (nothing sexual involving a minor), and a child's and a
-    teen's floors are unchanged (owner's ruling, 2026-10-19, amended
-    2026-10-19 to drop the adult message check;
-    docs/design/child-safety-text-2026-10-19.md).
+10. **The delivery gate checks CSAM and the child's or teen's content floor.** The output gate still checks replies before release. A child's content floor applies to every sentence; a teen follows the configured gate grain and teen floor. For an adult, the gate may block CSAM and non-content security or crisis paths, but never blocks ordinary content categories. Adult written text streams as generated and is checked as it arrives; released text is never retracted. Adult picture, video, song, edit and companion outputs may be withheld by the CSAM check only. A possible minor in nude or sexual media is a CSAM candidate; a child mention or possible minor in nonsexual content is not itself a reason to block an adult. A check that cannot run on a CSAM candidate fails closed. Model and provider refusals pass through as-is. Owner-approved: 2026-10-26; supersedes the adult content rules in `models-censor-app-protects-kids-2026-10-25.md` and `child-safety-text-2026-10-19.md`.
+
 11. **Only our own tested Stack components run the models.** Home
     talks to the engines the Stack installs, pins and tests, and to
     nothing else. No LM Studio, Open WebUI, Ollama or other outside

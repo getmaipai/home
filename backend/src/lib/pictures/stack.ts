@@ -68,8 +68,6 @@ export interface StackLora {
   strength_default: number;
   added_by?: string | null;
   added_at: string;
-  /** LIKENESS-01: the household adult this style looks like (an opaque id Home gave with a signed proof), or null. */
-  likeness_subject?: string | null;
 }
 
 export interface GenerationBody {
@@ -80,12 +78,10 @@ export interface GenerationBody {
   n?: number;
   seed?: number;
   steps?: number;
-  loras?: Array<{ id: string; scale: number; likeness_proof?: string }>;
+  loras?: Array<{ id: string; scale: number }>;
   audience: "all-ages" | "adult";
   init_image?: string;
-  /** LIKENESS-01: where the starting picture came from (required with `init_image`) and, for a household photo, Home's signed proof. */
-  image_source?: "generated" | "uploaded" | "household_photo";
-  consent_proof?: string;
+  image_source?: "generated" | "uploaded";
   strength?: number;
   timeout_ms: number;
 }
@@ -211,7 +207,7 @@ export async function listLoras(): Promise<StackLora[]> {
   return Array.isArray(body) ? body : Array.isArray(body.loras) ? body.loras : [];
 }
 
-/** Adds a LoRA from a file the admin uploaded. The Stack reads the tensors, hashes the file and refuses one that cannot work or must not be added (a minor in a sexual context, a real person's likeness). */
+/** Adds a LoRA from a file the admin uploaded. The Stack reads the tensors, hashes the file and refuses a file that cannot work or contains prohibited training material. */
 export async function addLoraFile(form: FormData): Promise<StackLora> {
   const res = await request("/stack/v1/image/loras", { method: "POST", body: form, timeoutMs: 600_000 });
   if (!res.ok) return failure(res);
@@ -252,20 +248,3 @@ export async function getStackJob(id: string): Promise<StackBackgroundJob> {
   return body.job ?? { id, state: "failed", reason: "The job could not be read." };
 }
 
-// ---------------------------------------------------------------- LIKENESS-01
-
-/** The Stack's likeness trust state, or null when it is too old to know about proofs (404). */
-export async function likenessTrustStatus(): Promise<{ trusted: boolean; fingerprint: string | null } | null> {
-  const res = await request("/stack/v1/likeness", { method: "GET", timeoutMs: 5_000 });
-  if (res.status === 404) return null;
-  if (!res.ok) return failure(res);
-  const body = await res.json() as { likeness?: { trusted?: boolean; fingerprint?: string | null } };
-  return { trusted: body.likeness?.trusted === true, fingerprint: body.likeness?.fingerprint ?? null };
-}
-
-/** Registers Home's proof-signing public key with the Stack (the first key a Stack sees is trusted). */
-export async function registerLikenessTrust(publicKey: string): Promise<{ result: string; fingerprint: string }> {
-  const res = await request("/stack/v1/likeness/trust", { method: "PUT", headers: { "content-type": "application/json" }, body: JSON.stringify({ public_key: publicKey }), timeoutMs: 8_000 });
-  if (!res.ok) return failure(res);
-  return await res.json() as { result: string; fingerprint: string };
-}

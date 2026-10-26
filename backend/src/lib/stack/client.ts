@@ -89,7 +89,7 @@ export interface StackImageToolsStatus {
   reason: string | null;
 }
 /** One finished edit as POST /v1/images/edits states it: a PNG with no metadata. */
-export interface StackImageEditItem { b64_json: string; width: number; height: number; content_type: string; operation: string; engine?: string; model?: string; ms?: number; /** find_people and erase_people (IMGEDIT-01): the people the on-device finder saw, numbered, boxes as fractions of the picture. */ people?: Array<{ id: number; x: number; y: number; w: number; h: number; area: number }> }
+export interface StackImageEditItem { b64_json: string; width: number; height: number; content_type: string; operation: string; engine?: string; model?: string; ms?: number }
 export type StackImageEditReply = { kind: "done"; job: string; item: StackImageEditItem } | { kind: "running"; job: string };
 
 /** The coding role's four generation paths on the Stack (CODE-STACK-01). */

@@ -5,7 +5,6 @@ export type { GenerationProvenance };
 export type SongLength = "quick" | "full";
 export type MusicTask = "text2music" | "cover" | "repaint" | "extend" | "remake" | "variation" | "trim" | "fade" | "loudness";
 export interface MusicRequest {
-  imitates_real_voice?: boolean;
   description: string; lyrics?: string; written_lyrics?: string; title?: string; instrumental: boolean; seconds: number;
   cut?: "asked" | "ceiling"; max_seconds?: number; retried?: boolean;
   bpm?: number; key?: string; language?: string; quality?: "quick" | "detailed"; seed?: number; length?: SongLength;

@@ -54,7 +54,6 @@ import { removeFileBlobs } from "@/lib/attachments";
 import { ROLE_LADDER, invalidateSessionCacheForPerson, type Role } from "@/middleware/auth";
 import { trigger } from "@/lib/notifications";
 import { forgetNewsOfPerson } from "@/lib/news/records";
-import { likenessPersonGone } from "@/lib/likeness/revoke";
 import { roleRequiresCredential } from "@/lib/personAuthMethods";
 import { eraseChatFolderReferences } from "@/lib/chatFolders";
 import type { PersonRow } from "@/types";
@@ -533,7 +532,6 @@ const commitDeletePerson = sqlite.transaction((actor: PersonRow, personId: strin
     .set({ deletedAt: now, updatedAt: now, nickname: null, birthdate: null, hlc: nextHlc() })
     .where(eq(people.id, personId))
     .run();
-  likenessPersonGone(personId);
 
   return { ok: true, value: counts };
 });
@@ -622,7 +620,6 @@ const commitMemorialize = sqlite.transaction((personId: string, alreadyMemoriali
       .where(eq(people.id, personId))
       .run();
   }
-  likenessPersonGone(personId);
 });
 
 /** BACKLOG.md: "memorialise (read-only profile, PIN cleared, sessions

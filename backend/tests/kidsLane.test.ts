@@ -1,6 +1,6 @@
 // KIDS-CREATE-01 (owner ruling 2026-10-17: "Kids can make cartoon images and videos of safe content"): the strict child lane. A child makes
 // cartoon pictures and videos of safe things, Quick only, with the cartoon look forced, a child-safe topic gate in ONE friendly line, no photos,
-// no references, no real people, edits only of their own cartoons, a daily limit, a switch for the home and one per child, a child-safety check on
+// no references, edits only of their own cartoons, a daily limit, a switch for the home and one per child, a child-safety check on
 // every finished item that fails closed, and an admin log. A teen and an adult are unaffected.
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { eq } from "drizzle-orm";
@@ -21,9 +21,6 @@ import { CHILD_CONTENT_LINE, CHILD_LIMIT_LINE, CHILD_NEGATIVE_PROMPT, CHILD_NO_P
 import { __setChildSafetyRunnerForTests, type ChildSafetyCheck } from "@/lib/pictures/laneGate";
 import { adapterAudiencesFor } from "@/lib/pictures/policy";
 import { editToolsStatus, loadSource, startComment } from "@/lib/imageEdit";
-import { __setPhotoInspectorForTests } from "@/lib/likeness/inspector";
-import { __setStackTrustForTests } from "@/lib/likeness/proof";
-import { __resetAttestationsForTests } from "@/lib/likeness/resolve";
 import { toolSpecFor } from "@/lib/turnMachine/nodes/model";
 import { TestClient } from "./client";
 import { installFakeImageStack, testPng, until, type FakeImageStack } from "./pictureFixture";
@@ -42,7 +39,7 @@ function addPerson(name: string, role: string): PersonRow {
   db.insert(peopleTable).values({ id: `p-${name.toLowerCase()}`, displayName: name, role, avatarSeed: name, source: "test", createdAt: now, updatedAt: now, hlc: "1:0:test00" }).run();
   return db.select().from(peopleTable).where(eq(peopleTable.id, `p-${name.toLowerCase()}`)).get()! as PersonRow;
 }
-const SAFE: ChildSafetyCheck = { ok: true, verdict: { is_cartoon: true, looks_like_photo: false, real_person_or_brand: false, violent_or_scary: false, sexual_or_romantic: false, weapons_drugs_or_alcohol: false, confidence: 0.9 } };
+const SAFE: ChildSafetyCheck = { ok: true, verdict: { is_cartoon: true, looks_like_photo: false, brand_or_licensed_character: false, violent_or_scary: false, sexual_or_romantic: false, weapons_drugs_or_alcohol: false, confidence: 0.9 } };
 const safeRunner = (check: ChildSafetyCheck = SAFE) => async (images: readonly Uint8Array[]) => images.map(() => check);
 
 beforeEach(() => {
@@ -52,13 +49,10 @@ beforeEach(() => {
   teen = addPerson("Rill", "teen");
   image = installFakeImageStack();
   video = installFakeVideoStack();
-  __setStackTrustForTests({ ok: true });
-  __setPhotoInspectorForTests(async () => ({ people: 1, faces: 1, under18: "yes" }));
-  __resetAttestationsForTests();
   __setAgeCheckRunnerForTests(async (images) => images.map(() => ({ ok: true as const, verdict: { people_count: 0, apparent_min_age_estimate: null, label: "none" as const, is_nude_or_sexual: false, confidence: 1 } })));
   __setChildSafetyRunnerForTests(safeRunner());
 });
-afterEach(() => { __setAgeCheckRunnerForTests(async (images) => images.map(() => ({ ok: true as const, verdict: { people_count: 0, apparent_min_age_estimate: null, label: "none" as const, is_nude_or_sexual: false, confidence: 1 } }))); removeTemporaryChatImages("conv-1"); image.restore(); video.restore(); __setStackTrustForTests(null); __setPhotoInspectorForTests(undefined); __setChildSafetyRunnerForTests(null); setHouseholdSettingValue("generation.kids", true); setHouseholdSettingValue("generation.people_prompts", false); });
+afterEach(() => { __setAgeCheckRunnerForTests(async (images) => images.map(() => ({ ok: true as const, verdict: { people_count: 0, apparent_min_age_estimate: null, label: "none" as const, is_nude_or_sexual: false, confidence: 1 } }))); removeTemporaryChatImages("conv-1"); image.restore(); video.restore(); __setChildSafetyRunnerForTests(null); setHouseholdSettingValue("generation.kids", true); });
 
 type Img = { id: string; name: string; width: number; height: number; media_type: string };
 async function put(owner: PersonRow, id: string, generated = false): Promise<Img> {
@@ -77,11 +71,8 @@ const finish = async (actor: PersonRow, o: ToolExecutionOutcome) => { await unti
 describe("a child makes cartoon pictures", () => {
   test("a friendly dragon works: the cartoon look is forced, Quick only, all-ages, no style, no friction text", async () => {
     expect(laneOf({ actor: kid, band: "child" })).toBe("child");
-    setHouseholdSettingValue("generation.people_prompts", true);
     const o = await pic(kid, { prompt: "a friendly dragon", style: "Pixel Art", quality: "detailed", count: 4 });
     expect(o.status).toBe("succeeded");
-    expect(text(o)).toContain("Do not add warnings");
-    expect(toolSpecFor("generate_image", "child")!.description).toContain("Do not add warnings");
     const sent = image.submitted[0]! as { prompt: string; negative_prompt: string; audience: string; n: number; model?: string; loras?: unknown };
     expect(sent.prompt.startsWith(CHILD_PROMPT_PREFIX)).toBe(true);
     expect(sent.prompt).toContain("a friendly dragon");
@@ -100,9 +91,8 @@ describe("a child makes cartoon pictures", () => {
     expect(sent.negative_prompt).toContain("photograph");
   });
 
-  test("a real person, a brand, violence and grown-up things are one friendly line, never a lecture, and nothing is sent", async () => {
+  test("a brand, violence and grown-up things are one friendly line, never a lecture, and nothing is sent", async () => {
     for (const args of [
-      { prompt: "a picture of a famous singer", depicts_real_person: true },
       { prompt: "a dragon wearing a Disney princess dress" },
       { prompt: "a knight fight with swords and blood" },
       { prompt: "a scary zombie in a graveyard" },
@@ -116,6 +106,8 @@ describe("a child makes cartoon pictures", () => {
     }
     expect(image.submitted).toHaveLength(0);
     expect(childPromptUnsafe("a friendly dragon with a balloon")).toBe(false);
+    expect((await pic(kid, { prompt: "a picture of a famous singer" })).status).toBe("succeeded");
+    expect(image.submitted).toHaveLength(1);
   });
 
   test("nothing sexual involving a minor is still the absolute line first", async () => {
@@ -204,7 +196,7 @@ describe("the finished item is checked and fails closed", () => {
     for (const check of [
       { ...SAFE, verdict: { ...SAFE.verdict!, is_cartoon: false } },
       { ...SAFE, verdict: { ...SAFE.verdict!, looks_like_photo: true } },
-      { ...SAFE, verdict: { ...SAFE.verdict!, real_person_or_brand: true } },
+      { ...SAFE, verdict: { ...SAFE.verdict!, brand_or_licensed_character: true } },
       { ...SAFE, verdict: { ...SAFE.verdict!, violent_or_scary: true } },
       { ...SAFE, verdict: { ...SAFE.verdict!, sexual_or_romantic: true } },
       { ...SAFE, verdict: { ...SAFE.verdict!, confidence: 0.2 } },

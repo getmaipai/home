@@ -11,7 +11,7 @@ import { PENDING, videoAdaptersFor, allVideoAdapters, dropVideoAdapterCache, for
 import { cancelVideoJob, clipUrl, getVideoJobFor, plainVideoFailure, posterUrl, readVideoFile, startVideoJob, videoJobsForTurn, type VideoJob } from "@/lib/videos/jobs";
 import { jobQueueCopy } from "@/lib/jobQueueCopy";
 import { promptRefusalLineFor } from "@/lib/pictures/ageCheck";
-import { CHILD_NEGATIVE_PROMPT, CHILD_NO_PHOTOS_LINE, CHILD_VIDEO_LIMIT_LINE, forceCartoon, kidsDailyVideos, laneOf, releaseKid, reserveKid, videoModelForLane, videosMadeToday } from "@/lib/pictures/lane";
+import { CHILD_NEGATIVE_PROMPT, CHILD_VIDEO_LIMIT_LINE, forceCartoon, kidsDailyVideos, laneOf, releaseKid, reserveKid, videoModelForLane, videosMadeToday } from "@/lib/pictures/lane";
 import { adultVideoAdaptersAllowed, householdAllowsVideo, refuseVideoPrompt, stackAudienceFor, videoAdapterAudiencesFor, videoDenial, VIDEO_DENIAL_LINE, VIDEO_REFUSAL_LINE, type VideoAudience } from "@/lib/videos/policy";
 import { laneOfPerson } from "@/lib/pictures/laneGate";
 import { getLive, liveCardFields } from "@/lib/genLive";
@@ -22,9 +22,6 @@ import { latestGeneratedPictureId } from "@/lib/videos/tool";
 import { prepareVideoRerun } from "@/lib/videos/rerun";
 import { chooseVideoQuality, detailedVideoReady, isVideoQuality, quickVideoReady, VIDEO_SIZES_BY_QUALITY } from "@/lib/videos/quality";
 import { householdVideoQuality } from "@/lib/videos/policy";
-import { declareStyleSubject, forgetStyleSubject } from "@/lib/likeness/adapters";
-import { checkStyleSubject, stackLikenessFields } from "@/lib/likeness/importStyle";
-import { lookedLikeView } from "@/routes/picturesAdmin";
 import { and, eq } from "drizzle-orm";
 import { db } from "@/db";
 import { conversationTurns } from "@/db/schema";
@@ -264,25 +261,24 @@ videosRoutes.openapi(anotherRoute, async (c) => {
   const choice = chooseVideoQuality({ requested: isVideoQuality(asked.quality) ? asked.quality : source.request.quality ?? "quick", style: used[0] ?? null, seconds: source.request.seconds, engine, hasPicture: source.request.source_file_id !== null, quickOnly: laneOf(audience) !== "adult" });
   const portrait = (() => { const [w, h] = source.request.size.split("x").map(Number); return Boolean(w && h && h > w); })();
   const size = VIDEO_SIZES_BY_QUALITY[choice.quality][portrait ? "portrait" : "landscape"];
-  // Only LoRAs this person may still use ride along; one turned off since is dropped. A picture or style of a household adult is decided again, now (LIKENESS-01).
+  // Only LoRAs this person may still use ride along; one turned off since is dropped.
   const prep = await prepareVideoRerun({
     actor, audience, conversationId: source.conversationId, temporary: source.temporary, prompt: source.prompt, sourceFileId: source.request.source_file_id,
-    prior: source.request.likeness ?? null, adapters, styleIds: source.request.loras,
+    adapters, styleIds: source.request.loras,
   });
-  if (!prep.ok) return c.json({ error: prep.line, code: prep.code }, prep.code === "likeness" ? 403 : 422) as never;
+  if (!prep.ok) return c.json({ error: prep.line, code: prep.code }, 422) as never;
   const slot = laneOf(audience) === "child" ? reserveKid(actor, "video", 1, source.prompt) : null;
   if (laneOf(audience) === "child" && !slot) return c.json({ error: CHILD_VIDEO_LIMIT_LINE, code: "daily_limit" }, 422) as never;
   try {
     const started = await startVideoJob({
       actor, conversationId: source.conversationId, turnId: source.turnId, temporary: source.temporary, kind: source.kind, prompt: source.prompt, sourceFileId: source.request.source_file_id,
       body: {
-        prompt: laneOf(audience) === "child" ? forceCartoon(source.prompt) : source.prompt, size, seconds: laneOf(audience) === "child" ? Math.min(choice.seconds, 3) : choice.seconds, ...(choice.quality === "detailed" ? { model: "detailed" as const } : {}), audience: prep.likeness ? "adult" : stackAudienceFor(audience),
+        prompt: laneOf(audience) === "child" ? forceCartoon(source.prompt) : source.prompt, size, seconds: laneOf(audience) === "child" ? Math.min(choice.seconds, 3) : choice.seconds, ...(choice.quality === "detailed" ? { model: "detailed" as const } : {}), audience: stackAudienceFor(audience),
         ...(laneOf(audience) === "adult" ? {} : { model: videoModelForLane(laneOf(audience)) }),
         ...(laneOf(audience) === "child" ? { negative_prompt: CHILD_NEGATIVE_PROMPT } : {}),
-        ...(prep.image ? { image: prep.image, image_source: prep.imageSource ?? "generated", ...(prep.consentProof ? { consent_proof: prep.consentProof } : {}) } : {}),
+        ...(prep.image ? { image: prep.image, image_source: prep.imageSource ?? "generated" } : {}),
         ...(prep.loras.length && laneOf(audience) !== "child" ? { loras: prep.loras } : {}),
       },
-      ...(prep.likeness ? { likeness: prep.likeness } : {}),
     });
     return c.json(videoCardView(actor, started, true, await readyFlags(actor)), 200);
   } catch (error) {
@@ -293,10 +289,9 @@ videosRoutes.openapi(anotherRoute, async (c) => {
 });
 
 const animateRoute = createRoute({
-  method: "post", path: "/animate", tags: ["Videos"], summary: "Animate a picture this home made, or a photo of a household adult", middleware: [requireAuth] as const,
+  method: "post", path: "/animate", tags: ["Videos"], summary: "Animate a picture", middleware: [requireAuth] as const,
   request: { body: { content: { "application/json": { schema: z.object({
     conversation_id: z.string().min(1).max(80), file_id: z.string().min(1).max(80).optional(), turn_id: z.string().min(1).max(80), prompt: z.string().trim().min(3).max(1200).optional(),
-    photo_subject_id: z.string().min(1).max(80).optional().describe("With a photo (file_id) that was not made here: the household adult the photo shows, picked from the adults list. Anyone else is refused."),
   }) } } } },
   responses: { 200: { content: { "application/json": { schema: CardSchema } }, description: "The card for the new clip." }, ...refusals },
 });
@@ -307,15 +302,14 @@ videosRoutes.openapi(animateRoute, async (c) => {
   const blocked = await gateRoute(actor, prompt);
   if (blocked) return c.json(blocked.body, blocked.status) as never;
   // A child animates only a cartoon made for them: never a photo or a named person.
-  if (laneOf(videoRouteAudience(actor)) === "child" && body.photo_subject_id) return c.json({ error: CHILD_NO_PHOTOS_LINE, code: "child_cartoons_only" }, 422) as never;
   const ownTurn = db.select({ id: conversationTurns.id }).from(conversationTurns).where(and(eq(conversationTurns.id, body.turn_id), eq(conversationTurns.conversationId, body.conversation_id), eq(conversationTurns.personId, actor.id))).get();
   if (!ownTurn) return c.json({ error: "That chat isn't available any more. Open it again and try once more.", code: "not_found" }, 404) as never;
   const fileId = body.file_id ?? latestGeneratedPictureId(actor, body.conversation_id);
-  if (!fileId) return c.json({ error: "I can only animate a picture that was made here in this home, or a photo of an adult in this household. Ask me to make a picture first, then animate that one.", code: "reference" }, 422) as never;
+  if (!fileId) return c.json({ error: "I can animate a picture made here or a photo you attach. Attach the photo, then try again.", code: "reference" }, 422) as never;
   const audience = videoRouteAudience(actor);
   const adapters = await videoAdaptersFor(videoAdapterAudiencesFor(audience));
-  const prep = await prepareVideoRerun({ actor, audience, conversationId: body.conversation_id, temporary: false, prompt, sourceFileId: fileId, declaredSubjectId: body.photo_subject_id ?? null, adapters, styleIds: [] });
-  if (!prep.ok) return c.json({ error: prep.line, code: prep.code }, prep.code === "likeness" ? 403 : 422) as never;
+  const prep = await prepareVideoRerun({ actor, audience, conversationId: body.conversation_id, temporary: false, prompt, sourceFileId: fileId, adapters, styleIds: [] });
+  if (!prep.ok) return c.json({ error: prep.line, code: prep.code }, 422) as never;
   const size = prep.width && prep.height && prep.height > prep.width ? VIDEO_SIZES_BY_QUALITY.quick.portrait : VIDEO_SIZES_BY_QUALITY.quick.landscape;
   const slot = laneOf(audience) === "child" ? reserveKid(actor, "video", 1, prompt) : null;
   if (laneOf(audience) === "child" && !slot) return c.json({ error: CHILD_VIDEO_LIMIT_LINE, code: "daily_limit" }, 422) as never;
@@ -323,11 +317,10 @@ videosRoutes.openapi(animateRoute, async (c) => {
     const job = await startVideoJob({
       actor, conversationId: body.conversation_id, turnId: body.turn_id, temporary: false, kind: "animate", prompt, sourceFileId: fileId,
       body: {
-        prompt: laneOf(audience) === "child" ? forceCartoon(prompt) : prompt, size, seconds: laneOf(audience) === "child" ? 3 : 5, audience: prep.likeness ? "adult" : stackAudienceFor(audience), image: prep.image!, image_source: prep.imageSource ?? "generated",
+        prompt: laneOf(audience) === "child" ? forceCartoon(prompt) : prompt, size, seconds: laneOf(audience) === "child" ? 3 : 5, audience: stackAudienceFor(audience), image: prep.image!, image_source: prep.imageSource ?? "generated",
         ...(laneOf(audience) === "adult" ? {} : { model: videoModelForLane(laneOf(audience)) }),
-        ...(prep.consentProof ? { consent_proof: prep.consentProof } : {}), ...(laneOf(audience) === "child" ? { negative_prompt: CHILD_NEGATIVE_PROMPT } : {}),
+        ...(laneOf(audience) === "child" ? { negative_prompt: CHILD_NEGATIVE_PROMPT } : {}),
       },
-      ...(prep.likeness ? { likeness: prep.likeness } : {}),
     });
     return c.json(videoCardView(actor, job, true, await readyFlags(actor)), 200);
   } catch (error) {
@@ -342,7 +335,6 @@ videosRoutes.openapi(animateRoute, async (c) => {
 const AdapterSchema = z.object({
   id: z.string(), name: z.string(), classification: z.enum(["all-ages", "adult-only"]), enabled: z.boolean(), needs_confirmation: z.boolean(), sha256: z.string(), base_model: z.string(), trigger_words: z.array(z.string()),
   licence: z.string(), strength_default: z.number(), bytes: z.number(), source_url: z.string().nullable(), added_at: z.string(),
-  looks_like: z.object({ id: z.string(), name: z.string() }).nullable().describe("LIKENESS-01: the household adult this style looks like, or null for nobody."),
 });
 const settingsRoute = createRoute({
   method: "get", path: "/settings", tags: ["Videos"], summary: "The video role's state, the household switches and the LoRA library", middleware: [requireAuth, requireRole("owner", "admin")] as const,
@@ -377,7 +369,7 @@ videosRoutes.openapi(settingsRoute, async (c) => {
     })(),
     enabled: householdAllowsVideo(), adult_adapters: adultVideoAdaptersAllowed(),
     minors: "Videos are off for children and teens. No setting turns them on.",
-    adapters: adapters.map((a) => ({ id: a.id, name: a.name, classification: a.classification, enabled: a.enabled, needs_confirmation: a.needs_confirmation, sha256: a.sha256, base_model: a.base_model, trigger_words: a.trigger_words, licence: a.licence, strength_default: a.strength_default, bytes: a.bytes, source_url: a.source_url, added_at: a.added_at, looks_like: lookedLikeView("video", a.id, a.likeness_subject ?? null) })),
+    adapters: adapters.map((a) => ({ id: a.id, name: a.name, classification: a.classification, enabled: a.enabled, needs_confirmation: a.needs_confirmation, sha256: a.sha256, base_model: a.base_model, trigger_words: a.trigger_words, licence: a.licence, strength_default: a.strength_default, bytes: a.bytes, source_url: a.source_url, added_at: a.added_at })),
   }, 200);
 });
 
@@ -399,7 +391,7 @@ videosRoutes.openapi(patchAdapterRoute, async (c) => {
     dropVideoAdapterCache();
     const found = (await allVideoAdapters()).find((a) => a.id === id);
     if (!found) return c.json({ error: "That style isn't in the library." }, 404) as never;
-    return c.json({ id: found.id, name: found.name, classification: found.classification, enabled: found.enabled, needs_confirmation: found.needs_confirmation, sha256: found.sha256, base_model: found.base_model, trigger_words: found.trigger_words, licence: found.licence, strength_default: found.strength_default, bytes: found.bytes, source_url: found.source_url, added_at: found.added_at, looks_like: lookedLikeView("video", found.id, found.likeness_subject ?? null) }, 200);
+    return c.json({ id: found.id, name: found.name, classification: found.classification, enabled: found.enabled, needs_confirmation: found.needs_confirmation, sha256: found.sha256, base_model: found.base_model, trigger_words: found.trigger_words, licence: found.licence, strength_default: found.strength_default, bytes: found.bytes, source_url: found.source_url, added_at: found.added_at }, 200);
   } catch (error) {
     if (error instanceof StackVideoError) return c.json({ error: error.message, code: error.code }, (error.status === 404 || error.status === 409 || error.status === 422 ? error.status : 422) as 404 | 409 | 422) as never;
     throw error;
@@ -415,7 +407,6 @@ videosRoutes.openapi(deleteAdapterRoute, async (c) => {
   const { id } = c.req.valid("param");
   try {
     await removeVideoLora(id);
-    forgetStyleSubject("video", id);
   } catch (error) {
     if (error instanceof StackVideoError && error.status === 404) return c.json({ error: "That style isn't in the library." }, 404) as never;
     throw error;
@@ -431,15 +422,12 @@ const addAdapterRoute = createRoute({
     file: z.custom<File>((value) => value instanceof File, "The .safetensors file.").openapi({ type: "string", format: "binary" }),
     name: z.string().trim().min(1).max(80), licence: z.string().trim().min(1).max(120), licence_acknowledged: z.enum(["true", "false"]).optional(),
     source_url: z.string().max(500).optional(), classification: z.enum(["all-ages", "adult-only"]).optional(), trigger_words: z.string().max(400).optional(),
-    looks_like: z.string().max(80).describe("'nobody', or the id of the living household adult the style looks like."),
   }) } } } },
   responses: { 200: { content: { "application/json": { schema: AdapterSchema } }, description: "Added." }, ...errorResponses({ 401: "Not signed in", 403: "Admins only", 409: "Already in the library", 413: "Too large", 422: "The file cannot be used", 503: "The video engine is not available" }) },
 });
 videosRoutes.openapi(addAdapterRoute, async (c) => {
   const form = c.req.valid("form");
   const adder = c.get("person");
-  const subjectCheck = checkStyleSubject(form.looks_like, adder);
-  if (!subjectCheck.ok) return c.json({ error: subjectCheck.line, code: subjectCheck.code }, subjectCheck.status) as never;
   const out = new FormData();
   out.set("file", form.file);
   out.set("name", form.name);
@@ -447,22 +435,15 @@ videosRoutes.openapi(addAdapterRoute, async (c) => {
   if (form.licence_acknowledged) out.set("licence_acknowledged", form.licence_acknowledged);
   if (form.source_url) out.set("source_url", form.source_url);
   // Uncertain means adult-only: an adder who does not say gets the stricter class.
-  out.set("classification", subjectCheck.kind === "person" ? "adult-only" : form.classification ?? "adult-only");
-  if (subjectCheck.kind === "person") {
-    const fields = await stackLikenessFields(subjectCheck, adder, new Uint8Array(await form.file.arrayBuffer()));
-    if ("error" in fields) return c.json({ error: fields.error, code: "likeness_engine" }, 503) as never;
-    out.set("likeness_subject", fields.likeness_subject);
-    out.set("likeness_proof", fields.likeness_proof);
-  }
+  out.set("classification", form.classification ?? "adult-only");
   if (form.trigger_words) out.set("trigger_words", form.trigger_words);
   out.set("added_by", "household");
   try {
     const lora = await addVideoLora(out);
-    declareStyleSubject({ adapterId: lora.id, medium: "video", subjectPersonId: subjectCheck.kind === "person" ? subjectCheck.subject.id : null, classification: lora.classification, declaredBy: adder.id });
     // A new style is off, for everyone, until an admin has read its fingerprint and licence and turns it on.
     setVideoAdapterEnabled(lora.id, false, PENDING);
     dropVideoAdapterCache();
-    return c.json({ id: lora.id, name: lora.name, classification: lora.classification, enabled: false, needs_confirmation: true, sha256: lora.sha256, base_model: lora.base_model, trigger_words: lora.trigger_words, licence: lora.licence, strength_default: lora.strength_default, bytes: lora.bytes, source_url: lora.source_url, added_at: lora.added_at, looks_like: lookedLikeView("video", lora.id, lora.likeness_subject ?? null) }, 200);
+    return c.json({ id: lora.id, name: lora.name, classification: lora.classification, enabled: false, needs_confirmation: true, sha256: lora.sha256, base_model: lora.base_model, trigger_words: lora.trigger_words, licence: lora.licence, strength_default: lora.strength_default, bytes: lora.bytes, source_url: lora.source_url, added_at: lora.added_at }, 200);
   } catch (error) {
     if (error instanceof StackVideoError) {
       const status = error.status === 403 || error.status === 409 || error.status === 413 || error.status === 422 ? error.status : 503;

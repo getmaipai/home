@@ -353,7 +353,7 @@ export const policyNode: Node<PolicyInput, PolicyOutput> = async (state, input) 
       const pictureProposal: ActionProposal = { kind: "read_only", request: { tool: call.tool, args: callArgs, callId: call.id ?? call.tool } };
       const refusal = !state.picturesAllowed ? { kind: "denied" as const } : refusalFor(audienceOf(state, false), callArgs);
       if (refusal) {
-        const reason = refusal.kind === "denied" ? "picture_not_here" as const : refusal.why === "minor_sexual" ? "picture_refused_minor" as const : "picture_refused_person" as const;
+        const reason = refusal.kind === "denied" ? "picture_not_here" as const : "picture_refused_minor" as const;
         noteRefusal(reason);
         entries.push({ proposal: pictureProposal, decision: { allow: false, reason } });
         continue;
@@ -367,7 +367,7 @@ export const policyNode: Node<PolicyInput, PolicyOutput> = async (state, input) 
       const offered = call.tool === EDIT_MUSIC_TOOL_ID ? state.musicEditAllowed : state.musicAllowed;
       const refusal = !offered ? { kind: "denied" as const } : musicRefusalFor(musicAudienceOf(state, false), callArgs);
       if (refusal) {
-        const reason = refusal.kind === "denied" ? "music_not_here" as const : refusal.why === "minor_sexual" ? "music_refused_minor" as const : "music_refused_voice" as const;
+        const reason = refusal.kind === "denied" ? "music_not_here" as const : "music_refused_minor" as const;
         noteRefusal(reason);
         entries.push({ proposal: musicProposal, decision: { allow: false, reason } });
         continue;
@@ -379,7 +379,7 @@ export const policyNode: Node<PolicyInput, PolicyOutput> = async (state, input) 
       const videoProposal: ActionProposal = { kind: "read_only", request: { tool: call.tool, args: callArgs, callId: call.id ?? call.tool } };
       const refusal = !state.videosAllowed ? { kind: "denied" as const } : videoRefusalFor(videoAudienceOf(state, false), callArgs);
       if (refusal) {
-        const reason = refusal.kind === "denied" ? "video_not_here" as const : refusal.why === "minor_sexual" ? "video_refused_minor" as const : "video_refused_person" as const;
+        const reason = refusal.kind === "denied" ? "video_not_here" as const : "video_refused_minor" as const;
         noteRefusal(reason);
         entries.push({ proposal: videoProposal, decision: { allow: false, reason } });
         continue;

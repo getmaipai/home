@@ -14,7 +14,6 @@ import { allAdapters } from "./adapters";
 import { qualityOfModel } from "./quality";
 import { checkImages, isAdultOnlyJob } from "./ageCheck";
 import { gateFinished } from "./laneGate";
-import { likenessStillAllowed, type JobLikeness } from "@/lib/likeness/guard";
 import { clearLive, updateLive } from "@/lib/genLive";
 import { refreshHouseholdQueue, registerQueueProvider, releaseHouseholdQueue, type QueueJob } from "@/lib/jobs/householdQueue";
 import { jobQueueCopy } from "@/lib/jobQueueCopy";
@@ -36,10 +35,6 @@ registerQueueProvider(() => unfinishedJobs().map((job) => {
 
 async function releasePicture(job: PictureJob): Promise<void> {
   if (job.state !== "queued" || job.stackJob) return;
-  if (job.request.likeness) {
-    const allowed = likenessStillAllowed(job.request.likeness);
-    if (!allowed.ok) { job.state = "failed"; job.error = allowed.line; queuedPictureSubmits.delete(job.id); savePictureJob(job); return; }
-  }
   try {
     const submit = queuedPictureSubmits.get(job.id);
     const submitted = submit ? await submit() : await submitGeneration({ ...((job.request as PictureJob["request"] & { stackBody?: Omit<GenerationBody, "timeout_ms"> }).stackBody ?? {
@@ -86,13 +81,11 @@ export interface StartPictureInput {
   prompt: string;
   body: Omit<GenerationBody, "timeout_ms">;
   sourceFileId?: string | null;
-  /** LIKENESS-01: the picture looks like this household adult (already decided by lib/likeness/decide.ts). */
-  likeness?: JobLikeness | null;
   /** IMGEDIT-01: this job changes a picture already in the chat; the result is saved as its next version. */
-  edit?: { sourceId: string; label: string; method: "instruct" | "erase_people" | "tool" };
+  edit?: { sourceId: string; label: string; method: "instruct" | "tool" };
   /** IMGEDIT-01: how the Stack is asked (default: a generation). An edit sends the picture and the instruction to POST /v1/images/edits. */
   submit?: () => Promise<{ job: string; done: StackPic[] | null }>;
-  /** IMGEDIT-01: work Home does itself, calling the Stack's tools (finding and erasing a person): no Stack job to poll. */
+  /** Work Home does itself for non-generative picture tools: no Stack job to poll. */
   local?: (progress: (phase: string, percent: number) => void, signal: AbortSignal) => Promise<StackPic[]>;
 }
 
@@ -110,7 +103,7 @@ export async function startPictureJob(input: StartPictureInput): Promise<Picture
     const job: PictureJob = {
       id: newPictureJobId(), personId: input.actor.id, conversationId: input.conversationId, turnId: input.turnId, companionId: input.companionId ?? null, purpose: input.purpose ?? null, kind: input.kind, state: input.local ? "running" : "queued", stackJob: null,
       percent: 0, phase: input.local ? "starting" : "queued", position: null, prompt: input.prompt,
-      request: ({ size: input.body.size ?? "1024x1024", n: input.body.n ?? 1, seed: input.body.seed ?? null, loras: (input.body.loras ?? []).map((l) => l.id), source_file_id: input.sourceFileId ?? input.edit?.sourceId ?? null, audience: input.body.audience, quality: qualityOfModel(input.body.model) ?? "quick", stackBody: Object.fromEntries(Object.entries(input.body).filter(([key]) => key !== "timeout_ms")) as Omit<GenerationBody, "timeout_ms">, ...(input.likeness ? { likeness: input.likeness } : {}), ...(input.edit ? { edit: { source_id: input.edit.sourceId, label: input.edit.label, method: input.edit.method } } : {}) } as PictureJob["request"]),
+      request: ({ size: input.body.size ?? "1024x1024", n: input.body.n ?? 1, seed: input.body.seed ?? null, loras: (input.body.loras ?? []).map((l) => l.id), source_file_id: input.sourceFileId ?? input.edit?.sourceId ?? null, audience: input.body.audience, quality: qualityOfModel(input.body.model) ?? "quick", stackBody: Object.fromEntries(Object.entries(input.body).filter(([key]) => key !== "timeout_ms")) as Omit<GenerationBody, "timeout_ms">, ...(input.edit ? { edit: { source_id: input.edit.sourceId, label: input.edit.label, method: input.edit.method } } : {}) } as PictureJob["request"]),
       error: null, files: [], temporary: input.temporary, createdAt: now, updatedAt: now,
     };
     markLive(job);
@@ -140,32 +133,6 @@ function sleep(ms: number, signal: AbortSignal): Promise<void> {
 
 const stopped = (job: PictureJob) => job.state === "cancelled";
 
-/** LIKENESS-01: ends the job (and the Stack's copy) when its subject no longer agrees. True when it did. */
-function stopForLikeness(job: PictureJob, line?: string): boolean {
-  const likeness = job.request.likeness;
-  if (!likeness) return false;
-  const now = line ? { ok: false as const, line } : likenessStillAllowed(likeness);
-  if (now.ok) return false;
-  job.state = "failed";
-  job.error = now.line;
-  job.files = [];
-  savePictureJob(job);
-  watching.get(job.id)?.abort();
-  if (job.stackJob) void cancelOrDelete(job.stackJob);
-  return true;
-}
-
-/** Stop every unfinished picture job when its subject leaves the household. */
-export function stopLikenessPictureJobs(subjectPersonId: string): number {
-  let count = 0;
-  for (const job of unfinishedJobs()) {
-    const likeness = job.request.likeness;
-    if (!likeness || likeness.subject !== subjectPersonId || likeness.subject === likeness.requester) continue;
-    if (stopForLikeness(job)) count += 1;
-  }
-  return count;
-}
-
 async function watch(job: PictureJob, actor: PersonRow, early: StackPic[] | null = null): Promise<void> {
   if (!job.stackJob || watching.has(job.id)) return;
   const controller = new AbortController();
@@ -174,14 +141,10 @@ async function watch(job: PictureJob, actor: PersonRow, early: StackPic[] | null
   const deadline = Date.now() + MAX_WATCH_MS;
   try {
     if (early) {
-      // A finished picture whose subject became ineligible since the request is thrown away, not stored.
-      if (stopForLikeness(job)) return;
       await finish(job, actor, early);
       return;
     }
     while (!controller.signal.aborted && !stopped(job) && Date.now() < deadline) {
-      // The household option and subject eligibility are checked on every poll, so a queued picture is stopped after a stricter change.
-      if (stopForLikeness(job)) return;
       let status;
       try {
         status = await getGenerationJob(job.stackJob);
@@ -193,7 +156,7 @@ async function watch(job: PictureJob, actor: PersonRow, early: StackPic[] | null
         continue;
       }
       if (stopped(job) || controller.signal.aborted) return;
-      if (status.state === "done") { if (stopForLikeness(job)) return; await finish(job, actor, status.data); return; }
+      if (status.state === "done") { await finish(job, actor, status.data); return;}
       if (status.state === "failed") { job.state = "failed"; job.error = plainFailure(new StackPicturesError(500, status.code ?? "failed", status.error ?? "")); savePictureJob(job); return; }
       // The Stack's memory watchdog stopped it (code no_memory): that is a pause the person should hear about, not a cancel they asked for.
       if (status.state === "cancelled" && status.code === "no_memory") {
@@ -237,7 +200,6 @@ async function watchLocal(job: PictureJob, actor: PersonRow, run: NonNullable<St
       job.phase = phase; job.percent = Math.max(job.percent, Math.min(95, Math.round(percent))); savePictureJob(job);
     }, controller.signal);
     if (stopped(job) || controller.signal.aborted) return;
-    if (stopForLikeness(job)) return;
     await finish(job, actor, pics);
   } catch (error) {
     if (!stopped(job)) {
@@ -314,12 +276,12 @@ async function finish(job: PictureJob, actor: PersonRow, pics: StackPic[]): Prom
       }
       if (job.temporary) {
         const id = newFileId();
-        storeTemporaryChatImage({ id, turnId: job.turnId ?? `gen-${job.id}`, conversationId, ownerPersonId: actor.id, name: "Generated picture", mediaType: "image/png", width, height, bytes: raw, audience: adult ? "adult-only" : "all-ages", ...(job.request.likeness ? { likeness: job.request.likeness.subject } : { generated: true as const }) });
+        storeTemporaryChatImage({ id, turnId: job.turnId ?? `gen-${job.id}`, conversationId, ownerPersonId: actor.id, name: "Generated picture", mediaType: "image/png", width, height, bytes: raw, audience: adult ? "adult-only" : "all-ages", generated: true });
         files.push({ id, width, height, ...meta });
         continue;
       }
       if (!job.turnId || !(await waitForTurnRow(job.turnId, job))) { if (stopped(job)) { discardStored(storedIds); return; } throw new Error("turn row never appeared"); }
-      const created = createAttachment(actor, { conversationId, turnId: job.turnId, mediaType: "image/png", bytes: raw, provenance: `picture-gen:${JSON.stringify({ v: 1, audience: adult ? "adult-only" : "all-ages", job: job.id, index, ...meta, width, height, ...(job.request.likeness ? { likeness: job.request.likeness.subject } : {}) })}`, deduplicate: false, retention: "conversation" });
+      const created = createAttachment(actor, { conversationId, turnId: job.turnId, mediaType: "image/png", bytes: raw, provenance: `picture-gen:${JSON.stringify({ v: 1, audience: adult ? "adult-only" : "all-ages", job: job.id, index, ...meta, width, height })}`, deduplicate: false, retention: "conversation" });
       if (!created.ok) {
         fail(created.status === 403 ? `${PICTURE_FAILED_PREFIX} Your storage is full. Delete some files in Settings, Storage, then try again.` : `${PICTURE_FAILED_PREFIX} The picture couldn't be saved. Try again.`);
         return;

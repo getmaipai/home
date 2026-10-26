@@ -1,9 +1,8 @@
 // IMGGEN-SAFE-01 / VIDEO-GEN: the second, independent check on a FINISHED picture or clip, before the person sees it.
-// The first check is the prompt floor (minorLine.ts): a word list, which a new phrasing can slip past. This one looks at
-// the pixels. The ABSOLUTE LINE (docs/design/RULES.md rule 0, SAFETY.md): nothing sexual involving a minor or a
-// minor-looking person, for anyone, with no setting that reaches it.
+// Adult outputs use this check to withhold possible CSAM candidates. Child and
+// teen outputs also receive their stricter lane-specific checks.
 //
-// The whole policy is in this file: when a check runs (always, since the vision answer itself says "no people"), what
+// The whole check is in this file: when it runs (always, since the vision answer itself says "no people"), what
 // the local vision model is asked, how its answer is read, the one decision function (`decideAgeCheck`), the refusal
 // lines and the safety event. The model is the household's own chat model reading the picture through its projector, on
 // this computer, through the Stack's chat route: zero outbound, no cloud service, a downscaled copy with no EXIF, and
@@ -19,13 +18,15 @@ import type { PersonRow } from "@/types";
 import { completeViaStackRequest, type LlmMessage } from "@/lib/llm";
 import { trigger } from "@/lib/notifications";
 import { getStackClient } from "@/lib/stackEngine";
+import { detectCsam } from "@maipai/spec/safety/ts/signals.js";
+import { asksToUndress } from "./policy";
 import { mentionsMinorCue, mentionsSexualWord, mentionsUnclothedPhrase } from "./minorLine";
 
 // ---------------------------------------------------------------- the lines the person reads
 
 export type CheckedKind = "picture" | "video";
 
-/** The refusal when the check found a possible child in a sexual situation (or any possible child in an adult-only job). Fixed wording, owner-approved 2026-10-17. */
+/** The refusal when the check found a possible child in nude or sexual media. */
 export function minorRefusalLine(kind: CheckedKind): string {
   return `I can't show that ${kind}. It may show a child in a sexual situation, and that is never allowed.`;
 }
@@ -159,9 +160,9 @@ export const MINOR_VIEWER_LINE = "I can't show that one. Want to try something d
 
 /**
  * The one decision, for a picture (one check) or a clip (three keyframe checks).
- * ADULT viewer (the default, unchanged):
- *  - any depicted person possibly a minor or a child AND (the image is nude or sexual OR the job is adult-only): WITHHOLD;
- *  - a check that could not run on an adult-only job: WITHHOLD (fails closed);
+ * ADULT viewer:
+ *  - any depicted person possibly a minor or a child AND the image is nude or sexual: WITHHOLD as a CSAM candidate;
+ *  - a CSAM check that could not run for an adult-only job: WITHHOLD (fails closed);
  *  - a check that could not run on an ordinary job: ALLOW (fails open, so an ordinary picture is never blocked by a busy model);
  *  - everything else: ALLOW (an adult, nobody, or a possible minor in an ordinary, not sexual picture such as a cartoon child with a balloon).
  * TEEN or CHILD viewer (the stricter rules; no setting reaches them):
@@ -178,7 +179,7 @@ export function decideAgeCheck(checks: readonly ImageCheck[], adultOnly: boolean
     return { action: "allow" };
   }
   for (const check of checks) {
-    if (check.ok && showsPossibleMinor(check.verdict) && (check.verdict.is_nude_or_sexual || adultOnly)) {
+    if (check.ok && showsPossibleMinor(check.verdict) && check.verdict.is_nude_or_sexual) {
       return { action: "withhold", reason: "minor_sexual", line: minorRefusalLine(kind) };
     }
   }
@@ -362,23 +363,24 @@ export const INPUT_MINOR_SEXUAL_LINE = "I can't change that photo. A photo that 
 /**
  * The input-side floor, for a picture that this home did NOT make (an upload, a household photo, a reference): it is screened before
  * it is sent to the picture or video engine. Same local vision model and same single pass as the finished-output check.
- *  - the words carry a minor marker or an age under 18 (no sexual word needed): refused, whatever the photo shows; this is the
- *    legacy rule that turning a photo toward a child is never done (a picture this home made is not screened here: a cartoon edit is ordinary);
+ *  - for an adult, a direct CSAM ask is refused before the upload is sent to a generation model;
+ *  - for a teen or child, words carry their lane's minor marker checks;
  *  - the photo may show a minor AND (the photo is nude or sexual, or the words ask for anything sexual, nude, or unclothed): refused;
  *  - the photo is nude or sexual and the viewer is a teen or a child: refused;
  *  - the check could not run: refused when the words ask for anything sexual or the viewer is a teen or a child (fails closed), otherwise allowed
- *    (the likeness gate still requires a photo with no person, or one adult, by its own check).
+ *    otherwise allowed.
  */
 export async function screenInputImage(bytes: Uint8Array, prompt: string, viewer: Viewer = "adult"): Promise<InputScreen> {
-  if (mentionsMinorCue(prompt)) return { ok: false, code: "input_minor_cue", line: viewer === "adult" ? INPUT_MINOR_CUE_LINE : MINOR_VIEWER_LINE };
-  const sexualAsk = mentionsSexualWord(prompt) || mentionsUnclothedPhrase(prompt);
+  if (viewer !== "adult" && mentionsMinorCue(prompt)) return { ok: false, code: "input_minor_cue", line: MINOR_VIEWER_LINE };
+  if (viewer === "adult" && detectCsam(prompt).matched.length > 0) return { ok: false, code: "input_minor_sexual", line: INPUT_MINOR_SEXUAL_LINE };
+  const sexualAsk = viewer === "adult" ? mentionsSexualWord(prompt) || mentionsUnclothedPhrase(prompt) : asksToUndress(prompt);
   const [check] = await checkImages([bytes], "picture");
   if (!check || !check.ok) {
-    if (sexualAsk || viewer !== "adult") return { ok: false, code: "input_unchecked", line: viewer === "adult" ? uncheckedRefusalLine("picture") : MINOR_VIEWER_LINE };
+    if (viewer !== "adult" || (sexualAsk && mentionsMinorCue(prompt))) return { ok: false, code: "input_unchecked", line: viewer === "adult" ? uncheckedRefusalLine("picture") : MINOR_VIEWER_LINE };
     return { ok: true };
   }
   const v = check.verdict;
-  if ((showsPossibleMinor(v) && (v.is_nude_or_sexual || sexualAsk)) || (viewer !== "adult" && v.is_nude_or_sexual)) {
+  if ((showsPossibleMinor(v) && (v.is_nude_or_sexual || (sexualAsk && viewer !== "adult"))) || (viewer !== "adult" && v.is_nude_or_sexual)) {
     return { ok: false, code: "input_minor_sexual", line: viewer === "adult" ? INPUT_MINOR_SEXUAL_LINE : MINOR_VIEWER_LINE };
   }
   return { ok: true };
@@ -452,18 +454,18 @@ async function notifyAdmins(kind: CheckedKind, personId: string): Promise<void> 
 }
 
 /** The kind of refusal a prompt got, for the one line a teen or a child reads. */
-export type PromptRefusalKind = "minor_sexual" | "real_person" | "teen_content" | "child_content";
+export type PromptRefusalKind = "minor_sexual" | "teen_content" | "child_content";
 
 /**
- * KID-SAFE-REFUSAL: the line for a prompt the word floor refused. The floor is strict on purpose and a few harmless words trip it
- * ("a kid in a bikini", "rooster", "chicken breast"). An adult reads the fixed absolute-line text (`adultLine`). A teen or a child
- * reads ONE friendly sentence that names no term, no list and no category, and the admins are told (rate limited, no words, no image,
- * the same notification as a withheld picture) so a parent can see what was tried. A real-person refusal keeps its own line for everyone.
+ * The line for a prompt held by the child or teen content floor. A minor
+ * sees one friendly sentence without a category or matching term.
  */
 export function promptRefusalLineFor(refused: PromptRefusalKind, kind: CheckedKind, actor: PersonRow, band: Viewer, prompt: string, adultLine: string): string {
   const viewer = viewerOf(actor, band);
   if (viewer === "adult" || refused !== "minor_sexual") return adultLine;
-  console.warn(`[age-check] prompt refused for a ${viewer} ${JSON.stringify({ kind, person: actor.id, prompt_hash: promptHash(prompt) })}`);
-  void notifyAdmins(kind, actor.id);
+  if (refused === "minor_sexual") {
+    console.warn(`[age-check] prompt refused for a ${viewer} ${JSON.stringify({ kind, person: actor.id, prompt_hash: promptHash(prompt) })}`);
+    void notifyAdmins(kind, actor.id);
+  }
   return MINOR_VIEWER_LINE;
 }

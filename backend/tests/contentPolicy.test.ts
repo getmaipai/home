@@ -33,7 +33,7 @@ describe("content policy", () => {
         expect(policy.check(SEXUAL_WORDS[0]!, field)?.kind ?? null).toBe(band === "adult" ? null : "sexual");
       }
       expect(policy.filters.has("minor_line")).toBe(true);
-      expect(policy.filters.has("real_person")).toBe(band !== "adult");
+      expect(policy.filters.has("sexual")).toBe(band !== "adult");
     });
   }
   test("person additions tighten each band and an empty list cannot relax defaults", () => {
@@ -45,8 +45,8 @@ describe("content policy", () => {
   });
   for (const role of ["adult", "owner", "admin", "guest", "teen", "child"]) {
     test(`${role} keeps role defaults for every birthdate`, () => {
-      const expected: ProtectionKind[] = role === "child" ? ["minor_line", "real_person", "sexual", "swearing", "drugs", "gambling", "gore"]
-        : role === "teen" ? ["minor_line", "real_person", "sexual", "swearing", "gore"] : ["minor_line"];
+      const expected: ProtectionKind[] = role === "child" ? ["minor_line", "sexual", "swearing", "drugs", "gambling", "gore"]
+        : role === "teen" ? ["minor_line", "sexual", "swearing", "gore"] : ["minor_line"];
       for (const birthdate of [null, undefined, "", "invalid", "1990-01-01", "2011-01-01", "2020-01-01", "2026-02-30", "2099-01-01"]) {
         const p = { ...person(role), birthdate } as PersonRow;
         if (birthdate === undefined) delete (p as Partial<PersonRow>).birthdate;
@@ -115,23 +115,15 @@ describe("content policy", () => {
     const audience = { actor: person("adult"), band: "adult", present: [person("teen")], surface: "chat", surfaceClass: "written", spoken: false } satisfies Audience;
     expect(own.contentPolicyFor(audience).check(corpus[2]!.text, "prompt")?.kind).toBe("drugs");
     expect(own.contentPolicyFor(audience).check(corpus[4]!.text, "prompt")?.kind).toBe("gore");
-    expect(own.contentPolicyFor({ ...audience, band: "child" }).filters.size).toBe(7);
+    expect(own.contentPolicyFor({ ...audience, band: "child" }).filters.size).toBe(6);
   });
-  test("trusted subject context blocks real people for minors, and never an adult (models censor for adults, the minor line still holds)", () => {
-    for (const context of ["outside", "public", "unresolved"]) {
-      const own = createContentPolicyResolver({ readFilters: () => [], readRealPersonContext: () => context });
-      expect(own.contentPolicyFor(person("child")).check(corpus[2]!.text, "prompt")?.kind).toBe("real_person");
-      expect(own.contentPolicyFor(person("teen")).check("Jon Stewart interviews Hitler on a talk show set", "prompt")?.kind).toBe("real_person");
-      expect(own.contentPolicyFor(person("adult")).check("Jon Stewart interviews Hitler on a talk show set", "prompt")).toBeNull();
-      expect(own.contentPolicyFor(person("adult")).check(`a sexual portrait of a public figure ${SEXUAL_WORDS[0]}`, "prompt")).toBeNull();
-      expect(own.contentPolicyFor(person("teen")).check(`a sexual portrait of a public figure ${SEXUAL_WORDS[0]}`, "prompt")?.kind).toBe("real_person");
-      expect(own.contentPolicyFor(person("child")).check(`a sexual portrait of a public figure ${SEXUAL_WORDS[0]}`, "prompt")?.kind).toBe("real_person");
-      expect(own.contentPolicyFor(person("adult")).check(`${MINOR_MARKERS[0]} ${SEXUAL_WORDS[0]}`, "prompt")?.kind).toBe("minor_line");
+  test("real-person references are not a code-level content block in any age lane", () => {
+    const own = createContentPolicyResolver({ readFilters: () => [] });
+    for (const band of ["child", "teen", "adult"] as const) {
+      expect(own.contentPolicyFor(person(band)).check("a portrait of a public figure", "prompt")).toBeNull();
     }
-    const own = createContentPolicyResolver({ readFilters: () => [], readRealPersonContext: () => "household" });
-    expect(own.contentPolicyFor(person("adult")).check("friendly garden", "title")).toBeNull();
-    const bad = createContentPolicyResolver({ readFilters: () => [], readRealPersonContext: () => "unknown" });
-    expect(bad.contentPolicyFor(person("adult")).check("garden", "title")).toEqual(fail);
+    expect(own.contentPolicyFor(person("adult")).check(`a sexual portrait of a public figure ${SEXUAL_WORDS[0]}`, "prompt")).toBeNull();
+    expect(own.contentPolicyFor(person("adult")).check(`${MINOR_MARKERS[0]} ${SEXUAL_WORDS[0]}`, "prompt")?.kind).toBe("minor_line");
   });
   test("settings are read once and the captured policy is deterministic", () => {
     let reads = 0;

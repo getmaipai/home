@@ -219,7 +219,7 @@ describe("SetupWizard", () => {
       await advanceTo(rendered, "Set up my Home", "Before you start");
       fireEvent.click(rendered.getByRole("button", { name: "Home goes online for you" }));
       expect(rendered.container.textContent).toContain("You also accept the licences of the AI models and tools Home installs for you.");
-      expect(rendered.getAllByRole("button", { name: /AI can be wrong|Kids may still|People can grow|Home goes online/ }).length).toBe(4);
+      expect(rendered.getAllByRole("button", { name: /AI can be wrong|AI decides|A little care|Kids may still|People can grow|Home goes online/ }).length).toBe(6);
       expect(h.licenceAccepts).toEqual([]);
       await advanceTo(rendered, "I understand", "How should Home run?");
       expect(h.licenceAccepts).toEqual(["accepted"]);

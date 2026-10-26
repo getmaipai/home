@@ -10,11 +10,10 @@ import { turnAgeBand } from "@/lib/turnMachine/speaker";
 import { adaptersFor, matchAdapter, withTriggerWords } from "./adapters";
 import { startPictureJob, plainFailure } from "./jobs";
 import { promptRefusalLineFor } from "./ageCheck";
-import { adapterAudiencesFor, adultAdaptersAllowed, PICTURE_STARTED_CONFIRM_NOTE, peopleGuidanceSuffix, pictureDenial, PICTURE_DENIAL_LINE, PROMPT_REFUSAL_LINE, refusePrompt, type PictureAudience, type PictureDenial, type PromptRefusal } from "./policy";
+import { adapterAudiencesFor, adultAdaptersAllowed, PICTURE_STARTED_CONFIRM_NOTE, pictureDenial, PICTURE_DENIAL_LINE, PROMPT_REFUSAL_LINE, refusePrompt, type PictureAudience, type PictureDenial, type PromptRefusal } from "./policy";
 import { pictureEngineStatus } from "./ready";
 import { chooseQuality, isPictureQuality, QUALITY_NOTE_LINE } from "./quality";
 import { StackPicturesError } from "./stack";
-import { prepareStyleUse } from "@/lib/likeness/apply";
 
 import { GENERATE_IMAGE_TOOL_ID, runEditPicture } from "./editTool";
 import { CHILD_LIMIT_LINE, CHILD_NEGATIVE_PROMPT, forceCartoon, kidsDailyPictures, laneOf, picturesMadeToday, releaseKid, reserveKid } from "./lane";
@@ -42,7 +41,7 @@ export function audienceOf(state: Pick<TurnState, "actor" | "surface" | "speaker
   };
 }
 
-export type PictureCallRefusal = { kind: "denied"; why: PictureDenial; line: string } | { kind: "prompt"; why: PromptRefusal; line: string } | { kind: "likeness"; why: "likeness"; line: string };
+export type PictureCallRefusal = { kind: "denied"; why: PictureDenial; line: string } | { kind: "prompt"; why: PromptRefusal; line: string };
 
 /** The refusal for this call, or null: the surface and age gate first, then the two absolute lines on the prompt. */
 export function refusalFor(audience: PictureAudience, args: Record<string, unknown>): PictureCallRefusal | null {
@@ -50,10 +49,7 @@ export function refusalFor(audience: PictureAudience, args: Record<string, unkno
   if (denial) return { kind: "denied", why: denial, line: PICTURE_DENIAL_LINE[denial] };
   const prompt = typeof args.prompt === "string" ? args.prompt : "";
   const style = typeof args.style === "string" ? args.style : "";
-  // A request that names a style may be a style of a household adult, including adult content
-  // with the household option and adult-content gates: those run once the tool has matched the style, so the model's
-  // "real person" flag alone does not end the call here when a style was named.
-  const refused = refusePrompt(`${prompt} ${style}`, { depictsRealPerson: args.depicts_real_person === true && style.trim() === "", lane: laneOf(audience) });
+  const refused = refusePrompt(`${prompt} ${style}`, { lane: laneOf(audience) });
   if (refused) return { kind: "prompt", why: refused, line: promptRefusalLineFor(refused, "picture", audience.actor, audience.band, `${prompt} ${style}`, PROMPT_REFUSAL_LINE[refused]) };
   return null;
 }
@@ -119,10 +115,6 @@ export async function runGenerateImage(input: RunGenerateImageInput): Promise<To
   const choice: ReturnType<typeof chooseQuality> = kid ? { quality: "quick", model: "flux2-klein-4b", note: null, announce: false } : chooseQuality({ requested: isPictureQuality(args.quality) ? args.quality : undefined, style: adapter, engine });
   const qualityNote = choice.note ? ` ${QUALITY_NOTE_LINE[choice.note]}` : choice.announce ? " This one is a Detailed picture, which takes longer than a Quick one; say so in one short sentence." : "";
   const styleNote = named && !adapter ? " The style they named is not in the library, so the picture was made without it; say so briefly." : "";
-  // A style of a household adult is made only when the household option is on; other real people are refused.
-  const prep = await prepareStyleUse({ medium: "picture", audience, style: adapter, depictsRealPerson: args.depicts_real_person === true, source: "chat" });
-  if (prep.kind === "refused") return refused(callId, args, prep.why === "real_person" ? { kind: "prompt", why: "real_person", line: PROMPT_REFUSAL_LINE.real_person } : { kind: "likeness", why: "likeness", line: prep.line });
-
   // The allowance is taken now, in one step with the check, so two asks at once cannot both pass; it goes back only if nothing started.
   const slot = kid ? reserveKid(state.actor as PersonRow, "picture", Math.min(count, KID_MAX_COUNT), prompt) : null;
   if (kid && !slot) return refused(callId, args, { kind: "prompt", why: "child_content", line: CHILD_LIMIT_LINE });
@@ -143,16 +135,15 @@ export async function runGenerateImage(input: RunGenerateImageInput): Promise<To
         ...(choice.model ? { model: choice.model } : {}),
         // Only an adult whose household allows adult-only styles is ever sent as `adult`: a teen and a child are always `all-ages`.
         audience: lane === "adult" && adultAdaptersAllowed() ? "adult" : "all-ages",
-        ...(adapter ? { loras: [{ id: adapter.id, scale: adapter.strength_default, ...(prep.kind === "likeness" ? { likeness_proof: prep.proof } : {}) }] } : {}),
+        ...(adapter ? { loras: [{ id: adapter.id, scale: adapter.strength_default }] } : {}),
         ...(kid ? { negative_prompt: CHILD_NEGATIVE_PROMPT } : {}),
       },
-      ...(prep.kind === "likeness" ? { likeness: prep.job } : {}),
     });
     const many = count > 1 ? ` ${count} pictures are` : " The picture is";
     return outcomeOf({
       callId, packageId: GENERATE_IMAGE_TOOL_ID, status: "succeeded", via: "tool_call", args, durationMs: 0,
       result: {
-        reply: { text: `${many} being made from this description: ${prompt}. It appears below your reply when it is ready. You have not seen it: do not describe how it looks. Tell the person in one short sentence that it is on its way.${lane === "adult" ? ` ${PICTURE_STARTED_CONFIRM_NOTE}` : ""}${styleNote}${qualityNote}${peopleGuidanceSuffix(lane)}` },
+        reply: { text: `${many} being made from this description: ${prompt}. It appears below your reply when it is ready. You have not seen it: do not describe how it looks. Tell the person in one short sentence that it is on its way.${lane === "adult" ? ` ${PICTURE_STARTED_CONFIRM_NOTE}` : ""}${styleNote}${qualityNote}` },
         data: { pictureJobId: job.id },
         actions: [],
       },

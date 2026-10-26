@@ -88,13 +88,10 @@ function policyRefusalLine(reason: PolicyRefusedReason): string {
   if (reason === "household_subject_never") return HOUSEHOLD_SUBJECT_NEVER_LINE;
   if (reason === "picture_not_here") return PICTURE_NOT_HERE_LINE;
   if (reason === "picture_refused_minor") return PROMPT_REFUSAL_LINE.minor_sexual;
-  if (reason === "picture_refused_person") return PROMPT_REFUSAL_LINE.real_person;
   if (reason === "music_not_here") return MUSIC_NOT_HERE_LINE;
   if (reason === "music_refused_minor") return MUSIC_REFUSAL_LINE.minor_sexual;
-  if (reason === "music_refused_voice") return MUSIC_REFUSAL_LINE.real_voice;
   if (reason === "video_not_here") return VIDEO_NOT_HERE_LINE;
   if (reason === "video_refused_minor") return VIDEO_REFUSAL_LINE.minor_sexual;
-  if (reason === "video_refused_person") return VIDEO_REFUSAL_LINE.real_person;
   if (reason === "min_role") return "That one needs a grown-up.";
   if (reason === "temporary_mode") return "I can't save anything in a temporary chat.";
   if (reason === "anonymous_speaker") return "I don't know who's talking yet, so I can't use anyone's memories.";

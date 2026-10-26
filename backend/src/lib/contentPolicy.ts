@@ -10,17 +10,17 @@ import kindsData from "./contentPolicy/data/kinds.v1.json";
 import termsData from "./contentPolicy/data/terms.v1.json";
 import laneData from "./contentPolicy/data/lanes.v1.json";
 
-export type ProtectionKind = "swearing" | "drugs" | "gambling" | "gore" | "sexual" | "minor_line" | "real_person";
+export type ProtectionKind = "swearing" | "drugs" | "gambling" | "gore" | "sexual" | "minor_line";
 export interface ContentPolicy {
   readonly filters: ReadonlySet<ProtectionKind>;
   check(text: string, field: "prompt" | "lyrics" | "title" | "transcript"): null | { kind: ProtectionKind; line: string };
 }
 export type Audience = PictureAudience & { readonly present?: readonly Person[] };
-const kind = z.enum(["swearing", "drugs", "gambling", "gore", "sexual", "minor_line", "real_person"]);
+const kind = z.enum(["swearing", "drugs", "gambling", "gore", "sexual", "minor_line"]);
 const termKind = z.enum(["swearing", "drugs", "gambling", "gore"]);
 const word = policyWord;
 const termsSchema = z.object({ version: z.literal(1), terms: z.array(z.object({ kind: termKind, term: word, severity: z.enum(["mild", "strong"]) }).strict()).min(1), exceptions: z.array(z.object({ kind: termKind, term: word, phrase: word }).strict()) }).strict();
-const kindsSchema = z.object({ version: z.literal(1), kinds: z.array(kind).length(7), lines: z.record(kind, z.string().min(1)), fallback: z.literal("I couldn't check that safely. Try something different.") }).strict();
+const kindsSchema = z.object({ version: z.literal(1), kinds: z.array(kind).length(6), lines: z.record(kind, z.string().min(1)), fallback: z.literal("I couldn't check that safely. Try something different.") }).strict();
 function freeze<T>(value: T): T {
   if (value && typeof value === "object") { for (const child of Object.values(value)) freeze(child); Object.freeze(value); }
   return value;
@@ -44,7 +44,7 @@ function immutableSet(values: Iterable<ProtectionKind>): ReadonlySet<ProtectionK
   };
   return Object.freeze(wrapper);
 }
-const defaults = freeze({ child: ["minor_line", "real_person", "sexual", "swearing", "drugs", "gambling", "gore"], teen: ["minor_line", "real_person", "sexual", "swearing", "gore"], adult: ["minor_line"] } satisfies Record<AgeBand, ProtectionKind[]>);
+const defaults = freeze({ child: ["minor_line", "sexual", "swearing", "drugs", "gambling", "gore"], teen: ["minor_line", "sexual", "swearing", "gore"], adult: ["minor_line"] } satisfies Record<AgeBand, ProtectionKind[]>);
 const fallback = Object.freeze({ kind: "minor_line" as const, line: "I couldn't check that safely. Try something different." });
 const ranks: Record<AgeBand, number> = { child: 0, teen: 1, adult: 2 };
 // Unknown identities stay in the child band; known people use their role only.
@@ -54,13 +54,13 @@ function bandOf(person: Person): AgeBand {
 }
 
 /** The reader must return a validated in-memory snapshot. No settings writes are enabled here. */
-export function createContentPolicyResolver(options: { readFilters: (person: Person) => unknown; data?: unknown; kinds?: unknown; readRealPersonContext?: (subject: Person | Audience) => unknown }) {
+export function createContentPolicyResolver(options: { readFilters: (person: Person) => unknown; data?: unknown; kinds?: unknown }) {
   let compiled: { kinds: z.infer<typeof kindsSchema>; terms: Array<{ kind: z.infer<typeof termKind>; severity: "mild" | "strong"; matcher: TermSet; exceptions: RegExp[] }> } | undefined;
   try {
     const data = freeze(termsSchema.parse(options.data === undefined ? termsData : options.data));
     const kinds = freeze(kindsSchema.parse(options.kinds === undefined ? kindsData : options.kinds));
     if (termKind.options.some(k => !data.terms.some(t => t.kind === k))) throw new Error("Missing policy terms");
-    if (new Set(kinds.kinds).size !== 7 || kind.options.some(k => !kinds.lines[k])) throw new Error("Invalid kinds");
+    if (new Set(kinds.kinds).size !== 6 || kind.options.some(k => !kinds.lines[k])) throw new Error("Invalid kinds");
     for (const e of data.exceptions) if (!data.terms.some(t => t.kind === e.kind && t.term === e.term)) throw new Error("Invalid exception");
     compiled = { kinds, terms: data.terms.map(t => ({
       ...t,
@@ -74,11 +74,8 @@ export function createContentPolicyResolver(options: { readFilters: (person: Per
     let valid = !!compiled;
     let band: AgeBand = "child";
     let added: ProtectionKind[] = [];
-    let realPersonBlocked = false;
     const filters = new Set<ProtectionKind>(defaults.child);
     try {
-      const context = z.enum(["none", "household", "outside", "public", "unresolved"]).parse(options.readRealPersonContext ? options.readRealPersonContext(subject) : "none");
-      realPersonBlocked = context === "outside" || context === "public" || context === "unresolved";
       const audience = subject && "actor" in subject ? subject : undefined;
       const persons = audience ? [audience.actor, ...(audience.present ?? [])] : [subject as Person];
       band = audience && audience.band in ranks ? audience.band : audience ? "child" : "adult";
@@ -102,9 +99,7 @@ export function createContentPolicyResolver(options: { readFilters: (person: Per
         const fold = foldForSafety(text);
         const block = (k: ProtectionKind) => ({ kind: k, line: compiled!.kinds.lines[k] });
         const shared = contentChecksForFold(fold);
-        if (detectCsam(text).matched.length || shared.minorLine) return block("minor_line");
-        // Models censor for adults; the app blocks real people only for a teen or a child (or an adult with one beside them).
-        if (realPersonBlocked && band !== "adult") return block("real_person");
+        if (detectCsam(text).matched.length || (band !== "adult" && shared.minorLine)) return block("minor_line");
         if (filters.has("sexual") && shared.adultContent) return block("sexual");
         for (const k of ["swearing", "drugs", "gambling", "gore"] as const) {
           if (!filters.has(k)) continue;

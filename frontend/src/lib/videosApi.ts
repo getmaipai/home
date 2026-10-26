@@ -24,7 +24,7 @@ export interface VideoItem {
 }
 export interface VideoCard { id: string; conversation_id: string | null; items: VideoItem[]; can_make_another: boolean; limits: string }
 export interface VideoStatus { can_make: boolean; reason: string | null; engine_ready: boolean; adult_styles: boolean; limits: string; styles: Array<{ id: string; name: string }> }
-export interface VideoAdapterRow { id: string; name: string; classification: "all-ages" | "adult-only"; enabled: boolean; needs_confirmation: boolean; sha256: string; base_model: string; trigger_words: string[]; licence: string; strength_default: number; bytes: number; source_url: string | null; added_at: string; looks_like?: { id: string; name: string } | null }
+export interface VideoAdapterRow { id: string; name: string; classification: "all-ages" | "adult-only"; enabled: boolean; needs_confirmation: boolean; sha256: string; base_model: string; trigger_words: string[]; licence: string; strength_default: number; bytes: number; source_url: string | null; added_at: string }
 /** VIDEO-LTX-01: Detailed videos as Settings sees them. */
 export interface DetailedVideoSettings { installed: boolean; available: boolean; reason: string | null; download_bytes: number; component: string; licence: { id: string; name: string; url: string } | null; lora_base_model: string }
 export interface VideoSettings {
