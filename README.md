@@ -7,11 +7,11 @@
 
 <h3 align="center">A private, self-hosted AI hub for families.</h3>
 
-<p align="center"><a href="https://github.com/getmaipai/home/releases">Releases</a></p>
+<p align="center"><a href="docs/site-fumadocs/content/docs/user/index.mdx">Documentation</a> · <a href="docs/user/install-upgrade-uninstall.md">Install</a> · <a href="CHANGELOG.md">Releases</a></p>
 
 Your own private AI at home, with chat, voice, pictures and videos, on your own hardware - for protection, privacy, and independence.
 
-Your chats, people and memories stay in your house. Home goes online only to do what you ask: downloads, updates and web searches.
+Your chats, people and memories stay in your house. Home goes online for downloads, updates, web searches and other lookups you start. The privacy page lists what each feature sends.
 
 ## What Home does today
 
@@ -22,6 +22,13 @@ Your chats, people and memories stay in your house. Home goes online only to do 
 - **Natural voice.** Talk and listen. Home speaks with Chatterbox Turbo on bigger computers, and can add small laughs and sighs. An owner or admin can turn that off.
 - **Web search.** Home searches with DuckDuckGo, or with your own SearXNG. Teens and children use your own SearXNG unless a grown-up allows more.
 - **Weather.** A Weather app and a weather card in chat, with your places and your choice of Fahrenheit or Celsius.
+- **Music and songs.** Browse your music library, make songs in chat, and follow the lyrics in the player.
+- **News.** Read stories from the same news shelf Home uses for headline questions.
+- **Companions.** Choose how chat sounds, make a companion, or ask another companion with an @mention.
+- **Coding mode.** Give an adult a local coding workspace with personal keys.
+- **Phone layout.** Apps use a bottom section bar and share the top bar with Home.
+- **Pictures, videos and songs share a household queue.** Home shows each job's place in line while it waits.
+- **Answer choices.** Adults can tap a choice below a question instead of typing it.
 - **A Home page** with an ask box, a Today row, and Getting started steps.
 - **Apps as packages.** A package can be an app with its own pages and settings. Weather is the first.
 - **A real household.** One profile per person. Children are restricted by default, teens get more privacy, and the safety gates cannot be switched off.
@@ -31,7 +38,7 @@ Your chats, people and memories stay in your house. Home goes online only to do 
 
 ## Coming soon
 
-Not shipped yet: a faster chat engine (oMLX) for 64 GB and 128 GB Macs, pictures and videos for children and teens, pictures of a family member's own face (needs the owner's ruling), music, videos, podcasts, maps and books apps, and the Go and Bot apps.
+Not shipped yet: a faster chat engine (oMLX) for 64 GB and 128 GB Macs, pictures and videos for children and teens, videos, podcasts, maps and the Go app.
 
 ## The privacy promise
 

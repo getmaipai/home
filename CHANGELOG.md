@@ -7,6 +7,52 @@ checklist (`docs/dev.md`). The first release is 0.1.0.
 
 ## [Unreleased]
 
+## [0.2.129] - 2026-10-25
+
+Companions can be added and removed, chosen for each chat, and called with an @mention. News and media pages get a simpler phone layout. New pictures use ERNIE-Image-Turbo for Quick when it is installed. Pictures, videos and songs wait in one household queue. No database migrations.
+
+### Added
+- **Companions: Discover and Add.** Browse companions, add one to your own list or remove it. A companion page lists your chats with it and starts a new one. Choose a companion in a chat's header, or use @mention to ask another companion one question without changing the chat's choice.
+- **Answer chips under a question.** Adults can tap a suggested answer instead of typing it. Chips do not appear for children or teens, or while an approval is waiting.
+- **One household queue for pictures, videos and songs.** Cards show their place in line and an estimate when Home knows one. A job starts when it is its turn.
+- **Quick pictures use ERNIE-Image-Turbo when available.** Quick uses the regular picture model if ERNIE is not installed. Edits still use the existing edit model.
+- **Hub diagnostics.** Owners can see slow requests and event-loop delays in performance details.
+
+### Changed
+- **Phone layout.** App sections sit in a bottom bar. The app name and actions share the top bar. Chat history opens from the actions menu.
+- **News loads pages and pictures more steadily.** News opens from saved page data while new stories load; story pictures download at a paced rate per publisher.
+- **Companion pages and gallery.** Companions use a gallery and detail page, with a clear way to start or continue a chat.
+
+## [0.2.128] - 2026-10-25
+
+Phone app sections move to the bottom bar, with Search at the end. The shared app settings include a Sidebar pin switch. No database migrations.
+
+### Changed
+- **App sections on phones.** Sections use the bottom bar, and the app name and actions share the top bar.
+- **Pin an app in its settings.** Every app's settings include a Sidebar section with its pin switch.
+
+## [0.2.127] - 2026-10-25
+
+Home's release tool checks that it will use the live hub's data before it changes the running install. No database migrations.
+
+### Changed
+- **Safer release checks.** Shipping stops before installation when Home is using a different data folder from the live install and that install has less data.
+
+## [0.2.126] - 2026-10-25
+
+The sidebar settings section now handles apps that have no sections yet. No database migrations.
+
+### Fixed
+- **An app with no sections can still show Sidebar settings.** Its pin switch remains available.
+
+## [0.2.125] - 2026-10-25
+
+The news shelf and companion preview get follow-up fixes. No database migrations.
+
+### Changed
+- **News pages open from saved page data.** News can show its last loaded page while it refreshes stories.
+- **Companion preview cards and Activity** use labeled sample data.
+
 ## [0.2.124] - 2026-10-24
 
 The first release cut from a commit that was already live: Home is now shipped by promoting a landed commit to the hub and tagging what runs, instead of tagging first and installing from the tag.

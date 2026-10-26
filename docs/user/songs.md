@@ -36,7 +36,7 @@ Press **Make it full** or **Make it quick** on the card to make the same song ag
 
 Type "write us a cheerful folk song about Saturday pancakes". Chat writes the words and starts the song. A card shows what Home is doing, a clock and a bar. Press **Stop** on the card to cancel.
 
-The first song after a restart takes about a minute more, while the model loads. If Home is busy making a picture, a video or another song, the card says so and your song starts after it. You can have one song in the making at a time.
+The first song after a restart takes about a minute more, while the model loads. Picture, video and song jobs share a household queue. Your card shows its place in line, and your song starts when its turn comes.
 
 If someone is chatting or talking to Home while a song is being made, the card says "Paused while chat is working". It carries on after the reply. The wait is not counted against the song.
 
@@ -87,7 +87,7 @@ Songs are made with a model whose makers say its songs may be used for money, fo
 ## Something not working?
 
 - **No song option.** Why: your Mac has less than 64 GB, the music model is not installed, you are not an adult, or music is off. Fix: ask an owner or admin to check Settings.
-- **"Home is busy making another picture, video or song".** Why: Home does one job at a time. Fix: wait. It starts by itself.
+- **Your song is waiting.** Why: picture, video and song jobs share a household queue. Fix: wait. Its card shows its place in line and it starts when its turn comes.
 - **"Not enough free memory for music right now".** Why: another big job has the memory. Fix: wait a few minutes, then ask again.
 - **The end of a song has no real words.** Why: the words were shorter than the song. Fix: ask for more words, or a shorter song.
 - **My full song leaves out some words.** Why: the words need more time than the length you asked for or your computer can make. Fix: ask for fewer words, or use a computer that can make a longer song.

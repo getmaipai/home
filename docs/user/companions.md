@@ -2,7 +2,7 @@
 
 A companion is how your assistant sounds. Some are plain and short. Some are cheerful and ask you questions.
 
-Open **Companions** from All apps. You can pin it to the side bar there.
+Open **Companions** from All apps. Choose **Discover** to browse companions you can add. Choose **Add** on one you like to put it in your list, or **Remove** to take it out.
 
 ## Pick one
 
@@ -16,12 +16,13 @@ You only see the companions that fit you. A child sees companions for everyone. 
 Tap a card to read more. You will see how it talks, things it might say, and its voice. Press **Play a sample** to hear the voice.
 Press **Set as my default** to use it in your chats.
 
-## The ones that come with Home
+Open one of your chats and choose the companion in the chat header to use it for that chat. The choice stays with that chat. Type **@** followed by another companion's name to ask that companion one question. The chat's own companion stays the same.
 
-- **MaiPai** is plain and direct, with no character on top.
-- **Nova, Riff and Sprout** share one bubbly, curious, affectionate personality. They notice small things, react before they ask a question, and keep their replies short.
-- **Rivet** is a tiny robot friend who finds wonder in ordinary things and has a playful imagination.
-- **Buddy, Pal and The Tutor** are a warm best friend, a laid-back teenage voice and a patient teacher.
+On a companion's page, you can see your chats with it and start a new chat.
+
+## Examples
+
+Names and companions in this guide are examples. What you can pick depends on your age and what the owner has added.
 
 ## A companion never loosens the rules
 
