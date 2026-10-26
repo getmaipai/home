@@ -69,7 +69,7 @@ function limitSettings() {
     } as SettingsKey)),
     {
       key: "generation.kid_enabled", scope: "person", selector: "boolean", default: true, label: "This child can make cartoon pictures and videos",
-      level: "basic", secret: false, lives_in: "person.limits", honoured_by: ["home"],
+      level: "basic", secret: false, lives_in: "person.likeness", honoured_by: ["home"],
     } as unknown as SettingsKey,
     {
       key: "topics.bodies", scope: "person", selector: "select", default: "default", label: "Bodies and relationships",

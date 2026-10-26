@@ -104,7 +104,7 @@ export const PICTURE_SETTINGS_KEYS: SettingsKey[] = [
     copy: { does: "Turns cartoon making on or off for this one person." },
     control: { child: "guardian", teen: "self", adult: "self" },
     band_default: { child: true, teen: true, adult: true },
-    lives_in: "person.limits",
+    lives_in: "person.likeness",
     honoured_by: ["home"],
   }),
 ];
