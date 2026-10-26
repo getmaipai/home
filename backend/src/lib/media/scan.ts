@@ -108,6 +108,7 @@ function recordFor(scanned: Draft, source: MediaSource, existing: MediaItemRow |
   // An edited field is locked: the existing row's value wins over the scanned one.
   const locked = (existing?.lockedFields ? JSON.parse(existing.lockedFields) : []) as MediaItem["locked_fields"];
   const draft: Draft = { ...scanned };
+  const keptArtwork = existing && locked.includes("artwork") ? (existing.artwork ? JSON.parse(existing.artwork) as MediaItem["artwork"] : null) : undefined;
   if (existing) {
     if (locked.includes("title")) draft.title = existing.title;
     if (locked.includes("description")) draft.description = existing.description;
@@ -123,7 +124,7 @@ function recordFor(scanned: Draft, source: MediaSource, existing: MediaItemRow |
   const item = MediaItem.parse({
     id: existing?.id ?? newMediaItemId(), kind: draft.kind, title: draft.title, subtitle: draft.subtitle, description: draft.description, source_id: source.id, parent_id: parentId,
     location: { root_id: source.id, path: draft.rel }, media_type: draft.mediaType, duration_s: draft.durationS, size: draft.size, width: draft.width, height: draft.height,
-    video_codec: draft.videoCodec, audio_codec: draft.audioCodec, playable: draft.playable, artwork: draft.artworkPath ? { path: draft.artworkPath } : null, previews: null,
+    video_codec: draft.videoCodec, audio_codec: draft.audioCodec, playable: draft.playable, artwork: keptArtwork !== undefined ? keptArtwork : draft.artworkPath ? { path: draft.artworkPath } : null, previews: null,
     chapters: draft.chapters, subtitles: [], series: draft.series, season: draft.season, episode: draft.episode, artist: draft.artist, album: draft.album, album_artist: draft.albumArtist,
     track_no: draft.trackNo, disc_no: draft.discNo, year: draft.year, genre: draft.genre, author: draft.author, narrator: draft.narrator, series_index: draft.seriesIndex,
     locator_kind: draft.locatorKind, external: null, lyrics, locked_fields: locked, advisory: { explicit: draft.explicit, source: verdict.advisorySource }, band_ok: band,

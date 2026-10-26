@@ -81,6 +81,15 @@ describe("locked fields survive a rescan", () => {
     expect(itemFromRow(rowAt(FILM)).artwork).toMatchObject({ path: "Moon Rivets (2021).jpg" });
   });
 
+  test("a locked cover picked from the hub's pictures keeps its file id", async () => {
+    const { tree, root } = await filmRoot();
+    const id = rowAt(FILM).id;
+    db.update(mediaItems).set({ artwork: JSON.stringify({ file_id: "file-abc123" }), lockedFields: JSON.stringify(["artwork"]) }).where(eq(mediaItems.id, id)).run();
+    writeFileSync(join(tree.films, FILM), "a longer film file again");
+    await scanRoot(root.id, noProber);
+    expect(itemFromRow(rowAt(FILM)).artwork).toEqual({ file_id: "file-abc123" });
+  });
+
   test("a locked track artist survives a rescan of the tags", async () => {
     const tree = buildMediaTree();
     const root = addRoot(tree.music, ["track"]);
