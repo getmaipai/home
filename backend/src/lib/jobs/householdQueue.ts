@@ -18,8 +18,6 @@ export interface QueueJob {
   /** Marks a queued record whose worker is paused and is the head's blocker. */
   resourcePaused?: boolean;
   childDailyCapReached?: boolean;
-  /** PERUSE-2026-10-25: held until the pictured adult answers a consent ask; such a job is never ordered or released. */
-  awaitingApproval?: boolean;
   headOfClass?: boolean;
 }
 
@@ -46,7 +44,7 @@ function compare(a: QueueJob, b: QueueJob, now: number): number {
 
 /** Returns every waiting job in household start order, with one based positions. */
 export function order(jobs: readonly QueueJob[], now: number): QueuePosition[] {
-  const waiting = jobs.filter((job) => job.state === "queued" && !job.childDailyCapReached && !job.awaitingApproval);
+  const waiting = jobs.filter((job) => job.state === "queued" && !job.childDailyCapReached);
   const classes = [...new Set(waiting.map((job) => effectiveClass(job, now)))].sort((a, b) => a - b);
   const ordered: QueueJob[] = [];
   for (const rank of classes) {

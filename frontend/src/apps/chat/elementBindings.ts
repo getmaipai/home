@@ -38,7 +38,7 @@ import {
 } from "@/apps/chat/chatThreadSlots";
 import { ChatMessageError } from "@/apps/chat/chatErrorSlot";
 import { ChatCitationLink } from "@/apps/chat/chatCitationLink";
-import { ArtifactCardToolRender, AskToolRender, ConfirmToolRender, LikenessAskToolRender, PictureProgressToolRender, PictureToolRender, MusicToolRender, ProjectToolRender, VideoToolRender, SpecSheetToolRender, ToolTimelineToolRender } from "@/apps/chat/chatToolUis";
+import { ArtifactCardToolRender, AskToolRender, ConfirmToolRender, PictureProgressToolRender, PictureToolRender, MusicToolRender, ProjectToolRender, VideoToolRender, SpecSheetToolRender, ToolTimelineToolRender } from "@/apps/chat/chatToolUis";
 import { ComposerAddMenu } from "@/apps/chat/composerAddMenu";
 import { ChatDateDivider } from "@/apps/chat/chatDateDivider";
 import { ComposerDictationWaveform } from "@/apps/chat/composerDictationWaveform";
@@ -80,8 +80,6 @@ export const TOOL_BINDINGS: readonly ToolBinding[] = [
   // IMGGEN-UI-01: a picture the person asked for: progress while it is made, then the pictures (or a plain failure).
   { toolName: "picture_progress", element: "job-progress", render: PictureProgressToolRender },
   { toolName: "picture", element: "image-gallery", render: PictureToolRender },
-  // PERUSE-2026-10-25: a picture or video held for the pictured adult's yes: the exact prompt with Consent and Decline.
-  { toolName: "likeness_ask", element: "approval-card", render: LikenessAskToolRender },
   // VIDEO-GEN-06: a video the person asked for: progress while it is made, then the clip in the kit player (or a plain failure).
   { toolName: "video", element: "video-player", render: VideoToolRender },
   // MUSIC-GEN-04: a song the person asked for (generate_music and edit_music name the job on the turn): progress while it is made, then the kit song card.

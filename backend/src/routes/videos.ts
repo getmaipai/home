@@ -20,7 +20,6 @@ import { hasAudioTrack, messagesCopyOf, videoFileName, videoTitle } from "@/lib/
 import { addVideoLora, removeVideoLora, StackVideoError, updateVideoLora } from "@/lib/videos/stack";
 import { latestGeneratedPictureId } from "@/lib/videos/tool";
 import { prepareVideoRerun } from "@/lib/videos/rerun";
-import { askWaiting, attachJob, dropAsk } from "@/lib/likeness/ask";
 import { chooseVideoQuality, detailedVideoReady, isVideoQuality, quickVideoReady, VIDEO_SIZES_BY_QUALITY } from "@/lib/videos/quality";
 import { householdVideoQuality } from "@/lib/videos/policy";
 import { declareStyleSubject, forgetStyleSubject } from "@/lib/likeness/adapters";
@@ -49,7 +48,6 @@ const ItemSchema = z.object({
   state: z.enum(["queued", "running", "done", "failed", "cancelled"]),
   percent: z.number(),
   label: z.string().describe("One plain line for the card: what the engine is doing now."),
-  likeness_ask_id: z.string().nullable().describe("When this clip is held for the pictured adult's consent, the ask to show on the card (GET /api/likeness/asks/{id}); otherwise null."),
   position: z.number().nullable(),
   eta_seconds: z.number().nullable().describe("While running: seconds left, from earlier clips of this size and length."),
   step: z.number().nullable(), steps: z.number().nullable(),
@@ -65,7 +63,6 @@ const ItemSchema = z.object({
 const CardSchema = z.object({ id: z.string(), conversation_id: z.string().nullable(), items: z.array(ItemSchema), can_make_another: z.boolean(), limits: z.string() });
 
 function phaseLabel(job: VideoJob, audience: "adult" | "child"): string {
-  if (job.state === "queued" && job.request.likeness?.ask && askWaiting(job.request.likeness.ask)) return jobQueueCopy("queued", "awaiting_approval", null, null, audience);
   if (job.phase === "paused while chat is working") return jobQueueCopy("paused_chat", "paused_chat", null, null, audience);
   if (job.phase === "paused: low memory") return "Paused: low memory";
   if (job.state === "queued" || job.phase === "queued" || job.phase === "waiting for memory") return jobQueueCopy("queued", job.riseReason ?? "queue", job.position, job.estimateSeconds ?? null, audience);
@@ -92,7 +89,6 @@ function itemView(job: VideoJob, actor: PersonRow, ready: { quick: boolean; deta
     id: job.id, state: job.state, percent: job.state === "done" ? 100 : job.percent,
     label: job.state === "queued" ? phaseLabel(job, laneOfPerson(actor) === "child" ? "child" : "adult") : job.state === "running" ? getLive(job.id)?.stageLabel ?? phaseLabel(job, laneOfPerson(actor) === "child" ? "child" : "adult") : "",
     position: job.position,
-    likeness_ask_id: job.request.likeness?.ask ?? null,
     ...(job.state === "running" ? (({ eta_seconds, step, steps, preview_url }) => ({ eta_seconds, step, steps, preview_url: laneOfPerson(actor) === "adult" ? preview_url : null }))(liveCardFields(job.id, (version) => `/api/videos/jobs/${encodeURIComponent(job.id)}/preview?v=${version}`)) : { eta_seconds: null, step: null, steps: null, preview_url: null }), started_at: new Date(job.createdAt).getTime(), prompt: job.prompt, kind: job.kind,
     error: job.state === "failed" ? job.error : null,
     ...qualityFields(job, ready),
@@ -272,7 +268,6 @@ videosRoutes.openapi(anotherRoute, async (c) => {
   const prep = await prepareVideoRerun({
     actor, audience, conversationId: source.conversationId, temporary: source.temporary, prompt: source.prompt, sourceFileId: source.request.source_file_id,
     prior: source.request.likeness ?? null, adapters, styleIds: source.request.loras,
-    ...(laneOf(audience) === "adult" ? { heldPrompt: source.prompt } : {}),
   });
   if (!prep.ok) return c.json({ error: prep.line, code: prep.code }, prep.code === "likeness" ? 403 : 422) as never;
   const slot = laneOf(audience) === "child" ? reserveKid(actor, "video", 1, source.prompt) : null;
@@ -289,11 +284,9 @@ videosRoutes.openapi(anotherRoute, async (c) => {
       },
       ...(prep.likeness ? { likeness: prep.likeness } : {}),
     });
-    if (prep.askId) attachJob(prep.askId, started.id);
     return c.json(videoCardView(actor, started, true, await readyFlags(actor)), 200);
   } catch (error) {
     releaseKid(slot);
-    if (prep.askId) dropAsk(prep.askId);
     const status = error instanceof StackVideoError && error.status === 422 ? 422 : 503;
     return c.json({ error: plainVideoFailure(error), code: error instanceof StackVideoError ? error.code : "failed" }, status) as never;
   }

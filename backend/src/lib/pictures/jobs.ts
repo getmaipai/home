@@ -15,8 +15,6 @@ import { qualityOfModel } from "./quality";
 import { checkImages, isAdultOnlyJob } from "./ageCheck";
 import { gateFinished } from "./laneGate";
 import { likenessStillAllowed, type JobLikeness } from "@/lib/likeness/guard";
-import { askOutcomeLine, askWaiting, dropAsk, onAskChange } from "@/lib/likeness/ask";
-import { proofHeldBody } from "@/lib/likeness/apply";
 import { clearLive, updateLive } from "@/lib/genLive";
 import { refreshHouseholdQueue, registerQueueProvider, releaseHouseholdQueue, type QueueJob } from "@/lib/jobs/householdQueue";
 import { jobQueueCopy } from "@/lib/jobQueueCopy";
@@ -29,55 +27,18 @@ type QueuedPictureJob = PictureJob & { estimateSeconds?: number | null; riseReas
 const queuedPictureSubmits = new Map<string, () => Promise<{ job: string; done: StackPic[] | null }>>();
 registerQueueProvider(() => unfinishedJobs().map((job) => {
   const queuedJob = job as QueuedPictureJob;
-  const queued: QueueJob = { id: job.id, personId: job.personId, jobClass: "picture", state: job.state, createdAt: job.createdAt, awaitingApproval: pictureAwaitsApproval(job), headOfClass: ((job.request as PictureJob["request"] & { memoryRequeues?: number }).memoryRequeues ?? 0) > 0,
+  const queued: QueueJob = { id: job.id, personId: job.personId, jobClass: "picture", state: job.state, createdAt: job.createdAt, headOfClass: ((job.request as PictureJob["request"] & { memoryRequeues?: number }).memoryRequeues ?? 0) > 0,
     position: job.position, estimateSeconds: queuedJob.estimateSeconds, riseReason: queuedJob.riseReason, typicalSeconds: job.kind === "edit" ? 20 : 44 };
   return { job: queued, stackWaiting: job.state === "queued" && !!job.stackJob,
     release: job.state === "queued" && !job.stackJob ? () => releasePicture(job) : undefined,
     save: () => { job.position = queued.position ?? null; Object.assign(queuedJob, { estimateSeconds: queued.estimateSeconds, riseReason: queued.riseReason }); saveJob(job); } };
 }));
 
-/** PERUSE-2026-10-25: a picture held for a consent ask the pictured adult has not answered. */
-function pictureAwaitsApproval(job: PictureJob): boolean {
-  const ask = job.request.likeness?.ask;
-  return job.state === "queued" && !job.stackJob && !!ask && askWaiting(ask);
-}
-
-/** Ends a held picture whose consent ask ended without a yes: nothing is sent, and the prompt text goes with it. */
-function failHeldPicture(job: PictureJob, line: string): void {
-  if (job.state !== "queued" && job.state !== "running") return;
-  job.state = "failed"; job.error = line; job.files = [];
-  if (job.request.likeness?.ask) {
-    // A held job's prompt text goes with its ask (the ask row clears its own copy).
-    job.prompt = "";
-    const request = job.request as PictureJob["request"] & { stackBody?: { prompt?: string } };
-    if (request.stackBody) request.stackBody.prompt = "";
-  }
-  queuedPictureSubmits.delete(job.id);
-  savePictureJob(job);
-  watching.get(job.id)?.abort();
-  if (job.stackJob) void cancelOrDelete(job.stackJob);
-}
-
-// A decision on a consent ask starts the held picture (approved) or ends it (declined, timed out, cancelled).
-onAskChange((event) => {
-  for (const job of unfinishedJobs()) {
-    if (job.request.likeness?.ask !== event.id) continue;
-    if (event.state === "approved") { void releaseHouseholdQueue(); continue; }
-    if (event.state === "declined" || event.state === "expired" || event.state === "cancelled") failHeldPicture(job, askOutcomeLine(event.reason ?? "unavailable", event.subjectName));
-  }
-});
-
 async function releasePicture(job: PictureJob): Promise<void> {
   if (job.state !== "queued" || job.stackJob) return;
   if (job.request.likeness) {
-    const allowed = likenessStillAllowed(job.request.likeness, job.id);
-    if (!allowed.ok) { failHeldPicture(job, allowed.line); return; }
-    // Adult content of another person: the proof is minted here, from the approved ask, for exactly this prompt.
-    const heldBody = (job.request as PictureJob["request"] & { stackBody?: Omit<GenerationBody, "timeout_ms"> }).stackBody;
-    if (job.request.likeness.adult_content && job.request.likeness.subject !== job.request.likeness.requester && queuedPictureSubmits.has(job.id)) { failHeldPicture(job, "This request can't be made."); return; }
-    const proofed = await proofHeldBody({ id: job.id, likeness: job.request.likeness, medium: "picture" }, heldBody);
-    if (!proofed.ok) { failHeldPicture(job, proofed.line); return; }
-    if (heldBody && job.request.likeness.adult_content) savePictureJob(job);
+    const allowed = likenessStillAllowed(job.request.likeness);
+    if (!allowed.ok) { job.state = "failed"; job.error = allowed.line; queuedPictureSubmits.delete(job.id); savePictureJob(job); return; }
   }
   try {
     const submit = queuedPictureSubmits.get(job.id);
@@ -96,16 +57,7 @@ async function releasePicture(job: PictureJob): Promise<void> {
   }
 }
 
-/** PERUSE-2026-10-25: a held job that ended keeps no prompt text (failed or stopped) and no signed proof (any end). Runs on every save. */
-function scrubEndedHeld(job: PictureJob): void {
-  if (!job.request.likeness?.ask || job.state === "queued" || job.state === "running") return;
-  const body = (job.request as unknown as { stackBody?: { prompt?: string; loras?: Array<{ likeness_proof?: string }> } }).stackBody;
-  for (const lora of body?.loras ?? []) delete lora.likeness_proof;
-  if (job.state === "failed" || job.state === "cancelled") { job.prompt = ""; if (body) body.prompt = ""; }
-}
-
 function savePictureJob(job: PictureJob): void {
-  scrubEndedHeld(job);
   saveJob(job);
   refreshHouseholdQueue();
 }
@@ -192,7 +144,7 @@ const stopped = (job: PictureJob) => job.state === "cancelled";
 function stopForLikeness(job: PictureJob, line?: string): boolean {
   const likeness = job.request.likeness;
   if (!likeness) return false;
-  const now = line ? { ok: false as const, line } : likenessStillAllowed(likeness, job.id);
+  const now = line ? { ok: false as const, line } : likenessStillAllowed(likeness);
   if (now.ok) return false;
   job.state = "failed";
   job.error = now.line;
@@ -400,15 +352,7 @@ export async function cancelPictureJob(actor: PersonRow, id: string): Promise<Pi
   job.state = "cancelled";
   job.error = null;
   queuedPictureSubmits.delete(job.id);
-  const ask = job.request.likeness?.ask;
-  if (ask) {
-    // Stopping a held picture ends its consent ask too, and the prompt text goes with it.
-    job.prompt = "";
-    const request = job.request as PictureJob["request"] & { stackBody?: { prompt?: string } };
-    if (request.stackBody) request.stackBody.prompt = "";
-  }
   savePictureJob(job);
-  if (ask) dropAsk(ask);
   watching.get(job.id)?.abort();
   if (job.stackJob) await cancelOrDelete(job.stackJob);
   return job;

@@ -1941,37 +1941,6 @@ export const likenessAdapters = sqliteTable(
   (table) => [index("likeness_adapters_subject_idx").on(table.subjectPersonId), uniqueIndex("likeness_adapters_medium_adapter_idx").on(table.medium, table.adapterId)],
 );
 
-// PERUSE-2026-10-25 (docs/design/per-use-consent-2026-10-25.md): one ask for the pictured adult's consent to ONE picture or video
-// of adult content that looks like them (spec LikenessAsk). `prompt` is the exact text shown on the card; it is kept only while
-// the ask is `waiting` or `approved` and set to null at any final state, so no prompt text outlives the ask: `prompt_sha256` is
-// the audit record. `count`, `style_name`, `style_ids` and `job_id` are Home-only columns for the card and the held job.
-export const likenessAsks = sqliteTable(
-  "likeness_asks",
-  {
-    id: text("id").primaryKey(),
-    subjectPersonId: text("subject_person_id").notNull().references(() => people.id),
-    requesterPersonId: text("requester_person_id").notNull().references(() => people.id),
-    medium: text("medium").notNull(),
-    way: text("way").notNull(),
-    state: text("state").notNull(),
-    promptSha256: text("prompt_sha256").notNull(),
-    prompt: text("prompt"),
-    count: integer("count").notNull().default(1),
-    styleName: text("style_name"),
-    styleIds: text("style_ids").notNull().default("[]"),
-    jobId: text("job_id"),
-    source: text("source").notNull(),
-    expiresAt: text("expires_at"),
-    decidedAt: text("decided_at"),
-    decidedBy: text("decided_by"),
-    consumedAt: text("consumed_at"),
-    createdAt: text("created_at").notNull(),
-    updatedAt: text("updated_at").notNull(),
-    hlc: text("hlc").notNull(),
-  },
-  (table) => [index("likeness_asks_subject_state_idx").on(table.subjectPersonId, table.state), index("likeness_asks_requester_subject_idx").on(table.requesterPersonId, table.subjectPersonId, table.createdAt)],
-);
-
 // MEDIA-LIB-01 / MEDIA-PROGRESS-01 (docs/design/media-apps-blend-2026-10-17.md, section 7): the four media records of
 // spec-v0.1.163 (MediaSource, MediaItem, MediaProgress, MediaCollection) in one migration so no later media slice needs
 // one. Each spec object field is stored as JSON text; the fields the app filters or joins on are real columns.

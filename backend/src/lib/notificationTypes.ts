@@ -61,18 +61,6 @@ function isDeliveredChannel(channel: string): channel is NotificationChannel {
 // off the household's own history of what happened, not just muting a
 // ping. Every type - configurable or not - always gets it.
 export const NOTIFICATION_TYPES: readonly NotificationType[] = [
-  // PERUSE-2026-10-25: a household adult asked for adult content that looks like this person and is waiting for their yes.
-  // The body names the requester only; the exact prompt is read on the card, never in the notification.
-  {
-    id: "likeness.ask",
-    level: "time_sensitive",
-    audience: "person",
-    template: "{requester} wants to make a picture of you. Open Home to read it and say yes or no.",
-    configurable: false,
-    privacy: true,
-    defaultChannels: ["in_app"],
-    toast: true,
-  },
   // INITIATIVE-01: a robot offer nobody answered in time lands here once, so the item is not lost.
   // The body never carries the prepared text, only the plain line the robot would have said.
   {

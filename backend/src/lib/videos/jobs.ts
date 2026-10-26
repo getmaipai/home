@@ -18,8 +18,6 @@ import { gateFinished, laneOfPerson } from "@/lib/pictures/laneGate";
 import { videoModelForLane } from "@/lib/pictures/lane";
 import { ensureKeyframeHelper, extractKeyframes } from "@/lib/pictures/keyframes";
 import { likenessStillAllowed, type JobLikeness } from "@/lib/likeness/guard";
-import { askOutcomeLine, askWaiting, dropAsk, onAskChange } from "@/lib/likeness/ask";
-import { proofHeldBody } from "@/lib/likeness/apply";
 import { clearLive, updateLive } from "@/lib/genLive";
 import { cancelOrDeleteVideo, fetchClip, fetchPoster, fetchVideoPreview, getVideoJob, StackVideoError, submitVideo, type StackClip, type VideoBody } from "./stack";
 
@@ -126,16 +124,7 @@ function fromRow(row: Row): VideoJob {
   };
 }
 
-/** PERUSE-2026-10-25: a held job that ended keeps no prompt text (failed or stopped) and no signed proof (any end). Runs on every save. */
-function scrubEndedHeld(job: VideoJob): void {
-  if (!job.request.likeness?.ask || job.state === "queued" || job.state === "running") return;
-  const body = (job.request as unknown as { stackBody?: { prompt?: string; loras?: Array<{ likeness_proof?: string }> } }).stackBody;
-  for (const lora of body?.loras ?? []) delete lora.likeness_proof;
-  if (job.state === "failed" || job.state === "cancelled") { job.prompt = ""; if (body) body.prompt = ""; }
-}
-
 function persistVideoJob(job: VideoJob): void {
-  scrubEndedHeld(job);
   job.updatedAt = new Date().toISOString();
   if (job.temporary) { memory.set(job.id, job); return; }
   const values = {
@@ -150,46 +139,12 @@ function saveVideoJob(job: VideoJob): void {
   refreshHouseholdQueue();
 }
 
-function unfinishedVideoJobs(): VideoJob[] {
+registerQueueProvider(() => {
   const jobs = new Map<string, VideoJob>();
   for (const job of [...memory.values(), ...liveJobs.values()]) if (job.state === "queued" || job.state === "running") jobs.set(job.id, job);
   for (const row of db.select().from(videoJobs).where(inArray(videoJobs.state, ["queued", "running"])).all()) if (!jobs.has(row.id)) jobs.set(row.id, fromRow(row));
-  return [...jobs.values()];
-}
-
-/** PERUSE-2026-10-25: a clip held for a consent ask the pictured adult has not answered. */
-function videoAwaitsApproval(job: VideoJob): boolean {
-  const ask = job.request.likeness?.ask;
-  return job.state === "queued" && !job.stackJob && !!ask && askWaiting(ask);
-}
-
-/** Ends a held clip whose consent ask ended without a yes: nothing is sent, and the prompt text goes with it. */
-function failHeldVideo(job: VideoJob, line: string): void {
-  if (job.state !== "queued" && job.state !== "running") return;
-  job.state = "failed"; job.error = line; job.files = [];
-  if (job.request.likeness?.ask) {
-    job.prompt = "";
-    const request = job.request as VideoRequest & { stackBody?: { prompt?: string } };
-    if (request.stackBody) request.stackBody.prompt = "";
-  }
-  saveVideoJob(job);
-  watching.get(job.id)?.abort();
-  watching.delete(job.id);
-  if (job.stackJob) void cancelOrDeleteVideo(job.stackJob);
-}
-
-// A decision on a consent ask starts the held clip (approved) or ends it (declined, timed out, cancelled).
-onAskChange((event) => {
-  for (const job of unfinishedVideoJobs()) {
-    if (job.request.likeness?.ask !== event.id) continue;
-    if (event.state === "approved") { void releaseHouseholdQueue(); continue; }
-    if (event.state === "declined" || event.state === "expired" || event.state === "cancelled") failHeldVideo(job, askOutcomeLine(event.reason ?? "unavailable", event.subjectName));
-  }
-});
-
-registerQueueProvider(() => {
-  return unfinishedVideoJobs().map((job) => {
-    const queued: QueueJob = { id: job.id, personId: job.personId, jobClass: "video", state: job.state, createdAt: job.createdAt, awaitingApproval: videoAwaitsApproval(job),
+  return [...jobs.values()].map((job) => {
+    const queued: QueueJob = { id: job.id, personId: job.personId, jobClass: "video", state: job.state, createdAt: job.createdAt,
       position: job.position, estimateSeconds: job.estimateSeconds, riseReason: ((job.request as VideoRequest & { memoryRequeues?: number }).memoryRequeues ?? 0) > 0 ? "requeued_memory" : job.riseReason, typicalSeconds: 140,
       headOfClass: ((job.request as VideoRequest & { memoryRequeues?: number }).memoryRequeues ?? 0) > 0 };
     return { job: queued, stackWaiting: job.state === "queued" && !!job.stackJob,
@@ -200,16 +155,12 @@ registerQueueProvider(() => {
 
 async function releaseVideo(job: VideoJob): Promise<void> {
   if (job.state !== "queued" || job.stackJob) return;
-  const storedBody = (job.request as VideoRequest & { stackBody?: Omit<VideoBody, "timeout_ms"> }).stackBody;
   if (job.request.likeness) {
-    const allowed = likenessStillAllowed(job.request.likeness, job.id);
-    if (!allowed.ok) { failHeldVideo(job, allowed.line); return; }
-    // Adult content of another person: the proof is minted here, from the approved ask, for exactly this prompt.
-    const proofed = await proofHeldBody({ id: job.id, likeness: job.request.likeness, medium: "video" }, storedBody);
-    if (!proofed.ok) { failHeldVideo(job, proofed.line); return; }
-    if (storedBody && job.request.likeness.adult_content) persistVideoJob(job);
+    const allowed = likenessStillAllowed(job.request.likeness);
+    if (!allowed.ok) { job.state = "failed"; job.error = allowed.line; persistVideoJob(job); refreshHouseholdQueue(); return; }
   }
   try {
+    const storedBody = (job.request as VideoRequest & { stackBody?: Omit<VideoBody, "timeout_ms"> }).stackBody;
     const submitted = await submitVideo({ ...(storedBody ?? { prompt: job.prompt, audience: job.request.audience, size: job.request.size, seconds: job.request.seconds }), timeout_ms: 1 });
     if (job.state !== "queued") { void cancelOrDeleteVideo(submitted.job); return; }
     job.stackJob = submitted.job; liveJobs.set(job.id, job); persistVideoJob(job);
@@ -416,7 +367,7 @@ function sleep(ms: number, signal: AbortSignal): Promise<void> {
 function stopForLikeness(job: VideoJob): boolean {
   const likeness = job.request.likeness;
   if (!likeness) return false;
-  const now = likenessStillAllowed(likeness, job.id);
+  const now = likenessStillAllowed(likeness);
   if (now.ok) return false;
   job.state = "failed";
   job.error = now.line;
@@ -580,15 +531,7 @@ export async function cancelVideoJob(actor: PersonRow, id: string): Promise<Vide
   if (job.stackJob) await cancelOrDeleteVideo(job.stackJob);
   job.state = "cancelled";
   job.error = null;
-  const ask = job.request.likeness?.ask;
-  if (ask) {
-    // Stopping a held clip ends its consent ask too, and the prompt text goes with it.
-    job.prompt = "";
-    const request = job.request as VideoRequest & { stackBody?: { prompt?: string } };
-    if (request.stackBody) request.stackBody.prompt = "";
-  }
   saveVideoJob(job);
-  if (ask) dropAsk(ask);
   return job;
 }
 

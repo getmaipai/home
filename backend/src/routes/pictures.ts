@@ -13,8 +13,6 @@ import { pictureEngineStatus, pictureEngineReady, pictureNotReadyReason } from "
 import { chooseQuality, detailedReady, isPictureQuality } from "@/lib/pictures/quality";
 import { StackPicturesError } from "@/lib/pictures/stack";
 import { prepareStylesUse } from "@/lib/likeness/apply";
-import { askWaiting, attachJob, dropAsk } from "@/lib/likeness/ask";
-import { jobQueueCopy } from "@/lib/jobQueueCopy";
 import { laneOfPerson } from "@/lib/pictures/laneGate";
 import { CHILD_LIMIT_LINE, CHILD_NEGATIVE_PROMPT, forceCartoon, kidsDailyPictures, laneOf, picturesMadeToday, releaseKid, reserveKid } from "@/lib/pictures/lane";
 import { getLive, liveCardFields } from "@/lib/genLive";
@@ -45,12 +43,10 @@ const JobSchema = z.object({
   switch_to: z.enum(["quick", "detailed"]).nullable().describe("The other kind this picture can be made again as, or null (it uses a style made for one kind, or the other kind is not on this computer)."),
   size: z.string().describe("The size being made, like 1024x1024."),
   stop_id: z.string().describe("The id to POST to /jobs/{id}/cancel to stop what is being made now."),
-  likeness_ask_id: z.string().nullable().describe("When this picture is held for the pictured adult's consent, the ask to show on the card (GET /api/likeness/asks/{id}); otherwise null."),
 });
 
 
 function phaseLabel(job: PictureJob): string {
-  if (job.state === "queued" && job.request.likeness?.ask && askWaiting(job.request.likeness.ask)) return jobQueueCopy("queued", "awaiting_approval", null, null, "adult");
   if (job.state === "queued") return job.position && job.position > 1 ? `Waiting in line, number ${job.position}` : "Waiting for the picture engine";
   if (job.phase === "waiting for memory") return "Waiting for memory to free up";
   if (job.phase === "paused: low memory") return "Paused: low memory";
@@ -97,7 +93,6 @@ export function cardView(actor: PersonRow, root: PictureJob, canVary: boolean, d
     ...(active && active.state === "running" ? withheldFromYoung(actor, liveCardFields(active.id, (version) => `/api/pictures/jobs/${encodeURIComponent(active.id)}/preview?v=${version}`)) : { stage_label: null, eta_seconds: null, step: null, steps: null, preview_url: null, preview_step: null }),
     elapsed_ms: Math.max(0, Date.now() - new Date(shown.createdAt).getTime()), prompt: root.prompt, kind: root.kind, conversation_id: root.conversationId,
     error: active ? null : last.state === "failed" || last.state === "cancelled" ? last.error : null, files, size: shown.request.size, stop_id: (active ?? root).id,
-    likeness_ask_id: (active ?? last).request.likeness?.ask ?? null,
     can_vary: canVary && root.kind !== "edit" && !active && files.length > 0 && files.length < 12,
     ...qualityFields(last, detailedReadyNow, canVary && root.kind !== "edit" && !active),
   };
@@ -189,7 +184,7 @@ picturesRoutes.openapi(variationRoute, async (c) => {
   if (kid && picturesMadeToday(actor) + 1 > kidsDailyPictures()) return c.json({ error: CHILD_LIMIT_LINE, code: "daily_limit" }, 422) as never;
   if (!(await pictureEngineReady())) return c.json({ error: pictureNotReadyReason(await pictureEngineStatus()), code: "not_installed" }, 503) as never;
   // A picture in a style of a household adult is decided again against current eligibility and household settings.
-  const prep = await prepareStylesUse({ medium: "picture", audience: routeAudience(actor), styles: used, text: `${prompt} ${used.map((a) => a.name).join(" ")}`, source: "chat", ...(lane === "adult" ? { held: { prompt, count: 1, temporary: source.temporary } } : {}) });
+  const prep = await prepareStylesUse({ medium: "picture", audience: routeAudience(actor), styles: used, text: `${prompt} ${used.map((a) => a.name).join(" ")}`, source: "chat" });
   if (prep.kind === "refused") return c.json({ error: prep.line || PROMPT_REFUSAL_LINE.real_person, code: "likeness" }, 403) as never;
   // IMGGEN-QUALITY-01: Quick or Detailed again. Left out, the picture keeps its own kind; a style made for one maker decides.
   const asked = (await c.req.json().catch(() => ({}))) as { quality?: unknown };
@@ -203,11 +198,10 @@ picturesRoutes.openapi(variationRoute, async (c) => {
       body: { prompt: kid ? forceCartoon(prompt) : prompt, size: source.request.size, n: 1, ...(choice.model ? { model: choice.model } : {}), audience: lane === "adult" && adultAdaptersAllowed() ? "adult" : "all-ages", ...(kid ? { negative_prompt: CHILD_NEGATIVE_PROMPT } : {}), ...(loras.length ? { loras } : {}), ...(prep.kind === "likeness" && prep.negativePrompt ? { negative_prompt: prep.negativePrompt } : {}) }, sourceFileId: source.files[0]?.id ?? null,
       ...(prep.kind === "likeness" ? { likeness: prep.job } : {}),
     });
-    if (prep.kind === "likeness" && prep.askId) attachJob(prep.askId, job.id);
+    void job;
     return c.json(cardView(actor, source, true, detailedReady(await pictureEngineStatus())), 200);
   } catch (error) {
     releaseKid(slot);
-    if (prep.kind === "likeness" && prep.askId) dropAsk(prep.askId);
     const status = error instanceof StackPicturesError && (error.status === 422 || error.status === 409) ? error.status : 503;
     return c.json({ error: plainFailure(error), code: error instanceof StackPicturesError ? error.code : "failed" }, status) as never;
   }
