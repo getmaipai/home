@@ -81,6 +81,7 @@ import { ArtifactOpenContext, AdminContext, ChatAgeBandContext, type CompareTarg
 import { ConfirmAskAnswerProvider, ReloadMainThreadProvider } from "@/apps/chat/chatToolUis";
 import { CompareIcon, toolCallPartFromMessage } from "@/apps/chat/chatThreadSlots";
 import { discardDraft } from "@/apps/chat/draftStore";
+import type { AskAnswerArm } from "@/apps/chat/chatAsk";
 import { chatFoldersQueryKey, useChatProjects } from "@/apps/chat/chatProjects";
 import { projectConversationRows, projectSourcesVisible } from "@/shell/pages/chatProjectPageModel";
 
@@ -252,7 +253,7 @@ function useChatRuntime(person: Roster, closeSheet: () => void, temporaryNext: b
   // callback (ConfirmToolRender's Allow once/Deny handlers, via
   // ConfirmAskAnswerContext), the same single-shot shape as
   // `pendingSpeechRef` above - `consumeAskAnswer` below reads and clears it.
-  const askAnswerRef = useRef<{ turnId: string; approved: boolean } | undefined>(undefined);
+  const askAnswerRef = useRef<AskAnswerArm | undefined>(undefined);
   // VOICE-LIVE-02: chatModelAdapter.ts's own onSpeakingChange, relayed as
   // real state so useLiveVoiceSession (a sibling hook, not inside this
   // runtime hook) can react to the live scheduler's own start/end - nothing else

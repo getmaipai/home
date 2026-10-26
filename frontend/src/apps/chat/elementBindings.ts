@@ -38,7 +38,7 @@ import {
 } from "@/apps/chat/chatThreadSlots";
 import { ChatMessageError } from "@/apps/chat/chatErrorSlot";
 import { ChatCitationLink } from "@/apps/chat/chatCitationLink";
-import { ArtifactCardToolRender, ConfirmToolRender, PictureProgressToolRender, PictureToolRender, MusicToolRender, ProjectToolRender, VideoToolRender, SpecSheetToolRender, ToolTimelineToolRender } from "@/apps/chat/chatToolUis";
+import { ArtifactCardToolRender, AskToolRender, ConfirmToolRender, PictureProgressToolRender, PictureToolRender, MusicToolRender, ProjectToolRender, VideoToolRender, SpecSheetToolRender, ToolTimelineToolRender } from "@/apps/chat/chatToolUis";
 import { ComposerAddMenu } from "@/apps/chat/composerAddMenu";
 import { ChatDateDivider } from "@/apps/chat/chatDateDivider";
 import { ComposerDictationWaveform } from "@/apps/chat/composerDictationWaveform";
@@ -74,6 +74,8 @@ export const TOOL_BINDINGS: readonly ToolBinding[] = [
   ...remainingSpecSheetToolIds.map((toolName) => ({ toolName, element: "spec-sheet", render: SpecSheetToolRender })),
   { toolName: "write_document", element: "artifact-card", render: ArtifactCardToolRender },
   { toolName: "confirm", element: "approval-card", render: ConfirmToolRender },
+  // FORM-CHAT-WEB-01: a package's typed ask (TurnValue.ask), drawn as the kit form; Submit sends ask_answer { turn_id, values }.
+  { toolName: "ask", element: "elicitation-form", render: AskToolRender },
   { toolName: "project", element: "job-progress", render: ProjectToolRender },
   // IMGGEN-UI-01: a picture the person asked for: progress while it is made, then the pictures (or a plain failure).
   { toolName: "picture_progress", element: "job-progress", render: PictureProgressToolRender },

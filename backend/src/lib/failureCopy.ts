@@ -262,6 +262,20 @@ export function promptLimitLine(kind: "carry_offer" | "too_big", minor: boolean)
   return minor ? PROMPT_LIMIT_COPY[kind].minor : PROMPT_LIMIT_COPY[kind].adult;
 }
 
+/** FORM-CHAT-WEB-01: the line a typed form shows in its own destructive error when a Submit is refused.
+ * Says what went wrong and what to do. `invalid_input` names the field the hub named in its message
+ * (the field's label only, never the value). */
+export function askFormFailureLine(code: string, hubMessage?: string): string {
+  if (code === "ask_stale") return "This form has expired or was already sent. Ask me again to get a new form.";
+  if (code === "invalid_input") {
+    const label = hubMessage?.match(/ for "([^"]{1,80})"\./)?.[1];
+    if (label) return `The answer for "${label}" did not fit. Correct that field, then submit the form again.`;
+    return "One answer did not fit. Check each field, then submit the form again.";
+  }
+  if (code === "hub_unreachable" || code === "client_unreachable" || code === "timeout") return "I could not send the form. Check your connection, then submit it again.";
+  return "I could not send the form. Submit it again in a moment.";
+}
+
 /** SAFETY-NOTICE-01: the one sentence a person sees when the output gate
  * stops a reply partway for safety (the `safety_refused` error). Plain,
  * no jargon, and it says what to do instead. Per band: a teen reads the

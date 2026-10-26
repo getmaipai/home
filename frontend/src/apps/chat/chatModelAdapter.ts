@@ -18,7 +18,8 @@ import type { CrisisSupport } from "@maipai/home-backend/src/wire";
 import type { PendingContinuation } from "@/apps/chat/chatContinue";
 import { ChatTurnError } from "@/apps/chat/chatTurnError";
 import { HUB_DOWN_LINE, isHubUnreachable } from "@/lib/hubReachability";
-import { failureLine } from "@maipai/home-backend/src/lib/failureCopy";
+import { askFormFailureLine, failureLine } from "@maipai/home-backend/src/lib/failureCopy";
+import { isFormAnswer, parseTurnAsk, type AskAnswerArm } from "@/apps/chat/chatAsk";
 import { randomUuid } from "@/lib/randomUuid";
 import { unstable_defaultDirectiveFormatter } from "@assistant-ui/react";
 
@@ -144,7 +145,7 @@ export interface ChatModelAdapterDeps {
   // typed "yes" still resumes an ask too, through the backend's own
   // AFFIRMATIVE_RE text match - this field only carries a real button
   // tap's structured answer).
-  consumeAskAnswer?(): { turnId: string; approved: boolean } | undefined;
+  consumeAskAnswer?(): AskAnswerArm | undefined;
   // VOICE-LIVE-02: reads AND resets the live voice session's own
   // "this send is spoken" choice, the same single-shot shape as
   // consumeTemporary()/consumePackageScope() - only meaningful on the
@@ -353,6 +354,11 @@ export function createChatModelAdapter(deps: ChatModelAdapterDeps): ChatModelAda
       // for a later, unrelated send to inherit.
       const supersedes = deps.consumeSupersedes();
       const continuation = deps.consumeContinuation?.();
+      // APPROVE-CARD-01 / FORM-CHAT-WEB-01: the card's one-shot answer, read and reset here for the
+      // same reason as supersedes above. A typed form's values ride only the first attempt.
+      const askArm0 = deps.consumeAskAnswer?.();
+      const askForm = askArm0 && isFormAnswer(askArm0) ? askArm0 : undefined;
+      let askFormSettled = false;
       deps.onReplyState?.("waiting");
       try {
         let conversationId = await deps.getConversationId?.();
@@ -417,10 +423,14 @@ export function createChatModelAdapter(deps: ChatModelAdapterDeps): ChatModelAda
             // packageScope/temporary/spoken above - a single-shot field
             // only ever meaningful on the first attempt of this send,
             // never resent on a reconnect retry within the same send.
-            askAnswer: reconnectAttempts === 0 ? deps.consumeAskAnswer?.() : undefined,
+            askAnswer: reconnectAttempts === 0 ? askArm0 : undefined,
             documentAttachments: reconnectAttempts === 0 && documentPayloads.length > 0 ? documentPayloads : undefined,
             images: imageParts.length > 0 ? imageParts : undefined,
           }));
+          if (askForm && !askFormSettled) {
+            askFormSettled = true;
+            askForm.onSettled?.({ ok: true });
+          }
           for await (const event of readAssistantTurnStream(response)) {
           // A review caught this: `safeParse` ran on every event
           // unconditionally, including every `delta` - the hottest path
@@ -630,6 +640,9 @@ export function createChatModelAdapter(deps: ChatModelAdapterDeps): ChatModelAda
             // - wire.ts's own doc comment on `confirm` has the full
             // read-time-derivation reasoning for `open`.
             const confirm = event.value.confirm;
+            // FORM-CHAT-WEB-01: `TurnValue.ask`, drawn as the typed form. Unknown or malformed
+            // asks draw nothing here; the reply's own text (the package's prompt) stands in.
+            const ask = parseTurnAsk(event.value.ask);
             // PROJECT-PROGRESS-01: `start_project`'s own outcome names
             // only the id it just launched (wire.ts's own comment on
             // `TurnValue.project` - the same "name it, don't inline it"
@@ -713,6 +726,7 @@ export function createChatModelAdapter(deps: ChatModelAdapterDeps): ChatModelAda
                 // approval card sits UNDER the reply that asks, the way the
                 // reference reads ("...so it waits for your approval", then
                 // the card), and the same place on reload (chatHistoryAdapter.ts).
+                ...(ask ? [toolCallPart(`${event.value.turn_id}-ask`, "ask", ask)] : []),
                 ...(confirm ? [toolCallPart(`${event.value.turn_id}-confirm`, "confirm", { package_id: confirm.package_id, open: confirm.open, turn_id: event.value.turn_id })] : []),
                 // Native source parts stay after the reply text. The
                 // footer's static Sources card and [n] citation mapper
@@ -842,6 +856,17 @@ export function createChatModelAdapter(deps: ChatModelAdapterDeps): ChatModelAda
           throw new DOMException("The run was stopped.", "AbortError");
         }
         if (deps.activeTurnRef && deps.activeTurnRef.current?.turnId === resumeTurnId) deps.activeTurnRef.current = null;
+        // FORM-CHAT-WEB-01 (S6): a refused form Submit (409 ask_stale, 400 invalid_input, a route
+        // failure) is shown by the form's own destructive error, never by the chat's error line.
+        // The send ends quietly (the runtime reads an AbortError as a cancelled run).
+        if (askForm && !askFormSettled) {
+          askFormSettled = true;
+          const code = e instanceof ApiError ? e.code ?? "unavailable" : "client_unreachable";
+          askForm.onSettled?.({ ok: false, code, message: askFormFailureLine(code, e instanceof ApiError ? e.message : undefined) });
+          deps.onReplyState?.("idle");
+          scheduler.stop();
+          throw new DOMException("The form was not accepted.", "AbortError");
+        }
         deps.onReplyState?.("error");
         scheduler.finish(); // a genuine failure, not a user stop - let whatever already started speaking finish naturally, enqueue nothing more
         // Show the generic banner for generic "unavailable" code; pass backend's

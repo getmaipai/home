@@ -2,6 +2,7 @@
 // Every slot and tool UI reads these with a safe default, so the same
 // composition renders in the chat page and in the /dev/ui showcase.
 import { createContext } from "react";
+import type { AskFormValues, AskSettled } from "@/apps/chat/chatAsk";
 // APPROVE-CARD-02: the named confirm renderer receives the lifted answer
 // callback so it can answer the parked ask as a new turn.
 import type { ConnectionPhase } from "@maipai/ui/src/elements/connection-state";
@@ -56,6 +57,11 @@ export const ReloadMainThreadContext = createContext<() => void>(() => {});
 // "send from outside the composer's own click handler" need. ChatPage's
 // voice-session hook instead receives the runtime's thread composer.
 export const ConfirmAskAnswerContext = createContext<(turnId: string, approved: boolean) => void>(() => {});
+
+// FORM-CHAT-WEB-01: a typed form's Submit. Same lifted shape as ConfirmAskAnswerContext: the closure
+// arms the one-shot `ask_answer { turn_id, values }` and sends a new turn from the thread-level
+// composer. `onSettled` hears whether the hub accepted the send or refused it (the form shows that).
+export const AskFormSubmitContext = createContext<(turnId: string, values: AskFormValues, onSettled: (outcome: AskSettled) => void) => void>(() => {});
 
 // ADMIN-COMPARE-01: the same two-context shape as the artifact panel
 // above (an "open" callback threaded down through context, since

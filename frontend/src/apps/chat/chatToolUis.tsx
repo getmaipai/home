@@ -6,6 +6,7 @@ import { useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { useAui, useAuiState, type ToolCallMessagePartComponent } from "@assistant-ui/react";
 import { ApprovalCard } from "@maipai/ui/src/elements/approval-card";
+import { ElicitationForm } from "@maipai/ui/src/elements/elicitation-form";
 import { SpecSheet } from "@maipai/ui/src/elements/spec-sheet";
 import { ArtifactCard } from "@maipai/ui/src/elements/artifact-card";
 import { ToolTimeline } from "@maipai/ui/src/elements/tool-timeline";
@@ -35,7 +36,8 @@ import { getIcon } from "@maipai/ui/src/icons";
 import { Kbd } from "@maipai/ui/src/dashboard/components/ui/kbd";
 import { useSurface } from "@maipai/ui/src/useSurface";
 import { api, type StructuredPart, type TurnStats, type ProjectView } from "@/lib/api";
-import { ArtifactOpenContext, ReloadMainThreadContext, ConfirmAskAnswerContext } from "@/apps/chat/chatThreadContexts";
+import { ArtifactOpenContext, ReloadMainThreadContext, ConfirmAskAnswerContext, AskFormSubmitContext } from "@/apps/chat/chatThreadContexts";
+import { parseTurnAsk, ASK_FORM_SUBMIT_TEXT, type AskAnswerArm, type AskFormValues, type AskSettled } from "@/apps/chat/chatAsk";
 import { faviconUrl } from "@/apps/chat/chatThreadSlots";
 
 // SHELL-02 slice 3, the wiring table's "spec-sheet" row: weather's and
@@ -148,6 +150,46 @@ export const ConfirmToolRender: ToolCallMessagePartComponent<Record<string, neve
       allowHint={pointer === "fine" ? <Kbd aria-hidden>{IS_MAC ? "⌘ ↵" : "Ctrl ↵"}</Kbd> : undefined}
       onAllowOnce={() => respond(turnId, true)}
       onDeny={() => respond(turnId, false)}
+    />
+  );
+};
+
+// FORM-CHAT-WEB-01: the typed package ask, drawn by the kit ElicitationForm (a registered render: it
+// returns only the Element). The part's result is the hub's `TurnValue.ask`; anything that does not
+// parse draws nothing, and the reply's own text (the prompt) stays. Submit sends a new turn; a refusal
+// comes back through `onSettled` into the form's own error. Values stay in the Element's state and the
+// request (rule 6a). Once a later message exists the form is no longer open, so it draws nothing,
+// the same close rule as the confirm card.
+export const AskToolRender: ToolCallMessagePartComponent<Record<string, never>, unknown> = function AskToolRender({ result }) {
+  const submit = useContext(AskFormSubmitContext);
+  const isLast = useAuiState((state) => state.message.isLast);
+  const [state, setState] = useState<"request" | "accepted" | "declined">("request");
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  // Sending adds the person's line after this message, so `isLast` turns false at once; a form that was
+  // submitted stays to show its accepted state or its refusal.
+  const [sent, setSent] = useState(false);
+  const ask = parseTurnAsk(result);
+  if (!ask || (state === "request" && !isLast && !sent)) return null;
+  return (
+    <ElicitationForm
+      server="MaiPai"
+      message={ask.prompt}
+      fields={ask.fields}
+      state={state}
+      submitting={submitting}
+      error={error}
+      onDecline={() => setState("declined")}
+      onSubmit={(values) => {
+        setError(null);
+        setSubmitting(true);
+        setSent(true);
+        submit(ask.turn_id, values, (outcome) => {
+          setSubmitting(false);
+          if (outcome.ok) setState("accepted");
+          else setError(outcome.message);
+        });
+      }}
     />
   );
 };
@@ -317,7 +359,7 @@ export const ProjectToolRender: ToolCallMessagePartComponent<Record<string, neve
 // composer send - the same single-shot shape `pendingSpeechRef` already
 // uses for VOICE-LIVE-02's live voice session; `chatModelAdapter.ts`'s
 // own `consumeAskAnswer()` reads AND resets it.
-export function ConfirmAskAnswerProvider({ askAnswerRef, children }: { askAnswerRef: MutableRefObject<{ turnId: string; approved: boolean } | undefined>; children: ReactNode }) {
+export function ConfirmAskAnswerProvider({ askAnswerRef, children }: { askAnswerRef: MutableRefObject<AskAnswerArm | undefined>; children: ReactNode }) {
   const aui = useAui();
   const respond = useCallback(
     (turnId: string, approved: boolean) => {
@@ -327,7 +369,21 @@ export function ConfirmAskAnswerProvider({ askAnswerRef, children }: { askAnswer
     },
     [aui, askAnswerRef],
   );
-  return <ConfirmAskAnswerContext.Provider value={respond}>{children}</ConfirmAskAnswerContext.Provider>;
+  // FORM-CHAT-WEB-01: a form Submit arms its values the same way; the composer text is the fixed line
+  // (the hub ignores it), so nothing the person typed is sent.
+  const submitForm = useCallback(
+    (turnId: string, values: AskFormValues, onSettled: (outcome: AskSettled) => void) => {
+      askAnswerRef.current = { turnId, values, onSettled };
+      aui.composer.setText(ASK_FORM_SUBMIT_TEXT);
+      void Promise.resolve(aui.composer.send());
+    },
+    [aui, askAnswerRef],
+  );
+  return (
+    <ConfirmAskAnswerContext.Provider value={respond}>
+      <AskFormSubmitContext.Provider value={submitForm}>{children}</AskFormSubmitContext.Provider>
+    </ConfirmAskAnswerContext.Provider>
+  );
 }
 
 // ReloadMainThreadContext's own provider - the same "call useAui() once,

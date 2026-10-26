@@ -929,6 +929,110 @@ describe("createChatModelAdapter confirm results (APPROVE-CARD-01)", () => {
   });
 });
 
+// FORM-CHAT-WEB-01: `TurnValue.ask` (typed package ask) becomes a tool-call part named "ask";
+// Submit goes out as `ask_answer { turn_id, values }`; a refused Submit reaches the form, not the chat.
+describe("createChatModelAdapter typed asks (FORM-CHAT-WEB-01)", () => {
+  const ASK = {
+    turn_id: "turn-ask1",
+    prompt: "What time should I remind you?",
+    fields: [{ name: "when", label: "When", kind: "date_time", required: true }, { name: "note", label: "Note", kind: "text", required: false, max_length: 500 }],
+    expires_at: "2099-01-01T00:00:00.000Z",
+  };
+  const done = (extra: Record<string, unknown>) => ndjsonStream([
+    { type: "delta", text: "What time should I remind you?" },
+    { type: "done", value: { turn_id: "turn-ask1", reply: { text: "What time should I remind you?" }, source: "plugin", safety: SAFETY, ...extra } },
+  ]);
+
+  test("a valid ask becomes an ask tool-call part under the prose", async () => {
+    const env = stubEnvironment(done({ ask: ASK }));
+    try {
+      const { yields } = await collect([fakeUserMessage("remind me to call the dentist")]);
+      expect(yields[yields.length - 1]?.content).toEqual([
+        { type: "text", text: "What time should I remind you?" },
+        { type: "tool-call", toolCallId: "turn-ask1-ask", toolName: "ask", args: {}, argsText: "", result: ASK },
+      ]);
+    } finally {
+      env.restore();
+    }
+  });
+
+  test.each([
+    ["an unknown field kind", { ...ASK, fields: [{ name: "x", label: "X", kind: "file", required: true }] }],
+    ["no fields", { ...ASK, fields: [] }],
+    ["a choice without options", { ...ASK, fields: [{ name: "x", label: "X", kind: "choice", required: true }] }],
+    ["a non-object", "nonsense"],
+    ["a missing prompt", { ...ASK, prompt: undefined }],
+  ])("%s keeps the text fallback and draws no form", async (_name, ask) => {
+    const env = stubEnvironment(done({ ask }));
+    try {
+      const { yields, error } = await collect([fakeUserMessage("remind me")]);
+      expect(error).toBeUndefined();
+      expect(yields[yields.length - 1]?.content).toEqual([{ type: "text", text: "What time should I remind you?" }]);
+    } finally {
+      env.restore();
+    }
+  });
+
+  test("a form answer sends ask_answer { turn_id, values } and reports the send as accepted", async () => {
+    const env = stubEnvironment(ndjsonStream([{ type: "delta", text: "Done." }, { type: "done", value: { turn_id: "turn-ask2", reply: { text: "Done." }, source: "plugin", safety: SAFETY } }]));
+    const settled: unknown[] = [];
+    try {
+      const { error } = await collect([fakeUserMessage("I filled in the form.")], undefined, undefined, undefined, undefined, undefined, {
+        consumeAskAnswer: () => ({ turnId: "turn-ask1", values: { when: "2030-01-01T09:00", note: "bring the card" }, onSettled: (o) => settled.push(o) }),
+      });
+      expect(error).toBeUndefined();
+      expect(env.turnBodies[0]).toMatchObject({ text: "I filled in the form.", ask_answer: { turn_id: "turn-ask1", values: { when: "2030-01-01T09:00", note: "bring the card" } } });
+      expect(env.turnBodies[0]).not.toHaveProperty("ask_answer.approved");
+      expect(settled).toEqual([{ ok: true }]);
+    } finally {
+      env.restore();
+    }
+  });
+
+  test.each([
+    [409, "ask_stale", "This form was already submitted or has expired. Ask again to get a new form.", "This form has expired or was already sent. Ask me again to get a new form."],
+    [400, "invalid_input", 'A value is needed for "When". Correct that field and submit the form again.', 'The answer for "When" did not fit. Correct that field, then submit the form again.'],
+  ])("a %s %s refusal goes to the form with failureCopy wording and ends the send quietly", async (status, code, hubError, expected) => {
+    const original = globalThis.fetch;
+    (globalThis as unknown as { AudioContext: unknown }).AudioContext = FakeAudioContext;
+    globalThis.fetch = mock(() => Promise.resolve(Response.json({ error: hubError, code }, { status }))) as unknown as typeof fetch;
+    const settled: Array<{ ok: boolean; code?: string; message?: string }> = [];
+    try {
+      const { error, yields } = await collect([fakeUserMessage("I filled in the form.")], undefined, undefined, undefined, undefined, undefined, {
+        consumeAskAnswer: () => ({ turnId: "turn-ask1", values: { when: "" }, onSettled: (o) => settled.push(o) }),
+      });
+      expect(settled).toEqual([{ ok: false, code, message: expected }]);
+      expect((error as Error | undefined)?.name).toBe("AbortError");
+      expect(yields.every((y) => !JSON.stringify(y).includes("error"))).toBe(true);
+    } finally {
+      globalThis.fetch = original;
+    }
+  });
+
+  test("submitted values and the prompt never reach the console or localStorage", async () => {
+    const SENTINEL = "sentinel-4417-dentist";
+    const env = stubEnvironment(ndjsonStream([{ type: "delta", text: "Done." }, { type: "done", value: { turn_id: "turn-ask3", reply: { text: "Done." }, source: "plugin", safety: SAFETY } }]));
+    const seen: string[] = [];
+    const methods = ["log", "info", "warn", "error", "debug"] as const;
+    const saved = methods.map((m) => console[m]);
+    for (const m of methods) console[m] = (...args: unknown[]) => { seen.push(JSON.stringify(args)); };
+    const stored = new Map<string, string>();
+    const originalStorage = Object.getOwnPropertyDescriptor(globalThis, "localStorage");
+    Object.defineProperty(globalThis, "localStorage", { configurable: true, value: { getItem: (k: string) => stored.get(k) ?? null, setItem: (k: string, v: string) => void stored.set(k, v), removeItem: (k: string) => void stored.delete(k), clear: () => stored.clear() } });
+    try {
+      await collect([fakeUserMessage("I filled in the form.")], undefined, undefined, undefined, undefined, undefined, {
+        consumeAskAnswer: () => ({ turnId: "turn-ask1", values: { note: SENTINEL } }),
+      });
+      expect(seen.join("")).not.toContain(SENTINEL);
+      expect([...stored.values()].join("")).not.toContain(SENTINEL);
+    } finally {
+      methods.forEach((m, i) => { console[m] = saved[i]!; });
+      if (originalStorage) Object.defineProperty(globalThis, "localStorage", originalStorage);
+      env.restore();
+    }
+  });
+});
+
 // PROJECT-PROGRESS-01: `start_project`'s own outcome names the project id
 // it just launched (wire.ts's `TurnValue.project`) - a real
 // ToolCallMessagePart here, `toolName: "project"` (ChatPage.tsx's

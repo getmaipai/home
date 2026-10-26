@@ -1666,6 +1666,69 @@ describe("ChatPage (APPROVE-CARD-01: the confirm tool-call card)", () => {
     }
   });
 
+  // FORM-CHAT-WEB-01: a typed package ask is drawn as the kit form; Submit sends ask_answer { turn_id, values }.
+  function stubAskTurnFetch(second: () => Response): () => void {
+    const original = globalThis.fetch;
+    (globalThis as unknown as { AudioContext: unknown }).AudioContext = FakeAudioContext;
+    let call = 0;
+    const ask = { turn_id: "turn-form1", prompt: "What should I call the reminder?", fields: [{ name: "label", label: "Reminder name", kind: "text", required: true }], expires_at: "2099-01-01T00:00:00.000Z" };
+    globalThis.fetch = mock((input: RequestInfo | URL) => {
+      const url = typeof input === "string" ? input : input.toString();
+      if (url.includes("/api/conversations") && url.endsWith("/api/conversations")) return Promise.resolve(Response.json({ id: "conv-form123", status: "open", surface: "chat" }));
+      if (url.includes("/api/conversations")) return Promise.resolve(new Response(JSON.stringify([]), { status: 200 }));
+      if (url.includes("/api/turn/stream")) {
+        call++;
+        if (call > 1) return Promise.resolve(second());
+        return Promise.resolve(new Response(ndjsonStream([
+          { type: "delta", text: "What should I call the reminder?" },
+          { type: "done", value: { turn_id: "turn-form1", reply: { text: "What should I call the reminder?" }, source: "plugin", safety: SAFETY, ask } },
+        ]), { status: 200, headers: ASSISTANT_STREAM_HEADERS }));
+      }
+      return Promise.resolve(new Response("{}", { status: 200 }));
+    }) as unknown as typeof fetch;
+    return () => { globalThis.fetch = original; };
+  }
+
+  test("a typed ask draws the form and Submit sends ask_answer values with the fixed text, then shows accepted", async () => {
+    const restore = stubAskTurnFetch(() => new Response(ndjsonStream([
+      { type: "delta", text: "Reminder set." },
+      { type: "done", value: { turn_id: "turn-form1-resumed", reply: { text: "Reminder set." }, source: "plugin", safety: SAFETY } },
+    ]), { status: 200, headers: ASSISTANT_STREAM_HEADERS }));
+    try {
+      const view = renderPage(<MemoryRouter initialEntries={["/chat"]}><ChatPage person={makePerson()} /></MemoryRouter>);
+      await sendMessage(view, "remind me");
+      const field = await view.findByLabelText(/Reminder name/);
+      fireEvent.change(field, { target: { value: "Call the dentist" } });
+      fireEvent.click(await view.findByRole("button", { name: "Submit" }));
+      expect(await view.findByText("Reminder set.")).toBeVisible();
+      const bodies = turnRequestBodies();
+      expect(bodies[1]).toMatchObject({ text: "I filled in the form.", ask_answer: { turn_id: "turn-form1", values: { label: "Call the dentist" } } });
+      expect(JSON.stringify(bodies[1])).not.toContain("approved");
+      expect(await view.findByText(/^Sent to /)).toBeVisible();
+    } finally {
+      restore();
+    }
+  });
+
+  test.each([
+    [409, "ask_stale", "This form was already submitted or has expired. Ask again to get a new form.", "This form has expired or was already sent. Ask me again to get a new form."],
+    [400, "invalid_input", 'A value is needed for "Reminder name". Correct that field and submit the form again.', 'The answer for "Reminder name" did not fit. Correct that field, then submit the form again.'],
+  ])("a %s %s refusal shows in the form's own error, with no chat error line", async (status, code, hubError, expected) => {
+    const restore = stubAskTurnFetch(() => Response.json({ error: hubError, code }, { status }));
+    try {
+      const view = renderPage(<MemoryRouter initialEntries={["/chat"]}><ChatPage person={makePerson()} /></MemoryRouter>);
+      await sendMessage(view, "remind me");
+      fireEvent.change(await view.findByLabelText(/Reminder name/), { target: { value: "Call the dentist" } });
+      fireEvent.click(await view.findByRole("button", { name: "Submit" }));
+      expect(await view.findByText(expected)).toBeVisible();
+      expect(view.container.textContent).not.toContain(hubError);
+      // The form stays open so the person can correct and send again.
+      expect(await view.findByRole("button", { name: "Submit" })).toBeVisible();
+    } finally {
+      restore();
+    }
+  });
+
   test("tapping Deny sends a new turn with ask_answer approved: false", async () => {
     const restore = stubConfirmTurnFetch([
       ndjsonStream([
