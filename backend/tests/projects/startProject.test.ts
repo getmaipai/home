@@ -9,7 +9,7 @@ import { describe, expect, test, beforeEach, afterEach, spyOn } from "bun:test";
 import { eq } from "drizzle-orm";
 import { resetDb } from "../reset-db";
 import { db } from "@/db";
-import { people, conversationTurns, artifacts } from "@/db/schema";
+import { people, conversationTurns, artifacts, projects } from "@/db/schema";
 import { nextHlc } from "@/lib/hlc";
 import { newConversationTurnId, newPersonId } from "@/lib/id";
 import { resolveOrCreateConversation } from "@/lib/conversationHistory";
@@ -160,9 +160,13 @@ describe("runStartProjectTool(): the tool's own execution", () => {
       conversationId: "conv-1",
       turnId: "turn-1",
       temporary: false,
+      companionId: "lively-adult",
     });
     expect(outcome.status).toBe("succeeded");
     expect(outcome.result?.reply?.text).toContain("bedtime story");
+    const startedProjectId = (outcome.result?.data as { projectId: string }).projectId;
+    const row = db.select().from(projects).where(eq(projects.id, startedProjectId)).get()!;
+    expect(JSON.parse(row.provenance).companion_id).toBe("lively-adult");
     // Jesse found live (2026-09-27): the old "N steps, about Y minutes"
     // phrasing read like a log line - the step count is gone from the
     // sentence (still in `data.stepCount` below for anything that wants

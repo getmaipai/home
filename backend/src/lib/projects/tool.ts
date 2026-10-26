@@ -182,6 +182,7 @@ export interface RunStartProjectInput {
    * TurnState.temporary, the same flag policy.ts's own temporary_mode
    * check already reads. */
   temporary: boolean;
+  companionId?: string;
 }
 
 /** nodes/tool.ts's own special case for this one tool id: builds the plan
@@ -221,8 +222,8 @@ export function runStartProjectTool(input: RunStartProjectInput): ToolExecutionO
   }
   const plan = projectType.buildPlan(params);
   const provenance = input.temporary
-    ? { person: input.actor.id, conversationId: null, turnId: null, companion_id: null, planSource: "package" as const }
-    : { person: input.actor.id, conversationId: input.conversationId, turnId: input.turnId, companion_id: null, planSource: "package" as const };
+    ? { person: input.actor.id, conversationId: null, turnId: null, companion_id: input.companionId ?? null, planSource: "package" as const }
+    : { person: input.actor.id, conversationId: input.conversationId, turnId: input.turnId, companion_id: input.companionId ?? null, planSource: "package" as const };
   const project = startProject({ type: projectType.id, title: projectType.title, plan, provenance });
   if (project.state === "failed") {
     return outcomeOf({

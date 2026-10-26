@@ -213,7 +213,7 @@ export const toolNode: Node<ToolInput, ToolOutput> = async (state, input, signal
     // background actor; the project keeps running long after this turn's
     // reply goes out), so there's no deadline race to run it under.
     if (tool === START_PROJECT_TOOL_ID) {
-      const outcome = runStartProjectTool({ actor: state.actor, args: args as StartProjectArgs, callId, conversationId: state.conversationId, turnId: state.turnId, temporary: state.temporary });
+      const outcome = runStartProjectTool({ actor: state.actor, args: args as StartProjectArgs, callId, conversationId: state.conversationId, turnId: state.turnId, temporary: state.temporary, companionId: state.persona?.id ?? "default" });
       outcomes.push(outcome);
       if (outcome.status === "succeeded") {
         toolEvents.push({ t: "tool_result", call_id: callId, package_id: tool, outcome: { text: outcome.result?.reply?.text } });

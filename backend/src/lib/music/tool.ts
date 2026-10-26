@@ -38,7 +38,7 @@ export function musicRefusalFor(audience: MusicAudience, args: Record<string, un
   return refusal ? { kind: "prompt" as const, why: refusal, line: MUSIC_REFUSAL_LINE[refusal] } : null;
 }
 export type MusicToolInput = {
-  state: Pick<TurnState, "actor" | "surface" | "speakerEvidence" | "deviceId" | "planBasis" | "plan" | "conversationId" | "turnId" | "temporary" | "ephemeral">;
+  state: Pick<TurnState, "actor" | "persona" | "surface" | "speakerEvidence" | "deviceId" | "planBasis" | "plan" | "conversationId" | "turnId" | "temporary" | "ephemeral">;
   args: Record<string, unknown>; callId: string; spoken: boolean;
 };
 const newSeed = (prior?: number | null): number => { const seed = Math.floor(Math.random() * 2_147_483_646) + 1; return seed === prior ? seed + 1 : seed; };
@@ -197,7 +197,7 @@ async function runMusic(input: MusicToolInput, editing: boolean): Promise<ToolEx
   if ((request.lyrics?.length ?? 0) > 4000 || (request.written_lyrics?.length ?? 0) > 4000) return failed("bad_arguments", "bad_arguments");
   if (request.seconds > engine!.limits.max_seconds || (body.task === "text2music" && request.seconds < Math.max(10, engine!.limits.min_seconds))) return failed("too_long_or_short", "bad_arguments");
   try {
-    const job = await startMusicJob({ actor, conversationId: state.conversationId, turnId: state.turnId, temporary, task, request, body, parentFileId });
+    const job = await startMusicJob({ actor, conversationId: state.conversationId, turnId: state.turnId, companionId: state.persona.id, temporary, task, request, body, parentFileId });
     return outcomeOf({ callId, packageId, status: "succeeded", via: "tool_call", args, durationMs: 0, result: {
       reply: { text: songOnItsWay(request) },
       data: { musicJobId: job.id }, actions: [],

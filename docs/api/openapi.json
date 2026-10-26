@@ -54340,6 +54340,22 @@
                           },
                           "can_copy": {
                             "type": "boolean"
+                          },
+                          "task_count": {
+                            "type": "number"
+                          },
+                          "chat_count": {
+                            "type": "number"
+                          },
+                          "working_count": {
+                            "type": "number"
+                          },
+                          "waiting_count": {
+                            "type": "number"
+                          },
+                          "latest_activity": {
+                            "type": "string",
+                            "nullable": true
                           }
                         },
                         "required": [
@@ -54356,7 +54372,12 @@
                           "status",
                           "chats",
                           "can_edit",
-                          "can_copy"
+                          "can_copy",
+                          "task_count",
+                          "chat_count",
+                          "working_count",
+                          "waiting_count",
+                          "latest_activity"
                         ]
                       }
                     },
@@ -54426,6 +54447,22 @@
                           },
                           "can_copy": {
                             "type": "boolean"
+                          },
+                          "task_count": {
+                            "type": "number"
+                          },
+                          "chat_count": {
+                            "type": "number"
+                          },
+                          "working_count": {
+                            "type": "number"
+                          },
+                          "waiting_count": {
+                            "type": "number"
+                          },
+                          "latest_activity": {
+                            "type": "string",
+                            "nullable": true
                           }
                         },
                         "required": [
@@ -54442,7 +54479,12 @@
                           "status",
                           "chats",
                           "can_edit",
-                          "can_copy"
+                          "can_copy",
+                          "task_count",
+                          "chat_count",
+                          "working_count",
+                          "waiting_count",
+                          "latest_activity"
                         ]
                       }
                     },
@@ -55119,6 +55161,22 @@
                     "can_copy": {
                       "type": "boolean"
                     },
+                    "task_count": {
+                      "type": "number"
+                    },
+                    "chat_count": {
+                      "type": "number"
+                    },
+                    "working_count": {
+                      "type": "number"
+                    },
+                    "waiting_count": {
+                      "type": "number"
+                    },
+                    "latest_activity": {
+                      "type": "string",
+                      "nullable": true
+                    },
                     "about": {
                       "type": "string"
                     },
@@ -55211,6 +55269,11 @@
                     "chats",
                     "can_edit",
                     "can_copy",
+                    "task_count",
+                    "chat_count",
+                    "working_count",
+                    "waiting_count",
+                    "latest_activity",
                     "about",
                     "pronouns",
                     "interests",
@@ -55480,6 +55543,96 @@
           },
           "409": {
             "description": "Companion is in use",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/companions/{id}/activity": {
+      "get": {
+        "tags": [
+          "Companions"
+        ],
+        "summary": "Read my recent work for one companion",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "lively-teen"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The signed-in person's recent jobs and projects for this companion, newest first, up to 50.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "activity": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string"
+                          },
+                          "kind": {
+                            "type": "string"
+                          },
+                          "title": {
+                            "type": "string"
+                          },
+                          "state": {
+                            "type": "string"
+                          },
+                          "created_at": {
+                            "type": "string"
+                          },
+                          "updated_at": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "kind",
+                          "title",
+                          "state",
+                          "created_at",
+                          "updated_at"
+                        ]
+                      }
+                    }
+                  },
+                  "required": [
+                    "activity"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such companion for this person",
             "content": {
               "application/json": {
                 "schema": {

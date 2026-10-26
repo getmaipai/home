@@ -14,6 +14,7 @@ export type HomeJob = {
   state: string; progress?: Record<string, unknown> | null; waitingReason?: string | null;
   legacyProgress?: Record<string, unknown> | null;
   resultRef?: string | null; conversationId?: string | null; errorKind?: string | null;
+  companionId?: string | null;
   raw?: string | null; provenance?: Record<string, unknown>; createdAt: string; updatedAt: string;
 };
 
@@ -46,7 +47,7 @@ export function visibleJobFor(actor: PersonRow, job: HomeJob, roleOf?: Map<strin
 export function createJob(input: Omit<HomeJob, "createdAt" | "updatedAt">): HomeJob {
   const now = new Date().toISOString();
   const row = { ...input, progress: input.progress ? JSON.stringify(input.progress) : null, provenance: JSON.stringify(input.provenance), createdAt: now, updatedAt: now };
-  db.insert(jobs).values({ id: row.id, kind: row.kind, startedBy: row.startedBy, forPerson: row.forPerson, title: row.title, state: row.state, progress: row.progress, waitingReason: row.waitingReason, resultRef: row.resultRef, conversationId: row.conversationId, errorKind: row.errorKind, raw: row.raw, provenance: row.provenance, createdAt: now, updatedAt: now }).run();
+  db.insert(jobs).values({ id: row.id, kind: row.kind, startedBy: row.startedBy, forPerson: row.forPerson, title: row.title, state: row.state, progress: row.progress, waitingReason: row.waitingReason, resultRef: row.resultRef, conversationId: row.conversationId, companionId: row.companionId ?? null, errorKind: row.errorKind, raw: row.raw, provenance: row.provenance, createdAt: now, updatedAt: now }).run();
   return { ...input, createdAt: now, updatedAt: now };
 }
 

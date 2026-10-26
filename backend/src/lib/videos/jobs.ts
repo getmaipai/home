@@ -61,6 +61,7 @@ export interface VideoJob {
   personId: string;
   conversationId: string | null;
   turnId: string | null;
+  companionId: string | null;
   kind: VideoJobKind;
   state: VideoJobState;
   stackJob: string | null;
@@ -116,7 +117,7 @@ type Row = typeof videoJobs.$inferSelect;
 function fromRow(row: Row): VideoJob {
   const request = JSON.parse(row.request) as VideoRequest & { memoryRequeues?: number };
   return {
-    id: row.id, personId: row.personId, conversationId: row.conversationId, turnId: row.turnId, kind: row.kind as VideoJobKind, state: row.state as VideoJobState,
+    id: row.id, personId: row.personId, conversationId: row.conversationId, turnId: row.turnId, companionId: row.companionId, kind: row.kind as VideoJobKind, state: row.state as VideoJobState,
     stackJob: row.stackJob, percent: row.percent, phase: row.phase, position: row.position, prompt: row.prompt, request: JSON.parse(row.request) as VideoRequest,
     error: row.error, files: JSON.parse(row.files) as VideoFile[], temporary: false, createdAt: row.createdAt, updatedAt: row.updatedAt,
     ...((request.memoryRequeues ?? 0) > 0 ? { riseReason: "requeued_memory" as const } : {}),
@@ -127,7 +128,7 @@ function persistVideoJob(job: VideoJob): void {
   job.updatedAt = new Date().toISOString();
   if (job.temporary) { memory.set(job.id, job); return; }
   const values = {
-    personId: job.personId, conversationId: job.conversationId, turnId: job.turnId, kind: job.kind, state: job.state, stackJob: job.stackJob, percent: job.percent,
+    personId: job.personId, conversationId: job.conversationId, turnId: job.turnId, companionId: job.companionId, kind: job.kind, state: job.state, stackJob: job.stackJob, percent: job.percent,
     phase: job.phase, position: job.position, prompt: job.prompt, request: JSON.stringify(job.request), error: job.error, files: JSON.stringify(job.files), updatedAt: job.updatedAt, hlc: nextHlc(),
   };
   db.insert(videoJobs).values({ id: job.id, createdAt: job.createdAt, ...values }).onConflictDoUpdate({ target: videoJobs.id, set: values }).run();
@@ -312,6 +313,7 @@ export interface StartVideoInput {
   actor: PersonRow;
   conversationId: string | null;
   turnId: string | null;
+  companionId?: string | null;
   temporary: boolean;
   kind: VideoJobKind;
   prompt: string;
@@ -329,7 +331,7 @@ export async function startVideoJob(input: StartVideoInput): Promise<VideoJob> {
   const model = videoModelForLane(laneOfPerson(input.actor), input.body.model);
   const now = new Date().toISOString();
   const job: VideoJob = {
-    id: newVideoJobId(), personId: input.actor.id, conversationId: input.conversationId, turnId: input.turnId, kind: input.kind, state: "queued", stackJob: null,
+    id: newVideoJobId(), personId: input.actor.id, conversationId: input.conversationId, turnId: input.turnId, companionId: input.companionId ?? null, kind: input.kind, state: "queued", stackJob: null,
     percent: 0, phase: "queued", position: null, prompt: input.prompt,
     request: ({ size: input.body.size ?? (model === "detailed" ? "768x448" : "832x480"), seconds: input.body.seconds ?? 5, quality: model === "detailed" ? "detailed" : "quick", seed: input.body.seed ?? null, loras: (input.body.loras ?? []).map((l) => l.id), source_file_id: input.sourceFileId ?? null, audience: input.body.audience, stackBody: { ...input.body, ...(model ? { model } : {}) }, ...(input.likeness ? { likeness: input.likeness } : {}) } as VideoRequest),
     error: null, files: [], temporary: input.temporary, createdAt: now, updatedAt: now,

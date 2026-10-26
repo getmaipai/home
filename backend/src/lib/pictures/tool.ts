@@ -65,7 +65,7 @@ function clampCount(value: unknown, max: number): number {
 }
 
 export interface RunGenerateImageInput {
-  state: Pick<TurnState, "actor" | "surface" | "speakerEvidence" | "deviceId" | "planBasis" | "plan" | "conversationId" | "turnId" | "temporary" | "ephemeral">;
+  state: Pick<TurnState, "actor" | "persona" | "surface" | "speakerEvidence" | "deviceId" | "planBasis" | "plan" | "conversationId" | "turnId" | "temporary" | "ephemeral">;
   args: Record<string, unknown>;
   callId: string;
   spoken: boolean;
@@ -133,6 +133,7 @@ export async function runGenerateImage(input: RunGenerateImageInput): Promise<To
       actor: state.actor as PersonRow,
       conversationId: state.conversationId,
       turnId: state.turnId,
+      companionId: state.persona.id,
       temporary,
       kind: "generate",
       prompt,
