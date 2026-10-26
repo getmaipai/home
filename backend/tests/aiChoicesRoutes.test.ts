@@ -1,6 +1,7 @@
 // AIMODELS-ROUTES-01: /api/ai. The cards, the unused list, one choice (install first, then the setting), set everything to
 // recommended (never removes, safe twice) and Free up space (per-id guard, partial results). Owner and admin only.
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
+import { mkdir } from "node:fs/promises";
 import { eq } from "drizzle-orm";
 import { db } from "@/db";
 import { people } from "@/db/schema";
@@ -11,6 +12,8 @@ import { getHouseholdSettingValue, setHouseholdSettingValue } from "@/lib/settin
 import { shippedDiskPlan } from "@/lib/diskPlan";
 import { resetInstallStatusCache } from "@/lib/installStatus";
 import type { StackClient, StackInstallPlan } from "@/lib/stack/client";
+import { wakewordDir } from "@/lib/paths";
+import { WAKEWORD_ALL_ASSETS, isWakewordAssetInstalled, wakewordAssetPath } from "@/lib/wakewordAssets";
 import { TestClient } from "./client";
 import { resetDb } from "./reset-db";
 
@@ -96,22 +99,24 @@ describe("access", () => {
     expect((await client.get("/api/ai/unused")).status).toBe(403);
     expect((await client.post("/api/ai/recommended", {})).status).toBe(403);
     expect((await client.post("/api/ai/cleanup", { ids: ["x"] })).status).toBe(403);
-    expect((await client.post("/api/ai/choices/pictures", { choice: "pictures.quick" })).status).toBe(403);
+    expect((await client.post("/api/ai/choices/pictures", { choice: "pictures.ernie" })).status).toBe(403);
     expect(calls).toEqual([]);
   });
 });
 
 describe("the cards", () => {
-  test("GET /api/ai/choices returns seven cards with the current picture choice from the setting", async () => {
+  test("GET /api/ai/choices returns eight cards with the current Quick picture model from the setting", async () => {
     const { client } = await owner();
-    setHouseholdSettingValue("generation.picture_quality", "detailed");
+    setHouseholdSettingValue("generation.picture_quick_model", "klein");
     const body = await (await client.get("/api/ai/choices")).json() as { stack: string; cards: Card[]; alwaysOn: { bytes: number; rowIds: string[] }; recommended: { changes: Array<{ job: string }> } | null };
     expect(body.stack).toBe("ok");
-    expect(body.cards.map((card) => card.id)).toEqual(["chat", "pictures", "videos", "music", "voice", "wakeword", "coding"]);
+    expect(body.cards.map((card) => card.id)).toEqual(["chat", "pictures", "picturesdetailed", "videos", "music", "voice", "wakeword", "coding"]);
     const pictures = body.cards.find((card) => card.id === "pictures")!;
-    expect(pictures.choices.find((choice) => choice.id === "pictures.detailed")!.current).toBe(true);
+    expect(pictures.choices.find((choice) => choice.id === "pictures.klein")!.current).toBe(true);
     expect(body.alwaysOn.rowIds.length).toBeGreaterThan(0);
     expect(body.recommended!.changes.map((change) => change.job)).toContain("pictures");
+    const wake = body.cards.find((card) => card.id === "wakeword")!;
+    expect(wake.choices.map((choice) => choice.id)).toEqual(["wakeword.detector"]);
   });
 
   test("the Stack unreachable: GET answers 200 with stack unreachable, POST answers 503 with the sentence", async () => {
@@ -127,42 +132,70 @@ describe("the cards", () => {
 });
 
 describe("choosing", () => {
-  test("choosing Detailed pictures installs first and then writes generation.picture_quality", async () => {
+  test("choosing Detailed pictures installs first and then writes generation.picture_detailed.enabled", async () => {
     const { client } = await owner();
     let seenAtInstall: unknown = "unset";
     const base = globalThis.fetch;
     components = everything(["pictures-ernie"]);
+    setHouseholdSettingValue("generation.picture_detailed.enabled", false);
     __setComponentsFetchForTests((async (input: string | URL | Request, init?: RequestInit) => {
       const path = new URL(String(input)).pathname;
-      if ((init?.method ?? "GET") === "POST") { seenAtInstall = getHouseholdSettingValue("generation.picture_quality"); calls.push({ method: "POST", path }); return Response.json({ job: "j", component: "z" }, { status: 202 }); }
+      if ((init?.method ?? "GET") === "POST") { seenAtInstall = getHouseholdSettingValue("generation.picture_detailed.enabled"); calls.push({ method: "POST", path }); return Response.json({ job: "j", component: "z" }, { status: 202 }); }
       calls.push({ method: "GET", path });
       return Response.json({ tier: "p128", free_disk_bytes: 800 * GIB, disk_margin_bytes: 5 * GIB, installed_bytes: 1, components });
     }) as never);
-    const res = await client.post("/api/ai/choices/pictures", { choice: "pictures.detailed" });
+    const res = await client.post("/api/ai/choices/picturesdetailed", { choice: "picturesdetailed.zimage" });
     expect(res.status).toBe(200);
     expect(installs()).toContain(idOf("pictures-zimage"));
-    expect(seenAtInstall).not.toBe("detailed");
-    expect(getHouseholdSettingValue("generation.picture_quality")).toBe("detailed");
+    expect(seenAtInstall).toBe(false);
+    expect(getHouseholdSettingValue("generation.picture_detailed.enabled")).toBe(true);
     void base;
   });
 
   test("choosing a picture style whose install cannot start does not write the setting", async () => {
     const { client } = await owner();
     components = everything(["pictures-ernie"]);
+    setHouseholdSettingValue("generation.picture_detailed.enabled", false);
     failInstall.add(idOf("pictures-zimage"));
-    const res = await client.post("/api/ai/choices/pictures", { choice: "pictures.detailed" });
+    const res = await client.post("/api/ai/choices/picturesdetailed", { choice: "picturesdetailed.zimage" });
     expect(res.status).toBe(409);
     expect(((await res.json()) as { error: string }).error).toMatch(/not enough room/);
-    expect(getHouseholdSettingValue("generation.picture_quality")).not.toBe("detailed");
+    expect(getHouseholdSettingValue("generation.picture_detailed.enabled")).toBe(false);
   });
 
   test("using an installed choice writes the setting only", async () => {
     const { client } = await owner();
     components = everything(["pictures-ernie", "pictures-zimage"]);
-    const res = await client.post("/api/ai/choices/pictures", { choice: "pictures.detailed" });
+    setHouseholdSettingValue("generation.picture_detailed.enabled", false);
+    const res = await client.post("/api/ai/choices/picturesdetailed", { choice: "picturesdetailed.zimage" });
     expect(res.status).toBe(200);
     expect(installs()).toEqual([]);
-    expect(getHouseholdSettingValue("generation.picture_quality")).toBe("detailed");
+    expect(getHouseholdSettingValue("generation.picture_detailed.enabled")).toBe(true);
+  });
+
+  test("picking Klein as the Quick model writes the setting and installs nothing extra", async () => {
+    const { client } = await owner();
+    components = everything(["pictures-ernie", "pictures"]);
+    const res = await client.post("/api/ai/choices/pictures", { choice: "pictures.klein" });
+    expect(res.status).toBe(200);
+    expect(installs()).toEqual([]);
+    expect(getHouseholdSettingValue("generation.picture_quick_model")).toBe("klein");
+  });
+
+  test("the wake word row lists the stock detector and its two feature files, and removing it deletes them", async () => {
+    const { client } = await owner();
+    await mkdir(wakewordDir, { recursive: true });
+    for (const asset of WAKEWORD_ALL_ASSETS) await Bun.write(wakewordAssetPath(asset.file), "x");
+    const read = async () => ((await (await client.get("/api/ai/choices")).json()) as { cards: Card[] }).cards.find((card) => card.id === "wakeword")!;
+    const before = await read();
+    expect(before.choices.map((choice) => choice.id)).toEqual(["wakeword.detector"]);
+    expect(before.choices[0]!.current).toBe(true);
+    const res = await client.post("/api/ai/choices/wakeword", { choice: "wakeword.detector" });
+    expect(res.status).toBe(200);
+    expect(WAKEWORD_ALL_ASSETS.some((asset) => isWakewordAssetInstalled(asset.file))).toBe(false);
+    const after = await read();
+    expect(after.choices[0]!.current).toBe(false);
+    expect(after.choices[0]!.action).toBe("get");
   });
 
   test("an unknown job or choice is a 404 with a sentence", async () => {
@@ -183,14 +216,14 @@ describe("choosing", () => {
 });
 
 describe("set everything to recommended", () => {
-  test("changes Detailed to Quick, starts only the missing installs, never calls DELETE", async () => {
+  test("changes Klein back to ERNIE, starts only the missing installs, never calls DELETE", async () => {
     const { client } = await owner();
-    setHouseholdSettingValue("generation.picture_quality", "detailed");
+    setHouseholdSettingValue("generation.picture_quick_model", "klein");
     const res = await client.post("/api/ai/recommended", {});
     expect(res.status).toBe(200);
     const body = await res.json() as { changed: string[]; started: string[] };
-    expect(body.changed).toContain("Pictures: Detailed to Quick");
-    expect(getHouseholdSettingValue("generation.picture_quality")).toBe("quick");
+    expect(body.changed.some((line) => line.startsWith("Quick pictures:"))).toBe(true);
+    expect(getHouseholdSettingValue("generation.picture_quick_model")).toBe("ernie");
     expect(installs()).toContain(idOf("video"));
     expect(installs()).not.toContain(idOf("pictures-ernie"));
     expect(installs()).not.toContain(idOf("video-detailed"));
@@ -222,7 +255,7 @@ describe("set everything to recommended", () => {
 });
 
 describe("free up space", () => {
-  const withUnused = () => { components = everything(["pictures-ernie", "pictures-zimage", "video", "video-detailed"]); };
+  const withUnused = () => { setHouseholdSettingValue("generation.picture_detailed.enabled", false); components = everything(["pictures-ernie", "pictures-zimage", "video", "video-detailed"]); };
 
   test("GET /api/ai/unused lists unused parts largest first by plain name", async () => {
     const { client } = await owner();
@@ -246,7 +279,7 @@ describe("free up space", () => {
   test("keeps an id that became used between the list and the confirm", async () => {
     const { client } = await owner();
     withUnused();
-    setHouseholdSettingValue("generation.picture_quality", "detailed");
+    setHouseholdSettingValue("generation.picture_detailed.enabled", true);
     const res = await client.post("/api/ai/cleanup", { ids: [idOf("pictures-zimage")] });
     const body = await res.json() as { results: Array<{ status: string; message: string }>; kept: number };
     expect(body.results[0]).toMatchObject({ status: "kept" });

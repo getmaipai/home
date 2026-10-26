@@ -26,7 +26,7 @@ import { sizeGb } from "../../../../shared/diskPlanMath";
 import type { AiJobId } from "../../../../shared/aiChoices";
 import type { SettingsViewProps } from "@/shell/pages/settings/settingsViews";
 
-const ICONS: Record<AiJobId, string> = { chat: "message-circle", pictures: "palette", videos: "film", music: "music", voice: "mic-vocal", wakeword: "ear", coding: "code" };
+const ICONS: Record<AiJobId, string> = { chat: "message-circle", pictures: "palette", picturesdetailed: "sparkles", videos: "film", music: "music", voice: "mic-vocal", wakeword: "ear", coding: "code" };
 const GB = 1_000_000_000;
 const messageOf = (error: unknown, fallback: string) => (error instanceof ApiError ? error.message : fallback);
 const delta = (bytes: number) => `${bytes < 0 ? "-" : "+"}${sizeGb(Math.abs(bytes))}`;
@@ -85,6 +85,7 @@ export function AiGlance({ card }: SettingsViewProps) {
         const single = row.options.length === 1 && row.options[0]!.kind === "switch" ? row.options[0]! : null;
         if (!row.shownEnabled) {
           if (single?.setting) await api.setSetting("household", single.setting.key, false, true);
+          else if (row.job === "wakeword") { if (single && row.liveEnabled) await aiChoicesApi.choose(row.job, single.id); }
           else await api.setSetting("household", `engines.${role}.choice`, "off", true);
         } else if (row.shown && (staged[row.job]?.choiceId || single)) {
           await aiChoicesApi.choose(row.job, row.shown.id);
@@ -205,7 +206,7 @@ function glanceRow({ row, copy, onSwitch, onEdit, onReset, onDownload }: { row: 
   const Gear = getIcon("settings");
   const Down = getIcon("download");
   const model = row.shown;
-  const line = !row.offered ? (copy.not_offered ?? "") : row.job === "wakeword" ? (copy.wakeword_note ?? "") : model?.description ?? row.summary;
+  const line = !row.offered ? (copy.not_offered ?? "") : model?.description ?? row.summary;
   return (
     <Item key={row.job} data-testid={`ai-row-${row.job}`} data-missing={row.missing ? "true" : undefined}>
       <ItemMedia variant="icon"><Icon /></ItemMedia>
@@ -216,6 +217,7 @@ function glanceRow({ row, copy, onSwitch, onEdit, onReset, onDownload }: { row: 
         </ItemTitle>
         <ItemDescription clamp={false}>{model && row.offered ? `${model.label}. ` : ""}{line}</ItemDescription>
         {model && row.offered ? <ItemDescription clamp={false}>{model.details.map((part) => part.name).join(", ")}</ItemDescription> : null}
+        {row.job === "wakeword" && row.offered ? <ItemDescription clamp={false}>{copy.wakeword_note}</ItemDescription> : null}
       </ItemContent>
       <ItemActions>
         {model && row.offered && row.shownEnabled ? <span className="text-base text-muted-foreground">{sizeGb(model.installedBytes)} · {fill(copy.ram_estimate ?? "", { size: sizeGb(model.ramBytes) })}</span> : null}

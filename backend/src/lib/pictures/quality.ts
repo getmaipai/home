@@ -1,7 +1,7 @@
 // IMGGEN-QUALITY-01: Quick and Detailed are the person-facing choices. New Quick pictures use ERNIE when installed, otherwise
 // the Stack's Klein default; Detailed uses Z-Image. Model names stay in the Details disclosure and this internal mapping.
 // Rule 0 is untouched: the age and surface gates ran before anything here.
-import { householdPictureQuality } from "./policy";
+import { householdDetailedEnabled, householdPictureQuality, householdQuickModel } from "./policy";
 import type { StackImageStatus } from "./stack";
 
 export type PictureQuality = "quick" | "detailed";
@@ -12,14 +12,15 @@ export const DETAILED_MODEL = "z-image-turbo";
 export const qualityOfModel = (model: string | null | undefined): PictureQuality | null => (model === DETAILED_MODEL ? "detailed" : model === QUICK_MODEL || model === ERNIE_MODEL ? "quick" : null);
 export const isPictureQuality = (value: unknown): value is PictureQuality => value === "quick" || value === "detailed";
 
-/** ERNIE is text-to-picture only. If it is not ready, leave Quick unnamed so the Stack uses its existing Klein default. */
+/** ERNIE is text-to-picture only. When the household picked Klein, or ERNIE is not ready, leave Quick unnamed so the Stack uses its existing Klein default. */
 export function quickModelFor(engine: Pick<StackImageStatus, "models"> | null): string | undefined {
+  if (householdQuickModel() === "klein") return undefined;
   const model = engine?.models.find((m) => m.id === ERNIE_MODEL);
   return model?.installed && model.available !== false ? ERNIE_MODEL : undefined;
 }
 
 /** Why the quality is not the one that was wanted, as a code the tool turns into one sentence for the model to relay. */
-export type QualityNote = "detailed_not_installed" | "style_needs_detailed" | "style_needs_quick" | null;
+export type QualityNote = "detailed_not_installed" | "detailed_off" | "style_needs_detailed" | "style_needs_quick" | null;
 
 export interface QualityChoice {
   quality: PictureQuality;
@@ -49,6 +50,7 @@ export function chooseQuality(input: { requested?: PictureQuality | undefined; s
     return { quality: "quick", model: QUICK_MODEL, note: input.requested === "detailed" ? "style_needs_quick" : null, announce: false };
   }
   if (wanted === "detailed") {
+    if (!householdDetailedEnabled()) return { quality: "quick", note: "detailed_off", announce: false };
     if (detailedReady(input.engine)) return { quality: "detailed", model: DETAILED_MODEL, note: null, announce: input.requested === "detailed" };
     return { quality: "quick", note: "detailed_not_installed", announce: false };
   }
@@ -59,6 +61,7 @@ export function chooseQuality(input: { requested?: PictureQuality | undefined; s
 /** The line the model relays for a quality note (plain words, no model names). */
 export const QUALITY_NOTE_LINE: Record<Exclude<QualityNote, null>, string> = {
   detailed_not_installed: "Detailed pictures are not on this computer yet, so this one was made Quick. If they want Detailed, tell them an admin can get it in Settings, Pictures and videos.",
+  detailed_off: "Detailed pictures are turned off, so this one was made Quick. If they want Detailed, tell them an admin can turn it on in Settings, AI and models.",
   style_needs_detailed: "That style only works with Detailed pictures, so this one is Detailed and takes a little longer. Say so in one short sentence.",
   style_needs_quick: "That style only works with Quick pictures, so this one was made Quick.",
 };

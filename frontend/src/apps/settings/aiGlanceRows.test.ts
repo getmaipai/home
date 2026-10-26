@@ -19,7 +19,7 @@ const cards = [
     choice("chat.standard", { recommended: true, current: true }),
     choice("chat.big", { state: "notInstalled", downloadBytes: 4e9, ramBytes: 5e9 }),
   ]),
-  card("pictures", [choice("pictures.quick", { recommended: true }), choice("pictures.detailed", { current: true })]),
+  card("pictures", [choice("pictures.ernie", { recommended: true }), choice("pictures.klein", { current: true }), choice("pictures.edit", { kind: "fixed", current: true })]),
   card("wakeword", []),
   card("coding", [choice("coding.helper", { kind: "switch", recommended: true, current: false, setting: { key: "x", value: true } })]),
 ];

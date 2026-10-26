@@ -27165,6 +27165,7 @@
                             "enum": [
                               "chat",
                               "pictures",
+                              "picturesdetailed",
                               "videos",
                               "music",
                               "voice",
@@ -27194,6 +27195,7 @@
                                   "enum": [
                                     "chat",
                                     "pictures",
+                                    "picturesdetailed",
                                     "videos",
                                     "music",
                                     "voice",
@@ -27393,6 +27395,7 @@
                                 "enum": [
                                   "chat",
                                   "pictures",
+                                  "picturesdetailed",
                                   "videos",
                                   "music",
                                   "voice",

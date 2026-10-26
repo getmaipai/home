@@ -2,6 +2,7 @@
 import { expect, test } from "bun:test";
 import table from "../../shared/diskPlan.json";
 import type { DiskPlan, DiskRow } from "../../shared/diskPlanMath";
+import type { AiSettingsInput } from "../../shared/aiChoices";
 import { aiCopy } from "@/lib/aiCopy";
 import { findUnused, whyKept, type UnusedComponent, type UnusedInput } from "@/lib/aiUnused";
 
@@ -22,11 +23,11 @@ function plan(rows: Array<Partial<DiskRow> & { id: string }>): DiskPlan {
   };
 }
 
-function unusedInput(plan: DiskPlan, components: UnusedComponent[], settings?: { pictureQuality: "quick" | "detailed"; videoQuality: "quick" | "detailed"; musicEnabled: boolean }): UnusedInput {
-  return { copy: aiCopy, plan, components, settings: settings ?? { pictureQuality: "quick", videoQuality: "quick", musicEnabled: false }, freeBytes: null };
+function unusedInput(plan: DiskPlan, components: UnusedComponent[], settings?: AiSettingsInput): UnusedInput {
+  return { copy: aiCopy, plan, components, settings: settings ?? { pictureQuickModel: "ernie", pictureDetailedEnabled: false, videoQuality: "quick", musicEnabled: false }, freeBytes: null };
 }
 
-test("lists Detailed pictures when Quick is chosen and no style needs it", () => {
+test("lists Detailed pictures when it is switched off and no style needs it", () => {
   const p = plan([
     { id: "chat", need: "required", model_ids: ["chat-m"] },
     { id: "pictures-ernie", need: "recommended", model_ids: ["ernie-m"] },
@@ -42,7 +43,7 @@ test("lists Detailed pictures when Quick is chosen and no style needs it", () =>
   const result = findUnused(input);
   expect(result.items.map((item) => item.id)).toEqual(["zimage-m", "music-m"]);
   expect(result.items[0]?.name).toBe("Detailed pictures");
-  expect(result.items[0]?.reason).toBe("You use Quick pictures and no saved style needs this.");
+  expect(result.items[0]?.reason).toBe("You turned Detailed pictures off and no saved style needs this.");
   expect(result.items[0]?.lastUsedAt).toBe("2026-08-17T12:00:00Z");
   expect(result.items[1]?.name).toBe("Music");
   expect(result.items[1]?.reason).toBe("Not used since August.");
@@ -161,7 +162,7 @@ test("whyKept returns null for an unused part and the plain reason otherwise", (
   expect(whyKept(input, "music-m")).toBe("It cannot be removed right now.");
   const result = findUnused(input);
   expect(result.items.map((item) => item.id)).toEqual(["zimage-m"]);
-  expect(result.items[0]?.reason).toBe("You use Quick pictures and no saved style needs this.");
+  expect(result.items[0]?.reason).toBe("You turned Detailed pictures off and no saved style needs this.");
 });
 
 test("totalBytes is the sum, and nothing is listed when nothing is unused", () => {
@@ -212,7 +213,7 @@ test("real p128 plan with everything installed and Quick chosen: Detailed pictur
       components.push(part({ id: row.id, label: row.label, size_bytes: row.installed_bytes, plan_need: row.need }));
     }
   }
-  const input = unusedInput(p, components, { pictureQuality: "quick", videoQuality: "quick", musicEnabled: true });
+  const input = unusedInput(p, components, { pictureQuickModel: "ernie", pictureDetailedEnabled: false, videoQuality: "quick", musicEnabled: true });
   const result = findUnused(input);
   const zimage = p.rows.find((row) => row.id === "pictures-zimage")!;
   const ltx = p.rows.find((row) => row.id === "video-detailed")!;
@@ -220,7 +221,7 @@ test("real p128 plan with everything installed and Quick chosen: Detailed pictur
   const expectedIds = [...zimage.model_ids, ...ltx.model_ids];
   expect(result.items.map((item) => item.id).sort()).toEqual([...expectedIds].sort());
   expect(result.items.every((item) => item.name === "Detailed pictures" || item.name === "Detailed videos")).toBe(true);
-  expect(result.items.every((item) => item.reason === "You use Quick pictures and no saved style needs this." || item.reason === "You use Quick videos and no saved style needs this.")).toBe(true);
+  expect(result.items.every((item) => item.reason === "You turned Detailed pictures off and no saved style needs this." || item.reason === "You use Quick videos and no saved style needs this.")).toBe(true);
   expect(result.totalBytes).toBe(result.items.reduce((total, item) => total + item.bytes, 0));
   for (const id of [...klein.model_ids, "judge", "embed", "stt", "search", "home"]) expect(result.items.map((item) => item.id)).not.toContain(id);
 });

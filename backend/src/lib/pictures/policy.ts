@@ -115,6 +115,24 @@ export function householdPictureQuality(): "quick" | "detailed" {
   }
 }
 
+/** `generation.picture_quick_model`: "ernie" (default) or "klein", the model behind Quick pictures. */
+export function householdQuickModel(): "ernie" | "klein" {
+  try {
+    return getHouseholdSettingValue("generation.picture_quick_model") === "klein" ? "klein" : "ernie";
+  } catch {
+    return "ernie";
+  }
+}
+
+/** `generation.picture_detailed.enabled`: the Detailed pictures switch on the AI and models page. On unless turned off. */
+export function householdDetailedEnabled(): boolean {
+  try {
+    return getHouseholdSettingValue("generation.picture_detailed.enabled") !== false;
+  } catch {
+    return true;
+  }
+}
+
 /** Which adapter audiences this person may use right now. Adult-only needs an allowed adult on a written, own-screen turn and the household not restricting them; everyone else gets only all-ages (and in practice nothing, since a person who may not make pictures never reaches this). */
 export function adapterAudiencesFor(input: PictureAudience): Array<"all-ages" | "adult-only"> {
   if (!picturesAllowed(input)) return [];

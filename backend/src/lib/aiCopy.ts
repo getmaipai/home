@@ -9,7 +9,7 @@ interface SpecCard { label: string; group?: string; groups?: string[]; view?: st
 interface SpecKey { key: string; label: string; copy?: { does?: string; options?: Record<string, string> } }
 
 const GROUPS: Record<AiJobId, string> = {
-  chat: "household.ai_chat", pictures: "household.ai_pictures", videos: "household.ai_videos",
+  chat: "household.ai_chat", pictures: "household.ai_pictures", picturesdetailed: "household.ai_pictures", videos: "household.ai_videos",
   music: "household.ai_music", voice: "household.ai_voice", wakeword: "household.ai_wakeword", coding: "household.ai_coding",
 };
 const QUALITY_KEYS: Record<string, string> = { pictures: "generation.picture_quality", videos: "generation.video_quality" };

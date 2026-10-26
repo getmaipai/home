@@ -15,7 +15,7 @@
 // SHA-256 below was computed locally against the file this session
 // actually downloaded and verified, not copied from a third-party
 // listing.
-import { existsSync } from "node:fs";
+import { existsSync, rmSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { downloadUrl } from "@/lib/modelDownload";
 import { wakewordDir } from "@/lib/paths";
@@ -27,6 +27,8 @@ export interface WakewordAsset {
   file: string;
   url: string;
   sha256: string;
+  /** The pinned file's size in bytes, shown on the AI and models page before and after the download. */
+  bytes: number;
 }
 
 // Shared by every detector - required before any wake-word inference can
@@ -36,11 +38,13 @@ export const WAKEWORD_SHARED_ASSETS: WakewordAsset[] = [
     file: "melspectrogram.onnx",
     url: `${OWW_RELEASE_BASE}/melspectrogram.onnx`,
     sha256: "ba2b0e0f8b7b875369a2c89cb13360ff53bac436f2895cced9f479fa65eb176",
+    bytes: 1_087_958,
   },
   {
     file: "embedding_model.onnx",
     url: `${OWW_RELEASE_BASE}/embedding_model.onnx`,
     sha256: "70d164290c1d095d1d4ee149bc5e00543250a7316b59f31d056cff7bd3075c1",
+    bytes: 1_326_578,
   },
 ];
 
@@ -50,6 +54,7 @@ export const WAKEWORD_STOCK_DETECTOR: WakewordAsset = {
   file: "hey_jarvis_v0.1.onnx",
   url: `${OWW_RELEASE_BASE}/hey_jarvis_v0.1.onnx`,
   sha256: "94a13cfe60075b132f6a472e7e462e8123ee70861bc3fb58434a73712ee0d2c",
+  bytes: 1_271_370,
 };
 
 export const WAKEWORD_ALL_ASSETS: WakewordAsset[] = [...WAKEWORD_SHARED_ASSETS, WAKEWORD_STOCK_DETECTOR];
@@ -86,3 +91,17 @@ export const ensureWakewordAssets = singleflight(async (): Promise<void> => {
     await downloadUrl(asset.url, wakewordAssetPath(asset.file), { expectedSha256: asset.sha256 });
   }
 });
+
+/** The wake word files as the AI and models page lists them: whether all are on this computer and how much room they take. */
+export function wakewordAssetState(): { installed: boolean; bytes: number } {
+  const bytes = WAKEWORD_ALL_ASSETS.reduce((total, asset) => {
+    try { return total + statSync(wakewordAssetPath(asset.file)).size; } catch { return total + asset.bytes; }
+  }, 0);
+  return { installed: areWakewordAssetsInstalled(), bytes };
+}
+
+/** Removes the pinned wake word files. The next request that needs them downloads them again (ensureWakewordAssets), and
+ * listening stays governed by the per-device adult opt-in, which this never touches. */
+export function removeWakewordAssets(): void {
+  for (const asset of WAKEWORD_ALL_ASSETS) rmSync(wakewordAssetPath(asset.file), { force: true });
+}

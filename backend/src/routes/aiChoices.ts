@@ -16,6 +16,7 @@ import { findUnused, plainPartName, qualified, whyKept, type UnusedInput } from 
 import { installStackComponent, listStackComponents, StackComponentError, uninstallStackComponent, type StackComponent, type StackComponentList } from "@/lib/stackComponents";
 import { previewPlan } from "@/lib/installActions";
 import { recordedLevel, shippedPlanForLevel } from "@/lib/diskPlan";
+import { ensureWakewordAssets, removeWakewordAssets, wakewordAssetState } from "@/lib/wakewordAssets";
 import { getHouseholdSettingValue, setHouseholdSettingValue } from "@/lib/settings";
 import { resetInstallStatusCache } from "@/lib/installStatus";
 import { dropPictureStatusCache } from "@/lib/pictures/ready";
@@ -24,9 +25,9 @@ import { dropMusicStatusCache } from "@/lib/music/ready";
 
 export const aiChoicesRoutes = apiRouter();
 
-const JOBS = ["chat", "pictures", "videos", "music", "voice", "wakeword", "coding"] as const;
+const JOBS = ["chat", "pictures", "picturesdetailed", "videos", "music", "voice", "wakeword", "coding"] as const;
 type JobId = (typeof JOBS)[number];
-const JOB_WORDS: Record<JobId, string> = { chat: "Chat", pictures: "Pictures", videos: "Videos", music: "Music", voice: "Voice", wakeword: "Wake word", coding: "Coding" };
+const JOB_WORDS: Record<JobId, string> = { chat: "Chat", pictures: "Quick pictures", picturesdetailed: "Detailed pictures", videos: "Videos", music: "Music", voice: "Voice", wakeword: "Wake word", coding: "Coding" };
 
 // The state every route reads: the disk plan, the Stack's component list and the three household settings
 // the cards are built from.
@@ -39,7 +40,7 @@ interface AiState {
 }
 
 function choicesInput(state: AiState): AiChoicesInput {
-  return { copy: aiCopy, plan: state.plan, components: state.components, settings: state.settings, freeBytes: state.freeBytes };
+  return { copy: aiCopy, plan: state.plan, components: state.components, settings: state.settings, freeBytes: state.freeBytes, wakeword: wakewordAssetState() };
 }
 
 function unusedInput(state: AiState): UnusedInput {
@@ -54,11 +55,13 @@ async function loadPlan(): Promise<DiskPlan> {
 }
 
 function readSettings(): AiChoicesInput["settings"] {
-  const picture = getHouseholdSettingValue("generation.picture_quality");
+  const quickModel = getHouseholdSettingValue("generation.picture_quick_model");
+  const detailed = getHouseholdSettingValue("generation.picture_detailed.enabled");
   const video = getHouseholdSettingValue("generation.video_quality");
   const music = getHouseholdSettingValue("generation.music.enabled");
   return {
-    pictureQuality: picture === "detailed" ? "detailed" : "quick",
+    pictureQuickModel: quickModel === "klein" ? "klein" : "ernie",
+    pictureDetailedEnabled: typeof detailed === "boolean" ? detailed : true,
     videoQuality: video === "detailed" ? "detailed" : "quick",
     musicEnabled: typeof music === "boolean" ? music : true,
   };
@@ -135,6 +138,9 @@ function keptMessage(name: string, reason: string): string {
       return `${name} cannot be removed right now, so it was kept.`;
   }
 }
+
+const WAKEWORD_CHOICE = "wakeword.detector";
+const SETTING_ONLY_SWITCHES: Record<string, string> = { "music.make": "generation.music.enabled", "picturesdetailed.zimage": "generation.picture_detailed.enabled" };
 
 const SettingRefSchema = z.object({ key: z.string(), value: z.unknown() }).nullable();
 const ChoiceSchema = z.object({
@@ -225,6 +231,12 @@ aiChoicesRoutes.openapi(chooseRoute, async (c) => {
     const { cards } = buildAiCards(choicesInput(state));
     const choice = cards.find((card) => card.id === (job as JobId))?.choices.find((item) => item.id === choiceId);
     if (!choice) return c.json({ error: `There is no choice called "${choiceId}" on this computer.`, code: "unknown_choice" }, 404);
+    if (choice.id === WAKEWORD_CHOICE) {
+      // The wake word files are the hub's own pinned downloads, not Stack parts: a few megabytes, fetched or removed here.
+      // Listening stays off until an adult turns it on for a device; nothing here touches that.
+      if (choice.action === "get") { await ensureWakewordAssets(); return c.json({ ok: true as const, started: [], removed: [] }, 200); }
+      if (choice.action === "remove") { removeWakewordAssets(); return c.json({ ok: true as const, started: [], removed: [choice.id] }, 200); }
+    }
     if (choice.action === "get") {
       // Download first, then the setting: a choice is never set to something that is missing.
       const started: string[] = [];
@@ -246,9 +258,9 @@ aiChoicesRoutes.openapi(chooseRoute, async (c) => {
       return c.json({ ok: true as const, started: [], removed: [] }, 200);
     }
     if (choice.action === "remove") {
-      // A person turned their own switch off (music): it stays on the computer, only the setting changes.
-      if (choice.id === "music.make") {
-        const error = writeSetting("generation.music.enabled", false);
+      // A person turned their own switch off (music, Detailed pictures): it stays on the computer, only the setting changes.
+      if (choice.id in SETTING_ONLY_SWITCHES) {
+        const error = writeSetting(SETTING_ONLY_SWITCHES[choice.id]!, false);
         if (error) return c.json({ error: error.error, code: "setting" }, error.status) as never;
         return c.json({ ok: true as const, started: [], removed: [] }, 200);
       }

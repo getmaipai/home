@@ -9,7 +9,7 @@ import { GIB, freeGb, needGb, sizeGb, type DiskPlan, type DiskRow, type DiskTota
 
 const TIERS = table.tiers as Record<DiskPlan["tier"], DiskPlan>;
 const TIERS_LIST = ["p16", "p32", "p64", "p128"] as const;
-const SETTINGS: AiSettingsInput = { pictureQuality: "quick", videoQuality: "quick", musicEnabled: false };
+const SETTINGS: AiSettingsInput = { pictureQuickModel: "ernie", pictureDetailedEnabled: true, videoQuality: "quick", musicEnabled: false };
 
 const kindIsModel = (id: string): boolean => !id.startsWith("engine:") && id !== "home";
 function row(id: string, overrides: Partial<DiskRow> = {}): DiskRow {
@@ -42,11 +42,11 @@ function component(overrides: Partial<AiComponentLike> & { id: string }): AiComp
   };
 }
 
-test("builds the seven job cards in order on every tier p16 to p128 from shared/diskPlan.json", () => {
+test("builds the eight job cards in order on every tier p16 to p128 from shared/diskPlan.json", () => {
   for (const tier of TIERS_LIST) {
     const plan = TIERS[tier];
     const result = buildAiCards({ copy, plan, components: null, settings: SETTINGS, freeBytes: null });
-    expect(result.cards.map((card) => card.id)).toEqual(["chat", "pictures", "videos", "music", "voice", "wakeword", "coding"]);
+    expect(result.cards.map((card) => card.id)).toEqual(["chat", "pictures", "picturesdetailed", "videos", "music", "voice", "wakeword", "coding"]);
     for (const card of result.cards) {
       if (card.choices.length === 0) {
         expect(card.unavailable).not.toBeNull();
@@ -76,33 +76,60 @@ test("exactly one recommended radio per radio card on every tier", () => {
   }
 });
 
-test("pictures: Quick is the ERNIE row when present and Klein when absent", () => {
+test("pictures: Quick offers ERNIE and Klein as radios, and Klein alone when ERNIE is absent", () => {
   const withErnie = buildAiCards({ copy, plan: TIERS.p128, components: null, settings: SETTINGS, freeBytes: null });
   const picturesA = withErnie.cards.find((card) => card.id === "pictures")!;
-  const quickA = picturesA.choices.find((choice) => choice.id === "pictures.quick")!;
-  expect(quickA.rowIds[0]).toBe("pictures-ernie");
+  const ernie = picturesA.choices.find((choice) => choice.id === "pictures.ernie")!;
+  const klein = picturesA.choices.find((choice) => choice.id === "pictures.klein")!;
+  expect(ernie.rowIds[0]).toBe("pictures-ernie");
+  expect(klein.rowIds[0]).toBe("pictures");
+  expect(ernie.setting).toEqual({ key: "generation.picture_quick_model", value: "ernie" });
+  expect(klein.setting).toEqual({ key: "generation.picture_quick_model", value: "klein" });
+  expect(ernie.current).toBe(true);
+  expect(klein.current).toBe(false);
   expect(picturesA.choices.some((choice) => choice.id === "pictures.edit")).toBe(true);
 
   const withoutErnie: DiskPlan = { ...TIERS.p128, rows: TIERS.p128.rows.filter((candidate) => candidate.id !== "pictures-ernie") };
   const picturesB = buildAiCards({ copy, plan: withoutErnie, components: null, settings: SETTINGS, freeBytes: null }).cards.find((card) => card.id === "pictures")!;
-  const quickB = picturesB.choices.find((choice) => choice.id === "pictures.quick")!;
-  expect(quickB.rowIds[0]).toBe("pictures");
+  expect(picturesB.choices.some((choice) => choice.id === "pictures.ernie")).toBe(false);
+  expect(picturesB.choices.find((choice) => choice.id === "pictures.klein")!.current).toBe(true);
   expect(picturesB.choices.some((choice) => choice.id === "pictures.edit")).toBe(false);
 });
 
-test("pictures: current follows generation.picture_quality; detailed with no Z-Image row counts as quick", () => {
-  const quick = buildAiCards({ copy, plan: TIERS.p128, components: null, settings: { ...SETTINGS, pictureQuality: "quick" }, freeBytes: null }).cards.find((card) => card.id === "pictures")!;
-  expect(quick.choices.find((choice) => choice.id === "pictures.quick")!.current).toBe(true);
-  expect(quick.choices.find((choice) => choice.id === "pictures.detailed")!.current).toBe(false);
+test("pictures: the Quick model current follows generation.picture_quick_model", () => {
+  const klein = buildAiCards({ copy, plan: TIERS.p128, components: null, settings: { ...SETTINGS, pictureQuickModel: "klein" }, freeBytes: null }).cards.find((card) => card.id === "pictures")!;
+  expect(klein.choices.find((choice) => choice.id === "pictures.klein")!.current).toBe(true);
+  expect(klein.choices.find((choice) => choice.id === "pictures.ernie")!.current).toBe(false);
+});
 
-  const detailed = buildAiCards({ copy, plan: TIERS.p128, components: null, settings: { ...SETTINGS, pictureQuality: "detailed" }, freeBytes: null }).cards.find((card) => card.id === "pictures")!;
-  expect(detailed.choices.find((choice) => choice.id === "pictures.detailed")!.current).toBe(true);
-  expect(detailed.choices.find((choice) => choice.id === "pictures.quick")!.current).toBe(false);
+test("Detailed pictures is its own switch row, on only when enabled and installed, with its own setting", () => {
+  const card = (settings: AiSettingsInput, components: AiComponentLike[] | null) => buildAiCards({ copy, plan: TIERS.p128, components, settings, freeBytes: null }).cards.find((c) => c.id === "picturesdetailed")!;
+  const on = card(SETTINGS, null).choices[0]!;
+  expect(on.id).toBe("picturesdetailed.zimage");
+  expect(on.kind).toBe("switch");
+  expect(on.setting).toEqual({ key: "generation.picture_detailed.enabled", value: true });
+  const installed = TIERS.p128.rows.find((candidate) => candidate.id === "pictures-zimage")!.model_ids.map((id) => component({ id, state: "installed" }));
+  expect(card(SETTINGS, installed).choices[0]!.current).toBe(true);
+  expect(card({ ...SETTINGS, pictureDetailedEnabled: false }, installed).choices[0]!.current).toBe(false);
 
   const noZImage: DiskPlan = { ...TIERS.p128, rows: TIERS.p128.rows.filter((candidate) => candidate.id !== "pictures-zimage") };
-  const fallback = buildAiCards({ copy, plan: noZImage, components: null, settings: { ...SETTINGS, pictureQuality: "detailed" }, freeBytes: null }).cards.find((card) => card.id === "pictures")!;
-  expect(fallback.choices.find((choice) => choice.id === "pictures.quick")!.current).toBe(true);
-  expect(fallback.choices.find((choice) => choice.id === "pictures.detailed")).toBeUndefined();
+  const gone = buildAiCards({ copy, plan: noZImage, components: null, settings: SETTINGS, freeBytes: null }).cards.find((c) => c.id === "picturesdetailed")!;
+  expect(gone.choices).toEqual([]);
+});
+
+test("wake word lists the stock detector as a switch that follows its files, and is not offered without the reading", () => {
+  const card = (wakeword: { installed: boolean; bytes: number } | null) => buildAiCards({ copy, plan: TIERS.p128, components: null, settings: SETTINGS, freeBytes: null, wakeword }).cards.find((c) => c.id === "wakeword")!;
+  const installed = card({ installed: true, bytes: 3_685_906 });
+  expect(installed.choices.map((choice) => choice.id)).toEqual(["wakeword.detector"]);
+  expect(installed.choices[0]!.kind).toBe("switch");
+  expect(installed.choices[0]!.current).toBe(true);
+  expect(installed.choices[0]!.state).toBe("installed");
+  expect(installed.choices[0]!.setting).toBeNull();
+  const missing = card({ installed: false, bytes: 3_685_906 });
+  expect(missing.choices[0]!.current).toBe(false);
+  expect(missing.choices[0]!.state).toBe("notInstalled");
+  expect(missing.choices[0]!.downloadBytes).toBe(3_685_906);
+  expect(card(null).choices).toEqual([]);
 });
 
 test("a chosen but not installed Detailed reads Chosen, not ready and notReady", () => {
@@ -121,12 +148,12 @@ test("a chosen but not installed Detailed reads Chosen, not ready and notReady",
   expect(detailed.stateText).toBe(`Not installed, ${sizeGb(74 * GIB)}`);
 });
 
-test("no label, name, description, stateText, chip or blockedReason contains a model name or MB", () => {
+test("no description, stateText, chip or blockedReason contains a model name or MB", () => {
   const banned = /\b(FLUX|Klein|ERNIE|Z-Image|Wan|LTX|Qwen|Chatterbox|Pocket|MB)\b/i;
   for (const tier of TIERS_LIST) {
     const { cards } = buildAiCards({
       copy, plan: TIERS[tier], components: null,
-      settings: { pictureQuality: "detailed", videoQuality: "detailed", musicEnabled: true },
+      settings: { pictureQuickModel: "klein", pictureDetailedEnabled: true, videoQuality: "detailed", musicEnabled: true },
       freeBytes: 1 * GIB,
     });
     for (const card of cards) {
@@ -134,7 +161,8 @@ test("no label, name, description, stateText, chip or blockedReason contains a m
       expect(card.chip.match(banned)).toBeNull();
       expect(card.chip).not.toContain("\"");
       for (const choice of card.choices) {
-        for (const word of [choice.label, choice.name, choice.description, choice.stateText, choice.blockedReason]) {
+        // A row is named by its model (the glance shows the name the person chose); the sentences around it stay plain.
+        for (const word of [choice.description, choice.stateText, choice.blockedReason]) {
           if (word === null) continue;
           expect(word.match(banned), `${tier} ${card.id} ${choice.id}: ${word}`).toBeNull();
           expect(word, `${tier} ${card.id} ${choice.id}`).not.toContain("\"");
@@ -267,7 +295,7 @@ test("the plan, components and settings inputs are not mutated", () => {
   deepFreeze(plan);
   const components: AiComponentLike[] = [component({ id: "some-model", state: "installed" })];
   deepFreeze(components);
-  const settings: AiSettingsInput = { pictureQuality: "detailed", videoQuality: "detailed", musicEnabled: true };
+  const settings: AiSettingsInput = { pictureQuickModel: "klein", pictureDetailedEnabled: true, videoQuality: "detailed", musicEnabled: true };
   deepFreeze(settings);
   const input = { copy, plan: plan as DiskPlan, components, settings, freeBytes: 90 * GIB };
   expect(() => {
@@ -276,7 +304,7 @@ test("the plan, components and settings inputs are not mutated", () => {
   }).not.toThrow();
 });
 
-test("every choice carries a marked RAM estimate, and wake word has no rows so it reads not offered", () => {
+test("every choice carries a marked RAM estimate, and wake word is not offered without its file reading", () => {
   const result = buildAiCards({ copy, plan: TIERS[TIERS_LIST[0]!], components: null, settings: SETTINGS, freeBytes: null });
   const wake = result.cards.find((card) => card.id === "wakeword")!;
   expect(wake.choices).toEqual([]);

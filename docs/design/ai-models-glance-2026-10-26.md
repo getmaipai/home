@@ -145,3 +145,14 @@ The setup wizard step (AIMODELS-SETUP-01) reuses the rows later. Stack-unreachab
   Button, the staged Memory and Storage segment uses the orange hue, and an unavailable model shows as the amber banner plus the
   row's download arrow, with no amber row. "View device" links to the Engines tab.
 - Overview stays on the AI page; Engines, Advanced and Coding are unchanged. The Models tab parts moved to Advanced (section 6).
+
+### Quick, Detailed and Wake word rows (2026-10-26, spec-v0.1.242)
+
+- **Eight jobs.** Quick pictures and Detailed pictures are separate rows. Quick is a radio choice between ERNIE and FLUX.2 Klein
+  (`generation.picture_quick_model`, default ERNIE). Detailed is Z-Image Turbo with its own switch and gear
+  (`generation.picture_detailed.enabled`, default on). Off is setting-only: the model stays installed, chat then makes Quick
+  pictures with the `detailed_off` note, and Free up space lists it as "turned off". `generation.picture_quality` stays the
+  household default that chat can override per picture.
+- **Wake word lists the model.** The row is the stock openWakeWord "hey jarvis" detector plus its two shared feature models
+  (`wakewordAssets.ts`, pinned and sha256-checked). On installs the files, Off removes them, and the next use downloads them
+  again. Listening stays default-off and needs the per-device adult opt-in (`voice.wakeword.enabled`); the row never touches it.

@@ -2,9 +2,9 @@
 // state until Apply) and the Memory and Storage projections are derived here from /api/ai/choices, so the page only draws them.
 import type { AiCard, AiChoice, AiJobId } from "../../../../shared/aiChoices";
 
-export const JOB_ORDER: AiJobId[] = ["chat", "pictures", "videos", "music", "voice", "wakeword", "coding"];
+export const JOB_ORDER: AiJobId[] = ["chat", "pictures", "picturesdetailed", "videos", "music", "voice", "wakeword", "coding"];
 /** The engine role whose `engines.<role>.choice` key is the job's On/Off switch (`off` or `auto`). */
-export const ENGINE_ROLE: Record<AiJobId, string> = { chat: "chat", pictures: "image", videos: "video", music: "music", voice: "tts", wakeword: "wakeword", coding: "coding" };
+export const ENGINE_ROLE: Record<AiJobId, string> = { chat: "chat", pictures: "image", picturesdetailed: "image", videos: "video", music: "music", voice: "tts", wakeword: "wakeword", coding: "coding" };
 export const OFF = "__off";
 
 /** One staged change for a job: the model picked in the dialog and/or the switch flipped. Nothing is written until Apply. */
@@ -14,7 +14,7 @@ export type Badge = "custom" | "recommended" | "disabled";
 
 export interface GlanceRow {
   job: AiJobId; title: string; summary: string;
-  /** False when this computer has no model for the job (Wake word today). */
+  /** False when this computer has no model for the job. */
   offered: boolean;
   options: AiChoice[];
   live: AiChoice | null; liveEnabled: boolean;

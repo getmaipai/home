@@ -92,6 +92,15 @@ describe("chooseQuality", () => {
     expect(chooseQuality({ engine: { models: [{ ...ERNIE, available: false }] }, household: "quick" })).toEqual({ quality: "quick", note: null, announce: false });
     expect(chooseQuality({ engine: { models: [{ ...ERNIE, installed: false }] }, household: "quick" })).toEqual({ quality: "quick", note: null, announce: false });
   });
+  test("a household that picked Klein as the Quick model leaves Quick unnamed even when ERNIE is ready", () => {
+    setHouseholdSettingValue("generation.picture_quick_model", "klein");
+    expect(chooseQuality({ engine: { models: [KLEIN, ERNIE, ZIMAGE] }, household: "quick" })).toEqual({ quality: "quick", note: null, announce: false });
+  });
+  test("Detailed switched off answers Quick with the detailed_off note even when Z-Image is ready", () => {
+    setHouseholdSettingValue("generation.picture_detailed.enabled", false);
+    expect(chooseQuality({ engine: withZ, household: "detailed" })).toEqual({ quality: "quick", note: "detailed_off", announce: false });
+    expect(chooseQuality({ requested: "detailed", engine: withZ, household: "quick" })).toEqual({ quality: "quick", note: "detailed_off", announce: false });
+  });
   test("model ids map to the two person-facing qualities", () => {
     expect(qualityOfModel(ERNIE_MODEL)).toBe("quick");
     expect(qualityOfModel(QUICK_MODEL)).toBe("quick");

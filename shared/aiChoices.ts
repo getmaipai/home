@@ -7,15 +7,17 @@
 
 import { sizeGb, needGb, freeGb, selectionTotals, type DiskPlan, type DiskRow } from "./diskPlanMath";
 
-export type AiJobId = "chat" | "pictures" | "videos" | "music" | "voice" | "wakeword" | "coding";
+export type AiJobId = "chat" | "pictures" | "picturesdetailed" | "videos" | "music" | "voice" | "wakeword" | "coding";
 export interface AiComponentLike { id: string; label: string; state: "installed"|"installing"|"notInstalled"|"failed"; size_bytes: number|null; download_bytes: number; requirement: "required"|"optional"|"unsupported"; requirement_reason: string|null; percent: number|null; job: string|null; failure: string|null; can_install: boolean; can_uninstall: boolean; last_used_at: string|null; used_by: string[] }
-export interface AiSettingsInput { pictureQuality: "quick"|"detailed"; videoQuality: "quick"|"detailed"; musicEnabled: boolean }
+export interface AiSettingsInput { pictureQuickModel: "ernie"|"klein"; pictureDetailedEnabled: boolean; videoQuality: "quick"|"detailed"; musicEnabled: boolean }
 /** The words of the cards, read from the spec's card and key copy (rule S5): this file holds none of its own. */
 export interface AiCopy {
   card(job: AiJobId): { title: string; summary: string };
   choice(id: string): { label: string; description: string };
 }
-export interface AiChoicesInput { copy: AiCopy; plan: DiskPlan; components: AiComponentLike[] | null; settings: AiSettingsInput; freeBytes: number | null }
+/** The stock wake word detector and the two files it shares: not Stack components, so the hub reads them from its own disk. */
+export interface AiWakewordInput { installed: boolean; bytes: number }
+export interface AiChoicesInput { copy: AiCopy; plan: DiskPlan; components: AiComponentLike[] | null; settings: AiSettingsInput; freeBytes: number | null; wakeword?: AiWakewordInput | null }
 export interface AiChoice {
   id: string;
   job: AiJobId; kind: "radio" | "switch" | "fixed";
@@ -45,12 +47,13 @@ export interface AiRecommendedPlan {
   text: string;
 }
 
-type AiCopyKey = "chat.standard" | "chat.mlx" | "chat.pictures" | "pictures.quick" | "pictures.detailed" | "pictures.edit" | "pictures.tools" | "pictures.look" | "videos.quick" | "videos.detailed" | "music.make" | "voice.standard" | "voice.better" | "coding.helper";
+type AiCopyKey = "chat.standard" | "chat.mlx" | "chat.pictures" | "pictures.ernie" | "pictures.klein" | "pictures.edit" | "picturesdetailed.zimage" | "wakeword.detector" | "pictures.tools" | "pictures.look" | "videos.quick" | "videos.detailed" | "music.make" | "voice.standard" | "voice.better" | "coding.helper";
 
 // The rows each job card draws.
 const CARDS: Array<{ id: AiJobId; rows: string[] }> = [
   { id: "chat", rows: ["chat", "chat-mlx", "reads-pictures"] },
-  { id: "pictures", rows: ["pictures", "pictures-ernie", "pictures-zimage", "image-tools", "tool-look"] },
+  { id: "pictures", rows: ["pictures", "pictures-ernie", "image-tools", "tool-look"] },
+  { id: "picturesdetailed", rows: ["pictures-zimage"] },
   { id: "videos", rows: ["video", "video-detailed"] },
   { id: "music", rows: ["music"] },
   { id: "voice", rows: ["voice", "voice-better"] },
@@ -181,40 +184,45 @@ function chipFor(card: { id: AiJobId; rows: string[] }, present: boolean, choice
   switch (card.id) {
     case "chat":
       return "Using Standard";
-    case "pictures":
+    case "pictures": {
+      const current = choices.find((choice) => choice.kind === "radio" && choice.current);
+      if (!current) return choices.some((choice) => choice.state === "installed") ? "On" : "Off";
+      return current.state === "installed" ? `Using ${current.label}` : "Chosen, not ready";
+    }
     case "videos": {
       const current = choices.find((choice) => choice.kind === "radio" && choice.current);
       if (!current) return choices.some((choice) => choice.state === "installed") ? "On" : "Off";
       if (current.state !== "installed") return "Chosen, not ready";
-      const quickId = card.id === "pictures" ? "pictures.quick" : "videos.quick";
-      return current.id === quickId ? "Using Quick" : "Using Detailed";
+      return current.id === "videos.quick" ? "Using Quick" : "Using Detailed";
     }
     case "wakeword":
-      return "Not on this computer";
-    case "voice": {
-      const better = choices.find((choice) => choice.id === "voice.better");
-      if (better && better.current) return better.state === "installed" ? "Using Better" : "Chosen, not ready";
-      return "Using Standard";
-    }
+    case "picturesdetailed":
     case "music":
     case "coding": {
       const toggle = choices.find((choice) => choice.kind === "switch");
       if (!toggle || !toggle.current) return "Off";
       return toggle.state === "installed" ? "On" : "Chosen, not ready";
     }
+    case "voice": {
+      const better = choices.find((choice) => choice.id === "voice.better");
+      if (better && better.current) return better.state === "installed" ? "Using Better" : "Chosen, not ready";
+      return "Using Standard";
+    }
   }
 }
 
 export function buildAiCards(input: AiChoicesInput): AiChoicesResult {
-  const { components, settings, freeBytes, copy } = input;
+  const { components, settings, freeBytes, copy, wakeword } = input;
   const plan = withLiveInstalled(input.plan, components);
   const rows = byRowId(plan);
+  // The wake word files are not in the disk plan; a row stands in for them so the card reads like every other.
+  if (wakeword) rows.set("wakeword-detector", { id: "wakeword-detector", label: "Hey Jarvis wake word", note: "", kind: "model", need: "optional", selectable: true, download_bytes: wakeword.bytes, installed_bytes: wakeword.bytes, peak_temp_bytes: 0, model_ids: [], engines: [], installed: wakeword.installed, basis: "pins" });
   const has = (id: string): boolean => rows.has(id);
   const need = (id: string): DiskNeedLike => rows.get(id)?.need ?? "optional";
 
   const cards: AiCard[] = [];
   for (const meta of CARDS) {
-    const present = meta.rows.some((id) => has(id));
+    const present = meta.id === "wakeword" ? wakeword != null : meta.rows.some((id) => has(id));
     const words = copy.card(meta.id);
     if (!present) {
       cards.push({ id: meta.id, title: words.title, summary: words.summary, chip: "Not on this computer", choices: [], notReady: false, unavailable: `${words.title} is not on this computer. It needs more memory.` });
@@ -229,14 +237,23 @@ export function buildAiCards(input: AiChoicesInput): AiChoicesResult {
         break;
       }
       case "pictures": {
-        const quickRowId = has("pictures-ernie") ? "pictures-ernie" : has("pictures") ? "pictures" : null;
-        const hasDetailed = has("pictures-zimage");
-        const preferDetailed = settings.pictureQuality === "detailed" && hasDetailed;
-        if (quickRowId) specs.push({ id: "pictures.quick", job: "pictures", kind: "radio", row: rows.get(quickRowId)!, current: !preferDetailed, recommended: true, setting: { key: "generation.picture_quality", value: "quick" } });
-        if (hasDetailed) specs.push({ id: "pictures.detailed", job: "pictures", kind: "radio", row: rows.get("pictures-zimage")!, current: preferDetailed, recommended: quickRowId === null, setting: { key: "generation.picture_quality", value: "detailed" } });
-        if (has("pictures") && quickRowId === "pictures-ernie") specs.push({ id: "pictures.edit", job: "pictures", kind: "fixed", row: rows.get("pictures")!, current: true, recommended: false, setting: null });
+        const hasErnie = has("pictures-ernie");
+        const hasKlein = has("pictures");
+        const ernieChosen = hasErnie && settings.pictureQuickModel === "ernie";
+        const quickKey = "generation.picture_quick_model";
+        if (hasErnie) specs.push({ id: "pictures.ernie", job: "pictures", kind: "radio", row: rows.get("pictures-ernie")!, current: ernieChosen, recommended: true, setting: { key: quickKey, value: "ernie" } });
+        if (hasKlein) specs.push({ id: "pictures.klein", job: "pictures", kind: "radio", row: rows.get("pictures")!, current: !ernieChosen, recommended: !hasErnie, setting: { key: quickKey, value: "klein" } });
+        if (hasKlein && hasErnie) specs.push({ id: "pictures.edit", job: "pictures", kind: "fixed", row: rows.get("pictures")!, current: true, recommended: false, setting: null });
         if (has("image-tools")) specs.push({ id: "pictures.tools", job: "pictures", kind: "switch", row: rows.get("image-tools")!, current: rowIsInstalled(rows.get("image-tools")!, components), recommended: need("image-tools") === "recommended", setting: null });
         if (has("tool-look")) specs.push({ id: "pictures.look", job: "pictures", kind: "switch", row: rows.get("tool-look")!, current: rowIsInstalled(rows.get("tool-look")!, components), recommended: need("tool-look") === "recommended", setting: null });
+        break;
+      }
+      case "picturesdetailed": {
+        if (has("pictures-zimage")) specs.push({ id: "picturesdetailed.zimage", job: "picturesdetailed", kind: "switch", row: rows.get("pictures-zimage")!, current: settings.pictureDetailedEnabled && rowIsInstalled(rows.get("pictures-zimage")!, components), recommended: need("pictures-zimage") === "recommended", setting: { key: "generation.picture_detailed.enabled", value: true } });
+        break;
+      }
+      case "wakeword": {
+        if (wakeword) specs.push({ id: "wakeword.detector", job: "wakeword", kind: "switch", row: rows.get("wakeword-detector")!, current: wakeword.installed, recommended: true, setting: null });
         break;
       }
       case "videos": {
