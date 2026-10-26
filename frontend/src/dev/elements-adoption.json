@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-10-26T02:22:32.019Z",
+  "generatedAt": "2026-10-26T02:53:26.536Z",
   "kitTag": "ui-v0.5.351",
   "items": [
     {
@@ -494,7 +494,7 @@
       "group": "creation",
       "verdict": "later",
       "verdictReason": "Home has no creation, share or visibility flow yet; defer until a Home screen needs it, then adopt without a Home-side wrapper.",
-      "implemented": false
+      "implemented": true
     },
     {
       "file": "data-table.tsx",
@@ -1194,7 +1194,7 @@
       "group": "share",
       "verdict": "later",
       "verdictReason": "Home has no creation, share or visibility flow yet; defer until a Home screen needs it, then adopt without a Home-side wrapper.",
-      "implemented": false
+      "implemented": true
     },
     {
       "file": "shared-conversation.tsx",
