@@ -1,5 +1,7 @@
 # Pictures, videos and styles that look like a household adult (2026-10-17)
 
+> **Superseded in part (Owner-approved: 2026-10-25):** [models-censor-app-protects-kids-2026-10-25.md](models-censor-app-protects-kids-2026-10-25.md) retires the adult-side limits described here: the per-person agreement (already retired by LIKENESS-SIMPLIFY-01) and the public-figure and outside-person bars.
+
 Owner's ruling, 2026-10-17 (Jesse, in the session that closed VIDEO-GEN-12's open question): an adult may make a video, a picture
 or a likeness style (LoRA) of a consenting household adult. This note is the design of that, built the same day. It changes
 SAFETY.md's line "no feature is built whose purpose is generating imagery of identifiable real people" to name this one exception

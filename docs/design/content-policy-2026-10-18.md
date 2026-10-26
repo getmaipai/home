@@ -1,5 +1,7 @@
 # One content-protection definition per person
 
+> **Superseded in part (Owner-approved: 2026-10-25):** [models-censor-app-protects-kids-2026-10-25.md](models-censor-app-protects-kids-2026-10-25.md) retires the adult-side limits described here: the adult absolute lines for real people and the real-voice song limit; the child and teen floors stand.
+
 Design only, 2026-10-18. Owner goal: set protections once for chat, search, pictures, videos and songs.
 Architect verdict: proposed: APPROVED-WITH-CONDITIONS; architect agent has not ruled.
 All six slices require independent review because they touch minors. No lane opens on this note alone.

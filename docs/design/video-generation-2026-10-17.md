@@ -1,5 +1,7 @@
 # Video generation: the model, the runtime, the policy (2026-10-17)
 
+> **Superseded in part (Owner-approved: 2026-10-25):** [models-censor-app-protects-kids-2026-10-25.md](models-censor-app-protects-kids-2026-10-25.md) retires the adult-side limit stated here (no non-consensual imagery of a real, identifiable person; for an adult the model decides); the minor line and every child and teen floor stand.
+
 Owner approval, 2026-10-17: "make your owner decisions, you have all approvals from me. Determine what video gen we should use and add it
 to the app and chat. Fast generation with high quality. Ideally LoRA support from the community." Correction the same night: adults get
 adult-only LoRAs; only the absolute lines no setting can lift stay (section 7). This note is part 1 of the pipeline (research, bench,

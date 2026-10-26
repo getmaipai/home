@@ -1,5 +1,7 @@
 # Companion characters as pregenerated video (2026-10-21)
 
+> **Superseded in part (Owner-approved: 2026-10-25):** [models-censor-app-protects-kids-2026-10-25.md](models-censor-app-protects-kids-2026-10-25.md) retires the adult-side limit stated here (no non-consensual imagery of a real, identifiable person; for an adult the model decides); the minor line and every child and teen floor stand.
+
 Owner ask (Jesse, chat, 2026-10-21): companions become animated characters shown as **pregenerated video**, not animated live. Our own video
 tool makes the clips. Every screen state of the companion (thinking, speaking and so on) needs a **template**. The background should be
 transparent if that is practical. The character must be **the same character in every clip** (same species, colour, nose, build). A

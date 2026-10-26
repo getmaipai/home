@@ -1,5 +1,7 @@
 # Image engine: the pick, the runtime, LoRAs and generative edits (2026-10-17)
 
+> **Superseded in part (Owner-approved: 2026-10-25):** [models-censor-app-protects-kids-2026-10-25.md](models-censor-app-protects-kids-2026-10-25.md) retires the adult-side limits stated here (no non-consensual imagery of a real, identifiable person, and an uploaded photo is never undressed or sexualised; for an adult the model decides); the minor line and every child and teen floor stand.
+
 Status: decision record for the engine half, written from a real bench on the Studio. The person-facing half (who may make what, the
 gallery, provenance, settings keys, the architect's earlier verdict) is [image-generation-2026-10-17.md](image-generation-2026-10-17.md); where the two
 meet, that note's names win (`adapter` records with `audience`, `generation.enabled`), and this note's slices are its engine side. Nothing is built yet; the rows are in `docs/BACKLOG.md` under

@@ -1,5 +1,7 @@
 # Music generation: songs made and edited in chat (2026-10-17)
 
+> **Superseded in part (Owner-approved: 2026-10-25):** [models-censor-app-protects-kids-2026-10-25.md](models-censor-app-protects-kids-2026-10-25.md) retires the adult-side limit stated here (the real-voice song clause); the minor line and every child and teen floor stand.
+
 Owner scope, 2026-10-17 (relayed by the coordinator): "build it into chat first, the same way image generation and editing work. A
 person asks in chat to create a song (words or lyrics, style, mood, length) and can then edit it conversationally (make it slower,
 change the chorus lyrics, swap the vocals for instrumental, extend it, make a version in a different genre, cut or trim, fade,

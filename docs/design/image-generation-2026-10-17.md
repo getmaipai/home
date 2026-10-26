@@ -1,5 +1,7 @@
 # Pictures people make: image generation and editing in Home (2026-10-17)
 
+> **Superseded in part (Owner-approved: 2026-10-25):** [models-censor-app-protects-kids-2026-10-25.md](models-censor-app-protects-kids-2026-10-25.md) retires the adult-side limit stated here (no non-consensual imagery of a real, identifiable person; for an adult the model decides); the minor line and every child and teen floor stand.
+
 Design note, written in the 2026-10-17 design audit. The engine side (runtimes, candidate models, the licence bar, the
 ComfyUI sidecar, consent for household people) is decided in [the hub on Apple silicon](../plans/hub-on-apple-silicon-2026-09-17.md)
 sections 2, 6 and 7 and the MEDIA-HOST and CHAT-MEDIA rows. The image editor tools (background removal, inpainting,

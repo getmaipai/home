@@ -1,5 +1,7 @@
 # Editing pictures in chat and in the editor (2026-10-17)
 
+> **Superseded in part (Owner-approved: 2026-10-25):** [models-censor-app-protects-kids-2026-10-25.md](models-censor-app-protects-kids-2026-10-25.md) retires the adult-side limit stated here (sexual content of a real person and a photo of a real person becoming adult content); the minor line and every child and teen floor stand.
+
 Owner request (Jesse, 2026-10-17): real picture editing, in chat and in the editor. "Remove person X from the picture", "add this person
 to the picture", "make the sky not cloudy", and the like (another background, the colour of an object, add or remove an object, fix the
 light). This note records what existed, what was measured, the method picked for each task and the safety rules. It builds on
