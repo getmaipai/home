@@ -61811,6 +61811,24 @@
                             "default": null,
                             "description": "Plain text, never HTML. Passes the band check with the title before band_ok includes child."
                           },
+                          "lyrics": {
+                            "nullable": true,
+                            "description": "Lyrics are null when unavailable, or plain text without HTML. Text passes the same band check as description with the title before band_ok includes child."
+                          },
+                          "locked_fields": {
+                            "type": "array",
+                            "items": {
+                              "type": "string",
+                              "enum": [
+                                "title",
+                                "description",
+                                "artist",
+                                "artwork"
+                              ]
+                            },
+                            "default": [],
+                            "description": "A rescan updates every field except these; an edit adds the field name here."
+                          },
                           "source_id": {
                             "type": "string",
                             "pattern": "^msrc-[a-z0-9]{6,}$",
@@ -62404,7 +62422,7 @@
                           "provenance": {
                             "type": "string",
                             "minLength": 1,
-                            "description": "Who wrote it: `hub:scan`, `hub:fetch`, `hub:feed`."
+                            "description": "Who wrote it: `hub:scan`, `hub:fetch`, `hub:feed` or `hub:edit`."
                           }
                         },
                         "required": [
@@ -62538,6 +62556,24 @@
                           ],
                           "default": null,
                           "description": "Plain text, never HTML. Passes the band check with the title before band_ok includes child."
+                        },
+                        "lyrics": {
+                          "nullable": true,
+                          "description": "Lyrics are null when unavailable, or plain text without HTML. Text passes the same band check as description with the title before band_ok includes child."
+                        },
+                        "locked_fields": {
+                          "type": "array",
+                          "items": {
+                            "type": "string",
+                            "enum": [
+                              "title",
+                              "description",
+                              "artist",
+                              "artwork"
+                            ]
+                          },
+                          "default": [],
+                          "description": "A rescan updates every field except these; an edit adds the field name here."
                         },
                         "source_id": {
                           "type": "string",
@@ -63132,7 +63168,7 @@
                         "provenance": {
                           "type": "string",
                           "minLength": 1,
-                          "description": "Who wrote it: `hub:scan`, `hub:fetch`, `hub:feed`."
+                          "description": "Who wrote it: `hub:scan`, `hub:fetch`, `hub:feed` or `hub:edit`."
                         }
                       },
                       "required": [
@@ -63213,6 +63249,24 @@
                             ],
                             "default": null,
                             "description": "Plain text, never HTML. Passes the band check with the title before band_ok includes child."
+                          },
+                          "lyrics": {
+                            "nullable": true,
+                            "description": "Lyrics are null when unavailable, or plain text without HTML. Text passes the same band check as description with the title before band_ok includes child."
+                          },
+                          "locked_fields": {
+                            "type": "array",
+                            "items": {
+                              "type": "string",
+                              "enum": [
+                                "title",
+                                "description",
+                                "artist",
+                                "artwork"
+                              ]
+                            },
+                            "default": [],
+                            "description": "A rescan updates every field except these; an edit adds the field name here."
                           },
                           "source_id": {
                             "type": "string",
@@ -63807,7 +63861,7 @@
                           "provenance": {
                             "type": "string",
                             "minLength": 1,
-                            "description": "Who wrote it: `hub:scan`, `hub:fetch`, `hub:feed`."
+                            "description": "Who wrote it: `hub:scan`, `hub:fetch`, `hub:feed` or `hub:edit`."
                           }
                         },
                         "required": [
@@ -63891,6 +63945,24 @@
                             "default": null,
                             "description": "Plain text, never HTML. Passes the band check with the title before band_ok includes child."
                           },
+                          "lyrics": {
+                            "nullable": true,
+                            "description": "Lyrics are null when unavailable, or plain text without HTML. Text passes the same band check as description with the title before band_ok includes child."
+                          },
+                          "locked_fields": {
+                            "type": "array",
+                            "items": {
+                              "type": "string",
+                              "enum": [
+                                "title",
+                                "description",
+                                "artist",
+                                "artwork"
+                              ]
+                            },
+                            "default": [],
+                            "description": "A rescan updates every field except these; an edit adds the field name here."
+                          },
                           "source_id": {
                             "type": "string",
                             "pattern": "^msrc-[a-z0-9]{6,}$",
@@ -64484,7 +64556,7 @@
                           "provenance": {
                             "type": "string",
                             "minLength": 1,
-                            "description": "Who wrote it: `hub:scan`, `hub:fetch`, `hub:feed`."
+                            "description": "Who wrote it: `hub:scan`, `hub:fetch`, `hub:feed` or `hub:edit`."
                           }
                         },
                         "required": [
@@ -64645,6 +64717,24 @@
                       ],
                       "default": null,
                       "description": "Plain text, never HTML. Passes the band check with the title before band_ok includes child."
+                    },
+                    "lyrics": {
+                      "nullable": true,
+                      "description": "Lyrics are null when unavailable, or plain text without HTML. Text passes the same band check as description with the title before band_ok includes child."
+                    },
+                    "locked_fields": {
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "enum": [
+                          "title",
+                          "description",
+                          "artist",
+                          "artwork"
+                        ]
+                      },
+                      "default": [],
+                      "description": "A rescan updates every field except these; an edit adds the field name here."
                     },
                     "source_id": {
                       "type": "string",
@@ -65239,7 +65329,7 @@
                     "provenance": {
                       "type": "string",
                       "minLength": 1,
-                      "description": "Who wrote it: `hub:scan`, `hub:fetch`, `hub:feed`."
+                      "description": "Who wrote it: `hub:scan`, `hub:fetch`, `hub:feed` or `hub:edit`."
                     }
                   },
                   "required": [
