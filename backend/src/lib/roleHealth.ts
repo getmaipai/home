@@ -71,7 +71,7 @@ export async function roleHealth(role: HealthRole, opts: { live?: boolean } = {}
     if (role === "chat" && state === "installed" && warmupInFlight()) return { availability: "starting", reason: null, ...status };
     if (state === "ready" || state === "installed") return { availability: "ready", reason: null, ...status };
     if (state === "loaded") return { availability: row.state.reason === STACK_IDLE_REASON ? "ready" : "starting", reason: null, ...status };
-    return { availability: "unavailable", reason: row.state.reason ?? row.reason ?? "failed_start", ...(state === "notInstalled" ? { cause: "not_installed" as const } : /memory/i.test(row.state.reason ?? "") ? { cause: "memory" as const } : {}) };
+    return { availability: "unavailable", reason: row.state.reason ?? row.reason ?? "failed_start", ...(row.plain_reason ? { detail: row.plain_reason } : {}), ...(state === "notInstalled" ? { cause: "not_installed" as const } : /memory/i.test(row.state.reason ?? "") ? { cause: "memory" as const } : {}) };
   } catch {
     return { availability: "unavailable", reason: "stack_unreachable", cause: "restarting" };
   }

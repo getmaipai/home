@@ -9,7 +9,7 @@ import { chatContextStatus, roleHealth, __setChatWindowContextForTests, chatWind
 beforeEach(() => resetDb());
 afterEach(() => { __resetStackEngineForTests(); __setChatWindowContextForTests(undefined); });
 
-function client(roles: Array<{ id: string; state: { state: string; reason?: string | null }; reason?: string | null }>, fail = false) {
+function client(roles: Array<{ id: string; state: { state: string; reason?: string | null }; reason?: string | null; plain_reason?: string | null }>, fail = false) {
   __setStackClientForTests({ roles: async () => { if (fail) throw new Error("offline"); return { roles }; } } as never);
 }
 
@@ -34,6 +34,15 @@ describe("roleHealth", () => {
     setHouseholdSettingValue("engines.stack.url", "http://127.0.0.1:8770");
     client([{ id: "chat", state: { state: "offline", reason: "model crashed" }, reason: "model crashed" }]);
     expect(await roleHealth("chat")).toMatchObject({ availability: "unavailable", reason: "model crashed" });
+  });
+
+  test("a classified plain cause from the Stack becomes detail; raw reasons never do", async () => {
+    setHouseholdSettingValue("engines.stack.url", "http://127.0.0.1:8770");
+    const plain = "The Mac's graphics compiler is not responding. Restart the Mac, then chat starts again on its own.";
+    client([{ id: "chat", state: { state: "offline", reason: "raw engine text" }, reason: "raw engine text", plain_reason: plain }]);
+    expect(await roleHealth("chat")).toMatchObject({ availability: "unavailable", detail: plain });
+    client([{ id: "chat", state: { state: "offline", reason: "raw engine text" }, reason: "raw engine text", plain_reason: null }]);
+    expect((await roleHealth("chat")) as Record<string, unknown>).not.toHaveProperty("detail");
   });
 
   test("Stack fetch failure makes owned roles unavailable with stack unreachable reason", async () => {

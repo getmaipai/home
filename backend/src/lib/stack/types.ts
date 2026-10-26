@@ -178,6 +178,8 @@ export interface RoleInfo extends ChatRoleContext {
   /** VISION-02b: the most tokens one picture takes in the chat process
    * (its declared --image-max-tokens); null or absent when it reads none. */
   picture_tokens_max?: number | null;
+  /** A classified plain sentence for why the role is offline (Metal compiler, memory, host fault); null or absent for anything else, never raw engine text. */
+  plain_reason?: string | null;
   /** REG-02: the nonverbal tags the role's engine honors (`tts.tags`), tts role only; absent or empty means none. */
   tts?: { engine?: string; requested?: string; tags?: string[]; fallback_reason?: string | null };
   check: {
