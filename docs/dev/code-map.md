@@ -111,7 +111,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `frontend/src/apps/settings/MicrophoneSection.tsx` | MicrophoneSection |
 | `frontend/src/apps/settings/ModelsAndStorageSection.tsx` | sizeWords, lastUsedWords, ModelsAndStorageSection |
 | `frontend/src/apps/settings/ModelsSection.tsx` | ModelsSection, describeHardware |
-| `frontend/src/apps/settings/PicturesLibrary.tsx` | PicturesLibrary |
+| `frontend/src/apps/settings/PicturesLibrary.tsx` | LikenessAsks, PicturesLibrary |
 | `frontend/src/apps/settings/ReferenceLibrarySettings.tsx` | ReferenceLibrarySettings |
 | `frontend/src/apps/settings/RepairsSection.tsx` | RepairsSection |
 | `frontend/src/apps/settings/RobotBody.tsx` | bodyHealthText, didPutDownCountIncrease, RobotBody |
@@ -427,7 +427,8 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/licenceRepair.ts` | LICENCE_ISSUE, syncLicenceIssue |
 | `backend/src/lib/likeness/adapters.ts` | declareStyleSubject, getStyleSubject, allStyleSubjects, forgetStyleSubject, queueStyleRemoval, drainStyleRemovals |
 | `backend/src/lib/likeness/apply.ts` | MANY_PEOPLE_LINE, STYLE_REMOVED_LINE, subjectOfStyle, prepareStyleUse, prepareStylesUse, PHOTO_ADULT_LINE |
-| `backend/src/lib/likeness/decide.ts` | subjectName, ADULT_CONTENT_OTHER_SUBJECT_LINE, LIKENESS_LINES, HOUSEHOLD_LIKENESS_KEY, NO_ADULT_CONTENT_NEGATIVE, householdLikenessOn |
+| `backend/src/lib/likeness/ask.ts` | ASK_WAIT_MS, ASK_APPROVED_MS, ASK_COOLDOWN_MS, ASK_HOURLY_CAP, ASK_TEMPORARY_LINE, askOutcomeLine |
+| `backend/src/lib/likeness/decide.ts` | subjectName, ADULT_CONTENT_OTHER_SUBJECT_LINE, LIKENESS_LINES, HOUSEHOLD_LIKENESS_KEY, PER_USE_KEY, NO_ADULT_CONTENT_NEGATIVE |
 | `backend/src/lib/likeness/guard.ts` | stoppedLine, likenessStillAllowed |
 | `backend/src/lib/likeness/importStyle.ts` | NOBODY, LOOKS_LIKE_REQUIRED_LINE, checkStyleSubject, sha256Of, stackLikenessFields |
 | `backend/src/lib/likeness/inspector.ts` | __setPhotoCompletionForTests, __setPhotoInspectorForTests, inspectPhotoResult, inspectPhoto, PHOTO_LINES, singleAdultPhoto |

@@ -51931,6 +51931,11 @@
                     "stop_id": {
                       "type": "string",
                       "description": "The id to POST to /jobs/{id}/cancel to stop what is being made now."
+                    },
+                    "likeness_ask_id": {
+                      "type": "string",
+                      "nullable": true,
+                      "description": "When this picture is held for the pictured adult's consent, the ask to show on the card (GET /api/likeness/asks/{id}); otherwise null."
                     }
                   },
                   "required": [
@@ -51955,7 +51960,8 @@
                     "quality",
                     "switch_to",
                     "size",
-                    "stop_id"
+                    "stop_id",
+                    "likeness_ask_id"
                   ]
                 }
               }
@@ -52264,6 +52270,11 @@
                     "stop_id": {
                       "type": "string",
                       "description": "The id to POST to /jobs/{id}/cancel to stop what is being made now."
+                    },
+                    "likeness_ask_id": {
+                      "type": "string",
+                      "nullable": true,
+                      "description": "When this picture is held for the pictured adult's consent, the ask to show on the card (GET /api/likeness/asks/{id}); otherwise null."
                     }
                   },
                   "required": [
@@ -52288,7 +52299,8 @@
                     "quality",
                     "switch_to",
                     "size",
-                    "stop_id"
+                    "stop_id",
+                    "likeness_ask_id"
                   ]
                 }
               }
@@ -52565,6 +52577,11 @@
                     "stop_id": {
                       "type": "string",
                       "description": "The id to POST to /jobs/{id}/cancel to stop what is being made now."
+                    },
+                    "likeness_ask_id": {
+                      "type": "string",
+                      "nullable": true,
+                      "description": "When this picture is held for the pictured adult's consent, the ask to show on the card (GET /api/likeness/asks/{id}); otherwise null."
                     }
                   },
                   "required": [
@@ -52589,7 +52606,8 @@
                     "quality",
                     "switch_to",
                     "size",
-                    "stop_id"
+                    "stop_id",
+                    "likeness_ask_id"
                   ]
                 }
               }
@@ -52657,6 +52675,420 @@
           },
           "503": {
             "description": "The picture engine is not available",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/likeness/asks": {
+      "get": {
+        "tags": [
+          "Pictures"
+        ],
+        "summary": "Consent asks you are part of",
+        "responses": {
+          "200": {
+            "description": "Newest first. As the pictured adult every ask about you; as the requester only your own.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "asks": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string"
+                          },
+                          "state": {
+                            "type": "string",
+                            "enum": [
+                              "waiting",
+                              "approved",
+                              "declined",
+                              "expired",
+                              "consumed",
+                              "cancelled"
+                            ]
+                          },
+                          "medium": {
+                            "type": "string",
+                            "enum": [
+                              "picture",
+                              "video"
+                            ]
+                          },
+                          "count": {
+                            "type": "number"
+                          },
+                          "style_name": {
+                            "type": "string",
+                            "nullable": true
+                          },
+                          "requester_name": {
+                            "type": "string"
+                          },
+                          "subject_name": {
+                            "type": "string"
+                          },
+                          "prompt": {
+                            "type": "string",
+                            "nullable": true,
+                            "description": "The exact prompt Home will send, only while the ask is open."
+                          },
+                          "expires_at": {
+                            "type": "string",
+                            "nullable": true
+                          },
+                          "created_at": {
+                            "type": "string"
+                          },
+                          "decided_at": {
+                            "type": "string",
+                            "nullable": true
+                          },
+                          "as": {
+                            "type": "string",
+                            "enum": [
+                              "subject",
+                              "requester"
+                            ],
+                            "description": "Which side of the ask the reader is."
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "state",
+                          "medium",
+                          "count",
+                          "style_name",
+                          "requester_name",
+                          "subject_name",
+                          "prompt",
+                          "expires_at",
+                          "created_at",
+                          "decided_at",
+                          "as"
+                        ]
+                      }
+                    }
+                  },
+                  "required": [
+                    "asks"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/likeness/asks/{id}": {
+      "get": {
+        "tags": [
+          "Pictures"
+        ],
+        "summary": "One consent ask, for its card",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 64
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The ask.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    },
+                    "state": {
+                      "type": "string",
+                      "enum": [
+                        "waiting",
+                        "approved",
+                        "declined",
+                        "expired",
+                        "consumed",
+                        "cancelled"
+                      ]
+                    },
+                    "medium": {
+                      "type": "string",
+                      "enum": [
+                        "picture",
+                        "video"
+                      ]
+                    },
+                    "count": {
+                      "type": "number"
+                    },
+                    "style_name": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "requester_name": {
+                      "type": "string"
+                    },
+                    "subject_name": {
+                      "type": "string"
+                    },
+                    "prompt": {
+                      "type": "string",
+                      "nullable": true,
+                      "description": "The exact prompt Home will send, only while the ask is open."
+                    },
+                    "expires_at": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "created_at": {
+                      "type": "string"
+                    },
+                    "decided_at": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "as": {
+                      "type": "string",
+                      "enum": [
+                        "subject",
+                        "requester"
+                      ],
+                      "description": "Which side of the ask the reader is."
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "state",
+                    "medium",
+                    "count",
+                    "style_name",
+                    "requester_name",
+                    "subject_name",
+                    "prompt",
+                    "expires_at",
+                    "created_at",
+                    "decided_at",
+                    "as"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such ask for you",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/likeness/asks/{id}/decide": {
+      "post": {
+        "tags": [
+          "Pictures"
+        ],
+        "summary": "Consent to or decline one ask",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 64
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "decision": {
+                    "type": "string",
+                    "enum": [
+                      "consent",
+                      "decline"
+                    ]
+                  }
+                },
+                "required": [
+                  "decision"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The ask after the decision.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "state": {
+                      "type": "string",
+                      "enum": [
+                        "waiting",
+                        "approved",
+                        "declined",
+                        "expired",
+                        "consumed",
+                        "cancelled"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "state"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such ask for you",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The ask already ended",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/likeness/asks/{id}/cancel": {
+      "post": {
+        "tags": [
+          "Pictures"
+        ],
+        "summary": "Cancel your own waiting ask",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 64
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Cancelled.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "state": {
+                      "type": "string",
+                      "enum": [
+                        "cancelled"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "state"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such ask for you",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The ask already ended",
             "content": {
               "application/json": {
                 "schema": {
@@ -52857,6 +53289,11 @@
                             "type": "string",
                             "description": "One plain line for the card: what the engine is doing now."
                           },
+                          "likeness_ask_id": {
+                            "type": "string",
+                            "nullable": true,
+                            "description": "When this clip is held for the pictured adult's consent, the ask to show on the card (GET /api/likeness/asks/{id}); otherwise null."
+                          },
                           "position": {
                             "type": "number",
                             "nullable": true
@@ -52968,6 +53405,7 @@
                           "state",
                           "percent",
                           "label",
+                          "likeness_ask_id",
                           "position",
                           "eta_seconds",
                           "step",
@@ -53298,6 +53736,11 @@
                             "type": "string",
                             "description": "One plain line for the card: what the engine is doing now."
                           },
+                          "likeness_ask_id": {
+                            "type": "string",
+                            "nullable": true,
+                            "description": "When this clip is held for the pictured adult's consent, the ask to show on the card (GET /api/likeness/asks/{id}); otherwise null."
+                          },
                           "position": {
                             "type": "number",
                             "nullable": true
@@ -53409,6 +53852,7 @@
                           "state",
                           "percent",
                           "label",
+                          "likeness_ask_id",
                           "position",
                           "eta_seconds",
                           "step",
@@ -53583,6 +54027,11 @@
                             "type": "string",
                             "description": "One plain line for the card: what the engine is doing now."
                           },
+                          "likeness_ask_id": {
+                            "type": "string",
+                            "nullable": true,
+                            "description": "When this clip is held for the pictured adult's consent, the ask to show on the card (GET /api/likeness/asks/{id}); otherwise null."
+                          },
                           "position": {
                             "type": "number",
                             "nullable": true
@@ -53694,6 +54143,7 @@
                           "state",
                           "percent",
                           "label",
+                          "likeness_ask_id",
                           "position",
                           "eta_seconds",
                           "step",
@@ -53877,6 +54327,11 @@
                             "type": "string",
                             "description": "One plain line for the card: what the engine is doing now."
                           },
+                          "likeness_ask_id": {
+                            "type": "string",
+                            "nullable": true,
+                            "description": "When this clip is held for the pictured adult's consent, the ask to show on the card (GET /api/likeness/asks/{id}); otherwise null."
+                          },
                           "position": {
                             "type": "number",
                             "nullable": true
@@ -53988,6 +54443,7 @@
                           "state",
                           "percent",
                           "label",
+                          "likeness_ask_id",
                           "position",
                           "eta_seconds",
                           "step",
