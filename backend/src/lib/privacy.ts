@@ -199,7 +199,7 @@ export function platformConnections(): PrivacyConnection[] {
     // household has not turned it off. docs/THIRD-PARTY-SERVICES.md records its budget.
     row("platform:music-lyrics-lookup", getHouseholdSettingValue("music.lyrics_online") !== false ? "lrclib.net" : null, {
       when: "only when someone opens Lyrics on a song that has no words yet, never for a song made at home, never for a child, once per song, at most one request a second. Turn it off under Music settings.",
-      what: "the song's title, artist, album and length, plus your home's internet address. Nothing else anyone in the house said or saved: no name, account, cookie or listening history.",
+      what: "the song's title, artist, album and length, plus your home's internet address. Nothing anyone in the house said or saved is sent: no name, account, cookie or listening history.",
     }),
     row("platform:hosted-search", hostedSearchKey() ? HOSTED_SEARCH_HOST : null, {
       when: "when an adult asks something that needs a web search, and only while a Brave Search key is saved under Household, Integrations. Never for a child or teen.",
