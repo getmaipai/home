@@ -131,22 +131,10 @@ export function AiGlance({ card }: SettingsViewProps) {
         {missing.length > 0 ? <Button type="button" disabled={download.isPending} onClick={() => download.mutate(missing)}>{fill(copy.download_missing ?? "", { count: missing.length })}</Button> : null}
       </header>
       {data.stack === "unreachable" ? <Alert variant="destructive"><AlertTitle>The AI engine isn't answering</AlertTitle><AlertDescription>{data.message ?? "Check that the engine is running, then try again."}</AlertDescription></Alert> : null}
-      {error ? <Alert variant="destructive"><AlertTitle>That did not work</AlertTitle><AlertDescription>{error}</AlertDescription></Alert> : null}
       {missing.length > 0 ? (
         <Alert variant="warning" data-testid="ai-missing">
           <AlertTitle>{fill(copy.missing_title ?? "", { count: missing.length })}</AlertTitle>
           <AlertDescription>{missing.map((row) => row.live?.label).join(", ")} · {sizeGb(missingBytes)}</AlertDescription>
-        </Alert>
-      ) : null}
-      {stagedCount > 0 ? (
-        <Alert data-testid="ai-staged">
-          <AlertTitle>{fill(copy.staged ?? "", { count: stagedCount })}</AlertTitle>
-          <AlertDescription>
-            <div className="flex gap-2">
-              <Button type="button" variant="outline" size="sm" onClick={() => setStaged({})}>{copy.discard}</Button>
-              <Button type="button" size="sm" disabled={apply.isPending} onClick={() => apply.mutate()}>{copy.apply}</Button>
-            </div>
-          </AlertDescription>
         </Alert>
       ) : null}
 
@@ -184,6 +172,20 @@ export function AiGlance({ card }: SettingsViewProps) {
       <Dialog open={editing !== null} onOpenChange={(open) => { if (!open) setEditing(null); }}>
         <DialogContent scroll="viewport">{editing ? <AiModelChoices key={editing.job} row={editing} copy={copy} onClose={() => setEditing(null)} onSave={stage} /> : null}</DialogContent>
       </Dialog>
+    <div className="sticky bottom-0 z-10 flex flex-col gap-2 bg-background pb-2" data-testid="ai-action-bar">
+      {error ? <Alert variant="destructive"><AlertTitle>That did not work</AlertTitle><AlertDescription>{error}</AlertDescription></Alert> : null}
+      {stagedCount > 0 ? (
+        <Alert data-testid="ai-staged">
+          <AlertTitle>{fill(copy.staged ?? "", { count: stagedCount })}</AlertTitle>
+          <AlertDescription>
+            <div className="flex gap-2">
+              <Button type="button" variant="outline" size="sm" onClick={() => setStaged({})}>{copy.discard}</Button>
+              <Button type="button" size="sm" disabled={apply.isPending} onClick={() => apply.mutate()}>{copy.apply}</Button>
+            </div>
+          </AlertDescription>
+        </Alert>
+      ) : null}
+    </div>
       <AlertDialog open={resetting !== null} onOpenChange={(open) => { if (!open) setResetting(null); }}>
         <AlertDialogContent>
           <AlertDialogHeader>
