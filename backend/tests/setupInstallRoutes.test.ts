@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { __resetStackEngineForTests, __setStackClientForTests } from "@/lib/stackEngine";
 import { resetInstallStatusCache } from "@/lib/installStatus";
+import { readAiSettings } from "@/lib/aiChoicesState";
 import { getMemoryAnswerGb, getSetupState } from "@/lib/setupState";
 import type { StackClient, StackInstallPlan } from "@/lib/stack/client";
 import { owner } from "./support/testAuth";
@@ -60,6 +61,31 @@ describe("setup install routes", () => {
     const response = await client.post("/api/setup/install", {});
     expect(response.status).toBe(409);
     expect((await response.json() as { error: string }).error).toMatch(/^This computer needs about \d+ GB free for the minimal setup; it has 5\.0 GB\. Free up space, or choose a smaller plan\.$/);
+  });
+
+  test("GET /api/setup/plan carries the job cards built from the disk plan, or none without one", async () => {
+    __setStackClientForTests(stack(async () => plan()));
+    const { client } = await owner();
+    const body = await (await client.get("/api/setup/plan")).json() as { wording: { disk?: unknown }; choices?: { cards: Array<{ id: string }> } | null };
+    if (body.wording.disk) expect(body.choices?.cards.map((card) => card.id)).toContain("chat");
+    else expect(body.choices ?? null).toBeNull();
+  });
+
+  test("POST /api/setup/install saves the card choices it was sent, and refuses a key that is not one", async () => {
+    __setStackClientForTests(stack(async () => plan()));
+    const client = new TestClient();
+    const refused = await client.post("/api/setup/install", { settings: { "auth.secret": "x" } });
+    expect(refused.status).toBe(409);
+    expect((await refused.json() as { error: string }).error).toMatch(/auth\.secret is not a choice setup can save/);
+    expect(getSetupState().steps.find((s) => s.id === "plan")?.status).not.toBe("done");
+    const before = readAiSettings();
+    expect(before.musicEnabled).toBe(true);
+    expect(before.videoQuality).toBe("quick");
+    const saved = await client.post("/api/setup/install", { settings: { "generation.music.enabled": false, "generation.video_quality": "detailed" } });
+    expect(saved.status).toBe(202);
+    const after = readAiSettings();
+    expect(after.musicEnabled).toBe(false);
+    expect(after.videoQuality).toBe("detailed");
   });
 
   test("POST /api/setup/install is closed once Home has an owner", async () => {

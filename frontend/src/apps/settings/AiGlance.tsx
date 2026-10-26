@@ -21,12 +21,11 @@ import { FreeUpSpaceDialog } from "@/apps/settings/FreeUpSpaceDialog";
 import { Dialog, DialogContent } from "@maipai/ui/src/ui/dialog";
 import { AiModelChoices } from "@/apps/settings/AiModelDialog";
 import { useAiChoices } from "@/apps/settings/useAiChoices";
-import { ENGINE_ROLE, JOB_ORDER, OFF, buildRows, counts, fill, missingRows, project, stageFor, type GlanceRow, type StagedMap } from "@/apps/settings/aiGlanceRows";
+import { ENGINE_ROLE, JOB_ICONS, JOB_ORDER, OFF, buildRows, counts, fill, missingRows, project, stageFor, type GlanceRow, type StagedMap } from "@/apps/settings/aiGlanceRows";
 import { sizeGb } from "../../../../shared/diskPlanMath";
 import type { AiJobId } from "../../../../shared/aiChoices";
 import type { SettingsViewProps } from "@/shell/pages/settings/settingsViews";
 
-const ICONS: Record<AiJobId, string> = { chat: "message-circle", pictures: "palette", picturesdetailed: "sparkles", videos: "film", music: "music", voice: "mic-vocal", wakeword: "ear", coding: "code" };
 const GB = 1_000_000_000;
 const messageOf = (error: unknown, fallback: string) => (error instanceof ApiError ? error.message : fallback);
 const delta = (bytes: number) => `${bytes < 0 ? "-" : "+"}${sizeGb(Math.abs(bytes))}`;
@@ -206,7 +205,7 @@ export function AiGlance({ card }: SettingsViewProps) {
 
 /** One row, drawn by a plain function so no Home component has a kit Item as its root (rule 9). */
 function glanceRow({ row, copy, onSwitch, onEdit, onReset, onDownload }: { row: GlanceRow; copy: Record<string, string>; onSwitch: (on: boolean) => void; onEdit: () => void; onReset: () => void; onDownload: () => void }) {
-  const Icon = getIcon(ICONS[row.job]);
+  const Icon = getIcon(JOB_ICONS[row.job]);
   const Reset = getIcon("rotate-ccw");
   const Gear = getIcon("settings");
   const Down = getIcon("download");

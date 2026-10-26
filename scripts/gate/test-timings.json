@@ -742,7 +742,6 @@
   "src/apps/setup/CheckGrid.test.tsx": 0,
   "src/apps/setup/checksFixtures.test.ts": 0,
   "src/apps/setup/HostTuneStep.test.tsx": 0.16,
-  "src/apps/setup/PlanDiskList.test.tsx": 0.34,
   "src/apps/setup/PlanStep.test.tsx": 0.06,
   "src/apps/setup/preview/bundle.test.ts": 7.81,
   "src/apps/setup/preview/validation.test.ts": 0,

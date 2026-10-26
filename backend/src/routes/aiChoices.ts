@@ -18,7 +18,8 @@ import { previewPlan } from "@/lib/installActions";
 import { recordedLevel, shippedPlanForLevel } from "@/lib/diskPlan";
 import { systemAvailableBytes } from "@/lib/resourceGovernor";
 import { ensureWakewordAssets, removeWakewordAssets, wakewordAssetState } from "@/lib/wakewordAssets";
-import { getHouseholdSettingValue, setHouseholdSettingValue } from "@/lib/settings";
+import { setHouseholdSettingValue } from "@/lib/settings";
+import { readAiSettings } from "@/lib/aiChoicesState";
 import { resetInstallStatusCache } from "@/lib/installStatus";
 import { dropPictureStatusCache } from "@/lib/pictures/ready";
 import { dropVideoStatusCache } from "@/lib/videos/ready";
@@ -55,22 +56,9 @@ async function loadPlan(): Promise<DiskPlan> {
   return preview.wording.disk?.plan ?? shippedPlanForLevel(recordedLevel());
 }
 
-function readSettings(): AiChoicesInput["settings"] {
-  const quickModel = getHouseholdSettingValue("generation.picture_quick_model");
-  const detailed = getHouseholdSettingValue("generation.picture_detailed.enabled");
-  const video = getHouseholdSettingValue("generation.video_quality");
-  const music = getHouseholdSettingValue("generation.music.enabled");
-  return {
-    pictureQuickModel: quickModel === "klein" ? "klein" : "ernie",
-    pictureDetailedEnabled: typeof detailed === "boolean" ? detailed : true,
-    videoQuality: video === "detailed" ? "detailed" : "quick",
-    musicEnabled: typeof music === "boolean" ? music : true,
-  };
-}
-
 async function loadAiState(): Promise<AiState> {
   const [plan, list] = await Promise.all([loadPlan(), listStackComponents()]);
-  return { plan, components: list.components, settings: readSettings(), freeBytes: list.free_disk_bytes, list };
+  return { plan, components: list.components, settings: readAiSettings(), freeBytes: list.free_disk_bytes, list };
 }
 
 // The Stack's refusal, passed through as its own sentence (routes/components.ts does the same mapping).
@@ -185,7 +173,7 @@ aiChoicesRoutes.openapi(choicesRoute, async (c) => {
   if (list === null) {
     return c.json({ stack: "unreachable" as const, message, tier: null, free_disk_bytes: null, installed_bytes: 0, cards: [], alwaysOn: { bytes: 0, rowIds: [] }, recommended: null, unused_bytes: 0, memory_available_bytes: null }, 200);
   }
-  const state: AiState = { plan: await loadPlan(), components: list.components, settings: readSettings(), freeBytes: list.free_disk_bytes, list };
+  const state: AiState = { plan: await loadPlan(), components: list.components, settings: readAiSettings(), freeBytes: list.free_disk_bytes, list };
   const { cards, alwaysOn } = buildAiCards(choicesInput(state));
   return c.json({
     stack: "ok" as const, message: null, tier: list.tier, free_disk_bytes: list.free_disk_bytes, installed_bytes: list.installed_bytes,

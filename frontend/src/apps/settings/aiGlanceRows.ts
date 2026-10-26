@@ -3,6 +3,8 @@
 import type { AiCard, AiChoice, AiJobId } from "../../../../shared/aiChoices";
 
 export const JOB_ORDER: AiJobId[] = ["chat", "pictures", "picturesdetailed", "videos", "music", "voice", "wakeword", "coding"];
+/** The icon name of each job, shared by Settings and the setup wizard. */
+export const JOB_ICONS: Record<AiJobId, string> = { chat: "message-circle", pictures: "palette", picturesdetailed: "sparkles", videos: "film", music: "music", voice: "mic-vocal", wakeword: "ear", coding: "code" };
 /** The engine role whose `engines.<role>.choice` key is the job's On/Off switch (`off` or `auto`). */
 export const ENGINE_ROLE: Record<AiJobId, string> = { chat: "chat", pictures: "image", picturesdetailed: "image", videos: "video", music: "music", voice: "tts", wakeword: "wakeword", coding: "coding" };
 export const OFF = "__off";

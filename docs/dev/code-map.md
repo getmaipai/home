@@ -131,7 +131,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `frontend/src/apps/setup/AwayFromHome.tsx` | AwayFromHome |
 | `frontend/src/apps/setup/CheckGrid.tsx` | visibleCheckRows, CheckGrid |
 | `frontend/src/apps/setup/HostTuneStep.tsx` | hostTuneFailure, useHostTuneSupported, HostTuneStep |
-| `frontend/src/apps/setup/PlanDiskList.tsx` | liveVerdict, PlanDiskList |
+| `frontend/src/apps/setup/PlanDiskSummary.tsx` | liveVerdict, PlanDiskSummary |
 | `frontend/src/apps/setup/PlanStep.tsx` | VRAM_CHOICES, PlanStep |
 | `frontend/src/apps/setup/SetupReviewPage.tsx` | SetupReviewPage |
 | `frontend/src/apps/setup/SetupWizard.tsx` | checksTitle, checksErrorMessage, checksSummary, renderSetupReviewScreen, SetupWizard |
@@ -247,6 +247,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 |---|---|
 | `backend/src/lib/access.ts` | isOwnerOrAdmin, canHaveTemporaryChat, rolesById, getPersonRole, canAccessPerson, listActivePeople |
 | `backend/src/lib/ageBand.ts` | speakerAgeBand |
+| `backend/src/lib/aiChoicesState.ts` | readAiSettings, SETUP_CHOICE_KEYS, setupCards |
 | `backend/src/lib/aiCopy.ts` | aiCopy |
 | `backend/src/lib/aiUnused.ts` | plainPartName, notUsedSince, whyKept, qualified, findUnused |
 | `backend/src/lib/allowance.ts` | dailyMinutesAllowed |

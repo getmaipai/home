@@ -1,14 +1,19 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { getIcon } from "@maipai/ui/src/icons";
 import { Alert, AlertDescription } from "@maipai/ui/src/ui/alert";
 import { Button } from "@maipai/ui/src/ui/button";
 import { Card, CardContent } from "@maipai/ui/src/dashboard/components/ui/card";
 import { RadioGroup, RadioGroupItem } from "@maipai/ui/src/dashboard/components/ui/radio-group";
-import { Field, FieldContent, FieldLabel } from "@maipai/ui/src/dashboard/components/ui/field";
-import { api, ApiError, type InstallStatusView, type PlanWording } from "@/lib/api";
+import { Field, FieldContent, FieldDescription, FieldLabel } from "@maipai/ui/src/dashboard/components/ui/field";
+import { Switch } from "@maipai/ui/src/ui/switch";
+import { Item, ItemActions, ItemContent, ItemDescription, ItemGroup, ItemMedia, ItemTitle } from "@maipai/ui/src/dashboard/components/ui/item";
+import { api, ApiError, type InstallStatusView, type PlanRead } from "@/lib/api";
 import { Checkbox } from "@maipai/ui/src/ui/checkbox";
 import type { PlanLicence } from "../../../../shared/licensedRows";
-import { liveVerdict, PlanDiskList } from "./PlanDiskList";
+import { sizeGb } from "../../../../shared/diskPlanMath";
+import { JOB_ICONS } from "@/apps/settings/aiGlanceRows";
+import { liveVerdict, PlanDiskSummary } from "./PlanDiskSummary";
+import { defaultPicks, selectedRows, settingsFor, setupJobs, type Picks, type SetupJob } from "./planChoices";
 
 /** Total graphics memory choices when Home cannot read it (GB). */
 const ErrorIcon = getIcon("circle-alert");
@@ -23,8 +28,8 @@ export interface PlanStepProps {
    * install from this screen and the person may go on without it. */
   onReady?: (ready: boolean) => void;
   /** Wizard uses the setup routes; Home settings uses the signed-in ones. */
-  readPlan?: (vramGb?: number) => Promise<{ wording: PlanWording; licences?: PlanLicence[] }>;
-  start?: (vramGb?: number, components?: string[], acceptedLicences?: string[]) => Promise<unknown>;
+  readPlan?: (vramGb?: number) => Promise<PlanRead>;
+  start?: (vramGb?: number, components?: string[], acceptedLicences?: string[], settings?: Record<string, string | boolean>) => Promise<unknown>;
   /** What the AI engine install is doing; the plan waits on it when this computer is installing the engine. */
   readInstall?: () => Promise<InstallStatusView>;
   /** Try the AI engine install again after it failed. */
@@ -36,7 +41,8 @@ export interface PlanStepProps {
  * it cannot be read, then start the downloads and go on at once. */
 export function PlanStep({ onInstalled, onReady, readPlan = api.setupPlan, start = api.setupInstall, readInstall = api.setupInstallStatus, retryEngine = api.setupEngineInstall, actionLabel = "Install and continue" }: PlanStepProps) {
   const [vram, setVram] = useState<number | undefined>();
-  const [wording, setWording] = useState<PlanWording | null>(null);
+  const [read, setRead] = useState<PlanRead | null>(null);
+  const wording = read?.wording ?? null;
   const [failed, setFailed] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -44,8 +50,8 @@ export function PlanStep({ onInstalled, onReady, readPlan = api.setupPlan, start
   const [notice, setNotice] = useState<string | null>(null);
   const [attempt, setAttempt] = useState(0);
   const [engine, setEngine] = useState<InstallStatusView | null>(null);
-  // The disk plan's rows left turned on (INSTALL-DISK-01): starts at the plan's defaults, changes with each checkbox, and the total and the disk check follow.
-  const [selected, setSelected] = useState<ReadonlySet<string>>(new Set());
+  // One pick per job card (AIMODELS-SETUP-01): starts at the plan's defaults; the rows to install, the total and the disk check follow it.
+  const [picks, setPicks] = useState<Picks>({});
   // Licensed rows (Detailed video): the notice is shown plainly and the install waits for the accept; unticking the row drops the need.
   const [licences, setLicences] = useState<PlanLicence[]>([]);
   const [accepted, setAccepted] = useState<ReadonlySet<string>>(new Set());
@@ -53,7 +59,7 @@ export function PlanStep({ onInstalled, onReady, readPlan = api.setupPlan, start
   useEffect(() => {
     let active = true;
     setFailed(false);
-    readPlan(vram).then((result) => { if (active) { setWording(result.wording); setLicences(result.licences ?? []); setSelected(new Set(result.wording.disk?.plan.default_selected ?? [])); } }).catch(() => { if (active) setFailed(true); });
+    readPlan(vram).then((result) => { if (active) { setRead(result); setLicences(result.licences ?? []); const plan = result.wording.disk?.plan; setPicks(plan && result.choices ? defaultPicks(setupJobs(result.choices.cards, plan), plan) : {}); } }).catch(() => { if (active) setFailed(true); });
     return () => { active = false; };
   }, [vram, attempt, readPlan]);
 
@@ -79,6 +85,8 @@ export function PlanStep({ onInstalled, onReady, readPlan = api.setupPlan, start
   // choosing anything: the engine was not answering, or the disk was short
   // and they have since freed space. Memory questions re-read on their own.
   const disk = wording?.disk ?? null;
+  const jobs = useMemo(() => (disk && read?.choices ? setupJobs(read.choices.cards, disk.plan) : []), [disk, read]);
+  const selected = useMemo<ReadonlySet<string>>(() => (disk ? (jobs.length > 0 ? selectedRows(jobs, disk.plan, picks) : new Set(disk.plan.default_selected)) : new Set()), [disk, jobs, picks]);
   // With a disk plan, the check follows the person's choice: turning off an extra can make a red check pass.
   const verdict = disk ? liveVerdict(disk, selected) : null;
   const diskShort = disk ? verdict!.state === "red" : !!wording?.diskLine;
@@ -99,7 +107,7 @@ export function PlanStep({ onInstalled, onReady, readPlan = api.setupPlan, start
   async function install() {
     setBusy(true); setError(null); setNotice(null);
     try {
-      const result = await (disk ? start(vram, [...selected], owed.map((licence) => licence.id)) : start(vram));
+      const result = await (disk ? start(vram, [...selected], owed.map((licence) => licence.id), settingsFor(jobs, picks)) : start(vram));
       const models = typeof result === "object" && result !== null && "models" in result && typeof result.models === "number" ? result.models : null;
       setNotice(models === 0 ? "Nothing to download: everything you ticked is already installed." : "Download started. Watch it in the bar at the top of this page; you can keep using Home while it finishes.");
       onInstalled();
@@ -129,7 +137,10 @@ export function PlanStep({ onInstalled, onReady, readPlan = api.setupPlan, start
           </RadioGroup>
         ) : null}
         {wording.gets.length ? <ul className="list-disc space-y-1 pl-5">{wording.gets.map((line) => <li key={line}>{line}</li>)}</ul> : null}
-        {disk ? <PlanDiskList disk={disk} selected={selected} onToggle={(id, on) => setSelected((current) => { const next = new Set(current); if (on) next.add(id); else next.delete(id); return next; })} /> : (
+        {disk ? <>
+          {jobs.length > 0 ? <ItemGroup variant="card" role="group" aria-label="What gets installed">{jobs.map((job) => jobItem(job, picks, (pick) => setPicks((current) => ({ ...current, [job.job]: pick })), disk.source === "stack"))}</ItemGroup> : null}
+          <PlanDiskSummary disk={disk} selected={selected} />
+        </> : (
           <>
             {wording.sizeLine ? <p>{wording.sizeLine}</p> : null}
             {wording.diskLine ? <Alert variant="destructive"><ErrorIcon /><AlertDescription>{wording.diskLine}</AlertDescription></Alert> : null}
@@ -142,7 +153,7 @@ export function PlanStep({ onInstalled, onReady, readPlan = api.setupPlan, start
               <ul className="list-disc space-y-1 pl-5">{licence.summary.map((line) => <li key={line}>{line}</li>)}</ul>
               <span className="block break-all">The full licence: {licence.url}</span>
               <Field orientation="horizontal"><Checkbox id={`licence-${licence.id}`} checked={accepted.has(licence.id)} onCheckedChange={(value) => setAccepted((current) => { const next = new Set(current); if (value === true) next.add(licence.id); else next.delete(licence.id); return next; })} /><FieldContent><FieldLabel htmlFor={`licence-${licence.id}`}>I have read it and I accept it</FieldLabel></FieldContent></Field>
-              <span className="block text-muted-foreground">Not for you? Untick the Detailed videos row above and nothing of it downloads.</span>
+              <span className="block text-muted-foreground">Not for you? Choose Quick videos, or turn Videos off, above and nothing of it downloads.</span>
             </AlertDescription>
           </Alert>
         ))}
@@ -150,7 +161,7 @@ export function PlanStep({ onInstalled, onReady, readPlan = api.setupPlan, start
           <p key={licence.id} className="text-muted-foreground" data-testid="plan-licence-info">{licence.name} comes with this part. You accepted its licence at the start; the terms are in Models and storage.</p>
         ))}
         {error ? <Alert variant="destructive"><ErrorIcon /><AlertDescription>{error}</AlertDescription></Alert> : null}
-        {canRecheck ? <Button type="button" variant="secondary" onClick={() => { setWording(null); setAttempt((n) => n + 1); }}>Check again</Button> : null}
+        {canRecheck ? <Button type="button" variant="secondary" onClick={() => { setRead(null); setAttempt((n) => n + 1); }}>Check again</Button> : null}
         {canInstall ? <Button type="button" size="lg" disabled={busy || unaccepted} onClick={() => void install()}>{actionLabel}</Button> : null}
         {canInstall && unaccepted ? <p className="text-muted-foreground" data-testid="plan-accept-hint">The button is waiting for you to accept the maker's licence above. Accept it, or untick that row, to go on.</p> : null}
         {notice ? <p role="status">{notice}</p> : null}
@@ -158,5 +169,34 @@ export function PlanStep({ onInstalled, onReady, readPlan = api.setupPlan, start
       </CardContent>
     </Card>
     </>
+  );
+}
+
+/** One job, drawn by a plain function so no Home component has a kit Item as its root (rule 9). */
+function jobItem(job: SetupJob, picks: Picks, onPick: (pick: { on: boolean; choiceId: string }) => void, missingOnly: boolean) {
+  const Icon = getIcon(JOB_ICONS[job.job]);
+  const pick = picks[job.job];
+  const chosen = job.options.find((option) => option.id === pick?.choiceId) ?? job.options[0]!;
+  const on = pick?.on ?? false;
+  const size = (option: SetupJob["options"][number]) => (missingOnly && option.state === "installed" ? "Installed" : sizeGb(option.installedBytes));
+  return (
+    <Item key={job.job} data-testid={`plan-job-${job.job}`}>
+      <ItemMedia variant="icon"><Icon /></ItemMedia>
+      <ItemContent>
+        <ItemTitle>{job.title}</ItemTitle>
+        <ItemDescription clamp={false}>{on ? `${chosen.label}. ${chosen.description}` : job.summary}</ItemDescription>
+        {job.options.length > 1 && on ? (
+          <RadioGroup value={chosen.id} onValueChange={(value) => onPick({ on: true, choiceId: value })} aria-label={`${job.title}: which one`}>
+            {job.options.map((option) => (
+              <Field key={option.id} orientation="horizontal"><RadioGroupItem value={option.id} id={`choice-${option.id}`} disabled={option.blockedReason !== null && option.state !== "installed"} /><FieldContent><FieldLabel htmlFor={`choice-${option.id}`}>{option.label}</FieldLabel><FieldDescription>{option.blockedReason ?? `${option.description} ${size(option)}.`}</FieldDescription></FieldContent></Field>
+            ))}
+          </RadioGroup>
+        ) : null}
+      </ItemContent>
+      <ItemActions>
+        {on ? <span className="text-base text-muted-foreground">{size(chosen)}</span> : null}
+        <Switch checked={on} disabled={job.required} onCheckedChange={(next) => onPick({ on: next, choiceId: chosen.id })} aria-label={`${job.title}: ${on ? "on" : "off"}`} />
+      </ItemActions>
+    </Item>
   );
 }
