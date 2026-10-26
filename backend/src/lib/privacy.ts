@@ -195,6 +195,12 @@ export function platformConnections(): PrivacyConnection[] {
       when: "only when Load News stories ahead of time is on and nobody is using MaiPai. Each item is tried once, at most one every 30 seconds for each site and 150 pages per site in 24 hours; story pictures follow the same pace. Home follows robots rules and pauses on the first block.",
       what: "a request for that story page and the site's robots rules, plus your home's internet address. Nothing anyone in the house said or saved is sent: no name, question, follow list, cookie or reading history. Background requests never ask the Internet Archive.",
     }),
+    // MEDIA-DETAIL-03: the single song lookup behind the player's Lyrics button, listed only while the
+    // household has not turned it off. docs/THIRD-PARTY-SERVICES.md records its budget.
+    row("platform:music-lyrics-lookup", getHouseholdSettingValue("music.lyrics_online") !== false ? "lrclib.net" : null, {
+      when: "only when someone opens Lyrics on a song that has no words yet, never for a song made at home, never for a child, once per song, at most one request a second. Turn it off under Music settings.",
+      what: "the song's title, artist, album and length, plus your home's internet address. Nothing else anyone in the house said or saved: no name, account, cookie or listening history.",
+    }),
     row("platform:hosted-search", hostedSearchKey() ? HOSTED_SEARCH_HOST : null, {
       when: "when an adult asks something that needs a web search, and only while a Brave Search key is saved under Household, Integrations. Never for a child or teen.",
       what: "the words searched, and your home's internet address. Nothing else anyone in the house said or saved.",

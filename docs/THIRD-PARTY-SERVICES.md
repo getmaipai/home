@@ -15,3 +15,13 @@ The scheduler offers one idle attempt each minute, below the allowed pace. It us
 Quiet mode starts at one hour and doubles after each failed scheduled probe, up to 24 hours, matching the shelf poller's backoff shape. A probe is a different, never-attempted eligible item; the blocked item is never retried in the background. Only a successful article clears the failure count. Foreground reading stays available through its existing guards. A child's sources and sentence gates are checked again at release. No follow list, reading history, name, cookie or question is sent to a publisher.
 
 The privacy table lists this traffic as `platform:news-full-text-prefetch` only while the setting and shelf are on. The setting help states the lifetime, pace and site limits.
+
+## MEDIA-DETAIL-03: song lyrics lookup
+
+The owner's exception of 2026-10-25 permits the Music app to look a single song up on lrclib.net. `music.lyrics_online` is a household switch, on by default. It permits no lookups for a child or for a song made at home, and only when a person opens Lyrics on a song that has no words yet.
+
+| Backlog row | Request | Lifetime limit | Pace | Site limit | Stop rule |
+|---|---|---|---|---|---|
+| MEDIA-DETAIL-03 | A song lookup on lrclib.net | One per song ever, hit or miss | One a second across the household | None beyond the pace | A refusal pauses lookups one hour, doubling to 24 hours; an answer clears it |
+
+The privacy table lists this traffic as `platform:music-lyrics-lookup` only while the setting is on.

@@ -10,6 +10,7 @@ import { hashSessionToken } from "@/lib/session";
 import "@/lib/media/podcastApp"; // registers the Podcasts data ids and item view with the shared host
 import "@/lib/media/musicApp"; // registers the Music lyrics fields with the shared host
 import { podcastRoutes } from "./podcastApp";
+import { lookupLyricsFor } from "@/lib/media/lyricsAction";
 import { musicPlaylistAction, startMusicQueue, coerceNumber, mediaAppAllowed, mediaAppData, saveProgress, setListed, setWatchlist, changeVideoCreationShare, changeMusicCreationShare, MEDIA_APP_IDS, type DataParams, type MediaAppId } from "@/lib/media/appHost";
 
 type Body = Record<string, unknown>;
@@ -58,6 +59,16 @@ export function createMediaAppRoutes(appId: MediaAppId) {
       return result.ok ? c.json(result.value as never, 200) : c.json({ error: result.error }, result.status as 400 | 403 | 404);
     });
   }
+
+  routes.post("/actions/lyrics", requireAuth, async (c, next) => {
+    const person = c.get("person");
+    if (appId !== "music" || !mediaAppAllowed(person, appId)) return next();
+    if (!appRouteAllowed(person, appId, "actions", "lyrics")) return next();
+    const body = await bodyOf(c.req.raw);
+    const id = typeof body.id === "string" ? body.id : typeof body.media_id === "string" ? body.media_id : "";
+    const result = await lookupLyricsFor(person, id);
+    return result.ok ? c.json(result.value as never, 200) : c.json({ error: result.error }, result.status);
+  });
 
   routes.post("/progress", requireAuth, async (c, next) => {
     const person = c.get("person");

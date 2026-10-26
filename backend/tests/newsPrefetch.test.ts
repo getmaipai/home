@@ -114,8 +114,11 @@ test("robots refusal never fetches a page, quiets the next item; a missing page 
 
 test("privacy lists background text only while the setting and shelf are on", () => {
   const row = () => platformConnections().find((entry) => entry.id === "platform:news-full-text-prefetch");
+  const lyricsRow = () => platformConnections().find((entry) => entry.id === "platform:music-lyrics-lookup");
   setHouseholdSettingValue("news.full_text_prefetch", false); expect(row()).toBeUndefined(); enabled(); expect(row()?.when).toContain("150 pages per site");
   setHouseholdSettingValue("news.shelf.enabled", false); expect(row()).toBeUndefined();
+  expect(lyricsRow()?.destination).toBe("lrclib.net"); expect(lyricsRow()?.when).toContain("at most one request a second");
+  setHouseholdSettingValue("music.lyrics_online", false); expect(lyricsRow()).toBeUndefined();
 });
 
 test("followed channels add stories beyond Today, unfollow removes them, stale items add nothing", async () => {
