@@ -4,6 +4,7 @@ import { cleanup, fireEvent, render, waitFor, within } from "@testing-library/re
 import table from "../../../../shared/diskPlan.json";
 import type { DiskPlan } from "../../../../shared/diskPlanMath";
 import { buildAiCards, type AiChoicesInput, type AiComponentLike } from "../../../../shared/aiChoices";
+import { aiCopy as copy } from "../../../../backend/src/lib/aiCopy";
 import { AiJobChoices } from "@/apps/settings/AiJobChoices";
 
 afterEach(cleanup);
@@ -19,14 +20,14 @@ function components(over: Record<string, Partial<AiComponentLike>> = {}): AiComp
   return plan.rows.filter((row) => row.kind === "model").flatMap((row) => row.model_ids.slice(0, 1).map((id) => part(id, { state: "installed", ...(over[row.id] ?? {}) })));
 }
 function cardOf(job: string, over: Record<string, Partial<AiComponentLike>> = {}, input: Partial<AiChoicesInput> = {}) {
-  return buildAiCards({ plan, components: components(over), settings, freeBytes: 800 * GIB, ...input }).cards.find((card) => card.id === job)!;
+  return buildAiCards({ copy, plan, components: components(over), settings, freeBytes: 800 * GIB, ...input }).cards.find((card) => card.id === job)!;
 }
 const MODEL_WORDS = /FLUX|Klein|ERNIE|Z-Image|Wan2|LTX|Qwen|Muse|Chatterbox|Pocket|ACE-Step|\bMB\b/;
 
 describe("a job card", () => {
   test("shows the title, the sentence, the chip and exactly one Recommended mark on a radio card", () => {
     const view = render(<AiJobChoices card={cardOf("pictures", { "pictures-zimage": { state: "notInstalled" } })} onAct={() => {}} />);
-    expect(view.getByRole("heading", { name: "Pictures" })).toBeTruthy();
+    expect(view.getByText("Pictures")).toBeTruthy();
     expect(view.getByText("Make pictures in chat and change the ones you have.")).toBeTruthy();
     expect(view.getByTestId("ai-chip-pictures").textContent).toBe("Using Quick");
     expect(view.getAllByText("Recommended").length).toBe(2); // Quick, and the Tools switch the plan recommends
@@ -65,7 +66,7 @@ describe("a job card", () => {
     const card = cardOf("pictures", { "pictures-zimage": { state: "notInstalled" } }, { settings: { ...settings, pictureQuality: "detailed" } });
     const view = render(<AiJobChoices card={card} onAct={() => {}} />);
     expect(view.getByTestId("ai-chip-pictures").textContent).toBe("Chosen, not ready");
-    expect(view.getByText("Detailed pictures is chosen, but it is not ready")).toBeTruthy();
+    expect(view.getByText("Detailed is chosen, but it is not ready")).toBeTruthy();
   });
 
   test("a choice this computer cannot hold stays visible, disabled, with the reason and the numbers", () => {
@@ -80,7 +81,7 @@ describe("a job card", () => {
   test("an installing choice shows its progress bar and no second action", () => {
     const card = cardOf("pictures", { "pictures-zimage": { state: "installing", percent: 40, job: "j1" } });
     const view = render(<AiJobChoices card={card} onAct={() => {}} />);
-    expect(view.getByRole("progressbar", { name: /Getting Detailed pictures/ })).toBeTruthy();
+    expect(view.getByRole("progressbar", { name: /Getting Detailed/ })).toBeTruthy();
     expect(within(view.getByTestId("ai-choice-pictures.detailed")).queryByRole("button")).toBeNull();
   });
 
@@ -113,14 +114,14 @@ describe("a job card", () => {
 
   test("a card with no rows on this computer says so plainly", () => {
     const small = (table as unknown as { tiers: Record<string, DiskPlan> }).tiers.p16!;
-    const card = buildAiCards({ plan: small, components: null, settings, freeBytes: 100 * GIB }).cards.find((c) => c.id === "videos")!;
+    const card = buildAiCards({ copy, plan: small, components: null, settings, freeBytes: 100 * GIB }).cards.find((c) => c.id === "videos")!;
     const view = render(<AiJobChoices card={card} onAct={() => {}} />);
     expect(view.getAllByText(/not on this computer/i).length).toBeGreaterThan(0);
     expect(view.queryByRole("radio")).toBeNull();
   });
 
   test("model names and MB figures appear only under Details", async () => {
-    for (const job of ["chat", "pictures", "videos", "music", "voice", "coding", "search"]) {
+    for (const job of ["chat", "pictures", "videos", "music", "voice", "coding"]) {
       const view = render(<AiJobChoices card={cardOf(job, { "pictures-zimage": { state: "notInstalled" } })} onAct={() => {}} />);
       expect(view.container.textContent ?? "").not.toMatch(MODEL_WORDS);
       const details = view.queryByRole("button", { name: "Details" });

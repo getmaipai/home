@@ -2,6 +2,7 @@
 import { expect, test } from "bun:test";
 import table from "../../shared/diskPlan.json";
 import type { DiskPlan, DiskRow } from "../../shared/diskPlanMath";
+import { aiCopy } from "@/lib/aiCopy";
 import { findUnused, whyKept, type UnusedComponent, type UnusedInput } from "@/lib/aiUnused";
 
 function part(overrides: Partial<UnusedComponent> & { id: string }): UnusedComponent {
@@ -22,7 +23,7 @@ function plan(rows: Array<Partial<DiskRow> & { id: string }>): DiskPlan {
 }
 
 function unusedInput(plan: DiskPlan, components: UnusedComponent[], settings?: { pictureQuality: "quick" | "detailed"; videoQuality: "quick" | "detailed"; musicEnabled: boolean }): UnusedInput {
-  return { plan, components, settings: settings ?? { pictureQuality: "quick", videoQuality: "quick", musicEnabled: false }, freeBytes: null };
+  return { copy: aiCopy, plan, components, settings: settings ?? { pictureQuality: "quick", videoQuality: "quick", musicEnabled: false }, freeBytes: null };
 }
 
 test("lists Detailed pictures when Quick is chosen and no style needs it", () => {
@@ -43,7 +44,7 @@ test("lists Detailed pictures when Quick is chosen and no style needs it", () =>
   expect(result.items[0]?.name).toBe("Detailed pictures");
   expect(result.items[0]?.reason).toBe("You use Quick pictures and no saved style needs this.");
   expect(result.items[0]?.lastUsedAt).toBe("2026-08-17T12:00:00Z");
-  expect(result.items[1]?.name).toBe("Music maker");
+  expect(result.items[1]?.name).toBe("Music");
   expect(result.items[1]?.reason).toBe("Not used since August.");
   expect(result.totalBytes).toBe(5000);
 });
@@ -191,11 +192,13 @@ test("does not mutate its input", () => {
   ]);
   const components = [part({ id: "ernie-m" }), part({ id: "zimage-m", last_used_at: "2026-08-17T12:00:00Z" })];
   const input = unusedInput(p, components);
-  const before = structuredClone(input);
+  const { copy: _copy, ...rest } = input;
+  const before = structuredClone(rest);
   findUnused(input);
   whyKept(input, "zimage-m");
   whyKept(input, "ernie-m");
-  expect(input).toEqual(before);
+  const { copy: _after, ...restAfter } = input;
+  expect(restAfter).toEqual(before);
 });
 
 test("real p128 plan with everything installed and Quick chosen: Detailed pictures and Detailed videos are unused, Klein and Always on are not", () => {

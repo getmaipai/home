@@ -44,7 +44,7 @@ and a proposed design; otherwise the household IP gets blocked.
 | [library-2026-10-18.md](library-2026-10-18.md) (with its clickable [mockup](assets/library-2026-10-18/index.html)) | new 2026-10-18, audit and design only; queued after music and the licence acknowledgement | BUG-LIBRARY-KEPT-01 and BUG-LIBRARY-SHARE-CHILD-01 first; LIBRARY-RETENTION-01, LIBRARY-DEDUP-01, LIBRARY-REVAMP-01 to -13 (Library revamp) |
 | [image-tools-2026-10-17.md](image-tools-2026-10-17.md) | current; Stack half landed | IMGTOOLS-01 to -09 |
 | [image-editing-2026-10-17.md](image-editing-2026-10-17.md) | current; built, live check open | IMGEDIT-01 to -06 |
-| [ai-models-simple-2026-10-25.md](ai-models-simple-2026-10-25.md) | current; designed, not built | none yet (slices in the note) |
+| [ai-models-simple-2026-10-25.md](ai-models-simple-2026-10-25.md) | current; page built 2026-10-26 | none yet (slices in the note) |
 | [image-model-bakeoff-2026-10-25.md](image-model-bakeoff-2026-10-25.md) | current; decided, not built | none yet (slices in section 6) |
 | [household-lists-reminders-2026-10-17.md](household-lists-reminders-2026-10-17.md) | new 2026-10-17, no code | HOUSEHOLD-01 to -04 (to be cut from the note; today the four bundled plugins and GENUI-05 in Skills and Intelligent UI answers) |
 | [smart-home-2026-10-17.md](smart-home-2026-10-17.md) | new 2026-10-17, no code | HOUSE-01 to -05 (to be cut; today the Integrations rows it supersedes) |

@@ -11,7 +11,8 @@ import { apiRouter, errorResponses } from "@/lib/openapi";
 import { requireRole } from "@/middleware/auth";
 import { buildAiCards, recommendedPlan, type AiChoicesInput, type AiChoice } from "../../../shared/aiChoices";
 import type { DiskPlan } from "../../../shared/diskPlanMath";
-import { findUnused, plainPartName, whyKept, type UnusedInput } from "@/lib/aiUnused";
+import { aiCopy } from "@/lib/aiCopy";
+import { findUnused, plainPartName, qualified, whyKept, type UnusedInput } from "@/lib/aiUnused";
 import { installStackComponent, listStackComponents, StackComponentError, uninstallStackComponent, type StackComponent, type StackComponentList } from "@/lib/stackComponents";
 import { previewPlan } from "@/lib/installActions";
 import { recordedLevel, shippedPlanForLevel } from "@/lib/diskPlan";
@@ -23,9 +24,9 @@ import { dropMusicStatusCache } from "@/lib/music/ready";
 
 export const aiChoicesRoutes = apiRouter();
 
-const JOBS = ["chat", "pictures", "videos", "music", "voice", "coding", "search"] as const;
+const JOBS = ["chat", "pictures", "videos", "music", "voice", "coding"] as const;
 type JobId = (typeof JOBS)[number];
-const JOB_WORDS: Record<JobId, string> = { chat: "Chat", pictures: "Pictures", videos: "Videos", music: "Music", voice: "Voice", coding: "Coding", search: "Search" };
+const JOB_WORDS: Record<JobId, string> = { chat: "Chat", pictures: "Pictures", videos: "Videos", music: "Music", voice: "Voice", coding: "Coding" };
 
 // The state every route reads: the disk plan, the Stack's component list and the three household settings
 // the cards are built from.
@@ -38,11 +39,11 @@ interface AiState {
 }
 
 function choicesInput(state: AiState): AiChoicesInput {
-  return { plan: state.plan, components: state.components, settings: state.settings, freeBytes: state.freeBytes };
+  return { copy: aiCopy, plan: state.plan, components: state.components, settings: state.settings, freeBytes: state.freeBytes };
 }
 
 function unusedInput(state: AiState): UnusedInput {
-  return { plan: state.plan, components: state.components, settings: state.settings, freeBytes: state.freeBytes };
+  return { copy: aiCopy, plan: state.plan, components: state.components, settings: state.settings, freeBytes: state.freeBytes };
 }
 
 // The disk plan this computer's AI runs on: the Stack's own rows when it answers (previewPlan never throws;
@@ -112,7 +113,7 @@ function plainName(state: AiState, id: string): string {
   const rows = new Map(state.plan.rows.map((row) => [row.id, row] as const));
   const { cards } = buildAiCards(choicesInput(state));
   for (const card of cards) for (const choice of card.choices) {
-    if (choice.rowIds.some((rowId) => id === rowId || (rows.get(rowId)?.model_ids.includes(id) ?? false))) return choice.name;
+    if (choice.rowIds.some((rowId) => id === rowId || (rows.get(rowId)?.model_ids.includes(id) ?? false))) return qualified(card, choice);
   }
   return plainPartName(state.components.find((component) => component.id === id) ?? {});
 }
@@ -145,7 +146,7 @@ const ChoiceSchema = z.object({
   details: z.array(z.object({ name: z.string(), sizeBytes: z.number() })),
 });
 const CardSchema = z.object({ id: z.enum(JOBS), title: z.string(), summary: z.string(), chip: z.string(), choices: z.array(ChoiceSchema), notReady: z.boolean(), unavailable: z.string().nullable() });
-const AlwaysOnSchema = z.object({ text: z.string(), bytes: z.number(), rowIds: z.array(z.string()) });
+const AlwaysOnSchema = z.object({ bytes: z.number(), rowIds: z.array(z.string()) });
 const SkippedSchema = z.object({ rowId: z.string(), label: z.string(), reason: z.string() });
 const PlanSchema = z.object({
   changes: z.array(z.object({ job: z.enum(JOBS), from: z.string(), to: z.string(), setting: SettingRefSchema })),
@@ -175,7 +176,7 @@ aiChoicesRoutes.openapi(choicesRoute, async (c) => {
     else throw error;
   }
   if (list === null) {
-    return c.json({ stack: "unreachable" as const, message, tier: null, free_disk_bytes: null, installed_bytes: 0, cards: [], alwaysOn: { text: "", bytes: 0, rowIds: [] }, recommended: null, unused_bytes: 0 }, 200);
+    return c.json({ stack: "unreachable" as const, message, tier: null, free_disk_bytes: null, installed_bytes: 0, cards: [], alwaysOn: { bytes: 0, rowIds: [] }, recommended: null, unused_bytes: 0 }, 200);
   }
   const state: AiState = { plan: await loadPlan(), components: list.components, settings: readSettings(), freeBytes: list.free_disk_bytes, list };
   const { cards, alwaysOn } = buildAiCards(choicesInput(state));

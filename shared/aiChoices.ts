@@ -7,10 +7,15 @@
 
 import { sizeGb, needGb, freeGb, selectionTotals, type DiskPlan, type DiskRow } from "./diskPlanMath";
 
-export type AiJobId = "chat" | "pictures" | "videos" | "music" | "voice" | "coding" | "search";
+export type AiJobId = "chat" | "pictures" | "videos" | "music" | "voice" | "coding";
 export interface AiComponentLike { id: string; label: string; state: "installed"|"installing"|"notInstalled"|"failed"; size_bytes: number|null; download_bytes: number; requirement: "required"|"optional"|"unsupported"; requirement_reason: string|null; percent: number|null; job: string|null; failure: string|null; can_install: boolean; can_uninstall: boolean; last_used_at: string|null; used_by: string[] }
 export interface AiSettingsInput { pictureQuality: "quick"|"detailed"; videoQuality: "quick"|"detailed"; musicEnabled: boolean }
-export interface AiChoicesInput { plan: DiskPlan; components: AiComponentLike[] | null; settings: AiSettingsInput; freeBytes: number | null }
+/** The words of the cards, read from the spec's card and key copy (rule S5): this file holds none of its own. */
+export interface AiCopy {
+  card(job: AiJobId): { title: string; summary: string };
+  choice(id: string): { label: string; description: string };
+}
+export interface AiChoicesInput { copy: AiCopy; plan: DiskPlan; components: AiComponentLike[] | null; settings: AiSettingsInput; freeBytes: number | null }
 export interface AiChoice {
   id: string;
   job: AiJobId; kind: "radio" | "switch" | "fixed";
@@ -28,7 +33,7 @@ export interface AiChoice {
   details: Array<{ name: string; sizeBytes: number }>;
 }
 export interface AiCard { id: AiJobId; title: string; summary: string; chip: string; choices: AiChoice[]; notReady: boolean; unavailable: string | null }
-export interface AiAlwaysOn { text: string; bytes: number; rowIds: string[] }
+export interface AiAlwaysOn { bytes: number; rowIds: string[] }
 export interface AiChoicesResult { cards: AiCard[]; alwaysOn: AiAlwaysOn }
 export interface AiRecommendedPlan {
   changes: Array<{ job: AiJobId; from: string; to: string; setting: { key: string; value: unknown } | null }>;
@@ -38,51 +43,17 @@ export interface AiRecommendedPlan {
   text: string;
 }
 
-// interim: moves to spec copy.options in AIMODELS-PAGE-01
-const AI_COPY = {
-  "chat.standard": { label: "Standard chat AI", description: "The AI that answers in chat.", name: "Standard chat AI" },
-  "chat.mlx": { label: "Faster on Apple chips", description: "Runs on the Apple chip for faster answers.", name: "Faster chat on Apple chips" },
-  "chat.pictures": { label: "Chat can look at pictures", description: "Lets Home see the pictures you send.", name: "Chat can look at pictures" },
-  "pictures.quick": { label: "Quick", description: "Pictures in a few seconds. Draws words correctly.", name: "Quick pictures" },
-  "pictures.detailed": { label: "Detailed", description: "Slower, with finer detail and more looks to add.", name: "Detailed pictures" },
-  "pictures.edit": { label: "Changing pictures", description: "Needed to change a picture and as the backup.", name: "Picture editor" },
-  "pictures.tools": { label: "Tools", description: "Take out a background, erase something, make a picture bigger.", name: "Picture tools" },
-  "pictures.look": { label: "Name things in a picture", description: "Names the things in a picture, so you can find them.", name: "Picture naming" },
-  "videos.quick": { label: "Quick videos", description: "A short clip in a few minutes.", name: "Quick videos" },
-  "videos.detailed": { label: "Detailed videos", description: "Longer wait, sharper, with sound.", name: "Detailed videos" },
-  "music.make": { label: "Make music", description: "Makes songs and tunes to share.", name: "Music maker" },
-  "voice.standard": { label: "Standard voice", description: "The voice that always comes with Home.", name: "Standard voice" },
-  "voice.better": { label: "Better voice", description: "Warmer and more natural, uses more space.", name: "Better voice" },
-  "coding.helper": { label: "Coding helper", description: "Helps with code in the Code app and in chat.", name: "Coding helper" },
-} as const;
-type AiCopyKey = keyof typeof AI_COPY;
+type AiCopyKey = "chat.standard" | "chat.mlx" | "chat.pictures" | "pictures.quick" | "pictures.detailed" | "pictures.edit" | "pictures.tools" | "pictures.look" | "videos.quick" | "videos.detailed" | "music.make" | "voice.standard" | "voice.better" | "coding.helper";
 
-const CARDS: Array<{ id: AiJobId; title: string; summary: string; unavailable: string; rows: string[] }> = [
-  { id: "chat", title: "Chat", summary: "Talk with Home, and let it look at pictures you send.", unavailable: "Chat is not on this computer. It needs more memory.", rows: ["chat", "chat-mlx", "reads-pictures"] },
-  { id: "pictures", title: "Pictures", summary: "Make pictures in chat and change the ones you have.", unavailable: "Pictures are not on this computer. It needs more memory.", rows: ["pictures", "pictures-ernie", "pictures-zimage", "image-tools", "tool-look"] },
-  { id: "videos", title: "Videos", summary: "Make short videos in chat.", unavailable: "Videos are not on this computer. It needs more memory.", rows: ["video", "video-detailed"] },
-  { id: "music", title: "Music", summary: "Make songs and tunes.", unavailable: "Music is not on this computer. It needs more memory.", rows: ["music"] },
-  { id: "voice", title: "Voice and speaking", summary: "Choose how Home sounds when it talks.", unavailable: "The voice is not on this computer. It needs more memory.", rows: ["voice", "voice-better"] },
-  { id: "coding", title: "Coding", summary: "Help with code in the Code app and in chat.", unavailable: "The coding helper is not on this computer. It needs more memory.", rows: ["coding"] },
-  { id: "search", title: "Search and memory", summary: "Look things up on the web and remember what you tell Home.", unavailable: "Search and memory are not on this computer. It needs more memory.", rows: ["search", "embed"] },
+// The rows each job card draws.
+const CARDS: Array<{ id: AiJobId; rows: string[] }> = [
+  { id: "chat", rows: ["chat", "chat-mlx", "reads-pictures"] },
+  { id: "pictures", rows: ["pictures", "pictures-ernie", "pictures-zimage", "image-tools", "tool-look"] },
+  { id: "videos", rows: ["video", "video-detailed"] },
+  { id: "music", rows: ["music"] },
+  { id: "voice", rows: ["voice", "voice-better"] },
+  { id: "coding", rows: ["coding"] },
 ];
-
-// The short words the confirm dialog uses for a radio card change.
-const SHORT_WORDS: Record<string, string> = {
-  "pictures.quick": "Quick", "pictures.detailed": "Detailed",
-  "videos.quick": "Quick", "videos.detailed": "Detailed",
-  "voice.standard": "Standard", "voice.better": "Better",
-};
-
-// Plain names for rows that may be skipped by the recommended plan.
-const PLAIN_ROW_NAMES: Record<string, string> = {
-  home: "Home itself", judge: "The answer checker", stt: "Listening", embed: "Memory search", search: "Web search help",
-  chat: "Standard chat AI", "chat-mlx": "Faster chat on Apple chips", "reads-pictures": "Chat looking at pictures",
-  pictures: "Changing pictures", "pictures-ernie": "Quick pictures", "pictures-zimage": "Detailed pictures",
-  "image-tools": "Picture tools", "tool-look": "Picture naming",
-  video: "Quick videos", "video-detailed": "Detailed videos",
-  music: "Music maker", voice: "Standard voice", "voice-better": "Better voice", coding: "Coding helper",
-};
 
 function byRowId(plan: DiskPlan): Map<string, DiskRow> {
   return new Map(plan.rows.map((row) => [row.id, row] as const));
@@ -160,7 +131,7 @@ interface ChoiceSpec {
   setting: { key: string; value: unknown } | null;
 }
 
-function buildChoice(plan: DiskPlan, components: AiComponentLike[] | null, freeBytes: number | null, spec: ChoiceSpec): AiChoice {
+function buildChoice(copyOf: AiCopy, plan: DiskPlan, components: AiComponentLike[] | null, freeBytes: number | null, spec: ChoiceSpec): AiChoice {
   const rows = [spec.row, ...engineRowsOf(plan, spec.row)];
   const state = rowState(spec.row, components);
   const blockedReason = blockedReasonFor(plan, spec.row, state, freeBytes);
@@ -172,14 +143,14 @@ function buildChoice(plan: DiskPlan, components: AiComponentLike[] | null, freeB
   else if (state.state === "installing") action = "none";
   else if (state.state === "installed") action = spec.current ? (spec.kind === "switch" ? "remove" : "none") : "use";
   else action = "get";
-  const copy = AI_COPY[spec.id];
+  const copy = copyOf.choice(spec.id);
   return {
     id: spec.id,
     job: spec.job,
     kind: spec.kind,
     label: copy.label,
     description: copy.description,
-    name: copy.name,
+    name: copy.label,
     rowIds: rows.map((row) => row.id),
     recommended: spec.recommended,
     current: spec.current,
@@ -202,8 +173,6 @@ function chipFor(card: { id: AiJobId; rows: string[] }, present: boolean, choice
   switch (card.id) {
     case "chat":
       return "Using Standard";
-    case "search":
-      return "Always on";
     case "pictures":
     case "videos": {
       const current = choices.find((choice) => choice.kind === "radio" && choice.current);
@@ -227,7 +196,7 @@ function chipFor(card: { id: AiJobId; rows: string[] }, present: boolean, choice
 }
 
 export function buildAiCards(input: AiChoicesInput): AiChoicesResult {
-  const { components, settings, freeBytes } = input;
+  const { components, settings, freeBytes, copy } = input;
   const plan = withLiveInstalled(input.plan, components);
   const rows = byRowId(plan);
   const has = (id: string): boolean => rows.has(id);
@@ -236,8 +205,9 @@ export function buildAiCards(input: AiChoicesInput): AiChoicesResult {
   const cards: AiCard[] = [];
   for (const meta of CARDS) {
     const present = meta.rows.some((id) => has(id));
+    const words = copy.card(meta.id);
     if (!present) {
-      cards.push({ id: meta.id, title: meta.title, summary: meta.summary, chip: "Not on this computer", choices: [], notReady: false, unavailable: meta.unavailable });
+      cards.push({ id: meta.id, title: words.title, summary: words.summary, chip: "Not on this computer", choices: [], notReady: false, unavailable: `${words.title} is not on this computer. It needs more memory.` });
       continue;
     }
     const specs: ChoiceSpec[] = [];
@@ -281,14 +251,12 @@ export function buildAiCards(input: AiChoicesInput): AiChoicesResult {
         if (has("coding")) specs.push({ id: "coding.helper", job: "coding", kind: "switch", row: rows.get("coding")!, current: rowIsInstalled(rows.get("coding")!, components), recommended: need("coding") === "recommended", setting: null });
         break;
       }
-      case "search":
-        break;
     }
-    const choices = specs.map((spec) => buildChoice(plan, components, freeBytes, spec));
+    const choices = specs.map((spec) => buildChoice(copy, plan, components, freeBytes, spec));
     cards.push({
       id: meta.id,
-      title: meta.title,
-      summary: meta.summary,
+      title: words.title,
+      summary: words.summary,
       chip: chipFor(meta, present, choices),
       choices,
       notReady: choices.some((choice) => choice.chosenNotReady),
@@ -302,7 +270,6 @@ export function buildAiCards(input: AiChoicesInput): AiChoicesResult {
   for (const row of base) for (const engine of row.engines) if (rows.has(engine)) engineIds.add(engine);
   const alwaysOnRows = [...base, ...[...engineIds].map((id) => rows.get(id)!).filter((row) => row !== undefined)];
   const alwaysOn: AiAlwaysOn = {
-    text: `Always on: Home itself, the helper that checks answers, listening, the standard voice, memory search and web search help. About ${needGb(alwaysOnRows.reduce((total, row) => total + row.installed_bytes, 0))} GB. They are needed, so they cannot be turned off.`,
     bytes: alwaysOnRows.reduce((total, row) => total + row.installed_bytes, 0),
     rowIds: alwaysOnRows.map((row) => row.id),
   };
@@ -329,7 +296,7 @@ export function recommendedPlan(input: AiChoicesInput): AiRecommendedPlan {
     if (!target) continue;
     const current = card.choices.find((choice) => choice.kind === "radio" && choice.current) ?? (card.id === "voice" ? card.choices.find((choice) => choice.id === "voice.standard") : undefined);
     if (!current || current.id === target.id) continue;
-    changes.push({ job: card.id, from: SHORT_WORDS[current.id] ?? current.label, to: SHORT_WORDS[target.id] ?? target.label, setting: target.setting });
+    changes.push({ job: card.id, from: current.label, to: target.label, setting: target.setting });
   }
 
   // The rows the recommended plan ends with: every required row and every row
@@ -383,7 +350,7 @@ export function recommendedPlan(input: AiChoicesInput): AiRecommendedPlan {
   else if (fits === "some") {
     const words = skipped.map((item) => {
       const row = rows.get(item.rowId);
-      const name = row ? PLAIN_ROW_NAMES[row.id] ?? row.label : item.label;
+      const name = cards.flatMap((card) => card.choices).find((choice) => choice.rowIds.includes(item.rowId))?.label ?? item.label;
       return `The ${name} (${row ? stateSizeSafe(row.download_bytes) : "?"})`;
     });
     text = `This computer has room for ${kept} of the ${total} recommended choices. ${joinWords(words)} will be skipped.`;

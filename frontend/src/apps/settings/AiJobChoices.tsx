@@ -1,8 +1,8 @@
-// AIMODELS-CHOICES-01: one job on the AI and models page (Chat, Pictures, Videos, Music, Voice, Coding, Search and memory).
+// AIMODELS-CHOICES-01: one job on the AI and models page (Chat, Pictures, Videos, Music, Voice, Coding).
 // The same shape for every job, so the page reads like Pictures does: a title and one sentence, the current choice marked
 // twice (the filled radio or the switch, and the chip), one Recommended mark, plain size and state words, one action per
-// choice that is not ready, and model names only under Details. Shared kit Elements only (rule 9): no frame, Card or wrapper
-// of its own; the page that holds the seven jobs draws them. The words come from shared/aiChoices.ts.
+// choice that is not ready, and model names only under Details. Shared kit Elements only (rule 9): the title, chip and sentence
+// are the first Item of the job's own ItemGroup. The settings page draws one per spec card (view `ai.job_choices`).
 import { useState } from "react";
 import { Alert, AlertDescription, AlertTitle } from "@maipai/ui/src/ui/alert";
 import { Badge } from "@maipai/ui/src/ui/badge";
@@ -19,6 +19,8 @@ import type { AiCard, AiChoice } from "../../../../shared/aiChoices";
 
 export interface AiJobChoicesProps {
   card: AiCard;
+  /** Open the choices at first. The settings page starts each job as one line; a job that is installing or not ready opens itself. */
+  defaultOpen?: boolean;
   /** Presses a choice: install it and make it the choice ("get"), make it the choice ("use"), or take a switch off ("remove"). */
   onAct: (choice: AiChoice) => void | Promise<void>;
   /** The id of the choice whose action is running now, so its button waits. */
@@ -105,7 +107,9 @@ function SwitchRow({ choice, onAct, busy }: { choice: AiChoice; onAct: AiJobChoi
   );
 }
 
-export function AiJobChoices({ card, onAct, busyId = null }: AiJobChoicesProps) {
+export function AiJobChoices({ card, onAct, busyId = null, defaultOpen = true }: AiJobChoicesProps) {
+  const busyNow = card.choices.some((choice) => choice.state === "installing" || choice.chosenNotReady);
+  const [open, setOpen] = useState(defaultOpen || busyNow);
   const radios = card.choices.filter(isRadioRow);
   const current = radios.find((choice) => choice.current)?.id ?? "";
   const others = card.choices.filter((choice) => !isRadioRow(choice));
@@ -113,13 +117,20 @@ export function AiJobChoices({ card, onAct, busyId = null }: AiJobChoicesProps) 
   const seen = new Set<string>();
   const detailRows = card.choices.flatMap((choice) => choice.details.map((detail) => ({ choice, ...detail }))).filter((row) => (seen.has(row.name) ? false : (seen.add(row.name), true)));
   return (
-    <section aria-label={card.title} data-testid={`ai-card-${card.id}`} className="flex flex-col gap-3">
-      <div className="flex items-start justify-between gap-3">
-        <h3 className="text-base font-semibold">{card.title}</h3>
-        <Badge variant="secondary" data-testid={`ai-chip-${card.id}`}>{card.chip}</Badge>
-      </div>
-      <p className="text-sm text-muted-foreground">{card.summary}</p>
-      {card.unavailable ? <p className="text-sm text-muted-foreground">{card.unavailable}</p> : null}
+    <section aria-label={card.title} data-testid={`ai-card-${card.id}`}>
+    <ItemGroup variant="card">
+      <Item>
+        <ItemContent>
+          <ItemTitle>{card.title}</ItemTitle>
+          <ItemDescription clamp={false}>{card.summary}</ItemDescription>
+          {card.unavailable ? <ItemDescription clamp={false}>{card.unavailable}</ItemDescription> : null}
+        </ItemContent>
+        <ItemActions>
+          <Badge variant="secondary" data-testid={`ai-chip-${card.id}`}>{card.chip}</Badge>
+          <Button type="button" variant="ghost" aria-expanded={open} aria-label={`${open ? "Hide" : "Show"} ${card.title} choices`} onClick={() => setOpen(!open)}>{open ? "Hide" : "Change"}</Button>
+        </ItemActions>
+      </Item>
+      {open ? <>
       {notReady.map((choice) => (
         <Alert key={choice.id}>
           <AlertTitle>{choice.name} is chosen, but it is not ready</AlertTitle>
@@ -131,22 +142,18 @@ export function AiJobChoices({ card, onAct, busyId = null }: AiJobChoicesProps) 
           {radios.map((choice) => <RadioChoice key={choice.id} choice={choice} onAct={onAct} busy={busyId === choice.id} />)}
         </RadioGroup>
       ) : null}
-      {others.length > 0 ? (
-        <ItemGroup variant="card" aria-label={`${card.title} options`}>
-          {others.map((choice) => (choice.kind === "switch"
-            ? <SwitchRow key={choice.id} choice={choice} onAct={onAct} busy={busyId === choice.id} />
-            : (
-              <Item key={choice.id} data-testid={`ai-choice-${choice.id}`}>
-                <ItemContent>
-                  <ItemTitle>{choice.label}</ItemTitle>
-                  <ItemDescription clamp={false}>{choice.description}</ItemDescription>
-                  <ItemDescription clamp={false}>{choice.state === "installed" ? "Installed, always on" : choice.stateText}</ItemDescription>
-                  {choice.state === "installing" ? <Progress value={choice.percent ?? 0} aria-label={`Getting ${choice.name}`} /> : null}
-                </ItemContent>
-              </Item>
-            )))}
-        </ItemGroup>
-      ) : null}
+      {others.map((choice) => (choice.kind === "switch"
+        ? <SwitchRow key={choice.id} choice={choice} onAct={onAct} busy={busyId === choice.id} />
+        : (
+          <Item key={choice.id} data-testid={`ai-choice-${choice.id}`}>
+            <ItemContent>
+              <ItemTitle>{choice.label}</ItemTitle>
+              <ItemDescription clamp={false}>{choice.description}</ItemDescription>
+              <ItemDescription clamp={false}>{choice.state === "installed" ? "Installed, always on" : choice.stateText}</ItemDescription>
+              {choice.state === "installing" ? <Progress value={choice.percent ?? 0} aria-label={`Getting ${choice.name}`} /> : null}
+            </ItemContent>
+          </Item>
+        )))}
       {detailRows.length > 0 ? (
         <Collapsible>
           <CollapsibleTrigger asChild><Button type="button" variant="link">Details</Button></CollapsibleTrigger>
@@ -164,6 +171,8 @@ export function AiJobChoices({ card, onAct, busyId = null }: AiJobChoicesProps) 
           </CollapsibleContent>
         </Collapsible>
       ) : null}
+      </> : null}
+    </ItemGroup>
     </section>
   );
 }

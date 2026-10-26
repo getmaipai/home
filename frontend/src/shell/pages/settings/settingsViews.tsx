@@ -17,6 +17,8 @@ import { VoiceManagerSection } from "@/apps/settings/VoiceManagerSection";
 import { EngineLinkCredentialSection } from "@/apps/settings/EngineLinkCredentialSection";
 import { ModelsSection } from "@/apps/settings/ModelsSection";
 import { AiOverview } from "@/apps/settings/AiOverview";
+import { AiAlwaysOnView, AiJobCardView } from "@/apps/settings/AiJobCardView";
+import type { Card as SpecCard } from "@maipai/ui/src/settings/settingsAudience";
 import { ModelsAndStorageSection } from "@/apps/settings/ModelsAndStorageSection";
 import { HuggingFaceTokenSection } from "@/apps/settings/HuggingFaceTokenSection";
 import { UsersSection } from "@/apps/settings/UsersSection";
@@ -46,6 +48,8 @@ export interface SettingsViewProps {
   onPersonChange: () => void | Promise<void>;
   tab?: string;
   detailId?: string;
+  /** The spec card that named this view (views that draw one card of a section read their group and words from it). */
+  card?: SpecCard;
 }
 
 function AccountProfile({ person, onPersonChange }: SettingsViewProps) {
@@ -120,6 +124,8 @@ export const SETTINGS_VIEWS: Record<string, ComponentType<SettingsViewProps>> = 
   "home.commands": HomeCommandsSettings,
   "home.voice_catalog": HomeVoiceCatalogSettings,
   "home.engine_admin": HomeEngineAdminSettings,
+  "ai.job_choices": AiJobCardView,
+  "ai.always_on": AiAlwaysOnView,
   "home.users_admin": HomeUsersAdminSettings,
   "home.devices_admin": HomeDevicesAdminSettings,
   "home.routing_stats": HomeRoutingStatsSettings,
@@ -149,10 +155,10 @@ function AppPinSettings({ person, to }: { person: SettingsViewProps["person"]; t
   );
 }
 
-export function SettingsView({ view, person, onPersonChange, tab, detailId }: SettingsViewProps & { view: string }) {
+export function SettingsView({ view, person, onPersonChange, tab, detailId, card }: SettingsViewProps & { view: string }) {
   if (view.startsWith("app.pin:")) return <AppPinSettings person={person} to={view.slice("app.pin:".length)} />;
   const View = SETTINGS_VIEWS[view];
-  return View ? <View person={person} onPersonChange={onPersonChange} tab={tab} detailId={detailId} /> : null;
+  return View ? <View person={person} onPersonChange={onPersonChange} tab={tab} detailId={detailId} card={card} /> : null;
 }
 
 function AccountVoiceControls({ person }: SettingsViewProps) {

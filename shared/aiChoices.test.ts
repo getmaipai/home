@@ -3,6 +3,7 @@
 
 import { expect, test } from "bun:test";
 import table from "./diskPlan.json";
+import { aiCopy as copy } from "../backend/src/lib/aiCopy";
 import { buildAiCards, recommendedPlan, type AiComponentLike, type AiSettingsInput } from "./aiChoices";
 import { GIB, freeGb, needGb, sizeGb, type DiskPlan, type DiskRow, type DiskTotals } from "./diskPlanMath";
 
@@ -41,17 +42,13 @@ function component(overrides: Partial<AiComponentLike> & { id: string }): AiComp
   };
 }
 
-test("builds the seven cards in order on every tier p16 to p128 from shared/diskPlan.json", () => {
+test("builds the six job cards in order on every tier p16 to p128 from shared/diskPlan.json", () => {
   for (const tier of TIERS_LIST) {
     const plan = TIERS[tier];
-    const result = buildAiCards({ plan, components: null, settings: SETTINGS, freeBytes: null });
-    expect(result.cards.map((card) => card.id)).toEqual(["chat", "pictures", "videos", "music", "voice", "coding", "search"]);
+    const result = buildAiCards({ copy, plan, components: null, settings: SETTINGS, freeBytes: null });
+    expect(result.cards.map((card) => card.id)).toEqual(["chat", "pictures", "videos", "music", "voice", "coding"]);
     for (const card of result.cards) {
-      if (card.id === "search") {
-        expect(card.unavailable).toBeNull();
-        expect(card.choices).toEqual([]);
-        expect(card.chip).toBe("Always on");
-      } else if (card.choices.length === 0) {
+      if (card.choices.length === 0) {
         expect(card.unavailable).not.toBeNull();
       } else {
         expect(card.unavailable).toBeNull();
@@ -70,7 +67,7 @@ test("builds the seven cards in order on every tier p16 to p128 from shared/disk
 
 test("exactly one recommended radio per radio card on every tier", () => {
   for (const tier of TIERS_LIST) {
-    const { cards } = buildAiCards({ plan: TIERS[tier], components: null, settings: SETTINGS, freeBytes: null });
+    const { cards } = buildAiCards({ copy, plan: TIERS[tier], components: null, settings: SETTINGS, freeBytes: null });
     for (const card of cards) {
       const radios = card.choices.filter((choice) => choice.kind === "radio");
       if (radios.length === 0) continue;
@@ -80,30 +77,30 @@ test("exactly one recommended radio per radio card on every tier", () => {
 });
 
 test("pictures: Quick is the ERNIE row when present and Klein when absent", () => {
-  const withErnie = buildAiCards({ plan: TIERS.p128, components: null, settings: SETTINGS, freeBytes: null });
+  const withErnie = buildAiCards({ copy, plan: TIERS.p128, components: null, settings: SETTINGS, freeBytes: null });
   const picturesA = withErnie.cards.find((card) => card.id === "pictures")!;
   const quickA = picturesA.choices.find((choice) => choice.id === "pictures.quick")!;
   expect(quickA.rowIds[0]).toBe("pictures-ernie");
   expect(picturesA.choices.some((choice) => choice.id === "pictures.edit")).toBe(true);
 
   const withoutErnie: DiskPlan = { ...TIERS.p128, rows: TIERS.p128.rows.filter((candidate) => candidate.id !== "pictures-ernie") };
-  const picturesB = buildAiCards({ plan: withoutErnie, components: null, settings: SETTINGS, freeBytes: null }).cards.find((card) => card.id === "pictures")!;
+  const picturesB = buildAiCards({ copy, plan: withoutErnie, components: null, settings: SETTINGS, freeBytes: null }).cards.find((card) => card.id === "pictures")!;
   const quickB = picturesB.choices.find((choice) => choice.id === "pictures.quick")!;
   expect(quickB.rowIds[0]).toBe("pictures");
   expect(picturesB.choices.some((choice) => choice.id === "pictures.edit")).toBe(false);
 });
 
 test("pictures: current follows generation.picture_quality; detailed with no Z-Image row counts as quick", () => {
-  const quick = buildAiCards({ plan: TIERS.p128, components: null, settings: { ...SETTINGS, pictureQuality: "quick" }, freeBytes: null }).cards.find((card) => card.id === "pictures")!;
+  const quick = buildAiCards({ copy, plan: TIERS.p128, components: null, settings: { ...SETTINGS, pictureQuality: "quick" }, freeBytes: null }).cards.find((card) => card.id === "pictures")!;
   expect(quick.choices.find((choice) => choice.id === "pictures.quick")!.current).toBe(true);
   expect(quick.choices.find((choice) => choice.id === "pictures.detailed")!.current).toBe(false);
 
-  const detailed = buildAiCards({ plan: TIERS.p128, components: null, settings: { ...SETTINGS, pictureQuality: "detailed" }, freeBytes: null }).cards.find((card) => card.id === "pictures")!;
+  const detailed = buildAiCards({ copy, plan: TIERS.p128, components: null, settings: { ...SETTINGS, pictureQuality: "detailed" }, freeBytes: null }).cards.find((card) => card.id === "pictures")!;
   expect(detailed.choices.find((choice) => choice.id === "pictures.detailed")!.current).toBe(true);
   expect(detailed.choices.find((choice) => choice.id === "pictures.quick")!.current).toBe(false);
 
   const noZImage: DiskPlan = { ...TIERS.p128, rows: TIERS.p128.rows.filter((candidate) => candidate.id !== "pictures-zimage") };
-  const fallback = buildAiCards({ plan: noZImage, components: null, settings: { ...SETTINGS, pictureQuality: "detailed" }, freeBytes: null }).cards.find((card) => card.id === "pictures")!;
+  const fallback = buildAiCards({ copy, plan: noZImage, components: null, settings: { ...SETTINGS, pictureQuality: "detailed" }, freeBytes: null }).cards.find((card) => card.id === "pictures")!;
   expect(fallback.choices.find((choice) => choice.id === "pictures.quick")!.current).toBe(true);
   expect(fallback.choices.find((choice) => choice.id === "pictures.detailed")).toBeUndefined();
 });
@@ -115,7 +112,7 @@ test("a chosen but not installed Detailed reads Chosen, not ready and notReady",
     row("video-detailed", { need: "optional", download_bytes: 74 * GIB, installed_bytes: 60 * GIB, peak_temp_bytes: 14 * GIB }),
     row("engine:video", { kind: "engine", need: "required", installed: true, download_bytes: 0, installed_bytes: 1 * GIB, peak_temp_bytes: 0 }),
   ]);
-  const card = buildAiCards({ plan, components: null, settings: { ...SETTINGS, videoQuality: "detailed" }, freeBytes: null }).cards.find((c) => c.id === "videos")!;
+  const card = buildAiCards({ copy, plan, components: null, settings: { ...SETTINGS, videoQuality: "detailed" }, freeBytes: null }).cards.find((c) => c.id === "videos")!;
   const detailed = card.choices.find((choice) => choice.id === "videos.detailed")!;
   expect(detailed.current).toBe(true);
   expect(detailed.chosenNotReady).toBe(true);
@@ -128,7 +125,7 @@ test("no label, name, description, stateText, chip or blockedReason contains a m
   const banned = /\b(FLUX|Klein|ERNIE|Z-Image|Wan|LTX|Qwen|Chatterbox|Pocket|MB)\b/i;
   for (const tier of TIERS_LIST) {
     const { cards } = buildAiCards({
-      plan: TIERS[tier], components: null,
+      copy, plan: TIERS[tier], components: null,
       settings: { pictureQuality: "detailed", videoQuality: "detailed", musicEnabled: true },
       freeBytes: 1 * GIB,
     });
@@ -152,7 +149,7 @@ test("a choice that does not fit says the numbers", () => {
     row("home", { kind: "home", need: "required", installed: true, download_bytes: 0, installed_bytes: 2 * GIB, peak_temp_bytes: 0 }),
     row("video", { need: "recommended", download_bytes: 82 * GIB, installed_bytes: 60 * GIB, peak_temp_bytes: 10 * GIB }),
   ]);
-  const card = buildAiCards({ plan, components: null, settings: SETTINGS, freeBytes: 38 * GIB }).cards.find((c) => c.id === "videos")!;
+  const card = buildAiCards({ copy, plan, components: null, settings: SETTINGS, freeBytes: 38 * GIB }).cards.find((c) => c.id === "videos")!;
   const quick = card.choices.find((choice) => choice.id === "videos.quick")!;
   const needBytes = Math.ceil(60 * GIB * 1.2) + 10 * GIB;
   expect(quick.blockedReason).toBe(`Needs about ${needGb(needBytes)} GB free. This computer has ${freeGb(38 * GIB)} GB free.`);
@@ -166,7 +163,7 @@ test("unsupported uses the component requirement_reason", () => {
     row("voice-better", { need: "recommended", download_bytes: 3 * GIB, installed_bytes: 3 * GIB, peak_temp_bytes: 1 * GIB, model_ids: ["better-model"] }),
   ]);
   const card = buildAiCards({
-    plan,
+    copy, plan,
     components: [component({ id: "better-model", requirement: "unsupported", requirement_reason: "This needs 32 GB of memory and this computer has 16 GB." })],
     settings: SETTINGS, freeBytes: 100 * GIB,
   }).cards.find((c) => c.id === "voice")!;
@@ -187,7 +184,7 @@ test("action: current none, installed-not-current use, missing get, installed sw
     component({ id: "video-detailed", state: "installed" }),
     component({ id: "coding", state: "installed" }),
   ];
-  const { cards } = buildAiCards({ plan, components, settings: { ...SETTINGS, videoQuality: "quick" }, freeBytes: null });
+  const { cards } = buildAiCards({ copy, plan, components, settings: { ...SETTINGS, videoQuality: "quick" }, freeBytes: null });
   const videos = cards.find((card) => card.id === "videos")!;
   expect(videos.choices.find((choice) => choice.id === "videos.quick")!.action).toBe("get");
   expect(videos.choices.find((choice) => choice.id === "videos.detailed")!.action).toBe("use");
@@ -200,7 +197,7 @@ test("action: current none, installed-not-current use, missing get, installed sw
 test("alwaysOn excludes the chat model and Klein, counts each engine once", () => {
   for (const tier of TIERS_LIST) {
     const plan = TIERS[tier];
-    const { alwaysOn } = buildAiCards({ plan, components: null, settings: SETTINGS, freeBytes: null });
+    const { alwaysOn } = buildAiCards({ copy, plan, components: null, settings: SETTINGS, freeBytes: null });
     for (const excluded of ["chat", "pictures", "pictures-ernie", "pictures-zimage", "video", "video-detailed", "coding", "music", "voice-better", "chat-mlx", "reads-pictures", "image-tools", "tool-look"]) {
       expect(alwaysOn.rowIds).not.toContain(excluded);
     }
@@ -213,7 +210,6 @@ test("alwaysOn excludes the chat model and Klein, counts each engine once", () =
     }
     const expectedBytes = plan.rows.filter((candidate) => alwaysOn.rowIds.includes(candidate.id)).reduce((total, candidate) => total + candidate.installed_bytes, 0);
     expect(alwaysOn.bytes).toBe(expectedBytes);
-    expect(alwaysOn.text).toContain(`About ${needGb(expectedBytes)} GB`);
   }
 });
 
@@ -235,7 +231,7 @@ test("recommendedPlan changes Detailed to Quick, lists changes, never removes, s
     row("engine:video", { kind: "engine", need: "required", download_bytes: 1 * GIB, installed_bytes: 1 * GIB, peak_temp_bytes: 0 }),
   ];
   const plan = planOf(base);
-  const result = recommendedPlan({ plan, components: null, settings: { ...SETTINGS, videoQuality: "detailed" }, freeBytes: 90 * GIB });
+  const result = recommendedPlan({ copy, plan, components: null, settings: { ...SETTINGS, videoQuality: "detailed" }, freeBytes: 90 * GIB });
 
   expect(result.changes).toEqual([{ job: "videos", from: "Detailed", to: "Quick", setting: { key: "generation.video_quality", value: "quick" } }]);
   expect(result.installRowIds).toContain("pictures");
@@ -253,7 +249,7 @@ test("recommendedPlan changes Detailed to Quick, lists changes, never removes, s
   expect(result.skipped.map((item) => item.rowId)).not.toContain("video-detailed");
 
   const donePlan = planOf(base.map((candidate) => ({ ...candidate, installed: true })));
-  const done = recommendedPlan({ plan: donePlan, components: null, settings: SETTINGS, freeBytes: 90 * GIB });
+  const done = recommendedPlan({ copy, plan: donePlan, components: null, settings: SETTINGS, freeBytes: 90 * GIB });
   expect(done.nothingToDo).toBe(true);
   expect(done.changes).toEqual([]);
   expect(done.installRowIds).toEqual([]);
@@ -273,7 +269,7 @@ test("the plan, components and settings inputs are not mutated", () => {
   deepFreeze(components);
   const settings: AiSettingsInput = { pictureQuality: "detailed", videoQuality: "detailed", musicEnabled: true };
   deepFreeze(settings);
-  const input = { plan: plan as DiskPlan, components, settings, freeBytes: 90 * GIB };
+  const input = { copy, plan: plan as DiskPlan, components, settings, freeBytes: 90 * GIB };
   expect(() => {
     buildAiCards(input);
     recommendedPlan(input);

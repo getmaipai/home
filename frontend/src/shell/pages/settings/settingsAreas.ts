@@ -11,7 +11,7 @@ export const SETTINGS_AREAS = (areasFile.areas as unknown as SettingsAreaDef[]).
     ...(section.id === "apps" && section.tabs ? { tabs: section.tabs.map((tab) => ({ ...tab, ...(tab.id === "robot" ? { view: "home.devices_admin" } : {}) })) } : {}),
     ...(section.id === "advanced" ? { tabs: [{ id: "developer", label: "Developer tools", view: "home.routing_stats" }, { id: "network", label: "Network and access" }], cards: section.cards?.map((card) => card.group === "household.network_port" ? { ...card, tab: "network" } : card) } : {}),
     ...(section.id === "data" ? { tabs: section.tabs?.map((tab) => tab.id === "data" ? { ...tab, view: "account.memories" } : tab) } : {}),
-    ...(section.cards ? { cards: section.cards.filter((card) => card.group !== "household.news" && !(section.id === "ai" && card.label === "Manage")).map((card) => ({
+    ...(section.cards ? { cards: section.cards.filter((card) => card.group !== "household.news").map((card) => ({
       ...card,
       ...(card.links ? { links: card.links.map((link) => link.label === "Memories" ? { ...link, href: "/settings/data?tab=data" } : link) } : {}),
     })) } : {}),

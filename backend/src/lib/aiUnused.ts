@@ -150,15 +150,19 @@ function matchingChoice(context: UnusedContext, component: UnusedComponent): { c
   return null;
 }
 
+// Quick and Detailed mean pictures on one card and videos on another, so those two are named with their job; the music
+// switch is named by its card, since its own label is a whole sentence.
+export const qualified = (card: AiCard, choice: AiChoice): string => (card.id === "pictures" || card.id === "videos" ? `${choice.label} ${card.id}` : card.id === "music" ? card.title : choice.label);
+
 function nameFor(context: UnusedContext, component: UnusedComponent): string {
   const match = matchingChoice(context, component);
-  return match?.choice.name ?? plainPartName(component);
+  return match ? qualified(match.card, match.choice) : plainPartName(component);
 }
 
 function reasonFor(context: UnusedContext, component: UnusedComponent): string {
   const match = matchingChoice(context, component);
   const chosen = match?.card.choices.find((choice) => choice.current);
-  if (match && chosen && chosen.id !== match.choice.id) return `You use ${chosen.name} and no saved style needs this.`;
+  if (match && chosen && chosen.id !== match.choice.id) return `You use ${qualified(match.card, chosen)} and no saved style needs this.`;
   return notUsedSince(component.last_used_at);
 }
 

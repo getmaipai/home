@@ -1,6 +1,6 @@
 # AI and models, made simple (2026-10-25)
 
-Status: design, not built. Item AIMODELS-2026-10-25.
+Status: built (page rework landed 2026-10-26; setup step AIMODELS-SETUP-01 still to do). Item AIMODELS-2026-10-25.
 Owner record: Jesse, 2026-10-25, with a screenshot of Settings > AI and models > Overview: about 20 checkbox rows with model names, sizes and
 "Installed", "impossible to go through". His words: "like I see Imaging and I have an easy choice between a few options, chat the
 same thing: easy to understand choices, and see what's selected and what's recommended." He could not find the new picture model

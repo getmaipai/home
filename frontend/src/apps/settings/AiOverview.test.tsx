@@ -2,12 +2,14 @@
 // and Free up space. No model name appears outside a Details block.
 import { afterEach, describe, expect, mock, test } from "bun:test";
 import { MemoryRouter } from "react-router-dom";
-import { cleanup, fireEvent, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, waitFor, within } from "@testing-library/react";
 import { renderWithQueryClient } from "../../../tests/renderWithQueryClient";
 import table from "../../../../shared/diskPlan.json";
 import type { DiskPlan } from "../../../../shared/diskPlanMath";
 import { buildAiCards, recommendedPlan, type AiComponentLike } from "../../../../shared/aiChoices";
+import { aiCopy as copy } from "../../../../backend/src/lib/aiCopy";
 import { AiOverview } from "@/apps/settings/AiOverview";
+import { AiAlwaysOnView, AiJobCardView } from "@/apps/settings/AiJobCardView";
 import { aiChoicesApi, type AiChoicesOverview } from "@/lib/aiChoicesApi";
 
 afterEach(cleanup);
@@ -23,8 +25,15 @@ function part(id: string, state: AiComponentLike["state"]): AiComponentLike {
 function overview(over: { settings?: Partial<{ pictureQuality: "quick" | "detailed"; videoQuality: "quick" | "detailed"; musicEnabled: boolean }>; all?: boolean; free?: number } = {}): AiChoicesOverview {
   const components = plan.rows.filter((row) => row.kind === "model").flatMap((row) => row.model_ids.slice(0, 1).map((id) => part(id, over.all || row.need === "required" || row.id === "pictures-ernie" ? "installed" : "notInstalled")));
   const input = { plan, components, settings: { pictureQuality: "detailed" as const, videoQuality: "quick" as const, musicEnabled: true, ...over.settings }, freeBytes: over.free ?? 800 * GIB };
-  const built = buildAiCards(input);
-  return { stack: "ok", message: null, tier: "p128", free_disk_bytes: input.freeBytes, installed_bytes: 41 * GIB, cards: built.cards, alwaysOn: built.alwaysOn, recommended: recommendedPlan(input), unused_bytes: 0 };
+  const built = buildAiCards({ copy, ...input });
+  return { stack: "ok", message: null, tier: "p128", free_disk_bytes: input.freeBytes, installed_bytes: 41 * GIB, cards: built.cards, alwaysOn: built.alwaysOn, recommended: recommendedPlan({ copy, ...input }), unused_bytes: 0 };
+}
+
+const GROUPS = ["chat", "pictures", "videos", "music", "voice", "coding"];
+const viewProps = { person: {} as never, onPersonChange: () => {} };
+/** The settings shell draws one view per spec card under the summary; this draws the same views in the same order. */
+function Page() {
+  return <><AiOverview />{GROUPS.map((job) => <AiJobCardView key={job} {...viewProps} card={{ label: job, group: `household.ai_${job}`, scope: "household" } as never} />)}<AiAlwaysOnView {...viewProps} card={{ label: "Always on", description: "Home itself and its helpers stay on." } as never} /></>;
 }
 
 function mount(data: AiChoicesOverview) {
@@ -33,18 +42,17 @@ function mount(data: AiChoicesOverview) {
   aiChoicesApi.unused = mock(async () => ({ items: [], total_bytes: 0 }));
   aiChoicesApi.choose = mock(async () => ({ ok: true as const, started: [] }));
   aiChoicesApi.applyRecommended = mock(async () => ({ ok: true, changed: [], started: ["x"], already: [], skipped: [], needs_licence: [] }));
-  const view = renderWithQueryClient(<MemoryRouter><AiOverview /></MemoryRouter>);
+  const view = renderWithQueryClient(<MemoryRouter><Page /></MemoryRouter>);
   return { ...view, restore: () => Object.assign(aiChoicesApi, original) };
 }
 
 describe("the AI and models Overview", () => {
-  test("shows the seven jobs in order, the Always on line and the link to all parts", async () => {
+  test("shows the six jobs in order and the Always on card", async () => {
     const v = mount(overview());
     await v.findByTestId("ai-card-chat");
     const order = Array.from(v.container.querySelectorAll("[data-testid^='ai-card-']")).map((el) => el.getAttribute("data-testid"));
-    expect(order).toEqual(["ai-card-chat", "ai-card-pictures", "ai-card-videos", "ai-card-music", "ai-card-voice", "ai-card-coding", "ai-card-search"]);
-    expect(v.getByTestId("ai-always-on").textContent).toMatch(/Always on: Home itself/);
-    expect(v.getByRole("link", { name: "All parts, with names and sizes" }).getAttribute("href")).toBe("/settings/ai?tab=models");
+    expect(order).toEqual(["ai-card-chat", "ai-card-pictures", "ai-card-videos", "ai-card-music", "ai-card-voice", "ai-card-coding"]);
+    expect(v.getByTestId("ai-always-on").textContent).toMatch(/Always on/);
     v.restore();
   });
 
@@ -66,7 +74,10 @@ describe("the AI and models Overview", () => {
 
   test("pressing Get and use on a choice sends the job and the choice id", async () => {
     const v = mount(overview({ settings: { pictureQuality: "quick" } }));
-    fireEvent.click(await v.findByRole("button", { name: "Get and use Detailed" }));
+    const pictures = within(await v.findByTestId("ai-card-pictures"));
+    expect(pictures.queryByRole("button", { name: "Get and use Detailed" })).toBeNull();
+    fireEvent.click(await pictures.findByRole("button", { name: "Show Pictures choices" }));
+    fireEvent.click(await pictures.findByRole("button", { name: "Get and use Detailed" }));
     await waitFor(() => expect(aiChoicesApi.choose).toHaveBeenCalledWith("pictures", "pictures.detailed"));
     v.restore();
   });

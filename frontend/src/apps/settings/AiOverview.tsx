@@ -1,48 +1,31 @@
-// AIMODELS-PAGE-01: Settings, AI and models, Overview. One card per job with the current choice marked and the recommended one
-// marked, one button that sets everything to recommended and downloads it, and "Free up space". The words and numbers come from
-// shared/aiChoices.ts through /api/ai/choices; progress rides the existing install strip and each choice's own bar (rule S6).
-// Kit Elements only (rule 9).
+// AIMODELS-PAGE-01: Settings, AI and models, Overview: the top of the page. The header numbers, the one button that sets everything
+// to recommended and downloads it, "Free up space", and the failures. The job cards below it are the spec's own cards
+// (AiJobCardView); progress rides the install strip and each choice's own bar (rule S6). Kit Elements only (rule 9).
 import { useState } from "react";
-import { Link } from "react-router-dom";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMutation } from "@tanstack/react-query";
 import { Alert, AlertDescription, AlertTitle } from "@maipai/ui/src/ui/alert";
 import { Button } from "@maipai/ui/src/ui/button";
 import { Skeleton } from "@maipai/ui/src/ui/skeleton";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@maipai/ui/src/dashboard/components/ui/alert-dialog";
-import { Item, ItemContent, ItemDescription, ItemTitle } from "@maipai/ui/src/dashboard/components/ui/item";
 import { ApiError } from "@/lib/api";
 import { aiChoicesApi } from "@/lib/aiChoicesApi";
 import { InstallStrip } from "@/shell/InstallStrip";
-import { AiJobChoices } from "@/apps/settings/AiJobChoices";
 import { FreeUpSpaceDialog } from "@/apps/settings/FreeUpSpaceDialog";
+import { useAiChoices } from "@/apps/settings/useAiChoices";
 import { sizeGb, needGb, freeGb } from "../../../../shared/diskPlanMath";
-import type { AiChoice, AiJobId } from "../../../../shared/aiChoices";
 
-const KEY = ["ai", "choices"] as const;
-const JOB_WORDS: Record<AiJobId, string> = { chat: "Chat", pictures: "Pictures", videos: "Videos", music: "Music", voice: "Voice", coding: "Coding", search: "Search" };
 const messageOf = (error: unknown, fallback: string) => (error instanceof ApiError ? error.message : fallback);
 
 export function AiOverview() {
-  const queryClient = useQueryClient();
   const [error, setError] = useState<string | null>(null);
-  const [busyId, setBusyId] = useState<string | null>(null);
   const [confirm, setConfirm] = useState(false);
   const [cleanup, setCleanup] = useState(false);
   const [note, setNote] = useState<string | null>(null);
-  const query = useQuery({
-    queryKey: KEY, queryFn: aiChoicesApi.overview,
-    refetchInterval: (q) => (q.state.data?.cards?.some((card) => card.choices.some((choice) => choice.state === "installing")) ? 2000 : 30_000),
-  });
-  const refresh = () => { void queryClient.invalidateQueries({ queryKey: KEY }); void queryClient.invalidateQueries({ queryKey: ["components"] }); };
+  const { query, refresh } = useAiChoices();
   const data = query.data;
   const plan = data?.recommended ?? null;
+  const titleOf = (job: string) => data?.cards.find((card) => card.id === job)?.title ?? job;
 
-  async function act(choice: AiChoice) {
-    setError(null); setNote(null); setBusyId(choice.id);
-    try { await aiChoicesApi.choose(choice.job, choice.id); refresh(); }
-    catch (e) { setError(messageOf(e, `Could not start ${choice.name}. Check that the engine is running, then try again.`)); }
-    finally { setBusyId(null); }
-  }
   const apply = useMutation({
     mutationFn: aiChoicesApi.applyRecommended,
     onSuccess: (done) => {
@@ -57,7 +40,7 @@ export function AiOverview() {
   const cannot = plan !== null && plan.fits === "none" && plan.installRowIds.length === 0 && plan.changes.length === 0;
 
   return (
-    <section aria-label="AI and models choices" className="flex flex-col gap-4">
+    <section aria-label="AI and models summary" className="flex flex-col gap-4">
       <InstallStrip detailsHref={null} />
       {query.isLoading ? <Skeleton aria-label="Loading" /> : null}
       {query.isError ? <Alert variant="destructive"><AlertTitle>The page did not load</AlertTitle><AlertDescription>{messageOf(query.error, "Check that Home is running, then reload this page.")}</AlertDescription></Alert> : null}
@@ -76,14 +59,6 @@ export function AiOverview() {
             </Button>
             <Button type="button" variant="outline" onClick={() => setCleanup(true)}>Free up space</Button>
           </div>
-          {data.cards.map((card) => <AiJobChoices key={card.id} card={card} onAct={act} busyId={busyId} />)}
-          <Item variant="outline" data-testid="ai-always-on">
-            <ItemContent>
-              <ItemTitle>Always on</ItemTitle>
-              <ItemDescription clamp={false}>{data.alwaysOn.text}</ItemDescription>
-            </ItemContent>
-          </Item>
-          <Button asChild variant="link"><Link to="/settings/ai?tab=models">All parts, with names and sizes</Link></Button>
         </>
       ) : null}
       <AlertDialog open={confirm} onOpenChange={setConfirm}>
@@ -91,7 +66,7 @@ export function AiOverview() {
           <AlertDialogHeader>
             <AlertDialogTitle>Set everything to recommended?</AlertDialogTitle>
             <AlertDialogDescription>
-              {plan && plan.changes.length > 0 ? "These choices change first: " + plan.changes.map((change) => `${JOB_WORDS[change.job]}: ${change.from} to ${change.to}`).join(". ") + ". " : ""}
+              {plan && plan.changes.length > 0 ? "These choices change first: " + plan.changes.map((change) => `${titleOf(change.job)}: ${change.from} to ${change.to}`).join(". ") + ". " : ""}
               {plan && plan.installRowIds.length > 0 ? `Then Home downloads ${needGb(plan.downloadBytes)} GB. ` : "Nothing needs to download. "}
               {plan && plan.fits !== "all" ? `${plan.text} ` : ""}
               Nothing is removed. Models you stop using stay until you choose Free up space.

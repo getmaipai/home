@@ -102,15 +102,15 @@ describe("access", () => {
 });
 
 describe("the cards", () => {
-  test("GET /api/ai/choices returns seven cards with the current picture choice from the setting", async () => {
+  test("GET /api/ai/choices returns six cards with the current picture choice from the setting", async () => {
     const { client } = await owner();
     setHouseholdSettingValue("generation.picture_quality", "detailed");
-    const body = await (await client.get("/api/ai/choices")).json() as { stack: string; cards: Card[]; alwaysOn: { text: string }; recommended: { changes: Array<{ job: string }> } | null };
+    const body = await (await client.get("/api/ai/choices")).json() as { stack: string; cards: Card[]; alwaysOn: { bytes: number; rowIds: string[] }; recommended: { changes: Array<{ job: string }> } | null };
     expect(body.stack).toBe("ok");
-    expect(body.cards.map((card) => card.id)).toEqual(["chat", "pictures", "videos", "music", "voice", "coding", "search"]);
+    expect(body.cards.map((card) => card.id)).toEqual(["chat", "pictures", "videos", "music", "voice", "coding"]);
     const pictures = body.cards.find((card) => card.id === "pictures")!;
     expect(pictures.choices.find((choice) => choice.id === "pictures.detailed")!.current).toBe(true);
-    expect(body.alwaysOn.text).toMatch(/^Always on:/);
+    expect(body.alwaysOn.rowIds.length).toBeGreaterThan(0);
     expect(body.recommended!.changes.map((change) => change.job)).toContain("pictures");
   });
 

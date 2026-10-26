@@ -95,6 +95,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `frontend/src/apps/settings/AddRobotSection.tsx` | AddRobotSection |
 | `frontend/src/apps/settings/AddVoiceForm.tsx` | AddVoiceForm |
 | `frontend/src/apps/settings/AdminGatedContent.tsx` | AdminGatedContent |
+| `frontend/src/apps/settings/AiJobCardView.tsx` | AiJobCardView, AiAlwaysOnView |
 | `frontend/src/apps/settings/AiJobChoices.tsx` | AiJobChoices |
 | `frontend/src/apps/settings/AiOverview.tsx` | AiOverview |
 | `frontend/src/apps/settings/AssistantKeysSettings.tsx` | AssistantKeysSettings |
@@ -247,7 +248,8 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 |---|---|
 | `backend/src/lib/access.ts` | isOwnerOrAdmin, canHaveTemporaryChat, rolesById, getPersonRole, canAccessPerson, listActivePeople |
 | `backend/src/lib/ageBand.ts` | speakerAgeBand |
-| `backend/src/lib/aiUnused.ts` | plainPartName, notUsedSince, whyKept, findUnused |
+| `backend/src/lib/aiCopy.ts` | aiCopy |
+| `backend/src/lib/aiUnused.ts` | plainPartName, notUsedSince, whyKept, qualified, findUnused |
 | `backend/src/lib/allowance.ts` | dailyMinutesAllowed |
 | `backend/src/lib/almanacCompute.ts` | WEEKDAYS, parseDateQuestion, computeDateAnswer, dateRelation |
 | `backend/src/lib/answerBlocks.ts` | filterAnswerBlocks |

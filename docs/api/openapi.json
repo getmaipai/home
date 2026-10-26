@@ -27168,8 +27168,7 @@
                               "videos",
                               "music",
                               "voice",
-                              "coding",
-                              "search"
+                              "coding"
                             ]
                           },
                           "title": {
@@ -27197,8 +27196,7 @@
                                     "videos",
                                     "music",
                                     "voice",
-                                    "coding",
-                                    "search"
+                                    "coding"
                                   ]
                                 },
                                 "kind": {
@@ -27352,9 +27350,6 @@
                     "alwaysOn": {
                       "type": "object",
                       "properties": {
-                        "text": {
-                          "type": "string"
-                        },
                         "bytes": {
                           "type": "number"
                         },
@@ -27366,7 +27361,6 @@
                         }
                       },
                       "required": [
-                        "text",
                         "bytes",
                         "rowIds"
                       ]
@@ -27388,8 +27382,7 @@
                                   "videos",
                                   "music",
                                   "voice",
-                                  "coding",
-                                  "search"
+                                  "coding"
                                 ]
                               },
                               "from": {

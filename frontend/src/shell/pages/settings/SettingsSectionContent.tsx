@@ -150,6 +150,7 @@ export function SettingsSectionContent(props: SectionContentProps) {
         // Same for the voice page: its lead view (account.voice) is the one dropdown bound to tts.voice_id, so the
         // registry row for that key is not drawn here (the key stays in the registry for other surfaces).
         if (section.id === "voice" && card.group === "person.voice") return null;
+        if (card.view) return <SettingsView key={`${card.scope}:${card.group ?? card.label}`} view={card.view} card={card} {...viewProps} />;
         if (card.links) return <SettingsLinks key={card.label} label={card.label} links={card.links.map((link) => ({ label: link.label, href: resolveHref(link.href, viewer) }))} />;
         return <div key={`${card.scope}:${card.group}`}>
           {incognito && drawsPlaces ? <p className="text-sm text-muted-foreground">Incognito is on, so places cannot be added or renamed until you turn it off.</p> : null}
