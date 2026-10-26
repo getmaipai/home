@@ -3,11 +3,12 @@ import { join } from "node:path";
 import media from "@maipai/spec/vocab/companion-media.json";
 import type { PersonRow } from "@/types";
 import { readLook, versionOriginalPath, versionPath } from "@/lib/companionLook";
-import { addTake, companionHasFinishingJob, finishTake, readStates, recordTakeFailure, setMotion, setTakeSeed, takePath, TAKE_LIMIT_LINE } from "@/lib/companionStates";
+import { addTake, companionHasFinishingJob, finishTake, readStates, recordTakeFailure, recordTakeModelReported, setMotion, setTakeSeed, takePath, TAKE_LIMIT_LINE } from "@/lib/companionStates";
 import { routeAudience } from "@/lib/pictures/audience";
 import { videoDenial, VIDEO_DENIAL_LINE, VIDEO_NOT_HERE_LINE, refuseVideoPrompt, VIDEO_REFUSAL_LINE } from "@/lib/videos/policy";
 import { videoEngineReady, videoEngineStatus } from "@/lib/videos/ready";
-import { quickVideoReady } from "@/lib/videos/quality";
+import { maxSecondsFor, quickVideoReady } from "@/lib/videos/quality";
+import { resolveCompanionClip, stackVideoModel, promptHash, COMPANION_MODEL_MISMATCH_LINE } from "@/lib/companionArt";
 import { cancelOrDeleteVideo, fetchClip, getVideoJob, StackVideoError, submitVideo } from "@/lib/videos/stack";
 import { activeLookJob } from "@/lib/companionLookJobs";
 import type { CompanionTake } from "@/lib/companionStates";
@@ -83,11 +84,13 @@ async function runTakes(run: TakeRun, count: number, motionOverride?: string): P
         let engineFailure = false;
         try {
           let seed = Math.floor(Math.random() * 2_147_483_647);
-          take = addTake(run.companionId, state, { source: "generated", seed, label: `Candidate ${index}` });
-          let done: Awaited<ReturnType<typeof submitVideo>>["done"];
+          const art = await resolveCompanionClip();
+          const seconds = Math.min(media.generate.seconds, maxSecondsFor(art.quality));
+          take = addTake(run.companionId, state, { source: "generated", seed, label: `Candidate ${index}`, model: art.model, quality: art.quality, prompt_hash: promptHash(prompt) });
+          let done: Awaited<ReturnType<typeof submitVideo>>["done"] = null;
           for (let attempt = 0; attempt < 2; attempt++) {
             try {
-              const submitted = await submitVideo({ prompt, negative_prompt: TAKE_NEGATIVE_PROMPT, size: `${media.generate.width}x${media.generate.height}`, seconds: media.generate.seconds, seed, image: pictureB64, image_source: "generated", audience: "all-ages", timeout_ms: 1 });
+              const submitted = await submitVideo({ prompt, negative_prompt: TAKE_NEGATIVE_PROMPT, size: `${media.generate.width}x${media.generate.height}`, seconds, model: stackVideoModel(art), seed, image: pictureB64, image_source: "generated", audience: "all-ages", timeout_ms: 1 });
               stackJob = submitted.job; run.stackJob = stackJob; done = submitted.done;
               const deadline = Date.now() + 15 * 60_000;
               while (!done) {
@@ -114,6 +117,10 @@ async function runTakes(run: TakeRun, count: number, motionOverride?: string): P
             }
           }
           if (run.cancelled) break;
+          const reported = done?.find((clip) => typeof clip.model === "string")?.model ?? null;
+          const reportedQuality = done?.find((clip) => clip.quality)?.quality ?? null;
+          if ((reportedQuality && reportedQuality !== art.quality) || (reported && reported !== take.model && reported !== stackVideoModel(art))) throw new Error(COMPANION_MODEL_MISMATCH_LINE);
+          recordTakeModelReported(run.companionId, state, take.id, reported);
           run.phase = "finishing"; run.label = `Finishing take ${index} of ${count} for ${stateLabel(state)}`; run.percent = Math.min(99, run.percent + 1);
           const completedStackJob = stackJob!;
           const clip = await fetchClip(completedStackJob);

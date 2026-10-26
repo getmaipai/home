@@ -4,7 +4,7 @@ import { addVersion, chooseKeyColour, compositeOnKey, describeCharacter, keyOut,
 import { routeAudience } from "@/lib/pictures/audience";
 import { laneOf } from "@/lib/pictures/lane";
 import { pictureDenial, PICTURE_DENIAL_LINE, PROMPT_REFUSAL_LINE, refusePrompt } from "@/lib/pictures/policy";
-import { QUICK_MODEL } from "@/lib/pictures/quality";
+import { resolveCompanionStill, resolveCompanionEdit, promptHash, COMPANION_MODEL_MISMATCH_LINE } from "@/lib/companionArt";
 import { pictureEngineReady } from "@/lib/pictures/ready";
 import { cancelOrDelete, fetchPicture, getGenerationJob, submitEdit, submitGeneration } from "@/lib/pictures/stack";
 import { promptRefusalLineFor } from "@/lib/pictures/ageCheck";
@@ -34,8 +34,13 @@ export interface LookJob {
   key: string;
   sourceVersion: string | null;
   instruction: string | null;
+  model: string;
+  quality: "quick" | "detailed";
+  promptHash: string;
+  modelReported: string | null;
   finalising?: Promise<void>;
 }
+interface SheetJob { companionId: string; personId: string; state: LookJobState; percent: number; versions: string[]; error: string | null; stackJob: string; index: number; model: string; quality: "quick" | "detailed"; promptHash: string; modelReported: string | null; finalising?: Promise<void> }
 const jobs = new Map<string, LookJob>();
 const activeByCompanion = new Map<string, string>();
 const startingCompanions = new Set<string>();
@@ -44,7 +49,6 @@ const SHEET_VIEWS = [
   { slot: "right" as const, label: "Turned right", prompt: "Turn the character to face three quarters to its right. Keep the exact same character: same colours, same face, same nose, same clothes, same proportions. Keep the plain solid <key> background." },
   { slot: "mouth" as const, label: "Mouth open", prompt: "Keep the exact same character and pose, but open the mouth as if speaking. Same colours, same face, same nose, same clothes. Keep the plain solid <key> background." },
 ];
-interface SheetJob { companionId: string; personId: string; state: LookJobState; percent: number; versions: string[]; error: string | null; stackJob: string; index: number; finalising?: Promise<void> }
 const sheetJobs = new Map<string, SheetJob>();
 
 export function __clearCompanionLookJobsForTests(): void { jobs.clear(); sheetJobs.clear(); activeByCompanion.clear(); startingCompanions.clear(); }
@@ -83,12 +87,13 @@ export async function startLookGeneration(input: { actor: PersonRow; companionId
   const denied = lookGenerationGate(input.actor, prompt);
   if (denied) throw Object.assign(new Error(denied.error), { status: denied.status });
   if (!(await pictureEngineReady())) throw Object.assign(new Error(LOOK_ENGINE_NOT_READY_LINE), { status: 503 });
+  const art = await resolveCompanionStill();
   if (activeLookJob(input.companionId) || companionHasFinishingJob(input.companionId) || companionHasTakeRun(input.companionId)) throw Object.assign(new Error(busyLineFor(input.companionId)), { status: 409 });
   const key = readLook(input.companionId).key;
   startingCompanions.add(input.companionId);
   try {
-    const submitted = await submitGeneration({ prompt, model: QUICK_MODEL, size: `${media.image.size}x${media.image.size}`, n: input.count, seed: Math.floor(Math.random() * 2_147_483_647), audience: "all-ages", timeout_ms: 1 });
-    register(submitted.job, { companionId: input.companionId, personId: input.actor.id, state: "queued", percent: 0, versions: [], error: null, count: input.count, key, sourceVersion: null, instruction: null });
+    const submitted = await submitGeneration({ prompt, model: art.model, size: `${media.image.size}x${media.image.size}`, n: input.count, seed: Math.floor(Math.random() * 2_147_483_647), audience: "all-ages", timeout_ms: 1 });
+    register(submitted.job, { companionId: input.companionId, personId: input.actor.id, state: "queued", percent: 0, versions: [], error: null, count: input.count, key, sourceVersion: null, instruction: null, model: art.model, quality: art.quality, promptHash: promptHash(prompt), modelReported: submitted.done?.[0]?.model ?? null });
     return submitted.job;
   } finally { startingCompanions.delete(input.companionId); }
 }
@@ -99,6 +104,7 @@ export async function startLookEdit(input: { actor: PersonRow; companionId: stri
   const denied = lookGenerationGate(input.actor, instruction);
   if (denied) throw Object.assign(new Error(denied.error), { status: denied.status });
   if (!(await pictureEngineReady())) throw Object.assign(new Error(LOOK_ENGINE_NOT_READY_LINE), { status: 503 });
+  const art = resolveCompanionEdit();
   if (activeLookJob(input.companionId) || companionHasFinishingJob(input.companionId) || companionHasTakeRun(input.companionId)) throw Object.assign(new Error(busyLineFor(input.companionId)), { status: 409 });
   startingCompanions.add(input.companionId);
   try {
@@ -113,8 +119,9 @@ export async function startLookEdit(input: { actor: PersonRow; companionId: stri
     form.append("image_source", originalPath ? "generated" : "uploaded");
     form.append("audience", "all-ages");
     form.append("timeout_ms", "1");
+    form.append("model", art.model);
     const submitted = await submitEdit(form);
-    register(submitted.job, { companionId: input.companionId, personId: input.actor.id, state: "queued", percent: 0, versions: [], error: null, count: 1, key: look.key, sourceVersion: version.id, instruction });
+    register(submitted.job, { companionId: input.companionId, personId: input.actor.id, state: "queued", percent: 0, versions: [], error: null, count: 1, key: look.key, sourceVersion: version.id, instruction, model: art.model, quality: art.quality, promptHash: promptHash(instruction), modelReported: null });
     return submitted.job;
   } finally { startingCompanions.delete(input.companionId); }
 }
@@ -137,9 +144,11 @@ export async function startLookSheet(input: { actor: PersonRow; companionId: str
     const sheet = { views: { left: null, right: null, mouth: null }, card: described.card, key, state: "making" as const, approved_by: null, approved_at: null };
     updateSheet(input.companionId, sheet);
     const originalPath = versionOriginalPath(input.companionId, version.id), sourceBytes = originalPath ? new Uint8Array(readFileSync(originalPath)) : await compositeOnKey(png, key), instruction = SHEET_VIEWS[0]!.prompt.replaceAll("<key>", key);
-    const submitted = await submitEdit(editForm(sourceBytes, instruction, Boolean(originalPath)));
+    const art = resolveCompanionEdit();
+    const form = editForm(sourceBytes, instruction, Boolean(originalPath)); form.append("model", art.model);
+    const submitted = await submitEdit(form);
     const job = crypto.randomUUID();
-    sheetJobs.set(job, { companionId: input.companionId, personId: input.actor.id, state: "queued", percent: 0, versions: [], error: null, stackJob: submitted.job, index: 0 });
+    sheetJobs.set(job, { companionId: input.companionId, personId: input.actor.id, state: "queued", percent: 0, versions: [], error: null, stackJob: submitted.job, index: 0, model: art.model, quality: art.quality, promptHash: promptHash(instruction), modelReported: null });
     activeByCompanion.set(input.companionId, job);
     return { job, card_source: described.card_source };
   } catch (error) {
@@ -179,6 +188,9 @@ export async function pollLookJob(id: string, actor: PersonRow, companionId: str
     else if (stack.state === "cancelled") { job.state = "cancelled"; activeByCompanion.delete(companionId); }
     else {
       if (!job.finalising) job.finalising = (async () => {
+        const reported = stack.data.find((picture) => typeof picture.model === "string")?.model ?? null;
+        job.modelReported = reported;
+        if (reported && reported !== job.model) throw new Error(COMPANION_MODEL_MISMATCH_LINE);
         const images = await Promise.all(Array.from({ length: job.count }, (_, index) => fetchPicture(id, index)));
         for (let index = 0; index < images.length; index++) {
           if (wasCancelled()) return;
@@ -199,7 +211,7 @@ export async function pollLookJob(id: string, actor: PersonRow, companionId: str
           const fraction = opaque / (rgba.info.width * rgba.info.height);
           if (fraction < 0.05 || fraction > 0.95) label += " (check the edges)";
           const normalized = await normalizePicture(picture, { removeBackground: async (bytes) => bytes });
-          const saved = addVersion(job.companionId, normalized, { source: job.sourceVersion ? "edit" : "generated", label, width: media.image.size, height: media.image.size, from: job.sourceVersion }, images[index]!);
+          const saved = addVersion(job.companionId, normalized, { source: job.sourceVersion ? "edit" : "generated", label, width: media.image.size, height: media.image.size, from: job.sourceVersion, model: job.model, quality: job.quality, prompt_hash: job.promptHash, model_reported: reported }, images[index]!);
           job.versions.push(saved.id);
         }
         if (wasCancelled()) return;
@@ -227,7 +239,10 @@ async function pollSheetJob(id: string, job: SheetJob, actor: PersonRow, compani
     } else if (!job.finalising) job.finalising = (async () => {
       const view = SHEET_VIEWS[job.index]!, image = await fetchPicture(job.stackJob, 0), look = readLook(companionId), key = look.sheet?.key ?? look.key;
       let keyedOut = await keyOut(image, key); keyedOut = await normalizePicture(keyedOut, { removeBackground: async (bytes) => bytes });
-      const saved = addVersion(companionId, keyedOut, { source: "edit", label: view.label, width: media.image.size, height: media.image.size, from: look.rest }, image);
+      const reported = current.data.find((picture) => typeof picture.model === "string")?.model ?? null;
+      job.modelReported = reported;
+      if (reported && reported !== job.model) throw new Error(COMPANION_MODEL_MISMATCH_LINE);
+      const saved = addVersion(companionId, keyedOut, { source: "edit", label: view.label, width: media.image.size, height: media.image.size, from: look.rest, model: job.model, quality: job.quality, prompt_hash: job.promptHash, model_reported: reported }, image);
       job.versions.push(saved.id);
       const updated = readLook(companionId), sheet = updated.sheet;
       if (sheet) updateSheet(companionId, { ...sheet, views: { ...sheet.views, [view.slot]: saved.id } });
@@ -235,7 +250,9 @@ async function pollSheetJob(id: string, job: SheetJob, actor: PersonRow, compani
       if (job.index >= SHEET_VIEWS.length) { const doneLook = readLook(companionId); if (doneLook.sheet) updateSheet(companionId, { ...doneLook.sheet, state: "needs_review" }); job.state = "done"; job.percent = 100; activeByCompanion.delete(companionId); return; }
       const restPath = versionPath(companionId, look.rest!); if (!restPath) throw new Error("The rest picture could not be found. Choose it again and retry the sheet.");
       const rest = new Uint8Array(readFileSync(restPath)), originalPath = versionOriginalPath(companionId, look.rest!), sourceBytes = originalPath ? new Uint8Array(readFileSync(originalPath)) : await compositeOnKey(rest, key), instruction = SHEET_VIEWS[job.index]!.prompt.replaceAll("<key>", key);
-      job.stackJob = (await submitEdit(editForm(sourceBytes, instruction, Boolean(originalPath)))).job; job.state = "queued";
+      const nextForm = editForm(sourceBytes, instruction, Boolean(originalPath)); nextForm.append("model", resolveCompanionEdit().model);
+      job.promptHash = promptHash(instruction);
+      job.stackJob = (await submitEdit(nextForm)).job; job.state = "queued";
     })();
     try { await job.finalising; } catch { job.state = "failed"; job.error = `The ${SHEET_VIEWS[job.index]?.slot === "mouth" ? "mouth-open" : "side"} view did not work. Try again.`; const look = readLook(companionId); if (look.sheet) updateSheet(companionId, { ...look.sheet, state: "needs_review" }); activeByCompanion.delete(companionId); }
     finally { job.finalising = undefined; }

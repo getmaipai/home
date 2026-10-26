@@ -12,8 +12,11 @@ const TTL_MS = 20_000;
 
 /** Test seam: the Stack's video status (null: no engine), or undefined to read for real. */
 export function __setVideoStatusForTests(status: StackVideoStatus | null | undefined): void { forTests = status; cached = null; }
+export function __setVideoStatusReaderForTests(reader: (() => Promise<StackVideoStatus | null>) | null): void { statusReaderForTests = reader; cached = null; }
+let statusReaderForTests: (() => Promise<StackVideoStatus | null>) | null = null;
 
 export async function videoEngineStatus(): Promise<StackVideoStatus | null> {
+  if (statusReaderForTests) return statusReaderForTests();
   if (forTests !== undefined) return forTests;
   if (!isStackConfigured()) return null;
   if (cached && Date.now() - cached.at < TTL_MS) return cached.status;

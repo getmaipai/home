@@ -314,10 +314,11 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/codeWire.ts` | WIRE_PATH, CodeRequestError, DROPPED_SAMPLING, parseBody, personText, DEFAULT_OUTPUT_TOKENS |
 | `backend/src/lib/codingMode.ts` | codingModeReason, codingModeReadiness, reconcileCodingModeAtStartup, raiseModeFailure |
 | `backend/src/lib/commands.ts` | __resetCommandsCacheForTests, createCommand, listCommands, deleteCommand, matchCommand, runCommand |
+| `backend/src/lib/companionArt.ts` | COMPANION_STILL_MODEL_MISSING_LINE, COMPANION_CLIP_MODEL_MISSING_LINE, COMPANION_MODEL_MISMATCH_LINE, COMPANION_EDIT_MODEL, __setCompanionArtStatusReadersForTests, promptHash |
 | `backend/src/lib/companionLook.ts` | LookSchema, EMPTY_LOOK, LOOK_LIMIT_LINE, SMALL_PICTURE_LINE, lookPromptFor, KEY_ALPHA_START |
 | `backend/src/lib/companionLookJobs.ts` | LOOK_JOB_BUSY_LINE, LOOK_PROMPT_REQUIRED_LINE, LOOK_EDIT_PROMPT_LINE, LOOK_ENGINE_NOT_READY_LINE, __clearCompanionLookJobsForTests, activeLookJob |
 | `backend/src/lib/companionPromptPack.ts` | picturePromptPack, clipPromptPack |
-| `backend/src/lib/companionStates.ts` | TAKE_LIMIT_LINE, MEDIA_ROOT_REMOTE_LINE, readStates, saveStates, takePath, addTake |
+| `backend/src/lib/companionStates.ts` | TAKE_LIMIT_LINE, MEDIA_ROOT_REMOTE_LINE, readStates, __parseStatesForTests, saveStates, takePath |
 | `backend/src/lib/companionTakes.ts` | TAKE_RUN_BUSY_LINE, TAKE_QUICK_NOT_READY_LINE, TAKE_RUN_NOT_FOUND_LINE, TAKE_RUN_TIMEOUT_LINE, TAKE_RETRY_WAIT_MS, TAKE_NEGATIVE_PROMPT |
 | `backend/src/lib/companions.ts` | companionsAllowed |
 | `backend/src/lib/companionsApp.ts` | currentCompanionId, mayUseCompanion, companionAreaOn, canCreateCompanion, cardOf, listCompanionCards |
@@ -565,7 +566,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/pictures/people.ts` | PeopleError, NO_PEOPLE_LINE, PEOPLE_UNAVAILABLE_LINE, PEOPLE_UNSURE_LINE, PEOPLE_BUSY_LINE, RETRY_PAUSE_MS |
 | `backend/src/lib/pictures/policy.ts` | GENERATION_ADULTS_KEY, GENERATION_ADULT_ADAPTERS_KEY, PEOPLE_PROMPTS_KEY, peoplePromptsOn, peopleGuidanceSuffix, REAL_PEOPLE_PICTURE_GUIDANCE |
 | `backend/src/lib/pictures/quality.ts` | QUICK_MODEL, ERNIE_MODEL, DETAILED_MODEL, qualityOfModel, isPictureQuality, quickModelFor |
-| `backend/src/lib/pictures/ready.ts` | __setPictureStatusForTests, pictureEngineStatus, dropPictureStatusCache, pictureEngineReady, readyStatusForTests, pictureNotReadyReason |
+| `backend/src/lib/pictures/ready.ts` | __setPictureStatusForTests, __setPictureStatusReaderForTests, pictureEngineStatus, dropPictureStatusCache, pictureEngineReady, readyStatusForTests |
 | `backend/src/lib/pictures/stack.ts` | StackPicturesError, __setPicturesFetchForTests, submitGeneration, submitEdit, getGenerationJob, fetchPicturePreview |
 | `backend/src/lib/pictures/tool.ts` | PICTURE_SIZES, audienceOf, refusalFor, runGenerateImage |
 | `backend/src/lib/placePrivacy.ts` | childSafeAreaLabel |
@@ -797,7 +798,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/videos/messagesCopy.ts` | videoFileName, videoTitle, hasAudioTrack, messagesCopyOf, __resetMessagesCopiesForTests |
 | `backend/src/lib/videos/policy.ts` | VIDEO_ENABLED_KEY, VIDEO_ADULT_ADAPTERS_KEY, VIDEO_QUALITY_KEY, VIDEO_DENIAL_LINE, VIDEO_NOT_HERE_LINE, householdAllowsVideo |
 | `backend/src/lib/videos/quality.ts` | QUICK_BASE, DETAILED_BASE, QUICK_MAX_SECONDS, DETAILED_MAX_SECONDS, isVideoQuality, qualityOfBase |
-| `backend/src/lib/videos/ready.ts` | __setVideoStatusForTests, videoEngineStatus, dropVideoStatusCache, videoStatusReady, videoEngineReady, readyVideoStatusForTests |
+| `backend/src/lib/videos/ready.ts` | __setVideoStatusForTests, __setVideoStatusReaderForTests, videoEngineStatus, dropVideoStatusCache, videoStatusReady, videoEngineReady |
 | `backend/src/lib/videos/rerun.ts` | prepareVideoRerun |
 | `backend/src/lib/videos/stack.ts` | StackVideoError, __setVideosFetchForTests, submitVideo, convertForMessages, getVideoJob, fetchVideoPreview |
 | `backend/src/lib/videos/tool.ts` | GENERATE_VIDEO_TOOL_ID, VIDEO_SIZES, videoAudienceOf, ATTACHED_PHOTO, videoRefusalFor, latestGeneratedPictureId |

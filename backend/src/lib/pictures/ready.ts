@@ -11,6 +11,8 @@ const TTL_MS = 20_000;
 
 /** Test seam: the Stack's picture status (null: no engine), or undefined to read for real. */
 export function __setPictureStatusForTests(status: StackImageStatus | null | undefined): void { forTests = status; cached = null; }
+export function __setPictureStatusReaderForTests(reader: (() => Promise<StackImageStatus | null>) | null): void { statusReaderForTests = reader; cached = null; }
+let statusReaderForTests: (() => Promise<StackImageStatus | null>) | null = null;
 
 let refreshing: Promise<StackImageStatus | null> | null = null;
 function refresh(): Promise<StackImageStatus | null> {
@@ -21,6 +23,7 @@ function refresh(): Promise<StackImageStatus | null> {
 /** Stale-while-revalidate: a chat turn never waits on the Stack for this. A fresh answer is used as is; a stale one is
  * used at once while a refresh runs; the very first read waits, at most 1.5 seconds, and reads as "no engine" past that. */
 export async function pictureEngineStatus(): Promise<StackImageStatus | null> {
+  if (statusReaderForTests) return statusReaderForTests();
   if (forTests !== undefined) return forTests;
   if (!isStackConfigured()) return null;
   if (cached && Date.now() - cached.at < TTL_MS) return cached.status;

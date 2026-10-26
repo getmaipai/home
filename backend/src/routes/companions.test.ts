@@ -446,7 +446,7 @@ describe("household companion routes", () => {
     let progress: any;
     for (let attempt = 0; attempt < 100; attempt++) { const response = await request(`companions/${id}/states/jobs/run/${job}`, adult); progress = await response.json(); if (progress.state === "done" || progress.state === "failed") break; await new Promise((resolve) => setTimeout(resolve, 5)); }
     expect(progress).toMatchObject({ state: "done", percent: 100, takes_made: 2 }); expect(progress.label).toContain("take 2 of 2");
-    expect(submitted).toHaveLength(2); expect(submitted[0]?.seed).not.toBe(submitted[1]?.seed); expect(submitted[0]).toMatchObject({ size: `${media.generate.width}x${media.generate.height}`, seconds: media.generate.seconds, image_source: "generated", audience: "all-ages", timeout_ms: 1 }); expect(submitted[0]).not.toHaveProperty("model");
+    expect(submitted).toHaveLength(2); expect(submitted[0]?.seed).not.toBe(submitted[1]?.seed); expect(submitted[0]).toMatchObject({ size: `${media.generate.width}x${media.generate.height}`, seconds: media.generate.seconds, image_source: "generated", audience: "all-ages", timeout_ms: 1 }); expect(submitted[0]).toMatchObject({ model: "wan2.2-ti2v-5b-fastwan-mlx" });
     expect(submitted[0]?.image).toBe(Buffer.from(stackOriginal).toString("base64"));
     expect(fetched).toEqual(["video-1", "video-2"]); expect(deleted).toEqual(["video-1", "video-2"]); expect(finished).toBe(2);
     const takes = readStates(id).states.idle!.takes; expect(takes).toHaveLength(2); expect(takes.every((take) => take.report?.ok)).toBe(true); expect(bestTake(takes)?.id).toBe("take-2");
