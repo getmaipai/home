@@ -58,6 +58,7 @@ describe("the media-app host: data ids", () => {
     const url = `/api/plugins/music/data/item`;
     const lyrics = await (await adult.client.post(url, { id: row.id })).json() as Record<string, unknown>;
     expect(lyrics).toMatchObject({ lyrics: "First line", timed_lyrics: [{ t: 1, line: "First line", section: "Verse" }], lyrics_lookup: "none" });
+    expect(lyrics.facts).toBe("Tempo · 2023 · Indie");
     db.update(mediaItems).set({ bandOk: "adult" }).where(eq(mediaItems.id, row.id)).run();
     expect(await (await child.client.post(url, { id: row.id })).json()).toEqual([]);
     db.update(mediaItems).set({ lyrics: null }).where(eq(mediaItems.id, row.id)).run();

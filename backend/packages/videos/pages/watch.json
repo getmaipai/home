@@ -18,7 +18,7 @@
           },
           "kind": "video",
           "autoplay_next": true,
-          "details": false,
+          "details": true,
           "actions": [
             {
               "label": "Like",
@@ -71,6 +71,53 @@
             "type": "empty_state",
             "icon": "film",
             "text": "This video is not on the hub. Go back to Videos and pick another."
+          },
+          "fields": {
+            "description": "description",
+            "facts": "facts"
+          },
+          "edit": {
+            "label": "Edit",
+            "title": "Edit video",
+            "visible_field": "can_edit",
+            "cover_choices_field": "cover_choices",
+            "fields": [
+              {
+                "name": "title",
+                "kind": "text",
+                "label": "Title"
+              },
+              {
+                "name": "description",
+                "kind": "textarea",
+                "label": "Description"
+              },
+              {
+                "name": "cover",
+                "kind": "cover",
+                "label": "Cover"
+              }
+            ],
+            "on_save": {
+              "call": {
+                "target": "/api/plugins/videos/actions/edit",
+                "args": {
+                  "id": "{id}",
+                  "title": "{title}",
+                  "description": "{description}",
+                  "artwork": "{cover}"
+                }
+              }
+            },
+            "on_upload": {
+              "call": {
+                "target": "/api/plugins/videos/actions/cover",
+                "args": {
+                  "id": "{id}",
+                  "file": "{file}"
+                }
+              }
+            }
           }
         },
         {
@@ -148,7 +195,8 @@
             }
           }
         }
-      ]
+      ],
+      "aside_sheet": "phone"
     }
   ]
 }

@@ -681,10 +681,23 @@ function itemView(person: PersonRow, appId: MediaAppId, item: MediaItem): MediaI
   const seconds = progress && "seconds" in progress.position ? progress.position.seconds : undefined;
   const address = (item.location as { url?: string }).url;
   const direct = item.kind === "podcast_episode" ? address?.replace(/^http:\/\//i, "https://") : address;
+  const duration = item.duration_s && item.duration_s > 0 ? (() => {
+    const minutes = Math.floor(item.duration_s / 60);
+    const hours = Math.floor(minutes / 60);
+    const remainder = minutes % 60;
+    return hours ? `${hours}h ${remainder}m` : `${minutes}m`;
+  })() : null;
+  const factParts = appId === "music"
+    ? [item.album, item.year === null ? null : String(item.year), item.genre]
+    : appId === "podcasts"
+      ? [item.subtitle, duration]
+      : [item.year === null ? null : String(item.year), duration, item.genre];
+  const facts = factParts.filter((part): part is string => typeof part === "string" && part.trim().length > 0).join(" · ");
   const view: MediaItemView = {
     // A stream-only item (a podcast episode not saved yet) plays from its own address on the person's device; the hub never relays it.
     ...base, channel: item.subtitle, src: direct ?? `/api/media/items/${encodeURIComponent(item.id)}/content`, subtitle: item.subtitle, description: item.description, poster: artworkUrl(item),
     chapters: item.chapters.map((chapter) => ({ start_s: chapter.start_s, title: chapter.title })), captions: [],
+    ...(facts ? { facts } : {}),
     ...(seconds !== undefined && !progress?.completed ? { position_s: seconds } : {}),
     ...(appId === "books" ? {} : (() => { const can = isOwnerOrAdmin(person) || mediaBandOf(person) === "adult"; return { can_edit: can, cover_choices: can ? coverChoices(person) : [] }; })()),
     liked: collectionIds(person, "liked").includes(item.id), watch_later: collectionIds(person, "watch_later").includes(item.id),

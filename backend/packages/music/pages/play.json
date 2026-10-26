@@ -69,7 +69,70 @@
             "icon": "film",
             "text": "This song is not available. Go back to Music and pick another."
           },
-          "layout": "audio"
+          "layout": "audio",
+          "fields": {
+            "description": "description",
+            "facts": "facts"
+          },
+          "lyrics_enabled": true,
+          "lyrics_empty_text": "No lyrics for this song.",
+          "on_lyrics_open": {
+            "call": {
+              "target": "/api/plugins/music/actions/lyrics",
+              "args": {
+                "media_id": "{id}"
+              }
+            }
+          },
+          "edit": {
+            "label": "Edit",
+            "title": "Edit song",
+            "visible_field": "can_edit",
+            "cover_choices_field": "cover_choices",
+            "fields": [
+              {
+                "name": "title",
+                "kind": "text",
+                "label": "Title"
+              },
+              {
+                "name": "artist",
+                "kind": "text",
+                "label": "Artist"
+              },
+              {
+                "name": "description",
+                "kind": "textarea",
+                "label": "Description"
+              },
+              {
+                "name": "cover",
+                "kind": "cover",
+                "label": "Cover"
+              }
+            ],
+            "on_save": {
+              "call": {
+                "target": "/api/plugins/music/actions/edit",
+                "args": {
+                  "id": "{id}",
+                  "title": "{title}",
+                  "description": "{description}",
+                  "artist": "{artist}",
+                  "artwork": "{cover}"
+                }
+              }
+            },
+            "on_upload": {
+              "call": {
+                "target": "/api/plugins/music/actions/cover",
+                "args": {
+                  "id": "{id}",
+                  "file": "{file}"
+                }
+              }
+            }
+          }
         },
         {
           "type": "creation_header",
@@ -152,7 +215,8 @@
           }
         }
       ],
-      "aside_label": "Up next"
+      "aside_label": "Up next",
+      "aside_sheet": "phone"
     }
   ]
 }

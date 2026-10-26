@@ -40,6 +40,53 @@
             "type": "empty_state",
             "icon": "film",
             "text": "This title is not available. Go back to Shows and Films and choose another."
+          },
+          "fields": {
+            "description": "description",
+            "facts": "facts"
+          },
+          "edit": {
+            "label": "Edit",
+            "title": "Edit episode",
+            "visible_field": "can_edit",
+            "cover_choices_field": "cover_choices",
+            "fields": [
+              {
+                "name": "title",
+                "kind": "text",
+                "label": "Title"
+              },
+              {
+                "name": "description",
+                "kind": "textarea",
+                "label": "Description"
+              },
+              {
+                "name": "cover",
+                "kind": "cover",
+                "label": "Cover"
+              }
+            ],
+            "on_save": {
+              "call": {
+                "target": "/api/plugins/shows/actions/edit",
+                "args": {
+                  "id": "{id}",
+                  "title": "{title}",
+                  "description": "{description}",
+                  "artwork": "{cover}"
+                }
+              }
+            },
+            "on_upload": {
+              "call": {
+                "target": "/api/plugins/shows/actions/cover",
+                "args": {
+                  "id": "{id}",
+                  "file": "{file}"
+                }
+              }
+            }
           }
         }
       ],
@@ -70,7 +117,8 @@
             }
           }
         }
-      ]
+      ],
+      "aside_sheet": "phone"
     }
   ]
 }
