@@ -1,6 +1,6 @@
 {
-  "generatedAt": "2026-10-26T01:07:20.106Z",
-  "kitTag": "ui-v0.5.347",
+  "generatedAt": "2026-10-26T01:59:50.157Z",
+  "kitTag": "ui-v0.5.349",
   "items": [
     {
       "file": "ActivityCardsShowcase.tsx",
@@ -147,6 +147,14 @@
       "group": "tests/support",
       "verdict": "no-fit",
       "verdictReason": "Not an Element: a kit test, snapshot or stylesheet that the scan lists.",
+      "implemented": false
+    },
+    {
+      "file": "__snapshots__/answer-block-cc05.test.tsx.snap",
+      "name": "__snapshots__/answer-block-cc05.test.tsx",
+      "group": "__snapshots__/answer",
+      "verdict": "unassessed",
+      "verdictReason": "Recorded unassessed verdict in elements-plan.json; see the plan entry for its dependency or scope.",
       "implemented": false
     },
     {
@@ -417,6 +425,14 @@
       "implemented": false
     },
     {
+      "file": "confirmation.tsx",
+      "name": "confirmation",
+      "group": "confirmation",
+      "verdict": "unassessed",
+      "verdictReason": "Recorded unassessed verdict in elements-plan.json; see the plan entry for its dependency or scope.",
+      "implemented": false
+    },
+    {
       "file": "connection-state.tsx",
       "name": "connection-state",
       "group": "errors/states",
@@ -462,6 +478,14 @@
       "group": "charts/data",
       "verdict": "no-fit",
       "verdictReason": "No current Home feature needs this Element’s specific data and interaction; the audit records the current scope decision.",
+      "implemented": false
+    },
+    {
+      "file": "countdown.tsx",
+      "name": "countdown",
+      "group": "countdown",
+      "verdict": "unassessed",
+      "verdictReason": "Recorded unassessed verdict in elements-plan.json; see the plan entry for its dependency or scope.",
       "implemented": false
     },
     {
@@ -755,6 +779,14 @@
       "implemented": true
     },
     {
+      "file": "lyrics-list.tsx",
+      "name": "lyrics-list",
+      "group": "lyrics",
+      "verdict": "unassessed",
+      "verdictReason": "Recorded unassessed verdict in elements-plan.json; see the plan entry for its dependency or scope.",
+      "implemented": false
+    },
+    {
       "file": "map-answer.tsx",
       "name": "map-answer",
       "group": "charts/data",
@@ -793,6 +825,14 @@
       "group": "settings/onboarding",
       "verdict": "later",
       "verdictReason": "Deferred until MCP client (tools design H1-H4).",
+      "implemented": false
+    },
+    {
+      "file": "media-card.tsx",
+      "name": "media-card",
+      "group": "media",
+      "verdict": "unassessed",
+      "verdictReason": "Recorded unassessed verdict in elements-plan.json; see the plan entry for its dependency or scope.",
       "implemented": false
     },
     {
