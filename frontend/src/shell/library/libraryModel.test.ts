@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { filterAllowed, filtersOf, parseView, queryOf, viewParams, secondaryLine, daysLeft, extensionOf, canAddFiles, isAdultRole } from "./libraryModel";
+import { filterAllowed, filtersOf, parseView, queryOf, viewParams, secondaryLine, daysLeft, extensionOf, canAddFiles, isAdultRole, creationOf } from "./libraryModel";
 import type { LibraryItem } from "@/lib/api";
 
 const view = (query: string) => parseView(new URLSearchParams(query));
@@ -64,5 +64,27 @@ describe("how an item reads", () => {
     expect(canAddFiles({ role: "teen" })).toBe(true);
     expect(isAdultRole({ role: "teen" })).toBe(false);
     expect(isAdultRole({ role: "admin" })).toBe(true);
+  });
+});
+
+describe("the creation header of a Library file", () => {
+  const me = { id: "p1" };
+  test("a private file of mine names me, the added date, and I can manage it", () => {
+    expect(creationOf(item(), me, [])).toEqual({ title: "Fox.png", creator: { name: "Sage", href: "/people/p1" }, madeAt: "2026-10-16T00:00:00.000Z", mode: "private", people: [], canManage: true });
+  });
+  test("a file shared with named people lists them", () => {
+    const got = creationOf(item({ shared_with: { count: 2, household: false } }), me, [{ id: "p2", name: "Marlow" }, { id: "p3", name: "Nova" }]);
+    expect(got.mode).toBe("shared");
+    expect(got.people).toEqual([{ id: "p2", name: "Marlow" }, { id: "p3", name: "Nova" }]);
+  });
+  test("a household share shows Everyone in the home", () => {
+    const got = creationOf(item({ shared_with: { count: 1, household: true } }), me, []);
+    expect(got.mode).toBe("shared");
+    expect(got.people).toEqual([{ id: "household", name: "Everyone in the home" }]);
+  });
+  test("someone else's file names its owner and I cannot manage it", () => {
+    const got = creationOf(item({ owner: { id: "p9", display_name: "Marlow" } }), me, []);
+    expect(got.creator).toEqual({ name: "Marlow", href: "/people/p9" });
+    expect(got.canManage).toBe(false);
   });
 });

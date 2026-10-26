@@ -1,11 +1,13 @@
 // The full-screen viewer over the current list: previous and next, zoom, the player for video and songs, an info panel
 // and the person's actions. The page owns the address (`?file=<id>`), so Back closes it and a link opens it after the hub's
 // access check.
-import { useMemo, type ReactNode } from "react";
+import { useMemo, useState, type ReactNode } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
+import { CreationHeader } from "@maipai/ui/src/elements/creation-header";
 import { MediaViewer, type MediaViewerItem } from "@maipai/ui/src/elements/media-viewer";
 import { MusicTrack } from "@maipai/ui/src/elements/music-track";
+import { SharePanel } from "@maipai/ui/src/elements/share-panel";
 import { Button } from "@maipai/ui/src/ui/button";
 import { formatBytes } from "@maipai/ui/src/format";
 import { getIcon } from "@maipai/ui/src/icons";
@@ -13,7 +15,7 @@ import { api, type LibraryItem, type Roster } from "@/lib/api";
 import type { MusicCard } from "@/lib/musicApi";
 import { useMusicTrackProps } from "@/apps/chat/MusicCardView";
 import { prepareClip, saveClip, shareClip } from "@/lib/shareClip";
-import { canShareFiles, fileKind, isAdultRole, kindWord, ownerName } from "./libraryModel";
+import { canShareFiles, creationOf, fileKind, isAdultRole, kindWord } from "./libraryModel";
 import { libraryOrigin } from "./libraryOrigin";
 import type { ItemActions } from "./LibraryItems";
 
@@ -38,8 +40,9 @@ function Details({ item, me, actions }: { item: LibraryItem; me: Roster; actions
   const record = useQuery({ queryKey: ["library-file", item.id], queryFn: () => api.libraryFile(item.id) });
   const shares = useQuery({ queryKey: ["file-shares", item.id], queryFn: () => api.fileShares(item.id), enabled: mine && item.shared_with.count > 0 });
   const people = useQuery({ queryKey: ["people"], queryFn: () => api.people(), enabled: mine && item.shared_with.count > 0 && !item.shared_with.household });
-  const names = (shares.data ?? []).map((share) => share.to === "household" ? "Everyone in the home" : people.data?.find((person) => person.id === share.to)?.display_name ?? "Someone in your home");
-  const who = item.shared_with.household ? "Everyone in the home can see this." : !mine ? `${item.owner.display_name} shared this with you.` : item.shared_with.count === 0 ? "Only you." : names.length > 0 ? names.join(", ") : `${item.shared_with.count} ${item.shared_with.count === 1 ? "person" : "people"} in your home.`;
+  const sharedWith = (shares.data ?? []).filter((share) => share.to !== "household").map((share) => ({ id: share.to, name: people.data?.find((person) => person.id === share.to)?.display_name ?? "Someone in your home" }));
+  const creation = creationOf(item, me, sharedWith);
+  const [panelOpen, setPanelOpen] = useState(false);
   const kept = item.retention === "kept";
   const row = (label: string, value: ReactNode) => <div><dt className="text-muted-foreground">{label}</dt><dd>{value}</dd></div>;
   const origin = libraryOrigin(item, record.data?.origin);
@@ -54,15 +57,13 @@ function Details({ item, me, actions }: { item: LibraryItem; me: Roster; actions
   return (
     <>
       {song ? <MusicTrack {...songTrackProps} /> : null}
+      <CreationHeader title={creation.title} creator={creation.creator} madeAt={creation.madeAt} headingLevel="h2" visibility={{ mode: creation.mode, people: creation.people, canManage: creation.canManage, onOpen: () => { if (creation.canManage) actions.share(item); else setPanelOpen(true); } }} />
+      <SharePanel open={panelOpen} onOpenChange={setPanelOpen} people={creation.people} candidates={[]} canManage={false} onAdd={() => {}} onRemove={() => {}} onMakePrivate={() => {}} />
       <div className="flex flex-col gap-4">
-      <dl className="grid gap-3 text-base">
-        {row("Name", item.name)}
+      <dl className="grid gap-3 pt-4 text-base">
         {row("Type", `${kindWord(item.kind)}, ${item.media_type}`)}
         {row("Size", formatBytes(item.size_bytes))}
-        {row("Added", date(item.created_at))}
-        {row("Owner", ownerName(item, me))}
         {row("Origin", origin.href ? <Link className="text-primary underline-offset-4 hover:underline" to={origin.href}>{origin.label}</Link> : origin.label)}
-        {row("Who can see it", who)}
         {row("Keeping", kept ? "Kept until you delete it." : item.expires_at ? `Home plans to remove this on ${date(item.expires_at)} to make room. Keep it to stop that.` : "Follows your storage rules. Keep it to stop automatic removal.")}
         {item.version_count > 1 ? row("Versions", `${item.version_count} versions. The newest one shows.`) : null}
         {item.audience === "adult-only" ? row("Audience", "Adults only. Teens and children never see this picture.") : null}
