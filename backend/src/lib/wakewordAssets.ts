@@ -37,13 +37,13 @@ export const WAKEWORD_SHARED_ASSETS: WakewordAsset[] = [
   {
     file: "melspectrogram.onnx",
     url: `${OWW_RELEASE_BASE}/melspectrogram.onnx`,
-    sha256: "ba2b0e0f8b7b875369a2c89cb13360ff53bac436f2895cced9f479fa65eb176",
+    sha256: "ba2b0e0f8b7b875369a2c89cb13360ff53bac436f2895cced9f479fa65eb176f",
     bytes: 1_087_958,
   },
   {
     file: "embedding_model.onnx",
     url: `${OWW_RELEASE_BASE}/embedding_model.onnx`,
-    sha256: "70d164290c1d095d1d4ee149bc5e00543250a7316b59f31d056cff7bd3075c1",
+    sha256: "70d164290c1d095d1d4ee149bc5e00543250a7316b59f31d056cff7bd3075c1f",
     bytes: 1_326_578,
   },
 ];
@@ -53,7 +53,7 @@ export const WAKEWORD_SHARED_ASSETS: WakewordAsset[] = [
 export const WAKEWORD_STOCK_DETECTOR: WakewordAsset = {
   file: "hey_jarvis_v0.1.onnx",
   url: `${OWW_RELEASE_BASE}/hey_jarvis_v0.1.onnx`,
-  sha256: "94a13cfe60075b132f6a472e7e462e8123ee70861bc3fb58434a73712ee0d2c",
+  sha256: "94a13cfe60075b132f6a472e7e462e8123ee70861bc3fb58434a73712ee0d2cb",
   bytes: 1_271_370,
 };
 

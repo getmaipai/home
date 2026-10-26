@@ -40,6 +40,10 @@ afterEach(() => {
 });
 
 describe("lib/wakewordAssets.ts", () => {
+  test("every pinned checksum is a full 64-character SHA-256 (a short one fails every download)", () => {
+    for (const asset of WAKEWORD_ALL_ASSETS) expect(asset.sha256).toMatch(/^[0-9a-f]{64}$/);
+  });
+
   test("wakewordAssetPath resolves under the wakeword directory", () => {
     expect(wakewordAssetPath("melspectrogram.onnx")).toBe(`${wakewordDir}/melspectrogram.onnx`);
   });

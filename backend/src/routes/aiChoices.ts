@@ -226,7 +226,12 @@ aiChoicesRoutes.openapi(chooseRoute, async (c) => {
     if (choice.id === WAKEWORD_CHOICE) {
       // The wake word files are the hub's own pinned downloads, not Stack parts: a few megabytes, fetched or removed here.
       // Listening stays off until an adult turns it on for a device; nothing here touches that.
-      if (choice.action === "get") { await ensureWakewordAssets(); return c.json({ ok: true as const, started: [], removed: [] }, 200); }
+      if (choice.action === "get") {
+        try { await ensureWakewordAssets(); } catch {
+          return c.json({ error: "The wake word files did not download. Check that this computer is online, then try again.", code: "wakeword_download" }, 503) as never;
+        }
+        return c.json({ ok: true as const, started: [], removed: [] }, 200);
+      }
       if (choice.action === "remove") { removeWakewordAssets(); return c.json({ ok: true as const, started: [], removed: [choice.id] }, 200); }
     }
     if (choice.action === "get") {
