@@ -27119,6 +27119,979 @@
         }
       }
     },
+    "/api/ai/choices": {
+      "get": {
+        "tags": [
+          "AI"
+        ],
+        "summary": "The seven job cards: every choice, which one is the household's now, which is recommended",
+        "responses": {
+          "200": {
+            "description": "The cards, the Always on line, the set-to-recommended plan and how much Free up space can find. With the engine down the cards are empty and the message says what to do.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "stack": {
+                      "type": "string",
+                      "enum": [
+                        "ok",
+                        "unreachable"
+                      ]
+                    },
+                    "message": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "tier": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "free_disk_bytes": {
+                      "type": "number",
+                      "nullable": true
+                    },
+                    "installed_bytes": {
+                      "type": "number"
+                    },
+                    "cards": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "enum": [
+                              "chat",
+                              "pictures",
+                              "videos",
+                              "music",
+                              "voice",
+                              "coding",
+                              "search"
+                            ]
+                          },
+                          "title": {
+                            "type": "string"
+                          },
+                          "summary": {
+                            "type": "string"
+                          },
+                          "chip": {
+                            "type": "string"
+                          },
+                          "choices": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "id": {
+                                  "type": "string"
+                                },
+                                "job": {
+                                  "type": "string",
+                                  "enum": [
+                                    "chat",
+                                    "pictures",
+                                    "videos",
+                                    "music",
+                                    "voice",
+                                    "coding",
+                                    "search"
+                                  ]
+                                },
+                                "kind": {
+                                  "type": "string",
+                                  "enum": [
+                                    "radio",
+                                    "switch",
+                                    "fixed"
+                                  ]
+                                },
+                                "label": {
+                                  "type": "string"
+                                },
+                                "description": {
+                                  "type": "string"
+                                },
+                                "name": {
+                                  "type": "string"
+                                },
+                                "rowIds": {
+                                  "type": "array",
+                                  "items": {
+                                    "type": "string"
+                                  }
+                                },
+                                "recommended": {
+                                  "type": "boolean"
+                                },
+                                "current": {
+                                  "type": "boolean"
+                                },
+                                "state": {
+                                  "type": "string",
+                                  "enum": [
+                                    "installed",
+                                    "installing",
+                                    "notInstalled",
+                                    "failed"
+                                  ]
+                                },
+                                "percent": {
+                                  "type": "number",
+                                  "nullable": true
+                                },
+                                "failure": {
+                                  "type": "string",
+                                  "nullable": true
+                                },
+                                "downloadBytes": {
+                                  "type": "number"
+                                },
+                                "installedBytes": {
+                                  "type": "number"
+                                },
+                                "stateText": {
+                                  "type": "string"
+                                },
+                                "blockedReason": {
+                                  "type": "string",
+                                  "nullable": true
+                                },
+                                "action": {
+                                  "type": "string",
+                                  "enum": [
+                                    "none",
+                                    "use",
+                                    "get",
+                                    "remove"
+                                  ]
+                                },
+                                "setting": {
+                                  "type": "object",
+                                  "nullable": true,
+                                  "properties": {
+                                    "key": {
+                                      "type": "string"
+                                    },
+                                    "value": {
+                                      "nullable": true
+                                    }
+                                  },
+                                  "required": [
+                                    "key"
+                                  ]
+                                },
+                                "chosenNotReady": {
+                                  "type": "boolean"
+                                },
+                                "details": {
+                                  "type": "array",
+                                  "items": {
+                                    "type": "object",
+                                    "properties": {
+                                      "name": {
+                                        "type": "string"
+                                      },
+                                      "sizeBytes": {
+                                        "type": "number"
+                                      }
+                                    },
+                                    "required": [
+                                      "name",
+                                      "sizeBytes"
+                                    ]
+                                  }
+                                }
+                              },
+                              "required": [
+                                "id",
+                                "job",
+                                "kind",
+                                "label",
+                                "description",
+                                "name",
+                                "rowIds",
+                                "recommended",
+                                "current",
+                                "state",
+                                "percent",
+                                "failure",
+                                "downloadBytes",
+                                "installedBytes",
+                                "stateText",
+                                "blockedReason",
+                                "action",
+                                "setting",
+                                "chosenNotReady",
+                                "details"
+                              ]
+                            }
+                          },
+                          "notReady": {
+                            "type": "boolean"
+                          },
+                          "unavailable": {
+                            "type": "string",
+                            "nullable": true
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "title",
+                          "summary",
+                          "chip",
+                          "choices",
+                          "notReady",
+                          "unavailable"
+                        ]
+                      }
+                    },
+                    "alwaysOn": {
+                      "type": "object",
+                      "properties": {
+                        "text": {
+                          "type": "string"
+                        },
+                        "bytes": {
+                          "type": "number"
+                        },
+                        "rowIds": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        }
+                      },
+                      "required": [
+                        "text",
+                        "bytes",
+                        "rowIds"
+                      ]
+                    },
+                    "recommended": {
+                      "type": "object",
+                      "nullable": true,
+                      "properties": {
+                        "changes": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "job": {
+                                "type": "string",
+                                "enum": [
+                                  "chat",
+                                  "pictures",
+                                  "videos",
+                                  "music",
+                                  "voice",
+                                  "coding",
+                                  "search"
+                                ]
+                              },
+                              "from": {
+                                "type": "string"
+                              },
+                              "to": {
+                                "type": "string"
+                              },
+                              "setting": {
+                                "type": "object",
+                                "nullable": true,
+                                "properties": {
+                                  "key": {
+                                    "type": "string"
+                                  },
+                                  "value": {
+                                    "nullable": true
+                                  }
+                                },
+                                "required": [
+                                  "key"
+                                ]
+                              }
+                            },
+                            "required": [
+                              "job",
+                              "from",
+                              "to",
+                              "setting"
+                            ]
+                          }
+                        },
+                        "installRowIds": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        },
+                        "installComponentIds": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        },
+                        "skipped": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "rowId": {
+                                "type": "string"
+                              },
+                              "label": {
+                                "type": "string"
+                              },
+                              "reason": {
+                                "type": "string"
+                              }
+                            },
+                            "required": [
+                              "rowId",
+                              "label",
+                              "reason"
+                            ]
+                          }
+                        },
+                        "downloadBytes": {
+                          "type": "number"
+                        },
+                        "fits": {
+                          "type": "string",
+                          "enum": [
+                            "all",
+                            "some",
+                            "none"
+                          ]
+                        },
+                        "nothingToDo": {
+                          "type": "boolean"
+                        },
+                        "text": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "changes",
+                        "installRowIds",
+                        "installComponentIds",
+                        "skipped",
+                        "downloadBytes",
+                        "fits",
+                        "nothingToDo",
+                        "text"
+                      ]
+                    },
+                    "unused_bytes": {
+                      "type": "number"
+                    }
+                  },
+                  "required": [
+                    "stack",
+                    "message",
+                    "tier",
+                    "free_disk_bytes",
+                    "installed_bytes",
+                    "cards",
+                    "alwaysOn",
+                    "recommended",
+                    "unused_bytes"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Admins only",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such job or choice",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "It cannot be installed or removed right now (the message says why)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "The engine is not answering",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/ai/unused": {
+      "get": {
+        "tags": [
+          "AI"
+        ],
+        "summary": "The installed parts nothing uses, the space they free and the plain reason",
+        "responses": {
+          "200": {
+            "description": "The Free up space list, largest first. A saved style is never listed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "items": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string"
+                          },
+                          "name": {
+                            "type": "string"
+                          },
+                          "bytes": {
+                            "type": "number"
+                          },
+                          "reason": {
+                            "type": "string"
+                          },
+                          "lastUsedAt": {
+                            "type": "string",
+                            "nullable": true
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "name",
+                          "bytes",
+                          "reason",
+                          "lastUsedAt"
+                        ]
+                      }
+                    },
+                    "total_bytes": {
+                      "type": "number"
+                    }
+                  },
+                  "required": [
+                    "items",
+                    "total_bytes"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Admins only",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such job or choice",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "It cannot be installed or removed right now (the message says why)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "The engine is not answering",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/ai/choices/{job}": {
+      "post": {
+        "tags": [
+          "AI"
+        ],
+        "summary": "Make one choice the household's: download it first when it is missing, then write the setting",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 20
+            },
+            "required": true,
+            "name": "job",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "choice": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 120
+                  }
+                },
+                "required": [
+                  "choice"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "What started downloading (a job or a part), or what was removed. The setting is written only after the install can start.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    },
+                    "started": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "removed": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    }
+                  },
+                  "required": [
+                    "ok",
+                    "started",
+                    "removed"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Admins only",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such job or choice",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "It cannot be installed or removed right now (the message says why)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "The engine is not answering",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/ai/recommended": {
+      "post": {
+        "tags": [
+          "AI"
+        ],
+        "summary": "Set everything to recommended: write the choices and start the missing downloads, never remove",
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {}
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The choice changes made, the downloads started, the parts already installed or downloading, the skipped ones and the parts that wait for a licence click. Safe to press twice; it never removes anything.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    },
+                    "changed": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "started": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "already": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "skipped": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "rowId": {
+                            "type": "string"
+                          },
+                          "label": {
+                            "type": "string"
+                          },
+                          "reason": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "rowId",
+                          "label",
+                          "reason"
+                        ]
+                      }
+                    },
+                    "needs_licence": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string"
+                          },
+                          "label": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "label"
+                        ]
+                      }
+                    }
+                  },
+                  "required": [
+                    "ok",
+                    "changed",
+                    "started",
+                    "already",
+                    "skipped",
+                    "needs_licence"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Admins only",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such job or choice",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "It cannot be installed or removed right now (the message says why)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "The engine is not answering",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/ai/cleanup": {
+      "post": {
+        "tags": [
+          "AI"
+        ],
+        "summary": "Remove the chosen unused parts and free their space; one failure never stops the rest",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "ids": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 200
+                    },
+                    "minItems": 1,
+                    "maxItems": 20
+                  }
+                },
+                "required": [
+                  "ids"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "One line per id, in the order sent: removed with its bytes, kept with the plain reason, failed with the engine's sentence.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "results": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string"
+                          },
+                          "status": {
+                            "type": "string",
+                            "enum": [
+                              "removed",
+                              "kept",
+                              "failed"
+                            ]
+                          },
+                          "freed_bytes": {
+                            "type": "number"
+                          },
+                          "message": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "status",
+                          "freed_bytes",
+                          "message"
+                        ]
+                      }
+                    },
+                    "freed_bytes": {
+                      "type": "number"
+                    },
+                    "kept": {
+                      "type": "number"
+                    },
+                    "failed": {
+                      "type": "number"
+                    }
+                  },
+                  "required": [
+                    "results",
+                    "freed_bytes",
+                    "kept",
+                    "failed"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Admins only",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such job or choice",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "It cannot be installed or removed right now (the message says why)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "The engine is not answering",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/coding-setup/pieces": {
       "get": {
         "tags": [
