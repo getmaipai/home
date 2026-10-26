@@ -5,7 +5,7 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@maipai/ui/
 import { Item, ItemActions, ItemContent, ItemDescription, ItemGroup, ItemTitle } from "@maipai/ui/src/dashboard/components/ui/item";
 import { AnswerBlockView } from "@maipai/ui/src/elements/answer-block";
 import { RouteSkeleton } from "@maipai/ui/src/primitives/RouteSkeleton";
-import { api, type WidgetData, type WidgetDescriptor } from "@/lib/api";
+import { api, type HomeWidgets, type WidgetData, type WidgetDescriptor } from "@/lib/api";
 
 /** Design note section 6: never more than four Today cards before "More". */
 export const TODAY_CARD_BUDGET = 4;
@@ -25,9 +25,11 @@ export function todaySlots(widgets: WidgetDescriptor[], results: Array<{ isPendi
 }
 
 /** HOME-ALIVE-01e: one card per widget the viewer's role clears (the server already filtered by role and age). */
-export function TodaySection() {
-  const list = useQuery({ queryKey: ["widgets"], queryFn: api.widgets, retry: false });
-  const widgets = Array.isArray(list.data) ? list.data : [];
+export function TodaySection({ home, heroOnly = false }: { home?: HomeWidgets; heroOnly?: boolean }) {
+  const list = useQuery({ queryKey: ["home-widgets"], queryFn: api.homeWidgets, retry: false, enabled: !home });
+  const ordered = home ?? list.data;
+  const slotsByOrder = ordered ? [...(ordered.cards ?? []), ...(ordered.more ?? [])] : [];
+  const widgets = Array.isArray(slotsByOrder) ? slotsByOrder : [];
   const results = useQueries({
     queries: widgets.map((widget) => ({
       queryKey: ["widget-data", widget.package, widget.id],
@@ -37,8 +39,10 @@ export function TodaySection() {
     })),
   });
   const slots = todaySlots(widgets, results);
+  const heroQuery = useQuery({ queryKey: ["home-hero"], queryFn: () => home?.hero ? api.widgetData(home.hero.package, home.hero.id) : Promise.resolve(undefined), enabled: Boolean(home?.hero), retry: false });
 
-  if (list.isPending) return <RouteSkeleton label="Loading Today" />;
+  if (!home && list.isPending) return <RouteSkeleton label="Loading Today" />;
+  if (!home && list.isError) return <p role="alert" className="text-sm text-muted-foreground">Could not load Today. Refresh Home to try again.</p>;
   if (slots.length === 0) return null;
 
   const cards = (shown: Slot[]) => shown.map((slot) => slot.data.card ? (
@@ -65,10 +69,17 @@ export function TodaySection() {
     </Card>
   ));
 
-  const first = slots.slice(0, TODAY_CARD_BUDGET);
+  const first = slots.slice(0, home ? home.cards.length : TODAY_CARD_BUDGET);
   const rest = slots.slice(TODAY_CARD_BUDGET);
+  const heroData: WidgetData | undefined = heroQuery.data;
+  const heroSlot = home?.hero && heroData && heroData.items.length > 0 && !heroData.degraded ? { widget: home.hero, data: heroData } : null;
+  const showHeroSkeleton = heroOnly && Boolean(home?.hero) && heroQuery.isPending;
+  if (showHeroSkeleton) return <RouteSkeleton label="Loading Home highlight" />;
+  if (heroOnly) return heroSlot ? <section aria-label="Home highlight" className="lg:col-span-4"><Card size="sm" data-testid="home-hero"><CardHeader><CardTitle>{heroSlot.widget.title}</CardTitle></CardHeader><CardContent><ItemGroup>{heroSlot.data.items.map((item, index) => <Item key={`${item.title}-${index}`} size="sm"><ItemContent><ItemTitle>{item.title}</ItemTitle>{item.subtitle ? <ItemDescription>{item.subtitle}</ItemDescription> : null}</ItemContent>{item.value ? <ItemActions>{item.value}</ItemActions> : null}</Item>)}</ItemGroup></CardContent></Card></section> : null;
   return (
-    <section aria-label="Today" className="flex flex-col gap-3">
+    <>
+    {heroSlot ? <section aria-label="Home highlight" className="lg:col-span-4"><Card size="sm" data-testid="home-hero"><CardHeader><CardTitle>{heroSlot.widget.title}</CardTitle></CardHeader><CardContent><ItemGroup>{heroSlot.data.items.map((item, index) => <Item key={`${item.title}-${index}`} size="sm"><ItemContent><ItemTitle>{item.title}</ItemTitle>{item.subtitle ? <ItemDescription>{item.subtitle}</ItemDescription> : null}</ItemContent>{item.value ? <ItemActions>{item.value}</ItemActions> : null}</Item>)}</ItemGroup></CardContent></Card></section> : null}
+    <section aria-label="Today" className="flex flex-col gap-3 lg:col-span-12">
       <h2 className="text-base leading-snug font-medium">Today</h2>
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">{cards(first)}</div>
       {rest.length === 0 ? null : (
@@ -80,5 +91,6 @@ export function TodaySection() {
         </Collapsible>
       )}
     </section>
+    </>
   );
 }

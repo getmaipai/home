@@ -278,6 +278,11 @@ export interface WidgetDescriptor {
   size: "card" | "row";
   refresh_s: number;
 }
+export interface HomeWidgets {
+  hero: WidgetDescriptor | null;
+  cards: WidgetDescriptor[];
+  more: WidgetDescriptor[];
+}
 export interface WidgetItem {
   title: string;
   subtitle?: string;
@@ -1425,6 +1430,7 @@ export const api = {
       if (e instanceof ApiError && e.status === 404) return [];
       throw e;
     }),
+  homeWidgets: () => request<HomeWidgets>("/api/widgets/home?surface=home"),
   widgetData: (pkg: string, id: string) =>
     request<WidgetData>(`/api/widgets/${encodeURIComponent(pkg)}/${encodeURIComponent(id)}/data`).catch(
       (e: unknown) => {
@@ -1436,6 +1442,7 @@ export const api = {
   // (a spec `page`, drawn by the kit's SchemaPage). A hidden or unknown app and page are both 404.
   apps: () => request<AppRow[]>("/api/apps"),
   mediaHome: () => request<MediaHome>("/api/media/home"),
+  continueRows: () => request<{ rows: Array<{ source: string; kind: "chat" | "media"; id: string; title: string; subtitle: string | null; href: string; at: string; percent: number | null; media_kind: string | null; artwork_url: string | null }> }>("/api/continue"),
   companions: () => request<CompanionList>("/api/companions"),
   companion: (id: string) => request<CompanionDetail>(`/api/companions/${encodeURIComponent(id)}`),
   companionActivity: (id: string) => request<CompanionActivity>(`/api/companions/${encodeURIComponent(id)}/activity`),

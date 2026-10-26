@@ -3,7 +3,7 @@ import { cleanup, fireEvent, waitFor } from "@testing-library/react";
 import { MemoryRouter, Route, Routes, useLocation } from "react-router-dom";
 import { DashboardPage } from "@/shell/pages/DashboardPage";
 import { renderWithQueryClient } from "../../../tests/renderWithQueryClient";
-import type { InstallStatusView, Roster, SetupChecklistItem, WidgetData, WidgetDescriptor } from "@/lib/api";
+import type { HomeWidgets, InstallStatusView, Roster, SetupChecklistItem, WidgetData, WidgetDescriptor } from "@/lib/api";
 
 afterEach(() => {
   cleanup();
@@ -36,6 +36,7 @@ const data = (title: string): WidgetData => ({ as_of: "2026-10-17T12:00:00.000Z"
 interface Mocks {
   checklist?: SetupChecklistItem[];
   widgets?: WidgetDescriptor[];
+  home?: HomeWidgets;
   widgetData?: Record<string, WidgetData | "fail">;
   install?: Partial<InstallStatusView>;
   chat?: "ready" | "starting";
@@ -53,7 +54,10 @@ function mockFetch(mocks: Mocks = {}) {
       if (body === "fail" || body === undefined) return Promise.resolve(new Response(JSON.stringify({ error: "no" }), { status: 400 }));
       return Promise.resolve(Response.json(body));
     }
+    if (url.includes("/api/widgets/home")) return Promise.resolve(Response.json(mocks.home ?? { hero: null, cards: mocks.widgets ?? [], more: [] }));
     if (url.includes("/api/widgets")) return Promise.resolve(Response.json(mocks.widgets ?? []));
+    if (url.includes("/api/people")) return Promise.resolve(Response.json([{ id: "person-abc123", display_name: "Nova", role: "owner" }]));
+    if (url.includes("/api/continue")) return Promise.resolve(Response.json({ rows: [] }));
     if (url.includes("/api/health")) {
       return Promise.resolve(Response.json({ ok: true, engines: { chat: mocks.chat === "starting" ? { state: "down", kind: "starting", reason: "ai_installing" } : { state: "up" } } }));
     }
@@ -83,6 +87,34 @@ const hrefOf = (label: string) => Array.from(document.querySelectorAll("a")).fin
 const urls = (fetchMock: ReturnType<typeof mock>) => fetchMock.mock.calls.map(([input]) => (typeof input === "string" ? input : String(input)));
 
 describe("DashboardPage (Home)", () => {
+  test("keeps the home block order in one layout function", async () => {
+    const { homeBlocks } = await import("@/shell/pages/dashboard/homeBlocks");
+    expect(homeBlocks()).toEqual(["greeting", "admin", "ask", "hero", "pick_up", "today", "family", "getting_started"]);
+    expect(homeBlocks("future-layout")).toEqual(homeBlocks());
+  });
+
+  test("shows skeletons on first paint", () => {
+    const originalFetch = globalThis.fetch;
+    globalThis.fetch = (() => new Promise(() => {})) as unknown as typeof fetch;
+    try {
+      const view = renderHome(makePerson("adult"));
+      expect(view.getByRole("status", { name: "Loading Home" })).toBeDefined();
+    } finally { globalThis.fetch = originalFetch; }
+  });
+
+  test("guest sees greeting, Ask and Today only", async () => {
+    const { restore } = mockFetch({ widgets: [widget("weather", "Weather")], widgetData: { weather: data("Sunny") }, checklist: [checklistItem("x", false)] });
+    try {
+      const view = renderHome(makePerson("guest"));
+      await view.findByText("Weather");
+      expect(view.getByRole("textbox", { name: "Ask" })).toBeDefined();
+      expect(view.queryByText("Getting started")).toBeNull();
+      expect(view.queryByText("Pick up where you left off")).toBeNull();
+      expect(view.queryByText("Your family")).toBeNull();
+      expect(hrefOf("Updates")).toBeUndefined();
+    } finally { restore(); }
+  });
+
   test("greets the person, asks first, and drops the old numbers and activity log", async () => {
     const { restore } = mockFetch();
     try {
@@ -160,7 +192,7 @@ describe("DashboardPage (Home)", () => {
     widgetData.b = "fail";
     widgetData.c = { ...data("Fallback text"), degraded: true };
     widgetData.d = { as_of: "2026-10-17T12:00:00.000Z", items: [] };
-    const { restore } = mockFetch({ widgets: ids.map((id) => widget(id)), widgetData });
+    const { restore } = mockFetch({ home: { hero: null, cards: ids.slice(0, 4).map((id) => widget(id)), more: ids.slice(4).map((id) => widget(id)) }, widgets: ids.map((id) => widget(id)), widgetData });
     try {
       const view = renderHome(makePerson("adult"));
       await waitFor(() => expect(view.getAllByTestId("home-today-card").length).toBe(4));
@@ -172,7 +204,7 @@ describe("DashboardPage (Home)", () => {
       restore();
     }
     const many = ["a", "b", "c", "d", "e", "f"];
-    const second = mockFetch({ widgets: many.map((id) => widget(id)), widgetData: Object.fromEntries(many.map((id) => [id, data(`Row ${id}`)])) });
+    const second = mockFetch({ home: { hero: null, cards: many.slice(0, 4).map((id) => widget(id)), more: many.slice(4).map((id) => widget(id)) }, widgets: many.map((id) => widget(id)), widgetData: Object.fromEntries(many.map((id) => [id, data(`Row ${id}`)])) });
     try {
       const view = renderHome(makePerson("adult"));
       const more = await view.findByRole("button", { name: "More" });
