@@ -16,6 +16,7 @@
             }
           },
           "kind": "audio",
+          "details": false,
           "autoplay_next": true,
           "actions": [
             {
@@ -69,6 +70,53 @@
             "text": "This song is not available. Go back to Music and pick another."
           },
           "layout": "audio"
+        },
+        {
+          "type": "creation_header",
+          "bind": {
+            "source": "package",
+            "path": "header",
+            "params": {
+              "id": "$state.id",
+              "scope": "creation"
+            }
+          },
+          "candidates_bind": {
+            "source": "package",
+            "path": "header",
+            "params": {
+              "id": "$state.id",
+              "scope": "creation-people"
+            }
+          },
+          "share_change": {
+            "add": {
+              "call": {
+                "target": "/api/plugins/music/actions/share-add",
+                "args": {
+                  "id": "{id}",
+                  "person_id": "{person_id}"
+                }
+              }
+            },
+            "remove": {
+              "call": {
+                "target": "/api/plugins/music/actions/share-remove",
+                "args": {
+                  "id": "{id}",
+                  "person_id": "{person_id}"
+                }
+              }
+            },
+            "make_private": {
+              "call": {
+                "target": "/api/plugins/music/actions/share-private",
+                "args": {
+                  "id": "{id}"
+                }
+              }
+            }
+          }
         }
       ],
       "aside": [

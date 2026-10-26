@@ -6,6 +6,8 @@ Open Listen now to see songs you played, albums just added, songs made in chat u
 music. Open an album or an artist, then choose Play, Shuffle or Start radio. The songs go into your own Up next list. Like a song on Now playing to
 keep it in Liked.
 
+On Now playing, you can see the song title, creator and date. Songs made at home can be shared with people in your home. Choose **Private** or **Shared** to change who can listen. Only the owner or an admin can change sharing. Children cannot share songs.
+
 Radio uses songs from your library only. It looks for the same artist, album artist, kind of music and decade. It does not
 search the web. Kids never see or play songs marked explicit.
 

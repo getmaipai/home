@@ -5,7 +5,7 @@
 // a child is allowlist-only (design section 11): the household's library plus channels an adult followed for them, and no discovery rows.
 import { and, desc, eq, inArray, isNull, sql, type SQL } from "drizzle-orm";
 import { db } from "@/db";
-import { attachments, mediaItems, mediaSources, people, videoJobs } from "@/db/schema";
+import { attachments, mediaItems, mediaSources, musicJobs, people, videoJobs } from "@/db/schema";
 import { loadManifestOnly } from "@/lib/plugins";
 import { appIndexFloorOk, appVisibleTo } from "@/lib/apps";
 import type { PersonRow } from "@/types";
@@ -297,7 +297,7 @@ export interface DataParams {
   limit?: number;
 }
 
-function safeText(value: unknown): string {
+export function safeText(value: unknown): string {
   return typeof value === "string" && !/\{[^{}]+\}/.test(value) ? value : "";
 }
 
@@ -307,7 +307,7 @@ function shortPromptTitle(prompt: string): string {
   return `${clause.slice(0, 60).replace(/\s+\S*$/, "").replace(/[\s.,;:!?-]+$/g, "")}`;
 }
 
-function visibilityForFile(person: PersonRow, fileId: string, canManage: boolean, adultOnly: boolean) {
+export function visibilityForFile(person: PersonRow, fileId: string, canManage: boolean, adultOnly: boolean) {
   const active = listActivePeople();
   const rows = listSharesForFile(fileId);
   const current = rows.flatMap((share) => {
@@ -327,7 +327,7 @@ function visibilityForFile(person: PersonRow, fileId: string, canManage: boolean
   };
 }
 
-function canManageMadeFile(person: PersonRow, ownerId: string): boolean {
+export function canManageMadeFile(person: PersonRow, ownerId: string): boolean {
   if (person.role === "child") return false;
   return person.id === ownerId || (isOwnerOrAdmin(person) && getPersonRole(ownerId) === "child");
 }
@@ -390,6 +390,68 @@ export function changeVideoCreationShare(person: PersonRow, op: "add" | "remove"
   }
   const refreshed = videoCreation(person, id)[0];
   return { ok: true as const, value: refreshed ?? { visibility: visibilityForFile(person, id, true, fileAudience(file.provenance) === "adult-only").visibility } };
+}
+
+function musicCreation(person: PersonRow, id: string): unknown[] {
+  const item = readableIn(person, "music", id);
+  const fileId = (item?.location as { file_id?: string } | undefined)?.file_id ?? id;
+  const file = db.select().from(attachments).where(eq(attachments.id, fileId)).get();
+  if (file && libraryProvenance(file.provenance).writer === "music-gen") {
+    if (file.deletedAt !== null || !canReadFileAudience(person, file)) return [];
+    const metadata = libraryProvenance(file.provenance);
+    const jobId = typeof metadata.job_id === "string" ? metadata.job_id : typeof metadata.job === "string" ? metadata.job : "";
+    const job = jobId ? db.select().from(musicJobs).where(and(eq(musicJobs.id, jobId), eq(musicJobs.personId, file.ownerPersonId))).get() : undefined;
+    let request: Record<string, unknown> = {};
+    try { request = JSON.parse(job?.request ?? "{}") as Record<string, unknown>; } catch { request = {}; }
+    const title = safeText(request.title) || safeText(metadata.title) || "Made at home";
+    const description = safeText(request.lyrics) || safeText(request.description) || safeText(request.style);
+    const owner = db.select().from(people).where(eq(people.id, file.ownerPersonId)).get();
+    const canManage = canManageMadeFile(person, file.ownerPersonId);
+    const share = visibilityForFile(person, fileId, canManage, fileAudience(file.provenance) === "adult-only");
+    return [{ id: fileId, title, description, creator: owner
+      ? { name: owner.displayName, avatar_url: null, href: `/people/${encodeURIComponent(owner.id)}` }
+      : { label: "Made at home" }, made_at: file.createdAt, visibility: share.visibility }];
+  }
+  if (!item) return [];
+  const source = liveSourceById(item.source_id);
+  if (!source) return [];
+  const members = listActivePeople();
+  const recipients = source.visible_to === "household"
+    ? members
+    : Array.isArray(source.visible_to) ? members.filter((candidate) => source.visible_to.includes(candidate.id)) : [];
+  const shared = source.visible_to === "household" || recipients.length > 1;
+  const household = shared ? recipients.map((candidate) => ({ id: candidate.id, name: candidate.displayName, avatar_url: null })) : [];
+  return [{ id: item.id, title: safeText(item.title) || "Song", description: safeText(item.description), creator: { name: safeText(item.subtitle) || safeText(source.label) || "Music library" }, made_at: item.added_at,
+    visibility: { mode: shared ? "shared" : "private", people: household, can_manage: false } }];
+}
+
+function musicCreationPeople(person: PersonRow, id: string): unknown[] {
+  const item = readableIn(person, "music", id);
+  const fileId = (item?.location as { file_id?: string } | undefined)?.file_id ?? id;
+  const file = db.select().from(attachments).where(eq(attachments.id, fileId)).get();
+  if (!file || file.deletedAt !== null || !canReadFileAudience(person, file) || libraryProvenance(file.provenance).writer !== "music-gen") return [];
+  return visibilityForFile(person, fileId, canManageMadeFile(person, file.ownerPersonId), fileAudience(file.provenance) === "adult-only").candidates;
+}
+
+export function changeMusicCreationShare(person: PersonRow, op: "add" | "remove" | "private", id: string, target?: string) {
+  const item = readableIn(person, "music", id);
+  const fileId = (item?.location as { file_id?: string } | undefined)?.file_id ?? id;
+  const file = db.select().from(attachments).where(eq(attachments.id, fileId)).get();
+  if (!file || file.deletedAt !== null || file.origin === "fetched" || !canReadFileAudience(person, file) || libraryProvenance(file.provenance).writer !== "music-gen") return { ok: false as const, status: 404, error: "Song unavailable. Go back to Music and choose another." };
+  if (!canManageMadeFile(person, file.ownerPersonId)) return { ok: false as const, status: 403, error: "Only the owner or an admin may change who sees this song." };
+  if (person.role === "child") return { ok: false as const, status: 403, error: "Sharing is turned off for children. Ask a grown-up to share this for you." };
+  if (op === "add") {
+    if (!target) return { ok: false as const, status: 400, error: "Choose someone in your home." };
+    const result = createShare(person, { fileId, to: target, provenance: "music:creation-header" });
+    if (!result.ok) return result;
+  } else {
+    const matching = listSharesForFile(fileId).filter((share) => op === "private" || share.to === target);
+    for (const share of matching) {
+      const result = deleteShare(person, share.id);
+      if (!result.ok) return result;
+    }
+  }
+  return { ok: true as const, value: musicCreation(person, fileId)[0] };
 }
 
 /** Ids whose rows are discovery: a child gets none (allowlist-only). */
@@ -865,6 +927,10 @@ function albumTile(person: PersonRow, id: string, tracks: readonly MediaItem[]):
 }
 
 function musicData(person: PersonRow, dataId: string, params: DataParams): unknown | null {
+  if (dataId === "header" && (params.scope === "creation" || params.scope === "creation-people")) {
+    if (!params.id) return [];
+    return params.scope === "creation-people" ? musicCreationPeople(person, params.id) : musicCreation(person, params.id);
+  }
   if (dataId === "songs" && params.scope === "made") return madeFiles(person, "music").slice(0, 16).map((file) => ({ id: file.id, title: file.name, channel: null, summary: "", kind: "track", thumbnail: file.thumb_url, backdrop: file.thumb_url, duration_s: file.duration_seconds, copy_label: "Saved", playing: false, like_label: "Like" }));
   if (dataId === "up-next") return trackRows(person, musicNext(person, params.id ?? ""));
   if (dataId === "songs") return trackRows(person, musicLibrary(person));
