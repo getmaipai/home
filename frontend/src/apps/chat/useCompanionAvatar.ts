@@ -1,5 +1,5 @@
 import { useContext } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQueries, useQuery } from "@tanstack/react-query";
 import type { CompanionClips } from "@maipai/ui/src/elements/companion-avatar-machine";
 import { api } from "@/lib/api";
 import { WakeWordPersonContext } from "@/apps/chat/chatThreadContexts";
@@ -25,4 +25,24 @@ export function useCompanionAvatar(companionId?: string | null) {
   });
   const avatar = query.data?.avatar ?? null;
   return { avatar: query.isLoading || query.isPending ? null : avatar, clips: avatar ? mapCompanionClips(avatar.states) : null, loading: query.isLoading || query.isPending };
+}
+
+/** The idle still (else the first state's) of each companion, by id, plus `default` for the person's own default. Shares the avatar query cache. */
+export function useCompanionStills(ids: string[]): Record<string, string | undefined> {
+  const person = useContext(WakeWordPersonContext);
+  const keys = [null, ...ids];
+  const results = useQueries({
+    queries: keys.map((id) => ({
+      queryKey: [...COMPANION_AVATAR_QUERY_KEY, person?.id ?? null, id],
+      queryFn: () => api.companionAvatar(id ?? undefined),
+      enabled: person !== null,
+      staleTime: 5 * 60_000,
+    })),
+  });
+  const stills: Record<string, string | undefined> = {};
+  keys.forEach((id, index) => {
+    const states = results[index]?.data?.avatar?.states ?? {};
+    stills[id ?? "default"] = (states.idle ?? Object.values(states)[0])?.urls.still;
+  });
+  return stills;
 }

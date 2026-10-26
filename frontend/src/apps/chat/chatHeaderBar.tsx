@@ -74,8 +74,6 @@ import {
   DropdownMenuContent,
   DropdownMenuCheckboxItem,
   DropdownMenuItem,
-  DropdownMenuRadioGroup,
-  DropdownMenuRadioItem,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@maipai/ui/src/ui/dropdown-menu";
@@ -87,7 +85,7 @@ import { getIcon } from "@maipai/ui/src/icons";
 
 const ColumnOpenIcon = getIcon("panel-left-open");
 import { useChatHeaderData } from "@/apps/chat/chatHeaderData";
-import { useCompanionAvatar } from "@/apps/chat/useCompanionAvatar";
+import { useCompanionAvatar, useCompanionStills } from "@/apps/chat/useCompanionAvatar";
 
 const PencilIcon = getIcon("pencil");
 const TrashIcon = getIcon("trash");
@@ -169,6 +167,7 @@ type ShellsProps = { shells?: boolean; onMenu?: (() => void) | undefined; menuEx
 
 export function ChatHeaderBar({ phoneRow = false, trailing, shells = false, onMenu, menuExpanded, menuControls, onHistory, onCall }: { phoneRow?: boolean; trailing?: ReactNode } & ShellsProps = {}) {
   const data = useChatHeaderData();
+  const stills = useCompanionStills(data?.companions.map(({ id }) => id) ?? []);
   const [renaming, setRenaming] = useState(false);
   const [open, setOpen] = useState(false);
 
@@ -208,16 +207,13 @@ export function ChatHeaderBar({ phoneRow = false, trailing, shells = false, onMe
     </>
   );
   const companionId = data.companionId ?? data.defaultCompanionId ?? null;
-  const identityMenu = data.pinnable ? (
-    <DropdownMenuRadioGroup value={data.companionId ?? "default"} onValueChange={(value) => void data.onCompanionChange(value === "default" ? null : value)}>
-      <DropdownMenuRadioItem value="default">My default</DropdownMenuRadioItem>
-      {data.companions.map((companion) => <DropdownMenuRadioItem key={companion.id} value={companion.id}>{companion.name}</DropdownMenuRadioItem>)}
-    </DropdownMenuRadioGroup>
-  ) : undefined;
+  const identityChoices = data.pinnable
+    ? [{ value: "default", label: data.companions.find(({ id }) => id === data.defaultCompanionId)?.name ?? "My default", imageUrl: stills.default }, ...data.companions.map((companion) => ({ value: companion.id, label: companion.name, imageUrl: stills[companion.id] }))]
+    : undefined;
   if (shells || companionId) {
     return (
       <>
-        <WithCompanion companionId={companionId} fallbackName={data.companions.find(({ id }) => id === companionId)?.name}>{(name, media) => <ChatHeader name={name} media={media} identityMenu={identityMenu} onMenu={onMenu} onCall={onCall} actions={actions} menuExpanded={menuExpanded} menuControls={menuControls} />}</WithCompanion>
+        <WithCompanion companionId={companionId} fallbackName={data.companions.find(({ id }) => id === companionId)?.name}>{(name, media) => <ChatHeader name={name} media={media} identityChoices={identityChoices} identityValue={data.companionId ?? "default"} onIdentityChange={(value) => void data.onCompanionChange(value === "default" ? null : value)} onMenu={onMenu} onCall={onCall} actions={actions} menuExpanded={menuExpanded} menuControls={menuControls} />}</WithCompanion>
         <Dialog open={renaming} onOpenChange={setRenaming}>
           <DialogContent>
             <DialogHeader><DialogTitle>Rename</DialogTitle><DialogDescription>{title}</DialogDescription></DialogHeader>
