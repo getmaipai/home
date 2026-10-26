@@ -555,7 +555,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/pictures/laneGate.ts` | CHILD_SAFETY_SCHEMA, CHILD_SAFETY_SYSTEM_PROMPT, MIN_CHILD_CONFIDENCE, parseChildSafety, childSafetyOk, __setChildSafetyRunnerForTests |
 | `backend/src/lib/pictures/minorLine.ts` | MINOR_MARKERS, SEXUAL_WORDS, UNCLOTHED_PHRASES, normalise, hasWord, mentionsSexualWord |
 | `backend/src/lib/pictures/people.ts` | PeopleError, NO_PEOPLE_LINE, PEOPLE_UNAVAILABLE_LINE, PEOPLE_UNSURE_LINE, PEOPLE_BUSY_LINE, RETRY_PAUSE_MS |
-| `backend/src/lib/pictures/policy.ts` | GENERATION_ADULTS_KEY, GENERATION_ADULT_ADAPTERS_KEY, PEOPLE_PROMPTS_KEY, peoplePromptsOn, peopleGuidanceSuffix, NO_PEOPLE_PROMPTS_GUIDANCE |
+| `backend/src/lib/pictures/policy.ts` | GENERATION_ADULTS_KEY, GENERATION_ADULT_ADAPTERS_KEY, PEOPLE_PROMPTS_KEY, peoplePromptsOn, peopleGuidanceSuffix, REAL_PEOPLE_PICTURE_GUIDANCE |
 | `backend/src/lib/pictures/quality.ts` | QUICK_MODEL, ERNIE_MODEL, DETAILED_MODEL, qualityOfModel, isPictureQuality, quickModelFor |
 | `backend/src/lib/pictures/ready.ts` | __setPictureStatusForTests, pictureEngineStatus, dropPictureStatusCache, pictureEngineReady, readyStatusForTests, pictureNotReadyReason |
 | `backend/src/lib/pictures/stack.ts` | StackPicturesError, __setPicturesFetchForTests, submitGeneration, submitEdit, getGenerationJob, fetchPicturePreview |
