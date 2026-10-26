@@ -152,7 +152,7 @@ To restart by hand use a copy of `pipeline.sh` taken from `origin/main` (`git sh
 
 `bash scripts/ship.sh [sha|main] [--before-green] [--tag] [--dry-run]`, only when the owner says so in that turn.
 
-**Run it on the Mac Studio only.** The live hub is the `com.maipai.home` launchd service there. Any other Mac (the MacBook runs a dev Home on 3000 from its own checkout and its own `data/`) refuses with "this Mac does not run the live hub". From the MacBook, release with `localrelease` (`ssh studio-release`): the Studio's release-only key runs `scripts/release-home.sh`, which tags `origin/main` and installs the tag. It accepts a live `sha-<7>` label as long as that commit is on `origin/main`. On 2026-10-25 a session ran `ship.sh` on the MacBook; only the data guard stopped it.
+**Run it on the Mac Studio only.** The live hub is the install there, marked by the file `/usr/local/maipai-home/.live-hub` (create it once on the Studio with `sudo touch`). Any other Mac (the MacBook also holds a `com.maipai.home` install, so a launchd check cannot tell them apart) refuses with "this Mac is not marked as the live hub". From the MacBook, release with `localrelease` (`ssh studio-release`): the Studio's release-only key runs `scripts/release-home.sh`, which tags `origin/main` and installs the tag. It accepts a live `sha-<7>` label as long as that commit is on `origin/main`. On 2026-10-25 a session ran `ship.sh` on the MacBook; only the data guard stopped it.
 
 1. The sha must be on `origin/main`, and the watcher must have written `green/<sha>`, or `--before-green` is given (recorded in `shipped.jsonl`).
 2. Stop any development Home started from the main checkout.

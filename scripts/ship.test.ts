@@ -24,6 +24,10 @@ beforeAll(() => {
   Object.assign(baseEnv, { MAIPAI_SHIP_DATA: data, MAIPAI_WATCH_DATA: watch, MAIPAI_SHIP_LIVE: live, MAIPAI_PROMOTE_BIN: promote, MAIPAI_SHIP_SUDO: "", MAIPAI_SHIP_STOP_DEV_CMD: "true", MAIPAI_SHIP_HEALTH_CMD: join(scratch, "health-check"), MAIPAI_SHIP_HEALTH_TIMEOUT: "1", MAIPAI_SHIP_MIGRATIONS_CMD: "echo 3", MAIPAI_PUBLISH_CMD: join(scratch, "publish") + " TAG NOTES", MAIPAI_LAND_GIT_ENV: "", MAIPAI_HUB_LOCK_PATH: join(scratch, "not-running.lock"), MAIPAI_SHIP_WEB_PORT: "45991" });
 });
 describe("ship pipeline", () => {
+  test("refuses on a Mac without the live-hub marker", () => {
+    const out = run([sha, "--before-green"], { MAIPAI_SHIP_LIVE: "", MAIPAI_SHIP_MARKER: join(scratch, "no-such-marker") });
+    expect(out.status).toBe(1); expect(out.stderr).toContain("not marked as the live hub"); expect(out.stderr).toContain("sudo touch");
+  }, 60_000);
   test("rejects side branch commits before calling helper", () => {
     git(main, "checkout", "-b", "side"); writeFileSync(join(main, "side.txt"), "side\n"); git(main, "add", "."); git(main, "commit", "-m", "side"); const side = git(main, "rev-parse", "HEAD"); git(main, "checkout", "main");
     const out = run([side, "--before-green"]); expect(out.status).toBe(1); expect(out.stderr).toContain("not on origin/main"); expect(existsSync(join(scratch, "promote.calls"))).toBe(false);
