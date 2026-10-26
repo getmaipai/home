@@ -295,7 +295,7 @@ describe("what the tool says it is for", () => {
   test("the tool says it also changes a picture the person already has, through `change`, and keeps the model from describing a result it has not seen (a model once called it for 'remove the background' and claimed the edit)", async () => {
     const manifest = JSON.parse(await Bun.file(new URL("../packages/generate_image/manifest.json", import.meta.url)).text()) as { args: { properties: Record<string, { description: string; enum?: string[] }> } };
     expect(manifest.args.properties.change!.description).toContain("already have changed");
-    expect(manifest.args.properties.kind!.enum).toEqual(["remove_people", "remove_background", "upscale", "change"]);
+    expect(manifest.args.properties.kind!.enum).toEqual(["remove_background", "upscale", "change"]);
     expect(manifest.args.properties.prompt!.description).toContain("never describe a picture you did not make");
   });
 });
