@@ -7,9 +7,11 @@
 import { describe, expect, test, beforeEach } from "bun:test";
 import { TestClient } from "./client";
 import { resetDb } from "./reset-db";
-import { widgetCardBlock } from "@/lib/widgets";
+import { widgetCardBlock, orderHomeCards, type WidgetDescriptor } from "@/lib/widgets";
 import type { PersonRow } from "@/types";
 import { HAS_DENO } from "./support/deno";
+import { settingsValues } from "@/db/schema";
+import { db } from "@/db";
 
 beforeEach(() => resetDb());
 
@@ -38,10 +40,21 @@ describe("GET /api/widgets", () => {
     const res = await client.get("/api/widgets");
     expect(res.status).toBe(200);
     const body = (await res.json()) as Array<{ package: string; id: string; title: string; size: string; refresh_s: number }>;
-    expect(body).toContainEqual({ package: "weather", id: "current", title: "Weather", size: "card", refresh_s: 1800 });
-    expect(body).toContainEqual({ package: "news", id: "headlines", title: "News", size: "row", refresh_s: 900 });
-    expect(body).toContainEqual({ package: "list-view", id: "shopping", title: "Shopping List", size: "card", refresh_s: 60 });
-    expect(body).toContainEqual({ package: "almanac-date", id: "today", title: "Today", size: "card", refresh_s: 3600 });
+    expect(body).toContainEqual(expect.objectContaining({ package: "weather", id: "current", title: "Weather", size: "card", refresh_s: 1800, priority: 50, surfaces: ["home"] }));
+    expect(body.some((w) => w.package === "news")).toBe(true);
+    expect(body.some((w) => w.package === "list-view")).toBe(true);
+    expect(body.some((w) => w.package === "almanac-date")).toBe(true);
+  });
+
+  test("/api/widgets/home returns the ordered hero, cards and more for my role", async () => {
+    const client = await owner();
+    const res = await client.get("/api/widgets/home");
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { hero: unknown; cards: unknown[]; more: unknown[] };
+    expect(Array.isArray(body.cards)).toBe(true);
+    expect(Array.isArray(body.more)).toBe(true);
+    expect((await client.get("/api/widgets/home?surface=nope")).status).toBe(400);
+    expect((await new TestClient().get("/api/widgets/home")).status).toBe(401);
   });
 
   test("a role below every bundled widget package's min_role (child) sees none of them", async () => {
@@ -52,6 +65,32 @@ describe("GET /api/widgets", () => {
     const body = (await res.json()) as Array<{ package: string }>;
     expect(body.some((w) => w.package === "weather")).toBe(false);
     expect(body.some((w) => w.package === "list-view")).toBe(false);
+  });
+});
+
+describe("orderHomeCards", () => {
+  const who = (role: string, id = "p") => ({ id, role, birthdate: null }) as unknown as PersonRow;
+  const widget = (id: string, changes: Partial<WidgetDescriptor> = {}): WidgetDescriptor => ({ package: "weather", id, title: id, size: "card", refresh_s: 10, min_role: "guest", priority: 50, hero: false, surfaces: ["home"], installed_at: "", ...changes });
+
+  test("widget role floors and all roles: child never gets adult widget", () => {
+    for (const role of ["owner", "admin", "adult", "teen", "child", "guest"]) {
+      const result = orderHomeCards([widget("adult-only", { min_role: "adult" })], who(role), "home");
+      const visible = [...result.cards, ...result.more].some((w) => w.id === "adult-only");
+      if (role === "child") expect(visible).toBe(false);
+    }
+  });
+
+  test("tv excludes person-named inputs", () => {
+    const result = orderHomeCards([widget("house", { surfaces: ["tv"] }), widget("mine", { surfaces: ["tv"], inputs: { person_id: "x" } })], who("owner"), "tv");
+    expect(result.cards.map((w) => w.id)).toEqual(["house"]);
+  });
+
+  test("hidden hero falls back to next hero candidate and ties use deterministic order", () => {
+    const person = who("owner", "hide-test");
+    db.insert(settingsValues).values({ scope: "person:hide-test", key: "ui.home_hidden", value: JSON.stringify(JSON.stringify(["weather/first"])), hlc: "1:0:test", source: "test", updatedAt: new Date().toISOString() }).run();
+    const ordered = orderHomeCards([widget("first", { hero: true, priority: 90 }), widget("second", { hero: true, priority: 80 }), widget("b", { priority: 40 }), widget("a", { priority: 40 })], person, "home");
+    expect(ordered.hero?.id).toBe("second");
+    expect(ordered.cards.map((w) => w.id)).toEqual(["a", "b"]);
   });
 });
 

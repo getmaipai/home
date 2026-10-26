@@ -19,6 +19,9 @@
 // function per package, the same "one definition, one implementation"
 // reasoning the org's own standards state outright.
 import { listPackageIds, loadManifestOnly, meetsMinRole, runPlugin } from "@/lib/plugins";
+import { getActiveInstall } from "@/lib/packageResolve";
+import { getPersonSettingValue } from "@/lib/settings";
+import { getPackageStatus } from "@/lib/smoke";
 import { householdHomePlaceName } from "@/lib/places";
 import { refusePackageReplyIfUnsafe } from "@/lib/safety";
 import { speakerAgeBand } from "@/lib/ageBand";
@@ -30,6 +33,19 @@ export interface WidgetDescriptor {
   title: string;
   size: "card" | "row";
   refresh_s: number;
+  min_role: string;
+  priority: number;
+  hero: boolean;
+  data?: string;
+  surfaces: Array<"home" | "tv" | "robot">;
+  inputs?: Record<string, unknown>;
+  installed_at: string;
+}
+
+export interface OrderedHomeCards {
+  hero: WidgetDescriptor | null;
+  cards: WidgetDescriptor[];
+  more: WidgetDescriptor[];
 }
 
 export interface WidgetItem {
@@ -78,11 +94,40 @@ export function listWidgets(actor: { role: string }): WidgetDescriptor[] {
     if (!loaded.ok) continue;
     const manifest = loaded.value;
     if (!meetsMinRole(actor.role, manifest.min_role)) continue;
+    const installedAt = getActiveInstall(id)?.installedAt ?? "";
     for (const widget of manifest.contributes?.widgets ?? []) {
-      out.push({ package: id, id: widget.id, title: widget.title, size: widget.size, refresh_s: widget.refresh_s });
+      out.push({ package: id, id: widget.id, title: widget.title, size: widget.size, refresh_s: widget.refresh_s,
+        min_role: widget.min_role ?? manifest.min_role, priority: widget.priority ?? 50, hero: widget.hero ?? false,
+        ...(widget.data ? { data: widget.data } : {}), surfaces: widget.surfaces ?? ["home"],
+        ...(widget.inputs ? { inputs: widget.inputs as Record<string, unknown> } : {}), installed_at: installedAt });
     }
   }
   return out;
+}
+
+/** Orders the actor's visible Home widgets. Package installs without a store
+ * timestamp use the empty timestamp, which keeps the sort stable for the
+ * bundled default set. */
+export function orderHomeCards(widgets: WidgetDescriptor[], person: PersonRow, surface: "home" | "tv" | "robot"): OrderedHomeCards {
+  const hiddenValue = getPersonSettingValue(person, "ui.home_hidden");
+  let hidden: Set<string>;
+  try { hidden = new Set(typeof hiddenValue === "string" ? JSON.parse(hiddenValue) as string[] : []); }
+  catch { hidden = new Set(); }
+  const eligible = widgets.filter((widget) => {
+    const loaded = loadManifestOnly(widget.package);
+    if (!meetsMinRole(person.role, widget.min_role)) return false;
+    if (loaded.ok && !meetsMinRole(person.role, loaded.value.min_role)) return false;
+    if (getPackageStatus(widget.package).status !== "enabled") return false;
+    if (!widget.surfaces.includes(surface)) return false;
+    if (surface !== "home" && Object.keys(widget.inputs ?? {}).some((key) => /person|people|user|profile/i.test(key))) return false;
+    if (surface === "home" && loaded.ok && loaded.value.incognito === "blocked") return false;
+    return !hidden.has(`${widget.package}/${widget.id}`);
+  });
+  const byOrder = (a: WidgetDescriptor, b: WidgetDescriptor) => b.priority - a.priority || a.installed_at.localeCompare(b.installed_at) || a.id.localeCompare(b.id);
+  const heroes = eligible.filter((widget) => widget.hero).sort(byOrder);
+  const hero = heroes[0] ?? null;
+  const rest = eligible.filter((widget) => widget !== hero).sort(byOrder);
+  return { hero, cards: rest.slice(0, 4), more: rest.slice(4) };
 }
 
 /** Runs the declared widget's own package recipe with its own declared

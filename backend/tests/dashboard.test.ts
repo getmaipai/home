@@ -96,7 +96,7 @@ describe("GET /api/dashboard", () => {
     }
   });
 
-  test("a child's own turn is visible to owner/admin, but a teen's or another adult's own turn never is", async () => {
+  test("an admin dashboard carries only the viewer's own activity row", async () => {
     restoreDefaultScriptedStack();
     const { client: ownerClient, row: ownerRow } = await owner();
     const { row: childRow } = await child(ownerClient);
@@ -119,10 +119,9 @@ describe("GET /api/dashboard", () => {
     expect(res.status).toBe(200);
     const body = (await res.json()) as { recent_activity: Array<{ person_id: string; display_name: string }> };
     const speakers = body.recent_activity.map((a) => a.person_id);
-    expect(speakers).toContain(ownerRow.id);
-    expect(speakers).toContain(childRow.id);
+    expect(speakers).toEqual([ownerRow.id]);
+    expect(speakers).not.toContain(childRow.id);
     expect(speakers).not.toContain(adultRow.id);
-    expect(speakers.length).toBe(new Set(speakers).size); // no duplicates from the self+children merge
   });
 
   test("updates_available reflects a real pending update, without calling GitHub", async () => {

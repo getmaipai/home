@@ -5,7 +5,8 @@
 import { createRoute, z } from "@hono/zod-openapi";
 import { apiRouter, errorResponses } from "@/lib/openapi";
 import { requireAuth } from "@/middleware/auth";
-import { listWidgets, getWidgetData } from "@/lib/widgets";
+import { listWidgets, getWidgetData, orderHomeCards } from "@/lib/widgets";
+import type { WidgetDescriptor } from "@/lib/widgets";
 
 export const widgetsRoutes = apiRouter();
 
@@ -15,7 +16,11 @@ const WidgetDescriptor = z.object({
   title: z.string(),
   size: z.enum(["card", "row"]),
   refresh_s: z.number().int(),
+  min_role: z.string(), priority: z.number().int(), hero: z.boolean(), data: z.string().optional(),
+  surfaces: z.array(z.enum(["home", "tv", "robot"])), inputs: z.record(z.string(), z.unknown()).optional(), installed_at: z.string(),
 });
+
+const OrderedCards = z.object({ hero: WidgetDescriptor.nullable(), cards: z.array(WidgetDescriptor), more: z.array(WidgetDescriptor) });
 
 const WidgetItem = z.object({
   title: z.string(),
@@ -46,9 +51,23 @@ const listRoute = createRoute({
     ...errorResponses({ 401: "Not signed in" }),
   },
 });
-widgetsRoutes.openapi(listRoute, (c) => {
+widgetsRoutes.openapi(listRoute, (c) => c.json(listWidgets(c.get("person")), 200));
+
+const homeRoute = createRoute({
+  method: "get",
+  path: "/home",
+  tags: ["Widgets"],
+  summary: "My Home cards for one surface: the hero, the first four and the rest, ordered and filtered for me",
+  middleware: [requireAuth] as const,
+  request: { query: z.object({ surface: z.enum(["home", "tv", "robot"]).default("home") }) },
+  responses: {
+    200: { content: { "application/json": { schema: OrderedCards } }, description: "Ordered Home slots for the requested surface." },
+    ...errorResponses({ 401: "Not signed in" }),
+  },
+});
+widgetsRoutes.openapi(homeRoute, (c) => {
   const actor = c.get("person");
-  return c.json(listWidgets(actor), 200);
+  return c.json(orderHomeCards(listWidgets(actor), actor, c.req.valid("query").surface), 200);
 });
 
 const dataRoute = createRoute({

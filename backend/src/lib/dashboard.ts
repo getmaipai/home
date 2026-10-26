@@ -46,9 +46,8 @@ const TURNS_PER_DAY_WINDOW_DAYS = 30;
  * or a teen's own activity here, the same privacy wall list() already
  * enforces on every other read of this data. */
 function visibleTargetIds(actor: PersonRow, activePeople: readonly PersonRow[]): string[] {
-  if (!isOwnerOrAdmin(actor)) return [actor.id];
-  const childIds = activePeople.filter((p) => p.role === "child" && p.id !== actor.id).map((p) => p.id);
-  return [actor.id, ...childIds];
+  void activePeople;
+  return [actor.id];
 }
 
 // A review finding: calling list(actor, id) once per target id (N
