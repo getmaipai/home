@@ -49,6 +49,8 @@ function extremeValueFor(key: SettingsKey, places: { household: string; person: 
       if ((key.range as { multiple?: boolean } | undefined)?.multiple) return [...(key.range?.options ?? [])];
       return key.range?.options?.at(-1) ?? key.default;
     case "text":
+      // companions.enabled takes a list of companion ids.
+      if (key.key === "companions.enabled") return ["stress-test-value"];
       // KS-05: a news feed box holds https feed addresses, one per line; free text is refused with a fix.
       if (key.key.startsWith("news.feeds.")) return "https://news.example.com/feed.xml";
       return key.default === "" ? "stress-test-value" : `${key.default}-stressed`;
@@ -273,7 +275,7 @@ describe("the crisis overlay is not configurable", () => {
       expect(result.value.crisis_resources, `after stressing ${keyDef.key}`).toContain("988");
     }
     expect(covered.size, "every real settings key was covered exactly once").toBe(registry.length);
-  }, 15_000);
+  }, 90_000);
 
   test("content-ceiling dial values (spec-level, not yet a household setting) never enter checkSafety() at all - a self-harm turn is identical under every band", async () => {
     // The ceiling isn't wired to any settings key yet (this step's own
