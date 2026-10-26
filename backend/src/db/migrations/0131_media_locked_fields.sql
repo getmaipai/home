@@ -1,0 +1,1 @@
+ALTER TABLE `media_items` ADD `locked_fields_json` text;
