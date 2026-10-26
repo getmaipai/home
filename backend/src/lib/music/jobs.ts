@@ -76,7 +76,7 @@ function sleep(ms: number, signal: AbortSignal): Promise<void> {
   });
 }
 export interface StartMusicInput {
-  actor: PersonRow; conversationId: string; turnId: string; temporary: boolean; task: MusicTask;
+  actor: PersonRow; conversationId: string; turnId: string; companionId?: string | null; temporary: boolean; task: MusicTask;
   request: MusicRequest; body: Omit<MusicBody, "timeout_ms">; parentFileId?: string | null;
 }
 export async function startMusicJob(input: StartMusicInput): Promise<MusicJob> {
@@ -94,7 +94,7 @@ export async function startMusicJob(input: StartMusicInput): Promise<MusicJob> {
   const priorAt = jobsForConversation(input.actor, input.conversationId, input.temporary).reduce((at, j) => Math.max(at, Date.parse(j.chosenAt ?? j.createdAt)), 0);
   const now = new Date(Math.max(Date.now(), priorAt + 1)).toISOString();
   const job: MusicJob = {
-    id: newMusicJobId(), personId: input.actor.id, conversationId: input.conversationId, turnId: input.turnId, task: input.task, request: input.request,
+    id: newMusicJobId(), personId: input.actor.id, conversationId: input.conversationId, turnId: input.turnId, companionId: input.companionId ?? null, task: input.task, request: input.request,
     stackJob: null, state: "queued", stage: "queued", progress: 0, etaSeconds: null, position: null,
     coverJobId: null, coverFileId: null, errorCode: null, errorLine: null, fileId: null, parentFileId: input.parentFileId ?? null,
     seed: null, durationS: null, lrc: null, chosenAt: null, createdAt: now, updatedAt: now, temporary: input.temporary,

@@ -5,6 +5,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, test } from "bun:tes
 import { TestClient } from "./client";
 import { resetDb } from "./reset-db";
 import { issueDeviceToken } from "@/lib/deviceTokens";
+import { createJob } from "@/lib/jobs";
 
 beforeEach(() => resetDb());
 
@@ -96,6 +97,19 @@ describe("one companion in full", () => {
     expect(detail.used_by.robots.map((robot) => robot.id)).toEqual([deviceId]);
     expect((await list(owner)).robots?.[0]?.companion_id).toBe("lively-child");
   });
+});
+
+test("companion activity and counts contain only the signed-in person's jobs", async () => {
+  const { owner, adult } = await setup();
+  const ownerId = (await owner.get("/api/auth/me").then((r) => r.json())) as { id: string };
+  createJob({ id: "activity-owner", kind: "image", startedBy: ownerId.id, forPerson: ownerId.id, companionId: "default", title: "Owner's private job", state: "running", progress: {}, provenance: {} });
+  createJob({ id: "activity-adult", kind: "image", startedBy: adult.id, forPerson: adult.id, companionId: "default", title: "My picture", state: "done", progress: {}, provenance: {} });
+  const activity = await (await owner.get("/api/companions/default/activity")).json() as { activity: Array<{ title: string }> };
+  expect(activity.activity.map((row) => row.title)).toEqual(["Owner's private job"]);
+  const cards = await (await owner.get("/api/companions")).json() as { companions: Array<{ id: string; task_count: number }> };
+  expect(cards.companions.find((card) => card.id === "default")?.task_count).toBe(1);
+  const adultActivity = await (await adult.client.get("/api/companions/default/activity")).json() as { activity: Array<{ title: string }> };
+  expect(adultActivity.activity.map((row) => row.title)).toEqual(["My picture"]);
 });
 
 describe("the companion's voice setting", () => {

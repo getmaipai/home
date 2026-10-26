@@ -57,8 +57,10 @@ describe("the refusal text and the other lines", () => {
   test("a sex reveal party is not a sexual word on its own", () => {
     expect(minorSexualMatch("a gender reveal and sex reveal party for the baby")).toBe(false);
   });
-  test("the real-person flag still refuses", () => {
-    expect(refusePrompt("a portrait of the mayor", { depictsRealPerson: true })).toBe("real_person");
+  test("the real-person flag refuses sexual content for an adult and everything for a teen (owner, 2026-10-25)", () => {
+    expect(refusePrompt("a portrait of the mayor", { depictsRealPerson: true })).toBeNull();
+    expect(refusePrompt("a sexual portrait of the mayor", { depictsRealPerson: true })).toBe("real_person");
+    expect(refusePrompt("a portrait of the mayor", { depictsRealPerson: true, lane: "teen" })).toBe("real_person");
   });
   test("an uploaded photo is still not dressed in swimwear or undressed", () => {
     expect(asksToUndress("put her in a bikini")).toBe(true);

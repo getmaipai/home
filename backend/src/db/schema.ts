@@ -906,6 +906,7 @@ export const jobs = sqliteTable("jobs", {
   waitingReason: text("waiting_reason"),
   resultRef: text("result_ref"),
   conversationId: text("conversation_id").references(() => conversations.id),
+  companionId: text("companion_id"),
   errorKind: text("error_kind"),
   raw: text("raw"),
   provenance: text("provenance").notNull(),
@@ -1826,6 +1827,7 @@ export const pictureJobs = sqliteTable(
       .references(() => people.id),
     conversationId: text("conversation_id"),
     turnId: text("turn_id"),
+    companionId: text("companion_id"),
     kind: text("kind").notNull(),
     purpose: text("purpose"),
     state: text("state").notNull(),
@@ -1891,6 +1893,7 @@ export const videoJobs = sqliteTable(
       .references(() => people.id),
     conversationId: text("conversation_id"),
     turnId: text("turn_id"),
+    companionId: text("companion_id"),
     kind: text("kind").notNull(),
     state: text("state").notNull(),
     stackJob: text("stack_job"),
@@ -2192,7 +2195,7 @@ export const mediaWatchSessions = sqliteTable("media_watch_sessions", {
 // MUSIC-GEN-03: private requests, progress and version lineage. Files are separate attachments.
 export const musicJobs = sqliteTable("music_jobs", {
   id: text("id").primaryKey(), personId: text("person_id").notNull().references(() => people.id),
-  conversationId: text("conversation_id"), turnId: text("turn_id"), task: text("task").notNull(), request: text("request").notNull(),
+  conversationId: text("conversation_id"), turnId: text("turn_id"), companionId: text("companion_id"), task: text("task").notNull(), request: text("request").notNull(),
   stackJob: text("stack_job"), state: text("state").notNull(), stage: text("stage"), progress: real("progress").notNull().default(0),
   etaSeconds: real("eta_seconds"), position: integer("position"), errorCode: text("error_code"), errorLine: text("error_line"),
   coverJobId: text("cover_job_id"), coverFileId: text("cover_file_id"),

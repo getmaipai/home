@@ -6,7 +6,7 @@ import { api, ApiError, type CompanionCard, type CompanionDetail, type Companion
 import { CompanionDetailPage, CompanionsPage } from "@/shell/pages/CompanionsPage";
 import { CompanionShellViewer } from "@/lib/companionShells";
 
-const originals = { companions: api.companions, companion: api.companion, conversationList: api.conversationList, createConversation: api.createConversation, setDefaultCompanion: api.setDefaultCompanion, addCompanion: api.addCompanion, removeCompanion: api.removeCompanion, deleteCompanion: api.deleteCompanion, stackVoices: api.stackVoices, setSetting: api.setSetting, settingsValues: api.settingsValues };
+const originals = { companions: api.companions, companion: api.companion, companionActivity: api.companionActivity, conversationList: api.conversationList, createConversation: api.createConversation, setDefaultCompanion: api.setDefaultCompanion, addCompanion: api.addCompanion, removeCompanion: api.removeCompanion, deleteCompanion: api.deleteCompanion, stackVoices: api.stackVoices, setSetting: api.setSetting, settingsValues: api.settingsValues };
 afterEach(() => { cleanup(); Object.assign(api, originals); });
 
 function card(overrides: Partial<CompanionCard> = {}): CompanionCard {
@@ -46,21 +46,27 @@ test("the gallery shows character tiles, default check and new companion tile", 
   expect(view.queryByText("Robots")).toBeNull();
 });
 
-test("preview status uses the kit badge and tile selection opens its detail", async () => {
+test("preview companion tile selection opens its detail", async () => {
   api.settingsValues = async () => [{ key: "companions.preview_shells", value: true, source: "user", label: "Preview", level: "basic", secret: false }] as never;
   api.companions = async (): Promise<CompanionList> => ({ allowed: true, can_create: false, can_discover: false, companions: [card({ id: "lively-child" })], discover: [], robots: null, default_id: "" });
   const view = open("/companions", true, { id: "viewer" } as never);
-  const status = await view.findByText("Needs approval");
-  expect(status.className).toContain("cn-badge");
+  await waitFor(() => expect(view.getByText("0 tasks · 0 chats")).toBeTruthy());
   expect(view.getByRole("button", { name: "Sprout" })).toBeTruthy();
 });
 
 test("standard companion card selection opens detail", async () => {
   api.companions = async (): Promise<CompanionList> => ({ allowed: true, can_create: false, can_discover: false, companions: [card()], discover: [], robots: null, default_id: "" });
   api.companion = async () => detail();
+  api.companionActivity = async () => ({ activity: [{ id: "work-1", kind: "project", title: "A real project", state: "running", created_at: "2026-10-25T12:00:00Z", updated_at: "2026-10-25T12:00:00Z" }] });
   const view = open("/companions");
   fireEvent.click(await view.findByRole("button", { name: "Sprout" }));
   await waitFor(() => expect(view.getByText("Sprout loves questions.")).toBeTruthy());
+  fireEvent.mouseDown(view.getByRole("tab", { name: "Activity" }), { button: 0 });
+  fireEvent.click(view.getByRole("tab", { name: "Activity" }));
+  expect(await view.findByText("A real project")).toBeTruthy();
+  fireEvent.mouseDown(view.getByRole("tab", { name: "Tasks" }), { button: 0 });
+  fireEvent.click(view.getByRole("tab", { name: "Tasks" }));
+  expect(await view.findByText("A real project")).toBeTruthy();
 });
 
 test("card actions set a default without opening the card", async () => {
@@ -206,13 +212,14 @@ test("a person who is not an admin gets no voice picker", async () => {
 });
 
 
-test("preview tabs show status and activity, and the detail page is a hero with rows", async () => {
+test("preview cards show real counts and detail activity, and the detail page is a hero with rows", async () => {
   api.settingsValues = async () => [{ key: "companions.preview_shells", value: true, source: "user", label: "Preview", level: "basic", secret: false }] as never;
   api.companions = async () => ({ allowed: true, can_create: true, can_discover: true, default_id: "lively-teen", robots: null,
     companions: [card({ id: "lively-child", name: "Sprout", chats: 2 }), card({ id: "lively-teen", name: "Riff", is_default: true, chats: 0 })], discover: [card({ id: "lively-adult", name: "Pal", type: "adult", tagline: "Research helper" })] });
   const yours = open("/companions", true);
-  await waitFor(() => expect(yours.getAllByText(/^(Working|Idle|Needs approval)$/).length).toBe(2));
-  expect(yours.getByText("Sample activity. Real activity is coming soon.")).toBeTruthy();
+  await waitFor(() => expect(yours.getByText("0 tasks · 0 chats")).toBeTruthy());
+  expect(yours.getAllByText("No activity yet").length).toBe(2);
+  expect(yours.getByText("0 tasks · 2 chats")).toBeTruthy();
   expect(yours.queryByRole("button", { name: "Add" })).toBeNull();
   expect(yours.getAllByRole("button", { name: "New companion" }).length).toBe(1);
   expect(yours.getByRole("link", { name: "New companion" }).getAttribute("href")).toBe("/companions/start");
@@ -225,6 +232,7 @@ test("preview tabs show status and activity, and the detail page is a hero with 
   expect((yours.getByRole("button", { name: "Add" }) as HTMLButtonElement).disabled).toBe(false);
   cleanup();
   api.companion = async () => detail({ can_edit: true });
+  api.companionActivity = async () => ({ activity: [{ id: "job-1", kind: "image", title: "Made a picture", state: "done", created_at: "2026-10-25T12:00:00Z", updated_at: "2026-10-25T12:00:00Z" }] });
   const detailView = open("/companions/lively-child", true);
   await waitFor(() => expect(detailView.getByRole("button", { name: /^Voice/ })).toBeTruthy());
   expect(detailView.queryByRole("tab")).toBeNull();
@@ -234,7 +242,7 @@ test("preview tabs show status and activity, and the detail page is a hero with 
   expect((detailView.getByRole("button", { name: "Chat" }) as HTMLButtonElement).disabled).toBe(false);
   expect(detailView.getByRole("button", { name: "Companion actions" })).toBeTruthy();
   fireEvent.click(detailView.getByRole("button", { name: /Recent activity/ }));
-  expect(await detailView.findByText("Sample activity. Real activity is coming soon.")).toBeTruthy();
+  expect(await detailView.findByText("Made a picture")).toBeTruthy();
   fireEvent.click(detailView.getByRole("button", { name: "Close" }));
   const created: unknown[][] = [];
   api.createConversation = async (_mode, _carryFrom, _folderId, companionId) => { created.push([_mode, _carryFrom, _folderId, companionId]); return { id: "conversation-new" } as never; };

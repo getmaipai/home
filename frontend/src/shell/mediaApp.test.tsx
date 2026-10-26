@@ -39,6 +39,7 @@ const watchPage = {
   body: [{ type: "player", bind: { source: "package", path: "item", params: { id: "$state.id" } }, kind: "video", empty_state: { type: "empty_state", icon: "film", text: "Not on the hub." } }],
 };
 const videosWatchPage = JSON.parse(readFileSync(resolve(import.meta.dir, "../../../backend/packages/videos/pages/watch.json"), "utf8")) as unknown;
+const musicPlayPage = JSON.parse(readFileSync(resolve(import.meta.dir, "../../../backend/packages/music/pages/play.json"), "utf8")) as unknown;
 
 let home: HomeFixture;
 let itemBodies: string[];
@@ -154,6 +155,42 @@ describe("a media app in the shell", () => {
     fireEvent.click(view.getByRole("switch", { name: "Elm" }));
     await waitFor(() => expect(shareBodies).toHaveLength(1));
     expect(JSON.parse(shareBodies[0]!)).toEqual({ url: "/api/plugins/videos/actions/share-add", body: JSON.stringify({ id: "file-rw9pa63jd4", person_id: "person-4" }) });
+  });
+
+  test("the shipped Music play schema renders song details and shares with the creation row file id", async () => {
+    const musicApp = { ...row, package: "music", page: "index", label: "Music", description: "Music.", to: "/apps/music", sections: [{ page: "index", label: "Listen now", icon: null }, { page: "play", label: "Now playing", icon: null }] } as AppRow;
+    const recipients = ["Aster", "Basil"].map((name, index) => ({ id: `person-${index}`, name, avatar_url: null }));
+    const candidate = { id: "person-2", name: "Clover", avatar_url: null };
+    globalThis.fetch = ((input: RequestInfo | URL, init?: RequestInit) => {
+      const url = typeof input === "string" ? input : input.toString();
+      if (url.startsWith("/api/apps")) return Promise.resolve(Response.json([musicApp]));
+      if (url.startsWith("/api/plugins/music/pages/play")) return Promise.resolve(Response.json(musicPlayPage));
+      if (url.startsWith("/api/plugins/music/data/header")) {
+        if (JSON.parse(String(init?.body ?? "{}")).scope === "creation-people") return Promise.resolve(Response.json([candidate]));
+        return Promise.resolve(Response.json([{ id: "file-song-123", title: "River song", creator: { name: "Jesse Torres", href: "/people/person-jesse", avatar_url: null }, made_at: "2026-10-21T12:00:00Z", description: "[Verse] Morning light by the river. The water moves beneath the willow trees.", visibility: { mode: "shared", people: recipients, can_manage: true } }]));
+      }
+      if (url.startsWith("/api/plugins/music/data/item")) return Promise.resolve(Response.json({ id: "file-song-123", title: "River song", src: "/api/files/file-song-123/content", duration_s: 20, chapters: [] }));
+      if (url.startsWith("/api/plugins/music/data/up-next")) return Promise.resolve(Response.json([]));
+      if (url.startsWith("/api/plugins/music/actions/")) {
+        shareBodies.push(JSON.stringify({ url, body: init?.body }));
+        return Promise.resolve(Response.json({ ok: true }));
+      }
+      return baseFetch(input, init);
+    }) as typeof fetch;
+    const view = open("/apps/music/play?id=file-song-123");
+    const title = await view.findByRole("heading", { level: 1, name: "River song" });
+    expect(title.className).toContain("font-bold");
+    expect(view.getByRole("link", { name: "Jesse Torres, open profile" }).getAttribute("href")).toBe("/people/person-jesse");
+    expect(view.container.querySelector("time")?.textContent).toMatch(/^Made /);
+    const shared = view.getByRole("button", { name: "Shared, manage sharing" });
+    expect(shared.querySelectorAll('[data-slot="avatar"]')).toHaveLength(2);
+    expect(view.getByText(/\[Verse\] Morning light/).className).toContain("line-clamp-3");
+    fireEvent.click(shared);
+    expect(await view.findByRole("dialog")).toBeTruthy();
+    fireEvent.click(view.getByRole("switch", { name: "Clover" }));
+    await waitFor(() => expect(shareBodies).toHaveLength(1));
+    expect(JSON.parse(shareBodies[0]!)).toEqual({ url: "/api/plugins/music/actions/share-add", body: JSON.stringify({ id: "file-song-123", person_id: "person-2" }) });
+    expect(document.body.textContent).not.toMatch(/\{[^{}]+\}/);
   });
 
   test("the shipped Videos watch schema shows a private lock chip", async () => {

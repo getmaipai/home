@@ -13,8 +13,8 @@ import { publishSettingsChanged } from "@/lib/deviceCommands";
 import { getPersonSettingValue, setValue } from "@/lib/settings";
 import { speakerAgeBand } from "@/lib/ageBand";
 import { db } from "@/db";
-import { people, settingsValues } from "@/db/schema";
-import { isNull, eq, and } from "drizzle-orm";
+import { people, settingsValues, jobs, projects, conversations, pictureJobs, videoJobs, musicJobs } from "@/db/schema";
+import { isNull, eq, and, sql } from "drizzle-orm";
 import { listDevicesByKind } from "@/lib/devices";
 import { getDeviceSettingValue } from "@/lib/settings";
 import { companionFits, robotControlsOf, ROBOT_COMPANION_KEY } from "@/lib/robotCompanion";
@@ -41,13 +41,29 @@ export const companionsRoutes = apiRouter();
 const Type = z.enum(["child", "teen", "adult"]);
 const Card = z.object({
   id: z.string(), name: z.string(), type: Type, type_label: z.string(), tagline: z.string(), who_can_use: z.string(),
-  dials: z.array(z.object({ label: z.string(), value: z.string() })), voice: z.string(), is_default: z.boolean(), is_household: z.boolean(), status: z.string(), chats: z.number(), can_edit: z.boolean(), can_copy: z.boolean(),
+  dials: z.array(z.object({ label: z.string(), value: z.string() })), voice: z.string(), is_default: z.boolean(), is_household: z.boolean(), status: z.string(), chats: z.number(), can_edit: z.boolean(), can_copy: z.boolean(), task_count: z.number(), chat_count: z.number(), working_count: z.number(), waiting_count: z.number(), latest_activity: z.string().nullable(),
 });
 const Detail = Card.extend({
   about: z.string(), pronouns: z.string().nullable(), interests: z.array(z.string()), examples: z.array(z.string()),
   voice_value: z.string().describe("The voice id the page previews through /api/voice/voices/{id}/preview."), voice_is_own: z.boolean(), voice_setting: z.string().nullable(),
   used_by: z.object({ people: z.array(z.object({ id: z.string(), name: z.string() })), robots: z.array(z.object({ id: z.string(), name: z.string() })) }).nullable(),
 });
+
+function companionCounts(personId: string, companionId: string) {
+  const homeJobs = db.select().from(jobs).where(and(eq(jobs.forPerson, personId), eq(jobs.companionId, companionId))).all();
+  const projectRows = db.select().from(projects).where(and(eq(projects.person, personId), sql`json_extract(${projects.provenance}, '$.companion_id') = ${companionId}`)).all();
+  const mediaJobs = [
+    ...db.select().from(pictureJobs).where(and(eq(pictureJobs.personId, personId), eq(pictureJobs.companionId, companionId))).all(),
+    ...db.select().from(videoJobs).where(and(eq(videoJobs.personId, personId), eq(videoJobs.companionId, companionId))).all(),
+    ...db.select().from(musicJobs).where(and(eq(musicJobs.personId, personId), eq(musicJobs.companionId, companionId))).all(),
+  ];
+  const chats = db.select().from(conversations).where(and(eq(conversations.personId, personId), eq(conversations.companionId, companionId))).all();
+  const tasks = [...homeJobs.map((row) => ({ title: row.title, state: row.state, at: row.updatedAt })), ...projectRows.map((row) => ({ title: row.title, state: row.state, at: row.updatedAt })), ...mediaJobs.map((row) => ({ title: "Made media", state: row.state, at: row.updatedAt }))];
+  const active = homeJobs.filter((row) => (row.state === "running" || row.state === "queued") && !row.waitingReason).length + projectRows.filter((row) => row.state === "running").length + mediaJobs.filter((row) => row.state === "running" || row.state === "queued").length;
+  const waiting = homeJobs.filter((row) => row.state === "waiting" || Boolean(row.waitingReason)).length + projectRows.filter((row) => row.state === "waiting").length + mediaJobs.filter((row) => row.state === "waiting" || row.state === "needs_you").length;
+  const latest = [...tasks.map((row) => ({ title: row.title, at: row.at })), ...chats.map((row) => ({ title: row.title || "Chat", at: row.updatedAt }))].sort((a, b) => Date.parse(b.at) - Date.parse(a.at))[0];
+  return { task_count: tasks.length, chat_count: chats.length, working_count: active, waiting_count: waiting, latest_activity: latest?.title ?? null };
+}
 
 const listRoute = createRoute({
   method: "get", path: "/", tags: ["Companions"], summary: "The companions I may use, and for an admin which companion each robot has",
@@ -65,7 +81,7 @@ const listRoute = createRoute({
 companionsRoutes.openapi(listRoute, (c) => {
   const person = c.get("person");
   const admin = isOwnerOrAdmin(person);
-  const decorate = (card: ReturnType<typeof listCompanionCards>[number]) => ({ ...card, can_edit: card.is_household && mayEdit(person, card.id), can_copy: canCreateCompanion(person, admin) });
+  const decorate = (card: ReturnType<typeof listCompanionCards>[number]) => ({ ...card, ...companionCounts(person.id, card.id), can_edit: card.is_household && mayEdit(person, card.id), can_copy: canCreateCompanion(person, admin) });
   return c.json({ allowed: companionAreaOn(person), can_create: canCreateCompanion(person, admin), can_discover: speakerAgeBand(person, new Date()) !== "child", default_id: currentCompanionId(person), companions: listCompanionCards(person, admin).map(decorate), discover: discoverCompanionCards(person).map(decorate), robots: admin ? robotAssignments() : null }, 200);
 });
 
@@ -166,7 +182,24 @@ companionsRoutes.openapi(detailRoute, (c) => {
   const persona = PERSONAS.find((candidate) => candidate.id === c.req.valid("param").id);
   if (!persona || !mayUseCompanion(person, persona)) return c.json({ error: "No such companion" }, 404);
   const detail = companionDetail(person, persona, isOwnerOrAdmin(person));
-  return c.json({ ...detail, can_edit: detail.is_household && mayEdit(person, detail.id), can_copy: speakerAgeBand(person, new Date()) === "adult" || isOwnerOrAdmin(person) }, 200);
+  return c.json({ ...detail, ...companionCounts(person.id, detail.id), can_edit: detail.is_household && mayEdit(person, detail.id), can_copy: speakerAgeBand(person, new Date()) === "adult" || isOwnerOrAdmin(person) }, 200);
+});
+
+const activityRow = z.object({ id: z.string(), kind: z.string(), title: z.string(), state: z.string(), created_at: z.string(), updated_at: z.string() });
+const activityRoute = createRoute({ method: "get", path: "/{id}/activity", tags: ["Companions"], summary: "Read my recent work for one companion", middleware: [requireAuth] as const,
+  request: { params: idParamSchema("id", "lively-teen") },
+  responses: { 200: { content: { "application/json": { schema: z.object({ activity: z.array(activityRow) }) } }, description: "The signed-in person's recent jobs and projects for this companion, newest first, up to 50." }, ...errorResponses({ 401: "Not signed in", 404: "No such companion for this person" }) },
+});
+companionsRoutes.openapi(activityRoute, (c) => {
+  const person = c.get("person"), id = c.req.valid("param").id, persona = PERSONAS.find((candidate) => candidate.id === id);
+  if (!persona || !mayUseCompanion(person, persona)) return c.json({ error: "No such companion" }, 404);
+  const ownJobs = db.select().from(jobs).where(and(eq(jobs.forPerson, person.id), eq(jobs.companionId, id))).all().map((row) => ({ id: row.id, kind: row.kind, title: row.title, state: row.state, created_at: row.createdAt, updated_at: row.updatedAt }));
+  const ownProjects = db.select().from(projects).where(and(eq(projects.person, person.id), sql`json_extract(${projects.provenance}, '$.companion_id') = ${id}`)).all().map((row) => ({ id: row.id, kind: row.type, title: row.title, state: row.state, created_at: row.createdAt, updated_at: row.updatedAt }));
+  const ownPictures = db.select().from(pictureJobs).where(and(eq(pictureJobs.personId, person.id), eq(pictureJobs.companionId, id))).all().map((row) => ({ id: row.id, kind: "picture", title: "Made a picture", state: row.state, created_at: row.createdAt, updated_at: row.updatedAt }));
+  const ownVideos = db.select().from(videoJobs).where(and(eq(videoJobs.personId, person.id), eq(videoJobs.companionId, id))).all().map((row) => ({ id: row.id, kind: "video", title: "Made a video", state: row.state, created_at: row.createdAt, updated_at: row.updatedAt }));
+  const ownSongs = db.select().from(musicJobs).where(and(eq(musicJobs.personId, person.id), eq(musicJobs.companionId, id))).all().map((row) => ({ id: row.id, kind: "music", title: "Made a song", state: row.state, created_at: row.createdAt, updated_at: row.updatedAt }));
+  const activity = [...ownJobs, ...ownProjects, ...ownPictures, ...ownVideos, ...ownSongs].sort((a, b) => Date.parse(b.updated_at) - Date.parse(a.updated_at)).slice(0, 50);
+  return c.json({ activity }, 200);
 });
 
 const defaultRoute = createRoute({

@@ -72,7 +72,7 @@ export function latestGeneratedPictureId(actor: PersonRow, conversationId: strin
 }
 
 export interface RunGenerateVideoInput {
-  state: Pick<TurnState, "actor" | "surface" | "speakerEvidence" | "deviceId" | "planBasis" | "plan" | "conversationId" | "turnId" | "temporary" | "ephemeral" | "images"> & Partial<Pick<TurnState, "utterance">>;
+  state: Pick<TurnState, "actor" | "persona" | "surface" | "speakerEvidence" | "deviceId" | "planBasis" | "plan" | "conversationId" | "turnId" | "temporary" | "ephemeral" | "images"> & Partial<Pick<TurnState, "utterance">>;
   args: Record<string, unknown>;
   callId: string;
   spoken: boolean;
@@ -194,6 +194,7 @@ export async function runGenerateVideo(input: RunGenerateVideoInput): Promise<To
       actor,
       conversationId: state.conversationId,
       turnId: state.turnId,
+      companionId: state.persona?.id ?? null,
       temporary,
       kind: image ? "animate" : "generate",
       prompt,

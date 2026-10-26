@@ -13,7 +13,7 @@ export interface MusicRequest {
   edit?: import("./stack").MusicBody["edit"];
 }
 export interface MusicJob {
-  id: string; personId: string; conversationId: string | null; turnId: string | null; task: MusicTask; request: MusicRequest;
+  id: string; personId: string; conversationId: string | null; turnId: string | null; companionId?: string | null; task: MusicTask; request: MusicRequest;
   stackJob: string | null; state: import("./stack").MusicState; stage: string | null; progress: number; etaSeconds: number | null;
   position: number | null; errorCode: string | null; errorLine: string | null; fileId: string | null; parentFileId: string | null;
   coverJobId: string | null; coverFileId: string | null;

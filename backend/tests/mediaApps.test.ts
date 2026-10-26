@@ -8,7 +8,7 @@ import { __resetProgressForTests, flushProgress } from "@/lib/media/progress";
 import { coerceNumber } from "@/lib/media/appHost";
 import { buildMediaTree } from "./support/mediaTree";
 import { db } from "@/db";
-import { people, shares, videoJobs } from "@/db/schema";
+import { people, shares, videoJobs, musicJobs } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import { storeFile } from "@/lib/attachments";
 
@@ -36,6 +36,8 @@ async function setup() {
   const tree = buildMediaTree();
   const added = await owner.post("/api/media/sources", { label: "videos", path: tree.videos, kinds: ["video"] });
   await scanRoot(((await added.json()) as { source: { id: string } }).source.id, { prober: null, pruneGraceMs: 0 });
+  const musicSource = await owner.post("/api/media/sources", { label: "music", path: tree.music, kinds: ["track"] });
+  await scanRoot(((await musicSource.json()) as { source: { id: string } }).source.id, { prober: null, pruneGraceMs: 0 });
   const data = async (client: TestClient, id: string, body: Record<string, unknown> = {}) => (await client.post(`/api/plugins/videos/data/${id}`, body)).json() as Promise<Row[]>;
   const rows = async (client: TestClient, id: string, body: Record<string, unknown> = {}) => data(client, id, body);
   const idOf = async (title: string) => (await rows(adult.client, "library")).find((row) => row.title === title)!.id;
@@ -129,6 +131,34 @@ describe("the media-app host: data ids", () => {
     const response = await owner.post("/api/plugins/videos/actions/share-add", { id: creation[0]?.id, person_id: adult.id });
     expect(response.status).toBe(200);
     expect((await data(owner, "creation", { id: made.value.id }) as unknown as Array<Record<string, any>>)[0]?.visibility.mode).toBe("shared");
+  });
+
+  test("Music creation header shares only home-made songs and uses the Library file id", async () => {
+    const { owner, adult, admin, child } = await setup();
+    const ownerPerson = db.select().from(people).where(eq(people.role, "owner")).get()!;
+    const now = new Date().toISOString();
+    const song = storeFile(ownerPerson, { conversationId: null, turnId: null, mediaType: "audio/mp4", bytes: new Uint8Array([4, 5, 6]), provenance: 'music-gen:{"job_id":"music-header","audience":"all-ages"}', deduplicate: false });
+    if (!song.ok) throw new Error(song.error);
+    db.insert(musicJobs).values({ id: "music-header", personId: ownerPerson.id, task: "text2music", state: "done", request: JSON.stringify({ title: "River song", lyrics: "[Verse] Morning light\nA river runs." }), fileId: song.value.id, createdAt: now, updatedAt: now, hlc: "1:0:music" }).run();
+    const data = async (client: TestClient, scope = "creation") => (await client.post("/api/plugins/music/data/header", { id: song.value.id, scope })).json() as Promise<any[]>;
+    const creation = await data(owner);
+    expect(creation[0]).toMatchObject({ id: song.value.id, title: "River song", description: "[Verse] Morning light\nA river runs.", creator: { name: "Sage", href: `/people/${ownerPerson.id}`, avatar_url: null }, made_at: expect.any(String), visibility: { mode: "private", can_manage: true } });
+    expect((await data(owner, "creation-people")).map((candidate) => candidate.id)).toEqual(["household", adult.id, admin.id, child.id]);
+    expect(await data(adult.client, "creation-people")).toEqual([]);
+    expect((await adult.client.post("/api/plugins/music/actions/share-add", { id: song.value.id, person_id: child.id })).status).toBe(403);
+    const childPerson = db.select().from(people).where(eq(people.id, child.id)).get()!;
+    const childSong = storeFile(childPerson, { conversationId: null, turnId: null, mediaType: "audio/mp4", bytes: new Uint8Array([7, 8, 9]), provenance: 'music-gen:{"audience":"all-ages"}', deduplicate: false });
+    if (!childSong.ok) throw new Error(childSong.error);
+    expect((await child.client.post("/api/plugins/music/actions/share-add", { id: childSong.value.id, person_id: adult.id })).status).toBe(403);
+    const share = await owner.post("/api/plugins/music/actions/share-add", { id: creation[0].id, person_id: adult.id });
+    expect(share.status).toBe(200);
+    expect((await data(owner))[0].visibility.mode).toBe("shared");
+
+    const scanned = (await (await adult.client.post("/api/plugins/music/data/songs", {})).json() as any[]).find((row) => row.title === "Morning Light");
+    expect(scanned).toBeTruthy();
+    const scannedHeader = await (await adult.client.post("/api/plugins/music/data/header", { id: scanned.id, scope: "creation" })).json() as any[];
+    expect(scannedHeader[0]).toMatchObject({ id: scanned.id, creator: { name: "The Marlows" }, visibility: { can_manage: false } });
+    expect(await adult.client.post("/api/plugins/music/data/header", { id: scanned.id, scope: "creation-people" }).then((response) => response.json())).toEqual([]);
   });
 
   test("an adult's rows carry title, channel, copy label and no progress before anything is watched", async () => {

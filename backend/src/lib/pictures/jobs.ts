@@ -79,6 +79,7 @@ export interface StartPictureInput {
   actor: PersonRow;
   conversationId: string | null;
   turnId: string | null;
+  companionId?: string | null;
   temporary: boolean;
   purpose?: "cover";
   kind: PictureJobKind;
@@ -107,7 +108,7 @@ export async function startPictureJob(input: StartPictureInput): Promise<Picture
   try {
     const now = new Date().toISOString();
     const job: PictureJob = {
-      id: newPictureJobId(), personId: input.actor.id, conversationId: input.conversationId, turnId: input.turnId, purpose: input.purpose ?? null, kind: input.kind, state: input.local ? "running" : "queued", stackJob: null,
+      id: newPictureJobId(), personId: input.actor.id, conversationId: input.conversationId, turnId: input.turnId, companionId: input.companionId ?? null, purpose: input.purpose ?? null, kind: input.kind, state: input.local ? "running" : "queued", stackJob: null,
       percent: 0, phase: input.local ? "starting" : "queued", position: null, prompt: input.prompt,
       request: ({ size: input.body.size ?? "1024x1024", n: input.body.n ?? 1, seed: input.body.seed ?? null, loras: (input.body.loras ?? []).map((l) => l.id), source_file_id: input.sourceFileId ?? input.edit?.sourceId ?? null, audience: input.body.audience, quality: qualityOfModel(input.body.model) ?? "quick", stackBody: Object.fromEntries(Object.entries(input.body).filter(([key]) => key !== "timeout_ms")) as Omit<GenerationBody, "timeout_ms">, ...(input.likeness ? { likeness: input.likeness } : {}), ...(input.edit ? { edit: { source_id: input.edit.sourceId, label: input.edit.label, method: input.edit.method } } : {}) } as PictureJob["request"]),
       error: null, files: [], temporary: input.temporary, createdAt: now, updatedAt: now,

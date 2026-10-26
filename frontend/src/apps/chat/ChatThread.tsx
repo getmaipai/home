@@ -249,6 +249,12 @@ export function ChatThread({ temporary, onEditSend, thinkingModeVisible = false,
             onEditSend,
             sendHeld,
             engineDown,
+            speakerMarker: {
+              joinedLabel: (name) => `${name} joined for one question`,
+              fallbackPoster: (speaker) => speaker.look
+                ? api.companionLookImage(speaker.companion_id, speaker.look)
+                : undefined,
+            },
             // CHAT-ACTION-ROW-01: copy, listen, rate, refresh and more sit under every reply, as in ChatGPT, not only the last.
             assistantActionBarAutohide: "never",
             ThreadViewportExtra: ChatThreadExtras,

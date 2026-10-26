@@ -7,7 +7,7 @@ import { backupDir } from "@/lib/paths";
 import { encryptFile } from "@/lib/backupCrypto";
 import { restoreBackup } from "@/lib/backup";
 
-const migration = readFileSync(join(import.meta.dir, "../src/db/migrations/0126_mild_otter.sql"), "utf8")
+const migration = readFileSync(join(import.meta.dir, "../src/db/migrations/0127_natural_kang.sql"), "utf8")
   .split("--> statement-breakpoint").map((part) => part.trim()).filter(Boolean);
 
 function legacyDatabase(path: string): Database {
@@ -30,7 +30,7 @@ function applyMigration(database: Database): void {
   for (const statement of migration) database.exec(statement);
 }
 
-describe("0126 likeness simplification migration", () => {
+describe("0127 likeness simplification migration", () => {
   test("removes legacy permissions and agreement tables while preserving unavailable style tombstones", () => {
     const database = new Database(":memory:");
     try {

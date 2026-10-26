@@ -48,6 +48,7 @@ async function makeHousehold() {
 }
 
 function writableValue(key: ReturnType<typeof getRegistry>[number], fallbackPersonId: string): unknown {
+  if (key.key === "companions.enabled") return []; // a person-owned list of companion ids; Home validates it as an array
   if (key.selector === "time") return "09:00";
   if (key.selector === "select") {
     const options = (key.range as { options?: unknown[] } | undefined)?.options ?? [];

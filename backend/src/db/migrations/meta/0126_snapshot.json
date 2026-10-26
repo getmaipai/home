@@ -1,8 +1,8 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "571726a4-a6ea-4dfb-a19c-e41092c020f6",
-  "prevId": "7fd45e02-ca10-4e1f-a259-ed311907a2a3",
+  "id": "0b6263a9-e5f4-4bff-9bd8-8627cc32c6e4",
+  "prevId": "0e60b4b9-61ea-434e-a70b-4d148421cb04",
   "tables": {
     "api_keys": {
       "name": "api_keys",
@@ -3559,6 +3559,13 @@
           "notNull": false,
           "autoincrement": false
         },
+        "companion_id": {
+          "name": "companion_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
         "error_kind": {
           "name": "error_kind",
           "type": "text",
@@ -3845,6 +3852,224 @@
           "tableTo": "people",
           "columnsFrom": [
             "declared_by"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {}
+    },
+    "likeness_consent_events": {
+      "name": "likeness_consent_events",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "person_id": {
+          "name": "person_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "option": {
+          "name": "option",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "state": {
+          "name": "state",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "source": {
+          "name": "source",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "changed_at": {
+          "name": "changed_at",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "hlc": {
+          "name": "hlc",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        }
+      },
+      "indexes": {
+        "likeness_consent_events_person_idx": {
+          "name": "likeness_consent_events_person_idx",
+          "columns": [
+            "person_id"
+          ],
+          "isUnique": false
+        }
+      },
+      "foreignKeys": {
+        "likeness_consent_events_person_id_people_id_fk": {
+          "name": "likeness_consent_events_person_id_people_id_fk",
+          "tableFrom": "likeness_consent_events",
+          "tableTo": "people",
+          "columnsFrom": [
+            "person_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {}
+    },
+    "likeness_uses": {
+      "name": "likeness_uses",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "subject_person_id": {
+          "name": "subject_person_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "requester_person_id": {
+          "name": "requester_person_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "medium": {
+          "name": "medium",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "way": {
+          "name": "way",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "adult_content": {
+          "name": "adult_content",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": false
+        },
+        "source": {
+          "name": "source",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "used_at": {
+          "name": "used_at",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "hlc": {
+          "name": "hlc",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        }
+      },
+      "indexes": {
+        "likeness_uses_subject_idx": {
+          "name": "likeness_uses_subject_idx",
+          "columns": [
+            "subject_person_id"
+          ],
+          "isUnique": false
+        }
+      },
+      "foreignKeys": {
+        "likeness_uses_subject_person_id_people_id_fk": {
+          "name": "likeness_uses_subject_person_id_people_id_fk",
+          "tableFrom": "likeness_uses",
+          "tableTo": "people",
+          "columnsFrom": [
+            "subject_person_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "likeness_uses_requester_person_id_people_id_fk": {
+          "name": "likeness_uses_requester_person_id_people_id_fk",
+          "tableFrom": "likeness_uses",
+          "tableTo": "people",
+          "columnsFrom": [
+            "requester_person_id"
           ],
           "columnsTo": [
             "id"
@@ -5694,6 +5919,13 @@
           "notNull": false,
           "autoincrement": false
         },
+        "companion_id": {
+          "name": "companion_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
         "task": {
           "name": "task",
           "type": "text",
@@ -7355,6 +7587,13 @@
         },
         "turn_id": {
           "name": "turn_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "companion_id": {
+          "name": "companion_id",
           "type": "text",
           "primaryKey": false,
           "notNull": false,
@@ -9224,6 +9463,13 @@
         },
         "turn_id": {
           "name": "turn_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "companion_id": {
+          "name": "companion_id",
           "type": "text",
           "primaryKey": false,
           "notNull": false,

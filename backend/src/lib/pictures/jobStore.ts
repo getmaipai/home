@@ -46,6 +46,7 @@ export interface PictureJob {
   personId: string;
   conversationId: string | null;
   turnId: string | null;
+  companionId?: string | null;
   purpose?: "cover" | null;
   kind: PictureJobKind;
   state: PictureJobState;
@@ -100,7 +101,7 @@ function fromRow(row: Row): PictureJob {
   const request = JSON.parse(row.request) as PictureRequest;
   request.likeness = normalizeJobLikeness(request.likeness);
   return {
-    id: row.id, personId: row.personId, conversationId: row.conversationId, turnId: row.turnId, purpose: row.purpose as "cover" | null, kind: row.kind as PictureJobKind, state: row.state as PictureJobState,
+    id: row.id, personId: row.personId, conversationId: row.conversationId, turnId: row.turnId, companionId: row.companionId, purpose: row.purpose as "cover" | null, kind: row.kind as PictureJobKind, state: row.state as PictureJobState,
     stackJob: row.stackJob, percent: row.percent, phase: row.phase, position: row.position, prompt: row.prompt, request,
     error: row.error, files: JSON.parse(row.files) as PictureFile[], temporary: false, createdAt: row.createdAt, updatedAt: row.updatedAt,
   };
@@ -124,7 +125,7 @@ export function saveJob(job: PictureJob): void {
   lastSaved.set(job.id, sig);
   job.updatedAt = new Date().toISOString();
   const values = {
-    personId: job.personId, conversationId: job.conversationId, turnId: job.turnId, purpose: job.purpose ?? null, kind: job.kind, state: job.state, stackJob: job.stackJob, percent: job.percent,
+    personId: job.personId, conversationId: job.conversationId, turnId: job.turnId, companionId: job.companionId ?? null, purpose: job.purpose ?? null, kind: job.kind, state: job.state, stackJob: job.stackJob, percent: job.percent,
     phase: job.phase, position: job.position, prompt: job.prompt, request: JSON.stringify(job.request), error: job.error, files: JSON.stringify(job.files), updatedAt: job.updatedAt, hlc: nextHlc(),
   };
   db.insert(pictureJobs).values({ id: job.id, createdAt: job.createdAt, ...values }).onConflictDoUpdate({ target: pictureJobs.id, set: values }).run();

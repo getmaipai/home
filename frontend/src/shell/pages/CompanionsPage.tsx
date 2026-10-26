@@ -23,8 +23,8 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@maipai/ui/src/ui/dropdown-menu";
 import { Chip } from "@maipai/ui/src/primitives/Chip";
 import { getIcon } from "@maipai/ui/src/icons";
-import { companionPreviewSample } from "@/shell/pages/companionPreviewSample";
 import { formatRelative } from "@maipai/ui/src/relativeTime";
+import { Status } from "@maipai/ui/src/ui/status";
 
 const listKey = ["companions"] as const;
 const ROBOT_SETTINGS = "/settings/apps?tab=robot";
@@ -34,7 +34,7 @@ const MoreIcon = getIcon("more-horizontal");
 const BackIcon = getIcon("arrow-left");
 
 /** Props for one companion tile, shared by Yours and Discover. */
-function companionTileProps({ card, preview = false, discover = false, onDelete, onRemove, onSelect, onSetDefault }: { card: CompanionCard; preview?: boolean; discover?: boolean; onDelete: (card: CompanionCard) => void; onRemove?: (card: CompanionCard) => void; onSelect: () => void; onSetDefault: (card: CompanionCard) => void }) {
+function companionTileProps({ card, discover = false, onDelete, onRemove, onSelect, onSetDefault }: { card: CompanionCard; discover?: boolean; onDelete: (card: CompanionCard) => void; onRemove?: (card: CompanionCard) => void; onSelect: () => void; onSetDefault: (card: CompanionCard) => void }) {
   const actions = <DropdownMenu>
     <DropdownMenuTrigger asChild>
       <Button type="button" variant="ghost" size="icon" aria-label="Companion actions" onClick={(event) => event.stopPropagation()} onPointerDown={(event) => event.stopPropagation()} onKeyDown={(event) => event.stopPropagation()}><MoreIcon aria-hidden="true" /></Button>
@@ -45,16 +45,10 @@ function companionTileProps({ card, preview = false, discover = false, onDelete,
       {card.can_edit && card.is_household ? <DropdownMenuItem variant="destructive" onSelect={() => onDelete(card)}>Delete</DropdownMenuItem> : null}
     </DropdownMenuContent>
   </DropdownMenu>;
-  let status: ReactNode;
-  if (preview && !discover) {
-    const sample = companionPreviewSample(card.id);
-    status = <Badge tone={sample.status === "Working" ? "success" : sample.status === "Needs approval" ? "warning" : "default"}>{sample.status}</Badge>;
-  }
   return {
     name: card.name,
     seed: card.id,
     line: card.tagline,
-    status,
     selected: card.is_default,
     menu: actions,
     onSelect,
@@ -108,11 +102,12 @@ export function CompanionsPage() {
                 <TabsContent value="Yours">
                   <div className="grid grid-cols-2 justify-items-center gap-4 sm:grid-cols-3 lg:grid-cols-4">
                     {data.companions.map((card) => <div key={card.id}>
-                      <CharacterTile {...companionTileProps({ card, preview: preview === true, onDelete: setDeleteTarget, onRemove: (item) => removeFromYours.mutate(item.id), onSetDefault: (item) => saveDefault.mutate(item.id), onSelect: () => navigate(`/companions/${encodeURIComponent(card.id)}`) })} />
-                      {preview === true ? <p className="mt-1 text-center text-sm text-muted-foreground">{companionPreviewSample(card.id).activityLine}</p> : null}
+                      <CharacterTile {...companionTileProps({ card, onDelete: setDeleteTarget, onRemove: (item) => removeFromYours.mutate(item.id), onSetDefault: (item) => saveDefault.mutate(item.id), onSelect: () => navigate(`/companions/${encodeURIComponent(card.id)}`) })} />
+                      <p className="mt-1 text-center text-sm text-muted-foreground">{card.latest_activity ?? "No activity yet"}</p>
+                      <p className="text-center text-sm text-muted-foreground">{card.task_count ?? 0} tasks · {card.chat_count ?? card.chats} chats</p>
+                      {(card.working_count ?? 0) + (card.waiting_count ?? 0) > 0 ? <Status status={(card.waiting_count ?? 0) > 0 ? "degraded" : "online"}>{card.working_count ?? 0} working · {card.waiting_count ?? 0} waiting on you</Status> : null}
                     </div>)}
                   </div>
-                  {preview === true ? <p className="mt-4 text-sm text-muted-foreground">Sample activity. Real activity is coming soon.</p> : null}
                 </TabsContent>
                 {data.can_discover ? <TabsContent value="Discover">
                   <div className="flex flex-wrap gap-2">
@@ -196,7 +191,6 @@ function DetailRows({ companion }: { companion: CompanionDetail }) {
       setStartingChat(false);
     }
   };
-  const sample = companionPreviewSample(companion.id);
   const rows: DetailRow[] = [
     { key: "voice", title: "Voice", hint: companion.voice_is_own ? "Its own voice" : "Your Settings voice", body: <VoiceRow companion={companion} /> },
     { key: "personality", title: "Personality", hint: companion.tagline, body: <div className="flex flex-col gap-3">
@@ -216,10 +210,10 @@ function DetailRows({ companion }: { companion: CompanionDetail }) {
       <p className="text-sm text-muted-foreground">{companion.who_can_use}</p>
     </div> });
   }
-  rows.push({ key: "activity", title: "Recent activity", hint: "Sample", body: <div className="flex flex-col gap-3">
-    <ul className="flex list-none flex-col gap-2 p-0">{sample.activities.map((activity) => <li key={activity.title}><p className="font-medium">{activity.title}</p><p className="text-sm text-muted-foreground">{activity.detail}</p></li>)}</ul>
-    <p className="text-sm text-muted-foreground">Sample activity. Real activity is coming soon.</p>
-  </div> });
+  const activityQuery = useQuery({ queryKey: ["companion-activity", companion.id], queryFn: () => api.companionActivity(companion.id), retry: false });
+  rows.push({ key: "activity", title: "Recent activity", hint: activityQuery.data?.activity.length ? `${activityQuery.data.activity.length} recent items` : "No activity yet", body: activityQuery.data?.activity.length
+    ? <ul className="flex list-none flex-col gap-2 p-0">{activityQuery.data.activity.map((item) => <li key={item.id}><p className="font-medium">{item.title}</p><p className="text-sm text-muted-foreground">{item.state} · {formatRelative(item.updated_at)}</p></li>)}</ul>
+    : <p>No activity for {companion.name} yet.</p> });
   rows.push({ key: "chats", title: "Chats", hint: matchingChats.length ? `${matchingChats.length} ${matchingChats.length === 1 ? "chat" : "chats"}` : "No chats yet", body: <div className="flex flex-col gap-4">
     {chats.length ? <ul className="flex list-none flex-col gap-3 p-0">{chats.map((chat) => <li key={chat.id}><Button type="button" variant="ghost" onClick={() => navigate(`/chat?conversation=${encodeURIComponent(chat.id)}`)}>{chat.title || "New chat"} · {formatRelative(chat.last_turn_at ?? chat.created_at)}</Button></li>)}</ul> : <p>No chats with {companion.name} yet.</p>}
     {chatsQuery.isError ? <p className="text-sm text-destructive">Could not load chats. Check your connection and try again.</p> : null}
@@ -301,6 +295,11 @@ function DetailSetup({ companion, saved, copy, save, headerOnly = false, aboutOn
       </> : null}
       {!headerOnly ? <>
       {!companion.is_household && companion.can_copy ? <p>This companion comes with Home, so it can't be changed. Make a copy and edit that.</p> : null}
+      <Tabs defaultValue="About">
+        <TabsList><TabsTrigger value="Activity">Activity</TabsTrigger><TabsTrigger value="About">About</TabsTrigger><TabsTrigger value="Tasks">Tasks</TabsTrigger></TabsList>
+        <TabsContent value="Activity"><CompanionWorkList companion={companion} mode="activity" /></TabsContent>
+        <TabsContent value="Tasks"><CompanionWorkList companion={companion} mode="tasks" /></TabsContent>
+        <TabsContent value="About">
       <Section heading="About">
         <p>{companion.about}</p>
         {companion.pronouns ? <p className="text-sm text-muted-foreground">Pronouns: {companion.pronouns}</p> : null}
@@ -326,9 +325,21 @@ function DetailSetup({ companion, saved, copy, save, headerOnly = false, aboutOn
           <p>Robots: {companion.used_by.robots.length ? companion.used_by.robots.map((robot) => robot.name).join(", ") : "none yet"}. <Link to={ROBOT_SETTINGS} className="underline">Companion settings</Link></p>
         </Section>
       ) : null}
+        </TabsContent>
+      </Tabs>
       </> : null}
     </>
   );
+}
+
+function CompanionWorkList({ companion, mode }: { companion: CompanionDetail; mode: "activity" | "tasks" }) {
+  const query = useQuery({ queryKey: ["companion-activity", companion.id], queryFn: () => api.companionActivity(companion.id), retry: false });
+  const rows = query.data?.activity ?? [];
+  const tasks = mode === "tasks" ? rows : rows;
+  if (query.isLoading) return <p>Loading {mode}…</p>;
+  if (query.isError) return <p>Could not load {mode}. Check your connection and try again.</p>;
+  if (!tasks.length) return <p>No {mode} for {companion.name} yet.</p>;
+  return <ul className="flex list-none flex-col gap-3 p-0">{tasks.map((item) => <li key={item.id}><p className="font-medium">{item.title}</p><p className="text-sm text-muted-foreground">{item.state} · {formatRelative(item.updated_at)}</p></li>)}</ul>;
 }
 
 /** The voice this companion speaks in, with a Test button that plays the same preview Settings uses. */

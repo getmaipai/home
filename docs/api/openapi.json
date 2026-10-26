@@ -51695,144 +51695,15 @@
         }
       }
     },
-    "/api/likeness/me": {
-      "get": {
-        "tags": [
-          "Likeness"
-        ],
-        "summary": "Where the signed-in person stands on pictures, videos and styles that look like them, their history and the use log",
-        "responses": {
-          "200": {
-            "description": "Only the person's own.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "eligible": {
-                      "type": "boolean",
-                      "description": "Only an adult has these switches; a child or a teen is never the subject of anything."
-                    },
-                    "adults": {
-                      "type": "boolean"
-                    },
-                    "adult_content": {
-                      "type": "boolean"
-                    },
-                    "history": {
-                      "type": "array",
-                      "items": {
-                        "type": "object",
-                        "properties": {
-                          "id": {
-                            "type": "string"
-                          },
-                          "option": {
-                            "type": "string",
-                            "enum": [
-                              "adults",
-                              "adult_content"
-                            ]
-                          },
-                          "state": {
-                            "type": "string",
-                            "enum": [
-                              "on",
-                              "off"
-                            ]
-                          },
-                          "changed_at": {
-                            "type": "string"
-                          }
-                        },
-                        "required": [
-                          "id",
-                          "option",
-                          "state",
-                          "changed_at"
-                        ]
-                      }
-                    },
-                    "uses": {
-                      "type": "array",
-                      "items": {
-                        "type": "object",
-                        "properties": {
-                          "id": {
-                            "type": "string"
-                          },
-                          "who": {
-                            "type": "string"
-                          },
-                          "medium": {
-                            "type": "string",
-                            "enum": [
-                              "picture",
-                              "video"
-                            ]
-                          },
-                          "way": {
-                            "type": "string",
-                            "enum": [
-                              "style",
-                              "photo"
-                            ]
-                          },
-                          "adult_content": {
-                            "type": "boolean"
-                          },
-                          "used_at": {
-                            "type": "string"
-                          },
-                          "line": {
-                            "type": "string"
-                          }
-                        },
-                        "required": [
-                          "id",
-                          "who",
-                          "medium",
-                          "way",
-                          "adult_content",
-                          "used_at",
-                          "line"
-                        ]
-                      }
-                    }
-                  },
-                  "required": [
-                    "eligible",
-                    "adults",
-                    "adult_content",
-                    "history",
-                    "uses"
-                  ]
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Not signed in",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
     "/api/likeness/adults": {
       "get": {
         "tags": [
           "Likeness"
         ],
-        "summary": "The household's adults, for the pickers (who a style looks like, who is in a photo)",
+        "summary": "Household members available to family media subject pickers",
         "responses": {
           "200": {
-            "description": "Adults only.",
+            "description": "Eligible household members.",
             "content": {
               "application/json": {
                 "schema": {
@@ -51851,17 +51722,12 @@
                           },
                           "self": {
                             "type": "boolean"
-                          },
-                          "agreed": {
-                            "type": "boolean",
-                            "description": "Whether they have agreed to pictures, videos and styles that look like them (always true for the person asking, about themselves)."
                           }
                         },
                         "required": [
                           "id",
                           "name",
-                          "self",
-                          "agreed"
+                          "self"
                         ]
                       }
                     }
@@ -52966,7 +52832,7 @@
         "tags": [
           "Videos"
         ],
-        "summary": "Animate a picture this home made, or a photo of a household adult who agreed",
+        "summary": "Animate a picture this home made, or a photo of a household member",
         "requestBody": {
           "content": {
             "application/json": {
@@ -52997,7 +52863,7 @@
                     "type": "string",
                     "minLength": 1,
                     "maxLength": 80,
-                    "description": "LIKENESS-01: with a photo (file_id) that was not made here: the household adult the photo shows, picked from the adults list. Anyone else is refused."
+                    "description": "LIKENESS-01: with a photo (file_id) that was not made here: the household member the photo shows, picked from the family list. Anyone else is refused."
                   }
                 },
                 "required": [
@@ -53429,7 +53295,7 @@
                               "id",
                               "name"
                             ],
-                            "description": "LIKENESS-01: the household adult this style looks like, or null for nobody."
+                            "description": "LIKENESS-01: the household member this style looks like, or null for nobody."
                           }
                         },
                         "required": [
@@ -53606,7 +53472,7 @@
                         "id",
                         "name"
                       ],
-                      "description": "LIKENESS-01: the household adult this style looks like, or null for nobody."
+                      "description": "LIKENESS-01: the household member this style looks like, or null for nobody."
                     }
                   },
                   "required": [
@@ -53804,7 +53670,7 @@
                   "looks_like": {
                     "type": "string",
                     "maxLength": 80,
-                    "description": "LIKENESS-01: 'nobody', or the id of the household adult the style looks like (they must have agreed, or be the one adding it)."
+                    "description": "LIKENESS-01: 'nobody', or the id of the household member the style looks like."
                   }
                 },
                 "required": [
@@ -53887,7 +53753,7 @@
                         "id",
                         "name"
                       ],
-                      "description": "LIKENESS-01: the household adult this style looks like, or null for nobody."
+                      "description": "LIKENESS-01: the household member this style looks like, or null for nobody."
                     }
                   },
                   "required": [
@@ -54340,6 +54206,22 @@
                           },
                           "can_copy": {
                             "type": "boolean"
+                          },
+                          "task_count": {
+                            "type": "number"
+                          },
+                          "chat_count": {
+                            "type": "number"
+                          },
+                          "working_count": {
+                            "type": "number"
+                          },
+                          "waiting_count": {
+                            "type": "number"
+                          },
+                          "latest_activity": {
+                            "type": "string",
+                            "nullable": true
                           }
                         },
                         "required": [
@@ -54356,7 +54238,12 @@
                           "status",
                           "chats",
                           "can_edit",
-                          "can_copy"
+                          "can_copy",
+                          "task_count",
+                          "chat_count",
+                          "working_count",
+                          "waiting_count",
+                          "latest_activity"
                         ]
                       }
                     },
@@ -54426,6 +54313,22 @@
                           },
                           "can_copy": {
                             "type": "boolean"
+                          },
+                          "task_count": {
+                            "type": "number"
+                          },
+                          "chat_count": {
+                            "type": "number"
+                          },
+                          "working_count": {
+                            "type": "number"
+                          },
+                          "waiting_count": {
+                            "type": "number"
+                          },
+                          "latest_activity": {
+                            "type": "string",
+                            "nullable": true
                           }
                         },
                         "required": [
@@ -54442,7 +54345,12 @@
                           "status",
                           "chats",
                           "can_edit",
-                          "can_copy"
+                          "can_copy",
+                          "task_count",
+                          "chat_count",
+                          "working_count",
+                          "waiting_count",
+                          "latest_activity"
                         ]
                       }
                     },
@@ -55119,6 +55027,22 @@
                     "can_copy": {
                       "type": "boolean"
                     },
+                    "task_count": {
+                      "type": "number"
+                    },
+                    "chat_count": {
+                      "type": "number"
+                    },
+                    "working_count": {
+                      "type": "number"
+                    },
+                    "waiting_count": {
+                      "type": "number"
+                    },
+                    "latest_activity": {
+                      "type": "string",
+                      "nullable": true
+                    },
                     "about": {
                       "type": "string"
                     },
@@ -55211,6 +55135,11 @@
                     "chats",
                     "can_edit",
                     "can_copy",
+                    "task_count",
+                    "chat_count",
+                    "working_count",
+                    "waiting_count",
+                    "latest_activity",
                     "about",
                     "pronouns",
                     "interests",
@@ -55480,6 +55409,96 @@
           },
           "409": {
             "description": "Companion is in use",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/companions/{id}/activity": {
+      "get": {
+        "tags": [
+          "Companions"
+        ],
+        "summary": "Read my recent work for one companion",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "lively-teen"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The signed-in person's recent jobs and projects for this companion, newest first, up to 50.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "activity": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string"
+                          },
+                          "kind": {
+                            "type": "string"
+                          },
+                          "title": {
+                            "type": "string"
+                          },
+                          "state": {
+                            "type": "string"
+                          },
+                          "created_at": {
+                            "type": "string"
+                          },
+                          "updated_at": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "kind",
+                          "title",
+                          "state",
+                          "created_at",
+                          "updated_at"
+                        ]
+                      }
+                    }
+                  },
+                  "required": [
+                    "activity"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such companion for this person",
             "content": {
               "application/json": {
                 "schema": {
@@ -61811,6 +61830,24 @@
                             "default": null,
                             "description": "Plain text, never HTML. Passes the band check with the title before band_ok includes child."
                           },
+                          "lyrics": {
+                            "nullable": true,
+                            "description": "Lyrics are null when unavailable, or plain text without HTML. Text passes the same band check as description with the title before band_ok includes child."
+                          },
+                          "locked_fields": {
+                            "type": "array",
+                            "items": {
+                              "type": "string",
+                              "enum": [
+                                "title",
+                                "description",
+                                "artist",
+                                "artwork"
+                              ]
+                            },
+                            "default": [],
+                            "description": "A rescan updates every field except these; an edit adds the field name here."
+                          },
                           "source_id": {
                             "type": "string",
                             "pattern": "^msrc-[a-z0-9]{6,}$",
@@ -62404,7 +62441,7 @@
                           "provenance": {
                             "type": "string",
                             "minLength": 1,
-                            "description": "Who wrote it: `hub:scan`, `hub:fetch`, `hub:feed`."
+                            "description": "Who wrote it: `hub:scan`, `hub:fetch`, `hub:feed` or `hub:edit`."
                           }
                         },
                         "required": [
@@ -62538,6 +62575,24 @@
                           ],
                           "default": null,
                           "description": "Plain text, never HTML. Passes the band check with the title before band_ok includes child."
+                        },
+                        "lyrics": {
+                          "nullable": true,
+                          "description": "Lyrics are null when unavailable, or plain text without HTML. Text passes the same band check as description with the title before band_ok includes child."
+                        },
+                        "locked_fields": {
+                          "type": "array",
+                          "items": {
+                            "type": "string",
+                            "enum": [
+                              "title",
+                              "description",
+                              "artist",
+                              "artwork"
+                            ]
+                          },
+                          "default": [],
+                          "description": "A rescan updates every field except these; an edit adds the field name here."
                         },
                         "source_id": {
                           "type": "string",
@@ -63132,7 +63187,7 @@
                         "provenance": {
                           "type": "string",
                           "minLength": 1,
-                          "description": "Who wrote it: `hub:scan`, `hub:fetch`, `hub:feed`."
+                          "description": "Who wrote it: `hub:scan`, `hub:fetch`, `hub:feed` or `hub:edit`."
                         }
                       },
                       "required": [
@@ -63213,6 +63268,24 @@
                             ],
                             "default": null,
                             "description": "Plain text, never HTML. Passes the band check with the title before band_ok includes child."
+                          },
+                          "lyrics": {
+                            "nullable": true,
+                            "description": "Lyrics are null when unavailable, or plain text without HTML. Text passes the same band check as description with the title before band_ok includes child."
+                          },
+                          "locked_fields": {
+                            "type": "array",
+                            "items": {
+                              "type": "string",
+                              "enum": [
+                                "title",
+                                "description",
+                                "artist",
+                                "artwork"
+                              ]
+                            },
+                            "default": [],
+                            "description": "A rescan updates every field except these; an edit adds the field name here."
                           },
                           "source_id": {
                             "type": "string",
@@ -63807,7 +63880,7 @@
                           "provenance": {
                             "type": "string",
                             "minLength": 1,
-                            "description": "Who wrote it: `hub:scan`, `hub:fetch`, `hub:feed`."
+                            "description": "Who wrote it: `hub:scan`, `hub:fetch`, `hub:feed` or `hub:edit`."
                           }
                         },
                         "required": [
@@ -63891,6 +63964,24 @@
                             "default": null,
                             "description": "Plain text, never HTML. Passes the band check with the title before band_ok includes child."
                           },
+                          "lyrics": {
+                            "nullable": true,
+                            "description": "Lyrics are null when unavailable, or plain text without HTML. Text passes the same band check as description with the title before band_ok includes child."
+                          },
+                          "locked_fields": {
+                            "type": "array",
+                            "items": {
+                              "type": "string",
+                              "enum": [
+                                "title",
+                                "description",
+                                "artist",
+                                "artwork"
+                              ]
+                            },
+                            "default": [],
+                            "description": "A rescan updates every field except these; an edit adds the field name here."
+                          },
                           "source_id": {
                             "type": "string",
                             "pattern": "^msrc-[a-z0-9]{6,}$",
@@ -64484,7 +64575,7 @@
                           "provenance": {
                             "type": "string",
                             "minLength": 1,
-                            "description": "Who wrote it: `hub:scan`, `hub:fetch`, `hub:feed`."
+                            "description": "Who wrote it: `hub:scan`, `hub:fetch`, `hub:feed` or `hub:edit`."
                           }
                         },
                         "required": [
@@ -64645,6 +64736,24 @@
                       ],
                       "default": null,
                       "description": "Plain text, never HTML. Passes the band check with the title before band_ok includes child."
+                    },
+                    "lyrics": {
+                      "nullable": true,
+                      "description": "Lyrics are null when unavailable, or plain text without HTML. Text passes the same band check as description with the title before band_ok includes child."
+                    },
+                    "locked_fields": {
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "enum": [
+                          "title",
+                          "description",
+                          "artist",
+                          "artwork"
+                        ]
+                      },
+                      "default": [],
+                      "description": "A rescan updates every field except these; an edit adds the field name here."
                     },
                     "source_id": {
                       "type": "string",
@@ -65239,7 +65348,7 @@
                     "provenance": {
                       "type": "string",
                       "minLength": 1,
-                      "description": "Who wrote it: `hub:scan`, `hub:fetch`, `hub:feed`."
+                      "description": "Who wrote it: `hub:scan`, `hub:fetch`, `hub:feed` or `hub:edit`."
                     }
                   },
                   "required": [

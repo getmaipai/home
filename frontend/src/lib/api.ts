@@ -336,7 +336,9 @@ export interface RobotCompanionInfo {
 export interface CompanionCard {
   id: string; name: string; type: "child" | "teen" | "adult"; type_label: string; tagline: string; who_can_use: string;
   dials: Array<{ label: string; value: string }>; voice: string; is_default: boolean; is_household: boolean; status: string; chats: number; can_edit: boolean; can_copy: boolean;
+  task_count?: number; chat_count?: number; working_count?: number; waiting_count?: number; latest_activity?: string | null;
 }
+export interface CompanionActivity { activity: Array<{ id: string; kind: string; title: string; state: string; created_at: string; updated_at: string }> }
 export interface CompanionDetail extends CompanionCard {
   about: string; pronouns: string | null; interests: string[]; examples: string[]; voice_value: string; voice_is_own: boolean; voice_setting: string | null;
   used_by: { people: Array<{ id: string; name: string }>; robots: Array<{ id: string; name: string }> } | null;
@@ -1434,6 +1436,7 @@ export const api = {
   mediaHome: () => request<MediaHome>("/api/media/home"),
   companions: () => request<CompanionList>("/api/companions"),
   companion: (id: string) => request<CompanionDetail>(`/api/companions/${encodeURIComponent(id)}`),
+  companionActivity: (id: string) => request<CompanionActivity>(`/api/companions/${encodeURIComponent(id)}/activity`),
   setDefaultCompanion: (id: string) => request<{ default_id: string }>(`/api/companions/${encodeURIComponent(id)}/default`, { method: "PUT" }),
   addCompanion: (id: string) => request<{ companions: string[] }>(`/api/companions/${encodeURIComponent(id)}/add`, { method: "POST" }),
   removeCompanion: (id: string) => request<{ companions: string[] }>(`/api/companions/${encodeURIComponent(id)}/remove`, { method: "POST" }),

@@ -257,6 +257,7 @@ export function rowsToBranchableMessages(
           source: row.source,
           pluginId: row.pluginId,
           commandId: row.commandId,
+          ...(row.answered_by ? { answered_by: row.answered_by } : {}),
           documentAvailable: Boolean(row.document),
           media: row.media,
           media_items: row.media_items,

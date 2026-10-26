@@ -10,7 +10,7 @@ import { turnAgeBand } from "@/lib/turnMachine/speaker";
 import { adaptersFor, matchAdapter, withTriggerWords } from "./adapters";
 import { startPictureJob, plainFailure } from "./jobs";
 import { promptRefusalLineFor } from "./ageCheck";
-import { adapterAudiencesFor, adultAdaptersAllowed, peopleGuidanceSuffix, pictureDenial, PICTURE_DENIAL_LINE, PROMPT_REFUSAL_LINE, refusePrompt, type PictureAudience, type PictureDenial, type PromptRefusal } from "./policy";
+import { adapterAudiencesFor, adultAdaptersAllowed, PICTURE_STARTED_CONFIRM_NOTE, peopleGuidanceSuffix, pictureDenial, PICTURE_DENIAL_LINE, PROMPT_REFUSAL_LINE, refusePrompt, type PictureAudience, type PictureDenial, type PromptRefusal } from "./policy";
 import { pictureEngineStatus } from "./ready";
 import { chooseQuality, isPictureQuality, QUALITY_NOTE_LINE } from "./quality";
 import { StackPicturesError } from "./stack";
@@ -63,7 +63,7 @@ function clampCount(value: unknown, max: number): number {
 }
 
 export interface RunGenerateImageInput {
-  state: Pick<TurnState, "actor" | "surface" | "speakerEvidence" | "deviceId" | "planBasis" | "plan" | "conversationId" | "turnId" | "temporary" | "ephemeral">;
+  state: Pick<TurnState, "actor" | "persona" | "surface" | "speakerEvidence" | "deviceId" | "planBasis" | "plan" | "conversationId" | "turnId" | "temporary" | "ephemeral">;
   args: Record<string, unknown>;
   callId: string;
   spoken: boolean;
@@ -131,6 +131,7 @@ export async function runGenerateImage(input: RunGenerateImageInput): Promise<To
       actor: state.actor as PersonRow,
       conversationId: state.conversationId,
       turnId: state.turnId,
+      companionId: state.persona?.id ?? null,
       temporary,
       kind: "generate",
       prompt,
@@ -150,7 +151,7 @@ export async function runGenerateImage(input: RunGenerateImageInput): Promise<To
     return outcomeOf({
       callId, packageId: GENERATE_IMAGE_TOOL_ID, status: "succeeded", via: "tool_call", args, durationMs: 0,
       result: {
-        reply: { text: `${many} being made from this description: ${prompt}. It appears below your reply when it is ready. You have not seen it: do not describe how it looks. Tell the person in one short sentence that it is on its way.${styleNote}${qualityNote}${peopleGuidanceSuffix(lane)}` },
+        reply: { text: `${many} being made from this description: ${prompt}. It appears below your reply when it is ready. You have not seen it: do not describe how it looks. Tell the person in one short sentence that it is on its way.${lane === "adult" ? ` ${PICTURE_STARTED_CONFIRM_NOTE}` : ""}${styleNote}${qualityNote}${peopleGuidanceSuffix(lane)}` },
         data: { pictureJobId: job.id },
         actions: [],
       },

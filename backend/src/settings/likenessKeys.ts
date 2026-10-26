@@ -1,18 +1,6 @@
-import { SettingsKey } from "@maipai/spec/gen/ts/settings-key.js";
+import type { SettingsKey } from "@maipai/spec/gen/ts/settings-key.js";
 
-/** Family media is enabled household-wide. Adult content remains governed by the fixed likeness policy. */
+/** The household switch for pictures, videos and styles of household members. The spec owns its definition (spec 0.1.229). */
 export const HOUSEHOLD_LIKENESS_KEY = "generation.household_likeness";
-export const LIKENESS_SETTINGS_KEYS: SettingsKey[] = [
-  SettingsKey.parse({
-    key: HOUSEHOLD_LIKENESS_KEY,
-    scope: "household",
-    selector: "boolean",
-    default: true,
-    label: "Pictures, videos and styles of your household",
-    help: "Let people in this household make pictures and videos of each other, including saved styles. Age and safety limits still apply.",
-    level: "basic",
-    secret: false,
-    lives_in: "generation",
-    honoured_by: ["home"],
-  }),
-];
+/** Nothing here: the likeness keys are all spec-owned now. Kept so the registry generator's imports stay one list. */
+export const LIKENESS_SETTINGS_KEYS: SettingsKey[] = [];
