@@ -278,11 +278,6 @@ html.dark body {
 }
 /* COLUMN-02 hover peek: the kit panel overlays the conversation without
  * moving it; the outer wrapper is positioned by ChatPage. */
-[data-slot="chat-column-title"] {
-  font-size: 15px;
-  font-weight: 500;
-}
-
 /* RAIL-01 conversation: assistant text sits on the surface at 15/24;
  * markdown headings at 22, 19 and 17; user messages are compact filled
  * bubbles at most 70% of the column. */
