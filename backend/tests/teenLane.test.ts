@@ -159,6 +159,16 @@ describe("a teen edits pictures", () => {
     void made;
   });
 
+  test("a teen never has an uploaded photo changed toward swimwear or undressing, in chat or in the editor (the adult exemption does not reach a teen)", async () => {
+    const photo = await put(teen, "photo-2");
+    __setPhotoInspectorForTests(async () => ({ people: 0, faces: 0, under18: "no" }));
+    const chat = await pic(teen, { prompt: "put her in a bikini", change: "attached" }, [photo]);
+    expect(text(chat)).toContain(TEEN_CONTENT_LINE);
+    expect(image.edits).toHaveLength(0);
+    await expect(startComment(teen, "conv-1", "photo-2", { prompt: "put her in a bikini" })).rejects.toMatchObject({ status: 422 });
+    expect(image.edits).toHaveLength(0);
+  });
+
   test("the editor's Comment works for a teen on a picture made here; a sexual description is one short line", async () => {
     await put(teen, "made-1", true);
     const started = await startComment(teen, "conv-1", "made-1", { prompt: "make the sky pink" });

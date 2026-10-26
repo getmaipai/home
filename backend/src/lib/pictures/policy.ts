@@ -156,14 +156,14 @@ export function refusePrompt(prompt: string, flags: { depictsRealPerson?: boolea
   return null;
 }
 
-/** Whether the words ask for sexual content at all (used where the picture may show a real person: an uploaded photo is never changed into that). */
+/** Whether the words ask for sexual content at all (used where the picture may show a real person: a teen's uploaded photo is never changed into that). */
 export function mentionsSexualContent(text: string): boolean {
   return mentionsSexualWord(text);
 }
 
 const UNDRESSING = /\b(?:remove|removing|removes|take|taking|takes|strip|stripping|get|getting|pull|pulling|lift|lifting)\b[^.]{0,40}\b(?:clothes|clothing|clothed|shirt|blouse|dress|top|bra|pants|trousers|skirt|underwear|swimsuit|swimwear|bikini|outfit|robe|towel)\b|\b(?:without|no)\s+(?:clothes|clothing|a shirt|a top|a bra|underwear)\b|\b(?:shirtless|topless|bottomless|naked|nude|undressed|see through|bare chest|bare skin|bare breasts)\b/;
 
-/** Words that undress or sexualize a person in a picture: a stricter reading than `mentionsSexualContent`, used where the picture is a photo that may show a real person. A word list cannot catch every phrasing, which is why it is paired with the rule that an uploaded photo is only ever changed in ways that leave the person clothed, and is named as a limit in docs/design/image-engine-2026-10-17.md. */
+/** Words that undress or sexualize a person in a picture: a stricter reading than `mentionsSexualContent`, used where the picture is a photo that may show a real person. A word list cannot catch every phrasing, which is why it is paired with the rule that a teen's uploaded photo is only ever changed in ways that leave the person clothed (an adult is not held to it), and is named as a limit in docs/design/image-engine-2026-10-17.md. */
 /** Words that take someone's clothes off or ask for none, without the bare swimwear word: what a teen's or a child's request may not ask for. */
 export function undressesSomeone(text: string): boolean {
   return UNDRESSING.test(normalise(text).trim());

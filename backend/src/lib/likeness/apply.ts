@@ -63,7 +63,7 @@ export type StylesPrep =
   | { kind: "refused"; line: string }
   | { kind: "likeness"; subjectId: string; subjectName: string; self: boolean; proofs: Map<string, string>; job: JobLikeness };
 
-/** The same decision for a request that applies several styles (Make another, a variation): every style of a person is decided and given its own proof; styles of two different people are refused; another adult-only style beside the likeness counts as adult content. */
+/** The same decision for a request that applies several styles (Make another, a variation): every style of a person is decided and given its own proof; styles of two different people are refused. */
 export async function prepareStylesUse(input: Omit<StyleInput, "style" | "depictsRealPerson"> & { styles: readonly StyleRef[] }): Promise<StylesPrep> {
   const people = new Map<string, StyleRef[]>();
   for (const style of input.styles) {
