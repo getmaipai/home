@@ -207,13 +207,11 @@ export function ChatHeaderBar({ phoneRow = false, trailing, shells = false, onMe
     </>
   );
   const companionId = data.companionId ?? data.defaultCompanionId ?? null;
-  const identityChoices = data.pinnable
-    ? [{ value: "default", label: data.companions.find(({ id }) => id === data.defaultCompanionId)?.name ?? "My default", imageUrl: stills.default }, ...data.companions.map((companion) => ({ value: companion.id, label: companion.name, imageUrl: stills[companion.id] }))]
-    : undefined;
+  const identityChoices = data.pinnable ? data.companions.map((companion) => ({ value: companion.id, label: companion.name, imageUrl: stills[companion.id] })) : undefined;
   if (shells || companionId) {
     return (
       <>
-        <WithCompanion companionId={companionId} fallbackName={data.companions.find(({ id }) => id === companionId)?.name}>{(name, media) => <ChatHeader name={name} media={media} identityChoices={identityChoices} identityValue={data.companionId ?? "default"} onIdentityChange={(value) => void data.onCompanionChange(value === "default" ? null : value)} onMenu={onMenu} onCall={onCall} actions={actions} menuExpanded={menuExpanded} menuControls={menuControls} />}</WithCompanion>
+        <WithCompanion companionId={companionId} fallbackName={data.companions.find(({ id }) => id === companionId)?.name}>{(name, media) => <ChatHeader name={name} media={media} identityChoices={identityChoices} identityValue={companionId ?? undefined} onIdentityChange={(value) => void data.onCompanionChange(value)} onMenu={onMenu} onCall={onCall} actions={actions} menuExpanded={menuExpanded} menuControls={menuControls} />}</WithCompanion>
         <Dialog open={renaming} onOpenChange={setRenaming}>
           <DialogContent>
             <DialogHeader><DialogTitle>Rename</DialogTitle><DialogDescription>{title}</DialogDescription></DialogHeader>

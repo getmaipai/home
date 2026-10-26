@@ -27,14 +27,14 @@ export function useCompanionAvatar(companionId?: string | null) {
   return { avatar: query.isLoading || query.isPending ? null : avatar, clips: avatar ? mapCompanionClips(avatar.states) : null, loading: query.isLoading || query.isPending };
 }
 
-/** The idle still (else the first state's) of each companion, by id, plus `default` for the person's own default. Shares the avatar query cache. */
+/** The idle still (else the first state's) of each companion, by id. Shares the avatar query cache. */
 export function useCompanionStills(ids: string[]): Record<string, string | undefined> {
   const person = useContext(WakeWordPersonContext);
-  const keys = [null, ...ids];
+  const keys = ids;
   const results = useQueries({
     queries: keys.map((id) => ({
       queryKey: [...COMPANION_AVATAR_QUERY_KEY, person?.id ?? null, id],
-      queryFn: () => api.companionAvatar(id ?? undefined),
+      queryFn: () => api.companionAvatar(id),
       enabled: person !== null,
       staleTime: 5 * 60_000,
     })),
@@ -42,7 +42,7 @@ export function useCompanionStills(ids: string[]): Record<string, string | undef
   const stills: Record<string, string | undefined> = {};
   keys.forEach((id, index) => {
     const states = results[index]?.data?.avatar?.states ?? {};
-    stills[id ?? "default"] = (states.idle ?? Object.values(states)[0])?.urls.still;
+    stills[id] = (states.idle ?? Object.values(states)[0])?.urls.still;
   });
   return stills;
 }
