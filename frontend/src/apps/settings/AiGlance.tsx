@@ -7,7 +7,7 @@ import { useMutation, useQuery } from "@tanstack/react-query";
 import { Alert, AlertDescription, AlertTitle } from "@maipai/ui/src/ui/alert";
 import { Badge } from "@maipai/ui/src/ui/badge";
 import { Button } from "@maipai/ui/src/ui/button";
-import { Skeleton } from "@maipai/ui/src/ui/skeleton";
+import { RouteSkeleton } from "@maipai/ui/src/primitives/RouteSkeleton";
 import { Switch } from "@maipai/ui/src/ui/switch";
 import { StorageBar } from "@maipai/ui/src/primitives/StorageBar";
 import { Item, ItemActions, ItemContent, ItemDescription, ItemGroup, ItemMedia, ItemTitle } from "@maipai/ui/src/dashboard/components/ui/item";
@@ -98,7 +98,7 @@ export function AiGlance({ card }: SettingsViewProps) {
     onError: (e) => { setError(messageOf(e, "Could not apply the changes. Check that the engine is running, then try again.")); refresh(); void settings.refetch(); },
   });
 
-  if (query.isLoading) return <section aria-label="Loading"><Skeleton aria-label="Loading" /></section>;
+  if (query.isLoading) return <RouteSkeleton label="Loading your AI setup" />;
   if (query.isError || !data) return <section><Alert variant="destructive"><AlertTitle>The page did not load</AlertTitle><AlertDescription>{messageOf(query.error, "Check that Home is running, then reload this page.")}</AlertDescription></Alert></section>;
 
   const totalRam = (hardware.data?.totalRamGb ?? 0) * GB;
@@ -123,8 +123,6 @@ export function AiGlance({ card }: SettingsViewProps) {
       <InstallStrip detailsHref={null} />
       <header className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <p className="text-base font-medium uppercase tracking-wide text-muted-foreground">{copy.eyebrow}</p>
-          <h2 className="text-2xl font-semibold">{copy.title}</h2>
           <p className="text-base text-muted-foreground">{copy.subtitle}</p>
         </div>
         {missing.length > 0 ? <Button type="button" disabled={download.isPending} onClick={() => download.mutate(missing)}>{fill(copy.download_missing ?? "", { count: missing.length })}</Button> : null}
@@ -178,8 +176,8 @@ export function AiGlance({ card }: SettingsViewProps) {
           <AlertTitle>{fill(copy.staged ?? "", { count: stagedCount })}</AlertTitle>
           <AlertDescription>
             <div className="flex gap-2">
-              <Button type="button" variant="outline" size="sm" onClick={() => setStaged({})}>{copy.discard}</Button>
-              <Button type="button" size="sm" disabled={apply.isPending} onClick={() => apply.mutate()}>{copy.apply}</Button>
+              <Button type="button" variant="outline" size="sm" disabled={apply.isPending} onClick={() => setStaged({})}>{copy.discard}</Button>
+              <Button type="button" size="sm" disabled={apply.isPending} onClick={() => apply.mutate()}>{apply.isPending ? "Applying…" : copy.apply}</Button>
             </div>
           </AlertDescription>
         </Alert>

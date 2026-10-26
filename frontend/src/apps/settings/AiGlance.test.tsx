@@ -14,15 +14,16 @@ const overview = { stack: "ok", message: null, tier: "p128", free_disk_bytes: 1e
 describe("AiGlance Apply", () => {
   test("a staged switch shows the sticky bar and Apply posts the choice", async () => {
     const posts: string[] = [];
+    let release = () => {};
     globalThis.fetch = ((input: RequestInfo | URL, init?: RequestInit) => {
       const path = (typeof input === "string" ? input : input.toString()).split("?")[0]!;
-      if (init?.method === "POST") posts.push(`${path} ${init.body}`);
+      if (init?.method === "POST") { posts.push(`${path} ${init.body}`); return new Promise((resolve) => { release = () => resolve(Response.json({ ok: true, started: [] })); }); }
       if (path.endsWith("/api/ai/choices")) return Promise.resolve(Response.json(overview));
       if (path.endsWith("/api/host/hardware")) return Promise.resolve(Response.json({ platform: "darwin", totalRamGb: 24, cpuCount: 8, isAppleSilicon: true, unifiedMemoryGb: 24, cudaDevices: [] }));
       if (path.includes("/api/settings")) return Promise.resolve(Response.json([]));
       return Promise.resolve(Response.json({}));
     }) as typeof fetch;
-    const view = renderWithQueryClient(<MemoryRouter><AiGlance {...({ card: { copy: { apply: "Apply changes", discard: "Discard", staged: "{count} changes staged." } } } as unknown as Parameters<typeof AiGlance>[0])} /></MemoryRouter>);
+    const view = renderWithQueryClient(<MemoryRouter><AiGlance {...({ card: { copy: { eyebrow: "Your AI setup", title: "AI & Models", apply: "Apply changes", discard: "Discard", staged: "{count} changes staged." } } } as unknown as Parameters<typeof AiGlance>[0])} /></MemoryRouter>);
     const toggle = await view.findByRole("switch", { name: /Wake Word/ });
     fireEvent.click(toggle);
     const bar = await view.findByTestId("ai-action-bar");
@@ -31,5 +32,9 @@ describe("AiGlance Apply", () => {
     await waitFor(() => expect(posts.length).toBeGreaterThan(0));
     expect(posts[0]).toContain("/api/ai/choices/wakeword");
     expect(posts[0]).toContain("wakeword.detector");
+    expect((await view.findByRole("button", { name: "Applying…" })).hasAttribute("disabled")).toBe(true);
+    expect(view.queryByText("Your AI setup")).toBeNull();
+    expect(view.queryByRole("heading", { name: "AI & Models" })).toBeNull();
+    release();
   });
 });

@@ -166,6 +166,9 @@ const choicesRoute = createRoute({
 aiChoicesRoutes.openapi(choicesRoute, async (c) => {
   let list: StackComponentList | null = null;
   let message: string | null = null;
+  // The plan and the memory reading do not depend on the list: start them together so the page waits for the slowest, not the sum.
+  const planned = loadPlan();
+  const memory = systemAvailableBytes();
   try { list = await listStackComponents(); } catch (error) {
     if (error instanceof StackComponentError) message = error.message;
     else throw error;
@@ -173,11 +176,11 @@ aiChoicesRoutes.openapi(choicesRoute, async (c) => {
   if (list === null) {
     return c.json({ stack: "unreachable" as const, message, tier: null, free_disk_bytes: null, installed_bytes: 0, cards: [], alwaysOn: { bytes: 0, rowIds: [] }, recommended: null, unused_bytes: 0, memory_available_bytes: null }, 200);
   }
-  const state: AiState = { plan: await loadPlan(), components: list.components, settings: readAiSettings(), freeBytes: list.free_disk_bytes, list };
+  const state: AiState = { plan: await planned, components: list.components, settings: readAiSettings(), freeBytes: list.free_disk_bytes, list };
   const { cards, alwaysOn } = buildAiCards(choicesInput(state));
   return c.json({
     stack: "ok" as const, message: null, tier: list.tier, free_disk_bytes: list.free_disk_bytes, installed_bytes: list.installed_bytes,
-    cards, alwaysOn, recommended: recommendedPlan(choicesInput(state)), unused_bytes: findUnused(unusedInput(state)).totalBytes, memory_available_bytes: (await systemAvailableBytes())?.available ?? null,
+    cards, alwaysOn, recommended: recommendedPlan(choicesInput(state)), unused_bytes: findUnused(unusedInput(state)).totalBytes, memory_available_bytes: (await memory)?.available ?? null,
   }, 200);
 });
 
