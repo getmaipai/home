@@ -27,6 +27,10 @@ const newsRow: AppRow = {
   sections: [{ page: "following", label: "Following", icon: null }, { page: "saved", label: "Saved", icon: null }], to: "/apps/news", incognito: "unaffected",
   settings_area: { id: "news" },
 } as unknown as AppRow;
+const weatherRow: AppRow = {
+  package: "weather", page: "index", label: "Weather", icon: "cloud-sun", description: "Forecasts.", category: "Utilities", keywords: [],
+  sections: [], to: "/apps/weather", incognito: "unaffected", settings_area: { id: "weather" },
+} as unknown as AppRow;
 const newsPage = { type: "page", id: "news", title: "Today", body: [{ type: "empty_state", icon: "newspaper", text: "No stories yet. Check back soon." }] };
 const shelf = (path: string) => ({
   type: "media_shelf", heading: path, bind: { source: "package", path }, item_key_field: "id", item_label_field: "title", item_media_field: "thumbnail", aspect: "wide",
@@ -40,6 +44,7 @@ const watchPage = {
 };
 const videosWatchPage = JSON.parse(readFileSync(resolve(import.meta.dir, "../../../backend/packages/videos/pages/watch.json"), "utf8")) as unknown;
 const musicPlayPage = JSON.parse(readFileSync(resolve(import.meta.dir, "../../../backend/packages/music/pages/play.json"), "utf8")) as unknown;
+const weatherIndexPage = JSON.parse(readFileSync(resolve(import.meta.dir, "../../../backend/packages/weather/pages/index.json"), "utf8")) as unknown;
 
 let home: HomeFixture;
 let itemBodies: string[];
@@ -53,8 +58,9 @@ beforeEach(() => {
   baseFetch = globalThis.fetch;
   globalThis.fetch = ((input: RequestInfo | URL, init?: RequestInit) => {
     const url = typeof input === "string" ? input : input.toString();
-    if (url.startsWith("/api/apps")) return Promise.resolve(Response.json([row, newsRow]));
+    if (url.startsWith("/api/apps")) return Promise.resolve(Response.json([row, newsRow, weatherRow]));
     if (url.startsWith("/api/plugins/news/pages/")) return Promise.resolve(Response.json(newsPage));
+    if (url.startsWith("/api/plugins/weather/pages/")) return Promise.resolve(Response.json(weatherIndexPage));
     if (url.startsWith("/api/plugins/videos/pages/index")) return Promise.resolve(Response.json(indexPage));
     if (url.startsWith("/api/plugins/videos/pages/watch")) return Promise.resolve(Response.json(watchPage));
     if (url.startsWith("/api/plugins/videos/data/recent")) return Promise.resolve(Response.json([{ id: "media-aaaaaa", title: "Building a birdhouse", kind: "video", thumbnail: null }]));
@@ -279,6 +285,10 @@ describe("MEDIA-POLISH-01 the docked mini bar", () => {
     await waitFor(() => expect(document.querySelector('[data-slot="player"][data-layout="mini"]')).not.toBeNull());
     const dock = document.querySelector('[data-slot="player"][data-layout="mini"]')!;
     expect(dock.getAttribute("data-placement")).toBe("dock");
+    const contentColumn = dock.parentElement!;
+    expect(contentColumn.lastElementChild).toBe(dock);
+    expect(contentColumn.lastElementChild?.previousElementSibling?.getAttribute("aria-hidden")).toBe("true");
+    expect(contentColumn.lastElementChild?.previousElementSibling?.className).toContain("flex-1");
     expect(dock.querySelector("video")).toBe(video);
     expect(await view.findByRole("button", { name: "Open the player: Building a birdhouse" })).toBeTruthy();
     fireEvent.click(view.getByRole("button", { name: "Close the player: Building a birdhouse" }));
@@ -335,11 +345,11 @@ describe("an app's first tab for the apps that are not media apps", () => {
   });
 });
 
-describe("News draws its header in the media family without being a media app", () => {
-  test("usesFamilyHeader is the media apps and News; isMediaApp stays the media apps", () => {
-    expect(["videos", "shows", "music", "podcasts", "books", "news"].every(usesFamilyHeader)).toBe(true);
-    expect(usesFamilyHeader("weather")).toBe(false);
+describe("family app headers", () => {
+  test("usesFamilyHeader is the media apps, News and Weather; isMediaApp stays the media apps", () => {
+    expect(["videos", "shows", "music", "podcasts", "books", "news", "weather"].every(usesFamilyHeader)).toBe(true);
     expect(isMediaApp("news")).toBe(false);
+    expect(isMediaApp("weather")).toBe(false);
   });
 
   test("the title is large, the controls are icons on the end side, and the sections are pill tabs starting at Today", async () => {
@@ -361,5 +371,32 @@ describe("News draws its header in the media family without being a media app", 
     const view = open("/apps/videos");
     expect((await view.findAllByRole("heading", { level: 1, name: "Videos" })).length).toBeGreaterThan(0);
     expect(view.getByRole("tablist", { name: "Sections" }).getAttribute("data-variant")).toBe("pill");
+  });
+
+  test("Weather has one h1 and a visible title on desktop and at phone width", async () => {
+    const originalMatchMedia = window.matchMedia;
+    const originalWidth = window.innerWidth;
+    try {
+      for (const width of [1440, 390]) {
+        Object.defineProperty(window, "innerWidth", { configurable: true, value: width });
+        window.matchMedia = ((query: string) => ({ matches: query.includes("639.98") ? width < 640 : query.includes("max-width") && width <= 768, media: query, onchange: null, addListener: () => {}, removeListener: () => {}, addEventListener: () => {}, removeEventListener: () => {}, dispatchEvent: () => false })) as typeof window.matchMedia;
+        const view = open("/apps/weather");
+        await waitFor(() => expect(view.container.querySelectorAll('[data-testid="package-app"] h1')).toHaveLength(1));
+        const pageHeadings = view.container.querySelectorAll('[data-testid="package-app"] h1');
+        expect(pageHeadings).toHaveLength(1);
+        if (width === 1440) {
+          const heading = await view.findByRole("heading", { level: 1, name: "Weather" });
+          expect(heading.className).not.toContain("sr-only");
+        } else {
+          expect(pageHeadings[0]?.className).toContain("sr-only");
+          expect(document.querySelector('[data-slot="rail-page-header"]')?.textContent).toContain("Weather");
+        }
+        expect(view.getByRole("link", { name: "Weather settings" })).toBeTruthy();
+        cleanup();
+      }
+    } finally {
+      window.matchMedia = originalMatchMedia;
+      Object.defineProperty(window, "innerWidth", { configurable: true, value: originalWidth });
+    }
   });
 });

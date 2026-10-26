@@ -28,7 +28,7 @@ Press a picture. The episode opens with its title. Press the big play button.
 - The sleep timer stops the sound after a time you pick, or at the end of the episode.
 - If the show lists chapters, the chapter button lets you jump to one.
 
-When you come back to an episode, it starts where you stopped. A show can also skip its first seconds the first time you play an episode, and count the last seconds as played.
+When you come back to an episode, it starts where you stopped. A show can also skip its first seconds the first time you play an episode, and count the last seconds as played. When you leave an episode, its mini player stays at the bottom of the app.
 
 Under the player you see three buttons:
 

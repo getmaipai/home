@@ -11,7 +11,7 @@ Type "what's the weather" or "will it rain in Seattle tomorrow". Home answers wi
 
 ## Open the Weather app
 
-Open **Weather** from the apps list, from the search box in the header, or from your favorites. The page shows one big weather card with an animated sky, today's high and low, and an hourly strip.
+Open **Weather** from the apps list, from the search box in the header, or from your favorites. The page shows a large **Weather** title and settings gear above one big weather card with an animated sky, today's high and low, and an hourly strip.
 
 Above the card is a place picker. The choices, in order:
 

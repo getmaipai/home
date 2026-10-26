@@ -242,7 +242,7 @@ export function PackageAppPage({ person }: { person: Roster }) {
   const content = (
     <div className={cn("flex min-h-0 min-w-0 flex-1 flex-col gap-2", (sidebarProps || media) && "lg:p-4 lg:ps-6", (sidebarProps || media) && !sectionsBar && "py-4")} data-testid="package-app" data-package={packageId}>
       {sectionsBar ? <PhoneNav variant="floating" label={`${app?.label ?? "App"} sections`} entries={sectionsBar.entries} more={sectionsBar.more} {...(sectionsBar.trailing ? { trailing: sectionsBar.trailing } : {})} /> : null}
-      {familyHeader ? null : <h1 className="sr-only">{app?.label ?? "App"}</h1>}
+      {familyHeader && !(packageId === "weather" && inShellBar) ? null : <h1 className="sr-only">{app?.label ?? "App"}</h1>}
       {app ? <AppToolbar inShellBar={inShellBar} sectionsInBar={sectionsBar !== null} hideSectionsOnWide={sidebar !== undefined} to={app.to} label={app.label} homeLabel={appHomeLabel(packageId, media)} settingsArea={app.settings_area?.id} sections={app.sections} current={pageId} familyHeader={familyHeader} title={contextTitle} titleSrOnly={sidebarProps ? ownHeader || contextTitle === undefined : false} /> : null}
       <AsyncState
         data={page.isError ? null : page.data}
@@ -287,6 +287,7 @@ export function PackageAppPage({ person }: { person: Roster }) {
           </> : null}
         </>); }}
       </AsyncState>
+      {docked ? <div className="flex-1" aria-hidden="true" /> : null}
       {docked ? (
         <Player
           key={docked.id}

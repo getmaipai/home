@@ -22,10 +22,9 @@ export const MEDIA_APP_IDS: readonly string[] = [...new Set(Object.values(MEDIA_
 
 export const isMediaApp = (id: string): boolean => MEDIA_APP_IDS.includes(id);
 
-/** NEWS-LOOK-02: the apps whose toolbar is drawn in the media family's header (title large, icon controls on the end side, sections as pill
- * tabs): the media apps, and News. This is the header only: News has no dock, plays nothing and keeps no query as page state, so
- * everything else still asks `isMediaApp`. */
-export const usesFamilyHeader = (id: string): boolean => isMediaApp(id) || id === "news";
+/** The apps whose toolbar uses the media family's header (large title, icon controls on the end side, sections as pill tabs): the media
+ * apps, News and Weather. This selects the header only; playback behavior still asks `isMediaApp`. */
+export const usesFamilyHeader = (id: string): boolean => isMediaApp(id) || id === "news" || id === "weather";
 
 /** The route that plays `id`, for an item of this kind; null for a kind no app plays. The id also rides in the query so a reload or a
  * shared link opens the same item (PackageAppPage reads it into the page's state). */
