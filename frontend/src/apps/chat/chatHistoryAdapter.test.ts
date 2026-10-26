@@ -85,6 +85,26 @@ describe("rowsToBranchableMessages", () => {
     expect(items[1]!.message.metadata!.custom!.turnId).toBe("row-1");
   });
 
+  test("SPEAKER-MARKER-HOME-01: history attributes changes and mention turns to their companion", () => {
+    const rows = [
+      { ...makeRow("row-a", "First."), answered_by: { companion_id: "c-a", name: "Ari", look: "look-a", via: "conversation" as const } },
+      { ...makeRow("row-b", "Joined."), answered_by: { companion_id: "c-b", name: "Bo", look: null, via: "mention" as const } },
+    ];
+    const replies = flatten(rowsToBranchableMessages(rows, "Nova", "conv-example123")).filter((item) => item.message.role === "assistant");
+    expect(replies.map(({ message }) => message.metadata?.custom?.answered_by)).toEqual(rows.map(({ answered_by }) => answered_by));
+  });
+
+  test("SPEAKER-MARKER-HOME-01: repeated and default-only speakers remain represented accurately", () => {
+    const companion = { companion_id: "c-a", name: "Ari", look: null, via: "conversation" as const };
+    const companionReplies = flatten(rowsToBranchableMessages([
+      { ...makeRow("row-a", "First."), answered_by: companion },
+      { ...makeRow("row-b", "Again."), answered_by: companion },
+    ], "Nova", "conv-example123")).filter((item) => item.message.role === "assistant");
+    const defaultReplies = flatten(rowsToBranchableMessages([makeRow("row-default", "Default.")], "Nova", "conv-example123")).filter((item) => item.message.role === "assistant");
+    expect(companionReplies.map(({ message }) => message.metadata?.custom?.answered_by)).toEqual([companion, companion]);
+    expect(defaultReplies[0]!.message.metadata?.custom?.answered_by).toBeUndefined();
+  });
+
   // CHAT-CALM-ERRORS-01c: a reloaded failed reply is flagged for the one
   // details control, from what the row itself says (its `failed` status, or
   // an admin's raw generation error or failed outcome); a clean row is not.

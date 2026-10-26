@@ -741,6 +741,7 @@ export function createChatModelAdapter(deps: ChatModelAdapterDeps): ChatModelAda
               ...(event.value.stats?.stop_reason === "length" ? { status: { type: "incomplete", reason: "length" as const } } : {}),
               metadata: {
                 custom: {
+                  ...(event.value.answered_by ? { answered_by: event.value.answered_by } : {}),
                   source: event.value.source,
                   // 4.3, "offer, never block" (SAFETY-NOTICE-01): the crisis
                   // resources ride on the reply's own metadata and are drawn
