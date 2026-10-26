@@ -78,15 +78,20 @@ export function extensionOf(item: Pick<LibraryItem, "name" | "media_type">): str
 export const hasThumbnail = (item: Pick<LibraryItem, "kind">): boolean => item.kind === "image" || item.kind === "video" || item.kind === "audio";
 
 export const ownerName = (item: LibraryItem, me: Pick<Roster, "id">): string => (item.owner.id === me.id ? "You" : item.owner.display_name);
-/** The creation header: who made the file, when, and who it is shared with. */
-export function creationOf(item: LibraryItem, me: Pick<Roster, "id">, sharedWith: Array<{ id: string; name: string }>): { title: string; creator: { name: string; href: string }; madeAt: string; mode: "private" | "shared"; people: Array<{ id: string; name: string }>; canManage: boolean } {
+/** The creation header: who made the file, when, and who it is shared with. `seeds` maps a person id to their avatar seed. */
+export function creationOf(item: LibraryItem, me: Pick<Roster, "id">, sharedWith: Array<{ id: string; name: string }>, seeds: Record<string, string> = {}): { title: string; creator: { name: string; href: string; avatarSeed?: string }; madeAt: string; mode: "private" | "shared"; people: Array<{ id: string; name: string; avatarSeed?: string }>; canManage: boolean } {
   const household = item.shared_with.household;
+  const ownerSeed = seeds[item.owner.id];
+  const withSeed = (person: { id: string; name: string }): { id: string; name: string; avatarSeed?: string } => {
+    const seed = person.id === "household" ? undefined : seeds[person.id];
+    return seed !== undefined ? { ...person, avatarSeed: seed } : person;
+  };
   return {
     title: item.name,
-    creator: { name: item.owner.display_name, href: `/people/${encodeURIComponent(item.owner.id)}` },
+    creator: { name: item.owner.display_name, href: `/people/${encodeURIComponent(item.owner.id)}`, ...(ownerSeed !== undefined ? { avatarSeed: ownerSeed } : {}) },
     madeAt: item.created_at,
     mode: household || item.shared_with.count > 0 ? "shared" : "private",
-    people: household ? [{ id: "household", name: "Everyone in the home" }] : sharedWith,
+    people: household ? [{ id: "household", name: "Everyone in the home" }] : sharedWith.map(withSeed),
     canManage: item.owner.id === me.id,
   };
 }

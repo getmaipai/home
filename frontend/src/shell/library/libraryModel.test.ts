@@ -87,4 +87,21 @@ describe("the creation header of a Library file", () => {
     expect(got.creator).toEqual({ name: "Marlow", href: "/people/p9" });
     expect(got.canManage).toBe(false);
   });
+  test("avatar seeds reach the creator and the shared people", () => {
+    const seeds = { p1: "seed-sage", p2: "seed-marlow", p3: "seed-nova" };
+    const got = creationOf(item({ shared_with: { count: 2, household: false } }), me, [{ id: "p2", name: "Marlow" }, { id: "p3", name: "Nova" }], seeds);
+    expect(got.creator).toEqual({ name: "Sage", href: "/people/p1", avatarSeed: "seed-sage" });
+    expect(got.people).toEqual([{ id: "p2", name: "Marlow", avatarSeed: "seed-marlow" }, { id: "p3", name: "Nova", avatarSeed: "seed-nova" }]);
+  });
+  test("the household entry never carries a seed", () => {
+    const got = creationOf(item({ shared_with: { count: 1, household: true } }), me, [], { household: "seed-house", p1: "seed-sage" });
+    expect(got.people).toEqual([{ id: "household", name: "Everyone in the home" }]);
+    expect("avatarSeed" in got.people[0]!).toBe(false);
+  });
+  test("missing seeds leave the avatarSeed key off", () => {
+    const got = creationOf(item({ shared_with: { count: 1, household: false } }), me, [{ id: "p2", name: "Marlow" }], { p9: "seed-other" });
+    expect("avatarSeed" in got.creator).toBe(false);
+    expect(got.people).toEqual([{ id: "p2", name: "Marlow" }]);
+    expect("avatarSeed" in got.people[0]!).toBe(false);
+  });
 });

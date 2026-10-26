@@ -39,9 +39,11 @@ function Details({ item, me, actions }: { item: LibraryItem; me: Roster; actions
   const mine = item.owner.id === me.id;
   const record = useQuery({ queryKey: ["library-file", item.id], queryFn: () => api.libraryFile(item.id) });
   const shares = useQuery({ queryKey: ["file-shares", item.id], queryFn: () => api.fileShares(item.id), enabled: mine && item.shared_with.count > 0 });
-  const people = useQuery({ queryKey: ["people"], queryFn: () => api.people(), enabled: mine && item.shared_with.count > 0 && !item.shared_with.household });
+  const people = useQuery({ queryKey: ["people"], queryFn: () => api.people(), enabled: true });
   const sharedWith = (shares.data ?? []).filter((share) => share.to !== "household").map((share) => ({ id: share.to, name: people.data?.find((person) => person.id === share.to)?.display_name ?? "Someone in your home" }));
-  const creation = creationOf(item, me, sharedWith);
+  const seeds: Record<string, string> = Object.fromEntries((people.data ?? []).map((person) => [person.id, person.avatar_seed]));
+  seeds[me.id] ??= me.avatar_seed;
+  const creation = creationOf(item, me, sharedWith, seeds);
   const [panelOpen, setPanelOpen] = useState(false);
   const kept = item.retention === "kept";
   const row = (label: string, value: ReactNode) => <div><dt className="text-muted-foreground">{label}</dt><dd>{value}</dd></div>;
@@ -57,7 +59,7 @@ function Details({ item, me, actions }: { item: LibraryItem; me: Roster; actions
   return (
     <>
       {song ? <MusicTrack {...songTrackProps} /> : null}
-      <CreationHeader title={creation.title} creator={creation.creator} madeAt={creation.madeAt} headingLevel="h2" visibility={{ mode: creation.mode, people: creation.people, canManage: creation.canManage, onOpen: () => { if (creation.canManage) actions.share(item); else setPanelOpen(true); } }} />
+      <CreationHeader title={creation.title} creator={{ ...creation.creator }} madeAt={creation.madeAt} headingLevel="h2" visibility={{ mode: creation.mode, people: creation.people, canManage: creation.canManage, onOpen: () => { if (creation.canManage) actions.share(item); else setPanelOpen(true); } }} />
       <SharePanel open={panelOpen} onOpenChange={setPanelOpen} people={creation.people} candidates={[]} canManage={false} onAdd={() => {}} onRemove={() => {}} onMakePrivate={() => {}} />
       <div className="flex flex-col gap-4">
       <dl className="grid gap-3 pt-4 text-base">

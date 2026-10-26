@@ -317,12 +317,12 @@ export function visibilityForFile(person: PersonRow, fileId: string, canManage: 
     if (share.to === "household") return [{ id: "household", name: "Everyone in the home", avatar_url: null }];
     const recipient = active.find((candidate) => candidate.id === share.to);
     if (!recipient || (!canManage && recipient.id !== person.id)) return [];
-    return [{ id: recipient.id, name: recipient.displayName, avatar_url: null }];
+    return [{ id: recipient.id, name: recipient.displayName, avatar_url: null, avatar_seed: recipient.avatarSeed }];
   });
   const candidates = canManage ? [
     ...(!adultOnly ? [{ id: "household", name: "Everyone in the home", avatar_url: null }] : []),
     ...active.filter((candidate) => candidate.id !== person.id && (!adultOnly || speakerAgeBand(candidate, new Date()) === "adult"))
-      .map((candidate) => ({ id: candidate.id, name: candidate.displayName, avatar_url: null })),
+      .map((candidate) => ({ id: candidate.id, name: candidate.displayName, avatar_url: null, avatar_seed: candidate.avatarSeed })),
   ] : [];
   return {
     visibility: { mode: rows.length ? "shared" : "private", people: current, can_manage: canManage },
@@ -352,7 +352,7 @@ function videoCreation(person: PersonRow, id: string): unknown[] {
     const adultOnly = fileAudience(file.provenance) === "adult-only";
     const share = visibilityForFile(person, id, canManage, adultOnly);
     return [{ id, title, description: prompt, creator: owner
-      ? { name: owner.displayName, avatar_url: null, href: `/people/${encodeURIComponent(owner.id)}` }
+      ? { name: owner.displayName, avatar_url: null, avatar_seed: owner.avatarSeed, href: `/people/${encodeURIComponent(owner.id)}` }
       : { label: "Made at home" }, made_at: made.created_at, visibility: share.visibility }];
   }
   const item = readableIn(person, "videos", id);
@@ -360,7 +360,7 @@ function videoCreation(person: PersonRow, id: string): unknown[] {
   const source = liveSourceById(item.source_id);
   if (!source) return [];
   const shared = source.visible_to === "household";
-  const household = shared ? listActivePeople().map((candidate) => ({ id: candidate.id, name: candidate.displayName, avatar_url: null })) : [];
+  const household = shared ? listActivePeople().map((candidate) => ({ id: candidate.id, name: candidate.displayName, avatar_url: null, avatar_seed: candidate.avatarSeed })) : [];
   return [{ id, title: safeText(item.title) || "Video", description: safeText(item.description), creator: { name: safeText(item.subtitle) || safeText(source.label) || "Video source" }, made_at: item.added_at,
     visibility: { mode: shared ? "shared" : "private", people: household, can_manage: false } }];
 }
@@ -412,7 +412,7 @@ function musicCreation(person: PersonRow, id: string): unknown[] {
     const canManage = canManageMadeFile(person, file.ownerPersonId);
     const share = visibilityForFile(person, fileId, canManage, fileAudience(file.provenance) === "adult-only");
     return [{ id: fileId, title, description, creator: owner
-      ? { name: owner.displayName, avatar_url: null, href: `/people/${encodeURIComponent(owner.id)}` }
+      ? { name: owner.displayName, avatar_url: null, avatar_seed: owner.avatarSeed, href: `/people/${encodeURIComponent(owner.id)}` }
       : { label: "Made at home" }, made_at: file.createdAt, visibility: share.visibility }];
   }
   if (!item) return [];
@@ -423,7 +423,7 @@ function musicCreation(person: PersonRow, id: string): unknown[] {
     ? members
     : Array.isArray(source.visible_to) ? members.filter((candidate) => source.visible_to.includes(candidate.id)) : [];
   const shared = source.visible_to === "household" || recipients.length > 1;
-  const household = shared ? recipients.map((candidate) => ({ id: candidate.id, name: candidate.displayName, avatar_url: null })) : [];
+  const household = shared ? recipients.map((candidate) => ({ id: candidate.id, name: candidate.displayName, avatar_url: null, avatar_seed: candidate.avatarSeed })) : [];
   return [{ id: item.id, title: safeText(item.title) || "Song", description: safeText(item.description), creator: { name: safeText(item.subtitle) || safeText(source.label) || "Music library" }, made_at: item.added_at,
     visibility: { mode: shared ? "shared" : "private", people: household, can_manage: false } }];
 }
