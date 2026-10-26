@@ -177,8 +177,6 @@ const EXEMPT: Record<string, string> = {
   "lib/companionLook.ts": "describes a companion's own character picture as a JSON card for its editor; no text reaches a person as a reply",
   "lib/pictures/ageCheck.ts": "labels a picture as a possible minor in JSON; no text reaches the person, a doubt withholds the picture",
   "lib/pictures/laneGate.ts": "labels a picture child-safe or not in JSON; no text reaches the person, a doubt withholds the picture",
-  "lib/pictures/people.ts": "picks which numbered, boxed person a description means, as numbers in JSON; no text reaches the person, a doubt removes no one",
-  "lib/likeness/inspector.ts": "counts the people and faces in an uploaded photo as JSON; no text reaches the person, and a doubt refuses",
   "lib/robotVision.ts": "describes one robot camera picture in a single sentence kept for 90 seconds as background data in that robot's own turn; it is never shown to the person, and the turn that reads it carries the topic block and passes the output gate",
   "lib/memoryJudge.ts": "classifies memory candidates into a JSON verdict; no text reaches the person",
   "lib/personaJudge.ts": "admin evaluation judge; no person-facing text",

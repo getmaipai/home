@@ -61,8 +61,8 @@ describe("the refusal text and the other lines", () => {
     expect(refusePrompt("a portrait of the mayor", {})).toBeNull();
     expect(refusePrompt("a sexual portrait of the mayor", {})).toBeNull();
     expect(refusePrompt("a portrait of the mayor", { lane: "teen" })).toBeNull();
-    expect(refusePrompt("a sexual portrait of the mayor", { lane: "teen" })).toBeNull();
-    expect(refusePrompt("a sexual portrait of the mayor", { lane: "child" })).toBeNull();
+    expect(refusePrompt("a sexual portrait of the mayor", { lane: "teen" })).toBe("teen_content");
+    expect(refusePrompt("a sexual portrait of the mayor", { lane: "child" })).toBe("child_content");
     expect(refusePrompt("she undresses slowly", { lane: "teen" })).toBe("teen_content");
     expect(refusePrompt("she undresses slowly", { lane: "child" })).toBe("child_content");
     // The minor line holds for an adult's request too.

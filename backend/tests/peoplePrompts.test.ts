@@ -60,7 +60,7 @@ describe("adult media requests", () => {
     const photo = await put(nadia, "photo-1");
     const edit = await pic(nadia, { prompt: "change her dress to red", change: "attached" }, [photo]);
     expect(edit.status).toBe("succeeded");
-    expect(image.edits[0]).toMatchObject({ image_source: "uploaded", audience: "adult" });
+    expect(image.edits[0]).toMatchObject({ image_source: "uploaded", operation: "edit" });
     const videoResult = await vid(nadia, { prompt: "she waves", from_picture: "attached" }, [photo]);
     expect(videoResult.status).toBe("succeeded");
   });
