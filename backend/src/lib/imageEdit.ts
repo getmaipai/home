@@ -37,14 +37,14 @@ import { photoUploadsAllowed } from "@/lib/chatPictures";
 import { getStackClient, isStackConfigured } from "@/lib/stackEngine";
 import { promptRefusalLineFor, checkImages, promptHash } from "@/lib/pictures/ageCheck";
 import { gateFinished, laneOfPerson } from "@/lib/pictures/laneGate";
-import { CHILD_LIMIT_LINE, CHILD_NO_PHOTOS_LINE, attachKid, kidLaneOn, laneOf, releaseKid, reserveKid } from "@/lib/pictures/lane";
+import { CHILD_LIMIT_LINE, CHILD_NO_PHOTOS_LINE, TEEN_CONTENT_LINE, attachKid, kidLaneOn, laneOf, releaseKid, reserveKid } from "@/lib/pictures/lane";
 import { mentionsSexualWord } from "@/lib/pictures/minorLine";
 import { asksToUndress, pictureDenial, PICTURE_DENIAL_LINE, PROMPT_REFUSAL_LINE, refusePrompt, type PictureAudience } from "@/lib/pictures/policy";
 import { cancelOrDelete, fetchPicture, getGenerationJob, StackPicturesError, submitEdit } from "@/lib/pictures/stack";
 import { pictureEngineStatus } from "@/lib/pictures/ready";
 import { speakerAgeBand } from "@/lib/ageBand";
 import { prepareEditSource } from "@/lib/pictures/editSources";
-import { MANY_PEOPLE_LINE, PHOTO_ADULT_LINE } from "@/lib/likeness/apply";
+import { MANY_PEOPLE_LINE } from "@/lib/likeness/apply";
 import { likenessStillAllowed, type JobLikeness } from "@/lib/likeness/guard";
 import { StackError } from "@/lib/stack/errors";
 import type { StackImageToolsStatus } from "@/lib/stack/client";
@@ -461,16 +461,16 @@ export async function startComment(actor: PersonRow, conversationId: string, id:
   if (laneOf(editorAudience(actor)) === "child" && (input.referenceId || input.subjectPersonId || input.referenceSubjectPersonId || (input.maskPng && input.maskPng.byteLength > 0))) throw new ImageEditError(422, CHILD_NO_PHOTOS_LINE, "child_cartoons_only");
   const refused = refusePrompt(prompt, { lane: laneOf(editorAudience(actor)) });
   if (refused) throw new ImageEditError(422, promptRefusalLineFor(refused, "picture", actor, editorAudience(actor).band, prompt, PROMPT_REFUSAL_LINE[refused]), `refused_${refused}`);
-  // A picture the person did not generate here (an upload) may show a real person: it is never changed into something sexual.
+  // A picture the person did not generate here (an upload) may show a real person: a teen or a child never has it changed into something sexual.
+  // An adult is not held to this (models censor for adults, the app filters only to protect kids).
   const generated = await isGeneratedPicture(actor, source);
-  if (!generated && asksToUndress(prompt)) throw new ImageEditError(422, PHOTO_ADULT_LINE, "refused_real_person");
+  if (!generated && laneOf(editorAudience(actor)) !== "adult" && asksToUndress(prompt)) throw new ImageEditError(422, TEEN_CONTENT_LINE, "refused_real_person");
   const comment = await commentState(actor);
   if (!comment.enabled) throw new ImageEditError(503, comment.reason ?? COMMENT_NOT_SET_UP, "not_set_up");
   const region = regionForStack(input.region);
   // LIKENESS-01: where the picture came from decides what the Stack is told (pictures/editSources.ts, shared with the chat tool).
   const rootLikeness = generated ? await generatedPictureLikeness(source, actor) : null;
-  const rootAdultContent = generated ? await generatedPictureAdultOnly(source, actor) : false;
-  const prepared = await prepareEditSource({ audience: editorAudience(actor), bytes: source.bytes, generated, rootLikeness, rootAdultContent, declaredSubjectId: input.subjectPersonId ?? null, text: prompt, source: "editor" });
+  const prepared = await prepareEditSource({ audience: editorAudience(actor), bytes: source.bytes, generated, rootLikeness, declaredSubjectId: input.subjectPersonId ?? null, text: prompt, source: "editor" });
   if (!prepared.ok) throw new ImageEditError(prepared.status, prepared.line, prepared.code);
   const imageSource = prepared.imageSource;
   const consentProof = prepared.proof;
@@ -484,7 +484,7 @@ export async function startComment(actor: PersonRow, conversationId: string, id:
     const status = await pictureEngineStatus().catch(() => null);
     if ((status?.edit?.references ?? 0) < 1) throw new ImageEditError(503, "The picture engine on this computer needs its next update before it can use a second picture.", "references_unsupported");
     const referenceGenerated = await isGeneratedPicture(actor, referenceSource);
-    const referencePrepared = await prepareEditSource({ audience: editorAudience(actor), bytes: referenceSource.bytes, generated: referenceGenerated, rootLikeness: referenceGenerated ? await generatedPictureLikeness(referenceSource, actor) : null, rootAdultContent: referenceGenerated ? await generatedPictureAdultOnly(referenceSource, actor) : false, declaredSubjectId: input.referenceSubjectPersonId ?? null, text: prompt, source: "editor" });
+    const referencePrepared = await prepareEditSource({ audience: editorAudience(actor), bytes: referenceSource.bytes, generated: referenceGenerated, rootLikeness: referenceGenerated ? await generatedPictureLikeness(referenceSource, actor) : null, declaredSubjectId: input.referenceSubjectPersonId ?? null, text: prompt, source: "editor" });
     if (!referencePrepared.ok) throw new ImageEditError(referencePrepared.status, referencePrepared.line, referencePrepared.code);
     if (referencePrepared.subjectId && subjectForLog && referencePrepared.subjectId !== subjectForLog) throw new ImageEditError(422, MANY_PEOPLE_LINE, "many_people");
     reference = { source: referenceSource, prepared: referencePrepared };
@@ -500,8 +500,6 @@ export async function startComment(actor: PersonRow, conversationId: string, id:
   else if (region) form.append("region", region);
   form.append("image_source", imageSource);
   if (consentProof) form.append("consent_proof", consentProof);
-  const negativePrompt = prepared.negativePrompt ?? reference?.prepared.negativePrompt;
-  if (negativePrompt) form.append("negative_prompt", negativePrompt);
   if (reference) {
     form.append("reference", new File([new Uint8Array(reference.source.bytes)], "reference", { type: reference.source.mediaType }));
     form.append("reference_source", reference.prepared.imageSource);
@@ -563,15 +561,6 @@ export async function generatedPictureLikeness(source: SourcePicture, actor?: Pe
     const meta = JSON.parse(note.slice(note.indexOf(":") + 1)) as { likeness?: unknown };
     return typeof meta.likeness === "string" && meta.likeness ? meta.likeness : null;
   } catch { return null; }
-}
-
-/** Whether the root generated picture's own safety gate classified its audience as adult-only. */
-export async function generatedPictureAdultOnly(source: SourcePicture, actor: PersonRow): Promise<boolean> {
-  if (source.temporary) return !!(actor && getTemporaryChatImageForReader(actor, source.conversationId, source.rootId)?.audience === "adult-only");
-  const row = db.select({ provenance: attachments.provenance }).from(attachments).where(eq(attachments.id, source.rootId)).get();
-  const note = row?.provenance ?? "";
-  if (!note.startsWith("picture-gen:")) return false;
-  try { return (JSON.parse(note.slice(note.indexOf(":") + 1)) as { audience?: unknown }).audience === "adult-only"; } catch { return false; }
 }
 
 export async function isGeneratedPicture(actor: PersonRow, source: SourcePicture): Promise<boolean> {

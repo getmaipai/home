@@ -23,17 +23,15 @@ export interface PrepareEditSourceInput {
   generated: boolean;
   /** The household adult a generated picture was made to look like, from its provenance, or null. */
   rootLikeness: string | null;
-  /** The generated source's own adult-only audience provenance. */
-  rootAdultContent?: boolean;
   /** The household adult the person says an upload shows (already resolved to an id), or null. */
   declaredSubjectId: string | null;
-  /** Everything the person asked for in words, for the adult-content reading. */
+  /** Everything the person asked for in words (a teen's own-photo edit is read for undressing). */
   text: string;
   source: UseSource;
 }
 
 export type EditSourcePrep =
-  | { ok: true; imageSource: EditImageSource; proof?: string; likeness?: JobLikeness; negativePrompt?: string | null; subjectId: string | null }
+  | { ok: true; imageSource: EditImageSource; proof?: string; likeness?: JobLikeness; subjectId: string | null }
   | { ok: false; status: 403 | 422; code: string; line: string };
 
 export const TEEN_PHOTO_LINE = "That photo doesn't look like it is of you. I only change a photo of yourself that you upload. Try another photo of you.";
@@ -70,7 +68,7 @@ export async function prepareEditSource(input: PrepareEditSourceInput): Promise<
     const verdict = await singleAdultPhoto(input.bytes);
     if (!verdict.ok) return { ok: false, status: 422, code: verdict.reason === "unavailable" ? "photo_check_unavailable" : "photo_not_single_adult", line: verdict.line };
   }
-  const prep = await preparePhotoUse({ medium: "picture", audience: input.audience, declaredSubjectId: declared, bytes: input.bytes, text: input.text, adultContent: input.rootAdultContent, source: input.source });
+  const prep = await preparePhotoUse({ medium: "picture", audience: input.audience, declaredSubjectId: declared, bytes: input.bytes, source: input.source });
   if (prep.kind === "refused") return { ok: false, status: 403, code: "likeness_refused", line: prep.line };
-  return { ok: true, imageSource: "household_photo", proof: prep.proof, negativePrompt: prep.negativePrompt, likeness: { ...prep.job, adult_content: prep.job.adult_content || input.rootAdultContent === true }, subjectId: prep.subjectId };
+  return { ok: true, imageSource: "household_photo", proof: prep.proof, likeness: prep.job, subjectId: prep.subjectId };
 }

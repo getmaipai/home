@@ -7,7 +7,7 @@ import { people as peopleTable } from "@/db/schema";
 import { setValue } from "@/lib/settings";
 import { likenessStillAllowed } from "@/lib/likeness/guard";
 import { preparePhotoUse, prepareStyleUse } from "@/lib/likeness/apply";
-import { ADULT_CONTENT_OTHER_SUBJECT_LINE, decideLikeness } from "@/lib/likeness/decide";
+import { decideLikeness } from "@/lib/likeness/decide";
 import { __setStackTrustForTests, proofPublicKey } from "@/lib/likeness/proof";
 import { __setPhotoInspectorForTests } from "@/lib/likeness/inspector";
 import { createBenchPeople, type BenchPeople } from "../scripts/bench/conversationRunner";
@@ -66,15 +66,15 @@ const audience = (actor: PersonRow, over: Partial<{ band: "adult" | "teen" | "ch
 describe("household likeness jobs", () => {
   test("styles of another adult follow the household option", async () => {
     expect(setHousehold(false).ok).toBe(true);
-    const off = await prepareStyleUse({ medium: "picture", audience: audience(requester), style: { id: PIC_STYLE, name: "Marlow portrait", likeness_subject: subject.id }, text: "portrait", depictsRealPerson: true, source: "chat" });
+    const off = await prepareStyleUse({ medium: "picture", audience: audience(requester), style: { id: PIC_STYLE, name: "Marlow portrait", likeness_subject: subject.id }, depictsRealPerson: true, source: "chat" });
     expect(off).toMatchObject({ kind: "refused" });
     expect(setHousehold(true).ok).toBe(true);
-    const on = await prepareStyleUse({ medium: "picture", audience: audience(requester), style: { id: PIC_STYLE, name: "Marlow portrait", likeness_subject: subject.id }, text: "portrait", depictsRealPerson: true, source: "chat" });
+    const on = await prepareStyleUse({ medium: "picture", audience: audience(requester), style: { id: PIC_STYLE, name: "Marlow portrait", likeness_subject: subject.id }, depictsRealPerson: true, source: "chat" });
     expect(on).toMatchObject({ kind: "likeness", subjectId: subject.id });
   });
 
   test("Home proofs verify and are limited to the one style use", async () => {
-    const prep = await prepareStyleUse({ medium: "picture", audience: audience(requester), style: { id: PIC_STYLE, name: "Marlow portrait", likeness_subject: subject.id }, text: "portrait", depictsRealPerson: true, source: "chat" });
+    const prep = await prepareStyleUse({ medium: "picture", audience: audience(requester), style: { id: PIC_STYLE, name: "Marlow portrait", likeness_subject: subject.id }, depictsRealPerson: true, source: "chat" });
     expect(prep.kind).toBe("likeness");
     if (prep.kind !== "likeness") return;
     const [payload, signature] = prep.proof.split(".");
@@ -85,7 +85,7 @@ describe("household likeness jobs", () => {
 
   test("untrusted or too-old Stack creates no proof or job", async () => {
     __setStackTrustForTests({ ok: false, code: "stack_old", line: "The engine on this computer is too old." });
-    const prep = await prepareStyleUse({ medium: "picture", audience: audience(requester), style: { id: PIC_STYLE, name: "Marlow portrait", likeness_subject: subject.id }, text: "portrait", depictsRealPerson: true, source: "chat" });
+    const prep = await prepareStyleUse({ medium: "picture", audience: audience(requester), style: { id: PIC_STYLE, name: "Marlow portrait", likeness_subject: subject.id }, depictsRealPerson: true, source: "chat" });
     expect(prep).toMatchObject({ kind: "refused" });
     expect(imageStack.submitted).toHaveLength(0);
   });
@@ -94,11 +94,11 @@ describe("household likeness jobs", () => {
     const teen = addPerson("Rill", "teen");
     const guest = addPerson("Visitor", "guest");
     for (const actor of [bench.child, teen, guest]) {
-      expect(await prepareStyleUse({ medium: "picture", audience: audience(actor), style: { id: PIC_STYLE, name: "Marlow portrait", likeness_subject: subject.id }, text: "portrait", depictsRealPerson: true, source: "chat" })).toMatchObject({ kind: "refused" });
-      expect(await preparePhotoUse({ medium: "video", audience: audience(actor), declaredSubjectId: subject.id, bytes: new Uint8Array([1]), text: "she waves", source: "chat" })).toMatchObject({ kind: "refused" });
+      expect(await prepareStyleUse({ medium: "picture", audience: audience(actor), style: { id: PIC_STYLE, name: "Marlow portrait", likeness_subject: subject.id }, depictsRealPerson: true, source: "chat" })).toMatchObject({ kind: "refused" });
+      expect(await preparePhotoUse({ medium: "video", audience: audience(actor), declaredSubjectId: subject.id, bytes: new Uint8Array([1]), source: "chat" })).toMatchObject({ kind: "refused" });
     }
     for (const over of [{ surfaceClass: "spoken" as const, spoken: true }, { surfaceClass: "glance" as const, surface: "tv" }]) {
-      expect(decideLikeness({ requester: audience(requester, over), subjectPersonId: subject.id, adultContent: false })).toMatchObject({ ok: false });
+      expect(decideLikeness({ requester: audience(requester, over), subjectPersonId: subject.id })).toMatchObject({ ok: false });
     }
   });
 
@@ -109,23 +109,18 @@ describe("household likeness jobs", () => {
     db.update(peopleTable).set({ deletedAt: new Date().toISOString() }).where(eq(peopleTable.id, gone.id)).run();
     for (const id of [bench.child.id, teen.id, guest.id, gone.id]) {
       expect(subjectEligibility(id).ok).toBe(false);
-      const prep = await prepareStyleUse({ medium: "picture", audience: audience(requester), style: { id: PIC_STYLE, name: "Marlow portrait", likeness_subject: id }, text: "portrait", depictsRealPerson: true, source: "chat" });
+      const prep = await prepareStyleUse({ medium: "picture", audience: audience(requester), style: { id: PIC_STYLE, name: "Marlow portrait", likeness_subject: id }, depictsRealPerson: true, source: "chat" });
       expect(prep).toMatchObject({ kind: "refused" });
     }
   });
 
-  test("missed wording still sends the engine-side adult-content negative for another adult, while self is unchanged", async () => {
-    const other = await prepareStyleUse({ medium: "picture", audience: audience(requester), style: { id: PIC_STYLE, name: "Marlow portrait", likeness_subject: subject.id }, text: "Iris in the bedroom", depictsRealPerson: true, source: "chat" });
-    const own = await prepareStyleUse({ medium: "picture", audience: audience(subject), style: { id: PIC_STYLE, name: "Marlow portrait", likeness_subject: subject.id }, text: "portrait", depictsRealPerson: true, source: "chat" });
-    expect(other).toMatchObject({ kind: "likeness", adultContent: false, negativePrompt: expect.stringContaining("nude") });
-    expect(own).toMatchObject({ kind: "likeness", self: true, negativePrompt: null });
-    const outcome = await runGenerateImage({ state: stateFor(requester), args: { prompt: "Iris in the bedroom", style: "Marlow portrait", depicts_real_person: true }, callId: "negative-prompt", spoken: false });
+  test("no engine-side nudity negative is added for another adult (models censor); a style of another adult is used as asked", async () => {
+    const other = await prepareStyleUse({ medium: "picture", audience: audience(requester), style: { id: PIC_STYLE, name: "Marlow portrait", likeness_subject: subject.id }, depictsRealPerson: true, source: "chat" });
+    expect(other).toMatchObject({ kind: "likeness", self: false });
+    expect(other).not.toHaveProperty("negativePrompt");
+    const outcome = await runGenerateImage({ state: stateFor(requester), args: { prompt: "Marlow in the bedroom", style: "Marlow portrait", depicts_real_person: true }, callId: "no-negative", spoken: false });
     expect(outcome.status).toBe("succeeded");
-    expect((imageStack.submitted[0] as { negative_prompt?: string } | undefined)?.negative_prompt).toContain("nude");
-  });
-
-  test("old queued adult-content jobs are withheld with the named line", () => {
-    expect(likenessStillAllowed({ subject: subject.id, requester: requester.id, way: "style", adult_content: true })).toMatchObject({ ok: false, line: ADULT_CONTENT_OTHER_SUBJECT_LINE });
+    expect((imageStack.submitted[0] as { negative_prompt?: string } | undefined)?.negative_prompt).toBeUndefined();
   });
 
   test("names shared with a child or guest resolve to nobody", () => {
@@ -153,16 +148,11 @@ describe("household likeness jobs", () => {
     expect(videoStack.submitted).toHaveLength(0);
   });
 
-  test("adult-only generated pictures cannot be edited or animated as another adult's likeness", async () => {
+  test("an adult-only generated picture of another adult can be edited as that adult's likeness (models censor)", async () => {
     const bytes = await testPng();
-    const safeEdit = await prepareEditSource({ audience: audience(requester), bytes, generated: true, rootLikeness: subject.id, declaredSubjectId: null, text: "make the background blue", source: "chat" });
-    expect(safeEdit).toMatchObject({ ok: true, negativePrompt: expect.stringContaining("nude") });
-    const edit = await prepareEditSource({ audience: audience(requester), bytes, generated: true, rootLikeness: subject.id, rootAdultContent: true, declaredSubjectId: null, text: "make the background blue", source: "chat" });
-    expect(edit).toMatchObject({ ok: false, line: ADULT_CONTENT_OTHER_SUBJECT_LINE });
-    storeTemporaryChatImage({ id: "adult-source", turnId: "turn-1", conversationId: "conv-1", ownerPersonId: requester.id, name: "source.png", mediaType: "image/png", width: 64, height: 64, bytes, generated: true, likeness: subject.id, audience: "adult-only" });
-    const video = await runGenerateVideo({ state: stateFor(requester), args: { prompt: "she waves", from_picture: "adult-source" }, callId: "adult-source", spoken: false });
-    expect(text(video)).toContain(ADULT_CONTENT_OTHER_SUBJECT_LINE);
-    expect(videoStack.submitted).toHaveLength(0);
+    const edit = await prepareEditSource({ audience: audience(requester), bytes, generated: true, rootLikeness: subject.id, declaredSubjectId: null, text: "make the background blue", source: "chat" });
+    expect(edit).toMatchObject({ ok: true });
+    expect(edit).not.toHaveProperty("negativePrompt");
   });
 
   test("a photo with multiple people, no face, uncertain age or no inspector answer fails closed", async () => {
@@ -190,42 +180,46 @@ describe("household likeness jobs", () => {
   });
 
   test("a queued job is withheld if the household option goes off", () => {
-    const job = { subject: subject.id, requester: requester.id, way: "style" as const, adult_content: false };
+    const job = { subject: subject.id, requester: requester.id, way: "style" as const };
     expect(likenessStillAllowed(job)).toEqual({ ok: true });
     expect(setHousehold(false).ok).toBe(true);
     expect(likenessStillAllowed(job)).toMatchObject({ ok: false });
   });
 
-  test("adult content of another adult is refused in picture and video style tools with the named line", async () => {
+  test("adult content of another adult is not refused by Home in picture and video style tools (the model decides)", async () => {
     const image = await runGenerateImage({ state: stateFor(requester), args: { prompt: "she undresses slowly", style: "Marlow portrait", depicts_real_person: true }, callId: "img-1", spoken: false });
-    expect(text(image)).toContain(ADULT_CONTENT_OTHER_SUBJECT_LINE);
-    expect(imageStack.submitted).toHaveLength(0);
+    expect(image.status).toBe("succeeded");
+    expect(imageStack.submitted).toHaveLength(1);
     const video = await runGenerateVideo({ state: stateFor(requester), args: { prompt: "she undresses slowly", style: "Marlow motion", depicts_real_person: true }, callId: "vid-1", spoken: false });
-    expect(text(video)).toContain(ADULT_CONTENT_OTHER_SUBJECT_LINE);
-    expect(videoStack.submitted).toHaveLength(0);
+    expect(video.status).toBe("succeeded");
+    expect(videoStack.submitted).toHaveLength(1);
   });
 
-  test("an adult-only style of another adult is refused with the named line", async () => {
-    const prep = await prepareStyleUse({ medium: "picture", audience: audience(requester), style: { id: PIC_STYLE, name: "Marlow portrait", likeness_subject: subject.id, classification: "adult-only" }, text: "portrait", depictsRealPerson: true, source: "chat" });
-    expect(prep).toMatchObject({ kind: "refused", line: ADULT_CONTENT_OTHER_SUBJECT_LINE });
+  test("an adult-only style of another adult is used as asked", async () => {
+    const prep = await prepareStyleUse({ medium: "picture", audience: audience(requester), style: { id: PIC_STYLE, name: "Marlow portrait", likeness_subject: subject.id, classification: "adult-only" }, depictsRealPerson: true, source: "chat" });
+    expect(prep).toMatchObject({ kind: "likeness", subjectId: subject.id });
   });
 
-  test("animate-photo adult content of another adult gets the same named refusal", async () => {
-    const bytes = await testPng();
-    storeTemporaryChatImage({ id: "photo-1", turnId: "turn-1", conversationId: "conv-1", ownerPersonId: requester.id, name: "photo.png", mediaType: "image/png", width: 64, height: 64, bytes });
-    const photo: Image = { id: "photo-1", name: "photo.png", width: 64, height: 64, media_type: "image/png" };
-    const animated = await runGenerateVideo({ state: stateFor(requester, { images: [photo], utterance: "animate this photo, it is Marlow" }), args: { prompt: "she undresses slowly", from_picture: "attached", photo_subject: "Marlow" }, callId: "vid-photo-1", spoken: false });
-    expect(text(animated)).toContain(ADULT_CONTENT_OTHER_SUBJECT_LINE);
-    expect(videoStack.submitted).toHaveLength(0);
+  test("a teen and a child can never make a likeness, with or without sexual wording, and a minor is never a subject", async () => {
+    const teen = addPerson("Quill", "teen");
+    const child = addPerson("Sprout", "child");
+    for (const [person, band] of [[teen, "teen"], [child, "child"]] as const) {
+      for (const style of [{ id: PIC_STYLE, name: "Marlow portrait", likeness_subject: subject.id }, { id: PIC_STYLE, name: "Marlow portrait", likeness_subject: subject.id, classification: "adult-only" as const }]) {
+        expect(await prepareStyleUse({ medium: "picture", audience: audience(person, { band }), style, depictsRealPerson: true, source: "chat" })).toMatchObject({ kind: "refused" });
+      }
+      expect(decideLikeness({ requester: audience(person, { band }), subjectPersonId: subject.id })).toMatchObject({ ok: false, denial: "requester" });
+      expect(decideLikeness({ requester: audience(requester), subjectPersonId: person.id })).toMatchObject({ ok: false, denial: "subject_minor" });
+    }
+    expect(imageStack.submitted).toHaveLength(0);
   });
 
   test("self adult content is allowed through likeness decision", async () => {
-    const own = await prepareStyleUse({ medium: "picture", audience: audience(subject), style: { id: PIC_STYLE, name: "Marlow portrait", likeness_subject: subject.id }, text: "a portrait", depictsRealPerson: true, source: "chat" });
+    const own = await prepareStyleUse({ medium: "picture", audience: audience(subject), style: { id: PIC_STYLE, name: "Marlow portrait", likeness_subject: subject.id }, depictsRealPerson: true, source: "chat" });
     expect(own).toMatchObject({ kind: "likeness", self: true });
   });
 
-  test("photo path keeps the real-photo adult-content refusal for self", async () => {
-    const prep = await preparePhotoUse({ medium: "video", audience: audience(subject), declaredSubjectId: subject.id, bytes: new Uint8Array([1]), text: "undress", source: "chat" });
-    expect(prep).toMatchObject({ kind: "refused" });
+  test("the photo path no longer refuses adult wording for an adult", async () => {
+    const prep = await preparePhotoUse({ medium: "video", audience: audience(subject), declaredSubjectId: subject.id, bytes: new Uint8Array([1]), source: "chat" });
+    expect(prep).toMatchObject({ kind: "likeness", self: true });
   });
 });

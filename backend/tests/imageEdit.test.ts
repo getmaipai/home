@@ -431,7 +431,7 @@ describe("picture editor routes", () => {
       expect(fake.edits).toHaveLength(0);
     });
 
-    test("the two absolute lines apply to a comment, and an uploaded photo is never changed into something sexual", async () => {
+    test("the minor line applies to a comment; an adult is not held to a sexual-edit refusal on a photo (models censor)", async () => {
       const { client, actor } = await owner();
       const conversation = resolveOrCreateConversation(actor, "chat");
       if (!conversation.ok) throw new Error("no conversation");
@@ -440,15 +440,13 @@ describe("picture editor routes", () => {
       expect(minor.status).toBe(422);
       for (const words of ["put her in lingerie", "take off her shirt", "make her shirtless", "remove her clothes"]) {
         const photo = await commented(client, conversation.value.id, picture.id, { prompt: words, region: null });
-        expect(photo.status).toBe(422);
-        expect(((await photo.json()) as { code: string }).code).toBe("refused_real_person");
+        expect(photo.status).toBe(200);
       }
-      // Ordinary changes to a photo of a person still work.
       const fine = await commented(client, conversation.value.id, picture.id, { prompt: "change her sweater to bright blue", region: null });
       expect(fine.status).toBe(200);
-      // Only the ordinary change reached the engine.
-      expect(fake.edits).toHaveLength(1);
-      expect(fake.edits[0]!.instruction).toBe("change her sweater to bright blue");
+      // The minor line stopped the first request; the adult's four and the ordinary change reached the engine.
+      expect(fake.edits).toHaveLength(5);
+      expect(fake.edits[4]!.instruction).toBe("change her sweater to bright blue");
     });
 
     test("Stop reaches the picture engine", async () => {

@@ -103,7 +103,8 @@ export function createContentPolicyResolver(options: { readFilters: (person: Per
         const block = (k: ProtectionKind) => ({ kind: k, line: compiled!.kinds.lines[k] });
         const shared = contentChecksForFold(fold);
         if (detectCsam(text).matched.length || shared.minorLine) return block("minor_line");
-        if (realPersonBlocked && (band !== "adult" || shared.adultContent)) return block("real_person");
+        // Models censor for adults; the app blocks real people only for a teen or a child (or an adult with one beside them).
+        if (realPersonBlocked && band !== "adult") return block("real_person");
         if (filters.has("sexual") && shared.adultContent) return block("sexual");
         for (const k of ["swearing", "drugs", "gambling", "gore"] as const) {
           if (!filters.has(k)) continue;

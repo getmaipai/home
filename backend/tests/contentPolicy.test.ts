@@ -117,13 +117,15 @@ describe("content policy", () => {
     expect(own.contentPolicyFor(audience).check(corpus[4]!.text, "prompt")?.kind).toBe("gore");
     expect(own.contentPolicyFor({ ...audience, band: "child" }).filters.size).toBe(7);
   });
-  test("trusted subject context blocks real people for minors and only sexual content for adults", () => {
+  test("trusted subject context blocks real people for minors, and never an adult (models censor for adults, the minor line still holds)", () => {
     for (const context of ["outside", "public", "unresolved"]) {
       const own = createContentPolicyResolver({ readFilters: () => [], readRealPersonContext: () => context });
       expect(own.contentPolicyFor(person("child")).check(corpus[2]!.text, "prompt")?.kind).toBe("real_person");
       expect(own.contentPolicyFor(person("teen")).check("Jon Stewart interviews Hitler on a talk show set", "prompt")?.kind).toBe("real_person");
       expect(own.contentPolicyFor(person("adult")).check("Jon Stewart interviews Hitler on a talk show set", "prompt")).toBeNull();
-      expect(own.contentPolicyFor(person("adult")).check(`a sexual portrait of a public figure ${SEXUAL_WORDS[0]}`, "prompt")?.kind).toBe("real_person");
+      expect(own.contentPolicyFor(person("adult")).check(`a sexual portrait of a public figure ${SEXUAL_WORDS[0]}`, "prompt")).toBeNull();
+      expect(own.contentPolicyFor(person("teen")).check(`a sexual portrait of a public figure ${SEXUAL_WORDS[0]}`, "prompt")?.kind).toBe("real_person");
+      expect(own.contentPolicyFor(person("child")).check(`a sexual portrait of a public figure ${SEXUAL_WORDS[0]}`, "prompt")?.kind).toBe("real_person");
       expect(own.contentPolicyFor(person("adult")).check(`${MINOR_MARKERS[0]} ${SEXUAL_WORDS[0]}`, "prompt")?.kind).toBe("minor_line");
     }
     const own = createContentPolicyResolver({ readFilters: () => [], readRealPersonContext: () => "household" });

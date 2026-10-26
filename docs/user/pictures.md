@@ -52,7 +52,7 @@ Adults can, on their own screen, in a written chat. Teens can too, with nothing 
 
 See [cartoon controls](people.md#cartoon-pictures-and-videos) for the home switch, daily limits and each child's switch.
 
-Two things are never made, whatever the settings: anything sexual that shows a child or someone who looks like one, and a picture of a real person who has not agreed to it. If you ask, Home says it will not make that and what to change. Home checks finished pictures and videos and will not show anything that may show a child in a sexual situation. If that happens, the picture or video is deleted and an owner or admin gets a note without the picture. The check uses the chat model on this computer, so nothing leaves it. If Home cannot check a picture or video for an adult-only request, it does not show it; ask again in a minute.
+One thing is never made, whatever the settings: anything sexual that shows a child or someone who looks like one. For a teen or a child, Home also never makes a picture of a real person. For an adult, what is made is up to the model on this computer. If you ask, Home says it will not make that and what to change. Home checks finished pictures and videos and will not show anything that may show a child in a sexual situation. If that happens, the picture or video is deleted and an owner or admin gets a note without the picture. The check uses the chat model on this computer, so nothing leaves it. If Home cannot check a picture or video for an adult-only request, it does not show it; ask again in a minute.
 
 ## Choose how it works (owner and admin)
 
@@ -79,8 +79,6 @@ The picture engine checks the file and refuses styles of public figures and anyt
 Home can make a picture that looks like an adult in your home, but only if that adult said yes. A style of a person comes from a file you add; a photo of a person comes from a photo you attach. Children and teens are never made this way (a teen can change their own photo, see above), and neither is anyone outside your home.
 
 To say yes, an adult opens **Settings**, **Pictures and videos** on their own account and turns on **Let other adults in this household make pictures, videos and styles that look like me**. Nobody else can turn it on for them, not even an owner. They can turn it off at any time. When they do, anything still waiting is stopped, nobody can ask for it again, and every saved style of them is removed. Things already made stay with the person who made them.
-
-A second switch, **Including adult content**, is off until they turn it on, and only counts while the first is on. A photo of a real person is never turned into adult content, whatever anyone agreed to.
 
 The page also lists every time someone made something that looks like them, and who. They are told each time, too.
 

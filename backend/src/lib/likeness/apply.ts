@@ -2,7 +2,7 @@
 // the Stack (the chat tools, the card routes that make another one, the photo editor): resolve who it looks like, decide
 // (age and surface gate, the subject is a living household adult, and the household option), make sure the Stack trusts
 // Home's key, and sign a proof for that one thing. Nothing here asks the model anything.
-import { isAdultContentRequest, decideLikeness, LIKENESS_LINES, NO_ADULT_CONTENT_NEGATIVE, subjectName, type LikenessMedium } from "./decide";
+import { decideLikeness, LIKENESS_LINES, subjectName, type LikenessMedium } from "./decide";
 import { ensureStackTrust, mintProof, photoBind, PROOF_TTL_SECONDS } from "./proof";
 import { getStyleSubject, type StyleMedium } from "./adapters";
 import type { JobLikeness } from "./guard";
@@ -15,7 +15,7 @@ export interface StyleRef { id: string; name: string; likeness_subject?: string 
 export type LikenessPrep =
   | { kind: "none" }
   | { kind: "refused"; why: "real_person" | "likeness"; line: string }
-  | { kind: "likeness"; subjectId: string; subjectName: string; self: boolean; adultContent: boolean; proof: string; job: JobLikeness; negativePrompt: string | null };
+  | { kind: "likeness"; subjectId: string; subjectName: string; self: boolean; proof: string; job: JobLikeness };
 
 export const MANY_PEOPLE_LINE = "I can make something that looks like one person at a time. Use styles of the same adult, or leave one out.";
 export const STYLE_REMOVED_LINE = "That style is no longer available. I made nothing.";
@@ -32,8 +32,6 @@ export interface StyleInput {
   audience: PictureAudience;
   /** The style the request will apply, or null for none. */
   style: StyleRef | null;
-  /** Everything the person asked for in words: the prompt and the style name. */
-  text: string;
   /** The model's own statement that the person asked for a real, named or identifiable person. */
   depictsRealPerson: boolean;
   source: UseSource;
@@ -48,24 +46,22 @@ export async function prepareStyleUse(input: StyleInput): Promise<LikenessPrep> 
     return input.depictsRealPerson && laneOf(input.audience) !== "adult" ? { kind: "refused", why: "real_person", line: "" } : { kind: "none" };
   }
   if (removed) return { kind: "refused", why: "likeness", line: STYLE_REMOVED_LINE };
-  const adultContent = isAdultContentRequest({ text: input.text, otherAdultOnlyStyle: input.style.classification === "adult-only" });
-  const decision = decideLikeness({ requester: input.audience, subjectPersonId: subjectId, adultContent });
+  const decision = decideLikeness({ requester: input.audience, subjectPersonId: subjectId });
   if (!decision.ok) return { kind: "refused", why: "likeness", line: decision.line };
   const trust = await ensureStackTrust();
   if (!trust.ok) return { kind: "refused", why: "likeness", line: trust.line };
   const requester = input.audience.actor;
   return {
-    kind: "likeness", subjectId: decision.subject.id, subjectName: subjectName(decision.subject), self: decision.self, adultContent,
+    kind: "likeness", subjectId: decision.subject.id, subjectName: subjectName(decision.subject), self: decision.self,
     proof: mintProof({ purpose: "style_use", subject: decision.subject.id, requester: requester.id, bind: input.style.id }),
-    job: { subject: decision.subject.id, requester: requester.id, way: "style", adult_content: adultContent },
-    negativePrompt: decision.self ? null : NO_ADULT_CONTENT_NEGATIVE,
+    job: { subject: decision.subject.id, requester: requester.id, way: "style" },
   };
 }
 
 export type StylesPrep =
   | { kind: "none" }
   | { kind: "refused"; line: string }
-  | { kind: "likeness"; subjectId: string; subjectName: string; self: boolean; adultContent: boolean; proofs: Map<string, string>; job: JobLikeness; negativePrompt: string | null };
+  | { kind: "likeness"; subjectId: string; subjectName: string; self: boolean; proofs: Map<string, string>; job: JobLikeness };
 
 /** The same decision for a request that applies several styles (Make another, a variation): every style of a person is decided and given its own proof; styles of two different people are refused; another adult-only style beside the likeness counts as adult content. */
 export async function prepareStylesUse(input: Omit<StyleInput, "style" | "depictsRealPerson"> & { styles: readonly StyleRef[] }): Promise<StylesPrep> {
@@ -80,23 +76,21 @@ export async function prepareStylesUse(input: Omit<StyleInput, "style" | "depict
   if (people.size > 1) return { kind: "refused", line: MANY_PEOPLE_LINE };
   const [subjectId, likenessStyles] = [...people.entries()][0]!;
   const likenessIds = new Set(likenessStyles.map((s) => s.id));
-  const adultContent = isAdultContentRequest({ text: input.text, otherAdultOnlyStyle: input.styles.some((s) => s.classification === "adult-only") });
-  const decision = decideLikeness({ requester: input.audience, subjectPersonId: subjectId, adultContent });
+  const decision = decideLikeness({ requester: input.audience, subjectPersonId: subjectId });
   if (!decision.ok) return { kind: "refused", line: decision.line };
   const trust = await ensureStackTrust();
   if (!trust.ok) return { kind: "refused", line: trust.line };
   const requester = input.audience.actor;
   const proofs = new Map(likenessStyles.map((s) => [s.id, mintProof({ purpose: "style_use", subject: decision.subject.id, requester: requester.id, bind: s.id })] as const));
   return {
-    kind: "likeness", subjectId: decision.subject.id, subjectName: subjectName(decision.subject), self: decision.self, adultContent, proofs,
-    job: { subject: decision.subject.id, requester: requester.id, way: "style", adult_content: adultContent },
-    negativePrompt: decision.self ? null : NO_ADULT_CONTENT_NEGATIVE,
+    kind: "likeness", subjectId: decision.subject.id, subjectName: subjectName(decision.subject), self: decision.self, proofs,
+    job: { subject: decision.subject.id, requester: requester.id, way: "style" },
   };
 }
 
 export type PhotoPrep =
   | { kind: "refused"; line: string }
-  | { kind: "likeness"; subjectId: string; subjectName: string; self: boolean; adultContent: boolean; proof: string; job: JobLikeness; negativePrompt: string | null };
+  | { kind: "likeness"; subjectId: string; subjectName: string; self: boolean; proof: string; job: JobLikeness };
 
 export interface PhotoInput {
   medium: LikenessMedium;
@@ -104,28 +98,19 @@ export interface PhotoInput {
   /** The household adult the requester says is in the photo. */
   declaredSubjectId: string | null;
   bytes: Uint8Array;
-  text: string;
-  /** Adult-only provenance inherited from a generated source picture. */
-  adultContent?: boolean;
   source: UseSource;
 }
 
 /** The likeness decision for a request that starts from a photo of a declared household adult. The photo itself is checked separately (inspector.ts singleAdultPhoto), by the caller, before this. */
-export const PHOTO_ADULT_LINE = "I never turn a photo of a real person into adult content. I can make something else from the photo.";
-
 export async function preparePhotoUse(input: PhotoInput): Promise<PhotoPrep> {
-  const requestedAdultContent = isAdultContentRequest({ text: input.text });
-  const adultContent = requestedAdultContent || input.adultContent === true;
-  const decision = decideLikeness({ requester: input.audience, subjectPersonId: input.declaredSubjectId, adultContent });
+  const decision = decideLikeness({ requester: input.audience, subjectPersonId: input.declaredSubjectId });
   if (!decision.ok) return { kind: "refused", line: decision.line };
-  if (requestedAdultContent) return { kind: "refused", line: PHOTO_ADULT_LINE };
   const trust = await ensureStackTrust();
   if (!trust.ok) return { kind: "refused", line: trust.line };
   return {
-    kind: "likeness", subjectId: decision.subject.id, subjectName: subjectName(decision.subject), self: decision.self, adultContent,
+    kind: "likeness", subjectId: decision.subject.id, subjectName: subjectName(decision.subject), self: decision.self,
     proof: mintProof({ purpose: "photo", subject: decision.subject.id, requester: input.audience.actor.id, bind: photoBind(input.bytes) }),
-    job: { subject: decision.subject.id, requester: input.audience.actor.id, way: "photo", adult_content: adultContent },
-    negativePrompt: decision.self ? null : NO_ADULT_CONTENT_NEGATIVE,
+    job: { subject: decision.subject.id, requester: input.audience.actor.id, way: "photo" },
   };
 }
 

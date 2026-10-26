@@ -111,10 +111,11 @@ describe("a change in words", () => {
     expect(stack.edits).toHaveLength(0);
   });
 
-  test("a photo of a person is never changed into something sexual, and the absolute lines still run first", async () => {
+  test("an adult is not held to a sexual-edit refusal on a photo (models censor), and the minor line still runs first", async () => {
     const photo = await put(nadia, "photo-1");
     const undress = await run(nadia, { prompt: "take off her shirt", change: "attached" }, [photo]);
-    expect(refusedWith(undress)).toBe("real_person");
+    expect(refusedWith(undress)).not.toBe("real_person");
+    stack.edits.length = 0;
     const minor = await run(nadia, { prompt: "make the 12 year old girl naked", change: "attached" }, [photo]);
     expect(replyText(minor)).toContain("Pictures of children in sexual situations are never allowed");
     expect(stack.edits).toHaveLength(0);

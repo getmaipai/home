@@ -14,10 +14,10 @@ import { and, desc, eq, like } from "drizzle-orm";
 import { db } from "@/db";
 import { attachments } from "@/db/schema";
 import { latestTemporaryChatImage } from "@/lib/attachments";
-import { generatedPictureAdultOnly, generatedPictureLikeness, isGeneratedPicture, loadSource, ImageEditError, type SourcePicture } from "@/lib/imageEdit";
+import { generatedPictureLikeness, isGeneratedPicture, loadSource, ImageEditError, type SourcePicture } from "@/lib/imageEdit";
 import { attestedAdult, WHO_IS_IN_PHOTO_LINE } from "@/lib/likeness/resolve";
 import { inspectPhoto } from "@/lib/likeness/inspector";
-import { MANY_PEOPLE_LINE, PHOTO_ADULT_LINE } from "@/lib/likeness/apply";
+import { MANY_PEOPLE_LINE } from "@/lib/likeness/apply";
 import type { JobLikeness } from "@/lib/likeness/guard";
 import type { ToolExecutionOutcome, TurnState } from "@/lib/turnMachine/contract";
 import { outcomeOf } from "@/lib/turnContext";
@@ -25,7 +25,7 @@ import type { PersonRow } from "@/types";
 import { prepareEditSource, type EditImageSource } from "./editSources";
 import sharp from "sharp";
 import { choosePeople, erasePeople, findPeople, FreezeError, freezePeople, inverseMask, maskCoverage, peopleMask, peopleMaskWithCount, PeopleError, PEOPLE_UNSURE_LINE, runPictureTool } from "./people";
-import { attachKid, CHILD_LIMIT_LINE, CHILD_NO_PHOTOS_LINE, laneOf, releaseKid, reserveKid, type Lane } from "./lane";
+import { attachKid, CHILD_LIMIT_LINE, CHILD_NO_PHOTOS_LINE, TEEN_CONTENT_LINE, laneOf, releaseKid, reserveKid, type Lane } from "./lane";
 import { asksToUndress, peopleGuidanceSuffix, peoplePromptsOn, PROMPT_REFUSAL_LINE, type PictureAudience } from "./policy";
 import { startPictureJob, plainFailure } from "./jobs";
 import { pictureEngineStatus } from "./ready";
@@ -119,16 +119,16 @@ async function runEditPictureUnmetered(input: RunEditInput): Promise<ToolExecuti
   if (!base) return line(callId, args, kid && typeof args.change === "string" && /^attached/i.test(args.change) ? CHILD_NO_PHOTOS_LINE : typeof args.change === "string" && /^attached/i.test(args.change) ? NOT_FOUND_LINE : NOTHING_TO_CHANGE_LINE);
   const generated = await isGeneratedPicture(actor, base);
   if (kid && !generated) return line(callId, args, CHILD_NO_PHOTOS_LINE, { refused: "child_cartoons_only" });
-  // A picture the person did not make here may show a real person: it is never changed into something sexual.
-  if (!generated && asksToUndress(instruction)) return line(callId, args, PHOTO_ADULT_LINE, { refused: "real_person" });
+  // A picture the person did not make here may show a real person: a teen never has it changed into something sexual (a child never reaches here).
+  // An adult is not held to this (models censor for adults, the app filters only to protect kids).
+  if (!generated && laneOf(audience) !== "adult" && asksToUndress(instruction)) return line(callId, args, TEEN_CONTENT_LINE, { refused: "real_person" });
   const rootLikeness = generated ? await generatedPictureLikeness(base, actor) : null;
-  const rootAdultContent = generated ? await generatedPictureAdultOnly(base, actor) : false;
   const label = instruction.replace(/\s+/g, " ").slice(0, 60);
 
   if (kind === "remove_background" || kind === "upscale") {
     // The Stack's non-generative tools: the same pixels, a cut-out or a bigger copy. Nothing is drawn. A picture made to look like a household adult is decided again with them.
     if (rootLikeness) {
-      const prepared = await prepareEditSource({ audience, bytes: base.bytes, generated, rootLikeness, rootAdultContent, declaredSubjectId: null, text: instruction, source: "chat" });
+      const prepared = await prepareEditSource({ audience, bytes: base.bytes, generated, rootLikeness, declaredSubjectId: null, text: instruction, source: "chat" });
       if (!prepared.ok) return line(callId, args, prepared.line, { refused: prepared.code });
     }
     try {
@@ -152,7 +152,7 @@ async function runEditPictureUnmetered(input: RunEditInput): Promise<ToolExecuti
     const status = await pictureEngineStatus().catch(() => null);
     // A picture made to look like a household adult is decided again with them, even to take someone out of it.
     if (rootLikeness) {
-      const prepared = await prepareEditSource({ audience, bytes: base.bytes, generated, rootLikeness, rootAdultContent, declaredSubjectId: null, text: instruction, source: "chat" });
+      const prepared = await prepareEditSource({ audience, bytes: base.bytes, generated, rootLikeness, declaredSubjectId: null, text: instruction, source: "chat" });
       if (!prepared.ok) return line(callId, args, prepared.line, { refused: prepared.code });
     }
     const who = typeof args.who === "string" && args.who.trim() ? args.who.trim() : instruction;
@@ -202,7 +202,7 @@ async function runEditPictureUnmetered(input: RunEditInput): Promise<ToolExecuti
   const declared = attestedAdult(args.photo_subject, state.utterance, actor, { photoKeys: [photoWithPerson.sha256, photoWithPerson.rootId], on: !peoplePromptsOn(laneOf(audience)) }).attested;
   const named = typeof args.photo_subject === "string" && args.photo_subject.trim() !== "";
 
-  const basePrep = await prepareEditSource({ audience, bytes: base.bytes, generated, rootLikeness, rootAdultContent, declaredSubjectId: ref ? null : declared?.id ?? null, text: instruction, source: "chat" });
+  const basePrep = await prepareEditSource({ audience, bytes: base.bytes, generated, rootLikeness, declaredSubjectId: ref ? null : declared?.id ?? null, text: instruction, source: "chat" });
   // IMGEDIT-05 (owner's ruling): a change that is not about a person (sky, colour, background, an object, the light) is allowed on a photo that
   // shows people by freezing them: after the edit every pixel inside every person's outline is put back from the original and the result is
   // proved identical there. People are never altered by it. A change that targets a person goes through the likeness rules below, as before.
@@ -258,8 +258,7 @@ async function runEditPictureUnmetered(input: RunEditInput): Promise<ToolExecuti
   if (ref) {
     refGenerated = await isGeneratedPicture(actor, ref);
     const refLikeness = refGenerated ? await generatedPictureLikeness(ref, actor) : null;
-    const refAdultContent = refGenerated ? await generatedPictureAdultOnly(ref, actor) : false;
-    refPrep = await prepareEditSource({ audience, bytes: ref.bytes, generated: refGenerated, rootLikeness: refLikeness, rootAdultContent: refAdultContent, declaredSubjectId: declared?.id ?? null, text: instruction, source: "chat" });
+    refPrep = await prepareEditSource({ audience, bytes: ref.bytes, generated: refGenerated, rootLikeness: refLikeness, declaredSubjectId: declared?.id ?? null, text: instruction, source: "chat" });
     if (!refPrep.ok) return line(callId, args, refPrep.code === "photo_has_person" || (named && !declared) ? WHO_IS_IN_PHOTO_LINE : refPrep.line, { refused: refPrep.code === "photo_has_person" ? "who_is_in_photo" : refPrep.code });
   } else if (named && !declared && !rootLikeness && !generated) {
     return line(callId, args, WHO_IS_IN_PHOTO_LINE, { refused: "who_is_in_photo" });
@@ -277,8 +276,6 @@ async function runEditPictureUnmetered(input: RunEditInput): Promise<ToolExecuti
     form.append("instruction", kid ? `${instruction}. Keep it a friendly children's cartoon drawing, not a photograph.` : instruction);
     form.append("image_source", baseSource);
     if (basePrep.proof) form.append("consent_proof", basePrep.proof);
-    const negativePrompt = basePrep.negativePrompt ?? (refPrep?.ok ? refPrep.negativePrompt : null);
-    if (negativePrompt) form.append("negative_prompt", negativePrompt);
     if (household) form.append("audience", "adult");
     if (ref && refPrep && refPrep.ok) {
       form.append("reference", new File([new Uint8Array(ref.bytes)], "reference", { type: ref.mediaType }));

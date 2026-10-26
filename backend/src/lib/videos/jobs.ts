@@ -243,7 +243,7 @@ export function __resetVideoJobsForTests(): void {
 export const GENERATED_PICTURE_NOTE = "picture-gen:";
 export const CLIP_POSTER_NOTE = "video-poster:";
 
-export type ReferenceResult = { ok: true; id: string; base64: string; bytes: Uint8Array; width: number | null; height: number | null; /** The person this picture looks like, if Home recorded a household subject. */ likenessSubject: string | null; adultOnly: boolean } | { ok: false; line: string };
+export type ReferenceResult = { ok: true; id: string; base64: string; bytes: Uint8Array; width: number | null; height: number | null; /** The person this picture looks like, if Home recorded a household subject. */ likenessSubject: string | null } | { ok: false; line: string };
 const NOT_GENERATED_LINE = "I can only animate a picture that was made here in this home. Ask me to make a picture first, then animate that one.";
 
 /** The newest picture of this temporary chat the Stack made: a generated picture or the poster of a clip, whichever is newer. */
@@ -259,11 +259,11 @@ export function latestTemporaryPosterId(actor: PersonRow, conversationId: string
 export function loadGeneratedReference(actor: PersonRow, conversationId: string, fileId: string, temporary: boolean): ReferenceResult {
   if (temporary) {
     const clip = temporaryClips.get(fileId);
-    if (clip && clip.ownerPersonId === actor.id && clip.conversationId === conversationId && clip.mediaType === "image/jpeg" && clip.noReference !== true) return { ok: true, id: fileId, base64: Buffer.from(clip.bytes).toString("base64"), bytes: clip.bytes, width: null, height: null, likenessSubject: null, adultOnly: false };
+    if (clip && clip.ownerPersonId === actor.id && clip.conversationId === conversationId && clip.mediaType === "image/jpeg" && clip.noReference !== true) return { ok: true, id: fileId, base64: Buffer.from(clip.bytes).toString("base64"), bytes: clip.bytes, width: null, height: null, likenessSubject: null };
     // A temporary picture counts only when Home marked it `generated` when the picture engine made it (a field no upload
     // can set; a file name proves nothing). The Stack still checks the bytes' hash.
     const image = getTemporaryChatImage(actor, conversationId, fileId);
-    if (image && (image.generated === true || image.likeness)) return { ok: true, id: fileId, base64: Buffer.from(image.bytes).toString("base64"), bytes: image.bytes, width: image.width, height: image.height, likenessSubject: image.likeness ?? null, adultOnly: image.audience === "adult-only" };
+    if (image && (image.generated === true || image.likeness)) return { ok: true, id: fileId, base64: Buffer.from(image.bytes).toString("base64"), bytes: image.bytes, width: image.width, height: image.height, likenessSubject: image.likeness ?? null };
     return { ok: false, line: NOT_GENERATED_LINE };
   }
   const row = db.select().from(attachments).where(eq(attachments.id, fileId)).get();
@@ -275,15 +275,13 @@ export function loadGeneratedReference(actor: PersonRow, conversationId: string,
   let width: number | null = null;
   let height: number | null = null;
   let likenessSubject: string | null = null;
-  let adultOnly = false;
   try {
     const meta = JSON.parse(note.slice(note.indexOf(":") + 1)) as { width?: number; height?: number; likeness?: string | null; audience?: string };
     width = typeof meta.width === "number" ? meta.width : null;
     height = typeof meta.height === "number" ? meta.height : null;
     likenessSubject = typeof meta.likeness === "string" && meta.likeness ? meta.likeness : null;
-    adultOnly = meta.audience === "adult-only";
   } catch { /* the size is only a hint for the clip's shape */ }
-  return { ok: true, id: fileId, base64: Buffer.from(read.value.bytes).toString("base64"), bytes: read.value.bytes, width, height, likenessSubject, adultOnly };
+  return { ok: true, id: fileId, base64: Buffer.from(read.value.bytes).toString("base64"), bytes: read.value.bytes, width, height, likenessSubject };
 }
 
 export type PhotoResult = { ok: true; id: string; base64: string; bytes: Uint8Array; width: number | null; height: number | null } | { ok: false; line: string };

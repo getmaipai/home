@@ -119,7 +119,6 @@ export async function runGenerateVideo(input: RunGenerateVideoInput): Promise<To
   let imageSource: "generated" | "household_photo" = "generated";
   let consentProof: string | undefined;
   let sourceFileId: string | null = null;
-  let negativePrompt: string | null = null;
   let photoLikeness: Extract<Awaited<ReturnType<typeof preparePhotoUse>>, { kind: "likeness" }> | null = null;
   let portrait = args.orientation === "portrait";
   const from = typeof args.from_picture === "string" ? args.from_picture.trim() : "";
@@ -138,9 +137,9 @@ export async function runGenerateVideo(input: RunGenerateVideoInput): Promise<To
     // The photo must show exactly the one declared adult, nobody who could be a child: counted by the household's own model, fail closed.
     const verdict = await singleAdultPhoto(photo.bytes);
     if (!verdict.ok) return refuseWith("likeness", verdict.line);
-    const prep = await preparePhotoUse({ medium: "video", audience, declaredSubjectId: declared.id, bytes: photo.bytes, text: prompt, source: "chat" });
+    const prep = await preparePhotoUse({ medium: "video", audience, declaredSubjectId: declared.id, bytes: photo.bytes, source: "chat" });
     if (prep.kind === "refused") return refuseWith("likeness", prep.line);
-    photoLikeness = prep; image = photo.base64; imageSource = "household_photo"; consentProof = prep.proof; sourceFileId = photo.id; negativePrompt = prep.negativePrompt;
+    photoLikeness = prep; image = photo.base64; imageSource = "household_photo"; consentProof = prep.proof; sourceFileId = photo.id;
     if (photo.width && photo.height) portrait = photo.height > photo.width;
   } else if (from) {
     const id = /^(latest|last|this|that)$/i.test(from) ? (temporary ? latestTemporaryPosterId(actor, state.conversationId) : latestGeneratedPictureId(actor, state.conversationId)) : from;
@@ -156,9 +155,9 @@ export async function runGenerateVideo(input: RunGenerateVideoInput): Promise<To
     if (ref.width && ref.height) portrait = ref.height > ref.width;
     // A picture that was itself made to look like a person is animated only if that person still agrees, now.
     if (ref.likenessSubject) {
-      const prep = await preparePhotoUse({ medium: "video", audience, declaredSubjectId: ref.likenessSubject, bytes: ref.bytes, text: prompt, adultContent: ref.adultOnly, source: "chat" });
+      const prep = await preparePhotoUse({ medium: "video", audience, declaredSubjectId: ref.likenessSubject, bytes: ref.bytes, source: "chat" });
       if (prep.kind === "refused") return refuseWith("likeness", prep.line);
-      photoLikeness = { ...prep, adultContent: prep.adultContent || ref.adultOnly, job: { ...prep.job, adult_content: prep.job.adult_content || ref.adultOnly } }; imageSource = "household_photo"; consentProof = prep.proof; negativePrompt = prep.negativePrompt;
+      photoLikeness = prep; imageSource = "household_photo"; consentProof = prep.proof;
     }
   }
 
@@ -183,11 +182,10 @@ export async function runGenerateVideo(input: RunGenerateVideoInput): Promise<To
   const longSpeechNote = choice.quality === "detailed" && seconds > 5 ? " Spoken words are clearest in a clip of 5 seconds or less; if the person wanted a line spoken and it does not come out clearly, offer a 5 second one." : "";
   const soundNote = choice.quality === "quick" ? " A Quick video has no sound; if they wanted sound or spoken words, offer to make a Detailed one." : "";
   // A style of a household adult is made only while the household option is on; a real person with no such style or photo is refused.
-  const stylePrep = await prepareStyleUse({ medium: "video", audience, style: adapter, text: `${prompt} ${adapter?.name ?? named}`, depictsRealPerson: args.depicts_real_person === true && !photoLikeness, source: "chat" });
+  const stylePrep = await prepareStyleUse({ medium: "video", audience, style: adapter, depictsRealPerson: args.depicts_real_person === true && !photoLikeness, source: "chat" });
   if (stylePrep.kind === "refused") return stylePrep.why === "real_person" ? refused(callId, args, { kind: "prompt", why: "real_person", line: VIDEO_REFUSAL_LINE.real_person }) : refuseWith("likeness", stylePrep.line);
   if (stylePrep.kind === "likeness" && photoLikeness && stylePrep.subjectId !== photoLikeness.subjectId) return refuseWith("likeness", "I can make something that looks like one person at a time. Use a style and a photo of the same adult, or leave one out.");
-  const likeness: JobLikeness | null = stylePrep.kind === "likeness" ? { ...stylePrep.job, adult_content: stylePrep.adultContent || (photoLikeness?.adultContent ?? false) } : photoLikeness ? photoLikeness.job : null;
-  if (stylePrep.kind === "likeness" && stylePrep.negativePrompt) negativePrompt = stylePrep.negativePrompt;
+  const likeness: JobLikeness | null = stylePrep.kind === "likeness" ? stylePrep.job : photoLikeness ? photoLikeness.job : null;
   const subjectForLog = stylePrep.kind === "likeness" ? stylePrep : photoLikeness;
 
   const slot = kid ? reserveKid(actor, "video", 1, prompt) : null;
@@ -211,7 +209,7 @@ export async function runGenerateVideo(input: RunGenerateVideoInput): Promise<To
         ...(lane === "adult" ? {} : { model: videoModelForLane(lane) }),
         ...(image ? { image, image_source: imageSource, ...(consentProof ? { consent_proof: consentProof } : {}) } : {}),
         ...(adapter ? { loras: [{ id: adapter.id, strength: adapter.strength_default, ...(stylePrep.kind === "likeness" ? { likeness_proof: stylePrep.proof } : {}) }] } : {}),
-        ...(kid ? { negative_prompt: CHILD_NEGATIVE_PROMPT } : negativePrompt ? { negative_prompt: negativePrompt } : {}),
+        ...(kid ? { negative_prompt: CHILD_NEGATIVE_PROMPT } : {}),
       },
       ...(likeness ? { likeness } : {}),
     });

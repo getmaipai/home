@@ -57,10 +57,16 @@ describe("the refusal text and the other lines", () => {
   test("a sex reveal party is not a sexual word on its own", () => {
     expect(minorSexualMatch("a gender reveal and sex reveal party for the baby")).toBe(false);
   });
-  test("the real-person flag refuses sexual content for an adult and everything for a teen (owner, 2026-10-25)", () => {
+  test("the real-person flag never refuses an adult (models censor), and still refuses everything for a teen and a child", () => {
     expect(refusePrompt("a portrait of the mayor", { depictsRealPerson: true })).toBeNull();
-    expect(refusePrompt("a sexual portrait of the mayor", { depictsRealPerson: true })).toBe("real_person");
+    expect(refusePrompt("a sexual portrait of the mayor", { depictsRealPerson: true })).toBeNull();
     expect(refusePrompt("a portrait of the mayor", { depictsRealPerson: true, lane: "teen" })).toBe("real_person");
+    expect(refusePrompt("a sexual portrait of the mayor", { depictsRealPerson: true, lane: "teen" })).toBe("real_person");
+    expect(refusePrompt("a sexual portrait of the mayor", { depictsRealPerson: true, lane: "child" })).toBe("child_content");
+    expect(refusePrompt("she undresses slowly", { lane: "teen" })).toBe("teen_content");
+    expect(refusePrompt("she undresses slowly", { lane: "child" })).toBe("child_content");
+    // The minor line holds for an adult's request too.
+    expect(refusePrompt("a naked 12 year old girl", { depictsRealPerson: true })).toBe("minor_sexual");
   });
   test("an uploaded photo is still not dressed in swimwear or undressed", () => {
     expect(asksToUndress("put her in a bikini")).toBe(true);

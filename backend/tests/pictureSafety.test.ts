@@ -157,9 +157,9 @@ describe("the two absolute lines", () => {
     }
   });
 
-  test("adults may depict real people unless the request is sexual", () => {
+  test("adults may depict real people (models censor); a teen and a child keep the block", () => {
     expect(refusePrompt("Jon Stewart interviews Hitler on a talk show set", { depictsRealPerson: true })).toBeNull();
-    expect(refusePrompt("a sexual portrait of the mayor", { depictsRealPerson: true })).toBe("real_person");
+    expect(refusePrompt("a sexual portrait of the mayor", { depictsRealPerson: true })).toBeNull();
     expect(PROMPT_REFUSAL_LINE.real_person).toBe("I won't make sexual pictures of a real person, because they can't agree to it. I can make it of an invented person or a character instead.");
     expect(refusePrompt("a portrait of the mayor", { depictsRealPerson: true, lane: "teen" })).toBe("real_person");
     expect(refusePrompt("a portrait of the mayor", { depictsRealPerson: true, lane: "child" })).toBe("child_content");
@@ -230,12 +230,13 @@ describe("the chat tool, even when a model calls it without being offered it", (
     });
   });
 
-  test("a sexual real-person request uses the updated line and starts no job", async () => {
-    await withStub({ calls: (r) => (isPhrasing(r) || r.tool_choice === "none" ? undefined : [call({ prompt: "a sexual portrait of the president", depicts_real_person: true })]), reply: () => "ignored" }, async () => {
-      const value = await turn(people.owner, "make me a sexual picture of the president");
-      expect(value.reply.text).toBe(PROMPT_REFUSAL_LINE.real_person);
-      expect(fake.submitted).toHaveLength(0);
-    });
+  test("a sexual real-person request from an adult is not refused by the tool gate (the model decides); a teen's is", async () => {
+    const { refusalFor } = await import("@/lib/pictures/tool");
+    const args = { prompt: "a sexual portrait of the president", depicts_real_person: true };
+    const adult = { actor: people.owner, band: "adult" as const, surface: "chat" as const, surfaceClass: "written" as const, spoken: false } as never;
+    expect(refusalFor(adult, args)).toBeNull();
+    const teen = { actor: people.owner, band: "teen" as const, surface: "chat" as const, surfaceClass: "written" as const, spoken: false } as never;
+    expect(refusalFor(teen, args)).not.toBeNull();
   });
 
   test("a call on a turn that was never offered the tool is refused (no picture model installed)", async () => {

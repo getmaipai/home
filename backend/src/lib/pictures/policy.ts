@@ -152,9 +152,7 @@ export function refusePrompt(prompt: string, flags: { depictsRealPerson?: boolea
     if (flags.depictsRealPerson === true) return "real_person";
     if (teenPromptUnsafe(prompt) || undressesSomeone(prompt)) return "teen_content";
   }
-  // Adults may ask for non-sexual depictions of real people (owner, 2026-10-25). Sexual content that shows a real person stays blocked;
-  // a request that names a household adult's own style is decided by the likeness gate, not by this flag.
-  if (flags.depictsRealPerson === true && (mentionsSexualContent(prompt) || undressesSomeone(prompt))) return "real_person";
+  // An adult is held only to the minor line above: models censor, the app filters only to protect kids (owner, 2026-10-25).
   return null;
 }
 

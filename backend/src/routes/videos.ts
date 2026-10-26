@@ -280,7 +280,7 @@ videosRoutes.openapi(anotherRoute, async (c) => {
         ...(laneOf(audience) === "adult" ? {} : { model: videoModelForLane(laneOf(audience)) }),
         ...(laneOf(audience) === "child" ? { negative_prompt: CHILD_NEGATIVE_PROMPT } : {}),
         ...(prep.image ? { image: prep.image, image_source: prep.imageSource ?? "generated", ...(prep.consentProof ? { consent_proof: prep.consentProof } : {}) } : {}),
-        ...(prep.loras.length && laneOf(audience) !== "child" ? { loras: prep.loras } : {}), ...(prep.negativePrompt && laneOf(audience) !== "child" ? { negative_prompt: prep.negativePrompt } : {}),
+        ...(prep.loras.length && laneOf(audience) !== "child" ? { loras: prep.loras } : {}),
       },
       ...(prep.likeness ? { likeness: prep.likeness } : {}),
     });
@@ -325,7 +325,7 @@ videosRoutes.openapi(animateRoute, async (c) => {
       body: {
         prompt: laneOf(audience) === "child" ? forceCartoon(prompt) : prompt, size, seconds: laneOf(audience) === "child" ? 3 : 5, audience: prep.likeness ? "adult" : stackAudienceFor(audience), image: prep.image!, image_source: prep.imageSource ?? "generated",
         ...(laneOf(audience) === "adult" ? {} : { model: videoModelForLane(laneOf(audience)) }),
-        ...(prep.consentProof ? { consent_proof: prep.consentProof } : {}), ...(laneOf(audience) === "child" ? { negative_prompt: CHILD_NEGATIVE_PROMPT } : prep.negativePrompt ? { negative_prompt: prep.negativePrompt } : {}),
+        ...(prep.consentProof ? { consent_proof: prep.consentProof } : {}), ...(laneOf(audience) === "child" ? { negative_prompt: CHILD_NEGATIVE_PROMPT } : {}),
       },
       ...(prep.likeness ? { likeness: prep.likeness } : {}),
     });

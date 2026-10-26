@@ -120,7 +120,7 @@ export async function runGenerateImage(input: RunGenerateImageInput): Promise<To
   const qualityNote = choice.note ? ` ${QUALITY_NOTE_LINE[choice.note]}` : choice.announce ? " This one is a Detailed picture, which takes longer than a Quick one; say so in one short sentence." : "";
   const styleNote = named && !adapter ? " The style they named is not in the library, so the picture was made without it; say so briefly." : "";
   // A style of a household adult is made only when the household option is on; other real people are refused.
-  const prep = await prepareStyleUse({ medium: "picture", audience, style: adapter, text: `${sentPrompt} ${adapter?.name ?? named}`, depictsRealPerson: args.depicts_real_person === true, source: "chat" });
+  const prep = await prepareStyleUse({ medium: "picture", audience, style: adapter, depictsRealPerson: args.depicts_real_person === true, source: "chat" });
   if (prep.kind === "refused") return refused(callId, args, prep.why === "real_person" ? { kind: "prompt", why: "real_person", line: PROMPT_REFUSAL_LINE.real_person } : { kind: "likeness", why: "likeness", line: prep.line });
 
   // The allowance is taken now, in one step with the check, so two asks at once cannot both pass; it goes back only if nothing started.
@@ -144,7 +144,7 @@ export async function runGenerateImage(input: RunGenerateImageInput): Promise<To
         // Only an adult whose household allows adult-only styles is ever sent as `adult`: a teen and a child are always `all-ages`.
         audience: lane === "adult" && adultAdaptersAllowed() ? "adult" : "all-ages",
         ...(adapter ? { loras: [{ id: adapter.id, scale: adapter.strength_default, ...(prep.kind === "likeness" ? { likeness_proof: prep.proof } : {}) }] } : {}),
-        ...(kid ? { negative_prompt: CHILD_NEGATIVE_PROMPT } : prep.kind === "likeness" && prep.negativePrompt ? { negative_prompt: prep.negativePrompt } : {}),
+        ...(kid ? { negative_prompt: CHILD_NEGATIVE_PROMPT } : {}),
       },
       ...(prep.kind === "likeness" ? { likeness: prep.job } : {}),
     });

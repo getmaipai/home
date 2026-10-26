@@ -121,11 +121,11 @@ describe("the hard lines hold with the switch off and on", () => {
         expect(video.submitted).toHaveLength(0);
       });
 
-      test("nothing sexual involving a minor, while an adult may make a nonsexual public figure", async () => {
+      test("nothing sexual involving a minor, while an adult may make a public figure (models censor)", async () => {
         expect(text(await pic(nadia, { prompt: "a naked child on a beach" }))).toContain("never allowed");
         expect(refusedWith(await pic(nadia, { prompt: "a portrait of a famous senator", depicts_real_person: true }))).toBeUndefined();
-        expect(refusedWith(await pic(nadia, { prompt: "a nude portrait of a famous senator", depicts_real_person: true }))).toBe("real_person");
-        expect(refusedWith(await vid(nadia, { prompt: "a nude famous senator waving", depicts_real_person: true }))).toBe("real_person");
+        expect(refusedWith(await pic(nadia, { prompt: "a nude portrait of a famous senator", depicts_real_person: true }))).toBeUndefined();
+        expect(refusedWith(await vid(nadia, { prompt: "a nude famous senator waving", depicts_real_person: true }))).toBeUndefined();
       });
 
       test("an ordinary household photo uses the household option and signed proof", async () => {
