@@ -229,3 +229,9 @@ test("a part no card offers is named by what it does, never by its model name", 
   expect(items.map((item) => item.name)).toEqual(["Extra chat model", "Extra model"]);
   expect(JSON.stringify(items.map((item) => [item.name, item.reason]))).not.toMatch(/Ornith|Mystery|122b/);
 });
+
+test("whyKept refuses a saved style by id, so a cleanup can never remove one", () => {
+  const p = plan([{ id: "chat", need: "required", model_ids: ["chat-m"] }]);
+  const input = unusedInput(p, [part({ id: "chat-m" }), part({ id: "lora.picture.cinema", kind: "lora", size_bytes: 500 })]);
+  expect(whyKept(input, "lora.picture.cinema")).toBe("A saved style is removed from its own page, not here.");
+});

@@ -126,6 +126,8 @@ function keptMessage(name: string, reason: string): string {
       return `${name} is always on, so it was kept.`;
     case "Another part needs it.":
       return `Another part needs ${name}, so it was kept.`;
+    case "A saved style is removed from its own page, not here.":
+      return `${name} is a saved style, so it was kept. Remove it from its own page.`;
     case "A saved style needs it.":
       return `A saved style needs ${name}, so it was kept.`;
     default:

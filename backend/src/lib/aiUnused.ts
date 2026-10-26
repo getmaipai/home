@@ -28,6 +28,7 @@ const KEPT_REASONS = {
   dependedOn: "Another part needs it.",
   busy: "It is in use right now.",
   style: "A saved style needs it.",
+  isStyle: "A saved style is removed from its own page, not here.",
 } as const;
 
 const MONTHS = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
@@ -126,6 +127,8 @@ function keptReasons(context: UnusedContext): Map<string, string | null> {
   }
   const out = new Map<string, string | null>();
   for (const [id, part] of base) {
+    // A saved style is never listed and never removed from here, whatever id a caller sends.
+    if (context.components.find((component) => component.id === id)?.kind === "lora") { out.set(id, KEPT_REASONS.isStyle); continue; }
     out.set(id, part.removable ?? part.selected ?? part.alwaysOn ?? (part.klein || dependedOn.has(id) ? KEPT_REASONS.dependedOn : null) ?? part.busy ?? part.style ?? null);
   }
   return out;
