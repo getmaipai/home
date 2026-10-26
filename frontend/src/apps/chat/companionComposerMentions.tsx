@@ -14,7 +14,7 @@ export function CompanionComposerMentions({ children }: { children: ReactNode })
   const settings = useQuery({ queryKey: ["settingsValues", `person:${person?.id ?? ""}`], queryFn: () => api.settingsValues(`person:${person!.id}`), enabled: Boolean(person?.id), retry: false });
   const currentConversation = useQuery({ queryKey: ["conversation", conversationId], queryFn: () => api.conversation(conversationId!), enabled: Boolean(conversationId), retry: false });
   const companions = useQuery({ queryKey: ["companions"], queryFn: api.companions, retry: false });
-  const selected = settings.data?.find((entry) => entry.key === "persona.active_id")?.value;
+  const selected = (Array.isArray(settings.data) ? settings.data : []).find((entry) => entry.key === "persona.active_id")?.value;
   const currentId = currentConversation.data?.companion_id ?? (typeof selected === "string" ? selected : companions.data?.default_id);
   const allowed = companions.data?.allowed === true;
   const mentions = allowed ? (companions.data?.companions ?? []).filter((card) => card.status === "ready" && card.id !== currentId && !card.is_default).map((card) => ({ id: card.id, type: "person" as const, label: card.name })) : [];
