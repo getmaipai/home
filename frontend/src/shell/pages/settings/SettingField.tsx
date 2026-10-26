@@ -51,6 +51,8 @@ interface SettingFieldProps {
 export function SettingField({ setting, onChange, onReset, disabled, selfPersonId, optionsFrom }: SettingFieldProps) {
   const { def } = setting;
   const resolved = setting.resolved as MergedSetting["resolved"] & Pick<ResolvedSetting, "does" | "state" | "reason">;
+  // The generic settings resolver supplies the permission reason; keep the control visible and read-only from that same state.
+  const readOnly = disabled || Boolean(resolved.reason);
   const [draft, setDraft] = useState<string>(String(resolved.value ?? ""));
   const canReset = resolved.source === "user";
 
@@ -150,13 +152,13 @@ export function SettingField({ setting, onChange, onReset, disabled, selfPersonI
     ) : (
       <div className="flex items-center gap-3">
         <span className="text-sm text-muted-foreground">{resolved.isSet ? "Set" : "Not set"}</span>
-        <Button type="button" variant="outline" disabled={disabled} onClick={() => setSecretEditing(true)}>
+        <Button type="button" variant="outline" disabled={readOnly} onClick={() => setSecretEditing(true)}>
           {resolved.isSet ? "Change" : "Set"}
         </Button>
       </div>
     );
   } else if (def.selector === "boolean") {
-    control = <><Switch size={def.key === "companions.allowed" || def.key === "ui.enrollment_sounds" ? "md" : "default"} checked={Boolean(resolved.value)} onCheckedChange={handleSwitchChange} disabled={disabled} aria-label={def.label} />{permissionMessage ? <span role="status" className="text-sm text-muted-foreground">{permissionMessage}</span> : null}</>;
+    control = <><Switch size={def.key === "companions.allowed" || def.key === "ui.enrollment_sounds" ? "md" : "default"} checked={Boolean(resolved.value)} onCheckedChange={handleSwitchChange} disabled={readOnly} aria-label={def.label} />{permissionMessage ? <span role="status" className="text-sm text-muted-foreground">{permissionMessage}</span> : null}</>;
   } else if (def.selector === "select" && (def.range as { multiple?: boolean } | undefined)?.multiple) {
     control = (
       <OptionMultiSelect
@@ -164,7 +166,7 @@ export function SettingField({ setting, onChange, onReset, disabled, selfPersonI
         options={(def.range as { options?: string[] }).options ?? []}
         labels={(def as { copy?: { option_labels?: Record<string, string> } }).copy?.option_labels}
         onValueChange={onChange}
-        disabled={disabled}
+        disabled={readOnly}
         ariaLabel={def.label}
       />
     );
@@ -177,7 +179,7 @@ export function SettingField({ setting, onChange, onReset, disabled, selfPersonI
     // MINOR-TOPICS-01e: a key's spec copy names its options in plain words; titleCaseOption is the fallback.
     const getLabel = (option: string) => optionLabels?.[option] ?? (def.key === "household.locale" ? localeDisplayName(option) : titleCaseOption(option));
     control = (
-      <Select value={String(resolved.value)} onValueChange={onChange} disabled={disabled || Boolean(source && !runtimeOptions && !source.startsWith("models."))}>
+      <Select value={String(resolved.value)} onValueChange={onChange} disabled={readOnly || Boolean(source && !runtimeOptions && !source.startsWith("models."))}>
         <SelectTrigger aria-label={def.label}>
           <SelectValue />
         </SelectTrigger>
@@ -197,7 +199,7 @@ export function SettingField({ setting, onChange, onReset, disabled, selfPersonI
           min={range?.min}
           max={range?.max}
           value={draft}
-          disabled={disabled}
+          disabled={readOnly}
           onChange={(e) => setDraft(e.target.value)}
           onBlur={commitDraft}
           aria-label={def.label}
@@ -205,13 +207,13 @@ export function SettingField({ setting, onChange, onReset, disabled, selfPersonI
       </div>
     );
   } else if (def.selector === "time") {
-    control = <div className="flex items-center gap-2"><div className="w-40 max-w-full shrink-0"><Input type="time" value={String(resolved.value ?? "")} disabled={disabled} onChange={(e) => void onChange(e.target.value)} aria-label={def.key} /></div>{resolved.value == null && <><span className="text-sm text-muted-foreground">Inheriting household hours</span><Button type="button" variant="link" onClick={onReset} disabled={disabled}>Use household hours</Button></>}</div>;
+    control = <div className="flex items-center gap-2"><div className="w-40 max-w-full shrink-0"><Input type="time" value={String(resolved.value ?? "")} disabled={readOnly} onChange={(e) => void onChange(e.target.value)} aria-label={def.key} /></div>{resolved.value == null && <><span className="text-sm text-muted-foreground">Inheriting household hours</span><Button type="button" variant="link" onClick={onReset} disabled={readOnly}>Use household hours</Button></>}</div>;
   } else if (def.selector === "text") {
     control = (
       <div className="w-64 max-w-full">
         <Input
           value={draft}
-          disabled={disabled}
+          disabled={readOnly}
           onChange={(e) => setDraft(e.target.value)}
           onBlur={commitDraft}
           aria-label={def.label}
@@ -227,13 +229,13 @@ export function SettingField({ setting, onChange, onReset, disabled, selfPersonI
       <PersonMultiSelect
         value={(resolved.value as string[] | undefined) ?? []}
         onValueChange={onChange}
-        disabled={disabled}
+        disabled={readOnly}
         excludePersonId={selfPersonId}
         ariaLabel={def.label}
       />
     );
   } else if (def.selector === "location") {
-    control = <LocationSetting def={def} value={resolved.value} onChange={onChange} disabled={disabled} />;
+    control = <LocationSetting def={def} value={resolved.value} onChange={onChange} disabled={readOnly} />;
   } else {
     control = <span className="text-sm text-muted-foreground">Not supported in this hub version yet.</span>;
   }
@@ -247,7 +249,7 @@ export function SettingField({ setting, onChange, onReset, disabled, selfPersonI
         {resolved.state ? <ItemDescription clamp={false}>{resolved.state}</ItemDescription> : null}
         {resolved.reason ? <ItemDescription clamp={false}>{resolved.reason}</ItemDescription> : null}
         {canReset ? (
-          <Button type="button" variant="link" onClick={onReset} disabled={disabled}>
+          <Button type="button" variant="link" onClick={onReset} disabled={readOnly}>
             Reset to default
           </Button>
         ) : null}

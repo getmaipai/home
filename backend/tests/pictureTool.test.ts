@@ -26,6 +26,7 @@ import { __setPictureStatusForTests } from "@/lib/pictures/ready";
 import type { ChatCompletionRequest } from "@maipai/spec/llm/ts/types.js";
 import type { TurnStreamEvent, TurnValue } from "@/wire";
 import { installFakeImageStack, until, type FakeImageStack } from "./pictureFixture";
+import { declareStyleSubject } from "@/lib/likeness/adapters";
 
 let people: BenchPeople;
 let fake: FakeImageStack;
@@ -171,6 +172,15 @@ describe("IMGGEN-HOME-01: the call, the job and the stored picture", () => {
       const sent = fake.submitted[0]!;
       expect(sent.prompt).toBe("a castle on a hill, pixelart");
       expect(sent.loras).toEqual([{ id: "lora-aaaaaaaaaaaaaaaa", scale: 0.8 }]);
+    });
+  });
+
+  test("a saved minor style sends the safety negative prompt even when phrasing misses the word check", async () => {
+    declareStyleSubject({ adapterId: "lora-aaaaaaaaaaaaaaaa", medium: "picture", subjectPersonId: people.child.id, classification: "all-ages", declaredBy: people.owner.id });
+    const call = { id: "c", name: "generate_image", args: JSON.stringify({ prompt: "a portrait in warm light", style: "my pixel style" }) };
+    await withStub(script(call), async () => {
+      await streamValue(people.owner, "make a warm portrait in my pixel style");
+      expect(fake.submitted[0]!.negative_prompt).toContain("nude, naked, nudity");
     });
   });
 

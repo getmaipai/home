@@ -37,6 +37,15 @@ beforeEach(() => {
 afterEach(() => __resetStackEngineForTests());
 
 describe("PUT /api/settings robot.voice.id", () => {
+  test("a non-admin cannot write or reset the household likeness option", async () => {
+    const owner = new TestClient();
+    await owner.post("/api/auth/setup", { displayName: "Sage", secret: "correcthorse" });
+    const created = await owner.post("/api/people", { displayName: "Adult", role: "adult", secret: "adultsecret" });
+    const adultClient = new TestClient();
+    await adultClient.post("/api/auth/verify-secret", { personId: ((await created.json()) as { id: string }).id, secret: "adultsecret" });
+    expect((await adultClient.put("/api/settings", { scope: "household", key: "generation.household_likeness", value: false })).status).toBe(403);
+    expect((await adultClient.post("/api/settings/reset", { scope: "household", key: "generation.household_likeness" })).status).toBe(403);
+  });
   test("accepts a listed voice and refuses an unknown one with the voice list message", async () => {
     const owner = new TestClient();
     const { person } = (await (await owner.post("/api/auth/setup", { displayName: "Sage", secret: "correcthorse" })).json()) as { person: { id: string } };

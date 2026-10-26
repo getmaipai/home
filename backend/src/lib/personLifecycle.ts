@@ -54,9 +54,11 @@ import { removeFileBlobs } from "@/lib/attachments";
 import { ROLE_LADDER, invalidateSessionCacheForPerson, type Role } from "@/middleware/auth";
 import { trigger } from "@/lib/notifications";
 import { forgetNewsOfPerson } from "@/lib/news/records";
-import { forgetLikenessOfPerson, likenessPersonGone } from "@/lib/likeness/history";
 import { roleRequiresCredential } from "@/lib/personAuthMethods";
 import { eraseChatFolderReferences } from "@/lib/chatFolders";
+import { queueStyleRemoval, drainStyleRemovals } from "@/lib/likeness/adapters";
+import { stopLikenessPictureJobs } from "@/lib/pictures/jobs";
+import { stopLikenessVideoJobs } from "@/lib/videos/jobs";
 import type { PersonRow } from "@/types";
 import type { personToDbValues } from "@/lib/personShape";
 
@@ -525,7 +527,10 @@ const commitDeletePerson = sqlite.transaction((actor: PersonRow, personId: strin
   if (lastOwnerError) return lastOwnerError;
 
   const counts = erasePersonData(personId, blobsAfterCommit);
-  forgetLikenessOfPerson(personId); // LIKENESS-01: their consent history and use records go; what waits for them stops; styles of them are removed
+  queueStyleRemoval(personId);
+  stopLikenessPictureJobs(personId, true);
+  stopLikenessVideoJobs(personId, true);
+  void drainStyleRemovals();
 
   // The tombstone. Nickname and birthdate go with the rest of their
   // data; the display name stays, because a tombstone that cannot say
@@ -617,7 +622,10 @@ function revokeAllCredentialsAndSessions(personId: string): { sessions: number }
 // memorializePerson()'s own read-only checks have already run.
 const commitMemorialize = sqlite.transaction((personId: string, alreadyMemorialized: boolean): void => {
   revokeAllCredentialsAndSessions(personId);
-  likenessPersonGone(personId);
+  queueStyleRemoval(personId);
+  stopLikenessPictureJobs(personId, true);
+  stopLikenessVideoJobs(personId, true);
+  void drainStyleRemovals();
   if (!alreadyMemorialized) {
     db.update(people)
       .set({ memorializedAt: new Date().toISOString(), updatedAt: new Date().toISOString(), hlc: nextHlc() })

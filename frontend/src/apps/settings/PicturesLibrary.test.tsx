@@ -92,7 +92,7 @@ describe("Pictures and videos settings view", () => {
 
   test("the add form needs the answer to 'Who does this style look like?', then sends it and not sure as unsure", async () => {
     const original = { ...likenessApi };
-    likenessApi.adults = mock(async () => [{ id: "p-marlow", name: "Marlow", self: false, agreed: true }, { id: "p-nadia", name: "Nadia", self: false, agreed: false }]);
+    likenessApi.adults = mock(async () => [{ id: "p-marlow", name: "Marlow", self: false }, { id: "p-nadia", name: "Nadia", self: false }]);
     const v = mount(overview({ adapters: [] }));
     await waitFor(() => expect(v.getByLabelText("Name")).toBeTruthy());
     fireEvent.change(v.getByLabelText("Name"), { target: { value: "Ink Wash" } });
@@ -111,15 +111,14 @@ describe("Pictures and videos settings view", () => {
     v.restore();
   });
 
-  test("an adult who has not agreed is listed but cannot be picked", async () => {
+  test("every eligible household member returned by Home can be picked", async () => {
     const original = { ...likenessApi };
-    likenessApi.adults = mock(async () => [{ id: "p-marlow", name: "Marlow", self: false, agreed: true }, { id: "p-nadia", name: "Nadia", self: false, agreed: false }]);
+    likenessApi.adults = mock(async () => [{ id: "p-marlow", name: "Marlow", self: false }, { id: "p-nadia", name: "Nadia", self: false }]);
     const v = mount(overview({ adapters: [] }));
     await waitFor(() => expect(v.getByLabelText("Name")).toBeTruthy());
     fireEvent.click(v.getByRole("combobox", { name: "Who does this style look like?" }));
-    const agreed = await v.findByRole("option", { name: "Marlow" });
-    expect(agreed.getAttribute("aria-disabled")).not.toBe("true");
-    expect((await v.findByRole("option", { name: "Nadia (has not agreed)" })).getAttribute("aria-disabled")).toBe("true");
+    expect((await v.findByRole("option", { name: "Marlow" })).getAttribute("aria-disabled")).not.toBe("true");
+    expect((await v.findByRole("option", { name: "Nadia" })).getAttribute("aria-disabled")).not.toBe("true");
     Object.assign(likenessApi, original);
     v.restore();
   });

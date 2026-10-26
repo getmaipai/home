@@ -105,6 +105,8 @@ describe("the migration chain (architecture review 4.4)", () => {
       seedRow(old, "conversation_turns", { id: "turn-seeded01", person_id: "person-child01", conversation_id: "conv-seeded01", user_text: "what do frogs eat", reply_text: "Insects, mostly.", created_at: now });
       seedRow(old, "memory_records", { id: "mem-seeded01", person: "person-child01", scope: "person", text: "Sprout likes frogs", created_at: now, updated_at: now, hlc: now });
       seedRow(old, "settings_values", { scope: "household", key: "household.home_place", value: JSON.stringify("Portland, OR"), hlc: now, source: "user", updated_at: now });
+      seedRow(old, "settings_values", { scope: "person:person-child01", key: "likeness.adults", value: JSON.stringify(true), hlc: now, source: "user", updated_at: now });
+      seedRow(old, "settings_values", { scope: "person:person-child01", key: "likeness.adult_content", value: JSON.stringify(true), hlc: now, source: "user", updated_at: now });
       const before = Object.fromEntries(["people", "conversations", "conversation_turns", "memory_records"].map((t) => [t, (old.query(`SELECT count(*) AS n FROM "${t}"`).get() as { n: number }).n]));
       old.close();
 

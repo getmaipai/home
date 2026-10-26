@@ -1,16 +1,16 @@
 // IMGEDIT-01 (built on LIKENESS-01): what a picture the person wants changed is, as far as the Stack must be told, and
 // whether it may be changed at all. One function for every door into a generative edit (the editor's Comment, the chat
-// tool): the picture is one this home made (its own), one made to look like a household adult (decided again with
-// them), an upload that shows no one (checked by the household's own picture-reading model), or an upload that shows
-// exactly one household adult who agreed (named by the person, checked, and given a signed proof). Anything else is
+// tool): the picture is one this home made (its own), one made to look like a household member (decided again with
+// current policy), an upload that shows no one (checked by the household's own picture-reading model), or an upload that shows
+// exactly one named household member (checked and given a signed proof). Anything else is
 // refused with a sentence that says what to do. Nothing here asks the Stack; the caller attaches the answer to its request.
 import { preparePhotoUse } from "@/lib/likeness/apply";
 import { inspectPhotoResult, PHOTO_LINES, photoShowsNoPerson, singleAdultPhoto } from "@/lib/likeness/inspector";
 import { asksToUndress } from "./policy";
 import { TEEN_CONTENT_LINE, laneOf, noteTeenPhotoEdit } from "./lane";
-import { subjectEligibility } from "@/lib/likeness/consent";
+import { subjectEligibility } from "@/lib/likeness/eligibility";
 import type { JobLikeness } from "@/lib/likeness/guard";
-import type { UseSource } from "@/lib/likeness/uses";
+import type { UseSource } from "@/lib/likeness/apply";
 import type { PictureAudience } from "./policy";
 import { screenInputImage, viewerOf } from "./ageCheck";
 
@@ -21,9 +21,9 @@ export interface PrepareEditSourceInput {
   bytes: Uint8Array;
   /** The picture is one this home's picture engine made (Home marked it so; a file name proves nothing). */
   generated: boolean;
-  /** The household adult a generated picture was made to look like, from its provenance, or null. */
+  /** The household member a generated picture was made to look like, from its provenance, or null. */
   rootLikeness: string | null;
-  /** The household adult the person says an upload shows (already resolved to an id), or null. */
+  /** The household member the person says an upload shows (already resolved to an id), or null. */
   declaredSubjectId: string | null;
   /** Everything the person asked for in words, for the adult-content reading. */
   text: string;
@@ -31,11 +31,11 @@ export interface PrepareEditSourceInput {
 }
 
 export type EditSourcePrep =
-  | { ok: true; imageSource: EditImageSource; proof?: string; likeness?: JobLikeness; subjectId: string | null }
+  | { ok: true; imageSource: EditImageSource; proof?: string; likeness?: JobLikeness; negativePrompt?: string; subjectId: string | null }
   | { ok: false; status: 403 | 422; code: string; line: string };
 
 export const TEEN_PHOTO_LINE = "That photo doesn't look like it is of you. I only change a photo of yourself that you upload. Try another photo of you.";
-export const SUBJECT_NOT_ALLOWED_LINE = "I can only change a photo of an adult who lives in this household and has agreed. Choose that adult from the list, or a photo with no one in it.";
+export const SUBJECT_NOT_ALLOWED_LINE = "I can only change a photo of a household member from an adult's written chat. Choose an eligible subject from the list, or a photo with no one in it.";
 
 export async function prepareEditSource(input: PrepareEditSourceInput): Promise<EditSourcePrep> {
   // A picture this home did not make is screened before anything else is asked of it (ageCheck.screenInputImage).
@@ -57,6 +57,7 @@ export async function prepareEditSource(input: PrepareEditSourceInput): Promise<
     return { ok: true, imageSource: "uploaded", subjectId: null };
   }
   const declared = input.rootLikeness ?? input.declaredSubjectId;
+  if (declared && laneOf(input.audience) !== "adult") return { ok: false, status: 403, code: "requester_not_allowed", line: "Only an adult can edit a photo that shows another household member." };
   if (!declared && input.generated) return { ok: true, imageSource: "generated", subjectId: null };
   if (!declared) {
     const verdict = await photoShowsNoPerson(input.bytes);
@@ -70,5 +71,5 @@ export async function prepareEditSource(input: PrepareEditSourceInput): Promise<
   }
   const prep = await preparePhotoUse({ medium: "picture", audience: input.audience, declaredSubjectId: declared, bytes: input.bytes, text: input.text, source: input.source });
   if (prep.kind === "refused") return { ok: false, status: 403, code: "likeness_refused", line: prep.line };
-  return { ok: true, imageSource: "household_photo", proof: prep.proof, likeness: prep.job, subjectId: prep.subjectId };
+  return { ok: true, imageSource: "household_photo", proof: prep.proof, likeness: prep.job, ...(prep.negativePrompt ? { negativePrompt: prep.negativePrompt } : {}), subjectId: prep.subjectId };
 }

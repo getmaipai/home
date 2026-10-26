@@ -1,39 +1,55 @@
-// LIKENESS-01: a request that makes something look like a person is checked once when it is made and again while it
-// waits for the engine (a clip can wait minutes behind another). `JobLikeness` rides on the job's own request record; the
-// watchers in lib/pictures/jobs.ts and lib/videos/jobs.ts ask `likenessStillAllowed` on every poll and stop the job the
-// moment the person takes their agreement back. The Stack checks its signed proof again when the job really starts.
-import { eq } from "drizzle-orm";
+// LIKENESS-01: a request that makes something look like a person is checked when it is made and again while it waits
+// for the engine. The Stack checks its signed proof again when the job really starts.
+import { isAdultSubject, subjectEligibility } from "./eligibility";
+import { LIKENESS_LINES } from "./decide";
+import { getHouseholdSettingValue } from "@/lib/settings";
 import { db } from "@/db";
 import { people } from "@/db/schema";
-import { consentState, subjectEligibility } from "./consent";
-import { LIKENESS_LINES, subjectName } from "./decide";
+import { eq } from "drizzle-orm";
+import { pictureDenial } from "@/lib/pictures/policy";
+import { laneOf } from "@/lib/pictures/lane";
+import { speakerAgeBand } from "@/lib/ageBand";
+import { styleIsUnavailable } from "./adapters";
 import type { LikenessWay } from "./decide";
 
 export interface JobLikeness {
   subject: string;
   requester: string;
   way: LikenessWay;
-  /** The request fell under the second switch (adult content). */
-  adult_content: boolean;
+  adultContent?: boolean;
+  adult_content?: boolean;
+  styleId?: string;
+  styleIds?: string[];
+  medium?: "picture" | "video";
+}
+
+export function normalizeJobLikeness(value: JobLikeness | null | undefined): JobLikeness | null {
+  if (!value) return null;
+  const raw = value as JobLikeness;
+  return { ...raw, adultContent: raw.adultContent ?? raw.adult_content ?? true };
 }
 
 /** What a stopped job tells the person who asked. */
 export function stoppedLine(name: string): string {
-  return `Stopped. ${name} took back their agreement to pictures and videos that look like them, so this was not finished.`;
+  return `Stopped. ${name} is no longer an eligible household subject, or the household option or requester policy changed, so this was not finished.`;
 }
 
 export type StillAllowed = { ok: true } | { ok: false; line: string };
 
-/** Whether the person is still willing, read from their own settings right now. A person who made it of themselves is always willing. */
+/** Rechecks the option, subject and requester policy while a job waits. */
 export function likenessStillAllowed(likeness: JobLikeness): StillAllowed {
+  likeness = normalizeJobLikeness(likeness)!;
+  if (likeness.medium && [likeness.styleId, ...(likeness.styleIds ?? [])].some((id) => id && styleIsUnavailable(likeness.medium!, id))) return { ok: false, line: stoppedLine("That saved style") };
   const eligible = subjectEligibility(likeness.subject);
-  // Someone making it of themselves needs no one's yes, but must still be a living household adult.
-  if (likeness.subject === likeness.requester) return eligible.ok ? { ok: true } : { ok: false, line: "Stopped. This profile can no longer make pictures or videos that look like a person." };
-  const person = eligible.ok ? eligible.person : db.select().from(people).where(eq(people.id, likeness.subject)).get();
-  const name = person ? subjectName(person) : "That person";
-  if (!eligible.ok) return { ok: false, line: stoppedLine(name) };
-  const consent = consentState(likeness.subject);
-  if (!consent.adults) return { ok: false, line: stoppedLine(name) };
-  if (likeness.adult_content && !consent.adultContent) return { ok: false, line: LIKENESS_LINES.adult_content_off(name) };
+  if (!eligible.ok) return { ok: false, line: stoppedLine("That person") };
+  if (likeness.adultContent && !isAdultSubject(eligible.person)) return { ok: false, line: LIKENESS_LINES.adult_content_minor };
+  const requester = db.select().from(people).where(eq(people.id, likeness.requester)).get();
+  if (!requester) return { ok: false, line: LIKENESS_LINES.requester };
+  const band = speakerAgeBand(requester, new Date());
+  const audience = { actor: requester, band, surface: "chat" as const, surfaceClass: "written" as const, spoken: false };
+  if (pictureDenial(audience) !== null || laneOf(audience) !== "adult") return { ok: false, line: LIKENESS_LINES.requester };
+  if (likeness.adultContent && likeness.subject !== likeness.requester) return { ok: false, line: LIKENESS_LINES.adult_content_other };
+  try { if (getHouseholdSettingValue("generation.household_likeness") !== true) return { ok: false, line: LIKENESS_LINES.household_off }; }
+  catch { return { ok: false, line: LIKENESS_LINES.household_off }; }
   return { ok: true };
 }

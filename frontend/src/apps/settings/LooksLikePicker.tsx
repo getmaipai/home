@@ -1,5 +1,4 @@
-// LIKENESS-01: "Who does this style look like?" (adding a style) and "Who is in this photo?" (the picture editor). A household
-// adult from the list, or Nobody. An adult who has not agreed is listed but cannot be picked: the reason is on the row.
+// "Who does this style look like?" and "Who is in this photo?" use the server's eligible household subjects.
 import { useQuery } from "@tanstack/react-query";
 import { Label } from "@maipai/ui/src/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@maipai/ui/src/ui/select";
@@ -16,9 +15,9 @@ export function LooksLikePicker({ id, label, value, onChange, disabled, nobodyLa
         <SelectTrigger id={id} aria-label={label}><SelectValue placeholder="Choose one" /></SelectTrigger>
         <SelectContent>
           {nobodyLabel ? <SelectItem value={NOBODY}>{nobodyLabel}</SelectItem> : null}
-          {(adults.data ?? []).map((adult) => (
-            <SelectItem key={adult.id} value={adult.id} disabled={!adult.agreed}>
-              {adult.self ? `${adult.name} (me)` : adult.agreed ? adult.name : `${adult.name} (has not agreed)`}
+          {[...(adults.data ?? [])].sort((a, b) => Number(b.self) - Number(a.self)).map((adult) => (
+            <SelectItem key={adult.id} value={adult.id}>
+              {adult.self ? `${adult.name} (me)` : adult.name}
             </SelectItem>
           ))}
         </SelectContent>

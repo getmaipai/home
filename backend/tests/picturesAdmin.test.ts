@@ -65,6 +65,21 @@ describe("overview", () => {
 });
 
 describe("adding a style", () => {
+  test("rejects guest, deleted, and memorialized subjects", async () => {
+    const { client } = await owner();
+    const create = async (role: string, name: string) => (await (await client.post("/api/people", { displayName: name, role, ...(role === "guest" ? { guestExpiresAt: new Date(Date.now() + 86_400_000).toISOString() } : {}) })).json()) as { id: string };
+    const guest = await create("guest", "Guest");
+    const deleted = await create("adult", "Deleted");
+    const memorial = await create("adult", "Memorial");
+    await client.request(`/api/people/${deleted.id}`, { method: "DELETE" });
+    await client.post(`/api/people/${memorial.id}/memorialize`);
+    for (const subject of [guest.id, deleted.id, memorial.id]) {
+      const res = await client.postForm("/api/pictures/admin/adapters", form({ ...GOOD, looks_like: subject }));
+      expect(res.status).toBe(422);
+      expect(((await res.json()) as { code: string }).code).toBe("subject_not_allowed");
+    }
+    expect(fake.loraAdds).toHaveLength(0);
+  });
   test("a file is added switched off, classed all-ages only on a plain yes, and turned on by the confirmation", async () => {
     const { client } = await owner();
     const res = await client.postForm("/api/pictures/admin/adapters", form(GOOD));

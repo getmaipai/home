@@ -39,6 +39,7 @@ import { AUDIO_SETTINGS_KEYS } from "@/settings/audioKeys";
 import { NEWS_SETTINGS_KEYS } from "@/settings/newsKeys";
 
 const RETIRED_WIKIPEDIA_FALLBACK_KEY = "search.wikipedia_fallback";
+const RETIRED_LIKENESS_KEYS = new Set(["likeness.adults", "likeness.adult_content"]);
 const REGISTRY_PATH = join(SPEC_DIR, "settings", "keys.json");
 
 // Maps still has no bundled package, so its two location keys ride here
@@ -78,7 +79,7 @@ function loadRegistry(): SettingsKey[] {
   // Nothing reads it any more, so it must not show or be settable until a commons tag drops it.
   // VOICE-PICK-01: Home's tts.voice_id (default "default", the engine's own voice) supersedes the spec's (default "alba",
   // Pocket's name) until a commons spec tag carries the same declaration; then this line goes.
-  const parsed = raw.map((entry) => SettingsKey.parse(entry)).filter((entry) => entry.key !== RETIRED_WIKIPEDIA_FALLBACK_KEY && entry.key !== "tts.voice_id");
+  const parsed = raw.map((entry) => SettingsKey.parse(entry)).filter((entry) => entry.key !== RETIRED_WIKIPEDIA_FALLBACK_KEY && entry.key !== "tts.voice_id" && !RETIRED_LIKENESS_KEYS.has(entry.key));
   // AI declarations ship with Home's backend, while the shared settings
   // snapshot is pinned independently. Include newly added Home AI keys
   // until the shared snapshot is advanced.

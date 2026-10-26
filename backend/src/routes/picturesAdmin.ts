@@ -17,7 +17,7 @@ import { db } from "@/db";
 import { kidUsage, pictureAdapterPrefs, people, pictureJobs, videoJobs } from "@/db/schema";
 import { and, eq, gte, ne } from "drizzle-orm";
 import { declareStyleSubject, forgetStyleSubject, getStyleSubject } from "@/lib/likeness/adapters";
-import { checkStyleSubject, LOOKS_LIKE_REQUIRED_LINE, notifyStyleAdded, stackLikenessFields } from "@/lib/likeness/importStyle";
+import { checkStyleSubject, LOOKS_LIKE_REQUIRED_LINE, stackLikenessFields } from "@/lib/likeness/importStyle";
 
 export const picturesAdminRoutes = apiRouter();
 
@@ -212,7 +212,6 @@ picturesAdminRoutes.openapi(addRoute, async (c) => {
       }
       const lora = await addLoraFile(stack);
       declareStyleSubject({ adapterId: lora.id, medium: "picture", subjectPersonId: subjectCheck.kind === "person" ? subjectCheck.subject.id : null, classification: lora.classification, declaredBy: adminId });
-      if (subjectCheck.kind === "person") await notifyStyleAdded(subjectCheck.subject.id, c.get("person"), "picture");
       setAdapterEnabled(lora.id, false, `added:${adminId}`);
       dropAdapterCache();
       const found = (await allAdapters()).find((a) => a.id === lora.id);

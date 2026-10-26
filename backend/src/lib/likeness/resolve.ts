@@ -1,9 +1,9 @@
-// LIKENESS-01: who the person says is in a photo, resolved against the household's adults. The requester declares the
+// LIKENESS-01: who the person says is in a photo, resolved against household identity. The requester declares the
 // depicted adult; the model only carries their words into the tool call (rule 1: the model decides when a tool is
-// needed, code checks what it may do). Only a household adult resolves: "someone else", a friend, a celebrity, a child,
+// needed, code checks what it may do). Only a living household member resolves: "someone else", a friend, a celebrity,
 // a name that matches two people, or no name at all resolves to nothing, and the request is refused.
 import { speakerAgeBand } from "@/lib/ageBand";
-import { subjectEligibility } from "./consent";
+import { subjectEligibility } from "./eligibility";
 import { db } from "@/db";
 import { people } from "@/db/schema";
 import type { PersonRow } from "@/types";
@@ -14,8 +14,8 @@ function norm(text: string): string {
 
 const SELF_WORDS = new Set(["me", "myself", "i", "self", "my own", "it is me", "it s me", "that is me", "that s me"]);
 
-/** The household adult named (by display name or nickname, whole or first word, never guessing between two), or the requester for "me". Null for anyone else. */
-export function resolveDeclaredAdult(declared: unknown, requester: PersonRow): PersonRow | null {
+/** The household member named (by display name or nickname, whole or first word, never guessing between two), or the requester for "me". Null for anyone else. */
+export function resolveDeclaredPerson(declared: unknown, requester: PersonRow): PersonRow | null {
   if (typeof declared !== "string") return null;
   const wanted = norm(declared);
   if (!wanted || wanted.length > 80) return null;
@@ -34,7 +34,7 @@ export function resolveDeclaredAdult(declared: unknown, requester: PersonRow): P
 
 const SELF_CLAIM = /\b(?:(?:photo|picture|pic|image|selfie|portrait|shot) of (?:me|myself)|(?:it|this|that) (?:is|s) me|i (?:am|m) (?:in|the one in)|me in (?:it|this|the)|my own (?:photo|picture|pic|image|selfie|face)|my (?:photo|picture|pic|selfie|face)|of myself)\b/;
 
-/** Whether the person's own message names or claims the adult the model says is in the photo. The model's `photo_subject` is only a proposal: it can never be the attestation (a photo of a stranger plus an invented "me" is not a household photo). A self claim counts only for the speaker; anyone else counts only when the message names them (whole name, nickname or first name, as resolveDeclaredAdult matched it). */
+/** Whether the person's own message names or claims who the model says is in the photo. The model's `photo_subject` is only a proposal: it can never be the attestation (a photo of a stranger plus an invented "me" is not a household photo). A self claim counts only for the speaker; anyone else counts only when the message names them. */
 export function messageAttests(utterance: unknown, requester: PersonRow, declared: PersonRow | null): boolean {
   if (!declared || typeof utterance !== "string") return false;
   const text = norm(utterance);
@@ -44,11 +44,11 @@ export function messageAttests(utterance: unknown, requester: PersonRow, declare
   return candidates.some((n) => new RegExp(`\\b${n.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\b`).test(text));
 }
 
-export const WHO_IS_IN_PHOTO_LINE = "Who is in this photo? Tell me which adult in this household it shows (say their name, or say it is you) and make sure they have agreed. I only use a photo of someone who lives here and said yes.";
+export const WHO_IS_IN_PHOTO_LINE = "Who is in this photo? Tell me which person in this household it shows (say their name, or say it is you). I only use a photo of someone who lives here.";
 
-/** The adult a tool call may treat as the person in a photo: the model's proposal (`photo_subject`) resolved against the household, kept only when the person's own message names or claims that adult. The one rule for every tool that takes a photo and a subject (pictures and videos). */
-export function attestedAdult(proposal: unknown, utterance: unknown, requester: PersonRow, remember?: { photoKeys: readonly string[]; on: boolean }): { proposed: PersonRow | null; attested: PersonRow | null } {
-  const proposed = resolveDeclaredAdult(proposal, requester) ?? ownTeenPhoto(proposal, requester);
+/** The household member a tool call may treat as the person in a photo: the model's proposal (`photo_subject`) resolved against the household, kept only when the person's own message names or claims them. The one rule for every tool that takes a photo and a subject (pictures and videos). */
+export function attestedPerson(proposal: unknown, utterance: unknown, requester: PersonRow, remember?: { photoKeys: readonly string[]; on: boolean }): { proposed: PersonRow | null; attested: PersonRow | null } {
+  const proposed = resolveDeclaredPerson(proposal, requester) ?? ownTeenPhoto(proposal, requester);
   if (!proposed) return { proposed, attested: null };
   const keys = (remember?.photoKeys ?? []).map((key) => `${requester.id}:${key}`);
   if (messageAttests(utterance, requester, proposed)) {
@@ -65,7 +65,7 @@ export function attestedAdult(proposal: unknown, utterance: unknown, requester: 
 const attestations = new Map<string, string>();
 export function __resetAttestationsForTests(): void { attestations.clear(); }
 
-/** A teen's own photo: "me" resolves to the teen themselves (an adult subject must be an adult, so this is the one way a minor is a subject). It is only ever used for a non-sexual edit of their own photo (pictures/editSources.ts); a child never reaches it. */
+/** A teen's own photo: "me" resolves to the teen themselves. It is only ever used for a non-sexual edit of their own photo (pictures/editSources.ts); a child never reaches it. */
 function ownTeenPhoto(proposal: unknown, requester: PersonRow): PersonRow | null {
   if (typeof proposal !== "string" || !SELF_WORDS.has(norm(proposal))) return null;
   return speakerAgeBand(requester, new Date()) === "teen" && requester.role !== "guest" ? requester : null;

@@ -6,12 +6,14 @@ import { SettingsKey } from "@maipai/spec/gen/ts/settings-key.js";
 import { SettingsRenderer } from "@/shell/pages/settings/SettingsRenderer";
 import { packageAreaKeySet, visibleRegistry } from "@/shell/pages/settings/settingsViewer";
 import { api } from "@/lib/api";
+import { SETTINGS_VIEWS } from "@/shell/pages/settings/settingsViews";
 
 afterEach(cleanup);
 
 const home = SettingsKey.parse({ key: "household.home", scope: "household", selector: "location", range: { multiple: false, allow_current: false }, default: null, label: "Home location", help: "The household place used as the fallback for location-based answers.", level: "basic", lives_in: "household.system", honoured_by: ["home", "bot"] });
 const previewShells = SettingsKey.parse({ key: "companions.preview_shells", scope: "household", selector: "boolean", default: false, label: "Preview the coming companion features", help: "Everyone in the home sees them.", level: "basic", lives_in: "household.system", honoured_by: ["home"] });
 const weatherPlaces = SettingsKey.parse({ key: "weather.places", scope: "person", selector: "location", range: { multiple: true, allow_current: false }, default: [], label: "Weather places", level: "basic", lives_in: "weather.places", honoured_by: ["home"] });
+const householdLikeness = SettingsKey.parse({ key: "generation.household_likeness", scope: "household", selector: "boolean", default: true, label: "Pictures, videos and styles of your household", help: "Age and safety limits still apply.", level: "basic", secret: false, lives_in: "generation", honoured_by: ["home"] });
 
 test("only the household home location key reaches the generic cards", () => {
   expect(visibleRegistry([home, weatherPlaces], "adult").map((k) => k.key)).toEqual(["household.home"]);
@@ -24,6 +26,19 @@ test("the standard household preview switch renders in the Household card", asyn
     const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
     const view = render(<QueryClientProvider client={client}><MemoryRouter><SettingsRenderer scope="household" scopeValue="household" only={["household.system"]} /></MemoryRouter></QueryClientProvider>);
     expect(await view.findByRole("switch", { name: previewShells.label })).toBeTruthy();
+  } finally { registry.mockRestore(); values.mockRestore(); }
+});
+
+test("the household likeness key renders from its generation group and a permission reason makes it read-only", async () => {
+  const registry = spyOn(api, "settingsRegistry").mockResolvedValue([householdLikeness] as never);
+  const values = spyOn(api, "settingsValues").mockResolvedValue([{ key: householdLikeness.key, value: true, source: "default", label: householdLikeness.label, help: householdLikeness.help, level: "basic", secret: false, reason: "Only an owner or admin can change this household setting." }] as never);
+  try {
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    const LikenessView = SETTINGS_VIEWS["account.likeness"]!;
+    const view = render(<QueryClientProvider client={client}><MemoryRouter><LikenessView person={{ id: "p-adult", displayName: "Adult", role: "adult" } as never} onPersonChange={() => {}} /></MemoryRouter></QueryClientProvider>);
+    const toggle = await view.findByRole("switch", { name: householdLikeness.label });
+    expect(toggle.getAttribute("data-disabled")).not.toBeNull();
+    expect(view.getByText("Only an owner or admin can change this household setting.")).toBeTruthy();
   } finally { registry.mockRestore(); values.mockRestore(); }
 });
 

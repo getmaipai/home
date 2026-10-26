@@ -17,7 +17,7 @@ import { checkImages, isAdultOnlyJob } from "@/lib/pictures/ageCheck";
 import { gateFinished, laneOfPerson } from "@/lib/pictures/laneGate";
 import { videoModelForLane } from "@/lib/pictures/lane";
 import { ensureKeyframeHelper, extractKeyframes } from "@/lib/pictures/keyframes";
-import { likenessStillAllowed, type JobLikeness } from "@/lib/likeness/guard";
+import { likenessStillAllowed, normalizeJobLikeness, stoppedLine, type JobLikeness } from "@/lib/likeness/guard";
 import { clearLive, updateLive } from "@/lib/genLive";
 import { cancelOrDeleteVideo, fetchClip, fetchPoster, fetchVideoPreview, getVideoJob, StackVideoError, submitVideo, type StackClip, type VideoBody } from "./stack";
 
@@ -52,7 +52,7 @@ export interface VideoRequest {
   audience: "all-ages" | "adult";
   /** VIDEO-LTX-01: Quick or Detailed (absent on a job stored before the choice existed: Quick). */
   quality?: "quick" | "detailed";
-  /** LIKENESS-01: set when the clip looks like a household adult. Checked again on every poll while the job waits. */
+  /** LIKENESS-01: set when the clip looks like a household member. Checked again on every poll while the job waits. */
   likeness?: JobLikeness | null;
 }
 
@@ -115,9 +115,10 @@ const liveJobs = new Map<string, VideoJob>();
 type Row = typeof videoJobs.$inferSelect;
 function fromRow(row: Row): VideoJob {
   const request = JSON.parse(row.request) as VideoRequest & { memoryRequeues?: number };
+  request.likeness = normalizeJobLikeness(request.likeness);
   return {
     id: row.id, personId: row.personId, conversationId: row.conversationId, turnId: row.turnId, kind: row.kind as VideoJobKind, state: row.state as VideoJobState,
-    stackJob: row.stackJob, percent: row.percent, phase: row.phase, position: row.position, prompt: row.prompt, request: JSON.parse(row.request) as VideoRequest,
+    stackJob: row.stackJob, percent: row.percent, phase: row.phase, position: row.position, prompt: row.prompt, request,
     error: row.error, files: JSON.parse(row.files) as VideoFile[], temporary: false, createdAt: row.createdAt, updatedAt: row.updatedAt,
     ...((request.memoryRequeues ?? 0) > 0 ? { riseReason: "requeued_memory" as const } : {}),
   };
@@ -155,6 +156,10 @@ registerQueueProvider(() => {
 async function releaseVideo(job: VideoJob): Promise<void> {
   if (job.state !== "queued" || job.stackJob) return;
   try {
+    if (job.request.likeness) {
+      const still = likenessStillAllowed(job.request.likeness);
+      if (!still.ok) { job.state = "failed"; job.error = still.line; persistVideoJob(job); refreshHouseholdQueue(); return; }
+    }
     const storedBody = (job.request as VideoRequest & { stackBody?: Omit<VideoBody, "timeout_ms"> }).stackBody;
     const submitted = await submitVideo({ ...(storedBody ?? { prompt: job.prompt, audience: job.request.audience, size: job.request.size, seconds: job.request.seconds }), timeout_ms: 1 });
     if (job.state !== "queued") { void cancelOrDeleteVideo(submitted.job); return; }
@@ -238,7 +243,7 @@ export function __resetVideoJobsForTests(): void {
 export const GENERATED_PICTURE_NOTE = "picture-gen:";
 export const CLIP_POSTER_NOTE = "video-poster:";
 
-export type ReferenceResult = { ok: true; id: string; base64: string; bytes: Uint8Array; width: number | null; height: number | null; /** LIKENESS-01: the person this picture looks like (it was made with a style of them, or from a photo of them). Starting a clip from it asks their agreement again. */ likenessSubject: string | null } | { ok: false; line: string };
+export type ReferenceResult = { ok: true; id: string; base64: string; bytes: Uint8Array; width: number | null; height: number | null; /** LIKENESS-01: the person this picture looks like (it was made with a style of them, or from a photo of them). */ likenessSubject: string | null } | { ok: false; line: string };
 const NOT_GENERATED_LINE = "I can only animate a picture that was made here in this home. Ask me to make a picture first, then animate that one.";
 
 /** The newest picture of this temporary chat the Stack made: a generated picture or the poster of a clip, whichever is newer. */
@@ -282,7 +287,7 @@ export function loadGeneratedReference(actor: PersonRow, conversationId: string,
 export type PhotoResult = { ok: true; id: string; base64: string; bytes: Uint8Array; width: number | null; height: number | null } | { ok: false; line: string };
 const NOT_A_PHOTO_LINE = "I can't find that photo any more. Attach it again and ask once more.";
 
-/** A photo a person attached in this conversation (not one this home made), as its stored bytes, unchanged. LIKENESS-01: it starts a clip only for a declared household adult who agreed, and only after the photo is checked to show exactly that one person. */
+/** A photo a person attached in this conversation (not one this home made), as its stored bytes, unchanged. LIKENESS-01: it starts a clip only for a declared household member and only after the photo is checked to show exactly that one person. */
 export function loadUploadedPhoto(actor: PersonRow, conversationId: string, fileId: string, temporary: boolean): PhotoResult {
   const typeOk = (type: string) => type === "image/png" || type === "image/jpeg" || type === "image/webp";
   if (temporary) {
@@ -317,7 +322,7 @@ export interface StartVideoInput {
   prompt: string;
   body: Omit<VideoBody, "timeout_ms">;
   sourceFileId?: string | null;
-  /** LIKENESS-01: the clip looks like this household adult (already decided by lib/likeness/decide.ts). */
+  /** LIKENESS-01: the clip looks like this household member (already decided by lib/likeness/decide.ts). */
   likeness?: JobLikeness | null;
 }
 
@@ -355,11 +360,11 @@ function sleep(ms: number, signal: AbortSignal): Promise<void> {
   });
 }
 
-/** LIKENESS-01: ends the job (and the Stack's copy) when its subject no longer agrees. True when it did. */
-function stopForLikeness(job: VideoJob): boolean {
+/** LIKENESS-01: ends the job (and the Stack's copy) when current policy no longer allows it. True when it did. */
+function stopForLikeness(job: VideoJob, line?: string): boolean {
   const likeness = job.request.likeness;
   if (!likeness) return false;
-  const now = likenessStillAllowed(likeness);
+  const now = line ? { ok: false as const, line } : likenessStillAllowed(likeness);
   if (now.ok) return false;
   job.state = "failed";
   job.error = now.line;
@@ -371,17 +376,16 @@ function stopForLikeness(job: VideoJob): boolean {
   return true;
 }
 
-/** The person took their agreement back (or only the adult-content part): every clip of them still waiting or being made stops now. Returns how many. */
-export function stopLikenessVideoJobs(subjectPersonId: string, onlyAdultContent: boolean): number {
+/** Stop unfinished work for an ineligible subject. */
+export function stopLikenessVideoJobs(subjectPersonId: string, includeSelf = false): number {
   let count = 0;
   const jobs = new Map<string, VideoJob>();
   for (const job of [...memory.values(), ...liveJobs.values()]) if (job.state === "queued" || job.state === "running") jobs.set(job.id, job);
   for (const row of db.select().from(videoJobs).where(inArray(videoJobs.state, ["queued", "running"])).all()) if (!jobs.has(row.id)) jobs.set(row.id, fromRow(row));
   for (const job of jobs.values()) {
     const likeness = job.request.likeness;
-    if (!likeness || likeness.subject !== subjectPersonId || likeness.subject === likeness.requester) continue;
-    if (onlyAdultContent && !likeness.adult_content) continue;
-    if (stopForLikeness(job)) count += 1;
+    if (!likeness || likeness.subject !== subjectPersonId || (!includeSelf && likeness.subject === likeness.requester)) continue;
+    if (stopForLikeness(job, includeSelf ? stoppedLine("That person") : undefined)) count += 1;
   }
   return count;
 }
@@ -398,7 +402,7 @@ async function watch(job: VideoJob, actor: PersonRow, early: StackClip[] | null 
       return;
     }
     while (!controller.signal.aborted && Date.now() < deadline) {
-      // The person it looks like can take their agreement back at any moment: checked on every poll, so a clip waiting in the line is stopped.
+      // Recheck current subject, household option and requester policy on every poll.
       if (stopForLikeness(job)) return;
       let status;
       try {

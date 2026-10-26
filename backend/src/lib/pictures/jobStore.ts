@@ -8,7 +8,7 @@ import { db } from "@/db";
 import { attachments, pictureJobs } from "@/db/schema";
 import { nextHlc } from "@/lib/hlc";
 import type { PersonRow } from "@/types";
-import type { JobLikeness } from "@/lib/likeness/guard";
+import { normalizeJobLikeness, type JobLikeness } from "@/lib/likeness/guard";
 import { StackPicturesError } from "./stack";
 
 export type PictureJobKind = "generate" | "variation" | "edit";
@@ -97,9 +97,11 @@ const TEMP_MAX_AGE_MS = 2 * 60 * 60 * 1000;
 
 type Row = typeof pictureJobs.$inferSelect;
 function fromRow(row: Row): PictureJob {
+  const request = JSON.parse(row.request) as PictureRequest;
+  request.likeness = normalizeJobLikeness(request.likeness);
   return {
     id: row.id, personId: row.personId, conversationId: row.conversationId, turnId: row.turnId, purpose: row.purpose as "cover" | null, kind: row.kind as PictureJobKind, state: row.state as PictureJobState,
-    stackJob: row.stackJob, percent: row.percent, phase: row.phase, position: row.position, prompt: row.prompt, request: JSON.parse(row.request) as PictureRequest,
+    stackJob: row.stackJob, percent: row.percent, phase: row.phase, position: row.position, prompt: row.prompt, request,
     error: row.error, files: JSON.parse(row.files) as PictureFile[], temporary: false, createdAt: row.createdAt, updatedAt: row.updatedAt,
   };
 }

@@ -1,5 +1,5 @@
-// LIKENESS-01: Home's signed proofs for the Stack. The consent lives here (the person's own setting); the Stack refuses
-// to act on a likeness without a short-lived proof Home signed for that one thing (the Stack's lib/likeness.ts has the
+// Home's signed proofs for the Stack. The Stack refuses to act on a likeness without a short-lived proof Home signed
+// for that one thing (the Stack's lib/likeness.ts has the
 // format and the rules it checks). The key is an Ed25519 key derived from a seed kept in Home's keystore, so it is the
 // same after a restart and a restore, never in the database and never sent anywhere but as a public key to the Stack.
 //

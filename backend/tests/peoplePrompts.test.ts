@@ -7,7 +7,7 @@ import sharp from "sharp";
 import { resetDb } from "./reset-db";
 import { db } from "@/db";
 import { people as peopleTable } from "@/db/schema";
-import { setHouseholdSettingValue, setValue } from "@/lib/settings";
+import { setHouseholdSettingValue } from "@/lib/settings";
 import { createBenchPeople, type BenchPeople } from "../scripts/bench/conversationRunner";
 import { removeTemporaryChatImages, storeTemporaryChatImage } from "@/lib/attachments";
 import { __setAgeCheckRunnerForTests } from "@/lib/pictures/ageCheck";
@@ -122,23 +122,22 @@ describe("the hard lines hold with the switch off and on", () => {
         expect(video.submitted).toHaveLength(0);
       });
 
-      test("nothing sexual involving a minor, and no real person without consent", async () => {
+      test("nothing sexual involving a minor, and nothing sexual of a real person", async () => {
         expect(text(await pic(nadia, { prompt: "a naked child on a beach" }))).toContain("never allowed");
-        expect(text(await pic(nadia, { prompt: "a portrait of a famous senator", depicts_real_person: true }))).toContain("real person");
-        expect(text(await vid(nadia, { prompt: "a famous senator waving", depicts_real_person: true }))).toContain("real person");
+        expect(text(await pic(nadia, { prompt: "a sexual portrait of a famous senator", depicts_real_person: true }))).toContain("real person");
+        expect(text(await vid(nadia, { prompt: "a sexual video of a famous senator", depicts_real_person: true }))).toContain("real person");
         expect(image.submitted).toHaveLength(0);
         expect(video.submitted).toHaveLength(0);
       });
 
-      test("a household person's likeness needs their recorded consent and the signed proof", async () => {
+      test("a household person's photo uses the signed identity proof", async () => {
         const photo = await put(nadia, "photo-1");
         const off = await pic(nadia, { prompt: "add her to the bench", change: "attached", affects_people: true, photo_subject: "Marlow" }, [photo], "the photo is Marlow");
-        expect(text(off)).toContain("Marlow hasn't agreed");
+        expect(text(off)).not.toContain("hasn't agreed");
         const v = await vid(nadia, { prompt: "she waves", from_picture: "attached", photo_subject: "Marlow" }, [photo], "animate this, it is Marlow");
-        expect(text(v)).toContain("Marlow hasn't agreed");
-        expect(image.edits).toHaveLength(0);
-        expect(video.submitted).toHaveLength(0);
-        expect(setValue(marlow, `person:${marlow.id}`, "likeness.adults", true).ok).toBe(true);
+        expect(text(v)).not.toContain("hasn't agreed");
+        expect(image.edits).toHaveLength(1);
+        expect(video.submitted).toHaveLength(1);
         const ok = await pic(nadia, { prompt: "change her dress to red", change: "attached", affects_people: true, photo_subject: "Marlow" }, [photo], "the photo is Marlow");
         expect(ok.status).toBe("succeeded");
         expect(image.edits[0]).toMatchObject({ image_source: "household_photo", audience: "adult" });

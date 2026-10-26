@@ -72,10 +72,6 @@ function limitSettings() {
       level: "basic", secret: false, lives_in: "person.likeness", honoured_by: ["home"],
     } as unknown as SettingsKey,
     {
-      key: "likeness.adults", scope: "person", selector: "boolean", default: false, label: "Let other adults make pictures that look like me",
-      level: "basic", secret: false, lives_in: "person.likeness", honoured_by: ["home"],
-    } as unknown as SettingsKey,
-    {
       key: "topics.bodies", scope: "person", selector: "select", default: "default", label: "Bodies and relationships",
       level: "basic", secret: false, lives_in: "person.topics", honoured_by: ["home"],
       range: { options: ["default", "redirect", "gentle"] },
@@ -143,7 +139,7 @@ describe("PersonProfilePage", () => {
     } finally { restore(); }
   });
 
-  // KIDS-CREATE-01: the per-child cartoon switch lives in the adults-only likeness card, which a child never sees and a parent never opens for a child. It is drawn on the child's own Limits tab, alone (no likeness consent switch beside it).
+  // KIDS-CREATE-01: the per-child cartoon switch is drawn on the child's own Limits tab.
   test("a child's Limits tab carries the child's cartoon switch, and only that key of its card", async () => {
     const restore = stubProfileAndLimitsFetch();
     try {

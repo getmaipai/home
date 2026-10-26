@@ -1,6 +1,6 @@
 import { describe, expect, test, beforeEach } from "bun:test";
 import { db } from "@/db";
-import { people, personCredentials, passkeyCredentials, sessions, deviceTokens, devices, totpSecrets } from "@/db/schema";
+import { people, personCredentials, passkeyCredentials, sessions, deviceTokens, devices, totpSecrets, pictureJobs, videoJobs, likenessAdapters } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import { newPersonId } from "@/lib/id";
 import { hashSecret } from "@/lib/secret";
@@ -8,6 +8,7 @@ import { issueDeviceToken } from "@/lib/deviceTokens";
 import { listPending } from "@/lib/notifications";
 import {
   memorializePerson,
+  deletePerson,
   disableExpiredGuests,
   applyAgeBandChanges,
 } from "@/lib/personLifecycle";
@@ -90,6 +91,21 @@ describe("memorializePerson()", () => {
     const owner = insertPerson({ displayName: "Sage", role: "owner" });
     const result = memorializePerson(admin, owner.id);
     expect(result.ok).toBe(false);
+  });
+});
+
+describe("delete likeness cleanup", () => {
+  test("deleting a person queues their styles for removal and stops waiting picture and video jobs", () => {
+    const owner = insertPerson({ role: "owner" });
+    const target = insertPerson({ displayName: "Marlow", role: "adult" });
+    const now = new Date().toISOString();
+    db.insert(likenessAdapters).values({ id: "la-delete-style", adapterId: "lora-delete-style", medium: "picture", subjectPersonId: target.id, classification: "all-ages", state: "active", declaredBy: owner.id, source: "import", createdAt: now, updatedAt: now, hlc: "1:0:testfix" }).run();
+    const request = JSON.stringify({ size: "1024x1024", n: 1, seed: null, loras: [], source_file_id: null, audience: "adult", stackBody: {}, likeness: { subject: target.id, requester: owner.id, way: "photo", adultContent: false } });
+    for (const table of [pictureJobs, videoJobs]) db.insert(table).values({ id: `job-${table === pictureJobs ? "picture" : "video"}`, personId: owner.id, conversationId: null, turnId: null, kind: "generate", ...(table === pictureJobs ? { purpose: null } : {}), state: "queued", stackJob: null, percent: 0, phase: "queued", position: null, prompt: "portrait", request, error: null, files: "[]", createdAt: now, updatedAt: now, hlc: "1:0:testfix" } as never).run();
+    expect(deletePerson(owner, target.id).ok).toBe(true);
+    expect(db.select().from(pictureJobs).get()?.state).toBe("failed");
+    expect(db.select().from(videoJobs).get()?.state).toBe("failed");
+    expect(db.select().from(likenessAdapters).get()?.state).not.toBe("active");
   });
 });
 

@@ -159,7 +159,7 @@ function WhoMakesVideosSection({ data }: { data: VideoSettings }) {
           </Item>
         ))}
       </ItemGroup>
-      <p className="text-sm text-muted-foreground">{data.minors} Videos are never made on a spoken turn, a shared screen or for a guest. Nothing here ever allows a video that is sexual and shows a child, or anyone who looks like one, or a video of a real person who has not agreed to it.</p>
+      <p className="text-sm text-muted-foreground">{data.minors} Videos are never made on a spoken turn, a shared screen or for a guest. Nothing here ever allows a video that is sexual and shows a child, or anyone who looks like one.</p>
     </section>
   );
 }
@@ -279,7 +279,7 @@ function AddStyle({ refresh }: { refresh: () => void }) {
           <Input id="vstyle-words" value={words} onChange={(e) => setWords(e.target.value)} maxLength={400} disabled={busy} />
         </div>
         <LooksLikePicker id="vstyle-looks-like" label="Who does this style look like?" value={looksLike} onChange={setLooksLike} disabled={busy}
-          help="Pick an adult in this household only if they have agreed, in their own settings. A style of a child, a teen, a guest or anyone outside the household is never added. A style of an adult here is always adults only, and is removed if they take their agreement back." />
+          help="Pick a household member. A style of a child, a teen, a guest or anyone outside the household is never added. Adult-only styles are available only to adults." />
         <p className="text-sm text-muted-foreground">The video engine also checks the file and refuses any style that puts a child in an adult scene or names a public figure. It cannot catch everything, so only add styles you trust.</p>
         {error ? <p role="alert" className="text-sm text-destructive">{error}</p> : null}
         <div><Button type="submit" disabled={busy || !file || looksLike === ""}>{busy ? "Adding…" : "Add video style"}</Button></div>

@@ -74,7 +74,6 @@ import { libraryRetentionRoutes } from "@/routes/libraryRetention";
 import { storageRoutes } from "@/routes/storage";
 import { filesRoutes, sharesRoutes } from "@/routes/files";
 import { imageEditRoutes } from "@/routes/imageEdit";
-import "@/lib/likeness/revoke";
 import { picturesRoutes } from "@/routes/pictures";
 import { picturesAdminRoutes } from "@/routes/picturesAdmin";
 import { videosRoutes } from "@/routes/videos";

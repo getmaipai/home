@@ -22,9 +22,8 @@ import { latestGeneratedPictureId } from "@/lib/videos/tool";
 import { prepareVideoRerun } from "@/lib/videos/rerun";
 import { chooseVideoQuality, detailedVideoReady, isVideoQuality, quickVideoReady, VIDEO_SIZES_BY_QUALITY } from "@/lib/videos/quality";
 import { householdVideoQuality } from "@/lib/videos/policy";
-import { recordLikenessUse } from "@/lib/likeness/uses";
 import { declareStyleSubject, forgetStyleSubject } from "@/lib/likeness/adapters";
-import { checkStyleSubject, notifyStyleAdded, stackLikenessFields } from "@/lib/likeness/importStyle";
+import { checkStyleSubject, stackLikenessFields } from "@/lib/likeness/importStyle";
 import { lookedLikeView } from "@/routes/picturesAdmin";
 import { and, eq } from "drizzle-orm";
 import { db } from "@/db";
@@ -265,7 +264,7 @@ videosRoutes.openapi(anotherRoute, async (c) => {
   const choice = chooseVideoQuality({ requested: isVideoQuality(asked.quality) ? asked.quality : source.request.quality ?? "quick", style: used[0] ?? null, seconds: source.request.seconds, engine, hasPicture: source.request.source_file_id !== null, quickOnly: laneOf(audience) !== "adult" });
   const portrait = (() => { const [w, h] = source.request.size.split("x").map(Number); return Boolean(w && h && h > w); })();
   const size = VIDEO_SIZES_BY_QUALITY[choice.quality][portrait ? "portrait" : "landscape"];
-  // Only LoRAs this person may still use ride along; one turned off since is dropped. A picture or style of a household adult is decided again, now (LIKENESS-01).
+  // Only LoRAs this person may still use ride along; one turned off since is dropped. A picture or style is checked against current policy again.
   const prep = await prepareVideoRerun({
     actor, audience, conversationId: source.conversationId, temporary: source.temporary, prompt: source.prompt, sourceFileId: source.request.source_file_id,
     prior: source.request.likeness ?? null, adapters, styleIds: source.request.loras,
@@ -280,12 +279,12 @@ videosRoutes.openapi(anotherRoute, async (c) => {
         prompt: laneOf(audience) === "child" ? forceCartoon(source.prompt) : source.prompt, size, seconds: laneOf(audience) === "child" ? Math.min(choice.seconds, 3) : choice.seconds, ...(choice.quality === "detailed" ? { model: "detailed" as const } : {}), audience: prep.likeness ? "adult" : stackAudienceFor(audience),
         ...(laneOf(audience) === "adult" ? {} : { model: videoModelForLane(laneOf(audience)) }),
         ...(laneOf(audience) === "child" ? { negative_prompt: CHILD_NEGATIVE_PROMPT } : {}),
-        ...(prep.image ? { image: prep.image, image_source: prep.imageSource ?? "generated", ...(prep.consentProof ? { consent_proof: prep.consentProof } : {}) } : {}),
-        ...(prep.loras.length && laneOf(audience) !== "child" ? { loras: prep.loras } : {}), ...(prep.negativePrompt && laneOf(audience) !== "child" ? { negative_prompt: prep.negativePrompt } : {}),
+        ...(prep.image ? { image: prep.image, image_source: prep.imageSource ?? "generated", ...(prep.likenessProof ? { consent_proof: prep.likenessProof } : {}) } : {}),
+        ...(prep.negativePrompt ? { negative_prompt: prep.negativePrompt } : {}),
+        ...(prep.loras.length && laneOf(audience) !== "child" ? { loras: prep.loras } : {}),
       },
       ...(prep.likeness ? { likeness: prep.likeness } : {}),
     });
-    if (prep.subject) await recordLikenessUse({ subjectPersonId: prep.subject.id, requesterPersonId: actor.id, medium: "video", way: prep.subject.way, adultContent: prep.subject.adultContent, source: "chat" });
     return c.json(videoCardView(actor, started, true, await readyFlags(actor)), 200);
   } catch (error) {
     releaseKid(slot);
@@ -295,10 +294,10 @@ videosRoutes.openapi(anotherRoute, async (c) => {
 });
 
 const animateRoute = createRoute({
-  method: "post", path: "/animate", tags: ["Videos"], summary: "Animate a picture this home made, or a photo of a household adult who agreed", middleware: [requireAuth] as const,
+  method: "post", path: "/animate", tags: ["Videos"], summary: "Animate a picture this home made, or a photo of a household member", middleware: [requireAuth] as const,
   request: { body: { content: { "application/json": { schema: z.object({
     conversation_id: z.string().min(1).max(80), file_id: z.string().min(1).max(80).optional(), turn_id: z.string().min(1).max(80), prompt: z.string().trim().min(3).max(1200).optional(),
-    photo_subject_id: z.string().min(1).max(80).optional().describe("LIKENESS-01: with a photo (file_id) that was not made here: the household adult the photo shows, picked from the adults list. Anyone else is refused."),
+    photo_subject_id: z.string().min(1).max(80).optional().describe("LIKENESS-01: with a photo (file_id) that was not made here: the household member the photo shows, picked from the family list. Anyone else is refused."),
   }) } } } },
   responses: { 200: { content: { "application/json": { schema: CardSchema } }, description: "The card for the new clip." }, ...refusals },
 });
@@ -313,7 +312,7 @@ videosRoutes.openapi(animateRoute, async (c) => {
   const ownTurn = db.select({ id: conversationTurns.id }).from(conversationTurns).where(and(eq(conversationTurns.id, body.turn_id), eq(conversationTurns.conversationId, body.conversation_id), eq(conversationTurns.personId, actor.id))).get();
   if (!ownTurn) return c.json({ error: "That chat isn't available any more. Open it again and try once more.", code: "not_found" }, 404) as never;
   const fileId = body.file_id ?? latestGeneratedPictureId(actor, body.conversation_id);
-  if (!fileId) return c.json({ error: "I can only animate a picture that was made here in this home, or a photo of an adult in this household who has agreed. Ask me to make a picture first, then animate that one.", code: "reference" }, 422) as never;
+  if (!fileId) return c.json({ error: "I can only animate a picture that was made here in this home, or a photo of a household member. Ask me to make a picture first, then animate that one.", code: "reference" }, 422) as never;
   const audience = videoRouteAudience(actor);
   const adapters = await videoAdaptersFor(videoAdapterAudiencesFor(audience));
   const prep = await prepareVideoRerun({ actor, audience, conversationId: body.conversation_id, temporary: false, prompt, sourceFileId: fileId, declaredSubjectId: body.photo_subject_id ?? null, adapters, styleIds: [] });
@@ -327,11 +326,10 @@ videosRoutes.openapi(animateRoute, async (c) => {
       body: {
         prompt: laneOf(audience) === "child" ? forceCartoon(prompt) : prompt, size, seconds: laneOf(audience) === "child" ? 3 : 5, audience: prep.likeness ? "adult" : stackAudienceFor(audience), image: prep.image!, image_source: prep.imageSource ?? "generated",
         ...(laneOf(audience) === "adult" ? {} : { model: videoModelForLane(laneOf(audience)) }),
-        ...(prep.consentProof ? { consent_proof: prep.consentProof } : {}), ...(laneOf(audience) === "child" ? { negative_prompt: CHILD_NEGATIVE_PROMPT } : prep.negativePrompt ? { negative_prompt: prep.negativePrompt } : {}),
+        ...(prep.likenessProof ? { consent_proof: prep.likenessProof } : {}), ...(laneOf(audience) === "child" ? { negative_prompt: CHILD_NEGATIVE_PROMPT } : prep.negativePrompt ? { negative_prompt: prep.negativePrompt } : {}),
       },
       ...(prep.likeness ? { likeness: prep.likeness } : {}),
     });
-    if (prep.subject) await recordLikenessUse({ subjectPersonId: prep.subject.id, requesterPersonId: actor.id, medium: "video", way: prep.subject.way, adultContent: prep.subject.adultContent, source: "chat" });
     return c.json(videoCardView(actor, job, true, await readyFlags(actor)), 200);
   } catch (error) {
     releaseKid(slot);
@@ -345,7 +343,7 @@ videosRoutes.openapi(animateRoute, async (c) => {
 const AdapterSchema = z.object({
   id: z.string(), name: z.string(), classification: z.enum(["all-ages", "adult-only"]), enabled: z.boolean(), needs_confirmation: z.boolean(), sha256: z.string(), base_model: z.string(), trigger_words: z.array(z.string()),
   licence: z.string(), strength_default: z.number(), bytes: z.number(), source_url: z.string().nullable(), added_at: z.string(),
-  looks_like: z.object({ id: z.string(), name: z.string() }).nullable().describe("LIKENESS-01: the household adult this style looks like, or null for nobody."),
+  looks_like: z.object({ id: z.string(), name: z.string() }).nullable().describe("LIKENESS-01: the household member this style looks like, or null for nobody."),
 });
 const settingsRoute = createRoute({
   method: "get", path: "/settings", tags: ["Videos"], summary: "The video role's state, the household switches and the LoRA library", middleware: [requireAuth, requireRole("owner", "admin")] as const,
@@ -434,7 +432,7 @@ const addAdapterRoute = createRoute({
     file: z.custom<File>((value) => value instanceof File, "The .safetensors file.").openapi({ type: "string", format: "binary" }),
     name: z.string().trim().min(1).max(80), licence: z.string().trim().min(1).max(120), licence_acknowledged: z.enum(["true", "false"]).optional(),
     source_url: z.string().max(500).optional(), classification: z.enum(["all-ages", "adult-only"]).optional(), trigger_words: z.string().max(400).optional(),
-    looks_like: z.string().max(80).describe("LIKENESS-01: 'nobody', or the id of the household adult the style looks like (they must have agreed, or be the one adding it)."),
+    looks_like: z.string().max(80).describe("LIKENESS-01: 'nobody', or the id of the household member the style looks like."),
   }) } } } },
   responses: { 200: { content: { "application/json": { schema: AdapterSchema } }, description: "Added." }, ...errorResponses({ 401: "Not signed in", 403: "Admins only", 409: "Already in the library", 413: "Too large", 422: "The file cannot be used", 503: "The video engine is not available" }) },
 });
@@ -462,7 +460,6 @@ videosRoutes.openapi(addAdapterRoute, async (c) => {
   try {
     const lora = await addVideoLora(out);
     declareStyleSubject({ adapterId: lora.id, medium: "video", subjectPersonId: subjectCheck.kind === "person" ? subjectCheck.subject.id : null, classification: lora.classification, declaredBy: adder.id });
-    if (subjectCheck.kind === "person") await notifyStyleAdded(subjectCheck.subject.id, adder, "video");
     // A new style is off, for everyone, until an admin has read its fingerprint and licence and turns it on.
     setVideoAdapterEnabled(lora.id, false, PENDING);
     dropVideoAdapterCache();

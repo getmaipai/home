@@ -221,7 +221,6 @@ resumePictureJobs();
 // VIDEO-GEN-05: and a clip a restart interrupted.
 resumeVideoJobs();
 resumeMusicJobs();
-// LIKENESS-01: a style of a person who took their agreement back, still waiting to be removed from the library, is removed now and then retried every few minutes until the engine has answered.
 void drainStyleRemovals();
 const styleRemovalInterval = setInterval(() => void drainStyleRemovals(), 5 * 60_000);
 migratePendingAsksThroughGate();

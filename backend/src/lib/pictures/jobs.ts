@@ -14,7 +14,7 @@ import { allAdapters } from "./adapters";
 import { qualityOfModel } from "./quality";
 import { checkImages, isAdultOnlyJob } from "./ageCheck";
 import { gateFinished } from "./laneGate";
-import { likenessStillAllowed, type JobLikeness } from "@/lib/likeness/guard";
+import { likenessStillAllowed, stoppedLine, type JobLikeness } from "@/lib/likeness/guard";
 import { clearLive, updateLive } from "@/lib/genLive";
 import { refreshHouseholdQueue, registerQueueProvider, releaseHouseholdQueue, type QueueJob } from "@/lib/jobs/householdQueue";
 import { jobQueueCopy } from "@/lib/jobQueueCopy";
@@ -37,6 +37,10 @@ registerQueueProvider(() => unfinishedJobs().map((job) => {
 async function releasePicture(job: PictureJob): Promise<void> {
   if (job.state !== "queued" || job.stackJob) return;
   try {
+    if (job.request.likeness) {
+      const still = likenessStillAllowed(job.request.likeness);
+      if (!still.ok) { job.state = "failed"; job.error = still.line; savePictureJob(job); return; }
+    }
     const submit = queuedPictureSubmits.get(job.id);
     const submitted = submit ? await submit() : await submitGeneration({ ...((job.request as PictureJob["request"] & { stackBody?: Omit<GenerationBody, "timeout_ms"> }).stackBody ?? {
       prompt: job.prompt, size: job.request.size, n: job.request.n, audience: job.request.audience,
@@ -81,7 +85,7 @@ export interface StartPictureInput {
   prompt: string;
   body: Omit<GenerationBody, "timeout_ms">;
   sourceFileId?: string | null;
-  /** LIKENESS-01: the picture looks like this household adult (already decided by lib/likeness/decide.ts). */
+  /** LIKENESS-01: the picture looks like this household member (already decided by lib/likeness/decide.ts). */
   likeness?: JobLikeness | null;
   /** IMGEDIT-01: this job changes a picture already in the chat; the result is saved as its next version. */
   edit?: { sourceId: string; label: string; method: "instruct" | "erase_people" | "tool" };
@@ -135,7 +139,7 @@ function sleep(ms: number, signal: AbortSignal): Promise<void> {
 
 const stopped = (job: PictureJob) => job.state === "cancelled";
 
-/** LIKENESS-01: ends the job (and the Stack's copy) when its subject no longer agrees. True when it did. */
+/** LIKENESS-01: ends the job (and the Stack's copy) when current policy no longer allows it. True when it did. */
 function stopForLikeness(job: PictureJob, line?: string): boolean {
   const likeness = job.request.likeness;
   if (!likeness) return false;
@@ -150,14 +154,13 @@ function stopForLikeness(job: PictureJob, line?: string): boolean {
   return true;
 }
 
-/** The person took their agreement back (or only the adult-content part): every picture of them still waiting or being made stops now. Returns how many. */
-export function stopLikenessPictureJobs(subjectPersonId: string, onlyAdultContent: boolean): number {
+/** Stop unfinished work for an ineligible subject. */
+export function stopLikenessPictureJobs(subjectPersonId: string, includeSelf = false): number {
   let count = 0;
   for (const job of unfinishedJobs()) {
     const likeness = job.request.likeness;
-    if (!likeness || likeness.subject !== subjectPersonId || likeness.subject === likeness.requester) continue;
-    if (onlyAdultContent && !likeness.adult_content) continue;
-    if (stopForLikeness(job)) count += 1;
+    if (!likeness || likeness.subject !== subjectPersonId || (!includeSelf && likeness.subject === likeness.requester)) continue;
+    if (stopForLikeness(job, includeSelf ? stoppedLine("That person") : undefined)) count += 1;
   }
   return count;
 }
@@ -170,13 +173,13 @@ async function watch(job: PictureJob, actor: PersonRow, early: StackPic[] | null
   const deadline = Date.now() + MAX_WATCH_MS;
   try {
     if (early) {
-      // A finished picture whose subject has taken their agreement back since the request is thrown away, not stored.
+      // A finished picture whose subject or policy became ineligible while it ran is thrown away, not stored.
       if (stopForLikeness(job)) return;
       await finish(job, actor, early);
       return;
     }
     while (!controller.signal.aborted && !stopped(job) && Date.now() < deadline) {
-      // The person it looks like can take their agreement back at any moment: checked on every poll, so a picture waiting in the line is stopped.
+      // Recheck current subject, household option and requester policy on every poll.
       if (stopForLikeness(job)) return;
       let status;
       try {

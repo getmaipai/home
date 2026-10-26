@@ -1800,7 +1800,7 @@ export function ChatPage({ person }: { person: Roster }) {
                   if (e.target === e.currentTarget && e.propertyName === "width" && openArtifactId === null && imageEditor.props === null) { setLastCanvasArtifactId(null); setLastImageEditorProps(null); }
                 }}
               >
-                {lastImageEditorProps !== null ? <><ImageEditor {...lastImageEditorProps} variant="pane" /><LooksLikePicker id="editor-photo-subject" label="Who is in this photo?" value={imageEditor.subjectId} onChange={imageEditor.setSubjectId} nobodyLabel="No one (a picture of a place or thing)" help="Needed to change a photo of a person with Comment. Pick an adult in this household who has agreed; a photo of anyone else is never changed." /></> : lastCanvasArtifactId !== null ? artifactCanvas : null}
+                {lastImageEditorProps !== null ? <><ImageEditor {...lastImageEditorProps} variant="pane" /><LooksLikePicker id="editor-photo-subject" label="Who is in this photo?" value={imageEditor.subjectId} onChange={imageEditor.setSubjectId} nobodyLabel="No one (a picture of a place or thing)" help="Needed to change a photo of a person with Comment. Pick an eligible household member; a photo of anyone else is never changed." /></> : lastCanvasArtifactId !== null ? artifactCanvas : null}
               </div>
             ) : null}
             {compareTarget !== null ? (

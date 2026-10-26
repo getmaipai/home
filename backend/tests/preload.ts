@@ -155,7 +155,7 @@ installTestIsolationGuard();
   };
   restoreAgeCheckDefaults();
   // After EVERY test in every file: a test that installed its own runner or vision seam (or set null, which would send the next file to the real
-  // model and fail it for the wrong reason: ageCheckInput.test.ts did, and likenessUse.test.ts then read "could not check" instead of its
+  // model and fail it for the wrong reason: ageCheckInput.test.ts did, and a later media test then read "could not check" instead of its
   // adult-content refusal) leaves nothing behind. tests/ageCheckStateReset.test.ts proves it.
   afterEach(restoreAgeCheckDefaults);
 }

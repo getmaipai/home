@@ -8,7 +8,7 @@ import { eq } from "drizzle-orm";
 import { resetDb } from "./reset-db";
 import { db } from "@/db";
 import { kidUsage, people as peopleTable } from "@/db/schema";
-import { setHouseholdSettingValue, setValue } from "@/lib/settings";
+import { setHouseholdSettingValue } from "@/lib/settings";
 import { createBenchPeople } from "../scripts/bench/conversationRunner";
 import { removeTemporaryChatImages, storeTemporaryChatImage } from "@/lib/attachments";
 import { runGenerateImage } from "@/lib/pictures/tool";
@@ -151,12 +151,11 @@ describe("a teen edits pictures", () => {
     expect(String(image.edits[0]!.audience ?? "all-ages")).not.toBe("adult");
     await finish(teen, ok);
     expect(text(await pic(teen, { prompt: "take off her clothes", change: "latest" }))).toContain(TEEN_CONTENT_LINE);
-    // Another person's likeness: the agreement an adult records is for other adults.
-    expect(setValue(adult, `person:${adult.id}`, "likeness.adults", true).ok).toBe(true);
+    // Another person's photo stays behind the teen requester gate.
     const photo = await put(teen, "photo-1");
     __setPhotoInspectorForTests(async () => ({ people: 1, faces: 1, under18: "no" }));
     const other = await pic(teen, { prompt: "change her dress to red", change: "attached", affects_people: true, photo_subject: "Marlow" }, [photo], "the photo is Marlow");
-    expect(text(other)).toContain("only be made by an adult");
+    expect(text(other)).toContain("Only an adult can edit a photo that shows another household member.");
     void made;
   });
 

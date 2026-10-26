@@ -15,7 +15,6 @@ import { StackPicturesError } from "@/lib/pictures/stack";
 import { prepareStylesUse } from "@/lib/likeness/apply";
 import { laneOfPerson } from "@/lib/pictures/laneGate";
 import { CHILD_LIMIT_LINE, CHILD_NEGATIVE_PROMPT, forceCartoon, kidsDailyPictures, laneOf, picturesMadeToday, releaseKid, reserveKid } from "@/lib/pictures/lane";
-import { recordLikenessUse } from "@/lib/likeness/uses";
 import { getLive, liveCardFields } from "@/lib/genLive";
 import type { PersonRow } from "@/types";
 
@@ -184,7 +183,7 @@ picturesRoutes.openapi(variationRoute, async (c) => {
   // KIDS-CREATE-01: a child's another-one is also a cartoon, Quick, within the daily limit, and never with a style.
   if (kid && picturesMadeToday(actor) + 1 > kidsDailyPictures()) return c.json({ error: CHILD_LIMIT_LINE, code: "daily_limit" }, 422) as never;
   if (!(await pictureEngineReady())) return c.json({ error: pictureNotReadyReason(await pictureEngineStatus()), code: "not_installed" }, 503) as never;
-  // LIKENESS-01: another picture in a style of a household adult is decided again, now: their agreement may have been taken back since.
+  // LIKENESS-01: another picture in a style is decided again against current household identity and policy.
   const prep = await prepareStylesUse({ medium: "picture", audience: routeAudience(actor), styles: used, text: `${prompt} ${used.map((a) => a.name).join(" ")}`, source: "chat" });
   if (prep.kind === "refused") return c.json({ error: prep.line || PROMPT_REFUSAL_LINE.real_person, code: "likeness" }, 403) as never;
   // IMGGEN-QUALITY-01: Quick or Detailed again. Left out, the picture keeps its own kind; a style made for one maker decides.
@@ -196,10 +195,9 @@ picturesRoutes.openapi(variationRoute, async (c) => {
   try {
     const job = await startPictureJob({
       actor, conversationId: source.conversationId, turnId: source.turnId, temporary: source.temporary, kind: group.some((j) => j.state === "done") ? "variation" : "generate", prompt: source.prompt,
-      body: { prompt: kid ? forceCartoon(prompt) : prompt, size: source.request.size, n: 1, ...(choice.model ? { model: choice.model } : {}), audience: lane === "adult" && adultAdaptersAllowed() ? "adult" : "all-ages", ...(kid ? { negative_prompt: CHILD_NEGATIVE_PROMPT } : {}), ...(loras.length ? { loras } : {}), ...(prep.kind === "likeness" && prep.negativePrompt ? { negative_prompt: prep.negativePrompt } : {}) }, sourceFileId: source.files[0]?.id ?? null,
+      body: { prompt: kid ? forceCartoon(prompt) : prompt, size: source.request.size, n: 1, ...(choice.model ? { model: choice.model } : {}), audience: lane === "adult" && adultAdaptersAllowed() ? "adult" : "all-ages", ...(kid ? { negative_prompt: CHILD_NEGATIVE_PROMPT } : {}), ...(loras.length ? { loras } : {}) }, sourceFileId: source.files[0]?.id ?? null,
       ...(prep.kind === "likeness" ? { likeness: prep.job } : {}),
     });
-    if (prep.kind === "likeness") await recordLikenessUse({ subjectPersonId: prep.subjectId, requesterPersonId: actor.id, medium: "picture", way: "style", adultContent: prep.adultContent, source: "chat" });
     void job;
     return c.json(cardView(actor, source, true, detailedReady(await pictureEngineStatus())), 200);
   } catch (error) {
