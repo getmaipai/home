@@ -154,7 +154,7 @@ export async function runGenerateImage(input: RunGenerateImageInput): Promise<To
     return outcomeOf({
       callId, packageId: GENERATE_IMAGE_TOOL_ID, status: "succeeded", via: "tool_call", args, durationMs: 0,
       result: {
-        reply: { text: `${many} being made from this description: ${prompt}. It appears below your reply when it is ready. You have not seen it: do not describe how it looks. Tell the person in one short sentence that it is on its way. ${PICTURE_STARTED_CONFIRM_NOTE}${styleNote}${qualityNote}${peopleGuidanceSuffix(lane)}` },
+        reply: { text: `${many} being made from this description: ${prompt}. It appears below your reply when it is ready. You have not seen it: do not describe how it looks. Tell the person in one short sentence that it is on its way.${lane === "adult" ? ` ${PICTURE_STARTED_CONFIRM_NOTE}` : ""}${styleNote}${qualityNote}${peopleGuidanceSuffix(lane)}` },
         data: { pictureJobId: job.id },
         actions: [],
       },
