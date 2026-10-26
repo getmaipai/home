@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-10-26T17:03:20.216Z",
+  "generatedAt": "2026-10-26T17:41:56.640Z",
   "kitTag": "ui-v0.5.363",
   "items": [
     {
@@ -1348,7 +1348,7 @@
       "group": "thread/navigation",
       "verdict": "later",
       "verdictReason": "Defer the kit sidebar Element until Home's permanent app rail and chat navigation can adopt it without duplicating the shell navigation.",
-      "implemented": true
+      "implemented": false
     },
     {
       "file": "thread-list.aui.tsx",

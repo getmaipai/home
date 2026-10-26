@@ -137,9 +137,11 @@ html.incognito body[class*="style-"] [data-slot="sidebar-inner"] a[data-slot="si
 
 html.incognito body[class*="style-"] [data-slot="sidebar-inset"],
 html.incognito body[class*="style-"] .aui-root.aui-thread-root,
-html.incognito body[class*="style-"] .aui-thread-viewport-footer,
-html.incognito body[class*="style-"] [data-slot="chat-rail"] {
+html.incognito body[class*="style-"] .aui-thread-viewport-footer {
   background: transparent;
+}
+html.incognito body[class*="style-"] [data-slot="chat-rail"] {
+  --settings-column: transparent;
 }
 
 /* The kit's Thread sets --composer-bg inline for temporary chats. Incognito
@@ -246,8 +248,8 @@ html.dark body {
 }
 
 [data-slot="chat-rail"] {
-  background: var(--shell-history);
-  border-color: var(--shell-divider);
+  --settings-column: var(--shell-history);
+  --settings-column-divider: var(--shell-divider);
 }
 /* The chat's whole workspace (header and conversation) is one surface. */
 [data-slot="rail-workspace"]:has([data-slot="chat-shell"]) {
@@ -276,39 +278,9 @@ html.dark body {
 }
 /* COLUMN-02 hover peek: the kit panel overlays the conversation without
  * moving it; the outer wrapper is positioned by ChatPage. */
-[data-slot="chat-rail"][data-state="peek"] {
-  box-shadow: 8px 0 24px -12px color-mix(in oklab, var(--foreground) 35%, transparent);
-  animation: chat-column-peek-in 160ms ease-out;
-}
-@keyframes chat-column-peek-in {
-  from { opacity: 0; transform: translateX(-12px); }
-  to { opacity: 1; transform: none; }
-}
-@media (prefers-reduced-motion: reduce) {
-  [data-slot="chat-rail"][data-state="peek"] { animation: none; }
-}
-[data-slot="chat-column-top"] {
-  position: relative;
-  z-index: 1;
-  transition: box-shadow 150ms ease-out;
-}
-/* A soft edge under the top rows once the list scrolls beneath them. */
-[data-slot="chat-column-top"][data-scrolled] {
-  box-shadow: 0 1px 0 color-mix(in oklab, var(--foreground) 6%, transparent), 0 8px 12px -12px color-mix(in oklab, var(--foreground) 22%, transparent);
-}
 [data-slot="chat-column-title"] {
   font-size: 15px;
   font-weight: 500;
-}
-[data-slot="chat-rail"] [data-slot="chat-column-icon"],
-[data-slot="chat-column-toggle"] {
-  color: var(--column-subdued, var(--muted-foreground));
-  border-radius: 8px;
-}
-[data-slot="chat-rail"] [data-slot="chat-column-icon"]:hover,
-[data-slot="chat-column-toggle"]:hover {
-  color: var(--foreground);
-  background-color: color-mix(in oklab, var(--foreground) 6%, transparent);
 }
 
 /* RAIL-01 conversation: assistant text sits on the surface at 15/24;

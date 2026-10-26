@@ -168,7 +168,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `frontend/src/shell/pageHeaderTitle.tsx` | PageHeaderTitle |
 | `frontend/src/shell/pages/AllAppsPage.tsx` | AllAppsPage |
 | `frontend/src/shell/pages/BackupsPage.tsx` | BackupsIcon, BackupsPage |
-| `frontend/src/shell/pages/ChatColumn.tsx` | CHAT_COLUMN_ID, CHAT_COLUMN_AUTO_COLLAPSE_MAX_WIDTH, PEEK_OPEN_DELAY_MS, PEEK_CLOSE_GRACE_MS, CHAT_SETTINGS_PATH, focusQuietly |
+| `frontend/src/shell/pages/ChatColumn.tsx` | CHAT_COLUMN_ID, CHAT_COLUMN_AUTO_COLLAPSE_MAX_WIDTH, CHAT_SETTINGS_PATH, chatColumnShortcutLabel, useChatThreadListState, searchableThreadsFor |
 | `frontend/src/shell/pages/ChatPage.tsx` | ChatPage |
 | `frontend/src/shell/pages/ChatShortcutReference.tsx` | ChatShortcutReference |
 | `frontend/src/shell/pages/CommandsPage.tsx` | CommandsIcon, CommandsPage |
