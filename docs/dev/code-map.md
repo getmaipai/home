@@ -427,8 +427,8 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/licenceFlow.ts` | licenceOverview, acceptLicences, widenLicenceAck, installRecommendedExtras, autoInstallOnUpgrade |
 | `backend/src/lib/licenceRepair.ts` | LICENCE_ISSUE, syncLicenceIssue |
 | `backend/src/lib/likeness/adapters.ts` | declareStyleSubject, getStyleSubject, allStyleSubjects, forgetStyleSubject, queueStyleRemoval, drainStyleRemovals |
-| `backend/src/lib/likeness/apply.ts` | MANY_PEOPLE_LINE, STYLE_REMOVED_LINE, subjectOfStyle, prepareStyleUse, prepareStylesUse, PHOTO_ADULT_LINE |
-| `backend/src/lib/likeness/decide.ts` | subjectName, ADULT_CONTENT_OTHER_SUBJECT_LINE, LIKENESS_LINES, HOUSEHOLD_LIKENESS_KEY, NO_ADULT_CONTENT_NEGATIVE, householdLikenessOn |
+| `backend/src/lib/likeness/apply.ts` | MANY_PEOPLE_LINE, STYLE_REMOVED_LINE, subjectOfStyle, prepareStyleUse, prepareStylesUse, preparePhotoUse |
+| `backend/src/lib/likeness/decide.ts` | subjectName, LIKENESS_LINES, HOUSEHOLD_LIKENESS_KEY, householdLikenessOn, decideLikeness |
 | `backend/src/lib/likeness/guard.ts` | stoppedLine, likenessStillAllowed |
 | `backend/src/lib/likeness/importStyle.ts` | NOBODY, LOOKS_LIKE_REQUIRED_LINE, checkStyleSubject, sha256Of, stackLikenessFields |
 | `backend/src/lib/likeness/inspector.ts` | __setPhotoCompletionForTests, __setPhotoInspectorForTests, inspectPhotoResult, inspectPhoto, PHOTO_LINES, singleAdultPhoto |
