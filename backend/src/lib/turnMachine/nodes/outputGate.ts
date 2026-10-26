@@ -22,7 +22,7 @@
 // claim a regex would have to invent (RULES-AND-LEARNED-COMPONENTS.md's
 // "No hacky rules": understanding language is the model's job, and a
 // text reply here was never granted an action result to misrepresent).
-import { assessReply, repairReply, repairTail } from "@/lib/wellFormed";
+import { analysisLead, assessReply, repairReply, repairTail } from "@/lib/wellFormed";
 import { evaluateReply, evaluateSafety, forOutput } from "@/lib/safety";
 import type { AgeBand } from "@/lib/ageBand";
 import { turnAgeBand } from "../speaker";
@@ -227,6 +227,9 @@ export class StreamGate {
   private lastFlagged: SafetyResult | undefined;
   private envelopeDecided = false;
   private heldAsEnvelope = false;
+  /** ANALYSIS-LEAK-01: the reply opened in the model's own task-analysis voice ("The user is asking ..."): reasoning, held whole and never released. */
+  private leakDecided = false;
+  private heldAsLeak = false;
   /** RECENCY-02: tool-call markup written as text. Everything from its opening on is swallowed here and never released. */
   private swallowing = false;
   private markupText = "";
@@ -281,6 +284,8 @@ export class StreamGate {
     this.isFirstChunk = true;
     this.envelopeDecided = false;
     this.heldAsEnvelope = false;
+    this.leakDecided = false;
+    this.heldAsLeak = false;
     this.swallowing = false;
     this.markupText = "";
     // Per sentence, an abandoned round released nothing, so the record
@@ -357,6 +362,13 @@ export class StreamGate {
       this.heldAsEnvelope = this.looksLikeEnvelope(trimmedStart[0]!);
     }
     if (this.heldAsEnvelope) return; // held whole - see the class doc
+    if (!this.leakDecided) {
+      const lead = analysisLead(this.pending);
+      if (lead === "undecided") return; // a short opening that could still become the analysis voice waits for more text
+      this.leakDecided = true;
+      this.heldAsLeak = lead === "leak";
+    }
+    if (this.heldAsLeak) return;
     if (this.grain === "arrival") {
       this.pushArriving();
       return;
@@ -487,7 +499,7 @@ export class StreamGate {
     this.done = true;
     try {
       this.reasoningLane?.endGeneration();
-      if (this.refused || this.heldAsEnvelope) return;
+      if (this.refused || this.heldAsEnvelope || this.heldAsLeak) return;
       const remainder = this.pending.trim();
       if (!remainder) return;
       const safety = this.checkAndNotify(remainder);

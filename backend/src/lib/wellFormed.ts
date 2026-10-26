@@ -33,7 +33,26 @@ const OPEN_THINK_RE = /<think>[\s\S]*$/i;
  * the end when a cap cut it) is the model's reasoning, stripped whole
  * by the frontend (chatModelAdapter.ts, #20) and never judged here. */
 export function visibleText(text: string): string {
-  return text.replace(THINK_BLOCK_RE, "").replace(OPEN_THINK_RE, "");
+  const stripped = text.replace(THINK_BLOCK_RE, "").replace(OPEN_THINK_RE, "");
+  return analysisLead(stripped) === "leak" ? "" : stripped;
+}
+
+// ANALYSIS-LEAK-01: a model with thinking off sometimes writes its own task analysis as the reply, in plain text with no
+// think tags ("The user is asking for ... I must refuse this request."; live 2026-10-26, Qwen3.6). That is reasoning, not
+// a reply to the person, and a reply never opens by narrating the person in the third person.
+const ANALYSIS_LEAD_RE = /^\s*the (?:user|person|human)\s+(?:is\s+(?:asking|requesting|trying|wanting|looking|making)|(?:has\s+)?asked|wants|requests|said|says|wrote)\b|^\s*the (?:user|person|human)'s\s+(?:request|message|question|prompt)\s+(?:is|was|asks|involves|violates)\b/i;
+const ANALYSIS_OPENERS = ["the user", "the person", "the human"];
+/** Longest opening the analysis voice needs to be recognised ("the person is requesting"), with room. */
+const ANALYSIS_DECIDE_CHARS = 48;
+
+/** Whether a reply's opening is the model analysing the request instead of answering it: `leak` once the opening says so,
+ * `undecided` while a short opening could still become it (a stream waits for more text), `clear` otherwise. */
+export function analysisLead(text: string): "leak" | "undecided" | "clear" {
+  const lead = text.trimStart();
+  if (ANALYSIS_LEAD_RE.test(lead)) return "leak";
+  if (lead.length >= ANALYSIS_DECIDE_CHARS) return "clear";
+  const lower = lead.toLowerCase();
+  return ANALYSIS_OPENERS.some((opener) => opener.startsWith(lower) || lower.startsWith(opener)) ? "undecided" : "clear";
 }
 
 /** The think blocks a reply carries, verbatim, to travel with the
@@ -180,7 +199,10 @@ export function extractReasoningText(text: string): string | undefined {
   const state = newThinkSplitState();
   const spans = [...feedThinkSplit(state, text), ...flushThinkSplit(state)];
   const reasoning = spans.filter((span) => span.reasoning).map((span) => span.text).join("");
-  return reasoning || undefined;
+  if (reasoning) return reasoning;
+  // ANALYSIS-LEAK-01: untagged analysis written as the reply travels as the reasoning it is.
+  const plain = spans.map((span) => span.text).join("");
+  return analysisLead(plain) === "leak" ? plain.trim() : undefined;
 }
 
 const WORD_RE = /[\p{L}\p{N}]+(?:['’][\p{L}]+)?/gu;
