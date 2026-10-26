@@ -598,7 +598,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/replyConstraints.ts` | parseReplyConstraint, setReplyConstraint, constraintsFor, bannedPhrasesFor, clearReplyConstraints |
 | `backend/src/lib/replyParityJudge.ts` | judgeReplyParity |
 | `backend/src/lib/replyVariation.ts` | pickVariant, REFUSAL_FIRST, REFUSAL_REPEAT, pickRefusalVariant, PLUGIN_ERROR_VARIANTS, PLUGIN_DONE_VARIANTS |
-| `backend/src/lib/resourceGovernor.ts` | __setGovernorTuningForTestsOnly, __resetGovernorTuningForTests, __stopAllGovernorsForTests, startResourceGovernor |
+| `backend/src/lib/resourceGovernor.ts` | __setGovernorTuningForTestsOnly, __resetGovernorTuningForTests, __stopAllGovernorsForTests, systemAvailableBytes, startResourceGovernor |
 | `backend/src/lib/restoreStaging.ts` | RestoreRefused, pendingRestore, cancelPendingRestore, moveDbSet, dbSetExists, partialMoveInProgress |
 | `backend/src/lib/retrieval/articleClean.ts` | isPromoText, cleanArticleDocument |
 | `backend/src/lib/retrieval/articleImages.ts` | extractArticleImages |

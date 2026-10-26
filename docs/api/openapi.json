@@ -27498,6 +27498,10 @@
                     },
                     "unused_bytes": {
                       "type": "number"
+                    },
+                    "memory_available_bytes": {
+                      "type": "number",
+                      "nullable": true
                     }
                   },
                   "required": [
@@ -27509,7 +27513,8 @@
                     "cards",
                     "alwaysOn",
                     "recommended",
-                    "unused_bytes"
+                    "unused_bytes",
+                    "memory_available_bytes"
                   ]
                 }
               }
