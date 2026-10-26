@@ -40,12 +40,14 @@ interface Mocks {
   widgetData?: Record<string, WidgetData | "fail">;
   install?: Partial<InstallStatusView>;
   chat?: "ready" | "starting";
+  layout?: "ask" | "board" | "shelves";
 }
 
 function mockFetch(mocks: Mocks = {}) {
   const originalFetch = globalThis.fetch;
   const fetchMock = mock((input: RequestInfo | URL) => {
     const url = typeof input === "string" ? input : input.toString();
+    if (url.includes("/api/settings") && url.includes("ui.home_layout")) return Promise.resolve(Response.json(mocks.layout ? [{ key: "ui.home_layout", value: mocks.layout, layer: "person", source: "set" }] : []));
     if (url.includes("/api/setup-checklist")) return Promise.resolve(Response.json(mocks.checklist ?? []));
     if (url.includes("/api/install")) return Promise.resolve(Response.json({ state: "none", ...mocks.install }));
     if (url.includes("/api/widgets/") && url.endsWith("/data")) {
@@ -89,8 +91,49 @@ const urls = (fetchMock: ReturnType<typeof mock>) => fetchMock.mock.calls.map(([
 describe("DashboardPage (Home)", () => {
   test("keeps the home block order in one layout function", async () => {
     const { homeBlocks } = await import("@/shell/pages/dashboard/homeBlocks");
-    expect(homeBlocks()).toEqual(["greeting", "admin", "ask", "hero", "pick_up", "today", "family", "getting_started"]);
-    expect(homeBlocks("future-layout")).toEqual(homeBlocks());
+    expect(homeBlocks("ask")).toEqual(["greeting", "admin", "ask", "today_chips", "pick_up", "family", "getting_started"]);
+    expect(homeBlocks("board")).toEqual(["greeting", "admin", "hero", "ask", "pick_up", "today", "family", "getting_started"]);
+    expect(homeBlocks("shelves")).toEqual(["greeting", "admin", "ask", "media_continue", "today", "media_new", "media_made", "getting_started"]);
+    expect(homeBlocks("shelves", false)).toEqual(homeBlocks("ask"));
+  });
+
+  test("Ask first draws Today as chips; a chip opens its card and a second tap closes it", async () => {
+    const { restore } = mockFetch({ layout: "ask", home: { hero: null, cards: [widget("a", "Weather")], more: [] }, widgets: [widget("a", "Weather")], widgetData: { a: data("Row a") } });
+    try {
+      const view = renderHome(makePerson("adult"));
+      const chip = await view.findByRole("button", { name: "Weather" });
+      expect(view.queryByTestId("home-today-card")).toBeNull();
+      fireEvent.click(chip);
+      await view.findByTestId("home-today-card");
+      fireEvent.click(chip);
+      expect(view.queryByTestId("home-today-card")).toBeNull();
+    } finally { restore(); }
+  });
+
+  test("Today board draws the cards themselves, not chips", async () => {
+    const { restore } = mockFetch({ layout: "board", home: { hero: null, cards: [widget("a", "Weather")], more: [] }, widgets: [widget("a", "Weather")], widgetData: { a: data("Row a") } });
+    try {
+      const view = renderHome(makePerson("adult"));
+      await view.findByTestId("home-today-card");
+      expect(view.queryByRole("button", { name: "Weather" })).toBeNull();
+    } finally { restore(); }
+  });
+
+  test("the Home layout gear links to the Appearance row for everyone except a guest", async () => {
+    for (const role of ["owner", "adult", "teen", "child"] as const) {
+      const { restore } = mockFetch();
+      try {
+        const view = renderHome(makePerson(role));
+        const gear = await view.findByRole("link", { name: "Home layout" });
+        expect(gear.getAttribute("href")).toContain("#ui.home_layout");
+      } finally { restore(); cleanup(); }
+    }
+    const { restore } = mockFetch();
+    try {
+      const view = renderHome(makePerson("guest"));
+      await view.findByText(/Good/);
+      expect(view.queryByRole("link", { name: "Home layout" })).toBeNull();
+    } finally { restore(); }
   });
 
   test("shows skeletons on first paint", () => {
@@ -192,7 +235,7 @@ describe("DashboardPage (Home)", () => {
     widgetData.b = "fail";
     widgetData.c = { ...data("Fallback text"), degraded: true };
     widgetData.d = { as_of: "2026-10-17T12:00:00.000Z", items: [] };
-    const { restore } = mockFetch({ home: { hero: null, cards: ids.slice(0, 4).map((id) => widget(id)), more: ids.slice(4).map((id) => widget(id)) }, widgets: ids.map((id) => widget(id)), widgetData });
+    const { restore } = mockFetch({ layout: "board", home: { hero: null, cards: ids.slice(0, 4).map((id) => widget(id)), more: ids.slice(4).map((id) => widget(id)) }, widgets: ids.map((id) => widget(id)), widgetData });
     try {
       const view = renderHome(makePerson("adult"));
       await waitFor(() => expect(view.getAllByTestId("home-today-card").length).toBe(4));
@@ -204,7 +247,7 @@ describe("DashboardPage (Home)", () => {
       restore();
     }
     const many = ["a", "b", "c", "d", "e", "f"];
-    const second = mockFetch({ home: { hero: null, cards: many.slice(0, 4).map((id) => widget(id)), more: many.slice(4).map((id) => widget(id)) }, widgets: many.map((id) => widget(id)), widgetData: Object.fromEntries(many.map((id) => [id, data(`Row ${id}`)])) });
+    const second = mockFetch({ layout: "board", home: { hero: null, cards: many.slice(0, 4).map((id) => widget(id)), more: many.slice(4).map((id) => widget(id)) }, widgets: many.map((id) => widget(id)), widgetData: Object.fromEntries(many.map((id) => [id, data(`Row ${id}`)])) });
     try {
       const view = renderHome(makePerson("adult"));
       const more = await view.findByRole("button", { name: "More" });
@@ -219,7 +262,7 @@ describe("DashboardPage (Home)", () => {
   test("a weather widget that carries a card draws the compact weather card in place of the text", async () => {
     const card = (await import("@maipai/spec/fixtures/answer-block/valid-weather_card.json")).default;
     const withCard: WidgetData = { ...data("Sunny"), card: card as unknown as Record<string, unknown> };
-    const { restore } = mockFetch({ widgets: [widget("weather", "Weather")], widgetData: { weather: withCard } });
+    const { restore } = mockFetch({ layout: "board", widgets: [widget("weather", "Weather")], widgetData: { weather: withCard } });
     try {
       const view = renderHome(makePerson("adult"));
       await view.findByTestId("home-today-card");

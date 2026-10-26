@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { useQueries, useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@maipai/ui/src/dashboard/components/ui/card";
 import { Button } from "@maipai/ui/src/dashboard/components/ui/button";
@@ -25,7 +26,8 @@ export function todaySlots(widgets: WidgetDescriptor[], results: Array<{ isPendi
 }
 
 /** HOME-ALIVE-01e: one card per widget the viewer's role clears (the server already filtered by role and age). */
-export function TodaySection({ home, heroOnly = false }: { home?: HomeWidgets; heroOnly?: boolean }) {
+export function TodaySection({ home, heroOnly = false, chips = false }: { home?: HomeWidgets; heroOnly?: boolean; chips?: boolean }) {
+  const [open, setOpen] = useState<string | null>(null);
   const list = useQuery({ queryKey: ["home-widgets"], queryFn: api.homeWidgets, retry: false, enabled: !home });
   const ordered = home ?? list.data;
   const slotsByOrder = ordered ? [...(ordered.cards ?? []), ...(ordered.more ?? [])] : [];
@@ -68,6 +70,23 @@ export function TodaySection({ home, heroOnly = false }: { home?: HomeWidgets; h
       </CardContent>
     </Card>
   ));
+
+  if (chips) {
+    // Ask first: each Today card is one chip; a tap opens that full card under the row, a second tap closes it.
+    const key = (slot: Slot) => `${slot.widget.package}/${slot.widget.id}`;
+    const opened = slots.find((slot) => key(slot) === open);
+    return (
+      <section aria-label="Today" className="flex flex-col gap-3 lg:col-span-12">
+        <h2 className="text-base leading-snug font-medium">Today</h2>
+        <div className="flex flex-wrap gap-2">
+          {slots.map((slot) => (
+            <Button key={key(slot)} variant="outline" size="sm" aria-expanded={open === key(slot)} onClick={() => setOpen(open === key(slot) ? null : key(slot))}>{slot.widget.title}</Button>
+          ))}
+        </div>
+        {opened ? <div className="max-w-xl">{cards([opened])}</div> : null}
+      </section>
+    );
+  }
 
   const first = slots.slice(0, home ? home.cards.length : TODAY_CARD_BUDGET);
   const rest = slots.slice(TODAY_CARD_BUDGET);

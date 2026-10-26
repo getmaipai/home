@@ -39,10 +39,17 @@ function MediaRows({ heading, rows }: { heading: string; rows: MediaHomeRow[] })
 
 export function HomeMedia({ kind }: { kind: "continue" | "new" | "made_at_home" }) {
   const query = useQuery({ queryKey: ["home-media"], queryFn: api.mediaHome, retry: false });
+  const continuing = useQuery({ queryKey: ["home-continue"], queryFn: api.continueRows, retry: false, enabled: kind === "continue" });
   if (query.isPending) return <p role="status" className="text-sm text-muted-foreground">Loading your library</p>;
   if (query.isError) return <p role="alert" className="text-sm text-muted-foreground">Could not load your library. Refresh Home to try again.</p>;
   const data: MediaHome = query.data;
-  const rows = data[kind];
-  const heading = kind === "continue" ? "Continue watching" : kind === "new" ? "New in your library" : "Made at home";
+  const rows = kind === "continue" ? [
+    ...data.continue,
+    ...(continuing.data?.rows ?? []).filter((row) => row.media_kind === null).map((row) => ({
+      id: row.id, app: "videos" as const, kind: "chat", title: row.title, subtitle: row.subtitle,
+      artwork_url: row.artwork_url, href: row.href, percent: row.percent, at: row.at,
+    })),
+  ] : data[kind];
+  const heading = kind === "continue" ? "Continue" : kind === "new" ? "New in your library" : "Made at home";
   return <MediaRows heading={heading} rows={rows} />;
 }
