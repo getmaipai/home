@@ -4,7 +4,8 @@
   "title": "Album",
   "body": [
     {
-      "type": "billboard",
+      "type": "creation_header",
+      "variant": "collection",
       "bind": {
         "source": "package",
         "path": "header",
@@ -13,15 +14,36 @@
           "scope": "album"
         }
       },
-      "label": "Album",
-      "size": "banner",
-      "autoplay": false,
-      "item_key_field": "id",
-      "item_title_field": "title",
-      "item_subtitle_field": "{channel}",
-      "item_art_field": "backdrop",
+      "share_change": {
+        "add": {
+          "call": {
+            "target": "/api/plugins/music/actions/share-add",
+            "args": {
+              "id": "{id}",
+              "person_id": "{person_id}"
+            }
+          }
+        },
+        "remove": {
+          "call": {
+            "target": "/api/plugins/music/actions/share-remove",
+            "args": {
+              "id": "{id}",
+              "person_id": "{person_id}"
+            }
+          }
+        },
+        "make_private": {
+          "call": {
+            "target": "/api/plugins/music/actions/share-private",
+            "args": {
+              "id": "{id}"
+            }
+          }
+        }
+      },
       "primary": {
-        "label": "Play album",
+        "label": "Play",
         "icon": "play",
         "action": {
           "play": {
@@ -29,18 +51,14 @@
           }
         }
       },
-      "secondary": [
-        {
-          "label": "Shuffle",
-          "icon": "refresh-cw",
-          "action": {
-            "play": {
-              "media_id": "{shuffle_id}"
-            }
+      "shuffle": {
+        "label": "Shuffle",
+        "action": {
+          "play": {
+            "media_id": "{shuffle_id}"
           }
         }
-      ],
-      "hide_when_empty": true
+      }
     },
     {
       "type": "media_shelf",
@@ -69,6 +87,47 @@
       },
       "item_index_field": "track_number",
       "hide_when_empty": true
+    },
+    {
+      "type": "creation_header",
+      "variant": "collection",
+      "part": "footer",
+      "bind": {
+        "source": "package",
+        "path": "header",
+        "params": {
+          "id": "$state.id",
+          "scope": "album"
+        }
+      },
+      "share_change": {
+        "add": {
+          "call": {
+            "target": "/api/plugins/music/actions/share-add",
+            "args": {
+              "id": "{id}",
+              "person_id": "{person_id}"
+            }
+          }
+        },
+        "remove": {
+          "call": {
+            "target": "/api/plugins/music/actions/share-remove",
+            "args": {
+              "id": "{id}",
+              "person_id": "{person_id}"
+            }
+          }
+        },
+        "make_private": {
+          "call": {
+            "target": "/api/plugins/music/actions/share-private",
+            "args": {
+              "id": "{id}"
+            }
+          }
+        }
+      }
     },
     {
       "type": "media_shelf",

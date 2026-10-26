@@ -23,4 +23,13 @@ describe("media detail player pages", () => {
       }
     }
   });
+
+  test("Music collection detail pages start with a collection creation header", () => {
+    const ajv = new Ajv2020({ strict: false });
+    for (const pageId of ["album", "playlist", "artist"]) {
+      const page = JSON.parse(readFileSync(join(PACKAGES_DIR, "music", "pages", `${pageId}.json`), "utf8")) as { body: Array<Record<string, unknown>> };
+      expect(ajv.validate(UI_SCHEMA as object, page), `${pageId}: ${JSON.stringify(ajv.errors)}`).toBe(true);
+      expect(page.body[0]).toMatchObject({ type: "creation_header", variant: "collection" });
+    }
+  });
 });

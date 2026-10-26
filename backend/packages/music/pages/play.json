@@ -132,7 +132,11 @@
                 }
               }
             }
-          }
+          },
+          "details_show": [
+            "facts",
+            "chapters"
+          ]
         },
         {
           "type": "creation_header",

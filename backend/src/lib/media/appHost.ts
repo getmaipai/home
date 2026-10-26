@@ -940,6 +940,16 @@ function musicNext(person: PersonRow, id: string): MediaItem[] {
 
 const artistOf = (item: MediaItem): string => item.artist ?? item.subtitle ?? "Unknown artist";
 const songCount = (count: number): string => `${count} ${count === 1 ? "song" : "songs"}`;
+const durationMinutes = (tracks: readonly MediaItem[]): number => tracks.length ? Math.max(1, Math.ceil(tracks.reduce((total, item) => total + (item.duration_s ?? 0), 0) / 60)) : 0;
+const durationLine = (tracks: readonly MediaItem[]): string => `${songCount(tracks.length)}, ${durationMinutes(tracks)} ${durationMinutes(tracks) === 1 ? "minute" : "minutes"}`;
+const newestTrackDate = (tracks: readonly MediaItem[]): string | null => {
+  const stamp = tracks.map((item) => item.added_at || "").sort().at(-1);
+  if (!stamp) return null;
+  const date = new Date(stamp);
+  if (!Number.isFinite(date.getTime()) || !date.getUTCFullYear()) return null;
+  return date.toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric", timeZone: "UTC" });
+};
+const collectionVisibility = (sharedTo: MediaCollection["shared_to"]) => ({ mode: sharedTo === null ? "private" : "shared", people: [], can_manage: false });
 
 /** The track the person's queue points at: the row the kit rings as "playing" (item_highlight_field). */
 function queueCurrent(person: PersonRow): string | null {
@@ -991,19 +1001,40 @@ function musicData(person: PersonRow, dataId: string, params: DataParams): unkno
     const tracks = albumOrder(groupTracks(musicLibrary(person), "album").get(params.id ?? "") ?? []);
     if (tracks.length === 0) return [];
     const years = [...new Set(tracks.map((item) => item.year).filter((year): year is number => !!year))];
+    const genres = [...new Set(tracks.map((item) => item.genre?.trim()).filter((genre): genre is string => !!genre))];
     const tile = albumTile(person, params.id!, tracks);
-    return [{ ...tile, channel: [tile.channel, years.length === 1 ? String(years[0]) : null, songCount(tracks.length)].filter(Boolean).join(" · "), shuffle_id: `shuffle:${params.id}` }];
+    const artist = tracks[0]!.album_artist ?? artistOf(tracks[0]!);
+    const art = artworkUrl(tracks.find((item) => item.artwork) ?? tracks[0]!);
+    const dates = tracks.map((item) => item.added_at).filter(Boolean).sort();
+    const copyright = tracks.map((item) => (item as MediaItem & { copyright?: string | null }).copyright?.trim()).filter((value): value is string => !!value);
+    const footerLines = [years.length ? newestTrackDate(tracks) : null, durationLine(tracks), ...(copyright.length ? [[...new Set(copyright)].join(" · ")] : [])].filter((line): line is string => !!line);
+    return [{ ...tile, channel: [tile.channel, years.length === 1 ? String(years[0]) : null, songCount(tracks.length)].filter(Boolean).join(" · "),
+      creator: { name: artist, href: `/apps/music/artist?id=${encodeURIComponent(artist)}` }, art,
+      meta: ["Album", genres.length === 1 && tracks.every((item) => item.genre?.trim() === genres[0]) ? genres[0] : null, years.length === 1 ? String(years[0]) : null].filter(Boolean).join(" · "),
+      footer_lines: footerLines, visibility: { mode: "shared", people: [], can_manage: false }, made_at: dates.at(-1) ?? tracks[0]!.added_at,
+      ...(tracks[0]!.description ? { description: tracks[0]!.description } : {}), shuffle_id: `shuffle:${params.id}` }];
   }
   if (dataId === "header" && params.scope === "artist") {
     const tracks = groupTracks(musicLibrary(person), "artist").get(params.id ?? "") ?? [];
     if (tracks.length === 0) return [];
     const pictured = tracks.find((item) => item.artwork) ?? tracks[0]!;
-    return [{ ...rowsOf(person, [pictured])[0]!, id: params.id, title: artistKey(tracks[0]!), channel: songCount(tracks.length), kind: "track", queue_mode: "artist", radio_id: `radio:artist:${params.id}` }];
+    const years = [...new Set(tracks.map((item) => item.year).filter((year): year is number => !!year))];
+    const genres = [...new Set(tracks.map((item) => item.genre?.trim()).filter((genre): genre is string => !!genre))];
+    const art = artworkUrl(pictured);
+    return [{ ...rowsOf(person, [pictured])[0]!, id: params.id, title: artistKey(tracks[0]!), channel: songCount(tracks.length), kind: "track", queue_mode: "artist",
+      art, meta: "Artist", radio_id: `radio:artist:${params.id}`, visibility: { mode: "shared", people: [], can_manage: false }, made_at: tracks.map((item) => item.added_at).sort().at(-1),
+      ...(years.length === 1 ? { year: years[0] } : {}), ...(genres.length === 1 ? { genre: genres[0] } : {}) }];
   }
   if (dataId === "header" && params.scope === "playlist") {
     const collection = resolveCollection(person.id, params.id ?? "");
     if (collection?.kind !== "playlist" || !visiblePlaylists(person).some((entry) => entry.id === collection.id)) return [];
-    return [{ ...playlistTile(person, collection), queue_mode: "playlist", shuffle_id: `shuffle:${collection.id}` }];
+    const tracks = playlistTracks(person, collection);
+    const tile = playlistTile(person, collection);
+    const owner = db.select().from(people).where(eq(people.id, collection.person_id)).get();
+    const art = tracks.length ? artworkUrl(tracks.find((item) => item.artwork) ?? tracks[0]!) : null;
+    const minutes = durationMinutes(tracks);
+    return [{ ...tile, queue_mode: "playlist", shuffle_id: `shuffle:${collection.id}`, creator: { name: owner?.displayName ?? "Someone" }, art,
+      meta: `Playlist · ${songCount(tracks.length)}`, footer_lines: [durationLine(tracks)], visibility: collectionVisibility(collection.shared_to), made_at: collection.created_at }];
   }
   if (dataId === "album") return trackRows(person, albumOrder(groupTracks(musicLibrary(person), "album").get(params.id ?? "") ?? []));
   if (dataId === "album-more") {

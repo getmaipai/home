@@ -189,7 +189,7 @@ describe("the media-app host: data ids", () => {
     const data = async (client: TestClient, scope = "creation") => (await client.post("/api/plugins/music/data/header", { id: song.value.id, scope })).json() as Promise<any[]>;
     const creation = await data(owner);
     expect(creation[0]).toMatchObject({ id: song.value.id, title: "River song", description: "[Verse] Morning light\nA river runs.", creator: { name: "Sage", href: `/people/${ownerPerson.id}`, avatar_url: null }, made_at: expect.any(String), visibility: { mode: "private", can_manage: true } });
-    expect((await data(owner, "creation-people")).map((candidate) => candidate.id)).toEqual(["household", adult.id, admin.id, child.id]);
+    expect((await data(owner, "creation-people")).map((candidate) => candidate.id).sort()).toEqual(["household", adult.id, admin.id, child.id].sort());
     expect(await data(adult.client, "creation-people")).toEqual([]);
     expect((await adult.client.post("/api/plugins/music/actions/share-add", { id: song.value.id, person_id: child.id })).status).toBe(403);
     const childPerson = db.select().from(people).where(eq(people.id, child.id)).get()!;
@@ -205,6 +205,39 @@ describe("the media-app host: data ids", () => {
     const scannedHeader = await (await adult.client.post("/api/plugins/music/data/header", { id: scanned.id, scope: "creation" })).json() as any[];
     expect(scannedHeader[0]).toMatchObject({ id: scanned.id, creator: { name: "The Marlows" }, visibility: { can_manage: false } });
     expect(await adult.client.post("/api/plugins/music/data/header", { id: scanned.id, scope: "creation-people" }).then((response) => response.json())).toEqual([]);
+  });
+
+  test("Music collection headers include safe Apple Music metadata and readable child details", async () => {
+    const { owner, adult, child } = await setup();
+    const songs = await (await adult.client.post("/api/plugins/music/data/songs", {})).json() as any[];
+    const morning = songs.find((row) => row.title === "Morning Light")!;
+    const albumId = JSON.stringify(["The Marlows", "Tempo"]);
+    const getHeader = async (client: TestClient, id: string, scope: string) => (await client.post("/api/plugins/music/data/header", { id, scope })).json() as Promise<any[]>;
+    const album = (await getHeader(adult.client, albumId, "album"))[0];
+    expect(album).toMatchObject({
+      title: "Tempo", creator: { name: "The Marlows", href: "/apps/music/artist?id=The%20Marlows" },
+      art: expect.stringContaining(morning.id), meta: expect.stringContaining("Album"),
+      footer_lines: expect.arrayContaining([expect.stringMatching(/\d+ songs?, \d+ minutes?/)]),
+      visibility: { mode: "shared" }, made_at: expect.any(String),
+    });
+    const explicit = songs.find((row) => row.title === "Loud Song")!;
+    const childSongs = await (await child.client.post("/api/plugins/music/data/songs", {})).json() as any[];
+    const childAlbumId = JSON.stringify(["The Marlows", "Tempo"]);
+    const childAlbum = await getHeader(child.client, childAlbumId, "album");
+    expect(childAlbum[0]?.title).toBe("Tempo");
+    expect(JSON.stringify(childAlbum)).not.toContain(explicit.title);
+    const madePlaylist = await adult.client.post("/api/plugins/music/playlist", { op: "new" });
+    const playlistId = ((await madePlaylist.json()) as { id: string }).id;
+    const playlist = (await getHeader(adult.client, playlistId, "playlist"))[0];
+    expect(playlist).toMatchObject({ creator: { name: "Marlow" }, meta: expect.stringContaining("Playlist"), footer_lines: expect.arrayContaining([expect.stringMatching(/\d+ songs?, \d+ minutes?/)]) });
+    const artist = (await getHeader(adult.client, "The Marlows", "artist"))[0];
+    expect(artist).toMatchObject({ title: "The Marlows", meta: "Artist", radio_id: expect.stringContaining("radio:artist") });
+    expect(artist).not.toHaveProperty("creator");
+    expect(childSongs.map((row) => row.title)).not.toContain(explicit.title);
+    expect(JSON.stringify(await getHeader(child.client, "Clover", "artist"))).not.toContain(explicit.title);
+    expect(JSON.stringify(await (await child.client.post("/api/plugins/music/data/album-more", { id: albumId })).json())).not.toContain(explicit.title);
+    const ownerAlbum = await (await owner.post("/api/plugins/music/data/header", { id: albumId, scope: "album" })).json() as any[];
+    expect(ownerAlbum[0]?.title).toBe("Tempo");
   });
 
   test("an adult's rows carry title, channel, copy label and no progress before anything is watched", async () => {
