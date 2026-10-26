@@ -1,0 +1,304 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Home page redesign mockups</title>
+<link rel="icon" href="data:,">
+<meta name="description" content="Four design options for the MaiPai Home page, each at desktop and phone width, light and dark. Placeholder content only.">
+<style>
+/* Four options for the Home page, drawn from one block library so they differ in arrangement, not in parts.
+   Every block here is a kit part (Card, Item, Avatar, Button, InputGroup) or an answer-block card the packages already supply.
+   Placeholder content: persona names from the org roster, no real family, no real addresses. Gradients stand in for pictures. */
+:root{color-scheme:dark;--bg:#0c0c0d;--card:#161618;--card2:#1d1d20;--fg:#f4f4f5;--mut:#a1a1aa;--bd:#2a2a2e;--pri:#f4f4f5;--prifg:#0c0c0d;--acc:#38bdf8;--ok:#4ade80;--warn:#fbbf24;--r:14px;--bar:#050506;--sans:ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+:root[data-theme=light]{color-scheme:light;--bg:#f6f7f9;--card:#fff;--card2:#f0f1f4;--fg:#111114;--mut:#64646e;--bd:#e3e4e9;--pri:#111114;--prifg:#fff;--acc:#0284c7;--ok:#16a34a;--warn:#b45309;--bar:#e9eaee}
+*{box-sizing:border-box}html,body{margin:0}
+body{background:var(--bar);color:var(--fg);font:14px/1.45 var(--sans);-webkit-font-smoothing:antialiased}
+button{font:inherit;color:inherit;background:none;border:0;padding:0;cursor:pointer}
+svg.i{width:18px;height:18px;flex:none;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+h1,h2,h3,p{margin:0}
+/* design bar */
+.top{position:sticky;top:0;z-index:20;background:var(--bar);border-bottom:1px solid var(--bd);padding:10px 16px;display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.top b{margin-right:8px}
+.tab{padding:7px 12px;border-radius:999px;border:1px solid var(--bd);color:var(--mut)}
+.tab[aria-selected=true]{background:var(--pri);color:var(--prifg);border-color:var(--pri)}
+.sp{flex:1}
+.wrap{padding:20px 16px 60px;max-width:1600px;margin:0 auto}
+.intro{max-width:900px;margin-bottom:18px}
+.intro h1{font-size:22px;margin-bottom:6px}
+.intro p{color:var(--mut)}
+.facts{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:10px;margin:14px 0 20px}
+.fact{background:var(--card);border:1px solid var(--bd);border-radius:12px;padding:12px}
+.fact h3{font-size:12px;text-transform:uppercase;letter-spacing:.06em;color:var(--mut);margin-bottom:4px}
+.stage{display:flex;gap:28px;align-items:flex-start;flex-wrap:wrap}
+.cap{color:var(--mut);font-size:12px;margin:0 0 6px}
+/* frames */
+.frame{container-type:inline-size;background:var(--bg);border:1px solid var(--bd);border-radius:14px;overflow:hidden;position:relative}
+.desk{width:1180px;height:760px}
+.phone{width:360px;height:740px;border-radius:34px;border-width:6px}
+.shell{display:flex;height:100%}
+.rail{width:56px;border-right:1px solid var(--bd);display:flex;flex-direction:column;align-items:center;gap:6px;padding:10px 0;background:var(--card)}
+.rail .lg{width:34px;height:34px;border-radius:10px;background:linear-gradient(135deg,#22d3ee,#6366f1);margin-bottom:8px}
+.rail .ic{width:38px;height:38px;border-radius:10px;display:grid;place-items:center;color:var(--mut)}
+.rail .ic.on{background:var(--card2);color:var(--fg)}
+.rail .sp{flex:1}
+.main{flex:1;min-width:0;display:flex;flex-direction:column}
+.hdr{height:48px;border-bottom:1px solid var(--bd);display:flex;align-items:center;gap:10px;padding:0 16px;font-weight:600;flex:none}
+.hdr .menu{display:none}
+.scroll{flex:1;overflow:auto;padding:22px 24px 28px}
+.phone .rail{display:none}
+.phone .hdr .menu{display:grid;place-items:center;width:34px;height:34px;border-radius:50%;background:var(--card2)}
+.phone .scroll{padding:16px 14px 22px}
+.notch{display:none}
+.phone .notch{display:block;height:26px;flex:none;background:var(--bg)}
+/* parts */
+.card{background:var(--card);border:1px solid var(--bd);border-radius:var(--r);padding:14px}
+.card h3{font-size:13px;font-weight:600;display:flex;align-items:center;justify-content:space-between;margin-bottom:8px}
+.card h3 a{color:var(--mut);font-weight:500;font-size:12px}
+.mut{color:var(--mut)}.sm{font-size:12px}
+.big{font-size:30px;font-weight:650;letter-spacing:-.02em;line-height:1.15}
+.mid{font-size:22px;font-weight:650;letter-spacing:-.01em}
+.row{display:flex;align-items:center;gap:10px;padding:8px 0}
+.row+.row{border-top:1px solid var(--bd)}
+.row .t{flex:1;min-width:0}.row .t b{display:block;font-weight:550;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pic{width:44px;height:44px;border-radius:10px;flex:none}
+.pic.sq{width:56px;height:56px}
+.g1{background:linear-gradient(135deg,#f97316,#db2777)}.g2{background:linear-gradient(135deg,#06b6d4,#4f46e5)}.g3{background:linear-gradient(135deg,#22c55e,#0d9488)}.g4{background:linear-gradient(135deg,#eab308,#ea580c)}.g5{background:linear-gradient(135deg,#a855f7,#3b82f6)}.g6{background:linear-gradient(135deg,#64748b,#1e293b)}
+.av{width:36px;height:36px;border-radius:50%;display:grid;place-items:center;font-weight:650;color:#fff;flex:none}
+.av.a{background:#6366f1}.av.b{background:#db2777}.av.c{background:#16a34a}.av.d{background:#475569}
+.btn{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--bd);border-radius:10px;padding:7px 12px;background:var(--card)}
+.btn.pri{background:var(--pri);color:var(--prifg);border-color:var(--pri)}
+.chip{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--bd);border-radius:999px;padding:7px 12px;background:var(--card);white-space:nowrap}
+.chips{display:flex;gap:8px;flex-wrap:wrap}
+.ask{display:flex;align-items:center;gap:10px;background:var(--card);border:1px solid var(--bd);border-radius:18px;padding:12px 12px 12px 16px;box-shadow:0 1px 0 rgba(255,255,255,.03)}
+.ask .ph{flex:1;color:var(--mut)}
+.ask .go{width:36px;height:36px;border-radius:50%;background:var(--pri);color:var(--prifg);display:grid;place-items:center}
+.ask .mic{width:36px;height:36px;border-radius:50%;display:grid;place-items:center;color:var(--mut)}
+.ask.lg{padding:18px 16px 18px 20px;border-radius:22px;font-size:16px}
+.wx{background:linear-gradient(160deg,#1e3a8a,#3b82f6 60%,#93c5fd);color:#fff;border:0;position:relative;overflow:hidden}
+.wx .sun{position:absolute;right:-30px;top:-30px;width:130px;height:130px;border-radius:50%;background:radial-gradient(circle,#fde68a,rgba(253,230,138,0) 70%)}
+.wx .temp{font-size:48px;font-weight:300;line-height:1}
+.prog{height:4px;border-radius:4px;background:rgba(255,255,255,.28);overflow:hidden}.prog i{display:block;height:100%;background:#fff;width:62%}
+.pill{font-size:11px;border-radius:999px;padding:2px 8px;background:var(--card2);color:var(--mut)}
+.dot{width:8px;height:8px;border-radius:50%;background:var(--warn);display:inline-block}
+.check{width:18px;height:18px;border-radius:5px;border:1.5px solid var(--mut);flex:none}
+.check.on{background:var(--ok);border-color:var(--ok)}
+.grid{display:grid;gap:14px}
+.sec{margin-top:22px}
+.sec>h2{font-size:15px;font-weight:650;margin-bottom:10px;display:flex;justify-content:space-between;align-items:baseline}
+.sec>h2 a{font-size:12px;color:var(--mut);font-weight:500}
+.shelf{display:flex;gap:12px;overflow:hidden}
+.tile{flex:none;width:150px}
+.tile .pic{width:150px;height:96px;border-radius:12px;margin-bottom:6px}
+.tile b{display:block;font-weight:550;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.hero{border-radius:18px;padding:22px;color:#fff;position:relative;overflow:hidden;min-height:200px;display:flex;flex-direction:column;justify-content:flex-end;gap:8px}
+.hero .big{font-size:26px}
+.center{max-width:700px;margin:0 auto}
+/* responsive: the frame's own width decides, so one markup draws desktop and phone */
+.a-list{display:grid;gap:14px}
+@container (min-width:900px){
+ .b-grid{grid-template-columns:repeat(12,1fr)}
+ .b-wx{grid-column:span 4;grid-row:span 2}.b-ask{grid-column:span 8}.b-cont{grid-column:span 5}.b-list{grid-column:span 3}
+ .b-news{grid-column:span 5}.b-fam{grid-column:span 3}
+ .c-split{grid-template-columns:1.6fr 1fr}
+ .d-board{grid-template-columns:1.1fr 1fr 1fr}
+ .d-clock{grid-column:span 1;grid-row:span 2}
+ .a-two{grid-template-columns:1.4fr 1fr}
+}
+@container (max-width:899px){
+ .b-grid,.c-split,.d-board,.a-two{grid-template-columns:1fr}
+ .big{font-size:26px}
+ .tile{width:132px}.tile .pic{width:132px;height:84px}
+ .hide-sm{display:none}
+}
+.note{background:var(--card);border:1px solid var(--bd);border-radius:12px;padding:14px;margin-top:22px;max-width:1180px}
+.note h3{margin-bottom:6px}.note ul{margin:6px 0 0;padding-left:18px;color:var(--mut)}
+.note li{margin:3px 0}
+.tv{width:1180px;height:664px}
+@media(max-width:1280px){.desk,.tv{width:100%;max-width:1180px}}
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute"><defs>
+<symbol id="home" viewBox="0 0 24 24"><path d="M3 11l9-8 9 8v9a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"/></symbol>
+<symbol id="chat" viewBox="0 0 24 24"><path d="M21 12a8 8 0 0 1-11.6 7.1L3 21l1.9-5.4A8 8 0 1 1 21 12z"/></symbol>
+<symbol id="play" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="14" rx="2"/><path d="M10 9l5 3-5 3z"/></symbol>
+<symbol id="folder" viewBox="0 0 24 24"><path d="M3 6a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></symbol>
+<symbol id="users" viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.5"/><path d="M2 20a7 7 0 0 1 14 0M16 4.5a3.5 3.5 0 0 1 0 7M18 14a7 7 0 0 1 4 6"/></symbol>
+<symbol id="search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></symbol>
+<symbol id="sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M2 12h2M20 12h2M5 5l1.5 1.5M17.5 17.5L19 19M5 19l1.5-1.5M17.5 6.5L19 5"/></symbol>
+<symbol id="send" viewBox="0 0 24 24"><path d="M12 19V5M5 12l7-7 7 7"/></symbol>
+<symbol id="mic" viewBox="0 0 24 24"><rect x="9" y="3" width="6" height="12" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></symbol>
+<symbol id="menu" viewBox="0 0 24 24"><path d="M4 7h16M4 12h16M4 17h10"/></symbol>
+<symbol id="news" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M7 9h10M7 13h10M7 17h6"/></symbol>
+<symbol id="music" viewBox="0 0 24 24"><path d="M9 18V5l11-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="17" cy="16" r="3"/></symbol>
+<symbol id="book" viewBox="0 0 24 24"><path d="M4 5a2 2 0 0 1 2-2h13v16H6a2 2 0 0 0-2 2zM4 19a2 2 0 0 0 2 2h13"/></symbol>
+<symbol id="img" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="9" cy="10" r="2"/><path d="M21 16l-5-5-8 8"/></symbol>
+<symbol id="list" viewBox="0 0 24 24"><path d="M9 6h12M9 12h12M9 18h12M4 6h.01M4 12h.01M4 18h.01"/></symbol>
+</defs></svg>
+
+<div class="top" role="tablist" aria-label="Options">
+ <b>Home page options</b>
+ <button class="tab" role="tab" data-o="a" aria-selected="true">A. Ask first</button>
+ <button class="tab" role="tab" data-o="b" aria-selected="false">B. Today board</button>
+ <button class="tab" role="tab" data-o="c" aria-selected="false">C. Shelves</button>
+ <button class="tab" role="tab" data-o="d" aria-selected="false">D. Family screen</button>
+ <span class="sp"></span>
+ <button class="tab" id="theme">Light / dark</button>
+</div>
+
+<div class="wrap">
+ <div class="intro">
+  <h1 id="title"></h1>
+  <p id="lede"></p>
+ </div>
+ <div class="facts" id="facts"></div>
+ <div class="stage">
+  <div><p class="cap">Desktop, 1180 wide</p><div class="frame desk" id="desk"></div></div>
+  <div><p class="cap">Phone</p><div class="frame phone" id="phone"></div></div>
+ </div>
+ <div id="extra"></div>
+ <div class="note" id="note"></div>
+</div>
+
+<!-- block library; every option reuses these, so a block is built once -->
+<template id="t-rail"><div class="rail"><div class="lg"></div><div class="ic on"><svg class="i"><use href="#home"/></svg></div><div class="ic"><svg class="i"><use href="#search"/></svg></div><div class="ic"><svg class="i"><use href="#chat"/></svg></div><div class="ic"><svg class="i"><use href="#play"/></svg></div><div class="ic"><svg class="i"><use href="#folder"/></svg></div><div class="ic"><svg class="i"><use href="#users"/></svg></div><div class="sp"></div><div class="av a" style="width:30px;height:30px;font-size:12px">S</div></div></template>
+
+<template id="o-a">
+ <div class="center">
+  <div style="margin:10px 0 18px">
+   <h1 class="big">Good evening, Sage</h1>
+   <p class="mut" style="margin-top:6px">52° and mostly clear in Seattle. Shopping list has 4 things. Nothing else is waiting for you.</p>
+  </div>
+  <div class="ask lg"><span class="ph">Ask anything</span><span class="mic"><svg class="i"><use href="#mic"/></svg></span><span class="go"><svg class="i"><use href="#send"/></svg></span></div>
+  <div class="chips" style="margin-top:12px"><span class="chip">Plan a week of simple dinners</span><span class="chip">Explain how rainbows form</span><span class="chip hide-sm">Write a short thank-you note</span></div>
+
+  <div class="sec"><h2>Pick up where you left off <a>All chats</a></h2>
+   <div class="card" style="padding:4px 14px">
+    <div class="row"><div class="pic g2" style="width:36px;height:36px"></div><div class="t"><b>Weekend trip ideas</b><span class="mut sm">Chat, 20 min ago</span></div><svg class="i mut"><use href="#chat"/></svg></div>
+    <div class="row"><div class="pic g1" style="width:36px;height:36px"></div><div class="t"><b>The Long Way Round, ch. 7</b><span class="mut sm">Audiobook, 2 h 10 min left</span></div><svg class="i mut"><use href="#book"/></svg></div>
+    <div class="row"><div class="pic g3" style="width:36px;height:36px"></div><div class="t"><b>Fix the garden gate</b><span class="mut sm">Chat, yesterday</span></div><svg class="i mut"><use href="#chat"/></svg></div>
+   </div>
+  </div>
+
+  <div class="sec"><h2>Today</h2>
+   <div class="chips">
+    <span class="chip"><svg class="i"><use href="#sun"/></svg>52° H 55 L 46</span>
+    <span class="chip"><svg class="i"><use href="#list"/></svg>Shopping list, 4</span>
+    <span class="chip"><svg class="i"><use href="#news"/></svg>3 new stories</span>
+   </div>
+  </div>
+  <div class="row" style="margin-top:24px;gap:6px">
+   <div class="av a" style="width:28px;height:28px;font-size:11px">S</div><div class="av b" style="width:28px;height:28px;font-size:11px;margin-left:-10px">M</div><div class="av c" style="width:28px;height:28px;font-size:11px;margin-left:-10px">N</div>
+   <span class="mut sm" style="margin-left:6px">Your family, 3 people</span><span class="sp"></span><span class="mut sm"><span class="dot"></span> 2 repairs, 1 update</span>
+  </div>
+ </div>
+</template>
+
+<template id="o-b">
+ <div style="display:flex;justify-content:space-between;align-items:flex-end;margin-bottom:16px;gap:12px;flex-wrap:wrap">
+  <div><p class="mut sm">Saturday, October 25</p><h1 class="big">Good evening, Sage</h1></div>
+  <div class="chips hide-sm"><span class="btn">Updates</span><span class="btn">Repairs <span class="pill">2</span></span></div>
+ </div>
+ <div class="grid b-grid">
+  <div class="card wx b-wx" style="min-height:190px"><div class="sun"></div><p class="sm" style="opacity:.85">SEATTLE</p><p class="temp" style="margin:14px 0 4px">52°</p><p>Mostly clear</p><p class="sm" style="opacity:.85;margin-top:2px">High 55, low 46. Dry until Tuesday.</p>
+   <div style="margin-top:18px;display:flex;gap:14px;font-size:12px;opacity:.95"><span>7p<br><b>51°</b></span><span>9p<br><b>49°</b></span><span>11p<br><b>47°</b></span><span>Sun<br><b>54°</b></span><span>Mon<br><b>53°</b></span></div></div>
+  <div class="b-ask card" style="padding:16px"><div class="ask" style="border:0;background:var(--card2)"><span class="ph">Ask anything</span><span class="mic"><svg class="i"><use href="#mic"/></svg></span><span class="go"><svg class="i"><use href="#send"/></svg></span></div>
+   <div class="chips" style="margin-top:10px"><span class="chip">Plan a week of simple dinners</span><span class="chip">Explain how rainbows form</span><span class="chip hide-sm">Write a thank-you note</span></div></div>
+  <div class="card b-cont"><h3>Pick up <a>All</a></h3>
+   <div class="row"><div class="pic g2"></div><div class="t"><b>Weekend trip ideas</b><span class="mut sm">Chat, 20 min ago</span></div></div>
+   <div class="row"><div class="pic g1"></div><div class="t"><b>The Long Way Round</b><span class="mut sm">Audiobook, 2 h 10 min left</span></div></div></div>
+  <div class="card b-list"><h3>Shopping list <a>Open</a></h3>
+   <div class="row"><span class="check"></span>Oat milk</div><div class="row"><span class="check"></span>Lemons</div><div class="row"><span class="check on"></span><s class="mut">Eggs</s></div><p class="mut sm" style="margin-top:4px">+1 more</p></div>
+  <div class="card b-news"><h3>News <a>Open</a></h3>
+   <div class="row"><div class="pic g4" style="width:40px;height:40px"></div><div class="t"><b>City council approves new bike lanes</b><span class="mut sm">Local, 1 h ago</span></div></div>
+   <div class="row"><div class="pic g5" style="width:40px;height:40px"></div><div class="t"><b>Small telescope spots a new comet</b><span class="mut sm">Science, 3 h ago</span></div></div></div>
+  <div class="card b-fam"><h3>Your family</h3>
+   <div style="display:flex;gap:14px"><div style="text-align:center"><div class="av a" style="width:44px;height:44px;margin:auto">S</div><span class="sm">Sage</span></div><div style="text-align:center"><div class="av b" style="width:44px;height:44px;margin:auto">M</div><span class="sm">Marlow</span></div><div style="text-align:center"><div class="av c" style="width:44px;height:44px;margin:auto">N</div><span class="sm">Nova</span></div></div></div>
+ </div>
+ <div class="card hide-sm" style="margin-top:14px;display:flex;align-items:center;gap:12px"><b>Getting started</b><span class="mut">Set up face sign-in</span><span class="sp"></span><span class="btn">Open</span><span class="mut sm">Skip</span><span class="pill">6 more</span></div>
+</template>
+
+<template id="o-c">
+ <div class="ask" style="padding:8px 8px 8px 14px;border-radius:14px"><svg class="i mut"><use href="#chat"/></svg><span class="ph">Ask anything, or search your library</span><span class="chip hide-sm"><svg class="i"><use href="#sun"/></svg>52°</span><span class="go"><svg class="i"><use href="#send"/></svg></span></div>
+ <div class="grid c-split" style="margin-top:16px">
+  <div class="hero g5" style="background:linear-gradient(160deg,rgba(0,0,0,.05),rgba(0,0,0,.65)),linear-gradient(135deg,#7c3aed,#2563eb 55%,#0ea5e9)">
+   <span class="pill" style="background:rgba(255,255,255,.2);color:#fff;align-self:flex-start">Continue watching</span>
+   <h2 class="big">Northern Lights, season 2, episode 4</h2>
+   <p style="opacity:.9">42 min left. Last played on the living room TV.</p>
+   <div class="prog"><i></i></div>
+   <div style="display:flex;gap:8px;margin-top:4px"><span class="btn pri" style="background:#fff;color:#111">Resume</span><span class="btn" style="background:rgba(255,255,255,.15);border-color:transparent;color:#fff">Next up</span></div>
+  </div>
+  <div class="card"><h3>Good evening, Sage</h3>
+   <div style="display:flex;align-items:center;gap:12px"><svg class="i" style="width:34px;height:34px;color:#fbbf24"><use href="#sun"/></svg><div><span class="mid">52°</span> <span class="mut">mostly clear</span></div></div>
+   <div class="row" style="margin-top:8px"><span class="check"></span><span class="t">Shopping list, 4 things</span></div>
+   <div class="row"><svg class="i mut"><use href="#news"/></svg><span class="t">3 new stories</span></div>
+   <div class="row"><svg class="i mut"><use href="#chat"/></svg><span class="t">Weekend trip ideas</span><span class="mut sm">20 min</span></div></div>
+ </div>
+ <div class="sec"><h2>New in your library <a>Open Library</a></h2>
+  <div class="shelf"><div class="tile"><div class="pic g1"></div><b>Harbor Lights</b><span class="mut sm">Film</span></div><div class="tile"><div class="pic g3"></div><b>Morning Run Mix</b><span class="mut sm">Music</span></div><div class="tile"><div class="pic g2"></div><b>The Quiet Hour</b><span class="mut sm">Podcast</span></div><div class="tile"><div class="pic g4"></div><b>Field Notes</b><span class="mut sm">Book</span></div><div class="tile"><div class="pic g6"></div><b>Deep Blue</b><span class="mut sm">Show</span></div><div class="tile"><div class="pic g5"></div><b>Old Songs</b><span class="mut sm">Music</span></div></div></div>
+ <div class="sec"><h2>Made at home <a>All</a></h2>
+  <div class="shelf"><div class="tile"><div class="pic g5"></div><b>Fox in the snow</b><span class="mut sm">Picture, today</span></div><div class="tile"><div class="pic g2"></div><b>Birthday song</b><span class="mut sm">Song, Tue</span></div><div class="tile"><div class="pic g1"></div><b>Robot at sunrise</b><span class="mut sm">Picture, Mon</span></div><div class="tile"><div class="pic g3"></div><b>Garden map</b><span class="mut sm">Picture, Sun</span></div><div class="tile hide-sm"><div class="pic g4"></div><b>Camp story</b><span class="mut sm">Clip, Sat</span></div></div></div>
+</template>
+
+<template id="o-d">
+ <div class="grid d-board">
+  <div class="card d-clock" style="display:flex;flex-direction:column;gap:12px">
+   <div><p class="mut sm">Saturday</p><p style="font-size:64px;font-weight:300;line-height:1;letter-spacing:-.03em">6:42</p><p class="mut">October 25</p></div>
+   <div class="card wx" style="padding:14px"><div class="sun"></div><span class="temp" style="font-size:36px">52°</span> <span>mostly clear</span><p class="sm" style="opacity:.9;margin-top:4px">Dry until Tuesday</p></div>
+   <div class="mut sm">Hello, Sage. Say "Hey Home" or tap Ask.</div>
+  </div>
+  <div class="card"><h3>Today for the family</h3>
+   <div class="row"><span class="pill" style="width:54px;text-align:center">4:30</span><span class="t"><b>Soccer practice</b><span class="mut sm">Marlow</span></span><span class="av b" style="width:22px;height:22px"></span></div>
+   <div class="row"><span class="pill" style="width:54px;text-align:center">6:00</span><span class="t"><b>Dinner</b><span class="mut sm">Everyone</span></span></div>
+   <div class="row"><span class="pill" style="width:54px;text-align:center">7:30</span><span class="t"><b>Movie night</b><span class="mut sm">Everyone</span></span></div>
+   <div class="row"><span class="pill" style="width:54px;text-align:center">Sun</span><span class="t"><b>Library books due</b><span class="mut sm">Nova</span></span><span class="av c" style="width:22px;height:22px"></span></div></div>
+  <div class="card"><h3>Lists</h3>
+   <p class="sm mut" style="margin-bottom:2px">Shopping</p><div class="row"><span class="check"></span>Oat milk</div><div class="row"><span class="check"></span>Lemons</div>
+   <p class="sm mut" style="margin:8px 0 2px">Chores</p><div class="row"><span class="check on"></span><s class="mut">Water the plants</s></div><div class="row"><span class="check"></span>Feed the fish</div></div>
+  <div class="card" style="padding:0;overflow:hidden;min-height:180px;position:relative"><div class="pic g2" style="width:100%;height:100%;min-height:180px;border-radius:0"></div><span class="pill" style="position:absolute;left:10px;bottom:10px;background:rgba(0,0,0,.5);color:#fff">From the family library, Oct 2024</span></div>
+  <div class="card"><h3>Now playing</h3><div class="row"><div class="pic g1"></div><div class="t"><b>Morning Run Mix</b><span class="mut sm">Living room speaker</span></div><svg class="i"><use href="#play"/></svg></div></div>
+ </div>
+ <div class="ask" style="margin-top:14px"><svg class="i mut"><use href="#chat"/></svg><span class="ph">Ask Home anything</span><span class="mic"><svg class="i"><use href="#mic"/></svg></span><span class="go"><svg class="i"><use href="#send"/></svg></span></div>
+</template>
+
+<script>
+const O={
+ a:{title:"A. Ask first",lede:"The page is a conversation starter with a little context under it. Closest to ChatGPT, Claude and Gemini, plus one quiet line about the day.",
+  facts:[["Best for","A home where most visits start with a question."],["Blocks (5)","Greeting with a one-line day summary, Ask with starters, Pick up (3 rows), Today as three chips, family and admin line."],["Trade","Calmest. Least to look at; a big screen is mostly empty by design."]],
+  note:["Why you might pick it","<li>Matches what the research found: every AI app opens on a greeting and a composer, and people punish apps that hide recents.</li><li>Scales to a child's screen unchanged: same shape, their starters, their rows.</li><li>The weather card, shopping list and news shrink to chips. A chip opens the full card.</li>"]},
+ b:{title:"B. Today board",lede:"A bento grid: the household's day at a glance, with Ask as one card among others. The most Apple Home, Google Home and Notion.",
+  facts:[["Best for","People who open Home to see what is going on."],["Blocks (6 to 7)","Weather hero, Ask, Pick up, Shopping list, News, Family, then Getting started as one slim bar."],["Trade","Most informative. Needs the card budget (four cards, then More) to stay calm as packages are added."]],
+  note:["Why you might pick it","<li>Every installed package gets a card, so the page grows with the household.</li><li>Setup chores shrink from a tall card to one bar, so they stop pushing content down.</li><li>Empty or failed cards drop out (today's \"Sorry, that didn't work\" card would not show).</li>"]},
+ c:{title:"C. Shelves",lede:"Led by what you can play and make. A hero for the thing to resume, then rows like Apple TV and Netflix. The day sits in a small card beside it.",
+  facts:[["Best for","A household that uses Videos, Music, Books and the picture and song tools daily."],["Blocks (5)","Slim Ask bar, Continue hero, day card, New in your library, Made at home."],["Trade","Best looking and the most distinctive. Weakest on day one before there is media or anything made."]],
+  note:["Why you might pick it","<li>Uses the Media hub, Library and the Continue provider that already exist.</li><li>Gives the page real pictures, which is what makes the other products feel alive.</li><li>Needs a good day-one state: with no media, it falls back to Option A's layout.</li>"]},
+ d:{title:"D. Family screen",lede:"A shared, wall-or-counter view: clock, family day, lists, a photo. Everything on it is household data, so it is safe on a shared screen. Ask sits at the bottom.",
+  facts:[["Best for","A tablet on the kitchen counter, the Apple TV, the robot's screen."],["Blocks (6)","Clock and weather, family schedule, lists, photo, now playing, Ask."],["Trade","Needs a calendar and chores package that do not exist yet. Shared by nature, so no per-person content on it."]],
+  note:["Why you might pick it","<li>Mirrors Skylight and Hearth, the products families pay for, and the Echo Show without its ads.</li><li>Not a replacement for the personal page. It would be a mode of Home that a device or person picks, and it needs the calendar and chores packages first.</li><li>Stays inside the rule that no one sees another person's activity: events carry only the household's shared plans.</li>"]}
+};
+const $=s=>document.querySelector(s);
+function frame(el,key,phone){
+ el.innerHTML='';
+ const shell=document.createElement('div');shell.className='shell';
+ if(!phone){shell.append($('#t-rail').content.cloneNode(true))}
+ const main=document.createElement('div');main.className='main';
+ main.innerHTML=(phone?'<div class="notch"></div>':'')+'<div class="hdr"><span class="menu"><svg class="i"><use href="#menu"/></svg></span><svg class="i"><use href="#home"/></svg>Home</div>';
+ const sc=document.createElement('div');sc.className='scroll';sc.append($('#o-'+key).content.cloneNode(true));
+ main.append(sc);shell.append(main);el.append(shell);
+}
+function show(k){
+ const o=O[k];
+ document.querySelectorAll('.tab[data-o]').forEach(t=>t.setAttribute('aria-selected',t.dataset.o===k));
+ $('#title').textContent=o.title;$('#lede').textContent=o.lede;
+ $('#facts').innerHTML=o.facts.map(f=>`<div class="fact"><h3>${f[0]}</h3>${f[1]}</div>`).join('');
+ frame($('#desk'),k,false);frame($('#phone'),k,true);
+ $('#note').innerHTML=`<h3>${o.note[0]}</h3><ul>${o.note[1]}</ul>`;
+ try{history.replaceState(null,'','#'+k)}catch(e){}
+}
+document.querySelectorAll('.tab[data-o]').forEach(t=>t.onclick=()=>show(t.dataset.o));
+$('#theme').onclick=()=>{const r=document.documentElement;r.dataset.theme=r.dataset.theme==='light'?'dark':'light'};
+show((location.hash||'#a').slice(1) in O?(location.hash||'#a').slice(1):'a');
+</script>
+</body>
+</html>
