@@ -21,6 +21,7 @@ function open(person: Roster, url: string) {
   globalThis.fetch = ((input: RequestInfo | URL, init?: RequestInit) => {
     const path = (typeof input === "string" ? input : input.toString()).split("?")[0]!;
     const json = (body: unknown) => Promise.resolve(Response.json(body));
+    if (path.endsWith("/api/ai/choices")) return json({ stack: "ok", message: null, tier: "p128", free_disk_bytes: 1e12, installed_bytes: 4e10, cards: [], alwaysOn: { text: "Always on: Home itself.", bytes: 1, rowIds: [] }, recommended: null, unused_bytes: 0 });
     if (path.endsWith("/api/engine-link/credentials")) return json({ paired: false });
     if (path.endsWith("/api/engines/health")) return json({ configured: false, health: [] });
     if (path.endsWith("/api/engines")) return json({ configured: false, roles: [], engines: [], budget: null });
@@ -52,7 +53,8 @@ describe("Engines and AI uses four tabs inside the settings shell", () => {
     const view = open(makePerson("owner"), "/settings/ai?tab=overview");
     expect(await view.findByRole("tab", { name: "Overview" })).toBeTruthy();
     expect(await view.findByRole("switch", { name: "Pause chat for everyone" })).toBeTruthy();
-    expect(await view.findByText("Install the AI for this computer")).toBeTruthy();
+    expect(await view.findByRole("button", { name: "Free up space" })).toBeTruthy();
+    expect(view.queryByText("Install the AI for this computer")).toBeNull();
     expect(view.queryByText("Engine computer link")).toBeNull();
     expect(view.getByRole("tab", { name: "Models" })).toBeTruthy();
     expect(view.getByRole("tab", { name: "Engines" })).toBeTruthy();

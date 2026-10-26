@@ -16,7 +16,7 @@ import { VoiceBrowserSection } from "@/apps/settings/VoiceBrowserSection";
 import { VoiceManagerSection } from "@/apps/settings/VoiceManagerSection";
 import { EngineLinkCredentialSection } from "@/apps/settings/EngineLinkCredentialSection";
 import { ModelsSection } from "@/apps/settings/ModelsSection";
-import { InstallPlanSection } from "@/apps/settings/InstallPlanSection";
+import { AiOverview } from "@/apps/settings/AiOverview";
 import { ModelsAndStorageSection } from "@/apps/settings/ModelsAndStorageSection";
 import { HuggingFaceTokenSection } from "@/apps/settings/HuggingFaceTokenSection";
 import { UsersSection } from "@/apps/settings/UsersSection";
@@ -93,7 +93,7 @@ function HomeEngineAdminSettings({ person, tab }: SettingsViewProps) {
   const [removal, setRemoval] = useState<{ message: string; confirm: () => void } | null>(null);
   const show = (id: string) => tab === undefined || tab === id;
   return <>
-    {show("overview") ? <InstallPlanSection /> : null}
+    {show("overview") ? <AiOverview /> : null}
     {show("models") ? <><ModelsAndStorageSection /><Card><CardHeader><CardTitle>Memory and model choices</CardTitle></CardHeader><CardContent><SizingPanel person={person} onRemoval={(message, confirm) => setRemoval({ message, confirm })} /></CardContent></Card><ModelsSection /></> : null}
     {show("engines") ? <><EngineLinkCredentialSection /><EnginesConsole person={person} /></> : null}
     {show("advanced") ? <HuggingFaceTokenSection /> : null}
