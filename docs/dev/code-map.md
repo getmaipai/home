@@ -95,9 +95,9 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `frontend/src/apps/settings/AddRobotSection.tsx` | AddRobotSection |
 | `frontend/src/apps/settings/AddVoiceForm.tsx` | AddVoiceForm |
 | `frontend/src/apps/settings/AdminGatedContent.tsx` | AdminGatedContent |
-| `frontend/src/apps/settings/AiJobCardView.tsx` | AiJobCardView, AiAlwaysOnView |
-| `frontend/src/apps/settings/AiJobChoices.tsx` | AiJobChoices |
-| `frontend/src/apps/settings/AiOverview.tsx` | AiOverview |
+| `frontend/src/apps/settings/AiGlance.tsx` | AiGlance |
+| `frontend/src/apps/settings/AiJobCardView.tsx` | AiAlwaysOnView |
+| `frontend/src/apps/settings/AiModelDialog.tsx` | AiModelChoices |
 | `frontend/src/apps/settings/AssistantKeysSettings.tsx` | AssistantKeysSettings |
 | `frontend/src/apps/settings/AwaySessionsSection.tsx` | AwaySessionsSection |
 | `frontend/src/apps/settings/BackupsSection.tsx` | EMERGENCY_KIT_SAVED_KEY, BackupsSection |
@@ -230,7 +230,6 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `frontend/src/shell/pages/settings/SettingsLinks.tsx` | SettingsLinks |
 | `frontend/src/shell/pages/settings/SettingsRenderer.tsx` | SettingsRenderer |
 | `frontend/src/shell/pages/settings/SettingsSectionContent.tsx` | beforeSettingChange, SettingsSectionContent |
-| `frontend/src/shell/pages/settings/SizingPanel.tsx` | SizingPanel |
 | `frontend/src/shell/pages/settings/WebSearchSettings.tsx` | webSearchStatusLine, WebSearchSettings |
 | `frontend/src/shell/pages/settings/placeAdapter.tsx` | usePlaceAdapter, LocationSetting |
 | `frontend/src/shell/pages/settings/settingsTestKit.tsx` | REGISTRY, makePerson, mockHome |

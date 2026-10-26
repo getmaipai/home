@@ -42,11 +42,11 @@ function component(overrides: Partial<AiComponentLike> & { id: string }): AiComp
   };
 }
 
-test("builds the six job cards in order on every tier p16 to p128 from shared/diskPlan.json", () => {
+test("builds the seven job cards in order on every tier p16 to p128 from shared/diskPlan.json", () => {
   for (const tier of TIERS_LIST) {
     const plan = TIERS[tier];
     const result = buildAiCards({ copy, plan, components: null, settings: SETTINGS, freeBytes: null });
-    expect(result.cards.map((card) => card.id)).toEqual(["chat", "pictures", "videos", "music", "voice", "coding"]);
+    expect(result.cards.map((card) => card.id)).toEqual(["chat", "pictures", "videos", "music", "voice", "wakeword", "coding"]);
     for (const card of result.cards) {
       if (card.choices.length === 0) {
         expect(card.unavailable).not.toBeNull();
@@ -274,4 +274,15 @@ test("the plan, components and settings inputs are not mutated", () => {
     buildAiCards(input);
     recommendedPlan(input);
   }).not.toThrow();
+});
+
+test("every choice carries a marked RAM estimate, and wake word has no rows so it reads not offered", () => {
+  const result = buildAiCards({ copy, plan: TIERS[TIERS_LIST[0]!], components: null, settings: SETTINGS, freeBytes: null });
+  const wake = result.cards.find((card) => card.id === "wakeword")!;
+  expect(wake.choices).toEqual([]);
+  expect(wake.unavailable).not.toBeNull();
+  for (const choice of result.cards.flatMap((card) => card.choices)) {
+    expect(choice.ramBasis).toBe("estimate");
+    expect(choice.ramBytes).toBeGreaterThanOrEqual(choice.installedBytes);
+  }
 });

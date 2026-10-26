@@ -1,7 +1,7 @@
 import { Switch } from "@maipai/ui/src/dashboard/components/ui/switch";
 import { Item, ItemActions, ItemContent, ItemDescription, ItemGroup, ItemTitle } from "@maipai/ui/src/dashboard/components/ui/item";
 import { usePinnedApps } from "@/shell/usePinnedApps";
-import { useState, type ComponentType } from "react";
+import { type ComponentType } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { canViewFaceEnrollment } from "@/apps/people/FaceEnrollmentBody";
 import { VoiceEnrollmentBody } from "@/apps/people/VoiceEnrollmentBody";
@@ -16,8 +16,8 @@ import { VoiceBrowserSection } from "@/apps/settings/VoiceBrowserSection";
 import { VoiceManagerSection } from "@/apps/settings/VoiceManagerSection";
 import { EngineLinkCredentialSection } from "@/apps/settings/EngineLinkCredentialSection";
 import { ModelsSection } from "@/apps/settings/ModelsSection";
-import { AiOverview } from "@/apps/settings/AiOverview";
-import { AiAlwaysOnView, AiJobCardView } from "@/apps/settings/AiJobCardView";
+import { AiGlance } from "@/apps/settings/AiGlance";
+import { AiAlwaysOnView } from "@/apps/settings/AiJobCardView";
 import type { Card as SpecCard } from "@maipai/ui/src/settings/settingsAudience";
 import { ModelsAndStorageSection } from "@/apps/settings/ModelsAndStorageSection";
 import { HuggingFaceTokenSection } from "@/apps/settings/HuggingFaceTokenSection";
@@ -34,9 +34,7 @@ import { PicturesLibrary } from "@/apps/settings/PicturesLibrary";
 import { VideoLibrary } from "@/apps/settings/VideoLibrary";
 import { CommandsSection } from "@/apps/settings/CommandsSection";
 import { CodingKeysSettings } from "@/apps/settings/CodingSettings";
-import { SizingPanel } from "@/shell/pages/settings/SizingPanel";
 import { Card, CardContent, CardHeader, CardTitle } from "@maipai/ui/src/dashboard/components/ui/card";
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@maipai/ui/src/dashboard/components/ui/alert-dialog";
 import { useTabItem } from "@/shell/tabIdentity";
 import { useSearchParams, useLocation } from "react-router-dom";
 import { useSettingsCapabilities } from "@/shell/pages/settings/useSettingsCapabilities";
@@ -94,14 +92,10 @@ function HomeVoiceCatalogSettings() { useTabItem("Voices"); return <VoiceManager
 // hub still gates every call these make.
 // SETTINGS-UX-05: the existing Engines and AI pieces are placed in four short tabs.
 function HomeEngineAdminSettings({ person, tab }: SettingsViewProps) {
-  const [removal, setRemoval] = useState<{ message: string; confirm: () => void } | null>(null);
   const show = (id: string) => tab === undefined || tab === id;
   return <>
-    {show("overview") ? <AiOverview /> : null}
-    {show("models") ? <><ModelsAndStorageSection /><Card><CardHeader><CardTitle>Memory and model choices</CardTitle></CardHeader><CardContent><SizingPanel person={person} onRemoval={(message, confirm) => setRemoval({ message, confirm })} /></CardContent></Card><ModelsSection /></> : null}
     {show("engines") ? <><EngineLinkCredentialSection /><EnginesConsole person={person} /></> : null}
-    {show("advanced") ? <HuggingFaceTokenSection /> : null}
-    <AlertDialog open={removal !== null} onOpenChange={(open) => { if (!open) setRemoval(null); }}><AlertDialogContent><AlertDialogHeader><AlertDialogTitle>Turn this feature off?</AlertDialogTitle><AlertDialogDescription>{removal?.message}</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel>Cancel</AlertDialogCancel><AlertDialogAction onClick={() => { const pending = removal; setRemoval(null); pending?.confirm(); }}>Confirm</AlertDialogAction></AlertDialogFooter></AlertDialogContent></AlertDialog>
+    {show("advanced") ? <><HuggingFaceTokenSection /><ModelsAndStorageSection /><ModelsSection /></> : null}
   </>;
 }
 // The user list, ready for the People section once the spec names this trail view (the report's commons order).
@@ -124,7 +118,7 @@ export const SETTINGS_VIEWS: Record<string, ComponentType<SettingsViewProps>> = 
   "home.commands": HomeCommandsSettings,
   "home.voice_catalog": HomeVoiceCatalogSettings,
   "home.engine_admin": HomeEngineAdminSettings,
-  "ai.job_choices": AiJobCardView,
+  "ai.glance": AiGlance,
   "ai.always_on": AiAlwaysOnView,
   "home.users_admin": HomeUsersAdminSettings,
   "home.devices_admin": HomeDevicesAdminSettings,

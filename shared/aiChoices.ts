@@ -7,7 +7,7 @@
 
 import { sizeGb, needGb, freeGb, selectionTotals, type DiskPlan, type DiskRow } from "./diskPlanMath";
 
-export type AiJobId = "chat" | "pictures" | "videos" | "music" | "voice" | "coding";
+export type AiJobId = "chat" | "pictures" | "videos" | "music" | "voice" | "wakeword" | "coding";
 export interface AiComponentLike { id: string; label: string; state: "installed"|"installing"|"notInstalled"|"failed"; size_bytes: number|null; download_bytes: number; requirement: "required"|"optional"|"unsupported"; requirement_reason: string|null; percent: number|null; job: string|null; failure: string|null; can_install: boolean; can_uninstall: boolean; last_used_at: string|null; used_by: string[] }
 export interface AiSettingsInput { pictureQuality: "quick"|"detailed"; videoQuality: "quick"|"detailed"; musicEnabled: boolean }
 /** The words of the cards, read from the spec's card and key copy (rule S5): this file holds none of its own. */
@@ -25,6 +25,8 @@ export interface AiChoice {
   recommended: boolean; current: boolean;
   state: "installed"|"installing"|"notInstalled"|"failed"; percent: number|null; failure: string|null;
   downloadBytes: number; installedBytes: number;
+  /** Memory the model uses while it runs. An estimate (a share of its size on disk) until the Stack measures it. */
+  ramBytes: number; ramBasis: "estimate" | "measured";
   stateText: string;
   blockedReason: string|null;
   action: "none" | "use" | "get" | "remove";
@@ -52,8 +54,12 @@ const CARDS: Array<{ id: AiJobId; rows: string[] }> = [
   { id: "videos", rows: ["video", "video-detailed"] },
   { id: "music", rows: ["music"] },
   { id: "voice", rows: ["voice", "voice-better"] },
+  { id: "wakeword", rows: [] },
   { id: "coding", rows: ["coding"] },
 ];
+
+// A model needs about this share of its size on disk in memory while it runs: a marked estimate, replaced by the Stack's measured footprint when there is one.
+const RAM_SHARE = 1.1;
 
 function byRowId(plan: DiskPlan): Map<string, DiskRow> {
   return new Map(plan.rows.map((row) => [row.id, row] as const));
@@ -159,6 +165,8 @@ function buildChoice(copyOf: AiCopy, plan: DiskPlan, components: AiComponentLike
     failure: state.failure,
     downloadBytes,
     installedBytes,
+    ramBytes: Math.round(installedBytes * RAM_SHARE),
+    ramBasis: "estimate",
     stateText,
     blockedReason,
     action,
@@ -181,6 +189,8 @@ function chipFor(card: { id: AiJobId; rows: string[] }, present: boolean, choice
       const quickId = card.id === "pictures" ? "pictures.quick" : "videos.quick";
       return current.id === quickId ? "Using Quick" : "Using Detailed";
     }
+    case "wakeword":
+      return "Not on this computer";
     case "voice": {
       const better = choices.find((choice) => choice.id === "voice.better");
       if (better && better.current) return better.state === "installed" ? "Using Better" : "Chosen, not ready";

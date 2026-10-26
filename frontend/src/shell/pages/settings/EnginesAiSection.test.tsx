@@ -53,10 +53,10 @@ describe("Engines and AI uses four tabs inside the settings shell", () => {
     const view = open(makePerson("owner"), "/settings/ai?tab=overview");
     expect(await view.findByRole("tab", { name: "Overview" })).toBeTruthy();
     expect(await view.findByRole("switch", { name: "Pause chat for everyone" })).toBeTruthy();
-    expect(await view.findByRole("button", { name: "Free up space" })).toBeTruthy();
+    expect(await view.findByText("Model choices at a glance")).toBeTruthy();
     expect(view.queryByText("Install the AI for this computer")).toBeNull();
     expect(view.queryByText("Engine computer link")).toBeNull();
-    expect(view.getByRole("tab", { name: "Models" })).toBeTruthy();
+    expect(view.queryByRole("tab", { name: "Models" })).toBeNull();
     expect(view.getByRole("tab", { name: "Engines" })).toBeTruthy();
     expect(view.getByRole("tab", { name: "Advanced" })).toBeTruthy();
     // Still the settings shell: the area's own section list is on the page.
@@ -69,18 +69,16 @@ describe("Engines and AI uses four tabs inside the settings shell", () => {
     expect(view.queryByRole("tab", { name: "Advanced" })).toBeNull();
   });
 
-  test("Models opens the existing model and storage sections", async () => {
-    const view = open(makePerson("owner"), "/settings/ai?tab=models");
-    expect(view.getByTestId("router-location").textContent).toContain("tab=models");
+  test("Advanced keeps the model and storage sections the Models tab used to hold", async () => {
+    const view = open(makePerson("owner"), "/settings/ai?tab=advanced");
     expect(await view.findByText("Models and storage")).toBeTruthy();
     expect(await view.findByText("This computer: Apple Silicon, 24 GB memory.")).toBeTruthy();
-    expect((await view.findAllByText("Memory and model choices")).length).toBeGreaterThan(0);
   });
 
   test("the spec declares the tab strip and default view tab", () => {
     const ai = SETTINGS_AREAS.find((area) => area.id === "settings")!.sections.find((section) => section.id === "ai")!;
-    expect(ai.tabs?.map((tab) => tab.id)).toEqual(["overview", "models", "engines", "advanced", "coding"]);
-    expect(ai.tabs?.filter((tab) => ["overview", "models", "engines", "advanced"].includes(tab.id)).every((tab) => tab.view === "home.engine_admin")).toBe(true);
+    expect(ai.tabs?.map((tab) => tab.id)).toEqual(["overview", "engines", "advanced", "coding"]);
+    expect(ai.tabs?.filter((tab) => ["overview", "engines", "advanced"].includes(tab.id)).every((tab) => tab.view === "home.engine_admin")).toBe(true);
     expect(SETTINGS_VIEWS["home.engine_admin"]).toBeDefined();
   });
 

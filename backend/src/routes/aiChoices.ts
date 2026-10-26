@@ -24,9 +24,9 @@ import { dropMusicStatusCache } from "@/lib/music/ready";
 
 export const aiChoicesRoutes = apiRouter();
 
-const JOBS = ["chat", "pictures", "videos", "music", "voice", "coding"] as const;
+const JOBS = ["chat", "pictures", "videos", "music", "voice", "wakeword", "coding"] as const;
 type JobId = (typeof JOBS)[number];
-const JOB_WORDS: Record<JobId, string> = { chat: "Chat", pictures: "Pictures", videos: "Videos", music: "Music", voice: "Voice", coding: "Coding" };
+const JOB_WORDS: Record<JobId, string> = { chat: "Chat", pictures: "Pictures", videos: "Videos", music: "Music", voice: "Voice", wakeword: "Wake word", coding: "Coding" };
 
 // The state every route reads: the disk plan, the Stack's component list and the three household settings
 // the cards are built from.
@@ -141,7 +141,7 @@ const ChoiceSchema = z.object({
   id: z.string(), job: z.enum(JOBS), kind: z.enum(["radio", "switch", "fixed"]), label: z.string(), description: z.string(), name: z.string(),
   rowIds: z.array(z.string()), recommended: z.boolean(), current: z.boolean(),
   state: z.enum(["installed", "installing", "notInstalled", "failed"]), percent: z.number().nullable(), failure: z.string().nullable(),
-  downloadBytes: z.number(), installedBytes: z.number(), stateText: z.string(), blockedReason: z.string().nullable(),
+  downloadBytes: z.number(), installedBytes: z.number(), ramBytes: z.number(), ramBasis: z.enum(["estimate", "measured"]), stateText: z.string(), blockedReason: z.string().nullable(),
   action: z.enum(["none", "use", "get", "remove"]), setting: SettingRefSchema, chosenNotReady: z.boolean(),
   details: z.array(z.object({ name: z.string(), sizeBytes: z.number() })),
 });

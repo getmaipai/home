@@ -134,3 +134,14 @@ The one-line model description on every row and radio card comes from the spec o
 ## 10. Not in this design
 
 The setup wizard step (AIMODELS-SETUP-01) reuses the rows later. Stack-unreachable failure copy (S6) stays as shipped.
+
+## 11. As built (2026-10-26)
+
+- Files: `AiGlance.tsx` (the `ai.glance` view), `AiModelDialog.tsx` (the gear dialog body), `aiGlanceRows.ts` (rows, staging, projection).
+- **Memory bar:** Home's models, the staged change and free memory. The hub has no reading for memory used by other apps, so
+  there is no "in use by others" segment. Each model's RAM is the disk plan's estimate and reads "about X GB RAM" until measured.
+- **Storage bar:** the disk total is installed models plus free space. "Free up space" opens the existing dialog.
+- **Closest shipped variants** (section 7 gaps stay open): the staged banner is the default Alert, "Download missing" the default
+  Button, the staged Memory and Storage segment uses the orange hue, and an unavailable model shows as the amber banner plus the
+  row's download arrow, with no amber row. "View device" links to the Engines tab.
+- Overview stays on the AI page; Engines, Advanced and Coding are unchanged. The Models tab parts moved to Advanced (section 6).
