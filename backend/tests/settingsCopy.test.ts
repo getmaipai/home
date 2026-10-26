@@ -48,6 +48,7 @@ async function makeHousehold() {
 }
 
 function writableValue(key: ReturnType<typeof getRegistry>[number], fallbackPersonId: string): unknown {
+  if (key.key === "companions.enabled") return []; // a person-owned list of companion ids; Home validates it as an array
   if (key.selector === "time") return "09:00";
   if (key.selector === "select") {
     const options = (key.range as { options?: unknown[] } | undefined)?.options ?? [];
@@ -100,7 +101,7 @@ describe("settings guard agreement metadata", () => {
 
       const expectedDefaults = {
         child: key.key === "media.allowlist_only" ? true : key.key === "search.safe_search" ? resolveSafeSearchLevel("default", "child")
-          : key.key === "chat.photo_uploads" || key.key === "reference.images" || key.key === "person.robot.may_address" || key.key === "person.robot.follow_up" ? false : key.key.startsWith("news.") ? key.band_default?.child
+          : key.key === "chat.photo_uploads" || key.key === "reference.images" || key.key === "person.robot.may_address" || key.key === "person.robot.follow_up" ? false : key.key.startsWith("news.") || key.key === "ui.home_layout" ? key.band_default?.child
           : key.key === "search.page_text_cleaning" ? true : key.default,
         teen: key.key === "search.safe_search" ? resolveSafeSearchLevel("default", "teen")
           : key.key === "search.page_text_cleaning" ? true : key.default,
