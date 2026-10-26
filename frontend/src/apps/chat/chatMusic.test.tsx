@@ -9,6 +9,8 @@ import { MusicTrack } from "@maipai/ui/src/elements/music-track";
 import { MusicToolRender, musicFileName, musicHint } from "@/apps/chat/chatToolUis";
 import { TOOL_BINDINGS } from "@/apps/chat/elementBindings";
 import type { MusicCard } from "@/lib/musicApi";
+import type { Roster } from "@/lib/api";
+import { WakeWordPersonContext } from "@/apps/chat/chatThreadContexts";
 
 afterEach(cleanup);
 const realFetch = globalThis.fetch;
@@ -315,4 +317,67 @@ test("song hints explain the hook, every part, and the computer ceiling", () => 
   expect(musicHint("quick")).toBe("Quick: the hook. Choose Full song to sing every verse.");
   expect(musicHint("full")).toBe("Full: every part of the song.");
   expect(musicHint("full", "ceiling", 120)).toBe("Longer than this computer's longest song (2 minutes), so it sings the first parts that fit.");
+});
+
+// The byline under the song card: the kit creation header in its byline form, read from the song's Library file.
+describe("SongByline under the song card", () => {
+  const ME = { id: "person-adult123", display_name: "Riff", avatar_seed: "person-adult123", role: "adult" } as Roster;
+  const FILE = { id: "file-one", owner_person_id: "person-adult123", kind: "audio", name: "Pancakes.m4a", media_type: "audio/mp4", size: 16, created_at: "2026-10-20T12:00:00.000Z", retention: "kept" };
+
+  function routed(file: { status: number; body: unknown } = { status: 200, body: FILE }) {
+    globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
+      calls.push({ url, method: init?.method ?? "GET", ...(typeof init?.body === "string" ? { body: init.body } : {}) });
+      if (url.endsWith("/api/files/file-one")) return new Response(JSON.stringify(file.body), { status: file.status, headers: { "content-type": "application/json" } });
+      if (url.endsWith("/api/files/file-one/shares")) return new Response(JSON.stringify([]), { status: 200, headers: { "content-type": "application/json" } });
+      if (url.endsWith("/api/people")) return new Response(JSON.stringify([]), { status: 200, headers: { "content-type": "application/json" } });
+      if (url.includes("/files/")) return new Response(new Uint8Array(16), { status: 200, headers: { "content-type": "audio/mp4" } });
+      return new Response(JSON.stringify(card), { status: 200, headers: { "content-type": "application/json" } });
+    }) as typeof fetch;
+  }
+
+  function mountAsMe() {
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    const Render = MusicToolRender as unknown as (props: { result: { id: string } }) => React.ReactElement;
+    return render(
+      <QueryClientProvider client={client}>
+        <MemoryRouter>
+          <WakeWordPersonContext.Provider value={ME}>
+            <Render result={{ id: "mus-1" }} />
+          </WakeWordPersonContext.Provider>
+        </MemoryRouter>
+      </QueryClientProvider>,
+    );
+  }
+
+  test("a done song I made, kept private, shows the byline with its Made date and the Private chip", async () => {
+    routed();
+    card = done();
+    const view = mountAsMe();
+    expect(await view.findByRole("button", { name: "Private, manage sharing" })).toBeTruthy();
+    expect(view.container.textContent).toContain("Made");
+    expect(calls.some((c) => c.url === "/api/files/file-one/shares")).toBe(true);
+  });
+
+  test("a song that is still running shows no byline and fetches no Library file", async () => {
+    routed();
+    card = make({});
+    const view = mountAsMe();
+    await waitFor(() => expect(cardOf(view)?.getAttribute("data-status")).toBe("generating"));
+    expect(view.queryByRole("button", { name: "Private, manage sharing" })).toBeNull();
+    expect(view.container.textContent).not.toContain("Made");
+    expect(calls.some((c) => c.url.endsWith("/api/files/file-one"))).toBe(false);
+  });
+
+  test("a failed Library file read shows no byline and no error line", async () => {
+    routed({ status: 500, body: { error: "boom" } });
+    card = done();
+    const view = mountAsMe();
+    await waitFor(() => expect(view.container.querySelector("audio")).not.toBeNull());
+    await waitFor(() => expect(calls.some((c) => c.url.endsWith("/api/files/file-one"))).toBe(true));
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    expect(view.queryByRole("button", { name: "Private, manage sharing" })).toBeNull();
+    expect(view.container.textContent).not.toContain("Made");
+    expect(view.queryByRole("alert")).toBeNull();
+  });
 });

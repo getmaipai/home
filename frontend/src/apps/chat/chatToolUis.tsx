@@ -23,6 +23,8 @@ import { MusicTrack } from "@maipai/ui/src/elements/music-track";
 import { musicApi } from "@/lib/musicApi";
 import { prepareClip, saveClip, shareClip } from "@/lib/shareClip";
 import { useMusicTrackProps } from "@/apps/chat/MusicCardView";
+import { useSongByline } from "@/apps/chat/useSongByline";
+import { CreationHeader } from "@maipai/ui/src/elements/creation-header";
 export { musicFileName, musicHint } from "@/apps/chat/MusicCardView";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@maipai/ui/src/ui/dropdown-menu";
 // The Elements' own smaller `Button` (not the dashboard `Button` this
@@ -36,7 +38,7 @@ import { getIcon } from "@maipai/ui/src/icons";
 import { Kbd } from "@maipai/ui/src/dashboard/components/ui/kbd";
 import { useSurface } from "@maipai/ui/src/useSurface";
 import { api, type StructuredPart, type TurnStats, type ProjectView } from "@/lib/api";
-import { ArtifactOpenContext, ReloadMainThreadContext, ConfirmAskAnswerContext, AskFormSubmitContext } from "@/apps/chat/chatThreadContexts";
+import { ArtifactOpenContext, ReloadMainThreadContext, ConfirmAskAnswerContext, AskFormSubmitContext, WakeWordPersonContext } from "@/apps/chat/chatThreadContexts";
 import { parseTurnAsk, ASK_FORM_SUBMIT_TEXT, type AskAnswerArm, type AskFormValues, type AskSettled } from "@/apps/chat/chatAsk";
 import { faviconUrl } from "@/apps/chat/chatThreadSlots";
 
@@ -679,9 +681,11 @@ function useMusicCard(id: string | undefined) {
 export const MusicToolRender: ToolCallMessagePartComponent<Record<string, never>, { id: string }> = ({ result }) => {
   const query = useMusicCard(result?.id);
   const navigate = useNavigate();
+  const me = useContext(WakeWordPersonContext);
   const card = query.data ?? { id: result?.id ?? "", state: "queued" as const, stage: null, stage_label: "", stages: [{ id: "queued", label: "Queued" }, { id: "model", label: "Loading" }, { id: "planning", label: "Planning" }, { id: "making", label: "Making" }, { id: "mixing", label: "Mixing" }, { id: "finishing", label: "Finishing" }], stage_index: 0, progress: 0, eta_seconds: null, position: null, error_line: null, cover_url: null, cover_versions: [], cover_pending: false, versions: [], current_id: null, length: "full" as const, cut: null, max_seconds: null, title: null, description: null, lyrics: null, timed_lyrics: null, duration_s: null, started_at: 0 };
   const trackProps = useMusicTrackProps({ card, navigate, onRefresh: () => { void query.refetch(); }, onStop: () => { void musicApi.stop(card.id).then(() => query.refetch()).catch(() => query.refetch()); } });
+  const byline = useSongByline(card, me ?? null);
   if (!result) return null;
   if (!query.data) return query.isError ? <ErrorState layout="inline" title="I couldn't check on that song" detail="Reload the chat to try again." retrying={false} /> : <MusicTrack status="queued" title="Your song" waitingForMemory copy={{ waitingForMemory: "Waiting for memory, your song starts when there is room" }} />;
-  return <MusicTrack {...trackProps} />;
+  return <MusicTrack {...trackProps} {...(byline ? { byline: <CreationHeader variant="byline" title="" {...byline} /> } : {})} />;
 };
