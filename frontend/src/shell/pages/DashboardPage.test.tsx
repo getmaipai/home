@@ -3,6 +3,10 @@ import { cleanup, fireEvent, waitFor } from "@testing-library/react";
 import { MemoryRouter, Route, Routes, useLocation } from "react-router-dom";
 import { DashboardPage } from "@/shell/pages/DashboardPage";
 import { renderWithQueryClient } from "../../../tests/renderWithQueryClient";
+import { QueryClientProvider } from "@tanstack/react-query";
+import { render } from "@testing-library/react";
+import { createQueryClient } from "@/lib/queryClient";
+import { TooltipProvider } from "@maipai/ui/src/ui/tooltip";
 import type { HomeWidgets, InstallStatusView, Roster, SetupChecklistItem, WidgetData, WidgetDescriptor } from "@/lib/api";
 
 afterEach(() => {
@@ -47,7 +51,9 @@ function mockFetch(mocks: Mocks = {}) {
   const originalFetch = globalThis.fetch;
   const fetchMock = mock((input: RequestInfo | URL) => {
     const url = typeof input === "string" ? input : input.toString();
-    if (url.includes("/api/settings") && url.includes("ui.home_layout")) return Promise.resolve(Response.json(mocks.layout ? [{ key: "ui.home_layout", value: mocks.layout, layer: "person", source: "set" }] : []));
+    // The real route refuses a key filter for this key (400 "unsupported settings key filter"); Home must read the whole list.
+    if (url.includes("/api/settings") && url.includes("key=")) return Promise.resolve(new Response(JSON.stringify({ error: "unsupported settings key filter" }), { status: 400 }));
+    if (url.includes("/api/settings")) return Promise.resolve(Response.json(mocks.layout ? [{ key: "ui.home_layout", value: mocks.layout, layer: "person", source: "user" }] : []));
     if (url.includes("/api/setup-checklist")) return Promise.resolve(Response.json(mocks.checklist ?? []));
     if (url.includes("/api/install")) return Promise.resolve(Response.json({ state: "none", ...mocks.install }));
     if (url.includes("/api/widgets/") && url.endsWith("/data")) {
@@ -108,6 +114,26 @@ describe("DashboardPage (Home)", () => {
       fireEvent.click(chip);
       expect(view.queryByTestId("home-today-card")).toBeNull();
     } finally { restore(); }
+  });
+
+  test("coming back to Home after changing the layout in Settings shows the new layout, not the cached one", async () => {
+    const queryClient = createQueryClient();
+    const tree = () => (
+      <QueryClientProvider client={queryClient}><TooltipProvider>
+        <MemoryRouter initialEntries={["/"]}><Routes><Route path="/" element={<DashboardPage person={makePerson("adult")} />} /></Routes></MemoryRouter>
+      </TooltipProvider></QueryClientProvider>
+    );
+    const board = mockFetch({ layout: "board", home: { hero: null, cards: [widget("a", "Weather")], more: [] }, widgets: [widget("a", "Weather")], widgetData: { a: data("Row a") } });
+    const first = render(tree());
+    await first.findByTestId("home-today-card");
+    first.unmount();
+    board.restore();
+    const ask = mockFetch({ layout: "ask", home: { hero: null, cards: [widget("a", "Weather")], more: [] }, widgets: [widget("a", "Weather")], widgetData: { a: data("Row a") } });
+    try {
+      const second = render(tree());
+      await second.findByRole("button", { name: "Weather" });
+      expect(second.queryByTestId("home-today-card")).toBeNull();
+    } finally { ask.restore(); }
   });
 
   test("Today board draws the cards themselves, not chips", async () => {

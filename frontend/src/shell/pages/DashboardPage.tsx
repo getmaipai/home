@@ -28,7 +28,9 @@ export function DashboardPage({ person }: { person: Roster }) {
   const { on: incognito } = useIncognitoContext();
   const widgets = useQuery({ queryKey: ["home-widgets"], queryFn: api.homeWidgets, retry: false });
   const settingKey = ["settings", "person", person.id, "ui.home_layout"] as const;
-  const layoutSetting = useQuery({ queryKey: settingKey, queryFn: async () => (await api.settingsValues(`person:${person.id}`, "ui.home_layout")).find((row) => row.key === "ui.home_layout"), retry: false });
+  const layoutSetting = useQuery({ queryKey: settingKey, queryFn: async () => (await api.settingsValues(`person:${person.id}`)).find((row) => row.key === "ui.home_layout"), retry: false,
+    // Coming back from Settings must show the layout just chosen, not the copy cached up to a minute ago.
+    staleTime: 0, refetchOnMount: "always" });
   const rawLayout = layoutSetting.data?.value;
   const layout = (layoutSetting.data?.layer === "band" && layoutSetting.data?.source === "default" ? "ask" : rawLayout === "ask" || rawLayout === "board" || rawLayout === "shelves" ? rawLayout : "shelves");
   const media = useQuery({ queryKey: ["home-media"], queryFn: api.mediaHome, retry: false, enabled: layout === "shelves" });
