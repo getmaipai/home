@@ -63,6 +63,9 @@ export interface MediaRow {
 }
 
 export interface MediaItemView extends MediaRow {
+  /** MEDIA-DETAIL-04c: the Edit sheet shows only when true; the cover picker lists these (newest first, up to 24). */
+  can_edit?: boolean;
+  cover_choices?: Array<{ file_id: string; url: string; alt: string }>;
   lyrics?: string;
   timed_lyrics?: Array<{ t: number; line: string; section?: string | null }>;
   lyrics_lookup?: "available" | "none";
@@ -658,6 +661,17 @@ function actionRows(person: PersonRow, item: MediaItem) {
   ];
 }
 
+/** The pictures a person can see, for the Edit sheet's cover picker: the Library's own picture list, newest first. */
+function coverChoices(person: PersonRow): NonNullable<MediaItemView["cover_choices"]> {
+  return listLibrary(person, { type: "image", sort: "newest", limit: 24 }).items.slice(0, 24).map((file) => ({ file_id: file.id, url: `/api/files/${file.id}/thumb?w=320`, alt: file.name }));
+}
+
+/** MEDIA-DETAIL-04c: the same view the page reads, for the edit route's answer. */
+export function itemViewFor(person: PersonRow, appId: MediaAppId, id: string): MediaItemView | null {
+  const item = readableIn(person, appId, id);
+  return item ? itemView(person, appId, item) : null;
+}
+
 function itemView(person: PersonRow, appId: MediaAppId, item: MediaItem): MediaItemView {
   const context = contextFor(person, [item]);
   const base = rowOf(item, context);
@@ -672,6 +686,7 @@ function itemView(person: PersonRow, appId: MediaAppId, item: MediaItem): MediaI
     ...base, channel: item.subtitle, src: direct ?? `/api/media/items/${encodeURIComponent(item.id)}/content`, subtitle: item.subtitle, description: item.description, poster: artworkUrl(item),
     chapters: item.chapters.map((chapter) => ({ start_s: chapter.start_s, title: chapter.title })), captions: [],
     ...(seconds !== undefined && !progress?.completed ? { position_s: seconds } : {}),
+    ...(appId === "books" ? {} : (() => { const can = isOwnerOrAdmin(person) || mediaBandOf(person) === "adult"; return { can_edit: can, cover_choices: can ? coverChoices(person) : [] }; })()),
     liked: collectionIds(person, "liked").includes(item.id), watch_later: collectionIds(person, "watch_later").includes(item.id),
     ...(queue ? { up_next: { id: queue.id, title: queue.title, ...(queue.subtitle ? { subtitle: queue.subtitle } : {}), ...(artworkUrl(queue) ? { art: artworkUrl(queue)! } : {}) } } : {}),
   };

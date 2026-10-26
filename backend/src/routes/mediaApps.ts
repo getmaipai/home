@@ -10,8 +10,10 @@ import { hashSessionToken } from "@/lib/session";
 import "@/lib/media/podcastApp"; // registers the Podcasts data ids and item view with the shared host
 import "@/lib/media/musicApp"; // registers the Music lyrics fields with the shared host
 import { podcastRoutes } from "./podcastApp";
+import { editMediaItem } from "@/lib/media/mediaEdit";
+import { saveMediaCover } from "@/lib/media/mediaCover";
 import { lookupLyricsFor } from "@/lib/media/lyricsAction";
-import { musicPlaylistAction, startMusicQueue, coerceNumber, mediaAppAllowed, mediaAppData, saveProgress, setListed, setWatchlist, changeVideoCreationShare, changeMusicCreationShare, MEDIA_APP_IDS, type DataParams, type MediaAppId } from "@/lib/media/appHost";
+import { musicPlaylistAction, startMusicQueue, coerceNumber, mediaAppAllowed, mediaAppData, saveProgress, setListed, setWatchlist, changeVideoCreationShare, changeMusicCreationShare, MEDIA_APP_IDS, itemViewFor, type DataParams, type MediaAppId } from "@/lib/media/appHost";
 
 type Body = Record<string, unknown>;
 
@@ -67,6 +69,25 @@ export function createMediaAppRoutes(appId: MediaAppId) {
     const body = await bodyOf(c.req.raw);
     const id = typeof body.id === "string" ? body.id : typeof body.media_id === "string" ? body.media_id : "";
     const result = await lookupLyricsFor(person, id);
+    return result.ok ? c.json(result.value as never, 200) : c.json({ error: result.error }, result.status);
+  });
+
+  routes.post("/actions/edit", requireAuth, async (c, next) => {
+    const person = c.get("person");
+    if (appId === "books" || !mediaAppAllowed(person, appId)) return next();
+    if (!appRouteAllowed(person, appId, "actions", "edit", undefined, "open")) return next();
+    const result = editMediaItem(person, appId, await bodyOf(c.req.raw));
+    if (!result.ok) return c.json({ error: result.error }, result.status);
+    return c.json((itemViewFor(person, appId, String(result.value.id)) ?? result.value) as never, 200);
+  });
+
+  routes.post("/actions/cover", requireAuth, async (c, next) => {
+    const person = c.get("person");
+    if (appId === "books" || !mediaAppAllowed(person, appId)) return next();
+    if (!appRouteAllowed(person, appId, "actions", "cover", undefined, "open")) return next();
+    const form = await c.req.parseBody().catch(() => ({} as Record<string, unknown>));
+    const file = form.file;
+    const result = await saveMediaCover(person, appId, typeof form.id === "string" ? form.id : "", file instanceof File ? file : null);
     return result.ok ? c.json(result.value as never, 200) : c.json({ error: result.error }, result.status);
   });
 
