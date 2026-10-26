@@ -2058,6 +2058,27 @@ export const mediaItems = sqliteTable(
   ],
 );
 
+// LYRICS-LOOKUP: the receipts and pause state for the lyrics lookup
+// (lib/media/lyricsLookup.ts). One row per media item the lookup already
+// ran for (a hit or a miss), so the same item is never asked about twice;
+// the title and artist it was asked by are deliberately not stored. The
+// second table is the single-row backoff state: while the service refuses,
+// lookups pause for 3600 s, doubling on each refusal up to 86400 s, and an
+// answer from the service (a hit or a miss) resets it. Hub-internal, not a
+// spec record, the same call mediaWatchDays above made for the identical
+// "private metering" reason.
+export const lyricsLookups = sqliteTable("lyrics_lookups", {
+  itemId: text("item_id").primaryKey(),
+  lookedUpAt: integer("looked_up_at").notNull(), // epoch ms
+  outcome: text("outcome").notNull(), // "hit" | "miss"
+});
+
+export const lyricsLookupState = sqliteTable("lyrics_lookup_state", {
+  id: integer("id").primaryKey(), // always 1
+  pausedUntil: integer("paused_until").notNull().default(0), // epoch ms, 0 = not paused
+  backoffS: integer("backoff_s").notNull().default(0), // current backoff in seconds, 0 = no refusal run
+});
+
 export const mediaProgress = sqliteTable(
   "media_progress",
   {
