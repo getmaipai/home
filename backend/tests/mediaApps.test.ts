@@ -8,9 +8,11 @@ import { __resetProgressForTests, flushProgress } from "@/lib/media/progress";
 import { coerceNumber } from "@/lib/media/appHost";
 import { buildMediaTree } from "./support/mediaTree";
 import { db } from "@/db";
-import { people, shares, videoJobs, musicJobs } from "@/db/schema";
+import { people, shares, videoJobs, musicJobs, mediaItems } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import { storeFile } from "@/lib/attachments";
+import { getHouseholdSettingValue, setHouseholdSettingValue } from "@/lib/settings";
+import { getRegistryKey } from "@/lib/settingsRegistry";
 
 beforeEach(() => {
   resetDb();
@@ -47,6 +49,43 @@ async function setup() {
 const progress = (client: TestClient, body: Record<string, unknown>) => client.post("/api/plugins/videos/progress", body);
 
 describe("the media-app host: data ids", () => {
+  test("Music item views gate lyrics and expose lookup eligibility", async () => {
+    const { adult, child } = await setup();
+    expect(getRegistryKey("music.lyrics_online")).toMatchObject({ default: true, label: "Look up song lyrics online", lives_in: "household.pictures", honoured_by: ["home"] });
+    expect(getHouseholdSettingValue("music.lyrics_online")).toBe(true);
+    const row = db.select().from(mediaItems).all().find((item) => item.title === "Morning Light")!;
+    db.update(mediaItems).set({ lyrics: JSON.stringify({ source: "file", text: "First line", timed: [{ t: 1, line: "First line", section: "Verse" }] }) }).where(eq(mediaItems.id, row.id)).run();
+    const url = `/api/plugins/music/data/item`;
+    const lyrics = await (await adult.client.post(url, { id: row.id })).json() as Record<string, unknown>;
+    expect(lyrics).toMatchObject({ lyrics: "First line", timed_lyrics: [{ t: 1, line: "First line", section: "Verse" }], lyrics_lookup: "none" });
+    db.update(mediaItems).set({ bandOk: "adult" }).where(eq(mediaItems.id, row.id)).run();
+    expect(await (await child.client.post(url, { id: row.id })).json()).toEqual([]);
+    db.update(mediaItems).set({ lyrics: null }).where(eq(mediaItems.id, row.id)).run();
+    db.update(mediaItems).set({ bandOk: "child" }).where(eq(mediaItems.id, row.id)).run();
+    const eligible = await (await adult.client.post(url, { id: row.id })).json() as Record<string, unknown>;
+    expect(eligible.lyrics_lookup).toBe("available");
+    db.update(mediaItems).set({ artist: null }).where(eq(mediaItems.id, row.id)).run();
+    expect(((await (await adult.client.post(url, { id: row.id })).json()) as Record<string, unknown>).lyrics_lookup).toBe("none");
+    db.update(mediaItems).set({ artist: row.artist, provenance: "music:generated-library" }).where(eq(mediaItems.id, row.id)).run();
+    expect(((await (await adult.client.post(url, { id: row.id })).json()) as Record<string, unknown>).lyrics_lookup).toBe("none");
+    db.update(mediaItems).set({ provenance: row.provenance }).where(eq(mediaItems.id, row.id)).run();
+    const noLookupForChild = await (await child.client.post(url, { id: row.id })).json() as Record<string, unknown>;
+    expect(noLookupForChild.lyrics_lookup).toBe("none");
+    setHouseholdSettingValue("music.lyrics_online", false);
+    expect(((await (await adult.client.post(url, { id: row.id })).json()) as Record<string, unknown>).lyrics_lookup).toBe("none");
+  });
+  test("a made song copies its stored words onto the promoted media item", async () => {
+    const { adult } = await setup();
+    const person = db.select().from(people).where(eq(people.id, adult.id)).get()!;
+    const made = storeFile(person, { conversationId: null, turnId: null, mediaType: "audio/mp4", bytes: new Uint8Array([2, 4, 6]), provenance: 'music-gen:{"job_id":"lyrics-made-test","title":"At Home"}', deduplicate: false });
+    if (!made.ok) throw new Error(made.error);
+    db.insert(musicJobs).values({ id: "lyrics-made-test", personId: adult.id, task: "text2music", state: "done", request: JSON.stringify({ title: "At Home", lyrics: "[Verse]\nWords from home" }), fileId: made.value.id, durationS: 40, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(), hlc: "1:0:lyrics-made" }).run();
+    await adult.client.post("/api/plugins/music/queue", { id: made.value.id });
+    const item = db.select().from(mediaItems).where(eq(mediaItems.locFileId, made.value.id)).get()!;
+    expect(JSON.parse(item.lyrics!)).toEqual({ source: "made", text: "[Verse]\nWords from home" });
+    const view = await (await adult.client.post("/api/plugins/music/data/item", { id: item.id })).json() as Record<string, unknown>;
+    expect(view.lyrics_lookup).toBe("none");
+  });
   test("Videos lists made clips through Library visibility and plays them in the existing player", async () => {
     const { owner, adult, child } = await setup();
     const adultPerson = db.select().from(people).where(eq(people.id, adult.id)).get()!;

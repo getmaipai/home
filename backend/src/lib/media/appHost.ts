@@ -63,6 +63,9 @@ export interface MediaRow {
 }
 
 export interface MediaItemView extends MediaRow {
+  lyrics?: string;
+  timed_lyrics?: Array<{ t: number; line: string; section?: string | null }>;
+  lyrics_lookup?: "available" | "none";
   /** Podcasts: the item is in this person's queue, and a copy is saved on the hub. */
   queued?: boolean;
   saved?: boolean;
@@ -890,6 +893,13 @@ function promoteMadeMusicFile(person: PersonRow, fileId: string): MediaItem | nu
   db.insert(mediaItems).values({
     id, kind: "track", title: file.name, sourceId: source.id, locFileId: file.id, mediaType: file.media_type,
     durationS: file.duration_seconds, size: file.size_bytes, playable: "original", bandOk: file.audience === "adult-only" ? "adult" : "child",
+    lyrics: (() => {
+      const job = db.select().from(musicJobs).where(eq(musicJobs.fileId, file.id)).get();
+      if (!job) return null;
+      const request = JSON.parse(job.request) as { instrumental?: boolean; lyrics?: string; written_lyrics?: string };
+      const text = request.lyrics;
+      return !request.instrumental && text?.trim() ? JSON.stringify({ source: "made", text }) : null;
+    })(),
     addedAt: file.created_at, createdAt: now, hlc: nextHlc(), provenance: "music:generated-library",
   }).run();
   return readableIn(person, "music", id);

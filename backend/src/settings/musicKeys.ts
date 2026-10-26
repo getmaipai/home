@@ -6,6 +6,12 @@ import { SettingsKey } from "@maipai/spec/gen/ts/settings-key.js";
 
 export const MUSIC_SETTINGS_KEYS: SettingsKey[] = [
   SettingsKey.parse({
+    key: "music.lyrics_online", scope: "household", selector: "boolean", default: true,
+    label: "Look up song lyrics online",
+    help: "When someone opens Lyrics for a song with no words, Home sends its title, artist, album and length once per song to look them up. Never for songs made at home or for a child.",
+    level: "advanced", secret: false, lives_in: "household.pictures", honoured_by: ["home"],
+  }),
+  SettingsKey.parse({
     key: "generation.music.enabled",
     scope: "household",
     selector: "boolean",

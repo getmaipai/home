@@ -8,6 +8,7 @@ import { appRouteAllowed } from "@/lib/apps";
 import { getCookie } from "hono/cookie";
 import { hashSessionToken } from "@/lib/session";
 import "@/lib/media/podcastApp"; // registers the Podcasts data ids and item view with the shared host
+import "@/lib/media/musicApp"; // registers the Music lyrics fields with the shared host
 import { podcastRoutes } from "./podcastApp";
 import { musicPlaylistAction, startMusicQueue, coerceNumber, mediaAppAllowed, mediaAppData, saveProgress, setListed, setWatchlist, changeVideoCreationShare, changeMusicCreationShare, MEDIA_APP_IDS, type DataParams, type MediaAppId } from "@/lib/media/appHost";
 
