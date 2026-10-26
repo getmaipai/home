@@ -151,7 +151,7 @@ describe("a media app in the shell", () => {
     expect(shared.textContent).toContain("+1");
     expect(shared.querySelectorAll('[data-slot="avatar"]')).toHaveLength(3);
     const description = view.getByText(/A paper boat glides/);
-    expect(description.className).toContain("line-clamp-3");
+    expect(description.closest('[data-slot="light-markdown"]')?.parentElement?.className).toContain("line-clamp-3");
     fireEvent.click(view.getByRole("button", { name: "Show more" }));
     expect(view.getByRole("button", { name: "Show less" })).toBeTruthy();
     expect(document.body.textContent).not.toMatch(/[{}]/);
@@ -175,7 +175,7 @@ describe("a media app in the shell", () => {
         if (JSON.parse(String(init?.body ?? "{}")).scope === "creation-people") return Promise.resolve(Response.json([candidate]));
         return Promise.resolve(Response.json([{ id: "file-song-123", title: "River song", creator: { name: "Jesse Torres", href: "/people/person-jesse", avatar_url: null }, made_at: "2026-10-21T12:00:00Z", description: "[Verse] Morning light by the river. The water moves beneath the willow trees.", visibility: { mode: "shared", people: recipients, can_manage: true } }]));
       }
-      if (url.startsWith("/api/plugins/music/data/item")) return Promise.resolve(Response.json({ id: "file-song-123", title: "River song", src: "/api/files/file-song-123/content", duration_s: 20, chapters: [] }));
+      if (url.startsWith("/api/plugins/music/data/item")) return Promise.resolve(Response.json([{ id: "file-song-123", title: "River song", src: "/api/files/file-song-123/content", duration_s: 20, lyrics: "[Verse] Morning light", chapters: [] }]));
       if (url.startsWith("/api/plugins/music/data/up-next")) return Promise.resolve(Response.json([]));
       if (url.startsWith("/api/plugins/music/actions/")) {
         shareBodies.push(JSON.stringify({ url, body: init?.body }));
@@ -184,13 +184,13 @@ describe("a media app in the shell", () => {
       return baseFetch(input, init);
     }) as typeof fetch;
     const view = open("/apps/music/play?id=file-song-123");
-    const title = await view.findByRole("heading", { level: 1, name: "River song" });
-    expect(title.className).toContain("font-bold");
+    expect(await view.findByText("River song")).toBeTruthy();
     expect(view.getByRole("link", { name: "Jesse Torres, open profile" }).getAttribute("href")).toBe("/people/person-jesse");
     expect(view.container.querySelector("time")?.textContent).toMatch(/^Made /);
     const shared = view.getByRole("button", { name: "Shared, manage sharing" });
     expect(shared.querySelectorAll('[data-slot="avatar"]')).toHaveLength(2);
-    expect(view.getByText(/\[Verse\] Morning light/).className).toContain("line-clamp-3");
+    fireEvent.click(view.getByRole("button", { name: "Lyrics" }));
+    expect(await view.findByText(/\[Verse\] Morning light/)).toBeTruthy();
     fireEvent.click(shared);
     expect(await view.findByRole("dialog")).toBeTruthy();
     fireEvent.click(view.getByRole("switch", { name: "Clover" }));
