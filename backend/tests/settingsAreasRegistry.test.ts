@@ -30,7 +30,7 @@ describe("settings registry and the spec's areas", () => {
     const notPlaced = new Set(not_placed.map((n) => `${n.scope}:${n.group}`));
     const cards = new Map<string, number>();
     // WEATHER-APP-01: a bundled package declares its own settings area (contributes.settings_area); its cards place keys too.
-    type Card = { group?: string; scope?: string; levels?: string[] };
+    type Card = { group?: string; groups?: string[]; scope?: string; levels?: string[] };
     const packageAreas = readdirSync(join(import.meta.dir, "../packages"), { withFileTypes: true })
       .filter((d) => d.isDirectory() && existsSync(join(import.meta.dir, "../packages", d.name, "manifest.json")))
       .flatMap((d) => {
@@ -38,10 +38,11 @@ describe("settings registry and the spec's areas", () => {
         return manifest.contributes?.settings_area ? [manifest.contributes.settings_area] : [];
       });
     for (const area of [...areas, ...packageAreas]) for (const s of area.sections as { cards?: Card[] }[]) {
-      for (const c of s.cards ?? []) if (c.group) {
+      // A card places one group (group) or a list of them (groups, the AI and models glance card).
+      for (const c of s.cards ?? []) for (const group of c.group ? [c.group] : (c.groups ?? [])) {
         const levels = c.levels ?? ["*"];
         for (const level of levels) {
-          const id = `${c.scope}:${c.group}:${level}`;
+          const id = `${c.scope}:${group}:${level}`;
           cards.set(id, (cards.get(id) ?? 0) + 1);
         }
       }
