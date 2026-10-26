@@ -209,6 +209,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `frontend/src/shell/pages/dashboard/GettingStarted.tsx` | GETTING_STARTED_ROWS, openChecklistItems, GettingStarted |
 | `frontend/src/shell/pages/dashboard/Greeting.tsx` | Greeting |
 | `frontend/src/shell/pages/dashboard/HomePlaceAsk.tsx` | label, HomePlaceAsk |
+| `frontend/src/shell/pages/dashboard/HomeShelves.tsx` | ContinueShelf, FamilyShelf, HomeMedia |
 | `frontend/src/shell/pages/dashboard/TodaySection.tsx` | TODAY_CARD_BUDGET, todaySlots, TodaySection |
 | `frontend/src/shell/pages/dataTableControls.tsx` | useDataTableControls |
 | `frontend/src/shell/pages/packageAppHeaderBar.tsx` | publishPackageAppHeader, PackageAppHeaderBar, sectionsBarEntries |
