@@ -108,7 +108,6 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `frontend/src/apps/settings/FreeUpSpaceDialog.tsx` | FreeUpSpaceDialog |
 | `frontend/src/apps/settings/HouseholdRobotsSection.tsx` | HouseholdRobotsSection |
 | `frontend/src/apps/settings/HuggingFaceTokenSection.tsx` | HuggingFaceTokenSection |
-| `frontend/src/apps/settings/LooksLikePicker.tsx` | NOBODY, LooksLikePicker |
 | `frontend/src/apps/settings/MicrophoneSection.tsx` | MicrophoneSection |
 | `frontend/src/apps/settings/ModelsAndStorageSection.tsx` | sizeWords, lastUsedWords, ModelsAndStorageSection |
 | `frontend/src/apps/settings/ModelsSection.tsx` | ModelsSection, describeHardware |
@@ -429,15 +428,6 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/licenceAcceptance.ts` | readLicenceAck, currentLicenceAck, ackCovers, licenceCovered, recordLicenceAck, adoptLicenceAck |
 | `backend/src/lib/licenceFlow.ts` | licenceOverview, acceptLicences, widenLicenceAck, installRecommendedExtras, autoInstallOnUpgrade |
 | `backend/src/lib/licenceRepair.ts` | LICENCE_ISSUE, syncLicenceIssue |
-| `backend/src/lib/likeness/adapters.ts` | declareStyleSubject, getStyleSubject, allStyleSubjects, forgetStyleSubject, queueStyleRemoval, drainStyleRemovals |
-| `backend/src/lib/likeness/apply.ts` | MANY_PEOPLE_LINE, STYLE_REMOVED_LINE, subjectOfStyle, prepareStyleUse, prepareStylesUse, preparePhotoUse |
-| `backend/src/lib/likeness/decide.ts` | subjectName, LIKENESS_LINES, HOUSEHOLD_LIKENESS_KEY, householdLikenessOn, decideLikeness |
-| `backend/src/lib/likeness/guard.ts` | stoppedLine, likenessStillAllowed |
-| `backend/src/lib/likeness/importStyle.ts` | NOBODY, LOOKS_LIKE_REQUIRED_LINE, checkStyleSubject, sha256Of, stackLikenessFields |
-| `backend/src/lib/likeness/inspector.ts` | __setPhotoCompletionForTests, __setPhotoInspectorForTests, inspectPhotoResult, inspectPhoto, PHOTO_LINES, singleAdultPhoto |
-| `backend/src/lib/likeness/proof.ts` | PROOF_TTL_SECONDS, __resetLikenessKeyForTests, __setProofClockForTests, mintProof, photoBind, STACK_OLD_LINE |
-| `backend/src/lib/likeness/resolve.ts` | subjectEligibility, householdAdults, resolveDeclaredAdult, messageAttests, WHO_IS_IN_PHOTO_LINE, attestedAdult |
-| `backend/src/lib/likeness/revoke.ts` | likenessPersonGone |
 | `backend/src/lib/lists.ts` | listLists, getList, createList, findOrCreateStandingList, updateList, deleteList |
 | `backend/src/lib/liveView.ts` | LIVE_VIEW_MAX_MS, LIVE_VIEW_ATTACH_GRACE_MS, LIVE_VIEW_MAX_FRAME_BYTES, liveViewAdmits, getLiveView, startLiveView |
 | `backend/src/lib/llm.ts` | PERSON_TURN_BUDGET, EPHEMERAL_TURN_BUDGET, personWithinTurnBudget, personWithinEphemeralBudget, toToolDefinition, envelopeToolCall |
@@ -555,16 +545,16 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/pictures/adapters.ts` | __resetAdapterCacheForTests, dropAdapterCache, allAdapters, adaptersFor, setAdapterEnabled, forgetAdapterPref |
 | `backend/src/lib/pictures/ageCheck.ts` | minorRefusalLine, uncheckedRefusalLine, VERDICT_SCHEMA, AGE_CHECK_SYSTEM_PROMPT, parseVerdict, MIN_ADULT_CONFIDENCE |
 | `backend/src/lib/pictures/audience.ts` | routeAudience |
-| `backend/src/lib/pictures/editSources.ts` | TEEN_PHOTO_LINE, SUBJECT_NOT_ALLOWED_LINE, prepareEditSource |
+| `backend/src/lib/pictures/editSources.ts` | prepareEditSource |
 | `backend/src/lib/pictures/editTool.ts` | GENERATE_IMAGE_TOOL_ID, EDIT_KINDS, nameEditModel, latestPictureId, runEditPicture |
 | `backend/src/lib/pictures/jobStore.ts` | PICTURE_FAILED_PREFIX, plainFailure, saveJob, markLive, markSettled, getPictureJob |
-| `backend/src/lib/pictures/jobs.ts` | __resetPictureJobsForTests, startPictureJob, __setPicturePollMsForTests, stopLikenessPictureJobs, cancelPictureJob, resumePictureJobs |
+| `backend/src/lib/pictures/jobs.ts` | __resetPictureJobsForTests, startPictureJob, __setPicturePollMsForTests, cancelPictureJob, resumePictureJobs, fileUrl |
 | `backend/src/lib/pictures/keyframes.ts` | ensureKeyframeHelper, __setKeyframesForTests, __resetKeyframeHelperForTests, keyframeCount, extractKeyframes |
 | `backend/src/lib/pictures/lane.ts` | laneOf, KIDS_KEY, KID_ENABLED_KEY, KIDS_DAILY_PICTURES_KEY, KIDS_DAILY_VIDEOS_KEY, DEFAULT_KIDS_DAILY_PICTURES |
 | `backend/src/lib/pictures/laneGate.ts` | CHILD_SAFETY_SCHEMA, CHILD_SAFETY_SYSTEM_PROMPT, MIN_CHILD_CONFIDENCE, parseChildSafety, childSafetyOk, __setChildSafetyRunnerForTests |
 | `backend/src/lib/pictures/minorLine.ts` | MINOR_MARKERS, SEXUAL_WORDS, UNCLOTHED_PHRASES, normalise, hasWord, mentionsSexualWord |
-| `backend/src/lib/pictures/people.ts` | PeopleError, NO_PEOPLE_LINE, PEOPLE_UNAVAILABLE_LINE, PEOPLE_UNSURE_LINE, PEOPLE_BUSY_LINE, RETRY_PAUSE_MS |
-| `backend/src/lib/pictures/policy.ts` | GENERATION_ADULTS_KEY, GENERATION_ADULT_ADAPTERS_KEY, PEOPLE_PROMPTS_KEY, peoplePromptsOn, peopleGuidanceSuffix, REAL_PEOPLE_PICTURE_GUIDANCE |
+| `backend/src/lib/pictures/people.ts` | __setPeopleRetryPauseForTests, runPictureTool |
+| `backend/src/lib/pictures/policy.ts` | GENERATION_ADULTS_KEY, GENERATION_ADULT_ADAPTERS_KEY, PICTURE_STARTED_CONFIRM_NOTE, GENERATION_PICTURE_QUALITY_KEY, PICTURE_DENIAL_LINE, PICTURE_NOT_HERE_LINE |
 | `backend/src/lib/pictures/quality.ts` | QUICK_MODEL, ERNIE_MODEL, DETAILED_MODEL, qualityOfModel, isPictureQuality, quickModelFor |
 | `backend/src/lib/pictures/ready.ts` | __setPictureStatusForTests, __setPictureStatusReaderForTests, pictureEngineStatus, dropPictureStatusCache, pictureEngineReady, readyStatusForTests |
 | `backend/src/lib/pictures/stack.ts` | StackPicturesError, __setPicturesFetchForTests, submitGeneration, submitEdit, getGenerationJob, fetchPicturePreview |

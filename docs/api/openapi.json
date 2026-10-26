@@ -50210,13 +50210,6 @@
                       "height"
                     ]
                   },
-                  "subject_person_id": {
-                    "type": "string",
-                    "nullable": true,
-                    "minLength": 1,
-                    "maxLength": 80,
-                    "description": "LIKENESS-01: the household adult an uploaded photo shows, picked from the adults list. Left out, the photo must show no one."
-                  },
                   "mask": {
                     "type": "string",
                     "nullable": true,
@@ -50228,14 +50221,7 @@
                     "nullable": true,
                     "minLength": 1,
                     "maxLength": 80,
-                    "description": "IMGEDIT-01: another picture of this chat the change draws on, such as the person to add to the scene."
-                  },
-                  "reference_subject_person_id": {
-                    "type": "string",
-                    "nullable": true,
-                    "minLength": 1,
-                    "maxLength": 80,
-                    "description": "IMGEDIT-01: the household adult the reference photo shows; left out, the reference must show no one."
+                    "description": "IMGEDIT-01: another picture of this chat the change draws on."
                   }
                 },
                 "required": [
@@ -50616,23 +50602,6 @@
                           },
                           "needs_confirmation": {
                             "type": "boolean"
-                          },
-                          "looks_like": {
-                            "type": "object",
-                            "nullable": true,
-                            "properties": {
-                              "id": {
-                                "type": "string"
-                              },
-                              "name": {
-                                "type": "string"
-                              }
-                            },
-                            "required": [
-                              "id",
-                              "name"
-                            ],
-                            "description": "LIKENESS-01: the household adult this style looks like, or null for nobody."
                           }
                         },
                         "required": [
@@ -50649,8 +50618,7 @@
                           "trigger_words",
                           "added_at",
                           "enabled",
-                          "needs_confirmation",
-                          "looks_like"
+                          "needs_confirmation"
                         ]
                       }
                     },
@@ -51054,23 +51022,6 @@
                         },
                         "needs_confirmation": {
                           "type": "boolean"
-                        },
-                        "looks_like": {
-                          "type": "object",
-                          "nullable": true,
-                          "properties": {
-                            "id": {
-                              "type": "string"
-                            },
-                            "name": {
-                              "type": "string"
-                            }
-                          },
-                          "required": [
-                            "id",
-                            "name"
-                          ],
-                          "description": "LIKENESS-01: the household adult this style looks like, or null for nobody."
                         }
                       },
                       "required": [
@@ -51087,8 +51038,7 @@
                         "trigger_words",
                         "added_at",
                         "enabled",
-                        "needs_confirmation",
-                        "looks_like"
+                        "needs_confirmation"
                       ]
                     }
                   },
@@ -51247,19 +51197,6 @@
                   "trigger_words": {
                     "type": "string",
                     "maxLength": 400
-                  },
-                  "looks_like": {
-                    "type": "string",
-                    "maxLength": 80,
-                    "description": "'nobody', or the id of the living household adult the style looks like."
-                  },
-                  "not_real_person": {
-                    "type": "string",
-                    "enum": [
-                      "true",
-                      "false"
-                    ],
-                    "description": "Older clients: the same as looks_like 'nobody'."
                   }
                 },
                 "required": [
@@ -51343,23 +51280,6 @@
                             },
                             "needs_confirmation": {
                               "type": "boolean"
-                            },
-                            "looks_like": {
-                              "type": "object",
-                              "nullable": true,
-                              "properties": {
-                                "id": {
-                                  "type": "string"
-                                },
-                                "name": {
-                                  "type": "string"
-                                }
-                              },
-                              "required": [
-                                "id",
-                                "name"
-                              ],
-                              "description": "LIKENESS-01: the household adult this style looks like, or null for nobody."
                             }
                           },
                           "required": [
@@ -51376,8 +51296,7 @@
                             "trigger_words",
                             "added_at",
                             "enabled",
-                            "needs_confirmation",
-                            "looks_like"
+                            "needs_confirmation"
                           ]
                         }
                       },
@@ -51593,23 +51512,6 @@
                     },
                     "needs_confirmation": {
                       "type": "boolean"
-                    },
-                    "looks_like": {
-                      "type": "object",
-                      "nullable": true,
-                      "properties": {
-                        "id": {
-                          "type": "string"
-                        },
-                        "name": {
-                          "type": "string"
-                        }
-                      },
-                      "required": [
-                        "id",
-                        "name"
-                      ],
-                      "description": "LIKENESS-01: the household adult this style looks like, or null for nobody."
                     }
                   },
                   "required": [
@@ -51626,8 +51528,7 @@
                     "trigger_words",
                     "added_at",
                     "enabled",
-                    "needs_confirmation",
-                    "looks_like"
+                    "needs_confirmation"
                   ]
                 }
               }
@@ -53018,63 +52919,6 @@
         }
       }
     },
-    "/api/likeness/adults": {
-      "get": {
-        "tags": [
-          "Pictures"
-        ],
-        "summary": "Household adults who can be a picture or video subject",
-        "responses": {
-          "200": {
-            "description": "Living household adults eligible to be a subject.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "adults": {
-                      "type": "array",
-                      "items": {
-                        "type": "object",
-                        "properties": {
-                          "id": {
-                            "type": "string"
-                          },
-                          "name": {
-                            "type": "string"
-                          },
-                          "self": {
-                            "type": "boolean"
-                          }
-                        },
-                        "required": [
-                          "id",
-                          "name",
-                          "self"
-                        ]
-                      }
-                    }
-                  },
-                  "required": [
-                    "adults"
-                  ]
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Not signed in",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
     "/api/videos/status": {
       "get": {
         "tags": [
@@ -54145,7 +53989,7 @@
         "tags": [
           "Videos"
         ],
-        "summary": "Animate a picture this home made, or a photo of a household adult",
+        "summary": "Animate a picture",
         "requestBody": {
           "content": {
             "application/json": {
@@ -54171,12 +54015,6 @@
                     "type": "string",
                     "minLength": 3,
                     "maxLength": 1200
-                  },
-                  "photo_subject_id": {
-                    "type": "string",
-                    "minLength": 1,
-                    "maxLength": 80,
-                    "description": "With a photo (file_id) that was not made here: the household adult the photo shows, picked from the adults list. Anyone else is refused."
                   }
                 },
                 "required": [
@@ -54592,23 +54430,6 @@
                           },
                           "added_at": {
                             "type": "string"
-                          },
-                          "looks_like": {
-                            "type": "object",
-                            "nullable": true,
-                            "properties": {
-                              "id": {
-                                "type": "string"
-                              },
-                              "name": {
-                                "type": "string"
-                              }
-                            },
-                            "required": [
-                              "id",
-                              "name"
-                            ],
-                            "description": "LIKENESS-01: the household adult this style looks like, or null for nobody."
                           }
                         },
                         "required": [
@@ -54624,8 +54445,7 @@
                           "strength_default",
                           "bytes",
                           "source_url",
-                          "added_at",
-                          "looks_like"
+                          "added_at"
                         ]
                       }
                     }
@@ -54769,23 +54589,6 @@
                     },
                     "added_at": {
                       "type": "string"
-                    },
-                    "looks_like": {
-                      "type": "object",
-                      "nullable": true,
-                      "properties": {
-                        "id": {
-                          "type": "string"
-                        },
-                        "name": {
-                          "type": "string"
-                        }
-                      },
-                      "required": [
-                        "id",
-                        "name"
-                      ],
-                      "description": "LIKENESS-01: the household adult this style looks like, or null for nobody."
                     }
                   },
                   "required": [
@@ -54801,8 +54604,7 @@
                     "strength_default",
                     "bytes",
                     "source_url",
-                    "added_at",
-                    "looks_like"
+                    "added_at"
                   ]
                 }
               }
@@ -54979,18 +54781,12 @@
                   "trigger_words": {
                     "type": "string",
                     "maxLength": 400
-                  },
-                  "looks_like": {
-                    "type": "string",
-                    "maxLength": 80,
-                    "description": "'nobody', or the id of the living household adult the style looks like."
                   }
                 },
                 "required": [
                   "file",
                   "name",
-                  "licence",
-                  "looks_like"
+                  "licence"
                 ]
               }
             }
@@ -55050,23 +54846,6 @@
                     },
                     "added_at": {
                       "type": "string"
-                    },
-                    "looks_like": {
-                      "type": "object",
-                      "nullable": true,
-                      "properties": {
-                        "id": {
-                          "type": "string"
-                        },
-                        "name": {
-                          "type": "string"
-                        }
-                      },
-                      "required": [
-                        "id",
-                        "name"
-                      ],
-                      "description": "LIKENESS-01: the household adult this style looks like, or null for nobody."
                     }
                   },
                   "required": [
@@ -55082,8 +54861,7 @@
                     "strength_default",
                     "bytes",
                     "source_url",
-                    "added_at",
-                    "looks_like"
+                    "added_at"
                   ]
                 }
               }
@@ -58305,18 +58083,8 @@
                 "properties": {
                   "image": {
                     "nullable": true
-                  },
-                  "rights_confirmed": {
-                    "type": "string"
-                  },
-                  "shows_real_person": {
-                    "type": "string"
                   }
-                },
-                "required": [
-                  "rights_confirmed",
-                  "shows_real_person"
-                ]
+                }
               }
             }
           }
