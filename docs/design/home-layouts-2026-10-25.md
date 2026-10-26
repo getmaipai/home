@@ -45,8 +45,9 @@ One block library, four arrangements (the mockup draws all four from the same ma
 ## 4. Decision
 
 1. **A person picks A, B or C** in Settings, Appearance, with the setting `ui.home_layout` (person scope, `select`, values `ask`,
-   `board`, `shelves`). The default is `ask`, the page as built. Making `board` the default would reverse Jesse's 2026-10-17
-   decision 1 (option C there, which rejected a dashboard-first page) and needs his yes; it is not assumed. D is not offered: it is a
+   `board`, `shelves`). The default is `shelves`, owner-approved in chat 2026-10-25 (Jesse: "start with shelves"). That reverses the 2026-10-17
+   decision 1 (option C there, ask first) for the default, with his yes. With no media and nothing made, `shelves` draws the `ask`
+   arrangement (decision 5), so a new household still opens on a full page. D is not offered: it is a
    shared-screen mode for a device, filed for when a calendar and a chores package exist (its own note then).
 2. **A gear on the Home header** (the kit's icon `Button`, a link) goes to the Appearance page with the `ui.home_layout` row in view.
    It is the only new control on Home. A guest does not see it (a guest has no settings). A child sees it and lands on the disabled
@@ -67,12 +68,11 @@ One block library, four arrangements (the mockup draws all four from the same ma
 
 ## 5. Supersedes
 
-- 2026-10-17 note section 5 and decision 1: it chose ask-first over a dashboard. This note keeps `ask` as the default; `board` is an
-  opt-in layout a person picks, not the page for everyone.
+- 2026-10-17 note section 5 and decision 1: it chose ask-first over a dashboard. The default is now `shelves` (owner-approved 2026-10-25), falling back to `ask` while there is
+  nothing to show; `board` and `ask` are layouts a person picks.
 - 2026-10-17 section 6 item 6 (Today as up to four `Card`s) and item 8 (Getting started as one card): in the `ask` layout Today is
   chips that open the full card, and in `board` Getting started is one slim bar. In `ask` the full cards stay one tap away.
-- 2026-10-17 section 9 (Recently made is an opt-in block): `shelves` shows "Made at home" because the person chose that layout; it
-  is not on the default page.
+- 2026-10-17 section 9 (Recently made is an opt-in block): `shelves`, the default, shows "Made at home" (owner-approved 2026-10-25).
 - Nothing in RULES.md.
 
 ## 6. Rule check
@@ -105,5 +105,4 @@ dispatched to Codex (`scripts/wt.sh run codex`, then `wait`), read, gated and la
 
 ## 9. Open items for Jesse
 
-None block the filing. For Jesse's yes when he wants it: `board` as the default for new people (it reverses 2026-10-17 decision 1;
-`ask` stays the default until then), and whether C ships with A and B or after the Media hub's pictures are real.
+None block the filing. Whether C ships with A and B or after the Media hub's pictures are real; with `shelves` the default, C should ship with the first layout.
