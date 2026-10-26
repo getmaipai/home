@@ -4,5 +4,7 @@
   "content.filters",
   "news.default_topics.adult",
   "news.default_topics.teen",
-  "news.default_topics.child"
+  "news.default_topics.child",
+  "likeness.adults",
+  "likeness.adult_content"
 ]
