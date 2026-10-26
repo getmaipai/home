@@ -27,9 +27,10 @@ import { stripCueTags } from "@/lib/voiceCues";
 import { validateTurnInput, validateContinuationInput, BareModeForbidden, loadAllManifests, commandOpeners, computedPatternMatch, StreamSafetyRefusal, StreamUnavailable, CRISIS_RESOURCES_TEXT, crisisSupportFor, deriveCrisisResources, judgeStatusAtInsert, variedConstantReply, speechTextFor } from "@/lib/turnShared";
 import { acquireTurnLease, type TurnLease } from "@/lib/turnActivity";
 import type { PersonRow } from "@/lib/memoryIngestion";
-import { resolveOrCreateConversation, resolveSupersedes, getPendingAsk, setPendingAsk, logTurn, appendTemporaryTurn, isTemporaryConversation, type PendingAsk } from "@/lib/conversationHistory";
+import { resolveOrCreateConversation, resolveSupersedes, getPendingAsk, setPendingAsk, takePendingAsk, logTurn, appendTemporaryTurn, isTemporaryConversation, type PendingAsk } from "@/lib/conversationHistory";
 import { classifyTurnSignal } from "@/lib/turnSignal";
 import { speakerIsAnonymous, turnAgeBand } from "./speaker";
+import { ASK_SUBMITTED_LINE, RESUMED_ASK_CALL_PREFIX, validateAskValues } from "@/lib/askForm";
 import { carriesCrisisSignal } from "@/lib/safety";
 import { resolvePersona, adaptPersonaToBand, DEFAULT_PERSONA, type Persona } from "@/lib/persona";
 import { createHash } from "node:crypto";
@@ -92,7 +93,7 @@ export interface RunTurnNextOpts {
   // /api/turn/stream's own additive `ask_answer` field - resumesAsk()'s
   // own doc comment has the full matching rule. Absent for every typed
   // or spoken turn, exactly as today.
-  ask_answer?: { turn_id: string; approved: boolean } | { offer_id: string; approved: boolean };
+  ask_answer?: { turn_id: string; approved: boolean } | { turn_id: string; values: Record<string, string | number | boolean | null> } | { offer_id: string; approved: boolean };
   // THIN-0D: the robot body's own speaker_evidence and present list,
   // from POST /api/turn and /api/turn/stream (routes/turn.ts passes them
   // for the robot surface only). Absent means the body said nothing, and
@@ -402,7 +403,7 @@ function resumesAsk(ask: PendingAsk, utterance: string, askAnswer: { turn_id: st
   } else if (!AFFIRMATIVE_RE.test(utterance)) {
     return null;
   }
-  return { kind: "side_effecting", request: { tool: ask.packageId, args: ask.args, callId: `resumed:${ask.packageId}` } };
+  return { kind: "side_effecting", request: { tool: ask.packageId, args: ask.args, callId: `resumed:${ask.packageId}` }, ...(ask.fromForm ? { redactArgs: true } : {}) };
 }
 
 /** finishTurn()'s own, narrow failure: the machine itself timed out or
@@ -488,6 +489,7 @@ async function beginTurn(actor: PersonRow, surface: Surface, text: string, opts:
   // the words in `text` decide (answerRobotOffer), never the flag alone.
   const offerAnswer = opts.ask_answer && "offer_id" in opts.ask_answer ? opts.ask_answer : undefined;
   const askAnswer = opts.ask_answer && "turn_id" in opts.ask_answer ? opts.ask_answer : undefined;
+  const fieldAnswer = askAnswer && "values" in askAnswer ? askAnswer : undefined;
   let offerTurn: { id: string; reply: string } | undefined;
   if (offerAnswer) {
     if (surface !== "robot") return { ok: false, result: { ok: false, status: 409, code: "ask_stale", error: "That offer is no longer waiting for an answer." } };
@@ -500,8 +502,25 @@ async function beginTurn(actor: PersonRow, surface: Surface, text: string, opts:
     else if (answered.kind === "declined") offerTurn = { id: answered.offer.id, reply: "Okay, I won't bring it up." };
     else if (answered.kind === "snoozed") offerTurn = { id: answered.offer.id, reply: "Okay, I'll ask again in a little while." };
   }
-  if (askAnswer && (!pendingAsk || pendingAsk.turnId !== askAnswer.turn_id)) {
+  const isFormAsk = pendingAsk?.kind === "ask" && pendingAsk.fields !== undefined;
+  if (askAnswer && (!pendingAsk || pendingAsk.turnId !== askAnswer.turn_id || ("values" in askAnswer) !== isFormAsk)) {
     return { ok: false, result: { ok: false, status: 409, code: "ask_stale", error: "This confirmation is no longer waiting for an answer." } };
+  }
+  let resumedFormProposal: ActionProposal | undefined;
+  if (fieldAnswer && pendingAsk?.fields) {
+    // Identity (turn id, above), package, actor, band, conversation (the ask is read from this request's conversation) and
+    // expiry are all checked before any value is read. A mismatch is the same 409 a stale confirm tap gets.
+    const stale = !pendingAsk.packageId || pendingAsk.actorId !== actor.id || band !== "adult" || speakerIsAnonymous(speaker)
+      || surface !== "chat" || temporary || opts.ephemeral === true
+      || !pendingAsk.expiresAt || !(Date.parse(pendingAsk.expiresAt) > Date.now());
+    if (stale) return { ok: false, result: { ok: false, status: 409, code: "ask_stale", error: "This form has expired or no longer belongs to this chat. Ask again to get a new form." } };
+    const checked = validateAskValues(pendingAsk.fields, fieldAnswer.values);
+    // The pending ask stays open on a bad value, so the person can correct the field and submit again.
+    if (!checked.ok) return { ok: false, result: { ok: false, status: 400, code: "invalid_input", error: checked.error } };
+    // Consumed here, before the first await: a replayed or concurrent Submit finds nothing left and is 409 ask_stale, so the
+    // package runs once per form.
+    if (!takePendingAsk(conversation.id, pendingAsk.turnId!)) return { ok: false, result: { ok: false, status: 409, code: "ask_stale", error: "This form was already submitted or has expired. Ask again to get a new form." } };
+    resumedFormProposal = { kind: "side_effecting", request: { tool: pendingAsk.packageId, args: { ...pendingAsk.args, ...checked.inputs }, callId: `${RESUMED_ASK_CALL_PREFIX}${pendingAsk.packageId}` }, formResume: true, redactArgs: true };
   }
   const blockedPendingAnswer = pendingAsk?.kind === "confirm" && (
     pendingAskDecision?.kind === "deny"
@@ -679,7 +698,8 @@ async function beginTurn(actor: PersonRow, surface: Surface, text: string, opts:
   // safety state runs first, then the pending ask is consumed before
   // commands") still holds, now with one safety evaluation, traced
   // once, for every turn including a resumed one.
-  const preConfirmed = pendingAsk ? (resumesAsk(pendingAsk, text, askAnswer, pendingAskDecision, band !== "adult") ?? undefined) : undefined;
+  const preConfirmed = resumedFormProposal
+    ?? (pendingAsk ? (resumesAsk(pendingAsk, text, askAnswer && "approved" in askAnswer ? askAnswer : undefined, pendingAskDecision, band !== "adult") ?? undefined) : undefined);
   // THIN-7E (ASK-01): a standing `who` question is read as an answer by the commands node
   // (askNames.ts), so it is kept on the state although the stored ask is cleared just below.
   if (pendingAsk?.kind === "who") state.pendingWho = pendingAsk;
@@ -700,6 +720,12 @@ async function beginTurn(actor: PersonRow, surface: Surface, text: string, opts:
     lease.release();
     throw err;
   }
+}
+
+/** FORM-CHAT-HUB-01: a form Submit carries values, not words. The turn's user line is fixed wording, so whatever text the
+ * client sent is never stored, traced or read (rule 6a). Applied by both entry points, before anything sees the text. */
+function formSubmitText(text: string, opts: RunTurnNextOpts): string {
+  return opts.ask_answer && "values" in opts.ask_answer ? ASK_SUBMITTED_LINE : text;
 }
 
 /** Awaits the machine to "done" and builds the turn's own TurnValue -
@@ -794,11 +820,13 @@ async function finishTurn(begun: BegunTurn): Promise<TurnValue> {
     // "the trace should say what actually happened" reasoning as every
     // other outcome this file already retains.
     if (ask) {
-      state.outcomes.push(outcomeOf({ callId: `${state.turnId}:confirm`, packageId: ask.packageId, status: "pending", args: ask.args, via: "confirm", userMessage: promptText }));
+      // FORM-CHAT-HUB-01 (rule 6a): no outcome for a drawn form, and a confirm parked after a form Submit keeps the submitted values out of it.
+      if (!ask.fields) state.outcomes.push(outcomeOf({ callId: `${state.turnId}:confirm`, packageId: ask.packageId, status: "pending", args: ask.fromForm ? {} : ask.args, via: "confirm", userMessage: promptText }));
     }
     if (ask && !temporary && !state.ephemeral) setPendingAsk(conversationId, { ...ask, turnId: state.turnId, capabilities: ask.capabilities, consequential: ask.consequential });
     value = buildTurnValue(state, startedAt, "confirm", promptText, undefined, undefined, undefined, contextSegments);
-    if (ask && !temporary && !state.ephemeral) value.confirm = { package_id: ask.packageId, open: true };
+    if (ask && !ask.fields && !temporary && !state.ephemeral) value.confirm = { package_id: ask.packageId, open: true };
+    if (ask?.fields && ask.expiresAt && !temporary && !state.ephemeral) value.ask = { turn_id: state.turnId, prompt: ask.prompt, fields: ask.fields, expires_at: ask.expiresAt };
   } else if (finalState === "refused") {
     // A review caught this reading `step` (SafetyOutput there, not
     // OutputGateOutput - a safety refusal parks in `refused` straight
@@ -969,6 +997,7 @@ function resolveRobotPersona(deviceId: string) {
 
 
 export async function runTurnNext(actor: PersonRow, surface: Surface, text: string, opts: RunTurnNextOpts = {}): Promise<TurnImmediateResult> {
+  text = formSubmitText(text, opts);
   const begun = await beginTurn(actor, surface, text, opts);
   if (!begun.ok) return begun.result;
   const { state, lease } = begun.value;
@@ -1047,6 +1076,7 @@ async function* drainDeltaQueue(channel: StatusChannel<string>): AsyncGenerator<
  * cancels it), but its own eventual finishTurn() completion checks
  * `finalizedValue` first and never logs a second time. */
 export async function runTurnNextStream(actor: PersonRow, surface: Surface, text: string, opts: RunTurnNextOpts = {}): Promise<TurnStreamResult> {
+  text = formSubmitText(text, opts);
   const begun = await beginTurn(actor, surface, text, opts);
   if (!begun.ok) return begun.result;
   // THIN-0C: anything below that throws before machineDone exists (its

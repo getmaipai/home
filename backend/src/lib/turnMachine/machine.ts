@@ -300,6 +300,8 @@ export const turnMachine = setup({
       const last = output.outcomes.at(-1);
       return last?.packageId === START_PROJECT_TOOL_ID && last.status === "succeeded";
     },
+    // FORM-CHAT-HUB-01: the tool node parked a typed form (TurnState.ask carries fields); the turn ends asking for it.
+    toolParkedForm: ({ context }) => context.turnState.ask?.fields !== undefined,
     outputRefused: ({ event }) => ((event as unknown as { output: OutputGateOutput }).output).refused === true,
     hasPreConfirmed: ({ context }) => context.preConfirmed !== undefined,
     // THIN-7C: bare mode and a continuation skip the command router; every other node, the
@@ -352,7 +354,7 @@ export const turnMachine = setup({
     // continuation never ran the model this turn, so this builds that
     // same shape from the one proposal turnNext.ts already resolved.
     stepFromPreConfirmed: assign(({ context }) => ({
-      step: { kind: "tool_calls", calls: [{ tool: context.preConfirmed!.request.tool, args: context.preConfirmed!.request.args, id: context.preConfirmed!.request.callId }] },
+      step: { kind: "tool_calls", calls: [{ tool: context.preConfirmed!.request.tool, args: context.preConfirmed!.request.args, id: context.preConfirmed!.request.callId, ...(context.preConfirmed!.formResume ? { formResume: true } : {}), ...(context.preConfirmed!.redactArgs ? { redactArgs: true } : {}) }] },
     })),
     // The policy state's own "asked" exit: stores the parked proposal
     // on TurnState.ask (the contract's own field) so turnNext.ts can
@@ -362,7 +364,7 @@ export const turnMachine = setup({
     parkAsk: ({ context }) => {
       const { parkedAsk } = proposalsFrom(context.step as PolicyOutput);
       if (parkedAsk) {
-        context.turnState.ask = { kind: "confirm", prompt: parkedAsk.prompt, packageId: parkedAsk.proposal.request.tool, args: parkedAsk.proposal.request.args, capabilities: parkedAsk.capabilities, consequential: parkedAsk.consequential };
+        context.turnState.ask = { kind: "confirm", prompt: parkedAsk.prompt, packageId: parkedAsk.proposal.request.tool, args: parkedAsk.proposal.request.args, capabilities: parkedAsk.capabilities, consequential: parkedAsk.consequential, ...(parkedAsk.proposal.redactArgs ? { fromForm: true } : {}) };
       }
     },
     // "Reasoning is a second output": output_gate is the one node that
@@ -530,6 +532,7 @@ export const turnMachine = setup({
           // `moreRoundsAvailable` ever runs, so a successful
           // start_project outcome always lands on `answer` directly,
           // never on a phrasing round `model` invocation.
+          { guard: "toolParkedForm", actions: [assign(({ event }) => ({ step: event.output })), "recordOutcomes"], target: "asked" },
           {
             guard: "toolProvidesOwnReply",
             actions: [assign(({ event }) => ({ step: event.output })), "recordOutcomes", "derivePlanFromEvidence"],

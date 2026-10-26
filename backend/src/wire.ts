@@ -457,6 +457,8 @@ export interface TurnValue {
    * this with the tool-call part's own `turn_id` to match a button tap
    * back to the right ask (chatToolCallPart.ts). */
   confirm?: { package_id: string; open: boolean };
+  /** A package argument form that can be submitted to resume its ask. */
+  ask?: TurnAsk;
   /** STATS-01: optional adult-only engine telemetry, never required. */
   stats?: TurnStats;
   /** ADMIN-COMPARE-01 (b): true when this turn ran the bare-mode bypass
@@ -480,6 +482,15 @@ export interface TurnValue {
    * gate the `reasoning` stream event already uses. */
   reasoning?: string;
 }
+
+/** Exact turn-stream and POST request contract for typed package asks. */
+export interface TurnAskField {
+  name: string; label: string; kind: "text" | "number" | "date_time" | "choice" | "yes_no"; required: boolean;
+  placeholder?: string; min?: number; max?: number; max_length?: 500; options?: string[];
+}
+export interface TurnAsk { turn_id: string; prompt: string; fields: TurnAskField[]; expires_at: string }
+/** POST /api/turn or /api/turn/stream body member; submitted values stay request-local. */
+export interface AskAnswerRequest { ask_answer: { turn_id: string; values: Record<string, string | number | boolean | null> } }
 
 export interface TurnLatency { stt_ms: number | null; first_token_ms: number | null; tts_ttfa_ms: number | null; e2e_ms: number | null }
 

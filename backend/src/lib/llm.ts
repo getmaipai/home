@@ -205,6 +205,9 @@ export interface ToolSpec {
 export interface ToolCall {
   tool: string;
   args: unknown;
+  /** FORM-CHAT-HUB-01, Home-only: set by turnNext.ts for a form-resume or form-confirm run; toolCallFromWire never sets them. */
+  formResume?: boolean;
+  redactArgs?: boolean;
   /** The model's own call id from the wire (CHAT-01: kept so a
    * ToolExecutionOutcome can name the call it answers); absent for a
    * call built by a test or a stub without one. */
@@ -238,7 +241,9 @@ function toolCallFromWire(wire: ToolCallWire): ToolCall {
   } catch {
     args = undefined;
   }
-  return { tool: wire.function.name, args, ...(wire.id ? { id: wire.id } : {}), rawArgs: wire.function.arguments };
+  // FORM-CHAT-HUB-01: a wire id in Home's reserved resume namespace is dropped, so a model or engine can never present one.
+  const id = wire.id && !wire.id.startsWith("resumed-ask:") && !wire.id.startsWith("resumed:") ? wire.id : undefined;
+  return { tool: wire.function.name, args, ...(id ? { id } : {}), rawArgs: wire.function.arguments };
 }
 
 // ENGINE-CONTRACT-03 (dev.md "U6 rerun ruling" (a)): a reply whose

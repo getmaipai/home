@@ -77,6 +77,7 @@ import type { PluginResult } from "@maipai/spec/interpreters/ts/recipe-interpret
 import type { PersonRow } from "@/types";
 import { canReadErrorDetail, statsForViewer } from "@/lib/turnErrorDetail";
 import type { ConversationRow, ConversationSummary, ConversationTurnWithMemoryIds, Media, StructuredPart, TurnValue } from "@/wire";
+import type { TurnAskField } from "@/wire";
 export type { ConversationSummary, ConversationTurnWithMemoryIds } from "@/wire";
 export type { Conversation } from "@maipai/spec/gen/ts/conversation.js";
 
@@ -1339,6 +1340,13 @@ export interface PendingAsk {
    * re-decided at answer time against the speaker's current band. */
   capabilities?: string[];
   consequential?: boolean;
+  /** Typed package form fields; submitted values are never stored here. */
+  fields?: TurnAskField[];
+  minBand?: AgeBand;
+  actorId?: string;
+  expiresAt?: string;
+  /** FORM-CHAT-HUB-01: this confirm was parked by a package re-run after a form Submit, so its args hold the person's values (never put in an outcome, rule 6a). */
+  fromForm?: boolean;
 }
 
 export function getPendingAsk(conversationId: string): PendingAsk | null {
@@ -1361,6 +1369,15 @@ export function setPendingAsk(conversationId: string, ask: PendingAsk | null): v
     .set({ pendingAsk: ask ? JSON.stringify(ask) : null, updatedAt: new Date().toISOString(), hlc: nextHlc() })
     .where(eq(conversations.id, conversationId))
     .run();
+}
+
+/** FORM-CHAT-HUB-01: clears the pending ask only if it is still the one for `turnId`, and says whether this call did.
+ * Synchronous (no await between the check and the clear), so of two concurrent Submits exactly one succeeds. */
+export function takePendingAsk(conversationId: string, turnId: string): boolean {
+  const current = getPendingAsk(conversationId);
+  if (!current || current.turnId !== turnId) return false;
+  setPendingAsk(conversationId, null);
+  return true;
 }
 
 // ==== ASK-01: open questions (spec/schemas/open-question.schema.json) ====

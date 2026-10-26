@@ -58,10 +58,20 @@ export interface ToolRequest {
 export interface ActionProposal {
   kind: "read_only" | "side_effecting";
   request: ToolRequest;
+  /** FORM-CHAT-HUB-01, Home-only (never set from a model or engine call): this run is a package re-run with a form's submitted
+   * values bound as inputs, so grounding is skipped and it is never pre-confirmed. Implies redactArgs. */
+  formResume?: boolean;
+  /** FORM-CHAT-HUB-01, Home-only: the args hold a form's submitted values, so the tool node puts none of them on the tool
+   * timeline, in an outcome, or in an error detail (rule 6a). Also set on the approval of a confirm a form Submit parked. */
+  redactArgs?: boolean;
 }
 
 export interface PendingAskInfo {
   prompt: string;
+  fields?: import("@/wire").TurnAskField[];
+  min_band?: "child" | "teen" | "adult";
+  packageId?: string;
+  args?: Record<string, unknown>;
   capabilities?: string[];
   consequential?: boolean;
 }

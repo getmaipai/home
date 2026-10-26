@@ -5,6 +5,9 @@ import { GENERATE_MUSIC_TOOL_ID, EDIT_MUSIC_TOOL_ID, runGenerateMusic, runEditMu
 // stop at cancellation; the race still records a timeout if a package
 // ignores the signal.
 import { runPlugin } from "@/lib/plugins";
+import { PluginResult } from "@maipai/spec/gen/ts/result.js";
+import { ASK_FORM_TTL_MS } from "@/lib/askForm";
+import type { TurnAskField } from "@/wire";
 import { resolveWeatherPlace } from "@/lib/places";
 import { blockEventsFor } from "../blockEvents";
 import { outcomeOf, type FailureKind } from "@/lib/turnContext";
@@ -84,6 +87,14 @@ function failureKindOf(code: string | undefined): FailureKind {
 }
 
 const MAX_DETAIL_CHARS = 2000;
+/** A form the speaker may not get: the fields go, the package's text prompt stays (as `ask.prompt`, and as the reply when the package sent none). */
+function sanitizeAskResult<T extends { ask?: unknown; reply?: { text?: string } }>(value: T): T {
+  const ask = (value.ask ?? {}) as { prompt?: string; expects?: string };
+  const { ask: _ask, ...safe } = value;
+  const kept = { ...(ask.prompt !== undefined ? { prompt: ask.prompt } : {}), ...(ask.expects !== undefined ? { expects: ask.expects } : {}) };
+  const reply = !value.reply?.text && ask.prompt ? { reply: { ...(value.reply ?? {}), text: ask.prompt } } : {};
+  return { ...safe, ...reply, ...(Object.keys(kept).length ? { ask: kept } : {}) } as T;
+}
 /** Keep the leading gallery opportunity while leaving headroom under the first-text budget. */
 const SHOW_IMAGES_LEAD_WAIT_MS = 600;
 
@@ -155,7 +166,9 @@ export const toolNode: Node<ToolInput, ToolOutput> = async (state, input, signal
     // The proposal is accepted the moment this node starts it - before
     // the call actually resolves, so a client's tool timeline shows the
     // step running, not just its eventual outcome.
-    toolEvents.push({ t: "tool_call", package_id: tool, call_id: callId, args });
+    // FORM-CHAT-HUB-01 (rule 6a): a package re-run with a form's values bound as inputs puts no args on the stream, and records none.
+    const resumedAsk = proposal.redactArgs === true;
+    if (!resumedAsk) toolEvents.push({ t: "tool_call", package_id: tool, call_id: callId, args });
     // ANSWER-IMG-02: show_images acknowledges at once and never runs a package
     // (the picture pipeline was started above, beside the answer).
     if (tool === SHOW_IMAGES_TOOL_ID) {
@@ -278,19 +291,37 @@ export const toolNode: Node<ToolInput, ToolOutput> = async (state, input, signal
     const raced = await withDeadline(runPlugin(tool, state.actor, weatherArgs ?? runArgs, { id: state.turnId, conversationId: state.conversationId }, { signal, deadlineAt: input.deadlineAt, spoken: (state.planBasis?.surfaceClass ?? "spoken") !== "written", band: turnAgeBand(state.surface, state.actor, state.speakerEvidence, new Date(), state.deviceId), ...(hostInputs ? { hostInputs, uncached } : {}) }), signal);
     const durationMs = Date.now() - startedAt;
     if (raced === "deadline") {
-      const outcome = outcomeOf({ callId, packageId: tool, status: "failed", via: "tool_call", args, errorCode: "deadline_exceeded", durationMs, failureKind: "timed_out", detail: "the tool deadline passed before the call returned" });
+      const outcome = outcomeOf({ callId, packageId: tool, status: "failed", via: resumedAsk ? "ask" : "tool_call", ...(resumedAsk ? {} : { args }), errorCode: "deadline_exceeded", durationMs, failureKind: "timed_out", detail: "the tool deadline passed before the call returned" });
       outcomes.push(outcome);
       toolEvents.push({ t: "tool_error", call_id: callId, package_id: tool, error: outcome.failureKind! });
       continue;
     }
     const result = raced;
+    // FORM-CHAT-HUB-01: a typed ask is drawn as a form for an adult speaker on their own written chat only. Anyone else (a
+    // minor, an unknown speaker, a temporary or ephemeral chat, a malformed ask) gets the package's text prompt: the fields
+    // are dropped and the result goes on as an ordinary one. An ask without fields is never touched.
+    let finalValue = result.ok ? result.value : undefined;
+    if (result.ok && (result.value as { ask?: { fields?: unknown } }).ask?.fields !== undefined) {
+      const validated = PluginResult.safeParse(result.value);
+      const ask = validated.success ? validated.data.ask : undefined;
+      const formAllowed = ask?.fields !== undefined && ask.min_band !== undefined
+        && turnAgeBand(state.surface, state.actor, state.speakerEvidence, new Date(), state.deviceId) === "adult"
+        && state.surface === "chat" && state.planBasis?.surfaceClass !== "spoken" && !state.temporary && !state.ephemeral && !speakerIsAnonymous(state);
+      if (ask?.fields && formAllowed) {
+        // The parked ask holds the model's own arguments (as a confirm does) so the package can run again; the person's values
+        // are never stored. No outcome is recorded for the pause (rule 6a), and the turn ends here with the prompt.
+        state.ask = { kind: "ask", prompt: ask.prompt ?? "Please fill in these details.", packageId: tool, args, fields: ask.fields as TurnAskField[], minBand: ask.min_band, actorId: state.actor.id, expiresAt: new Date(Date.now() + ASK_FORM_TTL_MS).toISOString() };
+        continue;
+      }
+      finalValue = sanitizeAskResult(result.value);
+    }
     const outcome = outcomeOf({
       callId,
       packageId: tool,
       status: result.ok ? "succeeded" : "failed",
-      via: "tool_call",
-      args,
-      result: result.ok ? result.value : undefined,
+      via: resumedAsk ? "ask" : "tool_call",
+      ...(resumedAsk ? {} : { args }),
+      result: finalValue,
       // SEARCH-EMPTY-01: this carried only the numeric HTTP-style
       // status, never the semantic HostError code a real caller (a
       // replay bench filtering on `search_unavailable`, e.g.) actually
@@ -307,7 +338,7 @@ export const toolNode: Node<ToolInput, ToolOutput> = async (state, input, signal
       durationMs,
       // R2: the raw error text is the admin-only `detail`, never a `userMessage`.
       failureKind: result.ok ? undefined : failureKindOf(result.code),
-      detail: result.ok ? undefined : result.error.slice(0, MAX_DETAIL_CHARS),
+      detail: result.ok ? undefined : resumedAsk ? "package failed after a form submission" : result.error.slice(0, MAX_DETAIL_CHARS),
     });
     outcomes.push(outcome);
     if (result.ok) {
@@ -322,7 +353,7 @@ export const toolNode: Node<ToolInput, ToolOutput> = async (state, input, signal
       // (2026-09-24) caught an earlier version of this comment claiming
       // the two "can never disagree," which only holds up to five rows.
       const sites = outcome.sources?.slice(0, TOOL_RESULT_SITES_MAX).map((s) => ({ host: s.site, url: s.url }));
-      toolEvents.push({ t: "tool_result", call_id: callId, package_id: tool, outcome: { text: result.value.reply?.text, ...(sites?.length ? { sites } : {}) } });
+      if (!resumedAsk) toolEvents.push({ t: "tool_result", call_id: callId, package_id: tool, outcome: { text: result.value.reply?.text, ...(sites?.length ? { sites } : {}) } });
       // GENUI-02: blocks are independently validated and filtered after
       // the package result lands. They follow their tool_result in call
       // order and precede the phrasing round's first streamed prose delta.

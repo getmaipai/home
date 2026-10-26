@@ -417,12 +417,23 @@ export const policyNode: Node<PolicyInput, PolicyOutput> = async (state, input) 
     }
     const manifest = loaded.value;
     const args = (call.args ?? {}) as Record<string, unknown>;
+    // FORM-CHAT-HUB-01: the Home-set flags count only when this call is exactly the turn's own pre-confirmed proposal
+    // (same tool, same args); a model's call can never carry them.
+    const matchesPre = input.preConfirmed?.request.tool === call.tool && JSON.stringify(input.preConfirmed.request.args) === JSON.stringify(args);
+    const resumedForm = matchesPre && call.formResume === true && input.preConfirmed?.formResume === true;
+    const redactArgs = matchesPre && call.redactArgs === true && input.preConfirmed?.redactArgs === true;
     const proposal: ActionProposal = {
       kind: manifest.consequential ? "side_effecting" : "read_only",
       request: { tool: call.tool, args, callId: call.id ?? call.tool },
+      ...(resumedForm ? { formResume: true } : {}),
+      ...(redactArgs || resumedForm ? { redactArgs: true } : {}),
     };
 
-    const isPreConfirmed = input.preConfirmed?.request.tool === call.tool && JSON.stringify(input.preConfirmed.request.args) === JSON.stringify(args);
+    // FORM-CHAT-HUB-01: a package re-run with a form's values is never pre-confirmed: the same role, band, consent and confirm
+    // checks as a model call apply (a consequential package parks its own confirm). Only the grounding check is skipped below,
+    // because the person's typed values are not in the conversation text by design.
+    // Pre-confirmation belongs to the Home-built call only: a later model round that re-issues the same tool and args is not it.
+    const isPreConfirmed = !resumedForm && matchesPre && input.preConfirmed?.formResume !== true && (input.preConfirmed?.redactArgs !== true || call.redactArgs === true);
     if (!isPreConfirmed) {
       const householdSubject = call.tool === "websearch" && roster.length > 0 && speakerNamedAny(JSON.stringify(args), roster);
       const gate = decide({ who: { personId: state.actor.id, role: state.actor.role as Role, band: turnAgeBand(state.surface, state.actor, state.speakerEvidence, new Date(), state.deviceId), anonymous: speakerIsAnonymous(state) }, what: { capabilities: householdSubject ? ["search.household_subject"] : manifest.permissions ?? [], summary: "Search the web for this request.", consequential: manifest.consequential, minRole: manifest.min_role }, context: { crisis: state.crisis, temporary: state.temporary } });
@@ -447,7 +458,7 @@ export const policyNode: Node<PolicyInput, PolicyOutput> = async (state, input) 
       // Grounded on the arguments the call will actually run with: a stray
       // model-set field the tool node strips (websearch's retired
       // `category`, ANSWER-IMG-02) never blocks the call.
-      const grounding = checkGrounding(modelFacingArgs(call.tool, args), sourceTexts, manifest.args as ArgSchema | undefined, conversationTexts);
+      const grounding = resumedForm ? { ok: true as const } : checkGrounding(modelFacingArgs(call.tool, args), sourceTexts, manifest.args as ArgSchema | undefined, conversationTexts);
       if (!grounding.ok) {
         // GROUND-01: the trace records the branch and the argument name, never the terms.
         noteRefusal("ungrounded_args", grounding.arg);
