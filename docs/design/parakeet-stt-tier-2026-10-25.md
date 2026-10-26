@@ -1,7 +1,7 @@
 # Parakeet v2 as the hub's speech-to-text pin on the larger tiers (2026-10-25)
 
 Owner's decision (Jesse, 2026-10-25, in chat, after the bench below): "write the design note for Parakeet v2 as a hardware-tier stt
-pin, Moonshine stays the default and robot fallback." Design only; nothing here is built.
+pin, Moonshine stays the default and robot fallback." Slices 01 and 03 were built the same day; the follow-up 2026-10-25 ruling (owner) removed the fallback model: no other Stack role has one.
 
 Architect verdict: pending (see "Gate" at the end).
 
@@ -13,8 +13,9 @@ Architect verdict: pending (see "Gate" at the end).
 2. **Parakeet TDT 0.6B v2 int8 becomes a second `stt` model record, bound to the larger tiers.** The Stack already chooses a model per
    role from `PROFILE_MODEL_BINDINGS` (`stack/backend/src/profiles.ts`); the bind is one line per tier, `stt: "parakeet-tdt-0.6b-v2-int8"`.
    No new selection mechanism, no new setting.
-3. **Moonshine tiny stays the default pin and the fallback.** It is the model on `p16` and `p32`, the model the robot runs without a
-   hub (platform principle 2), and the model the Stack falls back to when the Parakeet package is missing or fails its readiness probe.
+3. **Moonshine tiny stays the pin on `p16` and `p32` and the robot's recognizer.** It is the model the robot runs without a hub
+   (platform principle 2). There is no fallback model and no automatic switching: no other Stack role has one (owner, 2026-10-25), so
+   each tier has exactly one `stt` model.
 4. **Parakeet v2, not v3.** v3 measured worse for English (below) and its only gain is other European languages, which no household
    asked for. v3 is named, not pinned.
 5. **Word timestamps are a later, additive spec field.** `SttWireEvent` gains an optional `words` list only when a consumer exists (the
@@ -77,16 +78,15 @@ one-line change plus the disk-plan regeneration. Today that map has no `stt` ent
 first installed record; slice 3 adds an explicit `stt: "moonshine-tiny-en-int8"` binding for both, so a manual Parakeet install on
 p32 can never become its default by catalog order.
 
-### 3. Fallback and readiness
+### 3. Readiness (no fallback)
 
-- `selectedModel("stt")` already prefers the person's choice, then the tier binding, then the first record that can serve the role. If the Parakeet
-  package is not installed, selection falls through to Moonshine with no code change; the install plan lists both on p64 and p128 so
-  Moonshine is present as the fallback (107.6 MB).
-- The readiness probe already transcribes the bundled clip (`bundledClipBase64`); it runs against whichever model loaded. A Parakeet
-  failure to load or probe is new logic (today `selectedModel` falls through only when a model is missing, not when it fails): the Stack
-  restarts the role on Moonshine and raises the existing Stack-link Repairs item so an admin learns the larger model failed. While the
-  role is not ready, Home shows its existing spoken "not ready" line (`voiceFailureLine("listening_engine", ...)` in Home's
-  `lib/failureCopy.ts`). The person sees one line, not a model name; no new status surface.
+- `selectedModel("stt")` prefers the person's choice, then the tier binding, then the first record that can serve the role. The install
+  plan installs only the bound model (Parakeet on p64 and p128, Moonshine on p16 and p32), so there is one model per role, as for every
+  other role.
+- The readiness probe already transcribes the bundled clip (`bundledClipBase64`); it runs against whichever model loaded. If Parakeet
+  fails to load or probe, the role is not ready and the admin reinstalls the model, the same as any other role. While the role is not
+  ready, Home shows its existing spoken "not ready" line (`voiceFailureLine("listening_engine", ...)` in Home's `lib/failureCopy.ts`).
+  No new status surface, no switching logic.
 - The robot never takes Parakeet: its standalone recognizer is Moonshine through its own runtime, unchanged.
 
 ### 4. Session behavior that must be re-checked, not assumed
@@ -131,11 +131,11 @@ mechanism, no new setting. Home needs no change in the first slice.
 
 1. **STT-PARAKEET-01**: record, `loadParakeet`, worker flag for the model type, unit tests with the Parakeet test wav, prove script
    run on the Studio. Done when the prove script transcribes the bundled clip with Parakeet and Moonshine remains the default.
-2. **STT-PARAKEET-02**: per-record partial interval and retry flag, session tests, a 30 s live-session measurement with CPU and memory
+2. **STT-PARAKEET-02** (optional, only if a live session shows the partial transcript lagging): per-record partial interval and retry flag, session tests, a 30 s live-session measurement with CPU and memory
    numbers recorded in the Stack's dev.md.
 3. **STT-PARAKEET-03**: bind `p64` and `p128` and pin Moonshine explicitly on `p16` and `p32`; acceptance includes the CHAT-AB-01 spoken row (rule 13: the 3 s first-word bar reruns after
-   each stage, and Parakeet adds about 100 to 330 ms to each final decode); regenerate the disk plan and components doc, `NOTICE` attribution, fallback test (package
-   missing selects Moonshine), install-plan copy.
+   each stage, and Parakeet adds about 100 to 330 ms to each final decode); regenerate the disk plan and components doc, `NOTICE` attribution, install-plan copy. Built
+   2026-10-25 without a fallback model.
 4. **STT-PARAKEET-04** (Home, after 03): the duplex note's latency figure corrected; a household clip bench (the owner's own kitchen
    audio and its transcripts stay in `data-scratch`, never in a log or a commit; rule 6a) comparing both models, as the acceptance for
    leaving the binding in place.
@@ -144,7 +144,7 @@ mechanism, no new setting. Home needs no change in the first slice.
 ## Supersedes
 
 - Moonshine tiny as the `stt` pin on `p64` and `p128` (`PROFILE_MODEL_BINDINGS`): replaced by Parakeet TDT 0.6B v2 int8. Moonshine stays
-  the default on `p16` and `p32`, the fallback, and the robot's recognizer.
+  the pin on `p16` and `p32` and the robot's recognizer.
 - The single global partial interval and silent-head retry in the Stack's `speech/session.ts`: become per-record values (Moonshine
   unchanged).
 - `full-duplex-voice-2026-10-24.md`, the local-voice findings, item 6 ("Parakeet: 23 ms for a 2.5 s clip"): amended to about 150 ms on
