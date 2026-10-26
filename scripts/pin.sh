@@ -89,7 +89,7 @@ PY
       printf 'Would change:\n'; printf '  %s\n' "${changed[@]}"
       print_cmd "replace STACK_TAG with $full_sha in both scripts"; print_cmd "git -C $stack_dir show $full_sha:docs/disk-plan.json > shared/diskPlan.json"
     else
-      for file in scripts/install.sh scripts/engine-computer/maipai-engine; do sed -E "s/^STACK_TAG=?\"?[0-9a-fA-F]+\"?$/STACK_TAG=\"$full_sha\"/" "$file" > "$file.tmp" && mv "$file.tmp" "$file"; done
+      for file in scripts/install.sh scripts/engine-computer/maipai-engine; do sed -E "s/^STACK_TAG=?\"?[0-9a-fA-F]+\"?$/STACK_TAG=\"$full_sha\"/" "$file" > "$file.tmp" && chmod --reference="$file" "$file.tmp" 2>/dev/null || chmod "$(stat -f %Lp "$file" 2>/dev/null || stat -c %a "$file")" "$file.tmp"; mv "$file.tmp" "$file"; done
       printf '%s\n' "$disk_plan" > shared/diskPlan.json
     fi
     message="Pin Stack ${full_sha:0:7}"
