@@ -32,4 +32,10 @@ describe("media detail player pages", () => {
       expect(page.body[0]).toMatchObject({ type: "creation_header", variant: "collection" });
     }
   });
+
+  test("Music play page uses a byline creation header", () => {
+    const page = JSON.parse(readFileSync(join(PACKAGES_DIR, "music", "pages", "play.json"), "utf8")) as { body: Array<{ main: Array<Record<string, unknown>> }> };
+    const creationHeader = page.body[0]?.main.find((node) => node.type === "creation_header");
+    expect(creationHeader).toMatchObject({ type: "creation_header", variant: "byline" });
+  });
 });

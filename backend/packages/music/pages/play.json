@@ -140,6 +140,7 @@
         },
         {
           "type": "creation_header",
+          "variant": "byline",
           "bind": {
             "source": "package",
             "path": "header",
