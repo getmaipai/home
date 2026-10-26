@@ -97,3 +97,32 @@ Order: 00, then 01 and 02 (kit), then 03 and 04 (independent), then 05. Codex bu
 ## What is not in this pass
 
 Trim and delete, karaoke word-by-word highlighting, lyrics translation, comments, subscriptions, a share sheet beyond copy link, Books.
+
+## Apple Music pass (owner, 2026-10-26)
+
+Owner request, with a screenshot of an Apple Music album page: "no duplicate titles. be more like Apple Music."
+
+1. **One title, one description per page.** A page that carries a `creation_header` (title, creator, made date, Private or Shared chip,
+   collapsible description) must not also draw them in the player's details block. The player node gains an optional
+   `details_show` list (`title`, `facts`, `description`, `chapters`; default all four, so nothing existing changes). Videos, Shows,
+   Podcasts and Music play pages set `details_show: ["facts", "chapters"]` wherever a `creation_header` sits on the same page.
+2. **Reuse check for the album look.** Shipped parts considered: `CreationHeader` (`@maipai/ui` `src/elements/creation-header.tsx`:
+   title, creator link, made date, Private or Shared chip, collapsible description) and `Billboard` (artwork, primary and secondary
+   actions). `Billboard` is a banner with no creator, meta line or visibility chip, and MEDIA-MUSIC-01 uses it for the current Music
+   headers; it cannot carry the visibility part of MEDIA-MUSIC-DETAIL-01. `CreationHeader` already holds the identity and visibility
+   part and is what the Music pages must show anyway, so the Apple Music look is an additive **`collection` variant of
+   `CreationHeader`** (rule 9b: a variant, not a second part): square artwork beside the text (stacked and centered on a phone), the
+   title large, the creator, a muted meta line (kind, genre, year), the Private or Shared chip kept, then Play (primary pill), Shuffle
+   and More (round icon buttons). No second header component is added. The `creation_header` schema node gains `variant:
+   "collection"` and the optional fields `art`, `meta`, `primary`, `shuffle`, `more`, `footer_lines` and `part: "header" | "footer"`;
+   `part: "footer"` is the same node placed again under the track list and draws only the footer lines (release date, "N songs, M
+   minutes", copyright), so the footer is kit-drawn and Home writes only JSON. The numbered track list stays the existing compact
+   `media_shelf`; "More by the artist" is an existing `media_shelf`.
+3. **Safety (rule 0).** The header text, the footer lines and the "More by the artist" shelf come from the same readers a child's
+   Music view already uses (allowlist only, MEDIA-KID-01 explicit title masking, `readableItem`), so a child sees no title or word
+   through them that the child's track list would not show.
+4. **Supersedes.** The banner `billboard` headers that MEDIA-MUSIC-01 shipped on the Music album, playlist and artist pages are
+   replaced by the collection `creation_header` (the Music list pages keep their own layout). MEDIA-MUSIC-DETAIL-01's album, artist
+   and playlist part is folded into MEDIA-APPLE-PASS-02 (one header per page; the Private or Shared chip stays).
+5. Backlog: MEDIA-APPLE-PASS-01 (kit: `details_show` and the `collection` variant, commons), MEDIA-APPLE-PASS-02 (Home: header data
+   fields `creator`, `meta`, `footer_lines`; album, playlist and artist pages; the four play pages' `details_show`; "More by the artist").
