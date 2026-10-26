@@ -296,7 +296,7 @@ describe("picture editor routes", () => {
 
   describe("Comment with a picture engine (IMGGEN-EDITOR-01)", () => {
     let fake: FakeImageStack;
-    // LIKENESS-01: an uploaded photo must show no one (or a named adult who agreed); these tests use a photo with no one in it.
+    // An uploaded photo must show no one or a named adult in this household; these tests use a photo with no one in it.
     beforeEach(() => { fake = installFakeImageStack(); __setStackClientForTests(stubStack().client); __setPhotoInspectorForTests(async () => ({ people: 0, faces: 0, under18: "no" })); });
     afterEach(() => { fake.restore(); __setPhotoInspectorForTests(undefined); });
 

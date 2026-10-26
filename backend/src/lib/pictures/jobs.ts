@@ -36,6 +36,10 @@ registerQueueProvider(() => unfinishedJobs().map((job) => {
 
 async function releasePicture(job: PictureJob): Promise<void> {
   if (job.state !== "queued" || job.stackJob) return;
+  if (job.request.likeness) {
+    const allowed = likenessStillAllowed(job.request.likeness);
+    if (!allowed.ok) { job.state = "failed"; job.error = allowed.line; queuedPictureSubmits.delete(job.id); savePictureJob(job); return; }
+  }
   try {
     const submit = queuedPictureSubmits.get(job.id);
     const submitted = submit ? await submit() : await submitGeneration({ ...((job.request as PictureJob["request"] & { stackBody?: Omit<GenerationBody, "timeout_ms"> }).stackBody ?? {
@@ -151,13 +155,12 @@ function stopForLikeness(job: PictureJob, line?: string): boolean {
   return true;
 }
 
-/** The person took their agreement back (or only the adult-content part): every picture of them still waiting or being made stops now. Returns how many. */
-export function stopLikenessPictureJobs(subjectPersonId: string, onlyAdultContent: boolean): number {
+/** Stop every unfinished picture job when its subject leaves the household. */
+export function stopLikenessPictureJobs(subjectPersonId: string): number {
   let count = 0;
   for (const job of unfinishedJobs()) {
     const likeness = job.request.likeness;
     if (!likeness || likeness.subject !== subjectPersonId || likeness.subject === likeness.requester) continue;
-    if (onlyAdultContent && !likeness.adult_content) continue;
     if (stopForLikeness(job)) count += 1;
   }
   return count;
@@ -171,13 +174,13 @@ async function watch(job: PictureJob, actor: PersonRow, early: StackPic[] | null
   const deadline = Date.now() + MAX_WATCH_MS;
   try {
     if (early) {
-      // A finished picture whose subject has taken their agreement back since the request is thrown away, not stored.
+      // A finished picture whose subject became ineligible since the request is thrown away, not stored.
       if (stopForLikeness(job)) return;
       await finish(job, actor, early);
       return;
     }
     while (!controller.signal.aborted && !stopped(job) && Date.now() < deadline) {
-      // The person it looks like can take their agreement back at any moment: checked on every poll, so a picture waiting in the line is stopped.
+      // The household option and subject eligibility are checked on every poll, so a queued picture is stopped after a stricter change.
       if (stopForLikeness(job)) return;
       let status;
       try {
@@ -311,7 +314,7 @@ async function finish(job: PictureJob, actor: PersonRow, pics: StackPic[]): Prom
       }
       if (job.temporary) {
         const id = newFileId();
-        storeTemporaryChatImage({ id, turnId: job.turnId ?? `gen-${job.id}`, conversationId, ownerPersonId: actor.id, name: "Generated picture", mediaType: "image/png", width, height, bytes: raw, ...(job.request.likeness ? {} : { generated: true as const }) });
+        storeTemporaryChatImage({ id, turnId: job.turnId ?? `gen-${job.id}`, conversationId, ownerPersonId: actor.id, name: "Generated picture", mediaType: "image/png", width, height, bytes: raw, audience: adult ? "adult-only" : "all-ages", ...(job.request.likeness ? { likeness: job.request.likeness.subject } : { generated: true as const }) });
         files.push({ id, width, height, ...meta });
         continue;
       }

@@ -245,13 +245,7 @@ export function newVideoJobId(): string {
   return `vid-${randomSuffix(10)}`;
 }
 
-// LIKENESS-01: a consent change, a likeness use and a style-subject record (spec LikenessConsent, LikenessUse, LikenessAdapter).
-export function newLikenessConsentId(): string {
-  return `lc-${randomSuffix(10)}`;
-}
-export function newLikenessUseId(): string {
-  return `lu-${randomSuffix(10)}`;
-}
+// The saved style subject binding is the remaining likeness record.
 export function newLikenessAdapterId(): string {
   return `la-${randomSuffix(10)}`;
 }

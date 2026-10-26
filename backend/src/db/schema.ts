@@ -1920,48 +1920,9 @@ export const videoAdapterPrefs = sqliteTable("video_adapter_prefs", {
   updatedBy: text("updated_by"),
 });
 
-// LIKENESS-01: the history of one person's consent about their own likeness (spec LikenessConsent). The two settings
-// (`likeness.adults`, `likeness.adult_content`) hold the current value; one row is appended each time the person
-// changes one, with the clock stamp and where it came from. Never edited or deleted.
-export const likenessConsentEvents = sqliteTable(
-  "likeness_consent_events",
-  {
-    id: text("id").primaryKey(),
-    personId: text("person_id").notNull().references(() => people.id),
-    option: text("option").notNull(),
-    state: text("state").notNull(),
-    source: text("source").notNull(),
-    changedAt: text("changed_at").notNull(),
-    createdAt: text("created_at").notNull(),
-    updatedAt: text("updated_at").notNull(),
-    hlc: text("hlc").notNull(),
-  },
-  (table) => [index("likeness_consent_events_person_idx").on(table.personId)],
-);
-
-// LIKENESS-01: each time another adult made a picture or video that looks like this person (spec LikenessUse). Read by
-// the subject only (their own "Likeness use" log); holds no prompt, picture or file.
-export const likenessUses = sqliteTable(
-  "likeness_uses",
-  {
-    id: text("id").primaryKey(),
-    subjectPersonId: text("subject_person_id").notNull().references(() => people.id),
-    requesterPersonId: text("requester_person_id").notNull().references(() => people.id),
-    medium: text("medium").notNull(),
-    way: text("way").notNull(),
-    adultContent: integer("adult_content", { mode: "boolean" }).notNull().default(false),
-    source: text("source").notNull(),
-    usedAt: text("used_at").notNull(),
-    createdAt: text("created_at").notNull(),
-    updatedAt: text("updated_at").notNull(),
-    hlc: text("hlc").notNull(),
-  },
-  (table) => [index("likeness_uses_subject_idx").on(table.subjectPersonId)],
-);
-
 // LIKENESS-01: who a saved style (LoRA) looks like, declared when it was added (spec LikenessAdapter). The Stack owns the
-// file; this row is Home's record of whom it depicts, so consent can be checked at request time and the file removed when
-// the subject takes consent back. `subject_person_id` is null for "Nobody (not a real person)".
+// file; this row is Home's record of whom it depicts, so eligibility and the household setting can be checked at request time.
+// `subject_person_id` is null for "Nobody (not a real person)".
 export const likenessAdapters = sqliteTable(
   "likeness_adapters",
   {

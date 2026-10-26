@@ -1,6 +1,6 @@
 // IMGEDIT-01: the chat tool's edit half (`generate_image` with `change`), run through the real tool against fake Stacks.
 // What it proves: a change in words reaches the Stack as an edit with the right source declaration; a photo of a person is
-// used only for a household adult who agreed; nothing is sent when a rule refuses; "remove that person" finds the people,
+// used only for a named living household adult; nothing is sent when a rule refuses; "remove that person" finds the people,
 // picks the one meant (or asks which), erases only those, and never draws anyone; the result is the next version of the
 // picture so the original is kept.
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
@@ -18,7 +18,6 @@ import { listVersions } from "@/lib/imageEdit";
 import { __resetAttestationsForTests } from "@/lib/likeness/resolve";
 import { __setPhotoInspectorForTests } from "@/lib/likeness/inspector";
 import { __setStackTrustForTests } from "@/lib/likeness/proof";
-import { likenessUseLog } from "@/lib/likeness/uses";
 import { __setPersonPickerForTests, freezePeople, FreezeError } from "@/lib/pictures/people";
 import { __setPictureStatusForTests, readyStatusForTests } from "@/lib/pictures/ready";
 import { __resetStackEngineForTests, __setStackClientForTests } from "@/lib/stackEngine";
@@ -38,7 +37,8 @@ function addPerson(name: string, role: string): PersonRow {
   db.insert(peopleTable).values({ id: `p-${name.toLowerCase()}`, displayName: name, role, avatarSeed: name, source: "test", createdAt: now, updatedAt: now, hlc: "1:0:test00" }).run();
   return db.select().from(peopleTable).where(eq(peopleTable.id, `p-${name.toLowerCase()}`)).get()! as PersonRow;
 }
-const switchOn = (person: PersonRow, key = "likeness.adults") => expect(setValue(person, `person:${person.id}`, key, true).ok).toBe(true);
+const switchOn = (_person: PersonRow, key = "generation.household_likeness") => expect(setValue(bench.owner, "household", key, true).ok).toBe(true);
+const switchOff = () => expect(setValue(bench.owner, "household", "generation.household_likeness", false).ok).toBe(true);
 
 beforeEach(() => {
   resetDb();
@@ -95,7 +95,7 @@ describe("a change in words", () => {
     expect(versions[0]!.id).toBe(made.id);
   });
 
-  test("an attached photo that shows no one is sent as an upload; one that shows a person is refused unless an adult who agreed is named", async () => {
+  test("an attached photo that shows no one is sent as an upload; a photo with a person needs an identified household adult", async () => {
     const photo = await put(nadia, "photo-1");
     const ok = await run(nadia, { prompt: "change the car to bright yellow", change: "attached" }, [photo]);
     expect(stack.edits[0]).toMatchObject({ image_source: "uploaded" });
@@ -120,13 +120,14 @@ describe("a change in words", () => {
     expect(stack.edits).toHaveLength(0);
   });
 
-  test("adding a person from a second picture needs that adult's agreement: the reference goes with its own proof, and the use is logged", async () => {
+  test("adding a household adult from a second picture uses its bound proof", async () => {
     const scene = await put(nadia, "scene-1", { generated: true });
     const portrait = await put(nadia, "portrait-1");
     __setPhotoInspectorForTests(async () => ({ people: 1, faces: 1, under18: "no" }));
     const SAYS = "add the woman from the second picture to the bench, the photo is Marlow";
+    switchOff();
     const off = await run(nadia, { prompt: "add the woman from the second picture to the bench", change: "attached", reference: "attached_2", photo_subject: "Marlow" }, [scene, portrait], SAYS);
-    expect(replyText(off)).toContain("Marlow hasn't agreed");
+    expect(replyText(off)).toContain("switched off");
     expect(stack.edits).toHaveLength(0);
     switchOn(marlow);
     const ok = await run(nadia, { prompt: "add the woman from the second picture to the bench", change: "attached", reference: "attached_2", photo_subject: "Marlow" }, [scene, portrait], SAYS);
@@ -134,7 +135,6 @@ describe("a change in words", () => {
     expect(stack.edits[0]).toMatchObject({ image_source: "generated", reference_source: "household_photo", audience: "adult" });
     expect(String(stack.edits[0]!.reference_proof).split(".")).toHaveLength(2);
     expect(stack.edits[0]!.reference).toMatch(/^file:/);
-    expect(likenessUseLog(marlow.id)).toHaveLength(1);
     const job = await finished(nadia, ok);
     expect(job.state).toBe("done");
     expect(job.request.likeness?.subject).toBe(marlow.id);
@@ -271,10 +271,11 @@ describe("remove people", () => {
     expect(old.error).toContain("paint over the person with Erase");
   });
 
-  test("removing someone from a picture made to look like a household adult is decided again with that adult", async () => {
+  test("removing someone from a picture made to look like a household adult is decided again against current settings", async () => {
     // A picture whose provenance names a subject is stored (not temporary) in real chats; here the temporary store cannot carry it, so the rule is exercised through the shared source check.
     const { prepareEditSource } = await import("@/lib/pictures/editSources");
     const audience = { actor: nadia, band: "adult", surface: "chat", surfaceClass: "written", spoken: false } as never;
+    switchOff();
     const refused = await prepareEditSource({ audience, bytes: await testPng(), generated: true, rootLikeness: marlow.id, declaredSubjectId: null, text: "remove the dog", source: "chat" });
     expect(refused.ok).toBe(false);
     switchOn(marlow);

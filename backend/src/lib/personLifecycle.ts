@@ -54,7 +54,7 @@ import { removeFileBlobs } from "@/lib/attachments";
 import { ROLE_LADDER, invalidateSessionCacheForPerson, type Role } from "@/middleware/auth";
 import { trigger } from "@/lib/notifications";
 import { forgetNewsOfPerson } from "@/lib/news/records";
-import { forgetLikenessOfPerson, likenessPersonGone } from "@/lib/likeness/history";
+import { likenessPersonGone } from "@/lib/likeness/revoke";
 import { roleRequiresCredential } from "@/lib/personAuthMethods";
 import { eraseChatFolderReferences } from "@/lib/chatFolders";
 import type { PersonRow } from "@/types";
@@ -525,8 +525,6 @@ const commitDeletePerson = sqlite.transaction((actor: PersonRow, personId: strin
   if (lastOwnerError) return lastOwnerError;
 
   const counts = erasePersonData(personId, blobsAfterCommit);
-  forgetLikenessOfPerson(personId); // LIKENESS-01: their consent history and use records go; what waits for them stops; styles of them are removed
-
   // The tombstone. Nickname and birthdate go with the rest of their
   // data; the display name stays, because a tombstone that cannot say
   // who it was is not much of a record for a robot reconciling later.
@@ -535,6 +533,7 @@ const commitDeletePerson = sqlite.transaction((actor: PersonRow, personId: strin
     .set({ deletedAt: now, updatedAt: now, nickname: null, birthdate: null, hlc: nextHlc() })
     .where(eq(people.id, personId))
     .run();
+  likenessPersonGone(personId);
 
   return { ok: true, value: counts };
 });
@@ -617,13 +616,13 @@ function revokeAllCredentialsAndSessions(personId: string): { sessions: number }
 // memorializePerson()'s own read-only checks have already run.
 const commitMemorialize = sqlite.transaction((personId: string, alreadyMemorialized: boolean): void => {
   revokeAllCredentialsAndSessions(personId);
-  likenessPersonGone(personId);
   if (!alreadyMemorialized) {
     db.update(people)
       .set({ memorializedAt: new Date().toISOString(), updatedAt: new Date().toISOString(), hlc: nextHlc() })
       .where(eq(people.id, personId))
       .run();
   }
+  likenessPersonGone(personId);
 });
 
 /** BACKLOG.md: "memorialise (read-only profile, PIN cleared, sessions

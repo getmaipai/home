@@ -3,7 +3,6 @@
 // definitions from the registry (3.2) and from package manifests." This
 // is the store and its API; the generic renderer and the UI rules in
 // 6.5/6.6 are shell/kit work (chapter 6, not started).
-import { LIKENESS_KEY_OPTION, likenessSettingWritten } from "@/lib/likeness/history";
 import { checkFeedAddressBox } from "@/lib/shelf/feedAddresses";
 import { eq, and, isNull, like } from "drizzle-orm";
 import { db } from "@/db";
@@ -674,30 +673,6 @@ function assertCanSetRobotMayAddress(actor: PersonRow, targetId: string): Settin
   return assertCanAccessScope(actor, { kind: "person", id: targetId }, "write");
 }
 
-/** LIKENESS-01: the two consent switches about a person's own likeness are the person's alone. Not an owner, not an admin, not a parent: nobody else can say yes for them. And only an adult has them to give (a child or a teen is never the subject of anything, so there is nothing to switch). */
-function assertCanSetLikeness(actor: PersonRow, targetId: string, value: unknown): SettingsOpResult<true> {
-  if (actor.id === targetId) {
-    if (actor.role === "guest" || (actor.role !== "owner" && actor.role !== "admin" && actor.role !== "adult") || speakerAgeBand(actor, new Date()) !== "adult") {
-      return { ok: false, status: 403, error: "Only an adult can agree to pictures and videos that look like them. For a child or a teen the answer is always no." };
-    }
-    return { ok: true, value: true };
-  }
-  // An owner or admin can take someone's agreement away (turn it off), never give it for them.
-  if (isOwnerOrAdmin(actor) && value === false) return { ok: true, value: true };
-  return { ok: false, status: 403, error: "Only the person themselves can say yes to pictures and videos that look like them. Ask them to open Settings, Pictures and videos on their own account." };
-}
-
-/** What the two switches held just before a write, so a switch-off acts on the setting itself and not only on the history. */
-function likenessBeforeWrite(personId: string, key: string): { previous: boolean; adultContentStored: boolean } {
-  return { previous: getSettingValueForPerson(personId, key) === true, adultContentStored: getSettingValueForPerson(personId, "likeness.adult_content") === true };
-}
-
-/** After a likeness switch was written: the dated record, the revoke handler, and the second switch following the first off. */
-function afterLikenessWrite(actor: PersonRow, personId: string, key: string, value: unknown, before: { previous: boolean; adultContentStored: boolean }): void {
-  const { alsoReset } = likenessSettingWritten(personId, key, value, before);
-  if (alsoReset) setValue(actor, `person:${personId}`, alsoReset, false);
-}
-
 export function setValue(
   actor: PersonRow,
   scope: string,
@@ -739,8 +714,6 @@ export function setValue(
         : { ok: false as const, status: 403 as const, error: COMPANIONS_PERMISSION_ERROR })
     : key === SAFE_SEARCH_KEY && parsed.kind === "person"
       ? assertCanSetSafeSearch(actor, parsed.id!, value)
-      : key in LIKENESS_KEY_OPTION && parsed.kind === "person"
-        ? assertCanSetLikeness(actor, parsed.id!, value)
       : key === SESSION_LOCK_REQUIRED_KEY || key === SESSION_LOCK_TIMEOUT_KEY
         ? assertCanSetSessionLock(actor, parsed.id!)
       : key === WAKEWORD_SETTING_KEY && parsed.kind === "device"
@@ -780,9 +753,7 @@ export function setValue(
     }
   }
 
-  const likenessBefore = key in LIKENESS_KEY_OPTION && parsed.kind === "person" ? likenessBeforeWrite(parsed.id!, key) : null;
   const written = writeValue(scope, keyDef, value, responseContext(actor, responseSubject(actor, parsed), parsed.kind));
-  if (written.ok && likenessBefore) afterLikenessWrite(actor, parsed.id!, key, value, likenessBefore);
   return written;
 }
 
@@ -1014,8 +985,6 @@ export function resetValue(actor: PersonRow, scope: string, key: string): Settin
       : { ok: false as const, status: 403 as const, error: COMPANIONS_PERMISSION_ERROR })
     : key === WAKEWORD_SETTING_KEY && parsed.kind === "device"
     ? assertCanAccessWakewordDeviceSetting(actor)
-    : key in LIKENESS_KEY_OPTION && parsed.kind === "person"
-      ? assertCanSetLikeness(actor, parsed.id!, false)
     : key === "search.page_text_cleaning" && parsed.kind === "person"
       ? assertCanSetPageTextCleaning(actor, parsed.id!)
     : key.startsWith("topics.") && parsed.kind === "person"
@@ -1024,10 +993,8 @@ export function resetValue(actor: PersonRow, scope: string, key: string): Settin
   if (!auth.ok) return auth;
 
 
-  const likenessBeforeReset = key in LIKENESS_KEY_OPTION && parsed.kind === "person" ? likenessBeforeWrite(parsed.id!, key) : null;
   db.delete(settingsValues).where(and(eq(settingsValues.scope, scope), eq(settingsValues.key, key))).run();
   settingsCache.delete(settingsCacheKey(scope, key));
-  if (likenessBeforeReset) afterLikenessWrite(actor, parsed.id!, key, false, likenessBeforeReset);
   const restored = isLayeredScalar(keyDef) && parsed.kind === "person" && parsed.id
     ? resolveLayeredScalar(keyDef, parsed.id, speakerAgeBand(responseSubject(actor, parsed), new Date()))
     : { value: keyDef.default, layer: "default" as const };

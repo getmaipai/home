@@ -29,7 +29,6 @@ import { RobotPasswordSection } from "@/apps/settings/RobotPasswordSection";
 import { RoutingStatsSection } from "@/apps/settings/RoutingStatsSection";
 import { ReferenceLibrarySettings } from "@/apps/settings/ReferenceLibrarySettings";
 import { PicturesLibrary } from "@/apps/settings/PicturesLibrary";
-import { LikenessSettings } from "@/apps/settings/LikenessSettings";
 import { VideoLibrary } from "@/apps/settings/VideoLibrary";
 import { CommandsSection } from "@/apps/settings/CommandsSection";
 import { CodingKeysSettings } from "@/apps/settings/CodingSettings";
@@ -110,7 +109,6 @@ function HomeDevicesAdminSettings({ person, detailId, tab }: SettingsViewProps) 
   const setAddOpen = (open: boolean) => setParams((previous) => { const next = new URLSearchParams(previous); if (open) next.set("addRobot", "1"); else next.delete("addRobot"); return next; });
   return tab === "integrations" ? null : capabilities.includes("robots.enabled") ? <>{detailId ? <HouseholdRobotsSection detailId={detailId} tab={tab} /> : <><HouseholdRobotsSection /><Dialog open={addOpen} onOpenChange={setAddOpen}><DialogContent scroll="viewport"><DialogHeader><DialogTitle>Add a robot</DialogTitle><DialogDescription>Pair a robot with this home.</DialogDescription></DialogHeader><AddRobotSection onClose={() => setAddOpen(false)} /><StackChanInstallDialog /></DialogContent></Dialog><RobotPasswordSection /></>}</> : null;
 }
-function AccountLikenessView() { useTabItem("Pictures and videos"); return <LikenessSettings />; }
 function PicturesLibraryView() { useTabItem("Pictures and videos"); return <><PicturesLibrary /><VideoLibrary /></>; }
 function HomeRoutingStatsSettings() { return <RoutingStatsSection />; }
 
@@ -128,7 +126,6 @@ export const SETTINGS_VIEWS: Record<string, ComponentType<SettingsViewProps>> = 
   "home.reference_library": ReferenceLibrarySettings,
   "home.pictures_library": PicturesLibraryView,
   "home.media_library": PicturesLibraryView,
-  "account.likeness": AccountLikenessView,
   "account.device_appearance": DeviceAppearanceSettings,
   "chat.skills": ChatSkillsSettings,
   "chat.shortcuts": ChatShortcutsSettings,

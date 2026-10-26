@@ -129,6 +129,38 @@ describe("the migration chain (architecture review 4.4)", () => {
     });
   }, 60_000);
 
+  test("restoring a 0123 backup drops likeness agreements and ignores their stored permissions", () => {
+    withTempDir((dir) => {
+      const oldFolder = join(dir, "old-migrations");
+      cpSync(MIGRATIONS, oldFolder, { recursive: true });
+      const journal = JSON.parse(readFileSync(join(MIGRATIONS, "meta/_journal.json"), "utf8")) as Journal;
+      const cut = journal.entries.findIndex((entry) => entry.tag === "0123_robot_offline_notice");
+      writeFileSync(join(oldFolder, "meta/_journal.json"), JSON.stringify({ ...journal, entries: journal.entries.slice(0, cut + 1) }));
+      const backupPath = join(dir, "old-backup.db");
+      const backup = openDb(backupPath);
+      migrate(drizzle(backup), { migrationsFolder: oldFolder });
+      seedRow(backup, "people", { id: "person-owner01", display_name: "Willow", role: "owner", created_at: "2026-10-20T00:00:00Z", updated_at: "2026-10-20T00:00:00Z", hlc: "1:0:test00" });
+      seedRow(backup, "people", { id: "person-adult01", display_name: "Alder", role: "adult", created_at: "2026-10-20T00:00:00Z", updated_at: "2026-10-20T00:00:00Z", hlc: "1:0:test00" });
+      seedRow(backup, "settings_values", { scope: "person:person-adult01", key: "likeness.adults", value: "true", hlc: "1:0:test00", source: "user", updated_at: "2026-10-20T00:00:00Z" });
+      seedRow(backup, "settings_values", { scope: "person:person-adult01", key: "likeness.adult_content", value: "true", hlc: "1:0:test00", source: "user", updated_at: "2026-10-20T00:00:00Z" });
+      seedRow(backup, "likeness_consent_events", { id: "lc-old01", person_id: "person-adult01", option: "adults", state: "on", source: "settings", changed_at: "2026-10-20T00:00:00Z", created_at: "2026-10-20T00:00:00Z", updated_at: "2026-10-20T00:00:00Z", hlc: "1:0:test00" });
+      seedRow(backup, "likeness_uses", { id: "lu-old01", subject_person_id: "person-adult01", requester_person_id: "person-owner01", medium: "picture", way: "style", adult_content: 1, source: "chat", used_at: "2026-10-20T00:00:00Z", created_at: "2026-10-20T00:00:00Z", updated_at: "2026-10-20T00:00:00Z", hlc: "1:0:test00" });
+      backup.close();
+
+      // A restore swaps the database first; startup then applies the current migration journal.
+      const restored = openDb(backupPath);
+      try {
+        migrate(drizzle(restored), { migrationsFolder: MIGRATIONS });
+        const tables = (restored.query("SELECT name FROM sqlite_master WHERE type = 'table'").all() as Array<{ name: string }>).map((row) => row.name);
+        expect(tables).not.toContain("likeness_consent_events");
+        expect(tables).not.toContain("likeness_uses");
+        expect(restored.query("SELECT key FROM settings_values WHERE key LIKE 'likeness.%'").all()).toEqual([]);
+        expect(tables).toContain("likeness_adapters");
+        expect(restored.query("PRAGMA integrity_check").get()).toEqual({ integrity_check: "ok" });
+      } finally { restored.close(); }
+    });
+  }, 60_000);
+
   test("0095 does not create a household home when the transitional text value is empty", () => {
     withTempDir((dir) => {
       const oldFolder = join(dir, "old-migrations");

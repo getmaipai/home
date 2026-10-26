@@ -48912,7 +48912,7 @@
                     "nullable": true,
                     "minLength": 1,
                     "maxLength": 80,
-                    "description": "IMGEDIT-01: the household adult the reference photo shows (it must be one who agreed); left out, the reference must show no one."
+                    "description": "IMGEDIT-01: the household adult the reference photo shows; left out, the reference must show no one."
                   }
                 },
                 "required": [
@@ -49928,7 +49928,7 @@
                   "looks_like": {
                     "type": "string",
                     "maxLength": 80,
-                    "description": "LIKENESS-01: 'nobody', or the id of the household adult the style looks like (they must have agreed, or be the one adding it)."
+                    "description": "'nobody', or the id of the living household adult the style looks like."
                   },
                   "not_real_person": {
                     "type": "string",
@@ -51695,144 +51695,15 @@
         }
       }
     },
-    "/api/likeness/me": {
-      "get": {
-        "tags": [
-          "Likeness"
-        ],
-        "summary": "Where the signed-in person stands on pictures, videos and styles that look like them, their history and the use log",
-        "responses": {
-          "200": {
-            "description": "Only the person's own.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "eligible": {
-                      "type": "boolean",
-                      "description": "Only an adult has these switches; a child or a teen is never the subject of anything."
-                    },
-                    "adults": {
-                      "type": "boolean"
-                    },
-                    "adult_content": {
-                      "type": "boolean"
-                    },
-                    "history": {
-                      "type": "array",
-                      "items": {
-                        "type": "object",
-                        "properties": {
-                          "id": {
-                            "type": "string"
-                          },
-                          "option": {
-                            "type": "string",
-                            "enum": [
-                              "adults",
-                              "adult_content"
-                            ]
-                          },
-                          "state": {
-                            "type": "string",
-                            "enum": [
-                              "on",
-                              "off"
-                            ]
-                          },
-                          "changed_at": {
-                            "type": "string"
-                          }
-                        },
-                        "required": [
-                          "id",
-                          "option",
-                          "state",
-                          "changed_at"
-                        ]
-                      }
-                    },
-                    "uses": {
-                      "type": "array",
-                      "items": {
-                        "type": "object",
-                        "properties": {
-                          "id": {
-                            "type": "string"
-                          },
-                          "who": {
-                            "type": "string"
-                          },
-                          "medium": {
-                            "type": "string",
-                            "enum": [
-                              "picture",
-                              "video"
-                            ]
-                          },
-                          "way": {
-                            "type": "string",
-                            "enum": [
-                              "style",
-                              "photo"
-                            ]
-                          },
-                          "adult_content": {
-                            "type": "boolean"
-                          },
-                          "used_at": {
-                            "type": "string"
-                          },
-                          "line": {
-                            "type": "string"
-                          }
-                        },
-                        "required": [
-                          "id",
-                          "who",
-                          "medium",
-                          "way",
-                          "adult_content",
-                          "used_at",
-                          "line"
-                        ]
-                      }
-                    }
-                  },
-                  "required": [
-                    "eligible",
-                    "adults",
-                    "adult_content",
-                    "history",
-                    "uses"
-                  ]
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Not signed in",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
     "/api/likeness/adults": {
       "get": {
         "tags": [
-          "Likeness"
+          "Pictures"
         ],
-        "summary": "The household's adults, for the pickers (who a style looks like, who is in a photo)",
+        "summary": "Household adults who can be a picture or video subject",
         "responses": {
           "200": {
-            "description": "Adults only.",
+            "description": "Living household adults eligible to be a subject.",
             "content": {
               "application/json": {
                 "schema": {
@@ -51851,17 +51722,12 @@
                           },
                           "self": {
                             "type": "boolean"
-                          },
-                          "agreed": {
-                            "type": "boolean",
-                            "description": "Whether they have agreed to pictures, videos and styles that look like them (always true for the person asking, about themselves)."
                           }
                         },
                         "required": [
                           "id",
                           "name",
-                          "self",
-                          "agreed"
+                          "self"
                         ]
                       }
                     }
@@ -51875,16 +51741,6 @@
           },
           "401": {
             "description": "Not signed in",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Only an adult can use these pickers",
             "content": {
               "application/json": {
                 "schema": {
@@ -52966,7 +52822,7 @@
         "tags": [
           "Videos"
         ],
-        "summary": "Animate a picture this home made, or a photo of a household adult who agreed",
+        "summary": "Animate a picture this home made, or a photo of a household adult",
         "requestBody": {
           "content": {
             "application/json": {
@@ -52997,7 +52853,7 @@
                     "type": "string",
                     "minLength": 1,
                     "maxLength": 80,
-                    "description": "LIKENESS-01: with a photo (file_id) that was not made here: the household adult the photo shows, picked from the adults list. Anyone else is refused."
+                    "description": "With a photo (file_id) that was not made here: the household adult the photo shows, picked from the adults list. Anyone else is refused."
                   }
                 },
                 "required": [
@@ -53804,7 +53660,7 @@
                   "looks_like": {
                     "type": "string",
                     "maxLength": 80,
-                    "description": "LIKENESS-01: 'nobody', or the id of the household adult the style looks like (they must have agreed, or be the one adding it)."
+                    "description": "'nobody', or the id of the living household adult the style looks like."
                   }
                 },
                 "required": [

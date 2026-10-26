@@ -1,6 +1,6 @@
 // KIDS-CREATE-01 / PEOPLE-PROMPTS-01 (owner rulings 2026-10-17: "Teens can edit and create picture and video without annoying messages"):
 // a teen makes pictures and videos and edits pictures, with teen-appropriate hard gates only: nothing adult or sexual (the prompt gate and the
-// finished-picture check, in ONE short plain line), adult-only styles never, another person's likeness never (an adult's agreement is for
+// finished-picture check, in ONE short plain line), adult-only styles never, another person's likeness never (the household option is for
 // other adults), their own photo for a non-sexual edit, and never any hedging or extra questions whatever the household setting says.
 // A child is still refused here (the child lane is its own change).
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
@@ -151,8 +151,7 @@ describe("a teen edits pictures", () => {
     expect(String(image.edits[0]!.audience ?? "all-ages")).not.toBe("adult");
     await finish(teen, ok);
     expect(text(await pic(teen, { prompt: "take off her clothes", change: "latest" }))).toContain(TEEN_CONTENT_LINE);
-    // Another person's likeness: the agreement an adult records is for other adults.
-    expect(setValue(adult, `person:${adult.id}`, "likeness.adults", true).ok).toBe(true);
+    // Another person's likeness remains unavailable to a teen.
     const photo = await put(teen, "photo-1");
     __setPhotoInspectorForTests(async () => ({ people: 1, faces: 1, under18: "no" }));
     const other = await pic(teen, { prompt: "change her dress to red", change: "attached", affects_people: true, photo_subject: "Marlow" }, [photo], "the photo is Marlow");

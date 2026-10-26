@@ -72,10 +72,6 @@ function limitSettings() {
       level: "basic", secret: false, lives_in: "person.likeness", honoured_by: ["home"],
     } as unknown as SettingsKey,
     {
-      key: "likeness.adults", scope: "person", selector: "boolean", default: false, label: "Let other adults make pictures that look like me",
-      level: "basic", secret: false, lives_in: "person.likeness", honoured_by: ["home"],
-    } as unknown as SettingsKey,
-    {
       key: "topics.bodies", scope: "person", selector: "select", default: "default", label: "Bodies and relationships",
       level: "basic", secret: false, lives_in: "person.topics", honoured_by: ["home"],
       range: { options: ["default", "redirect", "gentle"] },

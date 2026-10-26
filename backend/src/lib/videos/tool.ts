@@ -16,7 +16,6 @@ import { preparePhotoUse, prepareStyleUse } from "@/lib/likeness/apply";
 import { attestedAdult, WHO_IS_IN_PHOTO_LINE } from "@/lib/likeness/resolve";
 import { singleAdultPhoto } from "@/lib/likeness/inspector";
 import { promptRefusalLineFor, screenInputImage, viewerOf } from "@/lib/pictures/ageCheck";
-import { recordLikenessUse } from "@/lib/likeness/uses";
 import type { JobLikeness } from "@/lib/likeness/guard";
 import { createHash } from "node:crypto";
 import { peopleGuidanceSuffix, peoplePromptsOn } from "@/lib/pictures/policy";
@@ -57,7 +56,7 @@ export function videoRefusalFor(audience: VideoAudience, args: Record<string, un
   if (denial) return { kind: "denied", why: denial, line: VIDEO_DENIAL_LINE[denial] };
   const prompt = typeof args.prompt === "string" ? args.prompt : "";
   const style = typeof args.style === "string" ? args.style : "";
-  // A request that names a style, or animates an attached photo, may be of a household adult who agreed (LIKENESS-01): the tool
+  // A request that names a style, or animates an attached photo, may be of a household adult: the tool
   // decides that once it has matched the style or read the photo, so the model's "real person" flag alone does not end the call here.
   const refused = refuseVideoPrompt(`${prompt} ${style}`, { depictsRealPerson: args.depicts_real_person === true && style.trim() === "" && !isAttached(args.from_picture), lane: laneOf(audience) });
   if (refused) return { kind: "prompt", why: refused, line: promptRefusalLineFor(refused, "video", audience.actor, audience.band, `${prompt} ${style}`, VIDEO_REFUSAL_LINE[refused]) };
@@ -91,8 +90,8 @@ function refused(callId: string, args: Record<string, unknown>, refusal: VideoCa
   });
 }
 
-const PHOTO_ATTACH_LINE = "Attach one photo to your message, say which adult in this household is in it, and I can animate it if they have agreed.";
-const PHOTO_SUBJECT_LINE = "Tell me which adult in this household is in the photo, by name, and make sure they have agreed. I won't animate a photo of someone I can't tie to an adult here, or of a child.";
+const PHOTO_ATTACH_LINE = "Attach one photo to your message and say which adult in this household is in it.";
+const PHOTO_SUBJECT_LINE = "Tell me which adult in this household is in the photo, by name. I won't animate a photo of someone I can't tie to an adult here, or of a child.";
 
 export async function runGenerateVideo(input: RunGenerateVideoInput): Promise<ToolExecutionOutcome> {
   const { state, args, callId } = input;
@@ -115,7 +114,7 @@ export async function runGenerateVideo(input: RunGenerateVideoInput): Promise<To
   if (kid && videosMadeToday(actor) + 1 > kidsDailyVideos()) return refused(callId, args, { kind: "likeness", why: "likeness", line: CHILD_VIDEO_LIMIT_LINE });
 
   // A clip can start from a picture this home's Stack made ("latest" or an id), or from a photo the person attached to this
-  // message when they say which household adult is in it (LIKENESS-01). Never from an upload of anyone else.
+  // message when they say which household adult is in it. Never from an upload of anyone else.
   let image: string | undefined;
   let imageSource: "generated" | "household_photo" = "generated";
   let consentProof: string | undefined;
@@ -149,7 +148,7 @@ export async function runGenerateVideo(input: RunGenerateVideoInput): Promise<To
     if (!ref || !ref.ok) {
       return outcomeOf({
         callId, packageId: GENERATE_VIDEO_TOOL_ID, status: "succeeded", via: "tool_call", args, durationMs: 0,
-        result: { reply: { text: `No video was made. Say this to the person in your own words and keep its meaning: ${ref && !ref.ok ? ref.line : "I can only animate a picture that was made here in this home, or a photo you attach of an adult in this household who has agreed. Ask me to make a picture first, then animate that one."}` }, data: { refused: "reference" }, actions: [] },
+        result: { reply: { text: `No video was made. Say this to the person in your own words and keep its meaning: ${ref && !ref.ok ? ref.line : "I can only animate a picture that was made here in this home, or a photo you attach of an adult in this household. Ask me to make a picture first, then animate that one."}` }, data: { refused: "reference" }, actions: [] },
       });
     }
     image = ref.base64;
@@ -157,9 +156,9 @@ export async function runGenerateVideo(input: RunGenerateVideoInput): Promise<To
     if (ref.width && ref.height) portrait = ref.height > ref.width;
     // A picture that was itself made to look like a person is animated only if that person still agrees, now.
     if (ref.likenessSubject) {
-      const prep = await preparePhotoUse({ medium: "video", audience, declaredSubjectId: ref.likenessSubject, bytes: ref.bytes, text: prompt, source: "chat" });
+      const prep = await preparePhotoUse({ medium: "video", audience, declaredSubjectId: ref.likenessSubject, bytes: ref.bytes, text: prompt, adultContent: ref.adultOnly, source: "chat" });
       if (prep.kind === "refused") return refuseWith("likeness", prep.line);
-      photoLikeness = prep; imageSource = "household_photo"; consentProof = prep.proof; negativePrompt = prep.negativePrompt;
+      photoLikeness = { ...prep, adultContent: prep.adultContent || ref.adultOnly, job: { ...prep.job, adult_content: prep.job.adult_content || ref.adultOnly } }; imageSource = "household_photo"; consentProof = prep.proof; negativePrompt = prep.negativePrompt;
     }
   }
 
@@ -183,7 +182,7 @@ export async function runGenerateVideo(input: RunGenerateVideoInput): Promise<To
   const lengthNote = choice.shortened ? ` The most this kind makes is ${seconds} seconds, so it is ${seconds}; say so briefly.` : "";
   const longSpeechNote = choice.quality === "detailed" && seconds > 5 ? " Spoken words are clearest in a clip of 5 seconds or less; if the person wanted a line spoken and it does not come out clearly, offer a 5 second one." : "";
   const soundNote = choice.quality === "quick" ? " A Quick video has no sound; if they wanted sound or spoken words, offer to make a Detailed one." : "";
-  // A style of a household adult is made only if they agreed; a real person with no such style or photo is refused (LIKENESS-01).
+  // A style of a household adult is made only while the household option is on; a real person with no such style or photo is refused.
   const stylePrep = await prepareStyleUse({ medium: "video", audience, style: adapter, text: `${prompt} ${adapter?.name ?? named}`, depictsRealPerson: args.depicts_real_person === true && !photoLikeness, source: "chat" });
   if (stylePrep.kind === "refused") return stylePrep.why === "real_person" ? refused(callId, args, { kind: "prompt", why: "real_person", line: VIDEO_REFUSAL_LINE.real_person }) : refuseWith("likeness", stylePrep.line);
   if (stylePrep.kind === "likeness" && photoLikeness && stylePrep.subjectId !== photoLikeness.subjectId) return refuseWith("likeness", "I can make something that looks like one person at a time. Use a style and a photo of the same adult, or leave one out.");
@@ -216,7 +215,6 @@ export async function runGenerateVideo(input: RunGenerateVideoInput): Promise<To
       },
       ...(likeness ? { likeness } : {}),
     });
-    if (subjectForLog) await recordLikenessUse({ subjectPersonId: subjectForLog.subjectId, requesterPersonId: actor.id, medium: "video", way: photoLikeness ? "photo" : "style", adultContent: likeness?.adult_content ?? false, source: "chat" });
     return outcomeOf({
       callId, packageId: GENERATE_VIDEO_TOOL_ID, status: "succeeded", via: "tool_call", args, durationMs: 0,
       result: {

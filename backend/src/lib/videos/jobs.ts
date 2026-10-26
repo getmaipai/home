@@ -155,6 +155,10 @@ registerQueueProvider(() => {
 
 async function releaseVideo(job: VideoJob): Promise<void> {
   if (job.state !== "queued" || job.stackJob) return;
+  if (job.request.likeness) {
+    const allowed = likenessStillAllowed(job.request.likeness);
+    if (!allowed.ok) { job.state = "failed"; job.error = allowed.line; persistVideoJob(job); refreshHouseholdQueue(); return; }
+  }
   try {
     const storedBody = (job.request as VideoRequest & { stackBody?: Omit<VideoBody, "timeout_ms"> }).stackBody;
     const submitted = await submitVideo({ ...(storedBody ?? { prompt: job.prompt, audience: job.request.audience, size: job.request.size, seconds: job.request.seconds }), timeout_ms: 1 });
@@ -239,7 +243,7 @@ export function __resetVideoJobsForTests(): void {
 export const GENERATED_PICTURE_NOTE = "picture-gen:";
 export const CLIP_POSTER_NOTE = "video-poster:";
 
-export type ReferenceResult = { ok: true; id: string; base64: string; bytes: Uint8Array; width: number | null; height: number | null; /** LIKENESS-01: the person this picture looks like (it was made with a style of them, or from a photo of them). Starting a clip from it asks their agreement again. */ likenessSubject: string | null } | { ok: false; line: string };
+export type ReferenceResult = { ok: true; id: string; base64: string; bytes: Uint8Array; width: number | null; height: number | null; /** The person this picture looks like, if Home recorded a household subject. */ likenessSubject: string | null; adultOnly: boolean } | { ok: false; line: string };
 const NOT_GENERATED_LINE = "I can only animate a picture that was made here in this home. Ask me to make a picture first, then animate that one.";
 
 /** The newest picture of this temporary chat the Stack made: a generated picture or the poster of a clip, whichever is newer. */
@@ -255,11 +259,11 @@ export function latestTemporaryPosterId(actor: PersonRow, conversationId: string
 export function loadGeneratedReference(actor: PersonRow, conversationId: string, fileId: string, temporary: boolean): ReferenceResult {
   if (temporary) {
     const clip = temporaryClips.get(fileId);
-    if (clip && clip.ownerPersonId === actor.id && clip.conversationId === conversationId && clip.mediaType === "image/jpeg" && clip.noReference !== true) return { ok: true, id: fileId, base64: Buffer.from(clip.bytes).toString("base64"), bytes: clip.bytes, width: null, height: null, likenessSubject: null };
+    if (clip && clip.ownerPersonId === actor.id && clip.conversationId === conversationId && clip.mediaType === "image/jpeg" && clip.noReference !== true) return { ok: true, id: fileId, base64: Buffer.from(clip.bytes).toString("base64"), bytes: clip.bytes, width: null, height: null, likenessSubject: null, adultOnly: false };
     // A temporary picture counts only when Home marked it `generated` when the picture engine made it (a field no upload
     // can set; a file name proves nothing). The Stack still checks the bytes' hash.
     const image = getTemporaryChatImage(actor, conversationId, fileId);
-    if (image && image.generated === true) return { ok: true, id: fileId, base64: Buffer.from(image.bytes).toString("base64"), bytes: image.bytes, width: image.width, height: image.height, likenessSubject: null };
+    if (image && (image.generated === true || image.likeness)) return { ok: true, id: fileId, base64: Buffer.from(image.bytes).toString("base64"), bytes: image.bytes, width: image.width, height: image.height, likenessSubject: image.likeness ?? null, adultOnly: image.audience === "adult-only" };
     return { ok: false, line: NOT_GENERATED_LINE };
   }
   const row = db.select().from(attachments).where(eq(attachments.id, fileId)).get();
@@ -271,19 +275,21 @@ export function loadGeneratedReference(actor: PersonRow, conversationId: string,
   let width: number | null = null;
   let height: number | null = null;
   let likenessSubject: string | null = null;
+  let adultOnly = false;
   try {
-    const meta = JSON.parse(note.slice(note.indexOf(":") + 1)) as { width?: number; height?: number; likeness?: string | null };
+    const meta = JSON.parse(note.slice(note.indexOf(":") + 1)) as { width?: number; height?: number; likeness?: string | null; audience?: string };
     width = typeof meta.width === "number" ? meta.width : null;
     height = typeof meta.height === "number" ? meta.height : null;
     likenessSubject = typeof meta.likeness === "string" && meta.likeness ? meta.likeness : null;
+    adultOnly = meta.audience === "adult-only";
   } catch { /* the size is only a hint for the clip's shape */ }
-  return { ok: true, id: fileId, base64: Buffer.from(read.value.bytes).toString("base64"), bytes: read.value.bytes, width, height, likenessSubject };
+  return { ok: true, id: fileId, base64: Buffer.from(read.value.bytes).toString("base64"), bytes: read.value.bytes, width, height, likenessSubject, adultOnly };
 }
 
 export type PhotoResult = { ok: true; id: string; base64: string; bytes: Uint8Array; width: number | null; height: number | null } | { ok: false; line: string };
 const NOT_A_PHOTO_LINE = "I can't find that photo any more. Attach it again and ask once more.";
 
-/** A photo a person attached in this conversation (not one this home made), as its stored bytes, unchanged. LIKENESS-01: it starts a clip only for a declared household adult who agreed, and only after the photo is checked to show exactly that one person. */
+/** A photo a person attached in this conversation (not one this home made), as its stored bytes, unchanged. It starts a clip only for a declared household adult, after the photo is checked to show exactly that one person. */
 export function loadUploadedPhoto(actor: PersonRow, conversationId: string, fileId: string, temporary: boolean): PhotoResult {
   const typeOk = (type: string) => type === "image/png" || type === "image/jpeg" || type === "image/webp";
   if (temporary) {
@@ -373,8 +379,8 @@ function stopForLikeness(job: VideoJob): boolean {
   return true;
 }
 
-/** The person took their agreement back (or only the adult-content part): every clip of them still waiting or being made stops now. Returns how many. */
-export function stopLikenessVideoJobs(subjectPersonId: string, onlyAdultContent: boolean): number {
+/** Stop every unfinished clip job when its subject leaves the household. */
+export function stopLikenessVideoJobs(subjectPersonId: string): number {
   let count = 0;
   const jobs = new Map<string, VideoJob>();
   for (const job of [...memory.values(), ...liveJobs.values()]) if (job.state === "queued" || job.state === "running") jobs.set(job.id, job);
@@ -382,7 +388,6 @@ export function stopLikenessVideoJobs(subjectPersonId: string, onlyAdultContent:
   for (const job of jobs.values()) {
     const likeness = job.request.likeness;
     if (!likeness || likeness.subject !== subjectPersonId || likeness.subject === likeness.requester) continue;
-    if (onlyAdultContent && !likeness.adult_content) continue;
     if (stopForLikeness(job)) count += 1;
   }
   return count;
@@ -400,7 +405,7 @@ async function watch(job: VideoJob, actor: PersonRow, early: StackClip[] | null 
       return;
     }
     while (!controller.signal.aborted && Date.now() < deadline) {
-      // The person it looks like can take their agreement back at any moment: checked on every poll, so a clip waiting in the line is stopped.
+      // The household option and subject eligibility are checked on every poll, so a queued clip is stopped after a stricter change.
       if (stopForLikeness(job)) return;
       let status;
       try {

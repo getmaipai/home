@@ -17,7 +17,7 @@ import { db } from "@/db";
 import { kidUsage, pictureAdapterPrefs, people, pictureJobs, videoJobs } from "@/db/schema";
 import { and, eq, gte, ne } from "drizzle-orm";
 import { declareStyleSubject, forgetStyleSubject, getStyleSubject } from "@/lib/likeness/adapters";
-import { checkStyleSubject, LOOKS_LIKE_REQUIRED_LINE, notifyStyleAdded, stackLikenessFields } from "@/lib/likeness/importStyle";
+import { checkStyleSubject, LOOKS_LIKE_REQUIRED_LINE, stackLikenessFields } from "@/lib/likeness/importStyle";
 
 export const picturesAdminRoutes = apiRouter();
 
@@ -166,7 +166,7 @@ const addRoute = createRoute({
     name: z.string().min(1).max(80), url: z.string().max(600).optional(), file: z.any().optional(), path: z.string().max(1000).optional(),
     licence: z.string().max(200).optional(), licence_acknowledged: z.enum(["true", "false"]).optional(),
     all_ages: z.enum(["yes", "no", "unsure"]).optional(), trigger_words: z.string().max(400).optional(),
-    looks_like: z.string().max(80).optional().describe("LIKENESS-01: 'nobody', or the id of the household adult the style looks like (they must have agreed, or be the one adding it)."),
+    looks_like: z.string().max(80).optional().describe("'nobody', or the id of the living household adult the style looks like."),
     not_real_person: z.enum(["true", "false"]).optional().describe("Older clients: the same as looks_like 'nobody'."),
   }) } } } },
   responses: { 200: { content: { "application/json": { schema: z.union([z.object({ job: z.string() }), z.object({ adapter: AdapterSchema })]) } }, description: "A file is added at once (switched off until confirmed); a link starts a job to poll at GET /jobs/{id}." }, ...refusals },
@@ -212,7 +212,6 @@ picturesAdminRoutes.openapi(addRoute, async (c) => {
       }
       const lora = await addLoraFile(stack);
       declareStyleSubject({ adapterId: lora.id, medium: "picture", subjectPersonId: subjectCheck.kind === "person" ? subjectCheck.subject.id : null, classification: lora.classification, declaredBy: adminId });
-      if (subjectCheck.kind === "person") await notifyStyleAdded(subjectCheck.subject.id, c.get("person"), "picture");
       setAdapterEnabled(lora.id, false, `added:${adminId}`);
       dropAdapterCache();
       const found = (await allAdapters()).find((a) => a.id === lora.id);

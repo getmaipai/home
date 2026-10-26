@@ -1,10 +1,22 @@
 // IMGGEN-SET-01: the household's picture controls (docs/design/image-generation-2026-10-17.md, "Policy"). Declared
 // here and written to the spec registry by `scripts/gen-settings-registry.ts`, like the reference keys. Children and
 // teens never make pictures whatever these say (lib/pictures/policy.ts): they are controls for adults only, and
-// the absolute lines (nothing sexual involving a minor, no likeness of a real person without consent) have no key.
+// the absolute lines (nothing sexual involving a minor, no adult content of another household adult) have no key.
 import { SettingsKey } from "@maipai/spec/gen/ts/settings-key.js";
 
 export const PICTURE_SETTINGS_KEYS: SettingsKey[] = [
+  SettingsKey.parse({
+    key: "generation.household_likeness",
+    scope: "household",
+    selector: "boolean",
+    default: true,
+    label: "Family can make pictures and videos of each other",
+    help: "Anyone in the household may make pictures, videos and songs with or of any household member. An admin can turn this off.",
+    level: "basic",
+    copy: { does: "Sets whether household members may include one another in things made here." },
+    lives_in: "household.pictures",
+    honoured_by: ["home"],
+  }),
   SettingsKey.parse({
     key: "generation.adults",
     scope: "household",
@@ -60,7 +72,7 @@ export const PICTURE_SETTINGS_KEYS: SettingsKey[] = [
   // PEOPLE-PROMPTS-01 (owner ruling 2026-10-17: "it's annoying"): the extra questions and warnings about people in pictures and videos
   // are one household switch, off by default. It never reaches a safety rule: nothing sexual involving a minor, a real person's
   // are one household switch, off by default. It never reaches a safety rule: children, nothing sexual involving a minor, a real person's
-  // likeness without their recorded consent, the finished-picture check and the fail-closed freeze have no key at all.
+  // likeness outside the household option, the finished-picture check and the fail-closed freeze have no key at all.
   SettingsKey.parse({
     key: "generation.people_prompts",
     scope: "household",

@@ -392,6 +392,10 @@ export interface TemporaryChatImage {
   createdAt: number;
   /** Set by Home on a picture the picture engine made (never by a name a person gave a file). */
   generated?: true;
+  /** Safety audience recorded when Home generated this temporary picture. */
+  audience?: "all-ages" | "adult-only";
+  /** The subject recorded on a temporary likeness generation. */
+  likeness?: string;
   /** Set on a version the picture editor made: where it came from (lib/imageEdit.ts). */
   edit?: { v: 1; op: string; label: string; source: string; source_sha256: string; root: string; engine?: string; model?: string; ms?: number; width: number; height: number };
 }

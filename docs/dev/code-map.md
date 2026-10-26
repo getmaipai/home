@@ -105,7 +105,6 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `frontend/src/apps/settings/HouseholdRobotsSection.tsx` | HouseholdRobotsSection |
 | `frontend/src/apps/settings/HuggingFaceTokenSection.tsx` | HuggingFaceTokenSection |
 | `frontend/src/apps/settings/InstallPlanSection.tsx` | InstallPlanSection |
-| `frontend/src/apps/settings/LikenessSettings.tsx` | LikenessSettings |
 | `frontend/src/apps/settings/LooksLikePicker.tsx` | NOBODY, LooksLikePicker |
 | `frontend/src/apps/settings/MicrophoneSection.tsx` | MicrophoneSection |
 | `frontend/src/apps/settings/ModelsAndStorageSection.tsx` | sizeWords, lastUsedWords, ModelsAndStorageSection |
@@ -424,16 +423,13 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/licenceRepair.ts` | LICENCE_ISSUE, syncLicenceIssue |
 | `backend/src/lib/likeness/adapters.ts` | declareStyleSubject, getStyleSubject, allStyleSubjects, forgetStyleSubject, queueStyleRemoval, drainStyleRemovals |
 | `backend/src/lib/likeness/apply.ts` | MANY_PEOPLE_LINE, STYLE_REMOVED_LINE, subjectOfStyle, prepareStyleUse, prepareStylesUse, PHOTO_ADULT_LINE |
-| `backend/src/lib/likeness/consent.ts` | subjectEligibility, householdAdults, consentState |
-| `backend/src/lib/likeness/decide.ts` | subjectName, LIKENESS_LINES, isAdultContentRequest, NO_ADULT_CONTENT_NEGATIVE, decideLikeness |
+| `backend/src/lib/likeness/decide.ts` | subjectName, ADULT_CONTENT_OTHER_SUBJECT_LINE, LIKENESS_LINES, HOUSEHOLD_LIKENESS_KEY, NO_ADULT_CONTENT_NEGATIVE, householdLikenessOn |
 | `backend/src/lib/likeness/guard.ts` | stoppedLine, likenessStillAllowed |
-| `backend/src/lib/likeness/history.ts` | LIKENESS_KEY_OPTION, recordConsentChange, consentHistory, lastRecordedState, registerRevokeHandler, likenessSettingWritten |
-| `backend/src/lib/likeness/importStyle.ts` | NOBODY, LOOKS_LIKE_REQUIRED_LINE, checkStyleSubject, sha256Of, stackLikenessFields, notifyStyleAdded |
+| `backend/src/lib/likeness/importStyle.ts` | NOBODY, LOOKS_LIKE_REQUIRED_LINE, checkStyleSubject, sha256Of, stackLikenessFields |
 | `backend/src/lib/likeness/inspector.ts` | __setPhotoCompletionForTests, __setPhotoInspectorForTests, inspectPhotoResult, inspectPhoto, PHOTO_LINES, singleAdultPhoto |
 | `backend/src/lib/likeness/proof.ts` | PROOF_TTL_SECONDS, __resetLikenessKeyForTests, __setProofClockForTests, mintProof, photoBind, STACK_OLD_LINE |
-| `backend/src/lib/likeness/resolve.ts` | resolveDeclaredAdult, messageAttests, WHO_IS_IN_PHOTO_LINE, attestedAdult, __resetAttestationsForTests |
-| `backend/src/lib/likeness/revoke.ts` | revokeLikeness |
-| `backend/src/lib/likeness/uses.ts` | recordLikenessUse, likenessUseLog |
+| `backend/src/lib/likeness/resolve.ts` | subjectEligibility, householdAdults, resolveDeclaredAdult, messageAttests, WHO_IS_IN_PHOTO_LINE, attestedAdult |
+| `backend/src/lib/likeness/revoke.ts` | likenessPersonGone |
 | `backend/src/lib/lists.ts` | listLists, getList, createList, findOrCreateStandingList, updateList, deleteList |
 | `backend/src/lib/liveView.ts` | LIVE_VIEW_MAX_MS, LIVE_VIEW_ATTACH_GRACE_MS, LIVE_VIEW_MAX_FRAME_BYTES, liveViewAdmits, getLiveView, startLiveView |
 | `backend/src/lib/llm.ts` | PERSON_TURN_BUDGET, EPHEMERAL_TURN_BUDGET, personWithinTurnBudget, personWithinEphemeralBudget, toToolDefinition, envelopeToolCall |

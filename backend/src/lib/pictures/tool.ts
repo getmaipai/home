@@ -15,7 +15,6 @@ import { pictureEngineStatus } from "./ready";
 import { chooseQuality, isPictureQuality, QUALITY_NOTE_LINE } from "./quality";
 import { StackPicturesError } from "./stack";
 import { prepareStyleUse } from "@/lib/likeness/apply";
-import { recordLikenessUse } from "@/lib/likeness/uses";
 
 import { GENERATE_IMAGE_TOOL_ID, runEditPicture } from "./editTool";
 import { CHILD_LIMIT_LINE, CHILD_NEGATIVE_PROMPT, forceCartoon, kidsDailyPictures, laneOf, picturesMadeToday, releaseKid, reserveKid } from "./lane";
@@ -51,9 +50,9 @@ export function refusalFor(audience: PictureAudience, args: Record<string, unkno
   if (denial) return { kind: "denied", why: denial, line: PICTURE_DENIAL_LINE[denial] };
   const prompt = typeof args.prompt === "string" ? args.prompt : "";
   const style = typeof args.style === "string" ? args.style : "";
-  // A request that names a style may be a style of a household adult who agreed (LIKENESS-01), including adult content they agreed to
-  // with the second consent switch: the tool decides that once it has matched the style, so the model's "real person" flag alone
-  // does not end the call here when a style was named.
+  // A request that names a style may be a style of a household adult, including adult content
+  // with the household option and adult-content gates: those run once the tool has matched the style, so the model's
+  // "real person" flag alone does not end the call here when a style was named.
   const refused = refusePrompt(`${prompt} ${style}`, { depictsRealPerson: args.depicts_real_person === true && style.trim() === "", lane: laneOf(audience) });
   if (refused) return { kind: "prompt", why: refused, line: promptRefusalLineFor(refused, "picture", audience.actor, audience.band, `${prompt} ${style}`, PROMPT_REFUSAL_LINE[refused]) };
   return null;
@@ -120,7 +119,7 @@ export async function runGenerateImage(input: RunGenerateImageInput): Promise<To
   const choice: ReturnType<typeof chooseQuality> = kid ? { quality: "quick", model: "flux2-klein-4b", note: null, announce: false } : chooseQuality({ requested: isPictureQuality(args.quality) ? args.quality : undefined, style: adapter, engine });
   const qualityNote = choice.note ? ` ${QUALITY_NOTE_LINE[choice.note]}` : choice.announce ? " This one is a Detailed picture, which takes longer than a Quick one; say so in one short sentence." : "";
   const styleNote = named && !adapter ? " The style they named is not in the library, so the picture was made without it; say so briefly." : "";
-  // LIKENESS-01: a style of a household adult is made only if they agreed; a real person with no such style is refused.
+  // A style of a household adult is made only when the household option is on; other real people are refused.
   const prep = await prepareStyleUse({ medium: "picture", audience, style: adapter, text: `${sentPrompt} ${adapter?.name ?? named}`, depictsRealPerson: args.depicts_real_person === true, source: "chat" });
   if (prep.kind === "refused") return refused(callId, args, prep.why === "real_person" ? { kind: "prompt", why: "real_person", line: PROMPT_REFUSAL_LINE.real_person } : { kind: "likeness", why: "likeness", line: prep.line });
 
@@ -149,7 +148,6 @@ export async function runGenerateImage(input: RunGenerateImageInput): Promise<To
       },
       ...(prep.kind === "likeness" ? { likeness: prep.job } : {}),
     });
-    if (prep.kind === "likeness") await recordLikenessUse({ subjectPersonId: prep.subjectId, requesterPersonId: state.actor.id, medium: "picture", way: "style", adultContent: prep.adultContent, source: "chat" });
     const many = count > 1 ? ` ${count} pictures are` : " The picture is";
     return outcomeOf({
       callId, packageId: GENERATE_IMAGE_TOOL_ID, status: "succeeded", via: "tool_call", args, durationMs: 0,

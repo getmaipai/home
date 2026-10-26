@@ -1,7 +1,6 @@
 // PEOPLE-PROMPTS-01 (owner ruling 2026-10-17: "it's annoying"): the household switch `generation.people_prompts` (default off) takes away the
 // extra friction (hedging guidance to the model, the second ask about who is in a photo) and nothing else. Every safety line is asserted
-// with the switch OFF and ON: a child is refused, nothing sexual involving a minor, a real person's likeness without the recorded
-// consent, a photo that may show a child, the fail-closed freeze. And the model can never attest who is in a photo.
+// with the switch OFF and ON: a child is refused, nothing sexual involving a minor, the household's real-person limits, a photo that may show a child, the fail-closed freeze. And the model can never attest who is in a photo.
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import sharp from "sharp";
 import { resetDb } from "./reset-db";
@@ -122,27 +121,21 @@ describe("the hard lines hold with the switch off and on", () => {
         expect(video.submitted).toHaveLength(0);
       });
 
-      test("nothing sexual involving a minor, and nothing sexual that shows a real person (owner, 2026-10-25)", async () => {
+      test("nothing sexual involving a minor, while an adult may make a nonsexual public figure", async () => {
         expect(text(await pic(nadia, { prompt: "a naked child on a beach" }))).toContain("never allowed");
-        expect(text(await pic(nadia, { prompt: "a sexual portrait of a famous senator", depicts_real_person: true }))).toContain("real person");
-        expect(text(await vid(nadia, { prompt: "a sexual video of a famous senator", depicts_real_person: true }))).toContain("real person");
-        expect(image.submitted).toHaveLength(0);
-        expect(video.submitted).toHaveLength(0);
+        expect(refusedWith(await pic(nadia, { prompt: "a portrait of a famous senator", depicts_real_person: true }))).toBeUndefined();
+        expect(refusedWith(await pic(nadia, { prompt: "a nude portrait of a famous senator", depicts_real_person: true }))).toBe("real_person");
+        expect(refusedWith(await vid(nadia, { prompt: "a nude famous senator waving", depicts_real_person: true }))).toBe("real_person");
       });
 
-      test("a household person's likeness needs their recorded consent and the signed proof", async () => {
+      test("an ordinary household photo uses the household option and signed proof", async () => {
         const photo = await put(nadia, "photo-1");
-        const off = await pic(nadia, { prompt: "add her to the bench", change: "attached", affects_people: true, photo_subject: "Marlow" }, [photo], "the photo is Marlow");
-        expect(text(off)).toContain("Marlow hasn't agreed");
-        const v = await vid(nadia, { prompt: "she waves", from_picture: "attached", photo_subject: "Marlow" }, [photo], "animate this, it is Marlow");
-        expect(text(v)).toContain("Marlow hasn't agreed");
-        expect(image.edits).toHaveLength(0);
-        expect(video.submitted).toHaveLength(0);
-        expect(setValue(marlow, `person:${marlow.id}`, "likeness.adults", true).ok).toBe(true);
         const ok = await pic(nadia, { prompt: "change her dress to red", change: "attached", affects_people: true, photo_subject: "Marlow" }, [photo], "the photo is Marlow");
         expect(ok.status).toBe("succeeded");
         expect(image.edits[0]).toMatchObject({ image_source: "household_photo", audience: "adult" });
         expect(String(image.edits[0]!.consent_proof).split(".")).toHaveLength(2);
+        const videoOk = await vid(nadia, { prompt: "she waves", from_picture: "attached", photo_subject: "Marlow" }, [photo], "animate this, it is Marlow");
+        expect(videoOk.status).toBe("succeeded");
       });
 
       test("a photo that may show a child is never used for a person", async () => {

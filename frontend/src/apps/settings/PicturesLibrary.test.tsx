@@ -1,10 +1,14 @@
 // IMGGEN-SET-01: the Pictures and videos settings view.
-import { afterEach, describe, expect, mock, test } from "bun:test";
+import { afterEach, describe, expect, mock, spyOn, test } from "bun:test";
 import { cleanup, fireEvent, waitFor } from "@testing-library/react";
+import { MemoryRouter } from "react-router-dom";
 import { renderWithQueryClient } from "../../../tests/renderWithQueryClient";
 import { PicturesLibrary } from "@/apps/settings/PicturesLibrary";
 import { likenessApi } from "@/lib/likenessApi";
 import { picturesAdminApi, type AdminAdapter, type AdminOverview } from "@/lib/picturesApi";
+import { api } from "@/lib/api";
+import { SettingsKey } from "@maipai/spec/gen/ts/settings-key.js";
+import { REGISTRY } from "@/shell/pages/settings/settingsTestKit";
 
 afterEach(cleanup);
 
@@ -27,11 +31,22 @@ function mount(data: AdminOverview) {
   picturesAdminApi.installModel = mock(async () => ({ job: "j1", family: "flux2-klein-4b" }));
   picturesAdminApi.job = mock(async () => ({ state: "running" as const, percent: 30, label: "x", error: null, code: null, adapter: null }));
   picturesAdminApi.addAdapter = mock(async () => ({ adapter: style({ id: "lora-new", name: "Ink Wash", enabled: false, needs_confirmation: true }) }));
-  const view = renderWithQueryClient(<PicturesLibrary />);
+  const view = renderWithQueryClient(<MemoryRouter><PicturesLibrary /></MemoryRouter>);
   return { ...view, restore: () => Object.assign(picturesAdminApi, original) };
 }
 
 describe("Pictures and videos settings view", () => {
+  test("renders the household likeness option with the shared settings key renderer", async () => {
+    const setting = SettingsKey.parse(REGISTRY.find((key) => key.key === "generation.household_likeness"));
+    const registry = spyOn(api, "settingsRegistry").mockResolvedValue([setting] as never);
+    const values = spyOn(api, "settingsValues").mockResolvedValue([{ key: setting.key, value: true, source: "default", label: setting.label, help: setting.help, level: setting.level, secret: false }] as never);
+    try {
+      const v = mount(overview());
+      expect(await v.findByRole("switch", { name: setting.label })).toBeTruthy();
+      v.restore();
+    } finally { registry.mockRestore(); values.mockRestore(); }
+  });
+
   test("shows the model, the three ages with children and teens locked off, and each style with its age badge and licence", async () => {
     const v = mount(overview());
     await waitFor(() => expect(v.getByText("Quick")).toBeTruthy());
@@ -92,7 +107,7 @@ describe("Pictures and videos settings view", () => {
 
   test("the add form needs the answer to 'Who does this style look like?', then sends it and not sure as unsure", async () => {
     const original = { ...likenessApi };
-    likenessApi.adults = mock(async () => [{ id: "p-marlow", name: "Marlow", self: false, agreed: true }, { id: "p-nadia", name: "Nadia", self: false, agreed: false }]);
+    likenessApi.adults = mock(async () => [{ id: "p-marlow", name: "Marlow", self: false }, { id: "p-nadia", name: "Nadia", self: false }]);
     const v = mount(overview({ adapters: [] }));
     await waitFor(() => expect(v.getByLabelText("Name")).toBeTruthy());
     fireEvent.change(v.getByLabelText("Name"), { target: { value: "Ink Wash" } });
@@ -111,15 +126,14 @@ describe("Pictures and videos settings view", () => {
     v.restore();
   });
 
-  test("an adult who has not agreed is listed but cannot be picked", async () => {
+  test("every living adult subject is available in the picker", async () => {
     const original = { ...likenessApi };
-    likenessApi.adults = mock(async () => [{ id: "p-marlow", name: "Marlow", self: false, agreed: true }, { id: "p-nadia", name: "Nadia", self: false, agreed: false }]);
+    likenessApi.adults = mock(async () => [{ id: "p-marlow", name: "Marlow", self: false }, { id: "p-nadia", name: "Nadia", self: false }]);
     const v = mount(overview({ adapters: [] }));
     await waitFor(() => expect(v.getByLabelText("Name")).toBeTruthy());
     fireEvent.click(v.getByRole("combobox", { name: "Who does this style look like?" }));
-    const agreed = await v.findByRole("option", { name: "Marlow" });
-    expect(agreed.getAttribute("aria-disabled")).not.toBe("true");
-    expect((await v.findByRole("option", { name: "Nadia (has not agreed)" })).getAttribute("aria-disabled")).toBe("true");
+    expect((await v.findByRole("option", { name: "Marlow" })).getAttribute("aria-disabled")).not.toBe("true");
+    expect((await v.findByRole("option", { name: "Nadia" })).getAttribute("aria-disabled")).not.toBe("true");
     Object.assign(likenessApi, original);
     v.restore();
   });

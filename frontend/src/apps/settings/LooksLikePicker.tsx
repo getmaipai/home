@@ -1,5 +1,5 @@
 // LIKENESS-01: "Who does this style look like?" (adding a style) and "Who is in this photo?" (the picture editor). A household
-// adult from the list, or Nobody. An adult who has not agreed is listed but cannot be picked: the reason is on the row.
+// adult from the list, or Nobody. Eligibility is enforced again by the backend when a request is made.
 import { useQuery } from "@tanstack/react-query";
 import { Label } from "@maipai/ui/src/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@maipai/ui/src/ui/select";
@@ -17,8 +17,8 @@ export function LooksLikePicker({ id, label, value, onChange, disabled, nobodyLa
         <SelectContent>
           {nobodyLabel ? <SelectItem value={NOBODY}>{nobodyLabel}</SelectItem> : null}
           {(adults.data ?? []).map((adult) => (
-            <SelectItem key={adult.id} value={adult.id} disabled={!adult.agreed}>
-              {adult.self ? `${adult.name} (me)` : adult.agreed ? adult.name : `${adult.name} (has not agreed)`}
+            <SelectItem key={adult.id} value={adult.id}>
+              {adult.self ? `${adult.name} (me)` : adult.name}
             </SelectItem>
           ))}
         </SelectContent>

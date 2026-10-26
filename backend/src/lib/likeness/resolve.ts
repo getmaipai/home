@@ -3,10 +3,30 @@
 // needed, code checks what it may do). Only a household adult resolves: "someone else", a friend, a celebrity, a child,
 // a name that matches two people, or no name at all resolves to nothing, and the request is refused.
 import { speakerAgeBand } from "@/lib/ageBand";
-import { subjectEligibility } from "./consent";
+import { eq } from "drizzle-orm";
 import { db } from "@/db";
 import { people } from "@/db/schema";
 import type { PersonRow } from "@/types";
+
+export type SubjectWhy = "unknown" | "gone" | "guest" | "minor" | "memorial";
+
+/** A likeness subject must be a living, enabled household adult. */
+export function subjectEligibility(personId: string | null | undefined): { ok: true; person: PersonRow } | { ok: false; why: SubjectWhy } {
+  if (!personId) return { ok: false, why: "unknown" };
+  const person = db.select().from(people).where(eq(people.id, personId)).get();
+  if (!person) return { ok: false, why: "unknown" };
+  if (person.deletedAt || person.enabled === false) return { ok: false, why: "gone" };
+  if (person.memorializedAt) return { ok: false, why: "memorial" };
+  if (person.role === "guest") return { ok: false, why: "guest" };
+  if (person.role !== "owner" && person.role !== "admin" && person.role !== "adult") return { ok: false, why: "minor" };
+  if (speakerAgeBand(person as PersonRow, new Date()) !== "adult") return { ok: false, why: "minor" };
+  return { ok: true, person: person as PersonRow };
+}
+
+export function householdAdults(): Array<{ id: string; name: string }> {
+  return db.select().from(people).all().filter((person) => subjectEligibility(person.id).ok)
+    .map((person) => ({ id: person.id, name: person.displayName })).sort((a, b) => a.name.localeCompare(b.name));
+}
 
 function norm(text: string): string {
   return text.toLowerCase().normalize("NFKD").replace(/[̀-ͯ]/g, "").replace(/[^a-z0-9]+/g, " ").trim();
@@ -44,7 +64,7 @@ export function messageAttests(utterance: unknown, requester: PersonRow, declare
   return candidates.some((n) => new RegExp(`\\b${n.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\b`).test(text));
 }
 
-export const WHO_IS_IN_PHOTO_LINE = "Who is in this photo? Tell me which adult in this household it shows (say their name, or say it is you) and make sure they have agreed. I only use a photo of someone who lives here and said yes.";
+export const WHO_IS_IN_PHOTO_LINE = "Who is in this photo? Tell me which adult in this household it shows (say their name, or say it is you). I only use a photo of someone who lives here.";
 
 /** The adult a tool call may treat as the person in a photo: the model's proposal (`photo_subject`) resolved against the household, kept only when the person's own message names or claims that adult. The one rule for every tool that takes a photo and a subject (pictures and videos). */
 export function attestedAdult(proposal: unknown, utterance: unknown, requester: PersonRow, remember?: { photoKeys: readonly string[]; on: boolean }): { proposed: PersonRow | null; attested: PersonRow | null } {

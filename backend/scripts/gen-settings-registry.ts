@@ -26,7 +26,6 @@ import { REFERENCE_SETTINGS_KEYS } from "../src/settings/referenceKeys.js";
 import { PICTURE_SETTINGS_KEYS } from "../src/settings/pictureKeys.js";
 import { VIDEO_SETTINGS_KEYS } from "../src/settings/videoKeys.js";
 import { MUSIC_SETTINGS_KEYS } from "../src/settings/musicKeys.js";
-import { LIKENESS_SETTINGS_KEYS } from "../src/settings/likenessKeys.js";
 import { NEWS_SETTINGS_KEYS } from "../src/settings/newsKeys.js";
 import { SECURITY_SETTINGS_KEYS } from "../src/settings/securityKeys.js";
 import { WAKEWORD_SETTINGS_KEYS } from "../src/settings/wakewordKeys.js";
@@ -52,7 +51,6 @@ const sorted = [
   ...PICTURE_SETTINGS_KEYS,
   ...VIDEO_SETTINGS_KEYS,
   ...MUSIC_SETTINGS_KEYS,
-  ...LIKENESS_SETTINGS_KEYS,
   ...NEWS_SETTINGS_KEYS,
   ...SECURITY_SETTINGS_KEYS,
   ...WAKEWORD_SETTINGS_KEYS,

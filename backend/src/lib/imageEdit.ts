@@ -46,7 +46,6 @@ import { speakerAgeBand } from "@/lib/ageBand";
 import { prepareEditSource } from "@/lib/pictures/editSources";
 import { MANY_PEOPLE_LINE, PHOTO_ADULT_LINE } from "@/lib/likeness/apply";
 import { likenessStillAllowed, type JobLikeness } from "@/lib/likeness/guard";
-import { recordLikenessUse } from "@/lib/likeness/uses";
 import { StackError } from "@/lib/stack/errors";
 import type { StackImageToolsStatus } from "@/lib/stack/client";
 import type { PersonRow } from "@/types";
@@ -279,7 +278,7 @@ export async function saveVersion(actor: PersonRow, source: SourcePicture, png: 
 
 // ---------------------------------------------------------------- running a Stack edit
 
-interface Preview { token: string; personId: string; png: Uint8Array; width: number; height: number; op: AnyEditOp; engine?: string; model?: string; ms?: number; sourceId: string; conversationId: string; createdAt: number; /** LIKENESS-01: the edit shows this household adult; their agreement is checked again when the preview is applied. */ likeness?: JobLikeness }
+interface Preview { token: string; personId: string; png: Uint8Array; width: number; height: number; op: AnyEditOp; engine?: string; model?: string; ms?: number; sourceId: string; conversationId: string; createdAt: number; /** LIKENESS-01: the edit shows this household adult; eligibility and the household setting are checked again when applied. */ likeness?: JobLikeness }
 const previews = new Map<string, Preview>();
 interface EditJob { personId: string; sourceId: string; conversationId: string; op: AnyEditOp; createdAt: number; finalising?: Promise<PreviewInfo>; /** A Comment: the job lives on the picture engine (/v1/images/generations/{job}), not the editing tools. */ generative?: boolean; /** The words carry a sexual or nudity word: the finished picture is checked as an adult-only one. */ adultOnly?: boolean; /** A hash of the words, for the safety log; never the words. */ promptHash?: string; /** LIKENESS-01: the photo shows this household adult; checked again on every poll and when the preview is applied. */ likeness?: JobLikeness }
 const jobs = new Map<string, EditJob>();
@@ -408,10 +407,10 @@ export function readPreview(actor: PersonRow, token: string): Preview {
 /** Apply: the previewed result becomes a new version of the picture's chain. */
 export async function applyPreview(actor: PersonRow, token: string, label?: string): Promise<PictureVersion> {
   const preview = readPreview(actor, token);
-  // LIKENESS-01: a preview that shows a household adult is thrown away if they took their agreement back before it was applied.
+  // LIKENESS-01: a preview is discarded if its subject becomes ineligible or the household setting is switched off.
   if (preview.likeness) {
     const still = likenessStillAllowed(preview.likeness);
-    if (!still.ok) { previews.delete(token); throw new ImageEditError(403, still.line, "likeness_withdrawn"); }
+    if (!still.ok) { previews.delete(token); throw new ImageEditError(403, still.line, "likeness_stopped"); }
   }
   const source = loadSource(actor, preview.conversationId, preview.sourceId, true);
   const defaults: Record<AnyEditOp, string> = { remove_background: "Background removed", erase: "Object erased", upscale: "Enlarged", resize: "Resized", comment: "Changed as described" };
@@ -469,8 +468,9 @@ export async function startComment(actor: PersonRow, conversationId: string, id:
   if (!comment.enabled) throw new ImageEditError(503, comment.reason ?? COMMENT_NOT_SET_UP, "not_set_up");
   const region = regionForStack(input.region);
   // LIKENESS-01: where the picture came from decides what the Stack is told (pictures/editSources.ts, shared with the chat tool).
-  const rootLikeness = generated ? await generatedPictureLikeness(source) : null;
-  const prepared = await prepareEditSource({ audience: editorAudience(actor), bytes: source.bytes, generated, rootLikeness, declaredSubjectId: input.subjectPersonId ?? null, text: prompt, source: "editor" });
+  const rootLikeness = generated ? await generatedPictureLikeness(source, actor) : null;
+  const rootAdultContent = generated ? await generatedPictureAdultOnly(source, actor) : false;
+  const prepared = await prepareEditSource({ audience: editorAudience(actor), bytes: source.bytes, generated, rootLikeness, rootAdultContent, declaredSubjectId: input.subjectPersonId ?? null, text: prompt, source: "editor" });
   if (!prepared.ok) throw new ImageEditError(prepared.status, prepared.line, prepared.code);
   const imageSource = prepared.imageSource;
   const consentProof = prepared.proof;
@@ -484,7 +484,7 @@ export async function startComment(actor: PersonRow, conversationId: string, id:
     const status = await pictureEngineStatus().catch(() => null);
     if ((status?.edit?.references ?? 0) < 1) throw new ImageEditError(503, "The picture engine on this computer needs its next update before it can use a second picture.", "references_unsupported");
     const referenceGenerated = await isGeneratedPicture(actor, referenceSource);
-    const referencePrepared = await prepareEditSource({ audience: editorAudience(actor), bytes: referenceSource.bytes, generated: referenceGenerated, rootLikeness: referenceGenerated ? await generatedPictureLikeness(referenceSource) : null, declaredSubjectId: input.referenceSubjectPersonId ?? null, text: prompt, source: "editor" });
+    const referencePrepared = await prepareEditSource({ audience: editorAudience(actor), bytes: referenceSource.bytes, generated: referenceGenerated, rootLikeness: referenceGenerated ? await generatedPictureLikeness(referenceSource, actor) : null, rootAdultContent: referenceGenerated ? await generatedPictureAdultOnly(referenceSource, actor) : false, declaredSubjectId: input.referenceSubjectPersonId ?? null, text: prompt, source: "editor" });
     if (!referencePrepared.ok) throw new ImageEditError(referencePrepared.status, referencePrepared.line, referencePrepared.code);
     if (referencePrepared.subjectId && subjectForLog && referencePrepared.subjectId !== subjectForLog) throw new ImageEditError(422, MANY_PEOPLE_LINE, "many_people");
     reference = { source: referenceSource, prepared: referencePrepared };
@@ -500,6 +500,8 @@ export async function startComment(actor: PersonRow, conversationId: string, id:
   else if (region) form.append("region", region);
   form.append("image_source", imageSource);
   if (consentProof) form.append("consent_proof", consentProof);
+  const negativePrompt = prepared.negativePrompt ?? reference?.prepared.negativePrompt;
+  if (negativePrompt) form.append("negative_prompt", negativePrompt);
   if (reference) {
     form.append("reference", new File([new Uint8Array(reference.source.bytes)], "reference", { type: reference.source.mediaType }));
     form.append("reference_source", reference.prepared.imageSource);
@@ -516,7 +518,6 @@ export async function startComment(actor: PersonRow, conversationId: string, id:
     sweep();
     attachKid(kidSlot, job);
     jobs.set(job, { personId: actor.id, sourceId: id, conversationId, op: "comment", createdAt: Date.now(), generative: true, adultOnly: mentionsSexualWord(prompt), promptHash: promptHash(prompt), ...(likenessAll ? { likeness: likenessAll } : {}) });
-    for (const subjectId of new Set([subjectForLog, reference?.prepared.subjectId ?? null])) if (subjectId) await recordLikenessUse({ subjectPersonId: subjectId, requesterPersonId: actor.id, medium: "picture", way: "photo", adultContent: false, source: "editor" });
     return { state: "running", job, percent: null, label: OP_LABEL.comment };
   } catch (error) {
     releaseKid(kidSlot);
@@ -550,8 +551,11 @@ async function submitEditSource(form: FormData, source: "generated" | "uploaded"
 }
 
 /** The household adult a picture this home made was made to look like (its provenance records it), or null. */
-export async function generatedPictureLikeness(source: SourcePicture): Promise<string | null> {
-  if (source.temporary) return null;
+export async function generatedPictureLikeness(source: SourcePicture, actor?: PersonRow): Promise<string | null> {
+  if (source.temporary) {
+    const image = actor ? getTemporaryChatImageForReader(actor, source.conversationId, source.rootId) : undefined;
+    return image?.likeness ?? null;
+  }
   const row = db.select({ provenance: attachments.provenance }).from(attachments).where(eq(attachments.id, source.rootId)).get();
   const note = row?.provenance ?? "";
   if (!note.startsWith("picture-gen:")) return null;
@@ -561,8 +565,17 @@ export async function generatedPictureLikeness(source: SourcePicture): Promise<s
   } catch { return null; }
 }
 
+/** Whether the root generated picture's own safety gate classified its audience as adult-only. */
+export async function generatedPictureAdultOnly(source: SourcePicture, actor: PersonRow): Promise<boolean> {
+  if (source.temporary) return !!(actor && getTemporaryChatImageForReader(actor, source.conversationId, source.rootId)?.audience === "adult-only");
+  const row = db.select({ provenance: attachments.provenance }).from(attachments).where(eq(attachments.id, source.rootId)).get();
+  const note = row?.provenance ?? "";
+  if (!note.startsWith("picture-gen:")) return false;
+  try { return (JSON.parse(note.slice(note.indexOf(":") + 1)) as { audience?: unknown }).audience === "adult-only"; } catch { return false; }
+}
+
 export async function isGeneratedPicture(actor: PersonRow, source: SourcePicture): Promise<boolean> {
-  if (source.temporary) return getTemporaryChatImageForReader(actor, source.conversationId, source.rootId)?.generated === true;
+  if (source.temporary) { const image = getTemporaryChatImageForReader(actor, source.conversationId, source.rootId); return image?.generated === true || !!image?.likeness; }
   const row = db.select({ provenance: attachments.provenance }).from(attachments).where(eq(attachments.id, source.rootId)).get();
   return typeof row?.provenance === "string" && row.provenance.startsWith("picture-gen:");
 }
@@ -576,10 +589,10 @@ async function pollComment(actor: PersonRow, jobId: string, job: EditJob): Promi
     const mapped = commentErrorFrom(error);
     return { state: "failed", error: mapped.message, code: mapped.code };
   }
-  // LIKENESS-01: the person it shows can take their agreement back while the edit waits; then it is stopped and thrown away.
+  // LIKENESS-01: recheck subject eligibility and the household setting while the edit waits.
   if (job.likeness) {
     const still = likenessStillAllowed(job.likeness);
-    if (!still.ok) { jobs.delete(jobId); void cancelOrDelete(jobId); return { state: "failed", error: still.line, code: "likeness_withdrawn" }; }
+    if (!still.ok) { jobs.delete(jobId); void cancelOrDelete(jobId); return { state: "failed", error: still.line, code: "likeness_stopped" }; }
   }
   if (status.state === "queued" || status.state === "running") {
     return { state: status.state, job: jobId, percent: status.progress > 0 ? Math.min(99, Math.round(status.progress)) : null, label: status.position && status.position > 1 ? `Waiting your turn (${status.position})` : OP_LABEL.comment };

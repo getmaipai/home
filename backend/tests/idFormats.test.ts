@@ -29,8 +29,6 @@ const TABLE: ReadonlyArray<readonly [string, string, number]> = [
   ["newEpisodeId", "ep-", 10],
   ["newFileId", "file-", 10],
   ["newVideoJobId", "vid-", 10],
-  ["newLikenessConsentId", "lc-", 10],
-  ["newLikenessUseId", "lu-", 10],
   ["newLikenessAdapterId", "la-", 10],
   ["newShareId", "share-", 10],
   ["newArtifactId", "art-", 10],

@@ -4,7 +4,7 @@
 // clip. A route is never a way around the tool's gates.
 import { preparePhotoUse, prepareStylesUse } from "@/lib/likeness/apply";
 import { singleAdultPhoto } from "@/lib/likeness/inspector";
-import { subjectEligibility } from "@/lib/likeness/consent";
+import { subjectEligibility } from "@/lib/likeness/resolve";
 import type { JobLikeness } from "@/lib/likeness/guard";
 import type { PersonRow } from "@/types";
 import type { VideoAudience } from "./policy";
@@ -70,9 +70,9 @@ export async function prepareVideoRerun(input: RerunInput): Promise<RerunResult>
       if (!ref.ok) return { ok: false, line: ref.line, code: "reference" };
       image = ref.base64; imageSource = "generated"; width = ref.width; height = ref.height;
       if (ref.likenessSubject) {
-        const prep = await preparePhotoUse({ medium: "video", audience: input.audience, declaredSubjectId: ref.likenessSubject, bytes: ref.bytes, text: input.prompt, source: "chat" });
+        const prep = await preparePhotoUse({ medium: "video", audience: input.audience, declaredSubjectId: ref.likenessSubject, bytes: ref.bytes, text: input.prompt, adultContent: ref.adultOnly, source: "chat" });
         if (prep.kind === "refused") return { ok: false, line: prep.line, code: "likeness" };
-        photo = prep; imageSource = "household_photo"; consentProof = prep.proof; negativePrompt = prep.negativePrompt;
+        photo = { ...prep, adultContent: prep.adultContent || ref.adultOnly, job: { ...prep.job, adult_content: prep.job.adult_content || ref.adultOnly } }; imageSource = "household_photo"; consentProof = prep.proof; negativePrompt = prep.negativePrompt;
       }
     }
   }

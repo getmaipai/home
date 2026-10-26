@@ -3,7 +3,7 @@
 // Three lanes, decided by the stricter of the turn's band and the person's own band (never the looser):
 //   - adult: pictures and videos with no filter beyond the absolute lines (policy.ts, minorLine.ts);
 //   - teen:  pictures, videos and edits too, with nothing adult or sexual: the prompt gate and the finished-picture check refuse it
-//            in ONE short plain line, adult-only styles are never offered, a real person's likeness needs that person's recorded consent;
+//            in ONE short plain line, adult-only styles are never offered, another household adult's likeness follows the household setting;
 //   - child: a strict lane of cartoon pictures and videos of safe things: a child-safe topic gate on the words, the cartoon look forced,
 //            Quick only, no photos, no references, no real people, edits only of their own generated cartoons, a daily limit, and a
 //            child-safety check on every finished picture or clip that fails closed.

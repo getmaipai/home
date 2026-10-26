@@ -1,22 +1,19 @@
-// LIKENESS-01: the one decision about a request that makes something look like a household adult. Run at the policy
-// node, at the tool, at every route, and again while the job waits (jobGuard.ts). The age and surface gate comes first
-// and is the picture policy's own: a request that is not an adult on their own written chat screen (a child, a teen,
-// a guest, a spoken turn, a shared screen) never reaches this decision at all. Nothing here makes anything more
-// permissive than an adult picture already is: the second switch (adult content) exists only to keep a person's likeness
-// out of adult-only requests unless they said it may be there.
+// One decision for every request that uses a bound household likeness. The
+// requester gate, living adult subject check and household option are kept
+// together so tools and queued jobs cannot skip a check.
 import { pictureDenial, asksToUndress, type PictureAudience } from "@/lib/pictures/policy";
+import { getHouseholdSettingValue } from "@/lib/settings";
 import { laneOf } from "@/lib/pictures/lane";
-import { consentState, subjectEligibility, type SubjectWhy } from "./consent";
+import { householdAdults, subjectEligibility, type SubjectWhy } from "./resolve";
 import type { PersonRow } from "@/types";
 
 export type LikenessWay = "style" | "photo";
 export type LikenessMedium = "picture" | "video";
-export type LikenessDenial = "requester" | "no_subject" | "subject_minor" | "subject_unknown" | "consent_off" | "adult_content_off";
+export type LikenessDenial = "requester" | "no_subject" | "subject_minor" | "subject_unknown" | "household_off" | "adult_content_other_subject";
 
 export interface LikenessAsk {
   requester: PictureAudience;
   subjectPersonId: string | null | undefined;
-  /** Whether the request is an adult-content one (see `isAdultContentRequest`). */
   adultContent: boolean;
 }
 
@@ -26,44 +23,46 @@ export type LikenessDecision =
 
 export function subjectName(person: PersonRow): string { return person.nickname?.trim() || person.displayName; }
 
+export const ADULT_CONTENT_OTHER_SUBJECT_LINE = "Adult pictures of another person need their yes each time, and that is coming soon. Ask for something else, or an invented character.";
+
 const SUBJECT_LINES: Record<SubjectWhy, string> = {
-  unknown: "I can only make something that looks like an adult who lives in this household and has agreed to it. I couldn't find that person here.",
-  gone: "I can only make something that looks like an adult who lives in this household and has agreed to it. That person isn't here any more.",
-  guest: "I can only make something that looks like an adult who lives in this household and has agreed to it. A guest can't be made.",
-  minor: "I never make a picture or video that looks like a child or a teen. I can only make one that looks like an adult in this household who has agreed to it.",
-  memorial: "I can only make something that looks like an adult who lives in this household and has agreed to it. That profile is a memorial.",
+  unknown: "I can only make something that looks like a living adult in this household. I couldn't find that person here.",
+  gone: "I can only make something that looks like a living adult in this household. That person isn't here any more.",
+  guest: "I can only make something that looks like a living adult in this household. A guest can't be a subject.",
+  minor: "I never make a picture or video that looks like a child or a teen.",
+  memorial: "I can only make something that looks like a living adult in this household. That profile is a memorial.",
 };
 
 export const LIKENESS_LINES = {
-  requester: "Pictures and videos that look like another person can only be made by an adult, with that person's agreement.",
-  no_subject: "Say which adult in this household it should look like, and make sure they have agreed. I won't make a picture or video of someone else.",
-  consent_off: (name: string) => `${name} hasn't agreed to pictures, videos or styles that look like them. They can turn that on in their own Settings, Pictures and videos. I made nothing.`,
-  adult_content_off: (name: string) => `${name} has agreed to pictures and videos that look like them, but not to adult content. They can change that in their own Settings, Pictures and videos. I made nothing.`,
+  requester: "Pictures and videos that look like another person can only be made by an adult on their own written screen.",
+  no_subject: "Say which adult in this household it should look like. I won't make a picture or video of someone else.",
+  household_off: "Pictures and videos of people in this household are switched off. An admin can switch them on in Settings.",
+  adult_content_other_subject: ADULT_CONTENT_OTHER_SUBJECT_LINE,
 } as const;
 
-/** Whether a request is an adult-content one: its words undress or sexualise someone (the same stricter reading the photo editor applies to a photo), or it also applies an adult-only style other than the likeness itself. A word list cannot catch every phrasing; the negative prompt below, the output being the requester's own and the subject's notification are the other half. */
+export const HOUSEHOLD_LIKENESS_KEY = "generation.household_likeness";
+/** Engine-side protection for another adult's likeness until per-use approval ships. */
+export const NO_ADULT_CONTENT_NEGATIVE = "nude, naked, nudity, topless, nsfw, explicit, sexual, lingerie, underwear";
+
+/** Default-on household option from the shared settings registry. */
+export function householdLikenessOn(): boolean {
+  try { return getHouseholdSettingValue(HOUSEHOLD_LIKENESS_KEY) !== false; } catch { return true; }
+}
+
 export function isAdultContentRequest(input: { text: string; otherAdultOnlyStyle?: boolean }): boolean {
   return input.otherAdultOnlyStyle === true || asksToUndress(input.text);
 }
 
-/** Words added to the engine's negative prompt for every request that looks like a person whose second switch is off. Belt and braces beside the refusal above. */
-export const NO_ADULT_CONTENT_NEGATIVE = "nude, naked, nudity, topless, nsfw, explicit, sexual, lingerie, underwear";
-
-/** May this request make something that looks like this person? */
 export function decideLikeness(ask: LikenessAsk): LikenessDecision {
-  if (pictureDenial(ask.requester) !== null) return { ok: false, denial: "requester", line: LIKENESS_LINES.requester };
-  // The agreement an adult records is "other adults may": a teen or a child never makes something that looks like another person, and a
-  // minor is never the subject here (subjectEligibility). A teen's own photo for a non-sexual edit is handled by the photo path (editSources).
-  if (laneOf(ask.requester) !== "adult") return { ok: false, denial: "requester", line: LIKENESS_LINES.requester };
+  if (pictureDenial(ask.requester) !== null || laneOf(ask.requester) !== "adult") return { ok: false, denial: "requester", line: LIKENESS_LINES.requester };
   if (!ask.subjectPersonId) return { ok: false, denial: "no_subject", line: LIKENESS_LINES.no_subject };
   const eligible = subjectEligibility(ask.subjectPersonId);
   if (!eligible.ok) return { ok: false, denial: eligible.why === "minor" ? "subject_minor" : "subject_unknown", line: SUBJECT_LINES[eligible.why] };
   const subject = eligible.person;
   const self = subject.id === ask.requester.actor.id;
-  // A person making something that looks like themselves needs no one's agreement but their own.
-  if (self) return { ok: true, subject, self };
-  const consent = consentState(subject.id);
-  if (!consent.adults) return { ok: false, denial: "consent_off", line: LIKENESS_LINES.consent_off(subjectName(subject)) };
-  if (ask.adultContent && !consent.adultContent) return { ok: false, denial: "adult_content_off", line: LIKENESS_LINES.adult_content_off(subjectName(subject)) };
+  if (!self && !householdLikenessOn()) return { ok: false, denial: "household_off", line: LIKENESS_LINES.household_off };
+  if (!self && ask.adultContent) return { ok: false, denial: "adult_content_other_subject", line: ADULT_CONTENT_OTHER_SUBJECT_LINE };
   return { ok: true, subject, self };
 }
+
+export { householdAdults, subjectEligibility };

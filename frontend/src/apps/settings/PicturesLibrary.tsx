@@ -20,6 +20,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { ApiError } from "@/lib/api";
 import { picturesAdminApi, type AdminAdapter, type AdminOverview } from "@/lib/picturesApi";
 import { LooksLikePicker, NOBODY } from "@/apps/settings/LooksLikePicker";
+import { SettingsRenderer } from "@/shell/pages/settings/SettingsRenderer";
 
 const OVERVIEW_KEY = ["pictures-admin"] as const;
 /** Home takes a request body of at most 128 MiB (the server's own limit); a bigger style comes by its Hugging Face link. */
@@ -159,7 +160,7 @@ function WhoMakesPicturesSection({ overview }: { overview: AdminOverview }) {
           </Item>
         ))}
       </ItemGroup>
-      <p className="text-sm text-muted-foreground">Adults are switched on or off in the settings above. Nothing here ever allows a picture that is sexual and shows a child, or anyone who looks like one, or a picture of a real person who has not agreed to it.</p>
+      <p className="text-sm text-muted-foreground">Adults are switched on or off in the settings above. Nothing here ever allows a picture that is sexual and shows a child, or anyone who looks like one.</p>
     </section>
   );
 }
@@ -313,7 +314,7 @@ function AddStyle({ refresh }: { refresh: () => void }) {
           <Input id="style-words" value={words} onChange={(e) => setWords(e.target.value)} maxLength={400} disabled={busy} />
         </div>
         <LooksLikePicker id="style-looks-like" label="Who does this style look like?" value={looksLike} onChange={(v) => { setLooksLike(v); if (v !== NOBODY && source === "link") setSource("file"); }} disabled={busy}
-          help="Pick an adult in this household only if they have agreed, in their own settings. A style of a child, a teen, a guest or anyone outside the household is never added. A style of an adult here is always adults only, and is removed if they take their agreement back." />
+          help="A style of a child, a teen, a guest or anyone outside the household is never added. A style of an adult here is always adults only." />
         <p className="text-sm text-muted-foreground">The picture engine also checks the file and refuses styles of public figures and anything that puts a child in an adult scene. It cannot catch everything, so only add styles you trust.</p>
         {error ? <p role="alert" className="text-sm text-destructive">{error}</p> : null}
         {job ? <Progress value={progress?.percent ?? 0} aria-label="Fetching the style" /> : null}
@@ -334,6 +335,7 @@ export function PicturesLibrary() {
   const data = overview.data;
   return (
     <div className="flex min-w-0 flex-col gap-10">
+      <SettingsRenderer scope="household" scopeValue="household" includeKeys={["generation.household_likeness"]} />
       <PictureModelSection overview={data} refresh={refresh} />
       <WhoMakesPicturesSection overview={data} />
       <section aria-label="Styles" className="flex flex-col gap-3">

@@ -1,6 +1,6 @@
 // LIKENESS-01: who a saved style looks like (spec LikenessAdapter). The Stack keeps the file; this is Home's record of the
-// answer to "Who does this style look like?" given when it was added, so consent can be checked at request time and the
-// file can be removed when the person takes their agreement back. Only styles of a household adult have a subject; a style
+// answer to "Who does this style look like?" given when it was added, so eligibility can be checked at request time and the
+// file can be removed if the subject leaves the household. Only styles of a household adult have a subject; a style
 // of "Nobody" has a record with a null subject so the answer is on file.
 import { and, eq } from "drizzle-orm";
 import { db } from "@/db";
@@ -48,7 +48,7 @@ export function forgetStyleSubject(medium: StyleMedium, adapterId: string): void
   db.delete(likenessAdapters).where(and(eq(likenessAdapters.medium, medium), eq(likenessAdapters.adapterId, adapterId))).run();
 }
 
-/** The person took their agreement back: every style of them stops being usable at once (use is checked against consent at request time anyway) and is queued for removal from the library. */
+/** Queue every style of a subject for removal when that profile is deleted or memorialized. */
 export function queueStyleRemoval(subjectPersonId: string): number {
   const rows = db.select().from(likenessAdapters).where(and(eq(likenessAdapters.subjectPersonId, subjectPersonId), eq(likenessAdapters.state, "active"))).all();
   const now = new Date().toISOString();

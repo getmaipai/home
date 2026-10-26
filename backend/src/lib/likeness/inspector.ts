@@ -99,9 +99,9 @@ export type PhotoVerdict = { ok: true } | { ok: false; reason: "unavailable" | "
 export const PHOTO_LINES = {
   unreadable: "I couldn't read that photo just now. Try again in a moment.",
   unavailable: "I can't check who is in a photo right now, so I won't use it for a person. Photos of people need the picture-reading model to be running; an admin can check Settings, Engine.",
-  count: "That photo doesn't clearly show just the one adult you named. I only use a photo with exactly one person in it, face showing, who has agreed. Try a photo of them on their own.",
+  count: "That photo doesn't clearly show just the one adult you named. I only use a photo with exactly one person in it, face showing. Try a photo of them on their own.",
   minor: "That photo may show a child or a teen, or I can't tell. I never make pictures or videos from a photo like that.",
-  none: "There is no one in that photo, so there is no one it could look like. Leave the person out, or choose a photo of the adult who has agreed.",
+  none: "There is no one in that photo, so there is no one it could look like. Leave the person out, or choose a photo of the adult in this household.",
 } as const;
 
 /** The photo must show exactly the one declared adult: one person, one face, nobody who looks under 18. */
@@ -119,5 +119,5 @@ export async function photoShowsNoPerson(bytes: Uint8Array): Promise<PhotoVerdic
   const { facts, line } = await inspectPhotoResult(bytes);
   if (!facts) return { ok: false, reason: "unavailable", line: line ?? PHOTO_LINES.unreadable };
   if (facts.people === 0 && facts.faces === 0) return { ok: true };
-  return { ok: false, reason: "count", line: "That photo has a person in it. Say which adult in this household it shows, and make sure they have agreed, or choose a photo with no one in it." };
+  return { ok: false, reason: "count", line: "That photo has a person in it. Say which adult in this household it shows, or choose a photo with no one in it." };
 }
