@@ -455,7 +455,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/media/kinds.ts` | VIDEO_TYPES, AUDIO_TYPES, BOOK_TYPES, IMAGE_TYPES, classOfExtension, mediaTypeOfExtension |
 | `backend/src/lib/media/model.ts` | itemFromRow, itemToRow, MADE_SOURCE_PREFIX, LEGACY_MADE_SOURCE_PREFIX, madeSourceId, sourceFromRow |
 | `backend/src/lib/media/music.ts` | albumKey, artistKey, albumOrder, groupTracks, radioTracks, shuffled |
-| `backend/src/lib/media/parsers/audioTags.ts` | explicitFromNative, tagsFromMetadata, readAudioTags, readEmbeddedCover |
+| `backend/src/lib/media/parsers/audioTags.ts` | explicitFromNative, tagsFromMetadata, readSidecarLyrics, readAudioTags, readEmbeddedCover |
 | `backend/src/lib/media/parsers/epub.ts` | parseOpf, readEpubMeta, readEpubCover |
 | `backend/src/lib/media/parsers/film.ts` | filmNameHasYear, parseFilmName, parseNfo, readNfoFor |
 | `backend/src/lib/media/parsers/pdf.ts` | parsePdf, readPdfMeta |
