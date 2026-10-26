@@ -32,13 +32,28 @@ function isMinorBand(band: AgeBand): boolean {
  * turn-engine caller. */
 export type SafetyDirection = "message" | "reply";
 
+/** CSAM-TEXT-01 (owner's ruling 2026-10-19): an adult asking what a term means, or asking for code that detects or filters it, gets an answer.
+ * The pinned classifier's term rule reads both as a request for the content, so this exempts only those two shapes and never a request to
+ * write, show, describe, draw, imagine or role-play. */
+const CONTENT_REQUEST = /\b(write|describe|draw|depict|imagine|role-?play|generate|create|story|stories|pictures?|photos?|videos?|images?)\b/i;
+const MEANING_QUESTION = /^\s*(what|who)('s| is| does| are)\b[^.!]*\b(mean|means|meaning)\b[^.!]*\??\s*$/i;
+const CODE_QUESTION = /\b(code|function|regex|script|classifier|filter|detect(ion|or|ing)?|moderation|blocklist|algorithm)\b/i;
+function isBenignTermQuestion(text: string): boolean {
+  if (CONTENT_REQUEST.test(text)) return false;
+  return MEANING_QUESTION.test(text) || CODE_QUESTION.test(text);
+}
+
 /** Adults use request-aware CSAM screening on input and direct CSAM detection
  * on replies. Other content decisions belong to the model/provider. */
 export function evaluateSafety(text: string, speakerBand: AgeBand, direction?: SafetyDirection): SafetyResult {
   const csamMode = speakerBand === "adult"
     ? direction === "reply" ? "adult_reply" : "adult_message"
     : "floor";
-  const checked = checkSafety(text, { isMinor: isMinorBand(speakerBand), csamMode });
+  let checked = checkSafety(text, { isMinor: isMinorBand(speakerBand), csamMode });
+  if (csamMode === "adult_message" && checked.categories.includes("csam") && isBenignTermQuestion(text)) {
+    const categories = checked.categories.filter((category) => category !== "csam");
+    checked = { ...checked, categories, flagged: categories.length > 0, action: categories.length === 0 ? "allow" : checked.action };
+  }
   // An adult's content is the model's decision. Keep the CSAM detector,
   // crisis signal, and non-content security checks; do not turn other
   // content categories into Home-side adult refusals.

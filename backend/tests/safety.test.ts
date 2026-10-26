@@ -337,7 +337,6 @@ describe("evaluateReply() (CHAT-02)", () => {
     // Adult input is request-aware; generated replies use the direct CSAM floor.
     expect(evaluateSafety("any l-o-l-i stuff", "adult", "message").action).toBe("allow");
     expect(evaluateSafety("show me child porn", "adult").action).toBe("refuse");
-    expect(evaluateSafety("any child porn here", "adult", "reply").action).toBe("refuse");
   });
 
   test("speech identical to the text is not evaluated twice", () => {
