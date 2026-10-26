@@ -233,8 +233,20 @@ glance, one Recommended per card, no model name outside Details, no horizontal s
 `cd frontend && bun run lint:ui-rules`, the page tests, and a test that fails if a model name or "MB" appears outside a Details block
 (a string scan of the rendered card text).
 
+## Where the settings live (owner ruling 2026-10-26, architect S4 and S5)
+
+Jesse ruled 2026-10-26: the settings move to this page. Spec first, in `commons/spec`:
+
+- `generation.picture_quality`, `generation.video_quality` and `generation.music.enabled` leave `household.pictures` and get a group placed only in the AI and models job cards. The "Pictures, videos and music" card drops them (its other keys stay).
+- The chat, voice and coding `engines.<role>.choice` rows leave "Model per job" (`household.ai_models`) and are placed only in their job card. "Model per job" keeps the roles that have no job card.
+- The seven job cards and Always on are declared in `areas.json` as `SettingsShell` cards, each body the `AiJobChoices` view for one job. Card titles and sentences are `areas.json` card copy.
+- Switches that set no setting (picture tools, picture naming, Chat can look at pictures, Coding helper, Standard voice) carry their label and description as per-choice card copy in the same `areas.json` card, read through the spec copy helper. Neither `aiChoices.ts` nor the view holds them.
+- The landed interim copy (`AI_COPY`, card summaries, `SHORT_WORDS`, `PLAIN_ROW_NAMES`, `JOB_WORDS`) is deleted when the spec tag is pinned. The landed frames (section, heading and summary in `AiJobChoices`, the Always on box and the button row in `AiOverview`) and the 2 s and 30 s refetch loop go too: choices refresh when the `/api/install` job list `InstallStrip` reads changes. The Stack-unreachable message goes through `lib/failureCopy.ts`. The Search and memory card renders its one line and the link.
+- A new `commons` spec tag needs Jesse's yes in that turn.
+
 ## Supersedes
 
+- SETTINGS-IA-04's line that the 13 `engines.<role>.choice` rows live in the Model per job card: the chat, voice and coding rows move to the job cards, and the three `generation.*` keys leave the Pictures, videos and music card.
 - The flat checkbox list as the Overview (`ModelsAndStorageSection` Overview use and `InstallPlanSection` in Settings): replaced by the cards; the list lives on as "All parts" in Models.
 - The "Install the recommended extras" button (LICENCE-ACK-01 `installExtras`) on the licence prompt and its use as a second way to get recommended parts: the new button replaces it as the one way (the licence acceptance itself stays; `install.recommended_auto_on_upgrade` keeps its meaning and is read by the new button's list, not duplicated).
 - `video-generation-2026-10-17.md` section 15 and VIDEO-LTX-07 (owner ruling 2026-10-17, Detailed video Recommended on 128 GB): replaced by owner answer 3 (2026-10-25). Quick video is recommended, `video-detailed` is optional, and the Recommended free-space figure for that tier and the setup default change with it. The sizes in the examples above are illustrations; slice 1 recomputes them from `diskVerdict`.
