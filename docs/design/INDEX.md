@@ -45,6 +45,7 @@ and a proposed design; otherwise the household IP gets blocked.
 | [image-tools-2026-10-17.md](image-tools-2026-10-17.md) | current; Stack half landed | IMGTOOLS-01 to -09 |
 | [image-editing-2026-10-17.md](image-editing-2026-10-17.md) | current; built, live check open | IMGEDIT-01 to -06 |
 | [ai-models-simple-2026-10-25.md](ai-models-simple-2026-10-25.md) | current; page built 2026-10-26 | none yet (slices in the note) |
+| [ai-models-glance-2026-10-26.md](ai-models-glance-2026-10-26.md) | approved 2026-10-26 (architect); amends ai-models-simple | AIMODELS-GLANCE-2026-10-26 |
 | [image-model-bakeoff-2026-10-25.md](image-model-bakeoff-2026-10-25.md) | current; decided, not built | none yet (slices in section 6) |
 | [household-lists-reminders-2026-10-17.md](household-lists-reminders-2026-10-17.md) | new 2026-10-17, no code | HOUSEHOLD-01 to -04 (to be cut from the note; today the four bundled plugins and GENUI-05 in Skills and Intelligent UI answers) |
 | [smart-home-2026-10-17.md](smart-home-2026-10-17.md) | new 2026-10-17, no code | HOUSE-01 to -05 (to be cut; today the Integrations rows it supersedes) |
