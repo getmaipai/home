@@ -2,6 +2,8 @@
 // its query as page state (so the item's data call has its id), the Home tab is named Home, `/media/<id>` resolves to its app, and the
 // Player's element is registered with the audio session while the play page shows it.
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 import { ToastProvider } from "@maipai/ui/src/primitives/Toast";
 import { cleanup, fireEvent, render, waitFor } from "@testing-library/react";
 import type { ReactNode } from "react";
@@ -36,13 +38,16 @@ const watchPage = {
   type: "page", id: "watch", title: "Watch",
   body: [{ type: "player", bind: { source: "package", path: "item", params: { id: "$state.id" } }, kind: "video", empty_state: { type: "empty_state", icon: "film", text: "Not on the hub." } }],
 };
+const videosWatchPage = JSON.parse(readFileSync(resolve(import.meta.dir, "../../../backend/packages/videos/pages/watch.json"), "utf8")) as unknown;
 
 let home: HomeFixture;
 let itemBodies: string[];
+let shareBodies: string[];
 let baseFetch: typeof fetch;
 
 beforeEach(() => {
   itemBodies = [];
+  shareBodies = [];
   home = mockHome();
   baseFetch = globalThis.fetch;
   globalThis.fetch = ((input: RequestInfo | URL, init?: RequestInit) => {
@@ -55,6 +60,10 @@ beforeEach(() => {
     if (url.startsWith("/api/plugins/videos/data/item")) {
       itemBodies.push(String(init?.body));
       return Promise.resolve(Response.json({ id: "media-aaaaaa", title: "Building a birdhouse", src: "/api/media/items/media-aaaaaa/content", channel: "Bramble Workshop", poster: null, duration_s: 14, chapters: [{ start_s: 0, title: "Intro" }, { start_s: 4, title: "Boards" }] }));
+    }
+    if (url.startsWith("/api/plugins/videos/actions/")) {
+      shareBodies.push(JSON.stringify({ url, body: init?.body }));
+      return Promise.resolve(Response.json({ ok: true }));
     }
     if (url.startsWith("/api/media/items/media-aaaaaa")) return Promise.resolve(Response.json({ item: { id: "media-aaaaaa", kind: "video", title: "Building a birdhouse" } }));
     if (url.startsWith("/api/media/items/media-gone")) return Promise.resolve(Response.json({ error: "no" }, { status: 404 }));
@@ -103,6 +112,62 @@ describe("a media app in the shell", () => {
     open("/apps/videos/watch?id=media-aaaaaa");
     await waitFor(() => expect(itemBodies.length).toBeGreaterThan(0));
     expect(itemBodies.every((body) => JSON.parse(body).id === "media-aaaaaa")).toBe(true);
+  });
+
+  test("the shipped Videos watch schema renders the shared creation header and its share panel", async () => {
+    const recipients = ["Aster", "Basil", "Clover", "Dove"].map((name, index) => ({ id: `person-${index}`, name, avatar_url: null }));
+    const candidates = [...recipients, { id: "person-4", name: "Elm", avatar_url: null }];
+    globalThis.fetch = ((input: RequestInfo | URL, init?: RequestInit) => {
+      const url = typeof input === "string" ? input : input.toString();
+      if (url.startsWith("/api/plugins/videos/pages/watch")) return Promise.resolve(Response.json(videosWatchPage));
+      if (url.startsWith("/api/plugins/videos/data/creation")) {
+        if (JSON.parse(String(init?.body ?? "{}")).scope === "people") return Promise.resolve(Response.json(candidates));
+        return Promise.resolve(Response.json([{ id: "file-rw9pa63jd4", title: "A paper boat on a lake", creator: { name: "Jesse Torres", href: "/people/person-jesse", avatar_url: null }, made_at: "2026-10-21T12:00:00Z", description: "A paper boat glides over a bright blue lake. The morning sun shines on gentle waves. The water moves slowly along the shore. A small bird flies over the boat.", visibility: { mode: "shared", people: recipients, can_manage: true } }]));
+      }
+      if (url.startsWith("/api/plugins/videos/data/item")) return Promise.resolve(Response.json({ id: "file-rw9pa63jd4", title: "A paper boat on a lake", src: "/api/files/file-rw9pa63jd4/content", channel: "Jesse", poster: null, duration_s: 14, chapters: [] }));
+      if (url.startsWith("/api/plugins/videos/data/up-next")) return Promise.resolve(Response.json([]));
+      if (url.startsWith("/api/plugins/videos/actions/")) {
+        shareBodies.push(JSON.stringify({ url, body: init?.body }));
+        return Promise.resolve(Response.json({ ok: true }));
+      }
+      return baseFetch(input, init);
+    }) as typeof fetch;
+    const view = open("/apps/videos/watch?id=file-rw9pa63jd4");
+    const title = await view.findByRole("heading", { level: 1, name: "A paper boat on a lake" });
+    expect(title.className).toContain("font-bold");
+    const creatorLink = view.getByRole("link", { name: "Jesse Torres, open profile" });
+    expect(creatorLink.getAttribute("href")).toBe("/people/person-jesse");
+    expect(creatorLink.querySelector('[data-slot="avatar"]')).toBeTruthy();
+    expect(view.container.querySelector("time")?.textContent).toMatch(/^Made /);
+    const shared = view.getByRole("button", { name: "Shared, manage sharing" });
+    expect(shared.textContent).toContain("Shared");
+    expect(shared.textContent).toContain("+1");
+    expect(shared.querySelectorAll('[data-slot="avatar"]')).toHaveLength(3);
+    const description = view.getByText(/A paper boat glides/);
+    expect(description.className).toContain("line-clamp-3");
+    fireEvent.click(view.getByRole("button", { name: "Show more" }));
+    expect(view.getByRole("button", { name: "Show less" })).toBeTruthy();
+    expect(document.body.textContent).not.toMatch(/[{}]/);
+    fireEvent.click(shared);
+    expect(await view.findByRole("dialog")).toBeTruthy();
+    expect(view.getByRole("dialog").textContent).toContain("Who can see this?");
+    fireEvent.click(view.getByRole("switch", { name: "Elm" }));
+    await waitFor(() => expect(shareBodies).toHaveLength(1));
+    expect(JSON.parse(shareBodies[0]!)).toEqual({ url: "/api/plugins/videos/actions/share-add", body: JSON.stringify({ id: "file-rw9pa63jd4", person_id: "person-4" }) });
+  });
+
+  test("the shipped Videos watch schema shows a private lock chip", async () => {
+    globalThis.fetch = ((input: RequestInfo | URL, init?: RequestInit) => {
+      const url = typeof input === "string" ? input : input.toString();
+      if (url.startsWith("/api/plugins/videos/pages/watch")) return Promise.resolve(Response.json(videosWatchPage));
+      if (url.startsWith("/api/plugins/videos/data/creation-people")) return Promise.resolve(Response.json([]));
+      if (url.startsWith("/api/plugins/videos/data/creation")) return Promise.resolve(Response.json([{ title: "Quiet morning", creator: { name: "Jesse" }, made_at: "2026-10-21T12:00:00Z", description: "A quiet morning.", visibility: { mode: "private", people: [], can_manage: false } }]));
+      if (url.startsWith("/api/plugins/videos/data/item")) return Promise.resolve(Response.json({ id: "media-aaaaaa", title: "Quiet morning", src: "/video.mp4", duration_s: 10, chapters: [] }));
+      if (url.startsWith("/api/plugins/videos/data/up-next")) return Promise.resolve(Response.json([]));
+      return baseFetch(input, init);
+    }) as typeof fetch;
+    const view = open("/apps/videos/watch?id=media-aaaaaa");
+    expect(await view.findByRole("button", { name: "Private, view sharing" })).toBeTruthy();
   });
 
   test("Made at home renders a creator line without leaking an unresolved template token", async () => {

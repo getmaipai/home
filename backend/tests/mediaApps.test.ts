@@ -8,7 +8,7 @@ import { __resetProgressForTests, flushProgress } from "@/lib/media/progress";
 import { coerceNumber } from "@/lib/media/appHost";
 import { buildMediaTree } from "./support/mediaTree";
 import { db } from "@/db";
-import { people } from "@/db/schema";
+import { people, shares, videoJobs } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import { storeFile } from "@/lib/attachments";
 
@@ -18,6 +18,7 @@ beforeEach(() => {
 });
 
 type Row = { id: string; title: string; channel: string | null; progress?: number; completed?: boolean; copy_label: string; thumbnail: string | null };
+const stringsOnly = (value: unknown): string[] => typeof value === "string" ? [value] : Array.isArray(value) ? value.flatMap(stringsOnly) : value && typeof value === "object" ? Object.values(value).flatMap(stringsOnly) : [];
 
 async function setup() {
   const owner = new TestClient();
@@ -30,6 +31,7 @@ async function setup() {
     return { client, id: created.id };
   };
   const adult = await signIn("Marlow", "adult");
+  const admin = await signIn("Robin", "admin");
   const child = await signIn("Sprout", "child");
   const tree = buildMediaTree();
   const added = await owner.post("/api/media/sources", { label: "videos", path: tree.videos, kinds: ["video"] });
@@ -37,7 +39,7 @@ async function setup() {
   const data = async (client: TestClient, id: string, body: Record<string, unknown> = {}) => (await client.post(`/api/plugins/videos/data/${id}`, body)).json() as Promise<Row[]>;
   const rows = async (client: TestClient, id: string, body: Record<string, unknown> = {}) => data(client, id, body);
   const idOf = async (title: string) => (await rows(adult.client, "library")).find((row) => row.title === title)!.id;
-  return { owner, adult, child, data, rows, idOf };
+  return { owner, adult, admin, child, data, rows, idOf };
 }
 
 const progress = (client: TestClient, body: Record<string, unknown>) => client.post("/api/plugins/videos/progress", body);
@@ -60,6 +62,73 @@ describe("the media-app host: data ids", () => {
     expect(await (await adult.client.post("/api/plugins/videos/data/item", { id: made.value.id })).json()).toMatchObject({ id: made.value.id, src: `/api/files/${made.value.id}/content`, kind: "video" });
     expect((await adult.client.get(`/api/media/items/${made.value.id}`)).status).toBe(200);
     expect((await child.client.get(`/api/media/items/${adultsOnly.value.id}`)).status).toBe(404);
+  });
+
+  test("creation header returns safe made and scanned details and uses Library sharing", async () => {
+    const { owner, adult, admin, child, data } = await setup();
+    const adultPerson = db.select().from(people).where(eq(people.id, adult.id)).get()!;
+    const ownerPerson = db.select().from(people).where(eq(people.role, "owner")).get()!;
+    const now = new Date().toISOString();
+    db.insert(videoJobs).values({ id: "clip-header", personId: adult.id, conversationId: null, turnId: null, kind: "generate", state: "done", stackJob: null, percent: 100, phase: null, position: null, prompt: "A tiny sailboat glides across a bright blue lake. Add soft morning light and gentle waves.", request: "{}", error: null, files: "[]", createdAt: now, updatedAt: now, hlc: "1:0:test" }).run();
+    const made = storeFile(adultPerson, { conversationId: null, turnId: null, mediaType: "video/mp4", bytes: new Uint8Array([8, 8, 8]), provenance: 'video-gen:{"job":"clip-header","audience":"all-ages"}', deduplicate: false });
+    const adultsOnly = storeFile(ownerPerson, { conversationId: null, turnId: null, mediaType: "video/mp4", bytes: new Uint8Array([8, 8, 7]), provenance: 'video-gen:{"prompt":"Adults only","audience":"adult-only"}', deduplicate: false });
+    if (!made.ok) throw new Error(made.error);
+    if (!adultsOnly.ok) throw new Error(adultsOnly.error);
+    const view = await data(adult.client, "creation", { id: made.value.id }) as unknown as Array<Record<string, any>>;
+    expect(view[0]?.id).toBe(made.value.id);
+    expect(view[0]).toMatchObject({ title: "A tiny sailboat glides across a bright blue lake", description: "A tiny sailboat glides across a bright blue lake. Add soft morning light and gentle waves.", creator: { name: "Marlow", href: `/people/${adult.id}`, avatar_url: null }, made_at: expect.any(String), visibility: { mode: "private", can_manage: true } });
+    expect(view[0]).not.toHaveProperty("candidates");
+    expect(stringsOnly(view).join(" ")).not.toMatch(/[{}]/);
+    const adultOnlyCandidates = await data(owner, "creation", { id: adultsOnly.value.id, scope: "people" }) as unknown as Array<Record<string, any>>;
+    expect(adultOnlyCandidates.map((candidate) => candidate.id)).toEqual([adult.id, admin.id]);
+    const owned = storeFile(ownerPerson, { conversationId: null, turnId: null, mediaType: "video/mp4", bytes: new Uint8Array([9, 9, 9]), provenance: 'video-gen:{"prompt":"A short family clip","audience":"all-ages"}', deduplicate: false });
+    if (!owned.ok) throw new Error(owned.error);
+    const allAgeCandidates = await data(owner, "creation", { id: owned.value.id, scope: "people" }) as unknown as Array<Record<string, any>>;
+    expect(allAgeCandidates.map((candidate) => candidate.id)).toEqual(["household", adult.id, admin.id, child.id]);
+    expect(await data(adult.client, "creation", { id: owned.value.id, scope: "people" })).toEqual([]);
+    expect((await owner.post("/api/plugins/videos/actions/share-add", { id: owned.value.id, person_id: adult.id })).status).toBe(200);
+    expect((await data(owner, "creation", { id: owned.value.id }) as any[])[0].visibility.mode).toBe("shared");
+    expect((await owner.post("/api/plugins/videos/actions/share-remove", { id: owned.value.id, person_id: adult.id })).status).toBe(200);
+    expect((await owner.post("/api/plugins/videos/actions/share-add", { id: owned.value.id, person_id: adult.id })).status).toBe(200);
+    expect((await owner.post("/api/plugins/videos/actions/share-add", { id: owned.value.id, person_id: child.id })).status).toBe(200);
+    const adultView = await data(adult.client, "creation", { id: owned.value.id }) as unknown as Array<Record<string, any>>;
+    expect(adultView[0]?.visibility).toMatchObject({ mode: "shared", can_manage: false });
+    expect(adultView[0]?.visibility.people.map((p: any) => p.id)).toEqual([adult.id]);
+    expect((await adult.client.post("/api/plugins/videos/actions/share-add", { id: owned.value.id, person_id: child.id })).status).toBe(403);
+    const childRow = await data(child.client, "creation", { id: owned.value.id }) as unknown as Array<Record<string, any>>;
+    expect(childRow[0]?.visibility).toMatchObject({ mode: "shared", can_manage: false });
+    expect(childRow[0]?.visibility.people.map((p: any) => p.id)).toEqual([child.id]);
+    expect((await child.client.post("/api/plugins/videos/actions/share-add", { id: owned.value.id, person_id: adult.id })).status).toBe(403);
+    expect((await owner.post("/api/plugins/videos/actions/share-private", { id: owned.value.id })).status).toBe(200);
+    expect((await data(owner, "creation", { id: owned.value.id }) as any[])[0].visibility.mode).toBe("private");
+    expect((await data(owner, "creation", { id: made.value.id })).length).toBe(0);
+
+    const childPerson = db.select().from(people).where(eq(people.id, child.id)).get()!;
+    const childMade = storeFile(childPerson, { conversationId: null, turnId: null, mediaType: "video/mp4", bytes: new Uint8Array([6, 6, 6]), provenance: 'video-gen:{"prompt":"A child-safe kite","audience":"all-ages"}', deduplicate: false });
+    if (!childMade.ok) throw new Error(childMade.error);
+    db.insert(shares).values({ id: "share-childadmin", fileId: childMade.value.id, fromPersonId: child.id, to: admin.id, provenance: "test", createdAt: now, hlc: "1:0:testtest" }).run();
+    const adminRow = await data(admin.client, "creation", { id: childMade.value.id }) as unknown as Array<Record<string, any>>;
+    expect(adminRow[0]?.visibility).toMatchObject({ mode: "shared", can_manage: true });
+    expect((await admin.client.post("/api/plugins/videos/actions/share-remove", { id: childMade.value.id, person_id: admin.id })).status).toBe(200);
+
+    const scanItem = (await data(adult.client, "library") as unknown as Array<Record<string, any>>).find((row) => row.title === "Building a birdhouse")!;
+    const scanned = await data(adult.client, "creation", { id: scanItem.id }) as unknown as Array<Record<string, any>>;
+    expect(scanned[0]?.id).toBe(scanItem.id);
+    expect(scanned[0]).toMatchObject({ title: "Building a birdhouse", creator: { name: "Bramble Workshop" }, visibility: { mode: "shared", can_manage: false } });
+    expect(stringsOnly(scanned).join(" ")).not.toMatch(/[{}]/);
+  });
+
+  test("creation row id can be used directly by share-add", async () => {
+    const { owner, adult, data } = await setup();
+    const ownerPerson = db.select().from(people).where(eq(people.role, "owner")).get()!;
+    const made = storeFile(ownerPerson, { conversationId: null, turnId: null, mediaType: "video/mp4", bytes: new Uint8Array([3, 2, 1]), provenance: 'video-gen:{"prompt":"A family clip","audience":"all-ages"}', deduplicate: false });
+    if (!made.ok) throw new Error(made.error);
+
+    const creation = await data(owner, "creation", { id: made.value.id }) as unknown as Array<Record<string, any>>;
+    expect(creation[0]?.id).toBe(made.value.id);
+    const response = await owner.post("/api/plugins/videos/actions/share-add", { id: creation[0]?.id, person_id: adult.id });
+    expect(response.status).toBe(200);
+    expect((await data(owner, "creation", { id: made.value.id }) as unknown as Array<Record<string, any>>)[0]?.visibility.mode).toBe("shared");
   });
 
   test("an adult's rows carry title, channel, copy label and no progress before anything is watched", async () => {

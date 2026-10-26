@@ -5,7 +5,7 @@
 // a child is allowlist-only (design section 11): the household's library plus channels an adult followed for them, and no discovery rows.
 import { and, desc, eq, inArray, isNull, sql, type SQL } from "drizzle-orm";
 import { db } from "@/db";
-import { mediaItems, mediaSources } from "@/db/schema";
+import { attachments, mediaItems, mediaSources, people, videoJobs } from "@/db/schema";
 import { loadManifestOnly } from "@/lib/plugins";
 import { appIndexFloorOk, appVisibleTo } from "@/lib/apps";
 import type { PersonRow } from "@/types";
@@ -14,12 +14,16 @@ import { z } from "zod";
 import { itemDetail } from "./items";
 import type { MediaBudget } from "./watchTime";
 import { listLibrary } from "@/lib/library";
-import { noDiscovery, readableItem, sourceVisibleTo } from "./access";
+import { liveSourceById, noDiscovery, readableItem, sourceVisibleTo } from "./access";
 import { allowedBandsFor, bandAllows, mediaBandOf, trips } from "./band";
 import { addItem, createCollection, removeItemFrom, resolveCollection, listCollections, setItems, setPointer } from "./collections";
 import { itemFromRow, madeSourceId, sourcesFromRows, type MediaCollection, type MediaItem, type MediaSource } from "./model";
 import { correctedStamp, getProgress, getProgressMany, percentOf, recentProgress, writeProgress } from "./progress";
 import { nextHlc } from "@/lib/hlc";
+import { createShare, deleteShare, listSharesForFile } from "@/lib/shares";
+import { canReadFileAudience, fileAudience, getPersonRole, isOwnerOrAdmin, listActivePeople } from "@/lib/access";
+import { libraryProvenance } from "@/lib/libraryProvenance";
+import { speakerAgeBand } from "@/lib/ageBand";
 
 import { albumKey, artistKey, albumOrder, groupTracks, radioTracks, shuffled } from "./music";
 
@@ -293,6 +297,101 @@ export interface DataParams {
   limit?: number;
 }
 
+function safeText(value: unknown): string {
+  return typeof value === "string" && !/\{[^{}]+\}/.test(value) ? value : "";
+}
+
+function shortPromptTitle(prompt: string): string {
+  const clause = (prompt.split(/[.!?](?:\s|$)|[,;:\n]/, 1)[0] ?? prompt).trim().replace(/[\s.,;:!?-]+$/g, "");
+  if (clause.length <= 60) return clause;
+  return `${clause.slice(0, 60).replace(/\s+\S*$/, "").replace(/[\s.,;:!?-]+$/g, "")}`;
+}
+
+function visibilityForFile(person: PersonRow, fileId: string, canManage: boolean, adultOnly: boolean) {
+  const active = listActivePeople();
+  const rows = listSharesForFile(fileId);
+  const current = rows.flatMap((share) => {
+    if (share.to === "household") return [{ id: "household", name: "Everyone in the home", avatar_url: null }];
+    const recipient = active.find((candidate) => candidate.id === share.to);
+    if (!recipient || (!canManage && recipient.id !== person.id)) return [];
+    return [{ id: recipient.id, name: recipient.displayName, avatar_url: null }];
+  });
+  const candidates = canManage ? [
+    ...(!adultOnly ? [{ id: "household", name: "Everyone in the home", avatar_url: null }] : []),
+    ...active.filter((candidate) => candidate.id !== person.id && (!adultOnly || speakerAgeBand(candidate, new Date()) === "adult"))
+      .map((candidate) => ({ id: candidate.id, name: candidate.displayName, avatar_url: null })),
+  ] : [];
+  return {
+    visibility: { mode: rows.length ? "shared" : "private", people: current, can_manage: canManage },
+    candidates,
+  };
+}
+
+function canManageMadeFile(person: PersonRow, ownerId: string): boolean {
+  if (person.role === "child") return false;
+  return person.id === ownerId || (isOwnerOrAdmin(person) && getPersonRole(ownerId) === "child");
+}
+
+function videoCreation(person: PersonRow, id: string): unknown[] {
+  const made = madeFileFor(person, "videos", id);
+  if (made) {
+    const file = db.select().from(attachments).where(eq(attachments.id, id)).get();
+    if (!file || file.deletedAt !== null || !canReadFileAudience(person, file)) return [];
+    const metadata = libraryProvenance(file.provenance) as Record<string, unknown>;
+    const jobId = typeof metadata.job === "string" ? metadata.job : "";
+    const job = jobId ? db.select().from(videoJobs).where(and(eq(videoJobs.id, jobId), eq(videoJobs.personId, file.ownerPersonId))).get() : undefined;
+    const prompt = safeText(job?.prompt) || safeText(metadata.prompt);
+    let request: Record<string, unknown> = {};
+    try { request = JSON.parse(job?.request ?? "{}") as Record<string, unknown>; } catch { request = {}; }
+    const title = safeText(metadata.title) || safeText(request.title) || shortPromptTitle(prompt) || "Made at home";
+    const owner = db.select().from(people).where(eq(people.id, file.ownerPersonId)).get();
+    const canManage = canManageMadeFile(person, file.ownerPersonId);
+    const adultOnly = fileAudience(file.provenance) === "adult-only";
+    const share = visibilityForFile(person, id, canManage, adultOnly);
+    return [{ id, title, description: prompt, creator: owner
+      ? { name: owner.displayName, avatar_url: null, href: `/people/${encodeURIComponent(owner.id)}` }
+      : { label: "Made at home" }, made_at: made.created_at, visibility: share.visibility }];
+  }
+  const item = readableIn(person, "videos", id);
+  if (!item) return [];
+  const source = liveSourceById(item.source_id);
+  if (!source) return [];
+  const shared = source.visible_to === "household";
+  const household = shared ? listActivePeople().map((candidate) => ({ id: candidate.id, name: candidate.displayName, avatar_url: null })) : [];
+  return [{ id, title: safeText(item.title) || "Video", description: safeText(item.description), creator: { name: safeText(item.subtitle) || safeText(source.label) || "Video source" }, made_at: item.added_at,
+    visibility: { mode: shared ? "shared" : "private", people: household, can_manage: false } }];
+}
+
+function videoCreationPeople(person: PersonRow, id: string): unknown[] {
+  const made = madeFileFor(person, "videos", id);
+  if (!made) return [];
+  const file = db.select().from(attachments).where(eq(attachments.id, id)).get();
+  if (!file || file.deletedAt !== null || !canReadFileAudience(person, file)) return [];
+  const canManage = canManageMadeFile(person, file.ownerPersonId);
+  return visibilityForFile(person, id, canManage, fileAudience(file.provenance) === "adult-only").candidates;
+}
+
+export function changeVideoCreationShare(person: PersonRow, op: "add" | "remove" | "private", id: string, target?: string) {
+  const file = db.select().from(attachments).where(eq(attachments.id, id)).get();
+  if (!file || file.deletedAt !== null || file.origin === "fetched" || !canReadFileAudience(person, file)) return { ok: false as const, status: 404, error: "Video unavailable. Go back to Videos and choose another." };
+  if (!madeFileFor(person, "videos", id)) return { ok: false as const, status: 404, error: "Video unavailable. Go back to Videos and choose another." };
+  if (!canManageMadeFile(person, file.ownerPersonId)) return { ok: false as const, status: 403, error: "Only the owner or an admin may change who sees this video." };
+  if (person.role === "child") return { ok: false as const, status: 403, error: "Sharing is turned off for children. Ask a grown-up to share this for you." };
+  if (op === "add") {
+    if (!target) return { ok: false as const, status: 400, error: "Choose someone in your home." };
+    const result = createShare(person, { fileId: id, to: target, provenance: "videos:creation-header" });
+    if (!result.ok) return result;
+  } else {
+    const matching = listSharesForFile(id).filter((share) => op === "private" || share.to === target);
+    for (const share of matching) {
+      const result = deleteShare(person, share.id);
+      if (!result.ok) return result;
+    }
+  }
+  const refreshed = videoCreation(person, id)[0];
+  return { ok: true as const, value: refreshed ?? { visibility: visibilityForFile(person, id, true, fileAudience(file.provenance) === "adult-only").visibility } };
+}
+
 /** Ids whose rows are discovery: a child gets none (allowlist-only). */
 export const DISCOVERY_IDS = ["featured", "new", "recent", "more-from"] as const;
 
@@ -360,6 +459,10 @@ function mediaAppDataRaw(person: PersonRow, appId: MediaAppId, dataId: string, p
     if (music !== null) return music as never;
   }
   switch (dataId) {
+    case "creation":
+      return appId === "videos" && params.id
+        ? (params.scope === "people" ? videoCreationPeople(person, params.id) : videoCreation(person, params.id)) as never
+        : null;
     case "made-at-home":
       return appId === "videos" ? madeFiles(person, "videos").slice(0, 16).map((file) => ({ id: file.id, title: file.name, channel: file.owner.display_name || "Made at home", summary: "", kind: "video", thumbnail: file.thumb_url, backdrop: file.thumb_url, duration_s: file.duration_seconds, copy_label: "Saved" })) : null;
     case "featured": {

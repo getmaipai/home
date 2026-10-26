@@ -7,6 +7,14 @@ Home can make short videos on your own computer. Nothing is sent to anyone.
 
 Open Videos or its Library to find clips you made in chat under **Made at home**, alongside the videos from your library folders.
 
+## Who made a video, and who can see it
+
+Below a video, you can see its title, creator and date. A video made at home uses a short title from its prompt; the full prompt is in the description. Press **Show more** to read it all.
+
+**Private** means only you can see your video. **Shared** means the people shown can watch it. A scanned video follows the audience set for its folder or source.
+
+To share a video you made, press **Private** or **Shared**, then choose people in your home. Press **Make private** to stop sharing. Only the owner or an admin can change sharing. Children can see videos shared with them, but cannot share videos.
+
 ## What you need
 
 A Mac with 128 GB of memory and the video model installed. On any other computer, Home says videos are not available and why.

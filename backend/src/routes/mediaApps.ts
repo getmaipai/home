@@ -9,7 +9,7 @@ import { getCookie } from "hono/cookie";
 import { hashSessionToken } from "@/lib/session";
 import "@/lib/media/podcastApp"; // registers the Podcasts data ids and item view with the shared host
 import { podcastRoutes } from "./podcastApp";
-import { musicPlaylistAction, startMusicQueue, coerceNumber, mediaAppAllowed, mediaAppData, saveProgress, setListed, setWatchlist, MEDIA_APP_IDS, type DataParams, type MediaAppId } from "@/lib/media/appHost";
+import { musicPlaylistAction, startMusicQueue, coerceNumber, mediaAppAllowed, mediaAppData, saveProgress, setListed, setWatchlist, changeVideoCreationShare, MEDIA_APP_IDS, type DataParams, type MediaAppId } from "@/lib/media/appHost";
 
 type Body = Record<string, unknown>;
 
@@ -44,6 +44,19 @@ export function createMediaAppRoutes(appId: MediaAppId) {
     if (value === null) return next();
     return c.json(value as never, 200);
   });
+
+  for (const [path, op] of [["share-add", "add"], ["share-remove", "remove"], ["share-private", "private"]] as const) {
+    routes.post(`/actions/${path}`, requireAuth, async (c, next) => {
+      const person = c.get("person");
+      if (appId !== "videos" || !mediaAppAllowed(person, appId)) return next();
+      if (!appRouteAllowed(person, appId, "actions", path)) return next();
+      const body = await bodyOf(c.req.raw);
+      const id = typeof body.id === "string" ? body.id : "";
+      const target = typeof body.person_id === "string" ? body.person_id : undefined;
+      const result = changeVideoCreationShare(person, op, id, target);
+      return result.ok ? c.json(result.value as never, 200) : c.json({ error: result.error }, result.status as 400 | 403 | 404);
+    });
+  }
 
   routes.post("/progress", requireAuth, async (c, next) => {
     const person = c.get("person");

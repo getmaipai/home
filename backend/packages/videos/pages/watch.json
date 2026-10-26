@@ -72,6 +72,52 @@
             "icon": "film",
             "text": "This video is not on the hub. Go back to Videos and pick another."
           }
+        },
+        {
+          "type": "creation_header",
+          "bind": {
+            "source": "package",
+            "path": "creation",
+            "params": {
+              "id": "$state.id"
+            }
+          },
+          "candidates_bind": {
+            "source": "package",
+            "path": "creation",
+            "params": {
+              "id": "$state.id",
+              "scope": "people"
+            }
+          },
+          "share_change": {
+            "add": {
+              "call": {
+                "target": "/api/plugins/videos/actions/share-add",
+                "args": {
+                  "id": "{id}",
+                  "person_id": "{person_id}"
+                }
+              }
+            },
+            "remove": {
+              "call": {
+                "target": "/api/plugins/videos/actions/share-remove",
+                "args": {
+                  "id": "{id}",
+                  "person_id": "{person_id}"
+                }
+              }
+            },
+            "make_private": {
+              "call": {
+                "target": "/api/plugins/videos/actions/share-private",
+                "args": {
+                  "id": "{id}"
+                }
+              }
+            }
+          }
         }
       ],
       "aside": [
