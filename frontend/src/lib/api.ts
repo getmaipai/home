@@ -383,6 +383,7 @@ export interface CompanionAvatarView {
 export interface CompanionStateTake {
   id: string; label: string; source: "generated" | "upload"; created_at: string; ok: boolean | null; reasons: string[];
   seconds: number | null; bytes: { h264: number; av1: number | null } | null; colour_distance: number | null; area_ratio: number | null;
+  report?: { ok: boolean; reasons: string[]; seconds: number; bytes: { h264: number; av1: number | null }; colour_distance: number | null; area_ratio: number; loop_gap: number; opaque_share: { min: number; max: number } } | null;
   urls: CompanionStateUrls; is_best: boolean;
 }
 export interface CompanionStateRow {
