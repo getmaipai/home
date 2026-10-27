@@ -9,7 +9,7 @@ import { eq } from "drizzle-orm";
 import { requireAuth } from "@/middleware/auth";
 import { normalizeForSpeech } from "@maipai/spec/voice/ts/normalizeForSpeech.js";
 import { StreamSafetyRefusal, StreamUnavailable, DocumentAttachmentError, BareModeForbidden, crisisSupportFor, conversationInCrisis, type Surface, type TurnOpResult, type TurnStreamResult } from "@/lib/turnShared";
-import { runTurnNext, runTurnNextStream } from "@/lib/turnMachine/turnNext";
+import { answeredByFor, runTurnNext, runTurnNextStream } from "@/lib/turnMachine/turnNext";
 import { isOwnerOrAdmin, canHaveTemporaryChat } from "@/lib/access";
 import { pickThinkingCue } from "@/lib/replyVariation";
 import { feedThinkSplit, flushThinkSplit, newThinkSplitState, type ThinkSpan } from "@/lib/wellFormed";
@@ -112,6 +112,7 @@ interface ResumeSession {
   modelStatus?: ModelSelectionStatus;
   conversationId: string;
   turnId: string;
+  answerMetadata?: import("@/wire").AnsweredBy;
   controller: AbortController;
   result: Extract<TurnStreamResult, { ok: true; kind: "stream" }>;
   events: StoredStreamEvent[];
@@ -459,7 +460,7 @@ function streamResponse(session: ResumeSession, resumeFrom: number | null, wire:
   let subscriber: StreamSubscriber | undefined;
   const replay = (sub: StreamSubscriber) => {
     try {
-      sub.write({ type: "turn_meta", conversation_id: session.conversationId, turn_id: session.turnId, resume_token: session.token });
+      sub.write({ type: "turn_meta", conversation_id: session.conversationId, turn_id: session.turnId, resume_token: session.token, ...(session.answerMetadata ? { answered_by: session.answerMetadata } : {}) });
       for (const stored of session.events) {
         if (!shouldDeliver(stored, resumeFrom)) continue;
         sub.write(stored.event);
@@ -1036,7 +1037,7 @@ turnRoutes.post("/stream", requireAuth, streamTurnBodyLimit, async (c) => {
   const turnMeta: TurnStreamEvent =
     result.kind === "immediate"
       ? { type: "turn_meta", conversation_id: result.value.conversation_id, turn_id: result.value.turn_id, resume_token: resumeToken }
-      : { type: "turn_meta", conversation_id: result.conversationId, turn_id: result.turnId, resume_token: resumeToken };
+      : { type: "turn_meta", conversation_id: result.conversationId, turn_id: result.turnId, resume_token: resumeToken, ...(!body.temporary && body.bare !== true && !ephemeral && result.answerMetadata ? { answered_by: result.answerMetadata } : {}) };
 
   if (result.kind === "immediate") {
     // A safety refusal or a plugin reply is already complete, deterministic
@@ -1085,6 +1086,7 @@ turnRoutes.post("/stream", requireAuth, streamTurnBodyLimit, async (c) => {
     modelStatus: modelSelection.status,
     conversationId: result.conversationId,
     turnId: result.turnId,
+    answerMetadata: !body.temporary && body.bare !== true && !ephemeral ? result.answerMetadata : undefined,
     controller: abortController,
     result,
     events: [],

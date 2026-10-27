@@ -29,6 +29,18 @@ const MESSAGES: ThreadMessageLike[] = [
   },
 ];
 
+test("history reply faces use the retained portrait and finished replies contain no video", async () => {
+  const speaker = { companion_id: "rivet", name: "Rivet", look: "look-old", portrait: "rivet/look1", via: "conversation" };
+  const portrait = spyOn(api, "companionPortrait").mockReturnValue("/api/companions/portraits/rivet/look1");
+  const messages: ThreadMessageLike[] = [{ role: "assistant", content: [{ type: "text", text: "A saved reply." }], status: { type: "complete", reason: "stop" }, metadata: { custom: { answered_by: speaker } } }];
+  const view = renderWithQueryClient(<MemoryRouter><Harness admin={false} band="adult" messages={messages} /></MemoryRouter>);
+  expect(await view.findByText("A saved reply.")).toBeTruthy();
+  await waitFor(() => expect(view.container.querySelector('img[src="/api/companions/portraits/rivet/look1"]')).toBeTruthy());
+  expect(portrait).toHaveBeenCalledWith("rivet/look1");
+  expect(view.container.querySelector("video")).toBeNull();
+  portrait.mockRestore();
+});
+
 function Harness({ admin, band = "child", connection = { phase: "online" }, adapter = NOOP, messages = MESSAGES }: { admin: boolean; band?: "child" | "teen" | "adult"; connection?: ConnectionState; adapter?: ChatModelAdapter; messages?: ThreadMessageLike[] }) {
   const runtime = useLocalRuntime(adapter, { initialMessages: messages });
   return (

@@ -377,6 +377,20 @@ describe("document attachment content", () => {
 });
 
 describe("createChatModelAdapter streaming", () => {
+  test("turn_meta yields the pinned speaker metadata before any delta", async () => {
+    const speaker = { companion_id: "rivet", name: "Rivet", look: "look1", via: "conversation", portrait: "rivet/look1" };
+    const env = stubEnvironment(ndjsonStream([
+      { type: "turn_meta", conversation_id: "c1", turn_id: "t1", answered_by: speaker },
+      { type: "delta", text: "Hello" },
+      { type: "done", value: { reply: { text: "Hello" }, source: "model", safety: SAFETY, answered_by: speaker, turn_id: "t1" } },
+    ]));
+    try {
+      const { yields, error } = await collect([fakeUserMessage("Hi")]);
+      expect(error).toBeUndefined();
+      expect(yields[0]?.metadata?.custom?.answered_by).toEqual(speaker);
+      expect(yields[0]?.content).toBeUndefined();
+    } finally { env.restore(); }
+  });
   test("a failed done reply carries the admin-details marker into message metadata", async () => {
     const env = stubEnvironment(ndjsonStream([
       { type: "done", value: { turn_id: "turn-failed-live", reply: { text: "That was too much text for me to read in one go. Try a shorter question." }, source: "plugin", failed_generation: true, safety: SAFETY } },

@@ -9,12 +9,6 @@ import { buildChatCommands, type ChatCommandAction } from "@/apps/chat/chatComma
 import { ChatAvailabilityContext } from "@/apps/chat/useChatAvailability";
 import { useIncognitoContext } from "@/shell/incognitoContext";
 import { setPendingChatFolder } from "@/apps/chat/chatThreadListAdapter";
-import { CompanionAvatar } from "@maipai/ui/src/elements/companion-avatar";
-import { useCompanionPresence } from "@/apps/chat/useCompanionPresence";
-import { useCompanionShells } from "@/lib/companionShells";
-import { DraftConversationContext } from "@/apps/chat/chatThreadContexts";
-import { useQuery } from "@tanstack/react-query";
-import { api } from "@/lib/api";
 
 const StableConversationMap = memo(ConversationMap);
 
@@ -30,10 +24,6 @@ export function ChatThreadExtras() {
   const scrollToMessage = useScrollToMessage();
   const { setOn, on: incognitoOn } = useIncognitoContext();
   const availability = useContext(ChatAvailabilityContext);
-  const conversationId = useContext(DraftConversationContext);
-  const companionQuery = useQuery({ queryKey: ["conversation", conversationId], queryFn: () => api.conversation(conversationId!), enabled: Boolean(conversationId) });
-  const presence = useCompanionPresence(companionQuery.data?.companion_id ?? null);
-  const shells = useCompanionShells();
   const [searchOpen, setSearchOpen] = useState(false);
   const [query, setQuery] = useState("");
   const [activeIndex, setActiveIndex] = useState(0);
@@ -186,7 +176,6 @@ export function ChatThreadExtras() {
 
   return (
     <>
-      {presence && shells !== true && messages.length > 0 ? <CompanionAvatar placement="corner" {...presence} /> : null}
       {entries.length >= 8 && (
         <StableConversationMap
           entries={entries}

@@ -77,10 +77,9 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@maipai/ui/src/ui/dropdown-menu";
-import { Avatar, AvatarFallback } from "@maipai/ui/src/ui/avatar";
+import { Avatar, AvatarFallback, AvatarImage } from "@maipai/ui/src/ui/avatar";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@maipai/ui/src/ui/dialog";
 import { ChatHeader } from "@maipai/ui/src/elements/chat-header";
-import { CompanionAvatar } from "@maipai/ui/src/elements/companion-avatar";
 import { getIcon } from "@maipai/ui/src/icons";
 
 const ColumnOpenIcon = getIcon("panel-left-open");
@@ -151,16 +150,12 @@ function ChatHeaderRename({ title, onRename, onDone, commitOnBlur = true }: { ti
  * `trailing` (the agent/task activity toggle's slot, when there is one)
  * sit on the right. */
 /** DOTS-CHAT-01: reads the companion for the kit header. Its own component so the presence hooks (runtime and router) run only when the preview switch is on. */
-const IDLE_WANTED = { needs_you: false, speaking: false, working: false, thinking: false, listening: false, sleeping: false };
-
 function WithCompanion({ companionId, fallbackName, children }: { companionId: string | null; fallbackName?: string; children: (name: string, media: ReactNode) => ReactNode }) {
-  // The header draws in the shell bar, outside the chat runtime, so it reads the avatar by query only and stays idle.
-  const { avatar, clips } = useCompanionAvatar(companionId);
-  const [failed, setFailed] = useState(false);
+  // The header draws in the shell bar, outside the chat runtime: a still and the name by query only, never a player.
+  const { avatar } = useCompanionAvatar(companionId);
+  const stills = useCompanionStills(companionId ? [companionId] : []);
   const name = avatar?.name ?? fallbackName ?? "MaiPai";
-  return children(name, avatar && clips && !failed
-    ? <CompanionAvatar name={avatar.name} clips={clips} wanted={IDLE_WANTED} once={null} size="sm" onFail={() => setFailed(true)} />
-    : <Avatar><AvatarFallback>{name.slice(0, 1)}</AvatarFallback></Avatar>);
+  return children(name, <Avatar><AvatarImage src={companionId ? stills[companionId] : undefined} alt="" /><AvatarFallback>{name.slice(0, 1)}</AvatarFallback></Avatar>);
 }
 
 type ShellsProps = { shells?: boolean; onMenu?: (() => void) | undefined; menuExpanded?: boolean; menuControls?: string; onHistory?: (() => void) | undefined; onCall?: (() => void) | undefined };

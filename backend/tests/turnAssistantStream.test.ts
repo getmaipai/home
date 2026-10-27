@@ -92,6 +92,17 @@ async function readNdjson(res: Response): Promise<Event[]> {
 const REPLY = "First sentence. Second sentence. Third sentence.";
 
 describe("THIN-5D: POST /api/turn/stream speaks assistant-stream to a client that asks", () => {
+  test("turn_meta pins a companion speaker, while temporary turns omit it", async () => {
+    const { client } = await owner();
+    await withStubReply("Hello.", async () => {
+      const regular = await readNdjson(await client.post("/api/turn/stream", { text: "say hello" }));
+      expect(regular[0]?.type).toBe("turn_meta");
+      expect((regular[0] as Event & { answered_by?: unknown }).answered_by).toBeTruthy();
+      const temporary = await readNdjson(await client.post("/api/turn/stream", { text: "say hello", temporary: true }));
+      expect(temporary[0]?.type).toBe("turn_meta");
+      expect((temporary[0] as Event & { answered_by?: unknown }).answered_by).toBeUndefined();
+    });
+  });
   test("the same released text, one terminal done, the stored reply is the concatenation", async () => {
     const { client } = await owner();
     await withStubReply(REPLY, async () => {

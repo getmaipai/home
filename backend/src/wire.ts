@@ -562,7 +562,7 @@ export type ConversationTurnWithMemoryIds = Omit<ConversationTurnRow, "sources" 
 // checking actually takes a moment, and a small model that saw its own
 // cue in its history would start opening every reply with it.
 export type TurnStreamEvent =
-  | { type: "turn_meta"; conversation_id: string; turn_id: string; resume_token?: string }
+  | { type: "turn_meta"; conversation_id: string; turn_id: string; resume_token?: string; answered_by?: AnsweredBy }
   /** WIRE-01: immediately after turn_meta, before any status, spoken_cue or delta, on every turn, immediate ones included. */
   | { type: "signal"; signal: TurnSignal; generation?: number }
   | { type: "delta"; text: string; sequence?: number; generation?: number }

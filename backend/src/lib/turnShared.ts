@@ -558,6 +558,7 @@ export type TurnStreamResult =
        * ("turn_meta"), before any delta. */
       conversationId: string;
       turnId: string;
+      answerMetadata?: import("@/wire").AnsweredBy;
       signal: TurnSignal;
       /** FAST-04: `Date.now()` at the top of runTurnStream(), before
        * prepareTurn() ran. streamTurnEvents() counts its 900 ms

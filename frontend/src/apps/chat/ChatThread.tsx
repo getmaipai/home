@@ -15,6 +15,7 @@ import { AdminContext, ChatAgeBandContext } from "@/apps/chat/chatThreadContexts
 import { useStatusApps } from "@/shell/useStatusApps";
 import { isSearchLimitedChat } from "@/shell/statusApps";
 import { messageForTurn } from "./chatTurnDeepLinkModel";
+import { useReplyFace } from "@/apps/chat/useReplyFace";
 import "@/apps/chat/chatOriginHighlight.css";
 
 type OriginHighlightStyle = CSSProperties & {
@@ -87,6 +88,7 @@ export function ChatThread({ temporary, onEditSend, thinkingModeVisible = false,
   focusKey?: string;
 }) {
   const rootRef = useRef<HTMLDivElement>(null);
+  const replyFace = useReplyFace();
   useComposerFocus(rootRef, focusKey);
   // COLUMN-01: the history column owns these (ChatColumn.tsx); the page
   // provides them, and a ChatThread shown outside the chat page has none.
@@ -249,12 +251,7 @@ export function ChatThread({ temporary, onEditSend, thinkingModeVisible = false,
             onEditSend,
             sendHeld,
             engineDown,
-            speakerMarker: {
-              joinedLabel: (name) => `${name} joined for one question`,
-              fallbackPoster: (speaker) => speaker.look
-                ? api.companionLookImage(speaker.companion_id, speaker.look)
-                : undefined,
-            },
+            replyFace,
             // CHAT-ACTION-ROW-01: copy, listen, rate, refresh and more sit under every reply, as in ChatGPT, not only the last.
             assistantActionBarAutohide: "never",
             ThreadViewportExtra: ChatThreadExtras,

@@ -4,18 +4,13 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { TooltipProvider } from "@maipai/ui/src/ui/tooltip";
 import { Button } from "@maipai/ui/src/ui/button";
 import * as avatarHookReal from "@/apps/chat/useCompanionAvatar";
-import * as realAvatar from "@maipai/ui/src/elements/companion-avatar";
 const avatarHookSnapshot = { ...avatarHookReal };
-const avatarSnapshot = { ...realAvatar };
 // mock.module outlives this file; put the real modules back for the files that run after it.
 afterAll(() => {
   mock.module("@/apps/chat/useCompanionAvatar", () => avatarHookSnapshot);
-  mock.module("@maipai/ui/src/elements/companion-avatar", () => avatarSnapshot);
 });
-let presenceMock: { name: string } | null = null;
-let requestedCompanionId: string | null | undefined;
-mock.module("@/apps/chat/useCompanionAvatar", () => ({ ...avatarHookSnapshot, useCompanionAvatar: (id?: string | null) => { requestedCompanionId = id; return presenceMock ? { avatar: { name: presenceMock.name }, clips: {}, loading: false } : { avatar: null, clips: null, loading: false }; } }));
-mock.module("@maipai/ui/src/elements/companion-avatar", () => ({ CompanionAvatar: ({ name }: { name: string }) => <div role="img" aria-label={name} /> }));
+let requestedIds: string[] = [];
+mock.module("@/apps/chat/useCompanionAvatar", () => ({ ...avatarHookSnapshot, useCompanionStills: (ids: string[]) => { requestedIds = ids; return { sprout: "/sprout.png" }; } }));
 import { ChatHeaderBar } from "@/apps/chat/chatHeaderBar";
 import { ChatHeaderDataProvider, useSetChatHeaderData, type ChatHeaderData } from "@/apps/chat/chatHeaderData";
 
@@ -80,12 +75,12 @@ describe("ChatHeaderBar", () => {
   });
 
   test("a new chat with no companion yet shows the person's default companion", async () => {
-    presenceMock = { name: "Sprout" };
-    requestedCompanionId = undefined;
+    requestedIds = [];
     const view = renderBar(baseData({ companionId: null, defaultCompanionId: "sprout", companions: [{ id: "sprout", name: "Sprout" }] }));
-    expect(await view.findByRole("img", { name: "Sprout" })).toBeVisible();
-    expect(String(requestedCompanionId)).toBe("sprout");
-    presenceMock = null;
+    expect(await view.findByText("Sprout")).toBeVisible();
+    expect(requestedIds).toContain("sprout");
+    expect(view.container.querySelector("video")).toBeNull();
+    expect(view.container.querySelector('img[src="/sprout.png"]')).toBeNull();
   });
 
   test("renders the conversation's own title", async () => {
@@ -285,35 +280,31 @@ describe("ChatHeaderBar", () => {
     }
 
     test("shows the companion's name over its character, not the conversation title row", async () => {
-      presenceMock = { name: "Nova" };
       const view = renderShells(baseData());
-      expect(await view.findByText("Nova")).toBeVisible();
-      expect(view.getByRole("img", { name: "Nova" })).toBeTruthy();
+      expect(await view.findByText("MaiPai")).toBeVisible();
+      expect(view.container.querySelector("video")).toBeNull();
       expect(view.container.querySelector("[data-chat-header-bar]")).toBeNull();
     });
 
     test("falls back to MaiPai with no animated companion", async () => {
-      presenceMock = null;
       const view = renderShells(baseData());
       expect(await view.findByText("MaiPai")).toBeVisible();
     });
 
     test("the menu button calls onMenu, and Call shows only when onCall is given", async () => {
-      presenceMock = { name: "Nova" };
       const onMenu = mock(() => {});
       const onCall = mock(() => {});
       const view = renderShells(baseData(), { onMenu });
       fireEvent.click(await view.findByRole("button", { name: "Open menu" }));
       expect(onMenu).toHaveBeenCalledTimes(1);
-      expect(view.queryByRole("button", { name: "Call Nova" })).toBeNull();
+      expect(view.queryByRole("button", { name: "Call MaiPai" })).toBeNull();
       view.unmount();
       const second = renderShells(baseData(), { onCall });
-      fireEvent.click(await second.findByRole("button", { name: "Call Nova" }));
+      fireEvent.click(await second.findByRole("button", { name: "Call MaiPai" }));
       expect(onCall).toHaveBeenCalledTimes(1);
     });
 
     test("onHistory puts Chat history in the actions menu and draws no second menu button", async () => {
-      presenceMock = { name: "Nova" };
       const onHistory = mock(() => {});
       const view = renderShells(baseData(), { onHistory });
       expect(view.queryByRole("button", { name: "Open menu" })).toBeNull();
@@ -323,7 +314,6 @@ describe("ChatHeaderBar", () => {
     });
 
     test("the stored chat offers companion radio choices and saves a selection", async () => {
-      presenceMock = { name: "Nova" };
       const onCompanionChange = mock(async (_id: string | null) => {});
       const view = renderShells(baseData({ companionId: "lively-child", companions: [{ id: "lively-child", name: "Sprout" }, { id: "lively-adult", name: "Rivet" }], onCompanionChange }));
       const picker = await view.findByRole("button", { name: "Change companion" });
@@ -337,14 +327,12 @@ describe("ChatHeaderBar", () => {
     });
 
     test("temporary chats hide the companion choice", async () => {
-      presenceMock = null;
       const view = renderShells(baseData({ pinnable: false, companions: [{ id: "lively-child", name: "Sprout" }] }));
       expect(view.queryByRole("button", { name: "Change companion" })).toBeNull();
       expect(view.queryByRole("menuitemradio", { name: "Sprout" })).toBeNull();
     });
 
     test("Rename opens a dialog that saves on Enter and closes on Escape; the other actions stay in the menu", async () => {
-      presenceMock = { name: "Nova" };
       const onRename = mock(async (_title: string) => {});
       const view = renderShells(baseData({ onRename, ttsAvailable: true }));
       await openActionsMenu(view);

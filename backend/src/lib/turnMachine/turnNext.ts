@@ -196,7 +196,7 @@ function buildTurnValue(state: TurnState, startedAt: number, source: TurnValue["
     safety: safety ?? state.safety,
     conversation_id: state.conversationId,
     turn_id: state.turnId,
-    answered_by: state.ephemeral ? null : answeredByFor(state),
+    answered_by: state.ephemeral ? null : answeredByFor(state.persona, state.surface === "robot" ? "device" : state.answerVia ?? "conversation"),
     ...(state.offer ? { offer_id: state.offer.id } : {}),
     ...(state.images?.length ? { images: state.images } : {}),
     ...(state.toolEvents.some((event) => event.t === "block")
@@ -235,26 +235,25 @@ function buildTurnValue(state: TurnState, startedAt: number, source: TurnValue["
   } as TurnValue;
 }
 
-function answeredByFor(state: TurnState): import("@/wire").AnsweredBy {
-  const via = state.surface === "robot" ? "device" : state.answerVia ?? "conversation";
+export function answeredByFor(persona: Persona, via: import("@/wire").AnsweredBy["via"]): import("@/wire").AnsweredBy {
   let look: string | null = null;
   let lookVersionId: string | null = null;
   let portrait: string | null = null;
   try {
-    const manifest = getHouseholdCompanion(state.persona.id) ?? (() => { const loaded = loadManifestOnly(state.persona.id); return loaded.ok ? loaded.value : null; })();
+    const manifest = getHouseholdCompanion(persona.id) ?? (() => { const loaded = loadManifestOnly(persona.id); return loaded.ok ? loaded.value : null; })();
     const animation = manifest?.companion?.animation;
     if (animation?.states.idle && (!manifest?.companion?.status || manifest.companion.status === "ready")) look = createHash("sha256").update(JSON.stringify(animation)).digest("hex").slice(0, 12);
   } catch { /* identity metadata must never fail an answer */ }
   try {
-    lookVersionId = readLook(state.persona.id).rest;
+    lookVersionId = readLook(persona.id).rest;
     if (lookVersionId) {
       // The key is stable, so the first reply names it before the still finishes writing.
-      portrait = `${state.persona.id}/${lookVersionId}`;
-      const existing = portraitPath(state.persona.id, lookVersionId);
-      if (!existing || !existsSync(existing)) void retainCompanionPortrait(state.persona.id, lookVersionId).catch(() => {});
+      portrait = `${persona.id}/${lookVersionId}`;
+      const existing = portraitPath(persona.id, lookVersionId);
+      if (!existing || !existsSync(existing)) void retainCompanionPortrait(persona.id, lookVersionId).catch(() => {});
     }
   } catch { /* portrait retention must never fail an answer */ }
-  return { companion_id: state.persona.id, name: state.persona.display_name, look, via, look_version_id: lookVersionId, voice_version: companionVoiceVersion(state.persona.id), portrait };
+  return { companion_id: persona.id, name: persona.display_name, look, via, look_version_id: lookVersionId, voice_version: companionVoiceVersion(persona.id), portrait };
 }
 
 /** THIN-3E: count growing prefixes of the one real prompt builder after
@@ -1190,6 +1189,7 @@ function startStream(actor: PersonRow, surface: Surface, text: string, begunValu
     kind: "stream",
     conversationId: state.conversationId,
     turnId: state.turnId,
+    answerMetadata: state.ephemeral ? undefined : answeredByFor(state.persona, state.surface === "robot" ? "device" : state.answerVia ?? "conversation"),
     signal: state.signal,
     startedAt,
     cueSuppressed: state.signal.target === "hub" && state.signal.repair !== "none",

@@ -220,14 +220,17 @@ test("the shortcut reference and the palette read the same catalog", () => {
   expect(palette.filter((command) => command.shortcut).map(({ name, shortcut }) => [name, shortcut] as const)).toEqual(expected);
 });
 
-test("the corner avatar draws without the preview header and gives way to the header's character with it", async () => {
+test("chat thread extras never mount a corner avatar player", async () => {
   shellsOn = false;
   const off = renderChat({ count: 2 });
-  await waitFor(() => expect(off.container.querySelector('[data-placement="corner"]')).not.toBeNull());
+  await waitFor(() => expect(off.container.querySelector('[data-slot="aui_thread-viewport"]')).not.toBeNull());
+  expect(off.container.querySelector('[data-placement="corner"]')).toBeNull();
+  expect(off.container.querySelector("video")).toBeNull();
   off.unmount();
   shellsOn = true;
   const on = renderChat({ count: 2 });
   await waitFor(() => expect(on.container.querySelector('[data-slot="aui_thread-viewport"]')).not.toBeNull());
   expect(on.container.querySelector('[data-placement="corner"]')).toBeNull();
+  expect(on.container.querySelector("video")).toBeNull();
   shellsOn = false;
 });

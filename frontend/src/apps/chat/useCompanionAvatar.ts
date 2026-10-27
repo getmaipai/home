@@ -46,3 +46,20 @@ export function useCompanionStills(ids: string[]): Record<string, string | undef
   });
   return stills;
 }
+
+/** Animated clips for reply faces, sharing the same query cache and keys as the header stills. */
+export function useReplyCompanionClips(ids: string[]): Record<string, CompanionClips | undefined> {
+  const person = useContext(WakeWordPersonContext);
+  const results = useQueries({
+    queries: ids.map((id) => ({
+      queryKey: [...COMPANION_AVATAR_QUERY_KEY, person?.id ?? null, id],
+      queryFn: () => api.companionAvatar(id),
+      enabled: person !== null,
+      staleTime: 5 * 60_000,
+    })),
+  });
+  return Object.fromEntries(ids.map((id, index) => {
+    const avatar = results[index]?.data?.avatar;
+    return [id, avatar ? mapCompanionClips(avatar.states) : undefined];
+  }));
+}

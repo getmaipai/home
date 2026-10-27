@@ -270,6 +270,7 @@ export function createChatModelAdapter(deps: ChatModelAdapterDeps): ChatModelAda
       let sawTerminalEvent = false;
       let resumeToken: string | undefined;
       let resumeTurnId: string | undefined;
+      let answeredBy: import("@maipai/home-backend/src/wire").AnsweredBy | undefined;
       let resumeGeneration: number | undefined;
       let crisisSupport: CrisisSupport | undefined;
       let lastAcknowledgedSequence = 0;
@@ -483,7 +484,9 @@ export function createChatModelAdapter(deps: ChatModelAdapterDeps): ChatModelAda
             conversationId = event.conversation_id;
             resumeToken = event.resume_token;
             resumeTurnId = event.turn_id;
+            answeredBy = event.answered_by;
             if (deps.activeTurnRef) deps.activeTurnRef.current = { turnId: event.turn_id, heardVisibleEnd: () => scheduler.heardVisibleEnd() };
+            if (answeredBy) yield { metadata: { custom: { answered_by: answeredBy, turnId: event.turn_id, conversationId } } };
             continue;
           }
           if (event.type === "signal") { if (event.generation !== undefined) resumeGeneration = event.generation; continue; }

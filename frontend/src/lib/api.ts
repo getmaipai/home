@@ -1468,6 +1468,11 @@ export const api = {
   removeCompanionStateApproval: (id: string, state: string) => request<{ ok: boolean; note?: string }>(`/api/companions/${encodeURIComponent(id)}/states/${encodeURIComponent(state)}/approve`, { method: "DELETE" }),
   deleteCompanionStateTake: (id: string, state: string, take: string) => request<void>(`/api/companions/${encodeURIComponent(id)}/states/${encodeURIComponent(state)}/${encodeURIComponent(take)}`, { method: "DELETE" }),
   companionLookImage: (id: string, versionId: string) => `/api/companions/${encodeURIComponent(id)}/look/${encodeURIComponent(versionId)}/image`,
+  companionPortrait: (key: string) => {
+    const [id, version, ...extra] = key.split("/");
+    if (!id || !version || extra.length) throw new Error("Companion portrait key must contain an id and version. Use the saved id/version key.");
+    return `/api/companions/portraits/${encodeURIComponent(id)}/${encodeURIComponent(version)}`;
+  },
   uploadCompanionLook: (id: string, form: FormData) => request<{ id: string }>(`/api/companions/${encodeURIComponent(id)}/look/upload`, { method: "POST", body: form }),
   setCompanionLookRest: (id: string, version_id: string) => request<{ rest: string; sheet_reset: boolean }>(`/api/companions/${encodeURIComponent(id)}/look/rest`, { method: "PUT", body: JSON.stringify({ version_id }) }),
   deleteCompanionLookVersion: (id: string, versionId: string) => request<void>(`/api/companions/${encodeURIComponent(id)}/look/${encodeURIComponent(versionId)}`, { method: "DELETE" }),
