@@ -18,7 +18,7 @@ export interface AiCopy {
 /** The stock wake word detector and the two files it shares: not Stack components, so the hub reads them from its own disk. */
 export interface AiWakewordInput { installed: boolean; bytes: number }
 /** The optional uncensored chat model: not in any tier's disk plan and not a Stack component of its own, so the hub reads it from the chat role (installed, running) and its catalog record (sizes). */
-export interface AiUncensoredInput { installed: boolean; running: boolean; /** A download of its files is in flight, and how far along (null when unknown). */ downloading?: boolean; percent?: number | null; downloadBytes: number; installedBytes: number }
+export interface AiUncensoredInput { /** The model's own name, shown in the option's parts line. */ label?: string; installed: boolean; running: boolean; /** A download of its files is in flight, and how far along (null when unknown). */ downloading?: boolean; percent?: number | null; downloadBytes: number; installedBytes: number }
 export interface AiChoicesInput { copy: AiCopy; plan: DiskPlan; components: AiComponentLike[] | null; settings: AiSettingsInput; freeBytes: number | null; wakeword?: AiWakewordInput | null; uncensored?: AiUncensoredInput | null }
 export interface AiChoice {
   id: string;
@@ -220,7 +220,7 @@ export function buildAiCards(input: AiChoicesInput): AiChoicesResult {
   // The wake word files are not in the disk plan; a row stands in for them so the card reads like every other.
   if (wakeword) rows.set("wakeword-detector", { id: "wakeword-detector", label: "Hey Jarvis wake word", note: "", kind: "model", need: "optional", selectable: true, download_bytes: wakeword.bytes, installed_bytes: wakeword.bytes, peak_temp_bytes: 0, model_ids: [], engines: [], installed: wakeword.installed, basis: "pins" });
   // The uncensored chat model is no plan row either; a row stands in for it so its choice reads like every other.
-  if (uncensored) rows.set("chat-uncensored", { id: "chat-uncensored", label: "Uncensored chat AI", note: "", kind: "model", need: "optional", selectable: true, download_bytes: uncensored.downloadBytes, installed_bytes: uncensored.installedBytes, peak_temp_bytes: 0, model_ids: [], engines: [], installed: uncensored.installed, basis: "pins" });
+  if (uncensored) rows.set("chat-uncensored", { id: "chat-uncensored", label: uncensored.label ?? "Uncensored chat AI", note: "", kind: "model", need: "optional", selectable: true, download_bytes: uncensored.downloadBytes, installed_bytes: uncensored.installedBytes, peak_temp_bytes: 0, model_ids: [], engines: [], installed: uncensored.installed, basis: "pins" });
   const has = (id: string): boolean => rows.has(id);
   const need = (id: string): DiskNeedLike => rows.get(id)?.need ?? "optional";
 

@@ -139,7 +139,7 @@ export function uncensoredChatEntry() {
 }
 
 /** What the AI and models page needs to draw the uncensored choice: its sizes from the catalog, whether the Stack has it, whether it is the running chat model. Null when the catalog has none or the Stack does not answer. */
-export async function uncensoredChoiceState(): Promise<{ id: string; installed: boolean; running: boolean; downloading: boolean; percent: number | null; downloadBytes: number; installedBytes: number } | null> {
+export async function uncensoredChoiceState(): Promise<{ id: string; label: string; installed: boolean; running: boolean; downloading: boolean; percent: number | null; downloadBytes: number; installedBytes: number } | null> {
   const entry = uncensoredChatEntry();
   if (!entry?.download) return null;
   let role: Awaited<ReturnType<typeof chatRole>> = null;
@@ -158,6 +158,7 @@ export async function uncensoredChoiceState(): Promise<{ id: string; installed: 
   const done = active.reduce((sum, job) => sum + job.completedBytes, 0);
   return {
     id: entry.id,
+    label: entry.label,
     installed: role.installed.includes(entry.id),
     running: role.modelId === entry.id,
     downloading: active.length > 0,

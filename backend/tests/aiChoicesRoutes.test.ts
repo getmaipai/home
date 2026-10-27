@@ -343,6 +343,9 @@ describe("the optional uncensored chat model (third Chat choice)", () => {
     const card = await chatCard(client);
     expect(card.choices.map((choice) => choice.id)).toContain("chat.uncensored");
     expect(card.choices.find((choice) => choice.id === "chat.uncensored")).toMatchObject({ current: false, action: "get" });
+    // The parts line names the model itself, as the Standard option does, never a generic "Uncensored chat AI".
+    const uncensoredRow = (card.choices.find((choice) => choice.id === "chat.uncensored") as unknown as { details: Array<{ name: string }> }).details[0]!.name;
+    expect(uncensoredRow).toBe("Qwen3.8 27B Uncensored (Huihui, IQ4_XS)");
     expect(card.choices.find((choice) => choice.id === "chat.standard")!.current).toBe(true);
   });
 
