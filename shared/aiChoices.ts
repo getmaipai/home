@@ -18,7 +18,7 @@ export interface AiCopy {
 /** The stock wake word detector and the two files it shares: not Stack components, so the hub reads them from its own disk. */
 export interface AiWakewordInput { installed: boolean; bytes: number }
 /** The optional uncensored chat model: not in any tier's disk plan and not a Stack component of its own, so the hub reads it from the chat role (installed, running) and its catalog record (sizes). */
-export interface AiUncensoredInput { installed: boolean; running: boolean; downloadBytes: number; installedBytes: number }
+export interface AiUncensoredInput { installed: boolean; running: boolean; /** A download of its files is in flight, and how far along (null when unknown). */ downloading?: boolean; percent?: number | null; downloadBytes: number; installedBytes: number }
 export interface AiChoicesInput { copy: AiCopy; plan: DiskPlan; components: AiComponentLike[] | null; settings: AiSettingsInput; freeBytes: number | null; wakeword?: AiWakewordInput | null; uncensored?: AiUncensoredInput | null }
 export interface AiChoice {
   id: string;
@@ -284,7 +284,12 @@ export function buildAiCards(input: AiChoicesInput): AiChoicesResult {
         break;
       }
     }
-    const choices = specs.map((spec) => buildChoice(copy, plan, components, freeBytes, spec));
+    const choices = specs.map((spec) => {
+      const built = buildChoice(copy, plan, components, freeBytes, spec);
+      // The model's files are coming down: no Stack component carries that, so the hub's reading of the download sets it.
+      if (spec.id === "chat.uncensored" && uncensored?.downloading && built.state !== "installed") return { ...built, state: "installing" as const, percent: uncensored.percent ?? null, stateText: "Installing", blockedReason: null, action: "none" as const };
+      return built;
+    });
     cards.push({
       id: meta.id,
       title: words.title,

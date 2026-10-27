@@ -86,9 +86,39 @@ export async function startChatModelChoice(modelId: string): Promise<ChatSwitchS
       const started = await getStackClient().pullModel(pullBody(part));
       if (typeof started.job === "string") jobs.push(started.job);
     }
+    // The person chose this model: once its files are on the computer, load it without a second click.
+    if (jobs.length > 0) void loadWhenDownloaded(modelId, jobs);
     return { modelId, status: "downloading", jobs };
   } catch (err) {
     return { error: err instanceof Error ? err.message : "The download could not start. Try again.", status: 502 };
+  }
+}
+
+const TERMINAL_JOB_STATES = new Set(["done", "failed", "cancelled"]);
+const DOWNLOAD_POLL_MS = 5_000;
+const DOWNLOAD_GIVE_UP_MS = 4 * 60 * 60_000;
+
+/** Waits for the download jobs of a chosen model, then loads it. A failed or cancelled download leaves the model not chosen and says so; a hub restart drops the wait, and choosing the model again loads it. */
+async function loadWhenDownloaded(modelId: string, jobIds: string[]): Promise<void> {
+  const deadline = Date.now() + DOWNLOAD_GIVE_UP_MS;
+  try {
+    for (;;) {
+      await new Promise((resolve) => setTimeout(resolve, DOWNLOAD_POLL_MS));
+      if (Date.now() > deadline) return;
+      const jobs = (await getStackClient().jobs()).filter((job) => jobIds.includes(job.id));
+      const bad = jobs.find((job) => job.state === "failed" || job.state === "cancelled");
+      if (bad) { outcomes.set(modelId, { status: "failed", reason: bad.reason ?? "The download did not finish. Choose the model again to retry." }); return; }
+      if (jobs.every((job) => TERMINAL_JOB_STATES.has(job.state))) break;
+    }
+    const role = await chatRole();
+    if (!role?.installed.includes(modelId)) return;
+    outcomes.set(modelId, { status: "loading" });
+    const result = await getStackClient().modelAction(modelId, "load");
+    if (result.ok === false) outcomes.set(modelId, { status: "failed", reason: typeof result.reason === "string" ? result.reason : "The Stack could not start that model." });
+    else outcomes.delete(modelId);
+  } catch (err) {
+    if (err instanceof StackError && err.kind === "timeout") return;
+    outcomes.set(modelId, { status: "failed", reason: err instanceof Error ? err.message : "The Stack could not start that model." });
   }
 }
 
@@ -109,17 +139,29 @@ export function uncensoredChatEntry() {
 }
 
 /** What the AI and models page needs to draw the uncensored choice: its sizes from the catalog, whether the Stack has it, whether it is the running chat model. Null when the catalog has none or the Stack does not answer. */
-export async function uncensoredChoiceState(): Promise<{ id: string; installed: boolean; running: boolean; downloadBytes: number; installedBytes: number } | null> {
+export async function uncensoredChoiceState(): Promise<{ id: string; installed: boolean; running: boolean; downloading: boolean; percent: number | null; downloadBytes: number; installedBytes: number } | null> {
   const entry = uncensoredChatEntry();
   if (!entry?.download) return null;
   let role: Awaited<ReturnType<typeof chatRole>> = null;
   try { role = await chatRole(); } catch { return null; }
   if (!role) return null;
   const bytes = entry.download.approx_bytes + (entry.image_input?.projector.download.approx_bytes ?? 0);
+  // A download of its weights or its picture file in flight, read from the Stack's own job list.
+  let active: Array<{ completedBytes: number; totalBytes: number }> = [];
+  try {
+    const mine = [entry.id, "uncensored-hauhaucs"];
+    active = (await getStackClient().jobs())
+      .filter((job) => job.kind === "model_download" && (job.state === "queued" || job.state === "running" || job.state === "paused" || job.state === "stalled"))
+      .filter((job) => { const text = JSON.stringify(job.input ?? {}) + JSON.stringify(job.items ?? []); return mine.some((id) => text.includes(id)); });
+  } catch { /* the job list failing only hides the progress */ }
+  const total = active.reduce((sum, job) => sum + job.totalBytes, 0);
+  const done = active.reduce((sum, job) => sum + job.completedBytes, 0);
   return {
     id: entry.id,
     installed: role.installed.includes(entry.id),
     running: role.modelId === entry.id,
+    downloading: active.length > 0,
+    percent: active.length > 0 && total > 0 ? Math.min(99, Math.round((done / total) * 100)) : null,
     downloadBytes: bytes,
     installedBytes: bytes,
   };

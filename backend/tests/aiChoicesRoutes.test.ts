@@ -355,6 +355,26 @@ describe("the optional uncensored chat model (third Chat choice)", () => {
     expect(installs()).toEqual([]);
   });
 
+  test("a chosen model loads by itself once its download jobs are done, and the card reads Installing while they run", async () => {
+    const { client } = await owner();
+    const state: "running" | "done" = "running";
+    let pulling = false;
+    const base = stackClient() as object;
+    const installed: string[] = [standard()];
+    __setStackClientForTests({
+      ...base,
+      roles: async () => ({ roles: [{ id: "chat", model: { id: standard() }, state: { state: "ready" }, models: installed.map((id) => ({ id, name: id })) }] }),
+      modelCatalog: async () => ({ models: [{ id: UNCENSORED, role: "chat", license: "Apache-2.0", revision: "r", imageInput: { projector: PROJECTOR }, download: { url: "https://example.com/a.gguf", sha256: "a".repeat(64), approx_bytes: 1000 } }, { id: PROJECTOR, role: "chat", license: "Apache-2.0", revision: "r", download: { url: "https://example.com/p.gguf", sha256: "b".repeat(64), approx_bytes: 100 } }] }),
+      pullModel: async (body: { id: string }) => { pulling = true; return { job: `job-${body.id}` }; },
+      jobs: async () => (!pulling ? [] : [PROJECTOR, UNCENSORED]).map((id) => ({ id: `job-${id}`, kind: "model_download", role: "chat", state, percent: 50, completedBytes: 50, totalBytes: 100, status: "", position: null, input: { id }, result: null, reason: null, createdAt: "2026-10-27T00:00:00Z", updatedAt: "2026-10-27T00:00:00Z" })),
+      modelAction: async (id: string) => { loaded.push(id); return { ok: true }; },
+    } as unknown as StackClient);
+    expect((await client.post("/api/ai/choices/chat", { choice: "chat.uncensored" })).status).toBe(200);
+    const card = await chatCard(client);
+    expect(card.choices.find((choice) => choice.id === "chat.uncensored")).toMatchObject({ state: "installing", percent: 50, action: "none" });
+    expect(loaded).toEqual([]);
+  });
+
   test("once installed it loads, and when it runs Standard offers Use and loads the tier's chat model", async () => {
     const { client } = await owner();
     chatStack([standard(), UNCENSORED], standard());

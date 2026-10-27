@@ -331,3 +331,8 @@ test("chat: the optional uncensored model is a third radio beside Standard, neve
   expect(running.choices.find((c) => c.id === "chat.standard")!.current).toBe(false);
   expect(running.chip).toBe("Using Uncensored");
 });
+
+test("chat: a download of the uncensored model in flight reads Installing with its percent and offers no action", () => {
+  const chat = buildAiCards({ copy, plan: TIERS.p128, components: null, settings: SETTINGS, freeBytes: null, uncensored: { installed: false, running: false, downloading: true, percent: 40, downloadBytes: 22 * GIB, installedBytes: 22 * GIB } }).cards.find((c) => c.id === "chat")!;
+  expect(chat.choices.find((c) => c.id === "chat.uncensored")).toMatchObject({ state: "installing", percent: 40, action: "none", stateText: "Installing" });
+});
