@@ -28,12 +28,11 @@ Home makes two kinds of picture. **Quick** is the usual one: a few seconds, clea
 
 Ask in chat, in your own words. Attach a picture, or point at one already in the chat, and say what you want:
 
-- "Remove the boy on the left from this picture." Home uses where people stand to tell which one you mean. It takes out only that person and fills the place from what is around it. Nothing new is drawn, so this works on any picture you have. If Home still cannot tell, it says so and does nothing; say where they stand or what they wear, or tap the picture, then **Edit**, and paint over them with **Erase**.
 - "Make the sky clear." "Make the car yellow." "Change the background to a beach." "Fix the lighting, it is too dark." The picture model makes the change. It can redraw small parts of the rest of the picture, so check the result.
-- "Add her to this picture." Attach the scene and a photo of the person (two pictures on one message) and say who is in the photo. Home uses a photo of a person only if that person lives in your home, is an adult, and has said yes in their own **Settings, Pictures and videos**. A child is never used. A photo of anyone else is not used.
+- "Add her to this picture." Attach the scene and the other picture (two pictures on one message) and describe the change.
 - "Remove the background" and "make it bigger" also work from chat.
 
-The original is never changed. The new picture is the next version of it: press **Edit** on it to see both and go back (**Undo**). A change to the sky, a colour, the background, an object or the light also works on a photo with people in it: the people are kept exactly as they are, pixel for pixel. A change to a person (their clothes, face or look, or adding someone) works only on a photo of one adult in your home who said yes. To take someone out of a photo of several people, use "remove" above. Home never changes a photo of a real person into something sexual.
+The original is never changed. The new picture is the next version of it: press **Edit** on it to see both and go back (**Undo**). Ask for the change you want, including changes to people or their likeness. The model decides whether to fulfill the request; Home blocks generated output only when its CSAM check finds a candidate.
 
 ## Change a picture in the editor
 
@@ -42,17 +41,13 @@ The original is never changed. The new picture is the next version of it: press 
 - **Make a variation.** Open the **More** menu under the reply and choose **Make a variation**. You get another picture from the same words.
 - **Try again.** If a picture did not work, the card says why and has a **Try again** button.
 
-## Fewer questions and warnings about people
-
-Home starts with extra questions and warnings about people turned off. To turn them on, an owner or admin opens **Settings**, **Pictures, videos and music**. Turn on **Ask me before making pictures and videos of people**. Safety rules for children and real people never turn off. When Home needs to know who is in a photo, it asks once and remembers your answer for that photo.
-
 ## Who can make pictures
 
 Adults can, on their own screen, in a written chat. Teens can too, with nothing adult or sexual. They only get the everyday styles. A teen's own photo can be changed in ordinary ways, never into anything sexual. The photo has to look like it could be of a teen, and a parent can see these edits. A teen is never shown a picture that may be adult. Children can make cartoon pictures of safe things, up to 20 a day. Changing one of their own cartoons counts as one. Cartoon pictures are on for every child unless you turn them off. The look is always a cartoon, nothing scary or grown-up is made, and photos and real people are never used. A parent or admin can turn this off for the home or for one child. Spoken answers, the TV and other shared screens never make pictures. A guest cannot.
 
 See [cartoon controls](people.md#cartoon-pictures-and-videos) for the home switch, daily limits and each child's switch.
 
-One thing is never made, whatever the settings: anything sexual that shows a child or someone who looks like one. For a teen or a child, Home also never makes a picture of a real person. For an adult, what is made is up to the model on this computer. If you ask, Home says it will not make that and what to change. Home checks finished pictures and videos and will not show anything that may show a child in a sexual situation. If that happens, the picture or video is deleted and an owner or admin gets a note without the picture. The check uses the chat model on this computer, so nothing leaves it. If Home cannot check a picture or video for an adult-only request, it does not show it; ask again in a minute.
+Home blocks CSAM. The model decides whether to make other adult content, including pictures of real people. Child and teen content filters remain in place. A CSAM candidate is withheld if the check cannot run.
 
 ## Choose how it works (owner and admin)
 
@@ -69,18 +64,10 @@ Open **Settings**, **Pictures, videos and music**.
 2. Give it a name and paste a Hugging Face link to the file, choose a file from this computer, or type where a big file is saved on this computer. Styles from sites such as Civitai are files you download yourself first: Home never signs in to a site or fetches from one for you.
 3. Say what the licence is and tick the box to say you read it.
 4. Say if it is fine for all ages. If you are not sure, only adults can use it.
-5. Answer **Who does this style look like?** Choose **Nobody (not a real person)**, or an adult in your home who has agreed. A style of a person has to be added as a file, not a link.
+5. Review the style details and confirm you have the rights and permission needed to use the file.
 6. Press **Add style**. Check the fingerprint and licence it shows, then press **Turn it on**.
 
-The picture engine checks the file and refuses styles of public figures and anything that puts a child in an adult scene. It cannot catch everything, so only add styles you trust.
-
-## Pictures that look like someone in your home
-
-Home can make a picture that looks like an adult in your home, but only if that adult said yes. A style of a person comes from a file you add; a photo of a person comes from a photo you attach. Children and teens are never made this way (a teen can change their own photo, see above), and neither is anyone outside your home.
-
-To say yes, an adult opens **Settings**, **Pictures and videos** on their own account and turns on **Let other adults in this household make pictures, videos and styles that look like me**. Nobody else can turn it on for them, not even an owner. They can turn it off at any time. When they do, anything still waiting is stopped, nobody can ask for it again, and every saved style of them is removed. Things already made stay with the person who made them.
-
-The page also lists every time someone made something that looks like them, and who. They are told each time, too.
+The picture engine checks that the file is supported and safe to process. Content decisions for adults belong to the model; child protections remain in place.
 
 ## Something not working?
 
@@ -93,7 +80,7 @@ The page also lists every time someone made something that looks like them, and 
 | "Something went wrong while making it" | The job failed | Press **Try again**, or change the words |
 | The reply says it is coming but no picture shows yet | The picture started and the reply did not finish | Wait a minute. The card fills in |
 | You asked chat to change a picture and got a new one | The picture tool cannot change an existing picture | Press **Edit** on the picture instead |
-| A style file is refused | Over 120 MB in the form, or it names a real person or a child in an adult scene, or it was made for another picture model (Pony, Illustrious and SDXL styles do not fit yet) | For a big file, type its path on this computer instead. Otherwise use a different style |
+| A style file is refused | Over 120 MB in the form, or it was made for another picture model (Pony, Illustrious and SDXL styles do not fit yet) | For a big file, type its path on this computer instead. Otherwise use a different style |
 | You cannot find **Edit** | The picture may not be in this chat | Open the picture in this chat and choose **Edit**. If it is in **Files**, open it there |
 
 ## Private chats

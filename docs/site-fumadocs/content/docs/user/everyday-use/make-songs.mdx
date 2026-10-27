@@ -67,13 +67,7 @@ Each change is a new version. Nothing is lost. The card shows "Version 2 of 2" w
 
 Adults can, on their own screen, in a written chat. Children and teens cannot make songs. Spoken answers, the TV and other shared screens never make songs. A guest cannot.
 
-Some things are never made, whatever the settings:
-
-- Words that are sexual and about children.
-- A song that copies a real person's voice. Home can make a song in a similar style with its own voice.
-- A song from a recording you upload. Home only changes songs it made.
-
-If you ask for one of these, Home says it will not make it and what to change.
+Home blocks CSAM. The model decides whether to make other adult content, including music that imitates a real person's voice. Child and teen content filters remain in place. A CSAM candidate is withheld if the check cannot run.
 
 ## Using a song for money
 

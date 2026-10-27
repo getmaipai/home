@@ -45,7 +45,7 @@ To choose who in your home can watch a saved video, open it in the Library and u
 
 After chat has made you a picture, say "animate this picture" or open the **More** menu under the reply and choose **Animate this picture**. Home makes a 5 second video that starts from that picture.
 
-Home animates pictures it made itself. It can also animate a photo you attach of an adult in your home who has said yes: attach one photo and say who is in it, for example "animate this, it's Marlow". Home checks that the photo shows only that one adult. A photo of a child, of two people, of someone outside your home, or one it cannot check, is never animated. A photo of a real person is never turned into adult content.
+Home can animate a picture you made or a photo you attach. Describe the motion you want. The model decides whether to fulfill adult requests; Home blocks output only when its CSAM check finds a candidate.
 
 ## Who can make videos
 
@@ -53,7 +53,7 @@ Adults can, on their own screen, in a written chat. Teens can too, with nothing 
 
 See [cartoon controls](people.md#cartoon-pictures-and-videos) for the home switch, daily limits and each child's switch.
 
-One thing is never made, whatever the settings: anything sexual that shows a child or someone who looks like one. For a teen or a child, Home also never makes a video of a real person. For an adult, what is made is up to the model on this computer. An adult in your home can say yes for themselves in **Settings**, **Pictures and videos** on their own account; see Pictures for how that works. If you ask, Home says it will not make that and what to change. Home checks finished pictures and videos and will not show anything that may show a child in a sexual situation. If that happens, the picture or video is deleted and an owner or admin gets a note without the picture. The check uses the chat model on this computer, so nothing leaves it. If Home cannot check a picture or video for an adult-only request, it does not show it; ask again in a minute.
+Home blocks CSAM. The model decides whether to make other adult content, including videos of real people. Child and teen content filters remain in place. A CSAM candidate is withheld if the check cannot run.
 
 ## Choose how it works (owner and admin)
 
@@ -62,7 +62,7 @@ Open **Settings**, **Pictures, videos and music**.
 - **Adults can make videos.** Turn it off to stop all video making.
 - **Adult-only video styles.** Choose whether styles marked adults only can be used.
 - **Video quality.** Quick (the default) or Detailed. This is what chat makes when nobody asks for a kind. Adults can ask chat for the other kind for one video. Teens and children get Quick videos only.
-- **Quick and Detailed videos.** Shows what each kind is and whether it is on this computer. **Get Detailed videos** (with its size) downloads the extra model. First it shows the maker's licence in plain points: it is free for a household and for a business under $10 million a year, a business above that needs its own licence from the maker, and it may never be used to harm children or to make a video of a real person who has not agreed. You accept once. **What is the difference?** is a short table, and **Details** names the models.
+- **Quick and Detailed videos.** Shows what each kind is and whether it is on this computer. **Get Detailed videos** (with its size) downloads the extra model. First it shows the maker's licence in plain points. You accept once. **What is the difference?** is a short table, and **Details** names the models.
 - **Video styles.** A style gives videos a look, like old colour film. Each has a switch, a note on who can use it, its licence and its size. Remove one to delete its file.
 
 ### Add a video style
