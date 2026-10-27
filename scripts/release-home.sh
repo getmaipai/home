@@ -24,6 +24,13 @@ if ! mkdir "$LOCK" 2>/dev/null; then
 fi
 echo $$ > "$LOCK/pid"; trap 'rm -rf "$LOCK"' EXIT
 git fetch -q --tags origin
+# A tag pushed from another machine (the laptop holds the GitHub login; the Studio has none, and over ssh its keychain login fails with -25308)
+# that already sits on origin/main is installed as it is: no second tag, no push from here (2026-10-27).
+if [[ -z "$INSTALL" ]]; then
+  for t in $(git tag --points-at origin/main --list 'v[0-9]*.[0-9]*.[0-9]*'); do
+    git ls-remote --tags origin "refs/tags/$t" | grep -q . && INSTALL="$t"
+  done
+fi
 LATEST="$(git tag --list 'v[0-9]*.[0-9]*.[0-9]*' | sort -t. -k1.2,1n -k2,2n -k3,3n | tail -1)"
 INSTALLED="$(cat "$LIVE/.installed-tag" 2>/dev/null || echo none)"
 echo "latest tag: $LATEST; live hub: $INSTALLED"
