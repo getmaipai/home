@@ -29,6 +29,14 @@ Every story, topic, source and search has its own web address. Copy it from the 
 
 When you open a story that Home has not read yet, you see its short summary right away and the full text takes its place a moment later.
 
+## Key points and Discuss
+
+Two buttons sit under a story's headline.
+
+**Key points** shows a short summary written on your hub from the article. If the summary is not ready yet, the button asks the hub to write it. You can read the whole story either way.
+
+**Discuss** opens a chat and sends the story with the question "Read this article and tell me what you think, including anything that looks one-sided or missing." Discuss is for teens and adults. A child sees a note to ask a grown-up.
+
 ## News settings
 
 Open the gear in News. Reading choices include My Mix, where stories open and the news digest. My Mix works now. The choice of where stories open and the news digest do nothing yet. Only an admin can change the **News shelf** lists and extra feed boxes. See [the shelf guide](news-shelf.md).

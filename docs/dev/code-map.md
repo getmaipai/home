@@ -186,6 +186,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `frontend/src/shell/pages/MediaHomePage.tsx` | MediaHomePage |
 | `frontend/src/shell/pages/MediaSearchPage.tsx` | MediaSearchPage |
 | `frontend/src/shell/pages/MicTestPage.tsx` | MicTestPage |
+| `frontend/src/shell/pages/NewsDiscussPage.tsx` | DISCUSS_PROMPT, DISCUSS_MAX_CHARS, blockText, discussMessage, NewsDiscussPage |
 | `frontend/src/shell/pages/NotFoundPage.tsx` | NotFoundPage |
 | `frontend/src/shell/pages/PackageAppPage.tsx` | contextTitleFor, PackageAppPage |
 | `frontend/src/shell/pages/PerformancePage.tsx` | PerformanceIcon, PerformancePage |
