@@ -34,6 +34,7 @@ import { ASK_SUBMITTED_LINE, RESUMED_ASK_CALL_PREFIX, validateAskValues } from "
 import { carriesCrisisSignal } from "@/lib/safety";
 import { resolvePersona, adaptPersonaToBand, DEFAULT_PERSONA, type Persona } from "@/lib/persona";
 import { createHash } from "node:crypto";
+import { existsSync } from "node:fs";
 import { loadManifestOnly } from "@/lib/plugins";
 import { getHouseholdCompanion } from "@/lib/householdCompanions";
 import { companionAreaOn, mayUseCompanion } from "@/lib/companionsApp";
@@ -78,6 +79,8 @@ import { AnswerImagePlacer, SHOW_IMAGES_TOOL_ID, answerImagesAllowed, settleAnsw
 import { reAskForShowImages } from "./nodes/model";
 import { answerRobotOffer } from "@/lib/robotOffers";
 import { decidePendingAsk } from "@/lib/gate/pendingAskMigration";
+import { readLook } from "@/lib/companionLook";
+import { companionVoiceVersion, portraitPath, retainCompanionPortrait } from "@/lib/companionPortrait";
 import type { GateDecision } from "@/lib/gate/types";
 
 export interface RunTurnNextOpts {
@@ -235,12 +238,23 @@ function buildTurnValue(state: TurnState, startedAt: number, source: TurnValue["
 function answeredByFor(state: TurnState): import("@/wire").AnsweredBy {
   const via = state.surface === "robot" ? "device" : state.answerVia ?? "conversation";
   let look: string | null = null;
+  let lookVersionId: string | null = null;
+  let portrait: string | null = null;
   try {
     const manifest = getHouseholdCompanion(state.persona.id) ?? (() => { const loaded = loadManifestOnly(state.persona.id); return loaded.ok ? loaded.value : null; })();
     const animation = manifest?.companion?.animation;
     if (animation?.states.idle && (!manifest?.companion?.status || manifest.companion.status === "ready")) look = createHash("sha256").update(JSON.stringify(animation)).digest("hex").slice(0, 12);
   } catch { /* identity metadata must never fail an answer */ }
-  return { companion_id: state.persona.id, name: state.persona.display_name, look, via };
+  try {
+    lookVersionId = readLook(state.persona.id).rest;
+    if (lookVersionId) {
+      // The key is stable, so the first reply names it before the still finishes writing.
+      portrait = `${state.persona.id}/${lookVersionId}`;
+      const existing = portraitPath(state.persona.id, lookVersionId);
+      if (!existing || !existsSync(existing)) void retainCompanionPortrait(state.persona.id, lookVersionId).catch(() => {});
+    }
+  } catch { /* portrait retention must never fail an answer */ }
+  return { companion_id: state.persona.id, name: state.persona.display_name, look, via, look_version_id: lookVersionId, voice_version: companionVoiceVersion(state.persona.id), portrait };
 }
 
 /** THIN-3E: count growing prefixes of the one real prompt builder after

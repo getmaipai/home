@@ -35,6 +35,7 @@ import { readStates, addTake, deleteTake, setMotion, takePath, bestTake, finishT
 import { householdCompanionFolder, setHouseholdCompanionAnimation } from "@/lib/householdCompanions";
 import { activeTakeRun, cancelTakeRun, companionHasTakeRun, publicTakeRun, startStateTakes, takeRunFor, TAKE_NO_ORIGINAL_LINE } from "@/lib/companionTakes";
 import { clipPromptPack, picturePromptPack } from "@/lib/companionPromptPack";
+import { portraitPath, readRetainedPortrait } from "@/lib/companionPortrait";
 
 export const companionsRoutes = apiRouter();
 
@@ -365,6 +366,20 @@ companionsRoutes.openapi(lookImageRoute, (c) => {
   if (!path || !readLook(id).versions.some((item) => item.id === versionId)) return c.json({ error: "That picture could not be found." }, 404);
   try { return new Response(readFileSync(path), { headers: { "content-type": "image/png", "cache-control": "private, max-age=0, must-revalidate" } }); }
   catch { return c.json({ error: "That picture could not be found." }, 404); }
+});
+
+const portraitParams = z.object({ companionId: z.string().min(1).max(80), versionId: z.string().regex(/^v-[0-9]+$/) });
+const portraitRoute = createRoute({ method: "get", path: "/portraits/{companionId}/{versionId}", tags: ["Companions"], summary: "Read a retained companion portrait", middleware: [requireAuth] as const,
+  request: { params: portraitParams }, responses: { 200: { content: { "image/webp": { schema: z.string().openapi({ format: "binary" }) } }, description: "The retained WebP portrait." }, ...errorResponses({ 401: "Not signed in", 403: "This companion is not available to this person", 404: "That portrait could not be found. Check the companion and version." }) } });
+companionsRoutes.openapi(portraitRoute, (c) => {
+  const { companionId, versionId } = c.req.valid("param"), actor = c.get("person");
+  const knownPersona = PERSONAS.find((candidate) => candidate.id === companionId);
+  const storedCompanion = getHouseholdCompanion(companionId);
+  const persona = knownPersona ?? (storedCompanion?.companion ? resolvePersona(companionId) : null);
+  if (persona && !mayUseCompanion(actor, persona)) return c.json({ error: "That portrait could not be found. Check the companion and version." }, 404);
+  const path = portraitPath(companionId, versionId), bytes = readRetainedPortrait(companionId, versionId);
+  if (!path || !bytes) return c.json({ error: "That portrait could not be found. Check the companion and version." }, 404);
+  return new Response(bytes, { headers: { "content-type": "image/webp", "cache-control": "private, max-age=31536000, immutable" } });
 });
 
 async function removePictureBackground(actor: import("@/types").PersonRow, bytes: Uint8Array): Promise<Uint8Array> {

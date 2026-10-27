@@ -501,7 +501,7 @@ export interface ChatImagePart {
    * later window names it as shown then, not as never seen. */
   shown_to_model?: true;
 }
-export interface AnsweredBy { companion_id: string; name: string; look: string | null; via: "conversation" | "mention" | "device" | "fallback" }
+export interface AnsweredBy { companion_id: string; name: string; look: string | null; via: "conversation" | "mention" | "device" | "fallback"; look_version_id?: string | null; voice_version?: string | null; portrait?: string | null }
 export const MAX_CHAT_IMAGES = 4;
 export const MAX_CHAT_IMAGE_BYTES = 10 * 1024 * 1024;
 export const CHAT_IMAGE_REFUSAL = "You can add up to 4 pictures, each up to 10 MB.";

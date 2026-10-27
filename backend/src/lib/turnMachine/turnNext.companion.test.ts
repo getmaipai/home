@@ -2,11 +2,17 @@ import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { db } from "@/db";
 import { people } from "@/db/schema";
 import { createHouseholdCompanion, setHouseholdCompanionAudience, setHouseholdCompanionStatus } from "@/lib/householdCompanions";
+import { getHouseholdCompanion } from "@/lib/householdCompanions";
 import { loadManifestOnly } from "@/lib/plugins";
 import { __reloadPersonasForTests } from "@/lib/persona";
 import { __resetSettingsCacheForTests } from "@/lib/settings";
 import { setValue } from "@/lib/settings";
 import { conversationPersona, mentionedConversationPersona } from "@/lib/turnMachine/turnNext";
+import { addVersion, setRest } from "@/lib/companionLook";
+import { readFileSync, rmSync } from "node:fs";
+import { join } from "node:path";
+import sharp from "sharp";
+import { companionVoiceVersion, portraitPath, retainCompanionPortrait, voiceVersion } from "@/lib/companionPortrait";
 import { resetDb } from "../../../tests/reset-db";
 
 function addPerson(id: string, role: string) {
@@ -24,6 +30,7 @@ function companion(audience: "all" | "adult" = "all") {
   __reloadPersonasForTests();
   return created.value.id;
 }
+const dataRoot = process.env.MAIPAI_DATA_DIR!;
 beforeEach(() => { resetDb(); __reloadPersonasForTests(); __resetSettingsCacheForTests(); });
 afterEach(() => { resetDb(); __reloadPersonasForTests(); __resetSettingsCacheForTests(); });
 
@@ -52,6 +59,19 @@ describe("conversation persona", () => {
     const picked = companion("adult");
     __reloadPersonasForTests();
     expect(conversationPersona(actor, picked).id).toBe(picked);
+  });
+
+  test("captures a companion's rest look, voice version, and retained portrait key", async () => {
+    addPerson("person-compoowner", "adult"); addPerson("turn-adult", "adult");
+    const picked = companion("adult");
+    const png = new Uint8Array(await sharp({ create: { width: 256, height: 192, channels: 3, background: "#4988aa" } }).png().toBuffer());
+    const version = addVersion(picked, png, { source: "upload", label: "Rest", width: 256, height: 192, from: null }); setRest(picked, version.id);
+    const persona = conversationPersona(db.select().from(people).all().find((row) => row.id === "turn-adult")!, picked);
+    const voice = companionVoiceVersion(picked), portrait = await retainCompanionPortrait(picked, version.id);
+    expect(persona.id).toBe(picked); expect(voice).toBe(voiceVersion(getHouseholdCompanion(picked)?.companion?.voice_id)); expect(portrait).toBe(`${picked}/${version.id}`);
+    expect(portraitPath(picked, version.id)).toBeTruthy();
+    expect(readFileSync(portraitPath(picked, version.id)!)).toBeTruthy();
+    rmSync(join(dataRoot, "companion-portraits", picked), { recursive: true, force: true });
   });
 
   test("falls back to the person's own persona when the conversation pick is no longer allowed", () => {

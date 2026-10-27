@@ -139,8 +139,9 @@ function parseAnsweredBy(raw: string | null): import("@/wire").AnsweredBy | null
   if (!raw) return null;
   try {
     const value = JSON.parse(raw) as Partial<import("@/wire").AnsweredBy>;
-    return typeof value.companion_id === "string" && typeof value.name === "string" && (typeof value.look === "string" || value.look === null) && ["conversation", "mention", "device", "fallback"].includes(value.via ?? "")
-      ? value as import("@/wire").AnsweredBy
+    const optionalText = (field: "look_version_id" | "voice_version" | "portrait") => value[field] === undefined || value[field] === null || typeof value[field] === "string";
+    return typeof value.companion_id === "string" && typeof value.name === "string" && (typeof value.look === "string" || value.look === null) && ["conversation", "mention", "device", "fallback"].includes(value.via ?? "") && optionalText("look_version_id") && optionalText("voice_version") && optionalText("portrait")
+      ? { ...value, look_version_id: value.look_version_id ?? null, voice_version: value.voice_version ?? null, portrait: value.portrait ?? null } as import("@/wire").AnsweredBy
       : null;
   } catch { return null; }
 }
