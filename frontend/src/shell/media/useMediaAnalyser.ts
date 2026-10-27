@@ -36,3 +36,17 @@ export function useIsPlaying(el: HTMLMediaElement | null): boolean {
   }, [el]);
   return playing;
 }
+
+/** How far through `el` is, 0 to 1, following its `timeupdate` events. */
+export function useProgress(el: HTMLMediaElement | null): number {
+  const [fraction, setFraction] = useState(0);
+  useEffect(() => {
+    if (!el) { setFraction(0); return; }
+    const sync = () => setFraction(el.duration > 0 && Number.isFinite(el.duration) ? el.currentTime / el.duration : 0);
+    el.addEventListener("timeupdate", sync);
+    el.addEventListener("loadedmetadata", sync);
+    sync();
+    return () => { el.removeEventListener("timeupdate", sync); el.removeEventListener("loadedmetadata", sync); };
+  }, [el]);
+  return fraction;
+}

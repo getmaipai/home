@@ -14,6 +14,7 @@ import { ApiError, api, type Roster } from "@/lib/api";
 import { NotFoundPage } from "@/shell/pages/NotFoundPage";
 import { useAppRows } from "@/shell/useAppCatalog";
 import { useTabItem } from "@/shell/tabIdentity";
+import { MusicVisualizerSection } from "@/shell/media/MusicVisualizerSection";
 import { appHomeLabel, isMediaApp, isMediaPlayPage, usesFamilyHeader } from "@/shell/mediaApps";
 import { SectionSidebar } from "@maipai/ui/src/primitives/SectionSidebar";
 import { WeatherForecastPage, dedupeLocations, type WeatherLocation } from "@maipai/ui/src/elements/weather-forecast-page";
@@ -239,6 +240,7 @@ export function PackageAppPage({ person }: { person: Roster }) {
         {(shown) => { const doc = sectionsBar?.trailing && pageId !== "search" ? withoutSearchBox(shown) : shown; return (hasQuery && !sameQuery ? null : <>
           {packageId === "weather" && pageId === "index" ? null : <SchemaPage key={`${packageId}/${pageId}`} page={doc} packageId={packageId} hideTitle sidebar={sidebarProps !== null} floatingBar={sectionsBar !== null} />}
           {packageId === "videos" && pageId === "watch" ? <VideoDetails id={new URLSearchParams(location.search).get("id") ?? String((location.state as { pageState?: { id?: string } } | null)?.pageState?.id ?? "")} /> : null}
+          {packageId === "music" && pageId === "play" ? <MusicVisualizerSection id={new URLSearchParams(location.search).get("id") ?? String((location.state as { pageState?: { id?: string } } | null)?.pageState?.id ?? "")} /> : null}
           {packageId === "weather" && pageId === "index" ? <>
             {weatherMessage ? <p role="status" className="text-sm text-muted-foreground">{weatherMessage}</p> : null}
             <WeatherForecastPage locations={weatherLocations} selectedId={weatherSelectedPlace?.id} onSelect={(id: string) => { if (id) setWeatherSelectedId(id); }} onSearch={(value: string) => { setWeatherSearch(value); setWeatherResults([]); setWeatherMessage(""); }} searchResults={(weatherSearchQuery.data ?? weatherResults).map((r) => ({ id: `${r.lat.toFixed(2)},${r.lon.toFixed(2)}`, city: r.name, state: r.area ?? undefined, latitude: r.lat, longitude: r.lon }))} onSelectResult={async (result) => {

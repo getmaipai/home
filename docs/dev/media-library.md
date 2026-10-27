@@ -388,4 +388,7 @@ title, play and pause); tapping the title opens the play page.
   through a suspended context), so playback is never affected. Colors come from the cover art (`lib/media/artPalette.ts`) or, with no art, the dark theme's tokens.
 - Ported from the pre-rebuild hub's `AudioVisualizer`, `artPalette` and `mediaAudioGraph`, without its EQ chain, DJ and radio parts.
 - Open: an Up next and a queue sheet on the stage, lyrics on the stage, and a Cast button; the host has no queue to show yet outside Music's own page.
+- The Music play page (`apps/music`, `play`) keeps the kit `Player` in its audio layout untouched and adds `shell/media/MusicVisualizerSection.tsx` beside it: a scene
+  picker (hide or show, the seven scenes), a Full screen button that opens the same stage, and an ambient strip along the bottom of the page, as the pre-rebuild hub's
+  Now Playing overlay had. It draws only while the host holds that song. Mini player and page hand off with no restart: the bar opens the page, the page hides the bar.
 
