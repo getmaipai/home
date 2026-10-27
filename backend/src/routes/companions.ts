@@ -668,10 +668,11 @@ companionsRoutes.openapi(audienceRoute, async (c) => {
   if (body.audience === "all" && body.confirmed !== true) return c.json({ error: "Review the all ages checklist and confirm before making this companion available to everyone." }, 400);
   const uses = liveUseCounts(id, body.audience); if (uses.robots) return c.json({ error: inUseSentence("robots", uses.robots) }, 409); if (uses.people) return c.json({ error: inUseSentence("people", uses.people) }, 409);
   const bandRank = { adult: 0, teen: 1, all: 2 } as const, currentAudience = getHouseholdCompanion(id)?.companion?.audience ?? "adult";
-  if (bandRank[body.audience] > bandRank[currentAudience] && getHouseholdCompanion(id)?.companion?.animation) {
-    ensurePublishedRecord(id);
+  const audienceAssets = bandRank[body.audience] > bandRank[currentAudience] ? await collectLiveAssets(id) : [];
+  if (audienceAssets.length > 0) {
+    if (getHouseholdCompanion(id)?.companion?.animation) ensurePublishedRecord(id);
     const animationBefore = JSON.stringify(getHouseholdCompanion(id)?.companion?.animation ?? null), cache: NonNullable<ReturnType<typeof readStates>["checks"]> = { ...(readStates(id).checks ?? {}) };
-    const reasons = await checkAssets(await collectLiveAssets(id), body.audience, cache);
+    const reasons = await checkAssets(audienceAssets, body.audience, cache);
     // The checks can take minutes: merge only the gained checks into a fresh read, and refuse if a Publish changed the live art meanwhile.
     const fresh = readStates(id); fresh.checks = { ...(fresh.checks ?? {}), ...cache }; saveStates(id, fresh);
     if (JSON.stringify(getHouseholdCompanion(id)?.companion?.animation ?? null) !== animationBefore) return c.json({ error: "The companion's artwork changed while it was being checked. Nothing was changed. Try again." }, 409);

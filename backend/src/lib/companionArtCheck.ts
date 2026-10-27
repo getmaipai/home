@@ -6,15 +6,17 @@
 import type { PersonRow } from "@/types";
 import { getHouseholdCompanion } from "@/lib/householdCompanions";
 import { readStates, saveStates, takePath } from "@/lib/companionStates";
+import { readLook, versionPath } from "@/lib/companionLook";
 import { checkFinishedAssets, stricterLane, type FinishedAsset, type FinishedCheckResult } from "@/lib/pictures/finishedCheck";
 import { laneOfPerson } from "@/lib/pictures/laneGate";
 import { extractKeyframes } from "@/lib/pictures/keyframes";
 import type { CheckedKind } from "@/lib/pictures/ageCheck";
 import type { Lane } from "@/lib/pictures/lane";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import media from "@maipai/spec/vocab/companion-media.json";
 import { dirname, join } from "node:path";
 import { dataDir } from "@/lib/paths";
-import { householdCompanionFolder, listHouseholdCompanionIds, setHouseholdCompanionAudience, setHouseholdCompanionStatus } from "@/lib/householdCompanions";
+import { householdCompanionFolder, listHouseholdCompanionIds, holdHouseholdCompanionAudience, setHouseholdCompanionAudience, setHouseholdCompanionStatus } from "@/lib/householdCompanions";
 import { reloadPersonas } from "@/lib/persona";
 
 export type CompanionAudience = "adult" | "teen" | "all";
@@ -55,15 +57,21 @@ export async function takeAssets(companionId: string, state: string, takeId: str
   return assets;
 }
 
-/** The art a companion shows today: its starting picture and each state's still and clip frames. */
+/** Clip lengths are not recorded for a live clip, so frames are taken within the shortest length the state allows. */
+function clipSeconds(state: string): number { return media.states.find((row) => row.id === state)?.min_seconds ?? 3; }
+
+/** Every picture the person may be shown for this companion, for the audience check: the look pictures (any of them can be served as a portrait) and the live animation's starting picture, stills and clip frames. */
 export async function collectLiveAssets(companionId: string): Promise<FinishedAsset[]> {
-  const root = join(householdCompanionFolder(companionId)!, "animation"), animation = getHouseholdCompanion(companionId)?.companion?.animation, assets: FinishedAsset[] = [];
-  const add = (label: string, path: string) => { try { assets.push({ label, bytes: new Uint8Array(readFileSync(path)) }); } catch { assets.push({ label }); } };
-  add("The starting picture", join(root, animation?.sheet?.rest ?? "rest.png"));
-  for (const [state, files] of Object.entries(animation?.states ?? {})) {
+  const assets: FinishedAsset[] = [], add = (label: string, path: string | null) => { try { assets.push({ label, bytes: new Uint8Array(readFileSync(path!)) }); } catch { assets.push({ label }); } };
+  for (const version of readLook(companionId).versions) add(`Look picture ${version.id}`, versionPath(companionId, version.id));
+  const animation = getHouseholdCompanion(companionId)?.companion?.animation;
+  if (!animation) return assets;
+  const root = join(householdCompanionFolder(companionId)!, "animation");
+  add("The starting picture", join(root, animation.sheet?.rest ?? "rest.png"));
+  for (const [state, files] of Object.entries(animation.states ?? {})) {
     add(`The ${state} still`, join(root, files.still));
     let frames: Uint8Array[] | null = null;
-    try { frames = await extractKeyframes(new Uint8Array(readFileSync(join(root, files.h264))), null); } catch { frames = null; }
+    try { frames = await extractKeyframes(new Uint8Array(readFileSync(join(root, files.h264))), clipSeconds(state)); } catch { frames = null; }
     if (!frames) assets.push({ label: `The ${state} clip frames` }); else for (const bytes of frames) assets.push({ label: `The ${state} clip frames`, bytes });
   }
   return assets;
@@ -72,31 +80,65 @@ export async function collectLiveAssets(companionId: string): Promise<FinishedAs
 // ---------------------------------------------------------------- the one-time check of art that was live before art was checked
 
 function sweepMarker(): string { return join(process.env.MAIPAI_DATA_DIR || dataDir, "companions", ".art-checked.json"); }
-export interface SweepOutcome { companionId: string; from: CompanionAudience; to: CompanionAudience | "draft" | null; unavailable: boolean }
+interface SweepRecord { at?: string; /** Companions held at a stricter audience until their art can be checked: id to the audience to restore. */ pending: Record<string, CompanionAudience>; done: boolean }
+function readSweep(): SweepRecord { try { const parsed = JSON.parse(readFileSync(sweepMarker(), "utf8")) as Partial<SweepRecord>; return { pending: parsed.pending ?? {}, done: parsed.done === true, ...(parsed.at ? { at: parsed.at } : {}) }; } catch { return { pending: {}, done: false }; } }
+function writeSweep(record: SweepRecord): void { mkdirSync(dirname(sweepMarker()), { recursive: true }); writeFileSync(sweepMarker(), JSON.stringify(record, null, 2)); }
 
-/** Checks every household companion's live art once against the audience it is shown to. Art that fails keeps the companion only for the stricter audience it does pass
- * (all ages, then teen, then adult-only); art that fails even adult-only makes the companion a draft. A companion whose art could not be checked is left alone and tried
- * again on the next boot (the marker is written only when every companion was decided). Nothing is deleted. */
+export interface SweepOutcome { companionId: string; from: CompanionAudience; to: CompanionAudience | "draft" | "pending"; }
+const ORDER: CompanionAudience[] = ["all", "teen", "adult"];
+
+function narrow(id: string, to: CompanionAudience | "draft", hold = false): void {
+  try {
+    const result = to === "draft" ? setHouseholdCompanionStatus(id, "draft") : hold ? holdHouseholdCompanionAudience(id, to) : setHouseholdCompanionAudience(id, to);
+    if (!result.ok) throw new Error(result.error);
+  } finally { reloadPersonas(); }
+}
+
+/** Checks the art of every household companion shown to teens or children, once, against the audience it is shown to. Art that fails keeps the companion only for the stricter
+ * audience it does pass (all ages, then teen, then adult-only); art that fails even adult-only makes the companion a draft. A companion whose art could not be looked at (no
+ * vision model yet, a missing file) and has no clear failure is held one step stricter (all ages becomes teen, teen becomes adult-only) until the check can run, then restored.
+ * Nothing is deleted. An admin's own change made while the checks ran is never overwritten. Returns what was decided this pass; `done` in the record is true when nothing is pending. */
 export async function sweepLiveCompanionArt(): Promise<SweepOutcome[]> {
-  if (existsSync(sweepMarker())) return [];
+  const record = readSweep();
+  if (record.done) return [];
   const outcomes: SweepOutcome[] = [];
   for (const id of listHouseholdCompanionIds()) {
     const companion = getHouseholdCompanion(id)?.companion;
-    if (!companion?.animation) continue;
-    const from = companion.audience ?? "adult", assets = await collectLiveAssets(id);
-    const order: CompanionAudience[] = ["all", "teen", "adult"], start = order.indexOf(from);
-    let to: CompanionAudience | "draft" | null = null, unavailable = false;
-    for (const audience of order.slice(start)) {
+    if (!companion) continue;
+    const held = record.pending[id], current = companion.audience ?? "adult", from = held ?? current;
+    if (from === "adult") continue;
+    const assets = await collectLiveAssets(id);
+    if (assets.length === 0) { delete record.pending[id]; continue; }
+    let to: CompanionAudience | "draft" | "pending" | null = null;
+    for (const audience of ORDER.slice(ORDER.indexOf(from))) {
       const result = await checkCompanionArt(id, null, assets, "video", audience);
       if (result.ok) { to = audience; break; }
-      if (result.unavailable) { unavailable = true; break; }
+      if (!result.definite && result.unavailable) { to = "pending"; break; }
     }
-    if (unavailable) { outcomes.push({ companionId: id, from, to: null, unavailable }); continue; }
-    if (to === null) { setHouseholdCompanionStatus(id, "draft"); to = "draft"; }
-    else if (to !== from) setHouseholdCompanionAudience(id, to);
-    outcomes.push({ companionId: id, from, to, unavailable: false });
+    const nowAudience = getHouseholdCompanion(id)?.companion?.audience ?? "adult";
+    if (nowAudience !== current) continue; // an admin changed it while the checks ran: theirs stands, and the next pass looks again
+    if (to === null) { narrow(id, "draft"); delete record.pending[id]; outcomes.push({ companionId: id, from, to: "draft" }); continue; }
+    if (to === "pending") {
+      const stricter = ORDER[Math.min(ORDER.indexOf(from) + 1, ORDER.length - 1)]!;
+      if (!held && stricter !== current) narrow(id, stricter, true);
+      record.pending[id] = from; outcomes.push({ companionId: id, from, to: "pending" }); continue;
+    }
+    if (to !== current) narrow(id, to, held !== undefined && to === held);
+    delete record.pending[id]; outcomes.push({ companionId: id, from, to });
   }
-  reloadPersonas();
-  if (!outcomes.some((outcome) => outcome.unavailable)) { mkdirSync(dirname(sweepMarker()), { recursive: true }); writeFileSync(sweepMarker(), JSON.stringify({ at: new Date().toISOString(), outcomes }, null, 2)); }
+  record.done = Object.keys(record.pending).length === 0;
+  if (record.done) record.at = new Date().toISOString();
+  writeSweep(record);
   return outcomes;
+}
+
+/** Runs the one-time check a minute after start and again with growing gaps (up to an hour) until every companion has been decided. The timer never keeps the process alive. */
+export function startLiveArtSweep(delayMs = 60_000): void {
+  const run = (wait: number) => {
+    const timer = setTimeout(() => {
+      sweepLiveCompanionArt().then(() => { if (!readSweep().done) run(Math.min(wait * 2, 3_600_000)); }).catch((error) => { console.warn(`[companions] live art check will retry: ${(error as Error).message}`); run(Math.min(wait * 2, 3_600_000)); });
+    }, wait);
+    timer.unref?.();
+  };
+  run(delayMs);
 }

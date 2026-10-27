@@ -12,7 +12,7 @@ import { createHouseholdCompanion, householdCompanionFolder, setHouseholdCompani
 import { loadManifestOnly } from "@/lib/plugins";
 import { __reloadPersonasForTests } from "@/lib/persona";
 import { __resetSettingsCacheForTests } from "@/lib/settings";
-import { resetDb } from "../../tests/reset-db";
+import { resetDb } from "./reset-db";
 import sharp from "sharp";
 import { __setPicturesFetchForTests } from "@/lib/pictures/stack";
 import { __setPictureStatusForTests, readyStatusForTests } from "@/lib/pictures/ready";
@@ -859,8 +859,10 @@ describe("household companion routes", () => {
     const minor = await upload(path, adult, png);
     expect(minor.status).toBe(422);
     expect(((await minor.json()) as { error: string }).error.length).toBeGreaterThan(10);
+    // A verdict is kept per file, so each case needs its own picture.
+    const second = new Uint8Array(await sharp({ create: { width: 512, height: 512, channels: 4, background: { r: 0, g: 0, b: 0, alpha: 0 } } }).composite([{ input: await sharp({ create: { width: 170, height: 170, channels: 4, background: { r: 40, g: 40, b: 220, alpha: 1 } } }).png().toBuffer(), left: 160, top: 160 }]).png().toBuffer());
     __setAgeCheckRunnerForTests(async (images) => images.map(() => ({ ok: false as const, why: "unavailable" as const })));
-    expect((await upload(path, adult, png)).status).toBe(422);
+    expect((await upload(path, adult, second)).status).toBe(422);
     expect(((await (await request(`companions/${created.value.id}/look`, adult)).json()) as { versions: unknown[] }).versions).toHaveLength(0);
     __setAgeCheckRunnerForTests(async (images) => images.map(() => verdict("adult")));
     // A verdict is kept per file, so a different picture is needed to see the new answer.

@@ -27,8 +27,11 @@ A companion keeps its cache in its `states.json` `checks`.
 - Look pictures and character sheet views are checked when they are generated (a failed candidate is dropped and the job says why) and when a picture is uploaded (HTTP 422).
 - A finished clip's still and keyframes are checked when it finishes. A clip that fails has its files removed and its take says why; it cannot be approved.
 - Publish and an audience change check again (`checkAssets` in `routes/companions.ts`), because the audience may have moved since.
-- Art that was live before art was checked is checked once at start (`sweepLiveCompanionArt`): art that fails is narrowed to the audience it passes (all ages, then teen, then
-  adult-only), or the companion becomes a draft. A companion whose art cannot be checked is left alone and tried again at the next start. The marker is
+- Look pictures and live art are also checked when an admin raises a companion's audience, because any look picture can be served as a portrait.
+- Art that was live before art was checked is checked once (`sweepLiveCompanionArt`, started a minute after boot and retried with growing gaps until every companion is decided).
+  It covers companions shown to teens or children, look pictures included. Art that clearly fails is narrowed to the audience it passes (all ages, then teen, then adult-only), or the
+  companion becomes a draft. A companion whose art could not be looked at (no vision model yet, a missing file) and has no clear failure is held one step stricter, keeping its
+  all-ages review on record, and put back when the check can run. An admin's own change made while the checks ran is never overwritten. The record is
   `companions/.art-checked.json` in the data folder.
 
 ## Adding a new place

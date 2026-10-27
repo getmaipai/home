@@ -22,6 +22,8 @@ export interface FinishedCheckResult {
   reasons: string[];
   /** True when a check could not run at all (no vision model, timeout, missing file): the item is withheld, but this is not a verdict on the picture, so a caller that sweeps should try again later. */
   unavailable: boolean;
+  /** True when at least one asset got a real verdict that withholds it, whatever happened to the others. A sweep decides on this first: art that is clearly refused is not left alone because another file could not be looked at. */
+  definite: boolean;
 }
 
 const LANE_ORDER: readonly Lane[] = ["adult", "teen", "child"];
@@ -65,6 +67,13 @@ export async function checkFinishedAssets(input: FinishedCheckInput): Promise<Fi
       childChecks.push(child ?? { ok: false, why: "unavailable" });
     }
   }
+  if (input.assets.length === 0) reasons.push("There is no artwork to check. Add a picture and try again.");
+  let definite = false;
+  for (const [index, age] of ageChecks.entries()) {
+    const child = input.lane === "child" ? childChecks[index] : undefined;
+    if (!age.ok || (input.lane === "child" && !child?.ok)) continue;
+    if (decideForLane({ lane: input.lane, checks: [age], adultOnly: input.adultOnly, kind: input.kind, ...(child ? { childChecks: [child] } : {}) }).action === "withhold") { definite = true; break; }
+  }
   if (ageChecks.length > 0) {
     const decision = decideForLane({ lane: input.lane, checks: ageChecks, adultOnly: input.adultOnly, kind: input.kind, ...(input.lane === "child" ? { childChecks } : {}) });
     if (decision.action === "withhold") {
@@ -74,5 +83,5 @@ export async function checkFinishedAssets(input: FinishedCheckInput): Promise<Fi
     if (input.lane === "child" && childChecks.some((check) => !childSafetyOk(check))) reasons.push("Some artwork could not be confirmed safe for children. Replace it or keep the audience teen or adult.");
   }
   const unavailable = input.assets.some((asset) => !asset.bytes) || ageChecks.some((check) => !check.ok) || childChecks.some((check) => !check.ok);
-  return { ok: reasons.length === 0, reasons: [...new Set(reasons)], unavailable };
+  return { ok: reasons.length === 0, reasons: [...new Set(reasons)], unavailable, definite };
 }

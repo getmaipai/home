@@ -51,6 +51,10 @@ describe("the standard finished-image check", () => {
     expect((await checkFinishedAssets({ assets: [{ label: "A", bytes: bytes(3) }], lane: "adult", adultOnly: true, kind: "picture" })).ok).toBe(true);
   });
 
+  test("an empty list fails closed", async () => {
+    expect((await checkFinishedAssets({ assets: [], lane: "adult", adultOnly: true, kind: "picture" })).ok).toBe(false);
+  });
+
   test("a missing file fails closed and names the asset", async () => {
     __setAgeCheckRunnerForTests(async (images) => images.map(() => verdict()));
     const result = await checkFinishedAssets({ assets: [{ label: "The idle still" }], lane: "adult", adultOnly: true, kind: "picture" });
@@ -79,7 +83,8 @@ describe("companion art", () => {
     const id = companion("all");
     __setAgeCheckRunnerForTests(async (images) => images.map(() => verdict()));
     __setChildSafetyRunnerForTests(async (images) => images.map(() => photo));
-    const result = await checkCompanionArt(id, null, [{ label: "A", bytes: bytes(7) }]);
+    const adult = { id: "p-adult", role: "owner", birthdate: null } as never;
+    const result = await checkCompanionArt(id, adult, [{ label: "A", bytes: bytes(7) }]);
     expect(result.ok).toBe(false);
     expect(readStates(id).checks).toBeDefined();
   });
@@ -109,25 +114,48 @@ describe("the one-time check of live art", () => {
     if (!result.ok) throw new Error(result.error);
     __setKeyframesForTests(async () => [new Uint8Array([9])]);
   }
+  const audienceOf = (id: string) => getHouseholdCompanion(id)?.companion?.audience;
 
   test("art that fails the child lane narrows the companion to the audience it does pass, once", async () => {
     const id = companion("all"); withLiveArt(id);
     __setAgeCheckRunnerForTests(async (images) => images.map(() => verdict()));
     __setChildSafetyRunnerForTests(async (images) => images.map(() => photo));
-    const outcomes = await sweepLiveCompanionArt();
-    expect(outcomes).toEqual([{ companionId: id, from: "all", to: "teen", unavailable: false }]);
-    expect(getHouseholdCompanion(id)?.companion?.audience).toBe("teen");
+    expect(await sweepLiveCompanionArt()).toEqual([{ companionId: id, from: "all", to: "teen" }]);
+    expect(audienceOf(id)).toBe("teen");
     expect(await sweepLiveCompanionArt()).toEqual([]);
   });
 
-  test("a companion whose art cannot be checked is left alone and tried again next time", async () => {
+  test("a clear failure narrows the companion even when another file could not be checked", async () => {
+    const id = companion("all"); withLiveArt(id);
+    let call = 0;
+    __setAgeCheckRunnerForTests(async (images) => images.map(() => (call++ % 2 === 0 ? unavailable : verdict({ label: "child", apparent_min_age_estimate: 9, is_nude_or_sexual: true }))));
+    __setChildSafetyRunnerForTests(async (images) => images.map(() => cartoon));
+    const outcomes = await sweepLiveCompanionArt();
+    // The picture that was looked at is clearly refused at every audience, so the companion is a draft; it is not left live at all ages.
+    expect(outcomes).toEqual([{ companionId: id, from: "all", to: "draft" }]);
+    expect(getHouseholdCompanion(id)?.companion?.status).toBe("draft");
+  });
+
+  test("a companion whose art cannot be checked is held one step stricter, then restored with its review when the check can run", async () => {
     const id = companion("all"); withLiveArt(id);
     __setAgeCheckRunnerForTests(async (images) => images.map(() => unavailable));
-    const outcomes = await sweepLiveCompanionArt();
-    expect(outcomes[0]).toMatchObject({ companionId: id, to: null, unavailable: true });
-    expect(getHouseholdCompanion(id)?.companion?.audience).toBe("all");
+    expect(await sweepLiveCompanionArt()).toEqual([{ companionId: id, from: "all", to: "pending" }]);
+    expect(audienceOf(id)).toBe("teen");
+    expect(getHouseholdCompanion(id)?.companion?.review?.confirmed_by).toBe("Reviewer");
     __setAgeCheckRunnerForTests(async (images) => images.map(() => verdict()));
     __setChildSafetyRunnerForTests(async (images) => images.map(() => cartoon));
-    expect((await sweepLiveCompanionArt())[0]).toMatchObject({ to: "all" });
+    expect(await sweepLiveCompanionArt()).toEqual([{ companionId: id, from: "all", to: "all" }]);
+    expect(audienceOf(id)).toBe("all");
+    expect(getHouseholdCompanion(id)?.companion?.review?.confirmed_by).toBe("Reviewer");
+    expect(await sweepLiveCompanionArt()).toEqual([]);
+  });
+
+  test("a look picture with no animation is swept too, and an admin's change made meanwhile is left alone", async () => {
+    const id = companion("all");
+    addVersion(id, new Uint8Array([1]), { source: "upload", label: "look", width: 1024, height: 1024, from: null });
+    __setAgeCheckRunnerForTests(async (images) => { setHouseholdCompanionAudience(id, "adult"); return images.map(() => verdict({ label: "child", apparent_min_age_estimate: 9, is_nude_or_sexual: true })); });
+    __setChildSafetyRunnerForTests(async (images) => images.map(() => cartoon));
+    expect(await sweepLiveCompanionArt()).toEqual([]);
+    expect(audienceOf(id)).toBe("adult");
   });
 });

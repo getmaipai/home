@@ -122,6 +122,11 @@ export function copyHouseholdCompanion(sourceId: string, author: CompanionAuthor
   if (!source) return { ok: false, error: "That household companion could not be found." };
   return createHouseholdCompanion({ ...source, display_name: `${source.display_name} (copy)`, audience: "adult", status: "draft", review: undefined }, author);
 }
+/** Moves a companion's audience while keeping its all-ages review on record: used only to hold a companion at a stricter audience until its art can be checked, and to put it back. An admin's own change goes through setHouseholdCompanionAudience. */
+export function holdHouseholdCompanionAudience(id: string, audience: "adult" | "teen" | "all"): WriteResult {
+  const current = read(id); if (!current?.companion) return { ok: false, error: "That household companion could not be found." };
+  return write({ ...current, companion: { ...current.companion, audience } });
+}
 export function setHouseholdCompanionAudience(id: string, audience: "adult" | "teen" | "all", reviewer?: CompanionAuthor): { ok: true; value: Manifest } | { ok: false; error: string } {
   const current = read(id); if (!current?.companion) return { ok: false, error: "That household companion could not be found." };
   if (audience === "all" && !reviewer?.display_name?.trim()) return { ok: false, error: "A reviewer must confirm an all ages companion." };
