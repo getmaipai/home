@@ -55964,6 +55964,10 @@
                         "version": {
                           "type": "string"
                         },
+                        "portrait": {
+                          "type": "string",
+                          "nullable": true
+                        },
                         "states": {
                           "type": "object",
                           "additionalProperties": {
