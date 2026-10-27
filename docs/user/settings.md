@@ -68,8 +68,6 @@ Qwen3.6 35B A3B is the first model offered beside the default. It starts answeri
 
 An owner or admin opens **Settings**, **Pictures, videos and music**. It has the picture model (install or see it), who can make pictures, the style library, and the same for videos. Children can make cartoons by default. See [cartoon controls](people.md#cartoon-pictures-and-videos) to change this. See [Pictures](pictures.md) and [Videos](videos.md).
 
-**Ask me before making pictures and videos of people** is on this page. It starts off and never turns off the safety rules.
-
 **Picture quality** and **Video quality** choose Quick or Detailed when nobody asks for a kind. **Song length** chooses quick or full songs. Quick songs are about 45 seconds and take under a minute. Full songs are about 3 minutes and take a minute or two. See [Songs](songs.md).
 
 ## Web search settings

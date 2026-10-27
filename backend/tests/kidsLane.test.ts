@@ -122,7 +122,7 @@ describe("a child makes cartoon pictures", () => {
     const photo = await put(kid, "photo-1");
     expect(text(await pic(kid, { prompt: "make the sky pink", change: "attached" }, [photo]))).toContain(CHILD_NO_PHOTOS_LINE);
     expect(text(await vid(kid, { prompt: "make it move", from_picture: "attached" }, [photo]))).toContain(CHILD_NO_PHOTOS_LINE);
-    expect(text(await pic(kid, { prompt: "add her", change: "latest", reference: "attached", photo_subject: "me" }, [photo]))).toContain(CHILD_NO_PHOTOS_LINE);
+    expect(text(await pic(kid, { prompt: "add her", change: "latest", reference: "attached" }, [photo]))).toContain(CHILD_NO_PHOTOS_LINE);
     expect(image.submitted).toHaveLength(0);
     expect(image.edits).toHaveLength(0);
     expect(video.submitted).toHaveLength(0);
