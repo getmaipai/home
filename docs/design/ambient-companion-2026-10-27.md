@@ -69,7 +69,7 @@ the top right brings it back; it never hides while listening, thinking or speaki
 
 1. **AMBIENT-01 spec and commons:** `placement` on conversations (spec), `RightPane`, `CompanionPreview`, `CompanionAvatar` ring state; tags, pin.
 2. **AMBIENT-02 shell:** header slot for the avatar and per-app buttons, ring states from the presence hook, hover and focus preview, touch tap, speech bubble, auto-hide, remove the dock.
-3. **AMBIENT-03 side chats:** backend `surface`, pane Chat tab on the same turn engine, History, "Continue in Chat", child lane tests.
+3. **AMBIENT-03 side chats:** backend `placement`, pane Chat tab on the same turn engine, History, "Continue in Chat", child lane tests.
 4. **AMBIENT-04 migrate panels:** chat details, sources, artifact, compare into pane tabs; remove the Sheets; each app's inspector as it comes up.
 5. **AMBIENT-05 page context and quick actions:** the typed page context from each app; "Help with this page", "Find something", "Take an action" through the existing tool and Ask gates.
 6. **AMBIENT-06 settings, wake word and shortcut:** the Ambient Companion card, wake word to the pane, global shortcut in the desktop app.
@@ -85,6 +85,7 @@ the top right brings it back; it never hides while listening, thinking or speaki
 - **Panels (AMBIENT-04):** only inspectors, sheets and panels move into the pane; an app's own content column (YouTube's up-next, for example) stays app content; the `SheetContent` className overrides in `ChatPage.tsx` go with the Sheets and the wrapper and className baselines only shrink.
 - **AMBIENT-05 and AMBIENT-06 each need their own architect verdict:** quick actions send a prompt with `tool_choice: auto` or are explicit controls passing the same policy checks; a per-page tool is a conditional tool with a bench row (never more than 16 tools on a turn);
   "Take an action" respects role and consent (starting or stopping a model is admin-only); the pane's Settings tab is the settings shell or a link to it (S4), the wake word stays in "This device" and the Ambient card links to it, copy comes through `describeSetting` (S5), the `companions.dock` key is kept, and the Memory tab reuses the existing memory list with `canRead`.
+- **One-action stop on touch (AMBIENT-02 test):** a tap opens the pane and Turn off would be a second tap, so while the wake word is listening on a touch screen the top-right indicator with Turn off is shown, or a tap while listening offers Turn off directly; the test shows Turn off is one tap from what is on screen.
 - New tags (commons `ui`, `spec`) need Jesse's yes at the time.
 
 ## 7. Open items
