@@ -138,6 +138,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `frontend/src/shell/AliasRedirect.tsx` | AliasRedirect |
 | `frontend/src/shell/AmbientCompanionPane.tsx` | readAmbientPaneState, isProtectedReply, createAmbientAskQueue, useAmbientCompanionPane |
 | `frontend/src/shell/BrowserAlerts.tsx` | shouldShowBrowserAlert, requestBrowserAlertPermission, BrowserAlerts |
+| `frontend/src/shell/GlobalMiniPlayer.tsx` | onPlayPageOf, GlobalMiniPlayer |
 | `frontend/src/shell/InstallDock.tsx` | buildDock, InstallDock |
 | `frontend/src/shell/InstallDockRow.tsx` | InstallDockRow |
 | `frontend/src/shell/InstallStrip.tsx` | installTitle, InstallStrip |
@@ -164,6 +165,8 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `frontend/src/shell/library/LibraryTrash.tsx` | LibraryTrash |
 | `frontend/src/shell/library/LibraryUploads.tsx` | useLibraryUploads, UploadTray |
 | `frontend/src/shell/library/LibraryViewer.tsx` | viewerItemOf, LibraryViewer |
+| `frontend/src/shell/media/AudioVisualizer.tsx` | VISUALIZERS, getVisualizerPref, setVisualizerPref, useVisualizerPref, AudioVisualizer |
+| `frontend/src/shell/media/NowPlayingStage.tsx` | clock, NowPlayingStage |
 | `frontend/src/shell/mediaHost.tsx` | createMediaStore, useMediaDock, MediaHostProvider, MediaLinkRedirect |
 | `frontend/src/shell/pageHeaderTitle.tsx` | PageHeaderTitle |
 | `frontend/src/shell/pages/AllAppsPage.tsx` | AllAppsPage |
