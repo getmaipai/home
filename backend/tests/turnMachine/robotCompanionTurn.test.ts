@@ -26,7 +26,7 @@ let outbound: string[] = [];
 let people: BenchPeople;
 let deviceId: string;
 
-beforeEach(() => {
+beforeEach(async () => {
   resetDb();
   useDefaultScriptedStack();
   __resetThrottleForTests();
@@ -36,6 +36,8 @@ beforeEach(() => {
   __clearPackageCacheDirForTests("weather");
   people = createBenchPeople();
   setHouseholdSettingValue("chat.model_id", "qwen3-8b-instruct-q4-k-m");
+  // These tests are about the robot's own companion. The owner's chat companion (Tessa is the default for a person with no pick) must not colour a robot with none assigned.
+  expect((await setValue(people.owner, `person:${people.owner.id}`, "persona.active_id", "default")).ok).toBe(true);
   deviceId = createDevice("robot", "StackChan", people.owner.id).id;
   outbound = [];
   globalThis.fetch = (async (input: string | URL | Request, init?: RequestInit) => {
