@@ -78,6 +78,13 @@ export interface StreamGateResult {
   reasoningRefused: boolean;
 }
 
+/** True when `text` ends a sentence: its last character, past trailing whitespace and closing quotes or brackets, is . ! ? or an ellipsis. */
+function endsSentence(text: string): boolean {
+  let i = text.length - 1;
+  while (i >= 0 && (text[i]!.trim() === "" || "\"')]".includes(text[i]!))) i -= 1;
+  return i >= 0 && ".!?\u2026".includes(text[i]!);
+}
+
 /** A child's or teen's authored spoken text is cut the same way as the shown text. */
 function minorSpeech(band: AgeBand, speech: string | undefined): string | undefined {
   return band === "adult" || speech === undefined ? speech : redactSuicideMethod(speech).text;
@@ -390,7 +397,7 @@ export class StreamGate {
       this.isFirstChunk = false;
       const piece = this.pending.slice(0, end);
       this.pending = this.pending.slice(end);
-      if (this.band !== "adult" && piece.trim() && !/[.!?\u2026]["')\]]*\s*$/.test(piece)) {
+      if (this.band !== "adult" && piece.trim() && !endsSentence(piece)) {
         this.heldClause += piece;
         continue;
       }
