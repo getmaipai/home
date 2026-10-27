@@ -1,4 +1,5 @@
-import { describe, expect, test, mock, afterEach } from "bun:test";
+import { describe, expect, test, mock, afterEach, beforeEach } from "bun:test";
+import { LocalRuntimeCore } from "@assistant-ui/core/internal";
 import { takeCarry } from "@/apps/chat/chatCarry";
 import type { ChatModelAdapter, ChatModelRunOptions, ChatModelRunResult, PendingAttachment, ThreadMessage } from "@assistant-ui/react";
 import { createChatModelAdapter, stripThinking, type ChatModelAdapterDeps } from "@/apps/chat/chatModelAdapter";
@@ -150,6 +151,71 @@ describe("companion mention request", () => {
   test("sends a selected directive id and leaves unmatched @ text unstructured", async () => {
     expect(await bodyFor("Please ask :person[Rivet]{name=guest-rivet}")).toHaveProperty("mention_companion_id", "guest-rivet");
     expect(await bodyFor("Please email @Rivet")).not.toHaveProperty("mention_companion_id");
+  });
+
+  async function retryBody(answeredBy: { companion_id: string } | null, current: boolean) {
+    const env = stubEnvironment(ndjsonStream([{ type: "done", value: { turn_id: "turn-retry-speaker", reply: { text: "Again" }, source: "model", safety: SAFETY } }]));
+    try {
+      const user = fakeUserMessage("original question");
+      await collect([user], undefined, undefined, undefined, undefined, undefined, { consumeRetryWithCurrentCompanion: () => current, findReplacedSpeaker: () => answeredBy?.companion_id });
+      return env.turnBodies[0] as Record<string, unknown>;
+    } finally { env.restore(); }
+  }
+
+  test("retry reload requests its original companion even when it differs from the conversation pick", async () => {
+    const env = stubEnvironment(ndjsonStream([{ type: "done", value: { turn_id: "turn-retry-speaker", reply: { text: "Again" }, source: "model", safety: SAFETY } }]));
+    try {
+      const user = fakeUserMessage("original question");
+      const adapter = createChatModelAdapter({ consumeThinking: () => false, consumeSupersedes: () => undefined, turnSchedulerRef: { current: null }, getConversationId: async () => "conv-1", findReplacedSpeaker: () => "original-companion" });
+      const options = { messages: [user], unstable_parentId: "user-1", unstable_assistantMessageId: "new-reply", runConfig: {}, abortSignal: new AbortController().signal, context: {} } as unknown as ChatModelRunOptions;
+      for await (const result of runAdapter(adapter, options)) void result;
+      expect(env.turnBodies[0]).toMatchObject({ mention_companion_id: "original-companion" });
+    } finally { env.restore(); }
+  });
+
+  test("retry for the current speaker and old replies without answered_by send no mention", async () => {
+    expect(await retryBody({ companion_id: "current-companion" }, false)).not.toHaveProperty("mention_companion_id");
+    expect(await retryBody(null, false)).not.toHaveProperty("mention_companion_id");
+  });
+
+  test("retry with current companion consumes the one-shot override", async () => {
+    expect(await retryBody({ companion_id: "original-companion" }, true)).not.toHaveProperty("mention_companion_id");
+  });
+
+});
+
+describe("assistant-ui reload speaker lookup", () => {
+  let thread: ReturnType<LocalRuntimeCore["threads"]["getMainThreadRuntimeCore"]> | undefined;
+  let env: ReturnType<typeof stubEnvironment> | undefined;
+  const adapter = createChatModelAdapter({
+    consumeThinking: () => false,
+    consumeSupersedes: () => undefined,
+    turnSchedulerRef: { current: null },
+    getConversationId: async () => "conv-retry",
+    findReplacedSpeaker: ({ parentId, newMessageId }) => {
+      const entry = thread?.export().messages.filter((item) => item.parentId === parentId && item.message.role === "assistant" && item.message.id !== newMessageId).at(-1);
+      const answeredBy = entry?.message.role === "assistant" ? entry.message.metadata.custom.answered_by as { companion_id?: string } | null | undefined : undefined;
+      return answeredBy?.companion_id;
+    },
+  });
+  beforeEach(() => {
+    env = stubEnvironment(
+      ndjsonStream([{ type: "done", value: { turn_id: "turn-original", reply: { text: "First reply" }, source: "model", safety: SAFETY } }]),
+      [ndjsonStream([{ type: "done", value: { turn_id: "turn-retried", reply: { text: "Second reply" }, source: "model", safety: SAFETY } }])],
+    );
+  });
+  afterEach(() => { env?.restore(); env = undefined; thread?.detach(); thread = undefined; });
+
+  test("real local runtime reload sends the replaced sibling reply's speaker", async () => {
+    const core = new LocalRuntimeCore({ adapters: { chatModel: adapter } }, undefined);
+    thread = core.threads.getMainThreadRuntimeCore();
+    const user = { ...fakeUserMessage("original question"), id: "user-parent" };
+    await thread.append({ ...user, parentId: null, sourceId: null, runConfig: {} } as never);
+    const repository = thread.export();
+    const originalReply = repository.messages.find((item) => item.message.role === "assistant")!;
+    thread.import({ ...repository, messages: repository.messages.map((item) => item.message.id === originalReply.message.id && item.message.role === "assistant" ? { ...item, message: { ...item.message, metadata: { ...item.message.metadata, custom: { ...item.message.metadata.custom, answered_by: { companion_id: "speaker-x", name: "Speaker X", via: "conversation" } } } } } : item) });
+    await thread.startRun({ parentId: "user-parent", sourceId: originalReply.message.id, runConfig: {} });
+    expect(env!.turnBodies[1]).toMatchObject({ mention_companion_id: "speaker-x" });
   });
 });
 

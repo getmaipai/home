@@ -8,6 +8,7 @@ import { FeedbackDialog } from "@maipai/ui/src/elements/feedback-dialog";
 import { MemoryChips } from "@maipai/ui/src/elements/memory-chips";
 import { memoryChipsAllowed, useReplyMemoryChips } from "@/apps/chat/chatMemoryChips";
 import { ChatActorContext, rememberMessage } from "@/apps/chat/chatMemoryActions";
+import { RetryWithCurrentCompanionSetterContext } from "@/apps/chat/chatThreadContexts";
 import { useContext, useEffect, useState, type PropsWithChildren } from "react";
 import { GuardrailNotice } from "@maipai/ui/src/elements/guardrail-notice";
 import type { CrisisSupport } from "@maipai/home-backend/src/wire";
@@ -481,6 +482,7 @@ export function AssistantMoreItems() {
       <RememberThisMenuItem />
       <MakeVariationMenuItem />
       <AnimatePictureMenuItem />
+      <RetryWithCurrentCompanionMenuItem />
       {temporary ? null : <BranchInNewChatMenuItem />}
       <CompareWithBareModelMenuItem />
       <BareModeSwitchMenuItem />
@@ -488,6 +490,24 @@ export function AssistantMoreItems() {
       <TurnTraceMenuItem />
     </>
   );
+}
+
+const RetryCurrentIcon = getIcon("rotate-ccw");
+
+export function RetryWithCurrentCompanionMenuItem() {
+  const temporary = useContext(TemporaryChatContext).on;
+  const original = useAuiState((s) => s.message.metadata?.custom?.answered_by as { companion_id?: string } | null | undefined);
+  const conversationId = useAuiState((s) => s.message.metadata?.custom?.conversationId as string | undefined);
+  const conversation = useQuery({ queryKey: ["conversation", conversationId], queryFn: () => api.conversation(conversationId!), enabled: Boolean(conversationId) });
+  const currentId = conversation.data?.companion_id ?? null;
+  const retryChoice = useContext(RetryWithCurrentCompanionSetterContext);
+  const aui = useAui();
+  if (!original?.companion_id || !currentId || original.companion_id === currentId || temporary) return null;
+  return <ActionBarMorePrimitive.Item
+    // eslint-disable-next-line shadcn/no-unknown-classes -- aui-action-bar-more-item is a kit ActionBarMorePrimitive class, not a Tailwind utility
+    className="aui-action-bar-more-item hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground flex cursor-pointer items-center gap-2 rounded-lg px-2.5 py-1.5 text-sm outline-none select-none"
+      onSelect={(event) => { event.preventDefault(); retryChoice.arm(); void Promise.resolve(aui.message().reload()).catch(() => { retryChoice.consume(); }); }}
+  ><RetryCurrentIcon className="size-4" />Retry with current companion</ActionBarMorePrimitive.Item>;
 }
 
 

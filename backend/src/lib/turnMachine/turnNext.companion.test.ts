@@ -7,13 +7,14 @@ import { loadManifestOnly } from "@/lib/plugins";
 import { __reloadPersonasForTests } from "@/lib/persona";
 import { __resetSettingsCacheForTests } from "@/lib/settings";
 import { setValue } from "@/lib/settings";
-import { conversationPersona, mentionedConversationPersona } from "@/lib/turnMachine/turnNext";
+import { conversationPersona, mentionedConversationPersona, runTurnNext } from "@/lib/turnMachine/turnNext";
 import { addVersion, setRest } from "@/lib/companionLook";
 import { readFileSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import sharp from "sharp";
 import { companionVoiceVersion, portraitPath, retainCompanionPortrait, voiceVersion } from "@/lib/companionPortrait";
 import { resetDb } from "../../../tests/reset-db";
+import { resolveOrCreateConversation, updateConversationCompanion } from "@/lib/conversationHistory";
 
 function addPerson(id: string, role: string) {
   const now = new Date().toISOString();
@@ -35,6 +36,33 @@ beforeEach(() => { resetDb(); __reloadPersonasForTests(); __resetSettingsCacheFo
 afterEach(() => { resetDb(); __reloadPersonasForTests(); __resetSettingsCacheForTests(); });
 
 describe("conversation persona", () => {
+  test("mentioning the conversation speaker keeps conversation attribution", async () => {
+    addPerson("person-compoowner", "adult");
+    const actor = addPerson("person-turnadult", "adult");
+    const picked = companion("adult");
+    const conversation = resolveOrCreateConversation(actor, "chat");
+    if (!conversation.ok) throw new Error("Could not create test chat");
+    updateConversationCompanion(actor, conversation.value.id, picked);
+    const result = await runTurnNext(actor, "chat", "hello", { conversationId: conversation.value.id, mentionCompanionId: picked });
+    expect(result.ok).toBe(true);
+    if (result.ok) expect(result.value.answered_by?.via).toBe("conversation");
+  });
+
+  test("forbidden adult companion mention falls back for a child without naming that companion", async () => {
+    addPerson("person-compoowner", "adult");
+    const child = addPerson("person-turnchild", "child");
+    const forbidden = companion("adult");
+    const conversation = resolveOrCreateConversation(child, "chat");
+    if (!conversation.ok) throw new Error("Could not create test chat");
+    const result = await runTurnNext(child, "chat", "hello", { conversationId: conversation.value.id, mentionCompanionId: forbidden });
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.value.answered_by?.via).toBe("fallback");
+      expect(result.value.answered_by?.companion_id).not.toBe(forbidden);
+      expect(result.value.answered_by?.name).not.toBe("Chat pick");
+    }
+  });
+
   test("a valid mention picks a guest for one selection while the conversation pick stays available", () => {
     addPerson("person-compoowner", "adult");
     const actor = addPerson("turn-adult", "adult");

@@ -584,7 +584,7 @@ async function beginTurn(actor: PersonRow, surface: Surface, text: string, opts:
     ? mentionedConversationPersona(actor, opts.mentionCompanionId)
     : null;
   const persona = adaptPersonaToBand(robotCompanion ?? (temporary || bare ? DEFAULT_PERSONA : mentionedPersona ?? conversationPersona(actor, conversation.companion_id)), band);
-  const answerVia: import("@/wire").AnsweredBy["via"] = surface === "robot" ? "device" : temporary || bare ? "conversation" : opts.mentionCompanionId ? mentionedPersona ? "mention" : "fallback" : conversation.companion_id && persona.id !== conversation.companion_id ? "fallback" : "conversation";
+  const answerVia: import("@/wire").AnsweredBy["via"] = surface === "robot" ? "device" : temporary || bare ? "conversation" : opts.mentionCompanionId ? mentionedPersona ? (conversation.companion_id ? mentionedPersona.id === conversation.companion_id : mentionedPersona.id === conversationPersona(actor, null).id) ? "conversation" : "mention" : "fallback" : conversation.companion_id && persona.id !== conversation.companion_id ? "fallback" : "conversation";
   // U4/RESP-01: computed once, the register's only length authority -
   // never recomputed by a later node, the same "decided once" shape
   // `reasoning.emit` already follows in `context`. U4c: everything

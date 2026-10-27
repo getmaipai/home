@@ -6,6 +6,7 @@ import { toast } from "sonner";
 import { voiceFailureLine, type VoiceFailureKind } from "@maipai/home-backend/src/lib/failureCopy";
 import { AssistantRuntimeProvider, useAui, useAuiState, useLocalRuntime, useRemoteThreadListRuntime } from "@assistant-ui/react";
 import { ChatThread } from "@/apps/chat/ChatThread";
+import { RetryWithCurrentCompanionSetterContext } from "@/apps/chat/chatThreadContexts";
 import { PageContext } from "@/shell/pages/chatProjectPageContext";
 import { isThreadPinned, ThreadListItems, ThreadListRoot, type ThreadListProjects } from "@maipai/ui/src/elements/thread-list.aui";
 import { SectionSidebar, SectionSidebarShowButton } from "@maipai/ui/src/primitives/SectionSidebar";
@@ -194,7 +195,7 @@ function useBareCompareCanvas(target: CompareTarget | null) {
  * wiring table's remaining rows). `speakReplies: false` still holds -
  * no "stop speaking" control on screen yet. */
 
-function useChatRuntime(person: Roster, closeSheet: () => void, temporaryNext: boolean, voiceOpen: boolean, onArtifactReady: (artifactId: string) => void, setDraftConversationId: (id: string | undefined) => void, folderId?: string) {
+function useChatRuntime(person: Roster, closeSheet: () => void, temporaryNext: boolean, voiceOpen: boolean, onArtifactReady: (artifactId: string) => void, setDraftConversationId: (id: string | undefined) => void, retryWithCurrentCompanionRef: { current: boolean }, folderId?: string) {
   const temporaryModeRef = useRef(temporaryNext);
   temporaryModeRef.current = temporaryNext;
   const turnSchedulerRef = useRef<SentenceSpeechScheduler | null>(null);
@@ -509,6 +510,17 @@ function useChatRuntime(person: Roster, closeSheet: () => void, temporaryNext: b
           // saved by its setter, and used on every send until changed.
           getThinking: () => (thinkingAllowed && currentModelThinksRef.current ? thinkingRef.current : undefined),
           getAgeBand: () => person.age_band,
+          consumeRetryWithCurrentCompanion: () => {
+            const value = retryWithCurrentCompanionRef.current;
+            retryWithCurrentCompanionRef.current = false;
+            return value;
+          },
+          findReplacedSpeaker: ({ parentId, newMessageId }) => {
+            const entries = runtimeRef.current?.thread.export().messages ?? [];
+            const previous = entries.filter((entry) => entry.parentId === parentId && entry.message.role === "assistant" && entry.message.id !== newMessageId).at(-1);
+            const answeredBy = previous?.message.role === "assistant" ? previous.message.metadata.custom.answered_by as { companion_id?: unknown } | null | undefined : undefined;
+            return typeof answeredBy?.companion_id === "string" ? answeredBy.companion_id : undefined;
+          },
           getCurrentLocation: () => (weatherDefaultIsCurrentRef.current ? currentLocationIfGranted(person.age_band) : Promise.resolve(undefined)),
           consumeSupersedes,
           consumePackageScope: () => {
@@ -1027,6 +1039,7 @@ function ProjectResultReload() {
 }
 
 export function ChatPage({ person }: { person: Roster }) {
+  const retryWithCurrentCompanionRef = useRef(false);
   const companionShells = useCompanionShells() === true;
   const navigate = useNavigate();
   const queryClient = useQueryClient();
@@ -1302,7 +1315,7 @@ export function ChatPage({ person }: { person: Roster }) {
     setOpenArtifactId(null);
     setCompareTarget(null);
     imageEditor.close();
-  }, temporaryNext, voiceOpen, setOpenArtifactId, setDraftConversationId, projectPage?.folderId);
+  }, temporaryNext, voiceOpen, setOpenArtifactId, setDraftConversationId, retryWithCurrentCompanionRef, projectPage?.folderId);
   const threadListState = useChatThreadListState(runtime);
   const hasThreads = threadListState.threadIds.length > 0;
   const isLoadingThreads = threadListState.isLoading;
@@ -1487,6 +1500,7 @@ export function ChatPage({ person }: { person: Roster }) {
       <ThinkingModeCapabilityContext.Provider value={thinkingModeCapability}>
       <BareModeContext.Provider value={bareModeValue}>
       <TemporaryChatContext.Provider value={temporaryChatValue}>
+      <RetryWithCurrentCompanionSetterContext.Provider value={{ arm: () => { retryWithCurrentCompanionRef.current = true; }, consume: () => { const value = retryWithCurrentCompanionRef.current; retryWithCurrentCompanionRef.current = false; return value; } }}>
       <DraftConversationContext.Provider value={draftConversationId}>
       <PackageScopeContext.Provider value={packageScopeValue}>
       <ImageEditContext.Provider value={imageEditor.editContext}>
@@ -1756,6 +1770,7 @@ export function ChatPage({ person }: { person: Roster }) {
       </ImageEditContext.Provider>
       </PackageScopeContext.Provider>
       </DraftConversationContext.Provider>
+      </RetryWithCurrentCompanionSetterContext.Provider>
       </TemporaryChatContext.Provider>
       </BareModeContext.Provider>
       </ThinkingModeCapabilityContext.Provider>

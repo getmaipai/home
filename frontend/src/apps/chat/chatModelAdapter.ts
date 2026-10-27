@@ -153,6 +153,8 @@ export interface ChatModelAdapterDeps {
   // transcript, sent via aui.composer.send()), never a mode a later
   // typed message inherits after the call ends.
   consumeSpoken?(): boolean | undefined;
+  consumeRetryWithCurrentCompanion?(): boolean;
+  findReplacedSpeaker?(input: { parentId: string; newMessageId: string }): string | undefined;
   getConversationId?(): Promise<string>;
   resumeConversationIfClosed?(conversationId: string): Promise<void>;
   // The live reply's own sentence-by-sentence speech (2026-09-04): a
@@ -221,7 +223,7 @@ function isStoredPicture(attachment: { file?: File; content?: readonly { type: s
 
 export function createChatModelAdapter(deps: ChatModelAdapterDeps): ChatModelAdapter {
   return {
-    async *run({ messages, abortSignal, runConfig }: ChatModelRunOptions): AsyncGenerator<ChatModelRunResult, void> {
+    async *run({ messages, abortSignal, runConfig, unstable_parentId, unstable_assistantMessageId }: ChatModelRunOptions): AsyncGenerator<ChatModelRunResult, void> {
       deps.onDraftSent?.();
       const lastMessage = messages[messages.length - 1];
       const quote = userQuote(lastMessage);
@@ -236,6 +238,10 @@ export function createChatModelAdapter(deps: ChatModelAdapterDeps): ChatModelAda
       const documentPayloads = lastMessage?.role === "user" ? (await Promise.all(lastMessage.attachments.filter((attachment) => attachment.type === "file").map((attachment) => stagedDocumentPayload(attachment.id)))).filter((item): item is NonNullable<typeof item> => Boolean(item)) : [];
       const typedText = lastUserText(messages, !quoteSpoken);
       const mentionCompanionId = lastMessage?.role === "user" ? unstable_defaultDirectiveFormatter.parse(messageText(lastMessage)).find((segment): segment is Extract<ReturnType<typeof unstable_defaultDirectiveFormatter.parse>[number], { kind: "mention" }> => segment.kind === "mention" && segment.type === "person")?.id : undefined;
+      const retryWithCurrent = deps.consumeRetryWithCurrentCompanion?.() ?? false;
+      const retrySpeakerId = !retryWithCurrent && unstable_parentId && unstable_assistantMessageId
+        ? deps.findReplacedSpeaker?.({ parentId: unstable_parentId, newMessageId: unstable_assistantMessageId })
+        : undefined;
       const text = typedText || (documentPayloads.length > 0 ? "Please read the attached document." : undefined);
       if (!text && !imageAttached && documentPayloads.length === 0) return;
 
@@ -410,7 +416,7 @@ export function createChatModelAdapter(deps: ChatModelAdapterDeps): ChatModelAda
             bare: bare || undefined,
             assistantStream: true,
             conversationId,
-            mentionCompanionId: reconnectAttempts === 0 ? mentionCompanionId : undefined,
+            mentionCompanionId: reconnectAttempts === 0 ? (!temporary && !retryWithCurrent && retrySpeakerId ? retrySpeakerId : mentionCompanionId) : undefined,
             supersedes,
             continuation,
             resumeToken,
