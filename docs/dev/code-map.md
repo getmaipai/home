@@ -166,6 +166,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `frontend/src/shell/library/LibraryUploads.tsx` | useLibraryUploads, UploadTray |
 | `frontend/src/shell/library/LibraryViewer.tsx` | viewerItemOf, LibraryViewer |
 | `frontend/src/shell/media/AudioVisualizer.tsx` | VISUALIZERS, getVisualizerPref, setVisualizerPref, useVisualizerPref, AudioVisualizer |
+| `frontend/src/shell/media/MusicVisualizerSection.tsx` | MusicVisualizerSection |
 | `frontend/src/shell/media/NowPlayingStage.tsx` | clock, NowPlayingStage |
 | `frontend/src/shell/mediaHost.tsx` | createMediaStore, useMediaDock, MediaHostProvider, MediaLinkRedirect |
 | `frontend/src/shell/pageHeaderTitle.tsx` | PageHeaderTitle |
