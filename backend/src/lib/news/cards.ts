@@ -8,7 +8,7 @@ import { releaseShelfItem, visibleFeedIds } from "@/lib/shelf/shelfRead";
 import { sharedShelfStore, type ShelfItem, type ShelfStore } from "@/lib/shelf/shelfStore";
 import { openedItemIds, savedItemIds } from "./records";
 import { gateFor, type Gate } from "./childGate";
-import { newsImagesOn } from "./pictures";
+import { newsImagesOn, newsPictureFocal } from "./pictures";
 import { enrichItem, enrichmentFresh } from "./enrich";
 import { topicOfferedTo } from "./topics";
 import { plainSummary } from "./text";
@@ -24,7 +24,7 @@ export interface StoryCard {
   published_at: string;
   outlets: number;
   topics: string[];
-  image?: { w480: string; w1280: string; alt: string };
+  image?: { w480: string; w1280: string; alt: string; focal?: { x: number; y: number; aspect: number } };
   saved: boolean;
   opened: boolean;
   open_url?: string;
@@ -101,7 +101,8 @@ export function pictureAlt(title: string, publisher: string): string {
 export function imageOf(item: ShelfItem, title: string, publisher: string, env: CardEnv): StoryCard["image"] | undefined {
   // A story with no picture of its own still gets one: the picture route stands the publisher's icon in (pictureFallback.ts).
   if (!env.imagesOn) return undefined;
-  return { w480: `/api/plugins/news/images/${item.id}?w=480`, w1280: `/api/plugins/news/images/${item.id}?w=1280`, alt: pictureAlt(title, publisher) };
+  const focal = newsPictureFocal(item.id);
+  return { w480: `/api/plugins/news/images/${item.id}?w=480`, w1280: `/api/plugins/news/images/${item.id}?w=1280`, alt: pictureAlt(title, publisher), ...(focal ? { focal } : {}) };
 }
 
 const DEK_MAX = 220;

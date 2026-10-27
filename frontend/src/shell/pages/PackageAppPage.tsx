@@ -24,8 +24,6 @@ import { MediaHubFrame } from "@/shell/MediaHubFrame";
 import { useMediaHubActive } from "@/shell/mediaHubSession";
 import { PackageAppHeaderTitle, PackageAppHeaderActions, publishPackageAppHeader, sectionsBarEntries } from "@/shell/pages/packageAppHeaderBar";
 import { PhoneNav } from "@maipai/ui/src/PhoneNav";
-import { FocalImageProvider } from "@maipai/ui/src/primitives/FocalImage";
-import { analyzeFocalImage, warmFocalModel } from "@/lib/focalImageAnalyzer";
 import "./packageAppNews.css";
 
 
@@ -163,7 +161,6 @@ export function PackageAppPage({ person }: { person: Roster }) {
   // A page document is static until the package changes, so every page this app can open is fetched once, up front: moving between its
   // pages then shows the next page at once instead of replacing the whole panel with a loading skeleton while its document loads.
   const queryClient = useQueryClient();
-  useEffect(() => { if (packageId === "news" && page.data) warmFocalModel(); }, [packageId, page.data]);
   const preload = app ? pagesOf(app).join(",") : "";
   useEffect(() => {
     if (packageId === "" || preload === "") return;
@@ -249,7 +246,7 @@ export function PackageAppPage({ person }: { person: Roster }) {
         loadingLabel="Opening the app"
       >
         {(shown) => { const doc = sectionsBar?.trailing && pageId !== "search" ? withoutSearchBox(shown) : shown; return (hasQuery && !sameQuery ? null : <>
-          {packageId === "weather" && pageId === "index" ? null : packageId === "news" ? <FocalImageProvider analyze={analyzeFocalImage}><SchemaPage key={`${packageId}/${pageId}`} page={doc} packageId={packageId} hideTitle sidebar={sidebarProps !== null} floatingBar={sectionsBar !== null} /></FocalImageProvider> : <SchemaPage key={`${packageId}/${pageId}`} page={doc} packageId={packageId} hideTitle sidebar={sidebarProps !== null} floatingBar={sectionsBar !== null} />}
+          {packageId === "weather" && pageId === "index" ? null : <SchemaPage key={`${packageId}/${pageId}`} page={doc} packageId={packageId} hideTitle sidebar={sidebarProps !== null} floatingBar={sectionsBar !== null} />}
           {packageId === "videos" && pageId === "watch" ? <VideoDetails id={new URLSearchParams(location.search).get("id") ?? String((location.state as { pageState?: { id?: string } } | null)?.pageState?.id ?? "")} /> : null}
           {packageId === "weather" && pageId === "index" ? <>
             {weatherMessage ? <p role="status" className="text-sm text-muted-foreground">{weatherMessage}</p> : null}

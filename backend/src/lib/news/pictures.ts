@@ -13,7 +13,7 @@ import { urlAllowedFor } from "@/lib/blocklists/hostLists";
 import { enrichItem } from "./enrich";
 import { newsHostQuiet, quietNewsHost, __resetNewsHostBackoffForTests } from "./hostBackoff";
 import { createHash } from "node:crypto";
-import { existsSync, mkdirSync, readFileSync, renameSync, unlinkSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, renameSync, statSync, unlinkSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import sharp from "sharp";
 import { assertNotPrivateHost, guardedFetch, SsrfBlockedError, type DnsLookup, type PinnedRequest } from "@maipai/core/src/ssrfGuard";
@@ -23,6 +23,7 @@ import { tryConsume } from "@/lib/rateLimiter";
 import { getHouseholdSettingValue } from "@/lib/settings";
 import { NEWS_IMAGES_KEY, NEWS_IMAGE_CACHE_MB_DEFAULT, NEWS_IMAGE_CACHE_MB_KEY, NEWS_IMAGE_CACHE_MB_MIN } from "@/settings/newsKeys";
 import { bumpNewsCounter } from "./newsCounters";
+import { focalPointOf, type FocalPoint } from "./focal";
 import { sharedShelfStore, type ShelfItem } from "@/lib/shelf/shelfStore";
 
 export const NEWS_PICTURE_WIDTHS = [480, 1280] as const;
@@ -42,7 +43,7 @@ export function newsPictureDir(): string {
 }
 const indexPath = (): string => join(newsPictureDir(), "index.json");
 
-interface IndexEntry { bytes: number; lastUsedAt: string; pinned?: boolean }
+interface IndexEntry { bytes: number; lastUsedAt: string; pinned?: boolean; focal?: FocalPoint | null }
 type PictureIndex = Record<string, IndexEntry>;
 
 /** The cache key a stored picture goes by: one per item, from the item id alone. */
@@ -55,8 +56,25 @@ export function figureRefOf(itemId: string, n: number): string {
 }
 const fileOf = (ref: string, width: NewsPictureWidth): string => join(newsPictureDir(), `${ref}-${width}.webp`);
 
+// A card asks for its picture's focal point once per story, so the parsed index is kept until the file changes.
+let indexMemo: { stamp: string; index: PictureIndex } | null = null;
 function readIndex(): PictureIndex {
-  try { return JSON.parse(readFileSync(indexPath(), "utf8")) as PictureIndex; } catch { return {}; }
+  try {
+    const info = statSync(indexPath());
+    const stamp = `${info.mtimeMs}:${info.size}`;
+    if (indexMemo?.stamp === stamp) return structuredClone(indexMemo.index);
+    const index = JSON.parse(readFileSync(indexPath(), "utf8")) as PictureIndex;
+    indexMemo = { stamp, index };
+    return structuredClone(index);
+  } catch { return {}; }
+}
+/** An item's focal point for the screen's crop, from the index alone (no file read per story). Null until the picture is stored and analysed. */
+export function newsPictureFocal(itemId: string): FocalPoint | null {
+  try {
+    const stamp = (() => { const info = statSync(indexPath()); return `${info.mtimeMs}:${info.size}`; })();
+    const index = indexMemo?.stamp === stamp ? indexMemo.index : (readIndex(), indexMemo?.index ?? {});
+    return index[pictureRefOf(itemId)]?.focal ?? null;
+  } catch { return null; }
 }
 function writeIndex(index: PictureIndex): void {
   mkdirSync(newsPictureDir(), { recursive: true });
@@ -282,7 +300,7 @@ async function ensure(item: ShelfItem, band: AgeBand, lane: Lane): Promise<boole
     failed.set(failureKey, clock() + FAILURE_MEMORY_MS);
     return false;
   }
-  persist(ref, sizes);
+  persist(ref, sizes, await focalPointOf(sizes[1280]));
   sharedShelfStore()?.setImageRef(item.id, ref);
   bumpNewsCounter("picture_fetched");
   sweepNewsPictures();
@@ -290,7 +308,7 @@ async function ensure(item: ShelfItem, band: AgeBand, lane: Lane): Promise<boole
 }
 
 /** Writes both sizes under one cache key and records them in the index. */
-function persist(ref: string, sizes: Record<NewsPictureWidth, Uint8Array>): void {
+function persist(ref: string, sizes: Record<NewsPictureWidth, Uint8Array>, focal: FocalPoint | null = null): void {
   mkdirSync(newsPictureDir(), { recursive: true });
   let total = 0;
   for (const width of NEWS_PICTURE_WIDTHS) {
@@ -298,7 +316,7 @@ function persist(ref: string, sizes: Record<NewsPictureWidth, Uint8Array>): void
     total += sizes[width].byteLength;
   }
   const next = readIndex();
-  next[ref] = { bytes: total, lastUsedAt: new Date(clock()).toISOString(), ...(next[ref]?.pinned ? { pinned: true } : {}) };
+  next[ref] = { bytes: total, lastUsedAt: new Date(clock()).toISOString(), ...(next[ref]?.pinned ? { pinned: true } : {}), ...(focal ? { focal } : {}) };
   writeIndex(next);
 }
 
@@ -311,7 +329,7 @@ async function ensureFigure(itemId: string, n: number, address: string, band: Ag
   const bytes = await downloadOnce(address, band);
   const sizes = bytes ? await resizeBoth(bytes) : null;
   if (!sizes) { failed.set(failureKey, clock() + FAILURE_MEMORY_MS); return false; }
-  persist(ref, sizes);
+  persist(ref, sizes, await focalPointOf(sizes[1280]));
   bumpNewsCounter("picture_fetched");
   sweepNewsPictures();
   return existsSync(fileOf(ref, 480));
@@ -347,8 +365,23 @@ export async function newsPicture(item: ShelfItem, width: NewsPictureWidth, band
   if (!existsSync(path)) return null;
   const bytes = new Uint8Array(readFileSync(path));
   const index = readIndex();
-  if (index[ref]) { index[ref].lastUsedAt = new Date(clock()).toISOString(); writeIndex(index); }
+  if (index[ref]) { index[ref].lastUsedAt = new Date(clock()).toISOString(); writeIndex(index); if (index[ref].focal === undefined) void backfillFocal(ref); }
   return { bytes, etag: `"${createHash("sha1").update(bytes).digest("hex").slice(0, 24)}"` };
+}
+
+/** A picture stored before focal points existed gets one the first time it is served; null is recorded when the model cannot find one. */
+const backfilling = new Set<string>();
+async function backfillFocal(ref: string): Promise<void> {
+  if (backfilling.has(ref)) return;
+  backfilling.add(ref);
+  try {
+    const path = fileOf(ref, 1280);
+    if (!existsSync(path)) return;
+    const focal = await focalPointOf(new Uint8Array(readFileSync(path)));
+    if (!focal) return;
+    const index = readIndex();
+    if (index[ref]) { index[ref].focal = focal; writeIndex(index); }
+  } catch { /* the next serve tries again */ } finally { backfilling.delete(ref); }
 }
 
 /** For a saved story: make sure the picture is stored (text-only items have none) and pin it. */
