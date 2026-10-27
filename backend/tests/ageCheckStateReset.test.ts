@@ -1,6 +1,6 @@
 // Module state in lib/pictures/ageCheck.ts must not leak from one test to the next (and so from one file to another: bun runs
 // every file in one process). tests/preload.ts restores the suite default after every test; this proves it, in order.
-// Found 2026-10-17: ageCheckInput.test.ts set the runner seam to null and likenessUse.test.ts then reached the real model path.
+// A test that clears the runner seam must not leave the next test reaching the real model path.
 import { describe, expect, test } from "bun:test";
 import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";

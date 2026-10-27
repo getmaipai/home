@@ -155,8 +155,7 @@ installTestIsolationGuard();
   };
   restoreAgeCheckDefaults();
   // After EVERY test in every file: a test that installed its own runner or vision seam (or set null, which would send the next file to the real
-  // model and fail it for the wrong reason: ageCheckInput.test.ts did, and likenessUse.test.ts then read "could not check" instead of its
-  // adult-content refusal) leaves nothing behind. tests/ageCheckStateReset.test.ts proves it.
+  // model and fail it for the wrong reason) leaves nothing behind. tests/ageCheckStateReset.test.ts proves it.
   afterEach(restoreAgeCheckDefaults);
 }
 // FLAKE-LOAD-01 (cause a, real I/O): a search test whose rows point at https://example.com/... made searxngSearch read those
