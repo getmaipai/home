@@ -4,7 +4,7 @@
 import { expect, test } from "bun:test";
 import table from "./diskPlan.json";
 import { aiCopy as copy } from "../backend/src/lib/aiCopy";
-import { buildAiCards, recommendedPlan, type AiComponentLike, type AiSettingsInput } from "./aiChoices";
+import { buildAiCards, partsLine, recommendedPlan, type AiComponentLike, type AiSettingsInput } from "./aiChoices";
 import { GIB, freeGb, needGb, sizeGb, type DiskPlan, type DiskRow, type DiskTotals } from "./diskPlanMath";
 
 const TIERS = table.tiers as Record<DiskPlan["tier"], DiskPlan>;
@@ -335,4 +335,18 @@ test("chat: the optional uncensored model is a third radio beside Standard, neve
 test("chat: a download of the uncensored model in flight reads Installing with its percent and offers no action", () => {
   const chat = buildAiCards({ copy, plan: TIERS.p128, components: null, settings: SETTINGS, freeBytes: null, uncensored: { installed: false, running: false, downloading: true, percent: 40, downloadBytes: 22 * GIB, installedBytes: 22 * GIB } }).cards.find((c) => c.id === "chat")!;
   expect(chat.choices.find((c) => c.id === "chat.uncensored")).toMatchObject({ state: "installing", percent: 40, action: "none", stateText: "Installing" });
+});
+
+test("a parts line names each model and folds every engine file into one short item", () => {
+  const row = (id: string, label: string, kind: "model" | "engine", bytes: number) => ({ id, label, note: "", kind, need: "optional", selectable: true, download_bytes: bytes, installed_bytes: bytes, peak_temp_bytes: 0, model_ids: [], engines: [], installed: false, basis: "pins" }) as never;
+  const line = partsLine([
+    row("chat-mlx", "Chat AI, Apple-chip build (Muse Glimmer 30B)", "model", 18_000_000_000),
+    row("engine:python", "Python base for the engines", "engine", 107_000_000),
+    row("engine:chat-mlx", "Faster chat engine tools (oMLX)", "engine", 1_200_000_000),
+  ]);
+  expect(line).toEqual([
+    { name: "Chat AI, Apple-chip build (Muse Glimmer 30B)", sizeBytes: 18_000_000_000 },
+    { name: "Engine files", sizeBytes: 1_307_000_000 },
+  ]);
+  expect(partsLine([row("chat", "Chat AI (Muse Glimmer 30B)", "model", 20_000_000_000)])).toHaveLength(1);
 });

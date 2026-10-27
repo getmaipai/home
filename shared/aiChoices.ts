@@ -177,8 +177,15 @@ function buildChoice(copyOf: AiCopy, plan: DiskPlan, components: AiComponentLike
     action,
     setting: spec.setting,
     chosenNotReady: spec.current && state.state !== "installed",
-    details: rows.map((row) => ({ name: row.label, sizeBytes: row.installed_bytes })),
+    details: partsLine(rows),
   };
+}
+
+/** The parts line of a choice: each model by name, and every engine file (Python base, engine tools) as one short "Engine files" item, so a long list of engine parts never buries the model's name. */
+export function partsLine(rows: DiskRow[]): Array<{ name: string; sizeBytes: number }> {
+  const models = rows.filter((row) => row.kind !== "engine").map((row) => ({ name: row.label, sizeBytes: row.installed_bytes }));
+  const engineBytes = rows.filter((row) => row.kind === "engine").reduce((sum, row) => sum + row.installed_bytes, 0);
+  return engineBytes > 0 ? [...models, { name: "Engine files", sizeBytes: engineBytes }] : models;
 }
 
 function chipFor(card: { id: AiJobId; rows: string[] }, present: boolean, choices: AiChoice[]): string {
