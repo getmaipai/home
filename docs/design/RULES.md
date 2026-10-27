@@ -399,7 +399,11 @@ S2. **Each app area emulates its native app.** Everything to the right of
     companion launcher at the bottom corner of any app except Chat; it
     opens Chat or a chat panel, carries no count or status, and the
     person can turn it off (Owner-approved 2026-10-24, design record
-    companions-shared-chat-and-presence-2026-10-24.md section 7).
+    companions-shared-chat-and-presence-2026-10-24.md section 7). The one
+    exception to "carries no count or status" is a single Review button,
+    shown only while a task of the viewer's own needs them (Owner-approved
+    2026-10-26, design record companions-handoff-revamp-2026-10-26.md);
+    the launcher shows no count, dot or other status.
 S3. **A test holds the rail.** A test fails when the main navigation does
     not render on an app page: the rail at 640 and up, the menu button and
     its drawer below 640, with accessible names, at 360, 402, 874 x 402,
@@ -432,6 +436,7 @@ S6. **System status reaches the person through the existing mechanisms.**
     | Whole-system health | the Status page and the header pill and rail menu, `StatusPage.tsx`, `StatusIndicator.tsx` | `lib/statusApps.ts`, `lib/statusBoard.ts`, `/api/status` (the Stack's health list is synced by `lib/stackHealthSync.ts`) | the Status page everyone; the pill hidden from a child |
     | One job's progress | that job's own card (picture, video, download) | the job record | whoever started it |
     | A companion's summary of one person's jobs (Owner-approved 2026-10-24) | one line on that companion's Yours card, "1 working · 2 waiting on you", the kit Status Element as shipped | the same job records, the viewer's own rows only (rule 6a) | the person whose jobs they are |
+    | A companion's task needs the viewer (Owner-approved 2026-10-26) | one Review button on the outside-chat launcher, the kit Button as shipped; it opens that task's own card and shows no count or dot | the same job and Ask records, the viewer's own rows only (rule 6a), read from the data the launcher already has, with no new polling loop | the person whose task it is; when a parent answers a child's Ask, the child's button disappears and shows nothing in its place |
     | Needs an admin's attention, not a person's screen | Notifications: the bell, `NotificationBell.tsx`, `BrowserAlerts.tsx` | `lib/notifications.ts`, declared in `lib/notificationTypes.ts` | the audience the type declares |
     | A form or action failed | the kit destructive Alert in that form, with the next step | the failing call's own response, `lib/failureCopy.ts` | the person acting |
     | A spoken turn is not ready | the voice session's spoken line | the same readiness function as the written chat | the person speaking |

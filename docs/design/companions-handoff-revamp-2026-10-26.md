@@ -44,13 +44,17 @@ Decided with Jesse, 2026-10-26.
    Stream-start metadata names the pinned speaker before text arrives.
 
 Needs a kit option on the commons `Thread` (per-reply face, live slot with clip or portrait). Rule 9c: commons first; Jesse said yes to a tag on 2026-10-26.
+The option is an additive prop that replaces `speakerMarker` and draws the shipped `SpeakerIdentity` and `CompanionAvatar` Elements, no `className`.
+The pinned speaker reaches the client as an additive `turn_meta` field. The corner `CompanionAvatar` (`ChatThreadExtras.tsx`) and the header idle loop
+(`chatHeaderBar.tsx`) go still (static portrait, no player) so the reply slot is the only live player in the chat.
 
 ## 4. Directory, profile, tasks
 
 Jesse: use the mockup. Left-aligned cards (64 to 72px portrait, one status, Chat and View profile), a compact profile header (96 to 112px), Activity first
 grouped by date with Needs-you above routine items, and a Tasks list and detail (Needs you, Running, Completed) over existing jobs, projects and the `Ask`.
 This **replaces** the round-character gallery and centered profile in [companions-dots-look-2026-10-25.md](companions-dots-look-2026-10-25.md)
-(DOTS-GALLERY-01, DOTS-DETAIL-01, and probably DOTS-KIT-01's `CharacterHero` and `CharacterTile`). No new task system; Cancel and Review ride existing records.
+(DOTS-GALLERY-01, DOTS-DETAIL-01, and DOTS-KIT-01's `CharacterHero` and `CharacterTile`; `CharacterHero` in the chat empty state goes with CHAT-WINDOWS-REVAMP-01). No new task system; Cancel and Review ride existing records. Portrait and header sizes come from kit props or variants, not `className`. "Header" here is the
+profile header, not DOTS-CHAT-01's chat header. Each card's one status is the S6 Yours own-jobs line; Tasks shows each job's own card over existing records, own rows only.
 "Chat" starts a new chat; "Continue" opens the existing one.
 
 ## 5. Voice and conversation mode
@@ -58,12 +62,14 @@ This **replaces** the round-character gallery and centered profile in [companion
 The conversation button opens a voice stage: the same character expands to 180 to 240px and follows real events only: idle, listening (mic accepting input),
 thinking, speaking (audio playing), working (tool running), done (task completed). While the stage is open the reply-side slot is static, so there is one live player.
 Waiting for approval is "Needs you", never working. Full duplex keeps mic indicators independent of the character state.
+"Done" means the current turn's tool finished (turn state); a background job finishing is job status and shows on that job's own card.
+Reuse check: the stage is `VoiceOrb` plus `CompanionAvatar`, with CHAR-01's `resolvePresence` and `PresenceState` as the single presence vocabulary and the `LauncherBubble` slots for the dock; nothing new is invented.
 
 ## 6. Decisions (Jesse, 2026-10-26)
 
 1. Face on every reply (reverses the marker-only choice in shared-chat section 3).
 2. Gallery and profile follow the handoff mockup, not the dots look.
-3. The outside-chat dock may show one Review button when a task needs the person, as in the mockup. This edits RULES.md S6 (S2 already allows a status-free launcher since 2026-10-24); the rules commit carries `Owner-approved: 2026-10-26`.
+3. The outside-chat dock may show one Review button when a task needs the person, as in the mockup. This edits RULES.md S2 (the launcher "carries no count or status" gets this one exception) and adds one S6 table row (same job and Ask records, own rows only, no new polling). Landed with `Owner-approved: 2026-10-26`; Jesse also approved every rule change needed to match the mockup.
 4. Each reply's portrait is kept permanently: a small still stored per look version, referenced by id from `answered_by`. This **reverses** shared-chat decision 13.6 (removed companion keeps a name only).
 5. Streaming text keeps the thinking clip; the finished face is full colour ("whatever ChatGPT would do").
 6. Companion art follows the household Quick and Detailed picture and video settings (section 7).
@@ -100,14 +106,16 @@ Settings, AI and models shows what companion art uses. Verify ERNIE is installed
 ## 9. Build order and rows
 
 1. COMPANION-ART-MODEL-01 (Codex): section 7. First, small, fixes a real defect.
-2. COMPANIONS-REVAMP-01 design note architect ruling, then Jesse's S6 edit commit (dock Review).
+2. COMPANIONS-REVAMP-01 design note architect ruling (2026-10-26: steps 3 to 7 and the bench approved; 8 and 9 needed the reuse checks added below; 10 needed the S2 and S6 edit), then the S2 and S6 rules commit (dock Review).
 3. Spec first: retained portrait per look version; `voice_version` and `look_version_id` in `answered_by` (new row under COMP-04a).
 4. Commons `Thread` option: per-reply face and live slot (REVAMP-FACE-01); then Home uses it.
 5. Picker polish: search, "X will answer next", explicit standard-assistant entry, unsent text survives (REVAMP-PICKER-01).
 6. Retry with the original speaker; "Retry with current companion" (REVAMP-RETRY-01; turn path, code review at medium).
 7. Directory, profile and Tasks in the mockup layout (REVAMP-DIRECTORY-01, REVAMP-TASKS-01).
-8. Appearance drafts, atomic Publish, "Review needed", with CMEDIA-BENCH-01 and the codec matrix (REVAMP-APPEARANCE-01).
-9. "Try it" test chat and state tester in the wizard (REVAMP-TRYIT-01).
+8. Appearance drafts, atomic Publish, "Review needed", with CMEDIA-BENCH-01 and the codec matrix (REVAMP-APPEARANCE-01). Reuse check: drafts live on the existing look store (CMEDIA-LOOK-01) and its approval step (CMEDIA-STATES-03), with the `status` and `review` fields of CMEDIA-SPEC-01;
+   this slice absorbs the open CMEDIA-REVIEW-01 and CMEDIA-EDITOR-05. "Review needed" stays on the draft's own record and editor. Publish never bypasses the CSAM check (rule 10, fails closed).
+9. "Try it" test chat and state tester in the wizard (REVAMP-TRYIT-01). Reuse check: "Try it" is the chat Thread in temporary mode with the draft pinned (no stored speaker, no activity, author only, still `companionFits`-gated);
+   the state tester is the `CompanionAvatar` Element as shipped.
 10. Voice stage and dock with Review, after the commons tag (REVAMP-PRESENCE-01, supersedes the open part of COMPANIONS-PRESENCE-01).
 11. COMPANIONS-ART-BENCH-01 any time on the Studio.
 
@@ -117,4 +125,6 @@ Rivet is described as a small robot but the mockup portrait is human. Fix the ar
 
 ## 11. Supersedes
 
-Shared-chat note section 3 (marker only on change) and decision 13.6; the dots-look gallery, detail and header decisions; the presence strip idea in the handoff.
+Shared-chat note section 3 (marker only on change) and decision 13.6; the dots-look gallery, detail and header decisions, and DOTS-KIT-01's `CharacterHero`/`CharacterTile`;
+CHAR-01's clause "no separate character mark appears in the chat column"; the open part of COMPANIONS-PRESENCE-01; CMEDIA-REVIEW-01 and CMEDIA-EDITOR-05 (absorbed by REVAMP-APPEARANCE-01);
+the presence strip idea in the handoff.
