@@ -194,12 +194,16 @@ describe("ambient companion shell slot", () => {
       );
       const avatar = await view.findByRole("button", { name: "Companion" });
       expect(avatar.closest('[data-slot="rail-top-right"]')).toBeTruthy();
+      // On a page with no header of its own the avatar sits in the title bar, so nothing goes under it.
+      expect(avatar.closest('[data-slot="rail-page-header"]')).toBeTruthy();
       fireEvent.click(avatar);
       expect(await view.findByRole("button", { name: "Close pane" })).toBeTruthy();
       expect(view.getAllByRole("button", { name: "Continue in Chat" })).toHaveLength(2);
       fireEvent.click(view.getByRole("button", { name: "Close pane" }));
       fireEvent.click(view.getByRole("button", { name: "Open /chat" }));
       await waitFor(() => expect(view.getByRole("button", { name: "Companion" }).closest('[data-slot="rail-top-right"]')).toBeTruthy());
+      // Chat draws its own header, so the avatar floats there and the header leaves room.
+      expect(view.getByRole("button", { name: "Companion" }).closest('[data-slot="rail-page-header"]')).toBeNull();
     } finally {
       globalThis.fetch = originalFetch;
       window.matchMedia = originalMatchMedia;
