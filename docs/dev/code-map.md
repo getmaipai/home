@@ -62,8 +62,6 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `frontend/src/apps/chat/ChatThread.tsx` | ChatExtrasContext, ChatThread |
 | `frontend/src/apps/chat/ChatThreadExtras.tsx` | ChatThreadExtras |
 | `frontend/src/apps/chat/MusicCardView.tsx` | musicFileName, musicHint, useMusicTrackProps |
-| `frontend/src/apps/chat/WakeWordController.tsx` | WakeWordController |
-| `frontend/src/apps/chat/WakeWordIndicator.tsx` | WakeWordIndicator |
 | `frontend/src/apps/chat/branchInNewChatMenuItem.tsx` | BranchInNewChatMenuItem |
 | `frontend/src/apps/chat/chatActionBar.tsx` | useFeedbackFormStore, createChatFeedbackAdapter, clearSubmittedFeedback |
 | `frontend/src/apps/chat/chatAnswerBlocks.tsx` | ANSWER_BLOCK_PART, placeParts, drawableBlocks, answerBlockParts, textWithAnswerParts, AnswerBlockDataRender |
