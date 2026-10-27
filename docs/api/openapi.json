@@ -8476,6 +8476,15 @@
                     "type": "string",
                     "description": "Where the chat happens; defaults to chat."
                   },
+                  "placement": {
+                    "type": "string",
+                    "enum": [
+                      "chat",
+                      "side"
+                    ],
+                    "default": "chat",
+                    "description": "Where the conversation is shown; defaults to Chat."
+                  },
                   "companion_id": {
                     "type": "string",
                     "nullable": true,
@@ -8724,7 +8733,7 @@
             }
           },
           "400": {
-            "description": "Bad surface, mode, carry_from or folder_id",
+            "description": "Bad surface, placement, mode, carry_from or folder_id",
             "content": {
               "application/json": {
                 "schema": {
@@ -9668,6 +9677,10 @@
                   "folder_id": {
                     "nullable": true,
                     "description": "Move the chat into a project (chat folder) id, or out with null (PROJECTS-01a)."
+                  },
+                  "placement": {
+                    "nullable": true,
+                    "description": "Continue a side conversation in Chat."
                   }
                 }
               }
@@ -56604,6 +56617,13 @@
                           "conversation_id": {
                             "type": "string",
                             "nullable": true
+                          },
+                          "placement": {
+                            "type": "string",
+                            "enum": [
+                              "chat",
+                              "side"
+                            ]
                           },
                           "waiting_reason": {
                             "type": "string",
