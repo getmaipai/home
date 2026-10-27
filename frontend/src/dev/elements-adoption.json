@@ -1,6 +1,6 @@
 {
-  "generatedAt": "2026-10-27T06:46:39.480Z",
-  "kitTag": "ui-v0.5.369",
+  "generatedAt": "2026-10-27T06:53:44.247Z",
+  "kitTag": "ui-v0.5.370",
   "items": [
     {
       "file": "ActivityCardsShowcase.tsx",
@@ -1316,7 +1316,7 @@
       "group": "studio",
       "verdict": "later",
       "verdictReason": "New kit page layout (title, actions, side nav and rail) for studio screens; Home adopts it when the appearance studio screen is built on it.",
-      "implemented": false
+      "implemented": true
     },
     {
       "file": "subagent-list.tsx",
