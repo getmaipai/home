@@ -4,6 +4,7 @@
 // release path (`releaseShelfItems` / `releaseShelfItem`), so a viewer is only ever shown what their lists and band release.
 // The routes (routes/newsRoutes.ts) check the role gate and the owning page's floor first; the block filter runs last, in
 // `finishBlocks`.
+import { storedKeyPoints } from "./summary";
 import { getPersonSettingValue } from "@/lib/settings";
 import type { MixSignal } from "./rankStories";
 import { isNull } from "drizzle-orm";
@@ -322,6 +323,9 @@ export async function storyData(person: PersonRow, body: Record<string, unknown>
     bumpNewsCounter("story_opened");
     recordRead(person.id, { itemId: item.id, storyId: storyIdOf(item) }, now.toISOString());
   }
+  // Key points are shown once written (the idle step or "Key points" in the menu); opening a story never waits for the model.
+  const points = block ? storedKeyPoints(storyIdOf(item), viewer.band) : null;
+  if (block && points) (block.props as Record<string, unknown>).key_points = points;
   return { as_of: now.toISOString(), blocks: block ? finishBlocks(person, viewer.band, [block]) : [] };
 }
 

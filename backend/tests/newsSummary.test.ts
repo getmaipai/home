@@ -111,3 +111,13 @@ test("timeout holds concurrency slot until underlying call settles", async () =>
   finish({ ok: true, text: JSON.stringify(good) }); await Promise.resolve();
   expect(db.select().from(newsStorySummaries).all()).toHaveLength(0);
 });
+
+test("an opened story carries its stored Key points, and none before they are written", async () => {
+  const adult = await owner(); installNewsApp(); const item = seed("adult");
+  const open = async () => ((await (await adult.client.post("/api/plugins/news/data/story", { id: item.id })).json()) as { blocks: Array<{ props: { key_points?: { text: string } } }> }).blocks[0]!.props.key_points;
+  expect(await open()).toBeUndefined();
+  await summarizeStory(item.id, "adult");
+  const points = await open();
+  expect(points?.text).toBe(`${good.intro}\n${good.points.map((point) => `\u2022 ${point}`).join("\n")}`);
+  expect(calls).toBe(1);
+});

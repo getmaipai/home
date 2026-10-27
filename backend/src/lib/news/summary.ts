@@ -42,6 +42,17 @@ function safe(summary: StorySummary, band: AgeBand): boolean {
   return true;
 }
 
+/** The stored Key points for a story, floored again at release; never calls the model. The kit draws `text` as plain lines. */
+export function storedKeyPoints(storyId: string, band: AgeBand): { text: string; band: AgeBand } | null {
+  const cached = stored(storyId, band);
+  if (!cached) return null;
+  try {
+    const parsed = Summary.safeParse(JSON.parse(cached.summary));
+    if (!parsed.success || !safe(parsed.data, band)) return null;
+    return { text: [parsed.data.intro, ...parsed.data.points.map((point) => `\u2022 ${point}`)].join("\n"), band };
+  } catch { return null; }
+}
+
 /** Never splits a paragraph, including when a single paragraph is over the limit. */
 export function summaryArticleText(paragraphs: readonly string[]): string {
   let text = "";
