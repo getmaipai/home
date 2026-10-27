@@ -827,8 +827,10 @@ describe("household companion routes", () => {
     const child = addPerson("person-tessa-avatar-child", "child");
     const response = await request("companions/avatar", child);
     expect(response.status).toBe(200);
-    const body = await response.json() as { avatar: { id: string; states: Record<string, { loop: boolean; urls: { h264: string | null; av1: string | null; still: string } }> } | null };
+    const body = await response.json() as { avatar: { id: string; portrait?: string | null; states: Record<string, { loop: boolean; urls: { h264: string | null; av1: string | null; still: string } }> } | null };
     expect(body.avatar?.id).toBe("tessa");
+    expect(body.avatar?.portrait).toBe("/api/companions/tessa/animation/portrait.png");
+    expect((await request(body.avatar!.portrait!.replace("/api/", ""), child)).status).toBe(200);
     expect(Object.keys(body.avatar!.states).sort()).toEqual(["idle", "listening", "speaking", "thinking"]);
     for (const state of Object.values(body.avatar!.states)) {
       expect(state.urls.h264).toBeNull();

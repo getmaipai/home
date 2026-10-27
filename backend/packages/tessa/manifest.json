@@ -81,6 +81,10 @@
         "tool": "Jesse's character sheet",
         "approved_by": "Jesse",
         "approved_at": "2026-10-27T20:00:00Z"
+      },
+      "sheet": {
+        "rest": "portrait.png",
+        "card": "card.json"
       }
     }
   },

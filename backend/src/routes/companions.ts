@@ -121,7 +121,7 @@ const avatarRoute = createRoute({
   middleware: [requireAuth] as const,
   request: { query: z.object({ companion: z.string().optional().describe("A companion id to read instead of the person's own pick (the chat's pick).") }) },
   responses: {
-    200: { content: { "application/json": { schema: z.object({ avatar: z.object({ id: z.string(), name: z.string(), key: z.string(), version: z.string(), states: z.record(z.string(), AvatarState) }).nullable() }) } }, description: "The usable active companion's approved animation, or null when it has none." },
+    200: { content: { "application/json": { schema: z.object({ avatar: z.object({ id: z.string(), name: z.string(), key: z.string(), version: z.string(), portrait: z.string().nullable().optional(), states: z.record(z.string(), AvatarState) }).nullable() }) } }, description: "The usable active companion's approved animation, or null when it has none." },
     304: { description: "The animation has not changed." },
     ...errorResponses({ 401: "Not signed in" }),
   },
@@ -145,7 +145,8 @@ companionsRoutes.openapi(avatarRoute, (c) => {
       still: `/api/companions/${encodeURIComponent(persona.id)}/animation/${encodeURIComponent(files.still)}`,
     },
   }]));
-  return c.json({ avatar: { id: persona.id, name: manifest?.companion?.display_name ?? persona.display_name, key: animation.key, version, states } }, 200, headers);
+  const portrait = animation.sheet?.rest ? `/api/companions/${encodeURIComponent(persona.id)}/animation/${encodeURIComponent(animation.sheet.rest)}` : null;
+  return c.json({ avatar: { id: persona.id, name: manifest?.companion?.display_name ?? persona.display_name, key: animation.key, version, portrait, states } }, 200, headers);
 });
 
 const animationParams = z.object({ id: z.string().min(1).max(80), file: z.string().min(1).max(80) });

@@ -26,11 +26,12 @@ export function useAmbientCompanion(person: Roster) {
 
   if (!wanted || !companion) return null;
   const states = avatar.data?.avatar ? mapCompanionClips(avatar.data.avatar.states) : undefined;
-  const still = companion.portrait ? api.companionPortrait(companion.portrait) : (states?.idle ?? Object.values(states ?? {})[0])?.still;
+  const still = companion.portrait ? api.companionPortrait(companion.portrait) : (avatar.data?.avatar?.portrait ?? (states?.idle ?? Object.values(states ?? {})[0])?.still);
   const row = (activity.data?.activity ?? []).find((item) => item.needs_you && item.kind !== "chat");
   return {
     companion,
     clips: states,
+    portrait: avatar.data?.avatar?.portrait ?? undefined,
     still,
     action: row ? { label: "Review", onClick: () => navigate(`/companions/${encodeURIComponent(companion.id)}?tab=tasks&task=${encodeURIComponent(row.id)}`) } : undefined,
   };

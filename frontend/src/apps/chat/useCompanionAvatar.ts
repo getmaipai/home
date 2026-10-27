@@ -42,7 +42,7 @@ export function useCompanionStills(ids: string[]): Record<string, string | undef
   const stills: Record<string, string | undefined> = {};
   keys.forEach((id, index) => {
     const states = results[index]?.data?.avatar?.states ?? {};
-    stills[id] = (states.idle ?? Object.values(states)[0])?.urls.still;
+    stills[id] = results[index]?.data?.avatar?.portrait ?? (states.idle ?? Object.values(states)[0])?.urls.still;
   });
   return stills;
 }

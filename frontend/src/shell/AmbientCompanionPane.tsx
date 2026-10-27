@@ -183,8 +183,8 @@ function StageBody({ person, personId, companionName, clips, still, onContinue, 
   const clipKey = mode === "idle" ? "idle" : mode;
   const characterState: StateId = clips?.[clipKey] ? clipKey : "idle";
   const character = clips
-    ? <CompanionAvatar name={companionName} clips={clips} size="xl" state={characterState} animated />
-    : still ? <img src={still} alt={companionName} className="max-h-full max-w-full object-contain" /> : <SeededAvatar name={companionName} seed={companionName} />;
+    ? <CompanionAvatar name={companionName} clips={clips} size="fill" state={characterState} animated />
+    : still ? <img src={still} alt={companionName} className="h-full w-full object-contain" /> : <SeededAvatar name={companionName} seed={companionName} />;
   const actions = [
     { id: "continue", label: "Continue in Chat", onSelect: () => { void side.handOff().then((id) => { if (id) onContinue(id); }).catch(() => toast.error("Could not continue this side chat. Try again.")); } },
     { id: "new", label: "New conversation", onSelect: () => side.newSideChat() },
