@@ -185,6 +185,30 @@ describe("companion look generation jobs", () => {
     expect((await request(`companions/${created.value.id}/look/jobs/${cancelledJob}`, adult, "DELETE")).status).toBe(204);
   });
 
+  test("COMPANION-ART-CHECK-01: generated look candidates that fail the age check are not kept and the job says why", async () => {
+    const adult = addPerson("person-look-withheld", "adult");
+    const created = createHouseholdCompanion({ ...fixture(), display_name: "Withheld character", look_prompt: "a red fox" }, { display_name: "Author", person_id: "person-look-withheld" });
+    if (!created.ok) throw new Error(created.error);
+    __setPictureStatusForTests(readyStatusForTests());
+    __setAgeCheckRunnerForTests(async (images) => images.map(() => ({ ok: true as const, verdict: { people_count: 1, apparent_min_age_estimate: 12, label: "child" as const, is_nude_or_sexual: true, confidence: 1 } })));
+    const image = await keyedPicture();
+    __setPicturesFetchForTests((async (input) => {
+      const url = String(input);
+      if (url.endsWith("/v1/images/generations")) return Response.json({ job: "look-withheld-1" }, { status: 202 });
+      if (url.endsWith("/look-withheld-1")) return Response.json({ job: "look-withheld-1", state: "done", progress: 1, data: [] });
+      if (/look-withheld-1\/\d+\.png$/.test(url)) return new Response(image, { headers: { "content-type": "image/png" } });
+      if (url.endsWith("/v1/images/generations/look-withheld-1")) return new Response(null, { status: 204 });
+      return new Response("Not found", { status: 404 });
+    }) as typeof fetch);
+    const started = await request(`companions/${created.value.id}/look/generate`, adult, "POST", {});
+    const { job } = await started.json() as { job: string };
+    const done = await (await request(`companions/${created.value.id}/look/jobs/${job}`, adult)).json() as { state: string; error?: string; versions: unknown[] };
+    expect(done.state).toBe("failed");
+    expect((done.error ?? "").length).toBeGreaterThan(10);
+    expect(done.versions).toHaveLength(0);
+    expect(((await (await request(`companions/${created.value.id}/look`, adult)).json()) as { versions: unknown[] }).versions).toHaveLength(0);
+  });
+
   test("edits a look picture and records its source version", async () => {
     const adult = addPerson("person-look-edit", "adult");
     const created = createHouseholdCompanion({ ...fixture(), display_name: "Edit character", look_prompt: "a red fox" }, { display_name: "Author", person_id: "person-look-edit" });
@@ -471,6 +495,7 @@ describe("household companion routes", () => {
   });
 
   test("state upload validates the file and approval stays in draft until Publish", async () => {
+    __setKeyframesForTests(async () => [new Uint8Array([7])]);
     const adult = addPerson("person-state-upload", "adult"), created = createHouseholdCompanion({ ...fixture(), display_name: "State upload" }, { display_name: "Author", person_id: "person-state-upload" });
     if (!created.ok) throw new Error(created.error);
     const companionId = created.value.id;
@@ -482,7 +507,7 @@ describe("household companion routes", () => {
     let submitted: any; let waitForFinish: (() => void) | undefined;
     __setStackClientForTests({ mediaRoots: async () => ({ read: [companionRoot], write: [companionRoot] }), setMediaRoots: async () => ({ read: [], write: [] }), submitJob: async (request: any) => { submitted = request; const out = join(request.input.output_dir, request.input.output_name); mkdirSync(out, { recursive: true }); writeFileSync(join(out, "clip.h264.mp4"), "h264"); writeFileSync(join(out, "still.png"), "png"); waitForFinish?.(); return { id: "state-job", state: "done", result: { ok: true, reasons: [], seconds: 3, files: [{ name: "clip.h264.mp4", bytes: 4 }], av1: false, colour_distance: 1, area_ratio: 1, loop_gap: 0, opaque_share: { min: .5, max: .8 } } }; }, job: async () => { throw Error("unexpected poll"); } } as never);
     const uploaded = await uploadVideo(); expect(uploaded.status).toBe(202); const { take_id } = await uploaded.json() as { take_id: string };
-    await new Promise<void>((resolve) => { waitForFinish = resolve; setTimeout(resolve, 20); });
+    await new Promise<void>((resolve) => { waitForFinish = resolve; setTimeout(resolve, 20); }); for (let attempt = 0; attempt < 200 && !readStates(companionId).states.idle?.takes.find((take) => take.id === take_id)?.report; attempt++) await new Promise((resolve) => setTimeout(resolve, 10));
     expect(submitted.input).toMatchObject({ key: "#00FF00", output_name: "finished", max_bytes: media.ship.max_bytes_per_clip });
     const approval = await request(`companions/${companionId}/states/idle/approve`, adult, "PUT", { take_id }); expect(approval.status).toBe(200);
     expect(getHouseholdCompanion(companionId)?.companion?.animation).toBeUndefined();
@@ -498,6 +523,7 @@ describe("household companion routes", () => {
   });
 
   test("generates two candidates in sequence, finishes them, stores reports and deletes Stack jobs", async () => {
+    __setKeyframesForTests(async () => [new Uint8Array([7])]);
     const adult = addPerson("person-state-generate", "adult"), created = createHouseholdCompanion({ ...fixture(), display_name: "Generated character" }, { display_name: "Author", person_id: "person-state-generate" }); if (!created.ok) throw new Error(created.error); const id = created.value.id;
     const stackOriginal = await transparentPng();
     const rest = addVersion(id, await transparentPng(), { source: "upload", label: "rest", width: 1024, height: 1024, from: null }, stackOriginal); setRest(id, rest.id); updateSheet(id, { views: { left: null, right: null, mouth: null }, card: { text: "A red fox with white paws", species: "fox", colours: ["#CC3322"] }, key: "#FF00FF", state: "needs_review", approved_by: null, approved_at: null }); approveSheet(id, "Author");
@@ -514,7 +540,7 @@ describe("household companion routes", () => {
       return new Response("Not found", { status: 404 });
     }) as typeof fetch);
     let finished = 0;
-    __setStackClientForTests({ mediaRoots: async () => ({ read: [companionRoot], write: [companionRoot] }), setMediaRoots: async () => ({ read: [companionRoot], write: [companionRoot] }), submitJob: async (request: any) => { finished++; expect(request.kind).toBe("media.companion_clip"); expect(request.input.key).toBe("#FF00FF"); const distance = request.input.output_dir.endsWith("take-2") ? 1 : 4; return { id: `media-${finished}`, state: "done", result: { ok: true, reasons: [], seconds: 3, files: [{ name: "clip.h264.mp4", bytes: 123 }], av1: false, colour_distance: distance, area_ratio: 1, loop_gap: 0, opaque_share: { min: .5, max: .8 }, colour_match: { applied: true, strength: .4 }, settle_skipped_frames: 16 } }; }, job: async () => { throw Error("unexpected poll"); } } as never);
+    __setStackClientForTests({ mediaRoots: async () => ({ read: [companionRoot], write: [companionRoot] }), setMediaRoots: async () => ({ read: [companionRoot], write: [companionRoot] }), submitJob: async (request: any) => { finished++; expect(request.kind).toBe("media.companion_clip"); expect(request.input.key).toBe("#FF00FF"); const distance = request.input.output_dir.endsWith("take-2") ? 1 : 4; const out = join(request.input.output_dir, request.input.output_name); mkdirSync(out, { recursive: true }); writeFileSync(join(out, "clip.h264.mp4"), "h264"); writeFileSync(join(out, "still.png"), "png"); return { id: `media-${finished}`, state: "done", result: { ok: true, reasons: [], seconds: 3, files: [{ name: "clip.h264.mp4", bytes: 123 }], av1: false, colour_distance: distance, area_ratio: 1, loop_gap: 0, opaque_share: { min: .5, max: .8 }, colour_match: { applied: true, strength: .4 }, settle_skipped_frames: 16 } }; }, job: async () => { throw Error("unexpected poll"); } } as never);
     const started = await request(`companions/${id}/states/idle/generate`, adult, "POST", { count: 2 }); expect(started.status).toBe(202); const { job } = await started.json() as { job: string };
     let progress: any;
     for (let attempt = 0; attempt < 100; attempt++) { const response = await request(`companions/${id}/states/jobs/run/${job}`, adult); progress = await response.json(); if (progress.state === "done" || progress.state === "failed") break; await new Promise((resolve) => setTimeout(resolve, 5)); }
@@ -821,5 +847,24 @@ describe("household companion routes", () => {
     const readyUrl = `companions/${ready.value.id}/animation/idle.h264.mp4`;
     expect((await request(readyUrl, other)).status).toBe(200);
     expect((await request(readyUrl, child)).status).toBe(404);
+  });
+
+  test("COMPANION-ART-CHECK-01: an uploaded look picture is checked, and one that may show a minor in a sexual picture or cannot be checked is refused and not kept", async () => {
+    const adult = addPerson("person-art-upload", "adult");
+    const created = createHouseholdCompanion({ ...fixture(), display_name: "Checked upload" }, { display_name: "Author", person_id: "person-art-upload" });
+    if (!created.ok) throw new Error(created.error);
+    const path = `companions/${created.value.id}/look/upload`, png = await transparentPng();
+    const verdict = (label: "adult" | "possibly_minor") => ({ ok: true as const, verdict: { people_count: 1, apparent_min_age_estimate: label === "adult" ? 30 : 15, label, is_nude_or_sexual: label === "possibly_minor", confidence: 1 } });
+    __setAgeCheckRunnerForTests(async (images) => images.map(() => verdict("possibly_minor")));
+    const minor = await upload(path, adult, png);
+    expect(minor.status).toBe(422);
+    expect(((await minor.json()) as { error: string }).error.length).toBeGreaterThan(10);
+    __setAgeCheckRunnerForTests(async (images) => images.map(() => ({ ok: false as const, why: "unavailable" as const })));
+    expect((await upload(path, adult, png)).status).toBe(422);
+    expect(((await (await request(`companions/${created.value.id}/look`, adult)).json()) as { versions: unknown[] }).versions).toHaveLength(0);
+    __setAgeCheckRunnerForTests(async (images) => images.map(() => verdict("adult")));
+    // A verdict is kept per file, so a different picture is needed to see the new answer.
+    const other = new Uint8Array(await sharp({ create: { width: 512, height: 512, channels: 4, background: { r: 0, g: 0, b: 0, alpha: 0 } } }).composite([{ input: await sharp({ create: { width: 200, height: 160, channels: 4, background: { r: 200, g: 40, b: 40, alpha: 1 } } }).png().toBuffer(), left: 150, top: 170 }]).png().toBuffer());
+    expect((await upload(path, adult, other)).status).toBe(201);
   });
 });

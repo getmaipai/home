@@ -61,7 +61,7 @@ function engineShouldStop(error: unknown): boolean {
 }
 function isEngineFailure(error: unknown): boolean { return error instanceof StackVideoError && (error.status >= 500 || ["generation_failed", "engine_error"].includes(error.code)); }
 
-async function runTakes(run: TakeRun, count: number, motionOverride?: string): Promise<void> {
+async function runTakes(run: TakeRun, count: number, actor: PersonRow, motionOverride?: string): Promise<void> {
   run.state = "running";
   let consecutiveEngineFailures = 0;
   const look = readLook(run.companionId), sheet = readySheet(run.companionId), keyName = sheet.look.sheet!.key === "#FF00FF" ? "magenta" : "green";
@@ -128,7 +128,7 @@ async function runTakes(run: TakeRun, count: number, motionOverride?: string): P
           const sourcePath = takePath(run.companionId, state, take.id, "source.mp4")!;
           writeFileSync(sourcePath, clip);
           await cancelOrDeleteVideo(completedStackJob); run.stackJob = null; stackJob = null;
-          await finishTake(run.companionId, state, take.id, { alpha: false });
+          await finishTake(run.companionId, state, take.id, { alpha: false, actor });
           consecutiveEngineFailures = 0;
         } catch (error) {
           if (stackJob && !run.cancelled) await cancelOrDeleteVideo(stackJob);
@@ -184,7 +184,7 @@ export async function startStateTakes(input: { actor: PersonRow; companionId: st
     const id = crypto.randomUUID();
     const run: TakeRun = { id, companionId: input.companionId, personId: input.actor.id, states: input.states, current: null, state: "queued", phase: "queued", percent: 0, label: "Waiting to make clips", cancelled: false, error: null, takesMade: 0, stackJob: null };
     runs.set(id, run); activeByCompanion.set(input.companionId, id);
-    void runTakes(run, input.count, input.motion).catch(() => undefined);
+    void runTakes(run, input.count, input.actor, input.motion).catch(() => undefined);
     return id;
   } finally { starting.delete(input.companionId); }
 }

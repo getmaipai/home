@@ -1,3 +1,4 @@
+import { ArtWithheldError, checkCompanionArt, requireCompanionPictureOk } from "@/lib/companionArtCheck";
 import sharp from "sharp";
 import media from "@maipai/spec/vocab/companion-media.json";
 import { addVersion, chooseKeyColour, compositeOnKey, describeCharacter, keyOut, lookPromptFor, normalizePicture, readLook, updateSheet, versionOriginalPath, versionPath } from "@/lib/companionLook";
@@ -192,8 +193,11 @@ export async function pollLookJob(id: string, actor: PersonRow, companionId: str
         job.modelReported = reported;
         if (reported && reported !== job.model) throw new Error(COMPANION_MODEL_MISMATCH_LINE);
         const images = await Promise.all(Array.from({ length: job.count }, (_, index) => fetchPicture(id, index)));
+        const withheld: string[] = [];
         for (let index = 0; index < images.length; index++) {
           if (wasCancelled()) return;
+          const checked = await checkCompanionArt(job.companionId, actor, [{ label: `Candidate ${index + 1}`, bytes: images[index]! }]);
+          if (!checked.ok) { withheld.push(...checked.reasons); continue; }
           let picture = job.sourceVersion ? images[index]! : await keyOut(images[index]!, job.key);
           let label = job.sourceVersion ? (job.instruction ?? "Edited picture").slice(0, 60) : `Candidate ${index + 1}`;
           if (job.sourceVersion) {
@@ -215,6 +219,7 @@ export async function pollLookJob(id: string, actor: PersonRow, companionId: str
           job.versions.push(saved.id);
         }
         if (wasCancelled()) return;
+        if (job.versions.length === 0 && withheld.length > 0) throw new ArtWithheldError([...new Set(withheld)].join(" "));
         job.state = "done"; job.percent = 100; activeByCompanion.delete(companionId);
       })();
       try { await job.finalising; } catch (error) { if (!wasCancelled()) { job.state = "failed"; job.error = error instanceof Error ? error.message : "The picture could not be saved. Try again."; activeByCompanion.delete(companionId); } }
@@ -238,6 +243,7 @@ async function pollSheetJob(id: string, job: SheetJob, actor: PersonRow, compani
       const look = readLook(companionId); if (look.sheet) updateSheet(companionId, { ...look.sheet, state: "needs_review" }); activeByCompanion.delete(companionId);
     } else if (!job.finalising) job.finalising = (async () => {
       const view = SHEET_VIEWS[job.index]!, image = await fetchPicture(job.stackJob, 0), look = readLook(companionId), key = look.sheet?.key ?? look.key;
+      await requireCompanionPictureOk(companionId, actor, `The ${view.slot === "left" || view.slot === "right" ? "side" : "mouth-open"} view`, image);
       let keyedOut = await keyOut(image, key); keyedOut = await normalizePicture(keyedOut, { removeBackground: async (bytes) => bytes });
       const reported = current.data.find((picture) => typeof picture.model === "string")?.model ?? null;
       job.modelReported = reported;
@@ -254,7 +260,7 @@ async function pollSheetJob(id: string, job: SheetJob, actor: PersonRow, compani
       job.promptHash = promptHash(instruction);
       job.stackJob = (await submitEdit(nextForm)).job; job.state = "queued";
     })();
-    try { await job.finalising; } catch { job.state = "failed"; job.error = `The ${SHEET_VIEWS[job.index]?.slot === "mouth" ? "mouth-open" : "side"} view did not work. Try again.`; const look = readLook(companionId); if (look.sheet) updateSheet(companionId, { ...look.sheet, state: "needs_review" }); activeByCompanion.delete(companionId); }
+    try { await job.finalising; } catch (error) { job.state = "failed"; job.error = error instanceof ArtWithheldError ? error.message : `The ${SHEET_VIEWS[job.index]?.slot === "mouth" ? "mouth-open" : "side"} view did not work. Try again.`; const look = readLook(companionId); if (look.sheet) updateSheet(companionId, { ...look.sheet, state: "needs_review" }); activeByCompanion.delete(companionId); }
     finally { job.finalising = undefined; }
   } catch { job.state = "failed"; job.error = "The character sheet could not be checked. Try again."; activeByCompanion.delete(companionId); }
   return publicState();

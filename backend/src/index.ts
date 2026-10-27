@@ -1,3 +1,4 @@
+import { sweepLiveCompanionArt } from "@/lib/companionArtCheck";
 import { resumeMusicJobs } from "@/lib/music/jobs";
 // SINGLE-INSTANCE-01 (#194): must stay the FIRST import. It refuses a stray
 // data directory and takes the data directory's one-hub lock before any
@@ -108,6 +109,8 @@ catch (err) { console.error(`[index] engine link failed to start: ${(err as Erro
 void syncStackRequirementIssue();
 // STACK-WARM-01: ask the Stack to have chat, memory and voice loaded so the first message is not a cold start.
 void warmStack();
+// COMPANION-ART-CHECK-01: companion art that was live before art was checked is checked once; what fails is narrowed to the audience it does pass.
+void sweepLiveCompanionArt().catch((err) => console.warn(`[companions] live art check will retry on the next start: ${(err as Error).message}`));
 await recordBootGap();
 void recordStatusSample();
 

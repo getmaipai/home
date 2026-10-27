@@ -8,6 +8,7 @@ import { __setStackClientForTests } from "@/lib/stackEngine";
 import { addVersion, approveSheet, setRest, updateSheet } from "@/lib/companionLook";
 import media from "@maipai/spec/vocab/companion-media.json";
 import { takePrompt } from "@/lib/companionTakes";
+import { __setKeyframesForTests } from "@/lib/pictures/keyframes";
 
 const dataRoot = process.env.MAIPAI_DATA_DIR!;
 const root = join(dataRoot, "companions");
@@ -16,7 +17,8 @@ if (!source.ok || !source.value.companion) throw new Error("rivet fixture is una
 const sourceCompanion = source.value.companion;
 
 beforeEach(() => { rmSync(root, { recursive: true, force: true }); __resetCompanionStatesForTests(); });
-afterEach(() => { rmSync(root, { recursive: true, force: true }); __resetCompanionStatesForTests(); __setStackClientForTests(null); });
+afterEach(() => {
+  __setKeyframesForTests(null); rmSync(root, { recursive: true, force: true }); __resetCompanionStatesForTests(); __setStackClientForTests(null); });
 
 function companion() { const result = createHouseholdCompanion({ ...sourceCompanion, display_name: "State fixture" }, { display_name: "Author", person_id: "state-test" }); if (!result.ok) throw new Error(result.error); return result.value.id; }
 
@@ -94,23 +96,25 @@ describe("companion states store", () => {
   });
 
   test("finishes a clip through Stack with the state vocabulary and stores its report", async () => {
+    __setKeyframesForTests(async () => [new Uint8Array([7])]);
     const { finishTake } = await import("@/lib/companionStates"), id = companion();
     const rest = addVersion(id, new Uint8Array([1]), { source: "upload", label: "rest", width: 1024, height: 1024, from: null }); setRest(id, rest.id);
     updateSheet(id, { views: { left: null, right: null, mouth: null }, card: { text: "red fox", species: "fox", colours: ["#CC3322"] }, key: "#FF00FF", state: "needs_review", approved_by: null, approved_at: null }); approveSheet(id, "Author");
     const take = addTake(id, "idle", { source: "upload", label: "idle" }); writeFileSync(takePath(id, "idle", take.id, "source.mp4")!, "source");
     let submitted: any; let roots = 0;
-    __setStackClientForTests({ mediaRoots: async () => ({ read: [join(dataRoot, "companions")], write: [join(dataRoot, "companions")] }), setMediaRoots: async () => { roots++; return { read: [], write: [] }; }, submitJob: async (job: any) => { submitted = job; return { id: "job-1", state: "done", result: { ok: true, reasons: [], seconds: 3, files: [{ name: "clip.h264.mp4", bytes: 123 }], av1: false, colour_distance: 2, area_ratio: 1, loop_gap: 0, opaque_share: { min: .5, max: .8 }, colour_match: { applied: true, strength: .35 }, settle_skipped_frames: 16 } }; }, job: async () => { throw Error("unexpected poll"); } } as never);
+    __setStackClientForTests({ mediaRoots: async () => ({ read: [join(dataRoot, "companions")], write: [join(dataRoot, "companions")] }), setMediaRoots: async () => { roots++; return { read: [], write: [] }; }, submitJob: async (job: any) => { submitted = job; const out = join(job.input.output_dir, job.input.output_name); mkdirSync(out, { recursive: true }); writeFileSync(join(out, "clip.h264.mp4"), "h264"); writeFileSync(join(out, "still.png"), "png"); return { id: "job-1", state: "done", result: { ok: true, reasons: [], seconds: 3, files: [{ name: "clip.h264.mp4", bytes: 123 }], av1: false, colour_distance: 2, area_ratio: 1, loop_gap: 0, opaque_share: { min: .5, max: .8 }, colour_match: { applied: true, strength: .35 }, settle_skipped_frames: 16 } }; }, job: async () => { throw Error("unexpected poll"); } } as never);
     await finishTake(id, "idle", take.id, { alpha: false });
     expect(submitted.kind).toBe("media.companion_clip"); expect(submitted.input).toMatchObject({ output_dir: join(dataRoot, "companions", id, "states", "idle", take.id), output_name: "finished", key: "#FF00FF", kind: "loop", min_seconds: media.states[0]!.min_seconds, max_seconds: media.states[0]!.max_seconds, colours: ["#CC3322"], palette_reference: Buffer.from([1]).toString("base64"), max_bytes: media.ship.max_bytes_per_clip });
     expect(readStates(id).states.idle?.takes[0]?.report).toMatchObject({ ok: true, seconds: 3, bytes: { h264: 123 }, colour_match: { applied: true, strength: .35 }, settle_skipped_frames: 16 }); expect(roots).toBe(0);
   });
 
   test("omits a missing rest picture palette reference", async () => {
+    __setKeyframesForTests(async () => [new Uint8Array([7])]);
     const id = companion(), rest = addVersion(id, new Uint8Array([1]), { source: "upload", label: "rest", width: 1024, height: 1024, from: null }); setRest(id, rest.id);
     updateSheet(id, { views: { left: null, right: null, mouth: null }, card: { text: "fox", species: "fox", colours: ["#CC3322"] }, key: "#00FF00", state: "needs_review", approved_by: null, approved_at: null }); approveSheet(id, "Author");
     const take = addTake(id, "idle", { source: "upload", label: "idle" }); writeFileSync(takePath(id, "idle", take.id, "source.mp4")!, "source"); rmSync(join(root, id, "look", `${rest.id}.png`));
     let submitted: any;
-    __setStackClientForTests({ mediaRoots: async () => ({ read: [root], write: [root] }), setMediaRoots: async () => ({ read: [root], write: [root] }), submitJob: async (job: any) => { submitted = job; return { id: "job-no-palette", state: "done", result: { ok: true, reasons: [], seconds: 3, files: [{ name: "clip.h264.mp4", bytes: 123 }], av1: false } }; } } as never);
+    __setStackClientForTests({ mediaRoots: async () => ({ read: [root], write: [root] }), setMediaRoots: async () => ({ read: [root], write: [root] }), submitJob: async (job: any) => { submitted = job; const out = join(job.input.output_dir, job.input.output_name); mkdirSync(out, { recursive: true }); writeFileSync(join(out, "clip.h264.mp4"), "h264"); writeFileSync(join(out, "still.png"), "png"); return { id: "job-no-palette", state: "done", result: { ok: true, reasons: [], seconds: 3, files: [{ name: "clip.h264.mp4", bytes: 123 }], av1: false } }; } } as never);
     await finishTake(id, "idle", take.id, { alpha: false });
     expect(submitted.input).not.toHaveProperty("palette_reference");
   });
