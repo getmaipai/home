@@ -149,10 +149,10 @@ export async function uncensoredChoiceState(): Promise<{ id: string; installed: 
   // A download of its weights or its picture file in flight, read from the Stack's own job list.
   let active: Array<{ completedBytes: number; totalBytes: number }> = [];
   try {
-    const mine = [entry.id, "uncensored-hauhaucs"];
+    // The Stack's install jobs are kind "model.install" and name their model in input.model (the weights and the picture file are separate jobs).
     active = (await getStackClient().jobs())
-      .filter((job) => job.kind === "model_download" && (job.state === "queued" || job.state === "running" || job.state === "paused" || job.state === "stalled"))
-      .filter((job) => { const text = JSON.stringify(job.input ?? {}) + JSON.stringify(job.items ?? []); return mine.some((id) => text.includes(id)); });
+      .filter((job) => job.kind === "model.install" && (job.state === "queued" || job.state === "running" || job.state === "paused" || job.state === "stalled"))
+      .filter((job) => { const model = job.input?.model; return typeof model === "string" && model.startsWith("qwen3-6-35b-a3b-uncensored-hauhaucs"); });
   } catch { /* the job list failing only hides the progress */ }
   const total = active.reduce((sum, job) => sum + job.totalBytes, 0);
   const done = active.reduce((sum, job) => sum + job.completedBytes, 0);
