@@ -28,6 +28,14 @@ describe("ship pipeline", () => {
     const out = run([sha, "--before-green"], { MAIPAI_SHIP_LIVE: "", MAIPAI_SHIP_MARKER: join(scratch, "no-such-marker") });
     expect(out.status).toBe(1); expect(out.stderr).toContain("not marked as the live hub"); expect(out.stderr).toContain("sudo touch");
   }, 60_000);
+  test("uses the durable marker beside the replaceable install directory", () => {
+    const marker = `${live}.live-hub`;
+    writeFileSync(marker, "");
+    try {
+      const out = run([sha, "--before-green", "--dry-run"], { MAIPAI_SHIP_MARKER: "" });
+      expect(out.status).toBe(0); expect(out.stdout).toContain(`live=${live}`);
+    } finally { rmSync(marker, { force: true }); }
+  }, 60_000);
   test("rejects side branch commits before calling helper", () => {
     git(main, "checkout", "-b", "side"); writeFileSync(join(main, "side.txt"), "side\n"); git(main, "add", "."); git(main, "commit", "-m", "side"); const side = git(main, "rev-parse", "HEAD"); git(main, "checkout", "main");
     const out = run([side, "--before-green"]); expect(out.status).toBe(1); expect(out.stderr).toContain("not on origin/main"); expect(existsSync(join(scratch, "promote.calls"))).toBe(false);

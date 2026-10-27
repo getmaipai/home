@@ -33,10 +33,12 @@ else sha="$(git rev-parse --verify "$target^{commit}" 2>/dev/null)" || die "coul
 git merge-base --is-ancestor "$sha" origin/main || die "${sha:0:7} is not on origin/main; land it first with bash scripts/land.sh"
 label="sha-${sha:0:7}"
 if (( ! before_green )) && [[ ! -f "$watch/green/$sha" ]]; then die "watcher has no green run for $sha; pass --before-green to ship anyway and record it."; fi
-# The live hub is the install on the Mac Studio, marked by $live/.live-hub. Any other Mac (the MacBook also holds a com.maipai.home install, so a
-# launchd check cannot tell them apart, and it misfired on the Studio) must not ship; the way to release from there is `localrelease` (ssh studio-release).
-marker="${MAIPAI_SHIP_MARKER:-$live/.live-hub}"
-if [[ -z "${MAIPAI_SHIP_LIVE:-}" && ! -f "$marker" ]]; then
+# The live hub is the install on the Mac Studio. Keep its marker beside the
+# install, not inside it: promotion replaces the install directory. Accept the
+# old in-directory marker during migration from earlier ship.sh versions.
+marker="${MAIPAI_SHIP_MARKER:-${live}.live-hub}"
+legacy_marker="$live/.live-hub"
+if [[ -z "${MAIPAI_SHIP_LIVE:-}" && ! -f "$marker" && ! -f "$legacy_marker" ]]; then
   die "this Mac is not marked as the live hub ($marker is missing). Run ship.sh on the Mac Studio, or release from here with localrelease. On the Studio, create the marker once: sudo touch $marker"
 fi
 lock_path="${MAIPAI_HUB_LOCK_PATH:-$HOME/.maipai/home/hub.lock}"
