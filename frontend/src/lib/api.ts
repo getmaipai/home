@@ -394,6 +394,14 @@ export interface CompanionStates {
   sheet_ready: boolean; start_ready: boolean; start_reason?: string; key: string; states: CompanionStateRow[]; run: { job: string; label: string; percent: number } | null;
   counts: { approved: number; total: number; required_missing: string[] };
 }
+export interface CompanionAppearance {
+  has_changes: boolean;
+  can_publish: boolean;
+  reasons: string[];
+  published: { at: string; by: string | null; states: Record<string, string> } | null;
+  states: Array<{ state: string; assigned_take: string | null; approved: boolean; published_take: string | null; changed: boolean }>;
+  portrait_changed: boolean;
+}
 export interface CompanionStateRun { state: "queued" | "running" | "done" | "failed" | "cancelled"; label: string; percent: number; current: { state: string; take: number; index: number; of: number } | null; takes_made: number; error: string | null }
 export interface CompanionStateJob { state: "running" | "done" | "failed"; label: string; report?: { ok: boolean; reasons: string[]; seconds: number; bytes: { h264: number; av1: number | null }; colour_distance: number | null; area_ratio: number; loop_gap: number; opaque_share: { min: number; max: number } }; failure?: string }
 
@@ -669,6 +677,8 @@ export class ApiError extends Error {
     public retryAfter?: number,
     /** Field-level validation messages returned by editable forms. */
     public fields?: Record<string, string>,
+    /** Reasons a publish or other decision was blocked. */
+    public reasons?: string[],
   ) {
     super(message);
   }
@@ -737,7 +747,7 @@ export async function request<T>(path: string, init?: RequestInit & { timeoutMs?
     const body = await res.json().catch(() => ({}));
     if (!res.ok) {
       if (isDeviceRevoked(res.status, body)) await removeAllOfflineMedia();
-      throw new ApiError(body.error ?? res.statusText, res.status, body.code, typeof body.next === "string" ? body.next : undefined, typeof body.retryAfter === "number" ? body.retryAfter : undefined, body.fields && typeof body.fields === "object" ? body.fields as Record<string, string> : undefined);
+      throw new ApiError(body.error ?? res.statusText, res.status, body.code, typeof body.next === "string" ? body.next : undefined, typeof body.retryAfter === "number" ? body.retryAfter : undefined, body.fields && typeof body.fields === "object" ? body.fields as Record<string, string> : undefined, Array.isArray(body.reasons) ? (body.reasons as unknown[]).filter((reason): reason is string => typeof reason === "string") : undefined);
     }
     return body as T;
   } catch (err) {
@@ -792,7 +802,7 @@ async function rawStreamPost(
     });
     if (!res.ok) {
       const parsed = await res.json().catch(() => ({}));
-      throw new ApiError(parsed.error ?? res.statusText, res.status, parsed.code);
+      throw new ApiError(parsed.error ?? res.statusText, res.status, parsed.code, undefined, undefined, undefined, Array.isArray(parsed.reasons) ? (parsed.reasons as unknown[]).filter((reason): reason is string => typeof reason === "string") : undefined);
     }
     return res;
   } catch (err) {
@@ -1456,6 +1466,8 @@ export const api = {
   companionLookPrompt: (id: string) => request<CompanionPromptPack>(`/api/companions/${encodeURIComponent(id)}/look/prompt`),
   companionStatePrompt: (id: string, state: string) => request<CompanionPromptPack>(`/api/companions/${encodeURIComponent(id)}/states/${encodeURIComponent(state)}/prompt`),
   companionStates: (id: string) => request<CompanionStates>(`/api/companions/${encodeURIComponent(id)}/states`),
+  companionAppearance: (id: string) => request<CompanionAppearance>(`/api/companions/${encodeURIComponent(id)}/appearance`),
+  publishCompanionAppearance: (id: string) => request<{ published: true }>(`/api/companions/${encodeURIComponent(id)}/appearance/publish`, { method: "POST" }),
   companionStateFile: (id: string, state: string, take: string, file: string) => `/api/companions/${encodeURIComponent(id)}/states/${encodeURIComponent(state)}/${encodeURIComponent(take)}/${encodeURIComponent(file)}`,
   setCompanionStateMotion: (id: string, state: string, motion: string | null) => request<{ ok: boolean }>(`/api/companions/${encodeURIComponent(id)}/states/${encodeURIComponent(state)}/motion`, { method: "PUT", body: JSON.stringify({ motion }) }),
   uploadCompanionState: (id: string, state: string, form: FormData) => request<{ take_id: string }>(`/api/companions/${encodeURIComponent(id)}/states/${encodeURIComponent(state)}/upload`, { method: "POST", body: form }),

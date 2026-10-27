@@ -11,6 +11,7 @@ import { ApiError, api } from "@/lib/api";
 import { CompanionStateContents } from "@/shell/pages/CompanionStateCard";
 
 const key = (id: string) => ["companions", id, "states"] as const;
+const appearanceKey = (id: string) => ["companion-appearance", id] as const;
 const networkError = "Could not reach Home. Check your connection and try again.";
 const errorText = (error: unknown) => error instanceof ApiError ? error.message : networkError;
 const titleState = (state: string) => state.split("_").map((part) => part[0]!.toUpperCase() + part.slice(1)).join(" ");
@@ -18,9 +19,12 @@ const titleState = (state: string) => state.split("_").map((part) => part[0]!.to
 export function CompanionStatesTab({ id, active }: { id: string; active: boolean }) {
   const client = useQueryClient();
   const query = useQuery({ queryKey: key(id), queryFn: () => api.companionStates(id), enabled: active, retry: false });
+  const appearanceQuery = useQuery({ queryKey: appearanceKey(id), queryFn: () => api.companionAppearance(id), enabled: active, retry: false });
   const [runId, setRunId] = useState<string | null>(null);
   const [openId, setOpenId] = useState<string | null>(null);
   const [error, setError] = useState("");
+  const [status, setStatus] = useState("");
+  const [publishing, setPublishing] = useState(false);
   const data = query.data;
   useEffect(() => { if (data?.run?.job) setRunId(data.run.job); }, [data?.run?.job]);
   const runQuery = useQuery({ queryKey: [...key(id), "run", runId], queryFn: () => api.companionStateRun(id, runId!), enabled: active && !!runId, retry: false, refetchInterval: (current) => document.hidden ? false : current.state.data?.state === "queued" || current.state.data?.state === "running" || current.state.data === undefined ? 2000 : false });
@@ -30,12 +34,12 @@ export function CompanionStatesTab({ id, active }: { id: string; active: boolean
     if (run && ["done", "failed", "cancelled"].includes(run.state)) {
       if (run.error) setError(run.error);
       setRunId(null);
-      void client.invalidateQueries({ queryKey: key(id) });
+      void Promise.all([client.invalidateQueries({ queryKey: key(id) }), client.invalidateQueries({ queryKey: appearanceKey(id) })]);
     }
   }, [run, id, client]);
   const perform = useCallback(async (action: () => Promise<unknown>) => {
     setError("");
-    try { await action(); await client.invalidateQueries({ queryKey: key(id) }); }
+    try { await action(); await Promise.all([client.invalidateQueries({ queryKey: key(id) }), client.invalidateQueries({ queryKey: appearanceKey(id) })]); }
     catch (cause) { setError(errorText(cause)); }
   }, [client, id]);
   async function start(action: () => Promise<{ job: string }>) {
@@ -43,13 +47,32 @@ export function CompanionStatesTab({ id, active }: { id: string; active: boolean
     try { setRunId((await action()).job); }
     catch (cause) { setError(errorText(cause)); }
   }
+  async function publish() {
+    setError(""); setStatus(""); setPublishing(true);
+    try {
+      await api.publishCompanionAppearance(id);
+      await Promise.all([
+        client.invalidateQueries({ queryKey: appearanceKey(id) }),
+        client.invalidateQueries({ queryKey: key(id) }),
+        client.invalidateQueries({ queryKey: ["companion-avatar"] }),
+      ]);
+      setStatus("Appearance published.");
+    } catch (cause) {
+      if (cause instanceof ApiError && (cause.status === 409 || cause.status === 422)) {
+        setError([...(cause.reasons?.length ? cause.reasons : [cause.message]), cause.next].filter(Boolean).join(" ") || "Publishing failed. Review the appearance and try again.");
+      } else setError(errorText(cause));
+    } finally { setPublishing(false); }
+  }
   if (!active) return null;
   if (query.isError) return <AsyncState data={null} error onRetry={() => void query.refetch()} errorMessage={errorText(query.error)} loadingLabel="Loading companion clips">{() => null}</AsyncState>;
   if (!data) return <AsyncState data={undefined} isFetching={query.isFetching} onRetry={() => void query.refetch()} loadingLabel="Loading companion clips">{() => null}</AsyncState>;
   const missing = data.counts.required_missing.map(titleState);
+  const appearance = appearanceQuery.data;
   return <div className="flex flex-col gap-4">
     {!data.sheet_ready ? <Alert><AlertDescription>Approve the character sheet in the Look tab first. Every clip starts from it. You can still copy a prompt for another tool.</AlertDescription></Alert> : null}
     {!data.start_ready ? <Alert><AlertDescription>{data.start_reason}</AlertDescription></Alert> : null}
+    {appearance ? <Card><CardContent><div className="flex flex-col gap-2"><div><Badge>{appearance.has_changes ? "Review needed" : appearance.published ? "Published" : "Not published yet"}</Badge></div><p className="text-sm text-muted-foreground">Changes stay in draft until published.</p><div className="flex flex-wrap items-center gap-2"><Button disabled={!appearance.can_publish || publishing} onClick={() => void publish()}>{publishing ? "Publishing…" : "Publish appearance"}</Button>{!appearance.can_publish && appearance.reasons[0] ? <span className="text-sm text-muted-foreground">{appearance.reasons[0]}</span> : null}</div></div></CardContent></Card> : null}
+    {status ? <Alert><AlertDescription>{status}</AlertDescription></Alert> : null}
     <section aria-label="Clip readiness" className="flex flex-col gap-2"><div className="flex flex-wrap items-center gap-2"><h2 className="text-lg font-semibold">{data.counts.approved} of {data.counts.total} ready</h2></div><Progress value={data.counts.approved / data.counts.total * 100} aria-label="Approved clips" />{missing.length ? <p className="text-sm text-muted-foreground">Still needed: {missing.join(", ")}</p> : null}
       <div className="flex flex-wrap gap-2"><Button disabled={!data.sheet_ready || !data.start_ready || running || !data.states.some((state) => !state.approved)} onClick={() => void start(() => api.generateCompanionStates(id, { required_only: false }))}>Make the missing clips</Button><Button variant="outline" disabled={!data.sheet_ready || !data.start_ready || running || data.counts.required_missing.length === 0} onClick={() => void start(() => api.generateCompanionStates(id, { required_only: true }))}>Make the required clips</Button></div>
     </section>
