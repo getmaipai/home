@@ -1,6 +1,6 @@
 {
-  "generatedAt": "2026-10-27T05:04:45.667Z",
-  "kitTag": "ui-v0.5.367",
+  "generatedAt": "2026-10-27T05:21:45.917Z",
+  "kitTag": "ui-v0.5.368",
   "items": [
     {
       "file": "ActivityCardsShowcase.tsx",
@@ -163,6 +163,14 @@
       "group": "tests/support",
       "verdict": "no-fit",
       "verdictReason": "Not an Element: a kit test, snapshot or stylesheet that the scan lists.",
+      "implemented": false
+    },
+    {
+      "file": "activity-feed.tsx",
+      "name": "activity-feed",
+      "group": "activity",
+      "verdict": "unassessed",
+      "verdictReason": "Recorded unassessed verdict in elements-plan.json; see the plan entry for its dependency or scope.",
       "implemented": false
     },
     {
@@ -1317,6 +1325,14 @@
       "verdict": "support",
       "verdictReason": "Supporting file for the shipped kit UI; it is not a standalone Home adoption target.",
       "implemented": true
+    },
+    {
+      "file": "task-browser.tsx",
+      "name": "task-browser",
+      "group": "task",
+      "verdict": "unassessed",
+      "verdictReason": "Recorded unassessed verdict in elements-plan.json; see the plan entry for its dependency or scope.",
+      "implemented": false
     },
     {
       "file": "task-card.tsx",

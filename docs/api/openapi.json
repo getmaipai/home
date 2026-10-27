@@ -56558,6 +56558,26 @@
                           },
                           "updated_at": {
                             "type": "string"
+                          },
+                          "conversation_id": {
+                            "type": "string",
+                            "nullable": true
+                          },
+                          "waiting_reason": {
+                            "type": "string",
+                            "nullable": true
+                          },
+                          "progress": {
+                            "type": "string",
+                            "nullable": true,
+                            "maxLength": 200
+                          },
+                          "result_ref": {
+                            "type": "string",
+                            "nullable": true
+                          },
+                          "needs_you": {
+                            "type": "boolean"
                           }
                         },
                         "required": [
