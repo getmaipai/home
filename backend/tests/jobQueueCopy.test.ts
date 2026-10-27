@@ -47,3 +47,12 @@ describe("job queue copy", () => {
     }
   });
 });
+
+test("a video waiting for memory with nothing ahead says why, never \"You are next\"", async () => {
+  const { phaseLabel } = await import("@/routes/videos");
+  const waiting = { state: "running", phase: "waiting for memory", position: 1, riseReason: undefined, estimateSeconds: 1 } as never;
+  const adult = phaseLabel(waiting, "adult");
+  expect(adult).toBe(JOB_QUEUE_COPY.memory_elsewhere.adult);
+  expect(adult).not.toContain("You are next");
+  expect(phaseLabel(waiting, "child")).toBe(JOB_QUEUE_COPY.memory_elsewhere.child);
+});

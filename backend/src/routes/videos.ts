@@ -59,10 +59,12 @@ const ItemSchema = z.object({
 });
 const CardSchema = z.object({ id: z.string(), conversation_id: z.string().nullable(), items: z.array(ItemSchema), can_make_another: z.boolean(), limits: z.string() });
 
-function phaseLabel(job: VideoJob, audience: "adult" | "child"): string {
+export function phaseLabel(job: VideoJob, audience: "adult" | "child"): string {
   if (job.phase === "paused while chat is working") return jobQueueCopy("paused_chat", "paused_chat", null, null, audience);
   if (job.phase === "paused: low memory") return "Paused: low memory";
-  if (job.state === "queued" || job.phase === "queued" || job.phase === "waiting for memory") return jobQueueCopy("queued", job.riseReason ?? "queue", job.position, job.estimateSeconds ?? null, audience);
+  // A job waiting on memory is not waiting in a line: with nothing ahead of it, "You are next" is wrong, so it gets the memory words.
+  if (job.phase === "waiting for memory") return jobQueueCopy("waiting_memory", job.riseReason ?? "memory_elsewhere", job.position, null, audience);
+  if (job.state === "queued" || job.phase === "queued") return jobQueueCopy("queued", job.riseReason ?? "queue", job.position, job.estimateSeconds ?? null, audience);
   if (job.phase === "setting up") return "Setting up the video model for the first time";
   if (job.phase === "starting" || job.phase === "loading") return "Getting the video model ready";
   if (job.phase === "rendering") return "Drawing the frames";
