@@ -4095,6 +4095,82 @@
       "realTurnToday": false
     },
     {
+      "file": "activity-feed.tsx",
+      "name": "activity-feed",
+      "group": "character",
+      "verdict": "wire-now",
+      "verdictReason": "The companion profile Activity tab (REVAMP-DIRECTORY-01): rows grouped by day with a Current work column; adopted as shipped with props only.",
+      "bindings": [
+        "companion profile activity"
+      ],
+      "backendNeeded": null,
+      "effort": null,
+      "specTagNeeded": false,
+      "newDependency": false,
+      "size": "S",
+      "showcaseScenario": null,
+      "batch": null,
+      "replacesHandBuilt": [],
+      "realTurnToday": false
+    },
+    {
+      "file": "companion-card.tsx",
+      "name": "companion-card",
+      "group": "character",
+      "verdict": "wire-now",
+      "verdictReason": "The Companions directory cards (REVAMP-DIRECTORY-01): left-aligned portrait, status, meta and actions; adopted as shipped with props only.",
+      "bindings": [
+        "companions directory"
+      ],
+      "backendNeeded": null,
+      "effort": null,
+      "specTagNeeded": false,
+      "newDependency": false,
+      "size": "S",
+      "showcaseScenario": null,
+      "batch": null,
+      "replacesHandBuilt": [],
+      "realTurnToday": false
+    },
+    {
+      "file": "companion-profile-header.tsx",
+      "name": "companion-profile-header",
+      "group": "character",
+      "verdict": "wire-now",
+      "verdictReason": "The companion profile header (REVAMP-DIRECTORY-01): portrait, eyebrow, chips and actions; adopted as shipped with props only.",
+      "bindings": [
+        "companion profile header"
+      ],
+      "backendNeeded": null,
+      "effort": null,
+      "specTagNeeded": false,
+      "newDependency": false,
+      "size": "S",
+      "showcaseScenario": null,
+      "batch": null,
+      "replacesHandBuilt": [],
+      "realTurnToday": false
+    },
+    {
+      "file": "task-browser.tsx",
+      "name": "task-browser",
+      "group": "character",
+      "verdict": "wire-now",
+      "verdictReason": "The companion Tasks tab (REVAMP-TASKS-01): Needs you, Running and Completed tabs with a list and detail; adopted as shipped with props only.",
+      "bindings": [
+        "companion tasks"
+      ],
+      "backendNeeded": null,
+      "effort": null,
+      "specTagNeeded": false,
+      "newDependency": false,
+      "size": "S",
+      "showcaseScenario": null,
+      "batch": null,
+      "replacesHandBuilt": [],
+      "realTurnToday": false
+    },
+    {
       "file": "chat-header.tsx",
       "name": "chat-header",
       "group": "character",

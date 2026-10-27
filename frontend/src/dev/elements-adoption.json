@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-10-27T05:27:54.251Z",
+  "generatedAt": "2026-10-27T05:32:10.237Z",
   "kitTag": "ui-v0.5.368",
   "items": [
     {
@@ -168,9 +168,9 @@
     {
       "file": "activity-feed.tsx",
       "name": "activity-feed",
-      "group": "activity",
-      "verdict": "unassessed",
-      "verdictReason": "Recorded unassessed verdict in elements-plan.json; see the plan entry for its dependency or scope.",
+      "group": "character",
+      "verdict": "wire-now",
+      "verdictReason": "The companion profile Activity tab (REVAMP-DIRECTORY-01): rows grouped by day with a Current work column; adopted as shipped with props only.",
       "implemented": true
     },
     {
@@ -347,17 +347,17 @@
     {
       "file": "companion-card.tsx",
       "name": "companion-card",
-      "group": "companion",
-      "verdict": "unassessed",
-      "verdictReason": "Recorded unassessed verdict in elements-plan.json; see the plan entry for its dependency or scope.",
+      "group": "character",
+      "verdict": "wire-now",
+      "verdictReason": "The Companions directory cards (REVAMP-DIRECTORY-01): left-aligned portrait, status, meta and actions; adopted as shipped with props only.",
       "implemented": true
     },
     {
       "file": "companion-profile-header.tsx",
       "name": "companion-profile-header",
-      "group": "companion",
-      "verdict": "unassessed",
-      "verdictReason": "Recorded unassessed verdict in elements-plan.json; see the plan entry for its dependency or scope.",
+      "group": "character",
+      "verdict": "wire-now",
+      "verdictReason": "The companion profile header (REVAMP-DIRECTORY-01): portrait, eyebrow, chips and actions; adopted as shipped with props only.",
       "implemented": true
     },
     {
@@ -1329,9 +1329,9 @@
     {
       "file": "task-browser.tsx",
       "name": "task-browser",
-      "group": "task",
-      "verdict": "unassessed",
-      "verdictReason": "Recorded unassessed verdict in elements-plan.json; see the plan entry for its dependency or scope.",
+      "group": "character",
+      "verdict": "wire-now",
+      "verdictReason": "The companion Tasks tab (REVAMP-TASKS-01): Needs you, Running and Completed tabs with a list and detail; adopted as shipped with props only.",
       "implemented": true
     },
     {
