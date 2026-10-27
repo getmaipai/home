@@ -152,7 +152,7 @@ export async function uncensoredChoiceState(): Promise<{ id: string; installed: 
     // The Stack's install jobs are kind "model.install" and name their model in input.model (the weights and the picture file are separate jobs).
     active = (await getStackClient().jobs())
       .filter((job) => job.kind === "model.install" && (job.state === "queued" || job.state === "running" || job.state === "paused" || job.state === "stalled"))
-      .filter((job) => { const model = job.input?.model; return typeof model === "string" && model.startsWith("qwen3-8-27b-uncensored-hauhaucs"); });
+      .filter((job) => { const model = job.input?.model; return typeof model === "string" && model.startsWith("qwen3-8-27b-huihui-abliterated"); });
   } catch { /* the job list failing only hides the progress */ }
   const total = active.reduce((sum, job) => sum + job.totalBytes, 0);
   const done = active.reduce((sum, job) => sum + job.completedBytes, 0);

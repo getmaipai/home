@@ -334,43 +334,44 @@ export const CATALOG: ModelCapabilities[] = [
     },
   }),
   // MODEL-SWITCH-02: the optional uncensored chat model, replacing the
-  // Qwen3.6 35B A3B fine-tune (2026-10-27): HauhauCS's Qwen3.8-27B Aggressive.
-  // The model card describes direct answers with minimal preamble. Pin
-  // mirrors Stack exactly; its image projector is the publisher's BF16 file,
-  // loaded alongside the GGUF. The `uncensored` tag is the catalog property
+  // Qwen3.6 35B A3B fine-tune and then HauhauCS's Qwen3.8-27B Aggressive
+  // Q4_K_P (2026-10-27): huihui-ai's abliterated Qwen3.8-27B, UD-IQ4_XS, a
+  // 3.5 GB smaller file with the same answers and refusal behaviour in a
+  // short side-by-side. Pin mirrors Stack exactly; its image projector is the
+  // publisher's BF16 file, loaded alongside the GGUF. The `uncensored` tag is the catalog property
   // Settings turns into a visible badge. Bound to no tier; downloads only when
   // an admin chooses it; Home's age and surface gates run in front of it.
   ModelCapabilities.parse({
-    id: "qwen3-8-27b-uncensored-hauhaucs-q4-k-p",
+    id: "qwen3-8-27b-huihui-abliterated-iq4-xs",
     role: "chat",
-    label: "Qwen3.8 27B Uncensored (Q4_K_P)",
+    label: "Qwen3.8 27B Uncensored (Huihui, IQ4_XS)",
     license: "Apache-2.0",
     engine: "llama-server",
     implemented: true,
     quality_tier: "high",
     tags: ["uncensored", "reads-pictures", "fast-answers"],
-    pros: ["Publisher describes direct answers with minimal preamble", "Reads the pictures you send", "262k context"],
+    pros: ["Does not refuse on its own: it answers what an adult asks", "A smaller file than the other 27B builds", "Reads the pictures you send", "262k context"],
     cons: ["Uncensored: this model has had its own refusals removed. Home's age and safety rules still apply in front of it", "Not yet measured against the current model for tool use in this home", "Needs a computer with about 64 GB of memory"],
     thinking_mode: "switchable",
     image_input: {
       projector: {
-        file: "mmproj-Qwen3.8-27B-Uncensored-HauhauCS-Aggressive-BF16.gguf",
+        file: "mmproj-model-bf16.gguf",
         download: {
-          url: "https://huggingface.co/HauhauCS/Qwen3.8-27B-Uncensored-HauhauCS-Aggressive-MTP-GGUF/resolve/993a5971fda8f30dd1b7eb2654792ba4415c7460/mmproj-Qwen3.8-27B-Uncensored-HauhauCS-Aggressive-BF16.gguf",
-          sha256: "5681b690bcb8eb10cd28d62d078cb4e01521a3ea4880a3fc7d54de72de2dd142",
-          approx_bytes: 931_146_624,
+          url: "https://huggingface.co/huihui-ai/Huihui-Qwen3.8-27B-abliterated-GGUF/resolve/1c69098e9c32db6dc06fc48f1d6cc75ad07da89e/mmproj-model-bf16.gguf",
+          sha256: "c9a09064683620bea3d3bfed5d4462e1a97a7d2fff7e5045d6862a0a85eeb5b5",
+          approx_bytes: 931_145_888,
         },
       },
     },
     download: {
-      url: "https://huggingface.co/HauhauCS/Qwen3.8-27B-Uncensored-HauhauCS-Aggressive-MTP-GGUF/resolve/993a5971fda8f30dd1b7eb2654792ba4415c7460/Qwen3.8-27B-Uncensored-HauhauCS-Aggressive-Q4_K_P.gguf",
-      sha256: "ba36dc3c2b2ff5e0aa5d71092a8894546996a6a119ae391803dda07cdc08516d",
-      approx_bytes: 17_923_393_664,
+      url: "https://huggingface.co/huihui-ai/Huihui-Qwen3.8-27B-abliterated-GGUF/resolve/1c69098e9c32db6dc06fc48f1d6cc75ad07da89e/Huihui-Qwen3.8-27B-abliterated-UD-IQ4_XS.gguf",
+      sha256: "d83adbbbaace8acdfcfe28004f779326176b9df00b4ec99dc6c24d749723d3b9",
+      approx_bytes: 14_403_496_864,
     },
     sizing: {
       kind: "transformer_gguf",
       param_count_billion: 27,
-      bits_per_weight: 5.2,
+      bits_per_weight: 4.184,
       gguf_overhead_fraction: 0.02,
       // Qwen3.8 has 16 full-attention layers; the other 48 use linear attention.
       num_layers: 16,

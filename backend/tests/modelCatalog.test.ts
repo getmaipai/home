@@ -222,21 +222,21 @@ describe("Qwen3.6 35B A3B (MODEL-SWITCH-01)", () => {
 });
 
 describe("Qwen3.8 uncensored replacement (MODEL-SWITCH-02)", () => {
-  const id = "qwen3-8-27b-uncensored-hauhaucs-q4-k-p";
+  const id = "qwen3-8-27b-huihui-abliterated-iq4-xs";
   test("the Home record mirrors Stack's model and projector pins", () => {
     const model = CATALOG.find((entry) => entry.id === id)!;
     expect(model.role).toBe("chat");
     expect(model.download).toEqual({
-      url: "https://huggingface.co/HauhauCS/Qwen3.8-27B-Uncensored-HauhauCS-Aggressive-MTP-GGUF/resolve/993a5971fda8f30dd1b7eb2654792ba4415c7460/Qwen3.8-27B-Uncensored-HauhauCS-Aggressive-Q4_K_P.gguf",
-      sha256: "ba36dc3c2b2ff5e0aa5d71092a8894546996a6a119ae391803dda07cdc08516d",
-      approx_bytes: 17_923_393_664,
+      url: "https://huggingface.co/huihui-ai/Huihui-Qwen3.8-27B-abliterated-GGUF/resolve/1c69098e9c32db6dc06fc48f1d6cc75ad07da89e/Huihui-Qwen3.8-27B-abliterated-UD-IQ4_XS.gguf",
+      sha256: "d83adbbbaace8acdfcfe28004f779326176b9df00b4ec99dc6c24d749723d3b9",
+      approx_bytes: 14_403_496_864,
     });
     expect(model.image_input?.projector.download).toMatchObject({
-      sha256: "5681b690bcb8eb10cd28d62d078cb4e01521a3ea4880a3fc7d54de72de2dd142",
-      approx_bytes: 931_146_624,
+      sha256: "c9a09064683620bea3d3bfed5d4462e1a97a7d2fff7e5045d6862a0a85eeb5b5",
+      approx_bytes: 931_145_888,
     });
     expect(thinkingModeFor(id)).toBe("switchable");
-    expect(Math.abs(weightsBytes(model.sizing as never) - 17_923_393_664) / 17_923_393_664).toBeLessThan(0.01);
+    expect(Math.abs(weightsBytes(model.sizing as never) - 14_403_496_864) / 14_403_496_864).toBeLessThan(0.01);
   });
 
   test("fits the Studio and reports that tool use has not been measured", () => {
@@ -248,6 +248,7 @@ describe("Qwen3.8 uncensored replacement (MODEL-SWITCH-02)", () => {
   test("it carries the uncensored tag alone and replaces the Qwen3.6 record", () => {
     expect(CATALOG.filter((entry) => entry.tags?.includes("uncensored")).map((entry) => entry.id)).toEqual([id]);
     expect(CATALOG.find((entry) => entry.id === "qwen3-6-35b-a3b-uncensored-hauhaucs-q4-k-m")).toBeUndefined();
+    expect(CATALOG.find((entry) => entry.id === "qwen3-8-27b-uncensored-hauhaucs-q4-k-p")).toBeUndefined();
     expect(recommend("chat", hw({ isAppleSilicon: true, unifiedMemoryGb: 128 }))[0]?.model.id).not.toBe(id);
   });
 });
