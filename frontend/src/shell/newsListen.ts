@@ -82,12 +82,17 @@ export function createStoryListener(store: ListenStore, onFail: (line: string) =
   }
 
   return {
+    /** Never throws: a failure is a toast over the page (like every other media line), so the article does not move. */
     async listen(storyId: string): Promise<void> {
-      const body = await api.appData<Array<{ props?: DiscussStory & { speech?: string[] } }> | { blocks?: Array<{ props?: DiscussStory & { speech?: string[] } }> }>("news", "story", { id: storyId });
-      const story = (Array.isArray(body) ? body : body.blocks ?? [])[0]?.props;
-      const paragraphs = story ? listenParagraphs(story) : [];
-      if (!story || paragraphs.length < 2) throw new Error(NOTHING_TO_READ);
-      void read({ id: storyId, title: story.title, paragraphs });
+      try {
+        const body = await api.appData<Array<{ props?: DiscussStory & { speech?: string[] } }> | { blocks?: Array<{ props?: DiscussStory & { speech?: string[] } }> }>("news", "story", { id: storyId });
+        const story = (Array.isArray(body) ? body : body.blocks ?? [])[0]?.props;
+        const paragraphs = story ? listenParagraphs(story) : [];
+        if (!story || paragraphs.length < 1) return onFail(NOTHING_TO_READ);
+        void read({ id: storyId, title: story.title, paragraphs });
+      } catch {
+        onFail(LISTEN_FAILED);
+      }
     },
     stop() { run += 1; abort?.abort(); release(); },
   };

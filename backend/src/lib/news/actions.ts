@@ -15,7 +15,7 @@ import { viewerOf } from "./data";
 
 import { summarizeStory, SUMMARY_SOURCE_NOTE } from "./summary";
 
-export type ActionResult = { ok: true; status: 200; value: Record<string, unknown> } | { ok: false; status: 400 | 403 | 404; error: string };
+export type ActionResult = { ok: true; status: 200; value: Record<string, unknown> } | { ok: false; status: 400 | 403 | 404 | 503; error: string };
 
 export const NEWS_ACTIONS = ["follow", "save", "read", "feedback", "reset_mix", "summarize", "search_recent", "search_recent_clear"] as const;
 export type NewsActionName = (typeof NEWS_ACTIONS)[number];
@@ -119,7 +119,9 @@ export async function runNewsAction(person: PersonRow, action: NewsActionName, b
       const item = releasedItem(viewer, body.id);
       if (!item) return gone();
       const summary = await summarizeStory(storyIdOf(item), viewer.band);
-      return ok({ summary: summary ? { ...summary, source_note: SUMMARY_SOURCE_NOTE } : null });
+      // A silent 200 left the button looking dead; the reader says so and stays readable (the page shows this line under the article).
+      if (!summary) return { ok: false, status: 503, error: "Key points are not ready for this story yet. Try again in a minute." };
+      return ok({ summary: { ...summary, source_note: SUMMARY_SOURCE_NOTE } });
     }
     case "follow": return follow(person, viewer, body);
     case "save": return save(person, viewer, body);

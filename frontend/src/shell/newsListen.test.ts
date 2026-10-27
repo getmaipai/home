@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { listenParagraphs, paragraphLine, createStoryListener, NOTHING_TO_READ } from "@/shell/newsListen";
+import { listenParagraphs, paragraphLine, createStoryListener, NOTHING_TO_READ, LISTEN_FAILED } from "@/shell/newsListen";
 import { createMediaStore } from "@/shell/mediaHost";
 import { api } from "@/lib/api";
 import type { DiscussStory } from "@/shell/pages/NewsDiscussPage";
@@ -19,13 +19,28 @@ describe("News Listen", () => {
 
   test("a story with no words says so instead of playing", async () => {
     const original = api.appData;
-    (api as { appData: unknown }).appData = async () => [{ props: { title: "Empty", blocks: [] } }];
+    (api as { appData: unknown }).appData = async () => [{ props: { title: "", blocks: [] } }];
     try {
-      const listener = createStoryListener(createMediaStore() as never, () => {});
-      await expect(listener.listen("s1")).rejects.toThrow(NOTHING_TO_READ);
+      const lines: string[] = [];
+      const listener = createStoryListener(createMediaStore() as never, (line) => lines.push(line));
+      await listener.listen("s1");
+      expect(lines).toEqual([NOTHING_TO_READ]);
     } finally {
       (api as { appData: unknown }).appData = original;
     }
+  });
+
+  test("a story with one paragraph is read, and a failed fetch is a line, never a throw", async () => {
+    const original = api.appData;
+    const lines: string[] = [];
+    try {
+      (api as { appData: unknown }).appData = async () => { throw new Error("down"); };
+      await createStoryListener(createMediaStore() as never, (line) => lines.push(line)).listen("s1");
+      expect(lines).toEqual([LISTEN_FAILED]);
+    } finally {
+      (api as { appData: unknown }).appData = original;
+    }
+    expect(listenParagraphs({ title: "Short", blocks: [] , speech: ["Only line."] })).toEqual(["Only line."]);
   });
 
   test("retarget moves the held element to the next paragraph without a new element", () => {

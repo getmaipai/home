@@ -35,7 +35,7 @@ Three buttons sit under a story's headline.
 
 **Listen** reads the story to you in your hub's voice. The player appears at the bottom of the screen with pause, speed and a close button, and it keeps going when you open another page. It shows which paragraph it is on. Nothing leaves your home.
 
-**Key points** shows a short summary written on your hub from the article. If the summary is not ready yet, the button asks the hub to write it. You can read the whole story either way.
+**Key points** shows a short summary written on your hub from the article. If the summary is not ready yet, the button asks the hub to write it; if the hub cannot write it right now, a red line at the top says to try again in a minute. You can read the whole story either way.
 
 **Discuss** opens a chat and sends the story with the question "Read this article and tell me what you think, including anything that looks one-sided or missing." Discuss is for teens and adults. A child sees a note to ask a grown-up.
 
