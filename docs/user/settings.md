@@ -64,6 +64,8 @@ An owner or admin can pick the chat model. Open **Settings**, then **AI models**
 
 Qwen3.6 35B A3B is the first model offered beside the default. It starts answering almost at once, because it can skip the thinking step, and it reads the pictures you send. It is a big download (about 22 GB) and is meant for a computer with 64 GB of memory or more.
 
+Qwen3.6 35B A3B Uncensored is a second optional model, marked with an **Uncensored** badge. It is a version of the same model with its own refusals removed, so it answers what an adult asks. It also reads pictures, and it is about a 21 GB download. Home's age and safety rules still apply in front of it, so children's chats are not changed. It is never downloaded unless you press **Download**.
+
 ## Pictures, videos and music
 
 An owner or admin opens **Settings**, **Pictures, videos and music**. It has the picture model (install or see it), who can make pictures, the style library, and the same for videos. Children can make cartoons by default. See [cartoon controls](people.md#cartoon-pictures-and-videos) to change this. See [Pictures](pictures.md) and [Videos](videos.md).
