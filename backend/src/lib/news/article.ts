@@ -5,7 +5,7 @@
 // the page's own pictures and captions, never an ad, and reaches them only through the picture route: a child's copy holds no figures). A page whose text is not an article (under 400 characters, the quality rule) or that
 // cannot be fetched shows the feed's own summary as a teaser. A failure is remembered 30 minutes; "Try again" bypasses.
 // A child's text passes the minor floor and then the child gate sentence by sentence, into both `blocks` and `speech[]`.
-import { randomSuffix } from "@/lib/id";
+import { createHash } from "node:crypto";
 import { nextHlc } from "@/lib/hlc";
 import { pageHtml } from "@/lib/packageHost";
 import { HostError } from "@maipai/spec/emulators/ts/host-emulator.js";
@@ -24,6 +24,10 @@ import { trimArticleTail } from "./tail";
 const NEWS_TTL_MS = 24 * 60 * 60 * 1000;
 // "Failures remembered 30 minutes" is contentQuality's rule (NEWS-02b); the memory is keyed by the item's address.
 let failures = createFailureMemory();
+/** The same block asks for the same id every time, so the page keeps it mounted when it refreshes (a new id each answer remounted the
+ * story page every poll and its picture and source icon flashed). */
+export const stableBlockId = (...parts: string[]): string => `blk-${createHash("sha1").update(parts.join("\u0000")).digest("hex").slice(0, 10)}`;
+
 export function __resetNewsArticleForTests(): void { failures = createFailureMemory(); }
 
 export type ContentSource = StoredContent["source"];
@@ -240,7 +244,7 @@ export async function articleBlock(item: ShelfItem, env: CardEnv, options: { ret
   const image = imageOf(item, title, publisher, env);
   const speech = speechFor(title, blocks);
   return {
-    id: `blk-${randomSuffix(10)}`, kind: "article", schema_version: 1, producer: "news",
+    id: stableBlockId("article", item.id), kind: "article", schema_version: 1, producer: "news",
     alt: `${title}, ${publisher}`.slice(0, 300), provenance: "news data story", created_at: new Date().toISOString(), hlc: nextHlc(),
     props: {
       story_id: storyIdOf(item), item_id: item.id, kicker: topic ?? publisher, title,

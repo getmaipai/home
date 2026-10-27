@@ -13,14 +13,13 @@ import { people } from "@/db/schema";
 import { speakerAgeBand, type AgeBand } from "@/lib/ageBand";
 import { filterAnswerBlocks } from "@/lib/answerBlocks";
 import { nextHlc } from "@/lib/hlc";
-import { randomSuffix } from "@/lib/id";
 import { loadManifestOnly } from "@/lib/plugins";
 import { listFeeds } from "@/lib/shelf/feedStore";
 import { feedIsOfferedTo, releaseShelfItem, releaseShelfItems, visibleFeedIds } from "@/lib/shelf/shelfRead";
 import { sharedShelfStore, type ShelfItem } from "@/lib/shelf/shelfStore";
 import { FEED_LISTS, shelfEnabled } from "@/lib/shelf/shelfPolicy";
 import type { PersonRow } from "@/types";
-import { articleBlock } from "./article";
+import { articleBlock, stableBlockId } from "./article";
 import { cardEnv, cardOf, enrichLeadCards, hostOf, itemIdFrom, pictureAlt, publishedAtOf, storyIdOf, topicsShown, type CardEnv, type StoryCard, type Viewer } from "./cards";
 import { rankStories, type RankInput } from "./rankStories";
 import { followedChannels, isFollowing, listSaves, recomputeMix, recordRead } from "./records";
@@ -70,7 +69,7 @@ export function finishBlocks(person: Pick<PersonRow, "displayName">, band: AgeBa
 }
 
 export const blockBase = (kind: string, alt: string, provenance: string) => ({
-  id: `blk-${randomSuffix(10)}`, kind, schema_version: 1, producer: "news", alt: alt.slice(0, 300), provenance, created_at: new Date().toISOString(), hlc: nextHlc(),
+  id: stableBlockId(kind, provenance), kind, schema_version: 1, producer: "news", alt: alt.slice(0, 300), provenance, created_at: new Date().toISOString(), hlc: nextHlc(),
 });
 
 // ---- Ranked feeds ----------------------------------------------------------------------------

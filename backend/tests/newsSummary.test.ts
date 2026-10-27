@@ -121,3 +121,10 @@ test("an opened story carries its stored Key points, and none before they are wr
   expect(points?.text).toBe(`${good.intro}\n${good.points.map((point) => `\u2022 ${point}`).join("\n")}`);
   expect(calls).toBe(1);
 });
+
+test("a story answers with the same block id every time, so the page does not remount it on each refresh", async () => {
+  const adult = await owner(); installNewsApp(); const item = seed("adult"); const other = seed("adult");
+  const idOf = async (id: string) => ((await (await adult.client.post("/api/plugins/news/data/story", { id })).json()) as { blocks: Array<{ id: string }> }).blocks[0]!.id;
+  expect(await idOf(item.id)).toBe(await idOf(item.id));
+  expect(await idOf(item.id)).not.toBe(await idOf(other.id));
+});
