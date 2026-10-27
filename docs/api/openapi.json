@@ -58439,6 +58439,219 @@
         }
       }
     },
+    "/api/companions/{id}/appearance": {
+      "get": {
+        "tags": [
+          "Companions"
+        ],
+        "summary": "Read companion appearance draft and published status",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 80
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Draft and published appearance status.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "has_changes": {
+                      "type": "boolean"
+                    },
+                    "can_publish": {
+                      "type": "boolean"
+                    },
+                    "reasons": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "published": {
+                      "type": "object",
+                      "nullable": true,
+                      "properties": {
+                        "at": {
+                          "type": "string"
+                        },
+                        "by": {
+                          "type": "string"
+                        },
+                        "states": {
+                          "type": "object",
+                          "additionalProperties": {
+                            "type": "string",
+                            "nullable": true
+                          }
+                        }
+                      },
+                      "required": [
+                        "at",
+                        "by",
+                        "states"
+                      ]
+                    },
+                    "states": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "state": {
+                            "type": "string"
+                          },
+                          "assigned_take": {
+                            "type": "string",
+                            "nullable": true
+                          },
+                          "approved": {
+                            "type": "boolean"
+                          },
+                          "published_take": {
+                            "type": "string",
+                            "nullable": true
+                          },
+                          "changed": {
+                            "type": "boolean"
+                          }
+                        },
+                        "required": [
+                          "state",
+                          "assigned_take",
+                          "approved",
+                          "published_take",
+                          "changed"
+                        ]
+                      }
+                    },
+                    "portrait_changed": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "has_changes",
+                    "can_publish",
+                    "reasons",
+                    "published",
+                    "states",
+                    "portrait_changed"
+                  ]
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Only the author or an admin can read this companion",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No household companion",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/companions/{id}/appearance/publish": {
+      "post": {
+        "tags": [
+          "Companions"
+        ],
+        "summary": "Publish the approved companion appearance",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 80
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Appearance published.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "published": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "published"
+                  ]
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Only the author or an admin can publish this companion",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No household companion",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Appearance is not ready to publish",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Appearance checks need attention",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/companions/{id}/states": {
       "get": {
         "tags": [
@@ -60051,6 +60264,16 @@
           },
           "409": {
             "description": "Companion is in use",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Published artwork does not pass the new audience checks",
             "content": {
               "application/json": {
                 "schema": {
