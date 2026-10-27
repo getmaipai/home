@@ -784,6 +784,41 @@ fetch_home_commons() {
   link_commons_siblings "$work" "$deps"
 }
 
+# Before anything on this computer is stopped or replaced: every Commons tag the fetched Home source pins has a digest
+# in this script (or is already staged). Run against the new source, so a missing digest ends the install while the
+# old Home is still intact, not after its dependencies were removed (issue 248, 249).
+check_home_pins() {
+  local dir="$1" label="${2:-this version}" work m deps one pkg cdir tag
+  work=$(dirname "$dir")
+  for m in backend frontend; do
+    [ -f "${dir}/${m}/package.json" ] || continue
+    grep -q 'file:\.\./\.\./commons-tags/' "${dir}/${m}/package.json" || continue
+    one=$(stack_commons_deps "${dir}/${m}/package.json" "Home's ${m}/package.json") || { printf '%s\n' "$one"; return 1; }
+    deps="${deps:-}${one}"$'\n'
+  done
+  while read -r pkg cdir tag; do
+    [ -n "$pkg" ] || continue
+    [ -f "${work}/commons-tags/${cdir}/${pkg}/package.json" ] && continue
+    if ! commons_archive_sha256 "$tag" >/dev/null; then
+      log "${label} pins Commons ${tag}, and this installer has no SHA-256 for it. Nothing was replaced and the running Home is untouched. Add the digest of https://github.com/getmaipai/commons/archive/refs/tags/${tag}.tar.gz to commons_archive_sha256 in scripts/install.sh and scripts/engine-computer/maipai-engine, then run the installer again."
+      return 1
+    fi
+  done <<< "$(printf '%s' "${deps:-}" | sort -u)"
+}
+
+# A commit install runs the installer that commit carries. When the script that is running is not the fetched
+# commit's own scripts/install.sh, run that one instead, so the digests and steps always match the source.
+reexec_with_source_installer() {
+  local src="$1"; shift
+  [ -z "${MAIPAI_INSTALL_SOURCE_REEXEC:-}" ] || return 0
+  [ -f "${src}/scripts/install.sh" ] && [ -f "$0" ] || return 0
+  [ "$(sha256_file "$0")" != "$(sha256_file "${src}/scripts/install.sh")" ] || return 0
+  local copy
+  copy=$(mktemp "${TMPDIR:-/tmp}/maipai-install.XXXXXX") && cp "${src}/scripts/install.sh" "$copy" || return 0
+  log "This installer is not the one the commit carries. Running the commit's own installer."
+  MAIPAI_INSTALL_SOURCE_REEXEC=1 MAIPAI_INSTALL_SELF_COPY="$copy" exec bash "$copy" "$@"
+}
+
 # One Commons package can name another as file:../<name> (core and ui name spec). A checkout of
 # Commons has the packages side by side, but here each tag sits in its own folder, so the sibling
 # is missing and bun install fails on it. Point each such name at the folder Home already staged.
@@ -1738,6 +1773,19 @@ on_install_exit() {
 }
 
 main() {
+  # A script that replaces its own folder must not run from it: rsync below rewrites scripts/install.sh while bash is
+  # still reading it (a go-back runs the installed copy). Run from a temporary copy instead.
+  if [ -n "${MAIPAI_INSTALL_SELF_COPY:-}" ] && [ "$MAIPAI_INSTALL_SELF_COPY" = "$0" ]; then
+    trap 'rm -f "$MAIPAI_INSTALL_SELF_COPY"' EXIT
+  elif [ -z "${MAIPAI_INSTALL_SELF_COPY:-}" ] && [ -f "$0" ] && [ "$#" -gt 0 ]; then
+    case " $* " in *" --rollback "*|*" --commit "*)
+      local self_copy
+      if self_copy=$(mktemp "${TMPDIR:-/tmp}/maipai-install.XXXXXX") && cp "$0" "$self_copy"; then
+        MAIPAI_INSTALL_SELF_COPY="$self_copy" exec bash "$self_copy" "$@"
+      fi ;;
+    esac
+  fi
+  local original_args=("$@")
   local dry_run="no"
   local engine_computer="no"
   local stack_only="no"
@@ -1949,6 +1997,13 @@ main() {
     rm -rf "${install_root}.new"
     fetch_release_source "$tag" "${install_root}.new" \
       || die "could not download ${REPO}@${tag}. Check that this computer can reach github.com, then run the installer again. Nothing was changed."
+    if [ -n "$commit_flag" ]; then
+      reexec_with_source_installer "${install_root}.new" "${original_args[@]}"
+    fi
+    check_home_pins "${install_root}.new" "${tag}" \
+      || die "the source for ${tag} cannot be installed by this installer. Nothing was changed."
+    # From here a failure can leave files half replaced, so the exit handler must not say none were.
+    INSTALL_STAGE="replaced"
     # rsync --delete so a file the new release removed also disappears
     # here (a plain cp -a only ever adds/overwrites) - but data/,
     # backups/, received-backups/ (lib/paths.ts's own layout, all three
@@ -1960,6 +2015,7 @@ main() {
     rsync -a --delete \
       --exclude=/data --exclude=/data.rolled-back-* --exclude=/backups --exclude=/received-backups \
       --exclude=/stack --exclude=/.bun --exclude=/upgrade-backups \
+      --exclude=/backend/node_modules --exclude=/frontend/node_modules \
       --exclude=/.installed-tag --exclude=/.previous-tag --exclude=/.stack-port-base --exclude=/.install-user \
       "${install_root}.new/" "${install_root}/"
     rm -rf "${install_root}.new"

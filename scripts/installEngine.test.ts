@@ -142,6 +142,43 @@ main ${args.join(" ")}`]);
     } finally { rmSync(root, { recursive: true, force: true }); }
   });
 
+  const UPGRADE_FETCH = (pins: string) => `fetch_release_source() { t "fetch_release_source $1"; mkdir -p "$2/backend"; printf '%s\\n' '${pins}' > "$2/backend/package.json"; }`;
+  const PIN = (tag: string) => JSON.stringify({ dependencies: { "@maipai/ui": `file:../../commons-tags/ui-${tag}/ui` } });
+
+  test("upgrade: a Commons pin with no digest stops the install before any file is replaced (issue 248)", () => {
+    const root = mkdtempSync(join(tmpdir(), "maipai-main-order-"));
+    mkdirSync(join(root, "install"));
+    writeFileSync(join(root, "install", ".installed-tag"), "v0.0.9\n");
+    try {
+      const { result, lines } = runMain(root, UPGRADE_FETCH(PIN("ui-v9.9.9")));
+      expect(result.exitCode).toBe(1);
+      expect(lines).not.toContain("rsync");
+      expect(lines).toContain("launchctl bootstrap");
+      const out = result.stdout.toString() + result.stderr.toString();
+      expect(out).toContain("no SHA-256 for it");
+      expect(out).toContain("Nothing was changed");
+      expect(out).toContain("before any file was replaced");
+    } finally { rmSync(root, { recursive: true, force: true }); }
+  });
+
+  test("upgrade: the delete leaves node_modules alone and a half-finished replace is not reported as untouched (issue 249)", () => {
+    const root = mkdtempSync(join(tmpdir(), "maipai-main-order-"));
+    mkdirSync(join(root, "install"));
+    writeFileSync(join(root, "install", ".installed-tag"), "v0.0.9\n");
+    try {
+      writeFileSync(join(root, "install", ".previous-tag"), "v0.0.8\n");
+      const { result, lines } = runMain(root, 'rsync() { t "rsync $*"; return 23; }');
+      expect(result.exitCode).not.toBe(0);
+      const rsyncLine = lines.find((line) => line.startsWith("rsync "))!;
+      expect(rsyncLine).toContain("--exclude=/backend/node_modules");
+      expect(rsyncLine).toContain("--exclude=/frontend/node_modules");
+      const out = result.stdout.toString() + result.stderr.toString();
+      expect(out).toContain("The install stopped part way");
+      expect(out).not.toContain("before any file was replaced");
+      expect(out).toContain("--rollback");
+    } finally { rmSync(root, { recursive: true, force: true }); }
+  });
+
   test("a failed preflight stops before the Stack and before any service", () => {
     const root = mkdtempSync(join(tmpdir(), "maipai-main-order-"));
     try {
