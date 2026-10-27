@@ -125,8 +125,7 @@ describe("THIN-5C: the gate's grain follows the person", () => {
 });
 
 describe("THIN-5C: which grain each person and surface gets", () => {
-  test("a child is always per sentence, setting or not", () => {
-    setHouseholdSettingValue("chat.teen_gate_grain", "arrival");
+  test("a child is always per sentence", () => {
     expect(gateGrainFor("child", "chat", false)).toBe("sentence");
   });
 
@@ -134,25 +133,18 @@ describe("THIN-5C: which grain each person and surface gets", () => {
     expect(gateGrainFor("adult", "chat", false)).toBe("arrival");
   });
 
-  test("every spoken turn is per sentence whatever the setting or the band", () => {
-    setHouseholdSettingValue("chat.teen_gate_grain", "arrival");
+  test("every spoken turn is per sentence whatever the band", () => {
     expect(gateGrainFor("adult", "chat", true)).toBe("sentence");
     expect(gateGrainFor("adult", "robot", false)).toBe("sentence");
     expect(gateGrainFor("teen", "chat", true)).toBe("sentence");
   });
 
-  test("a teen is per sentence by default and follows the household setting", () => {
-    expect(gateGrainFor("teen", "chat", false)).toBe("sentence");
-    setHouseholdSettingValue("chat.teen_gate_grain", "arrival");
-    expect(gateGrainFor("teen", "chat", false)).toBe("arrival");
-    setHouseholdSettingValue("chat.teen_gate_grain", "sentence");
+  test("a teen is always per sentence (a cut sentence can only be withheld before release)", () => {
     expect(gateGrainFor("teen", "chat", false)).toBe("sentence");
   });
 
-  test("the setting is a household key defaulting to per sentence, with no person scope", () => {
-    const key = getRegistryKey("chat.teen_gate_grain");
-    expect(key?.scope).toBe("household");
-    expect(key?.default).toBe("sentence");
+  test("there is no setting for a teen's grain any more", () => {
+    expect(getRegistryKey("chat.teen_gate_grain")).toBeUndefined();
   });
 });
 
@@ -199,14 +191,12 @@ describe("THIN-5C: the live turn path", () => {
     expect(chunks[0]!.trim()).toBe(SAFE_SENTENCE);
   });
 
-  test("a teen's reply follows the household setting, per sentence unless it says otherwise", async () => {
+  test("a teen's reply is released a whole sentence at a time", async () => {
     db.update(peopleTable).set({ role: "teen" }).where(eq(peopleTable.id, people.child.id)).run();
     const teen = db.select().from(peopleTable).where(eq(peopleTable.id, people.child.id)).get()!;
     const standard = await streamReply(teen, `${SAFE_SENTENCE} Water it when the soil feels dry.`);
     expect(standard.chunks[0]!.trim()).toBe(SAFE_SENTENCE);
-    setHouseholdSettingValue("chat.teen_gate_grain", "arrival");
-    const arriving = await streamReply(teen, `${SAFE_SENTENCE} Water it when the soil feels dry.`);
-    expect(arriving.chunks.length).toBeGreaterThan(5);
+
   });
 
   test("a refusal mid-stream on an adult's turn throws the safety refusal and keeps what was sent", async () => {
@@ -216,10 +206,9 @@ describe("THIN-5C: the live turn path", () => {
     expect(chunks.join("")).not.toContain("step by step instructions");
   });
 
-  test("a refusal mid-stream on a teen's as-it-arrives turn still notifies the parent, once", async () => {
+  test("a refusal mid-stream on a teen's turn still notifies the parent, once", async () => {
     db.update(peopleTable).set({ role: "teen" }).where(eq(peopleTable.id, people.child.id)).run();
     const teen = db.select().from(peopleTable).where(eq(peopleTable.id, people.child.id)).get()!;
-    setHouseholdSettingValue("chat.teen_gate_grain", "arrival");
     const { chunks, refusal } = await streamReply(teen, `${SAFE_SENTENCE} ${UNSAFE_SENTENCE}`);
     expect(refusal).toBeInstanceOf(StreamSafetyRefusal);
     expect(chunks.join("")).toContain("beautiful day");

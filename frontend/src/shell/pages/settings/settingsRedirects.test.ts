@@ -10,7 +10,7 @@ const key = (k: string, lives_in: string, scope: SettingsKey["scope"] = "person"
 const registry = [
   key("search.safe_search", "person.search"),
   key("search.searxng_url", "household.search", "household"),
-  key("chat.teen_gate_grain", "household.ai_advanced", "household"),
+  key("chat.flash_attention_override", "household.ai_advanced", "household"),
   key("notifications.browser.enabled", "person.notifications"),
 ];
 
@@ -42,7 +42,7 @@ describe("legacy settings search links", () => {
     ["?tab=me&section=appearance", "/settings/appearance?tab=appearance"],
     ["?tab=me&section=chat", "/settings/chat"],
     ["?tab=household&section=ai", "/settings/ai?tab=overview"],
-    ["?tab=household&section=household.ai", "/settings/ai?tab=advanced#chat.teen_gate_grain"],
+    ["?tab=household&section=household.ai", "/settings/ai?tab=advanced#chat.flash_attention_override"],
     ["?tab=household&section=household.search", "/settings/search?tab=search#search.searxng_url"],
     ["?tab=me&section=person.search", "/settings/chat?tab=general#search.safe_search"],
     ["?tab=device", "/settings/voice?tab=device"],
@@ -50,7 +50,7 @@ describe("legacy settings search links", () => {
     expect(legacySettingsTarget(search, "", admin, registry)).toBe(expected);
   });
   test("household search links remain on their page so non-admins see the access explanation", () => {
-    expect(legacySettingsTarget("?tab=household&section=household.ai", "", member, registry)).toBe("/settings/ai?tab=advanced#chat.teen_gate_grain");
+    expect(legacySettingsTarget("?tab=household&section=household.ai", "", member, registry)).toBe("/settings/ai?tab=advanced#chat.flash_attention_override");
   });
   test("hash deep links survive the legacy chat section", () => {
     expect(legacySettingsTarget("?tab=me&section=chat", "#chat.photo_uploads", member, registry)).toBe("/settings/chat#chat.photo_uploads");

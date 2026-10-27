@@ -120,18 +120,6 @@ export const AI_SETTINGS_KEYS: SettingsKey[] = [
     honoured_by: ["home"],
   }),
   SettingsKey.parse({
-    key: "chat.teen_gate_grain",
-    scope: "household",
-    selector: "select",
-    range: { options: ["sentence", "arrival"] },
-    default: "sentence",
-    label: "How a teen's replies are checked",
-    help: "\"Sentence\" checks every sentence before a teen sees it (the default). \"Arrival\" shows a teen's reply as it is written and checks it as it comes, so part of a sentence can show before its check finishes and the reply stops there if the check fails. Children and anything spoken always check every sentence first.",
-    level: "advanced",
-    lives_in: "household.ai_advanced",
-    honoured_by: ["home"],
-  }),
-  SettingsKey.parse({
     key: "chat.search_assist",
     scope: "household",
     selector: "select",

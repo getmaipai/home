@@ -28,7 +28,6 @@ import type { AgeBand } from "@/lib/ageBand";
 import { turnAgeBand } from "../speaker";
 import { stripLinksForChild } from "@/lib/childLinks";
 import { surfaceClassOf } from "@/lib/surfaceClass";
-import { getHouseholdSettingValue } from "@/lib/settings";
 import type { Surface } from "@/lib/turnShared";
 import { REFUSAL_FIRST } from "@/lib/replyVariation";
 import { PROMPT_REFUSAL_LINE } from "@/lib/pictures/policy";
@@ -39,6 +38,7 @@ import { failureLine } from "@/lib/generationFailure";
 import { notifyOncePerTurn } from "@/lib/turnShared";
 import type { PersonRow } from "@/lib/memoryIngestion";
 import { nextSentenceBoundary } from "@maipai/spec/safety/ts/sentenceChunker.js";
+import { SUICIDE_METHOD_NOTE, namesSuicideMethod, redactSuicideMethod } from "@maipai/spec/safety/ts/replyMethod.js";
 import type { SafetyResult } from "@maipai/spec/gen/ts/safety-result.js";
 import type { Node, TurnState } from "../contract";
 import type { AnswerOutput } from "./answer";
@@ -76,6 +76,18 @@ export interface StreamGateResult {
   /** THIN-5B: a reasoning sentence refused. Reasoning stopped there; the
    * answer is unaffected, and what had already been released stays. */
   reasoningRefused: boolean;
+}
+
+/** A child's or teen's authored spoken text is cut the same way as the shown text. */
+function minorSpeech(band: AgeBand, speech: string | undefined): string | undefined {
+  return band === "adult" || speech === undefined ? speech : redactSuicideMethod(speech).text;
+}
+
+/** On a streamed turn the gate already cut the shown text. Authored speech that differed from the reply is cut the same way;
+ * speech that was the reply itself follows what the gate delivered. */
+function streamedSpeech(band: AgeBand, reply: { text: string; speech?: string }, delivered: string): string | undefined {
+  if (band === "adult" || reply.speech === undefined) return reply.speech;
+  return reply.speech === reply.text ? delivered : redactSuicideMethod(reply.speech).text;
 }
 
 const FIXED_MINOR_REFUSAL_LINES: ReadonlySet<string> = new Set([PROMPT_REFUSAL_LINE.minor_sexual, VIDEO_REFUSAL_LINE.minor_sexual]);
@@ -183,21 +195,13 @@ class ReasoningLane {
 export type GateGrain = "sentence" | "arrival";
 
 /** Who gets which grain. A spoken or glance turn is per sentence whatever
- * the band or any setting; a child is per sentence; an adult's written
- * chat arrives as generated; a teen's written chat follows the household
- * setting and defaults to per sentence. A failed read of the setting is
- * the stricter grain. */
+ * the band; a child and a teen are per sentence (a sentence that names how
+ * a person died by suicide can only be withheld before it is released, so
+ * the household setting `chat.teen_gate_grain` no longer changes a teen's
+ * grain); an adult's written chat arrives as generated. */
 export function gateGrainFor(band: AgeBand, surface: Surface, spoken: boolean): GateGrain {
   if (surfaceClassOf(surface, spoken) !== "written") return "sentence";
-  if (band === "adult") return "arrival";
-  if (band === "teen") {
-    try {
-      return getHouseholdSettingValue("chat.teen_gate_grain") === "arrival" ? "arrival" : "sentence";
-    } catch {
-      return "sentence";
-    }
-  }
-  return "sentence";
+  return band === "adult" ? "arrival" : "sentence";
 }
 
 export interface StreamGateOptions {
@@ -225,6 +229,11 @@ export class StreamGate {
   private joinNext = false;
   private refused: SafetyResult | undefined;
   private lastFlagged: SafetyResult | undefined;
+  /** A child's or teen's sentence naming how a person died by suicide was left out; the fixed note follows at the end. */
+  private methodCut = false;
+  /** A child's or teen's clause-split front half (the chunker flushes a long sentence at a comma): held until the sentence ends, so a
+   * cut sentence is never left as a fragment. */
+  private heldClause = "";
   private envelopeDecided = false;
   private heldAsEnvelope = false;
   /** ANALYSIS-LEAK-01: the reply opened in the model's own task-analysis voice ("The user is asking ..."): reasoning, held whole and never released. */
@@ -288,6 +297,8 @@ export class StreamGate {
     this.heldAsLeak = false;
     this.swallowing = false;
     this.markupText = "";
+    this.methodCut = false;
+    this.heldClause = "";
     // Per sentence, an abandoned round released nothing, so the record
     // starts clean. As it arrives, what the round showed stays shown and
     // stays in the record; the next round continues after it.
@@ -377,8 +388,14 @@ export class StreamGate {
       const end = nextSentenceBoundary(this.pending, this.isFirstChunk);
       if (end < 0) break;
       this.isFirstChunk = false;
-      const rawSpan = this.pending.slice(0, end);
+      const piece = this.pending.slice(0, end);
       this.pending = this.pending.slice(end);
+      if (this.band !== "adult" && piece.trim() && !/[.!?\u2026]["')\]]*\s*$/.test(piece)) {
+        this.heldClause += piece;
+        continue;
+      }
+      const rawSpan = this.heldClause + piece;
+      this.heldClause = "";
       const trimmed = rawSpan.trim();
       if (!trimmed) {
         // Whitespace alone between two sentences: nothing to classify,
@@ -407,11 +424,25 @@ export class StreamGate {
         this.onRefuse(whole);
         return;
       }
+      if (this.band !== "adult" && namesSuicideMethod(trimmed, this.checked)) {
+        this.methodCut = true;
+        this.checked += rawSpan;
+        continue;
+      }
       const shown = this.shownText(rawSpan);
       this.delivered += shown;
       this.checked += rawSpan;
       this.release(shown);
     }
+  }
+
+  /** A minor's reply that told a suicide without its method: one fixed note, released last (never refused, never a parent alert). */
+  private releaseMethodNote(): void {
+    if (!this.methodCut) return;
+    this.methodCut = false;
+    const note = `${this.delivered.trim() ? "\n\n" : ""}${SUICIDE_METHOD_NOTE}`;
+    this.delivered += note;
+    this.release(note);
   }
 
   /** MINOR-SEARCH-01m: a child's released text carries no link (closed formats); the safety checks above ran on the raw text. */
@@ -500,6 +531,8 @@ export class StreamGate {
     try {
       this.reasoningLane?.endGeneration();
       if (this.refused || this.heldAsEnvelope || this.heldAsLeak) return;
+      this.pending = this.heldClause + this.pending;
+      this.heldClause = "";
       const remainder = this.pending.trim();
       if (!remainder) return;
       const safety = this.checkAndNotify(remainder);
@@ -534,12 +567,18 @@ export class StreamGate {
         this.checked += this.pending;
         return;
       }
+      if (this.band !== "adult" && namesSuicideMethod(remainder, this.checked)) {
+        this.methodCut = true;
+        this.checked += this.pending;
+        return;
+      }
       const repaired = repairTail(this.delivered, this.pending);
       const shown = this.shownText(repaired);
       this.delivered += shown;
       this.checked += repaired;
       this.release(shown);
     } finally {
+      if (!this.refused) this.releaseMethodNote();
       this.onDone();
     }
   }
@@ -667,10 +706,10 @@ export const outputGateNode: Node<OutputGateInput, OutputGateOutput> = async (st
     // into `content`) still gets the whole-span pass below.
     if (input.reasoningEmit && (streamed.reasoning || streamed.reasoningRefused)) {
       const reasoningOut = streamed.reasoning || undefined;
-      return { outcome: { ok: true }, output: { refused: false, text: streamed.text, speech: input.reply.speech, sources: input.reply.sources, reasoningOut, reasoning: { emitted: reasoningOut !== undefined, withheld_for: streamed.reasoningRefused ? "gate" : null } } };
+      return { outcome: { ok: true }, output: { refused: false, text: streamed.text, speech: streamedSpeech(band, input.reply, streamed.text), sources: input.reply.sources, reasoningOut, reasoning: { emitted: reasoningOut !== undefined, withheld_for: streamed.reasoningRefused ? "gate" : null } } };
     }
     const { reasoningOut, withheldFor } = gateReasoning(input, band, state.actor, state.turnId);
-    return { outcome: { ok: true }, output: { refused: false, text: streamed.text, speech: input.reply.speech, sources: input.reply.sources, reasoningOut, reasoning: { emitted: reasoningOut !== undefined, withheld_for: withheldFor } } };
+    return { outcome: { ok: true }, output: { refused: false, text: streamed.text, speech: streamedSpeech(band, input.reply, streamed.text), sources: input.reply.sources, reasoningOut, reasoning: { emitted: reasoningOut !== undefined, withheld_for: withheldFor } } };
   }
 
   // Home's own fixed refusal of a picture or video request that crosses the minor line names children and sexual
@@ -680,9 +719,10 @@ export const outputGateNode: Node<OutputGateInput, OutputGateOutput> = async (st
     return { outcome: { ok: true }, output: { refused: false, text: input.reply.text, speech: input.reply.speech, sources: input.reply.sources, reasoning: { emitted: false, withheld_for: input.reasoningEmit ? "gate" : input.reasoningWithheldFor } } };
   }
   const repairedRaw = assessReply(input.reply.text) ? repairReply(input.reply.text) : input.reply.text;
-  const repaired = band === "child" ? stripLinksForChild(repairedRaw) : repairedRaw;
+  const linked = band === "child" ? stripLinksForChild(repairedRaw) : repairedRaw;
+  const repaired = band === "adult" ? linked : redactSuicideMethod(linked).text;
   const evaluation = evaluateReply({ text: repairedRaw, speech: input.reply.speech }, band);
-  const speechOut = band === "child" && input.reply.speech ? stripLinksForChild(input.reply.speech) : input.reply.speech;
+  const speechOut = minorSpeech(band, band === "child" && input.reply.speech ? stripLinksForChild(input.reply.speech) : input.reply.speech);
   // SAFETY-NOTIFY-NEXT-01: the immediate (non-streamed) path's own whole-
   // reply boundary - the identical call the old engine file's own
   // applyOutputBoundary() makes right after its own equivalent

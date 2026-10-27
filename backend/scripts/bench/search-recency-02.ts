@@ -27,13 +27,13 @@ import "../../../scripts/runTemp";
 //           MAIPAI_SR_WEIGHTS=<manifest.json> overrides the pinned head with a locally trained one (ROUTER-BUILD-01f); unset, the arm uses the real pin.
 //   desc    (arm 1) plain plus one sentence on the websearch description (first round).
 //   cutoff  (arm 2) plain plus the loki-doki e0d8c75e knowledge-cutoff block on the system message.
-// Teen rows (01k) run once per gate grain (--grains sentence,arrival; sets chat.teen_gate_grain); a child is always sentence.
+// A child and a teen are always per sentence.
 // Child and spoken rows always run the plain turn (router and forcing apply to adult rows only).
 // Prior turns of a follow-up row run through the hub in the same conversation as a plain turn.
 //
 //   MAIPAI_LLAMA_SERVER_URL=http://127.0.0.1:8771 MAIPAI_KS_OUT=<dir> \
 //   bun run scripts/bench/search-recency-02.ts [--arms diag,router,always,plain] [--reps 3]
-//        [--bands adult,child,teen] [--grains sentence,arrival] [--only id,id] [--limit N] [--fresh]
+//        [--bands adult,child,teen] [--only id,id] [--limit N] [--fresh]
 //   bun run scripts/bench/search-recency-02.ts --summarize
 //   MAIPAI_SR_DATASET=<a.json>,<b.json> runs the rows of several dataset files (held-out by each row's own split).
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
@@ -300,8 +300,6 @@ if (!chatUrl) {
 const classifierDecisions: Record<string, string> = process.env.MAIPAI_SR_DECISIONS ? JSON.parse(readFileSync(process.env.MAIPAI_SR_DECISIONS, "utf-8")) : {};
 const ARMS = ((argOf("--arms") ?? "diag,router,always,plain").split(",").map((s) => s.trim()).filter(Boolean)) as Arm[];
 for (const a of ARMS) if (!ALL_ARMS.includes(a)) throw new Error(`--arms: unknown arm ${a}; known: ${ALL_ARMS.join(", ")}`);
-const GRAINS = (argOf("--grains") ?? "sentence").split(",").map((g) => g.trim()).filter(Boolean) as Grain[];
-for (const g of GRAINS) if (g !== "sentence" && g !== "arrival") throw new Error(`--grains: ${g} is not sentence or arrival`);
 const REPS = Math.max(1, Number(argOf("--reps") ?? 3));
 if (!Number.isFinite(REPS)) throw new Error("--reps must be a number, for example --reps 3");
 const BANDS = new Set((argOf("--bands") ?? "adult,child").split(",").map((s) => s.trim()));
@@ -547,7 +545,7 @@ async function main(): Promise<void> {
   if (existsSync(RESULTS) && !process.argv.includes("--fresh")) runs = (JSON.parse(readFileSync(RESULTS, "utf-8")) as { runs: RunRecord[] }).runs;
   const done = new Set(runs.map((r) => `${r.arm}|${r.row}|${r.rep}|${r.grain ?? "-"}`));
   // 01k: a teen row runs once per gate grain; a child is always per sentence; adult and spoken have no grain.
-  const grainsFor = (row: Row): (Grain | null)[] => (row.band === "teen" ? GRAINS : row.band === "child" ? ["sentence"] : [null]);
+  const grainsFor = (row: Row): (Grain | null)[] => (row.band === "adult" ? [null] : ["sentence"]);
   const work = selected.flatMap((row) => grainsFor(row).map((grain) => ({ row, grain })));
   let consecutiveErrors = 0;
 
@@ -570,10 +568,6 @@ async function main(): Promise<void> {
       for (const { row, grain } of work) {
         if (done.has(`${arm}|${row.id}|${rep}|${grain ?? "-"}`)) continue;
         console.log(`[search-recency-02] rep ${rep}/${REPS} ${arm} ${row.id}${grain ? ` (${grain})` : ""}`);
-        if (grain && row.band === "teen") {
-          const g = setHouseholdSettingValue("chat.teen_gate_grain", grain);
-          if (!g.ok) throw new Error(`could not set chat.teen_gate_grain: ${g.error}`);
-        }
         const base = { arm, row: row.id, band: row.band, category: row.category, heldOut: row.heldOut, followUp: !!row.followUp, rep, prompt: row.prompt, grain, hit: row.hit ?? null };
         const blank = { routerAnswer: null as string | null, diagMs: null as number | null, forced: false };
         if (arm === "diag") {

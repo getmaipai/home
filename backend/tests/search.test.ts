@@ -157,9 +157,9 @@ describe("GET /api/search: settings", () => {
 
   test("a word from a household setting's label opens the household page that holds it", async () => {
     const { client } = await owner();
-    const groups = await search(client, "teen's replies");
-    const found = group(groups, "setting")?.results.find((r) => r.id === "chat.teen_gate_grain");
-    expect(found).toMatchObject({ kind: "setting", title: "How a teen's replies are checked", subtitle: expect.stringContaining("checks every sentence before a teen sees it"), href: "/settings/ai?tab=advanced#chat.teen_gate_grain" });
+    const groups = await search(client, "Flash attention");
+    const found = group(groups, "setting")?.results.find((r) => r.id === "chat.flash_attention_override");
+    expect(found).toMatchObject({ kind: "setting", title: "Flash attention override", subtitle: expect.stringContaining("decide based on the model"), href: "/settings/ai?tab=advanced#chat.flash_attention_override" });
   });
 
   test("a person-scope setting opens the Account or Chat settings page that draws it", async () => {
