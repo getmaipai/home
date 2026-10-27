@@ -1,12 +1,13 @@
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient, type UseMutationResult } from "@tanstack/react-query";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { AsyncState } from "@maipai/ui/src/primitives/AsyncState";
 import { EmptyState } from "@maipai/ui/src/primitives/EmptyState";
 import { Section } from "@maipai/ui/src/primitives/Section";
-import { CharacterHero } from "@maipai/ui/src/elements/character-hero";
-import { CharacterTile } from "@maipai/ui/src/primitives/CharacterTile";
-import { Badge } from "@maipai/ui/src/dashboard/components/ui/badge";
+import { CompanionCard as CompanionCardElement } from "@maipai/ui/src/elements/companion-card";
+import { CompanionProfileHeader } from "@maipai/ui/src/elements/companion-profile-header";
+import { Avatar, AvatarFallback, AvatarImage } from "@maipai/ui/src/elements/ui/avatar";
+import { Badge } from "@maipai/ui/src/elements/ui/badge";
 import { Alert, AlertDescription } from "@maipai/ui/src/ui/alert";
 import { Button } from "@maipai/ui/src/ui/button";
 import { Select } from "@maipai/ui/src/primitives/Select";
@@ -17,24 +18,35 @@ import { voicePreviewPlayer, type VoicePreviewState } from "@/lib/voice/voicePre
 import { useTabItem } from "@/shell/tabIdentity";
 import { useCompanionShells } from "@/lib/companionShells";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@maipai/ui/src/ui/tabs";
-import { List } from "@maipai/ui/src/primitives/List";
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@maipai/ui/src/ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@maipai/ui/src/ui/alert-dialog";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@maipai/ui/src/ui/dropdown-menu";
 import { Chip } from "@maipai/ui/src/primitives/Chip";
 import { getIcon } from "@maipai/ui/src/icons";
 import { formatRelative } from "@maipai/ui/src/relativeTime";
 import { Status } from "@maipai/ui/src/ui/status";
+import { Input } from "@maipai/ui/src/ui/input";
+import { useCompanionStills } from "@/apps/chat/useCompanionAvatar";
 
 const listKey = ["companions"] as const;
 const ROBOT_SETTINGS = "/settings/apps?tab=robot";
-const SettingsIcon = getIcon("settings-2");
-const ChevronRightIcon = getIcon("chevron-right");
 const MoreIcon = getIcon("more-horizontal");
-const BackIcon = getIcon("arrow-left");
 
-/** Props for one companion tile, shared by Yours and Discover. */
-function companionTileProps({ card, discover = false, onDelete, onRemove, onSelect, onSetDefault }: { card: CompanionCard; discover?: boolean; onDelete: (card: CompanionCard) => void; onRemove?: (card: CompanionCard) => void; onSelect: () => void; onSetDefault: (card: CompanionCard) => void }) {
+async function openCompanionChat(card: CompanionCard, navigate: ReturnType<typeof useNavigate>, onError: (message: string) => void) {
+  try {
+    const chats = await api.conversationList();
+    const latest = chats.filter((chat) => chat.companion_id === card.id)
+      .sort((a, b) => new Date(b.last_turn_at ?? b.created_at).getTime() - new Date(a.last_turn_at ?? a.created_at).getTime())[0];
+    if (latest) navigate(`/chat?conversation=${encodeURIComponent(latest.id)}`);
+    else {
+      const conversation = await api.createConversation(undefined, undefined, undefined, card.id);
+      navigate(`/chat?conversation=${encodeURIComponent(conversation.id)}`);
+    }
+  } catch (error) {
+    onError(error instanceof ApiError ? error.message : "Could not open a chat. Check your connection and try again.");
+  }
+}
+
+function companionMenu({ card, discover = false, onDelete, onRemove, onSetDefault }: { card: CompanionCard; discover?: boolean; onDelete: (card: CompanionCard) => void; onRemove?: (card: CompanionCard) => void; onSetDefault: (card: CompanionCard) => void }) {
   const actions = <DropdownMenu>
     <DropdownMenuTrigger asChild>
       <Button type="button" variant="ghost" size="icon" aria-label="Companion actions" onClick={(event) => event.stopPropagation()} onPointerDown={(event) => event.stopPropagation()} onKeyDown={(event) => event.stopPropagation()}><MoreIcon aria-hidden="true" /></Button>
@@ -45,37 +57,32 @@ function companionTileProps({ card, discover = false, onDelete, onRemove, onSele
       {card.can_edit && card.is_household ? <DropdownMenuItem variant="destructive" onSelect={() => onDelete(card)}>Delete</DropdownMenuItem> : null}
     </DropdownMenuContent>
   </DropdownMenu>;
-  return {
-    name: card.name,
-    seed: card.id,
-    line: card.tagline,
-    selected: card.is_default,
-    menu: actions,
-    onSelect,
-  };
+  return actions;
 }
 
 /** /companions: the companions this person may use, as a card grid. */
-export function CompanionsPage() {
+function CompanionsDirectory() {
   useTabItem("Companions");
   const navigate = useNavigate();
-  const query = useQuery<CompanionList>({ queryKey: listKey, queryFn: api.companions, retry: false });
   const preview = useCompanionShells();
+  const query = useQuery<CompanionList>({ queryKey: listKey, queryFn: api.companions, retry: false });
   const [discoverFilter, setDiscoverFilter] = useState("All");
+  const [search, setSearch] = useState("");
   const [actionError, setActionError] = useState<string | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<CompanionCard | null>(null);
   const queryClient = useQueryClient();
+  const companionStills = useCompanionStills([...(query.data?.companions ?? []), ...(query.data?.discover ?? [])].map(({ id }) => id));
   const saveDefault = useMutation({ mutationFn: (id: string) => api.setDefaultCompanion(id), onSuccess: () => { void queryClient.invalidateQueries({ queryKey: listKey }); }, onError: (error) => setActionError(error instanceof ApiError ? error.message : "Could not set your default. Check your connection and try again.") });
   const remove = useMutation({ mutationFn: (id: string) => api.deleteCompanion(id), onSuccess: () => { setDeleteTarget(null); void queryClient.invalidateQueries({ queryKey: listKey }); }, onError: (error) => setActionError(error instanceof ApiError ? error.message : "Could not delete this companion. Check your connection and try again.") });
   const addToYours = useMutation({ mutationFn: (id: string) => api.addCompanion(id), onSuccess: () => { setActionError(null); void queryClient.invalidateQueries({ queryKey: listKey }); }, onError: (error) => setActionError(error instanceof ApiError ? error.message : "Could not add this companion. Check your connection and try again.") });
   const removeFromYours = useMutation({ mutationFn: (id: string) => api.removeCompanion(id), onSuccess: () => { setActionError(null); void queryClient.invalidateQueries({ queryKey: listKey }); }, onError: (error) => setActionError(error instanceof ApiError ? error.message : "Could not remove this companion. Check your connection and try again.") });
   return (
-    <div className="flex flex-col gap-6" data-testid="companions">
+    <>
       {actionError ? <Alert variant="destructive"><AlertDescription>{actionError}</AlertDescription></Alert> : null}
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div className="flex min-w-0 flex-col gap-1">
           <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">Companions</h1>
-          <p className="text-sm text-muted-foreground">A companion is how your assistant sounds. Pick one, read about it, and make it your default.</p>
+          <p className="text-sm text-muted-foreground">Familiar faces. Different ways to help.</p>
         </div>
         {query.data?.can_create ? <Link to={preview === true ? "/companions/start" : "/companions/new"}><Button>New companion</Button></Link> : null}
       </div>
@@ -95,18 +102,16 @@ export function CompanionsPage() {
               <EmptyState icon="user" text="No companions are installed yet." />
             ) : (
               <Tabs defaultValue="Yours">
-                <TabsList>
-                  <TabsTrigger value="Yours">Yours</TabsTrigger>
-                  {data.can_discover ? <TabsTrigger value="Discover">Discover</TabsTrigger> : null}
-                </TabsList>
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <TabsList>
+                    <TabsTrigger value="Yours">Yours</TabsTrigger>
+                    {data.can_discover ? <TabsTrigger value="Discover">Discover</TabsTrigger> : null}
+                  </TabsList>
+                  <div className="w-full sm:w-72"><Input aria-label="Search companions" type="search" placeholder="Search companions" value={search} onChange={(event) => setSearch(event.target.value)} /></div>
+                </div>
                 <TabsContent value="Yours">
-                  <div className="grid grid-cols-2 justify-items-center gap-4 sm:grid-cols-3 lg:grid-cols-4">
-                    {data.companions.map((card) => <div key={card.id}>
-                      <CharacterTile {...companionTileProps({ card, onDelete: setDeleteTarget, onRemove: (item) => removeFromYours.mutate(item.id), onSetDefault: (item) => saveDefault.mutate(item.id), onSelect: () => navigate(`/companions/${encodeURIComponent(card.id)}`) })} />
-                      <p className="mt-1 text-center text-sm text-muted-foreground">{card.latest_activity ?? "No activity yet"}</p>
-                      <p className="text-center text-sm text-muted-foreground">{card.task_count ?? 0} tasks · {card.chat_count ?? card.chats} chats</p>
-                      {(card.working_count ?? 0) + (card.waiting_count ?? 0) > 0 ? <Status status={(card.waiting_count ?? 0) > 0 ? "degraded" : "online"}>{card.working_count ?? 0} working · {card.waiting_count ?? 0} waiting on you</Status> : null}
-                    </div>)}
+                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
+                    {data.companions.filter((card) => `${card.name} ${card.tagline}`.toLowerCase().includes(search.trim().toLowerCase())).map((card) => <CompanionCardElement key={card.id} name={card.name} line={card.tagline} media={<Avatar><AvatarImage src={companionStills[card.id]} alt={card.name} /><AvatarFallback>{card.name.slice(0, 1).toUpperCase()}</AvatarFallback></Avatar>} status={card.is_default ? "Your default" : card.status === "ready" ? "Ready" : card.status === "draft" ? "Draft · needs a portrait" : card.status} menu={companionMenu({ card, onDelete: setDeleteTarget, onRemove: (item) => removeFromYours.mutate(item.id), onSetDefault: (item) => saveDefault.mutate(item.id) })} meta={(card.working_count ?? 0) + (card.waiting_count ?? 0) > 0 ? <Status status={(card.waiting_count ?? 0) > 0 ? "degraded" : "online"}>{card.working_count ?? 0} working · {card.waiting_count ?? 0} waiting on you</Status> : card.latest_activity ? `Last active ${formatRelative(card.latest_activity)} · ${card.chat_count ?? card.chats} chats` : "Choose a conversation to get started"} actions={<><Button type="button" onClick={() => void openCompanionChat(card, navigate, setActionError)}>{(card.chat_count ?? card.chats) > 0 ? "Continue" : "Chat"}</Button><Button type="button" variant="outline" onClick={() => navigate(`/companions/${encodeURIComponent(card.id)}`)}>View profile</Button></>} />)}
                   </div>
                 </TabsContent>
                 {data.can_discover ? <TabsContent value="Discover">
@@ -114,11 +119,8 @@ export function CompanionsPage() {
                     {["All", "Chat", "Research", "Shopping", "Stories", "Kids"].map((item) =>
                       <Chip key={item} selected={discoverFilter === item} onClick={() => setDiscoverFilter(item)}>{item}</Chip>)}
                   </div>
-                  <div className="grid grid-cols-2 justify-items-center gap-4 sm:grid-cols-3 lg:grid-cols-4">
-                    {data.discover.filter((card) => discoverFilter === "All" || card.tagline.toLowerCase().includes(discoverFilter.toLowerCase())).map((card) => <div key={card.id}>
-                      <CharacterTile {...companionTileProps({ card, discover: true, onDelete: setDeleteTarget, onSetDefault: (item) => saveDefault.mutate(item.id), onSelect: () => navigate(`/companions/${encodeURIComponent(card.id)}`) })} />
-                      <div className="mt-2"><Button disabled={addToYours.isPending} onClick={() => addToYours.mutate(card.id)}>Add</Button></div>
-                    </div>)}
+                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
+                    {data.discover.filter((card) => `${card.name} ${card.tagline}`.toLowerCase().includes(search.trim().toLowerCase())).filter((card) => discoverFilter === "All" || card.tagline.toLowerCase().includes(discoverFilter.toLowerCase())).map((card) => <CompanionCardElement key={card.id} name={card.name} line={card.tagline} media={<Avatar><AvatarImage src={companionStills[card.id]} alt={card.name} /><AvatarFallback>{card.name.slice(0, 1).toUpperCase()}</AvatarFallback></Avatar>} status={card.is_default ? "Your default" : card.status === "ready" ? "Ready" : card.status === "draft" ? "Draft · needs a portrait" : card.status} menu={companionMenu({ card, discover: true, onDelete: setDeleteTarget, onSetDefault: (item) => saveDefault.mutate(item.id) })} meta={(card.working_count ?? 0) + (card.waiting_count ?? 0) > 0 ? <Status status={(card.waiting_count ?? 0) > 0 ? "degraded" : "online"}>{card.working_count ?? 0} working · {card.waiting_count ?? 0} waiting on you</Status> : card.latest_activity ? `Last active ${formatRelative(card.latest_activity)} · ${card.chat_count ?? card.chats} chats` : "Choose a conversation to get started"} actions={<Button disabled={addToYours.isPending} onClick={() => addToYours.mutate(card.id)}>Add</Button>} />)}
                   </div>
                   <p className="mt-4 text-sm text-muted-foreground">More companions from the catalog are coming soon.</p>
                 </TabsContent> : null}
@@ -133,21 +135,21 @@ export function CompanionsPage() {
           </>
         )}
       </AsyncState>
-    </div>
+    </>
   );
+}
+
+export function CompanionsPage() {
+  return <CompanionsDirectory />;
 }
 
 /** /companions/:id: one companion in full, a voice preview, and Set as my default. */
 export function CompanionDetailPage() {
   const { id = "" } = useParams();
-  const preview = useCompanionShells();
   const query = useQuery<CompanionDetail>({ queryKey: [...listKey, id], queryFn: () => api.companion(id), retry: false });
   useTabItem(query.data?.name ?? "Companion");
   return (
     <div className="flex flex-col gap-6" data-testid="companion-detail">
-      {preview === true
-        ? <Link to="/companions" className="self-start" aria-label="All companions"><Button type="button" variant="ghost" size="icon" tabIndex={-1}><BackIcon aria-hidden="true" /></Button></Link>
-        : <Link to="/companions" className="text-sm underline">All companions</Link>}
       <AsyncState
         data={query.isError ? null : query.data}
         error={query.isError}
@@ -156,87 +158,13 @@ export function CompanionDetailPage() {
         errorMessage={query.error instanceof ApiError && query.error.status === 404 ? "That companion is not on your list. Go back and pick one from the gallery." : "Could not load this companion. Check your connection and try again."}
         loadingLabel="Loading companion"
       >
-        {(companion: CompanionDetail) => <>
-          {preview === true ? <>
-            <DetailBody companion={companion} headerOnly />
-            <DetailRows companion={companion} />
-          </> : <DetailBody companion={companion} />}
-        </>}
+        {(companion: CompanionDetail) => <DetailBody companion={companion} />}
       </AsyncState>
     </div>
   );
 }
 
-type DetailRow = { key: string; title: string; hint: string; body: ReactNode };
-
-/** The preview detail page: a short list of rows, each opening its own sheet, so nothing long sits under the hero. */
-function DetailRows({ companion }: { companion: CompanionDetail }) {
-  const [open, setOpen] = useState<string | null>(null);
-  const navigate = useNavigate();
-  const chatsQuery = useQuery({ queryKey: ["companion-chats", companion.id], queryFn: () => api.conversationList(), retry: false });
-  const matchingChats = (chatsQuery.data ?? []).filter((chat) => chat.companion_id === companion.id)
-    .sort((a, b) => new Date(b.last_turn_at ?? b.created_at).getTime() - new Date(a.last_turn_at ?? a.created_at).getTime());
-  const chats = matchingChats.slice(0, 20);
-  const [startingChat, setStartingChat] = useState(false);
-  const [chatError, setChatError] = useState<string | null>(null);
-  const startChat = async () => {
-    setStartingChat(true);
-    setChatError(null);
-    try {
-      const conversation = await api.createConversation(undefined, undefined, undefined, companion.id);
-      navigate(`/chat?conversation=${encodeURIComponent(conversation.id)}`);
-    } catch (error) {
-      setChatError(error instanceof ApiError ? error.message : "Could not start a chat. Check your connection and try again.");
-    } finally {
-      setStartingChat(false);
-    }
-  };
-  const rows: DetailRow[] = [
-    { key: "voice", title: "Voice", hint: companion.voice_is_own ? "Its own voice" : "Your Settings voice", body: <VoiceRow companion={companion} /> },
-    { key: "personality", title: "Personality", hint: companion.tagline, body: <div className="flex flex-col gap-3">
-      <p>{companion.about}</p>
-      {companion.pronouns ? <p className="text-sm text-muted-foreground">Pronouns: {companion.pronouns}</p> : null}
-      {companion.interests.length > 0 ? <p className="text-sm text-muted-foreground">Likes: {companion.interests.join(", ")}.</p> : null}
-      <dl className="grid gap-3 sm:grid-cols-2">{companion.dials.map((dial) => <div key={dial.label}><dt className="text-sm font-medium">{dial.label}</dt><dd className="text-muted-foreground">{dial.value}</dd></div>)}</dl>
-    </div> },
-    { key: "examples", title: "Things it might say", hint: `${companion.examples.length} examples`, body: <ul className="flex list-none flex-col gap-2 p-0">{companion.examples.map((line) => <li key={line}>&ldquo;{line}&rdquo;</li>)}</ul> },
-  ];
-  if (companion.used_by) {
-    const people = companion.used_by.people.length ? companion.used_by.people.map((person) => person.name).join(", ") : "nobody yet";
-    const robots = companion.used_by.robots.length ? companion.used_by.robots.map((robot) => robot.name).join(", ") : "none yet";
-    rows.push({ key: "used", title: "Who uses it", hint: people, body: <div className="flex flex-col gap-2">
-      <p>People: {people}.</p>
-      <p>Robots: {robots}. <Link to={ROBOT_SETTINGS} className="underline">Companion settings</Link></p>
-      <p className="text-sm text-muted-foreground">{companion.who_can_use}</p>
-    </div> });
-  }
-  const activityQuery = useQuery({ queryKey: ["companion-activity", companion.id], queryFn: () => api.companionActivity(companion.id), retry: false });
-  rows.push({ key: "activity", title: "Recent activity", hint: activityQuery.data?.activity.length ? `${activityQuery.data.activity.length} recent items` : "No activity yet", body: activityQuery.data?.activity.length
-    ? <ul className="flex list-none flex-col gap-2 p-0">{activityQuery.data.activity.map((item) => <li key={item.id}><p className="font-medium">{item.title}</p><p className="text-sm text-muted-foreground">{item.state} · {formatRelative(item.updated_at)}</p></li>)}</ul>
-    : <p>No activity for {companion.name} yet.</p> });
-  rows.push({ key: "chats", title: "Chats", hint: matchingChats.length ? `${matchingChats.length} ${matchingChats.length === 1 ? "chat" : "chats"}` : "No chats yet", body: <div className="flex flex-col gap-4">
-    {chats.length ? <ul className="flex list-none flex-col gap-3 p-0">{chats.map((chat) => <li key={chat.id}><Button type="button" variant="ghost" onClick={() => navigate(`/chat?conversation=${encodeURIComponent(chat.id)}`)}>{chat.title || "New chat"} · {formatRelative(chat.last_turn_at ?? chat.created_at)}</Button></li>)}</ul> : <p>No chats with {companion.name} yet.</p>}
-    {chatsQuery.isError ? <p className="text-sm text-destructive">Could not load chats. Check your connection and try again.</p> : null}
-    {chatError ? <Alert variant="destructive"><AlertDescription>{chatError}</AlertDescription></Alert> : null}
-    <Button type="button" disabled={startingChat} onClick={() => void startChat()}>{startingChat ? "Starting chat…" : `New chat with ${companion.name}`}</Button>
-  </div> });
-  const current = rows.find((row) => row.key === open) ?? null;
-  return <>
-    {!companion.is_household && companion.can_copy ? <p>This companion comes with Home, so it can't be changed. Make a copy and edit that.</p> : null}
-    <List label={`About ${companion.name}`} items={rows} getKey={(row) => row.key} onSelect={(row) => setOpen(row.key)} renderItem={(row) => <div className="flex min-w-0 flex-1 items-center gap-3">
-      <div className="min-w-0 flex-1"><p className="font-medium">{row.title}</p><p className="truncate text-sm text-muted-foreground">{row.hint}</p></div>
-      <ChevronRightIcon aria-hidden="true" className="text-muted-foreground" />
-    </div>} />
-    <Dialog open={current !== null} onOpenChange={(next) => { if (!next) setOpen(null); }}>
-      <DialogContent>
-        <DialogHeader><DialogTitle>{current?.title}</DialogTitle><DialogDescription>{companion.name}</DialogDescription></DialogHeader>
-        {current?.body}
-      </DialogContent>
-    </Dialog>
-  </>;
-}
-
-function DetailBody({ companion, headerOnly = false, aboutOnly = false }: { companion: CompanionDetail; headerOnly?: boolean; aboutOnly?: boolean }) {
+function DetailBody({ companion }: { companion: CompanionDetail }) {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const copy = useMutation({ mutationFn: () => api.copyCompanion(companion.id), onSuccess: (result) => {
@@ -246,12 +174,12 @@ function DetailBody({ companion, headerOnly = false, aboutOnly = false }: { comp
   const save = useMutation({ mutationFn: () => api.setDefaultCompanion(companion.id), onSuccess: () => {
     void queryClient.invalidateQueries({ queryKey: listKey });
   } });
-  return <DetailSetup companion={companion} saved={save.isSuccess || companion.is_default} copy={copy} save={save} headerOnly={headerOnly} aboutOnly={aboutOnly} />;
+  return <DetailSetup companion={companion} saved={save.isSuccess || companion.is_default} copy={copy} save={save} />;
 }
 
-function DetailSetup({ companion, saved, copy, save, headerOnly = false, aboutOnly = false }: { companion: CompanionDetail; saved: boolean; copy: UseMutationResult<unknown, Error, void>; save: UseMutationResult<unknown, Error, void>; headerOnly?: boolean; aboutOnly?: boolean }) {
-  const preview = useCompanionShells() === true;
+function DetailSetup({ companion, saved, copy, save }: { companion: CompanionDetail; saved: boolean; copy: UseMutationResult<unknown, Error, void>; save: UseMutationResult<unknown, Error, void> }) {
   const navigate = useNavigate();
+  const stills = useCompanionStills([companion.id]);
   const [chatError, setChatError] = useState<string | null>(null);
   const [startingChat, setStartingChat] = useState(false);
   const startChat = async () => {
@@ -268,35 +196,18 @@ function DetailSetup({ companion, saved, copy, save, headerOnly = false, aboutOn
   };
   return (
     <>
-      {!aboutOnly ? <>
-      <>
-      <h1 className="sr-only">{companion.name}</h1>
-      <CharacterHero name={companion.name} seed={companion.id} line={<><span>{companion.tagline}</span><div className="flex flex-wrap justify-center gap-2"><Badge>{companion.type_label}</Badge>{saved ? <Badge>Your default</Badge> : null}</div></>} actions={<>
-              <Button type="button" disabled={startingChat} onClick={() => void startChat()}>{startingChat ? "Starting chat…" : "Chat"}</Button>
-              {preview ? <>
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild><Button type="button" variant="ghost" size="icon" aria-label="Companion actions"><MoreIcon aria-hidden="true" /></Button></DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                <DropdownMenuItem disabled={saved || save.isPending} onSelect={() => save.mutate()}>{saved ? "Your default" : "Set as my default"}</DropdownMenuItem>
-                {companion.can_edit ? <DropdownMenuItem asChild><Link to={`/companions/${encodeURIComponent(companion.id)}/edit`}>Edit settings</Link></DropdownMenuItem> : null}
-                {companion.can_copy ? <DropdownMenuItem disabled={copy.isPending} onSelect={() => copy.mutate()}>{companion.is_household ? "Make a copy" : "Edit a copy"}</DropdownMenuItem> : null}
-              </DropdownMenuContent>
-            </DropdownMenu>
-          </> : <>
-          {companion.can_edit ? <Link to={`/companions/${encodeURIComponent(companion.id)}/edit`}><Button type="button" variant="ghost" size="icon" aria-label="Companion settings" title="Companion settings"><SettingsIcon /></Button></Link> : null}
-          {companion.can_copy ? <Button type="button" variant="outline" disabled={copy.isPending} onClick={() => copy.mutate()}>{companion.is_household ? "Make a copy" : "Edit a copy"}</Button> : null}
-          <Button type="button" disabled={saved || save.isPending} onClick={() => save.mutate()}>{saved ? "Your default" : "Set as my default"}</Button>
-          </>}
+      <CompanionProfileHeader name={companion.name} eyebrow={companion.is_household ? "Household companion" : "Built-in companion"} line={companion.tagline} back={<Link to="/companions" className="text-sm underline">All companions</Link>} media={<Avatar size="lg"><AvatarImage src={stills[companion.id]} alt={companion.name} /><AvatarFallback>{companion.name.slice(0, 1).toUpperCase()}</AvatarFallback></Avatar>} chips={<><Badge variant="secondary">{companion.who_can_use}</Badge>{saved ? <Badge>Your default</Badge> : null}<Badge variant="outline">{companion.status === "ready" ? "Ready" : companion.status === "draft" ? "Draft · needs a portrait" : companion.status}</Badge></>} actions={<>
+
+              <Button type="button" disabled={startingChat} onClick={() => void startChat()}>{startingChat ? "Starting chat…" : `Chat with ${companion.name}`}</Button>
+          {companion.can_copy ? <Button type="button" variant="outline" disabled={copy.isPending} onClick={() => copy.mutate()}>Customize a copy</Button> : null}
+          {companion.can_edit ? <Link to={`/companions/${encodeURIComponent(companion.id)}/edit`}><Button type="button" variant="outline">Edit</Button></Link> : null}
       </>} />
-      </>
       {save.isError ? <Alert variant="destructive"><AlertDescription>{save.error instanceof ApiError ? save.error.message : "Could not save this. Check your connection and try again."}</AlertDescription></Alert> : null}
       {chatError ? <Alert variant="destructive"><AlertDescription>{chatError}</AlertDescription></Alert> : null}
       {copy.isError ? <Alert variant="destructive"><AlertDescription>{copy.error instanceof ApiError ? copy.error.message : "Could not reach Home. Check your connection and try again."}</AlertDescription></Alert> : null}
-      </> : null}
-      {!headerOnly ? <>
       {!companion.is_household && companion.can_copy ? <p>This companion comes with Home, so it can't be changed. Make a copy and edit that.</p> : null}
-      <Tabs defaultValue="About">
-        <TabsList><TabsTrigger value="Activity">Activity</TabsTrigger><TabsTrigger value="About">About</TabsTrigger><TabsTrigger value="Tasks">Tasks</TabsTrigger></TabsList>
+      <Tabs defaultValue="Activity">
+        <TabsList><TabsTrigger value="Activity">Activity</TabsTrigger><TabsTrigger value="About">About</TabsTrigger><TabsTrigger value="Tasks">Tasks{(companion.task_count ?? 0) > 0 ? <Badge variant="secondary">{companion.task_count}</Badge> : null}</TabsTrigger></TabsList>
         <TabsContent value="Activity"><CompanionWorkList companion={companion} mode="activity" /></TabsContent>
         <TabsContent value="Tasks"><CompanionWorkList companion={companion} mode="tasks" /></TabsContent>
         <TabsContent value="About">
@@ -327,7 +238,6 @@ function DetailSetup({ companion, saved, copy, save, headerOnly = false, aboutOn
       ) : null}
         </TabsContent>
       </Tabs>
-      </> : null}
     </>
   );
 }

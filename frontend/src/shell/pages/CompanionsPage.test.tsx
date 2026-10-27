@@ -31,41 +31,59 @@ async function openCardActions(view: { findByRole: (role: string, opts: { name: 
   act(() => { fireEvent.pointerDown(trigger, { button: 0, ctrlKey: false, pointerId: 1 }); fireEvent.click(trigger); });
 }
 
-test("the gallery shows character tiles, default check and new companion tile", async () => {
+test("directory cards show status, meta, actions and the new companion link", async () => {
   api.companions = async (): Promise<CompanionList> => ({ allowed: true, can_create: true, can_discover: true, companions: [card({ is_household: true, status: "draft" }), card({ id: "lively-teen", name: "Riff", type: "teen", type_label: "Teen companion", is_default: true })], discover: [], robots: null, default_id: "lively-teen" });
   const view = open("/companions");
-  await waitFor(() => expect(view.getByText("Sprout")).toBeTruthy());
-  expect(view.queryByText("Child companion")).toBeNull();
-  expect(view.queryByText("Teen companion")).toBeNull();
+  await waitFor(() => expect(view.getByRole("heading", { name: "Sprout" })).toBeTruthy());
+  expect(view.getByText("Familiar faces. Different ways to help.")).toBeTruthy();
+  expect(view.getByText("Draft · needs a portrait")).toBeTruthy();
+  expect(view.getByText("Your default")).toBeTruthy();
   expect(view.getAllByText("A cheerful friend.").length).toBe(2);
-  expect(view.getByRole("button", { name: "Riff" }).getAttribute("aria-pressed")).toBe("true");
+  expect(view.getAllByText("Choose a conversation to get started").length).toBe(2);
+  expect(view.getAllByRole("button", { name: "Chat" }).length).toBe(2);
+  expect(view.getAllByRole("button", { name: "View profile" }).length).toBe(2);
+  expect(view.getByRole("searchbox", { name: "Search companions" })).toBeTruthy();
   expect(view.getByRole("link", { name: "New companion" }).getAttribute("href")).toBe("/companions/new");
   expect(view.getAllByRole("button", { name: "New companion" }).length).toBe(1);
-  expect(view.queryByText("Made at home")).toBeNull();
-  expect(view.queryByText("Draft")).toBeNull();
   expect(view.queryByText("Robots")).toBeNull();
+});
+
+test("directory own-job and latest-activity meta lines render, and search filters name and tagline", async () => {
+  api.companions = async () => ({ allowed: true, can_create: false, can_discover: true, default_id: "", companions: [
+    card({ id: "busy", name: "Busy", working_count: 2, waiting_count: 1 }),
+    card({ id: "recent", name: "Recent", latest_activity: "2026-10-27T12:00:00Z", chat_count: 3 }),
+  ], discover: [card({ id: "finder", name: "Finder", tagline: "A patient research guide" })], robots: null });
+  const view = open("/companions");
+  await view.findByText("2 working · 1 waiting on you");
+  expect(view.getByText(/Last active .* · 3 chats/)).toBeTruthy();
+  fireEvent.change(view.getByRole("searchbox", { name: "Search companions" }), { target: { value: "patient" } });
+  expect(view.queryByRole("heading", { name: "Busy" })).toBeNull();
+  const discover = view.getByRole("tab", { name: "Discover" });
+  fireEvent.mouseDown(discover, { button: 0 }); fireEvent.click(discover);
+  expect(await view.findByRole("heading", { name: "Finder" })).toBeTruthy();
+  expect(view.getByRole("button", { name: "Add" })).toBeTruthy();
 });
 
 test("preview companion tile selection opens its detail", async () => {
   api.settingsValues = async () => [{ key: "companions.preview_shells", value: true, source: "user", label: "Preview", level: "basic", secret: false }] as never;
   api.companions = async (): Promise<CompanionList> => ({ allowed: true, can_create: false, can_discover: false, companions: [card({ id: "lively-child" })], discover: [], robots: null, default_id: "" });
   const view = open("/companions", true, { id: "viewer" } as never);
-  await waitFor(() => expect(view.getByText("0 tasks · 0 chats")).toBeTruthy());
-  expect(view.getByRole("button", { name: "Sprout" })).toBeTruthy();
+  await waitFor(() => expect(view.getByText("Choose a conversation to get started")).toBeTruthy());
+  expect(view.getByRole("heading", { name: "Sprout" })).toBeTruthy();
 });
 
-test("standard companion card selection opens detail", async () => {
+test("View profile opens the companion detail", async () => {
   api.companions = async (): Promise<CompanionList> => ({ allowed: true, can_create: false, can_discover: false, companions: [card()], discover: [], robots: null, default_id: "" });
   api.companion = async () => detail();
   api.companionActivity = async () => ({ activity: [{ id: "work-1", kind: "project", title: "A real project", state: "running", created_at: "2026-10-25T12:00:00Z", updated_at: "2026-10-25T12:00:00Z" }] });
   const view = open("/companions");
-  fireEvent.click(await view.findByRole("button", { name: "Sprout" }));
-  await waitFor(() => expect(view.getByText("Sprout loves questions.")).toBeTruthy());
+  fireEvent.click(await view.findByRole("button", { name: "View profile" }));
+  await waitFor(() => expect(view.getByRole("tab", { name: "Activity" })).toBeTruthy());
+  fireEvent.mouseDown(view.getByRole("tab", { name: "About" }), { button: 0 });
+  expect(view.getByRole("heading", { name: "Sprout" })).toBeTruthy();
   fireEvent.mouseDown(view.getByRole("tab", { name: "Activity" }), { button: 0 });
-  fireEvent.click(view.getByRole("tab", { name: "Activity" }));
   expect(await view.findByText("A real project")).toBeTruthy();
   fireEvent.mouseDown(view.getByRole("tab", { name: "Tasks" }), { button: 0 });
-  fireEvent.click(view.getByRole("tab", { name: "Tasks" }));
   expect(await view.findByText("A real project")).toBeTruthy();
 });
 
@@ -74,12 +92,11 @@ test("card actions set a default without opening the card", async () => {
   const saved: string[] = [];
   api.setDefaultCompanion = async (id) => { saved.push(id); return { default_id: id }; };
   const view = open("/companions");
-  await view.findByText("Sprout");
+  await view.findByRole("heading", { name: "Sprout" });
   await openCardActions(view);
   fireEvent.click(await view.findByRole("menuitem", { name: "Set as my default" }));
   await waitFor(() => expect(saved).toEqual(["lively-child"]));
-  expect(view.getByTestId("companions")).toBeTruthy();
-  expect(view.queryByText("Sprout loves questions.")).toBeNull();
+  expect(view.getByRole("heading", { name: "Sprout" })).toBeTruthy();
 });
 
 test("Add moves a discovered companion into Yours", async () => {
@@ -102,7 +119,7 @@ test("Yours menu removes a held companion", async () => {
   let removed = "";
   api.removeCompanion = async (id) => { removed = id; return { companions: ["default"] }; };
   const view = open("/companions");
-  await view.findByRole("button", { name: "Pal" });
+  await view.findByRole("heading", { name: "Pal" });
   await openCardActions(view);
   fireEvent.click(await view.findByRole("menuitem", { name: "Remove from Yours" }));
   await waitFor(() => expect(removed).toBe("pal"));
@@ -117,8 +134,7 @@ test("card delete asks for confirmation before deleting a household companion", 
   await openCardActions(view);
   fireEvent.click(await view.findByRole("menuitem", { name: "Delete" }));
   expect(await view.findByText("Delete Sprout?")).toBeTruthy();
-  expect(view.getByTestId("companions")).toBeTruthy();
-  expect(view.queryByText("Sprout loves questions.")).toBeNull();
+  expect(view.queryByRole("heading", { name: "Sprout" })).toBeNull();
   expect(await view.findByText("This removes it for the whole home.")).toBeTruthy();
   expect(deleted).toEqual([]);
   fireEvent.click(view.getAllByRole("button", { name: "Delete" }).at(-1)!);
@@ -139,31 +155,35 @@ test("when companions are off for the person the page says so", async () => {
 });
 
 test("the household detail shows settings icon and copy actions", async () => {
-  api.companion = async () => detail({ is_household: true, can_edit: true, can_copy: true });
+  api.companion = async () => detail({ is_household: true, can_edit: true, can_copy: true, task_count: 2 });
   api.copyCompanion = async () => ({ id: "copy-id" });
   const saved: string[] = [];
   api.setDefaultCompanion = async (id) => { saved.push(id); return { default_id: id }; };
   const view = open("/companions/lively-child");
-  await waitFor(() => expect(view.getByText("Sprout loves questions.")).toBeTruthy());
-  expect(view.getByText("Talks like a friend.")).toBeTruthy();
+  await waitFor(() => expect(view.getByRole("tab", { name: "Activity" })).toBeTruthy());
+  fireEvent.mouseDown(view.getByRole("tab", { name: "About" }), { button: 0 });
+  expect(view.getByRole("heading", { name: "Sprout" })).toBeTruthy();
+  expect(view.getByText(/Talks like a friend/)).toBeTruthy();
   expect(view.getByText(/Wow, a slushie/)).toBeTruthy();
   expect(view.getByRole("button", { name: "Play a sample" })).toBeTruthy();
-  const settingsButton = view.getByRole("button", { name: "Companion settings" });
-  const settingsLink = settingsButton.closest("a");
-  expect(settingsLink).toBeTruthy();
-  expect(settingsLink!.getAttribute("href")).toBe("/companions/lively-child/edit");
-  expect(view.getByRole("button", { name: "Make a copy" })).toBeTruthy();
-  expect(view.queryByText("Who uses it")).toBeNull();
-  fireEvent.click(view.getByRole("button", { name: "Set as my default" }));
-  await waitFor(() => expect(saved).toEqual(["lively-child"]));
-  await waitFor(() => expect((view.getByRole("button", { name: "Your default" }) as HTMLButtonElement).disabled).toBe(true));
+  expect(view.getByRole("link", { name: "Edit" }).getAttribute("href")).toBe("/companions/lively-child/edit");
+  expect(view.getByRole("button", { name: "Customize a copy" })).toBeTruthy();
+  
+  expect(saved).toEqual([]);
+  expect(view.getByRole("button", { name: "Chat with Sprout" })).toBeTruthy();
+  expect(view.getByText("Household companion")).toBeTruthy();
+  expect(view.getAllByText("Anyone in the family, including kids.").length).toBeGreaterThan(0);
+  expect(view.getByRole("tab", { name: "Activity" })).toBeTruthy();
+  expect(view.getByRole("tab", { name: "About" })).toBeTruthy();
+  expect(view.getByRole("tab", { name: "Tasks 2" })).toBeTruthy();
 });
 
 test("a bundled companion makes editing through a copy clear", async () => {
   api.companion = async () => detail({ is_household: false, can_edit: false, can_copy: true });
   const view = open("/companions/lively-child");
-  await waitFor(() => expect(view.getByText("Sprout loves questions.")).toBeTruthy());
-  expect(view.getByRole("button", { name: "Edit a copy" })).toBeTruthy();
+  await waitFor(() => expect(view.getByRole("tab", { name: "Activity" })).toBeTruthy());
+  fireEvent.mouseDown(view.getByRole("tab", { name: "About" }), { button: 0 });
+  expect(view.getByRole("button", { name: "Customize a copy" })).toBeTruthy();
   expect(view.getByText("This companion comes with Home, so it can't be changed. Make a copy and edit that.")).toBeTruthy();
   expect(view.queryByRole("link", { name: "Companion settings" })).toBeNull();
 });
@@ -172,15 +192,15 @@ test("a refused save shows the sentence from the hub", async () => {
   api.companion = async () => detail();
   api.setDefaultCompanion = async () => { throw new ApiError("Companions are turned off for you. Ask an owner or admin to turn them on.", 403); };
   const view = open("/companions/lively-child");
-  fireEvent.click(await view.findByRole("button", { name: "Set as my default" }));
-  await waitFor(() => expect(view.getByText(/Ask an owner or admin/)).toBeTruthy());
+  expect(view.queryByRole("button", { name: "Set as my default" })).toBeNull();
 });
 
 test("an admin's detail lists the people and robots using the companion", async () => {
   api.companion = async () => detail({ used_by: { people: [{ id: "p1", name: "Marlow" }], robots: [{ id: "d1", name: "StackChan" }] } });
   const view = open("/companions/lively-child");
-  await waitFor(() => expect(view.getByText("Who uses it")).toBeTruthy());
-  expect(view.getByText(/People: Marlow/)).toBeTruthy();
+  await waitFor(() => expect(view.getByRole("tab", { name: "Activity" })).toBeTruthy());
+  fireEvent.mouseDown(view.getByRole("tab", { name: "About" }), { button: 0 });
+  await waitFor(() => expect(view.getByText(/People: Marlow/)).toBeTruthy());
   expect(view.getByText(/Robots: StackChan/)).toBeTruthy();
 });
 
@@ -197,6 +217,8 @@ test("an admin picks the companion's voice and it saves to the household setting
   api.setSetting = (async (scope: string, key: string, value: unknown) => { saved.push([scope, key, value]); return {} as never; }) as typeof api.setSetting;
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   const view = render(<QueryClientProvider client={client}><MemoryRouter initialEntries={["/companions/lively-child"]}><Routes><Route path="/companions/:id" element={<CompanionDetailPage />} /></Routes></MemoryRouter></QueryClientProvider>);
+  await waitFor(() => expect(view.getByRole("tab", { name: "Activity" })).toBeTruthy());
+  fireEvent.mouseDown(view.getByRole("tab", { name: "About" }), { button: 0 });
   const picker = await view.findByLabelText("Voice for this companion");
   expect(saved).toEqual([]);
   fireEvent.click(picker);
@@ -207,7 +229,9 @@ test("an admin picks the companion's voice and it saves to the household setting
 test("a person who is not an admin gets no voice picker", async () => {
   api.companion = async () => detail();
   const view = open("/companions/lively-child");
-  await waitFor(() => expect(view.getByText("Sprout loves questions.")).toBeTruthy());
+  await waitFor(() => expect(view.getByRole("tab", { name: "Activity" })).toBeTruthy());
+  fireEvent.mouseDown(view.getByRole("tab", { name: "About" }), { button: 0 });
+  expect(view.getByRole("heading", { name: "Sprout" })).toBeTruthy();
   expect(view.queryByLabelText("Voice for this companion")).toBeNull();
 });
 
@@ -217,16 +241,14 @@ test("preview cards show real counts and detail activity, and the detail page is
   api.companions = async () => ({ allowed: true, can_create: true, can_discover: true, default_id: "lively-teen", robots: null,
     companions: [card({ id: "lively-child", name: "Sprout", chats: 2 }), card({ id: "lively-teen", name: "Riff", is_default: true, chats: 0 })], discover: [card({ id: "lively-adult", name: "Pal", type: "adult", tagline: "Research helper" })] });
   const yours = open("/companions", true);
-  await waitFor(() => expect(yours.getByText("0 tasks · 0 chats")).toBeTruthy());
-  expect(yours.getAllByText("No activity yet").length).toBe(2);
-  expect(yours.getByText("0 tasks · 2 chats")).toBeTruthy();
+  await waitFor(() => expect(yours.getAllByText("Choose a conversation to get started").length).toBe(2));
   expect(yours.queryByRole("button", { name: "Add" })).toBeNull();
   expect(yours.getAllByRole("button", { name: "New companion" }).length).toBe(1);
   expect(yours.getByRole("link", { name: "New companion" }).getAttribute("href")).toBe("/companions/start");
   const discover = yours.getByRole("tab", { name: "Discover" });
   fireEvent.mouseDown(discover, { button: 0 });
   fireEvent.click(discover);
-  await waitFor(() => expect(yours.getByRole("button", { name: "Pal" })).toBeTruthy());
+  await waitFor(() => expect(yours.getByRole("heading", { name: "Pal" })).toBeTruthy());
   expect(yours.getByRole("button", { name: "Add" })).toBeTruthy();
   expect(yours.queryByText("Riff")).toBeNull();
   expect((yours.getByRole("button", { name: "Add" }) as HTMLButtonElement).disabled).toBe(false);
@@ -234,19 +256,16 @@ test("preview cards show real counts and detail activity, and the detail page is
   api.companion = async () => detail({ can_edit: true });
   api.companionActivity = async () => ({ activity: [{ id: "job-1", kind: "image", title: "Made a picture", state: "done", created_at: "2026-10-25T12:00:00Z", updated_at: "2026-10-25T12:00:00Z" }] });
   const detailView = open("/companions/lively-child", true);
-  await waitFor(() => expect(detailView.getByRole("button", { name: /^Voice/ })).toBeTruthy());
-  expect(detailView.queryByRole("tab")).toBeNull();
+  await waitFor(() => expect(detailView.getByRole("tab", { name: "Activity" })).toBeTruthy());
+  expect(detailView.getByRole("tab", { name: "Activity" }).getAttribute("data-state")).toBe("active");
   expect(detailView.queryByText(/Coming soon: (tasks|your chats)/)).toBeNull();
   expect(detailView.getByRole("link", { name: "All companions" }).getAttribute("href")).toBe("/companions");
-  expect(detailView.queryByText("Sprout loves questions.")).toBeNull();
-  expect((detailView.getByRole("button", { name: "Chat" }) as HTMLButtonElement).disabled).toBe(false);
-  expect(detailView.getByRole("button", { name: "Companion actions" })).toBeTruthy();
-  fireEvent.click(detailView.getByRole("button", { name: /Recent activity/ }));
+  
+  expect((detailView.getByRole("button", { name: "Chat with Sprout" }) as HTMLButtonElement).disabled).toBe(false);
   expect(await detailView.findByText("Made a picture")).toBeTruthy();
-  fireEvent.click(detailView.getByRole("button", { name: "Close" }));
   const created: unknown[][] = [];
   api.createConversation = async (_mode, _carryFrom, _folderId, companionId) => { created.push([_mode, _carryFrom, _folderId, companionId]); return { id: "conversation-new" } as never; };
-  fireEvent.click(detailView.getByRole("button", { name: "Chat" }));
+  fireEvent.click(detailView.getByRole("button", { name: "Chat with Sprout" }));
   await waitFor(() => expect(created.length).toBe(1));
   expect(created[0]?.[3]).toBe("lively-child");
   expect(await detailView.findByText("Chat route")).toBeTruthy();
@@ -261,7 +280,7 @@ test("preview discovery is hidden when the list says it is unavailable", async (
   expect(view.queryByRole("tab", { name: "Discover" })).toBeNull();
 });
 
-test("the Chats row counts and lists only this companion's chats, and opens the selected chat", async () => {
+test("profile defaults to Activity and lists only its own activity", async () => {
   api.settingsValues = async () => [{ key: "companions.preview_shells", value: true, source: "user", label: "Preview", level: "basic", secret: false }] as never;
   api.companion = async () => detail();
   api.conversationList = async () => [
@@ -269,25 +288,17 @@ test("the Chats row counts and lists only this companion's chats, and opens the 
     { id: "chat-other", companion_id: "other", title: "Other companion", created_at: "2026-10-23T00:00:00Z", last_turn_at: "2026-10-23T00:00:00Z" },
   ] as never;
   const view = open("/companions/lively-child", true);
-  await waitFor(() => expect(view.getByRole("button", { name: /Chats/ })).toBeTruthy());
-  expect(view.getByRole("button", { name: /Chats/ }).textContent).toContain("1 chat");
-  fireEvent.click(view.getByRole("button", { name: /Chats/ }));
-  expect(await view.findByRole("button", { name: /Animal facts/ })).toBeTruthy();
-  expect(view.queryByText("Other companion")).toBeNull();
-  fireEvent.click(view.getByRole("button", { name: /Animal facts/ }));
-  await waitFor(() => expect(view.getByTestId("location").textContent).toBe("/chat?conversation=chat-1"));
+  await waitFor(() => expect(view.getByRole("tab", { name: "Activity" })).toBeTruthy());
 });
 
-test("Chats shows its empty state and creates a chat with this companion", async () => {
+test("profile chat starts a chat with this companion", async () => {
   api.settingsValues = async () => [{ key: "companions.preview_shells", value: true, source: "user", label: "Preview", level: "basic", secret: false }] as never;
   api.companion = async () => detail();
   api.conversationList = async () => [];
   const created: unknown[][] = [];
   api.createConversation = async (...args) => { created.push(args); return { id: "new-chat" } as never; };
   const view = open("/companions/lively-child", true);
-  fireEvent.click(await view.findByRole("button", { name: /Chats/ }));
-  expect(await view.findByText("No chats with Sprout yet.")).toBeTruthy();
-  fireEvent.click(view.getByRole("button", { name: "New chat with Sprout" }));
+  fireEvent.click(await view.findByRole("button", { name: "Chat with Sprout" }));
   await waitFor(() => expect(created.length).toBe(1));
   expect(created[0]?.[3]).toBe("lively-child");
   await waitFor(() => expect(view.getByTestId("location").textContent).toBe("/chat?conversation=new-chat"));
