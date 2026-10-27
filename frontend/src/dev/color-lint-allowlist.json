@@ -8,5 +8,20 @@
     "file": "apps/people/FaceEnrollmentPage.tsx",
     "pattern": "bg-black/60",
     "reason": "The translucent black scrim keeps camera guidance legible over arbitrary live camera frames."
+  },
+  {
+    "file": "lib/media/artPalette.ts",
+    "pattern": "rgba(",
+    "reason": "Builds canvas colors from the playing cover art's own pixels; the audio-reactive visuals follow the art, not the theme."
+  },
+  {
+    "file": "shell/media/AudioVisualizer.tsx",
+    "pattern": "rgba(",
+    "reason": "The audio-reactive canvas draws in the playing cover art's colors, with white and clear highlights over them."
+  },
+  {
+    "file": "shell/media/AudioVisualizer.tsx",
+    "pattern": "#000",
+    "reason": "An opaque stop in a CSS mask that fades the strip's edges; it is an alpha value, not a visible color."
   }
 ]

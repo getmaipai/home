@@ -8,15 +8,13 @@ import { useHeaderExtra } from "@maipai/ui/src/dashboard/layouts/full/vertical/h
 import { useIsPhoneLayout } from "@maipai/ui/src/dashboard/layouts/full/FullLayout";
 import { AsyncState } from "@maipai/ui/src/primitives/AsyncState";
 import { SchemaPage } from "@maipai/ui/src/schema/SchemaPage";
-import { Player } from "@maipai/ui/src/primitives/Player";
 import { PageNodeSchema } from "@maipai/ui/src/schema/types";
 import { cn } from "@maipai/ui/src/utils";
 import { ApiError, api, type Roster } from "@/lib/api";
 import { NotFoundPage } from "@/shell/pages/NotFoundPage";
 import { useAppRows } from "@/shell/useAppCatalog";
 import { useTabItem } from "@/shell/tabIdentity";
-import { appHomeLabel, isMediaApp, isMediaPlayPage, playPageOf, usesFamilyHeader } from "@/shell/mediaApps";
-import { useMediaDock } from "@/shell/mediaHost";
+import { appHomeLabel, isMediaApp, isMediaPlayPage, usesFamilyHeader } from "@/shell/mediaApps";
 import { SectionSidebar } from "@maipai/ui/src/primitives/SectionSidebar";
 import { WeatherForecastPage, dedupeLocations, type WeatherLocation } from "@maipai/ui/src/elements/weather-forecast-page";
 import { useAppSidebar } from "@/shell/useAppSidebar";
@@ -209,13 +207,6 @@ export function PackageAppPage({ person }: { person: Roster }) {
     const search = params.toString();
     if (search) navigate(`${location.pathname}?${search}`, { replace: true, state: location.state });
   }, [packageId, location.pathname, location.search, location.state, arrived, navigate]);
-  // MEDIA-POLISH-01: the docked mini bar. What the media host holds, drawn in a media app's area once the person started it, except
-  // on the page that is playing it right now.
-  const dock = useMediaDock();
-  const held = dock.current;
-  const onItsPlayPage = held !== null && held.appId === packageId && isMediaPlayPage(packageId, pageId) && (queryState.id === held.id || (packageId === "books" && pageId === "listen"));
-  const docked = media && held !== null && held.started && !onItsPlayPage ? held : null;
-  const CloseIcon = getIcon("x");
 
   const sidebar = app?.sidebar;
   const arrivedState = (location.state as { pageState?: Record<string, unknown> } | null)?.pageState ?? {};
@@ -280,30 +271,6 @@ export function PackageAppPage({ person }: { person: Roster }) {
           </> : null}
         </>); }}
       </AsyncState>
-      {docked ? <div className="flex-1" aria-hidden="true" /> : null}
-      {docked ? (
-        <Player
-          key={docked.id}
-          media={docked.el}
-          src={docked.src}
-          kind={docked.kind}
-          layout="mini"
-          placement="dock"
-          title={docked.title}
-          subtitle={docked.subtitle}
-          poster={docked.poster}
-          mediaSession={false}
-          onExpand={() => navigate(`/apps/${docked.appId}/${playPageOf(docked.appId)}?id=${encodeURIComponent(docked.id)}`, { state: { pageState: { id: docked.id } } })}
-          onProgress={(p) => {
-            api.mediaProgress(docked.appId, { media_id: docked.id, position_s: p.position_s, duration_s: p.duration_s, reason: p.reason }, p.reason === "unload").catch(() => {});
-          }}
-          actionsSlot={
-            <Button variant="ghost" size="icon" aria-label={`Close the player: ${docked.title}`} onClick={dock.clear}>
-              <CloseIcon aria-hidden="true" />
-            </Button>
-          }
-        />
-      ) : null}
     </div>
   );
   // NEWS-SIDEBAR-01: an app that declares a sidebar gets its own column beside the content from wide screens up (the kit's one

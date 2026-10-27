@@ -271,26 +271,23 @@ describe("MEDIA-POLISH-01 the docked mini bar", () => {
     expect(video.isConnected).toBe(false);
   });
 
-  test("leaving the watch page by its tab keeps the element playing in the dock, which opens the player again", async () => {
+  test("leaving the watch page keeps the element playing in the one global mini player, in any app, which opens the player again", async () => {
     const view = open("/apps/videos/watch?id=media-aaaaaa", <><Link to="/apps/videos">Go to Videos</Link><Link to="/apps/weather">Go to Weather</Link></>);
     await waitFor(() => expect(document.querySelector('[data-slot="player"][data-layout="video"] video')).not.toBeNull());
     const video = document.querySelector('[data-slot="player"][data-layout="video"] video') as HTMLVideoElement;
     video.dispatchEvent(new Event("play"));
     fireEvent.click(view.getByRole("link", { name: "Go to Weather" }));
-    // Another app's area draws no bar (RULES S2); the element waits, still in the document, in the kit's parking spot.
-    await waitFor(() => expect(document.querySelector('[data-slot="player"][data-layout="video"]')).toBeNull());
-    expect(document.querySelector('[data-layout="mini"]')).toBeNull();
-    expect(video.isConnected).toBe(true);
+    // MEDIA-VIZ-01: the mini player follows the person into any app, fixed at the bottom of everything right of the rail.
+    await waitFor(() => expect(document.querySelector('[data-slot="global-mini-player"] [data-slot="player"][data-layout="mini"]')).not.toBeNull());
+    expect(document.querySelector('[data-slot="player"][data-layout="video"]')).toBeNull();
+    const bar = document.querySelector('[data-slot="global-mini-player"] [data-slot="player"][data-layout="mini"]')!;
+    expect(bar.querySelector("video")).toBe(video);
+    // A video gets Picture in picture (when the browser has it) and Full screen; it is not offered the audio visualizer.
+    expect(view.queryByRole("button", { name: "Full screen" })).not.toBeNull();
+    expect(view.queryByRole("button", { name: "Open Now playing with visualizer" })).toBeNull();
     fireEvent.click(view.getByRole("link", { name: "Go to Videos" }));
-    await waitFor(() => expect(document.querySelector('[data-slot="player"][data-layout="mini"]')).not.toBeNull());
-    const dock = document.querySelector('[data-slot="player"][data-layout="mini"]')!;
-    expect(dock.getAttribute("data-placement")).toBe("dock");
-    const contentColumn = dock.parentElement!;
-    expect(contentColumn.lastElementChild).toBe(dock);
-    expect(contentColumn.lastElementChild?.previousElementSibling?.getAttribute("aria-hidden")).toBe("true");
-    expect(contentColumn.lastElementChild?.previousElementSibling?.className).toContain("flex-1");
-    expect(dock.querySelector("video")).toBe(video);
     expect(await view.findByRole("button", { name: "Open the player: Building a birdhouse" })).toBeTruthy();
+    expect(video.isConnected).toBe(true);
     fireEvent.click(view.getByRole("button", { name: "Close the player: Building a birdhouse" }));
     await waitFor(() => expect(document.querySelector('[data-layout="mini"]')).toBeNull());
     // Three page loads through the whole shell: slower than the default 5 s on a loaded machine.

@@ -23,6 +23,7 @@ import { api, type Roster } from "@/lib/api";
 import { toast } from "sonner";
 import { AudioSessionProvider } from "@/shell/audioSessionContext";
 import { MediaHostProvider, MediaLinkRedirect } from "@/shell/mediaHost";
+import { GlobalMiniPlayer } from "@/shell/GlobalMiniPlayer";
 import { IncognitoProvider, INCOGNITO_DISCARDED_EVENT, useIncognitoContext } from "@/shell/incognitoContext";
 import { MemoriesRedirect, LegacyProfileMemoriesRedirect } from "@/shell/MemoriesRedirect";
 import { InstallDock } from "@/shell/InstallDock";
@@ -337,6 +338,7 @@ function RoutesWithIncognito({ person, onPersonChange, onSignedOut }: { person: 
       {/* When ambient mode is off, keep the docked launcher here; moving it to the top right is a later slice. */}
       {shellWake.indicator && !ambient ? <LauncherBubble docked open={false} unread={0} greeting="" prompts={[]} {...shellWake.indicator} /> : null}
       <ShellInstallStrip person={person} />
+      <GlobalMiniPlayer />
       {activeTour ? (
         <Tour
           steps={activeTour.tour.steps.map((step) => ({

@@ -371,3 +371,21 @@ sit under the caption, not trailing as in the mockup, so track lists carry none 
 full-bleed art backdrop, no "Playing from" line; tile sizes follow the kit budget (about 4.3 across at 1280, mockup 6).
 Phone rail instead of a drawer is MOBILE-RAIL-01 (shell). Explicit title masking belongs to MEDIA-KID-01; today a minor never
 sees an explicit track at all.
+
+## The one mini player and the visualizers (MEDIA-VIZ-01)
+
+One mini player serves all media (music, videos, podcasts, books). `shell/GlobalMiniPlayer.tsx` draws the kit `Player` in its `mini` layout, as shipped,
+fixed to the bottom of everything right of the rail on every page, whichever app is open. It shows what the media host (`shell/mediaHost.tsx`) holds once the
+person has started it, and steps aside only on the page that plays that same item. Close unloads the item. A phone shows the kit's phone mini row (art,
+title, play and pause); tapping the title opens the play page.
+
+- Audio gets a Now playing stage (`shell/media/NowPlayingStage.tsx`, the waveform button): the cover or one of seven audio-reactive scenes (Soundprint, Ribbons,
+  Dot Grid, Aurora, Spectrum, Radial, Nebula) over the dark theme, a seek bar and the transport, in the browser's full screen when it allows. A soft strip of the
+  chosen scene also plays behind the bar. The scene is one device preference (`music.visualizer`).
+- Video gets Picture in picture and Full screen buttons on the bar; the hidden video element is shown only while the browser holds it.
+- The scenes read the real sound: `lib/media/audioGraph.ts` taps the host's element with one `AnalyserNode`. It skips the tap on iOS (Web Audio ends background
+  playback), for a stream from another origin and until the person's first tap or key press has started the audio context (a tapped element plays silently
+  through a suspended context), so playback is never affected. Colors come from the cover art (`lib/media/artPalette.ts`) or, with no art, the dark theme's tokens.
+- Ported from the pre-rebuild hub's `AudioVisualizer`, `artPalette` and `mediaAudioGraph`, without its EQ chain, DJ and radio parts.
+- Open: an Up next and a queue sheet on the stage, lyrics on the stage, and a Cast button; the host has no queue to show yet outside Music's own page.
+
