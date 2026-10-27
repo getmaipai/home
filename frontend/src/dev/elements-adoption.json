@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-10-27T05:21:45.917Z",
+  "generatedAt": "2026-10-27T05:27:54.251Z",
   "kitTag": "ui-v0.5.368",
   "items": [
     {
@@ -171,7 +171,7 @@
       "group": "activity",
       "verdict": "unassessed",
       "verdictReason": "Recorded unassessed verdict in elements-plan.json; see the plan entry for its dependency or scope.",
-      "implemented": false
+      "implemented": true
     },
     {
       "file": "activity-graph.tsx",
@@ -1332,7 +1332,7 @@
       "group": "task",
       "verdict": "unassessed",
       "verdictReason": "Recorded unassessed verdict in elements-plan.json; see the plan entry for its dependency or scope.",
-      "implemented": false
+      "implemented": true
     },
     {
       "file": "task-card.tsx",
