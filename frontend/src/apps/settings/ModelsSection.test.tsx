@@ -574,6 +574,21 @@ describe("ModelsSection chat model choices (MODEL-SWITCH-01)", () => {
     } finally { restore(); }
   });
 
+  test("a model tagged uncensored shows an Uncensored badge, and an untagged one does not", async () => {
+    const tagged = () => { const fit = second(); return { ...fit, model: { ...fit.model, id: "qwen3-6-35b-a3b-uncensored-hauhaucs-q4-k-m", label: "Qwen3.6 35B A3B Uncensored (Q4_K_M)", tags: ["uncensored", "reads-pictures"] } }; };
+    const restore = stubFetch({
+      "/api/host/hardware": HARDWARE, "role=chat": [first(), tagged()], "role=image": [], "role=video": [], "/api/jobs": [],
+      "/models/selection": { modelId: "muse-glimmer-30b-q4-k-xl", name: "muse", state: "ready", installed: ["muse-glimmer-30b-q4-k-xl"] }, "/engine/status": NO_ENGINE,
+    });
+    try {
+      const { findByText, getAllByText } = render(<ModelsSection />);
+      await findByText("Chat models");
+      expect(getAllByText("Uncensored")).toHaveLength(1);
+      const row = (await findByText("Qwen3.6 35B A3B Uncensored (Q4_K_M)")).closest("li")!;
+      expect(row.textContent).toContain("Uncensored");
+    } finally { restore(); }
+  });
+
   test("an installed model offers Use this model, and choosing it asks the hub to load it", async () => {
     const calls: string[] = [];
     const original = globalThis.fetch;

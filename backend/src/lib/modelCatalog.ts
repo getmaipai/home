@@ -333,6 +333,76 @@ export const CATALOG: ModelCapabilities[] = [
       },
     },
   }),
+  // Optional uncensored chat model (2026-10-26): HauhauCS's "Aggressive"
+  // fine-tune of Qwen3.6-35B-A3B, pinned to the Stack's revision, hashes and
+  // own projector. The `uncensored` tag is the catalog property Settings turns
+  // into a visible badge. It is bound to no tier and downloads only when an
+  // admin chooses it; Home's age and surface gates run in front of it as
+  // for every model.
+  ModelCapabilities.parse({
+    id: "qwen3-6-35b-a3b-uncensored-hauhaucs-q4-k-m",
+    role: "chat",
+    label: "Qwen3.6 35B A3B Uncensored (Q4_K_M)",
+    license: "Apache-2.0",
+    engine: "llama-server",
+    implemented: true,
+    quality_tier: "high",
+    tags: ["uncensored", "reads-pictures", "fast-answers"],
+    pros: ["Does not refuse on its own: it answers what an adult asks", "Answers start fast: it only uses 3 billion of its 35 billion parts for each word", "Reads the pictures you send", "262k context"],
+    cons: ["Uncensored: this model has had its own refusals removed. Home's age and safety rules still apply in front of it", "A big download, so the first install takes a while", "Meant for a computer with 64 GB of memory or more", "Not yet tested against Muse for search and tool use in this house"],
+    thinking_mode: "switchable",
+    image_input: {
+      projector: {
+        file: "mmproj-Qwen3.6-35B-A3B-Uncensored-HauhauCS-Aggressive-f16.gguf",
+        download: {
+          url: "https://huggingface.co/HauhauCS/Qwen3.6-35B-A3B-Uncensored-HauhauCS-Aggressive/resolve/f12a584fecbeb5f20001130d8ecd66c9327ae685/mmproj-Qwen3.6-35B-A3B-Uncensored-HauhauCS-Aggressive-f16.gguf",
+          sha256: "c8e702344a81f8c226a914aa980ed6e1f604bce9374f1fed8e65c896908af414",
+          approx_bytes: 899_283_072,
+        },
+      },
+    },
+    // HauhauCS's GGUF repository, pinned to one revision; sha256 is the
+    // file's git-lfs oid, the same value the Stack verifies on download.
+    download: {
+      url: "https://huggingface.co/HauhauCS/Qwen3.6-35B-A3B-Uncensored-HauhauCS-Aggressive/resolve/f12a584fecbeb5f20001130d8ecd66c9327ae685/Qwen3.6-35B-A3B-Uncensored-HauhauCS-Aggressive-Q4_K_M.gguf",
+      sha256: "bbef58c37ce88820be9d98b6437f1cf4bac890c947bd55fc7b68e22098574231",
+      approx_bytes: 21_166_758_016,
+    },
+    sizing: {
+      kind: "transformer_gguf",
+      param_count_billion: 35,
+      // bits_per_weight and the overhead fraction together reproduce the
+      // pinned file's size (22.36 GB) within 1% (modelCatalog.test.ts).
+      bits_per_weight: 4.75,
+      gguf_overhead_fraction: 0.02,
+      // Only the 10 full-attention layers keep a KV cache; the other 30
+      // are Gated DeltaNet layers with a small fixed state.
+      num_layers: 10,
+      num_kv_heads: 2,
+      head_dim: 256,
+      max_context: 262144,
+    },
+    // Muse's budget shape (same tools, rounds and ceiling, thinking zero
+    // unless toggled); the measured block says what has not been run.
+    turn_budget: {
+      rounds: 1,
+      max_tools: 16,
+      always_search: true,
+      model_transitions: true,
+      context_tokens: 2048,
+      thinking_budget_tokens: 0,
+      thinking_budget_tokens_toggled: 512,
+      thinking_for_minors: false,
+      reply_ceiling_tokens: 1536,
+      deadlines_ms: { model: 30000, tool: 10000, total: 60000 },
+      measured: {
+        false_call_rate: 0,
+        inverse_miss_rate: 0,
+        rewrite_pass_rate: 0,
+        on: "not yet measured for this model: the CHAT-AB-01 and tool-calling benches record the real values; Muse's budget shape is carried until then",
+      },
+    },
+  }),
   // VISION-02: Qwen3-VL-8B-Instruct, the chat model that reads pictures
   // itself (the Stack's VISION-02b pin, the same revision and hashes).
   // The Instruct edition has no thinking mode (its template has no switch
