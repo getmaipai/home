@@ -509,7 +509,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/nativeFolderDialog.ts` | runCommand, chooseNativeFolder |
 | `backend/src/lib/networkSettings.ts` | LAN_EXPOSURE_SETTING, HUB_PORT_SETTING, configuredHubPort, configuredLanExposure, canBindHubPort, HUB_PORT_IN_USE_MESSAGE |
 | `backend/src/lib/news/actions.ts` | NEWS_ACTIONS, runNewsAction |
-| `backend/src/lib/news/article.ts` | __resetNewsArticleForTests, __setPaceWaitForTests, sourceIconUrlOf, pictureKey, keepFigures, figureAddressesOf |
+| `backend/src/lib/news/article.ts` | stableBlockId, __resetNewsArticleForTests, __setPaceWaitForTests, sourceIconUrlOf, pictureKey, keepFigures |
 | `backend/src/lib/news/cards.ts` | storyIdOf, itemIdFrom, hostOf, publishedAtOf, cardEnv, publisherOf |
 | `backend/src/lib/news/childGate.ts` | sentencesOf, gateFor, inlineText, gateBlock, gateBlocks, SPEECH_CHUNK_MAX |
 | `backend/src/lib/news/contentQuality.ts` | MIN_ARTICLE_CHARS, FAILURE_TTL_MS, looksLikeStub, acceptArticleText, betterCopy, createFailureMemory |
