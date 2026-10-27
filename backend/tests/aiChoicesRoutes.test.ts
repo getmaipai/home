@@ -319,8 +319,8 @@ describe("free up space", () => {
 });
 
 describe("the optional uncensored chat model (third Chat choice)", () => {
-  const UNCENSORED = "qwen3-6-35b-a3b-uncensored-hauhaucs-q4-k-m";
-  const PROJECTOR = "mmproj-qwen3-6-35b-a3b-uncensored-hauhaucs-f16";
+  const UNCENSORED = "qwen3-8-27b-uncensored-hauhaucs-q4-k-p";
+  const PROJECTOR = "qwen3-8-27b-uncensored-hauhaucs-mmproj-bf16";
   const standard = () => rowFor("chat").model_ids.filter((id) => id !== UNCENSORED).at(-1)!;
   let pulled: string[] = [];
   let loaded: string[] = [];
