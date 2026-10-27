@@ -151,6 +151,11 @@ describe("REASONING-01: feedThinkSplit/flushThinkSplit", () => {
     expect(drain(["17 times 24 is 408."])).toEqual([{ reasoning: false, text: "17 times 24 is 408." }]);
   });
 
+  test("an orphan closing think tag is discarded instead of shown", () => {
+    expect(drain(["Answer. </think>"])).toEqual([{ reasoning: false, text: "Answer. " }]);
+    expect(drain(["Answer. </thi", "nk>"])).toEqual([{ reasoning: false, text: "Answer. " }]);
+  });
+
   test("a truncated, never-closed think block: everything is reasoning, flushed at stream end", () => {
     expect(drain(["<think>carry the two"])).toEqual([{ reasoning: true, text: "carry the two" }]);
   });

@@ -148,6 +148,17 @@ export function feedThinkSplit(state: ThinkSplitState, chunk: string): ThinkSpan
       }
       break;
     }
+    // Some templates emit a closing marker without the opening marker
+    // (for example when reasoning is disabled). It is control text, not
+    // part of the answer, so discard it instead of streaming `</think>`.
+    const orphanClose = /<\/think>/i.exec(state.buffer);
+    const firstOpen = /<think>/i.exec(state.buffer);
+    if (orphanClose && (!firstOpen || orphanClose.index < firstOpen.index)) {
+      if (orphanClose.index > 0) spans.push({ reasoning: false, text: state.buffer.slice(0, orphanClose.index) });
+      state.buffer = state.buffer.slice(orphanClose.index + orphanClose[0].length);
+      state.skippingCloseWhitespace = true;
+      continue;
+    }
     const open = /<think>/i.exec(state.buffer);
     if (open) {
       if (open.index > 0) spans.push({ reasoning: false, text: state.buffer.slice(0, open.index) });
@@ -155,7 +166,7 @@ export function feedThinkSplit(state: ThinkSplitState, chunk: string): ThinkSpan
       state.inThink = true;
       continue;
     }
-    const holdBack = partialTagOverlapLength(state.buffer, "<think>");
+    const holdBack = Math.max(partialTagOverlapLength(state.buffer, "<think>"), partialTagOverlapLength(state.buffer, "</think>"));
     const safe = state.buffer.length - holdBack;
     if (safe > 0) {
       spans.push({ reasoning: false, text: state.buffer.slice(0, safe) });

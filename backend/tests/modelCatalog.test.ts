@@ -221,33 +221,33 @@ describe("Qwen3.6 35B A3B (MODEL-SWITCH-01)", () => {
   });
 });
 
-// Optional uncensored fine-tune: the Stack's pin, plus the `uncensored` tag Settings shows as a badge.
-describe("Qwen3.6 35B A3B Uncensored (HauhauCS)", () => {
-  const id = "qwen3-6-35b-a3b-uncensored-hauhaucs-q4-k-m";
-  const model = () => CATALOG.find((m) => m.id === id)!;
-
-  test("it is catalogued with the Stack's revision, sha256, bytes and its own projector", () => {
-    expect(model().role).toBe("chat");
-    expect(model().download).toEqual({
-      url: "https://huggingface.co/HauhauCS/Qwen3.6-35B-A3B-Uncensored-HauhauCS-Aggressive/resolve/f12a584fecbeb5f20001130d8ecd66c9327ae685/Qwen3.6-35B-A3B-Uncensored-HauhauCS-Aggressive-Q4_K_M.gguf",
-      sha256: "bbef58c37ce88820be9d98b6437f1cf4bac890c947bd55fc7b68e22098574231",
-      approx_bytes: 21_166_758_016,
+describe("Qwen3.8 uncensored replacement (MODEL-SWITCH-02)", () => {
+  const id = "qwen3-8-27b-uncensored-hauhaucs-q4-k-p";
+  test("the Home record mirrors Stack's model and projector pins", () => {
+    const model = CATALOG.find((entry) => entry.id === id)!;
+    expect(model.role).toBe("chat");
+    expect(model.download).toEqual({
+      url: "https://huggingface.co/HauhauCS/Qwen3.8-27B-Uncensored-HauhauCS-Aggressive-MTP-GGUF/resolve/993a5971fda8f30dd1b7eb2654792ba4415c7460/Qwen3.8-27B-Uncensored-HauhauCS-Aggressive-Q4_K_P.gguf",
+      sha256: "ba36dc3c2b2ff5e0aa5d71092a8894546996a6a119ae391803dda07cdc08516d",
+      approx_bytes: 17_923_393_664,
     });
-    expect(model().image_input?.projector.download).toEqual({
-      url: "https://huggingface.co/HauhauCS/Qwen3.6-35B-A3B-Uncensored-HauhauCS-Aggressive/resolve/f12a584fecbeb5f20001130d8ecd66c9327ae685/mmproj-Qwen3.6-35B-A3B-Uncensored-HauhauCS-Aggressive-f16.gguf",
-      sha256: "c8e702344a81f8c226a914aa980ed6e1f604bce9374f1fed8e65c896908af414",
-      approx_bytes: 899_283_072,
+    expect(model.image_input?.projector.download).toMatchObject({
+      sha256: "5681b690bcb8eb10cd28d62d078cb4e01521a3ea4880a3fc7d54de72de2dd142",
+      approx_bytes: 931_146_624,
     });
-    expect(Math.abs(weightsBytes(model().sizing as never) - 21_166_758_016) / 21_166_758_016).toBeLessThan(0.01);
+    expect(thinkingModeFor(id)).toBe("switchable");
+    expect(Math.abs(weightsBytes(model.sizing as never) - 17_923_393_664) / 17_923_393_664).toBeLessThan(0.01);
   });
 
-  test("it carries the explicit uncensored tag, and no other chat model does", () => {
-    expect(model().tags).toContain("uncensored");
-    expect(CATALOG.filter((m) => m.tags?.includes("uncensored")).map((m) => m.id)).toEqual([id]);
+  test("fits the Studio and reports that tool use has not been measured", () => {
+    const model = CATALOG.find((entry) => entry.id === id)!;
+    expect(recommend("chat", hw({ isAppleSilicon: true, unifiedMemoryGb: 128 })).find((entry) => entry.model.id === id)?.fits).toBe(true);
+    expect(model.turn_budget?.measured.on).toContain("not yet measured");
   });
 
-  test("it is a choice, never the first recommendation", () => {
-    const studio = recommend("chat", hw({ isAppleSilicon: true, unifiedMemoryGb: 128 }));
-    expect(studio[0]?.model.id).not.toBe(id);
+  test("it carries the uncensored tag alone and replaces the Qwen3.6 record", () => {
+    expect(CATALOG.filter((entry) => entry.tags?.includes("uncensored")).map((entry) => entry.id)).toEqual([id]);
+    expect(CATALOG.find((entry) => entry.id === "qwen3-6-35b-a3b-uncensored-hauhaucs-q4-k-m")).toBeUndefined();
+    expect(recommend("chat", hw({ isAppleSilicon: true, unifiedMemoryGb: 128 }))[0]?.model.id).not.toBe(id);
   });
 });
