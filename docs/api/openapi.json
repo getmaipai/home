@@ -55976,7 +55976,8 @@
                                 "type": "object",
                                 "properties": {
                                   "h264": {
-                                    "type": "string"
+                                    "type": "string",
+                                    "nullable": true
                                   },
                                   "av1": {
                                     "type": "string",
