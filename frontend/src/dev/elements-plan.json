@@ -4147,6 +4147,34 @@
       "group": "media-card",
       "verdict": "later",
       "verdictReason": "New kit media card; Home adopts it when the media shelves are rebuilt on the kit."
+    },
+    {
+      "file": "activity-feed.tsx",
+      "name": "activity-feed",
+      "group": "activity",
+      "verdict": "wire-now",
+      "verdictReason": "Draws the dated activity list on a companion's page (Companions page, Activity tab); adopted as shipped with props only."
+    },
+    {
+      "file": "companion-card.tsx",
+      "name": "companion-card",
+      "group": "companion",
+      "verdict": "wire-now",
+      "verdictReason": "Draws each companion in the Companions directory grid; adopted as shipped with props only."
+    },
+    {
+      "file": "companion-profile-header.tsx",
+      "name": "companion-profile-header",
+      "group": "companion",
+      "verdict": "wire-now",
+      "verdictReason": "Draws the companion's profile header on its page; adopted as shipped with props only."
+    },
+    {
+      "file": "task-browser.tsx",
+      "name": "task-browser",
+      "group": "task",
+      "verdict": "wire-now",
+      "verdictReason": "Draws the Tasks list with its detail on a companion's page (Companions page, Tasks tab); adopted as shipped with props only."
     }
   ]
 }

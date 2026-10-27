@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-10-27T05:27:54.251Z",
+  "generatedAt": "2026-10-27T05:31:01.519Z",
   "kitTag": "ui-v0.5.368",
   "items": [
     {
@@ -169,8 +169,8 @@
       "file": "activity-feed.tsx",
       "name": "activity-feed",
       "group": "activity",
-      "verdict": "unassessed",
-      "verdictReason": "Recorded unassessed verdict in elements-plan.json; see the plan entry for its dependency or scope.",
+      "verdict": "wire-now",
+      "verdictReason": "Draws the dated activity list on a companion's page (Companions page, Activity tab); adopted as shipped with props only.",
       "implemented": true
     },
     {
@@ -348,16 +348,16 @@
       "file": "companion-card.tsx",
       "name": "companion-card",
       "group": "companion",
-      "verdict": "unassessed",
-      "verdictReason": "Recorded unassessed verdict in elements-plan.json; see the plan entry for its dependency or scope.",
+      "verdict": "wire-now",
+      "verdictReason": "Draws each companion in the Companions directory grid; adopted as shipped with props only.",
       "implemented": true
     },
     {
       "file": "companion-profile-header.tsx",
       "name": "companion-profile-header",
       "group": "companion",
-      "verdict": "unassessed",
-      "verdictReason": "Recorded unassessed verdict in elements-plan.json; see the plan entry for its dependency or scope.",
+      "verdict": "wire-now",
+      "verdictReason": "Draws the companion's profile header on its page; adopted as shipped with props only.",
       "implemented": true
     },
     {
@@ -1330,8 +1330,8 @@
       "file": "task-browser.tsx",
       "name": "task-browser",
       "group": "task",
-      "verdict": "unassessed",
-      "verdictReason": "Recorded unassessed verdict in elements-plan.json; see the plan entry for its dependency or scope.",
+      "verdict": "wire-now",
+      "verdictReason": "Draws the Tasks list with its detail on a companion's page (Companions page, Tasks tab); adopted as shipped with props only.",
       "implemented": true
     },
     {
