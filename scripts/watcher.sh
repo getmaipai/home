@@ -59,7 +59,8 @@ install_if_needed() {
   [[ "$changed" -eq 1 ]] || return 0
   for d in backend frontend; do
     [[ -d "$checkout/$d" ]] || continue
-    (cd "$checkout/$d" && bun install --frozen-lockfile) || { error "bun install failed in $d; repair dependencies in $checkout and retry."; return 1; }
+    # --force for the same reason as the lander: a changed commons pin is a file: dependency and a plain install keeps the old snapshot.
+    (cd "$checkout/$d" && bun install --frozen-lockfile --force) || { error "bun install failed in $d; repair dependencies in $checkout and retry."; return 1; }
   done
 }
 

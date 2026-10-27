@@ -191,7 +191,8 @@ PY
     local d
     for d in backend frontend; do
       if printf '%s\n' "$package_changed" | grep -Eq "^$d/"; then
-        (cd "$checkout/$d" && bun install --frozen-lockfile) || { bounce "$request" "$branch" "$sha" "bun install failed in $d; repair dependencies and run land.sh again" "$started" "$output"; rm -f "$output"; return 0; }
+        # --force: a pinned commons package is a file: dependency, and a plain install keeps the old snapshot when only the pin path changed (docs/PINNING.md), which made the generated adoption file name the old kit and turned main red.
+        (cd "$checkout/$d" && bun install --frozen-lockfile --force) || { bounce "$request" "$branch" "$sha" "bun install failed in $d; repair dependencies and run land.sh again" "$started" "$output"; rm -f "$output"; return 0; }
       fi
     done
   fi
