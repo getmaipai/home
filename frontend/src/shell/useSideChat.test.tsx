@@ -47,6 +47,15 @@ function stubTurns(rows: unknown[] = [turn]) {
 afterEach(() => { cleanup(); currentView = undefined; mock.restore(); localStorage.clear(); });
 
 describe("useSideChat lifecycle", () => {
+  test("read aloud defaults off and is remembered for the current person", async () => {
+    restoreApi();
+    const { view } = mount(); currentView = view;
+    expect(currentSide.readAloud).toBe(false);
+    act(() => currentSide.setReadAloud(true));
+    await waitFor(() => expect(localStorage.getItem("maipai.ambient.readaloud.person-1")).toBe("true"));
+    expect(currentSide.readAloud).toBe(true);
+  });
+
   test("restores the remembered conversation and imports its messages", async () => {
     localStorage.setItem("maipai.ambient.side.person-1.companion-1", "remembered-1");
     restoreApi(); stubTurns();

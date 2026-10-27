@@ -136,7 +136,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `frontend/src/apps/setup/WebSearchStep.tsx` | webSearchFailure, WebSearchStep |
 | `frontend/src/lib/media/micGate.tsx` | useMicGate, micDeviceSteps, micFixSteps, micHelp |
 | `frontend/src/shell/AliasRedirect.tsx` | AliasRedirect |
-| `frontend/src/shell/AmbientCompanionPane.tsx` | readAmbientPaneState, createAmbientAskQueue, useAmbientCompanionPane |
+| `frontend/src/shell/AmbientCompanionPane.tsx` | readAmbientPaneState, isProtectedReply, createAmbientAskQueue, useAmbientCompanionPane |
 | `frontend/src/shell/BrowserAlerts.tsx` | shouldShowBrowserAlert, requestBrowserAlertPermission, BrowserAlerts |
 | `frontend/src/shell/InstallDock.tsx` | buildDock, InstallDock |
 | `frontend/src/shell/InstallDockRow.tsx` | InstallDockRow |

@@ -3,10 +3,11 @@ import { useLocalRuntime } from "@assistant-ui/react";
 import { useQuery } from "@tanstack/react-query";
 import { createChatModelAdapter } from "@/apps/chat/chatModelAdapter";
 import { createChatHistoryAdapter } from "@/apps/chat/chatHistoryAdapter";
-import { SentenceSpeechScheduler } from "@/lib/sentenceSpeechScheduler";
+import { useChatVoiceTurnState } from "@/apps/chat/useChatVoiceTurnState";
 import { createChatSpeechAdapter } from "@/apps/chat/chatSpeechAdapter";
 import { createSttDictationAdapter } from "@/lib/voice/sttDictationAdapter";
 import { createSttSocket } from "@/lib/voice/sttSocket";
+import { useVoiceAvailable } from "@/apps/chat/useChatAvailability";
 import { toast } from "sonner";
 import { api, type Roster } from "@/lib/api";
 import { INCOGNITO_DISCARDED_EVENT } from "@/shell/incognitoContext";
@@ -31,16 +32,25 @@ export function useSideChat(person: Roster, companionId: string, incognito: bool
   const threadActionsRef = useRef<{ reset(): void; import(repository: Awaited<ReturnType<ReturnType<typeof createChatHistoryAdapter>["load"]>>): void } | null>(null);
   const pendingThreadWorkRef = useRef<{ kind: "reset" } | { kind: "import"; repository: Awaited<ReturnType<ReturnType<typeof createChatHistoryAdapter>["load"]>> } | undefined>(undefined);
   const [conversationId, setConversationId] = useState<string | undefined>();
-  const schedulerRef = useRef<SentenceSpeechScheduler | null>(null);
-  const pendingSpokenRef = useRef(false);
+  const voiceTurn = useChatVoiceTurnState();
+  const { turnSchedulerRef, liveVoiceActiveRef, pendingSpeechRef, activeTurnRef, askAnswerRef, isSpeaking, speakingEndedAt, speechFailed } = voiceTurn;
+  const pendingSpokenRef = pendingSpeechRef;
+  const [callActive, setCallActive] = useState(false);
+  const [readAloud, setReadAloud] = useState(() => {
+    try { return window.localStorage.getItem(`maipai.ambient.readaloud.${person.id}`) === "true"; } catch { return false; }
+  });
+  const readAloudRef = useRef(false);
+  readAloudRef.current = readAloud;
+  const ttsAvailable = useVoiceAvailable();
   const sttStatus = useQuery({ queryKey: ["stt-status"], queryFn: api.sttStatus });
+  const sttInstalled = sttStatus.data?.installed ?? true;
   const dictation = useMemo(() => createSttDictationAdapter({
     createSocket: createSttSocket,
-    turnSchedulerRef: schedulerRef,
-    sttInstalled: () => sttStatus.data?.installed ?? true,
+    turnSchedulerRef,
+    sttInstalled: () => sttInstalled,
     onNotInstalled: () => toast.error("Voice input needs a one-time download that hasn't finished on this hub yet.", { id: "stt-not-installed" }),
     onFinalReady: () => { pendingSpokenRef.current = true; },
-  }), [sttStatus.data]);
+  }), [pendingSpokenRef, sttInstalled, turnSchedulerRef]);
   const speech = useMemo(() => createChatSpeechAdapter(), []);
   const resolveConversationId = useCallback(async () => {
     if (restorePromiseRef.current) await restorePromiseRef.current;
@@ -61,7 +71,7 @@ export function useSideChat(person: Roster, companionId: string, incognito: bool
     return createPromiseRef.current;
   }, [companionId, incognito, storageKey]);
   const model = useMemo(() => createChatModelAdapter({
-    turnSchedulerRef: schedulerRef,
+    turnSchedulerRef,
     consumeSupersedes: () => undefined,
     getAgeBand: () => person.age_band,
     consumeTemporary: () => incognito || undefined,
@@ -70,12 +80,16 @@ export function useSideChat(person: Roster, companionId: string, incognito: bool
       pendingSpokenRef.current = false;
       return spoken;
     },
+    consumeAskAnswer: () => { const value = askAnswerRef.current; askAnswerRef.current = undefined; return value; },
     consumeRetryWithCurrentCompanion: () => false,
     getConversationId: resolveConversationId,
     onReplyText,
     onReplyState,
-    speakReplies: false,
-  }), [incognito, onReplyState, onReplyText, person.age_band, resolveConversationId]);
+    onSpeakingChange: voiceTurn.onSpeakingChange,
+    onSpeechError: voiceTurn.onSpeechError,
+    activeTurnRef,
+    speakReplies: () => liveVoiceActiveRef.current || (ttsAvailable && readAloudRef.current),
+  }), [activeTurnRef, askAnswerRef, incognito, liveVoiceActiveRef, onReplyState, onReplyText, pendingSpokenRef, person.age_band, resolveConversationId, ttsAvailable, turnSchedulerRef, voiceTurn.onSpeakingChange, voiceTurn.onSpeechError]);
   const history = useMemo(() => createChatHistoryAdapter(person.display_name, () => conversationIdRef.current), [person.display_name]);
   const runtime = useLocalRuntime(model, { adapters: { history, speech, dictation } });
 
@@ -110,7 +124,7 @@ export function useSideChat(person: Roster, companionId: string, incognito: bool
     setConversationId(undefined);
     if (removeStored) { try { window.localStorage.removeItem(storageKey); } catch { /* storage may be unavailable */ } }
     resetThread();
-  }, [invalidate, resetThread, storageKey]);
+  }, [invalidate, pendingSpokenRef, resetThread, storageKey]);
 
   useEffect(() => {
     const nextKey = currentKey;
@@ -173,5 +187,6 @@ export function useSideChat(person: Roster, companionId: string, incognito: bool
     newSideChat();
     return target;
   }, [newSideChat]);
-  return { runtime, conversationId, newSideChat, openConversation, handOff, registerThreadActions, ensureConversationId: resolveConversationId };
+  useEffect(() => { try { window.localStorage.setItem(`maipai.ambient.readaloud.${person.id}`, String(readAloud)); } catch { /* local storage may be unavailable */ } }, [person.id, readAloud]);
+  return { runtime, conversationId, newSideChat, openConversation, handOff, registerThreadActions, ensureConversationId: resolveConversationId, turnSchedulerRef, liveVoiceActiveRef, pendingSpeechRef, activeTurnRef, askAnswerRef, isSpeaking, speakingEndedAt, speechFailed, readAloud, setReadAloud, ttsAvailable, sttInstalled, callActive, setCallActive };
 }

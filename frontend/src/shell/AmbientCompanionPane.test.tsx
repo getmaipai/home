@@ -4,7 +4,8 @@ import { useState, type ReactNode } from "react";
 import { MemoryRouter } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { api, type Roster } from "@/lib/api";
-import { createAmbientAskQueue, useAmbientCompanionPane, type AmbientPaneState } from "@/shell/AmbientCompanionPane";
+import { MarkdownText } from "@maipai/ui/src/elements/markdown-text";
+import { createAmbientAskQueue, isProtectedReply, useAmbientCompanionPane, type AmbientPaneState } from "@/shell/AmbientCompanionPane";
 import type { useSideChat } from "@/shell/useSideChat";
 
 const person = { id: "person-1", display_name: "Sage", role: "adult", age_band: "adult" } as Roster;
@@ -29,6 +30,31 @@ describe("ambient companion pane controls", () => {
     queue.register(null);
     expect(send).toHaveBeenCalledTimes(1);
     expect(send).toHaveBeenCalledWith("Question from preview");
+  });
+
+  test("a wake call waits for the companion stage to mount, then starts it once", () => {
+    const start = mock(() => {});
+    const queue = createAmbientAskQueue();
+    queue.startCall();
+    queue.registerCall(start);
+    queue.registerCall(null);
+    expect(start).toHaveBeenCalledTimes(1);
+  });
+
+  test("crisis, failed-tool and approval replies are marked to stay until dismissed", () => {
+    expect(isProtectedReply({ metadata: { custom: { crisisSupport: { text: "Call or text 988." } } } })).toBe(true);
+    expect(isProtectedReply({ metadata: { custom: { failedTool: true } } })).toBe(true);
+    expect(isProtectedReply({ content: [{ type: "tool-call", toolName: "confirm" }] })).toBe(true);
+    expect(isProtectedReply({ content: [{ type: "tool-call", toolName: "ask" }] })).toBe(true);
+    expect(isProtectedReply({ content: [{ type: "text", text: "A normal reply." }] })).toBe(false);
+  });
+
+  test("long replies keep their complete text in a vertically scrollable bubble", () => {
+    const longReply = Array.from({ length: 120 }, (_, index) => `Sentence ${index + 1} stays visible.`).join(" ");
+    const view = render(<div className="max-h-48 overflow-y-auto overscroll-contain"><MarkdownText text={longReply} /></div>, { wrapper });
+    expect(view.container.textContent).toBe(longReply);
+    expect(view.container.firstElementChild?.className).toContain("overflow-y-auto");
+    expect(view.container.firstElementChild?.className).toContain("max-h-48");
   });
 
   test("New from History opens the closed pane on the Companion tab and clears the thread", async () => {

@@ -79,7 +79,7 @@ import { createSttSocket } from "@/lib/voice/sttSocket";
 import type { LevelMeter } from "@/lib/voice/audioLevelMeter";
 import { CompositeAttachmentAdapter, SimpleTextAttachmentAdapter } from "@assistant-ui/core";
 import { useTabItem } from "@/shell/tabIdentity";
-import type { SentenceSpeechScheduler } from "@/lib/sentenceSpeechScheduler";
+import { useChatVoiceTurnState } from "@/apps/chat/useChatVoiceTurnState";
 import { ChatColumnControlContext } from "@/apps/chat/chatColumnControl";
 import { CHAT_COLUMN_ID, CHAT_SETTINGS_PATH, chatColumnShortcutLabel, searchableThreadsFor, useChatColumn, useChatThreadListState } from "@/shell/pages/ChatColumn";
 import { INCOGNITO_DISCARDED_EVENT, useIncognitoContext } from "@/shell/incognitoContext";
@@ -90,7 +90,6 @@ import { ArtifactOpenContext, AdminContext, ChatAgeBandContext, type CompareTarg
 import { ConfirmAskAnswerProvider, ReloadMainThreadProvider } from "@/apps/chat/chatToolUis";
 import { CompareIcon, toolCallPartFromMessage } from "@/apps/chat/chatThreadSlots";
 import { discardDraft } from "@/apps/chat/draftStore";
-import type { AskAnswerArm } from "@/apps/chat/chatAsk";
 import { chatFoldersQueryKey, useChatProjects } from "@/apps/chat/chatProjects";
 import { projectConversationRows, projectSourcesVisible } from "@/shell/pages/chatProjectPageModel";
 
@@ -208,12 +207,12 @@ function useBareCompareCanvas(target: CompareTarget | null) {
 function useChatRuntime(person: Roster, closeSheet: () => void, temporaryNext: boolean, voiceOpen: boolean, onArtifactReady: (artifactId: string) => void, setDraftConversationId: (id: string | undefined) => void, retryWithCurrentCompanionRef: { current: boolean }, tryCompanionIdRef: { current: string | undefined }, folderId?: string) {
   const temporaryModeRef = useRef(temporaryNext);
   temporaryModeRef.current = temporaryNext;
-  const turnSchedulerRef = useRef<SentenceSpeechScheduler | null>(null);
+  const voiceTurn = useChatVoiceTurnState();
+  const { turnSchedulerRef, liveVoiceActiveRef, pendingSpeechRef, activeTurnRef, askAnswerRef, isSpeaking, speakingEndedAt, speechFailed } = voiceTurn;
   // VOICE-LIVE-02: true only while the live voice session (below) is
   // open - the one gate on `speakReplies` above, and `pendingSpeechRef` the
   // one flag `consumeSpoken` reads and clears, the same single-shot
   // shape `temporaryModeRef`/`packageScopeRef` already use.
-  const liveVoiceActiveRef = useRef(false);
   // HANDSFREE-01(a): automatic read-aloud is remembered per conversation.
   const [autoReadReplies, setAutoReadReplies] = useState(false);
   const autoReadRepliesRef = useRef(false);
@@ -248,18 +247,14 @@ function useChatRuntime(person: Roster, closeSheet: () => void, temporaryNext: b
   const ttsAvailable = useVoiceAvailable();
   const ttsAvailableRef = useRef(ttsAvailable);
   ttsAvailableRef.current = ttsAvailable;
-  const pendingSpeechRef = useRef(false);
-  const activeTurnRef = useRef<{ turnId: string; heardVisibleEnd: () => number } | null>(null);
   // APPROVE-CARD-01: armed by ConfirmAskAnswerProvider's own `respond`
   // callback (ConfirmToolRender's Allow once/Deny handlers, via
   // ConfirmAskAnswerContext), the same single-shot shape as
   // `pendingSpeechRef` above - `consumeAskAnswer` below reads and clears it.
-  const askAnswerRef = useRef<AskAnswerArm | undefined>(undefined);
   // VOICE-LIVE-02: chatModelAdapter.ts's own onSpeakingChange, relayed as
   // real state so useLiveVoiceSession (a sibling hook, not inside this
   // runtime hook) can react to the live scheduler's own start/end - nothing else
   // in this file reads it today, so no other caller changes.
-  const [isSpeaking, setIsSpeaking] = useState(false);
   // A code review caught this: `isSpeaking` alone misses the case where a
   // reply never spoke at all (empty, or every sentence's TTS failed) -
   // onFirstAudio never fires, so onSpeakingChange(false) arrives with
@@ -268,8 +263,6 @@ function useChatRuntime(person: Roster, closeSheet: () => void, temporaryNext: b
   // the call stuck on "Thinking" forever. Bumped on every `false` call
   // regardless of the previous value, so useLiveVoiceSession can depend on
   // this instead of `isSpeaking` alone to notice "speaking is over."
-  const [speakingEndedAt, setSpeakingEndedAt] = useState(0);
-  const [speechFailed, setSpeechFailed] = useState(0);
   const [connection, setConnection] = useState<ConnectionState>({ phase: "online" });
   const [searchParams, setSearchParams] = useSearchParams();
   // Archive first switches an active remote thread to the blank thread
@@ -465,7 +458,7 @@ function useChatRuntime(person: Roster, closeSheet: () => void, temporaryNext: b
         onFinalReady: () => {},
         onLevelMeter: setDictationLevelMeter,
       }),
-    [sttStatusQuery.data],
+    [sttStatusQuery.data, turnSchedulerRef],
   );
 
   // FEEDBACK-CANCEL-01: the feedback adapter un-lights a thumb through the
@@ -568,11 +561,8 @@ function useChatRuntime(person: Roster, closeSheet: () => void, temporaryNext: b
           // background project's own live completion does (below,
           // ProjectFinishedArtifact).
           onArtifactReady,
-          onSpeakingChange: (speaking) => {
-            setIsSpeaking(speaking);
-            if (!speaking) setSpeakingEndedAt((n) => n + 1);
-          },
-          onSpeechError: () => setSpeechFailed((n) => n + 1),
+          onSpeakingChange: voiceTurn.onSpeakingChange,
+          onSpeechError: voiceTurn.onSpeechError,
           turnSchedulerRef,
           activeTurnRef,
           // VOICE-LIVE-02: on only for the one send the live voice

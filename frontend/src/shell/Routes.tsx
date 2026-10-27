@@ -195,9 +195,7 @@ function RoutesWithIncognito({ person, onPersonChange, onSignedOut }: { person: 
   const chatMatch = useMatch("/chat");
   const projectChatMatch = useMatch("/chat/projects/:id");
   const onChatPage = chatMatch !== null || projectChatMatch !== null;
-  const openChatWithCall = useCallback(() => navigate("/chat?wake=1"), [navigate]);
   const ambient = useAmbientCompanion(person);
-  const shellWake = useWakeWordListening({ person, onWake: openChatWithCall, active: !onChatPage });
   const [ring, setRing] = useState<AmbientRing>(null);
   const [wakeIndicator, setWakeIndicator] = useState<AmbientWakeIndicator>(null);
   const selectedAppHref = activeAppHref(location.pathname, packageAreaApps(usePackageAreas().areas));
@@ -207,11 +205,10 @@ function RoutesWithIncognito({ person, onPersonChange, onSignedOut }: { person: 
   const appCatalog = useAppCatalog();
   const { on: incognito, setOn: setIncognito } = useIncognitoContext();
   const chatAvailability = useChatAvailability();
-  const shellListeningLine = shellWake.indicator?.listening;
-  const shellTurnOff = shellWake.indicator?.onTurnOff;
   const [coarse, setCoarse] = useState(() => typeof matchMedia !== "undefined" && matchMedia("(pointer: coarse)").matches);
   const [previewOpen, setPreviewOpen] = useState(false);
   const [paneState, setPaneState] = useState(readAmbientPaneState);
+  const paneControlRef = useRef<AmbientPaneControl | null>(null);
   const [paneRing, setPaneRing] = useState<AmbientRing>(null);
   const [lastLine, setLastLine] = useState("");
   const paneOpenRef = useRef(paneState.open);
@@ -227,6 +224,14 @@ function RoutesWithIncognito({ person, onPersonChange, onSignedOut }: { person: 
     try { window.localStorage.setItem("maipai.ambient.pane", JSON.stringify(next)); } catch { /* local storage may be unavailable */ }
     if (next.open) { setLastLine(""); setPreviewOpen(false); }
   };
+  const openChatWithCall = useCallback(() => {
+    if (!ambient) { navigate("/chat?wake=1"); return; }
+    updatePaneState({ ...paneState, open: true });
+    paneControlRef.current?.startCall();
+  }, [ambient, navigate, paneState]);
+  const shellWake = useWakeWordListening({ person, onWake: openChatWithCall, active: !onChatPage, voiceOpen: sideChat.callActive });
+  const shellListeningLine = shellWake.indicator?.listening;
+  const shellTurnOff = shellWake.indicator?.onTurnOff;
   useEffect(() => {
     if (!lastLine || paneState.open) return;
     setPreviewOpen(true);
@@ -246,7 +251,6 @@ function RoutesWithIncognito({ person, onPersonChange, onSignedOut }: { person: 
   }, [shellListeningLine, shellTurnOff, onChatPage]);
   useEffect(() => { if (coarse && wakeIndicator) setPreviewOpen(true); }, [coarse, wakeIndicator]);
   const effectiveRing = effectiveAmbientRing(paneRing, ring, ambientRingFromWake(shellListeningLine ? { listening: shellListeningLine } : null));
-  const paneControlRef = useRef<AmbientPaneControl | null>(null);
   const currentApp = appCatalog.find((app) => location.pathname === app.to || location.pathname.startsWith(`${app.to}/`));
   const appName = currentApp?.label ?? (location.pathname === "/" ? "Home" : undefined);
   const ambientTrigger = ambient ? <button type="button" aria-label={wakeIndicator?.listening.startsWith("Listening for") ? `${ambient.companion.name}, listening` : ambient.companion.name} onClick={() => {
