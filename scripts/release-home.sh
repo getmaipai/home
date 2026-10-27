@@ -47,12 +47,17 @@ fi
 if [[ -n "$INSTALL" ]]; then WHAT="install the existing tag $TAG"; else WHAT="tag origin/main ($(git log "$LATEST..origin/main" --oneline | wc -l | tr -d ' ') commits since $LATEST) as $TAG"; fi
 echo "plan: $WHAT, then update the live hub from $INSTALLED"
 [[ "$DRY" == 1 ]] && { echo "dry run: nothing changed."; exit 0; }
+if [[ -z "$INSTALL" ]]; then
+  # Prove the push can authenticate before tagging: a non-interactive ssh session cannot reach the login keychain
+  # (error -25308), and a failed push used to leave an unpushed local tag that the next run took for the latest release (2026-10-27).
+  git push --dry-run -q origin "origin/main:refs/tags/$TAG" >/dev/null 2>&1 || { echo "Cannot push the tag to GitHub from this session (a keychain-backed login does not work over ssh). Give this checkout a deploy key or token that does not use the keychain, then re-run. Nothing was tagged or stopped." >&2; exit 1; }
+fi
 # A development Home from the main checkout holds the hub lock and 8787 and blocks the installer (three times on 2026-10-23, the live hub down for
 # minutes each time). Stop it now, before the tag is pushed and before the installer stops the live service, so the downtime is only the install.
 bash "$(dirname "$0")/stop-dev-home.sh" --live "$LIVE" || exit 1
 if [[ -z "$INSTALL" ]]; then
   git tag -a "$TAG" -m "$TAG" origin/main
-  git push origin "$TAG"
+  git push origin "$TAG" || { git tag -d "$TAG" >/dev/null; echo "Pushing $TAG failed; the local tag was removed so the next run starts clean." >&2; exit 1; }
 fi
 BEFORE_MIGRATIONS="$(sqlite3 -readonly "$LIVE/data/hub.db" 'select count(*) from __drizzle_migrations' 2>/dev/null || echo 0)"
 sudo -n /usr/local/libexec/maipai-install "$TAG"
