@@ -122,17 +122,16 @@ function open(path: string | { pathname: string; state: unknown }, width = 1440)
 describe("an app that declares a settings area", () => {
   const area = { id: "demo", title: "Demo", app: "/apps/demo", audience: { min_role: "child" }, groups: [{ label: "Demo", sections: ["places"] }], sections: [{ id: "places", label: "Places", icon: "map-pin", kind: "keys", cards: [{ label: "Places", group: "demo", scope: "person" }] }] };
 
-  test("the toolbar has a Settings link named for the app that opens /settings/<area id>", async () => {
+  test("the shell row has a Settings button named for the app", async () => {
     rows = [{ ...row, settings_area: area } as AppRow];
     const view = open("/apps/demo");
-    const gear = await view.findByRole("link", { name: "Demo weather settings" });
-    expect(gear.getAttribute("href")).toBe("/settings/demo");
+    expect(await view.findByRole("button", { name: "Demo weather settings" })).toBeTruthy();
   });
 
   test("an app with no settings area has no gear", async () => {
     const view = open("/apps/demo");
     await waitFor(() => expect(view.container.querySelector('[data-slot="weather-card"]')).not.toBeNull());
-    expect(view.queryByRole("link", { name: /settings/i })).toBeNull();
+    expect(view.queryByRole("button", { name: /settings/i })).toBeNull();
   });
 });
 

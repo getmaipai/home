@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, mock, spyOn, test } from "bun:test";
-import { act, cleanup, renderHook, waitFor } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, renderHook, waitFor } from "@testing-library/react";
 import { useState, type ReactNode } from "react";
 import { MemoryRouter } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
@@ -52,5 +52,27 @@ describe("ambient companion pane controls", () => {
     await waitFor(() => expect(result.current.open).toBe(true));
     expect(result.current.activeTab).toBe("companion");
     expect(onContinue).toHaveBeenCalledWith("side-1");
+  });
+
+  test("Settings links to companion voice, appearance and presence pages and saves the selected companion", async () => {
+    const originals = { companions: api.companions, setSetting: api.setSetting };
+    const save = mock(async () => ({} as never));
+    api.companions = async () => ({ companions: [{ id: "companion-1", name: "Companion" }, { id: "companion-2", name: "Another companion" }] } as never);
+    api.setSetting = save as never;
+    try {
+      const side = { newSideChat: noop, openConversation: mock(async () => true), handOff: mock(async () => undefined) } as never;
+      const { result } = renderHook(() => usePane(side, noop), { wrapper });
+      act(() => { result.current.onOpenChange(true); result.current.onActiveTabChange("settings"); });
+      const settings = result.current.tabs.find((tab) => tab.id === "settings")!.content;
+      const view = render(<>{settings}</>, { wrapper });
+      expect((await view.findByRole("link", { name: "Voice" })).getAttribute("href")).toBe("/companions/companion-1");
+      expect(view.getByRole("link", { name: "Appearance" }).getAttribute("href")).toBe("/companions/companion-1");
+      expect(view.getByRole("link", { name: "Presence" }).getAttribute("href")).toBe("/settings/chat?tab=personalization");
+      fireEvent.change(view.getByRole("combobox", { name: "Choose companion" }), { target: { value: "companion-2" } });
+      await waitFor(() => expect(save).toHaveBeenCalledWith("person:person-1", "persona.active_id", "companion-2"));
+    } finally {
+      api.companions = originals.companions;
+      api.setSetting = originals.setSetting;
+    }
   });
 });

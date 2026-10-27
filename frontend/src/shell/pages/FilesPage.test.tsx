@@ -78,12 +78,12 @@ describe("Library states", () => {
       expect(document.querySelector('[aria-label="Loading your files"]')).toBeNull();
     } finally { server.restore(); }
   });
-  test("an empty Library explains what lands here and offers Upload", async () => {
+  test("an empty Library explains what lands here without a second Upload row", async () => {
     const server = serve();
     try {
       page();
       await waitFor(() => expect(document.body.textContent).toContain("Nothing here yet. Pictures, videos and songs you make in chat land here"));
-      expect(within(document.body).getAllByRole("button", { name: "Upload" }).length).toBeGreaterThan(0);
+      expect(within(document.body).queryByRole("button", { name: "Upload" })).toBeNull();
     } finally { server.restore(); }
   });
   test("a failed load says what to do and Try again loads again", async () => {
@@ -414,7 +414,7 @@ describe("viewer, menu, sharing and roles", () => {
       const column = document.querySelector("#library-sidebar")!;
       expect(column.textContent).not.toContain("Shared by me");
       expect(within(document.body).queryByRole("button", { name: "Upload" })).toBeNull();
-      expect(within(document.body).getByRole("button", { name: "Ask to add a file" })).toBeTruthy();
+      expect(within(document.body).queryByRole("button", { name: "Ask to add a file" })).toBeNull();
       const trigger = document.querySelector<HTMLElement>('[aria-label="Actions for Fox"]')!;
       fireEvent.pointerDown(trigger, { button: 0, ctrlKey: false, pointerType: "mouse" });
       await waitFor(() => expect(document.querySelector('[role="menu"]')).not.toBeNull());

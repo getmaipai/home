@@ -22,7 +22,6 @@ export function MediaSearchPage() {
   return (
     <MediaHubFrame packageId="search">
       <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-6 p-4 lg:ps-6" data-testid="media-search">
-        <h1 className="min-w-0 truncate text-2xl font-bold tracking-tight sm:text-3xl">Search Media</h1>
         {q.trim().length === 0 ? <EmptyState icon="search" text="Search for a title across your media apps." /> : (
           <AsyncState data={page.isError ? null : page.data} error={page.isError} isFetching={page.isFetching} onRetry={() => page.refetch()}
             errorMessage="Could not search Media. Check your connection and try again." loadingLabel="Searching Media">

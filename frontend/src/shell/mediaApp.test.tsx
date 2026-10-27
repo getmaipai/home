@@ -352,24 +352,23 @@ describe("family app headers", () => {
     expect(isMediaApp("weather")).toBe(false);
   });
 
-  test("the title is large, the controls are icons on the end side, and the sections are pill tabs starting at Today", async () => {
+  test("the app title and controls use the shell row, and sections stay as pill tabs starting at Today", async () => {
     const view = open("/apps/news");
     await view.findByRole("tab", { name: "Today" });
     const headings = view.getAllByRole("heading", { level: 1, name: "News" });
-    expect(headings.some((heading) => heading.className.includes("text-2xl"))).toBe(true);
-    // The app's own sr-only heading is gone (the visible title is the heading), as for a media app.
-    expect(headings.some((heading) => heading.className.includes("sr-only") && heading.closest("[data-testid=package-app]") !== null)).toBe(false);
+    expect(headings).toHaveLength(1);
+    expect(headings[0]?.closest('[data-slot="rail-page-header"]')).toBeTruthy();
     expect(await view.findByRole("tab", { name: "Today" })).toBeTruthy();
     expect(view.getByRole("tab", { name: "Following" })).toBeTruthy();
     expect(view.getByRole("tablist", { name: "Sections" }).getAttribute("data-variant")).toBe("pill");
-    expect(view.getByRole("link", { name: "News settings" })).toBeTruthy();
+    expect(view.getByRole("button", { name: "News settings" }).closest('[data-slot="rail-page-header"]')).toBeTruthy();
     expect(view.queryByRole("button", { name: /favorites/ })).toBeNull();
     expect(view.queryByRole("button", { name: /Close the player/ })).toBeNull();
   });
 
   test("a media app keeps the same header", async () => {
     const view = open("/apps/videos");
-    expect((await view.findAllByRole("heading", { level: 1, name: "Videos" })).length).toBeGreaterThan(0);
+    await waitFor(() => expect(document.querySelector('[data-slot="rail-page-header"] h1')?.textContent).toBe("Videos"));
     expect(view.getByRole("tablist", { name: "Sections" }).getAttribute("data-variant")).toBe("pill");
   });
 
@@ -381,17 +380,16 @@ describe("family app headers", () => {
         Object.defineProperty(window, "innerWidth", { configurable: true, value: width });
         window.matchMedia = ((query: string) => ({ matches: query.includes("639.98") ? width < 640 : query.includes("max-width") && width <= 768, media: query, onchange: null, addListener: () => {}, removeListener: () => {}, addEventListener: () => {}, removeEventListener: () => {}, dispatchEvent: () => false })) as typeof window.matchMedia;
         const view = open("/apps/weather");
-        await waitFor(() => expect(view.container.querySelectorAll('[data-testid="package-app"] h1')).toHaveLength(1));
+        await waitFor(() => expect(document.querySelectorAll('[data-slot="rail-page-header"] h1')).toHaveLength(1));
         const pageHeadings = view.container.querySelectorAll('[data-testid="package-app"] h1');
-        expect(pageHeadings).toHaveLength(1);
+        expect(pageHeadings).toHaveLength(0);
         if (width === 1440) {
           const heading = await view.findByRole("heading", { level: 1, name: "Weather" });
-          expect(heading.className).not.toContain("sr-only");
+          expect(heading.closest('[data-slot="rail-page-header"]')).toBeTruthy();
         } else {
-          expect(pageHeadings[0]?.className).toContain("sr-only");
           expect(document.querySelector('[data-slot="rail-page-header"]')?.textContent).toContain("Weather");
         }
-        expect(view.getByRole("link", { name: "Weather settings" })).toBeTruthy();
+        expect(view.getByRole("button", { name: "Weather settings" }).closest('[data-slot="rail-page-header"]')).toBeTruthy();
         cleanup();
       }
     } finally {

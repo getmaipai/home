@@ -22,7 +22,7 @@ import { WeatherForecastPage, dedupeLocations, type WeatherLocation } from "@mai
 import { useAppSidebar } from "@/shell/useAppSidebar";
 import { MediaHubFrame } from "@/shell/MediaHubFrame";
 import { useMediaHubActive } from "@/shell/mediaHubSession";
-import { PackageAppHeaderBar, publishPackageAppHeader, sectionsBarEntries } from "@/shell/pages/packageAppHeaderBar";
+import { PackageAppHeaderTitle, PackageAppHeaderActions, publishPackageAppHeader, sectionsBarEntries } from "@/shell/pages/packageAppHeaderBar";
 import { PhoneNav } from "@maipai/ui/src/PhoneNav";
 import { FocalImageProvider } from "@maipai/ui/src/primitives/FocalImage";
 import { analyzeFocalImage, warmFocalModel } from "@/lib/focalImageAnalyzer";
@@ -181,16 +181,10 @@ export function PackageAppPage({ person }: { person: Roster }) {
   // On a phone the app's name and its two icon buttons live in the shell's top bar, not in a row of the page.
   const phone = useIsPhoneLayout();
   const inShellBar = phone && app !== undefined;
-  useHeaderExtra(inShellBar ? PackageAppHeaderBar : undefined);
+  useHeaderExtra(PackageAppHeaderTitle, PackageAppHeaderActions);
   // An app with sections shows them in the kit's floating bottom bar on a phone (not as a row of pills), with Search last when the
   // app has a search page; a page that plays something (a video, a book) draws no bar.
   const sectionsBar = inShellBar && app && app.sections.length > 0 && !isMediaPlayPage(packageId, pageId) ? sectionsBarEntries(app, appHomeLabel(packageId, media), pagesOf(app).includes("search")) : null;
-  // With a sections bar the settings link sits under its More button, so the shell bar does not repeat it.
-  const hasSectionsBar = sectionsBar !== null;
-  useEffect(() => {
-    publishPackageAppHeader(inShellBar && app ? { to: app.to, label: app.label, ...(app.settings_area?.id && !hasSectionsBar ? { settingsArea: app.settings_area.id } : {}) } : null);
-    return () => publishPackageAppHeader(null);
-  }, [inShellBar, hasSectionsBar, app?.to, app?.label, app?.settings_area?.id]); // eslint-disable-line react-hooks/exhaustive-deps -- app is read through its own fields
   // The reader draws its own Back and action pill, so on a phone the shell bar shrinks to the menu button and the pill sits beside it
   // (packageAppNews.css) instead of under an empty bar.
   const readingStory = packageId === "news" && pageId === "story";
@@ -229,22 +223,23 @@ export function PackageAppPage({ person }: { person: Roster }) {
   const sidebar = app?.sidebar;
   const arrivedState = (location.state as { pageState?: Record<string, unknown> } | null)?.pageState ?? {};
   const sidebarProps = useAppSidebar(app, sidebar, pageId, arrivedState, person.id);
+  const pageDoc = page.data as { title?: string; body?: Array<{ type?: string }> } | undefined;
+  const activeLabel = sidebarProps?.groups?.flatMap((group) => group.items).find((item) => item.active)?.label;
+  const contextTitle = sidebarProps ? contextTitleFor(activeLabel, pageDoc?.title) : undefined;
+  useEffect(() => {
+    publishPackageAppHeader(app ? { to: app.to, label: app.label, ...(contextTitle ? { title: contextTitle } : {}), ...(app.settings_area?.id ? { settingsArea: app.settings_area.id } : {}) } : null);
+    return () => publishPackageAppHeader(null);
+  }, [app?.to, app?.label, app?.settings_area?.id, contextTitle]); // eslint-disable-line react-hooks/exhaustive-deps -- app is read through its own fields
 
   if (packageId === "" || (page.error instanceof ApiError && page.error.status === 404)) return <NotFoundPage />;
 
   // NEWS-ARTICLE-PANE-01: with a sidebar column the app's title names where the person is (the chosen row: Today, My Mix, Saved, a
   // topic, a source), never the app's own name, which the column already carries. A page whose body draws its own header (a story
   // feed or an article) keeps its title for assistive technology only, so the same words are not drawn twice.
-  const pageDoc = page.data as { title?: string; body?: Array<{ type?: string }> } | undefined;
-  const activeLabel = sidebarProps?.groups?.flatMap((group) => group.items).find((item) => item.active)?.label;
-  const ownHeader = pageDoc?.body?.some((node) => node.type === "answer_blocks") === true;
-  const contextTitle = sidebarProps ? contextTitleFor(activeLabel, pageDoc?.title) : undefined;
-
   const content = (
     <div className={cn("flex min-h-0 min-w-0 flex-1 flex-col gap-2", (sidebarProps || media) && !readingStory && "lg:p-4 lg:ps-6", (sidebarProps || media) && !sectionsBar && !readingStory && "py-4")} data-testid="package-app" data-package={packageId}>
       {sectionsBar ? <PhoneNav variant="floating" label={`${app?.label ?? "App"} sections`} entries={sectionsBar.entries} more={sectionsBar.more} {...(sectionsBar.trailing ? { trailing: sectionsBar.trailing } : {})} /> : null}
-      {familyHeader && !(packageId === "weather" && inShellBar) ? null : <h1 className="sr-only">{app?.label ?? "App"}</h1>}
-      {app ? <AppToolbar inShellBar={inShellBar} sectionsInBar={sectionsBar !== null} hideSectionsOnWide={sidebar !== undefined} to={app.to} label={app.label} homeLabel={appHomeLabel(packageId, media)} settingsArea={app.settings_area?.id} sections={app.sections} current={pageId} familyHeader={familyHeader} title={contextTitle} titleSrOnly={sidebarProps ? ownHeader || contextTitle === undefined : false} /> : null}
+      {app ? <AppToolbar inShellBar={inShellBar} sectionsInBar={sectionsBar !== null} hideSectionsOnWide={sidebar !== undefined} to={app.to} homeLabel={appHomeLabel(packageId, media)} sections={app.sections} current={pageId} familyHeader={familyHeader} /> : null}
       <AsyncState
         data={page.isError ? null : page.data}
         error={page.isError}
@@ -347,10 +342,9 @@ function withoutSearchBox(doc: unknown): unknown {
   return Array.isArray(page.body) ? { ...page, body: page.body.filter((node) => node.type !== "search") } : doc;
 }
 
-/** The app's own sections as tabs (when it has any) and its settings button. */
-function AppToolbar({ inShellBar = false, sectionsInBar = false, hideSectionsOnWide = false, to, label, title, titleSrOnly = false, homeLabel, settingsArea, sections, current, familyHeader }: { inShellBar?: boolean; sectionsInBar?: boolean; title?: string; titleSrOnly?: boolean; hideSectionsOnWide?: boolean; to: string; label: string; homeLabel: string; settingsArea?: string; sections: Array<{ page: string; label: string }>; current: string; familyHeader: boolean }) {
+/** The app's own sections as tabs (when it has any). */
+function AppToolbar({ inShellBar = false, sectionsInBar = false, hideSectionsOnWide = false, to, homeLabel, sections, current, familyHeader }: { inShellBar?: boolean; sectionsInBar?: boolean; hideSectionsOnWide?: boolean; to: string; homeLabel: string; sections: Array<{ page: string; label: string }>; current: string; familyHeader: boolean }) {
   const navigate = useNavigate();
-  const GearIcon = getIcon("settings");
   // MEDIA-POLISH-01: a media app's own header, as the native app has it (YouTube's): its name large with its icon controls on the
   // end side, then its sections as chip tabs. The play page has no header: the picture starts the page.
   if (familyHeader) {
@@ -369,19 +363,7 @@ function AppToolbar({ inShellBar = false, sectionsInBar = false, hideSectionsOnW
     ) : null;
     // In the shell bar (a phone) the title and icon buttons are drawn there; only the section tabs stay in the page.
     if (inShellBar) return tabs && !sectionsInBar ? <div className="flex flex-col gap-2 px-4 lg:px-0">{tabs}</div> : null;
-    return (
-      <div className="flex flex-col gap-2 px-4 lg:px-0">
-        <div className="flex items-center gap-1">
-          <h1 className={cn("min-w-0 flex-1 truncate text-2xl font-bold tracking-tight sm:text-3xl", titleSrOnly && "sr-only")}>{title ?? label}</h1>
-          {settingsArea ? (
-            <Button variant="ghost" size="icon-lg" className={hideSectionsOnWide ? "lg:hidden" : undefined} render={<Link to={`/settings/${settingsArea}`} aria-label={`${label} settings`} />}>
-              <GearIcon aria-hidden="true" />
-            </Button>
-          ) : null}
-        </div>
-        {tabs}
-      </div>
-    );
+    return tabs ? <div className="flex flex-col gap-2 px-4 lg:px-0">{tabs}</div> : null;
   }
   if (inShellBar) {
     if (sections.length === 0 || sectionsInBar) return null;
@@ -412,14 +394,6 @@ function AppToolbar({ inShellBar = false, sectionsInBar = false, hideSectionsOnW
           </Tabs>
         </div>
       ) : <span />}
-      <div className={cn("flex items-center gap-1", hideSectionsOnWide && "lg:hidden")}>
-      {settingsArea ? (
-        <Button variant="ghost" size="sm" render={<Link to={`/settings/${settingsArea}`} aria-label={`${label} settings`} />}>
-          <GearIcon aria-hidden="true" />
-          Settings
-        </Button>
-      ) : null}
-      </div>
     </div>
   );
 }

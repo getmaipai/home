@@ -20,6 +20,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { api, ApiError, type LibraryItem, type LibraryQuery, type Roster } from "@/lib/api";
 import { useTabItem } from "@/shell/tabIdentity";
 import { useDrawerSections } from "@/shell/drawerSections";
+import { useHeaderExtra } from "@maipai/ui/src/dashboard/layouts/full/vertical/header/HeaderExtraContext";
 import { readLibrarySidebarCollapsed, writeLibrarySidebarCollapsed } from "@/shell/library/librarySidebarPreference";
 import {
   SECTIONS, SORT_LABELS, canAddFiles, canShareFiles, filterAllowed, filtersOf, parseView, queryOf, sectionOf, viewParams,
@@ -35,6 +36,17 @@ import { UploadTray, useLibraryUploads } from "@/shell/library/LibraryUploads";
 
 export const FilesIcon = getIcon("folder");
 const UploadIcon = getIcon("upload-cloud");
+const LIBRARY_UPLOAD_EVENT = "maipai:library-upload";
+let libraryCanAdd = false;
+const libraryHeaderListeners = new Set<() => void>();
+function publishLibraryCanAdd(value: boolean) { if (libraryCanAdd === value) return; libraryCanAdd = value; for (const listener of libraryHeaderListeners) listener(); }
+function subscribeLibraryHeader(listener: () => void) { libraryHeaderListeners.add(listener); return () => libraryHeaderListeners.delete(listener); }
+function libraryHeaderSnapshot() { return libraryCanAdd; }
+function LibraryHeaderTitle() { return <h1 className="min-w-0 flex-1 truncate text-base font-medium">Library</h1>; }
+function LibraryHeaderAction() {
+  const canUpload = useSyncExternalStore(subscribeLibraryHeader, libraryHeaderSnapshot, libraryHeaderSnapshot);
+  return <><Button type="button" onClick={() => window.dispatchEvent(new Event(LIBRARY_UPLOAD_EVENT))}>{canUpload ? <UploadIcon aria-hidden className="size-4" /> : null}{canUpload ? "Upload" : "Ask to add a file"}</Button></>;
+}
 const GridIcon = getIcon("layout-grid");
 const ListIcon = getIcon("layout-list");
 
@@ -58,6 +70,7 @@ const CHILD_ADD = "Ask a grown-up to add this file. Adding files to the Library 
 /** The Library: a Dropbox-style page. Sections, search, filters and sort are all in the address; the hub does the filtering
  * and paging; the kit draws the tiles, the table, the viewer and the share dialog. No folders. */
 export function FilesPage({ person }: { person: Roster }) {
+  useHeaderExtra(LibraryHeaderTitle, LibraryHeaderAction);
   useTabItem("Library");
   const [params, setParams] = useSearchParams();
   const view = useMemo(() => parseView(params), [params]);
@@ -66,6 +79,7 @@ export function FilesPage({ person }: { person: Roster }) {
   const [cardSize, setCardSize] = useCardSize("library");
   const actions = useLibraryActions(person.id);
   const canAdd = canAddFiles(person);
+  useEffect(() => { publishLibraryCanAdd(canAdd); return () => publishLibraryCanAdd(false); }, [canAdd]);
   const canShare = canShareFiles(person);
 
   const update = useCallback((change: Partial<LibraryView>, replace = true) => {
@@ -182,6 +196,11 @@ export function FilesPage({ person }: { person: Roster }) {
   // Upload: the button, a dropped file, a pasted picture.
   const uploads = useLibraryUploads(useCallback(() => { void actions.refresh(); }, [actions]));
   const fileInput = useRef<HTMLInputElement>(null);
+  useEffect(() => {
+    const openUpload = () => { if (canAdd) fileInput.current?.click(); else toast(CHILD_ADD); };
+    window.addEventListener(LIBRARY_UPLOAD_EVENT, openUpload);
+    return () => window.removeEventListener(LIBRARY_UPLOAD_EVENT, openUpload);
+  }, [canAdd]);
   const [dragging, setDragging] = useState(false);
   const addFiles = (files: readonly File[]) => { if (!canAdd) toast.error(CHILD_ADD); else uploads.add(files); };
   useEffect(() => {
@@ -290,7 +309,7 @@ export function FilesPage({ person }: { person: Roster }) {
     if (list.isPending) return <RouteSkeleton label="Loading your files" />;
     if (items.length === 0) {
       if (filtersOn) return <EmptyState icon="search" text="No matches. Try a different word or clear a filter." actionLabel="Clear filters" onAction={() => { setSearchText(""); update({ q: "", filter: "any" }); }} />;
-      if (view.section === "all") return <EmptyState icon="folder" text="Nothing here yet. Pictures, videos and songs you make in chat land here, along with files you upload. Drop a file anywhere on this page to add it." {...(canAdd ? { actionLabel: "Upload", onAction: () => fileInput.current?.click() } : {})} />;
+      if (view.section === "all") return <EmptyState icon="folder" text="Nothing here yet. Pictures, videos and songs you make in chat land here, along with files you upload. Drop a file anywhere on this page to add it." />;
       return <EmptyState icon={sectionOf(view.section).icon} text={`Nothing in ${sectionOf(view.section).label} yet.`} actionLabel="Show all files" onAction={() => goSection("all")} />;
     }
     return (
@@ -326,8 +345,6 @@ export function FilesPage({ person }: { person: Roster }) {
             <h1 className="truncate text-2xl font-semibold tracking-tight">{sectionOf(view.section).label}</h1>
             <p className="text-base text-muted-foreground" aria-live="polite">{headline}</p>
           </div>
-          {canAdd ? <Button type="button" onClick={() => fileInput.current?.click()}><UploadIcon aria-hidden className="size-4" />Upload</Button>
-            : <Button type="button" variant="secondary" onClick={() => toast(CHILD_ADD)}>Ask to add a file</Button>}
           <input ref={fileInput} type="file" multiple hidden aria-label="Choose files to add" onChange={(event) => { const files = Array.from(event.target.files ?? []); event.target.value = ""; if (files.length > 0) addFiles(files); }} />
         </div>
 
