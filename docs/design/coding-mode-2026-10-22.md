@@ -1,5 +1,7 @@
 # Home mode: Normal and Optimized for coding (2026-10-22)
 
+> **Superseded in part (2026-10-27):** [resource-tiers-2026-10-27.md](resource-tiers-2026-10-27.md) replaces the household switch `coding.home_mode` with a Max chat lease (no mode switch); the readiness record, swap transaction and rollback here are reused. Retired in TIER-HOME-05, after TIER-EVAL-05.
+
 Owner's request, 2026-10-22 (chat): on a big machine, let the household switch Home into a mode where one large coding model is loaded and also answers chat and the other
 model jobs, so coding gets the memory and the family still has a working Home. A switch in the household settings, offered by the setup wizard, installed and configured
 by the recommended plan, and never changeable until everything it needs is proven ready. This note is the design; rows are in `docs/BACKLOG.md` ("Home mode").
