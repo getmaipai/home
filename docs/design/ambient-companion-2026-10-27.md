@@ -11,7 +11,7 @@ pinned pane, per-app help, settings). This note replaces the bottom-corner launc
 - `companions-shared-chat-and-presence-2026-10-24.md` section 7 (launcher at the lower right, hidden on Chat).
 - The dock half of REVAMP-PRESENCE-01 in the open COMPANIONS-REVAMP-01 backlog row, and the WAKEUX-02 row's bottom-corner placement.
 - `ELEMENTS-DECISIONS.md` "not needed: `CompanionDock`" (the dock is retired by this design).
-- Within this note (2026-10-27, after the first build): the pane's companion tab as "the same assistant-ui Thread and Composer as Chat" (sections 3 and 6a) is replaced by the stage in section 2c; the thread lives in History and in Chat. The floating-only top-right avatar is replaced by the standard header row in section 2b.
+- Within this note (2026-10-27, after the first build): the pane's companion tab as "the same assistant-ui Thread and Composer as Chat" (section 2a and the AMBIENT-03 conditions) is replaced by the stage in section 2c; the thread lives in History and in Chat. The floating-only top-right avatar is replaced by the standard header row in section 2b.
 
 ## 1. What the person sees
 
@@ -47,6 +47,7 @@ artifact tab, the split itself is replaced by the pane); the unused `chat-panel`
 
 Every page has one header row of the same height and the same places: title on the left, the app's own buttons at the right, the companion avatar last (36 px, fixed spot, never overlapping a page button). The front dashboard and Chat follow it too.
 - The shell draws the row on every page. A page supplies its title and its buttons through the shell's header slots (`useHeaderExtra` gains a right-hand slot); a page with no title gets its app's name from the app catalog. An app that draws its own header row today (Library, Media, package apps, Settings) moves its title and primary buttons into this row and keeps only content below it (Library's Upload button moves up, for example).
+- Full-screen overlays (the photo viewer, the voice call, setup and the immersive screens RULES.md S1 names) are not pages: they carry no header row and get the stand-alone listening indicator.
 - Chat's header (the companion picker, history toggle and menu) is the row on Chat: the kit `ChatHeader` takes an end slot for the avatar, so Chat has one row, not two.
 - The pane's header row has the same height and ends the same way (title, the pane's buttons including a settings gear, pin, close, then the avatar), so the avatar stays in one spot with the pane open or closed.
 
@@ -101,6 +102,8 @@ Slice update, 2026-10-27: AMBIENT-04 is now the standard header row on every pag
   "Take an action" respects role and consent (starting or stopping a model is admin-only); the pane's Settings tab is the settings shell or a link to it (S4), the wake word stays in "This device" and the Ambient card links to it, copy comes through `describeSetting` (S5), the `companions.dock` key is kept, and the Memory tab reuses the existing memory list with `canRead`.
 - **One-action stop on touch (AMBIENT-02 test):** a tap opens the pane and Turn off would be a second tap, so while the wake word is listening on a touch screen the top-right indicator with Turn off is shown, or a tap while listening offers Turn off directly; the test shows Turn off is one tap from what is on screen.
 - New tags (commons `ui`, `spec`) need Jesse's yes at the time.
+
+- **Header row and stage conditions (architect, 2026-10-27):** one row drawn by the shell from kit pieces (an end slot on `ChatHeader` and a row Element land in commons first); Chat has exactly one row; Library, Media, Settings and package apps move their title and primary buttons into the row, draw no second header, and keep an own-records search box in or below it; the avatar is last, 36 px, in one spot at every S3 width, pane open or closed; phone keeps S1's round menu button first and the title after it; no bell, theme, profile or global settings button in the row; a page with no title gets its app name; the listening indicator with Turn off shows everywhere. The stage is a kit `CompanionStage` with slots: no background, gradient or scene behind the character (transparency comes from the art, never from CSS; opaque art shows its still with no backdrop; new cut-out art passes the COMPANION-ART-CHECK-01 check); state words as text only from `useCompanionPresence` (Ready reads `/api/health` availability, Listening only while the microphone is open, Thinking a thought cloud, Idle no text); Working is turn state only from the turn's own status event, never a background job's percentage; the talk pill is the kit composer in a compact variant and a mic turn is a spoken turn; the speech bubble runs through the same output gate and renderer and is never cut short for a crisis reply, safety notice, refusal, Ask approval or failed-tool line (those stay until dismissed and are in History); the Settings tab is the settings shell or links into it, Voice and Appearance open the existing companion pages, the wake word stays in "This device".
 
 ## 7. Open items
 
