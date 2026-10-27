@@ -4205,6 +4205,20 @@
       "verdictReason": "Ambient companion hover, focus and touch preview in the shell (AMBIENT-02)."
     },
     {
+      "file": "companion-stage.css",
+      "name": "companion-stage",
+      "group": "companion",
+      "verdict": "wire-now",
+      "verdictReason": "The companion stage's shipped layout and transparency styles are needed by the AMBIENT-04 stage."
+    },
+    {
+      "file": "companion-stage.tsx",
+      "name": "companion-stage",
+      "group": "companion",
+      "verdict": "wire-now",
+      "verdictReason": "The ambient companion pane's stage, wired to its side chat and presence signals (AMBIENT-04)."
+    },
+    {
       "file": "right-pane.tsx",
       "name": "right-pane",
       "group": "right",

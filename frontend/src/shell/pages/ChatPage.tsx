@@ -1698,11 +1698,11 @@ export function ChatPage({ person }: { person: Roster }) {
             re-deriving the same number a second, guessable way. */}
         <div data-slot="chat-shell" className="flex h-full flex-col overflow-hidden">
           {/* Below lg the column is a sheet, opened from this row. */}
-          {companionShells ? (chatColumnBreakpoint.atLeast(960) ? null : <ChatHeaderBar shells reserveEnd={Boolean(ambient)} onHistory={() => setSheetOpen(true)} onCall={callReady ? openVoiceFromHeader : undefined} />) : barOnPhone ? null : <div className="flex items-center gap-1 border-b border-border pb-2 lg:hidden">
+          {companionShells ? (chatColumnBreakpoint.atLeast(960) ? null : <ChatHeaderBar shells onHistory={() => setSheetOpen(true)} onCall={callReady ? openVoiceFromHeader : undefined} />) : barOnPhone ? null : <div className="flex items-center gap-1 border-b border-border pb-2 lg:hidden">
             <Button variant="ghost" size="icon" aria-label={sheetOpen ? "Hide threads" : "Show threads"} aria-expanded={sheetOpen} aria-controls="next-chat-threads" onClick={() => setSheetOpen((open) => !open)}>
               <span aria-hidden>☰</span>
             </Button>
-            <ChatHeaderBar phoneRow reserveEnd={Boolean(ambient)} />
+            <ChatHeaderBar phoneRow />
           </div>}
           <div className="relative flex min-h-0 flex-1" data-slot="chat-column-stage">
             {threadSidebar(CHAT_COLUMN_ID)}
@@ -1719,9 +1719,9 @@ export function ChatPage({ person }: { person: Roster }) {
                   way Claude's is (owner, 2026-10-06): the controls just
                   sit at the top. While the history column is hidden, its
                   show control sits at this header's left edge, in flow. */}
-              {companionShells ? (chatColumnBreakpoint.atLeast(960) ? <ChatHeaderBar shells reserveEnd={Boolean(ambient)} onCall={callReady ? openVoiceFromHeader : undefined} /> : null) : <header data-slot="chat-header" className="hidden h-13 shrink-0 items-center gap-1 px-5 lg:flex">
+              {companionShells ? (chatColumnBreakpoint.atLeast(960) ? <ChatHeaderBar shells onCall={callReady ? openVoiceFromHeader : undefined} /> : null) : <header data-slot="chat-header" className="hidden h-13 shrink-0 items-center gap-1 px-5 lg:flex">
                 {column.collapsed ? <SectionSidebarShowButton label="Show conversations" controls={CHAT_COLUMN_ID} onClick={() => column.setCollapsedPreference(false)} /> : null}
-                <ChatHeaderBar reserveEnd={Boolean(ambient)} />
+                <ChatHeaderBar />
               </header>}
           {bareMode ? (
             // COORDINATOR, 2026-09-22: "while it is on, it is obvious...

@@ -201,9 +201,11 @@ describe("ambient companion shell slot", () => {
       expect(view.getAllByRole("button", { name: "Continue in Chat" })).toHaveLength(2);
       fireEvent.click(view.getByRole("button", { name: "Close pane" }));
       fireEvent.click(view.getByRole("button", { name: "Open /chat" }));
-      await waitFor(() => expect(view.getByRole("button", { name: "Companion" }).closest('[data-slot="rail-top-right"]')).toBeTruthy());
-      // Chat draws its own header, so the avatar floats there and the header leaves room.
-      expect(view.getByRole("button", { name: "Companion" }).closest('[data-slot="rail-page-header"]')).toBeNull();
+      await waitFor(() => expect(document.querySelector('[data-slot="rail-workspace"] [data-slot="hover-card-trigger"]')).toBeTruthy());
+      const chatAvatar = document.querySelector('[data-slot="rail-workspace"] [data-slot="hover-card-trigger"]');
+      expect(chatAvatar?.closest("header")).toBeTruthy();
+      expect(chatAvatar?.closest('[data-slot="rail-page-header"]')).toBeNull();
+      expect(chatAvatar?.closest("header")?.querySelectorAll('[data-slot="hover-card-trigger"]')).toHaveLength(1);
     } finally {
       globalThis.fetch = originalFetch;
       window.matchMedia = originalMatchMedia;

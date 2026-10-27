@@ -1,14 +1,14 @@
 import { useSyncExternalStore } from "react";
-import { Link } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import { Button } from "@maipai/ui/src/dashboard/components/ui/button";
 import { getIcon, iconNames } from "@maipai/ui/src/icons";
 
-// On a phone the shell already draws a bar across the top (the menu button's band). A package app puts its name and its settings
-// button in that bar instead of in a row of its own, so the stories start a whole row higher. The bar's
-// content is a stable component (useHeaderExtra's rule), so the page publishes what it shows through this small store.
+// Package app pages publish their title and header action data here for the stable components
+// registered with useHeaderExtra. The shell header renders them beside the companion avatar.
 export interface PackageAppHeaderState {
   to: string;
   label: string;
+  title?: string;
   settingsArea?: string;
 }
 
@@ -16,7 +16,7 @@ let current: PackageAppHeaderState | null = null;
 const listeners = new Set<() => void>();
 
 export function publishPackageAppHeader(next: PackageAppHeaderState | null): void {
-  const same = current === next || (current !== null && next !== null && current.to === next.to && current.label === next.label && current.settingsArea === next.settingsArea);
+  const same = current === next || (current !== null && next !== null && current.to === next.to && current.label === next.label && current.title === next.title && current.settingsArea === next.settingsArea);
   if (same) return;
   current = next;
   for (const listener of listeners) listener();
@@ -33,23 +33,16 @@ function snapshot(): PackageAppHeaderState | null {
 
 const GearIcon = getIcon("settings");
 
-export function PackageAppHeaderBar() {
+export function PackageAppHeaderTitle() {
   const state = useSyncExternalStore(subscribe, snapshot, snapshot);
-  if (!state) return null;
-  return <Bar state={state} />;
+  return state ? <h1 data-top-row-hide="" className="min-w-0 flex-1 truncate text-base font-medium">{state.title || state.label}</h1> : null;
 }
 
-function Bar({ state }: { state: PackageAppHeaderState }) {
-  return (
-    <div data-top-row-hide="" className="flex min-w-0 flex-1 items-center gap-1">
-      <span className="min-w-0 flex-1 truncate text-base font-semibold">{state.label}</span>
-      {state.settingsArea ? (
-        <Button variant="ghost" size="icon-lg" render={<Link to={`/settings/${state.settingsArea}`} aria-label={`${state.label} settings`} />}>
-          <GearIcon aria-hidden="true" />
-        </Button>
-      ) : null}
-    </div>
-  );
+export function PackageAppHeaderActions() {
+  const state = useSyncExternalStore(subscribe, snapshot, snapshot);
+  const navigate = useNavigate();
+  if (!state?.settingsArea) return null;
+  return <><Button type="button" variant="ghost" size="icon-lg" aria-label={`${state.label} settings`} onClick={() => navigate(`/settings/${state.settingsArea}`)}><GearIcon aria-hidden="true" /></Button></>;
 }
 
 // The sections of an app as the kit's phone bar entries (phone-minimal-2026-10-25 P2): the app's own index first (active only on its

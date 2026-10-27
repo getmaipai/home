@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
 import { Link, Navigate } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
@@ -14,12 +14,29 @@ import { getIcon } from "@maipai/ui/src/icons";
 import { api, type ChatFolderView, type Roster } from "@/lib/api";
 import { useIncognitoContext } from "@/shell/incognitoContext";
 import { useTabItem } from "@/shell/tabIdentity";
+import { useHeaderExtra } from "@maipai/ui/src/dashboard/layouts/full/vertical/header/HeaderExtraContext";
 
 export const ProjectsIcon = getIcon("folder");
 const SearchIcon = getIcon("search");
 const PinIcon = getIcon("pin");
 const PlusIcon = getIcon("plus");
 const EditIcon = getIcon("pencil");
+let projectsCreateAllowed = false;
+const projectsHeaderListeners = new Set<() => void>();
+function publishProjectsCreateAllowed(value: boolean) {
+  if (projectsCreateAllowed === value) return;
+  projectsCreateAllowed = value;
+  for (const listener of projectsHeaderListeners) listener();
+}
+function subscribeProjectsHeader(listener: () => void) { projectsHeaderListeners.add(listener); return () => projectsHeaderListeners.delete(listener); }
+function projectsHeaderSnapshot() { return projectsCreateAllowed; }
+
+function ProjectsHeaderTitle() { return <h1 className="min-w-0 flex-1 truncate text-base font-medium">Projects</h1>; }
+function ProjectsHeaderAction() {
+  const canCreate = useSyncExternalStore(subscribeProjectsHeader, projectsHeaderSnapshot, projectsHeaderSnapshot);
+  if (!canCreate) return null;
+  return <><Button type="button" onClick={() => window.dispatchEvent(new Event("maipai:projects-create"))}><PlusIcon className="size-4" />Create</Button></>;
+}
 
 const projectsQueryKey = (personId: string) => ["chat-projects", personId, "all", "updated"] as const;
 
@@ -36,6 +53,7 @@ const emptyValue: ProjectSettingsValue = {
 /** The app's project index. The hub's access field controls every action;
  * the page only renders the kit table, ProjectMark, and settings Element. */
 export function ProjectsPage({ person }: { person: Roster }) {
+  useHeaderExtra(ProjectsHeaderTitle, ProjectsHeaderAction);
   const { on: incognito } = useIncognitoContext();
   useTabItem("Projects");
   const queryClient = useQueryClient();
@@ -54,6 +72,12 @@ export function ProjectsPage({ person }: { person: Roster }) {
     return projects.filter((project) => `${project.name} ${project.description}`.toLocaleLowerCase().includes(term));
   }, [projects, search]);
   const canCreate = !incognito && person.role !== "child";
+  useEffect(() => { publishProjectsCreateAllowed(canCreate); return () => publishProjectsCreateAllowed(false); }, [canCreate]);
+  useEffect(() => {
+    const create = () => { if (canCreate) setDialog({ kind: "create" }); };
+    window.addEventListener("maipai:projects-create", create);
+    return () => window.removeEventListener("maipai:projects-create", create);
+  }, [canCreate]);
   const editingProject = dialog?.kind === "edit" ? dialog.project : null;
   const dialogValue = editingProject ? {
     name: editingProject.name,
@@ -104,7 +128,7 @@ export function ProjectsPage({ person }: { person: Roster }) {
   if (incognito) return <Navigate to="/chat" replace />;
 
   return (
-    <Page title="Projects">
+    <Page title="Projects" hideTitle>
       <div className="flex min-h-0 flex-1 flex-col gap-4 px-4 py-4 sm:px-6">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-end">
           <div className="relative min-w-0 flex-1 sm:max-w-sm">
@@ -116,12 +140,6 @@ export function ProjectsPage({ person }: { person: Roster }) {
               onChange={(event) => setSearch(event.target.value)}
             />
           </div>
-          {canCreate ? (
-            <Button onClick={() => setDialog({ kind: "create" })}>
-              <PlusIcon className="size-4" />
-              Create
-            </Button>
-          ) : null}
         </div>
 
         {query.isError ? (
@@ -135,7 +153,6 @@ export function ProjectsPage({ person }: { person: Roster }) {
           <EmptyState>
             <EmptyStateGreeting>{projects.length === 0 ? "No projects yet" : "No matching projects"}</EmptyStateGreeting>
             {projects.length === 0 ? <p className="text-muted-foreground text-center">Projects keep related chats together.</p> : null}
-            {projects.length === 0 && canCreate ? <Button onClick={() => setDialog({ kind: "create" })}>Create project</Button> : null}
           </EmptyState>
         ) : (
           <div className="min-w-0 flex-1 overflow-x-auto">

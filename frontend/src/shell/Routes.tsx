@@ -56,6 +56,7 @@ import { CompanionShellViewer } from "@/lib/companionShells";
 import { RightPane } from "@maipai/ui/src/elements/right-pane";
 import { useAmbientCompanionPane, readAmbientPaneState, type AmbientPaneControl, type AmbientPaneState } from "@/shell/AmbientCompanionPane";
 import { useSideChat } from "@/shell/useSideChat";
+import { AmbientHeaderProvider } from "@/shell/ambientHeaderContext";
 
 // BUNDLE-SPLIT-01 (2026-10-17): every page but the two a person lands on (Home and Chat) loads on first visit, not
 // with the shell. The shell chunk had grown to 3.84 MB against the 4 MiB PWA precache ceiling; the pages below hold
@@ -275,7 +276,7 @@ function RoutesWithIncognito({ person, onPersonChange, onSignedOut }: { person: 
   </button> : null;
   const ambientPaneProps = useAmbientCompanionPane({
     person, companionName: ambient?.companion.name ?? "Companion", companionId: ambient?.companion.id ?? "",
-    avatar: ambientAvatar, incognito, state: paneState, onStateChange: updatePaneState,
+    avatar: ambientAvatar, clips: ambient?.clips, still: ambient?.still, incognito, state: paneState, onStateChange: updatePaneState,
     onRing: onPaneRing,
     onContinue: (id) => { if (id) navigate(`/chat?conversation=${encodeURIComponent(id)}`); },
     side: sideChat,
@@ -346,6 +347,7 @@ function RoutesWithIncognito({ person, onPersonChange, onSignedOut }: { person: 
       ) : null}
       <ChatAvailabilityContext.Provider value={chatAvailability}>
       <AmbientRingProvider value={ring} onChange={setRing} wake={wakeIndicator} onWakeChange={setWakeIndicator}>
+      <AmbientHeaderProvider value={paneState.open ? null : ambientTopRight}>
       <RouterRoutes>
         {/* HOME-UI-02d: the old Memories page now lives on the signed-in
             person's own profile. Preserve both old bookmarks and deep
@@ -370,7 +372,7 @@ function RoutesWithIncognito({ person, onPersonChange, onSignedOut }: { person: 
             Notifications, System status, Incognito, Settings, Help and Log
             out. Pages draw their own slim title bar; chat draws its own
             beside the history column. */}
-        <Route element={<FullLayout rail topRight={paneState.open ? undefined : ambientTopRight} topRightBand={!onChatPage} rightPane={ambientRightPane} mobileSections={drawerSections} activeAppHref={selectedAppHref} railApps={railApps(appCatalog, pinnedRoutes)} railCoreDestinations={[{ name: "Media", url: "/media", icon: "cast" }]} onRailAppPinChange={(url) => togglePin(url)} railAllAppsHref={ALL_APPS_PATH} settingsHref="/settings" headerSearchRemote={api.search} railTourId="shell.rail" railItemTourId={(item) => item.name === "Chat" ? "rail.chat" : undefined} incognitoTourId="shell.incognito" railProfile={<RailProfile person={person} incognito={incognito} onIncognitoChange={onIncognitoChange} onSignedOut={onSignedOut} helpEntries={helpEntries} />} sidebarItemStatus={(item) => sidebarItemStatus(statusAppsQuery.data ?? [], item)} />}>
+        <Route element={<FullLayout rail topRight={onChatPage || paneState.open ? undefined : ambientTopRight} topRightBand={!onChatPage} fallbackTitle={location.pathname.startsWith("/settings") ? "Settings" : appName ?? (location.pathname === "/" ? "Home" : undefined)} rightPane={ambientRightPane} mobileSections={drawerSections} activeAppHref={selectedAppHref} railApps={railApps(appCatalog, pinnedRoutes)} railCoreDestinations={[{ name: "Media", url: "/media", icon: "cast" }]} onRailAppPinChange={(url) => togglePin(url)} railAllAppsHref={ALL_APPS_PATH} settingsHref="/settings" headerSearchRemote={api.search} railTourId="shell.rail" railItemTourId={(item) => item.name === "Chat" ? "rail.chat" : undefined} incognitoTourId="shell.incognito" railProfile={<RailProfile person={person} incognito={incognito} onIncognitoChange={onIncognitoChange} onSignedOut={onSignedOut} helpEntries={helpEntries} />} sidebarItemStatus={(item) => sidebarItemStatus(statusAppsQuery.data ?? [], item)} />}>
           <Route path="chat" element={<ChatPage person={person} />} />
           <Route path="chat/projects" element={<ProjectsPage person={person} />} />
           <Route path="chat/projects/:id" element={<ChatPage person={person} />} />
@@ -432,6 +434,7 @@ function RoutesWithIncognito({ person, onPersonChange, onSignedOut }: { person: 
           </Route>
         </Route>
       </RouterRoutes>
+      </AmbientHeaderProvider>
       </AmbientRingProvider>
       </ChatAvailabilityContext.Provider>
     </ChatHeaderDataProvider>

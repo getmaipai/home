@@ -120,10 +120,9 @@ describe("an app that declares a sidebar", () => {
     expect(side.getByRole("heading", { level: 2, name: "Demo news" })).toBeTruthy();
     expect(side.getByRole("link", { name: "Demo news settings" }).getAttribute("href")).toBe("/settings/demo");
     expect(side.queryByRole("button", { name: /favorites/ })).toBeNull();
-    // The page's own toolbar copies stay for a phone only (hidden from the `lg` breakpoint up).
-    const toolbarCopies = [...view.container.querySelectorAll<HTMLElement>('[data-testid="package-app"] a[aria-label="Demo news settings"]')];
-    expect(toolbarCopies.length).toBeGreaterThan(0);
-    for (const copy of toolbarCopies) expect(copy.closest(".lg\\:hidden")).not.toBeNull();
+    const headerRow = document.querySelector('[data-slot="rail-page-header"]');
+    expect(headerRow?.querySelector('h1')?.textContent).toBe("Today");
+    expect(view.getByRole("button", { name: "Demo news settings" }).closest('[data-slot="rail-page-header"]')).toBe(headerRow);
   });
 
   test("choosing a topic opens its page with the row's key as state and marks it current", async () => {

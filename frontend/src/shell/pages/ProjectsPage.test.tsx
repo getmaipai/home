@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, mock, test } from "bun:test";
-import { cleanup, fireEvent, render, waitFor, within } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, waitFor, within } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { MemoryRouter, Route, Routes, useLocation } from "react-router-dom";
 import { IncognitoProvider } from "@/shell/incognitoContext";
@@ -122,7 +122,8 @@ describe("ProjectsPage (PROJECTS-UI-03)", () => {
       return Response.json({});
     });
     try {
-      fireEvent.click(await view.findByRole("button", { name: "Create" }));
+      await view.findByText("No projects yet");
+      act(() => { window.dispatchEvent(new Event("maipai:projects-create")); });
       expect(await view.findByText("Project settings")).toBeTruthy();
       fireEvent.change(view.getByRole("textbox", { name: "Project name" }), { target: { value: "Recipes" } });
       expect(view.queryByLabelText("Memory")).toBeNull();

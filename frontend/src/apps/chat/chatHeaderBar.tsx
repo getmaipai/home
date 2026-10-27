@@ -88,6 +88,7 @@ const ColumnOpenIcon = getIcon("panel-left-open");
 import { useChatHeaderData } from "@/apps/chat/chatHeaderData";
 import { useCompanionAvatar, useCompanionStills } from "@/apps/chat/useCompanionAvatar";
 import { companionImageUrl } from "@/apps/chat/companionImage";
+import { useAmbientHeader } from "@/shell/ambientHeaderContext";
 
 const PencilIcon = getIcon("pencil");
 const TrashIcon = getIcon("trash");
@@ -169,7 +170,8 @@ function CompanionPickerFooter() {
   return <><DropdownMenuItem onSelect={() => navigate("/companions")}>Manage companions</DropdownMenuItem><DropdownMenuItem onSelect={() => navigate("/companions/start")}>Create a companion</DropdownMenuItem></>;
 }
 
-export function ChatHeaderBar({ phoneRow = false, trailing, shells = false, reserveEnd = false, onMenu, menuExpanded, menuControls, onHistory, onCall }: { phoneRow?: boolean; trailing?: ReactNode; reserveEnd?: boolean } & ShellsProps = {}) {
+export function ChatHeaderBar({ phoneRow = false, trailing, shells = false, onMenu, menuExpanded, menuControls, onHistory, onCall }: { phoneRow?: boolean; trailing?: ReactNode } & ShellsProps = {}) {
+  const ambient = useAmbientHeader();
   const data = useChatHeaderData();
   const stills = useCompanionStills(data?.companions.map(({ id }) => id) ?? []);
   const [renaming, setRenaming] = useState(false);
@@ -242,7 +244,7 @@ export function ChatHeaderBar({ phoneRow = false, trailing, shells = false, rese
   if (shells || companionId) {
     return (
       <>
-        <WithCompanion companionId={companionId} fallbackName={selectedName} portrait={data.companions.find(({ id }) => id === companionId)?.portrait}>{(name, media) => <ChatHeader name={name} media={media} reserveEnd={reserveEnd} identityChoices={identityChoices} identityValue={companionId ?? undefined} onIdentityChange={(value) => void changeCompanion(value)} identityIntro="Earlier messages keep their original speaker." identitySearchLabel="Search companions" identityNotice={identityNotice} identityFooter={<CompanionPickerFooter />} onMenu={onMenu} onCall={onCall} actions={actions} menuExpanded={menuExpanded} menuControls={menuControls} />}</WithCompanion>
+        <WithCompanion companionId={companionId} fallbackName={selectedName} portrait={data.companions.find(({ id }) => id === companionId)?.portrait}>{(name, media) => <ChatHeader name={name} media={media} end={ambient} identityChoices={identityChoices} identityValue={companionId ?? undefined} onIdentityChange={(value) => void changeCompanion(value)} identityIntro="Earlier messages keep their original speaker." identitySearchLabel="Search companions" identityNotice={identityNotice} identityFooter={<CompanionPickerFooter />} onMenu={onMenu} onCall={onCall} actions={actions} menuExpanded={menuExpanded} menuControls={menuControls} />}</WithCompanion>
         <Dialog open={renaming} onOpenChange={setRenaming}>
           <DialogContent>
             <DialogHeader><DialogTitle>Rename</DialogTitle><DialogDescription>{title}</DialogDescription></DialogHeader>
@@ -253,7 +255,7 @@ export function ChatHeaderBar({ phoneRow = false, trailing, shells = false, rese
     );
   }
   return (
-    <div data-chat-header-bar className={`${phoneRow ? "flex min-w-0 flex-1 items-center gap-1 overflow-hidden" : "hidden min-w-0 flex-1 items-center gap-1 overflow-hidden lg:flex"}${reserveEnd ? " pe-12" : ""}`}>
+    <div data-chat-header-bar className={phoneRow ? "flex min-w-0 flex-1 items-center gap-1 overflow-hidden" : "hidden min-w-0 flex-1 items-center gap-1 overflow-hidden lg:flex"}>
       {inBar && data.onToggleSheet ? (
         <Button variant="ghost" size="icon-lg" aria-label={data.sheetOpen ? "Hide threads" : "Show threads"} aria-expanded={data.sheetOpen === true} aria-controls="next-chat-threads" onClick={data.onToggleSheet}>
           <ColumnOpenIcon className="size-4.5" />

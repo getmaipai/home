@@ -4,10 +4,14 @@ import { SectionSidebar, type SectionSidebarItem } from "@maipai/ui/src/primitiv
 import { useAppRows } from "@/shell/useAppCatalog";
 import { mediaNav } from "@/shell/mediaNav";
 import { enterMediaHub } from "@/shell/mediaHubSession";
+import { useHeaderExtra } from "@maipai/ui/src/dashboard/layouts/full/vertical/header/HeaderExtraContext";
+
+function MediaHeaderTitle() { return <h1 className="min-w-0 flex-1 truncate text-base font-medium">Media</h1>; }
 
 /** MEDIA-HUB-05: the media hub's left column, beside the page content: the media apps the person may open as the kit's one section
  * sidebar. The app rows come from the same shared catalog the app pages read (`useAppRows` via `mediaNav`), in the hub's own order. */
 export function MediaHubFrame({ packageId, children }: { packageId: string; children: ReactNode }) {
+  useHeaderExtra(MediaHeaderTitle);
   const rows = useAppRows();
   const navigate = useNavigate();
   const location = useLocation();
