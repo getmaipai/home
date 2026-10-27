@@ -10,7 +10,7 @@ import * as ort from "onnxruntime-web";
 import type { InferenceSession } from "onnxruntime-web";
 import { existsSync, readFileSync } from "node:fs";
 import sharp from "sharp";
-import { VISION_FOCAL_CROP, ensureFocalCropAsset, visionAssetPath } from "@/lib/visionAssets";
+import { VISION_FOCAL_CROP, ensureFocalCropAsset, visionAssetPath } from "@/lib/visionFocalAsset";
 
 export interface FocalPoint { x: number; y: number; aspect: number }
 
