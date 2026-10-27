@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient, type UseMutationResult } from "@tanstack/react-query";
-import { Link, useNavigate, useParams } from "react-router-dom";
+import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { AsyncState } from "@maipai/ui/src/primitives/AsyncState";
 import { EmptyState } from "@maipai/ui/src/primitives/EmptyState";
 import { Section } from "@maipai/ui/src/primitives/Section";
@@ -12,7 +12,7 @@ import { Alert, AlertDescription } from "@maipai/ui/src/ui/alert";
 import { Button } from "@maipai/ui/src/ui/button";
 import { Select } from "@maipai/ui/src/primitives/Select";
 import { companionVoiceKey } from "@/lib/companionVoice";
-import { api, ApiError, type CompanionCard, type CompanionDetail, type CompanionList } from "@/lib/api";
+import { api, ApiError, type CompanionActivity, type CompanionCard, type CompanionDetail, type CompanionList } from "@/lib/api";
 import { playableVoices, previewIdFor, voiceChoices } from "@/lib/voice/voiceBrowserRows";
 import { voicePreviewPlayer, type VoicePreviewState } from "@/lib/voice/voicePreviewPlayer";
 import { useTabItem } from "@/shell/tabIdentity";
@@ -26,6 +26,9 @@ import { formatRelative } from "@maipai/ui/src/relativeTime";
 import { Status } from "@maipai/ui/src/ui/status";
 import { Input } from "@maipai/ui/src/ui/input";
 import { useCompanionStills } from "@/apps/chat/useCompanionAvatar";
+import { ActivityFeed, type ActivityFeedGroup } from "@maipai/ui/src/elements/activity-feed";
+import { TaskBrowser } from "@maipai/ui/src/elements/task-browser";
+import { Card } from "@maipai/ui/src/primitives/Card";
 
 const listKey = ["companions"] as const;
 const ROBOT_SETTINGS = "/settings/apps?tab=robot";
@@ -206,11 +209,64 @@ function DetailSetup({ companion, saved, copy, save }: { companion: CompanionDet
       {chatError ? <Alert variant="destructive"><AlertDescription>{chatError}</AlertDescription></Alert> : null}
       {copy.isError ? <Alert variant="destructive"><AlertDescription>{copy.error instanceof ApiError ? copy.error.message : "Could not reach Home. Check your connection and try again."}</AlertDescription></Alert> : null}
       {!companion.is_household && companion.can_copy ? <p>This companion comes with Home, so it can't be changed. Make a copy and edit that.</p> : null}
-      <Tabs defaultValue="Activity">
+      <ProfileTabs companion={companion} stills={stills} />
+    </>
+  );
+}
+
+function ProfileTabs({ companion, stills }: { companion: CompanionDetail; stills: Record<string, string | undefined> }) {
+  const [params, setParams] = useSearchParams();
+  const tab = params.get("tab") === "tasks" ? "Tasks" : params.get("tab") === "about" ? "About" : "Activity";
+  const selectTab = (value: string) => {
+    const next = new URLSearchParams(params);
+    if (value === "Activity") { next.delete("tab"); next.delete("task"); }
+    else if (value === "Tasks") next.set("tab", "tasks");
+    else { next.set("tab", "about"); next.delete("task"); }
+    setParams(next, { replace: false });
+  };
+  const activityQuery = useQuery<CompanionActivity>({ queryKey: ["companion-activity", companion.id], queryFn: () => api.companionActivity(companion.id), retry: false });
+  const rows = activityQuery.data?.activity ?? [];
+  const tasks = rows.filter((row) => row.kind !== "chat");
+  const active = params.get("task");
+  const selected = tasks.find((row) => row.id === active) ?? null;
+  const taskTab = params.get("taskTab") ?? "needs";
+  const setTaskTab = (value: string) => { const next = new URLSearchParams(params); next.set("tab", "tasks"); next.set("taskTab", value); next.delete("task"); setParams(next); };
+  const chooseTask = (id: string) => { const next = new URLSearchParams(params); next.set("tab", "tasks"); next.set("task", id); setParams(next); };
+  const selectAndOpenTasks = (row: typeof rows[number]) => { const next = new URLSearchParams(params); next.set("tab", "tasks"); next.set("task", row.id); setParams(next); };
+  const now = new Date();
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+  const dayLabel = (iso: string) => {
+    const date = new Date(iso); const start = new Date(date.getFullYear(), date.getMonth(), date.getDate()).getTime();
+    if (start === today) return "Today";
+    if (start === today - 86400000) return "Yesterday";
+    return new Intl.DateTimeFormat(undefined, { weekday: "long", month: "long", day: "numeric" }).format(date);
+  };
+  const stateLine = (row: typeof rows[number]) => row.kind === "chat" ? "Conversation" : row.needs_you ? row.waiting_reason || "Waiting for you" : row.state === "running" || row.state === "queued" ? "Working" : row.state === "done" ? "Finished" : row.state === "failed" ? "Stopped" : row.state;
+  const tone = (row: typeof rows[number]) => row.needs_you ? "needs_you" as const : row.state === "running" || row.state === "queued" ? "working" as const : row.state === "done" ? "done" as const : "plain" as const;
+  const sorted = [...rows].sort((a, b) => Number(Boolean(b.needs_you)) - Number(Boolean(a.needs_you)) || new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime());
+  const grouped = sorted.reduce<ActivityFeedGroup[]>((groups, row) => {
+    const label = dayLabel(row.created_at); let group = groups.find((candidate) => candidate.label === label);
+    if (!group) { group = { id: label, label, items: [] }; groups.push(group); }
+    group.items.push({ id: row.id, title: row.title, line: stateLine(row), meta: `${formatRelative(row.updated_at)} · ${row.kind === "chat" ? "Conversation" : "Task"}`, tone: tone(row), action: row.kind === "chat" ? <Link to={`/chat?conversation=${encodeURIComponent(row.conversation_id ?? "")}`}><Button variant="link" size="sm">Open chat</Button></Link> : <Button variant="link" size="sm" onClick={() => selectAndOpenTasks(row)}>{row.needs_you ? "Review" : "View"}</Button> });
+    return groups;
+  }, []);
+  const needs = tasks.filter((row) => row.needs_you);
+  const running = tasks.filter((row) => !row.needs_you && (row.state === "running" || row.state === "queued"));
+  const completed = tasks.filter((row) => ["done", "failed", "cancelled"].includes(row.state));
+  const visible = taskTab === "running" ? running : taskTab === "completed" ? completed : needs;
+  const current = needs[0] ?? running[0];
+  const taskStatus = selected ? selected.needs_you && selected.waiting_reason ? "Needs your choice" : selected.state : "";
+  const progressItems = selected ? ["Understood the request", ...(selected.needs_you ? ["Waiting for your choice"] : selected.state === "running" || selected.state === "queued" ? ["Working"] : selected.state === "done" ? ["Finished"] : selected.state === "failed" ? ["Stopped"] : [])] : [];
+  return <>
+      <Tabs value={tab} onValueChange={selectTab}>
         <TabsList><TabsTrigger value="Activity">Activity</TabsTrigger><TabsTrigger value="About">About</TabsTrigger><TabsTrigger value="Tasks">Tasks{(companion.task_count ?? 0) > 0 ? <Badge variant="secondary">{companion.task_count}</Badge> : null}</TabsTrigger></TabsList>
-        <TabsContent value="Activity"><CompanionWorkList companion={companion} mode="activity" /></TabsContent>
-        <TabsContent value="Tasks"><CompanionWorkList companion={companion} mode="tasks" /></TabsContent>
-        <TabsContent value="About">
+        {tab === "Activity" ? <div>
+          {activityQuery.isError ? <p>Could not load activity. Check your connection and try again.</p> : activityQuery.isLoading ? <p>Loading activity…</p> : <ActivityFeed label="Activity" groups={grouped} empty={`No activity for ${companion.name} yet.`} aside={current ? <Card label="Current work" far={false}><div className="flex flex-col gap-2 p-4"><h2 className="font-semibold">Current work</h2><p className="font-medium">{current.title}</p><p className="text-sm text-muted-foreground">{needs.length ? current.waiting_reason ? "Needs your choice" : "Needs you" : "Working"}</p><Button onClick={() => selectAndOpenTasks(current)}>Review task</Button></div></Card> : undefined} />}
+        </div> : null}
+        {tab === "Tasks" ? <div>
+          {activityQuery.isError ? <p>Could not load tasks. Check your connection and try again.</p> : activityQuery.isLoading ? <p>Loading tasks…</p> : <TaskBrowser label="Tasks" tabs={[{ id: "needs", label: "Needs you", count: needs.length }, { id: "running", label: "Running", count: running.length }, { id: "completed", label: "Completed", count: completed.length }]} activeTab={taskTab} onTabChange={setTaskTab} items={visible.map((row) => ({ id: row.id, title: row.title, line: stateLine(row), meta: formatRelative(row.updated_at), badge: row.needs_you ? <Badge>Needs you</Badge> : undefined }))} selectedId={selected?.id ?? null} onSelect={chooseTask} empty={taskTab === "needs" ? "Nothing needs you right now." : taskTab === "running" ? "Nothing is running." : "Nothing has finished yet."} backLabel="Back to tasks" detail={selected ? <><div className="flex flex-col gap-4"><div className="flex items-center gap-3"><Avatar><AvatarImage src={stills[companion.id]} alt={companion.name} /><AvatarFallback>{companion.name.slice(0, 1).toUpperCase()}</AvatarFallback></Avatar><span className="font-medium">{companion.name}</span></div><Badge>{taskStatus}</Badge><h2 className="text-xl font-semibold">{selected.title}</h2>{selected.waiting_reason || selected.progress ? <p>{selected.waiting_reason || selected.progress}</p> : null}<section aria-label="Progress"><h3 className="font-semibold">Progress</h3><ul>{progressItems.map((line, index) => <li key={line}>{index === 0 || selected?.state === "done" || selected?.state === "failed" ? "✓ " : "• "}{line}</li>)}</ul></section>{selected.needs_you && selected.conversation_id ? <Link to={`/chat?conversation=${encodeURIComponent(selected.conversation_id)}`}><Button>Open source conversation</Button></Link> : null}{selected.state === "done" && ["picture", "video", "music"].includes(selected.kind) ? <Link to={`/media/${encodeURIComponent(selected.result_ref || selected.id)}`}><Button>Open result</Button></Link> : null}</div></> : <p>Choose a task to see its details.</p>} />}
+        </div> : null}
+        {tab === "About" ? <section aria-label="About">
       <Section heading="About">
         <p>{companion.about}</p>
         {companion.pronouns ? <p className="text-sm text-muted-foreground">Pronouns: {companion.pronouns}</p> : null}
@@ -236,20 +292,9 @@ function DetailSetup({ companion, saved, copy, save }: { companion: CompanionDet
           <p>Robots: {companion.used_by.robots.length ? companion.used_by.robots.map((robot) => robot.name).join(", ") : "none yet"}. <Link to={ROBOT_SETTINGS} className="underline">Companion settings</Link></p>
         </Section>
       ) : null}
-        </TabsContent>
+        </section> : null}
       </Tabs>
-    </>
-  );
-}
-
-function CompanionWorkList({ companion, mode }: { companion: CompanionDetail; mode: "activity" | "tasks" }) {
-  const query = useQuery({ queryKey: ["companion-activity", companion.id], queryFn: () => api.companionActivity(companion.id), retry: false });
-  const rows = query.data?.activity ?? [];
-  const tasks = mode === "tasks" ? rows : rows;
-  if (query.isLoading) return <p>Loading {mode}…</p>;
-  if (query.isError) return <p>Could not load {mode}. Check your connection and try again.</p>;
-  if (!tasks.length) return <p>No {mode} for {companion.name} yet.</p>;
-  return <ul className="flex list-none flex-col gap-3 p-0">{tasks.map((item) => <li key={item.id}><p className="font-medium">{item.title}</p><p className="text-sm text-muted-foreground">{item.state} · {formatRelative(item.updated_at)}</p></li>)}</ul>;
+  </>;
 }
 
 /** The voice this companion speaks in, with a Test button that plays the same preview Settings uses. */

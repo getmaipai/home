@@ -82,9 +82,9 @@ test("View profile opens the companion detail", async () => {
   fireEvent.mouseDown(view.getByRole("tab", { name: "About" }), { button: 0 });
   expect(view.getByRole("heading", { name: "Sprout" })).toBeTruthy();
   fireEvent.mouseDown(view.getByRole("tab", { name: "Activity" }), { button: 0 });
-  expect(await view.findByText("A real project")).toBeTruthy();
+  expect((await view.findAllByText("A real project")).length).toBeGreaterThan(0);
   fireEvent.mouseDown(view.getByRole("tab", { name: "Tasks" }), { button: 0 });
-  expect(await view.findByText("A real project")).toBeTruthy();
+  expect(await view.findByText("Nothing needs you right now.")).toBeTruthy();
 });
 
 test("card actions set a default without opening the card", async () => {
@@ -302,4 +302,65 @@ test("profile chat starts a chat with this companion", async () => {
   await waitFor(() => expect(created.length).toBe(1));
   expect(created[0]?.[3]).toBe("lively-child");
   await waitFor(() => expect(view.getByTestId("location").textContent).toBe("/chat?conversation=new-chat"));
+});
+
+test("activity groups dated rows, prioritizes needs-you, and keeps chats out of tasks", async () => {
+  api.companion = async () => detail({ task_count: 2 });
+  const now = new Date();
+  const today = now.toISOString();
+  api.companionActivity = async () => ({ activity: [
+    { id: "routine", kind: "project", title: "Routine task", state: "done", created_at: today, updated_at: today },
+    { id: "waiting", kind: "job", title: "Waiting task", state: "waiting", needs_you: true, waiting_reason: "Choose a color", conversation_id: "conv-2", created_at: today, updated_at: today },
+    { id: "chat-row", kind: "chat", title: "Garden chat", state: "done", conversation_id: "conv-1", created_at: today, updated_at: today },
+  ] });
+  const view = open("/companions/lively-child");
+  await view.findByRole("button", { name: "Open chat" });
+  const feed = view.getByRole("region", { name: "Activity" });
+  expect(feed.textContent?.indexOf("Waiting task")).toBeLessThan(feed.textContent!.indexOf("Routine task"));
+  expect(view.getByRole("separator", { name: "Today" })).toBeTruthy();
+  expect(view.getByRole("button", { name: "Open chat" })).toBeTruthy();
+  fireEvent.click(view.getByRole("button", { name: "Review task" }));
+  expect(view.getByTestId("location").textContent).toContain("?tab=tasks&task=waiting");
+  expect(await view.findByRole("heading", { name: "Waiting task" })).toBeTruthy();
+  expect(view.getAllByText("Choose a color").length).toBeGreaterThan(0);
+  expect(view.queryByText("Garden chat", { selector: "button" })).toBeNull();
+  expect(view.getByRole("link", { name: "Open source conversation" }).getAttribute("href")).toBe("/chat?conversation=conv-2");
+});
+
+test("task tabs show counts, real progress and media result route", async () => {
+  api.companion = async () => detail({ task_count: 3 });
+  api.companionActivity = async () => ({ activity: [
+    { id: "ask", kind: "job", title: "Pick a style", state: "waiting", needs_you: true, progress: "The choices are ready", waiting_reason: null, created_at: new Date().toISOString(), updated_at: new Date().toISOString() },
+    { id: "run", kind: "project", title: "Research", state: "running", progress: "Reading sources", created_at: new Date().toISOString(), updated_at: new Date().toISOString() },
+    { id: "pic", kind: "picture", title: "Finished picture", state: "done", result_ref: "media-pic", created_at: new Date().toISOString(), updated_at: new Date().toISOString() },
+  ] });
+  const view = open("/companions/lively-child?tab=tasks&task=ask");
+  await view.findByRole("heading", { name: "Pick a style" });
+  expect(view.getByText("Needs you", { selector: "[data-slot='badge']" })).toBeTruthy();
+  expect(view.getByRole("heading", { name: "Pick a style" })).toBeTruthy();
+  expect(view.getAllByText(/Understood the request/).length).toBeGreaterThan(0);
+  expect(view.getAllByText(/Waiting for your choice/).length).toBeGreaterThan(0);
+  const runningTab = view.getByRole("tab", { name: "Running 1" });
+  fireEvent.mouseDown(runningTab, { button: 0 });
+  expect(view.queryByText("Nothing is running.")).toBeNull();
+  fireEvent.click(view.getByRole("button", { name: /Research/ }));
+  expect(view.getByText("Reading sources")).toBeTruthy();
+  const completedTab = view.getByRole("tab", { name: "Completed 1" });
+  fireEvent.mouseDown(completedTab, { button: 0 });
+  fireEvent.click(view.getByRole("button", { name: /Finished picture/ }));
+  expect(view.getByRole("link", { name: "Open result" }).getAttribute("href")).toBe("/media/media-pic");
+  expect(view.queryByText(/step|option/i)).toBeNull();
+});
+
+test("task tabs show their empty copy and activity shows its own empty copy", async () => {
+  api.companion = async () => detail();
+  api.companionActivity = async () => ({ activity: [] });
+  const view = open("/companions/lively-child");
+  await view.findByText("No activity for Sprout yet.");
+  fireEvent.mouseDown(view.getByRole("tab", { name: "Tasks" }), { button: 0 });
+  await view.findByText("Nothing needs you right now.");
+  fireEvent.mouseDown(view.getByRole("tab", { name: "Running" }), { button: 0 });
+  await view.findByText("Nothing is running.");
+  fireEvent.mouseDown(view.getByRole("tab", { name: "Completed" }), { button: 0 });
+  await view.findByText("Nothing has finished yet.");
 });
