@@ -58265,6 +58265,16 @@
               }
             }
           },
+          "422": {
+            "description": "The picture did not pass the age check",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
           "503": {
             "description": "Background removal is unavailable",
             "content": {
