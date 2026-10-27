@@ -418,10 +418,14 @@ S2. **Each app area emulates its native app.** Everything to the right of
     kept by the same one conversation store as Chat, marked as side chats, under
     the same age, surface and parent-visibility rules as any chat. The person can
     turn the ambient companion off in settings. While the wake word has the
-    microphone open on this device, the avatar's listening ring is the listening
-    indicator; when the ambient companion is turned off, the shell draws the
-    listening indicator alone, with its Turn off button, at the top right (the
-    wake-word record is wake-word-ux-2026-10-27.md). This supersedes the bottom
+    microphone open on this device, on every page, setup and full-screen
+    screens included, the person can see it and stop it in one action: the
+    avatar shows its listening ring, and its preview and pane say "Listening
+    for" the wake word and carry a Turn off button (the avatar's accessible
+    name says it is listening); where there is no header or the ambient
+    companion is turned off, the shell draws the listening indicator alone,
+    with its Turn off button, at the top right (the wake-word record is
+    wake-word-ux-2026-10-27.md). This supersedes the bottom
     corner launcher and the companion dock of 2026-10-24 to 2026-10-27.
 S3. **A test holds the rail.** A test fails when the main navigation does
     not render on an app page: the rail at 640 and up, the menu button and
@@ -455,7 +459,7 @@ S6. **System status reaches the person through the existing mechanisms.**
     | Whole-system health | the Status page and the header pill and rail menu, `StatusPage.tsx`, `StatusIndicator.tsx` | `lib/statusApps.ts`, `lib/statusBoard.ts`, `/api/status` (the Stack's health list is synced by `lib/stackHealthSync.ts`) | the Status page everyone; the pill hidden from a child |
     | One job's progress | that job's own card (picture, video, download) | the job record | whoever started it |
     | A companion's summary of one person's jobs (Owner-approved 2026-10-24) | one line on that companion's Yours card, "1 working · 2 waiting on you", the kit Status Element as shipped | the same job records, the viewer's own rows only (rule 6a) | the person whose jobs they are |
-    | A companion's task needs the viewer (Owner-approved 2026-10-26) | one Review button in the ambient companion's preview and pane (Owner-approved 2026-10-27), the kit Button as shipped; it opens that task's own card and shows no count or dot | the same job and Ask records, the viewer's own rows only (rule 6a), read from the data the launcher already has, with no new polling loop | the person whose task it is; when a parent answers a child's Ask, the child's button disappears and shows nothing in its place |
+    | A companion's task needs the viewer (Owner-approved 2026-10-26) | one Review button in the ambient companion's preview and pane (Owner-approved 2026-10-27), the kit Button as shipped; it opens that task's own card and shows no count or dot | the same job and Ask records, the viewer's own rows only (rule 6a), read from the data the shell already has, with no new polling loop | the person whose task it is; when a parent answers a child's Ask, the child's button disappears and shows nothing in its place |
     | Needs an admin's attention, not a person's screen | Notifications: the bell, `NotificationBell.tsx`, `BrowserAlerts.tsx` | `lib/notifications.ts`, declared in `lib/notificationTypes.ts` | the audience the type declares |
     | A form or action failed | the kit destructive Alert in that form, with the next step | the failing call's own response, `lib/failureCopy.ts` | the person acting |
     | A spoken turn is not ready | the voice session's spoken line | the same readiness function as the written chat | the person speaking |

@@ -2,7 +2,15 @@
 
 Owner: Jesse. Mockup: [assets/ambient-companion-2026-10-27/mockup.webp](assets/ambient-companion-2026-10-27/mockup.webp) (Rivet in the top right of every app, hover preview,
 pinned pane, per-app help, settings). This note replaces the bottom-corner launcher and the companion dock (`CompanionDock`, `companions.dock`) from
-[companions-handoff-revamp-2026-10-26.md](companions-handoff-revamp-2026-10-26.md) section 5a. RULES.md S2 and S6 carry the owner-approved edit.
+[companions-handoff-revamp-2026-10-26.md](companions-handoff-revamp-2026-10-26.md) section 5a. RULES.md S2 and S6 carry the owner-approved edit (Turn off and the spoken "Listening for" wording stay on the listening indicator; that clause was kept, not dropped).
+
+## Supersedes
+
+- `companions-handoff-revamp-2026-10-26.md` section 5a items 3, 5 and 6 (the `CompanionDock`, its hide-on-Chat rule, the bottom-corner shell mount).
+- `wake-word-ux-2026-10-27.md` item 2 and Slice 2 (the indicator at the bottom corner with `LauncherBubble` `docked` as its home): the indicator is now the avatar's listening ring, or the top-right indicator alone.
+- `companions-shared-chat-and-presence-2026-10-24.md` section 7 (launcher at the lower right, hidden on Chat).
+- The dock half of REVAMP-PRESENCE-01 in the open COMPANIONS-REVAMP-01 backlog row, and the WAKEUX-02 row's bottom-corner placement.
+- `ELEMENTS-DECISIONS.md` "not needed: `CompanionDock`" (the dock is retired by this design).
 
 ## 1. What the person sees
 
@@ -13,7 +21,7 @@ pinned pane, per-app help, settings). This note replaces the bottom-corner launc
 3. **Hover or focus shows a compact preview** (after about 300 ms): name, "Ready" only when it can answer, what it knows of the page ("You're on Models"), its last line, a quick Ask field with a mic, and the single
    Review button when a task of the viewer's own needs them. On touch screens there is no hover: a tap opens the pane directly.
 4. **Click opens the standard right pane.** Pin keeps it open and it then behaves like the chat column (same width rules, same collapse on narrow screens), without a toggle button.
-5. **What the companion said floats** beside the avatar for a few seconds (a speech bubble) and is kept in the pane's History, so nothing spoken is lost.
+5. **What the companion said floats** beside the avatar for a few seconds (a speech bubble; it shortens only what is displayed, never what is generated) and is kept in the pane's History, so nothing spoken is lost.
 6. **Per-page help.** The pane's Chat tab starts with what the page offers ("Help me with this page", "Find something", "Take an action", "Continue in Chat"). On Photos it sees the open photo
    ("find similar photos", "create an album"). Page context is a small typed object each app gives the shell (app id, route, one selected record id and title); it stays on the hub (local model) and is
    never stored beyond the side chat itself.
@@ -27,11 +35,18 @@ pinned pane, per-app help, settings). This note replaces the bottom-corner launc
 - **Commons first.** The pane is a new kit Element (`RightPane`, tabs as slots, `pinned`, `open`, `activeTab`, `onTabChange`, `onPinnedChange`) plus a `CompanionPreview` Element for the hover card; Home passes data
   and handlers only (RULES.md rule 9). The header avatar uses the shipped `CompanionAvatar` with a new `ring` state prop.
 
-## 3. Side chats: one store, two surfaces
+## 2a. Reuse check (org principle 6, RULES.md rule 9b)
 
-- A conversation row gets `surface: "chat" | "side"` (spec first, then hub). Chats started in the pane are `side`; everything else stays `chat`. One store, one retention rule, one export, one set of age gates
+Considered and why each is or is not enough: the kit's shadcn `sidebar.tsx` (right-side, collapsible, pin-like: `RightPane` is built on it and `tabs.tsx`, not beside it); `popover.tsx` (hover preview needs hover and
+focus open with a delay: the shadcn registry `hover-card` is added to the kit with a `UI-DECISIONS.md` row, then `CompanionPreview` composes it); `canvas-split` (shipped, used by Chat's artifact canvas: its renderer stays as the
+artifact tab, the split itself is replaced by the pane); the unused `chat-panel` Element (a candidate for the pane's Chat tab body; the tab is the same assistant-ui Thread and Composer as Chat, not a mini chat);
+`CompanionDock` and `LauncherBubble` (retired by this design; `ELEMENTS-DECISIONS.md` gets a row saying so).
+
+## 3. Side chats: one store, two placements
+
+- A conversation row gets `placement: "chat" | "side"` (spec first, then hub; not called `surface`, which RULES.md rule 0 already uses for the surface gates, and no gate reads `placement`: a side turn is classed as written web chat). Chats started in the pane are `side`; everything else stays `chat`. One store, one retention rule, one export, one set of age gates
   (RULES.md rule 0) and parent-visibility rules. Chat's history list shows `chat` rows by default; the companion's History tab and its profile Activity show both, labelled "Chat" or "Side chat".
-- The model sees the same memory and the same tools as in Chat for that person and age band. A side chat can hand off to Chat ("Continue in Chat" sets its surface to `chat`).
+- The model sees the same memory and the same tools as in Chat for that person and age band. A side chat can hand off to Chat ("Continue in Chat" sets its placement to `chat`).
 - A child's side chat follows the child lane exactly as a chat does: same prompt gates, same finished-item checks, same Ask flow for a parent.
 
 ## 4. Settings (the Ambient Companion card, person scope)
@@ -52,12 +67,25 @@ the top right brings it back; it never hides while listening, thinking or speaki
 
 ## 6. Build order (each a backlog row, each lands on its own)
 
-1. **AMBIENT-01 spec and commons:** `surface` on conversations (spec), `RightPane`, `CompanionPreview`, `CompanionAvatar` ring state; tags, pin.
+1. **AMBIENT-01 spec and commons:** `placement` on conversations (spec), `RightPane`, `CompanionPreview`, `CompanionAvatar` ring state; tags, pin.
 2. **AMBIENT-02 shell:** header slot for the avatar and per-app buttons, ring states from the presence hook, hover and focus preview, touch tap, speech bubble, auto-hide, remove the dock.
 3. **AMBIENT-03 side chats:** backend `surface`, pane Chat tab on the same turn engine, History, "Continue in Chat", child lane tests.
 4. **AMBIENT-04 migrate panels:** chat details, sources, artifact, compare into pane tabs; remove the Sheets; each app's inspector as it comes up.
 5. **AMBIENT-05 page context and quick actions:** the typed page context from each app; "Help with this page", "Find something", "Take an action" through the existing tool and Ask gates.
 6. **AMBIENT-06 settings, wake word and shortcut:** the Ambient Companion card, wake word to the pane, global shortcut in the desktop app.
+
+## 6a. Conditions the build must meet (architect, AMBIENT-COMPANION-01)
+
+- **Side chats (AMBIENT-03):** the same `routes/turn.ts` path with the person's own age band, so a child's side chat has the same prompt gates, finished-item checks and Ask flow; written side chat is adult written chat with no length cap;
+  a pane mic turn is a spoken turn (stored reply is the heard prefix); Incognito and temporary mode apply; a parent or admin sees a child's side chats exactly as that child's chats, and no admin sees another adult's;
+  page context (route, record id, title) never appears in a trace, log or status line, the server checks its record id against `canRead` for that person, and the title reaches the model as data, never as instructions. Code review at medium.
+- **Ring and preview (AMBIENT-02):** the ring is an additive `CompanionAvatar` prop driven by its existing `state`; it takes only listening, thinking and speaking, and a child-band session shows nothing else; no count, dot or badge anywhere (the mockup's green dot by
+  "Ready" is not built: Ready is text, from `/api/health` availability, and when not ready the pane's Chat tab shows the existing paused or starting composer line); Review data refetches on focus and navigation, no timer; the header avatar is a still plus the ring, never a playing clip;
+  the idle animation never looks like listening; auto-hide never hides during listening, thinking or speaking; the indicator with Turn off shows on every page where the microphone can open (header-less screens draw it alone); no bell, theme or settings buttons are copied into app headers and the mockup's labelled rail is ignored (S1, S2).
+- **Panels (AMBIENT-04):** only inspectors, sheets and panels move into the pane; an app's own content column (YouTube's up-next, for example) stays app content; the `SheetContent` className overrides in `ChatPage.tsx` go with the Sheets and the wrapper and className baselines only shrink.
+- **AMBIENT-05 and AMBIENT-06 each need their own architect verdict:** quick actions send a prompt with `tool_choice: auto` or are explicit controls passing the same policy checks; a per-page tool is a conditional tool with a bench row (never more than 16 tools on a turn);
+  "Take an action" respects role and consent (starting or stopping a model is admin-only); the pane's Settings tab is the settings shell or a link to it (S4), the wake word stays in "This device" and the Ambient card links to it, copy comes through `describeSetting` (S5), the `companions.dock` key is kept, and the Memory tab reuses the existing memory list with `canRead`.
+- New tags (commons `ui`, `spec`) need Jesse's yes at the time.
 
 ## 7. Open items
 
