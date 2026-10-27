@@ -65,6 +65,25 @@ Waiting for approval is "Needs you", never working. Full duplex keeps mic indica
 "Done" means the current turn's tool finished (turn state); a background job finishing is job status and shows on that job's own card.
 Reuse check: the stage is `VoiceOrb` plus `CompanionAvatar`, with CHAR-01's `resolvePresence` and `PresenceState` as the single presence vocabulary and the `LauncherBubble` slots for the dock; nothing new is invented.
 
+## 5a. Step 10 build (REVAMP-PRESENCE-01, design 2026-10-27, after the architect's ruling)
+
+The architect approved step 10 with conditions. This is how each is met and where the build deliberately differs from the first sketch.
+
+1. **One presence vocabulary, no second resolver.** Home already resolves presence on the client: `useCompanionSignals` and `useCompanionPresence` (`frontend/src/apps/chat`) turn the running turn, speech, dictation, voice and job events into the `wanted` flags and one-shot states the kit `CompanionAvatar` machine plays
+   (needs_you, speaking, working, thinking, listening, sleeping), which are the shipped `PresenceState` values the avatar uses. The voice stage reuses that hook as it is. CHAR-01's core `resolvePresence()` and the backend `presence` event (the robot and Go parity work) are NOT built here;
+   when CHAR-01 lands it replaces the internals of that one hook and nothing in the stage or dock changes. No second resolver is written.
+2. **The stage is a kit slot, not a Home component.** Commons gets two additive pieces: `CompanionAvatar size="xl"` (about 208px, inside the 180 to 240px the mockup asks for) and an optional `stage` slot on `VoiceConversation` that replaces the orb when the host supplies the character.
+   Home passes the shipped `CompanionAvatar` from `useCompanionPresence` into that slot; the stage follows real events only. While the voice stage is open the reply-side face is static (one live player).
+3. **The dock is a new kit Element, `CompanionDock`, not an extended `LauncherBubble`.** `LauncherBubble` is a chat launcher that opens a panel (hard-coded message icon, 304 px panel, reply-time copy, no Escape or outside click, no phone sheet), and `assistant-modal` does not exist; the mockup's dock is a small card
+   (face, name, one line, one action, minimize, close) that opens no panel. A new Element with those slots and the dismissal is the smaller, honest change, and `LauncherBubble` stays as it is. Inside it the character shows only the idle still, greeting and sleeping looks (no working or asking expression, no `AvatarBadge`, no `AgentStatus`, no count or dot: RULES.md S2).
+4. **Review reads data the shell already gets, with no new poller (S6).** The dock asks for the companion's own activity rows (`GET /api/companions/{id}/activity`, own rows only, rule 6a) with a plain query that refetches on focus and navigation, never on a timer; it shows the Review button only while one of the viewer's own rows needs them (`needs_you`),
+   and the button opens that task in the companion's Tasks tab. When a parent answers a child's Ask the row stops needing them, the button disappears and nothing replaces it. A child-band session shows no working or asking expression.
+5. **The person can turn it off (S2): a spec person setting.** `companions.dock` (boolean, default on, person scope) in `commons/spec`, placed in the companions settings card, with the copy the settings registry requires; the dock's close button writes it. The dock is hidden on Chat routes (the character is drawn once) and when companions are off for the person.
+   This needs one spec tag (`spec-v0.1.246`) and a pin.
+6. The owed open part of COMPANIONS-PRESENCE-01 moves here: the shell-level mount (beside `ShellInstallStrip`, stacked clear of `InstallDock`), the hide setting, the launcher hidden on Chat routes, the corner avatar unchanged in Chat (it is the reply-side face now). The `launcher-bubble` and `assistant-modal` claim in `docs/design/ELEMENTS-DECISIONS.md` (lines 84 to 87) moves to REVAMP-PRESENCE-01 as "not needed: `CompanionDock`".
+7. The thinking clip in the reply face replaces CHAR-01's "working dot at the reply tail" in the chat column (the dot is not built); the voice orb stays the only other chat-column mark and is replaced by the character only inside the voice stage.
+8. Build order: spec setting and tag, kit pieces and tag (parallel), then Home (pins, adoption verdicts, shell mount, stage wiring, tests). Not shipped without Jesse's word.
+
 ## 6. Decisions (Jesse, 2026-10-26)
 
 1. Face on every reply (reverses the marker-only choice in shared-chat section 3).
