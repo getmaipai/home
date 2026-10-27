@@ -5,6 +5,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { api, type Roster } from "@/lib/api";
 import { WakeWordPersonContext } from "@/apps/chat/chatThreadContexts";
 import { mapCompanionClips, useCompanionAvatar } from "@/apps/chat/useCompanionAvatar";
+import { CompanionAvatar } from "@maipai/ui/src/elements/companion-avatar";
 
 afterEach(cleanup);
 const states = { idle: { loop: true, urls: { h264: "/idle.mp4", av1: null, still: "/idle.png" } } };
@@ -25,6 +26,15 @@ test("null avatar is returned as no clips", async () => {
 test("maps states and turns a null AV1 URL into undefined", () => {
   const clips = mapCompanionClips(states);
   expect(clips.idle).toEqual({ h264: "/idle.mp4", av1: undefined, still: "/idle.png", loop: true });
+});
+
+test("maps a null H264 URL to no video and the kit avatar renders its still", () => {
+  const clips = mapCompanionClips({ idle: { loop: true, urls: { h264: null, av1: null, still: "/tessa-idle.png" } } });
+  expect(clips.idle).toEqual({ h264: undefined, av1: undefined, still: "/tessa-idle.png", loop: true });
+  const view = render(createElement(CompanionAvatar, { name: "Tessa", clips, state: "idle" }));
+  expect(view.getByRole("img", { name: "Tessa" })).toBeTruthy();
+  expect(view.container.querySelector("img")?.getAttribute("src")).toBe("/tessa-idle.png");
+  expect(view.container.querySelector("video")).toBeNull();
 });
 
 test("no signed-in person does not request an avatar", () => {

@@ -3,9 +3,9 @@ import { join } from "node:path";
 import { rmSync } from "node:fs";
 import { db } from "@/db";
 import { conversations, people, settingsValues } from "@/db/schema";
-import { canCreateCompanion, listCompanionCards, discoverCompanionCards } from "@/lib/companionsApp";
+import { canCreateCompanion, currentCompanionId, listCompanionCards, discoverCompanionCards } from "@/lib/companionsApp";
 import { __resetSettingsCacheForTests } from "@/lib/settings";
-import { createHouseholdCompanion, setHouseholdCompanionStatus } from "@/lib/householdCompanions";
+import { createHouseholdCompanion, setHouseholdCompanionAudience, setHouseholdCompanionStatus } from "@/lib/householdCompanions";
 import { loadManifestOnly } from "@/lib/plugins";
 import { __reloadPersonasForTests } from "@/lib/persona";
 import { resetDb } from "../../tests/reset-db";
@@ -19,6 +19,25 @@ beforeEach(() => { resetDb(); rmSync(root, { recursive: true, force: true }); __
 afterEach(() => { resetDb(); rmSync(root, { recursive: true, force: true }); __reloadPersonasForTests(); });
 
 describe("companion app cards", () => {
+  test("a person without a pick defaults to Tessa, including a child, while an ineligible pick falls back to default", () => {
+    addPerson("person-tessa-owner", "adult"); addPerson("person-tessa-child", "child");
+    const owner = db.select().from(people).all().find((person) => person.id === "person-tessa-owner")!;
+    const child = db.select().from(people).all().find((person) => person.id === "person-tessa-child")!;
+    expect(currentCompanionId(owner)).toBe("tessa");
+    expect(currentCompanionId(child)).toBe("tessa");
+    expect(listCompanionCards(child).map((card) => card.id)).toContain("tessa");
+    const loaded = loadManifestOnly("rivet");
+    if (!loaded.ok || !loaded.value.companion) throw new Error("rivet fixture is unavailable");
+    const explicit = createHouseholdCompanion({ ...loaded.value.companion, display_name: "Adult-only fixture" }, { display_name: "Author", person_id: owner.id });
+    if (!explicit.ok) throw new Error(explicit.error);
+    setHouseholdCompanionAudience(explicit.value.id, "adult", { display_name: "Admin" });
+    setHouseholdCompanionStatus(explicit.value.id, "ready");
+    __reloadPersonasForTests();
+    db.insert(settingsValues).values({ scope: `person:${child.id}`, key: "persona.active_id", value: JSON.stringify(explicit.value.id), hlc: "2:0:test", source: "user", updatedAt: new Date().toISOString() }).run();
+    __resetSettingsCacheForTests();
+    expect(currentCompanionId(child)).toBe("default");
+  });
+
   test("unset means all companions, while stored sets are person scoped and include the default", () => {
     addPerson("person-set-a", "adult"); addPerson("person-set-b", "adult");
     const [a, b] = db.select().from(people).all();

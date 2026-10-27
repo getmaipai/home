@@ -115,7 +115,7 @@ const setMembershipRoute = (action: "add" | "remove") => {
 setMembershipRoute("add");
 setMembershipRoute("remove");
 
-const AvatarState = z.object({ loop: z.boolean(), urls: z.object({ h264: z.string(), av1: z.string().nullable(), still: z.string() }) });
+const AvatarState = z.object({ loop: z.boolean(), urls: z.object({ h264: z.string().nullable(), av1: z.string().nullable(), still: z.string() }) });
 const avatarRoute = createRoute({
   method: "get", path: "/avatar", tags: ["Companions"], summary: "Read the signed-in person's active video avatar",
   middleware: [requireAuth] as const,
@@ -137,10 +137,10 @@ companionsRoutes.openapi(avatarRoute, (c) => {
   const headers = { "cache-control": "private, max-age=0, must-revalidate", etag };
   if (matchesEtag(c.req.header("if-none-match"), etag)) return new Response(null, { status: 304, headers });
   const folder = householdCompanionFolder(persona.id) ?? resolvePackageDir(persona.id);
-  const states = Object.fromEntries((Object.entries(animation.states) as Array<[string, { h264: string; av1?: string; still: string; loop: boolean }]>).map(([state, files]) => [state, {
+  const states = Object.fromEntries((Object.entries(animation.states) as Array<[string, { h264?: string; av1?: string; still: string; loop: boolean }]>).map(([state, files]) => [state, {
     loop: files.loop,
     urls: {
-      h264: `/api/companions/${encodeURIComponent(persona.id)}/animation/${encodeURIComponent(files.h264)}`,
+      h264: files.h264 ? `/api/companions/${encodeURIComponent(persona.id)}/animation/${encodeURIComponent(files.h264)}` : null,
       av1: files.av1 ? `/api/companions/${encodeURIComponent(persona.id)}/animation/${encodeURIComponent(files.av1)}` : null,
       still: `/api/companions/${encodeURIComponent(persona.id)}/animation/${encodeURIComponent(files.still)}`,
     },

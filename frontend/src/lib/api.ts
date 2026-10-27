@@ -377,7 +377,7 @@ export interface CompanionAvatarView {
     name: string;
     key: string;
     version: number;
-    states: Record<string, { loop: boolean; urls: { h264: string; av1: string | null; still: string } }>;
+    states: Record<string, { loop: boolean; urls: { h264: string | null; av1: string | null; still: string } }>;
   };
 }
 export interface CompanionStateTake {

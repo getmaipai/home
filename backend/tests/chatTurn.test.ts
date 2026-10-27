@@ -36,7 +36,7 @@ import { resolveOrCreateConversation, turnSubjectsOf } from "@/lib/conversationH
 import type { ChatCompletionRequest } from "@maipai/spec/llm/ts/types.js";
 import type { PersonRow } from "@/types";
 import type { SafetyResult } from "@maipai/spec/gen/ts/safety-result.js";
-import { setHouseholdSettingValue } from "@/lib/settings";
+import { getPersonSettingValue, setHouseholdSettingValue } from "@/lib/settings";
 import type { ToolExecutionOutcome } from "@/lib/turnContext";
 import { ReplyPlan } from "@maipai/spec/gen/ts/reply-plan.js";
 import { HAS_DENO } from "./support/deno";
@@ -1259,8 +1259,9 @@ describe("prepareTurn() persona resolution (via runTurnNext - prepareTurn itself
     expect(result.value.source).toBe("model");
   });
 
-  test("nobody having ever picked a persona still resolves to the real default, not a crash or a missing key", async () => {
+  test("nobody having ever picked a persona gets Tessa and a working chat turn", async () => {
     const { actor } = await owner();
+    expect(getPersonSettingValue(actor, "persona.active_id")).toBe("tessa");
     const result = await runTurnNext(actor, "chat", "good morning, how's it going");
     expect(result.ok).toBe(true);
   });

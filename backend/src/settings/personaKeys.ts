@@ -4,7 +4,7 @@
 // household member picks their own persona for their own conversations,
 // not one voice for the whole house.
 import { SettingsKey } from "@maipai/spec/gen/ts/settings-key.js";
-import { PERSONA_IDS, DEFAULT_PERSONA_ID } from "@/lib/persona";
+import { PERSONA_IDS } from "@/lib/persona";
 
 export const PERSONA_SETTINGS_KEYS: SettingsKey[] = [
   SettingsKey.parse({
@@ -12,7 +12,7 @@ export const PERSONA_SETTINGS_KEYS: SettingsKey[] = [
     scope: "person",
     selector: "select",
     range: { options: [...PERSONA_IDS] },
-    default: DEFAULT_PERSONA_ID,
+    default: "tessa",
     label: "Personality",
     help: "How MaiPai talks to you: formality, complexity, and how much it follows up on what you say.",
     level: "basic",

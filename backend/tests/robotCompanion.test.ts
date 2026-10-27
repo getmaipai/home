@@ -42,8 +42,8 @@ describe("the bundled companions", () => {
       for (const band of ["child", "teen", "adult"] as const) expect(persona.examples_by_band?.[band]?.length).toBeGreaterThanOrEqual(2);
     }
   });
-  test("the older companions read their audience from min_role (child: everyone)", () => {
-    for (const id of ["default", "buddy", "tutor", "pal"]) expect(PERSONAS.find((p) => p.id === id)!.audience).toBe("all");
+  test("the older companions and Tessa are available to everyone", () => {
+    for (const id of ["default", "buddy", "tutor", "pal", "tessa"]) expect(PERSONAS.find((p) => p.id === id)!.audience).toBe("all");
   });
   test("the choices follow the controls: dynamic companions anywhere, teen from teen up, adult only on adult", () => {
     const ids = (level: "child" | "teen" | "adult") => companionsForControls(level).map((p) => p.id);

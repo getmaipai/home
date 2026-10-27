@@ -107,7 +107,7 @@ test("companion set routes materialize unset, add and remove per person, and enf
   const addableId = created.value.id;
   const initial = await (await request("companions", adult)).json() as { companions: Array<{ id: string }>; discover: Array<{ id: string }> };
   expect(initial.companions.map((item) => item.id)).toContain(addableId);
-  expect((await request("companions/default/remove", adult, "POST")).status).toBe(400);
+  expect((await request("companions/tessa/remove", adult, "POST")).status).toBe(400);
   const add = await request(`companions/${addableId}/add`, adult, "POST"); expect(add.status).toBe(200);
   const afterAdd = await (await request("companions", adult)).json() as { companions: Array<{ id: string }>; discover: Array<{ id: string }> };
   expect(afterAdd.companions.map((item) => item.id)).toContain(addableId);
@@ -381,7 +381,7 @@ describe("household companion routes", () => {
     const adultList = await (await request("companions", adult)).json() as { can_discover: boolean; default_id: string };
     expect(kidList.can_discover).toBe(false);
     expect(adultList.can_discover).toBe(true);
-    expect(kidList.default_id).toBe("default");
+    expect(kidList.default_id).toBe("tessa");
   });
 
   test("children and teens cannot create; an adult creates a draft", async () => {
@@ -820,7 +820,22 @@ describe("household companion routes", () => {
     db.delete(settingsValues).where(and(eq(settingsValues.scope, "person:person-avatar-adult"), eq(settingsValues.key, "persona.active_id"))).run();
     db.insert(settingsValues).values({ scope: "person:person-avatar-adult", key: "persona.active_id", value: JSON.stringify(draft.value.id), hlc: "2:0:test", source: "user", updatedAt: now }).run();
     expect((await (await request("companions/avatar", adult)).json() as { avatar: unknown }).avatar).toBeNull();
-    const bundled = await request("companions/avatar", admin); expect((await bundled.json() as { avatar: unknown }).avatar).toBeNull();
+    const bundled = await request("companions/avatar", admin); expect((await bundled.json() as { avatar: { id: string } | null }).avatar?.id).toBe("tessa");
+  });
+
+  test("Tessa's four still-only animation states return null video URLs and only listed stills are served", async () => {
+    const child = addPerson("person-tessa-avatar-child", "child");
+    const response = await request("companions/avatar", child);
+    expect(response.status).toBe(200);
+    const body = await response.json() as { avatar: { id: string; states: Record<string, { loop: boolean; urls: { h264: string | null; av1: string | null; still: string } }> } | null };
+    expect(body.avatar?.id).toBe("tessa");
+    expect(Object.keys(body.avatar!.states).sort()).toEqual(["idle", "listening", "speaking", "thinking"]);
+    for (const state of Object.values(body.avatar!.states)) {
+      expect(state.urls.h264).toBeNull();
+      expect(state.urls.av1).toBeNull();
+      expect((await request(state.urls.still.replace("/api/", ""), child)).status).toBe(200);
+    }
+    expect((await request("companions/tessa/animation/unlisted.png", child)).status).toBe(404);
   });
 
   test("animation files use companion access, manifest allowlists, validators and byte ranges", async () => {

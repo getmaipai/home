@@ -103,10 +103,10 @@ test("card actions set a default without opening the card", async () => {
 
 test("Add moves a discovered companion into Yours", async () => {
   api.settingsValues = async () => [{ key: "companions.preview_shells", value: true, source: "user", label: "Preview", level: "basic", secret: false }] as never;
-  let held = [card({ id: "default", name: "MaiPai", is_default: true })];
+  let held = [card({ id: "tessa", name: "Tessa", is_default: true })];
   const added = card({ id: "pal", name: "Pal", type: "adult" });
-  api.companions = async () => ({ allowed: true, can_create: false, can_discover: true, default_id: "default", companions: held, discover: held.some((item) => item.id === "pal") ? [] : [added], robots: null });
-  api.addCompanion = async (id) => { held = [...held, added]; return { companions: ["default", id] }; };
+  api.companions = async () => ({ allowed: true, can_create: false, can_discover: true, default_id: "tessa", companions: held, discover: held.some((item) => item.id === "pal") ? [] : [added], robots: null });
+  api.addCompanion = async (id) => { held = [...held, added]; return { companions: ["tessa", id] }; };
   const view = open("/companions", true);
   const discoverTab = await view.findByRole("tab", { name: "Discover" });
   fireEvent.mouseDown(discoverTab, { button: 0 }); fireEvent.click(discoverTab);
@@ -117,9 +117,9 @@ test("Add moves a discovered companion into Yours", async () => {
 
 test("Yours menu removes a held companion", async () => {
   const pal = card({ id: "pal", name: "Pal", type: "adult" });
-  api.companions = async () => ({ allowed: true, can_create: false, can_discover: true, default_id: "default", companions: [pal], discover: [], robots: null });
+  api.companions = async () => ({ allowed: true, can_create: false, can_discover: true, default_id: "tessa", companions: [pal], discover: [], robots: null });
   let removed = "";
-  api.removeCompanion = async (id) => { removed = id; return { companions: ["default"] }; };
+  api.removeCompanion = async (id) => { removed = id; return { companions: ["tessa"] }; };
   const view = open("/companions");
   await view.findByRole("heading", { name: "Pal" });
   await openCardActions(view);

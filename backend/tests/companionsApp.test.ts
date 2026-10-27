@@ -51,7 +51,7 @@ describe("the companion list follows the person's type", () => {
     expect((nova as unknown as { type_label: string }).type_label).toBe("Companion for everyone");
     const explicit = (await list(adult.client)).companions.find((card) => card.id === "zz-test-adult")!;
     expect(explicit.who_can_use).toBe("Adults only.");
-    expect((await list(adult.client)).companions.find((card) => card.is_default)?.id).toBe("default");
+    expect((await list(adult.client)).companions.find((card) => card.is_default)?.id).toBe("tessa");
   });
   test("only owners and admins get the robots list", async () => {
     const { owner, adult, list } = await setup();
@@ -144,6 +144,6 @@ describe("Set as my default", () => {
     expect(viaSettings.status).toBe(400);
     const byAdmin = await owner.put("/api/settings", { scope: `person:${child.id}`, key: "persona.active_id", value: "zz-test-adult" });
     expect(byAdmin.status).toBe(400);
-    expect((await list(child.client)).companions.find((card) => card.is_default)?.id).toBe("default");
+    expect((await list(child.client)).companions.find((card) => card.is_default)?.id).toBe("tessa");
   });
 });

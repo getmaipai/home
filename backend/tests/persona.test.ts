@@ -20,6 +20,8 @@ import {
   FILLER_FRAGMENT_WRITTEN,
 } from "@/lib/persona";
 import { loadManifestOnly } from "@/lib/plugins";
+import { readFileSync } from "node:fs";
+import { PackageManifest } from "@maipai/spec/gen/ts/manifest.js";
 
 const companionRoot = join(process.env.MAIPAI_DATA_DIR!, "companions");
 const rivetManifest = loadManifestOnly("rivet");
@@ -31,6 +33,14 @@ describe("the persona catalog", () => {
     expect(new Set(ids).size).toBe(ids.length);
     expect(PERSONA_IDS).toEqual(ids);
     expect(PERSONAS.find((p) => p.id === DEFAULT_PERSONA_ID)).toBe(DEFAULT_PERSONA);
+  });
+
+  test("Tessa is a bundled all-ages companion with valid still-only animation states", () => {
+    const manifest = PackageManifest.parse(JSON.parse(readFileSync(new URL("../packages/tessa/manifest.json", import.meta.url), "utf8")));
+    expect(PERSONA_IDS).toContain("tessa");
+    expect(PERSONAS.find((persona) => persona.id === "tessa")).toMatchObject({ display_name: "Tessa", audience: "all" });
+    expect(Object.values(manifest.companion!.animation!.states)).toHaveLength(4);
+    expect(Object.values(manifest.companion!.animation!.states).every((state) => Boolean(state.still) && !("h264" in state))).toBe(true);
   });
 
   test("drafts stay out, ready companions reload in place with fresh fields, and deletion removes them", () => {

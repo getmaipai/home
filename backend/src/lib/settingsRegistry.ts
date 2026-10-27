@@ -61,6 +61,24 @@ function bundledPackageKeys(): SettingsKey[] {
   });
 }
 
+/** Keep the selector aligned with bundled manifests without importing persona.ts here.
+ * persona.ts reaches settings through robot companion helpers, so importing its key
+ * declaration here would introduce a settings/persona initialization cycle. */
+function bundledPersonaSettingsKey(raw: unknown[]): SettingsKey | null {
+  const source = raw.find((entry) => typeof entry === "object" && entry !== null && (entry as { key?: unknown }).key === "persona.active_id");
+  if (!source || !existsSync(PACKAGES_DIR)) return null;
+  const ids = readdirSync(PACKAGES_DIR, { withFileTypes: true }).filter((entry) => entry.isDirectory()).sort((a, b) => a.name.localeCompare(b.name)).flatMap((entry) => {
+    const path = join(PACKAGES_DIR, entry.name, "manifest.json");
+    if (!existsSync(path)) return [];
+    try {
+      const manifest = JSON.parse(readFileSync(path, "utf-8")) as { kind?: string; companion?: { status?: string } };
+      return manifest.kind === "companion" && (!manifest.companion?.status || manifest.companion.status === "ready") ? [entry.name] : [];
+    } catch { return []; }
+  });
+  const base = source as { range?: Record<string, unknown> } & Record<string, unknown>;
+  return SettingsKey.parse({ ...base, range: { ...base.range, options: ids }, default: "tessa" });
+}
+
 // Transition alias: the current Home settings field still writes a name.
 // It is kept outside the committed Commons registry and resolves through
 // household.home in settings.ts until the shipped location selector lands.
@@ -77,13 +95,17 @@ function loadRegistry(): SettingsKey[] {
   // Nothing reads it any more, so it must not show or be settable until a commons tag drops it.
   // VOICE-PICK-01: Home's tts.voice_id (default "default", the engine's own voice) supersedes the spec's (default "alba",
   // Pocket's name) until a commons spec tag carries the same declaration; then this line goes.
-  const parsed = raw.map((entry) => SettingsKey.parse(entry)).filter((entry) => entry.key !== RETIRED_WIKIPEDIA_FALLBACK_KEY && entry.key !== "tts.voice_id");
+  // persona.active_id's list comes from the bundled companion manifests,
+  // so the local key supersedes the pinned snapshot until the shared
+  // settings registry carries Tessa and the new default.
+  const parsed = raw.map((entry) => SettingsKey.parse(entry)).filter((entry) => entry.key !== RETIRED_WIKIPEDIA_FALLBACK_KEY && entry.key !== "tts.voice_id" && entry.key !== "persona.active_id");
   // AI declarations ship with Home's backend, while the shared settings
   // snapshot is pinned independently. Include newly added Home AI keys
   // until the shared snapshot is advanced.
   const keys = new Set(parsed.map((entry) => entry.key));
   // THIN-4H: search.brave_api_key likewise rides here until a commons spec tag carries it.
-  const combined = [...parsed, ...[...LIBRARY_RETENTION_KEYS, ...AI_SETTINGS_KEYS, ...HOSTED_SEARCH_SETTINGS_KEYS, ...MINOR_DDGS_SETTINGS_KEYS, ...NOTIFICATION_SETTINGS_KEYS, ...REFERENCE_SETTINGS_KEYS, ...PICTURE_SETTINGS_KEYS, ...VIDEO_SETTINGS_KEYS, ...MUSIC_SETTINGS_KEYS, ...INSTALL_SETTINGS_KEYS, ...COMPANION_SHELL_SETTINGS_KEYS, ...COMPANION_SET_SETTINGS_KEYS, ...NEWS_SETTINGS_KEYS, ...VOICE_SETTINGS_KEYS, ...AUDIO_SETTINGS_KEYS, ...MEDIA_SETTINGS_KEYS, ...PLACE_SETTINGS_KEYS, ...ROBOT_COMPANION_SETTINGS_KEYS, ...ROBOT_SOFTWARE_SETTINGS_KEYS, ...companionVoiceSettingsKeys(), ...ROBOT_VISION_SETTINGS_KEYS, ...ROBOT_LEVELS_SETTINGS_KEYS, ...bundledPackageKeys()].filter((entry) => !keys.has(entry.key))];
+  const personaKey = bundledPersonaSettingsKey(raw);
+  const combined = [...parsed, ...(personaKey ? [personaKey] : []), ...[...LIBRARY_RETENTION_KEYS, ...AI_SETTINGS_KEYS, ...HOSTED_SEARCH_SETTINGS_KEYS, ...MINOR_DDGS_SETTINGS_KEYS, ...NOTIFICATION_SETTINGS_KEYS, ...REFERENCE_SETTINGS_KEYS, ...PICTURE_SETTINGS_KEYS, ...VIDEO_SETTINGS_KEYS, ...MUSIC_SETTINGS_KEYS, ...INSTALL_SETTINGS_KEYS, ...COMPANION_SHELL_SETTINGS_KEYS, ...COMPANION_SET_SETTINGS_KEYS, ...NEWS_SETTINGS_KEYS, ...VOICE_SETTINGS_KEYS, ...AUDIO_SETTINGS_KEYS, ...MEDIA_SETTINGS_KEYS, ...PLACE_SETTINGS_KEYS, ...ROBOT_COMPANION_SETTINGS_KEYS, ...ROBOT_SOFTWARE_SETTINGS_KEYS, ...companionVoiceSettingsKeys(), ...ROBOT_VISION_SETTINGS_KEYS, ...ROBOT_LEVELS_SETTINGS_KEYS, ...bundledPackageKeys()].filter((entry) => !keys.has(entry.key))];
   return combined.map((key) => withPersonGuardFacts(withOwnControl(key)));
 }
 

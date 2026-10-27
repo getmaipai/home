@@ -70,9 +70,11 @@ export async function collectLiveAssets(companionId: string): Promise<FinishedAs
   add("The starting picture", join(root, animation.sheet?.rest ?? "rest.png"));
   for (const [state, files] of Object.entries(animation.states ?? {})) {
     add(`The ${state} still`, join(root, files.still));
-    let frames: Uint8Array[] | null = null;
-    try { frames = await extractKeyframes(new Uint8Array(readFileSync(join(root, files.h264))), clipSeconds(state)); } catch { frames = null; }
-    if (!frames) assets.push({ label: `The ${state} clip frames` }); else for (const bytes of frames) assets.push({ label: `The ${state} clip frames`, bytes });
+    if (files.h264) {
+      let frames: Uint8Array[] | null = null;
+      try { frames = await extractKeyframes(new Uint8Array(readFileSync(join(root, files.h264))), clipSeconds(state)); } catch { frames = null; }
+      if (!frames) assets.push({ label: `The ${state} clip frames` }); else for (const bytes of frames) assets.push({ label: `The ${state} clip frames`, bytes });
+    }
   }
   return assets;
 }

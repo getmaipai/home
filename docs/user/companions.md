@@ -4,6 +4,8 @@ A companion is how your assistant sounds. Some are plain and short. Some are che
 
 Open **Companions** from All apps. Choose **Discover** to browse companions you can add. Choose **Add** on one you like to put it in your list, or **Remove** to take it out.
 
+Tessa is the built-in companion for anyone who has not picked one. She is available to children, teens and adults.
+
 ## Pick one
 
 Each card shows the companion's name, one line about it, and who it is for:

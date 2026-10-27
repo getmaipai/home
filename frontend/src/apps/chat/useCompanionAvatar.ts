@@ -6,9 +6,9 @@ import { WakeWordPersonContext } from "@/apps/chat/chatThreadContexts";
 
 export const COMPANION_AVATAR_QUERY_KEY = ["companion-avatar"] as const;
 
-export function mapCompanionClips(states: Record<string, { loop: boolean; urls: { h264: string; av1: string | null; still: string } }>): CompanionClips {
+export function mapCompanionClips(states: Record<string, { loop: boolean; urls: { h264?: string | null; av1?: string | null; still: string } }>): CompanionClips {
   return Object.fromEntries(Object.entries(states).map(([id, state]) => [id, {
-    h264: state.urls.h264,
+    h264: state.urls.h264 ?? undefined,
     av1: state.urls.av1 ?? undefined,
     still: state.urls.still,
     loop: state.loop,
