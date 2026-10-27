@@ -98,7 +98,13 @@ companion. Owner-approved: 2026-10-21 (chat).
 4. **The window is the model's real context.** History is sized from
    the engine's reported context length with real token counts, per
    slot. The chat engine is never launched with a smaller context than
-   the machine can hold. The window reserves room for the stable
+   the machine can hold. The one exception (Owner-approved: Jesse,
+   2026-10-27, note DESIGN-chat-memory-yields-to-generators-2026-10-27):
+   while a video job is held for memory, the Stack may restart chat
+   once at a smaller context, never below 32768 tokens, and restores
+   the full context when the job ends; Home re-sizes history from the
+   reported length, so no conversation fails or loses history because
+   of it. The window reserves room for the stable
    prefix, the tools block, the memory block, the reply ceiling and the
    thinking allowance. Trimming must not break the prompt-cache prefix
    on every turn. The rolling summary and episode recall are defined on
