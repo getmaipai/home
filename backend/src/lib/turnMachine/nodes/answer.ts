@@ -88,6 +88,7 @@ function policyRefusalLine(reason: PolicyRefusedReason): string {
   if (reason === "household_subject_never") return HOUSEHOLD_SUBJECT_NEVER_LINE;
   if (reason === "picture_not_here") return PICTURE_NOT_HERE_LINE;
   if (reason === "picture_refused_minor") return PROMPT_REFUSAL_LINE.minor_sexual;
+  if (reason === "item_not_here") return "I can't open that one from here. Open it in its app and ask again from there.";
   if (reason === "music_not_here") return MUSIC_NOT_HERE_LINE;
   if (reason === "music_refused_minor") return MUSIC_REFUSAL_LINE.minor_sexual;
   if (reason === "video_not_here") return VIDEO_NOT_HERE_LINE;

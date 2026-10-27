@@ -103,7 +103,7 @@ export type PolicyDecision =
       // actually have that in this conversation") covers it, the same
       // closed set of named-then-defaulted reasons `ungrounded_args`/
       // `unknown_tool` already are.
-      reason: "min_role" | "consent_needed" | "confirm_needed" | "parent_required" | "ungrounded_args" | "unknown_tool" | "manifest_invalid" | "temporary_mode" | "crisis_state" | "anonymous_speaker" | "unknown_project_type" | "household_subject_never" | "picture_not_here" | "picture_refused_minor" | "video_not_here" | "video_refused_minor" | "music_not_here" | "music_refused_minor";
+      reason: "min_role" | "consent_needed" | "confirm_needed" | "parent_required" | "ungrounded_args" | "unknown_tool" | "manifest_invalid" | "temporary_mode" | "crisis_state" | "anonymous_speaker" | "unknown_project_type" | "household_subject_never" | "picture_not_here" | "picture_refused_minor" | "video_not_here" | "video_refused_minor" | "music_not_here" | "music_refused_minor" | "item_not_here";
       ask?: PendingAskInfo;
     };
 
@@ -210,6 +210,8 @@ export interface TurnState {
   /** MUSIC-GEN-03: age, surface, household switch and Stack readiness; edits also need a made-here song in this chat. */
   musicAllowed?: boolean;
   musicEditAllowed?: boolean;
+  /** NEWS-DISCUSS-TOOL-2026-10-27: the person's own message holds a maipai:// reference they may read; `read_item` is offered only then. */
+  itemReferenceAllowed?: boolean;
   modelId?: string;
   /** MINOR-CEILING-01: the chat model the Stack runs this turn (the person's pick when they made
    * one), so a node can read the running model's record; never sent to a client. */

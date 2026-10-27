@@ -193,7 +193,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `frontend/src/shell/pages/MediaHomePage.tsx` | MediaHomePage |
 | `frontend/src/shell/pages/MediaSearchPage.tsx` | MediaSearchPage |
 | `frontend/src/shell/pages/MicTestPage.tsx` | MicTestPage |
-| `frontend/src/shell/pages/NewsDiscussPage.tsx` | DISCUSS_PROMPT, DISCUSS_MAX_CHARS, blockText, discussMessage, NewsDiscussPage |
+| `frontend/src/shell/pages/NewsDiscussPage.tsx` | DISCUSS_PROMPT, blockText, discussMessage, NewsDiscussPage |
 | `frontend/src/shell/pages/NotFoundPage.tsx` | NotFoundPage |
 | `frontend/src/shell/pages/PackageAppPage.tsx` | contextTitleFor, PackageAppPage |
 | `frontend/src/shell/pages/PerformancePage.tsx` | PerformanceIcon, PerformancePage |
@@ -418,6 +418,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/internetProbe.ts` | classifyInternetFailures, probeInternet, runConfiguredInternetProbe, __resetInternetProbeForTests |
 | `backend/src/lib/interruptedReply.ts` | noteInterruptedReply, takeInterruptedReply, mayCarryInterruptedReply, dropInterruptedReply, __clearInterruptedRepliesForTests |
 | `backend/src/lib/issues.ts` | __setReminderTimingForTests, __resetReminderTimersForTests, __setMaintenanceNowForTests, raiseIssue, resolveIssue, listIssues |
+| `backend/src/lib/items/tool.ts` | READ_ITEM_TOOL_ID, ITEM_REF_PATTERN, ITEM_READERS, itemRefsIn, readItemToolSpec, runReadItemTool |
 | `backend/src/lib/jobProducers.ts` | mapStackJobToHomeJob, mapModelDownloadStackJob, modelDownloadJobsAsHomeJobs, listStackModelDownloadJobs, registerProducerJob, updateProducerJob |
 | `backend/src/lib/jobQueueCopy.ts` | JOB_QUEUE_COPY, jobQueueCopy |
 | `backend/src/lib/jobs.ts` | visibleJobFor, createJob, updateJob, listJobsForViewer, listJobsForViewerLive, canStopJob |
@@ -515,6 +516,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/news/contentQuality.ts` | MIN_ARTICLE_CHARS, FAILURE_TTL_MS, looksLikeStub, acceptArticleText, betterCopy, createFailureMemory |
 | `backend/src/lib/news/data.ts` | __releasedForBandForTests, viewerOf, finishBlocks, blockBase, topicParam, withKicker |
 | `backend/src/lib/news/dayParts.ts` | hubTimeZone, datelineOf, localDayKey, dayGroupOf |
+| `backend/src/lib/news/discuss.ts` | DISCUSS_MAX_CHARS, readNewsStory |
 | `backend/src/lib/news/enrich.ts` | ENRICHMENT_NONE_MS, __setNewsEnrichClockForTests, __resetNewsEnrichForTests, enrichmentFresh, enrichItem |
 | `backend/src/lib/news/enrichmentStore.ts` | ENRICHMENT_SCHEMA, enrichmentStore |
 | `backend/src/lib/news/feedLabels.ts` | feedLabels |

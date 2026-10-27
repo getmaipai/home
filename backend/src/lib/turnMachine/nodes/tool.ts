@@ -13,6 +13,7 @@ import { blockEventsFor } from "../blockEvents";
 import { outcomeOf, type FailureKind } from "@/lib/turnContext";
 import { lookupFailureKind } from "./lookupFallback";
 import { pickStatusPhrase } from "@/lib/statusPhrases";
+import { READ_ITEM_TOOL_ID, runReadItemTool } from "@/lib/items/tool";
 import { START_PROJECT_TOOL_ID, runStartProjectTool, type StartProjectArgs } from "@/lib/projects/tool";
 import { SHOW_IMAGES_TOOL_ID, SHOW_IMAGES_UNAVAILABLE_LINE, answerImageFailureKind, showImagesEmptyResultLine, showImagesMultiResultLine, showImagesNames, showImagesPendingResultLine, showImagesResultLine, startAnswerImages } from "@/lib/answerImages/turn";
 import { GENERATE_IMAGE_TOOL_ID, runGenerateImage } from "@/lib/pictures/tool";
@@ -233,6 +234,15 @@ export const toolNode: Node<ToolInput, ToolOutput> = async (state, input, signal
       } else {
         toolEvents.push({ t: "tool_error", call_id: callId, package_id: tool, error: lookupFailureKind(outcome) });
       }
+      continue;
+    }
+
+    // NEWS-DISCUSS-TOOL-2026-10-27: read_item is a virtual tool; the policy node already checked the offer and the reference.
+    if (tool === READ_ITEM_TOOL_ID) {
+      const outcome = await runReadItemTool({ actor: state.actor, args: args as Record<string, unknown>, callId });
+      outcomes.push(outcome);
+      if (outcome.status === "succeeded") toolEvents.push({ t: "tool_result", call_id: callId, package_id: tool, outcome: { text: outcome.result?.reply?.text } });
+      else toolEvents.push({ t: "tool_error", call_id: callId, package_id: tool, error: lookupFailureKind(outcome) });
       continue;
     }
 

@@ -82,6 +82,7 @@ import { decidePendingAsk } from "@/lib/gate/pendingAskMigration";
 import { readLook } from "@/lib/companionLook";
 import { companionVoiceVersion, portraitPath, retainCompanionPortrait } from "@/lib/companionPortrait";
 import type { GateDecision } from "@/lib/gate/types";
+import { itemRefsIn } from "@/lib/items/tool";
 
 export interface RunTurnNextOpts {
   robotName?: string;
@@ -647,7 +648,9 @@ async function beginTurn(actor: PersonRow, surface: Surface, text: string, opts:
   const videosOk = !bare && videosAllowed({ actor, band, surface, surfaceClass, spoken: opts.spoken === true }) && (await videoReadyNow);
   const musicOk = await musicReadyNow;
   const musicEditOk = musicOk && conversationHasMusic(actor, conversation.id, temporary || opts.ephemeral === true);
-  const budget: TurnBudget = withTurnToolGates(thinkingBudget, answerImagesOk, picturesOk, videosOk, musicOk, musicEditOk);
+  // NEWS-DISCUSS-TOOL-2026-10-27: `read_item` only for a grown person's own typed message that holds a reference (never a robot or spoken turn).
+  const itemRefOk = !bare && actor.role !== "guest" && band !== "child" && surfaceClass === "written" && itemRefsIn(text).length > 0;
+  const budget: TurnBudget = withTurnToolGates(thinkingBudget, answerImagesOk, picturesOk, videosOk, musicOk, musicEditOk, itemRefOk);
 
   const state: TurnState = {
     turnId,
@@ -667,6 +670,7 @@ async function beginTurn(actor: PersonRow, surface: Surface, text: string, opts:
     ...(videosOk ? { videosAllowed: true } : {}),
     ...(musicOk ? { musicAllowed: true } : {}),
     ...(musicEditOk ? { musicEditAllowed: true } : {}),
+    ...(itemRefOk ? { itemReferenceAllowed: true } : {}),
     modelId: opts.model,
     ...(engineModelId ? { engineModelId } : {}),
     signal,

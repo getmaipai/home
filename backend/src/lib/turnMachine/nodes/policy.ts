@@ -12,6 +12,7 @@ import { GENERATE_MUSIC_TOOL_ID, EDIT_MUSIC_TOOL_ID, musicAudienceOf, musicRefus
 import { loadManifestOnly } from "@/lib/plugins";
 import { speakerNamedAny } from "@/lib/subjects";
 import { tokenize, wordsOf, isBarePronoun } from "@/lib/text";
+import { READ_ITEM_TOOL_ID, itemRefsIn } from "@/lib/items/tool";
 import { START_PROJECT_TOOL_ID, projectParamsOf, projectTypeForArgs, validateProjectParams, type StartProjectArgs } from "@/lib/projects/tool";
 import { sentenceInitial } from "@/lib/projects/projectTypes";
 import type { Node, ActionProposal, PolicyDecision, ToolCall, TurnState } from "../contract";
@@ -358,6 +359,21 @@ export const policyNode: Node<PolicyInput, PolicyOutput> = async (state, input) 
         entries.push({ proposal: pictureProposal, decision: { allow: false, reason } });
         continue;
       }
+    }
+
+    // NEWS-DISCUSS-TOOL-2026-10-27: `read_item` reads only a reference the person typed in this very message, and only on a turn
+    // that was offered it; a guessed or invented reference is refused here, before any reader runs.
+    if (call.tool === READ_ITEM_TOOL_ID) {
+      const callArgs = (call.args ?? {}) as Record<string, unknown>;
+      const itemProposal: ActionProposal = { kind: "read_only", request: { tool: call.tool, args: callArgs, callId: call.id ?? call.tool } };
+      const asked = typeof callArgs.ref === "string" && itemRefsIn(state.utterance).some((item) => item.ref === (callArgs.ref as string).trim());
+      if (!state.itemReferenceAllowed || !asked) {
+        noteRefusal("item_not_here");
+        entries.push({ proposal: itemProposal, decision: { allow: false, reason: "item_not_here" } });
+        continue;
+      }
+      entries.push({ proposal: itemProposal, decision: { allow: true } });
+      continue;
     }
 
     // MUSIC-GEN-03: the music offer and both absolute lines bind forged calls too.
