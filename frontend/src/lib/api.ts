@@ -340,7 +340,7 @@ export interface RobotCompanionInfo {
 /** COMPANIONS-APP-01: GET /api/companions and /api/companions/{id} (backend/src/routes/companions.ts). */
 export interface CompanionCard {
   id: string; name: string; type: "child" | "teen" | "adult"; type_label: string; tagline: string; who_can_use: string;
-  dials: Array<{ label: string; value: string }>; voice: string; is_default: boolean; is_household: boolean; status: string; chats: number; can_edit: boolean; can_copy: boolean;
+  dials: Array<{ label: string; value: string }>; voice: string; is_default: boolean; is_household: boolean; portrait?: string | null; status: string; chats: number; can_edit: boolean; can_copy: boolean;
   task_count?: number; chat_count?: number; working_count?: number; waiting_count?: number; latest_activity?: string | null;
 }
 export interface CompanionActivity { activity: Array<{ id: string; kind: string; title: string; state: string; created_at: string; updated_at: string; conversation_id?: string | null; waiting_reason?: string | null; progress?: string | null; result_ref?: string | null; needs_you?: boolean }> }

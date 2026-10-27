@@ -18,7 +18,7 @@ import { __setPicturesFetchForTests } from "@/lib/pictures/stack";
 import { __setPictureStatusForTests, readyStatusForTests } from "@/lib/pictures/ready";
 import { __clearCompanionLookJobsForTests } from "@/lib/companionLookJobs";
 import { __setCharacterPictureCapabilityForTests } from "@/lib/companionLook";
-import { retainCompanionPortrait, portraitPath } from "@/lib/companionPortrait";
+import { portraitPath } from "@/lib/companionPortrait";
 import { addTake, takePath, saveStates, readStates, bestTake, __resetCompanionStatesForTests } from "@/lib/companionStates";
 import { __setStackClientForTests } from "@/lib/stackEngine";
 import { addVersion, approveSheet, setRest, updateSheet } from "@/lib/companionLook";
@@ -303,11 +303,12 @@ describe("household companion routes", () => {
     expect(new Uint8Array(await image.arrayBuffer()).byteLength).toBeGreaterThan(100);
     expect((await request(`companions/${created.value.id}/look/${version}/image`, admin)).status).toBe(200);
     expect((await request(`companions/${created.value.id}/look/${version}/image`, other)).status).toBe(403);
-    const portraitKey = await retainCompanionPortrait(created.value.id, version);
-    expect(portraitKey).toBe(`${created.value.id}/${version}`);
+    expect(existsSync(portraitPath(created.value.id, version)!)).toBe(false);
     const portrait = await request(`companions/portraits/${created.value.id}/${version}`, author);
     expect(portrait.status).toBe(200); expect(portrait.headers.get("content-type")).toBe("image/webp"); expect(portrait.headers.get("cache-control")).toContain("immutable");
+    expect(existsSync(portraitPath(created.value.id, version)!)).toBe(true);
     expect((await request(`companions/portraits/${created.value.id}/v-999`, author)).status).toBe(404);
+    expect((await request(`companions/portraits/${created.value.id}/${version}`, child)).status).toBe(404);
     expect((await app.request(`http://localhost/api/companions/portraits/${created.value.id}/${version}`)).status).toBe(401);
     const second = await upload(path, author, png); const secondId = (await second.json() as { id: string }).id;
     const set = await request(`companions/${created.value.id}/look/rest`, author, "PUT", { version_id: secondId }); expect(set.status).toBe(200);
@@ -320,6 +321,33 @@ describe("household companion routes", () => {
     const adult = addPerson("person-look-bundle", "adult");
     const response = await app.request("http://localhost/api/companions/rivet/look", { headers: headers(adult) });
     expect(response.status).toBe(403); expect((await response.json() as { error: string }).error).toBe("A bundled companion can't be changed. Make a copy to edit it.");
+  });
+
+  test("a draft companion's portrait is only for its author or an admin", async () => {
+    const author = addPerson("portrait-draft-author", "adult"), other = addPerson("portrait-draft-other", "adult");
+    const draft = createHouseholdCompanion({ ...fixture(), display_name: "Draft portrait" }, { display_name: "Author", person_id: "portrait-draft-author" });
+    if (!draft.ok) throw new Error(draft.error);
+    const png = await transparentPng(), version = addVersion(draft.value.id, png, { source: "upload", label: "rest", width: 512, height: 512, from: null });
+    setRest(draft.value.id, version.id);
+    expect((await request(`companions/portraits/${draft.value.id}/${version.id}`, author)).status).toBe(200);
+    expect((await request(`companions/portraits/${draft.value.id}/${version.id}`, other)).status).toBe(404);
+  });
+
+  test("companion lists expose rest portrait keys without creating retained files", async () => {
+    const adult = addPerson("portrait-list-adult", "adult");
+    const created = createHouseholdCompanion({ ...fixture(), display_name: "Portrait list" }, { display_name: "Author", person_id: "portrait-list-adult" });
+    if (!created.ok) throw new Error(created.error);
+    setHouseholdCompanionStatus(created.value.id, "ready"); __reloadPersonasForTests();
+    const png = await transparentPng(), version = addVersion(created.value.id, png, { source: "upload", label: "rest", width: 512, height: 512, from: null });
+    setRest(created.value.id, version.id);
+    const withoutLook = createHouseholdCompanion({ ...fixture(), display_name: "No portrait" }, { display_name: "Author", person_id: "portrait-list-adult" });
+    if (!withoutLook.ok) throw new Error(withoutLook.error);
+    setHouseholdCompanionStatus(withoutLook.value.id, "ready"); __reloadPersonasForTests();
+    const cards = (await (await request("companions", adult)).json() as { companions: Array<{ id: string; portrait: string | null }> }).companions;
+    expect(cards.find((card) => card.id === created.value.id)?.portrait).toBe(`${created.value.id}/${version.id}`);
+    expect(cards.find((card) => card.id === withoutLook.value.id)?.portrait).toBeNull();
+    expect(cards.find((card) => card.id === "rivet")?.portrait).toBeNull();
+    expect(existsSync(portraitPath(created.value.id, version.id)!)).toBe(false);
   });
 
   test("list exposes child discovery eligibility and the actual default id", async () => {

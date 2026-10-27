@@ -15,6 +15,7 @@ import { companionVoiceKey } from "@/settings/companionVoiceKeys";
 import { voiceForSpeech } from "@/lib/voiceForSpeech";
 import { getHouseholdCompanion, householdCompanionAuthorId, listHouseholdCompanionIds } from "@/lib/householdCompanions";
 import type { PersonRow } from "@/types";
+import { readLook } from "@/lib/companionLook";
 
 const FORMALITY: Record<Persona["formality"], string> = {
   casual: "Talks like a friend.",
@@ -57,6 +58,7 @@ export interface CompanionCard {
   voice: string;
   is_default: boolean;
   is_household: boolean;
+  portrait: string | null;
   status: string;
   chats: number;
 }
@@ -118,6 +120,8 @@ function voiceLabel(value: string, own: boolean): string {
 export function cardOf(person: PersonRow, persona: Persona): CompanionCard {
   const manifest = manifestOf(persona.id);
   const household = Boolean(getHouseholdCompanion(persona.id));
+  const look = household ? readLook(persona.id) : null;
+  const portrait = look?.rest && look.versions.some((version) => version.id === look.rest) ? `${persona.id}/${look.rest}` : null;
   const own = Boolean(manifest?.companion?.voice_id);
   const isDefault = currentCompanionId(person) === persona.id;
   const ownChats = db.select().from(conversations).where(and(eq(conversations.personId, person.id), ne(conversations.status, "deleted"))).all();
@@ -134,6 +138,7 @@ export function cardOf(person: PersonRow, persona: Persona): CompanionCard {
     is_default: isDefault,
     chats,
     is_household: household,
+    portrait,
     status: manifest?.companion?.status ?? "ready",
   };
 }
@@ -161,7 +166,7 @@ export function listCompanionCards(person: PersonRow, admin = false): CompanionC
       const c = manifest.companion;
       cards.push({ id, name: c.display_name, type: "adult", type_label: TYPE_LABEL.adult, tagline: c.tagline ?? "", who_can_use: WHO_CAN_USE.adult,
         dials: [{ label: "How it talks", value: FORMALITY[c.formality] }, { label: "Word choice", value: COMPLEXITY[c.complexity] }, { label: "Questions back", value: ENGAGEMENT[c.engagement] }, { label: "Casual chatter", value: FILLER[c.filler_density] }],
-        voice: voiceLabel(c.voice_id ?? "", Boolean(c.voice_id)), is_default: false, is_household: true, status: "draft", chats: 0 });
+        voice: voiceLabel(c.voice_id ?? "", Boolean(c.voice_id)), is_default: false, is_household: true, portrait: null, status: "draft", chats: 0 });
     }
   }
   return cards;

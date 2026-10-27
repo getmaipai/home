@@ -17,7 +17,7 @@ import { people, settingsValues, jobs, projects, conversations, pictureJobs, vid
 import { isNull, eq, and, sql } from "drizzle-orm";
 import { listDevicesByKind } from "@/lib/devices";
 import { getDeviceSettingValue } from "@/lib/settings";
-import { companionFits, robotControlsOf, ROBOT_COMPANION_KEY } from "@/lib/robotCompanion";
+import { companionFits, companionFloor, robotControlsOf, ROBOT_COMPANION_KEY } from "@/lib/robotCompanion";
 import { PERSONAS, reloadPersonas, resolvePersona } from "@/lib/persona";
 import { loadManifestOnly } from "@/lib/plugins";
 import { resolvePackageDir } from "@/lib/packageResolve";
@@ -35,7 +35,7 @@ import { readStates, addTake, deleteTake, setMotion, takePath, bestTake, finishT
 import { householdCompanionFolder, setHouseholdCompanionAnimation } from "@/lib/householdCompanions";
 import { activeTakeRun, cancelTakeRun, companionHasTakeRun, publicTakeRun, startStateTakes, takeRunFor, TAKE_NO_ORIGINAL_LINE } from "@/lib/companionTakes";
 import { clipPromptPack, picturePromptPack } from "@/lib/companionPromptPack";
-import { portraitPath, readRetainedPortrait } from "@/lib/companionPortrait";
+import { portraitPath, readRetainedPortrait, retainCompanionPortrait } from "@/lib/companionPortrait";
 import { checkImages } from "@/lib/pictures/ageCheck";
 import { decideForLane, checkChildSafety, childSafetyOk } from "@/lib/pictures/laneGate";
 import { extractKeyframes } from "@/lib/pictures/keyframes";
@@ -45,7 +45,7 @@ export const companionsRoutes = apiRouter();
 const Type = z.enum(["child", "teen", "adult"]);
 const Card = z.object({
   id: z.string(), name: z.string(), type: Type, type_label: z.string(), tagline: z.string(), who_can_use: z.string(),
-  dials: z.array(z.object({ label: z.string(), value: z.string() })), voice: z.string(), is_default: z.boolean(), is_household: z.boolean(), status: z.string(), chats: z.number(), can_edit: z.boolean(), can_copy: z.boolean(), task_count: z.number(), chat_count: z.number(), working_count: z.number(), waiting_count: z.number(), latest_activity: z.string().nullable(),
+  dials: z.array(z.object({ label: z.string(), value: z.string() })), voice: z.string(), is_default: z.boolean(), is_household: z.boolean(), portrait: z.string().nullable(), status: z.string(), chats: z.number(), can_edit: z.boolean(), can_copy: z.boolean(), task_count: z.number(), chat_count: z.number(), working_count: z.number(), waiting_count: z.number(), latest_activity: z.string().nullable(),
 });
 const Detail = Card.extend({
   about: z.string(), pronouns: z.string().nullable(), interests: z.array(z.string()), examples: z.array(z.string()),
@@ -379,13 +379,21 @@ companionsRoutes.openapi(lookImageRoute, (c) => {
 const portraitParams = z.object({ companionId: z.string().min(1).max(80), versionId: z.string().regex(/^v-[0-9]+$/) });
 const portraitRoute = createRoute({ method: "get", path: "/portraits/{companionId}/{versionId}", tags: ["Companions"], summary: "Read a retained companion portrait", middleware: [requireAuth] as const,
   request: { params: portraitParams }, responses: { 200: { content: { "image/webp": { schema: z.string().openapi({ format: "binary" }) } }, description: "The retained WebP portrait." }, ...errorResponses({ 401: "Not signed in", 403: "This companion is not available to this person", 404: "That portrait could not be found. Check the companion and version." }) } });
-companionsRoutes.openapi(portraitRoute, (c) => {
+companionsRoutes.openapi(portraitRoute, async (c) => {
   const { companionId, versionId } = c.req.valid("param"), actor = c.get("person");
   const knownPersona = PERSONAS.find((candidate) => candidate.id === companionId);
   const storedCompanion = getHouseholdCompanion(companionId);
   const persona = knownPersona ?? (storedCompanion?.companion ? resolvePersona(companionId) : null);
-  if (persona && !mayUseCompanion(actor, persona)) return c.json({ error: "That portrait could not be found. Check the companion and version." }, 404);
-  const path = portraitPath(companionId, versionId), bytes = readRetainedPortrait(companionId, versionId);
+  const householdAudience = storedCompanion?.companion?.audience;
+  if ((persona && !mayUseCompanion(actor, persona)) || (storedCompanion?.companion && (!companionAreaOn(actor) || !companionFits(speakerAgeBand(actor, new Date()), companionFloor(householdAudience ?? "adult"))))) return c.json({ error: "That portrait could not be found. Check the companion and version." }, 404);
+  // A draft is not published to the household: only its author or an admin may see its portrait.
+  if (storedCompanion?.companion?.status === "draft" && statesAccess(actor, companionId)) return c.json({ error: "That portrait could not be found. Check the companion and version." }, 404);
+  const path = portraitPath(companionId, versionId);
+  let bytes = readRetainedPortrait(companionId, versionId);
+  if (!bytes && storedCompanion?.companion && readLook(companionId).versions.some((version) => version.id === versionId)) {
+    await retainCompanionPortrait(companionId, versionId);
+    bytes = readRetainedPortrait(companionId, versionId);
+  }
   if (!path || !bytes) return c.json({ error: "That portrait could not be found. Check the companion and version." }, 404);
   return new Response(bytes, { headers: { "content-type": "image/webp", "cache-control": "private, max-age=31536000, immutable" } });
 });
