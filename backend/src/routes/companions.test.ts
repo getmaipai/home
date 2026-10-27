@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { OpenAPIHono } from "@hono/zod-openapi";
 import { createHash } from "node:crypto";
 import { join } from "node:path";
-import { rmSync, mkdirSync, writeFileSync } from "node:fs";
+import { rmSync, mkdirSync, writeFileSync, existsSync } from "node:fs";
 import { db } from "@/db";
 import { and, eq } from "drizzle-orm";
 import { devices, people, sessions, settingsValues, jobs, conversations } from "@/db/schema";
@@ -27,6 +27,9 @@ import { __setVideosFetchForTests } from "@/lib/videos/stack";
 import { __setVideoStatusForTests, readyVideoStatusForTests } from "@/lib/videos/ready";
 import { __clearCompanionTakeRunsForTests, __setTakeRetryWaitMsForTests } from "@/lib/companionTakes";
 import media from "@maipai/spec/vocab/companion-media.json";
+import { __setAgeCheckRunnerForTests, __resetAgeCheckForTests } from "@/lib/pictures/ageCheck";
+import { __setChildSafetyRunnerForTests } from "@/lib/pictures/laneGate";
+import { __setKeyframesForTests } from "@/lib/pictures/keyframes";
 
 const app = new OpenAPIHono();
 app.route("/api/companions", companionsRoutes);
@@ -57,8 +60,29 @@ function fixture() {
   return loaded.value.companion;
 }
 
+
+const AGE_OK = { ok: true as const, verdict: { people_count: 0, apparent_min_age_estimate: null, label: "none" as const, is_nude_or_sexual: false, confidence: 1 } };
+const AGE_WITHHELD = { ok: true as const, verdict: { people_count: 1, apparent_min_age_estimate: 8, label: "child" as const, is_nude_or_sexual: true, confidence: 1 } };
+const CHILD_OK = { ok: true as const, verdict: { is_cartoon: true, looks_like_photo: false, brand_or_licensed_character: false, violent_or_scary: false, sexual_or_romantic: false, weapons_drugs_or_alcohol: false, confidence: 1 } };
+/** A live companion under the old model (live animation, approved idle) whose draft has since moved to a second approved take. */
+async function publishFixture(personId: string, role: string, audience: "adult" | "teen" | "all", persistBackfill = true) {
+  const token = addPerson(personId, role), made = createHouseholdCompanion({ ...fixture(), display_name: `Pub ${personId}` }, { display_name: "Author", person_id: personId }); if (!made.ok) throw new Error(made.error); const id = made.value.id;
+  const png = await transparentPng(), rest = addVersion(id, png, { source: "upload", label: "rest", width: 1024, height: 1024, from: null }); setRest(id, rest.id);
+  updateSheet(id, { views: { left: null, right: null, mouth: null }, card: { text: "fox", species: "fox", colours: ["#CC3322"] }, key: "#00FF00", state: "needs_review", approved_by: null, approved_at: null }); approveSheet(id, "Author");
+  const report = { ok: true, reasons: [], seconds: 3, bytes: { h264: 4, av1: null }, colour_distance: 1, area_ratio: 1, loop_gap: 0, opaque_share: { min: .5, max: .8 } };
+  const makeTake = (label: string) => { const take = addTake(id, "idle", { source: "upload", label }), all = readStates(id); all.states.idle!.takes.find((row) => row.id === take.id)!.report = report; saveStates(id, all); mkdirSync(join(takePath(id, "idle", take.id, "clip.h264.mp4")!, ".."), { recursive: true }); writeFileSync(takePath(id, "idle", take.id, "clip.h264.mp4")!, label); writeFileSync(takePath(id, "idle", take.id, "still.png")!, Buffer.from(png)); return take.id; };
+  const first = makeTake("first"), seeded = readStates(id); seeded.states.idle!.approved = first; saveStates(id, seeded);
+  setHouseholdCompanionAnimation(id, { kind: "video", spec_version: media.version, key: "#00FF00", states: { idle: { h264: "old.h264.mp4", still: "old.png", loop: true } } });
+  const live = join(householdCompanionFolder(id)!, "animation"); mkdirSync(live, { recursive: true }); writeFileSync(join(live, "old.h264.mp4"), "old"); writeFileSync(join(live, "old.png"), Buffer.from(png)); writeFileSync(join(live, "rest.png"), Buffer.from(png));
+  setHouseholdCompanionAudience(id, audience, { display_name: "Author" });
+  if (persistBackfill) expect((await request(`companions/${id}/appearance`, token)).status).toBe(200);
+  const second = makeTake("second"), moved = readStates(id); moved.states.idle!.approved = second; saveStates(id, moved);
+  __setKeyframesForTests(async () => [new Uint8Array([7])]);
+  return { token, id, png, first, second, live };
+}
+
 beforeEach(() => { resetDb(); rmSync(companionRoot, { recursive: true, force: true }); __reloadPersonasForTests(); __clearCompanionLookJobsForTests(); __clearCompanionTakeRunsForTests(); __resetCompanionStatesForTests(); __setPicturesFetchForTests(null); __setVideoStatusForTests(undefined); __setVideosFetchForTests(null); __setPictureStatusForTests(undefined); __setCharacterPictureCapabilityForTests(null); __setStackClientForTests(null); });
-afterEach(() => { resetDb(); rmSync(companionRoot, { recursive: true, force: true }); __reloadPersonasForTests(); __clearCompanionLookJobsForTests(); __clearCompanionTakeRunsForTests(); __resetCompanionStatesForTests(); __setPicturesFetchForTests(null); __setVideoStatusForTests(undefined); __setVideosFetchForTests(null); __setPictureStatusForTests(undefined); __setCharacterPictureCapabilityForTests(null); __setStackClientForTests(null); });
+afterEach(() => { __resetAgeCheckForTests(); __setChildSafetyRunnerForTests(null); __setKeyframesForTests(null); resetDb(); rmSync(companionRoot, { recursive: true, force: true }); __reloadPersonasForTests(); __clearCompanionLookJobsForTests(); __clearCompanionTakeRunsForTests(); __resetCompanionStatesForTests(); __setPicturesFetchForTests(null); __setVideoStatusForTests(undefined); __setVideosFetchForTests(null); __setPictureStatusForTests(undefined); __setCharacterPictureCapabilityForTests(null); __setStackClientForTests(null); });
 
 test("activity returns own task details and needs-you agrees with companion waiting counts", async () => {
   const person = addPerson("activity-own", "adult"), other = addPerson("activity-other", "adult");
@@ -418,7 +442,7 @@ describe("household companion routes", () => {
     expect((await request("companions/rivet/states", adult)).status).toBe(403);
   });
 
-  test("state upload validates the file and approval writes animation assets", async () => {
+  test("state upload validates the file and approval stays in draft until Publish", async () => {
     const adult = addPerson("person-state-upload", "adult"), created = createHouseholdCompanion({ ...fixture(), display_name: "State upload" }, { display_name: "Author", person_id: "person-state-upload" });
     if (!created.ok) throw new Error(created.error);
     const companionId = created.value.id;
@@ -433,7 +457,8 @@ describe("household companion routes", () => {
     await new Promise<void>((resolve) => { waitForFinish = resolve; setTimeout(resolve, 20); });
     expect(submitted.input).toMatchObject({ key: "#00FF00", output_name: "finished", max_bytes: media.ship.max_bytes_per_clip });
     const approval = await request(`companions/${companionId}/states/idle/approve`, adult, "PUT", { take_id }); expect(approval.status).toBe(200);
-    expect(getHouseholdCompanion(companionId)?.companion?.animation).toMatchObject({ kind: "video", states: { idle: { h264: "idle.h264.mp4", still: "idle.png", loop: true } }, sheet: { rest: "rest.png", card: "card.json" } });
+    expect(getHouseholdCompanion(companionId)?.companion?.animation).toBeUndefined();
+    const appearance = await request(`companions/${companionId}/appearance`, adult); expect(appearance.status).toBe(200); expect(await appearance.json()).toMatchObject({ has_changes: true, can_publish: true });
     expect((await request(`companions/${companionId}/states/idle/${take_id}/source.mp4`, adult)).status).toBe(200);
   });
 
@@ -553,7 +578,7 @@ describe("household companion routes", () => {
     expect((await (await request(`companions/${id}/states/jobs/run/${job}`, adult)).json() as { state: string }).state).toBe("cancelled");
   });
 
-  test("approval requires force, requires idle first, adds states, and idle removal clears every approval", async () => {
+  test("approval requires force and idle first, edits only the draft, and idle removal clears every draft approval", async () => {
     const adult = addPerson("person-state-approve", "adult"), created = createHouseholdCompanion({ ...fixture(), display_name: "Approval flow" }, { display_name: "Author", person_id: "person-state-approve" }); if (!created.ok) throw new Error(created.error); const id = created.value.id;
     const rest = addVersion(id, new Uint8Array([1]), { source: "upload", label: "rest", width: 1024, height: 1024, from: null }); setRest(id, rest.id); updateSheet(id, { views: { left: null, right: null, mouth: null }, card: { text: "fox", species: "fox", colours: ["#CC3322"] }, key: "#00FF00", state: "needs_review", approved_by: null, approved_at: null }); approveSheet(id, "Author");
     const idle = addTake(id, "idle", { source: "upload", label: "idle" }), thinking = addTake(id, "thinking", { source: "upload", label: "thinking" });
@@ -565,11 +590,117 @@ describe("household companion routes", () => {
     const beforeIdle = await request(`companions/${id}/states/thinking/approve`, adult, "PUT", { take_id: thinking.id }); expect(beforeIdle.status).toBe(409); expect((await beforeIdle.json() as { error: string }).error).toBe("Approve the idle clip first.");
     expect((await request(idlePath, adult, "PUT", { take_id: idle.id, force: true })).status).toBe(200);
     expect((await request(`companions/${id}/states/thinking/approve`, adult, "PUT", { take_id: thinking.id })).status).toBe(200);
-    expect(getHouseholdCompanion(id)?.companion?.animation?.states).toHaveProperty("thinking");
+    expect(getHouseholdCompanion(id)?.companion?.animation).toBeUndefined();
     expect((await request(`companions/${id}/states/thinking/approve`, adult, "DELETE")).status).toBe(200);
-    expect(getHouseholdCompanion(id)?.companion?.animation?.states).not.toHaveProperty("thinking");
+    expect(getHouseholdCompanion(id)?.companion?.animation).toBeUndefined();
     const removedIdle = await request(idlePath, adult, "DELETE"); expect(removedIdle.status).toBe(200); expect(await removedIdle.json()).toMatchObject({ note: "Without the idle clip the others cannot play, so their approvals were removed too." });
     expect(getHouseholdCompanion(id)?.companion?.animation).toBeUndefined(); expect(Object.values(readStates(id).states).every((state) => !state?.approved)).toBe(true);
+  });
+
+  test("appearance backfills published live animation and Publish checks then swaps the approved draft", async () => {
+    const author = addPerson("person-publish", "adult"), made = createHouseholdCompanion({ ...fixture(), display_name: "Publish test" }, { display_name: "Author", person_id: "person-publish" }); if (!made.ok) throw new Error(made.error); const id = made.value.id;
+    const png = await transparentPng(), rest = addVersion(id, png, { source: "upload", label: "rest", width: 1024, height: 1024, from: null }); setRest(id, rest.id); updateSheet(id, { views: { left: null, right: null, mouth: null }, card: { text: "fox", species: "fox", colours: ["#CC3322"] }, key: "#00FF00", state: "needs_review", approved_by: null, approved_at: null }); approveSheet(id, "Author");
+    const idle = addTake(id, "idle", { source: "upload", label: "idle" }), report = { ok: true, reasons: [], seconds: 3, bytes: { h264: 4, av1: null }, colour_distance: 1, area_ratio: 1, loop_gap: 0, opaque_share: { min: .5, max: .8 } }, states = readStates(id); states.states.idle!.takes[0]!.report = report; saveStates(id, states); mkdirSync(join(takePath(id, "idle", idle.id, "clip.h264.mp4")!, ".."), { recursive: true }); writeFileSync(takePath(id, "idle", idle.id, "clip.h264.mp4")!, "clip"); writeFileSync(takePath(id, "idle", idle.id, "still.png")!, Buffer.from(png));
+    const oldAnimation = { kind: "video" as const, spec_version: media.version, key: "#00FF00", states: { idle: { h264: "old.h264.mp4", still: "old.png", loop: true } } }; setHouseholdCompanionAnimation(id, oldAnimation);
+    const seedState = readStates(id); seedState.states.idle!.approved = idle.id; saveStates(id, seedState);
+    const backed = await request(`companions/${id}/appearance`, author); expect(await backed.json()).toMatchObject({ has_changes: false, published: { states: { idle: idle.id } } });
+    const changedTake = addTake(id, "idle", { source: "upload", label: "replacement" }), changed = readStates(id); changed.states.idle!.takes.find((row) => row.id === changedTake.id)!.report = report; saveStates(id, changed); mkdirSync(join(takePath(id, "idle", changedTake.id, "still.png")!, ".."), { recursive: true }); writeFileSync(takePath(id, "idle", changedTake.id, "clip.h264.mp4")!, "clip2"); writeFileSync(takePath(id, "idle", changedTake.id, "still.png")!, Buffer.from(png));
+    const approved = await request(`companions/${id}/states/idle/approve`, author, "PUT", { take_id: changedTake.id }); expect(approved.status).toBe(200);
+    __setKeyframesForTests(async () => [new Uint8Array([9])]); __setAgeCheckRunnerForTests(async (images) => images.map(() => ({ ok: true, verdict: { people_count: 0, apparent_min_age_estimate: null, label: "none", is_nude_or_sexual: false, confidence: 1 } })));
+    const pub = await request(`companions/${id}/appearance/publish`, author, "POST"); expect(pub.status).toBe(200); expect(getHouseholdCompanion(id)?.companion?.animation?.states).toHaveProperty("idle"); expect(readStates(id).published?.states.idle).toBe(changedTake.id);
+  });
+
+  test("Publish withholds an unrunnable adult check and leaves the live animation untouched", async () => {
+    const author = addPerson("person-publish-block", "adult"), made = createHouseholdCompanion({ ...fixture(), display_name: "Blocked publish" }, { display_name: "Author", person_id: "person-publish-block" }); if (!made.ok) throw new Error(made.error); const id = made.value.id;
+    const png = await transparentPng(), rest = addVersion(id, png, { source: "upload", label: "rest", width: 1024, height: 1024, from: null }); setRest(id, rest.id); updateSheet(id, { views: { left: null, right: null, mouth: null }, card: { text: "fox", species: "fox", colours: ["#CC3322"] }, key: "#00FF00", state: "needs_review", approved_by: null, approved_at: null }); approveSheet(id, "Author");
+    const take = addTake(id, "idle", { source: "upload", label: "idle" }), all = readStates(id); all.states.idle!.approved = take.id; all.states.idle!.takes[0]!.report = { ok: true, reasons: [], seconds: 3, bytes: { h264: 4, av1: null }, colour_distance: 1, area_ratio: 1, loop_gap: 0, opaque_share: { min: .5, max: .8 } }; saveStates(id, all); mkdirSync(join(takePath(id, "idle", take.id, "clip.h264.mp4")!, ".."), { recursive: true }); writeFileSync(takePath(id, "idle", take.id, "clip.h264.mp4")!, "clip"); writeFileSync(takePath(id, "idle", take.id, "still.png")!, Buffer.from(png));
+    setHouseholdCompanionAnimation(id, { kind: "video", spec_version: media.version, key: "#00FF00", states: { idle: { h264: "old.h264.mp4", still: "old.png", loop: true } } });
+    // The first read saves the backfilled published record; then the draft changes to a second take.
+    expect((await request(`companions/${id}/appearance`, author)).status).toBe(200);
+    const second = addTake(id, "idle", { source: "upload", label: "second" }), moved = readStates(id); moved.states.idle!.takes.find((row) => row.id === second.id)!.report = moved.states.idle!.takes[0]!.report; moved.states.idle!.approved = second.id; saveStates(id, moved); mkdirSync(join(takePath(id, "idle", second.id, "clip.h264.mp4")!, ".."), { recursive: true }); writeFileSync(takePath(id, "idle", second.id, "clip.h264.mp4")!, "clip2"); writeFileSync(takePath(id, "idle", second.id, "still.png")!, Buffer.from(png));
+    __setKeyframesForTests(async () => [new Uint8Array([3])]); __setAgeCheckRunnerForTests(async (images) => images.map(() => ({ ok: false, why: "unavailable" })));
+    const blocked = await request(`companions/${id}/appearance/publish`, author, "POST"); expect(blocked.status).toBe(422); expect(getHouseholdCompanion(id)?.companion?.animation?.states.idle?.h264).toBe("old.h264.mp4"); expect(readStates(id).checks && Object.values(readStates(id).checks!).every((check) => !check.age)).toBe(true);
+  });
+
+
+  test("Publish is blocked by a withheld age check and leaves the live animation untouched", async () => {
+    const f = await publishFixture("person-pub-withheld", "adult", "adult");
+    __setAgeCheckRunnerForTests(async (images) => images.map(() => AGE_WITHHELD));
+    const blocked = await request(`companions/${f.id}/appearance/publish`, f.token, "POST");
+    expect(blocked.status).toBe(422); expect(((await blocked.json()) as { reasons: string[] }).reasons.length).toBeGreaterThan(0);
+    expect(getHouseholdCompanion(f.id)?.companion?.animation?.states.idle?.h264).toBe("old.h264.mp4");
+    expect(existsSync(join(f.live, "old.h264.mp4"))).toBe(true); expect(existsSync(join(f.live, "..", "animation.next"))).toBe(false);
+    expect(readStates(f.id).published?.states.idle).toBe(f.first);
+  });
+
+  test("an all-ages companion's art also gets the child-safety question; a check that did not run is never cached", async () => {
+    const f = await publishFixture("person-pub-child", "adult", "all");
+    let ageCalls = 0, childCalls = 0, childOk = false;
+    __setAgeCheckRunnerForTests(async (images) => { ageCalls += images.length; return images.map(() => AGE_OK); });
+    __setChildSafetyRunnerForTests(async (images) => { childCalls += images.length; return images.map(() => childOk ? CHILD_OK : { ok: false as const, why: "unavailable" as const }); });
+    const blocked = await request(`companions/${f.id}/appearance/publish`, f.token, "POST");
+    expect(blocked.status).toBe(422); expect(childCalls).toBeGreaterThan(0);
+    expect(Object.values(readStates(f.id).checks ?? {}).every((entry) => !entry.child)).toBe(true);
+    expect(getHouseholdCompanion(f.id)?.companion?.animation?.states.idle?.h264).toBe("old.h264.mp4");
+    const agesBefore = ageCalls; childOk = true;
+    const published = await request(`companions/${f.id}/appearance/publish`, f.token, "POST");
+    expect(published.status).toBe(200); expect(ageCalls).toBe(agesBefore);
+    expect(getHouseholdCompanion(f.id)?.companion?.animation?.states.idle?.h264).toBe("idle.h264.mp4"); expect(readStates(f.id).published?.states.idle).toBe(f.second);
+  });
+
+  test("teen and adult companions are decided on their own band without the child-safety question", async () => {
+    for (const audience of ["teen", "adult"] as const) {
+      const f = await publishFixture(`person-pub-${audience}`, "adult", audience); let childCalls = 0;
+      __setAgeCheckRunnerForTests(async (images) => images.map(() => AGE_OK)); __setChildSafetyRunnerForTests(async (images) => { childCalls += images.length; return images.map(() => CHILD_OK); });
+      expect((await request(`companions/${f.id}/appearance/publish`, f.token, "POST")).status).toBe(200); expect(childCalls).toBe(0);
+    }
+  });
+
+  test("widening the audience re-checks the live set; narrowing and a companion with no live animation are unchecked", async () => {
+    const f = await publishFixture("person-pub-widen", "admin", "adult"); let calls = 0;
+    __setAgeCheckRunnerForTests(async (images) => { calls += images.length; return images.map(() => AGE_WITHHELD); });
+    const refused = await request(`companions/${f.id}/audience`, f.token, "PUT", { audience: "teen" });
+    expect(refused.status).toBe(422); expect(calls).toBeGreaterThan(0); expect(getHouseholdCompanion(f.id)?.companion?.audience).toBe("adult");
+    // The raw verdict for these exact bytes is cached (and would not change in production), so the test clears it before the checker answers differently.
+    const cached = readStates(f.id); delete cached.checks; saveStates(f.id, cached);
+    __setAgeCheckRunnerForTests(async (images) => { calls += images.length; return images.map(() => AGE_OK); });
+    expect((await request(`companions/${f.id}/audience`, f.token, "PUT", { audience: "teen" })).status).toBe(200); expect(getHouseholdCompanion(f.id)?.companion?.audience).toBe("teen");
+    calls = 0; expect((await request(`companions/${f.id}/audience`, f.token, "PUT", { audience: "adult" })).status).toBe(200); expect(calls).toBe(0);
+    const bare = createHouseholdCompanion({ ...fixture(), display_name: "No art yet" }, { display_name: "Author", person_id: "person-pub-widen" }); if (!bare.ok) throw new Error(bare.error);
+    expect((await request(`companions/${bare.value.id}/audience`, f.token, "PUT", { audience: "teen" })).status).toBe(200); expect(calls).toBe(0);
+  });
+
+  test("changing the rest picture clears the draft approvals but leaves the live animation until the next Publish", async () => {
+    const f = await publishFixture("person-pub-rest", "adult", "adult");
+    const other = addVersion(f.id, f.png, { source: "upload", label: "other", width: 1024, height: 1024, from: null });
+    const changed = await request(`companions/${f.id}/look/rest`, f.token, "PUT", { version_id: other.id }); expect(changed.status).toBe(200);
+    expect(readStates(f.id).states.idle?.approved ?? null).toBeNull();
+    expect(getHouseholdCompanion(f.id)?.companion?.animation?.states.idle?.h264).toBe("old.h264.mp4"); expect(existsSync(join(f.live, "old.h264.mp4"))).toBe(true);
+    expect(readStates(f.id).published?.states.idle).toBe(f.first);
+  });
+
+
+  test("Publish aborts and touches nothing when the approvals change while the checks run", async () => {
+    const f = await publishFixture("person-pub-race", "adult", "adult");
+    __setAgeCheckRunnerForTests(async (images) => { const moved = readStates(f.id); moved.states.idle!.approved = f.first; saveStates(f.id, moved); return images.map(() => AGE_OK); });
+    const aborted = await request(`companions/${f.id}/appearance/publish`, f.token, "POST");
+    expect(aborted.status).toBe(409); expect(getHouseholdCompanion(f.id)?.companion?.animation?.states.idle?.h264).toBe("old.h264.mp4"); expect(existsSync(join(f.live, "..", "animation.next"))).toBe(false);
+    expect(readStates(f.id).states.idle?.approved).toBe(f.first);
+  });
+
+  test("Publish aborts when the audience changes while the checks run", async () => {
+    const f = await publishFixture("person-pub-audience-race", "adult", "adult");
+    __setAgeCheckRunnerForTests(async (images) => { setHouseholdCompanionAudience(f.id, "teen", { display_name: "Author" }); return images.map(() => AGE_OK); });
+    const aborted = await request(`companions/${f.id}/appearance/publish`, f.token, "POST");
+    expect(aborted.status).toBe(409); expect(getHouseholdCompanion(f.id)?.companion?.animation?.states.idle?.h264).toBe("old.h264.mp4");
+  });
+
+  test("a rest picture change on a companion that was never backfilled still reads as a portrait change", async () => {
+    const f = await publishFixture("person-pub-legacy-rest", "adult", "adult", false);
+    const other = addVersion(f.id, f.png, { source: "upload", label: "other", width: 1024, height: 1024, from: null });
+    expect((await request(`companions/${f.id}/look/rest`, f.token, "PUT", { version_id: other.id })).status).toBe(200);
+    const status = (await (await request(`companions/${f.id}/appearance`, f.token)).json()) as { portrait_changed: boolean; has_changes: boolean };
+    expect(status.portrait_changed).toBe(true); expect(status.has_changes).toBe(true);
   });
 
   test("children, teens, non-author adults and bundled companions cannot use state routes", async () => {

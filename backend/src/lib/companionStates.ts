@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync, readFileSync, renameSync, rmSync, writeFileSync, copyFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, renameSync, rmSync, writeFileSync, copyFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 import { z } from "zod";
 import media from "@maipai/spec/vocab/companion-media.json";
@@ -11,7 +11,10 @@ const StateId = z.enum(media.states.map((s) => s.id) as [string, ...string[]]);
 const Report = z.object({ ok: z.boolean(), reasons: z.array(z.string()), seconds: z.number(), bytes: z.object({ h264: z.number(), av1: z.number().nullable() }), colour_distance: z.number().nullable(), area_ratio: z.number(), loop_gap: z.number(), opaque_share: z.object({ min: z.number(), max: z.number() }), colour_match: z.object({ applied: z.boolean(), strength: z.number() }).optional(), settle_skipped_frames: z.number().optional() });
 const Take = z.object({ id: z.string().regex(/^take-[1-9][0-9]*$/), created_at: z.string().datetime(), source: z.enum(["generated", "upload"]), seed: z.number().nullable(), label: z.string().max(80), report: Report.nullable(), failure: z.string().nullable(), model: z.string().nullable().optional(), quality: z.enum(["quick", "detailed"]).nullable().optional(), prompt_hash: z.string().regex(/^[a-f0-9]{64}$/).nullable().optional(), model_reported: z.string().nullable().optional() });
 const State = z.object({ motion: z.string().nullable(), approved: z.string().nullable(), approved_by: z.string().nullable(), approved_at: z.string().datetime().nullable(), takes: z.array(Take) });
-const StatesSchema = z.object({ version: z.literal(1), states: z.partialRecord(StateId, State) });
+const ImageCheck = z.discriminatedUnion("ok", [z.object({ ok: z.literal(true), verdict: z.object({ people_count: z.number(), apparent_min_age_estimate: z.number().nullable(), label: z.enum(["adult", "possibly_minor", "child", "none"]), is_nude_or_sexual: z.boolean(), confidence: z.number() }) }), z.object({ ok: z.literal(false), why: z.enum(["no_vision", "memory", "timeout", "unavailable", "unparsed"]) })]);
+const ChildCheck = z.discriminatedUnion("ok", [z.object({ ok: z.literal(true), verdict: z.object({ is_cartoon: z.boolean(), looks_like_photo: z.boolean(), brand_or_licensed_character: z.boolean(), violent_or_scary: z.boolean(), sexual_or_romantic: z.boolean(), weapons_drugs_or_alcohol: z.boolean(), confidence: z.number() }) }), z.object({ ok: z.literal(false), why: z.enum(["no_vision", "timeout", "unavailable", "unparsed"]) })]);
+const Published = z.object({ at: z.string().datetime(), by: z.string(), rest: z.string(), states: z.record(z.string(), z.string().nullable()) });
+const StatesSchema = z.object({ version: z.literal(1), states: z.partialRecord(StateId, State), published: Published.optional(), checks: z.record(z.string(), z.object({ age: ImageCheck.optional(), child: ChildCheck.optional() })).optional() });
 export type CompanionStates = z.infer<typeof StatesSchema>;
 export type CompanionTake = z.infer<typeof Take>;
 export const TAKE_LIMIT_LINE = "This state already has 12 clips. Delete some of this state's other takes first.";
@@ -36,7 +39,24 @@ export function deleteTake(id: string, rawState: string, rawTake: string): boole
 export function bestTake(takes: CompanionTake[]): CompanionTake | null { return takes.filter((t) => t.report?.ok).sort((a, b) => (a.report!.colour_distance ?? 999) - (b.report!.colour_distance ?? 999) || a.report!.area_ratio - b.report!.area_ratio)[0] ?? null; }
 export function deleteStates(id: string): void { const root = householdCompanionFolder(id); if (root) rmSync(join(root, "states"), { recursive: true, force: true }); }
 export function clearApprovedStates(id: string): void { const all = readStates(id); for (const value of Object.values(all.states)) { if (!value) continue; value.approved = null; value.approved_by = null; value.approved_at = null; } saveStates(id, all); }
-export async function ensureCompanionMediaRoot(): Promise<{ ok: true } | { ok: false; error: string }> { if (isRemoteStackSelected()) return { ok: false, error: MEDIA_ROOT_REMOTE_LINE }; if (rootsReady) return { ok: true }; try { const root = join(process.env.MAIPAI_DATA_DIR || (await import("@/lib/paths")).dataDir, "companions"); mkdirSync(root, { recursive: true }); const client = getStackClient(), current = await client.mediaRoots(); const read = [...new Set([...current.read, root])], write = [...new Set([...current.write, root])]; if (read.length !== current.read.length || write.length !== current.write.length) await client.setMediaRoots({ read, write }); rootsReady = true; return { ok: true }; } catch { return { ok: false, error: "The engine could not allow access to companion clips. Check the engine and try again." }; } }
+/** Swaps `animation.next` in as the live `animation` folder. The old folder is kept as `animation.prev` until `commit` (the manifest and published-record writes) succeeds; any failure puts it back. */
+export function swapInAnimation(root: string, commit: () => void): void {
+  const live = join(root, "animation"), next = join(root, "animation.next"), prev = join(root, "animation.prev");
+  rmSync(prev, { recursive: true, force: true });
+  if (existsSync(live)) renameSync(live, prev);
+  try { renameSync(next, live); commit(); rmSync(prev, { recursive: true, force: true }); }
+  catch (error) { rmSync(live, { recursive: true, force: true }); if (existsSync(prev)) renameSync(prev, live); throw error; }
+}
+export function recoverAppearanceSwap(root: string, listed?: readonly string[] | null): void {
+  const live = join(root, "animation"), prev = join(root, "animation.prev"), next = join(root, "animation.next");
+  if (existsSync(prev) && !existsSync(live)) renameSync(prev, live);
+  // A crash after the folder swap but before the manifest write leaves the new folder with the old manifest: keep the folder the manifest describes.
+  else if (existsSync(prev) && listed && listed.some((file) => !existsSync(join(live, file)))) { rmSync(live, { recursive: true, force: true }); renameSync(prev, live); }
+  else rmSync(prev, { recursive: true, force: true });
+  rmSync(next, { recursive: true, force: true });
+}
+const listedAnimationFiles = (id: string): string[] | null => { const animation = getHouseholdCompanion(id)?.companion?.animation; return animation ? [animation.sheet?.rest ?? "rest.png", ...Object.values(animation.states).flatMap((state) => [state.h264, state.av1, state.still]).filter((name): name is string => typeof name === "string")] : null; };
+export async function ensureCompanionMediaRoot(): Promise<{ ok: true } | { ok: false; error: string }> { if (isRemoteStackSelected()) return { ok: false, error: MEDIA_ROOT_REMOTE_LINE }; if (rootsReady) return { ok: true }; try { const root = join(process.env.MAIPAI_DATA_DIR || (await import("@/lib/paths")).dataDir, "companions"); mkdirSync(root, { recursive: true }); for (const entry of readdirSync(root, { withFileTypes: true })) if (entry.isDirectory()) recoverAppearanceSwap(join(root, entry.name), listedAnimationFiles(entry.name)); const client = getStackClient(), current = await client.mediaRoots(); const read = [...new Set([...current.read, root])], write = [...new Set([...current.write, root])]; if (read.length !== current.read.length || write.length !== current.write.length) await client.setMediaRoots({ read, write }); rootsReady = true; return { ok: true }; } catch { return { ok: false, error: "The engine could not allow access to companion clips. Check the engine and try again." }; } }
 export function __resetCompanionStatesForTests(): void { jobs.clear(); rootsReady = false; }
 export function companionStateJob(companionId: string, takeId: string) { return [...jobs.values()].find((j) => j.companionId === companionId && j.takeId === takeId) ?? null; }
 export function companionHasFinishingJob(companionId: string): boolean { return [...jobs.values()].some((j) => j.companionId === companionId && j.state === "running"); }

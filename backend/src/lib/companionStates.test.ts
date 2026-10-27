@@ -1,9 +1,9 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
-import { rmSync, writeFileSync } from "node:fs";
+import { rmSync, writeFileSync, mkdirSync, existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { loadManifestOnly } from "@/lib/plugins";
 import { createHouseholdCompanion } from "@/lib/householdCompanions";
-import { addTake, bestTake, deleteStates, deleteTake, readStates, setMotion, takePath, __resetCompanionStatesForTests, finishTake } from "@/lib/companionStates";
+import { addTake, bestTake, deleteStates, deleteTake, readStates, setMotion, takePath, __resetCompanionStatesForTests, finishTake, swapInAnimation } from "@/lib/companionStates";
 import { __setStackClientForTests } from "@/lib/stackEngine";
 import { addVersion, approveSheet, setRest, updateSheet } from "@/lib/companionLook";
 import media from "@maipai/spec/vocab/companion-media.json";
@@ -76,6 +76,14 @@ describe("companion states store", () => {
     expect(readStates(id).states).toEqual({});
   });
 
+  test("recovers an interrupted animation swap and removes completed swap leftovers", async () => {
+    const { recoverAppearanceSwap } = await import("@/lib/companionStates"), id = companion(), dir = join(root, id);
+    mkdirSync(join(dir, "animation.prev"), { recursive: true }); writeFileSync(join(dir, "animation.prev", "old"), "old");
+    recoverAppearanceSwap(dir); expect(existsSync(join(dir, "animation", "old"))).toBe(true);
+    mkdirSync(join(dir, "animation.next"), { recursive: true }); recoverAppearanceSwap(dir);
+    expect(existsSync(join(dir, "animation"))).toBe(true); expect(existsSync(join(dir, "animation.next"))).toBe(false);
+  });
+
   test("declares the companion media root once, preserves other roots, and retries a failed put", async () => {
     const { ensureCompanionMediaRoot } = await import("@/lib/companionStates");
     const expected = join(dataRoot, "companions"); let reads = 0, writes = 0; let fail = true;
@@ -119,5 +127,35 @@ describe("companion states store", () => {
     await expect(finishTake(id, "thinking", take.id, { alpha: true })).rejects.toThrow("too_short: The clip is too short. Use a longer video.");
     expect(readStates(id).states.thinking?.takes[0]?.failure).toContain("The clip is too short. Use a longer video.");
     expect(readStates(id).states.thinking?.takes[0]?.report).toBeNull();
+  });
+});
+
+describe("swapInAnimation", () => {
+  const folder = () => join(dataRoot, "swap-test");
+  beforeEach(() => { rmSync(folder(), { recursive: true, force: true }); mkdirSync(join(folder(), "animation.next"), { recursive: true }); writeFileSync(join(folder(), "animation.next", "marker"), "new"); });
+  afterEach(() => rmSync(folder(), { recursive: true, force: true }));
+  test("puts the new folder live and drops the old one once the commit succeeds", () => {
+    mkdirSync(join(folder(), "animation"), { recursive: true }); writeFileSync(join(folder(), "animation", "marker"), "old");
+    swapInAnimation(folder(), () => {});
+    expect(readFileSync(join(folder(), "animation", "marker"), "utf8")).toBe("new"); expect(existsSync(join(folder(), "animation.prev"))).toBe(false); expect(existsSync(join(folder(), "animation.next"))).toBe(false);
+  });
+  test("a failed commit puts the old folder back and leaves nothing behind", () => {
+    mkdirSync(join(folder(), "animation"), { recursive: true }); writeFileSync(join(folder(), "animation", "marker"), "old");
+    expect(() => swapInAnimation(folder(), () => { throw new Error("manifest write failed"); })).toThrow("manifest write failed");
+    expect(readFileSync(join(folder(), "animation", "marker"), "utf8")).toBe("old"); expect(existsSync(join(folder(), "animation.prev"))).toBe(false);
+  });
+  test("startup recovery keeps the folder the manifest describes", async () => {
+    const { recoverAppearanceSwap } = await import("@/lib/companionStates");
+    mkdirSync(join(folder(), "animation"), { recursive: true }); writeFileSync(join(folder(), "animation", "new.png"), "n");
+    mkdirSync(join(folder(), "animation.prev"), { recursive: true }); writeFileSync(join(folder(), "animation.prev", "old.png"), "o");
+    recoverAppearanceSwap(folder(), ["old.png"]);
+    expect(existsSync(join(folder(), "animation", "old.png"))).toBe(true); expect(existsSync(join(folder(), "animation.prev"))).toBe(false);
+    mkdirSync(join(folder(), "animation.prev"), { recursive: true }); writeFileSync(join(folder(), "animation.prev", "older.png"), "x");
+    recoverAppearanceSwap(folder(), ["old.png"]);
+    expect(existsSync(join(folder(), "animation", "old.png"))).toBe(true); expect(existsSync(join(folder(), "animation.prev"))).toBe(false);
+  });
+  test("a failed first publish leaves no live folder", () => {
+    expect(() => swapInAnimation(folder(), () => { throw new Error("manifest write failed"); })).toThrow();
+    expect(existsSync(join(folder(), "animation"))).toBe(false);
   });
 });
