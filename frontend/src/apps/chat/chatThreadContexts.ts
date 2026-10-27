@@ -142,5 +142,5 @@ export const CompanionSpeechContext = createContext<{ isSpeaking: boolean; liveV
  * Repairs link words for an owner or admin. Null when chat is ready; the
  * showcase mounts without the chat page's providers, so null is the safe
  * default. */
-export type ChatComposerNoticeValue = { text: string; repairsLink: string | null };
+export type ChatComposerNoticeValue = { text: string; repairsLink: string | null; actionLabel?: string; onAction?: () => void };
 export const ChatComposerNoticeContext = createContext<ChatComposerNoticeValue | null>(null);

@@ -11,7 +11,7 @@ import { ChatHeaderDataProvider } from "@/apps/chat/chatHeaderData";
 import { writeIncognitoCache } from "@/shell/incognitoCache";
 import { IncognitoProvider, useIncognitoContext } from "@/shell/incognitoContext";
 import { __setUnwiredControlsForTests } from "@/apps/chat/composerAddMenu";
-import type { NotificationDeliveryView, Roster } from "@/lib/api";
+import { api, type NotificationDeliveryView, type Roster } from "@/lib/api";
 import { FakeAudioContext } from "../../../tests/fakeAudioContext";
 import { ndjsonStream as bareNdjsonStream } from "../../../tests/ndjsonStream";
 import { assistantStreamBody as ndjsonStream, staggeredAssistantStreamBody as staggeredNdjsonStream, ASSISTANT_STREAM_HEADERS } from "../../../tests/assistantStreamBody";
@@ -97,6 +97,8 @@ function ConversationLocation() {
   const location = useLocation();
   return <output data-testid="conversation-location">{location.search}</output>;
 }
+
+function TryLocationProbe() { const location = useLocation(); return <output data-testid="try-location">{location.search}</output>; }
 
 function makePerson(overrides: Partial<Roster> = {}): Roster {
   return {
@@ -3433,6 +3435,25 @@ describe("ChatPage (ELT-MODE-01 / RESP-04 (f): the composer's mode picker)", () 
 });
 
 describe("ChatPage (INCOGNITO-01 session flag wiring)", () => {
+  test("Try it pins a draft in temporary chat and Stop trying restores Incognito", async () => {
+    const restore = stubMultiTurnFetch();
+    const originalCompanion = api.editCompanion;
+    let nameLookups = 0;
+    api.editCompanion = async () => { nameLookups += 1; return { id: "draft-1", name: "Draft Buddy" } as never; };
+    try {
+      localStorage.setItem("maipai.incognito-explanation-seen", "true");
+      writeIncognitoCache(false);
+      const view = renderPage(<MemoryRouter initialEntries={["/chat?try=draft-1"]}><TryLocationProbe /><ChatPage person={makePerson()} /></MemoryRouter>);
+      expect(await view.findByText("Trying Draft Buddy, a draft. Nothing is saved.")).toBeTruthy();
+      expect(view.getByRole("button", { name: "Stop trying" })).toBeTruthy();
+      // Regression: the effects once refetched the name on every render (thousands of requests) and kept the page from sending.
+      await new Promise((resolve) => setTimeout(resolve, 100));
+      expect(nameLookups).toBe(1);
+      fireEvent.click(view.getByRole("button", { name: "Stop trying" }));
+      await waitFor(() => expect(view.getByTestId("try-location").textContent).not.toContain("try="));
+      await waitFor(() => expect(sessionStorage.getItem("maipai.incognito")).toBeNull());
+    } finally { api.editCompanion = originalCompanion; restore(); }
+  });
   test.each([
     ["light"],
     ["dark"],

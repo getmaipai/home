@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { Link } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { StudioLayout } from "@maipai/ui/src/elements/studio-layout";
 import { List } from "@maipai/ui/src/primitives/List";
@@ -17,7 +18,7 @@ import { companionAppearanceKey, useCompanionStates } from "@/shell/pages/useCom
 type StudioItem = { id: string; label: string; status: string; state: CompanionStateRow | null };
 const errorText = (error: unknown) => error instanceof ApiError ? error.message : "Could not reach Home. Check your connection and try again.";
 
-export function CompanionStudioTab({ id, name, prompt, promptError, onPromptChange, active }: { id: string; name: string; prompt: string; promptError?: string; onPromptChange: (value: string) => void; active: boolean }) {
+export function CompanionStudioTab({ id, name, prompt, promptError, onPromptChange, active, draft }: { id: string; name: string; prompt: string; promptError?: string; onPromptChange: (value: string) => void; active: boolean; draft: boolean }) {
   const states = useCompanionStates(id, active);
   const appearanceQuery = useQuery({ queryKey: companionAppearanceKey(id), queryFn: () => api.companionAppearance(id), enabled: active, retry: false });
   const lookQuery = useQuery({ queryKey: ["companions", id, "look"], queryFn: () => api.companionLook(id), enabled: active, retry: false });
@@ -54,7 +55,7 @@ export function CompanionStudioTab({ id, name, prompt, promptError, onPromptChan
   const badgeText = appearance.has_changes ? "Review needed" : appearance.published ? "Published" : "Draft";
   const nav = <><List items={items} getKey={(item) => item.id} label="Character and states" onSelect={(item) => setSelected(item.id)} isSelected={(item) => item.id === selectedKey} renderItem={(item) => <div className="flex min-w-0 flex-1 flex-wrap items-center justify-between gap-2"><span className="min-w-0 break-words">{item.label}</span><Badge variant={item.id === selectedKey ? "secondary" : "outline"}>{item.status}</Badge></div>} />
     <p className="mt-4 text-sm text-muted-foreground">Changes stay in draft until published.</p></>;
-  const actions = <><div className="flex flex-wrap items-center gap-2"><Button disabled={!appearance.can_publish || states.publishing} onClick={() => void states.publish()}>{states.publishing ? "Publishing…" : "Publish appearance"}</Button>{!appearance.can_publish && appearance.reasons[0] ? <span className="text-sm text-muted-foreground">{appearance.reasons[0]}</span> : null}</div>{states.status ? <Alert><AlertDescription>{states.status}</AlertDescription></Alert> : null}</>;
+  const actions = <><div className="flex flex-wrap items-center gap-2"><Button disabled={!appearance.can_publish || states.publishing} onClick={() => void states.publish()}>{states.publishing ? "Publishing…" : "Publish appearance"}</Button>{draft ? <div className="flex flex-col"><Button asChild variant="outline"><Link to={`/chat?try=${encodeURIComponent(id)}`}>Try it</Link></Button><span className="text-sm text-muted-foreground">Opens a temporary chat. Nothing is saved.</span></div> : null}{!appearance.can_publish && appearance.reasons[0] ? <span className="text-sm text-muted-foreground">{appearance.reasons[0]}</span> : null}</div>{states.status ? <Alert><AlertDescription>{states.status}</AlertDescription></Alert> : null}</>;
   const readiness = <section aria-label="Clip readiness" className="mb-4 flex flex-col gap-2"><h2 className="text-lg font-semibold">{data.counts.approved} of {data.counts.total} ready</h2><Progress value={data.counts.approved / data.counts.total * 100} aria-label="Approved clips" /><div className="flex flex-wrap gap-2"><Button disabled={!data.sheet_ready || !data.start_ready || states.running || !data.states.some((state) => !state.approved)} onClick={() => void states.start(() => api.generateCompanionStates(id, { required_only: false }))}>Generate missing clips</Button><Button variant="outline" disabled={!data.sheet_ready || !data.start_ready || states.running || data.counts.required_missing.length === 0} onClick={() => void states.start(() => api.generateCompanionStates(id, { required_only: true }))}>Generate required clips</Button></div></section>;
   const main = <>
     {!sheetApproved ? <Alert><AlertDescription>Approve the character sheet in Portrait first. Every clip starts from it. You can still copy a prompt for another tool.</AlertDescription></Alert> : null}

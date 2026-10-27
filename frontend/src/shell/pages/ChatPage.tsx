@@ -195,7 +195,7 @@ function useBareCompareCanvas(target: CompareTarget | null) {
  * wiring table's remaining rows). `speakReplies: false` still holds -
  * no "stop speaking" control on screen yet. */
 
-function useChatRuntime(person: Roster, closeSheet: () => void, temporaryNext: boolean, voiceOpen: boolean, onArtifactReady: (artifactId: string) => void, setDraftConversationId: (id: string | undefined) => void, retryWithCurrentCompanionRef: { current: boolean }, folderId?: string) {
+function useChatRuntime(person: Roster, closeSheet: () => void, temporaryNext: boolean, voiceOpen: boolean, onArtifactReady: (artifactId: string) => void, setDraftConversationId: (id: string | undefined) => void, retryWithCurrentCompanionRef: { current: boolean }, tryCompanionIdRef: { current: string | undefined }, folderId?: string) {
   const temporaryModeRef = useRef(temporaryNext);
   temporaryModeRef.current = temporaryNext;
   const turnSchedulerRef = useRef<SentenceSpeechScheduler | null>(null);
@@ -510,6 +510,7 @@ function useChatRuntime(person: Roster, closeSheet: () => void, temporaryNext: b
           // saved by its setter, and used on every send until changed.
           getThinking: () => (thinkingAllowed && currentModelThinksRef.current ? thinkingRef.current : undefined),
           getAgeBand: () => person.age_band,
+          getTryCompanionId: () => tryCompanionIdRef.current,
           consumeRetryWithCurrentCompanion: () => {
             const value = retryWithCurrentCompanionRef.current;
             retryWithCurrentCompanionRef.current = false;
@@ -666,7 +667,8 @@ function useChatRuntime(person: Roster, closeSheet: () => void, temporaryNext: b
         setDraftConversationId(id);
         deselectedConversationIdRef.current = undefined;
       }
-      setSearchParams(id ? { conversation: id } : {}, { replace: true });
+      const tryId = new URLSearchParams(window.location.search).get("try")?.trim();
+      setSearchParams(id ? { conversation: id, ...(tryId ? { try: tryId } : {}) } : tryId ? { try: tryId } : {}, { replace: true });
       closeSheet();
       const isDeliberateSwitch = previousThreadIdRef.current !== undefined && id !== previousThreadIdRef.current;
       previousThreadIdRef.current = id;
@@ -769,11 +771,12 @@ function ChatTitleCatchUp({ incognito }: { incognito: boolean }) {
  * pushes it into the data context. Same side-effect-mount shape as
  * ArtifactCacheInvalidator/ChatDocumentTitle above, just carrying data
  * instead of a DOM/browser-API side effect. */
-function ChatHeaderDataBridge({ autoReadReplies, setAutoReadReplies, ttsAvailable, pinnable, person, conversationId, sheetOpen, onToggleSheet, inShellBar }: {
+function ChatHeaderDataBridge({ autoReadReplies, setAutoReadReplies, ttsAvailable, pinnable, trying, person, conversationId, sheetOpen, onToggleSheet, inShellBar }: {
   autoReadReplies: boolean;
   setAutoReadReplies: (enabled: boolean) => void;
   ttsAvailable: boolean;
   pinnable: boolean;
+  trying: boolean;
   person: Roster;
   conversationId?: string;
   sheetOpen: boolean;
@@ -810,7 +813,7 @@ function ChatHeaderDataBridge({ autoReadReplies, setAutoReadReplies, ttsAvailabl
     title,
     ttsAvailable,
     autoReadReplies,
-    pinnable,
+    pinnable: pinnable && !trying,
     pinned,
     companionId: conversation.data?.companion_id ?? null,
     conversationExists: Boolean(conversationId),
@@ -818,7 +821,9 @@ function ChatHeaderDataBridge({ autoReadReplies, setAutoReadReplies, ttsAvailabl
     assistantReplySignal,
     defaultCompanionId,
     companions: companionChoices,
+    ...(trying ? { defaultCompanionId: null } : {}),
     onCompanionChange: async (companionId) => {
+      if (trying) return;
       if (!pinnable) return;
       try {
         if (!conversationId) {
@@ -1045,13 +1050,45 @@ export function ChatPage({ person }: { person: Roster }) {
   const queryClient = useQueryClient();
   const [draftConversationId, setDraftConversationId] = useState<string | undefined>(() => new URLSearchParams(window.location.search).get("conversation") ?? undefined);
   const chatAvailability = useChatAvailability();
-  const composerNotice = useChatComposerNotice(person);
+  const baseComposerNotice = useChatComposerNotice(person);
 
   // RAIL-01 (owner's layout, 2026-10-06): the chat draws its own slim
   // header at the top of the conversation pane, beside the history column,
   // instead of filling the shell header's slot (which spanned the history
   // column too).
-  const { on: temporaryNext } = useIncognitoContext();
+  const { on: incognitoOn, setOn: setIncognitoOn } = useIncognitoContext();
+  const [trySearchParams] = useSearchParams();
+  const tryParam = trySearchParams.get("try")?.trim() || undefined;
+  const tryCompanionIdRef = useRef<string | undefined>(undefined);
+  tryCompanionIdRef.current = tryParam;
+  const previousIncognitoRef = useRef<boolean | undefined>(undefined);
+  const [tryCompanionName, setTryCompanionName] = useState<string>();
+  const tryActive = Boolean(tryParam);
+  const temporaryNext = tryActive || incognitoOn;
+  // The setter is not stable across renders: keep the latest in a ref so these effects run only when Try starts or stops.
+  const setIncognitoRef = useRef(setIncognitoOn);
+  setIncognitoRef.current = setIncognitoOn;
+  useEffect(() => {
+    if (!tryParam) { setTryCompanionName(undefined); return; }
+    let cancelled = false;
+    void api.editCompanion(tryParam).then((record) => { if (!cancelled) setTryCompanionName(record.name); }).catch(() => { if (!cancelled) setTryCompanionName(undefined); });
+    return () => { cancelled = true; };
+  }, [tryParam]);
+  useEffect(() => {
+    if (tryActive) {
+      if (previousIncognitoRef.current === undefined) previousIncognitoRef.current = incognitoOn;
+      if (!incognitoOn) setIncognitoRef.current(true);
+    } else if (previousIncognitoRef.current !== undefined) {
+      setIncognitoRef.current(previousIncognitoRef.current);
+      previousIncognitoRef.current = undefined;
+    }
+  }, [tryActive, incognitoOn]);
+  useEffect(() => () => {
+    if (previousIncognitoRef.current !== undefined) setIncognitoRef.current(previousIncognitoRef.current);
+  }, []);
+  const composerNotice = tryActive
+    ? { text: tryCompanionName ? `Trying ${tryCompanionName}, a draft. Nothing is saved.` : "Trying a draft. Nothing is saved.", repairsLink: null, actionLabel: "Stop trying", onAction: () => navigate("/chat") }
+    : baseComposerNotice;
   const routeLocation = useLocation();
   const projectRoute = useMatch("/chat/projects/:id");
   const projectFolderId = projectRoute?.params.id ? decodeURIComponent(projectRoute.params.id) : undefined;
@@ -1315,7 +1352,7 @@ export function ChatPage({ person }: { person: Roster }) {
     setOpenArtifactId(null);
     setCompareTarget(null);
     imageEditor.close();
-  }, temporaryNext, voiceOpen, setOpenArtifactId, setDraftConversationId, retryWithCurrentCompanionRef, projectPage?.folderId);
+  }, temporaryNext, voiceOpen, setOpenArtifactId, setDraftConversationId, retryWithCurrentCompanionRef, tryCompanionIdRef, projectPage?.folderId);
   const threadListState = useChatThreadListState(runtime);
   const hasThreads = threadListState.threadIds.length > 0;
   const isLoadingThreads = threadListState.isLoading;
@@ -1516,7 +1553,7 @@ export function ChatPage({ person }: { person: Roster }) {
               <ChatDocumentTitle person={person} />
         <ChatTitleCatchUp incognito={temporaryNext} />
         <ChatMemoryPoll incognito={temporaryNext} />
-        <ChatHeaderDataBridge autoReadReplies={autoReadReplies} setAutoReadReplies={setAutoReadReplies} ttsAvailable={ttsAvailable} pinnable={!temporaryNext} person={person} conversationId={temporaryNext ? undefined : draftConversationId} sheetOpen={sheetOpen} onToggleSheet={() => setSheetOpen((open) => !open)} inShellBar={barOnPhone} />
+        <ChatHeaderDataBridge autoReadReplies={autoReadReplies} setAutoReadReplies={setAutoReadReplies} ttsAvailable={ttsAvailable} pinnable={!temporaryNext} trying={tryActive} person={person} conversationId={temporaryNext ? undefined : draftConversationId} sheetOpen={sheetOpen} onToggleSheet={() => setSheetOpen((open) => !open)} inShellBar={barOnPhone} />
         <ProjectResultReload />
         {settingsDialog}
         <Dialog open={micGate.problem !== null} onOpenChange={(open) => { if (!open) micGate.dismiss(); }}>

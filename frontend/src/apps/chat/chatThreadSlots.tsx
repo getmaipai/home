@@ -134,6 +134,7 @@ export function ChatComposerNotice() {
           </KitButton>
         </>
       ) : null}
+      {notice.actionLabel && notice.onAction ? <><span> </span><KitButton variant="quiet-link" size="xs" onClick={notice.onAction}>{notice.actionLabel}</KitButton></> : null}
     </span>
   );
 }

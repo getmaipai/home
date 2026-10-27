@@ -137,6 +137,21 @@ describe("regenerate model override", () => {
   });
 });
 
+describe("TRYIT-01 pinned draft", () => {
+  test("sends the pinned id on the first request and omits it when unset", async () => {
+    const env = stubEnvironment(ndjsonStream([{ type: "done", value: { turn_id: "try-turn", reply: { text: "Hello." }, source: "model", safety: SAFETY } }]));
+    try {
+      await collect([fakeUserMessage("hi")], undefined, undefined, undefined, undefined, undefined, { getTryCompanionId: () => "draft-1" });
+      expect((env.turnBodies[0] as { try_companion_id?: string }).try_companion_id).toBe("draft-1");
+    } finally { env.restore(); }
+    const normal = stubEnvironment(ndjsonStream([{ type: "done", value: { turn_id: "normal-turn", reply: { text: "Hello." }, source: "model", safety: SAFETY } }]));
+    try {
+      await collect([fakeUserMessage("hi")]);
+      expect((normal.turnBodies[0] as { try_companion_id?: string }).try_companion_id).toBeUndefined();
+    } finally { normal.restore(); }
+  });
+});
+
 describe("companion mention request", () => {
   async function bodyFor(text: string) {
     const env = stubEnvironment(ndjsonStream([{ type: "done", value: { turn_id: "turn-mention", reply: { text: "ok" }, source: "model", safety: SAFETY } }]));

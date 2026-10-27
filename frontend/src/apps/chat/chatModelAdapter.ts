@@ -101,6 +101,8 @@ export interface ChatModelAdapterDeps {
   getModel?(): string | undefined;
   /** Age band for the signed-in person; per-message model choice is adults-only. */
   getAgeBand?(): "adult" | "teen" | "child" | undefined;
+  /** Draft companion pinned to this temporary test chat. */
+  getTryCompanionId?(): string | undefined;
   /** PLACE-WEATHER-01: this request's coordinates when the person's weather
    * default is Current location and the browser already allowed it. Read once
    * per send, never on a reconnect, and never stored. */
@@ -416,6 +418,7 @@ export function createChatModelAdapter(deps: ChatModelAdapterDeps): ChatModelAda
             bare: bare || undefined,
             assistantStream: true,
             conversationId,
+            tryCompanionId: deps.getTryCompanionId?.(),
             mentionCompanionId: reconnectAttempts === 0 ? (!temporary && !retryWithCurrent && retrySpeakerId ? retrySpeakerId : mentionCompanionId) : undefined,
             supersedes,
             continuation,
