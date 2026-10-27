@@ -203,7 +203,11 @@ describe("logTurn's supersedes option (getmaipai/home#60)", () => {
     const stored = db.select().from(conversationTurns).where(eq(conversationTurns.id, "turn-answered")).get()!;
     expect(JSON.parse(stored.answeredBy!)).toEqual(answered_by);
     const history = listConversationTurns(actor, conv.value.id);
-    expect(history.ok && history.value[0]!.answered_by).toEqual(answered_by);
+    expect(history.ok && history.value[0]!.answered_by).toEqual({ ...answered_by, look_version_id: null, voice_version: null, portrait: null });
+    const withVersions = { ...answered_by, look_version_id: "v-2", voice_version: "abc123abc123", portrait: "default/v-2" };
+    db.update(conversationTurns).set({ answeredBy: JSON.stringify(withVersions) }).where(eq(conversationTurns.id, "turn-answered")).run();
+    const versioned = listConversationTurns(actor, conv.value.id);
+    expect(versioned.ok && versioned.value[0]!.answered_by).toEqual(withVersions);
     const old = db.select().from(conversationTurns).where(eq(conversationTurns.id, "turn-original")).get();
     expect(old?.answeredBy ?? null).toBeNull();
     db.update(conversationTurns).set({ answeredBy: "{" }).where(eq(conversationTurns.id, "turn-answered")).run();
