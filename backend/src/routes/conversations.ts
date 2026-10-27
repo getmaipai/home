@@ -34,6 +34,7 @@ import {
   updateConversationMode,
   updateConversationCompanion,
   updateConversationSettings,
+  updateConversationPlacement,
   deleteConversationById,
   batchDeleteConversations,
   clearConversations,
@@ -86,12 +87,15 @@ conversationsRoutes.get("/", requireAuth, async (c) => {
   // actor.id`, conversationHistory.ts), so there was never a reason to
   // drop it here.
   const archived = c.req.query("archived");
-  return c.json(listConversations(actor, person, query, { archived: archived === "include" || archived === "only" ? archived : "exclude" }));
+  const requestedPlacement = c.req.query("placement");
+  const placement = requestedPlacement === "side" || requestedPlacement === "all" ? requestedPlacement : "chat";
+  return c.json(listConversations(actor, person, query, { archived: archived === "include" || archived === "only" ? archived : "exclude", placement }));
 });
 
 conversationsRoutes.get("/incognito", requireAuth, async (c) => {
   const actor = c.get("person");
-  return c.json(listTemporaryConversations(actor, c.req.query("person")));
+  const incognitoPlacement = c.req.query("placement");
+  return c.json(listTemporaryConversations(actor, c.req.query("person"), incognitoPlacement === "side" || incognitoPlacement === "all" ? incognitoPlacement : "chat"));
 });
 
 conversationsRoutes.post("/incognito/discard", requireAuth, async (c) => {
@@ -158,6 +162,7 @@ conversationsRoutes.get("/export", requireAuth, async (c) => {
 // error message from the checks below.
 const CreateConversationBody = z.object({
   surface: z.string().optional().describe("Where the chat happens; defaults to chat."),
+  placement: Conversation.shape.placement.optional().describe("Where the conversation is shown; defaults to Chat."),
   companion_id: z.string().nullable().optional().describe("The companion for this chat."),
   mode: z.unknown().optional().describe("chat, research or temporary."),
   carry_from: z.unknown().optional().describe("A conversation id whose summary seeds this chat (THIN-3G)."),
@@ -173,13 +178,13 @@ const createConversationRoute = createRoute({
   request: { body: { required: false, content: { "application/json": { schema: CreateConversationBody } } } },
   responses: {
     201: { content: { "application/json": { schema: Conversation } }, description: "The new conversation." },
-    ...errorResponses({ 400: "Bad surface, mode, carry_from or folder_id", 401: "Sign in first", 403: "Temporary chat is not available for minors", 404: "carry_from not found" }),
+    ...errorResponses({ 400: "Bad surface, placement, mode, carry_from or folder_id", 401: "Sign in first", 403: "Temporary chat is not available for minors", 404: "carry_from not found" }),
   },
 });
 
 conversationsRoutes.openapi(createConversationRoute, (c) => {
   const actor = c.get("person");
-  const body = (c.req.valid("json") ?? {}) as { surface?: Surface; companion_id?: string | null; mode?: unknown; carry_from?: unknown; folder_id?: unknown };
+  const body = (c.req.valid("json") ?? {}) as { surface?: Surface; placement?: Conversation["placement"]; companion_id?: string | null; mode?: unknown; carry_from?: unknown; folder_id?: unknown };
   const mode = body.mode === undefined ? undefined : Conversation.shape.mode.safeParse(body.mode);
   if (mode && !mode.success) return c.json({ error: "invalid conversation mode" }, 400);
   if (body.carry_from !== undefined && body.carry_from !== null && typeof body.carry_from !== "string") return c.json({ error: "carry_from must be a conversation id" }, 400);
@@ -188,7 +193,7 @@ conversationsRoutes.openapi(createConversationRoute, (c) => {
   if (typeof body.companion_id === "string" && (resolvePersona(body.companion_id).id !== body.companion_id || !mayUseCompanion(actor, resolvePersona(body.companion_id)))) return c.json({ error: "That companion is not available to you. Choose another from the list." }, 403);
   // THIN-3G: carry_from seeds the new chat with that chat's summary.
   // PROJECTS-01a: folder_id starts the chat inside one of the person's projects.
-  const result = createConversation(actor, { surface: body.surface, companionId: body.companion_id, mode: mode?.data, carryFrom: (body.carry_from as string | null | undefined) ?? null, folderId: (body.folder_id as string | null | undefined) ?? null });
+  const result = createConversation(actor, { surface: body.surface, placement: body.placement, companionId: body.companion_id, mode: mode?.data, carryFrom: (body.carry_from as string | null | undefined) ?? null, folderId: (body.folder_id as string | null | undefined) ?? null });
   if (!result.ok) return c.json({ error: result.error }, result.status as 400 | 403 | 404);
   return c.json(result.value, 201);
 });
@@ -512,6 +517,7 @@ const PatchConversationBody = z.object({
   settings: z.unknown().optional().describe("A key-wise settings patch; null removes a key."),
   companion_id: z.unknown().optional().describe("The companion that speaks in this chat, or null for your own pick (COMPANIONS-PICK-01)."),
   folder_id: z.unknown().optional().describe("Move the chat into a project (chat folder) id, or out with null (PROJECTS-01a)."),
+  placement: z.unknown().optional().describe("Continue a side conversation in Chat."),
 });
 
 const patchConversationRoute = createRoute({
@@ -531,6 +537,11 @@ conversationsRoutes.openapi(patchConversationRoute, (c) => {
   const actor = c.get("person");
   const body = (c.req.valid("json") ?? {}) as { title?: string | null; pinned?: boolean; archived?: boolean; mode?: Conversation["mode"]; settings?: unknown; folder_id?: unknown; companion_id?: unknown };
   const id = c.req.valid("param").id;
+  if (Object.hasOwn(body, "placement")) {
+    const result = updateConversationPlacement(actor, id, (body as { placement?: unknown }).placement);
+    if (!result.ok) return c.json({ error: result.error }, result.status as 400 | 403 | 404);
+    return c.json(result.value, 200);
+  }
   if (Object.hasOwn(body, "companion_id")) {
     const picked = body.companion_id;
     if (picked !== null && typeof picked !== "string") return c.json({ error: "Choose a companion from the list." }, 400);

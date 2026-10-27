@@ -516,6 +516,7 @@ export type ConversationRow = typeof conversations.$inferSelect;
 export interface ConversationSummary {
   id: string;
   surface: string;
+  placement: "chat" | "side";
   companion_id: string | null;
   title: string | null;
   pinned: boolean;

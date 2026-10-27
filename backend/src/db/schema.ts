@@ -420,6 +420,7 @@ export const conversations = sqliteTable(
       .notNull()
       .references(() => people.id),
     surface: text("surface").notNull(),
+    placement: text("placement").notNull().default("chat"),
     mode: text("mode").notNull().default("chat"), // chat|research
     companionId: text("companion_id"),
     title: text("title"),

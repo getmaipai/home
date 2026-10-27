@@ -1,0 +1,1 @@
+ALTER TABLE `conversations` ADD `placement` text DEFAULT 'chat' NOT NULL;

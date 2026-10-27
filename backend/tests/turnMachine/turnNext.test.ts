@@ -1584,6 +1584,18 @@ describe("turnNext.ts: THIN-1A, no word cap on an adult's written chat", () => {
     expect(allMessageText(plainRequest)).not.toMatch(WORD_COUNT);
     expect(allMessageText(plainRequest)).not.toContain("sentence");
 
+    const sideConversation = createConversation(people.owner, { surface: "chat", placement: "side" });
+    if (!sideConversation.ok) throw new Error(sideConversation.error);
+    let sideRequest: ChatCompletionRequest | undefined;
+    const side = await withStub(
+      { reply: (request) => { sideRequest = request; return "A complete answer with enough detail for the person."; } },
+      () => runTurnNext(people.owner, "chat", "explain this clearly", { conversationId: sideConversation.value.id }),
+    );
+    expect(side.ok).toBe(true);
+    expect(sideRequest?.max_tokens).toBe(1536);
+    expect(allMessageText(sideRequest)).not.toMatch(WORD_COUNT);
+    expect(allMessageText(sideRequest)).not.toContain("under 140 words");
+
     const searched = await searchedTurn(people.owner, "chat");
     // The phrasing round: the ceiling again, never the plan's own word
     // budget turned into tokens (360 words -> 608 before this item).

@@ -795,15 +795,16 @@ export function isTemporaryConversation(conversationId: string): boolean {
 /** Live temporary conversations for one visible person. These sessions
  * have no database row, so their summaries come from the spec record and
  * their in-memory turn window. */
-export function listTemporaryConversations(actor: PersonRow, personId?: string): ConversationSummary[] {
+export function listTemporaryConversations(actor: PersonRow, personId?: string, placement: "chat" | "side" | "all" = "chat"): ConversationSummary[] {
   const target = personId ?? actor.id;
   if (!canAccessPerson(actor, target)) return [];
   pruneTemporarySessions(Date.now());
   return [...temporarySessions.values()]
-    .filter(({ conversation }) => conversation.person === target)
+    .filter(({ conversation }) => conversation.person === target && (placement === "all" || conversation.placement === placement))
     .map(({ conversation, turns }) => ({
       id: conversation.id,
       surface: conversation.surface,
+      placement: conversation.placement,
       companion_id: conversation.companion_id,
       title: conversation.title,
       pinned: conversation.pinned,
@@ -830,10 +831,10 @@ export function discardTemporarySessions(personId: string): number {
   return discarded;
 }
 
-function createTemporaryConversation(actor: PersonRow, surface: Surface, companionId?: string | null): Conversation {
+function createTemporaryConversation(actor: PersonRow, surface: Surface, companionId?: string | null, placement: Conversation["placement"] = "chat"): Conversation {
   pruneTemporarySessions(Date.now());
   evictOldestTemporarySessionIfFull();
-  const record = buildNewConversationRecord(actor, surface, companionId, "temporary");
+  const record = buildNewConversationRecord(actor, surface, companionId, "temporary", placement);
   temporarySessions.set(record.id, { conversation: record, turns: [], lastActivityAt: Date.now() });
   return record;
 }
@@ -1106,6 +1107,7 @@ export function toConversationRecord(row: ConversationRow): Conversation {
     person: row.personId,
     device_id: row.deviceId ?? null,
     surface: row.surface,
+    placement: row.placement as Conversation["placement"],
     mode: row.mode,
     companion_id: row.companionId,
     title: row.title,
@@ -1128,6 +1130,7 @@ function conversationToDbValues(c: Conversation) {
     personId: c.person,
     deviceId: c.device_id ?? null,
     surface: c.surface,
+    placement: c.placement,
     mode: c.mode ?? "chat",
     companionId: c.companion_id,
     title: c.title,
@@ -1148,7 +1151,7 @@ function conversationToDbValues(c: Conversation) {
  * homes it's headed for (a real DB row, or - TEMP-CHAT-01 - a
  * process-memory-only session): one definition of what "new" means,
  * shared rather than kept twice. Pure: never touches the DB. */
-function buildNewConversationRecord(actor: PersonRow, surface: Surface, companionId: string | null | undefined, mode: Conversation["mode"], deviceId: string | null = null): Conversation {
+function buildNewConversationRecord(actor: PersonRow, surface: Surface, companionId: string | null | undefined, mode: Conversation["mode"], placement: Conversation["placement"] = "chat", deviceId: string | null = null): Conversation {
   const now = new Date().toISOString();
   // Set at creation from the person's own persona pick (the contract:
   // "A conversation's companion_id is set at creation from that
@@ -1168,6 +1171,7 @@ function buildNewConversationRecord(actor: PersonRow, surface: Surface, companio
     device_id: deviceId,
     surface,
     mode,
+    placement,
     companion_id: resolvedCompanionId,
     title: null,
     pinned: false,
@@ -1181,8 +1185,8 @@ function buildNewConversationRecord(actor: PersonRow, surface: Surface, companio
   });
 }
 
-function insertNewConversation(actor: PersonRow, surface: Surface, companionId?: string | null, mode: Conversation["mode"] = "chat", deviceId: string | null = null): Conversation {
-  const record = buildNewConversationRecord(actor, surface, companionId, mode, deviceId);
+function insertNewConversation(actor: PersonRow, surface: Surface, companionId?: string | null, mode: Conversation["mode"] = "chat", placement: Conversation["placement"] = "chat", deviceId: string | null = null): Conversation {
+  const record = buildNewConversationRecord(actor, surface, companionId, mode, placement, deviceId);
   try {
     db.insert(conversations).values(conversationToDbValues(record)).run();
   } catch (err) {
@@ -1213,8 +1217,9 @@ export function resolveOrCreateConversation(
   actor: PersonRow,
   surface: Surface,
   conversationId?: string,
-  opts: { temporary?: boolean; deviceId?: string | null } = {},
+  opts: { temporary?: boolean; deviceId?: string | null; placement?: Conversation["placement"] } = {},
 ): ConversationOpResult<Conversation> {
+  const placement = opts.placement ?? "chat";
   if (conversationId) {
     // TEMP-CHAT-01: a given id is authoritative regardless of whether
     // this particular call also asked for `temporary` - once a
@@ -1275,20 +1280,20 @@ export function resolveOrCreateConversation(
     if (!canHaveTemporaryChat(actor)) {
       return { ok: false, status: 403, error: "temporary chat is not available for minors" };
     }
-    return { ok: true, value: createTemporaryConversation(actor, surface) };
+    return { ok: true, value: createTemporaryConversation(actor, surface, undefined, placement) };
   }
 
   const openOnes = db
     .select()
     .from(conversations)
-    .where(and(eq(conversations.personId, actor.id), eq(conversations.surface, surface), eq(conversations.status, "open")))
+    .where(and(eq(conversations.personId, actor.id), eq(conversations.surface, surface), eq(conversations.placement, placement), eq(conversations.status, "open")))
     .all().filter((r) => surface !== "robot" || r.deviceId === (opts.deviceId ?? null));
   if (openOnes.length > 0) {
     openOnes.sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
     return { ok: true, value: toConversationRecord(openOnes[0]!) };
   }
 
-  return { ok: true, value: insertNewConversation(actor, surface, undefined, "chat", surface === "robot" ? opts.deviceId ?? null : null) };
+  return { ok: true, value: insertNewConversation(actor, surface, undefined, "chat", placement, surface === "robot" ? opts.deviceId ?? null : null) };
 }
 
 // ==== Session C step 2: pendingAsk (Tier 2 confirmation / ask continuation) ====
@@ -1535,9 +1540,10 @@ const VALID_MODES = new Set(modeEnum.options);
 
 export function createConversation(
   actor: PersonRow,
-  opts: { surface?: Surface; companionId?: string | null; mode?: Conversation["mode"]; carryFrom?: string | null; folderId?: string | null } = {},
+  opts: { surface?: Surface; placement?: Conversation["placement"]; companionId?: string | null; mode?: Conversation["mode"]; carryFrom?: string | null; folderId?: string | null } = {},
 ): ConversationOpResult<Conversation> {
   const surface = opts.surface ?? "chat";
+  const placement = opts.placement ?? "chat";
   const mode = opts.mode ?? "chat";
   // PROJECTS-01a: a new chat may start inside one of the person's own
   // projects (chat folders). A temporary chat never joins one: it must
@@ -1568,6 +1574,8 @@ export function createConversation(
   if (!VALID_SURFACES.has(surface)) {
     return { ok: false, status: 400, error: `invalid surface: ${surface}` };
   }
+  if (placement !== "chat" && placement !== "side") return { ok: false, status: 400, error: `invalid conversation placement: ${placement}` };
+  if (placement === "side" && surface !== "chat") return { ok: false, status: 400, error: "side conversations must use the chat surface" };
   if (!VALID_MODES.has(mode)) {
     return { ok: false, status: 400, error: `invalid conversation mode: ${mode}` };
   }
@@ -1581,7 +1589,7 @@ export function createConversation(
   if (mode !== "temporary") {
     db.update(conversations)
       .set({ status: "closed", updatedAt: new Date().toISOString(), hlc: nextHlc() })
-      .where(and(eq(conversations.personId, actor.id), eq(conversations.surface, surface), eq(conversations.status, "open")))
+      .where(and(eq(conversations.personId, actor.id), eq(conversations.surface, surface), eq(conversations.placement, placement), eq(conversations.status, "open")))
       .run();
   }
   // TEMP-CHAT-01: this is the only place a real DB row was ever written
@@ -1593,7 +1601,7 @@ export function createConversation(
   // turn-level `temporary` flag uses, so there is one way to get a
   // temporary conversation, not two designs that happen to agree today
   // and drift apart later.
-  let value = mode === "temporary" ? createTemporaryConversation(actor, surface, opts.companionId) : insertNewConversation(actor, surface, opts.companionId, mode);
+  let value = mode === "temporary" ? createTemporaryConversation(actor, surface, opts.companionId, placement) : insertNewConversation(actor, surface, opts.companionId, mode, placement);
   if (carried) {
     // Seeded, never anchored: the summary covers no turn of this chat, and
     // the window carries it from the first turn (held out of that first
@@ -1636,7 +1644,7 @@ export function forkConversationAtTurn(actor: PersonRow, turnId: string): Conver
     path.unshift(row);
     row = row.parentTurnId ? db.select().from(conversationTurns).where(eq(conversationTurns.id, row.parentTurnId)).get() : undefined;
   }
-  const created = createConversation(actor, { surface: source.surface as Surface, companionId: source.companionId, mode: source.mode as Conversation["mode"] });
+  const created = createConversation(actor, { surface: source.surface as Surface, placement: source.placement as Conversation["placement"], companionId: source.companionId, mode: source.mode as Conversation["mode"] });
   if (!created.ok) return created;
   const fork = created.value;
   const ids = new Map(path.map((row) => [row.id, newConversationTurnId()]));
@@ -1691,7 +1699,7 @@ export const resumeConversation = sqlite.transaction((actor: PersonRow, id: stri
   const now = new Date().toISOString();
   db.update(conversations)
     .set({ status: "closed", updatedAt: now, hlc: nextHlc() })
-    .where(and(eq(conversations.personId, actor.id), eq(conversations.surface, row.surface), eq(conversations.status, "open")))
+    .where(and(eq(conversations.personId, actor.id), eq(conversations.surface, row.surface), eq(conversations.placement, row.placement), eq(conversations.status, "open")))
     .run();
   const updated = db.update(conversations)
     .set({ status: "open", pendingAsk: null, updatedAt: now, hlc: nextHlc() })
@@ -1703,6 +1711,7 @@ function toConversationSummary(row: ConversationRow, turnCount: number, lastTurn
   return {
     id: row.id,
     surface: row.surface,
+    placement: row.placement as ConversationSummary["placement"],
     companion_id: row.companionId,
     title: row.title,
     pinned: row.pinned,
@@ -1746,18 +1755,19 @@ export function matchQueryFor(query: string): string | null {
 /** CONV-ARCHIVE-01: which shelved chats a listing carries. `exclude` (the
  * default, so every older caller is unchanged) hides them, `only` is the
  * archive view, `include` returns both with `archived` set on each row. */
-export interface ListConversationsOptions { archived?: "exclude" | "include" | "only" }
+export interface ListConversationsOptions { archived?: "exclude" | "include" | "only"; placement?: "chat" | "side" | "all" }
 
 export function listConversations(actor: PersonRow, personId?: string, query?: string, options: ListConversationsOptions = {}): ConversationSummary[] {
   const target = personId ?? actor.id;
   if (!canAccessPerson(actor, target)) return [];
   const archivedMode = options.archived ?? "exclude";
+  const placementMode = options.placement ?? "chat";
   let rows = db
     .select()
     .from(conversations)
     .where(and(eq(conversations.personId, target), not(eq(conversations.status, "deleted")), not(eq(conversations.mode, "temporary"))))
     .all()
-    .filter((row) => archivedMode === "include" || row.archived === (archivedMode === "only"));
+    .filter((row) => (placementMode === "all" || row.placement === placementMode) && (archivedMode === "include" || row.archived === (archivedMode === "only")));
   const normalizedQuery = query?.trim() ?? "";
   if (normalizedQuery) {
     // `%`/`_` are LIKE wildcards (a bare backslash isn't, without an
@@ -1773,6 +1783,7 @@ export function listConversations(actor: PersonRow, personId?: string, query?: s
       .where(
         and(
           eq(conversations.personId, target),
+          ...(placementMode === "all" ? [] : [eq(conversations.placement, placementMode)]),
           not(eq(conversations.status, "deleted")),
           not(eq(conversations.mode, "temporary")),
           sql`${conversations.title} LIKE ${pattern} ESCAPE '\\'`,
@@ -2137,6 +2148,32 @@ export function updateConversationTitle(actor: PersonRow, id: string, title: str
   // Clearing the title hands it back: it is re-filled at once, never left on the default.
   const refilled = renamed && nextTitle === null ? ensureProvisionalTitle(id) : null;
   return { ok: true, value: refilled ? { ...parsed.data, title: refilled } : parsed.data };
+}
+
+/** Move an owned side conversation into Chat. Placement never participates in a turn gate. */
+export function updateConversationPlacement(actor: PersonRow, id: string, placement: unknown): ConversationOpResult<Conversation> {
+  if (placement !== "chat" && placement !== "side") return { ok: false, status: 400, error: "placement must be chat or side" };
+  const found = getConversation(actor, id);
+  if (!found.ok) return found;
+  if (found.value.person !== actor.id) return { ok: false, status: 404, error: "conversation not found" };
+  if (placement === "side") return { ok: false, status: 400, error: "To start a side chat, open the companion pane and start a new chat." };
+  if (found.value.placement === "chat") return found;
+  const temporary = temporarySessions.get(id);
+  if (temporary) {
+    temporary.conversation = { ...temporary.conversation, placement: "chat", updated_at: new Date().toISOString(), hlc: nextHlc() };
+    return { ok: true, value: temporary.conversation };
+  }
+  const now = new Date().toISOString();
+  const hlc = nextHlc();
+  sqlite.transaction(() => {
+    db.update(conversations)
+      .set({ status: "closed", updatedAt: now, hlc })
+      .where(and(eq(conversations.personId, actor.id), eq(conversations.surface, found.value.surface), eq(conversations.placement, "chat"), eq(conversations.status, "open")))
+      .run();
+    db.update(conversations).set({ placement: "chat", updatedAt: now, hlc }).where(eq(conversations.id, id)).run();
+  })();
+  const updated = db.select().from(conversations).where(eq(conversations.id, id)).get()!;
+  return { ok: true, value: toConversationRecord(updated) };
 }
 
 /** CONV-ARCHIVE-01: shelve or restore a chat. Same access rule as a rename. Leaves updated_at
