@@ -82,8 +82,8 @@ describe("fetchFaviconBytes", () => {
     expect(result).toEqual({ kind: "confirmed_absent" });
   });
 
-  test("a body over the 64 KB cap is rejected as confirmed-absent", async () => {
-    const fetchFn = async () => pngResponse(64 * 1024 + 1);
+  test("a body over the 192 KB cap is rejected as confirmed-absent", async () => {
+    const fetchFn = async () => pngResponse(192 * 1024 + 1);
     const result = await fetchFaviconBytes("example.com", fetchFn);
     expect(result).toEqual({ kind: "confirmed_absent" });
   });
@@ -159,7 +159,7 @@ describe("getFavicon", () => {
     // The first call tries both candidates (favicon.ico, then
     // apple-touch-icon.png) before giving up; the second call is a
     // cache hit and makes no network call at all.
-    expect(calls).toBe(2);
+    expect(calls).toBe(3); // favicon.ico, apple-touch-icon.png, then the home page
   });
 
   test("a network failure (timeout, DNS) is never cached - the next call retries for real", async () => {
@@ -174,7 +174,7 @@ describe("getFavicon", () => {
     expect(second.found).toBe(false);
     // Both calls hit the network for real (2 candidates each) - unlike
     // the confirmed-absence case above, nothing here was ever cached.
-    expect(calls).toBe(4);
+    expect(calls).toBe(6);
     expect(__getFaviconEntryForTests("flaky.example.com")).toBeUndefined();
   });
 });

@@ -15,7 +15,7 @@ export const faviconsDir = resolve(dataDir, "favicons");
 const indexPath = (): string => join(faviconsDir, "index.json");
 
 const FETCH_TIMEOUT_MS = 10_000;
-const MAX_ICON_BYTES = 64 * 1024; // 64 KB per icon
+const MAX_ICON_BYTES = 192 * 1024; // 192 KB per icon (a 180 pixel touch icon runs larger than a .ico)
 const MAX_TOTAL_BYTES = 20 * 1024 * 1024; // 20 MB across the whole cache
 const UNUSED_EXPIRY_MS = 30 * 24 * 60 * 60 * 1000; // 30 days unused
 
@@ -24,6 +24,27 @@ const UNUSED_EXPIRY_MS = 30 * 24 * 60 * 60 * 1000; // 30 days unused
 // under this name) - the same two-rung ladder the c-99f4 brief named,
 // nothing else tried beyond it.
 const CANDIDATE_PATHS = ["/favicon.ico", "/apple-touch-icon.png"];
+
+const MAX_HOMEPAGE_BYTES = 256 * 1024;
+
+/** The icon addresses a home page declares (`<link rel="icon" | "apple-touch-icon">`), largest declared size first. A site that serves
+ * nothing at the two fixed paths (many do not) usually names its icon here. */
+export function iconLinksOf(html: string, baseUrl: string): string[] {
+  const found: Array<{ href: string; size: number }> = [];
+  for (const tag of html.match(/<link\b[^>]*>/gi) ?? []) {
+    const rel = /\brel\s*=\s*["']([^"']*)["']/i.exec(tag)?.[1]?.toLowerCase() ?? "";
+    if (!/\b(?:icon|apple-touch-icon(?:-precomposed)?)\b/.test(rel)) continue;
+    const href = /\bhref\s*=\s*["']([^"']+)["']/i.exec(tag)?.[1];
+    if (!href) continue;
+    const sizes = /\bsizes\s*=\s*["'](\d+)x\d+/i.exec(tag)?.[1];
+    const size = sizes ? Number(sizes) : rel.includes("apple-touch") ? 180 : 16;
+    try {
+      const url = new URL(href.replace(/&amp;/g, "&"), baseUrl);
+      if (url.protocol === "https:") found.push({ href: url.toString(), size });
+    } catch { /* a malformed address is skipped */ }
+  }
+  return found.sort((a, b) => b.size - a.size).map((entry) => entry.href).slice(0, 4);
+}
 
 const EXT_BY_CONTENT_TYPE: Record<string, string> = {
   "image/x-icon": "ico",
@@ -89,6 +110,8 @@ interface IndexEntry {
   contentType: string | null;
   bytes: number;
   lastUsedAt: string;
+  /** 2 once the home page's own icon links were tried: an older "no icon" entry is asked again. */
+  v?: number;
 }
 
 type FaviconIndex = Record<string, IndexEntry>;
@@ -167,45 +190,51 @@ export type FaviconFetchOutcome =
  * then `/apple-touch-icon.png`, 10s timeout per attempt, only an
  * `image/*` content type accepted, capped at `MAX_ICON_BYTES`. Never
  * thrown - a site with no favicon is the ordinary case, not an error. */
-export async function fetchFaviconBytes(host: string, fetchFn?: FaviconFetchFn): Promise<FaviconFetchOutcome> {
+export async function fetchFaviconBytes(host: string, fetchFn?: FaviconFetchFn, prefer: "small" | "large" = "small"): Promise<FaviconFetchOutcome> {
   let sawDefiniteAnswer = false;
-  for (const path of CANDIDATE_PATHS) {
+  const get = (url: string, signal: AbortSignal) => fetchFn
+    ? fetchFn(url, { signal })
+    : guardedFetch(url, { signal, redirect: "follow", maxRedirects: 3 });
+  const tryIcon = async (url: string): Promise<FaviconFetchOutcome | null> => {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
     try {
-      const url = `https://${host}${path}`;
-      const response = fetchFn
-        ? await fetchFn(url, { signal: controller.signal })
-        : await guardedFetch(url, { signal: controller.signal, redirect: "follow", maxRedirects: 3 });
+      const response = await get(url, controller.signal);
       if (!response.ok) {
-        // 404/410 (packageHost.ts's own identical "not found, not
-        // unreachable" line): the server positively confirmed this path
-        // doesn't exist, a real fact about the site. Any other non-ok
-        // status (5xx, 429, 403, ...) is the server itself in trouble,
-        // not a fact about whether an icon exists - left unmarked, the
-        // same as a thrown network error.
+        // 404/410 (packageHost.ts's own identical "not found, not unreachable" line): the server positively confirmed this path
+        // doesn't exist, a real fact about the site. Any other non-ok status is the server in trouble, not a fact about the icon.
         if (response.status === 404 || response.status === 410) sawDefiniteAnswer = true;
-        continue;
+        return null;
       }
       const contentType = (response.headers.get("content-type") ?? "").split(";")[0]!.trim().toLowerCase();
-      if (!contentType.startsWith("image/")) {
-        sawDefiniteAnswer = true; // the full header set arrived; the content type itself is the definitive fact, no body read needed
-        continue;
-      }
+      if (!contentType.startsWith("image/")) { sawDefiniteAnswer = true; return null; }
       const bytes = await readCapped(response, MAX_ICON_BYTES);
-      if (!bytes) {
-        // readCapped returns null only for its own deliberate size-cap
-        // decision (an oversized body IS a definitive fact) - a genuine
-        // mid-read connection drop throws instead and lands in the catch
-        // below, never here, so this marker stays accurate either way.
-        sawDefiniteAnswer = true;
-        continue;
-      }
+      // readCapped returns null only for its own deliberate size-cap decision (a definitive fact); a dropped connection throws.
+      if (!bytes) { sawDefiniteAnswer = true; return null; }
       return { kind: "found", bytes, contentType };
     } catch {
-      continue; // a timeout, DNS failure, TLS error, or dropped connection - try the next candidate
+      return null; // a timeout, DNS failure, TLS error, or dropped connection - try the next candidate
     } finally {
       clearTimeout(timer);
+    }
+  };
+  const homepageLinks = async (): Promise<string[]> => {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
+    try {
+      const response = await get(`https://${host}/`, controller.signal);
+      if (!response.ok || !(response.headers.get("content-type") ?? "").toLowerCase().includes("html")) return [];
+      const bytes = await readCapped(response, MAX_HOMEPAGE_BYTES);
+      return bytes ? iconLinksOf(new TextDecoder().decode(bytes), `https://${host}/`) : [];
+    } catch { return []; } finally { clearTimeout(timer); }
+  };
+  const fixed = async (): Promise<string[]> => CANDIDATE_PATHS.map((path) => `https://${host}${path}`);
+  // Small: the two fixed paths, then what the home page declares. Large (a card's stand-in picture): the declared icons first, largest first.
+  const rungs = prefer === "large" ? [homepageLinks, async () => [`https://${host}/apple-touch-icon.png`, `https://${host}/favicon.ico`]] : [fixed, homepageLinks];
+  for (const rung of rungs) {
+    for (const url of await rung()) {
+      const icon = await tryIcon(url);
+      if (icon) return icon;
     }
   }
   return sawDefiniteAnswer ? { kind: "confirmed_absent" } : { kind: "network_failure" };
@@ -217,25 +246,26 @@ export type FaviconResult = { found: true; bytes: Uint8Array; contentType: strin
  * never touches the network; a miss fetches once, writes the result
  * (including a confirmed absence) to the cache, and sweeps the cache if
  * that write pushed it over budget. */
-export async function getFavicon(host: string, fetchFn?: FaviconFetchFn, now: Date = new Date()): Promise<FaviconResult> {
+export async function getFavicon(host: string, fetchFn?: FaviconFetchFn, now: Date = new Date(), prefer: "small" | "large" = "small"): Promise<FaviconResult> {
   const index = readIndex();
-  const cached = index[host];
-  if (cached) {
+  const key = prefer === "large" ? `hq.${host}` : host;
+  const cached = index[key];
+  if (cached && !(cached.ext === null && cached.v !== 2)) {
     cached.lastUsedAt = now.toISOString();
     writeIndex(index);
     if (cached.ext === null || cached.contentType === null) return { found: false };
-    const path = filePath(host, cached.ext);
+    const path = filePath(key, cached.ext);
     if (!existsSync(path)) {
       // The index says there should be a file and there isn't (a manual
       // clear, a partial write) - treat it as a fresh miss below rather
       // than serving a 500 for a cache-consistency bug.
-      delete index[host];
+      delete index[key];
     } else {
       return { found: true, bytes: readFileSync(path), contentType: cached.contentType };
     }
   }
 
-  const outcome = await fetchFaviconBytes(host, fetchFn ?? testFetch ?? undefined);
+  const outcome = await fetchFaviconBytes(host, fetchFn ?? testFetch ?? undefined, prefer);
   if (outcome.kind === "network_failure") {
     // Not cached: a transient failure on the hub's own side is never a
     // fact about the site worth remembering for 30 days - the next
@@ -244,15 +274,15 @@ export async function getFavicon(host: string, fetchFn?: FaviconFetchFn, now: Da
     return { found: false };
   }
   if (outcome.kind === "confirmed_absent") {
-    index[host] = { ext: null, contentType: null, bytes: 0, lastUsedAt: now.toISOString() };
+    index[key] = { ext: null, contentType: null, bytes: 0, lastUsedAt: now.toISOString(), v: 2 };
     writeIndex(index);
     return { found: false };
   }
 
   const ext = EXT_BY_CONTENT_TYPE[outcome.contentType] ?? "img";
   ensureDataDir(faviconsDir);
-  writeFileSync(filePath(host, ext), outcome.bytes);
-  index[host] = { ext, contentType: outcome.contentType, bytes: outcome.bytes.byteLength, lastUsedAt: now.toISOString() };
+  writeFileSync(filePath(key, ext), outcome.bytes);
+  index[key] = { ext, contentType: outcome.contentType, bytes: outcome.bytes.byteLength, lastUsedAt: now.toISOString(), v: 2 };
   writeIndex(index);
   sweepFavicons(now);
   return { found: true, bytes: outcome.bytes, contentType: outcome.contentType };

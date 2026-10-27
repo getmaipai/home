@@ -14,7 +14,8 @@ import { channelData, householdTodayData, mixData, savedRows, sourceRows, storyD
 import { recentRows, searchData } from "@/lib/news/search";
 import { releasedItem } from "@/lib/news/cards";
 import { bumpNewsCounter } from "@/lib/news/newsCounters";
-import { NEWS_PICTURE_WIDTHS, newsFigurePicture, newsPicture, type NewsPictureWidth } from "@/lib/news/pictures";
+import { NEWS_PICTURE_WIDTHS, newsFigurePicture, newsImagesOn, newsPicture, type NewsPictureWidth } from "@/lib/news/pictures";
+import { publisherIconPicture } from "@/lib/news/pictureFallback";
 import { figureAddressesOf } from "@/lib/news/article";
 
 export const newsRoutes = new Hono<AppEnv>();
@@ -104,10 +105,11 @@ newsRoutes.get("/images/:item", requireAuth, async (c) => {
   // The item must be one this person's band is released: a guessed id is a 404, never a fetch.
   const item = releasedItem(viewerOf(person), c.req.param("item"));
   if (!item) return c.json({ error: "no such picture" }, 404);
-  const picture = await newsPicture(item, width as NewsPictureWidth, viewerOf(person).band);
+  const own = await newsPicture(item, width as NewsPictureWidth, viewerOf(person).band);
+  const picture = own ?? (newsImagesOn() ? await publisherIconPicture(item, width as NewsPictureWidth) : null);
   if (!picture) return c.json({ error: "no such picture" }, 404);
   c.header("Content-Type", "image/webp");
-  c.header("Cache-Control", "private, max-age=86400");
+  c.header("Cache-Control", own ? "private, max-age=86400" : "private, max-age=3600");
   c.header("ETag", picture.etag);
   c.header("X-Content-Type-Options", "nosniff");
   c.header("Content-Security-Policy", "default-src 'none'");

@@ -243,21 +243,22 @@ async function gateRoute(actor: PersonRow, prompt: string): Promise<{ status: 40
 
 const anotherRoute = createRoute({
   method: "post", path: "/jobs/{id}/another", tags: ["Videos"], summary: "Make another clip from the same words with a new seed (also Try again after a failed or stopped one, and Make it Detailed or Quick)", middleware: [requireAuth] as const,
-  request: { params: idParams, body: { required: false, content: { "application/json": { schema: z.object({ quality: z.enum(["quick", "detailed"]).optional().describe("Make it again as this kind. Left out, the video keeps its own kind.") }) } } } },
+  request: { params: idParams, body: { required: false, content: { "application/json": { schema: z.object({ quality: z.enum(["quick", "detailed"]).optional().describe("Make it again as this kind. Left out, the video keeps its own kind."), prompt: z.string().trim().min(1).max(2000).optional().describe("Remix: new words describing the changes. Left out, the clip is made again from its own words.") }) } } } },
   responses: { 200: { content: { "application/json": { schema: CardSchema } }, description: "The card, with a new clip queued." }, ...refusals },
 });
 videosRoutes.openapi(anotherRoute, async (c) => {
   const actor = c.get("person");
   const source = getVideoJobFor(actor, c.req.valid("param").id);
   if (!source || source.state === "queued" || source.state === "running") return c.json({ error: "That video isn't available any more. Ask for it again." }, 404) as never;
-  const blocked = await gateRoute(actor, source.prompt);
+  const asked = (await c.req.json().catch(() => ({}))) as { quality?: unknown; prompt?: unknown };
+  const words = typeof asked.prompt === "string" && asked.prompt.trim() ? asked.prompt.trim().slice(0, 2000) : source.prompt;
+  const blocked = await gateRoute(actor, words);
   if (blocked) return c.json(blocked.body, blocked.status) as never;
   if (!source.conversationId) return c.json({ error: "That video isn't available any more." }, 404) as never;
   if (source.turnId && videoJobsForTurn(actor, source.turnId).length >= MAX_CLIPS_PER_CARD) return c.json({ error: "That chat already has eight videos from this request. Ask for a new one in a new message.", code: "too_many" }, 422) as never;
   const audience = videoRouteAudience(actor);
   const adapters = await videoAdaptersFor(videoAdapterAudiencesFor(audience));
   // VIDEO-LTX-01: Quick or Detailed again. Left out, the video keeps its own kind; a style made for one model decides.
-  const asked = (await c.req.json().catch(() => ({}))) as { quality?: unknown };
   const engine = await videoEngineStatus();
   const used = source.request.loras.flatMap((id) => { const found = adapters.find((a) => a.id === id); return found ? [found] : []; });
   const choice = chooseVideoQuality({ requested: isVideoQuality(asked.quality) ? asked.quality : source.request.quality ?? "quick", style: used[0] ?? null, seconds: source.request.seconds, engine, hasPicture: source.request.source_file_id !== null, quickOnly: laneOf(audience) !== "adult" });
@@ -265,17 +266,17 @@ videosRoutes.openapi(anotherRoute, async (c) => {
   const size = VIDEO_SIZES_BY_QUALITY[choice.quality][portrait ? "portrait" : "landscape"];
   // Only LoRAs this person may still use ride along; one turned off since is dropped.
   const prep = await prepareVideoRerun({
-    actor, audience, conversationId: source.conversationId, temporary: source.temporary, prompt: source.prompt, sourceFileId: source.request.source_file_id,
+    actor, audience, conversationId: source.conversationId, temporary: source.temporary, prompt: words, sourceFileId: source.request.source_file_id,
     adapters, styleIds: source.request.loras,
   });
   if (!prep.ok) return c.json({ error: prep.line, code: prep.code }, 422) as never;
-  const slot = laneOf(audience) === "child" ? reserveKid(actor, "video", 1, source.prompt) : null;
+  const slot = laneOf(audience) === "child" ? reserveKid(actor, "video", 1, words) : null;
   if (laneOf(audience) === "child" && !slot) return c.json({ error: CHILD_VIDEO_LIMIT_LINE, code: "daily_limit" }, 422) as never;
   try {
     const started = await startVideoJob({
-      actor, conversationId: source.conversationId, turnId: source.turnId, temporary: source.temporary, kind: source.kind, prompt: source.prompt, sourceFileId: source.request.source_file_id,
+      actor, conversationId: source.conversationId, turnId: source.turnId, temporary: source.temporary, kind: source.kind, prompt: words, sourceFileId: source.request.source_file_id,
       body: {
-        prompt: laneOf(audience) === "child" ? forceCartoon(source.prompt) : source.prompt, size, seconds: laneOf(audience) === "child" ? Math.min(choice.seconds, 3) : choice.seconds, ...(choice.quality === "detailed" ? { model: "detailed" as const } : {}), audience: stackAudienceFor(audience),
+        prompt: laneOf(audience) === "child" ? forceCartoon(words) : words, size, seconds: laneOf(audience) === "child" ? Math.min(choice.seconds, 3) : choice.seconds, ...(choice.quality === "detailed" ? { model: "detailed" as const } : {}), audience: stackAudienceFor(audience),
         ...(laneOf(audience) === "adult" ? {} : { model: videoModelForLane(laneOf(audience)) }),
         ...(laneOf(audience) === "child" ? { negative_prompt: CHILD_NEGATIVE_PROMPT } : {}),
         ...(prep.image ? { image: prep.image, image_source: prep.imageSource ?? "generated" } : {}),

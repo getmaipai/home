@@ -37,6 +37,7 @@ import { redactCredentials, CREDENTIAL_REDACTION, CREDENTIAL_SAFE_MESSAGE } from
 import { withoutBankLines, bankLineNote, bankLinesOf, splitIntoSentences } from "@/lib/guards";
 import { archiveByProvenance } from "@/lib/memory";
 import { deleteAttachmentsForTurns } from "@/lib/attachments";
+import { trashFile } from "@/lib/libraryTrash";
 import { checkFolderFor } from "@/lib/chatFolders";
 import { db, sqlite } from "@/db";
 import { conversationTurns, conversations, people, memoryRecords, commands, openQuestions, relationships } from "@/db/schema";
@@ -2297,9 +2298,20 @@ export function updateConversationSettings(actor: PersonRow, id: string, patch: 
  * under the tombstone. The turns themselves - the real transcript - are
  * a genuine hard delete. Memories the turns produced are untouched: they
  * carry the turn id as provenance and outlive the chat by design. */
-export function deleteConversationById(actor: PersonRow, id: string): ConversationOpResult<true> {
+/** The caller's own pictures and videos that belong to this chat and are still in the Library (edit versions and posters travel with their parent). */
+export function chatMediaFiles(actor: PersonRow, conversationId: string): Array<{ id: string; kind: "image" | "video" }> {
+  const rows = sqlite.query<{ id: string; media_type: string; provenance: string }, string[]>(
+    `SELECT id, media_type, provenance FROM attachments WHERE conversation_id = ? AND owner_person_id = ? AND deleted_at IS NULL AND origin != 'fetched'
+       AND (media_type LIKE 'image/%' OR media_type LIKE 'video/%') AND provenance NOT LIKE 'image-edit:%' AND provenance NOT LIKE 'video-poster:%'`,
+  ).all(conversationId, actor.id);
+  return rows.map((r) => ({ id: r.id, kind: r.media_type.startsWith("video/") ? "video" as const : "image" as const }));
+}
+
+export function deleteConversationById(actor: PersonRow, id: string, opts: { media?: boolean } = {}): ConversationOpResult<true> {
   const found = getConversation(actor, id);
   if (!found.ok) return found;
+  // The person chose to take the chat's pictures and videos along: they go to Library Trash (30 days), not straight to gone.
+  if (opts.media) for (const file of chatMediaFiles(actor, id)) trashFile(actor, file.id);
   deleteMusicJobsForConversation(id);
   const turns = db.select({ id: conversationTurns.id }).from(conversationTurns).where(eq(conversationTurns.conversationId, id)).all();
   deleteAttachmentsForTurns(turns.map((t) => t.id));
@@ -2321,10 +2333,10 @@ export function deleteConversationById(actor: PersonRow, id: string): Conversati
  * (docs/UI.md, 2026-09-05). Each id goes through the identical single
  * access-checked delete above; one denied or missing id doesn't fail the
  * whole batch, it just doesn't count. */
-export function batchDeleteConversations(actor: PersonRow, ids: string[]): { deleted: number } {
+export function batchDeleteConversations(actor: PersonRow, ids: string[], opts: { media?: boolean } = {}): { deleted: number } {
   let deleted = 0;
   for (const id of ids) {
-    if (deleteConversationById(actor, id).ok) deleted++;
+    if (deleteConversationById(actor, id, opts).ok) deleted++;
   }
   return { deleted };
 }

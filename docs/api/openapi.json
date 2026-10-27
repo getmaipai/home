@@ -52690,6 +52690,12 @@
                       "detailed"
                     ],
                     "description": "Make it again as this kind. Left out, the picture keeps its own kind."
+                  },
+                  "prompt": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 2000,
+                    "description": "Remix: new words describing the changes. Left out, the picture is made again from its own words."
                   }
                 }
               }
@@ -53771,6 +53777,12 @@
                       "detailed"
                     ],
                     "description": "Make it again as this kind. Left out, the video keeps its own kind."
+                  },
+                  "prompt": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 2000,
+                    "description": "Remix: new words describing the changes. Left out, the clip is made again from its own words."
                   }
                 }
               }
@@ -70497,6 +70509,10 @@
                           },
                           "can_purge": {
                             "type": "boolean"
+                          },
+                          "thumb_url": {
+                            "type": "string",
+                            "nullable": true
                           }
                         },
                         "required": [
@@ -70524,6 +70540,56 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/trash/file/{id}/thumb": {
+      "get": {
+        "tags": [
+          "Trash"
+        ],
+        "summary": "A small preview of one of my own trashed files",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "A preview up to 320 pixels.",
+            "content": {
+              "image/webp": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Sign in to see your trash.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not in your Trash, or no preview.",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "string"
                 }
               }
             }

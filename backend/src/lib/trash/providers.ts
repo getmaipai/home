@@ -101,7 +101,7 @@ registerTrashProvider({
 // restores or purges them; the household Trash page and the Library's Trash section read this one provider.
 registerTrashProvider({
   kind: "file", label: "Library files",
-  list: (person) => listTrashedFiles(person).map((row) => ({ kind: "file", id: row.id, title: row.title, deleted_at: row.deleted_at, trash_until: row.trash_until, can_restore: row.can_restore, can_purge: true })),
+  list: (person) => listTrashedFiles(person).map((row) => ({ kind: "file", id: row.id, title: row.title, deleted_at: row.deleted_at, trash_until: row.trash_until, can_restore: row.can_restore, can_purge: true, thumb_url: row.thumb_url })),
   restore: (person, id) => restoreFile(person, id),
   purge: (person, id) => purgeTrashedFile(person, id),
   purgeExpired: (now) => { purgeExpiredFiles(now); },

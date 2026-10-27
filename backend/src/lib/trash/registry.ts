@@ -8,6 +8,7 @@ export interface TrashRow {
   trash_until: string | null;
   can_restore: boolean;
   can_purge: boolean;
+  thumb_url?: string | null;
 }
 export interface TrashProvider {
   kind: string;

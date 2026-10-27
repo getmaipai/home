@@ -11,6 +11,7 @@ import { gateFor, type Gate } from "./childGate";
 import { newsImagesOn } from "./pictures";
 import { enrichItem, enrichmentFresh } from "./enrich";
 import { topicOfferedTo } from "./topics";
+import { plainSummary } from "./text";
 
 export interface StoryCard {
   story_id: string;
@@ -98,7 +99,8 @@ export function pictureAlt(title: string, publisher: string): string {
 }
 
 export function imageOf(item: ShelfItem, title: string, publisher: string, env: CardEnv): StoryCard["image"] | undefined {
-  if (!env.imagesOn || (!item.image_url && env.store.getEnrichment(item.id, env.viewer.band)?.status === "none")) return undefined;
+  // A story with no picture of its own still gets one: the picture route stands the publisher's icon in (pictureFallback.ts).
+  if (!env.imagesOn) return undefined;
   return { w480: `/api/plugins/news/images/${item.id}?w=480`, w1280: `/api/plugins/news/images/${item.id}?w=1280`, alt: pictureAlt(title, publisher) };
 }
 
@@ -121,7 +123,7 @@ export function cardOf(item: ShelfItem, env: CardEnv): StoryCard | null {
   if (!publisher) return null;
   const title = band === "child" ? env.gate.text(item.title) : item.title;
   if (!title || (band === "child" && !env.gate.passes(publisher))) return null;
-  const description = item.summary.trim() || env.store.getEnrichment(item.id, band)?.description || "";
+  const description = plainSummary(item.summary) || plainSummary(env.store.getEnrichment(item.id, band)?.description ?? "");
   const dekText = band === "child" ? env.gate.text(description) : description;
   const dek = dekText ? clampDek(dekText) : "";
   const image = imageOf(item, title, publisher, env);

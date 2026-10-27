@@ -68,6 +68,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `frontend/src/apps/chat/chatCitationLink.tsx` | ChatCitationLink |
 | `frontend/src/apps/chat/chatConnectionBanner.tsx` | ChatConnectionBanner |
 | `frontend/src/apps/chat/chatDateDivider.tsx` | DATE_DIVIDER_GAP_MS, needsDateDivider, dateDividerLabel, ChatDateDivider |
+| `frontend/src/apps/chat/chatDeleteMedia.tsx` | askDeleteMedia, describeMedia, useDeleteMediaAsk |
 | `frontend/src/apps/chat/chatErrorSlot.tsx` | __resetAutoRetriedForTests, RESTARTED_LINE, ChatMessageError |
 | `frontend/src/apps/chat/chatHeaderBar.tsx` | ChatHeaderBar |
 | `frontend/src/apps/chat/chatHeaderData.tsx` | ChatHeaderDataProvider, useChatHeaderData, useSetChatHeaderData |
@@ -362,10 +363,10 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/faceModelPins.ts` | SFACE_MODEL_ID, SFACE_SHA256, SFACE_DIM |
 | `backend/src/lib/factoryReset.ts` | FACTORY_RESET_CONFIRMATION_PHRASE, stageFactoryReset, pendingFactoryReset, cancelPendingFactoryReset, applyPendingFactoryReset |
 | `backend/src/lib/failureCopy.ts` | VOICE_FAILURE_COPY, voiceFailureLine, FAILURE_COPY, composerNotice, adminPauseLine, stackRefusalKind |
-| `backend/src/lib/favicons.ts` | faviconsDir, __setFaviconDnsLookupForTests, __setFaviconFetchForTests, validateFaviconHost, fetchFaviconBytes, getFavicon |
+| `backend/src/lib/favicons.ts` | faviconsDir, iconLinksOf, __setFaviconDnsLookupForTests, __setFaviconFetchForTests, validateFaviconHost, fetchFaviconBytes |
 | `backend/src/lib/fileBlobs.ts` | digestOfFile, reclaimQueuedBlobs, reclaimQueuedBlobsInBackground |
 | `backend/src/lib/fileContent.ts` | FILE_REFERENCE_KINDS, contentFor, ensureContent, expectedReferences, syncFileReferences, syncAllFileReferences |
-| `backend/src/lib/fileThumbnails.ts` | thumbnailsDir, previewStats, clearPreviews, fileThumbnail |
+| `backend/src/lib/fileThumbnails.ts` | thumbnailsDir, previewStats, clearPreviews, fileThumbnail, trashedFileThumbnail |
 | `backend/src/lib/fitWording.ts` | fitWording, fitUnavailableWording, fitNoStackWording, fitNotFoundWording |
 | `backend/src/lib/folderBrowse.ts` | refusedReason, resolveFolder, listFolder, validateFolderName, createFolder, validateProposedPath |
 | `backend/src/lib/followUpSuggestions.ts` | canGenerateFollowUpSuggestions, generateFollowUpSuggestions |
@@ -512,6 +513,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/news/hostBackoff.ts` | NEWS_HOST_BACKOFF_MS, newsHostQuiet, quietNewsHost, __resetNewsHostBackoffForTests |
 | `backend/src/lib/news/mixAffinity.ts` | computeAffinity |
 | `backend/src/lib/news/newsCounters.ts` | NEWS_COUNTER_NAMES, bumpNewsCounter, newsCounters, __resetNewsCountersForTests |
+| `backend/src/lib/news/pictureFallback.ts` | publisherIconPicture |
 | `backend/src/lib/news/pictures.ts` | NEWS_PICTURE_WIDTHS, newsPictureDir, pictureRefOf, figureRefOf, newsImagesOn, newsImageCacheBytes |
 | `backend/src/lib/news/prefetch.ts` | prefetchNewsText |
 | `backend/src/lib/news/prefetchBudget.ts` | PREFETCH_SCHEMA, prefetchBudget |
@@ -520,6 +522,8 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/news/records.ts` | defaultTopicsFor, followedChannels, isFollowing, setFollow, resetMix, interestRowsOf |
 | `backend/src/lib/news/search.ts` | SEARCH_ALL, SEARCH_SAVED, SEARCH_TODAY, searchData, recentRows |
 | `backend/src/lib/news/summary.ts` | SUMMARY_SOURCE_NOTE, __setNewsSummaryModelForTests, summaryArticleText, summarizeStory, runNewsSummaryTick |
+| `backend/src/lib/news/tail.ts` | trimArticleTail |
+| `backend/src/lib/news/text.ts` | decodeEntities, plainSummary |
 | `backend/src/lib/news/topicTagger.ts` | TOPIC_OVERRIDE_MARGIN, cosine, chooseTopic, __resetTopicTaggerForTests, classifyPendingTopics |
 | `backend/src/lib/news/topics.ts` | TOPICS, topicsFor, topicById, topicOfferedTo |
 | `backend/src/lib/newsMinorFloor.ts` | NEWS_NONE_FOR_MINOR_TEXT, NEWS_NONE_FOR_TEEN_TEXT, applyNewsMinorFloor |

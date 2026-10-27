@@ -7,7 +7,11 @@ import { toast } from "sonner";
 import { createChatHistoryAdapter } from "@/apps/chat/chatHistoryAdapter";
 import { discardDraft } from "@/apps/chat/draftStore";
 import { api } from "@/lib/api";
+import { askDeleteMedia } from "@/apps/chat/chatDeleteMedia";
 import type { Conversation } from "@maipai/spec/gen/ts/conversation.js";
+
+/** The person backed out of the delete dialog: callers treat it as "nothing happened". */
+export class DeleteCancelled extends Error {}
 
 export interface ChatThreadListOptions {
   /** getmaipai/home#206: told when a saved chat could not be opened, so the
@@ -188,7 +192,13 @@ export function createChatThreadListAdapter(selfName: string, options: ChatThrea
         throw error;
       }
     },
-    async delete(remoteId) { await api.deleteConversation(remoteId); },
+    async delete(remoteId) {
+      // A chat that made pictures or videos asks whether they go too; a failed count never blocks the delete.
+      const count = await api.conversationMediaCount(remoteId).catch(() => ({ images: 0, videos: 0 }));
+      const choice = count.images + count.videos > 0 ? await askDeleteMedia(count) : "keep";
+      if (choice === "cancel") throw new DeleteCancelled();
+      await api.deleteConversation(remoteId, { media: choice === "delete" });
+    },
     async initialize(threadId) {
       // Issue #163 / the persistence-boundary design (docs/plans/
       // privacy-mode-2026-09-24.md, 2026-09-26): this used to mint a

@@ -18,6 +18,8 @@ import { hostOf, imageOf, publishedAtOf, publisherOf, storyIdOf, topicsShown, ty
 import { bumpNewsCounter } from "./newsCounters";
 import { topicById } from "./topics";
 import { newsImagesOn } from "./pictures";
+import { plainSummary } from "./text";
+import { trimArticleTail } from "./tail";
 
 const NEWS_TTL_MS = 24 * 60 * 60 * 1000;
 // "Failures remembered 30 minutes" is contentQuality's rule (NEWS-02b); the memory is keyed by the item's address.
@@ -122,7 +124,7 @@ export function readingSeconds(blocks: readonly ArticleBlock[]): number {
 }
 
 function teaserOf(item: ShelfItem): ArticleBlock[] {
-  const text = item.summary.replace(/\s+/g, " ").trim();
+  const text = plainSummary(item.summary);
   return text ? [{ type: "paragraph", inlines: [{ type: "text", text }] }] : [];
 }
 
@@ -216,7 +218,8 @@ export async function articleBlock(item: ShelfItem, env: CardEnv, options: { ret
   const gate = env.gate;
   const title = band === "child" ? gate.text(item.title) : item.title;
   if (!title || (band === "child" && !gate.passes(publisher))) return null;
-  const loaded = await loadWithinGrace(item, band, { retry: options.retry, store: env.store });
+  const fetched = await loadWithinGrace(item, band, { retry: options.retry, store: env.store });
+  const loaded = { ...fetched, blocks: fetched.source === "teaser" ? fetched.blocks : trimArticleTail(fetched.blocks) };
   // A figure's `src` is a hub path numbered in the stored article's order; the publisher's address never leaves the hub.
   // A copy stored before the lead picture was recognized by its file name may still carry it: it is dropped here too, and the number
   // stays the figure's place in the stored copy, so the picture route keeps resolving the same file.

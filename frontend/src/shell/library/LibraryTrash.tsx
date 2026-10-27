@@ -34,6 +34,7 @@ export function LibraryTrash({ rows, busy, onRestore, onPurge }: { rows: readonl
           const left = daysLeft(row.trash_until);
           return (
             <li key={row.id} className="flex flex-wrap items-center gap-3 rounded-lg border border-border p-3">
+              {row.thumb_url ? <img src={row.thumb_url} alt="" loading="lazy" className="size-14 shrink-0 rounded-md bg-muted object-cover" /> : null}
               <div className="min-w-0 flex-1">
                 <p className="truncate text-base font-medium">{row.title}</p>
                 <p className="text-base text-muted-foreground">{left === null ? "Held until you delete it" : left === 0 ? "Removed today" : `${left} ${left === 1 ? "day" : "days"} left`}</p>

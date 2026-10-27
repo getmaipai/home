@@ -9,6 +9,7 @@ import { canAccessFile } from "@/lib/access";
 import { attachmentFilePath } from "@/lib/attachments";
 import { classDir } from "@/lib/paths";
 import { libraryProvenance, libraryProvenanceSql } from "@/lib/libraryProvenance";
+import { companionsOf } from "@/lib/libraryTrash";
 import { MAX_CHAT_IMAGE_BYTES } from "@/wire";
 import type { PersonRow } from "@/types";
 
@@ -85,6 +86,22 @@ export async function fileThumbnail(actor: PersonRow, id: string, width: 320 | 6
     return new Response(bytes,{ headers });
   } catch {
     if (!allowed(actor,row)) return new Response("attachment not found",{ status:404 });
+    return new Response("no preview",{ status:404 });
+  }
+}
+
+/** A small preview of one of the caller's own files in Trash: the picture itself, a video's poster or a song's cover. */
+export async function trashedFileThumbnail(actor: PersonRow, id: string): Promise<Response> {
+  const row = db.select().from(attachments).where(eq(attachments.id,id)).get();
+  const inTrash = (r: Row | undefined): r is Row => !!r && r.ownerPersonId === actor.id && r.deletedAt !== null && r.trashUntil !== null;
+  if (!inTrash(row)) return new Response("attachment not found",{ status:404 });
+  const source = row.mediaType.startsWith("image/") ? row : companionsOf(row).find(other => other.mediaType.startsWith("image/") && inTrash(other));
+  if (!source || source.size > MAX_CHAT_IMAGE_BYTES || !/^[a-f0-9]{64}$/.test(source.sha256)) return new Response("no preview",{ status:404 });
+  const etag = `"${source.sha256}-320"`;
+  try {
+    const bytes = await generate(source,join(thumbnailsDir,`${source.sha256}-320.webp`),320,() => inTrash(db.select().from(attachments).where(eq(attachments.id,id)).get()));
+    return new Response(bytes,{ headers:{ "content-type":"image/webp", "cache-control":"private, no-cache", etag } });
+  } catch {
     return new Response("no preview",{ status:404 });
   }
 }

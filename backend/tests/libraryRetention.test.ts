@@ -5,7 +5,7 @@ import { eq } from "drizzle-orm";
 import { db } from "@/db";
 import { attachments, conversationTurns, musicJobs, people, pictureJobs } from "@/db/schema";
 import { attachmentFilePath, createAttachment, deleteAttachmentsForPerson, readAttachment } from "@/lib/attachments";
-import { deleteConversationById, resolveOrCreateConversation, runRetention } from "@/lib/conversationHistory";
+import { chatMediaFiles, deleteConversationById, resolveOrCreateConversation, runRetention } from "@/lib/conversationHistory";
 import { listFilesVisibleToActor } from "@/lib/shares";
 import { createHost } from "@/lib/packageHost";
 import { PackageManifest } from "@maipai/spec/gen/ts/manifest.js";
@@ -96,5 +96,18 @@ test("new generated picture, edit, video and poster records follow the storage r
     expect(getVideoJobFor(c.actor, clip.id)?.files).toHaveLength(1);
   } finally {
     picture.restore(); video.restore(); __resetAgeCheckForTests(); __setKeyframesForTests(null);
+  }
+});
+
+test("deleting a chat with media=true moves its pictures to Library Trash; without it they stay", () => {
+  for (const media of [false, true]) {
+    const c = context();
+    const pic = createAttachment(c.actor, { ...c, mediaType: "image/png", bytes: new TextEncoder().encode(`pic-${media}-${c.turnId}`), retention: "conversation" });
+    if (!pic.ok) throw new Error(pic.error);
+    expect(chatMediaFiles(c.actor, c.conversationId).map((f) => f.id)).toEqual([pic.value.id]);
+    expect(deleteConversationById(c.actor, c.conversationId, { media }).ok).toBe(true);
+    const row = db.select().from(attachments).where(eq(attachments.id, pic.value.id)).get();
+    if (media) expect(row?.trashUntil).toBeTruthy();
+    else expect(row?.trashUntil ?? null).toBeNull();
   }
 });

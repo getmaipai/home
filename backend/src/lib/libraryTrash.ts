@@ -105,8 +105,8 @@ function trashedMain(person: PersonRow): Row[] {
   return metas.filter(({ row, meta }) => !companion(row, meta)).map(({ row }) => row).sort((a, b) => b.deletedAt!.localeCompare(a.deletedAt!) || a.id.localeCompare(b.id));
 }
 
-export function listTrashedFiles(person: PersonRow, now = new Date()): Array<{ id: string; title: string; deleted_at: string; trash_until: string; can_restore: boolean }> {
-  return trashedMain(person).map((row) => ({ id: row.id, title: titleOf(row), deleted_at: row.deletedAt!, trash_until: row.trashUntil!, can_restore: row.trashUntil! > now.toISOString() }));
+export function listTrashedFiles(person: PersonRow, now = new Date()): Array<{ id: string; title: string; deleted_at: string; trash_until: string; can_restore: boolean; thumb_url: string | null }> {
+  return trashedMain(person).map((row) => ({ id: row.id, thumb_url: kindForMediaType(row.mediaType) === "document" || kindForMediaType(row.mediaType) === "other" ? null : `/api/trash/file/${row.id}/thumb`, title: titleOf(row), deleted_at: row.deletedAt!, trash_until: row.trashUntil!, can_restore: row.trashUntil! > now.toISOString() }));
 }
 
 /** Counts for the Library header: items in Trash and the bytes they still hold (identical bytes count once). */

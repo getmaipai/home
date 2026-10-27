@@ -1,0 +1,26 @@
+import { expect, test } from "bun:test";
+import { plainSummary } from "../src/lib/news/text";
+import { trimArticleTail } from "../src/lib/news/tail";
+import type { ArticleBlock } from "../src/lib/retrieval/extractArticle";
+import { iconLinksOf } from "../src/lib/favicons";
+
+const p = (text: string): ArticleBlock => ({ type: "paragraph", inlines: [{ type: "text", text }] });
+const h = (text: string): ArticleBlock => ({ type: "heading", level: 2, id: text, text });
+
+test("plainSummary drops the aggregator line, tags, entities and addresses", () => {
+  expect(plainSummary("Article URL: https://discord.com/blog/x Comments URL: https://news.ycombinator.com/item?id=1 Points: 7 # Comments: 0")).toBe("");
+  expect(plainSummary("<p>President Trump doesn&#8217;t like the term &#8220;AI&#8221; &#8212; sure</p> See https://x.example/a")).toBe("President Trump doesn’t like the term “AI” - sure See");
+  expect(plainSummary("&lt;b&gt;bold&lt;/b&gt; text")).toBe("bold text");
+});
+
+test("trimArticleTail cuts at the first marker after the story begins and drops embedded posts", () => {
+  const blocks: ArticleBlock[] = [p("One."), p("Two."), p("Three."), p("Four."), { type: "quote", inlines: [{ type: "text", text: "Today we are releasing pic.twitter.com/abc — Matt (@m)" }] }, p("Five."), h("Do more with your Apple products"), p("AirPods"), h("Comments")];
+  expect(trimArticleTail(blocks).map((b) => (b.type === "paragraph" ? b.inlines[0]!.text : ""))).toEqual(["One.", "Two.", "Three.", "Four.", "Five."]);
+  expect(trimArticleTail([p("a"), h("Comments"), p("b")]).length).toBe(3);
+  expect(trimArticleTail([p("a"), p("b"), p("c"), p("FTC: We use income earning auto affiliate links."), p("d")]).length).toBe(3);
+});
+
+test("iconLinksOf lists declared icons, largest first, https only", () => {
+  const html = '<link rel="icon" href="/f.ico"><link rel="apple-touch-icon" sizes="180x180" href="/a.png"><link rel="icon" href="http://x/y.png">';
+  expect(iconLinksOf(html, "https://s.example/")).toEqual(["https://s.example/a.png", "https://s.example/f.ico"]);
+});

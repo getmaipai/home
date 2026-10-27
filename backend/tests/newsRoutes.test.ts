@@ -744,13 +744,13 @@ describe("foreground card enrichment", () => {
     expect(publisher.requests).toEqual(["/child-enrich"]);
   });
 
-  test("none omits image, and rows and shelf cards cause no synchronous enrichment", async () => {
+  test("none keeps the picture route, and rows and shelf cards cause no synchronous enrichment", async () => {
     publisher.stop(); publisher = await startPublisher({ "/none": "<html></html>" }); publisher.attach();
     installNewsApp(); const who = await household();
     const item = putItem(feeds.household, ADULT_HOST, { path: "/none", image: null, summary: "" });
     const json = await (await post(who.adult, "data/today")).json() as { blocks: Array<{ props: { hero?: { image?: unknown }; featured: Array<{ image?: unknown }> } }> };
     const lead = json.blocks[0]!.props.hero ?? json.blocks[0]!.props.featured[0]!;
-    expect(lead.image).toBeUndefined();
+    expect(lead.image).toBeTruthy();
     expect(sharedShelfStore()!.getEnrichment(item.id, "adult")!.status).toBe("none");
     // Search is rows only; it consumes stored enrichment without fetching result pages.
     putItem(feeds.household, ADULT_HOST, { path: "/row", title: "Row lookup", image: null, summary: "" });

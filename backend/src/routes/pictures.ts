@@ -159,7 +159,7 @@ picturesRoutes.openapi(cancelRoute, async (c) => {
 
 const variationRoute = createRoute({
   method: "post", path: "/jobs/{id}/variation", tags: ["Pictures"], summary: "Make another version of a picture with a new seed, or try a failed or stopped one again", middleware: [requireAuth] as const,
-  request: { params: idParams, body: { required: false, content: { "application/json": { schema: z.object({ quality: z.enum(["quick", "detailed"]).optional().describe("Make it again as this kind. Left out, the picture keeps its own kind.") }) } } } },
+  request: { params: idParams, body: { required: false, content: { "application/json": { schema: z.object({ quality: z.enum(["quick", "detailed"]).optional().describe("Make it again as this kind. Left out, the picture keeps its own kind."), prompt: z.string().trim().min(1).max(2000).optional().describe("Remix: new words describing the changes. Left out, the picture is made again from its own words.") }) } } } },
   responses: { 200: { content: { "application/json": { schema: JobSchema } }, description: "A new job in the same chat." }, ...refusals },
 });
 picturesRoutes.openapi(variationRoute, async (c) => {
@@ -171,10 +171,12 @@ picturesRoutes.openapi(variationRoute, async (c) => {
   // One at a time: a card with a picture still being made takes no second one.
   const group = source.turnId ? pictureJobsForTurn(actor, source.turnId) : [source];
   if (group.some((j) => j.state === "queued" || j.state === "running")) return c.json({ error: "A picture is still being made. Wait for it or stop it first.", code: "busy" }, 409) as never;
+  const asked = (await c.req.json().catch(() => ({}))) as { quality?: unknown; prompt?: unknown };
+  const words = typeof asked.prompt === "string" && asked.prompt.trim() ? asked.prompt.trim().slice(0, 2000) : source.prompt;
   const adapters = await adaptersFor(adapterAudiencesFor(routeAudience(actor)));
   // Only styles this person may still use ride along (one turned off since is dropped); their trigger words go with them.
   const used = source.request.loras.flatMap((id) => { const a = adapters.find((x) => x.id === id); return a ? [a] : []; });
-  const prompt = used.reduce((text, a) => withTriggerWords(text, a), source.prompt);
+  const prompt = used.reduce((text, a) => withTriggerWords(text, a), words);
   const lane = laneOf(routeAudience(actor));
   const kid = lane === "child";
   const refused = refusePrompt(`${prompt} ${used.map((a) => a.name).join(" ")}`, { lane });
@@ -183,14 +185,13 @@ picturesRoutes.openapi(variationRoute, async (c) => {
   if (kid && picturesMadeToday(actor) + 1 > kidsDailyPictures()) return c.json({ error: CHILD_LIMIT_LINE, code: "daily_limit" }, 422) as never;
   if (!(await pictureEngineReady())) return c.json({ error: pictureNotReadyReason(await pictureEngineStatus()), code: "not_installed" }, 503) as never;
   // IMGGEN-QUALITY-01: Quick or Detailed again. Left out, the picture keeps its own kind; a style made for one maker decides.
-  const asked = (await c.req.json().catch(() => ({}))) as { quality?: unknown };
   const choice = kid ? { quality: "quick" as const, model: "flux2-klein-4b", note: null, announce: false } : chooseQuality({ requested: isPictureQuality(asked.quality) ? asked.quality : source.request.quality ?? "quick", style: used[0] ?? null, engine: await pictureEngineStatus() });
   const loras = used.map((a) => ({ id: a.id, scale: a.strength_default }));
-  const slot = kid ? reserveKid(actor, "picture", 1, source.prompt) : null;
+  const slot = kid ? reserveKid(actor, "picture", 1, words) : null;
   if (kid && !slot) return c.json({ error: CHILD_LIMIT_LINE, code: "daily_limit" }, 422) as never;
   try {
     const job = await startPictureJob({
-      actor, conversationId: source.conversationId, turnId: source.turnId, temporary: source.temporary, kind: group.some((j) => j.state === "done") ? "variation" : "generate", prompt: source.prompt,
+      actor, conversationId: source.conversationId, turnId: source.turnId, temporary: source.temporary, kind: group.some((j) => j.state === "done") ? "variation" : "generate", prompt: words,
       body: { prompt: kid ? forceCartoon(prompt) : prompt, size: source.request.size, n: 1, ...(choice.model ? { model: choice.model } : {}), audience: lane === "adult" && adultAdaptersAllowed() ? "adult" : "all-ages", ...(kid ? { negative_prompt: CHILD_NEGATIVE_PROMPT } : {}), ...(loras.length ? { loras } : {}) }, sourceFileId: source.files[0]?.id ?? null,
     });
     void job;

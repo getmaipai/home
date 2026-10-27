@@ -69,13 +69,13 @@ test("a site logo or default share image is not the story's picture", async () =
   expect(await enrichItem(real, "adult")).toMatchObject({ image_url: `${ADULT_HOST}/img/story-photo.jpg` });
 });
 
-test("none is remembered for 12 hours and omits the card image; prune and feed erasure remove every variant", async () => {
+test("none is remembered for 12 hours and the card keeps its picture route (the publisher icon stands in); prune and feed erasure remove every variant", async () => {
   await pages({ "/empty": "<html></html>" });
   let now = Date.now(); __setNewsEnrichClockForTests(() => now);
   const item = putItem(feeds.household, ADULT_HOST, { path: "/empty", image: null, summary: "" });
   expect(card(item).image).toBeTruthy();
   expect(await enrichItem(item, "adult")).toMatchObject({ status: "none" });
-  expect(card(item).image).toBeUndefined();
+  expect(card(item).image).toBeTruthy();
   now += 12 * 3_600_000 - 1;
   await enrichItem(item, "adult");
   expect(publisher.requests).toEqual(["/empty"]);
@@ -207,7 +207,7 @@ test("invalid metadata addresses and descriptions with no passing child sentence
   const kid = putItem(feeds.kids, KIDS_HOST, { path: "/invalid", image: null, summary: "" });
   expect(await enrichItem(kid, "child")).toMatchObject({ status: "none", image_url: null, description: null });
   expect(card(kid, "child").dek).toBeUndefined();
-  expect(card(kid, "child").image).toBeUndefined();
+  expect(card(kid, "child").image).toBeTruthy();
 });
 
 test("the reader's real SSRF guard rejects a private page before any request and counts the block", async () => {

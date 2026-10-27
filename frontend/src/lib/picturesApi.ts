@@ -41,7 +41,7 @@ export const picturesApi = {
   status: () => send<PictureStatus>("/api/pictures/status"),
   card: (id: string, signal?: AbortSignal) => send<PictureCard>(`/api/pictures/jobs/${encodeURIComponent(id)}`, signal ? { signal } : {}),
   stop: (id: string) => send<PictureCard>(`/api/pictures/jobs/${encodeURIComponent(id)}/cancel`, { method: "POST" }),
-  again: (id: string, quality?: "quick" | "detailed") => send<PictureCard>(`/api/pictures/jobs/${encodeURIComponent(id)}/variation`, { method: "POST", ...(quality ? { headers: { "Content-Type": "application/json" }, body: JSON.stringify({ quality }) } : {}) }),
+  again: (id: string, quality?: "quick" | "detailed", prompt?: string) => send<PictureCard>(`/api/pictures/jobs/${encodeURIComponent(id)}/variation`, { method: "POST", ...(quality || prompt ? { headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ...(quality ? { quality } : {}), ...(prompt ? { prompt } : {}) }) } : {}) }),
 };
 
 // IMGGEN-SET-01: the admin side (/api/pictures/admin), for the Pictures and videos settings view.

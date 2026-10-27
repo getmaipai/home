@@ -1,4 +1,9 @@
 import { lazy, Suspense, useCallback, useContext, useEffect, useMemo, useRef, useState, } from "react";
+import { describeMedia, useDeleteMediaAsk } from "@/apps/chat/chatDeleteMedia";
+import { useRemixAsk } from "@/apps/chat/chatRemix";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@maipai/ui/src/dashboard/components/ui/alert-dialog";
+import { Textarea } from "@maipai/ui/src/ui/textarea";
+import { DeleteCancelled } from "@/apps/chat/chatThreadListAdapter";
 import { currentLocationIfGranted } from "@/lib/currentLocation";
 import { Link, useLocation, useMatch, useNavigate, useSearchParams } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -888,8 +893,8 @@ function ChatHeaderDataBridge({ autoReadReplies, setAutoReadReplies, ttsAvailabl
     onDelete: async () => {
       try {
         await aui.threadListItem.delete();
-      } catch {
-        toast.error("Could not delete this chat. Try again.");
+      } catch (error) {
+        if (!(error instanceof DeleteCancelled)) toast.error("Could not delete this chat. Try again.");
         return;
       }
       // The deleted conversation was the one open in this very header -
@@ -1192,6 +1197,8 @@ export function ChatPage({ person }: { person: Roster }) {
   const [voiceOpen, setVoiceOpen] = useState(false);
   const [voiceOpenedByWake, setVoiceOpenedByWake] = useState(false);
   const micGate = useMicGate(() => setVoiceOpen(true));
+  const deleteMedia = useDeleteMediaAsk();
+  const remix = useRemixAsk();
   const micGateRequest = micGate.request;
   const closeAwareSetVoiceOpen = useCallback((open: boolean) => {
     if (!open) setVoiceOpenedByWake(false);
@@ -1597,6 +1604,36 @@ export function ChatPage({ person }: { person: Roster }) {
         {chatWake.indicator && !ambient ? <LauncherBubble docked open={false} unread={0} greeting="" prompts={[]} {...chatWake.indicator} /> : null}
         <ArtifactCacheInvalidator />
               <ChatDocumentTitle person={person} />
+              {deleteMedia.ask ? (
+                <AlertDialog open onOpenChange={(open) => { if (!open) deleteMedia.answer("cancel"); }}>
+                  <AlertDialogContent data-testid="chat-delete-media">
+                    <AlertDialogHeader>
+                      <AlertDialogTitle>Delete this chat?</AlertDialogTitle>
+                      <AlertDialogDescription>This chat made {describeMedia(deleteMedia.ask.count)}. Delete them too, or keep them in your Library? Deleted files wait in Trash for 30 days.</AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                      <AlertDialogCancel onClick={() => deleteMedia.answer("cancel")}>Cancel</AlertDialogCancel>
+                      <AlertDialogCancel onClick={() => deleteMedia.answer("keep")}>Keep {describeMedia(deleteMedia.ask.count)}</AlertDialogCancel>
+                      <AlertDialogAction variant="destructive" onClick={() => deleteMedia.answer("delete")}>Delete chat and {describeMedia(deleteMedia.ask.count)}</AlertDialogAction>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
+              ) : null}
+              {remix.ask ? (
+                <AlertDialog open onOpenChange={(open) => { if (!open) remix.answer(null); }}>
+                  <AlertDialogContent data-testid="remix-dialog">
+                    <AlertDialogHeader>
+                      <AlertDialogTitle>Remix this {remix.ask.kind}</AlertDialogTitle>
+                      <AlertDialogDescription>Change the words to describe what you want different. The original stays.</AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <Textarea aria-label={`What the ${remix.ask.kind} should be`} value={remix.words} maxLength={2000} rows={5} onChange={(event) => remix.setWords(event.target.value)} />
+                    <AlertDialogFooter>
+                      <AlertDialogCancel onClick={() => remix.answer(null)}>Cancel</AlertDialogCancel>
+                      <AlertDialogAction disabled={remix.words.trim() === ""} onClick={() => remix.answer(remix.words.trim())}>Make it</AlertDialogAction>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
+              ) : null}
         <ChatTitleCatchUp incognito={temporaryNext} />
         <ChatMemoryPoll incognito={temporaryNext} />
         <ChatHeaderDataBridge autoReadReplies={autoReadReplies} setAutoReadReplies={setAutoReadReplies} ttsAvailable={ttsAvailable} pinnable={!temporaryNext} trying={tryActive} person={person} conversationId={temporaryNext ? undefined : draftConversationId} sheetOpen={sheetOpen} onToggleSheet={() => setSheetOpen((open) => !open)} inShellBar={barOnPhone} />

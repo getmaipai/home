@@ -36,6 +36,7 @@ import {
   updateConversationSettings,
   updateConversationPlacement,
   deleteConversationById,
+  chatMediaFiles,
   batchDeleteConversations,
   clearConversations,
   chooseConversationTurn,
@@ -581,9 +582,17 @@ conversationsRoutes.openapi(patchConversationRoute, (c) => {
 
 conversationsRoutes.delete("/:id", requireAuth, async (c) => {
   const actor = c.get("person");
-  const result = deleteConversationById(actor, c.req.param("id"));
+  const result = deleteConversationById(actor, c.req.param("id"), { media: c.req.query("media") === "1" });
   if (!result.ok) return fail(c, result);
   return c.json({ ok: true });
+});
+
+conversationsRoutes.get("/:id/media-count", requireAuth, (c) => {
+  const actor = c.get("person");
+  const found = getConversation(actor, c.req.param("id"));
+  if (!found.ok) return fail(c, found);
+  const files = chatMediaFiles(actor, c.req.param("id"));
+  return c.json({ images: files.filter((f) => f.kind === "image").length, videos: files.filter((f) => f.kind === "video").length });
 });
 
 

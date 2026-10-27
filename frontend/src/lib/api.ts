@@ -611,7 +611,7 @@ export interface LibrarySummary {
 }
 export interface LibraryTrashItem {
   kind: string; id: string; title: string; deleted_at: string; trash_until: string | null;
-  can_restore: boolean; can_purge: boolean;
+  can_restore: boolean; can_purge: boolean; thumb_url?: string | null;
 }
 function libraryParams(query: LibraryQuery): string {
   const params = new URLSearchParams();
@@ -1213,8 +1213,9 @@ export const api = {
       method: "PATCH",
       body: JSON.stringify({ mode }),
     }),
-  deleteConversation: (id: string) =>
-    request<{ ok: true }>(`/api/conversations/${encodeURIComponent(id)}`, { method: "DELETE" }),
+  deleteConversation: (id: string, opts: { media?: boolean } = {}) =>
+    request<{ ok: true }>(`/api/conversations/${encodeURIComponent(id)}${opts.media ? "?media=1" : ""}`, { method: "DELETE" }),
+  conversationMediaCount: (id: string) => request<{ images: number; videos: number }>(`/api/conversations/${encodeURIComponent(id)}/media-count`),
   batchDeleteConversations: (ids: string[]) =>
     request<{ deleted: number }>("/api/conversations/batch-delete", { method: "POST", body: JSON.stringify({ ids }) }),
   clearConversations: () => request<{ deleted: number }>("/api/conversations/clear", { method: "POST" }),

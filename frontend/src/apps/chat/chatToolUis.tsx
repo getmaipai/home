@@ -19,6 +19,7 @@ import { picturesApi, type PictureCard } from "@/lib/picturesApi";
 import { etaLabel } from "@/lib/etaLabel";
 import { VideoPlayer } from "@maipai/ui/src/elements/video-player";
 import { videosApi, type VideoItem } from "@/lib/videosApi";
+import { askRemix } from "@/apps/chat/chatRemix";
 import { MusicTrack } from "@maipai/ui/src/elements/music-track";
 import { musicApi } from "@/lib/musicApi";
 import { prepareClip, saveClip, shareClip } from "@/lib/shareClip";
@@ -556,6 +557,7 @@ export const PictureToolRender: ToolCallMessagePartComponent<Record<string, neve
       disabled: retrying,
       onSelect: () => { setRetrying(true); void picturesApi.again(card.id, card.switch_to!).then(() => query.refetch()).catch(() => undefined).finally(() => setRetrying(false)); },
     }] : [];
+    const remixActions = card.can_vary ? [{ id: "remix", label: "Remix", hint: "Change the words and make a new one", disabled: retrying, onSelect: () => { void askRemix("picture", card.prompt).then((words) => { if (!words) return; setRetrying(true); void picturesApi.again(card.id, undefined, words).then(() => query.refetch()).catch(() => undefined).finally(() => setRetrying(false)); }); } }] : [];
     return (
       <ImageGallery
         images={galleryImagesOf(card)}
@@ -563,7 +565,7 @@ export const PictureToolRender: ToolCallMessagePartComponent<Record<string, neve
         size="large"
         {...(edit ? { onEditImage: (image: { id: string; src: string; alt: string }) => edit.onEdit(target(image)), canEditImage: editable, editLabel: edit.label ?? "Edit picture" } : {})}
         /* IMGGEN-QUALITY-01: the on-the-fly choice. A Quick picture offers Detailed (slower, finer); a Detailed one offers Quick. No model names. */
-        {...(editActions.length + qualityActions.length > 0 ? { actions: [...editActions, ...qualityActions] } : {})}
+        {...(editActions.length + qualityActions.length + remixActions.length > 0 ? { actions: [...editActions, ...remixActions, ...qualityActions] } : {})}
       />
     );
   }
@@ -652,6 +654,7 @@ export const VideoToolRender: ToolCallMessagePartComponent<Record<string, never>
         // VIDEO-LTX-01: the on-the-fly choice, the same two words as pictures. A Quick video offers Detailed (with sound and speech); a Detailed one offers Quick. No model names.
         actions: [
           ...(item.switch_to && card.can_make_another ? [<Button key="switch-quality" type="button" variant="ghost" size="sm" title={item.switch_to === "detailed" ? "With sound and speech, up to 10 seconds" : "No sound, up to 5 seconds, can start from a picture"} onClick={() => { void videosApi.another(item.id, item.switch_to!).then(refresh).catch(refresh); }}>{item.switch_to === "detailed" ? "Make it Detailed" : "Make it Quick"}</Button>] : []),
+          ...(card.can_make_another ? [<Button key="remix" type="button" variant="ghost" size="sm" onClick={() => { void askRemix("video", item.prompt).then((words) => { if (words) void videosApi.another(item.id, undefined, words).then(refresh).catch(refresh); }); }}>Remix</Button>] : []),
           <Button key="original" type="button" variant="ghost" size="sm" onClick={() => saveClip({ url: clip.url, name: (prepared.data?.name ?? "video.mp4").replace(/\.mp4$/, "-original.mp4") })}>Download original</Button>,
         ],
       } : {})}
