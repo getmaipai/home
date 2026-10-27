@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-10-27T08:25:59.142Z",
+  "generatedAt": "2026-10-27T08:51:25.036Z",
   "kitTag": "ui-v0.5.373",
   "items": [
     {
@@ -800,7 +800,7 @@
       "group": "other",
       "verdict": "no-fit",
       "verdictReason": "No current Home feature needs this Element’s specific data and interaction; the audit records the current scope decision.",
-      "implemented": false
+      "implemented": true
     },
     {
       "file": "light-markdown.tsx",
