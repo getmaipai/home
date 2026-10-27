@@ -4,7 +4,7 @@
 # --tag labels a shipped commit afterwards;
 # the live .installed-tag remains sha-<first 7> so update checks do not treat it as a release.
 set -euo pipefail
-usage() { echo "usage: bash scripts/ship.sh [<sha>|main] [--before-green] [--tag] [--dry-run] [--adopt-empty-live]" >&2; }
+usage() { echo "usage: bash scripts/ship.sh [<sha>|main] [--before-green] [--tag] [--dry-run] [--adopt-empty-live] [--reinstall]" >&2; }
 die() { echo "ship.sh: $1" >&2; exit "${2:-1}"; }
 common="$(git rev-parse --git-common-dir 2>/dev/null)" || die "run this inside a Home checkout."
 [[ "$common" = /* ]] || common="$(cd "$(dirname "$common")" && pwd -P)/$(basename "$common")"
@@ -24,8 +24,8 @@ stack_url="${MAIPAI_SHIP_STACK_URL:-http://127.0.0.1:8770/healthz}"
 migrations_cmd="${MAIPAI_SHIP_MIGRATIONS_CMD:-sqlite3 -readonly $live/data/hub.db 'select count(*) from __drizzle_migrations'}"
 publish_cmd="${MAIPAI_PUBLISH_CMD:-bash scripts/publish-release.sh TAG --latest NOTES}"
 health_timeout="${MAIPAI_SHIP_HEALTH_TIMEOUT:-90}"
-before_green=0; tag_after=0; dry=0; adopt_empty_live=0; target=main
-while (($#)); do case "$1" in --before-green) before_green=1;; --tag) tag_after=1;; --dry-run) dry=1;; --adopt-empty-live) adopt_empty_live=1;; main) target=main;; --*) usage; exit 2;; *) target="$1";; esac; shift; done
+before_green=0; tag_after=0; dry=0; adopt_empty_live=0; reinstall=0; target=main
+while (($#)); do case "$1" in --before-green) before_green=1;; --tag) tag_after=1;; --dry-run) dry=1;; --adopt-empty-live) adopt_empty_live=1;; --reinstall) reinstall=1;; main) target=main;; --*) usage; exit 2;; *) target="$1";; esac; shift; done
 [[ "$target" == main || "$target" =~ ^[0-9a-f]{7,40}$ ]] || { usage; exit 2; }
 git fetch origin || die "could not fetch origin; check network access and retry."
 if [[ "$target" == main ]]; then sha="$(git rev-parse --verify 'origin/main^{commit}')" || die "could not resolve origin/main; fetch and retry."
@@ -79,6 +79,15 @@ if (( guard_finding )); then
   (( adopt_empty_live )) || die "$finding Pass --adopt-empty-live only to override this guard."
 fi
 before_tag="$(cat "$live/.installed-tag" 2>/dev/null || echo none)"
+# Re-promoting the commit that is already live gains nothing and can break a working hub: on 2026-10-27 a second ship of an
+# installed commit failed part way, left the install without its dependencies and took the family's hub down. When the live tag
+# is this commit and the hub answers, stop. A hub that is not answering still gets the install (that is a repair), and
+# --reinstall forces it.
+if (( ! reinstall )) && (( tag_after == 0 )) && [[ "$before_tag" == "$label" ]]; then
+  if [[ -n "$health_cmd" ]]; then eval "$health_cmd" >/dev/null 2>&1 && live_answers=1 || live_answers=0
+  elif [[ "$(curl -sS -o /dev/null -w '%{http_code}' "$web_url" 2>/dev/null || true)" == 200 ]] && curl -sS "$stack_url" 2>/dev/null | grep -q '"ok":true'; then live_answers=1; else live_answers=0; fi
+  if (( live_answers )); then echo "ship.sh: $label is already live and the hub answers; nothing to do. Pass --reinstall to install it again anyway."; exit 0; fi
+fi
 if (( dry )); then printf 'plan: sha=%s label=%s live=%s current=%s before-green=%s tag=%s\n' "$sha" "$label" "$live" "$before_tag" "$([[ $before_green == 1 ]] && echo yes || echo no)" "$([[ $tag_after == 1 ]] && echo yes || echo no)"; exit 0; fi
 if [[ ! -x "$promote" ]] || [[ "$(eval "$sudo_cmd \"$promote\" --check" 2>/dev/null || true)" != ok ]]; then die "promotion helper is not ready; run: sudo bash $main/scripts/install-promote.sh" 2; fi
 if (( tag_after == 0 )) || [[ "$before_tag" != "$label" ]]; then

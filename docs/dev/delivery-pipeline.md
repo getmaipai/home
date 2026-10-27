@@ -72,7 +72,7 @@ Where it ended up (measured on the Studio):
 | `scripts/lander.sh` | The lander: takes requests oldest first, runs every landing step, writes notes. |
 | `scripts/watcher.sh` | The watcher: runs the suite on `main`, classifies, bisects, files issues, writes green marks. |
 | `scripts/pipeline.sh` | `status`, `start`, `stop`, `install-service`, `uninstall-service` for the two daemons. |
-| `scripts/ship.sh` | Promote a landed commit to the live hub; `--tag` cuts the release. |
+| `scripts/ship.sh` | Promote a landed commit to the live hub; `--tag` cuts the release. It does nothing when that commit is already live and the hub answers (a repeat install can break a working hub: 2026-10-27); a hub that is not answering is still repaired, and `--reinstall` forces it. |
 | `scripts/maipai-promote`, `scripts/install-promote.sh` | The one root helper and its one-time setup. |
 | `scripts/install.sh --commit <sha>` | Installs a commit of `main` from a root-owned mirror, recorded as the label `sha-<first 7>`. |
 | `scripts/pin.sh` | One command to bump a commons, Stack or bot pin and land it. |

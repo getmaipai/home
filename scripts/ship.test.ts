@@ -1,4 +1,4 @@
-import { afterAll, beforeAll, describe, expect, test } from "bun:test";
+import { afterAll, beforeAll, beforeEach, describe, expect, test } from "bun:test";
 import { chmodSync, copyFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -24,6 +24,8 @@ beforeAll(() => {
   Object.assign(baseEnv, { MAIPAI_SHIP_DATA: data, MAIPAI_WATCH_DATA: watch, MAIPAI_SHIP_LIVE: live, MAIPAI_PROMOTE_BIN: promote, MAIPAI_SHIP_SUDO: "", MAIPAI_SHIP_STOP_DEV_CMD: "true", MAIPAI_SHIP_HEALTH_CMD: join(scratch, "health-check"), MAIPAI_SHIP_HEALTH_TIMEOUT: "1", MAIPAI_SHIP_MIGRATIONS_CMD: "echo 3", MAIPAI_PUBLISH_CMD: join(scratch, "publish") + " TAG NOTES", MAIPAI_LAND_GIT_ENV: "", MAIPAI_HUB_LOCK_PATH: join(scratch, "not-running.lock"), MAIPAI_SHIP_WEB_PORT: "45991" });
 });
 describe("ship pipeline", () => {
+  // Each test starts from a hub on the previous release, so a test that promotes does not make the next one a no-op "already live".
+  beforeEach(() => { writeFileSync(join(live, ".installed-tag"), "v0.0.1\n"); });
   test("refuses on a Mac without the live-hub marker", () => {
     const out = run([sha, "--before-green"], { MAIPAI_SHIP_LIVE: "", MAIPAI_SHIP_MARKER: join(scratch, "no-such-marker") });
     expect(out.status).toBe(1); expect(out.stderr).toContain("not marked as the live hub"); expect(out.stderr).toContain("sudo touch");
@@ -43,7 +45,7 @@ describe("ship pipeline", () => {
   test("requires a green marker or records the before-green override", () => {
     const missing = run([sha]); expect(missing.status).toBe(1); expect(missing.stderr).toContain("--before-green");
     mkdirSync(join(watch, "green"), { recursive: true }); writeFileSync(join(watch, "green", sha), "green\n"); const green = run([sha]); if (green.status !== 0) throw new Error(green.stderr + green.stdout); expect(green.status).toBe(0); expect(green.stdout).toContain("shipped:");
-    rmSync(join(watch, "green", sha)); const override = run([sha, "--before-green"]); expect(override.status).toBe(0); expect(readFileSync(join(data, "shipped.jsonl"), "utf8")).toContain('"before_green":true');
+    rmSync(join(watch, "green", sha)); const override = run([sha, "--before-green", "--reinstall"]); expect(override.status).toBe(0); expect(readFileSync(join(data, "shipped.jsonl"), "utf8")).toContain('"before_green":true');
   }, 60_000);
   test("success promotes full SHA and records shipped", () => {
     writeFileSync(join(watch, "green", sha), "green\n"); const out = run([sha]); expect(out.status).toBe(0); expect(readFileSync(join(scratch, "promote.calls"), "utf8")).toContain(sha); expect(readFileSync(join(data, "shipped.jsonl"), "utf8")).toContain('"result":"shipped"'); expect(out.stdout).toContain("shipped:");
@@ -51,6 +53,24 @@ describe("ship pipeline", () => {
   test("health failure rolls back", () => {
     writeFileSync(join(watch, "green", sha), "green\n"); writeFileSync(join(scratch, "health.fail"), "bad"); const out = run([sha]); expect(out.status).toBe(1);
     expect(readFileSync(join(scratch, "promote.calls"), "utf8")).toContain(sha + "\n--rollback"); expect(readFileSync(join(data, "shipped.jsonl"), "utf8")).toContain('"result":"rolled_back"'); expect(out.stdout).toContain("rolled back to v0.0.1");
+  }, 60_000);
+  test("a commit that is already live and answering is not promoted again, unless asked", () => {
+    const calls = () => (existsSync(join(scratch, "promote.calls")) ? readFileSync(join(scratch, "promote.calls"), "utf8") : "");
+    rmSync(join(scratch, "health.fail"), { force: true });
+    writeFileSync(join(live, ".installed-tag"), `sha-${sha.slice(0, 7)}\n`);
+    const before = calls();
+    const same = run([sha, "--before-green"]);
+    expect(same.status).toBe(0); expect(same.stdout).toContain("already live"); expect(calls()).toBe(before);
+    const forced = run([sha, "--before-green", "--reinstall"]);
+    expect(forced.status).toBe(0); expect(calls().length).toBeGreaterThan(before.length);
+  }, 60_000);
+  test("the same commit with a hub that is not answering is still installed, as a repair", () => {
+    const calls = () => (existsSync(join(scratch, "promote.calls")) ? readFileSync(join(scratch, "promote.calls"), "utf8") : "");
+    writeFileSync(join(live, ".installed-tag"), `sha-${sha.slice(0, 7)}\n`); writeFileSync(join(scratch, "health.fail"), "bad");
+    const before = calls();
+    run([sha, "--before-green"]);
+    expect(calls().length).toBeGreaterThan(before.length);
+    rmSync(join(scratch, "health.fail"), { force: true });
   }, 60_000);
   test("refuses a stale local next tag and reports how to remove it", () => {
     git(main, "tag", "-a", "v0.0.2", "-m", "v0.0.2", sha);
@@ -90,7 +110,7 @@ describe("ship pipeline", () => {
     expect(dry.status).toBe(1); expect(dry.stderr).toContain("empty Home");
     const adopted = run([sha, "--before-green", "--adopt-empty-live"], injected);
     expect(adopted.status).toBe(0);
-    const clean = run([sha, "--before-green"], { MAIPAI_HUB_LOCK_PATH: join(scratch, "missing.lock") });
+    const clean = run([sha, "--before-green", "--reinstall"], { MAIPAI_HUB_LOCK_PATH: join(scratch, "missing.lock") });
     expect(clean.status).toBe(0); expect(clean.stdout).toContain("shipped:");
   }, 60_000);
   test("preflight names one-time setup when helper is missing", () => {
