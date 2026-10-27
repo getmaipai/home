@@ -241,7 +241,7 @@ export function PackageAppPage({ person }: { person: Roster }) {
   const contextTitle = sidebarProps ? contextTitleFor(activeLabel, pageDoc?.title) : undefined;
 
   const content = (
-    <div className={cn("flex min-h-0 min-w-0 flex-1 flex-col gap-2", (sidebarProps || media) && !readingStory && "lg:p-4 lg:ps-6", (sidebarProps || media) && !sectionsBar && !readingStory && "py-4")} data-testid="package-app" data-package={packageId}>
+    <div className={cn("flex min-h-0 min-w-0 flex-1 flex-col", !readingStory && "gap-2", (sidebarProps || media) && !readingStory && "lg:p-4 lg:ps-6", (sidebarProps || media) && !sectionsBar && !readingStory && "py-4")} data-testid="package-app" data-package={packageId}>
       {sectionsBar ? <PhoneNav variant="floating" label={`${app?.label ?? "App"} sections`} entries={sectionsBar.entries} more={sectionsBar.more} {...(sectionsBar.trailing ? { trailing: sectionsBar.trailing } : {})} /> : null}
       {familyHeader && !(packageId === "weather" && inShellBar) ? null : <h1 className="sr-only">{app?.label ?? "App"}</h1>}
       {app ? <AppToolbar inShellBar={inShellBar} sectionsInBar={sectionsBar !== null} hideSectionsOnWide={sidebar !== undefined} to={app.to} label={app.label} homeLabel={appHomeLabel(packageId, media)} settingsArea={app.settings_area?.id} sections={app.sections} current={pageId} familyHeader={familyHeader} title={contextTitle} titleSrOnly={sidebarProps ? ownHeader || contextTitle === undefined : false} /> : null}

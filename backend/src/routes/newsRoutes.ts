@@ -10,7 +10,7 @@ import { requireAuth } from "@/middleware/auth";
 import type { AppEnv } from "@/types";
 import { appImageAllowed, appRouteAllowed } from "@/lib/apps";
 import { NEWS_ACTIONS, runNewsAction, type NewsActionName } from "@/lib/news/actions";
-import { channelData, householdTodayData, mixData, savedRows, sourceRows, storyData, todayData, topicRows, viewerOf } from "@/lib/news/data";
+import { channelData, householdTodayData, mixData, moreData, savedRows, sourceRows, storyData, todayData, topicRows, viewerOf } from "@/lib/news/data";
 import { recentRows, searchData } from "@/lib/news/search";
 import { releasedItem } from "@/lib/news/cards";
 import { bumpNewsCounter } from "@/lib/news/newsCounters";
@@ -20,7 +20,7 @@ import { figureAddressesOf } from "@/lib/news/article";
 
 export const newsRoutes = new Hono<AppEnv>();
 
-const DATA_IDS = ["today", "mix", "channel", "story", "household-today", "topics", "sources", "saved", "search", "search-recents"] as const;
+const DATA_IDS = ["today", "mix", "channel", "story", "more", "household-today", "topics", "sources", "saved", "search", "search-recents"] as const;
 type DataId = (typeof DATA_IDS)[number];
 const isDataId = (value: string): value is DataId => (DATA_IDS as readonly string[]).includes(value);
 const isAction = (value: string): value is NewsActionName => (NEWS_ACTIONS as readonly string[]).includes(value);
@@ -49,6 +49,11 @@ newsRoutes.post("/data/:dataId", requireAuth, async (c) => {
     }
     case "story": {
       const result = await storyData(person, body);
+      if (!result) return c.json({ error: "That story is not available." }, 404);
+      return c.json(result, 200);
+    }
+    case "more": {
+      const result = await moreData(person, body);
       if (!result) return c.json({ error: "That story is not available." }, 404);
       return c.json(result, 200);
     }

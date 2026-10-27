@@ -15,7 +15,7 @@ const dir = join(PACKAGES_DIR, "news");
 const manifest = JSON.parse(readFileSync(join(dir, "manifest.json"), "utf-8")) as PackageManifest;
 const contributes = manifest.contributes as AppContributes;
 const pages = ["index", "mix", "following", "saved", "channel", "story", "search"];
-const ids = ["today", "mix", "topics", "sources", "channel", "saved", "story", "household-today", "search", "search-recents"];
+const ids = ["today", "mix", "topics", "sources", "channel", "saved", "story", "more", "household-today", "search", "search-recents"];
 const actions = ["follow", "save", "read", "feedback", "reset_mix", "summarize", "search_recent", "search_recent_clear"];
 const readPage = (module: string) => JSON.parse(readFileSync(join(dir, "pages", `${module}.json`), "utf-8"));
 

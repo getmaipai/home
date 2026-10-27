@@ -52,6 +52,38 @@
         "icon": "newspaper",
         "text": "This story is not available."
       }
+    },
+    {
+      "type": "answer_blocks",
+      "bind": {
+        "source": "package",
+        "path": "more",
+        "params": {
+          "id": "$state.id"
+        }
+      },
+      "kinds": [
+        "story_feed"
+      ],
+      "actions": {
+        "open": {
+          "navigate": {
+            "to": "/apps/news/story",
+            "state": {
+              "id": "{item_id}"
+            }
+          }
+        },
+        "save": {
+          "call": {
+            "target": "/api/plugins/news/actions/save",
+            "args": {
+              "item_id": "{item_id}",
+              "on": "{on}"
+            }
+          }
+        }
+      }
     }
   ]
 }

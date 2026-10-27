@@ -20,7 +20,7 @@ import { sharedShelfStore, type ShelfItem } from "@/lib/shelf/shelfStore";
 import { FEED_LISTS, shelfEnabled } from "@/lib/shelf/shelfPolicy";
 import type { PersonRow } from "@/types";
 import { articleBlock } from "./article";
-import { cardEnv, cardOf, enrichLeadCards, hostOf, itemIdFrom, pictureAlt, publishedAtOf, storyIdOf, type CardEnv, type StoryCard, type Viewer } from "./cards";
+import { cardEnv, cardOf, enrichLeadCards, hostOf, itemIdFrom, pictureAlt, publishedAtOf, storyIdOf, topicsShown, type CardEnv, type StoryCard, type Viewer } from "./cards";
 import { rankStories, type RankInput } from "./rankStories";
 import { followedChannels, isFollowing, listSaves, recomputeMix, recordRead } from "./records";
 import { TOPICS, topicById, topicOfferedTo, topicsFor } from "./topics";
@@ -286,6 +286,26 @@ function stripOpenUrls(value: unknown): unknown {
     return Object.fromEntries(Object.entries(value as Record<string, unknown>).filter(([key]) => key !== "open_url").map(([key, child]) => [key, stripOpenUrls(child)]));
   }
   return value;
+}
+
+/** `more {id}`: the other stories of the opened story's first topic, under the article ("More from Technology"). Empty when the story has no topic or nothing else to show. */
+export async function moreData(person: PersonRow, body: Record<string, unknown>, now = new Date()): Promise<BlocksData | null> {
+  const viewer = viewerOf(person, now);
+  const id = itemIdFrom(body.id ?? body.item_id ?? body.story_id);
+  if (!id) return null;
+  const item = releaseShelfItem(viewer.band, id);
+  if (!item) return null;
+  if (!shelfEnabled()) return emptyBlocks(false);
+  const env = cardEnv(viewer);
+  if (!env) return emptyBlocks(true);
+  const key = topicsShown(item, viewer.band)[0];
+  const topic = key ? topicById(key) : undefined;
+  if (!topic) return emptyBlocks(false);
+  const raw = feedBlock(env, {
+    layout: "channel", title: `More from ${topic.label}`, sectionStyle: "todays_news", windowH: CHANNEL_WINDOW_H,
+    match: (other) => other.id !== item.id && (other.topics ?? []).includes(key!), followed: followedChannels(person.id), shelf: false, channelRows: true, page: 1, provenance: "news data more",
+  }, now);
+  return { as_of: now.toISOString(), blocks: finishBlocks(person, viewer.band, raw) };
 }
 
 /** `story {id}`: the article block for one released item, opening it for this person (the NewsRead row an open writes). Null when the id is not one this viewer is released. */

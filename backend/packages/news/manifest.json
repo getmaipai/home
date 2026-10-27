@@ -477,6 +477,10 @@
         "refresh_s": 300
       },
       {
+        "id": "more",
+        "refresh_s": 300
+      },
+      {
         "id": "household-today",
         "refresh_s": 300
       },
