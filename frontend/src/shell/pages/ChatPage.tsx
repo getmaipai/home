@@ -1624,9 +1624,9 @@ export function ChatPage({ person }: { person: Roster }) {
                   <AlertDialogContent data-testid="remix-dialog">
                     <AlertDialogHeader>
                       <AlertDialogTitle>Remix this {remix.ask.kind}</AlertDialogTitle>
-                      <AlertDialogDescription>Change the words to describe what you want different. The original stays.</AlertDialogDescription>
+                      <AlertDialogDescription>Describe what you want changed. The original stays.</AlertDialogDescription>
                     </AlertDialogHeader>
-                    <Textarea aria-label={`What the ${remix.ask.kind} should be`} value={remix.words} maxLength={2000} rows={5} onChange={(event) => remix.setWords(event.target.value)} />
+                    <Textarea aria-label={`Describe the changes to this ${remix.ask.kind}`} placeholder="For example: make it night time, add a red hat" value={remix.words} maxLength={2000} rows={5} onChange={(event) => remix.setWords(event.target.value)} />
                     <AlertDialogFooter>
                       <AlertDialogCancel onClick={() => remix.answer(null)}>Cancel</AlertDialogCancel>
                       <AlertDialogAction disabled={remix.words.trim() === ""} onClick={() => remix.answer(remix.words.trim())}>Make it</AlertDialogAction>
