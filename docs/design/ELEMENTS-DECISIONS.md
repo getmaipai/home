@@ -83,5 +83,6 @@ These non-adoptions carry no baseline entry because the scanners do not see them
   those rows are a stale record, not a decision.
 - `launcher-bubble`, `assistant-modal` and `assistant-sidebar`: master plan Q5 recommended no floating ask button. Ruled the other
   way by Jesse on 2026-10-24 (S2 edited, Owner-approved): the shell draws the person's companion launcher on non-chat areas and it
-  opens a chat panel, so `launcher-bubble` and `assistant-modal` are claimed by COMPANIONS-PRESENCE-01
-  (`companions-shared-chat-and-presence-2026-10-24.md`, section 7); `assistant-sidebar` stays unclaimed.
+  opens a chat panel. Revised 2026-10-27 (REVAMP-PRESENCE-01, `companions-handoff-revamp-2026-10-26.md` section 5a): the corner card
+  opens no panel, so it is the new kit Element `companion-dock`; `launcher-bubble` stays the wake-word indicator and `assistant-modal`
+  is not needed; `assistant-sidebar` stays unclaimed.

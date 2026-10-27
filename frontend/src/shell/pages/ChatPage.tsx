@@ -30,6 +30,7 @@ import { Button } from "@maipai/ui/src/ui/button";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@maipai/ui/src/ui/sheet";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@maipai/ui/src/ui/dialog";
 import { VoiceConversation } from "@maipai/ui/src/elements/voice-conversation";
+import { VoiceStage } from "@/shell/VoiceStage";
 import { TooltipIconButton } from "@maipai/ui/src/elements/tooltip-icon-button";
 import { AsyncState } from "@maipai/ui/src/primitives/AsyncState";
 import { useBreakpoint } from "@maipai/ui/src/hooks/useBreakpoint";
@@ -1594,6 +1595,7 @@ export function ChatPage({ person }: { person: Roster }) {
         <Dialog open={voiceOpen} onOpenChange={closeAwareSetVoiceOpen}>
           <DialogContent variant="call" showCloseButton={false} aria-label="Voice conversation">
             <VoiceConversation
+              stage={<CompanionSpeechContext.Provider value={{ isSpeaking, liveVoiceListening: voiceSession.mode === "listening" }}><VoiceStage conversationId={temporaryNext ? null : draftConversationId ?? null} mode={voiceSession.mode} /></CompanionSpeechContext.Provider>}
               mode={voiceSession.mode}
               amplitude={voiceSession.amplitude}
               muted={voiceSession.muted}

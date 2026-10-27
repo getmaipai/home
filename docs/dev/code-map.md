@@ -147,6 +147,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `frontend/src/shell/Routes.tsx` | Routes |
 | `frontend/src/shell/StatusIndicator.tsx` | useStatusSummary, StatusIndicator |
 | `frontend/src/shell/ThemeToggle.tsx` | useIsDark, ThemeToggle |
+| `frontend/src/shell/VoiceStage.tsx` | VoiceStage |
 | `frontend/src/shell/audioSessionContext.tsx` | AudioSessionProvider, useAudioSession, useAudioSessionState, useAudioPosition, useMiniBar, useAudioRegistration |
 | `frontend/src/shell/components/DataTableControls.tsx` | DataTableControls |
 | `frontend/src/shell/components/DataTableRowActions.tsx` | DataTableRowActions |
@@ -237,6 +238,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `frontend/src/shell/pages/status/StatusComponents.tsx` | ENGINE_ROWS, engineState, formatUptime, StatusLegend, StatusPartsBody |
 | `frontend/src/shell/pages/status/StatusIncident.tsx` | statusIncidentFacts, StatusIncidentBody |
 | `frontend/src/shell/sessionLockContext.tsx` | useSessionLocked, SessionLockGate |
+| `frontend/src/shell/useCompanionDock.tsx` | useCompanionDock |
 
 ## Backend units (backend/src/lib)
 

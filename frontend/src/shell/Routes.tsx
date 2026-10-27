@@ -26,6 +26,8 @@ import { MediaHostProvider, MediaLinkRedirect } from "@/shell/mediaHost";
 import { IncognitoProvider, INCOGNITO_DISCARDED_EVENT, useIncognitoContext } from "@/shell/incognitoContext";
 import { MemoriesRedirect, LegacyProfileMemoriesRedirect } from "@/shell/MemoriesRedirect";
 import { InstallDock } from "@/shell/InstallDock";
+import { CompanionDock } from "@maipai/ui/src/elements/companion-dock";
+import { useCompanionDock } from "@/shell/useCompanionDock";
 import { RailProfile } from "@/shell/RailProfile";
 import { BrowserAlerts } from "@/shell/BrowserAlerts";
 import { useWakeWordListening } from "@/apps/chat/useWakeWordListening";
@@ -184,6 +186,7 @@ function RoutesWithIncognito({ person, onPersonChange, onSignedOut }: { person: 
   const projectChatMatch = useMatch("/chat/projects/:id");
   const onChatPage = chatMatch !== null || projectChatMatch !== null;
   const openChatWithCall = useCallback(() => navigate("/chat?wake=1"), [navigate]);
+  const companionDock = useCompanionDock(person);
   const shellWake = useWakeWordListening({ person, onWake: openChatWithCall, active: !onChatPage });
   const selectedAppHref = activeAppHref(location.pathname, packageAreaApps(usePackageAreas().areas));
   const statusAppsQuery = useStatusApps();
@@ -239,6 +242,7 @@ function RoutesWithIncognito({ person, onPersonChange, onSignedOut }: { person: 
       <BrowserAlerts person={person} />
       {shellWake.indicator ? <LauncherBubble docked open={false} unread={0} greeting="" prompts={[]} {...shellWake.indicator} /> : null}
       <ShellInstallStrip person={person} />
+      {companionDock ? <CompanionDock {...companionDock} /> : null}
       {activeTour ? (
         <Tour
           steps={activeTour.tour.steps.map((step) => ({

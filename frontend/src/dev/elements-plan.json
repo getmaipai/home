@@ -4170,6 +4170,13 @@
       "verdictReason": "Draws the companion's profile header on its page; adopted as shipped with props only."
     },
     {
+      "file": "companion-dock.tsx",
+      "name": "companion-dock",
+      "group": "companion",
+      "verdict": "wire-now",
+      "verdictReason": "Draws the companion's corner card outside Chat (shell mount, Review button, minimize and close); adopted as shipped with props only."
+    },
+    {
       "file": "task-browser.tsx",
       "name": "task-browser",
       "group": "task",
