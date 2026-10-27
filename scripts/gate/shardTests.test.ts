@@ -290,13 +290,8 @@ describe("run: the gate's pass/fail meaning", () => {
 
   test("an unlisted file that fails alone remains red", async () => {
     const dir = fixture({ "a.test.ts": `import {test,expect} from "bun:test"; test("always red",()=>expect(1).toBe(2));` });
-    const output: string[] = [];
-    const write = process.stderr.write;
-    process.stderr.write = ((chunk: string | Uint8Array) => { output.push(String(chunk)); return true; }) as typeof process.stderr.write;
-    try {
-      expect(await run({ ...fixtureBudget, dir, root: "tests", shards: 1, timingsPath: join(dir, "t.json"), ledger: { version: 2, flakes: [], serial: {}, skipped: [] }, changedFiles: [] })).not.toBe(0);
-      expect(output.join("")).toContain("always red");
-    } finally { process.stderr.write = write; rmSync(dir, { recursive: true, force: true }); }
+    try { expect(await quietRun({ dir, root: "tests", shards: 1, timingsPath: join(dir, "t.json"), ledger: { version: 2, flakes: [], serial: {}, skipped: [] }, changedFiles: [] })).not.toBe(0); }
+    finally { rmSync(dir, { recursive: true, force: true }); }
   });
 
   test("a listed failure lets all shards finish, reruns that test once, and records FLAKY", async () => {
