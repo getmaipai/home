@@ -19,20 +19,22 @@ function useTabHidden(): boolean {
 }
 
 /** WAKEUX-02: this device's wake word. `onWake` runs after the rising chime (Chat opens the call in place; any other page opens Chat with it).
- * `voiceOpen` pauses listening while a call owns the microphone. `indicator` is non-null exactly while the mic is open:
+ * `active` false (the shell hook while Chat is showing) neither listens nor reacts. `voiceOpen` pauses listening while a call owns the microphone. `indicator` is non-null exactly while the mic is open:
  * the caller renders it as the kit launcher's listening state (RULES S2), one per page. */
-export function useWakeWordListening({ person, onWake, voiceOpen = false, runtime }: { person: Roster; onWake: () => void; voiceOpen?: boolean; runtime?: WakeWordRuntime }) {
+export function useWakeWordListening({ person, onWake, voiceOpen = false, active = true, runtime }: { person: Roster; onWake: () => void; voiceOpen?: boolean; active?: boolean; runtime?: WakeWordRuntime }) {
   const setting = useDeviceWakeWordSetting(person);
   const persistEnabled = setting.setEnabled;
   const tabHidden = useTabHidden();
   const onWakeDetected = useCallback(() => {
+    // The wake event bus is global: only the active site (Chat's own, or the shell's off Chat) reacts.
+    if (!active) return;
     playWakeCue("heard");
     onWake();
-  }, [onWake]);
+  }, [active, onWake]);
   const { enabled, status, start, stop } = useWakeWord({ onWakeDetected, ...runtime });
 
   useEffect(() => {
-    if (!setting.adult || !setting.available || !setting.enabled || tabHidden) {
+    if (!setting.adult || !setting.available || !setting.enabled || tabHidden || !active) {
       if (enabled) void stop();
       return;
     }
@@ -43,13 +45,13 @@ export function useWakeWordListening({ person, onWake, voiceOpen = false, runtim
       return;
     }
     if (!enabled && status === "idle") void start();
-  }, [setting.adult, setting.available, setting.enabled, tabHidden, voiceOpen, enabled, status, start, stop]);
+  }, [setting.adult, setting.available, setting.enabled, tabHidden, active, voiceOpen, enabled, status, start, stop]);
 
   const turnOff = useCallback(() => {
     void stop();
     void persistEnabled(false);
   }, [persistEnabled, stop]);
 
-  if (!setting.adult || !setting.available || (status !== "starting" && status !== "listening")) return { indicator: null };
+  if (!setting.adult || !setting.available || (!active || (status !== "starting" && status !== "listening"))) return { indicator: null };
   return { indicator: { listening: status === "listening" ? "Listening for Hey Jarvis" : "Starting the microphone", onTurnOff: turnOff } };
 }

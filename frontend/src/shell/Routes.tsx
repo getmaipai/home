@@ -184,7 +184,7 @@ function RoutesWithIncognito({ person, onPersonChange, onSignedOut }: { person: 
   const projectChatMatch = useMatch("/chat/projects/:id");
   const onChatPage = chatMatch !== null || projectChatMatch !== null;
   const openChatWithCall = useCallback(() => navigate("/chat?wake=1"), [navigate]);
-  const shellWake = useWakeWordListening({ person, onWake: openChatWithCall, voiceOpen: onChatPage });
+  const shellWake = useWakeWordListening({ person, onWake: openChatWithCall, active: !onChatPage });
   const selectedAppHref = activeAppHref(location.pathname, packageAreaApps(usePackageAreas().areas));
   const statusAppsQuery = useStatusApps();
   // LEFTNAV-APPS-01: the installed package apps this person may open (the hub's list, minus an Incognito-blocked app
@@ -237,7 +237,7 @@ function RoutesWithIncognito({ person, onPersonChange, onSignedOut }: { person: 
     <TabIdentityProvider temporary={incognito} locked={locked} ageBand={person.age_band}>
     <ChatHeaderDataProvider>
       <BrowserAlerts person={person} />
-      {!onChatPage && shellWake.indicator ? <LauncherBubble docked open={false} unread={0} greeting="" prompts={[]} {...shellWake.indicator} /> : null}
+      {shellWake.indicator ? <LauncherBubble docked open={false} unread={0} greeting="" prompts={[]} {...shellWake.indicator} /> : null}
       <ShellInstallStrip person={person} />
       {activeTour ? (
         <Tour

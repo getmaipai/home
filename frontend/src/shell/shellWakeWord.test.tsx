@@ -38,7 +38,7 @@ function Where() {
 function ShellWakeWord({ person }: { person: Roster }) {
   const navigate = useNavigate();
   const onChat = useLocation().pathname === "/chat";
-  useWakeWordListening({ person, onWake: () => navigate("/chat?wake=1"), voiceOpen: onChat });
+  useWakeWordListening({ person, onWake: () => navigate("/chat?wake=1"), active: !onChat });
   return null;
 }
 
