@@ -103,23 +103,35 @@ Settings, AI and models shows what companion art uses. Verify ERNIE is installed
 - Open: no independent anime comparison of ERNIE, Z-Image and Klein; Qwen-Image-Edit-2511 licence conflicts between its card and the bakeoff note; LoRA training time on our hardware unmeasured.
 - Bench (COMPANIONS-ART-BENCH-01): 10 mascot prompts (5 animals, 3 anime humanoids, 2 robots) on Klein, ERNIE, Z-Image with no style prompt, a style prompt, and a style prompt plus LoRA; 3 edit views per character; 6 states by 5 characters by 3 seeds on Wan. Pass: 8 of 10 clean single characters, 80 percent same-character on edit views, palette and outline hold over the clip, loop seam under threshold, under 1 percent key fringe.
 
-## 8a. Appearance drafts and Publish (REVAMP-APPEARANCE-01, design 2026-10-27)
+## 8a. Appearance drafts and Publish (REVAMP-APPEARANCE-01, design 2026-10-27, revised after the architect's ruling)
 
 Research of the code (2026-10-27) found: approving a state clip copies it into the live `animation/` folder and rewrites the live manifest `companion.animation` in the same request
 (`routes/companions.ts` approve route), unapprove and `clearStateApprovals` delete it, and nothing else writes the live folder. `states/<state>/<take>/` and `look/` are already the working store.
-So the draft is the existing store, the published copy is the existing `animation/` plus the manifest field, and no second store is added (principle 1).
+So the draft is the existing store, the published copy is the existing `animation/` plus the manifest field, and no second store is added (principles 1 and 6).
 
 1. **Approve and unapprove touch the draft only.** They keep today's checks (take report present, quality `force`, idle first) and stop writing `animation/` and the manifest.
-2. **Publish** (`POST /api/companions/{id}/appearance/publish`, author or admin, same access as the states routes): requires the sheet approved and idle approved; builds the whole `animation` tree (rest.png, card.json, every approved state's h264/av1/still) in a sibling temp folder,
-   then swaps it in with renames and writes the manifest in the same step; any failure leaves the previous published animation untouched. It records which take each state published (`published` map and time on the states record).
-3. **Review needed** is computed, not stored: the draft differs from the published map (a different take, a newly approved or unapproved state, a changed portrait). The appearance read returns `has_changes`, per-state `assigned`, `published` and `changed`, and `reasons` when Publish is not possible.
-4. A change to the rest picture, card or key clears the draft approvals as today but leaves the live animation in place until the next Publish; the studio says "Changes stay in draft until published."
-5. **Safety, said plainly.** No per-asset safety verdict exists in the companion records today: look uploads and clip uploads are not screened, generation screens the prompt text only, and the post-render check is the open item VIDEO-GEN-12.
-   Approve was equally unchecked, so Publish adds no new exposure and enforces exactly the checks approve enforces. This slice builds no new asset screening and makes no safety claim beyond that; VIDEO-GEN-12 stays open and is not part of this work.
-   (Rule 10 fails closed for a check that exists and cannot run; there is none to fail here.) When VIDEO-GEN-12 lands, Publish is the one place that adds its verdict requirement.
-6. Reuse check (principle 6): the look store (CMEDIA-LOOK-01), the approval step (CMEDIA-STATES-03) and the sheet record are kept as they are; this slice absorbs CMEDIA-REVIEW-01 (the per-state review screen) and the editor part of CMEDIA-EDITOR-05.
-7. Tests that assumed approval is live (`routes/companions.test.ts`: state upload and approval, approval requires force and idle, sheet approve/unapprove and rest change) are rewritten to assert the draft/publish split; the avatar and animation-file tests keep working because the live manifest field and folder stay the published store.
-8. Studio UI follows `mockups/studio.png`: a state list with Assigned/Selected/Optional status, the stage with Test state and Upload clip, "1. Choose a start image" and "2. Animate your selection", a right rail with the character reference, clip checks drawn from the take's real quality report, and recent generation; the header carries "Publish appearance". Slices: 8a backend (this section), 8b the studio layout.
+2. **Publish** (`POST /api/companions/{id}/appearance/publish`, author or admin, same access as the states routes): requires the sheet approved and idle approved, and refuses while `companionHasFinishingJob(id)` is true.
+   It builds the whole `animation` tree (rest.png, card.json, every approved state's h264/av1/still) in a sibling temp folder, then swaps it in: the old folder is kept until the new one and the manifest write both succeed, a failure restores it, and startup recovers an interrupted swap.
+   It records the `published` map (state to take id), who published and when, on the states record (provenance, principle 3).
+3. **The finished-item age check runs on everything Publish makes live (rules 0 and 10).** Home already ships it: `pictures/ageCheck.ts` (`checkImages`, `decideAgeCheck`, IMGGEN-SAFE-01), used for picture jobs, video keyframes, edits, uploads and when a picture is widened to all ages.
+   Companion art skips it today (the look job sends `audience: "all-ages"` straight to generation, uploads and takes are never checked after rendering). That is a gap, not a license: rule 0 names companion media, and rule 10 says a check that cannot run on a CSAM candidate fails closed.
+   Publish therefore runs `checkImages` on rest.png, the sheet views, and each published state's still and clip keyframes (the same way `videos/jobs.ts` does), uploaded and generated assets alike.
+   - The viewer band is the strictest the companion's audience reaches: `all` is checked as child, `teen` as teen, `adult` as adult (`isAdultOnlyJob` supplies adult-only).
+   - A withheld or unrunnable result blocks Publish and is listed in `reasons`; the child and teen bands and adult-only jobs fail closed through `decideAgeCheck` as they already do.
+   - The verdict is stored per take or asset hash on the draft record so an unchanged asset is not checked twice.
+   - Widening a published companion's audience (adult to teen or all) re-checks the published set at the new band and blocks the change on a withheld or unrunnable result.
+   This wires a component that already ships; it adds no new screening and needs no rule change. The backlog row VIDEO-GEN-12 (post-render check) lags the code on this point, since video keyframes are already checked; it is not edited here because it carries an open owner question.
+4. **Review needed** is computed, not stored: the draft differs from the published map (a different take, a newly approved or unapproved state, a changed portrait). The appearance read returns `has_changes`, per-state `assigned`, `published` and `changed`, and `reasons` when Publish is not possible.
+   It shows only in the studio and the record: no badge on directory cards or the launcher (RULES.md S2 and S6).
+5. **Backfill:** a companion that has a live `animation` but no `published` map treats the current manifest as published, so no existing companion shows Review needed.
+6. A change to the rest picture, card or key clears the draft approvals as today but leaves the live animation in place until the next Publish; the studio says "Changes stay in draft until published."
+7. **Reuse check (principle 6):** the look store (CMEDIA-LOOK-01), the approval step (CMEDIA-STATES-03), the sheet record and `pictures/ageCheck.ts` are kept and reused. This slice absorbs CMEDIA-REVIEW-01's per-state review screen only; its package-signing half stays with package companions (unchanged, still open there).
+   CMEDIA-EDITOR-05 (the audience review and the "suitable for children" checklist for the `all` audience, with who and when stored, design 12.5) is NOT absorbed: it stays open as its own row, and Publish's age check is independent of it.
+8. Tests that assumed approval is live (`routes/companions.test.ts`: state upload and approval, approval requires force and idle, sheet approve/unapprove and rest change) are rewritten to assert the draft/publish split, plus: Publish blocked by a withheld or unrunnable check, atomic swap failure leaves the old animation, backfill, and audience widening re-check.
+   The avatar and animation-file tests keep working because the live manifest field and folder stay the published store.
+9. **Studio UI (slice 8b, after 8a)** follows `mockups/studio.png`. Reuse per region: the state list is the kit `List` (as the page uses today for About rows) with kit `Badge` status (Assigned, Selected, Optional); the stage is the kit `CompanionAvatar` player Element as shipped (not Home's temporary `StackedAlphaPreview`, CMEDIA-PLAYER-02) with the kit `Button` for Test state and Upload clip;
+   "Choose a start image" candidates are the existing `CharacterTile`/picture cards of the Look tab; the right rail is kit `Card`s: character reference (the rest picture, kit `Avatar`), clip checks drawn from the take's real `report` (kit `Status`/list, never invented checks), and recent generation as that job's own card (S6, no new list or status).
+   No `className` overrides and no Home wrappers (rule 9); any look the kit cannot reach becomes a commons prop first. The header carries "Publish appearance" (kit `Button`).
 
 ## 9. Build order and rows
 
@@ -131,7 +143,7 @@ So the draft is the existing store, the published copy is the existing `animatio
 6. Retry with the original speaker; "Retry with current companion" (REVAMP-RETRY-01; turn path, code review at medium).
 7. Directory, profile and Tasks in the mockup layout (REVAMP-DIRECTORY-01, REVAMP-TASKS-01).
 8. Appearance drafts, atomic Publish, "Review needed", with CMEDIA-BENCH-01 and the codec matrix (REVAMP-APPEARANCE-01). Reuse check: drafts live on the existing look store (CMEDIA-LOOK-01) and its approval step (CMEDIA-STATES-03), with the `status` and `review` fields of CMEDIA-SPEC-01;
-   this slice absorbs the open CMEDIA-REVIEW-01 and CMEDIA-EDITOR-05. "Review needed" stays on the draft's own record and editor. Publish never bypasses the CSAM check (rule 10, fails closed).
+   this slice absorbs the per-state review screen of CMEDIA-REVIEW-01 (not CMEDIA-EDITOR-05, see section 8a.7). "Review needed" stays on the draft's own record and editor. Publish runs the finished-item age check on everything it makes live and fails closed (rules 0 and 10, section 8a.3).
 9. "Try it" test chat and state tester in the wizard (REVAMP-TRYIT-01). Reuse check: "Try it" is the chat Thread in temporary mode with the draft pinned (no stored speaker, no activity, author only, still `companionFits`-gated);
    the state tester is the `CompanionAvatar` Element as shipped.
 10. Voice stage and dock with Review, after the commons tag (REVAMP-PRESENCE-01, supersedes the open part of COMPANIONS-PRESENCE-01).
@@ -144,5 +156,5 @@ Rivet is described as a small robot but the mockup portrait is human. Fix the ar
 ## 11. Supersedes
 
 Shared-chat note section 3 (marker only on change) and decision 13.6; the dots-look gallery, detail and header decisions, and DOTS-KIT-01's `CharacterHero`/`CharacterTile`;
-CHAR-01's clause "no separate character mark appears in the chat column"; the open part of COMPANIONS-PRESENCE-01; CMEDIA-REVIEW-01 and CMEDIA-EDITOR-05 (absorbed by REVAMP-APPEARANCE-01);
+CHAR-01's clause "no separate character mark appears in the chat column"; the open part of COMPANIONS-PRESENCE-01; the per-state review screen of CMEDIA-REVIEW-01 (absorbed by REVAMP-APPEARANCE-01; its package-signing half and CMEDIA-EDITOR-05 stay open);
 the presence strip idea in the handoff.
