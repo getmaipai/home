@@ -1,6 +1,6 @@
 {
-  "generatedAt": "2026-10-27T03:54:31.852Z",
-  "kitTag": "ui-v0.5.366",
+  "generatedAt": "2026-10-27T05:04:45.667Z",
+  "kitTag": "ui-v0.5.367",
   "items": [
     {
       "file": "ActivityCardsShowcase.tsx",
@@ -334,6 +334,22 @@
       "group": "companion",
       "verdict": "wire-now",
       "verdictReason": "Drawn in the chat thread's corner for a person whose companion is ready and animated (CMEDIA-PLAYER-01c); it carries its own placement and hide control, so Home passes props only.",
+      "implemented": true
+    },
+    {
+      "file": "companion-card.tsx",
+      "name": "companion-card",
+      "group": "companion",
+      "verdict": "unassessed",
+      "verdictReason": "Recorded unassessed verdict in elements-plan.json; see the plan entry for its dependency or scope.",
+      "implemented": true
+    },
+    {
+      "file": "companion-profile-header.tsx",
+      "name": "companion-profile-header",
+      "group": "companion",
+      "verdict": "unassessed",
+      "verdictReason": "Recorded unassessed verdict in elements-plan.json; see the plan entry for its dependency or scope.",
       "implemented": true
     },
     {
