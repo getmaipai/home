@@ -350,3 +350,13 @@ test("a parts line names each model and folds every engine file into one short i
   ]);
   expect(partsLine([row("chat", "Chat AI (Muse Glimmer 30B)", "model", 20_000_000_000)])).toHaveLength(1);
 });
+
+test("every option's parts line names a model, never a job label (issue 250)", () => {
+  for (const tier of TIERS_LIST) {
+    const cards = buildAiCards({ copy, plan: TIERS[tier], components: null, settings: SETTINGS, freeBytes: null, wakeword: { installed: false, bytes: 1_000_000 }, uncensored: { installed: false, running: false, downloading: false, percent: null, downloadBytes: 22 * GIB, installedBytes: 22 * GIB } }).cards;
+    for (const choice of cards.flatMap((card) => card.choices)) {
+      for (const part of choice.details) expect(part.name).not.toMatch(/projector|tools$|^Look at pictures$/);
+      expect(choice.details.length).toBeGreaterThan(0);
+    }
+  }
+});

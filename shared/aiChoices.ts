@@ -181,9 +181,16 @@ function buildChoice(copyOf: AiCopy, plan: DiskPlan, components: AiComponentLike
   };
 }
 
+// Plan rows whose label describes the job and not the model (issue 250). The parts line shows the model's own name instead.
+const MODEL_NAMES: Record<string, string> = {
+  "reads-pictures": "Muse Glimmer 30B picture reader",
+  "image-tools": "ISNet, LaMa and Real-ESRGAN",
+  "tool-look": "YOLOX Nano",
+};
+
 /** The parts line of a choice: each model by name, and every engine file (Python base, engine tools) as one short "Engine files" item, so a long list of engine parts never buries the model's name. */
 export function partsLine(rows: DiskRow[]): Array<{ name: string; sizeBytes: number }> {
-  const models = rows.filter((row) => row.kind !== "engine").map((row) => ({ name: row.label, sizeBytes: row.installed_bytes }));
+  const models = rows.filter((row) => row.kind !== "engine").map((row) => ({ name: MODEL_NAMES[row.id] ?? row.label, sizeBytes: row.installed_bytes }));
   const engineBytes = rows.filter((row) => row.kind === "engine").reduce((sum, row) => sum + row.installed_bytes, 0);
   return engineBytes > 0 ? [...models, { name: "Engine files", sizeBytes: engineBytes }] : models;
 }
