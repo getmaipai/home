@@ -20,6 +20,15 @@ test("trimArticleTail cuts at the first marker after the story begins and drops 
   expect(trimArticleTail([p("a"), p("b"), p("c"), p("FTC: We use income earning auto affiliate links."), p("d")]).length).toBe(3);
 });
 
+test("trimArticleTail keeps a story that has a Related box in the middle (The Verge) and still cuts a closing one", () => {
+  const long = (n: string) => p(`${n} `.repeat(60));
+  const list = (text: string): ArticleBlock => ({ type: "list", ordered: false, items: [[{ type: "text", text }]] });
+  const mid = [long("a"), long("b"), long("c"), long("d"), h("Related"), list("Link box"), long("e"), long("f"), long("g"), h("More in: Topic"), h("Most Popular")];
+  expect(trimArticleTail(mid).map((b) => b.type)).toEqual(["paragraph", "paragraph", "paragraph", "paragraph", "paragraph", "paragraph", "paragraph"]);
+  const closing = [long("a"), long("b"), long("c"), long("d"), long("e"), h("Related"), list("Link box"), h("Another headline"), h("Most Popular")];
+  expect(trimArticleTail(closing).length).toBe(5);
+});
+
 test("iconLinksOf lists declared icons, largest first, https only", () => {
   const html = '<link rel="icon" href="/f.ico"><link rel="apple-touch-icon" sizes="180x180" href="/a.png"><link rel="icon" href="http://x/y.png">';
   expect(iconLinksOf(html, "https://s.example/")).toEqual(["https://s.example/a.png", "https://s.example/f.ico"]);
