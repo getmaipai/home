@@ -403,7 +403,16 @@ S2. **Each app area emulates its native app.** Everything to the right of
     exception to "carries no count or status" is a single Review button,
     shown only while a task of the viewer's own needs them (Owner-approved
     2026-10-26, design record companions-handoff-revamp-2026-10-26.md);
-    the launcher shows no count, dot or other status.
+    the launcher shows no count, dot or other status. The one other
+    thing the shell draws there is the listening indicator: one, at the
+    bottom corner of every page, Chat included, for exactly as long as
+    this device's wake word has the microphone open. It says it is
+    listening and carries a Turn off button; when the companion launcher
+    exists it is that launcher's listening state, shown even while the
+    launcher is turned off (Owner-approved 2026-10-27, design record
+    wake-word-ux-2026-10-27.md; his words: "should we combine the ear and
+    companion always on thing so we have 1 thing", answered "Launcher
+    shows listening").
 S3. **A test holds the rail.** A test fails when the main navigation does
     not render on an app page: the rail at 640 and up, the menu button and
     its drawer below 640, with accessible names, at 360, 402, 874 x 402,
