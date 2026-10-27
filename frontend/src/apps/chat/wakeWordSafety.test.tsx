@@ -3,8 +3,9 @@ import { act, cleanup, fireEvent, waitFor } from "@testing-library/react";
 import * as fs from "node:fs";
 import { useState } from "react";
 import { VoiceSessionProvider } from "@/apps/chat/voiceSessionContext";
-import { WakeWordController } from "@/apps/chat/WakeWordController";
-import { WakeWordIndicator } from "@/apps/chat/WakeWordIndicator";
+import { useWakeWordListening } from "@/apps/chat/useWakeWordListening";
+import { useVoiceSession } from "@/apps/chat/voiceSessionContext";
+import { LauncherBubble } from "@maipai/ui/src/elements/launcher-bubble";
 import { Button } from "@maipai/ui/src/ui/button";
 import { emitWakeDetected } from "@/lib/voice/wake-word-events";
 import type { Roster, ResolvedSetting } from "@/lib/api";
@@ -64,6 +65,18 @@ function stubWakewordSettings(initialValue: boolean) {
   return { writes, restore: () => { globalThis.fetch = original; } };
 }
 
+// Stands in for the two use sites (Routes off Chat, ChatPage on it): the hook plus the kit Element it feeds.
+function WakeWordController({ person, runtime, onWake }: { person: Roster; runtime?: Parameters<typeof useWakeWordListening>[0]["runtime"]; onWake?: () => void }) {
+  const voiceSession = useVoiceSession();
+  const wake = useWakeWordListening({
+    person,
+    runtime,
+    voiceOpen: voiceSession?.open ?? false,
+    onWake: onWake ?? (() => { if (voiceSession?.openFromWake) voiceSession.openFromWake(); else voiceSession?.setOpen(true); }),
+  });
+  return wake.indicator ? <LauncherBubble docked open={false} unread={0} greeting="" prompts={[]} {...wake.indicator} /> : null;
+}
+
 function ControllerHarness({ runtime, person = adult(), openFromWake }: { runtime?: React.ComponentProps<typeof WakeWordController>["runtime"]; person?: Roster; openFromWake?: () => void }) {
   const [open, setOpen] = useState(false);
   const [openedByWake, setOpenedByWake] = useState(false);
@@ -107,29 +120,28 @@ describe("HANDSFREE-01(c) wake-word safety", () => {
         <ControllerHarness runtime={{ loadModels: modelLoadNoop, startCapture, createLoop: inertLoop }} />,
       );
       await waitFor(() => expect(globalThis.fetch).toHaveBeenCalled());
-      expect(view.queryByLabelText("Wake word is listening")).toBeNull();
+      expect(view.queryByText("Listening for Hey Jarvis")).toBeNull();
       expect(startCapture).not.toHaveBeenCalled();
     } finally {
       fetcher.restore();
     }
   });
 
-  test("(iii) the persistent indicator is present while listening/starting and absent when idle", () => {
-    const off = renderWithQueryClient(<WakeWordIndicator status="idle" onTurnOff={() => {}} />);
-    expect(off.queryByRole("status")).toBeNull();
-    off.unmount();
-    const starting = renderWithQueryClient(<WakeWordIndicator status="starting" onTurnOff={() => {}} />);
-    expect(starting.getByRole("status", { name: "Wake word microphone is starting" })).toBeTruthy();
-    starting.unmount();
-    const listening = renderWithQueryClient(<WakeWordIndicator status="listening" onTurnOff={() => {}} />);
-    expect(listening.getByRole("status", { name: "Wake word is listening" })).toBeTruthy();
-  });
-
-  test("(iv) activating the indicator's own control invokes the off action in one click", () => {
-    const off = mock();
-    const view = renderWithQueryClient(<WakeWordIndicator status="listening" onTurnOff={off} />);
-    fireEvent.click(view.getByRole("button", { name: "Turn off wake word listening" }));
-    expect(off).toHaveBeenCalledTimes(1);
+  test("(iii)/(iv) the one indicator shows only while the mic is open, on any page, and carries its own Turn off (see (i) and (vi))", async () => {
+    localStorage.setItem("maipai.device-settings-id.v1", "browser-1234567890ab");
+    const fetcher = stubWakewordSettings(true);
+    const woke = mock();
+    try {
+      const view = renderWithQueryClient(
+        <WakeWordController person={adult()} onWake={woke} runtime={{ loadModels: modelLoadNoop, startCapture: async () => ({ stop: () => {}, sampleRate: 16_000 }), createLoop: inertLoop }} />,
+      );
+      await view.findByText("Listening for Hey Jarvis");
+      expect(view.getByRole("button", { name: "Turn off wake word listening" })).toBeTruthy();
+      act(() => emitWakeDetected({ modelId: "hey_jarvis", score: 0.9, threshold: 0.5, frameIndex: 1, timestamp: Date.now() }));
+      await waitFor(() => expect(woke).toHaveBeenCalledTimes(1));
+    } finally {
+      fetcher.restore();
+    }
   });
 
   test("(v) captured pre-wake audio only enters the in-memory detector; no file, turn, or memory request occurs", async () => {
@@ -146,7 +158,7 @@ describe("HANDSFREE-01(c) wake-word safety", () => {
       const view = renderWithQueryClient(
         <ControllerHarness runtime={{ loadModels: modelLoadNoop, startCapture }} />,
       );
-      await view.findByRole("status", { name: "Wake word is listening" });
+      await view.findByText("Listening for Hey Jarvis");
       const preWakeFrame = new Float32Array(160).fill(0.125); // below one detector frame: buffered in the real WakeWordLoop's typed-array accumulator
       deliverFrame!(preWakeFrame);
       await Promise.resolve();
@@ -172,11 +184,11 @@ describe("HANDSFREE-01(c) wake-word safety", () => {
       const view = renderWithQueryClient(
         <ControllerHarness runtime={{ loadModels: modelLoadNoop, startCapture, createLoop: inertLoop }} />,
       );
-      await view.findByRole("status", { name: "Wake word is listening" });
+      await view.findByText("Listening for Hey Jarvis");
       fireEvent.click(view.getByRole("button", { name: "Turn off wake word listening" }));
       await waitFor(() => expect(stopped).toBe(1));
       await waitFor(() => expect(fetcher.writes).toEqual([{ scope: DEVICE_SCOPE, key: KEY, value: false }]));
-      expect(view.queryByRole("status", { name: "Wake word is listening" })).toBeNull();
+      expect(view.queryByText("Listening for Hey Jarvis")).toBeNull();
     } finally {
       fetcher.restore();
     }
@@ -189,7 +201,7 @@ describe("HANDSFREE-01(c) wake-word safety", () => {
       <ControllerHarness runtime={{ loadModels: modelLoadNoop, startCapture: async () => ({ stop: () => {}, sampleRate: 16_000 }), createLoop: inertLoop }} />,
     );
     try {
-      await view.findByRole("status", { name: "Wake word is listening" });
+      await view.findByText("Listening for Hey Jarvis");
       act(() => emitWakeDetected({ modelId: "hey_jarvis", score: 0.9, threshold: 0.5, frameIndex: 1, timestamp: Date.now() }));
       await waitFor(() => expect(view.getByTestId("voice-session-open").textContent).toBe("true"));
     } finally {
@@ -208,11 +220,11 @@ describe("HANDSFREE-01(c) wake-word safety", () => {
       <WakeWordController person={adult()} runtime={{ loadModels: modelLoadNoop, startCapture: async () => ({ stop: () => {}, sampleRate: 16_000 }), createLoop: inertLoop }} />,
     );
     try {
-      await view.findByRole("status", { name: "Wake word is listening" });
+      await view.findByText("Listening for Hey Jarvis");
       act(() => setHidden(true));
-      await waitFor(() => expect(view.queryByRole("status", { name: "Wake word is listening" })).toBeNull());
+      await waitFor(() => expect(view.queryByText("Listening for Hey Jarvis")).toBeNull());
       act(() => setHidden(false));
-      await view.findByRole("status", { name: "Wake word is listening" });
+      await view.findByText("Listening for Hey Jarvis");
     } finally {
       Object.defineProperty(document, "hidden", { configurable: true, get: () => false });
       fetcher.restore();
@@ -230,7 +242,7 @@ describe("HANDSFREE-01(c) wake-word safety", () => {
       />,
     );
     try {
-      await view.findByRole("status", { name: "Wake word is listening" });
+      await view.findByText("Listening for Hey Jarvis");
       act(() => emitWakeDetected({ modelId: "hey_jarvis", score: 0.9, threshold: 0.5, frameIndex: 1, timestamp: Date.now() }));
       await waitFor(() => expect(setOrigin).toHaveBeenCalledTimes(1));
       expect(view.getByTestId("voice-session-open").textContent).toBe("true");

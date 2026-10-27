@@ -49,7 +49,8 @@ import { createChatSuggestionAdapter } from "@/apps/chat/chatSuggestionAdapter";
 import { PackageScopeContext, PhotoUploadsContext } from "@/apps/chat/composerAddMenu";
 import "@/shell/pages/chatTouchTargets.css";
 import "@/shell/pages/chatReplyMarkdown.css";
-import { WakeWordController } from "@/apps/chat/WakeWordController";
+import { useWakeWordListening } from "@/apps/chat/useWakeWordListening";
+import { LauncherBubble } from "@maipai/ui/src/elements/launcher-bubble";
 import { useSetChatHeaderData } from "@/apps/chat/chatHeaderData";
 import { ChatHeaderBar } from "@/apps/chat/chatHeaderBar";
 import { useHeaderExtra } from "@maipai/ui/src/dashboard/layouts/full/vertical/header/HeaderExtraContext";
@@ -1186,6 +1187,18 @@ export function ChatPage({ person }: { person: Roster }) {
     setVoiceOpenedByWake(true);
     setVoiceOpen(true);
   }, []);
+  // WAKEUX-02: the word heard on another page opens Chat as /chat?wake=1; read once, then the flag leaves the URL so a reload or Back does not start a call.
+  const [wakeParams, setWakeParams] = useSearchParams();
+  const wakeFlag = wakeParams.get("wake") === "1";
+  useEffect(() => {
+    if (!wakeFlag) return;
+    openVoiceFromWake();
+    const next = new URLSearchParams(wakeParams);
+    next.delete("wake");
+    setWakeParams(next, { replace: true });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [wakeFlag]);
+  const chatWake = useWakeWordListening({ person, onWake: openVoiceFromWake, voiceOpen });
   // COLUMN-01: the history column's open/hidden state (remembered per
   // browser), its thread search, and the phone sheet. lg (960px) is where
   // the column stops being a sheet.
@@ -1548,7 +1561,7 @@ export function ChatPage({ person }: { person: Roster }) {
       <ChatColumnControlContext.Provider value={column.control}>
         <ChatShortcutReference />
         <AskHandoff />
-        <WakeWordController person={person} />
+        {chatWake.indicator ? <LauncherBubble docked open={false} unread={0} greeting="" prompts={[]} {...chatWake.indicator} /> : null}
         <ArtifactCacheInvalidator />
               <ChatDocumentTitle person={person} />
         <ChatTitleCatchUp incognito={temporaryNext} />

@@ -1,7 +1,7 @@
-import { lazy, Suspense, useEffect, useState, type ReactNode } from "react";
+import { lazy, Suspense, useCallback, useEffect, useState, type ReactNode } from "react";
 import { DrawerSectionsContext } from "@/shell/drawerSections";
 import { NotFoundPage } from "@/shell/pages/NotFoundPage";
-import { Navigate, Outlet, Route, Routes as RouterRoutes, useLocation } from "react-router-dom";
+import { Navigate, Outlet, Route, Routes as RouterRoutes, useLocation, useMatch, useNavigate } from "react-router-dom";
 import FullLayout from "@maipai/ui/src/dashboard/layouts/full/FullLayout";
 import BlankLayout from "@maipai/ui/src/dashboard/layouts/blank/BlankLayout";
 import { ThemeProvider } from "@maipai/ui/src/dashboard/context/shadcntheme/ThemeContext";
@@ -28,6 +28,8 @@ import { MemoriesRedirect, LegacyProfileMemoriesRedirect } from "@/shell/Memorie
 import { InstallDock } from "@/shell/InstallDock";
 import { RailProfile } from "@/shell/RailProfile";
 import { BrowserAlerts } from "@/shell/BrowserAlerts";
+import { useWakeWordListening } from "@/apps/chat/useWakeWordListening";
+import { LauncherBubble } from "@maipai/ui/src/elements/launcher-bubble";
 import { useStatusApps } from "@/shell/useStatusApps";
 import { railApps } from "@/shell/appCatalog";
 import { useAppCatalog } from "@/shell/useAppCatalog";
@@ -176,6 +178,13 @@ function RoutesInner({ person, onPersonChange, onSignedOut }: { person: Roster; 
 
 function RoutesWithIncognito({ person, onPersonChange, onSignedOut }: { person: Roster; onPersonChange: () => void | Promise<void>; onSignedOut: () => void }) {
   const location = useLocation();
+  // WAKEUX-02: ChatPage listens for the word itself (it owns the call); on every other page this does, and Chat opens with the call running.
+  const navigate = useNavigate();
+  const chatMatch = useMatch("/chat");
+  const projectChatMatch = useMatch("/chat/projects/:id");
+  const onChatPage = chatMatch !== null || projectChatMatch !== null;
+  const openChatWithCall = useCallback(() => navigate("/chat?wake=1"), [navigate]);
+  const shellWake = useWakeWordListening({ person, onWake: openChatWithCall, voiceOpen: onChatPage });
   const selectedAppHref = activeAppHref(location.pathname, packageAreaApps(usePackageAreas().areas));
   const statusAppsQuery = useStatusApps();
   // LEFTNAV-APPS-01: the installed package apps this person may open (the hub's list, minus an Incognito-blocked app
@@ -228,6 +237,7 @@ function RoutesWithIncognito({ person, onPersonChange, onSignedOut }: { person: 
     <TabIdentityProvider temporary={incognito} locked={locked} ageBand={person.age_band}>
     <ChatHeaderDataProvider>
       <BrowserAlerts person={person} />
+      {!onChatPage && shellWake.indicator ? <LauncherBubble docked open={false} unread={0} greeting="" prompts={[]} {...shellWake.indicator} /> : null}
       <ShellInstallStrip person={person} />
       {activeTour ? (
         <Tour

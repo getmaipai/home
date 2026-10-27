@@ -1,9 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import type { Roster } from "@/lib/api";
 import { useDeviceWakeWordSetting } from "@/apps/chat/useDeviceWakeWordSetting";
-import { useVoiceSession } from "@/apps/chat/voiceSessionContext";
 import { useWakeWord, type UseWakeWordOptions } from "@/apps/chat/useWakeWord";
-import { WakeWordIndicator } from "@/apps/chat/WakeWordIndicator";
 import { playWakeCue } from "@/lib/voice/wakeCue";
 
 type WakeWordRuntime = Pick<UseWakeWordOptions, "startCapture" | "loadModels" | "createLoop">;
@@ -20,18 +18,17 @@ function useTabHidden(): boolean {
   return hidden;
 }
 
-export function WakeWordController({ person, runtime }: { person: Roster; runtime?: WakeWordRuntime }) {
+/** WAKEUX-02: this device's wake word. `onWake` runs after the rising chime (Chat opens the call in place; any other page opens Chat with it).
+ * `voiceOpen` pauses listening while a call owns the microphone. `indicator` is non-null exactly while the mic is open:
+ * the caller renders it as the kit launcher's listening state (RULES S2), one per page. */
+export function useWakeWordListening({ person, onWake, voiceOpen = false, runtime }: { person: Roster; onWake: () => void; voiceOpen?: boolean; runtime?: WakeWordRuntime }) {
   const setting = useDeviceWakeWordSetting(person);
   const persistEnabled = setting.setEnabled;
-  const voiceSession = useVoiceSession();
-  const openFromWake = voiceSession?.openFromWake;
-  const setVoiceOpen = voiceSession?.setOpen;
   const tabHidden = useTabHidden();
   const onWakeDetected = useCallback(() => {
     playWakeCue("heard");
-    if (openFromWake) openFromWake();
-    else setVoiceOpen?.(true);
-  }, [openFromWake, setVoiceOpen]);
+    onWake();
+  }, [onWake]);
   const { enabled, status, start, stop } = useWakeWord({ onWakeDetected, ...runtime });
 
   useEffect(() => {
@@ -41,18 +38,18 @@ export function WakeWordController({ person, runtime }: { person: Roster; runtim
     }
     // The explicit live voice session owns its own microphone. Pause the
     // local detector while it is open, then resume this device's opt-in.
-    if (voiceSession?.open) {
+    if (voiceOpen) {
       if (enabled) void stop();
       return;
     }
     if (!enabled && status === "idle") void start();
-  }, [setting.adult, setting.available, setting.enabled, tabHidden, voiceSession?.open, enabled, status, start, stop]);
+  }, [setting.adult, setting.available, setting.enabled, tabHidden, voiceOpen, enabled, status, start, stop]);
 
   const turnOff = useCallback(() => {
     void stop();
     void persistEnabled(false);
   }, [persistEnabled, stop]);
 
-  if (!setting.adult || !setting.available) return null;
-  return <WakeWordIndicator status={status} onTurnOff={turnOff} />;
+  if (!setting.adult || !setting.available || (status !== "starting" && status !== "listening")) return { indicator: null };
+  return { indicator: { listening: status === "listening" ? "Listening for Hey Jarvis" : "Starting the microphone", onTurnOff: turnOff } };
 }

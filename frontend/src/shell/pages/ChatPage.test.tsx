@@ -4542,4 +4542,24 @@ describe("ChatPage (UI-2 A7: Branch in new chat)", () => {
       restore();
     }
   });
+
+  test("WAKEUX-02: /chat?wake=1 opens the voice call once and the flag leaves the URL", async () => {
+    const restore = stubFetch();
+    // The call overlay opens a live socket and a microphone; neither exists under test.
+    const realSocket = globalThis.WebSocket;
+    globalThis.WebSocket = class { readonly readyState = 0; addEventListener() {} removeEventListener() {} send() {} close() {} } as unknown as typeof WebSocket;
+    try {
+      const view = renderPage(
+        <MemoryRouter initialEntries={["/chat?wake=1"]}>
+          <ChatPage person={makePerson()} />
+          <ConversationLocation />
+        </MemoryRouter>,
+      );
+      await view.findByLabelText("Hands-free settings");
+      await waitFor(() => expect(view.getByTestId("conversation-location").textContent).not.toContain("wake"));
+    } finally {
+      globalThis.WebSocket = realSocket;
+      restore();
+    }
+  });
 });

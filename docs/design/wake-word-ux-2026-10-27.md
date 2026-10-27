@@ -15,3 +15,7 @@ Decision record for WAKEUX-01. Owner-approved 2026-10-27 ("ok i agree with your 
 ## Rules touched
 
 Slice 2 needs a RULES.md S2 sentence for the shell-wide indicator and the kit Element first (architect 2026-10-27: rule 9b forbids a hand-built bordered box outside Chat; the owner approved a new ui tag the same day). The shared kit gets no new Element in this slice: the hand-built indicator stays until a `listening-indicator` Element exists in `commons` (reuse check: `status.tsx`, `launcher-bubble.tsx` and `connection-state.tsx` carry no microphone or off action, so none fits as is; the launcher bubble is the intended home once it ships, which is why the corner is shared).
+
+## Slice 2 (WAKEUX-02, landed)
+
+The Element is the kit `LauncherBubble` with a listening state (`listening` sentence and `onTurnOff`, `ui-v0.5.371`). `WakeWordController` draws it at the bottom corner; `ShellWakeWord` mounts the controller on every page except Chat (ChatPage keeps its own, which owns the call). Off Chat the word plays the rising chime and navigates to `/chat?wake=1`; ChatPage reads the flag once, opens the call as a wake-opened call and removes the flag from the URL. RULES S2 carries the indicator sentence (Owner-approved 2026-10-27).
