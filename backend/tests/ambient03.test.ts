@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { TestClient } from "./client";
 import { resetDb } from "./reset-db";
 import { db } from "@/db";
-import { conversationTurns, memoryRecords, people } from "@/db/schema";
+import { conversations, conversationTurns, memoryRecords, people } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import { readFileSync } from "node:fs";
 import { createConversation, getConversation, listConversations, listTemporaryConversations, updateConversationPlacement } from "@/lib/conversationHistory";
@@ -180,10 +180,36 @@ describe("AMBIENT-03 side conversations", () => {
       "src/lib/pictures/lane.ts",
       "src/lib/pictures/laneGate.ts",
       "src/routes/turn.ts",
+      "src/lib/access.ts",
+      "src/lib/gate/decide.ts",
+      "src/lib/gate/types.ts",
     ];
     for (const path of gateModules) {
       const source = readFileSync(new URL(`../${path}`, import.meta.url), "utf8");
       expect(source, `${path} must not branch on conversation placement`).not.toMatch(/\bplacement\b/);
     }
+  });
+
+  test("handing a closed side chat to Chat opens it and keeps one open Chat conversation", async () => {
+    const { client, actor } = await signedInOwner();
+    const chat = await (await client.post("/api/conversations", {})).json() as { id: string };
+    const sideA = await (await client.post("/api/conversations", { placement: "side" })).json() as { id: string };
+    const sideB = await (await client.post("/api/conversations", { placement: "side" })).json() as { id: string };
+    expect(db.select().from(conversations).where(eq(conversations.id, sideA.id)).get()?.status).toBe("closed");
+    const moved = await client.request(`/api/conversations/${sideA.id}`, { method: "PATCH", body: { placement: "chat" } });
+    expect(moved.status).toBe(200);
+    const rows = db.select().from(conversations).where(eq(conversations.personId, actor.id)).all();
+    expect(rows.find((row) => row.id === sideA.id)).toMatchObject({ placement: "chat", status: "open", archived: false });
+    expect(rows.find((row) => row.id === chat.id)?.status).toBe("closed");
+    expect(rows.find((row) => row.id === sideB.id)).toMatchObject({ placement: "side", status: "open" });
+    expect(rows.filter((row) => row.placement === "chat" && row.status === "open")).toHaveLength(1);
+  });
+
+  test("a placement change must be sent on its own", async () => {
+    const { client } = await signedInOwner();
+    const side = await (await client.post("/api/conversations", { placement: "side" })).json() as { id: string };
+    const mixed = await client.request(`/api/conversations/${side.id}`, { method: "PATCH", body: { placement: "chat", title: "Mixed" } });
+    expect(mixed.status).toBe(400);
+    expect(((await mixed.json()) as { error: string }).error).toContain("on its own");
   });
 });

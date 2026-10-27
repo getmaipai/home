@@ -152,7 +152,7 @@ export function visibleFolder(actor: PersonRow, id: string): ChatFolderRow | nul
 
 function countsFor(row: ChatFolderRow, chatsOf: string): { counts: ChatFolderView["counts"]; lastChat: string | null } {
   const chats = sqlite
-    .query("SELECT COUNT(*) AS n, MAX(updated_at) AS m FROM conversations WHERE folder_id = ? AND person_id = ? AND status != 'deleted' AND mode != 'temporary' AND archived = 0")
+    .query("SELECT COUNT(*) AS n, MAX(updated_at) AS m FROM conversations WHERE folder_id = ? AND person_id = ? AND status != 'deleted' AND mode != 'temporary' AND archived = 0 AND placement = 'chat'")
     .get(row.id, chatsOf) as { n: number; m: string | null };
   const artifacts = sqlite
     .query("SELECT COUNT(DISTINCT a.artifact_key) AS n FROM artifacts a JOIN conversations c ON c.id = a.conversation_id WHERE c.folder_id = ? AND c.person_id = ? AND c.status != 'deleted' AND c.mode != 'temporary'")

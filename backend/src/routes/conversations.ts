@@ -538,6 +538,7 @@ conversationsRoutes.openapi(patchConversationRoute, (c) => {
   const body = (c.req.valid("json") ?? {}) as { title?: string | null; pinned?: boolean; archived?: boolean; mode?: Conversation["mode"]; settings?: unknown; folder_id?: unknown; companion_id?: unknown };
   const id = c.req.valid("param").id;
   if (Object.hasOwn(body, "placement")) {
+    if (Object.keys(body).some((key) => key !== "placement")) return c.json({ error: "Send the placement change on its own, then make the other changes in a second request." }, 400);
     const result = updateConversationPlacement(actor, id, (body as { placement?: unknown }).placement);
     if (!result.ok) return c.json({ error: result.error }, result.status as 400 | 403 | 404);
     return c.json(result.value, 200);

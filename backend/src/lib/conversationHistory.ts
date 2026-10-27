@@ -2170,7 +2170,8 @@ export function updateConversationPlacement(actor: PersonRow, id: string, placem
       .set({ status: "closed", updatedAt: now, hlc })
       .where(and(eq(conversations.personId, actor.id), eq(conversations.surface, found.value.surface), eq(conversations.placement, "chat"), eq(conversations.status, "open")))
       .run();
-    db.update(conversations).set({ placement: "chat", updatedAt: now, hlc }).where(eq(conversations.id, id)).run();
+    // The chat that was handed over becomes the person's open Chat conversation, and an archived one comes back to the list.
+    db.update(conversations).set({ placement: "chat", status: "open", archived: false, updatedAt: now, hlc }).where(eq(conversations.id, id)).run();
   })();
   const updated = db.select().from(conversations).where(eq(conversations.id, id)).get()!;
   return { ok: true, value: toConversationRecord(updated) };
