@@ -300,7 +300,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/capabilityReconcile.ts` | packagesLosingCapability, removalConfirmation, reconcileCapabilities |
 | `backend/src/lib/chatFolders.ts` | ChatFolderView, MAX_SHARES, canManageFolders, folderAccess, visibleFolder, listChatFolders |
 | `backend/src/lib/chatImageNote.ts` | cleanPictureName, picturesAttachedNote, picturesNotReadNote, picturesWindowNote, pictureFailureWords, storedImages |
-| `backend/src/lib/chatModelSwitch.ts` | __resetChatSwitchForTests, startChatModelChoice, chatModelChoiceState |
+| `backend/src/lib/chatModelSwitch.ts` | __resetChatSwitchForTests, startChatModelChoice, chatModelChoiceState, uncensoredChatEntry, uncensoredChoiceState |
 | `backend/src/lib/chatPause.ts` | chatPausedByAdmin, chatPauseMessage |
 | `backend/src/lib/chatPictures.ts` | __setChatPictureCapabilityForTests, chatModelReadsPictures, photoUploadsAllowed, picturePartsAllowed, loadPictureParts |
 | `backend/src/lib/chatTemplateTokens.ts` | stripChatTemplateTokens, ChatTemplateTokenFilter |
