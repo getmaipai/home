@@ -4175,6 +4175,20 @@
       "group": "task",
       "verdict": "wire-now",
       "verdictReason": "Draws the Tasks list with its detail on a companion's page (Companions page, Tasks tab); adopted as shipped with props only."
+    },
+    {
+      "file": "StudioLayoutShowcase.tsx",
+      "name": "StudioLayoutShowcase",
+      "group": "StudioLayoutShowcase",
+      "verdict": "support",
+      "verdictReason": "Developer-only story fixture for the studio layout, covered by the Commons tests; not a standalone Home product surface."
+    },
+    {
+      "file": "studio-layout.tsx",
+      "name": "studio-layout",
+      "group": "studio",
+      "verdict": "later",
+      "verdictReason": "New kit page layout (title, actions, side nav and rail) for studio screens; Home adopts it when the appearance studio screen is built on it."
     }
   ]
 }
