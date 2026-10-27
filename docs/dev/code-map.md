@@ -316,6 +316,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/companionArt.ts` | COMPANION_STILL_MODEL_MISSING_LINE, COMPANION_CLIP_MODEL_MISSING_LINE, COMPANION_MODEL_MISMATCH_LINE, COMPANION_EDIT_MODEL, __setCompanionArtStatusReadersForTests, promptHash |
 | `backend/src/lib/companionLook.ts` | LookSchema, EMPTY_LOOK, LOOK_LIMIT_LINE, SMALL_PICTURE_LINE, lookPromptFor, KEY_ALPHA_START |
 | `backend/src/lib/companionLookJobs.ts` | LOOK_JOB_BUSY_LINE, LOOK_PROMPT_REQUIRED_LINE, LOOK_EDIT_PROMPT_LINE, LOOK_ENGINE_NOT_READY_LINE, __clearCompanionLookJobsForTests, activeLookJob |
+| `backend/src/lib/companionPortrait.ts` | portraitPath, retainedPortraitExists, readRetainedPortrait, retainCompanionPortrait, voiceVersion, companionVoiceVersion |
 | `backend/src/lib/companionPromptPack.ts` | picturePromptPack, clipPromptPack |
 | `backend/src/lib/companionStates.ts` | TAKE_LIMIT_LINE, MEDIA_ROOT_REMOTE_LINE, readStates, __parseStatesForTests, saveStates, takePath |
 | `backend/src/lib/companionTakes.ts` | TAKE_RUN_BUSY_LINE, TAKE_QUICK_NOT_READY_LINE, TAKE_RUN_NOT_FOUND_LINE, TAKE_RUN_TIMEOUT_LINE, TAKE_RETRY_WAIT_MS, TAKE_NEGATIVE_PROMPT |
