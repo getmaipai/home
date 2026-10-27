@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-10-27T21:02:51.938Z",
+  "generatedAt": "2026-10-27T21:07:25.491Z",
   "kitTag": "ui-v0.5.393",
   "items": [
     {
@@ -388,17 +388,17 @@
       "file": "companion-stage.css",
       "name": "companion-stage",
       "group": "companion",
-      "verdict": "unassessed",
-      "verdictReason": "Recorded unassessed verdict in elements-plan.json; see the plan entry for its dependency or scope.",
-      "implemented": false
+      "verdict": "wire-now",
+      "verdictReason": "The companion stage's shipped layout and transparency styles are needed by the AMBIENT-04 stage.",
+      "implemented": true
     },
     {
       "file": "companion-stage.tsx",
       "name": "companion-stage",
       "group": "companion",
-      "verdict": "unassessed",
-      "verdictReason": "Recorded unassessed verdict in elements-plan.json; see the plan entry for its dependency or scope.",
-      "implemented": false
+      "verdict": "wire-now",
+      "verdictReason": "The ambient companion pane's stage, wired to its side chat and presence signals (AMBIENT-04).",
+      "implemented": true
     },
     {
       "file": "comparison-card.tsx",
