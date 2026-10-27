@@ -170,6 +170,8 @@ The live hub reports a `sha-` label, not a release tag. The in-app update check 
 
 `bash scripts/pin.sh commons <pkg>-vX.Y.Z | stack <sha> | bot <version> [--no-land] [--dry-run]` edits every file the pin lives in (both `package.json` files, the archive digests in `install.sh` and `maipai-engine`, `STACK_TAG` in both and `shared/diskPlan.json`, `botReleasePin.json`), runs `bun install --force`, commits and lands. Pin bumps were 17% of all commits and each used to be a hand edit across several files.
 
+A pin that lands without its tag worktree makes the watcher red on unrelated tests (2026-10-27: `scripts/uiRulesPrecommit.test.ts` failed with "Cannot find module '@maipai/ui/tests/...'" because `main` pinned `ui-v0.5.396` and `../commons-tags/ui-ui-v0.5.396` did not exist on this machine, so the watcher's install left no kit). Fix it by creating the worktree, not by shipping over the red: `bash ../commons/scripts/ensure-tag.sh ui ui-vX.Y.Z` (or `spec spec-vX.Y.Z`), then let the next landing re-run the watcher. `wt.sh start` prints the same fix when it cannot create a tag worktree.
+
 ## 11. Agents and the test environment
 
 - **Codex runs** use `scripts/wt.sh run codex <brief>`, which starts `codex exec -s workspace-write` in the worktree's own tmux session and sets `MAIPAI_TEST_NO_PORTS=1`. That switch makes the backend test setup skip its port probe and serve `port: 0` test servers in-process, so a sandbox that forbids binding ports can still run backend tests. The default path is unchanged. A test that needs a real listener for a child process fails there by design.
