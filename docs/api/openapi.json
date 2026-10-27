@@ -55286,6 +55286,10 @@
                           "is_household": {
                             "type": "boolean"
                           },
+                          "portrait": {
+                            "type": "string",
+                            "nullable": true
+                          },
                           "status": {
                             "type": "string"
                           },
@@ -55326,6 +55330,7 @@
                           "voice",
                           "is_default",
                           "is_household",
+                          "portrait",
                           "status",
                           "chats",
                           "can_edit",
@@ -55393,6 +55398,10 @@
                           "is_household": {
                             "type": "boolean"
                           },
+                          "portrait": {
+                            "type": "string",
+                            "nullable": true
+                          },
                           "status": {
                             "type": "string"
                           },
@@ -55433,6 +55442,7 @@
                           "voice",
                           "is_default",
                           "is_household",
+                          "portrait",
                           "status",
                           "chats",
                           "can_edit",
@@ -56106,6 +56116,10 @@
                     "is_household": {
                       "type": "boolean"
                     },
+                    "portrait": {
+                      "type": "string",
+                      "nullable": true
+                    },
                     "status": {
                       "type": "string"
                     },
@@ -56222,6 +56236,7 @@
                     "voice",
                     "is_default",
                     "is_household",
+                    "portrait",
                     "status",
                     "chats",
                     "can_edit",
