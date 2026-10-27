@@ -174,7 +174,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `frontend/src/shell/pages/CompanionEditorPage.tsx` | CompanionEditorPage |
 | `frontend/src/shell/pages/CompanionLookTab.tsx` | CompanionLookTab |
 | `frontend/src/shell/pages/CompanionStateContent.tsx` | CompanionStateContents |
-| `frontend/src/shell/pages/CompanionStatesTab.tsx` | CompanionStatesTab |
+| `frontend/src/shell/pages/CompanionStudioTab.tsx` | CompanionStudioTab |
 | `frontend/src/shell/pages/CompanionWizardPage.tsx` | CompanionWizardPage |
 | `frontend/src/shell/pages/CompanionsPage.tsx` | CompanionsPage, CompanionDetailPage |
 | `frontend/src/shell/pages/DashboardPage.tsx` | DashboardPage |
