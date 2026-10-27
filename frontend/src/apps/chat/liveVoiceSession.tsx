@@ -26,6 +26,7 @@
 // finishes speaking - the whole state machine is a value the mount
 // effect reacts to, never a manually chained callback tree.
 import { useEffect, useRef, useState } from "react";
+import { playWakeCue } from "@/lib/voice/wakeCue";
 import type { VoiceMode } from "@maipai/ui/src/elements/voice-conversation";
 import { createSttSocket, type SttSocket, type SttSocketHandlers } from "@/lib/voice/sttSocket";
 import { MicCaptureError, startMicCapture, type MicCaptureHandle } from "@/lib/voice/mic-capture";
@@ -449,7 +450,7 @@ export function useLiveVoiceSession({ composer, open, onOpenChange, onProblem, i
     if (!open || mode !== "listening" || activeSpeechRef.current || typeof idleCloseMs !== "number") return;
     // Read the speech flag again when the timer fires: a stalled event loop can run this callback before React has
     // re-rendered from the speech message that set it, which closed a call whose person was already talking.
-    const timer = setTimeout(() => { if (modeRef.current === "listening" && !activeSpeechRef.current) onOpenChange(false); }, idleCloseMs);
+    const timer = setTimeout(() => { if (modeRef.current === "listening" && !activeSpeechRef.current) { playWakeCue("closed"); onOpenChange(false); } }, idleCloseMs);
     return () => clearTimeout(timer);
   }, [open, mode, idleCloseMs, idleActivity, onOpenChange]);
 

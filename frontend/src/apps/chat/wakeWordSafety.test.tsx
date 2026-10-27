@@ -197,6 +197,28 @@ describe("HANDSFREE-01(c) wake-word safety", () => {
     }
   });
 
+  test("WAKEUX: a hidden tab stops listening and a shown tab resumes", async () => {
+    localStorage.setItem("maipai.device-settings-id.v1", "browser-1234567890ab");
+    const fetcher = stubWakewordSettings(true);
+    const setHidden = (hidden: boolean) => {
+      Object.defineProperty(document, "hidden", { configurable: true, get: () => hidden });
+      document.dispatchEvent(new Event("visibilitychange"));
+    };
+    const view = renderWithQueryClient(
+      <WakeWordController person={adult()} runtime={{ loadModels: modelLoadNoop, startCapture: async () => ({ stop: () => {}, sampleRate: 16_000 }), createLoop: inertLoop }} />,
+    );
+    try {
+      await view.findByRole("status", { name: "Wake word is listening" });
+      act(() => setHidden(true));
+      await waitFor(() => expect(view.queryByRole("status", { name: "Wake word is listening" })).toBeNull());
+      act(() => setHidden(false));
+      await view.findByRole("status", { name: "Wake word is listening" });
+    } finally {
+      Object.defineProperty(document, "hidden", { configurable: true, get: () => false });
+      fetcher.restore();
+    }
+  });
+
   test("a wake detection opens the session through openFromWake", async () => {
     localStorage.setItem("maipai.device-settings-id.v1", "browser-1234567890ab");
     const fetcher = stubWakewordSettings(true);

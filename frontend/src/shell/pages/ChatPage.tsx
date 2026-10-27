@@ -1588,8 +1588,8 @@ export function ChatPage({ person }: { person: Roster }) {
               onEnd={voiceSession.onEnd}
               onInterrupt={voiceSession.onInterrupt}
               extra={(
-                <TooltipIconButton asChild tooltip="Voice settings">
-                  <Link to="/settings/voices" aria-label="Voice settings">
+                <TooltipIconButton asChild tooltip={voiceOpenedByWake ? "Hands-free settings" : "Voice settings"}>
+                  <Link to="/settings/voices" aria-label={voiceOpenedByWake ? "Hands-free settings" : "Voice settings"}>
                     <VoiceSettingsIcon />
                   </Link>
                 </TooltipIconButton>

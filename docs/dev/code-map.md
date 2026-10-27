@@ -61,7 +61,6 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `frontend/src/apps/chat/AskHandoff.tsx` | ASK_HANDOFF_MAX, askFromSearch, AskHandoff |
 | `frontend/src/apps/chat/ChatThread.tsx` | ChatExtrasContext, ChatThread |
 | `frontend/src/apps/chat/ChatThreadExtras.tsx` | ChatThreadExtras |
-| `frontend/src/apps/chat/ComposerWakeWordControl.tsx` | ComposerWakeWordControl |
 | `frontend/src/apps/chat/MusicCardView.tsx` | musicFileName, musicHint, useMusicTrackProps |
 | `frontend/src/apps/chat/WakeWordController.tsx` | WakeWordController |
 | `frontend/src/apps/chat/WakeWordIndicator.tsx` | WakeWordIndicator |

@@ -1,0 +1,17 @@
+# Wake word UX (2026-10-27)
+
+Decision record for WAKEUX-01. Owner-approved 2026-10-27 ("ok i agree with your design. build it"; on the corner thing: "should we combine the ear and companion always on thing so we have 1 thing", answered "Launcher shows listening").
+
+**Supersedes** the HANDSFREE-01 acceptance line "toggling it from the composer and from the settings page moves the one same value": the composer toggle is gone (it looked like the microphone button), and the one setting is switched in Settings > AI and models > Wake word and from the indicator's Turn off.
+
+## What the person sees
+
+1. **Turning it on.** Settings, This device, "Wake word listening". Off by default, adult only, per device (HANDSFREE-01 invariants i, ii, v are unchanged).
+2. **While it listens.** **Slice 1 (this one): Chat only.** The indicator stays where it is today; the shell-wide version waits for the kit Element (slice 2). Target: one indicator at the bottom corner of every page, Chat included: an ear icon, "Listening for Hey Jarvis" and a Turn off button on the indicator itself (invariants iii and iv). It is the companion launcher's listening state: when the launcher is built it takes the ear and Turn off rather than a second element, and it shows while listening even if the person turned the launcher off.
+3. **Saying the word.** A short rising two-note chime, then the voice call opens in place on Chat. Slice 2: from any other page Chat opens with the call running.
+4. **In the call.** The call overlay is the existing one. A wake-opened call closes by itself after 8 seconds with no speech, with a short falling chime; the overlay's settings link reads "Hands-free settings".
+5. **Hidden tab.** A hidden browser tab stops listening and resumes when shown, so the microphone is never open in the background without the indicator on screen.
+
+## Rules touched
+
+Slice 2 needs a RULES.md S2 sentence for the shell-wide indicator and the kit Element first (architect 2026-10-27: rule 9b forbids a hand-built bordered box outside Chat; the owner approved a new ui tag the same day). The shared kit gets no new Element in this slice: the hand-built indicator stays until a `listening-indicator` Element exists in `commons` (reuse check: `status.tsx`, `launcher-bubble.tsx` and `connection-state.tsx` carry no microphone or off action, so none fits as is; the launcher bubble is the intended home once it ships, which is why the corner is shared).

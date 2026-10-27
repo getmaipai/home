@@ -1,18 +1,4 @@
 {
-  "apps/chat/ComposerWakeWordControl.tsx": {
-    "TooltipIconButton": {
-      "tokens": [
-        "before:-inset-3",
-        "before:absolute",
-        "before:content-['']",
-        "relative",
-        "rounded-full",
-        "size-7"
-      ],
-      "ed": "ED-035",
-      "reason": "NO REASON: to be removed (cleanup item 6, chat className overrides)."
-    }
-  },
   "apps/chat/chatDateDivider.tsx": {
     "DayDivider": {
       "tokens": [

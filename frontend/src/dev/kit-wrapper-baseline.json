@@ -11,12 +11,6 @@
       "reason": "Custom fixed find-bar overlay around ConversationSearch (cleanup item 5, chat wrappers)."
     }
   },
-  "apps/chat/ComposerWakeWordControl.tsx": {
-    "ComposerWakeWordControl": {
-      "ed": "ED-034",
-      "reason": "NO REASON: to be removed (cleanup item 5, chat wrappers)."
-    }
-  },
   "apps/chat/chatCitationLink.tsx": {
     "ChatCitationLink": {
       "ed": "ED-002",

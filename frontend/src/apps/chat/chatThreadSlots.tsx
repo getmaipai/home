@@ -61,7 +61,6 @@ import { useTurnActivity } from "@/apps/chat/chatTurnActivity";
 import { BranchInNewChatMenuItem } from "@/apps/chat/branchInNewChatMenuItem";
 import { useChatActivity } from "@/apps/chat/chatActivity";
 import { ComposerVoiceControls } from "@/apps/chat/composerVoiceControls";
-import { ComposerWakeWordControl } from "@/apps/chat/ComposerWakeWordControl";
 import { AdminContext, ChatAgeBandContext, ChatComposerNoticeContext, CompareOpenContext, SourcesOpenContext, DetailsOpenContext, ThinkingModeContext, ThinkingModeCapabilityContext, BareModeContext, TemporaryChatContext, WakeWordPersonContext } from "@/apps/chat/chatThreadContexts";
 import { ChatAvailabilityContext, useEngineDownReason } from "@/apps/chat/useChatAvailability";
 import { TurnErrorDetails, hasErrorFacts } from "@/shell/pages/TurnErrorDetails";
@@ -78,14 +77,12 @@ export const DetailsIcon = getIcon("gauge");
 const QueueSendIcon = getIcon("arrow-up");
 
 export function ComposerExtraControls() {
-  const person = useContext(WakeWordPersonContext);
   const engineDown = useEngineDownReason();
   const isRunning = useAuiState((s) => s.thread.isRunning && s.thread.voice === undefined && s.thread.capabilities.queue);
   const writtenTurnBusy = useAuiState((s) => s.thread.isRunning || s.composer.queue.length > 0);
   return (
     <>
       <ComposerVoiceControls disabled={writtenTurnBusy} engineDown={engineDown} />
-      {person ? <ComposerWakeWordControl person={person} /> : null}
       {isRunning ? (
         <ComposerPrimitive.Send asChild>
           <ElementsButton type="button" size="icon" className="size-7 rounded-full" aria-label="Queue message" title="Queue message" disabled={engineDown !== undefined}>

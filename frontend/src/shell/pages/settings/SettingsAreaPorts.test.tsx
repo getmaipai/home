@@ -6,7 +6,6 @@ import { cleanup, fireEvent, waitFor, within } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { renderWithQueryClient } from "../../../../tests/renderWithQueryClient";
 import { SettingsAreaPage } from "@/shell/pages/settings/SettingsAreaPage";
-import { ComposerWakeWordControl } from "@/apps/chat/ComposerWakeWordControl";
 import { CHAT_SHORTCUTS } from "@/shell/pages/chatShortcuts";
 import { getDeviceSettingsScope } from "@/lib/deviceSettingsScope";
 import { makePerson, mockHome, type HomeFixture } from "@/shell/pages/settings/settingsTestKit";
@@ -34,14 +33,14 @@ function open(person: Roster, url: string, home: Parameters<typeof mockHome>[0] 
 }
 
 describe("ported from the old settings page", () => {
-  test("an adult's composer and This device settings control write the same wake-word value", async () => {
+  test("the This device settings switch writes the wake-word value for this device", async () => {
     localStorage.setItem("maipai.device-settings-id.v1", "browser-1234567890ab");
     const deviceScope = getDeviceSettingsScope();
     const adult = makePerson("adult");
-    const view = open(adult, "/settings/voice?tab=device", { wakeword: true }, <ComposerWakeWordControl person={adult} />);
-    fireEvent.click(await view.findByRole("button", { name: "Turn on wake word listening" }));
-    await waitFor(() => expect(fixture!.puts).toContainEqual({ scope: deviceScope, key: "voice.wakeword.enabled", value: true }));
+    const view = open(adult, "/settings/voice?tab=device", { wakeword: true });
     const toggle = await view.findByRole("switch", { name: "Wake word listening" });
+    fireEvent.click(toggle);
+    await waitFor(() => expect(fixture!.puts).toContainEqual({ scope: deviceScope, key: "voice.wakeword.enabled", value: true }));
     await waitFor(() => expect(toggle.getAttribute("aria-checked")).toBe("true"));
     expect(fixture!.puts.every((put) => put.scope === deviceScope && put.key === "voice.wakeword.enabled")).toBe(true);
   });
