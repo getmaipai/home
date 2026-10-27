@@ -789,7 +789,7 @@ function ChatHeaderDataBridge({ autoReadReplies, setAutoReadReplies, ttsAvailabl
   const personSettings = useQuery({ queryKey: ["settingsValues", `person:${person.id}`], queryFn: () => api.settingsValues(`person:${person.id}`) });
   const conversation = useQuery({ queryKey: ["conversation", conversationId], queryFn: () => api.conversation(conversationId!), enabled: Boolean(conversationId) });
   // Memoized: the header data hook re-sends on a changed reference, and a fresh array per render would loop.
-  const companionChoices = useMemo(() => companionList.data?.companions?.map(({ id, name, tagline }) => ({ id, name, tagline })) ?? [], [companionList.data]);
+  const companionChoices = useMemo(() => companionList.data?.companions?.map(({ id, name, tagline, portrait }) => ({ id, name, tagline, portrait })) ?? [], [companionList.data]);
   const activeCompanionId = Array.isArray(personSettings.data) ? personSettings.data.find((setting) => setting.key === "persona.active_id")?.value : undefined;
   const defaultCompanionId = (typeof activeCompanionId === "string" && companionList.data?.companions?.some(({ id }) => id === activeCompanionId) ? activeCompanionId : undefined)
     ?? companionList.data?.default_id

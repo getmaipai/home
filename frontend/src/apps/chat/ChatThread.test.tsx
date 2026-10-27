@@ -31,11 +31,13 @@ const MESSAGES: ThreadMessageLike[] = [
 
 test("history reply faces use the retained portrait and finished replies contain no video", async () => {
   const speaker = { companion_id: "rivet", name: "Rivet", look: "look-old", portrait: "rivet/look1", via: "conversation" };
-  const portrait = spyOn(api, "companionPortrait").mockReturnValue("/api/companions/portraits/rivet/look1");
+  // A data URI does not need the network, so the test DOM does not raise an image error (the kit falls back to the seeded face on an error).
+  const PORTRAIT_URL = "data:image/gif;base64,R0lGODlhAQABAAAAACw=";
+  const portrait = spyOn(api, "companionPortrait").mockReturnValue(PORTRAIT_URL);
   const messages: ThreadMessageLike[] = [{ role: "assistant", content: [{ type: "text", text: "A saved reply." }], status: { type: "complete", reason: "stop" }, metadata: { custom: { answered_by: speaker } } }];
   const view = renderWithQueryClient(<MemoryRouter><Harness admin={false} band="adult" messages={messages} /></MemoryRouter>);
   expect(await view.findByText("A saved reply.")).toBeTruthy();
-  await waitFor(() => expect(view.container.querySelector('img[src="/api/companions/portraits/rivet/look1"]')).toBeTruthy());
+  await waitFor(() => expect(view.container.querySelector(`img[src="${PORTRAIT_URL}"]`)).toBeTruthy());
   expect(portrait).toHaveBeenCalledWith("rivet/look1");
   expect(view.container.querySelector("video")).toBeNull();
   portrait.mockRestore();

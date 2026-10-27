@@ -6,7 +6,8 @@ import { List } from "@maipai/ui/src/primitives/List";
 import { Badge } from "@maipai/ui/src/dashboard/components/ui/badge";
 import { Button } from "@maipai/ui/src/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@maipai/ui/src/dashboard/components/ui/card";
-import { Avatar, AvatarFallback, AvatarImage } from "@maipai/ui/src/dashboard/components/ui/avatar";
+import { Avatar, AvatarImage } from "@maipai/ui/src/dashboard/components/ui/avatar";
+import { Avatar as SeededAvatar } from "@maipai/ui/src/primitives/Avatar";
 import { Alert, AlertDescription } from "@maipai/ui/src/ui/alert";
 import { Progress } from "@maipai/ui/src/dashboard/components/ui/progress";
 import { AsyncState } from "@maipai/ui/src/primitives/AsyncState";
@@ -64,7 +65,7 @@ export function CompanionStudioTab({ id, name, prompt, promptError, onPromptChan
     {selectedKey === "portrait" ? <CompanionLookTab id={id} prompt={prompt} promptError={promptError} onPromptChange={onPromptChange} active /> : selectedState ? <CompanionStateContents id={id} state={selectedState} busy={states.running} startReady={data.start_ready} sheetReady={data.sheet_ready} onAction={states.perform} onError={states.setError} /> : null}
   </>;
   const rail = <div className="flex flex-col gap-4">
-    <Card><CardHeader><CardTitle>Character reference</CardTitle></CardHeader><CardContent><div className="flex flex-col gap-3"><Avatar><AvatarImage src={rest ? api.companionLookImage(id, rest.id) : undefined} alt="" /><AvatarFallback>{name.trim().charAt(0).toUpperCase() || "?"}</AvatarFallback></Avatar><p className="text-sm text-muted-foreground">Use the approved portrait for every state.</p><Button variant="outline" onClick={() => setSelected("portrait")}>Change portrait</Button></div></CardContent></Card>
+    <Card><CardHeader><CardTitle>Character reference</CardTitle></CardHeader><CardContent><div className="flex flex-col gap-3">{rest ? <Avatar><AvatarImage src={api.companionLookImage(id, rest.id)} alt="" /></Avatar> : <SeededAvatar name={name} seed={id} />}<p className="text-sm text-muted-foreground">Use the approved portrait for every state.</p><Button variant="outline" onClick={() => setSelected("portrait")}>Change portrait</Button></div></CardContent></Card>
     <Card><CardHeader><CardTitle>Clip checks</CardTitle></CardHeader><CardContent>{selectedState ? activeTake && activeTake.ok !== null ? <><p>{activeTake.ok ? "Passed quality checks" : "Missed a quality check"}</p>{activeTake.reasons.map((reason, index) => <p key={`${index}-${reason}`}>{reason}</p>)}</> : <p>No clip quality report is available.</p> : <p>Pick a state to see its clip checks.</p>}</CardContent></Card>
     <Card><CardHeader><CardTitle>Recent generation</CardTitle></CardHeader><CardContent>{states.running ? <><p>{states.run?.label ?? data.run?.label ?? "Starting clip run"}</p><Progress value={states.run?.percent ?? data.run?.percent ?? 0} aria-label={states.run?.label ?? "Clip run progress"} /></> : <p>Nothing is running.</p>}</CardContent></Card>
   </div>;

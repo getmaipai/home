@@ -32,7 +32,7 @@ async function openCardActions(view: { findByRole: (role: string, opts: { name: 
 }
 
 test("directory cards show status, meta, actions and the new companion link", async () => {
-  api.companions = async (): Promise<CompanionList> => ({ allowed: true, can_create: true, can_discover: true, companions: [card({ is_household: true, status: "draft" }), card({ id: "lively-teen", name: "Riff", type: "teen", type_label: "Teen companion", is_default: true })], discover: [], robots: null, default_id: "lively-teen" });
+  api.companions = async (): Promise<CompanionList> => ({ allowed: true, can_create: true, can_discover: true, companions: [card({ is_household: true, status: "draft", portrait: "lively-child/v7" }), card({ id: "lively-teen", name: "Riff", type: "teen", type_label: "Teen companion", is_default: true })], discover: [], robots: null, default_id: "lively-teen" });
   const view = open("/companions");
   await waitFor(() => expect(view.getByRole("heading", { name: "Sprout" })).toBeTruthy());
   expect(view.getByText("Familiar faces. Different ways to help.")).toBeTruthy();
@@ -44,6 +44,8 @@ test("directory cards show status, meta, actions and the new companion link", as
   expect(view.getAllByRole("button", { name: "View profile" }).length).toBe(2);
   expect(view.getByRole("searchbox", { name: "Search companions" })).toBeTruthy();
   expect(view.getByRole("link", { name: "New companion" }).getAttribute("href")).toBe("/companions/new");
+  // A portrait image only appears once the browser has loaded it, so the pictured card shows no seeded face yet; the card without a picture shows exactly one (never a bare letter).
+  expect(view.container.querySelectorAll('img[src^="data:image/svg+xml"]').length).toBe(1);
   expect(view.getAllByRole("button", { name: "New companion" }).length).toBe(1);
   expect(view.queryByText("Robots")).toBeNull();
 });

@@ -38,7 +38,7 @@ export interface ChatHeaderData {
   assistantReplySignal?: string | number;
   /** The signed-in person's selected companion for a not-yet-created chat. */
   defaultCompanionId?: string | null;
-  companions: Array<{ id: string; name: string; tagline?: string }>;
+  companions: Array<{ id: string; name: string; tagline?: string; portrait?: string | null }>;
   onCompanionChange: (companionId: string | null) => Promise<void>;
   /** The history sheet's open state and toggle, for a phone, where the toggle sits in the shell bar beside the title. */
   sheetOpen?: boolean;

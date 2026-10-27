@@ -89,6 +89,7 @@ describe("ChatHeaderBar", () => {
     expect(view.container.querySelector('img[src="/sprout.png"]')).toBeNull();
   });
 
+
   test("renders the conversation's own title", async () => {
     const view = renderBar(baseData({ title: "What's 2 plus 2?" }));
     expect(await view.findByText("What's 2 plus 2?")).toBeVisible();
@@ -284,6 +285,17 @@ describe("ChatHeaderBar", () => {
         </QueryClientProvider>,
       );
     }
+
+    test("an unpictured companion gets a seeded face in the picker, not a letter", async () => {
+      const view = renderShells(baseData({ companionId: "unpictured", companions: [
+        { id: "portrait", name: "Portrait", portrait: "hc-one/v3" },
+        { id: "unpictured", name: "Unpictured" },
+      ] }));
+      const picker = await view.findByRole("button", { name: "Change companion" });
+      act(() => { fireEvent.pointerDown(picker, { button: 0, ctrlKey: false, pointerId: 1 }); fireEvent.click(picker); });
+      // The menu draws in a portal and a loaded image is swapped in by the browser, so assert the seeded face (the kit's fallback) is there for a companion with no picture; the portrait choice itself is tested in companionImage.test.ts.
+      expect(document.body.querySelector('[role="menuitemradio"] [data-slot="avatar"]')).toBeTruthy();
+    });
 
     test("shows the companion's name over its character, not the conversation title row", async () => {
       const view = renderShells(baseData());

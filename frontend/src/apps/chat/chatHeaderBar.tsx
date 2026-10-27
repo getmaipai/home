@@ -78,7 +78,8 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@maipai/ui/src/ui/dropdown-menu";
-import { Avatar, AvatarFallback, AvatarImage } from "@maipai/ui/src/ui/avatar";
+import { Avatar, AvatarImage } from "@maipai/ui/src/ui/avatar";
+import { Avatar as SeededAvatar } from "@maipai/ui/src/primitives/Avatar";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@maipai/ui/src/ui/dialog";
 import { ChatHeader } from "@maipai/ui/src/elements/chat-header";
 import { getIcon } from "@maipai/ui/src/icons";
@@ -86,6 +87,7 @@ import { getIcon } from "@maipai/ui/src/icons";
 const ColumnOpenIcon = getIcon("panel-left-open");
 import { useChatHeaderData } from "@/apps/chat/chatHeaderData";
 import { useCompanionAvatar, useCompanionStills } from "@/apps/chat/useCompanionAvatar";
+import { companionImageUrl } from "@/apps/chat/companionImage";
 
 const PencilIcon = getIcon("pencil");
 const TrashIcon = getIcon("trash");
@@ -151,12 +153,13 @@ function ChatHeaderRename({ title, onRename, onDone, commitOnBlur = true }: { ti
  * `trailing` (the agent/task activity toggle's slot, when there is one)
  * sit on the right. */
 /** DOTS-CHAT-01: reads the companion for the kit header. Its own component so the presence hooks (runtime and router) run only when the preview switch is on. */
-function WithCompanion({ companionId, fallbackName, children }: { companionId: string | null; fallbackName?: string; children: (name: string, media: ReactNode) => ReactNode }) {
+function WithCompanion({ companionId, fallbackName, portrait, children }: { companionId: string | null; fallbackName?: string; portrait?: string | null; children: (name: string, media: ReactNode) => ReactNode }) {
   // The header draws in the shell bar, outside the chat runtime: a still and the name by query only, never a player.
   const { avatar } = useCompanionAvatar(companionId);
   const stills = useCompanionStills(companionId ? [companionId] : []);
   const name = avatar?.name ?? fallbackName ?? "MaiPai";
-  return children(name, <Avatar><AvatarImage src={companionId ? stills[companionId] : undefined} alt="" /><AvatarFallback>{name.slice(0, 1)}</AvatarFallback></Avatar>);
+  const imageUrl = companionImageUrl(portrait, companionId ? stills[companionId] : undefined);
+  return children(name, imageUrl ? <Avatar><AvatarImage src={imageUrl} alt="" /></Avatar> : <SeededAvatar name={name} seed={companionId ?? "default"} />);
 }
 
 type ShellsProps = { shells?: boolean; onMenu?: (() => void) | undefined; menuExpanded?: boolean; menuControls?: string; onHistory?: (() => void) | undefined; onCall?: (() => void) | undefined };
@@ -222,8 +225,8 @@ export function ChatHeaderBar({ phoneRow = false, trailing, shells = false, onMe
   const companionId = data.conversationExists ? data.companionId : data.companionId ?? data.defaultCompanionId ?? null;
   const selectedName = data.companions.find(({ id }) => id === companionId)?.name ?? data.companionName;
   const identityChoices = data.pinnable ? [
-    ...(data.companions.some(({ id }) => id === "default") ? [] : [{ value: "default", label: "MaiPai", hint: "Standard assistant", description: "No character" }]),
-    ...data.companions.map((companion) => ({ value: companion.id, label: companion.id === "default" ? "MaiPai" : companion.name, imageUrl: stills[companion.id], description: companion.tagline, ...(companion.id === "default" ? { hint: "Standard assistant" } : {}) })),
+    ...(data.companions.some(({ id }) => id === "default") ? [] : [{ value: "default", label: "MaiPai", hint: "Standard assistant", description: "No character", seed: "default" }]),
+    ...data.companions.map((companion) => ({ value: companion.id, label: companion.id === "default" ? "MaiPai" : companion.name, imageUrl: companionImageUrl(companion.portrait, stills[companion.id]), seed: companion.id, description: companion.tagline, ...(companion.id === "default" ? { hint: "Standard assistant" } : {}) })),
   ] : undefined;
   const changeCompanion = async (value: string) => {
     try {
@@ -239,7 +242,7 @@ export function ChatHeaderBar({ phoneRow = false, trailing, shells = false, onMe
   if (shells || companionId) {
     return (
       <>
-        <WithCompanion companionId={companionId} fallbackName={selectedName}>{(name, media) => <ChatHeader name={name} media={media} identityChoices={identityChoices} identityValue={companionId ?? undefined} onIdentityChange={(value) => void changeCompanion(value)} identityIntro="Earlier messages keep their original speaker." identitySearchLabel="Search companions" identityNotice={identityNotice} identityFooter={<CompanionPickerFooter />} onMenu={onMenu} onCall={onCall} actions={actions} menuExpanded={menuExpanded} menuControls={menuControls} />}</WithCompanion>
+        <WithCompanion companionId={companionId} fallbackName={selectedName} portrait={data.companions.find(({ id }) => id === companionId)?.portrait}>{(name, media) => <ChatHeader name={name} media={media} identityChoices={identityChoices} identityValue={companionId ?? undefined} onIdentityChange={(value) => void changeCompanion(value)} identityIntro="Earlier messages keep their original speaker." identitySearchLabel="Search companions" identityNotice={identityNotice} identityFooter={<CompanionPickerFooter />} onMenu={onMenu} onCall={onCall} actions={actions} menuExpanded={menuExpanded} menuControls={menuControls} />}</WithCompanion>
         <Dialog open={renaming} onOpenChange={setRenaming}>
           <DialogContent>
             <DialogHeader><DialogTitle>Rename</DialogTitle><DialogDescription>{title}</DialogDescription></DialogHeader>
