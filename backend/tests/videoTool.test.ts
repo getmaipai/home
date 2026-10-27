@@ -1,3 +1,4 @@
+import { JOB_QUEUE_COPY } from "@/lib/jobQueueCopy";
 // VIDEO-GEN-05 on the live turn path (rules 0, 1, 6, 9; docs/design/video-generation-2026-10-17.md): the video tool
 // is offered only where a video may be made, the call starts one Stack job and answers at once, the finished clip and
 // its poster are the person's own files, a picture reference is sent unchanged and only when the Stack made it, and
@@ -155,8 +156,8 @@ describe("VIDEO-GEN-05: the call, the job and the stored clip", () => {
       const { value } = await streamValue(people.owner, "make a short video of a paper boat in the rain");
       await until(() => getVideoJobFor(people.owner, value.video!.id)?.phase === "waiting for memory");
       const card = videoCardView(people.owner, getVideoJobFor(people.owner, value.video!.id)!, true);
-      expect(card.items[0]!.label).toBe("You are next.");
-      // The household queue is the one definition of the place in line (MEMMGMT slice 16): alone in the line this job is next, so no number is shown.
+      // A job the Stack holds for memory says so (and never "You are next", which read as a line of other people when nothing was ahead); no place in line is shown.
+      expect(card.items[0]!.label).toBe(JOB_QUEUE_COPY.memory_elsewhere.adult);
       expect(card.items[0]!.label).not.toContain("in line");
       await until(() => getVideoJobFor(people.owner, value.video!.id)?.state === "done");
     });
