@@ -67,6 +67,7 @@
 // much busier header slot is ever built here) - not re-litigated in
 // this comment a second time, see git history for the original.
 import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useNavigate } from "react-router-dom";
 import { Button } from "@maipai/ui/src/ui/button";
 import { Input } from "@maipai/ui/src/ui/input";
 import {
@@ -160,11 +161,28 @@ function WithCompanion({ companionId, fallbackName, children }: { companionId: s
 
 type ShellsProps = { shells?: boolean; onMenu?: (() => void) | undefined; menuExpanded?: boolean; menuControls?: string; onHistory?: (() => void) | undefined; onCall?: (() => void) | undefined };
 
+function CompanionPickerFooter() {
+  const navigate = useNavigate();
+  return <><DropdownMenuItem onSelect={() => navigate("/companions")}>Manage companions</DropdownMenuItem><DropdownMenuItem onSelect={() => navigate("/companions/start")}>Create a companion</DropdownMenuItem></>;
+}
+
 export function ChatHeaderBar({ phoneRow = false, trailing, shells = false, onMenu, menuExpanded, menuControls, onHistory, onCall }: { phoneRow?: boolean; trailing?: ReactNode } & ShellsProps = {}) {
   const data = useChatHeaderData();
   const stills = useCompanionStills(data?.companions.map(({ id }) => id) ?? []);
   const [renaming, setRenaming] = useState(false);
   const [open, setOpen] = useState(false);
+  const [identityNotice, setIdentityNotice] = useState("");
+  const noticeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const switchedReplySignal = useRef<string | number | undefined>(undefined);
+  const waitingForNextReply = useRef(false);
+
+  useEffect(() => {
+    if (waitingForNextReply.current && data?.assistantReplySignal !== undefined && data.assistantReplySignal !== switchedReplySignal.current) {
+      setIdentityNotice("");
+      waitingForNextReply.current = false;
+    }
+  }, [data?.assistantReplySignal]);
+  useEffect(() => () => { if (noticeTimer.current) clearTimeout(noticeTimer.current); }, []);
 
   // Non-chat pages never call useSetChatHeaderData at all (they don't
   // import this file), so this is only ever null for one real reason:
@@ -201,12 +219,27 @@ export function ChatHeaderBar({ phoneRow = false, trailing, shells = false, onMe
       </DropdownMenu>
     </>
   );
-  const companionId = data.companionId ?? data.defaultCompanionId ?? null;
-  const identityChoices = data.pinnable ? data.companions.map((companion) => ({ value: companion.id, label: companion.name, imageUrl: stills[companion.id] })) : undefined;
+  const companionId = data.conversationExists ? data.companionId : data.companionId ?? data.defaultCompanionId ?? null;
+  const selectedName = data.companions.find(({ id }) => id === companionId)?.name ?? data.companionName;
+  const identityChoices = data.pinnable ? [
+    ...(data.companions.some(({ id }) => id === "default") ? [] : [{ value: "default", label: "MaiPai", hint: "Standard assistant", description: "No character" }]),
+    ...data.companions.map((companion) => ({ value: companion.id, label: companion.id === "default" ? "MaiPai" : companion.name, imageUrl: stills[companion.id], description: companion.tagline, ...(companion.id === "default" ? { hint: "Standard assistant" } : {}) })),
+  ] : undefined;
+  const changeCompanion = async (value: string) => {
+    try {
+      await data.onCompanionChange(value);
+      const name = value === "default" ? "MaiPai" : data.companions.find((companion) => companion.id === value)?.name ?? data.companionName ?? "MaiPai";
+      setIdentityNotice(`${name} will answer next.`);
+      switchedReplySignal.current = data.assistantReplySignal;
+      waitingForNextReply.current = true;
+      if (noticeTimer.current) clearTimeout(noticeTimer.current);
+      noticeTimer.current = setTimeout(() => { setIdentityNotice(""); waitingForNextReply.current = false; }, 8000);
+    } catch { /* The bridge reports a user-facing error for failed saves. */ }
+  };
   if (shells || companionId) {
     return (
       <>
-        <WithCompanion companionId={companionId} fallbackName={data.companions.find(({ id }) => id === companionId)?.name}>{(name, media) => <ChatHeader name={name} media={media} identityChoices={identityChoices} identityValue={companionId ?? undefined} onIdentityChange={(value) => void data.onCompanionChange(value)} onMenu={onMenu} onCall={onCall} actions={actions} menuExpanded={menuExpanded} menuControls={menuControls} />}</WithCompanion>
+        <WithCompanion companionId={companionId} fallbackName={selectedName}>{(name, media) => <ChatHeader name={name} media={media} identityChoices={identityChoices} identityValue={companionId ?? undefined} onIdentityChange={(value) => void changeCompanion(value)} identityIntro="Earlier messages keep their original speaker." identitySearchLabel="Search companions" identityNotice={identityNotice} identityFooter={<CompanionPickerFooter />} onMenu={onMenu} onCall={onCall} actions={actions} menuExpanded={menuExpanded} menuControls={menuControls} />}</WithCompanion>
         <Dialog open={renaming} onOpenChange={setRenaming}>
           <DialogContent>
             <DialogHeader><DialogTitle>Rename</DialogTitle><DialogDescription>{title}</DialogDescription></DialogHeader>

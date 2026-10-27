@@ -3,6 +3,8 @@ import { act, cleanup, fireEvent, render, waitFor } from "@testing-library/react
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { TooltipProvider } from "@maipai/ui/src/ui/tooltip";
 import { Button } from "@maipai/ui/src/ui/button";
+import { MemoryRouter, useLocation } from "react-router-dom";
+import { useState } from "react";
 import * as avatarHookReal from "@/apps/chat/useCompanionAvatar";
 const avatarHookSnapshot = { ...avatarHookReal };
 // mock.module outlives this file; put the real modules back for the files that run after it.
@@ -21,6 +23,10 @@ function TestBridge({ data }: { data: ChatHeaderData | null }) {
   return null;
 }
 
+function RouteProbe() {
+  return <output data-testid="route-path">{useLocation().pathname}</output>;
+}
+
 // chatMemoryChip.test.tsx's own established fix: Radix's DropdownMenu
 // trigger opens on pointerdown, not a plain click - happy-dom's click
 // alone leaves it closed.
@@ -37,10 +43,10 @@ function renderBar(data: ChatHeaderData | null, phoneRow = false) {
   return render(
     <QueryClientProvider client={client}>
       <TooltipProvider>
-        <ChatHeaderDataProvider>
+        <MemoryRouter><ChatHeaderDataProvider>
           <TestBridge data={data} />
           <ChatHeaderBar phoneRow={phoneRow} />
-        </ChatHeaderDataProvider>
+        </ChatHeaderDataProvider></MemoryRouter>
       </TooltipProvider>
     </QueryClientProvider>,
   );
@@ -127,12 +133,12 @@ describe("ChatHeaderBar", () => {
   test("the activity slot renders at the right of the header, before the conversation actions", async () => {
     const view = render(
       <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
-        <TooltipProvider>
+        <TooltipProvider><MemoryRouter>
           <ChatHeaderDataProvider>
             <TestBridge data={baseData({ title: "Plans" })} />
             <ChatHeaderBar trailing={<Button type="button">Activity</Button>} />
           </ChatHeaderDataProvider>
-        </TooltipProvider>
+        </MemoryRouter></TooltipProvider>
       </QueryClientProvider>,
     );
     const activity = await view.findByRole("button", { name: "Activity" });
@@ -270,10 +276,10 @@ describe("ChatHeaderBar", () => {
       return render(
         <QueryClientProvider client={client}>
           <TooltipProvider>
-            <ChatHeaderDataProvider>
+          <MemoryRouter><ChatHeaderDataProvider>
               <TestBridge data={data} />
               <ChatHeaderBar shells menuExpanded={false} menuControls="next-chat-threads" {...props} />
-            </ChatHeaderDataProvider>
+          </ChatHeaderDataProvider></MemoryRouter>
           </TooltipProvider>
         </QueryClientProvider>,
       );
@@ -324,6 +330,58 @@ describe("ChatHeaderBar", () => {
       expect((await view.findByRole("menuitemradio", { name: "Sprout" })).getAttribute("aria-checked")).toBe("true");
       fireEvent.click(view.getByRole("menuitemradio", { name: "Rivet" }));
       await waitFor(() => expect(onCompanionChange).toHaveBeenCalledWith("lively-adult"));
+    });
+
+    test("includes MaiPai once, the companion tagline descriptions, intro, and search label", async () => {
+      const view = renderShells(baseData({ companions: [{ id: "sprout", name: "Sprout", tagline: "A gentle guide." }, { id: "default", name: "Old Default", tagline: "No character" }, { id: "a", name: "A" }, { id: "b", name: "B" }, { id: "c", name: "C" }, { id: "d", name: "D" }] }));
+      act(() => { fireEvent.pointerDown(view.getByRole("button", { name: "Change companion" }), { button: 0, ctrlKey: false, pointerId: 1 }); fireEvent.click(view.getByRole("button", { name: "Change companion" })); });
+      expect(await view.findAllByRole("menuitemradio", { name: /MaiPai/ })).toHaveLength(1);
+      expect(view.getByText("A gentle guide.")).toBeVisible();
+      expect(view.getByText("Earlier messages keep their original speaker.")).toBeVisible();
+      expect(view.getByRole("textbox", { name: "Search companions" })).toBeVisible();
+    });
+
+    test("keeps a stored null companion unselected instead of implying the person's current default", async () => {
+      const view = renderShells(baseData({ conversationExists: true, companionId: null, defaultCompanionId: "sprout", companions: [{ id: "sprout", name: "Sprout" }] }));
+      act(() => { fireEvent.pointerDown(view.getByRole("button", { name: "Change companion" }), { button: 0, ctrlKey: false, pointerId: 1 }); fireEvent.click(view.getByRole("button", { name: "Change companion" })); });
+      expect(await view.findByRole("menuitemradio", { name: /MaiPai/ })).toHaveAttribute("aria-checked", "false");
+      expect(view.getByRole("menuitemradio", { name: "Sprout" })).toHaveAttribute("aria-checked", "false");
+    });
+
+    test("shows a switch notice, keeps it through the existing reply, then clears on a new reply", async () => {
+      const onCompanionChange = mock(async () => {});
+      const data = baseData({ companionId: "lively-child", assistantReplySignal: undefined, companions: [{ id: "lively-child", name: "Sprout" }, { id: "lively-adult", name: "Rivet" }], onCompanionChange });
+      const view = renderShells(data);
+      act(() => { fireEvent.pointerDown(view.getByRole("button", { name: "Change companion" }), { button: 0, ctrlKey: false, pointerId: 1 }); fireEvent.click(view.getByRole("button", { name: "Change companion" })); });
+      fireEvent.click(await view.findByRole("menuitemradio", { name: "Rivet" }));
+      expect(await view.findByRole("status")).toHaveTextContent("Rivet will answer next.");
+      view.rerender(<QueryClientProvider client={new QueryClient()}><TooltipProvider><MemoryRouter><ChatHeaderDataProvider><TestBridge data={baseData({ companionId: "lively-adult", assistantReplySignal: "reply-2", companions: [{ id: "lively-child", name: "Sprout" }, { id: "lively-adult", name: "Rivet" }], onCompanionChange })} /><ChatHeaderBar shells /></ChatHeaderDataProvider></MemoryRouter></TooltipProvider></QueryClientProvider>);
+      await waitFor(() => expect(view.queryByRole("status")).toBeNull());
+    });
+
+    test("provides management and create links and preserves a composer draft across the switch callback", async () => {
+      let updateSelected: (id: string) => void = () => {};
+      const onCompanionChange = mock(async (id: string | null) => { if (id) updateSelected(id); });
+      function Harness() {
+        const [draft, setDraft] = useState("unsent note");
+        const [selected, setSelected] = useState("lively-child");
+        updateSelected = setSelected;
+        return <><RouteProbe /><textarea aria-label="Message" value={draft} onChange={(event) => setDraft(event.currentTarget.value)} /><TestBridge data={baseData({ companionId: selected, companions: [{ id: "lively-child", name: "Sprout" }, { id: "lively-adult", name: "Rivet" }], onCompanionChange })} /><ChatHeaderBar shells /></>;
+      }
+      const client = new QueryClient();
+      const view = render(<QueryClientProvider client={client}><TooltipProvider><MemoryRouter><ChatHeaderDataProvider><Harness /></ChatHeaderDataProvider></MemoryRouter></TooltipProvider></QueryClientProvider>);
+      act(() => { fireEvent.pointerDown(view.getByRole("button", { name: "Change companion" }), { button: 0, ctrlKey: false, pointerId: 1 }); fireEvent.click(view.getByRole("button", { name: "Change companion" })); });
+      expect(await view.findByText("Manage companions")).toBeVisible();
+      expect(view.getByText("Create a companion")).toBeVisible();
+      fireEvent.click(view.getByRole("menuitem", { name: "Manage companions" }));
+      await waitFor(() => expect(view.getByTestId("route-path")).toHaveTextContent("/companions"));
+      act(() => { fireEvent.pointerDown(view.getByRole("button", { name: "Change companion" }), { button: 0, ctrlKey: false, pointerId: 1 }); fireEvent.click(view.getByRole("button", { name: "Change companion" })); });
+      fireEvent.click(await view.findByRole("menuitem", { name: "Create a companion" }));
+      await waitFor(() => expect(view.getByTestId("route-path")).toHaveTextContent("/companions/start"));
+      act(() => { fireEvent.pointerDown(view.getByRole("button", { name: "Change companion" }), { button: 0, ctrlKey: false, pointerId: 1 }); fireEvent.click(view.getByRole("button", { name: "Change companion" })); });
+      fireEvent.click(await view.findByRole("menuitemradio", { name: "Rivet" }));
+      await waitFor(() => expect(onCompanionChange).toHaveBeenCalled());
+      expect(view.getByRole("textbox", { name: "Message" })).toHaveValue("unsent note");
     });
 
     test("temporary chats hide the companion choice", async () => {

@@ -33,9 +33,12 @@ export interface ChatHeaderData {
   onPinChange: (pinned: boolean) => Promise<void>;
   onArchive: () => Promise<void>;
   companionId: string | null;
+  conversationExists?: boolean;
+  companionName?: string;
+  assistantReplySignal?: string | number;
   /** The signed-in person's selected companion for a not-yet-created chat. */
   defaultCompanionId?: string | null;
-  companions: Array<{ id: string; name: string }>;
+  companions: Array<{ id: string; name: string; tagline?: string }>;
   onCompanionChange: (companionId: string | null) => Promise<void>;
   /** The history sheet's open state and toggle, for a phone, where the toggle sits in the shell bar beside the title. */
   sheetOpen?: boolean;
@@ -93,13 +96,16 @@ export function useSetChatHeaderData(data: ChatHeaderData | null): void {
   const pinnable = data?.pinnable;
   const pinned = data?.pinned;
   const companionId = data?.companionId;
+  const conversationExists = data?.conversationExists;
   const defaultCompanionId = data?.defaultCompanionId;
   const companions = data?.companions;
+  const companionName = data?.companionName;
+  const assistantReplySignal = data?.assistantReplySignal;
   const sheetOpen = data?.sheetOpen;
   const inShellBar = data?.inShellBar;
   useEffect(() => {
     setData(dataRef.current);
     return () => setData(null);
     // eslint-disable-next-line react-hooks/exhaustive-deps -- deliberately narrower than `data` itself; see this function's own comment above.
-  }, [data === null, title, ttsAvailable, autoReadReplies, pinnable, pinned, companionId, defaultCompanionId, companions, sheetOpen, inShellBar, setData]);
+  }, [data === null, title, ttsAvailable, autoReadReplies, pinnable, pinned, companionId, conversationExists, companionName, assistantReplySignal, defaultCompanionId, companions, sheetOpen, inShellBar, setData]);
 }

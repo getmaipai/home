@@ -774,13 +774,18 @@ function ChatHeaderDataBridge({ autoReadReplies, setAutoReadReplies, ttsAvailabl
   const personSettings = useQuery({ queryKey: ["settingsValues", `person:${person.id}`], queryFn: () => api.settingsValues(`person:${person.id}`) });
   const conversation = useQuery({ queryKey: ["conversation", conversationId], queryFn: () => api.conversation(conversationId!), enabled: Boolean(conversationId) });
   // Memoized: the header data hook re-sends on a changed reference, and a fresh array per render would loop.
-  const companionChoices = useMemo(() => companionList.data?.companions?.map(({ id, name }) => ({ id, name })) ?? [], [companionList.data]);
+  const companionChoices = useMemo(() => companionList.data?.companions?.map(({ id, name, tagline }) => ({ id, name, tagline })) ?? [], [companionList.data]);
   const activeCompanionId = Array.isArray(personSettings.data) ? personSettings.data.find((setting) => setting.key === "persona.active_id")?.value : undefined;
   const defaultCompanionId = (typeof activeCompanionId === "string" && companionList.data?.companions?.some(({ id }) => id === activeCompanionId) ? activeCompanionId : undefined)
     ?? companionList.data?.default_id
     ?? null;
   const title = useAuiState((s) => s.threadListItem.title) ?? "";
   const pinned = useAuiState((s) => isThreadPinned(s.threadListItem.custom));
+  const assistantReplySignal = useAuiState((s) => {
+    const message = [...s.thread.messages].reverse().find((entry) => entry.role === "assistant" && entry.status.type === "running");
+    return message?.id;
+  });
+  const answeredByName = useAuiState((s) => [...s.thread.messages].reverse().map((entry) => entry.metadata?.custom?.answered_by as { companion_id?: string; name?: string } | undefined).find((speaker) => speaker?.name && speaker.companion_id === conversation.data?.companion_id)?.name);
   useEffect(() => {
     const reloadThreads = () => void aui.threads.reload();
     window.addEventListener(INCOGNITO_DISCARDED_EVENT, reloadThreads);
@@ -796,6 +801,9 @@ function ChatHeaderDataBridge({ autoReadReplies, setAutoReadReplies, ttsAvailabl
     pinnable,
     pinned,
     companionId: conversation.data?.companion_id ?? null,
+    conversationExists: Boolean(conversationId),
+    companionName: answeredByName,
+    assistantReplySignal,
     defaultCompanionId,
     companions: companionChoices,
     onCompanionChange: async (companionId) => {
@@ -819,6 +827,7 @@ function ChatHeaderDataBridge({ autoReadReplies, setAutoReadReplies, ttsAvailabl
         ]);
       } catch (error) {
         toast.error(error instanceof ApiError ? `${error.message} Choose an available companion and try again.` : "Could not change this chat's companion. Check your connection and try again.");
+        throw error;
       }
     },
     // Same call the row menu makes: updateCustom replaces the whole
