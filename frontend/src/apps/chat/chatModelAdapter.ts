@@ -90,6 +90,7 @@ export interface ChatModelAdapterDeps {
   onDraftSent?(): void;
   onConnection?(state: { phase: "online" | "dropped" | "reconnecting" | "resumed"; attempt?: number; resumedTokens?: number }): void;
   onReplyState?(state: "waiting" | "responding" | "ready" | "error" | "idle"): void;
+  onReplyText?(text: string): void;
   onSpeechError?(): void;
   // NewChat reads the active conversation's selected mode. Undefined
   // for a minor (safety ruling, 2026-09-22): its request omits `thinking`.
@@ -246,6 +247,7 @@ export function createChatModelAdapter(deps: ChatModelAdapterDeps): ChatModelAda
         : undefined;
       const text = typedText || (documentPayloads.length > 0 ? "Please read the attached document." : undefined);
       if (!text && !imageAttached && documentPayloads.length === 0) return;
+      deps.onReplyState?.("waiting");
 
       // Stop whatever an earlier live reply was still speaking - never two
       // voices at once. A manual "Listen" replay (chatListen.ts) stops
@@ -583,6 +585,7 @@ export function createChatModelAdapter(deps: ChatModelAdapterDeps): ChatModelAda
             // non-streaming path already relied on.
             deps.onReplyState?.("ready");
             const finalText = stripThinking(event.value.reply.text);
+            deps.onReplyText?.(finalText);
             const trailing = finalText.slice(spokenLength).trim();
             if (trailing && speakReplies) {
               // Nothing was spoken incrementally yet (an immediate plugin/

@@ -1,6 +1,6 @@
 {
-  "generatedAt": "2026-10-27T17:32:23.150Z",
-  "kitTag": "ui-v0.5.379",
+  "generatedAt": "2026-10-27T18:31:28.125Z",
+  "kitTag": "ui-v0.5.380",
   "items": [
     {
       "file": "ActivityCardsShowcase.tsx",
@@ -1206,9 +1206,9 @@
       "file": "right-pane.tsx",
       "name": "right-pane",
       "group": "right",
-      "verdict": "later",
-      "verdictReason": "Defer to AMBIENT-04, which migrates Chat panels into the standard right pane.",
-      "implemented": false
+      "verdict": "wire-now",
+      "verdictReason": "The standard right pane, AMBIENT-03.",
+      "implemented": true
     },
     {
       "file": "schedule-card.tsx",

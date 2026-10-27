@@ -166,7 +166,7 @@ describe("Routes appearance", () => {
 });
 
 describe("ambient companion shell slot", () => {
-  test("shows the avatar in the top right on app and Chat routes and touch opens the preview", async () => {
+  test("shows the avatar in the top right and touch opens the companion pane", async () => {
     const originalFetch = globalThis.fetch;
     const originalMatchMedia = window.matchMedia;
     window.matchMedia = mock((query: string) => ({ matches: query === "(pointer: coarse)", addEventListener: () => {}, removeEventListener: () => {} })) as unknown as typeof window.matchMedia;
@@ -195,9 +195,9 @@ describe("ambient companion shell slot", () => {
       const avatar = await view.findByRole("button", { name: "Companion" });
       expect(avatar.closest('[data-slot="rail-top-right"]')).toBeTruthy();
       fireEvent.click(avatar);
-      expect(await view.findByRole("textbox", { name: "Ask Companion" })).toBeTruthy();
-      fireEvent.click(view.getByRole("button", { name: "Companion" }));
-      await waitFor(() => expect(view.queryByRole("textbox", { name: "Ask Companion" })).toBeNull());
+      expect(await view.findByRole("button", { name: "Close pane" })).toBeTruthy();
+      expect(view.getAllByRole("button", { name: "Continue in Chat" })).toHaveLength(2);
+      fireEvent.click(view.getByRole("button", { name: "Close pane" }));
       fireEvent.click(view.getByRole("button", { name: "Open /chat" }));
       await waitFor(() => expect(view.getByRole("button", { name: "Companion" }).closest('[data-slot="rail-top-right"]')).toBeTruthy());
     } finally {

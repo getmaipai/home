@@ -1102,11 +1102,12 @@ export const api = {
   // `person` for the parental view (an owner/admin listing a child's own
   // threads; the route's own list() enforces that access check server-
   // side and returns an empty list for anyone it denies, never a 403).
-  conversationList: (person?: string, query?: string, archived?: "include" | "only") => {
+  conversationList: (person?: string, query?: string, archived?: "include" | "only", placement?: "side" | "all") => {
     const params = new URLSearchParams();
     if (person) params.set("person", person);
     if (query) params.set("q", query);
     if (archived) params.set("archived", archived);
+    if (placement) params.set("placement", placement);
     const suffix = params.toString();
     return request<ConversationSummary[]>(`/api/conversations${suffix ? `?${suffix}` : ""}`);
   },
@@ -1119,7 +1120,7 @@ export const api = {
     return request<{ discarded: number }>(`/api/conversations/incognito/discard${suffix}`, { method: "POST" });
   },
   // PROJECTS-01a: `folderId` starts the chat inside one of the person's projects.
-  createConversation: (mode?: Conversation["mode"], carryFrom?: string, folderId?: string, companionId?: string) => request<Conversation>("/api/conversations", { method: "POST", body: JSON.stringify({ surface: "chat", ...(mode ? { mode } : {}), ...(carryFrom ? { carry_from: carryFrom } : {}), ...(folderId ? { folder_id: folderId } : {}), ...(companionId ? { companion_id: companionId } : {}) }) }),
+  createConversation: (mode?: Conversation["mode"], carryFrom?: string, folderId?: string, companionId?: string, placement?: "chat" | "side") => request<Conversation>("/api/conversations", { method: "POST", body: JSON.stringify({ surface: "chat", ...(placement ? { placement } : {}), ...(mode ? { mode } : {}), ...(carryFrom ? { carry_from: carryFrom } : {}), ...(folderId ? { folder_id: folderId } : {}), ...(companionId ? { companion_id: companionId } : {}) }) }),
   // PROJECTS-01a: a person's projects (chat folders) in the chat column.
   chatFolders: (person?: string, options?: { scope?: "mine" | "shared" | "all"; sort?: "order" | "updated" }) => {
     const params = new URLSearchParams();
@@ -1143,6 +1144,8 @@ export const api = {
     request<Conversation>(`/api/conversations/${encodeURIComponent(id)}`, { method: "PATCH", body: JSON.stringify({ folder_id: folderId }) }),
   setConversationCompanion: (id: string, companionId: string | null) =>
     request<Conversation>(`/api/conversations/${encodeURIComponent(id)}`, { method: "PATCH", body: JSON.stringify({ companion_id: companionId }) }),
+  setConversationPlacement: (id: string, placement: "chat" | "side") =>
+    request<Conversation>(`/api/conversations/${encodeURIComponent(id)}`, { method: "PATCH", body: JSON.stringify({ placement }) }),
   resumeConversation: (id: string) => request<Conversation>(`/api/conversations/${encodeURIComponent(id)}/resume`, { method: "POST" }),
   conversation: (id: string) => request<Conversation>(`/api/conversations/${encodeURIComponent(id)}`),
   setConversationSettings: (id: string, settings: Record<string, unknown>) =>
