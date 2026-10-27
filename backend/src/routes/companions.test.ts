@@ -5,7 +5,7 @@ import { join } from "node:path";
 import { rmSync, mkdirSync, writeFileSync } from "node:fs";
 import { db } from "@/db";
 import { and, eq } from "drizzle-orm";
-import { devices, people, sessions, settingsValues } from "@/db/schema";
+import { devices, people, sessions, settingsValues, jobs, conversations } from "@/db/schema";
 import { companionsRoutes } from "@/routes/companions";
 import { settingsRoutes } from "@/routes/settings";
 import { createHouseholdCompanion, householdCompanionFolder, setHouseholdCompanionAnimation, setHouseholdCompanionAudience, setHouseholdCompanionStatus } from "@/lib/householdCompanions";
@@ -59,6 +59,21 @@ function fixture() {
 
 beforeEach(() => { resetDb(); rmSync(companionRoot, { recursive: true, force: true }); __reloadPersonasForTests(); __clearCompanionLookJobsForTests(); __clearCompanionTakeRunsForTests(); __resetCompanionStatesForTests(); __setPicturesFetchForTests(null); __setVideoStatusForTests(undefined); __setVideosFetchForTests(null); __setPictureStatusForTests(undefined); __setCharacterPictureCapabilityForTests(null); __setStackClientForTests(null); });
 afterEach(() => { resetDb(); rmSync(companionRoot, { recursive: true, force: true }); __reloadPersonasForTests(); __clearCompanionLookJobsForTests(); __clearCompanionTakeRunsForTests(); __resetCompanionStatesForTests(); __setPicturesFetchForTests(null); __setVideoStatusForTests(undefined); __setVideosFetchForTests(null); __setPictureStatusForTests(undefined); __setCharacterPictureCapabilityForTests(null); __setStackClientForTests(null); });
+
+test("activity returns own task details and needs-you agrees with companion waiting counts", async () => {
+  const person = addPerson("activity-own", "adult"), other = addPerson("activity-other", "adult");
+  db.insert(jobs).values([
+    { id: "waiting-task", kind: "ask", startedBy: "activity-own", forPerson: "activity-own", title: "Choose an option", state: "waiting", progress: "  Looking for an answer  ", waitingReason: "Choose one", resultRef: null, conversationId: null, companionId: "rivet", errorKind: null, raw: null, provenance: "{}", createdAt: now, updatedAt: now },
+    { id: "running-task", kind: "project", startedBy: "activity-own", forPerson: "activity-own", title: "Working", state: "running", progress: "Working now", waitingReason: null, resultRef: null, conversationId: null, companionId: "rivet", errorKind: null, raw: null, provenance: "{}", createdAt: now, updatedAt: now },
+    { id: "private-task", kind: "ask", startedBy: "activity-other", forPerson: "activity-other", title: "Private", state: "waiting", progress: null, waitingReason: "Private reason", resultRef: null, conversationId: null, companionId: "rivet", errorKind: null, raw: null, provenance: "{}", createdAt: now, updatedAt: now },
+  ]).run();
+  const rows = (await (await request("companions/rivet/activity", person)).json() as { activity: Array<Record<string, unknown>> }).activity;
+  expect(rows).toHaveLength(2);
+  expect(rows.find((row) => row.id === "waiting-task")).toMatchObject({ conversation_id: null, waiting_reason: "Choose one", progress: "Looking for an answer", result_ref: null, needs_you: true });
+  expect(rows.find((row) => row.id === "running-task")?.needs_you).toBe(false);
+  const card = (await (await request("companions", person)).json() as { companions: Array<{ id: string; waiting_count: number }> }).companions.find((row) => row.id === "rivet");
+  expect(card?.waiting_count).toBe(1);
+});
 
 test("companion set routes materialize unset, add and remove per person, and enforce default and age limits", async () => {
   const adult = addPerson("person-set-route", "adult"), other = addPerson("person-set-other", "adult"), child = addPerson("person-set-child", "child"), teen = addPerson("person-set-teen", "teen");

@@ -61,9 +61,13 @@ function companionCounts(personId: string, companionId: string) {
   const chats = db.select().from(conversations).where(and(eq(conversations.personId, personId), eq(conversations.companionId, companionId))).all();
   const tasks = [...homeJobs.map((row) => ({ title: row.title, state: row.state, at: row.updatedAt })), ...projectRows.map((row) => ({ title: row.title, state: row.state, at: row.updatedAt })), ...mediaJobs.map((row) => ({ title: "Made media", state: row.state, at: row.updatedAt }))];
   const active = homeJobs.filter((row) => (row.state === "running" || row.state === "queued") && !row.waitingReason).length + projectRows.filter((row) => row.state === "running").length + mediaJobs.filter((row) => row.state === "running" || row.state === "queued").length;
-  const waiting = homeJobs.filter((row) => row.state === "waiting" || Boolean(row.waitingReason)).length + projectRows.filter((row) => row.state === "waiting").length + mediaJobs.filter((row) => row.state === "waiting" || row.state === "needs_you").length;
+  const waiting = homeJobs.filter((row) => needsYou(row.state, row.waitingReason)).length + projectRows.filter((row) => row.state === "waiting").length + mediaJobs.filter((row) => needsYou(row.state, null)).length;
   const latest = [...tasks.map((row) => ({ title: row.title, at: row.at })), ...chats.map((row) => ({ title: row.title || "Chat", at: row.updatedAt }))].sort((a, b) => Date.parse(b.at) - Date.parse(a.at))[0];
   return { task_count: tasks.length, chat_count: chats.length, working_count: active, waiting_count: waiting, latest_activity: latest?.title ?? null };
+}
+
+function needsYou(state: string, waitingReason: string | null): boolean {
+  return state === "waiting" || Boolean(waitingReason) || state === "needs_you";
 }
 
 const listRoute = createRoute({
@@ -186,7 +190,7 @@ companionsRoutes.openapi(detailRoute, (c) => {
   return c.json({ ...detail, ...companionCounts(person.id, detail.id), can_edit: detail.is_household && mayEdit(person, detail.id), can_copy: speakerAgeBand(person, new Date()) === "adult" || isOwnerOrAdmin(person) }, 200);
 });
 
-const activityRow = z.object({ id: z.string(), kind: z.string(), title: z.string(), state: z.string(), created_at: z.string(), updated_at: z.string() });
+const activityRow = z.object({ id: z.string(), kind: z.string(), title: z.string(), state: z.string(), created_at: z.string(), updated_at: z.string(), conversation_id: z.string().nullable().optional(), waiting_reason: z.string().nullable().optional(), progress: z.string().max(200).nullable().optional(), result_ref: z.string().nullable().optional(), needs_you: z.boolean().optional() });
 const activityRoute = createRoute({ method: "get", path: "/{id}/activity", tags: ["Companions"], summary: "Read my recent work for one companion", middleware: [requireAuth] as const,
   request: { params: idParamSchema("id", "lively-teen") },
   responses: { 200: { content: { "application/json": { schema: z.object({ activity: z.array(activityRow) }) } }, description: "The signed-in person's recent jobs and projects for this companion, newest first, up to 50." }, ...errorResponses({ 401: "Not signed in", 404: "No such companion for this person" }) },
@@ -194,12 +198,13 @@ const activityRoute = createRoute({ method: "get", path: "/{id}/activity", tags:
 companionsRoutes.openapi(activityRoute, (c) => {
   const person = c.get("person"), id = c.req.valid("param").id, persona = PERSONAS.find((candidate) => candidate.id === id);
   if (!persona || !mayUseCompanion(person, persona)) return c.json({ error: "No such companion" }, 404);
-  const ownJobs = db.select().from(jobs).where(and(eq(jobs.forPerson, person.id), eq(jobs.companionId, id))).all().map((row) => ({ id: row.id, kind: row.kind, title: row.title, state: row.state, created_at: row.createdAt, updated_at: row.updatedAt }));
-  const ownProjects = db.select().from(projects).where(and(eq(projects.person, person.id), sql`json_extract(${projects.provenance}, '$.companion_id') = ${id}`)).all().map((row) => ({ id: row.id, kind: row.type, title: row.title, state: row.state, created_at: row.createdAt, updated_at: row.updatedAt }));
-  const ownPictures = db.select().from(pictureJobs).where(and(eq(pictureJobs.personId, person.id), eq(pictureJobs.companionId, id))).all().map((row) => ({ id: row.id, kind: "picture", title: "Made a picture", state: row.state, created_at: row.createdAt, updated_at: row.updatedAt }));
-  const ownVideos = db.select().from(videoJobs).where(and(eq(videoJobs.personId, person.id), eq(videoJobs.companionId, id))).all().map((row) => ({ id: row.id, kind: "video", title: "Made a video", state: row.state, created_at: row.createdAt, updated_at: row.updatedAt }));
-  const ownSongs = db.select().from(musicJobs).where(and(eq(musicJobs.personId, person.id), eq(musicJobs.companionId, id))).all().map((row) => ({ id: row.id, kind: "music", title: "Made a song", state: row.state, created_at: row.createdAt, updated_at: row.updatedAt }));
-  const activity = [...ownJobs, ...ownProjects, ...ownPictures, ...ownVideos, ...ownSongs].sort((a, b) => Date.parse(b.updated_at) - Date.parse(a.updated_at)).slice(0, 50);
+  const ownJobs = db.select().from(jobs).where(and(eq(jobs.forPerson, person.id), eq(jobs.companionId, id))).all().map((row) => ({ id: row.id, kind: row.kind, title: row.title, state: row.state, created_at: row.createdAt, updated_at: row.updatedAt, conversation_id: row.conversationId, waiting_reason: row.waitingReason, progress: typeof row.progress === "string" ? row.progress.trim().slice(0, 200) : null, result_ref: row.resultRef, needs_you: needsYou(row.state, row.waitingReason) }));
+  const ownProjects = db.select().from(projects).where(and(eq(projects.person, person.id), sql`json_extract(${projects.provenance}, '$.companion_id') = ${id}`)).all().map((row) => ({ id: row.id, kind: row.type, title: row.title, state: row.state, created_at: row.createdAt, updated_at: row.updatedAt, conversation_id: null, waiting_reason: null, progress: null, result_ref: null, needs_you: needsYou(row.state, null) }));
+  const ownPictures = db.select().from(pictureJobs).where(and(eq(pictureJobs.personId, person.id), eq(pictureJobs.companionId, id))).all().map((row) => ({ id: row.id, kind: "picture", title: "Made a picture", state: row.state, created_at: row.createdAt, updated_at: row.updatedAt, conversation_id: row.conversationId, waiting_reason: null, progress: row.phase?.trim().slice(0, 200) ?? null, result_ref: row.id, needs_you: needsYou(row.state, null) }));
+  const ownVideos = db.select().from(videoJobs).where(and(eq(videoJobs.personId, person.id), eq(videoJobs.companionId, id))).all().map((row) => ({ id: row.id, kind: "video", title: "Made a video", state: row.state, created_at: row.createdAt, updated_at: row.updatedAt, conversation_id: row.conversationId, waiting_reason: null, progress: row.phase?.trim().slice(0, 200) ?? null, result_ref: row.id, needs_you: needsYou(row.state, null) }));
+  const ownSongs = db.select().from(musicJobs).where(and(eq(musicJobs.personId, person.id), eq(musicJobs.companionId, id))).all().map((row) => ({ id: row.id, kind: "music", title: "Made a song", state: row.state, created_at: row.createdAt, updated_at: row.updatedAt, conversation_id: row.conversationId, waiting_reason: null, progress: row.stage?.trim().slice(0, 200) ?? null, result_ref: row.id, needs_you: needsYou(row.state, null) }));
+  const ownChats = db.select().from(conversations).where(and(eq(conversations.personId, person.id), eq(conversations.companionId, id))).all().map((row) => ({ id: row.id, kind: "chat", title: row.title || "Conversation", state: "done", created_at: row.createdAt, updated_at: row.updatedAt, conversation_id: row.id, waiting_reason: null, progress: null, result_ref: null, needs_you: false }));
+  const activity = [...ownJobs, ...ownProjects, ...ownPictures, ...ownVideos, ...ownSongs, ...ownChats].sort((a, b) => Date.parse(b.updated_at) - Date.parse(a.updated_at)).slice(0, 50);
   return c.json({ activity }, 200);
 });
 

@@ -343,7 +343,7 @@ export interface CompanionCard {
   dials: Array<{ label: string; value: string }>; voice: string; is_default: boolean; is_household: boolean; status: string; chats: number; can_edit: boolean; can_copy: boolean;
   task_count?: number; chat_count?: number; working_count?: number; waiting_count?: number; latest_activity?: string | null;
 }
-export interface CompanionActivity { activity: Array<{ id: string; kind: string; title: string; state: string; created_at: string; updated_at: string }> }
+export interface CompanionActivity { activity: Array<{ id: string; kind: string; title: string; state: string; created_at: string; updated_at: string; conversation_id?: string | null; waiting_reason?: string | null; progress?: string | null; result_ref?: string | null; needs_you?: boolean }> }
 export interface CompanionDetail extends CompanionCard {
   about: string; pronouns: string | null; interests: string[]; examples: string[]; voice_value: string; voice_is_own: boolean; voice_setting: string | null;
   used_by: { people: Array<{ id: string; name: string }>; robots: Array<{ id: string; name: string }> } | null;
