@@ -39,6 +39,7 @@ export function AiModelChoices({ row, copy, onClose, onSave }: AiModelChoicesPro
                     <FieldTitle>
                       {option.label}
                       {option.recommended ? <Badge tone="success">{copy.recommended}</Badge> : null}
+                      {option.id === "chat.uncensored" ? <Badge variant="outline" tone="warning">Uncensored</Badge> : null}
                     </FieldTitle>
                     <FieldDescription>{option.description}</FieldDescription>
                     <FieldDescription>

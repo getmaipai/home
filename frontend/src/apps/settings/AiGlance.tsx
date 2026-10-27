@@ -224,6 +224,7 @@ function glanceRow({ row, copy, onSwitch, onEdit, onReset, onDownload }: { row: 
         <ItemTitle>
           {row.title}
           {row.offered ? <Badge tone={row.badge === "recommended" ? "success" : undefined} variant={row.badge === "disabled" ? "secondary" : "default"}>{copy[row.badge]}</Badge> : null}
+          {row.offered && row.shown?.id === "chat.uncensored" ? <Badge variant="outline" tone="warning">Uncensored</Badge> : null}
         </ItemTitle>
         <ItemDescription clamp={false}>{model && row.offered ? `${model.label}. ` : ""}{line}</ItemDescription>
         {model && row.offered ? <ItemDescription clamp={false}>{model.details.map((part) => part.name).join(", ")}</ItemDescription> : null}

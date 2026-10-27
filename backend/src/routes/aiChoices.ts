@@ -19,6 +19,8 @@ import { recordedLevel, shippedPlanForLevel } from "@/lib/diskPlan";
 import { systemAvailableBytes } from "@/lib/resourceGovernor";
 import { ensureWakewordAssets, removeWakewordAssets, wakewordAssetState } from "@/lib/wakewordAssets";
 import { setHouseholdSettingValue } from "@/lib/settings";
+import { CATALOG } from "@/lib/modelCatalog";
+import { startChatModelChoice, uncensoredChoiceState } from "@/lib/chatModelSwitch";
 import { readAiSettings } from "@/lib/aiChoicesState";
 import { resetInstallStatusCache } from "@/lib/installStatus";
 import { dropPictureStatusCache } from "@/lib/pictures/ready";
@@ -39,10 +41,11 @@ interface AiState {
   settings: AiChoicesInput["settings"];
   freeBytes: number | null;
   list: StackComponentList;
+  uncensored: Awaited<ReturnType<typeof uncensoredChoiceState>>;
 }
 
 function choicesInput(state: AiState): AiChoicesInput {
-  return { copy: aiCopy, plan: state.plan, components: state.components, settings: state.settings, freeBytes: state.freeBytes, wakeword: wakewordAssetState() };
+  return { copy: aiCopy, plan: state.plan, components: state.components, settings: state.settings, freeBytes: state.freeBytes, wakeword: wakewordAssetState(), uncensored: state.uncensored };
 }
 
 function unusedInput(state: AiState): UnusedInput {
@@ -57,8 +60,8 @@ async function loadPlan(): Promise<DiskPlan> {
 }
 
 async function loadAiState(): Promise<AiState> {
-  const [plan, list] = await Promise.all([loadPlan(), listStackComponents()]);
-  return { plan, components: list.components, settings: readAiSettings(), freeBytes: list.free_disk_bytes, list };
+  const [plan, list, uncensored] = await Promise.all([loadPlan(), listStackComponents(), uncensoredChoiceState()]);
+  return { plan, components: list.components, settings: readAiSettings(), freeBytes: list.free_disk_bytes, list, uncensored };
 }
 
 // The Stack's refusal, passed through as its own sentence (routes/components.ts does the same mapping).
@@ -129,6 +132,15 @@ function keptMessage(name: string, reason: string): string {
 }
 
 const WAKEWORD_CHOICE = "wakeword.detector";
+// The chat choices that are a chat model: picking one goes through the model switch (download, then load), not a Stack part and a setting.
+const CHAT_MODEL_CHOICES = ["chat.standard", "chat.uncensored"];
+
+// The model "Standard chat AI" means on this computer: the last catalog chat model the tier's chat row holds (its starter model comes first).
+function standardChatModelId(state: AiState): string | null {
+  const row = state.plan.rows.find((candidate) => candidate.id === "chat");
+  const ids = (row?.model_ids ?? []).filter((id) => CATALOG.some((model) => model.id === id && model.role === "chat" && model.implemented && !model.tags?.includes("uncensored")));
+  return ids.at(-1) ?? null;
+}
 const SETTING_ONLY_SWITCHES: Record<string, string> = { "music.make": "generation.music.enabled", "picturesdetailed.zimage": "generation.picture_detailed.enabled" };
 
 const SettingRefSchema = z.object({ key: z.string(), value: z.unknown() }).nullable();
@@ -176,7 +188,7 @@ aiChoicesRoutes.openapi(choicesRoute, async (c) => {
   if (list === null) {
     return c.json({ stack: "unreachable" as const, message, tier: null, free_disk_bytes: null, installed_bytes: 0, cards: [], alwaysOn: { bytes: 0, rowIds: [] }, recommended: null, unused_bytes: 0, memory_available_bytes: null }, 200);
   }
-  const state: AiState = { plan: await planned, components: list.components, settings: readAiSettings(), freeBytes: list.free_disk_bytes, list };
+  const state: AiState = { plan: await planned, components: list.components, settings: readAiSettings(), freeBytes: list.free_disk_bytes, list, uncensored: await uncensoredChoiceState() };
   const { cards, alwaysOn } = buildAiCards(choicesInput(state));
   return c.json({
     stack: "ok" as const, message: null, tier: list.tier, free_disk_bytes: list.free_disk_bytes, installed_bytes: list.installed_bytes,
@@ -233,6 +245,14 @@ aiChoicesRoutes.openapi(chooseRoute, async (c) => {
         return c.json({ ok: true as const, started: [], removed: [] }, 200);
       }
       if (choice.action === "remove") { removeWakewordAssets(); return c.json({ ok: true as const, started: [], removed: [choice.id] }, 200); }
+    }
+    if (CHAT_MODEL_CHOICES.includes(choice.id) && (choice.action === "get" || choice.action === "use")) {
+      const modelId = choice.id === "chat.uncensored" ? state.uncensored?.id ?? null : standardChatModelId(state);
+      if (!modelId) return c.json({ error: "That chat model is not available on this computer.", code: "unknown_choice" }, 404) as never;
+      const started = await startChatModelChoice(modelId);
+      if ("error" in started) return c.json({ error: started.error, code: "chat_model" }, started.status === 404 ? 404 : started.status === 409 ? 409 : 503) as never;
+      dropModelCaches();
+      return c.json({ ok: true as const, started: started.jobs ?? [], removed: [] }, 200);
     }
     if (choice.action === "get") {
       // Download first, then the setting: a choice is never set to something that is missing.

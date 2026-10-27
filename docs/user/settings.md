@@ -64,7 +64,7 @@ An owner or admin can pick the chat model. Open **Settings**, then **AI models**
 
 Qwen3.6 35B A3B is the first model offered beside the default. It starts answering almost at once, because it can skip the thinking step, and it reads the pictures you send. It is a big download (about 22 GB) and is meant for a computer with 64 GB of memory or more.
 
-Qwen3.6 35B A3B Uncensored is a second optional model, marked with an **Uncensored** badge. It is a version of the same model with its own refusals removed, so it answers what an adult asks. It also reads pictures, and it is about a 21 GB download. Home's age and safety rules still apply in front of it, so children's chats are not changed. It is never downloaded unless you press **Download**.
+Qwen3.6 35B A3B Uncensored is a second optional model, marked with an **Uncensored** badge. It is a version of the same model with its own refusals removed, so it answers what an adult asks. It also reads pictures, and it is about a 21 GB download. Home's age and safety rules still apply in front of it, so children's chats are not changed. It is never downloaded unless you choose it. You can pick it on the **AI & Models** overview (open the Chat row's gear and choose **Uncensored chat AI**, then **Apply changes**), or press **Download** in the **Advanced** tab. Picking **Standard chat AI** there puts the usual model back.
 
 ## Pictures, videos and music
 

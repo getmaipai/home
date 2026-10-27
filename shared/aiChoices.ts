@@ -17,7 +17,9 @@ export interface AiCopy {
 }
 /** The stock wake word detector and the two files it shares: not Stack components, so the hub reads them from its own disk. */
 export interface AiWakewordInput { installed: boolean; bytes: number }
-export interface AiChoicesInput { copy: AiCopy; plan: DiskPlan; components: AiComponentLike[] | null; settings: AiSettingsInput; freeBytes: number | null; wakeword?: AiWakewordInput | null }
+/** The optional uncensored chat model: not in any tier's disk plan and not a Stack component of its own, so the hub reads it from the chat role (installed, running) and its catalog record (sizes). */
+export interface AiUncensoredInput { installed: boolean; running: boolean; downloadBytes: number; installedBytes: number }
+export interface AiChoicesInput { copy: AiCopy; plan: DiskPlan; components: AiComponentLike[] | null; settings: AiSettingsInput; freeBytes: number | null; wakeword?: AiWakewordInput | null; uncensored?: AiUncensoredInput | null }
 export interface AiChoice {
   id: string;
   job: AiJobId; kind: "radio" | "switch" | "fixed";
@@ -47,7 +49,7 @@ export interface AiRecommendedPlan {
   text: string;
 }
 
-type AiCopyKey = "chat.standard" | "chat.mlx" | "chat.pictures" | "pictures.ernie" | "pictures.klein" | "pictures.edit" | "picturesdetailed.zimage" | "wakeword.detector" | "pictures.tools" | "pictures.look" | "videos.quick" | "videos.detailed" | "music.make" | "voice.standard" | "voice.better" | "coding.helper";
+type AiCopyKey = "chat.standard" | "chat.mlx" | "chat.uncensored" | "chat.pictures" | "pictures.ernie" | "pictures.klein" | "pictures.edit" | "picturesdetailed.zimage" | "wakeword.detector" | "pictures.tools" | "pictures.look" | "videos.quick" | "videos.detailed" | "music.make" | "voice.standard" | "voice.better" | "coding.helper";
 
 // The rows each job card draws.
 const CARDS: Array<{ id: AiJobId; rows: string[] }> = [
@@ -183,7 +185,7 @@ function chipFor(card: { id: AiJobId; rows: string[] }, present: boolean, choice
   if (!present) return "Not on this computer";
   switch (card.id) {
     case "chat":
-      return "Using Standard";
+      return choices.some((choice) => choice.id === "chat.uncensored" && choice.current) ? "Using Uncensored" : "Using Standard";
     case "pictures": {
       const current = choices.find((choice) => choice.kind === "radio" && choice.current);
       if (!current) return choices.some((choice) => choice.state === "installed") ? "On" : "Off";
@@ -212,11 +214,13 @@ function chipFor(card: { id: AiJobId; rows: string[] }, present: boolean, choice
 }
 
 export function buildAiCards(input: AiChoicesInput): AiChoicesResult {
-  const { components, settings, freeBytes, copy, wakeword } = input;
+  const { components, settings, freeBytes, copy, wakeword, uncensored } = input;
   const plan = withLiveInstalled(input.plan, components);
   const rows = byRowId(plan);
   // The wake word files are not in the disk plan; a row stands in for them so the card reads like every other.
   if (wakeword) rows.set("wakeword-detector", { id: "wakeword-detector", label: "Hey Jarvis wake word", note: "", kind: "model", need: "optional", selectable: true, download_bytes: wakeword.bytes, installed_bytes: wakeword.bytes, peak_temp_bytes: 0, model_ids: [], engines: [], installed: wakeword.installed, basis: "pins" });
+  // The uncensored chat model is no plan row either; a row stands in for it so its choice reads like every other.
+  if (uncensored) rows.set("chat-uncensored", { id: "chat-uncensored", label: "Uncensored chat AI", note: "", kind: "model", need: "optional", selectable: true, download_bytes: uncensored.downloadBytes, installed_bytes: uncensored.installedBytes, peak_temp_bytes: 0, model_ids: [], engines: [], installed: uncensored.installed, basis: "pins" });
   const has = (id: string): boolean => rows.has(id);
   const need = (id: string): DiskNeedLike => rows.get(id)?.need ?? "optional";
 
@@ -231,8 +235,9 @@ export function buildAiCards(input: AiChoicesInput): AiChoicesResult {
     const specs: ChoiceSpec[] = [];
     switch (meta.id) {
       case "chat": {
-        if (has("chat")) specs.push({ id: "chat.standard", job: "chat", kind: "fixed", row: rows.get("chat")!, current: true, recommended: true, setting: null });
+        if (has("chat")) specs.push({ id: "chat.standard", job: "chat", kind: "fixed", row: rows.get("chat")!, current: !uncensored?.running, recommended: true, setting: null });
         if (has("chat-mlx")) specs.push({ id: "chat.mlx", job: "chat", kind: "switch", row: rows.get("chat-mlx")!, current: rowIsInstalled(rows.get("chat-mlx")!, components), recommended: need("chat-mlx") === "recommended", setting: null });
+        if (has("chat") && uncensored) specs.push({ id: "chat.uncensored", job: "chat", kind: "radio", row: rows.get("chat-uncensored")!, current: uncensored.running, recommended: false, setting: null });
         if (has("reads-pictures")) specs.push({ id: "chat.pictures", job: "chat", kind: "switch", row: rows.get("reads-pictures")!, current: rowIsInstalled(rows.get("reads-pictures")!, components), recommended: need("reads-pictures") === "recommended", setting: null });
         break;
       }

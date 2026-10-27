@@ -317,3 +317,55 @@ describe("free up space", () => {
     expect(body.results[0]!.message).toMatch(/saved style needs/);
   });
 });
+
+describe("the optional uncensored chat model (third Chat choice)", () => {
+  const UNCENSORED = "qwen3-6-35b-a3b-uncensored-hauhaucs-q4-k-m";
+  const PROJECTOR = "mmproj-qwen3-6-35b-a3b-uncensored-hauhaucs-f16";
+  const standard = () => rowFor("chat").model_ids.filter((id) => id !== UNCENSORED).at(-1)!;
+  let pulled: string[] = [];
+  let loaded: string[] = [];
+  function chatStack(installed: string[], running: string) {
+    const pin = (id: string, extra: object = {}) => ({ id, role: "chat", license: "Apache-2.0", revision: "r", download: { url: `https://example.com/${id}.gguf`, sha256: "a".repeat(64), approx_bytes: 1000 }, ...extra });
+    __setStackClientForTests({
+      ...(stackClient() as object),
+      roles: async () => ({ roles: [{ id: "chat", model: { id: running }, state: { state: "ready" }, models: installed.map((id) => ({ id, name: id })) }] }),
+      modelCatalog: async () => ({ models: [pin(UNCENSORED, { imageInput: { projector: PROJECTOR } }), pin(PROJECTOR), pin(standard())] }),
+      pullModel: async (body: { id: string }) => { pulled.push(body.id); return { job: `job-${body.id}` }; },
+      modelAction: async (id: string) => { loaded.push(id); return { ok: true }; },
+    } as unknown as StackClient);
+  }
+  const chatCard = async (client: TestClient) => ((await (await client.get("/api/ai/choices")).json()) as { cards: Card[] }).cards.find((card) => card.id === "chat")!;
+  beforeEach(() => { pulled = []; loaded = []; });
+
+  test("it is listed after Standard, not current, and Standard stays current until it runs", async () => {
+    const { client } = await owner();
+    chatStack([standard()], standard());
+    const card = await chatCard(client);
+    expect(card.choices.map((choice) => choice.id)).toContain("chat.uncensored");
+    expect(card.choices.find((choice) => choice.id === "chat.uncensored")).toMatchObject({ current: false, action: "get" });
+    expect(card.choices.find((choice) => choice.id === "chat.standard")!.current).toBe(true);
+  });
+
+  test("choosing it downloads its picture file and weights through the model switch, never a Stack part", async () => {
+    const { client } = await owner();
+    chatStack([standard()], standard());
+    const res = await client.post("/api/ai/choices/chat", { choice: "chat.uncensored" });
+    expect(res.status).toBe(200);
+    expect(pulled).toEqual([PROJECTOR, UNCENSORED]);
+    expect(installs()).toEqual([]);
+  });
+
+  test("once installed it loads, and when it runs Standard offers Use and loads the tier's chat model", async () => {
+    const { client } = await owner();
+    chatStack([standard(), UNCENSORED], standard());
+    expect((await client.post("/api/ai/choices/chat", { choice: "chat.uncensored" })).status).toBe(200);
+    expect(loaded).toEqual([UNCENSORED]);
+    loaded = [];
+    chatStack([standard(), UNCENSORED], UNCENSORED);
+    const card = await chatCard(client);
+    expect(card.chip).toBe("Using Uncensored");
+    expect(card.choices.find((choice) => choice.id === "chat.standard")).toMatchObject({ current: false, action: "use" });
+    expect((await client.post("/api/ai/choices/chat", { choice: "chat.standard" })).status).toBe(200);
+    expect(loaded).toEqual([standard()]);
+  });
+});

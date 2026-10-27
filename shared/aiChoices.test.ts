@@ -314,3 +314,20 @@ test("every choice carries a marked RAM estimate, and wake word is not offered w
     expect(choice.ramBytes).toBeGreaterThanOrEqual(choice.installedBytes);
   }
 });
+
+test("chat: the optional uncensored model is a third radio beside Standard, never recommended, only when the hub reports it", () => {
+  const chat = (uncensored: { installed: boolean; running: boolean; downloadBytes: number; installedBytes: number } | null) =>
+    buildAiCards({ copy, plan: TIERS.p128, components: null, settings: SETTINGS, freeBytes: null, uncensored }).cards.find((c) => c.id === "chat")!;
+  expect(chat(null).choices.some((choice) => choice.id === "chat.uncensored")).toBe(false);
+  const off = chat({ installed: false, running: false, downloadBytes: 22 * GIB, installedBytes: 22 * GIB });
+  const choice = off.choices.find((c) => c.id === "chat.uncensored")!;
+  expect(choice).toMatchObject({ kind: "radio", current: false, recommended: false, state: "notInstalled", action: "get", label: "Uncensored chat AI" });
+  expect(off.choices.find((c) => c.id === "chat.standard")!.current).toBe(true);
+  expect(off.chip).toBe("Using Standard");
+  const ready = chat({ installed: true, running: false, downloadBytes: 22 * GIB, installedBytes: 22 * GIB });
+  expect(ready.choices.find((c) => c.id === "chat.uncensored")).toMatchObject({ state: "installed", action: "use" });
+  const running = chat({ installed: true, running: true, downloadBytes: 22 * GIB, installedBytes: 22 * GIB });
+  expect(running.choices.find((c) => c.id === "chat.uncensored")).toMatchObject({ current: true, action: "none" });
+  expect(running.choices.find((c) => c.id === "chat.standard")!.current).toBe(false);
+  expect(running.chip).toBe("Using Uncensored");
+});

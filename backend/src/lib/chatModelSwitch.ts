@@ -102,3 +102,25 @@ export async function chatModelChoiceState(modelId: string): Promise<ChatSwitchS
   if (outcomes.get(modelId)?.status === "loading") return { modelId, status: "loading" };
   return { modelId, status: "none" };
 }
+
+/** The catalog's optional uncensored chat model, the one record tagged `uncensored`. */
+export function uncensoredChatEntry() {
+  return CATALOG.find((model) => model.role === "chat" && model.implemented && model.download && model.tags?.includes("uncensored"));
+}
+
+/** What the AI and models page needs to draw the uncensored choice: its sizes from the catalog, whether the Stack has it, whether it is the running chat model. Null when the catalog has none or the Stack does not answer. */
+export async function uncensoredChoiceState(): Promise<{ id: string; installed: boolean; running: boolean; downloadBytes: number; installedBytes: number } | null> {
+  const entry = uncensoredChatEntry();
+  if (!entry?.download) return null;
+  let role: Awaited<ReturnType<typeof chatRole>> = null;
+  try { role = await chatRole(); } catch { return null; }
+  if (!role) return null;
+  const bytes = entry.download.approx_bytes + (entry.image_input?.projector.download.approx_bytes ?? 0);
+  return {
+    id: entry.id,
+    installed: role.installed.includes(entry.id),
+    running: role.modelId === entry.id,
+    downloadBytes: bytes,
+    installedBytes: bytes,
+  };
+}

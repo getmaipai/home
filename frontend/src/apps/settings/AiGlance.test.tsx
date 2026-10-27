@@ -59,4 +59,28 @@ describe("AiGlance Apply", () => {
     const failed = renderWithQueryClient(<MemoryRouter><AiGlance {...card} /></MemoryRouter>);
     expect(await failed.findByText("The download stopped. Try again.")).toBeTruthy();
   });
+
+  test("the chat row carries an Uncensored badge only while the uncensored model is the one in use", async () => {
+    const base = { ...wakeChoice, job: "chat", kind: "radio", recommended: false, state: "installed", action: "none", stateText: "Installed" };
+    const standard = { ...base, id: "chat.standard", kind: "fixed", label: "Standard chat AI", name: "Standard chat AI", recommended: true, current: true };
+    const uncensored = { ...base, id: "chat.uncensored", label: "Uncensored chat AI", name: "Uncensored chat AI", current: false };
+    const serve = (choices: object[]) => {
+      globalThis.fetch = ((input: RequestInfo | URL) => {
+        const path = (typeof input === "string" ? input : input.toString()).split("?")[0]!;
+        if (path.endsWith("/api/ai/choices")) return Promise.resolve(Response.json({ ...overview, cards: [{ id: "chat", title: "Chat", summary: "", chip: "", choices, notReady: false, unavailable: null }] }));
+        if (path.endsWith("/api/host/hardware")) return Promise.resolve(Response.json({ platform: "darwin", totalRamGb: 24, cpuCount: 8, isAppleSilicon: true, unifiedMemoryGb: 24, cudaDevices: [] }));
+        if (path.includes("/api/settings")) return Promise.resolve(Response.json([]));
+        return Promise.resolve(Response.json({}));
+      }) as typeof fetch;
+    };
+    const card = { card: { copy: {} } } as unknown as Parameters<typeof AiGlance>[0];
+    serve([standard, uncensored]);
+    const before = renderWithQueryClient(<MemoryRouter><AiGlance {...card} /></MemoryRouter>);
+    await before.findByTestId("ai-row-chat");
+    expect(before.queryByText("Uncensored")).toBeNull();
+    cleanup();
+    serve([{ ...standard, current: false }, { ...uncensored, current: true }]);
+    const after = renderWithQueryClient(<MemoryRouter><AiGlance {...card} /></MemoryRouter>);
+    expect(await after.findByText("Uncensored")).toBeTruthy();
+  });
 });
