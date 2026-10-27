@@ -6,6 +6,7 @@ import { MemoryRouter, useLocation } from "react-router-dom";
 import { TooltipProvider } from "@maipai/ui/src/ui/tooltip";
 import { IncognitoToggle } from "@maipai/ui/src/dashboard/layouts/full/vertical/header/Header";
 import { ChatPage } from "@/shell/pages/ChatPage";
+import { AmbientRingProvider } from "@/shell/ambientRing";
 import { ChatHeaderBar } from "@/apps/chat/chatHeaderBar";
 import { ChatHeaderDataProvider } from "@/apps/chat/chatHeaderData";
 import { writeIncognitoCache } from "@/shell/incognitoCache";
@@ -82,7 +83,9 @@ function renderPage(ui: ReactElement) {
   return { ...render(
     <QueryClientProvider client={client}>
       <IncognitoProvider>
+        <AmbientRingProvider>
         <TooltipProvider>{ui}</TooltipProvider>
+        </AmbientRingProvider>
       </IncognitoProvider>
     </QueryClientProvider>,
   ), queryClient: client };
@@ -217,6 +220,23 @@ describe("ChatPage (SHELL-02's first slice)", () => {
       for (const id of ["chat.thread", "chat.composer", "chat.send"]) {
         await waitFor(() => expect(view.container.querySelector(`[${target}="${id}"]`)).not.toBeNull());
       }
+    } finally {
+      restore();
+    }
+  });
+
+  test("an ask deep link is sent once and removed from the URL", async () => {
+    const restore = stubMultiTurnFetch();
+    try {
+      const view = renderPage(
+        <MemoryRouter initialEntries={["/chat?ask=Please%20help"]}>
+          <><ChatPage person={makePerson()} /><ConversationLocation /></>
+        </MemoryRouter>,
+      );
+      await view.findByText("Reply 1.");
+      await waitFor(() => expect(view.getByTestId("conversation-location").textContent).not.toContain("ask="));
+      expect(turnRequestBodies()).toHaveLength(1);
+      expect(turnRequestBodies()[0]).toMatchObject({ text: "Please help" });
     } finally {
       restore();
     }

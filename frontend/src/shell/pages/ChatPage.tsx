@@ -63,6 +63,9 @@ import { copyMicDetails, lastMicFailure, micFailureLine } from "@/lib/voice/micD
 import { VoiceSessionProvider } from "@/apps/chat/voiceSessionContext";
 import { DictationLevelMeterProvider } from "@/apps/chat/composerDictationWaveform";
 import { ChatAvailabilityContext, useChatAvailability, useChatComposerNotice, useVoiceAvailable } from "@/apps/chat/useChatAvailability";
+import { useAmbientCompanion } from "@/shell/useAmbientCompanion";
+import { useSetAmbientRing, useSetAmbientWake } from "@/shell/ambientRing";
+import { assistantText, isListening, isSpeaking as speakingSignal, isThinking, type SignalMessage } from "@/apps/chat/useCompanionSignals";
 import { useLiveVoiceSession, WAKE_SESSION_IDLE_CLOSE_MS } from "@/apps/chat/liveVoiceSession";
 import { createLocalImageAttachmentAdapter } from "@/apps/chat/localImageAttachmentAdapter";
 import { photoUploadsEnabledForBand } from "@/apps/chat/photoUploadAccess";
@@ -1045,7 +1048,20 @@ function ProjectResultReload() {
   return null;
 }
 
+function ChatAmbientRing({ isSpeaking, voiceListening, wakeListening }: { isSpeaking: boolean; voiceListening: boolean; wakeListening: boolean }) {
+  const messages = useAuiState((state) => state.thread.messages);
+  const running = useAuiState((state) => state.thread.isRunning);
+  const dictating = useAuiState((state) => state.composer.dictation != null);
+  const last = [...messages].reverse().find((message) => message.role === "assistant") as SignalMessage | undefined;
+  const ring = isListening(dictating || voiceListening || wakeListening)
+    ? "listening"
+    : speakingSignal(isSpeaking) ? "speaking" : isThinking(running, last) && assistantText(last).length === 0 ? "thinking" : null;
+  useSetAmbientRing(ring);
+  return null;
+}
+
 export function ChatPage({ person }: { person: Roster }) {
+  const ambient = useAmbientCompanion(person);
   const retryWithCurrentCompanionRef = useRef(false);
   const companionShells = useCompanionShells() === true;
   const navigate = useNavigate();
@@ -1200,6 +1216,10 @@ export function ChatPage({ person }: { person: Roster }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [wakeFlag]);
   const chatWake = useWakeWordListening({ person, onWake: openVoiceFromWake, voiceOpen });
+  useSetAmbientWake(chatWake.indicator ?? null);
+  const [askParams, setAskParams] = useSearchParams();
+  const askText = askParams.get("ask")?.trim();
+  const handledAsk = useRef<string | undefined>(undefined);
   // COLUMN-01: the history column's open/hidden state (remembered per
   // browser), its thread search, and the phone sheet. lg (960px) is where
   // the column stops being a sheet.
@@ -1367,6 +1387,16 @@ export function ChatPage({ person }: { person: Roster }) {
     setCompareTarget(null);
     imageEditor.close();
   }, temporaryNext, voiceOpen, setOpenArtifactId, setDraftConversationId, retryWithCurrentCompanionRef, tryCompanionIdRef, projectPage?.folderId);
+  useEffect(() => {
+    const askKey = askText ? `${routeLocation.key}:${askText}` : undefined;
+    if (!askText || handledAsk.current === askKey) return;
+    handledAsk.current = askKey;
+    const next = new URLSearchParams(askParams);
+    next.delete("ask");
+    setAskParams(next, { replace: true });
+    runtime.thread.composer.setText(askText);
+    runtime.thread.composer.send();
+  }, [askText, askParams, setAskParams, runtime, routeLocation.key]);
   const threadListState = useChatThreadListState(runtime);
   const hasThreads = threadListState.threadIds.length > 0;
   const isLoadingThreads = threadListState.isLoading;
@@ -1536,6 +1566,7 @@ export function ChatPage({ person }: { person: Roster }) {
 
   return (
     <AssistantRuntimeProvider runtime={runtime}>
+      <ChatAmbientRing isSpeaking={isSpeaking} voiceListening={voiceSession.mode === "listening"} wakeListening={chatWake.indicator?.listening.startsWith("Listening for") === true} />
       <ChatAvailabilityContext.Provider value={chatAvailability}>
       <ChatComposerNoticeContext.Provider value={composerNotice}>
       <ArtifactOpenContext.Provider value={setOpenArtifactId}>
@@ -1562,7 +1593,8 @@ export function ChatPage({ person }: { person: Roster }) {
       <ChatColumnControlContext.Provider value={column.control}>
         <ChatShortcutReference />
         <AskHandoff />
-        {chatWake.indicator ? <LauncherBubble docked open={false} unread={0} greeting="" prompts={[]} {...chatWake.indicator} /> : null}
+        {/* Keep the docked wake control when ambient mode is off; moving it to the top right is a later slice. */}
+        {chatWake.indicator && !ambient ? <LauncherBubble docked open={false} unread={0} greeting="" prompts={[]} {...chatWake.indicator} /> : null}
         <ArtifactCacheInvalidator />
               <ChatDocumentTitle person={person} />
         <ChatTitleCatchUp incognito={temporaryNext} />
@@ -1629,11 +1661,11 @@ export function ChatPage({ person }: { person: Roster }) {
             re-deriving the same number a second, guessable way. */}
         <div data-slot="chat-shell" className="flex h-full flex-col overflow-hidden">
           {/* Below lg the column is a sheet, opened from this row. */}
-          {companionShells ? (chatColumnBreakpoint.atLeast(960) ? null : <ChatHeaderBar shells onHistory={() => setSheetOpen(true)} onCall={callReady ? openVoiceFromHeader : undefined} />) : barOnPhone ? null : <div className="flex items-center gap-1 border-b border-border pb-2 lg:hidden">
+          {companionShells ? (chatColumnBreakpoint.atLeast(960) ? null : <ChatHeaderBar shells reserveEnd={Boolean(ambient)} onHistory={() => setSheetOpen(true)} onCall={callReady ? openVoiceFromHeader : undefined} />) : barOnPhone ? null : <div className="flex items-center gap-1 border-b border-border pb-2 lg:hidden">
             <Button variant="ghost" size="icon" aria-label={sheetOpen ? "Hide threads" : "Show threads"} aria-expanded={sheetOpen} aria-controls="next-chat-threads" onClick={() => setSheetOpen((open) => !open)}>
               <span aria-hidden>☰</span>
             </Button>
-            <ChatHeaderBar phoneRow />
+            <ChatHeaderBar phoneRow reserveEnd={Boolean(ambient)} />
           </div>}
           <div className="relative flex min-h-0 flex-1" data-slot="chat-column-stage">
             {threadSidebar(CHAT_COLUMN_ID)}
@@ -1650,9 +1682,9 @@ export function ChatPage({ person }: { person: Roster }) {
                   way Claude's is (owner, 2026-10-06): the controls just
                   sit at the top. While the history column is hidden, its
                   show control sits at this header's left edge, in flow. */}
-              {companionShells ? (chatColumnBreakpoint.atLeast(960) ? <ChatHeaderBar shells onCall={callReady ? openVoiceFromHeader : undefined} /> : null) : <header data-slot="chat-header" className="hidden h-13 shrink-0 items-center gap-1 px-5 lg:flex">
+              {companionShells ? (chatColumnBreakpoint.atLeast(960) ? <ChatHeaderBar shells reserveEnd={Boolean(ambient)} onCall={callReady ? openVoiceFromHeader : undefined} /> : null) : <header data-slot="chat-header" className="hidden h-13 shrink-0 items-center gap-1 px-5 lg:flex">
                 {column.collapsed ? <SectionSidebarShowButton label="Show conversations" controls={CHAT_COLUMN_ID} onClick={() => column.setCollapsedPreference(false)} /> : null}
-                <ChatHeaderBar />
+                <ChatHeaderBar reserveEnd={Boolean(ambient)} />
               </header>}
           {bareMode ? (
             // COORDINATOR, 2026-09-22: "while it is on, it is obvious...

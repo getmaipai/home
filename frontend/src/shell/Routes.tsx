@@ -26,8 +26,14 @@ import { MediaHostProvider, MediaLinkRedirect } from "@/shell/mediaHost";
 import { IncognitoProvider, INCOGNITO_DISCARDED_EVENT, useIncognitoContext } from "@/shell/incognitoContext";
 import { MemoriesRedirect, LegacyProfileMemoriesRedirect } from "@/shell/MemoriesRedirect";
 import { InstallDock } from "@/shell/InstallDock";
-import { CompanionDock } from "@maipai/ui/src/elements/companion-dock";
-import { useCompanionDock } from "@/shell/useCompanionDock";
+import { CompanionPreview } from "@maipai/ui/src/elements/companion-preview";
+import { CompanionAvatar } from "@maipai/ui/src/elements/companion-avatar";
+import { Avatar, AvatarImage } from "@maipai/ui/src/elements/ui/avatar";
+import { Avatar as SeededAvatar } from "@maipai/ui/src/primitives/Avatar";
+import { Button } from "@maipai/ui/src/elements/ui/button";
+import { useAmbientCompanion } from "@/shell/useAmbientCompanion";
+import { AmbientRingProvider, ambientRingFromWake, type AmbientRing, type AmbientWakeIndicator } from "@/shell/ambientRing";
+import { ChatAvailabilityContext, useChatAvailability } from "@/apps/chat/useChatAvailability";
 import { RailProfile } from "@/shell/RailProfile";
 import { BrowserAlerts } from "@/shell/BrowserAlerts";
 import { useWakeWordListening } from "@/apps/chat/useWakeWordListening";
@@ -186,13 +192,51 @@ function RoutesWithIncognito({ person, onPersonChange, onSignedOut }: { person: 
   const projectChatMatch = useMatch("/chat/projects/:id");
   const onChatPage = chatMatch !== null || projectChatMatch !== null;
   const openChatWithCall = useCallback(() => navigate("/chat?wake=1"), [navigate]);
-  const companionDock = useCompanionDock(person);
+  const ambient = useAmbientCompanion(person);
   const shellWake = useWakeWordListening({ person, onWake: openChatWithCall, active: !onChatPage });
+  const [ring, setRing] = useState<AmbientRing>(null);
+  const [wakeIndicator, setWakeIndicator] = useState<AmbientWakeIndicator>(null);
   const selectedAppHref = activeAppHref(location.pathname, packageAreaApps(usePackageAreas().areas));
   const statusAppsQuery = useStatusApps();
   // LEFTNAV-APPS-01: the installed package apps this person may open (the hub's list, minus an Incognito-blocked app
   // while Incognito is on), pinned ones in the rail and all of them in the launcher at its foot.
   const appCatalog = useAppCatalog();
+  const chatAvailability = useChatAvailability();
+  const shellListeningLine = shellWake.indicator?.listening;
+  const shellTurnOff = shellWake.indicator?.onTurnOff;
+  const [coarse, setCoarse] = useState(() => typeof matchMedia !== "undefined" && matchMedia("(pointer: coarse)").matches);
+  const [previewOpen, setPreviewOpen] = useState(false);
+  useEffect(() => {
+    if (typeof matchMedia === "undefined") return;
+    const media = matchMedia("(pointer: coarse)");
+    const update = () => setCoarse(media.matches);
+    media.addEventListener?.("change", update);
+    return () => media.removeEventListener?.("change", update);
+  }, []);
+  useEffect(() => { setRing(ambientRingFromWake(shellListeningLine ? { listening: shellListeningLine } : null)); }, [shellListeningLine]);
+  useEffect(() => {
+    if (shellListeningLine && shellTurnOff) setWakeIndicator({ listening: shellListeningLine, onTurnOff: shellTurnOff });
+    else if (!onChatPage) setWakeIndicator(null);
+  }, [shellListeningLine, shellTurnOff, onChatPage]);
+  useEffect(() => { if (coarse && wakeIndicator) setPreviewOpen(true); }, [coarse, wakeIndicator]);
+  const currentApp = appCatalog.find((app) => location.pathname === app.to || location.pathname.startsWith(`${app.to}/`));
+  const appName = currentApp?.label ?? (location.pathname === "/" ? "Home" : undefined);
+  const ambientTrigger = ambient ? <button type="button" aria-label={wakeIndicator?.listening.startsWith("Listening for") ? `${ambient.companion.name}, listening` : ambient.companion.name} onClick={coarse ? () => setPreviewOpen((value) => !value) : undefined}>
+    {ambient.clips ? <CompanionAvatar name={ambient.companion.name} clips={ambient.clips} size="xs" animated={false} ring={ring} /> : ambient.still ? <Avatar><AvatarImage src={ambient.still} alt="" /></Avatar> : <SeededAvatar name={ambient.companion.name} seed={ambient.companion.id} />}
+  </button> : null;
+  const ambientTopRight = ambient ? <CompanionPreview
+    name={ambient.companion.name}
+    trigger={ambientTrigger}
+    ready={chatAvailability === "ready"}
+    context={appName ? `You're on ${appName}` : undefined}
+    askPlaceholder={`Ask ${ambient.companion.name}`}
+    onAsk={(text) => navigate(`/chat?ask=${encodeURIComponent(text)}`)}
+    action={ambient.action ? <Button type="button" onClick={ambient.action.onClick}>{ambient.action.label}</Button> : undefined}
+    listeningLine={wakeIndicator?.listening}
+    onTurnOff={wakeIndicator?.onTurnOff}
+    open={coarse ? (wakeIndicator ? true : previewOpen) : undefined}
+    onOpenChange={setPreviewOpen}
+  /> : undefined;
   const { pinned: pinnedRoutes, togglePin } = usePinnedApps(person.id);
   const { on: incognito, setOn: setIncognito } = useIncognitoContext();
   const locked = useSessionLocked();
@@ -240,9 +284,9 @@ function RoutesWithIncognito({ person, onPersonChange, onSignedOut }: { person: 
     <TabIdentityProvider temporary={incognito} locked={locked} ageBand={person.age_band}>
     <ChatHeaderDataProvider>
       <BrowserAlerts person={person} />
-      {shellWake.indicator ? <LauncherBubble docked open={false} unread={0} greeting="" prompts={[]} {...shellWake.indicator} /> : null}
+      {/* When ambient mode is off, keep the docked launcher here; moving it to the top right is a later slice. */}
+      {shellWake.indicator && !ambient ? <LauncherBubble docked open={false} unread={0} greeting="" prompts={[]} {...shellWake.indicator} /> : null}
       <ShellInstallStrip person={person} />
-      {companionDock ? <CompanionDock {...companionDock} /> : null}
       {activeTour ? (
         <Tour
           steps={activeTour.tour.steps.map((step) => ({
@@ -256,6 +300,8 @@ function RoutesWithIncognito({ person, onPersonChange, onSignedOut }: { person: 
           onTargetMissing={activeTour.missing}
         />
       ) : null}
+      <ChatAvailabilityContext.Provider value={chatAvailability}>
+      <AmbientRingProvider value={ring} onChange={setRing} wake={wakeIndicator} onWakeChange={setWakeIndicator}>
       <RouterRoutes>
         {/* HOME-UI-02d: the old Memories page now lives on the signed-in
             person's own profile. Preserve both old bookmarks and deep
@@ -280,7 +326,7 @@ function RoutesWithIncognito({ person, onPersonChange, onSignedOut }: { person: 
             Notifications, System status, Incognito, Settings, Help and Log
             out. Pages draw their own slim title bar; chat draws its own
             beside the history column. */}
-        <Route element={<FullLayout rail mobileSections={drawerSections} activeAppHref={selectedAppHref} railApps={railApps(appCatalog, pinnedRoutes)} railCoreDestinations={[{ name: "Media", url: "/media", icon: "cast" }]} onRailAppPinChange={(url) => togglePin(url)} railAllAppsHref={ALL_APPS_PATH} settingsHref="/settings" headerSearchRemote={api.search} railTourId="shell.rail" railItemTourId={(item) => item.name === "Chat" ? "rail.chat" : undefined} incognitoTourId="shell.incognito" railProfile={<RailProfile person={person} incognito={incognito} onIncognitoChange={onIncognitoChange} onSignedOut={onSignedOut} helpEntries={helpEntries} />} sidebarItemStatus={(item) => sidebarItemStatus(statusAppsQuery.data ?? [], item)} />}>
+        <Route element={<FullLayout rail topRight={ambientTopRight} mobileSections={drawerSections} activeAppHref={selectedAppHref} railApps={railApps(appCatalog, pinnedRoutes)} railCoreDestinations={[{ name: "Media", url: "/media", icon: "cast" }]} onRailAppPinChange={(url) => togglePin(url)} railAllAppsHref={ALL_APPS_PATH} settingsHref="/settings" headerSearchRemote={api.search} railTourId="shell.rail" railItemTourId={(item) => item.name === "Chat" ? "rail.chat" : undefined} incognitoTourId="shell.incognito" railProfile={<RailProfile person={person} incognito={incognito} onIncognitoChange={onIncognitoChange} onSignedOut={onSignedOut} helpEntries={helpEntries} />} sidebarItemStatus={(item) => sidebarItemStatus(statusAppsQuery.data ?? [], item)} />}>
           <Route path="chat" element={<ChatPage person={person} />} />
           <Route path="chat/projects" element={<ProjectsPage person={person} />} />
           <Route path="chat/projects/:id" element={<ChatPage person={person} />} />
@@ -342,6 +388,8 @@ function RoutesWithIncognito({ person, onPersonChange, onSignedOut }: { person: 
           </Route>
         </Route>
       </RouterRoutes>
+      </AmbientRingProvider>
+      </ChatAvailabilityContext.Provider>
     </ChatHeaderDataProvider>
     </TabIdentityProvider>
     </DrawerSectionsContext.Provider>

@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, mock, test } from "bun:test";
 import { ToastProvider } from "@maipai/ui/src/primitives/Toast";
 import { cleanup, fireEvent, waitFor } from "@testing-library/react";
-import { MemoryRouter, Route, Routes as RouterRoutes, useLocation } from "react-router-dom";
+import { MemoryRouter, Route, Routes as RouterRoutes, useLocation, useNavigate } from "react-router-dom";
 import { UpdatesPage } from "@/shell/pages/UpdatesPage";
 import { RepairsPage } from "@/shell/pages/RepairsPage";
 import { BackupsPage } from "@/shell/pages/BackupsPage";
@@ -49,6 +49,11 @@ function healthResponse() {
     },
     sidecars: [],
   });
+}
+
+function RouteJump({ to }: { to: string }) {
+  const navigate = useNavigate();
+  return <button type="button" onClick={() => navigate(to)}>Open {to}</button>;
 }
 
 // HOME-UI-04d's own acceptance: the class on <html> follows
@@ -156,6 +161,48 @@ describe("Routes appearance", () => {
       localStorage.removeItem("vite-ui-theme");
       window.matchMedia = originalMatchMedia;
       globalThis.fetch = originalFetch;
+    }
+  });
+});
+
+describe("ambient companion shell slot", () => {
+  test("shows the avatar in the top right on app and Chat routes and touch opens the preview", async () => {
+    const originalFetch = globalThis.fetch;
+    const originalMatchMedia = window.matchMedia;
+    window.matchMedia = mock((query: string) => ({ matches: query === "(pointer: coarse)", addEventListener: () => {}, removeEventListener: () => {} })) as unknown as typeof window.matchMedia;
+    globalThis.fetch = mock((input: RequestInfo | URL) => {
+      const url = new URL(typeof input === "string" ? input : input.toString(), "http://home");
+      if (url.pathname === "/api/setup-checklist" || url.pathname === "/api/apps" || url.pathname === "/api/jobs") return Promise.resolve(Response.json([]));
+      if (url.pathname === "/api/settings") return Promise.resolve(Response.json([
+        { scope: "person:person-abc123", key: "companions.allowed", value: true },
+        { scope: "person:person-abc123", key: "companions.dock", value: true },
+        { scope: "person:person-abc123", key: "ui.appearance", value: "light" },
+        { scope: "person:person-abc123", key: "ui.look", value: "neutral" },
+      ]));
+      if (url.pathname === "/api/companions") return Promise.resolve(Response.json({ allowed: true, can_create: false, can_discover: false, default_id: "companion-1", companions: [{ id: "companion-1", name: "Companion", type: "adult", type_label: "Adult", tagline: "Calm", who_can_use: "Everyone", dials: [], voice: "", is_default: true, is_household: false, portrait: null, status: "ready", chats: 0, can_edit: false, can_copy: false }], discover: [] }));
+      if (url.pathname === "/api/companions/companion-1/activity") return Promise.resolve(Response.json({ activity: [] }));
+      if (url.pathname === "/api/companions/avatar") return Promise.resolve(Response.json({ avatar: null }));
+      if (url.pathname === "/api/health") return Promise.resolve(healthResponse());
+      if (url.pathname === "/api/voice/wakewords") return Promise.resolve(Response.json({ installed: false, detectors: [] }));
+      return Promise.resolve(Response.json({}));
+    }) as unknown as typeof fetch;
+    try {
+      const view = renderWithQueryClient(
+        <MemoryRouter initialEntries={["/ambient-test"]}>
+          <ToastProvider><><Routes person={makePerson()} onSignedIn={() => {}} /><RouteJump to="/chat" /></></ToastProvider>
+        </MemoryRouter>,
+      );
+      const avatar = await view.findByRole("button", { name: "Companion" });
+      expect(avatar.closest('[data-slot="rail-top-right"]')).toBeTruthy();
+      fireEvent.click(avatar);
+      expect(await view.findByRole("textbox", { name: "Ask Companion" })).toBeTruthy();
+      fireEvent.click(view.getByRole("button", { name: "Companion" }));
+      await waitFor(() => expect(view.queryByRole("textbox", { name: "Ask Companion" })).toBeNull());
+      fireEvent.click(view.getByRole("button", { name: "Open /chat" }));
+      await waitFor(() => expect(view.getByRole("button", { name: "Companion" }).closest('[data-slot="rail-top-right"]')).toBeTruthy());
+    } finally {
+      globalThis.fetch = originalFetch;
+      window.matchMedia = originalMatchMedia;
     }
   });
 });

@@ -4173,8 +4173,8 @@
       "file": "companion-dock.tsx",
       "name": "companion-dock",
       "group": "companion",
-      "verdict": "wire-now",
-      "verdictReason": "Draws the companion's corner card outside Chat (shell mount, Review button, minimize and close); adopted as shipped with props only."
+      "verdict": "no-fit",
+      "verdictReason": "Retired by AMBIENT-COMPANION-01."
     },
     {
       "file": "task-browser.tsx",
@@ -4196,6 +4196,20 @@
       "group": "studio",
       "verdict": "later",
       "verdictReason": "New kit page layout (title, actions, side nav and rail) for studio screens; Home adopts it when the appearance studio screen is built on it."
+    },
+    {
+      "file": "companion-preview.tsx",
+      "name": "companion-preview",
+      "group": "companion",
+      "verdict": "wire-now",
+      "verdictReason": "Ambient companion hover, focus and touch preview in the shell (AMBIENT-02)."
+    },
+    {
+      "file": "right-pane.tsx",
+      "name": "right-pane",
+      "group": "right",
+      "verdict": "later",
+      "verdictReason": "Defer to AMBIENT-04, which migrates Chat panels into the standard right pane."
     }
   ]
 }
