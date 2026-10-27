@@ -32,7 +32,7 @@ import { Avatar, AvatarImage } from "@maipai/ui/src/elements/ui/avatar";
 import { Avatar as SeededAvatar } from "@maipai/ui/src/primitives/Avatar";
 import { Button } from "@maipai/ui/src/elements/ui/button";
 import { useAmbientCompanion } from "@/shell/useAmbientCompanion";
-import { AmbientRingProvider, ambientRingFromWake, type AmbientRing, type AmbientWakeIndicator } from "@/shell/ambientRing";
+import { AmbientRingProvider, ambientRingFromWake, effectiveAmbientRing, type AmbientRing, type AmbientWakeIndicator } from "@/shell/ambientRing";
 import { ChatAvailabilityContext, useChatAvailability } from "@/apps/chat/useChatAvailability";
 import { RailProfile } from "@/shell/RailProfile";
 import { BrowserAlerts } from "@/shell/BrowserAlerts";
@@ -54,7 +54,7 @@ import { Tour } from "@maipai/ui/src/primitives/Tour";
 import { useTourRunner } from "@/shell/useTourRunner";
 import { CompanionShellViewer } from "@/lib/companionShells";
 import { RightPane } from "@maipai/ui/src/elements/right-pane";
-import { useAmbientCompanionPane, readAmbientPaneState } from "@/shell/AmbientCompanionPane";
+import { useAmbientCompanionPane, readAmbientPaneState, type AmbientPaneControl, type AmbientPaneState } from "@/shell/AmbientCompanionPane";
 import { useSideChat } from "@/shell/useSideChat";
 
 // BUNDLE-SPLIT-01 (2026-10-17): every page but the two a person lands on (Home and Chat) loads on first visit, not
@@ -199,8 +199,6 @@ function RoutesWithIncognito({ person, onPersonChange, onSignedOut }: { person: 
   const shellWake = useWakeWordListening({ person, onWake: openChatWithCall, active: !onChatPage });
   const [ring, setRing] = useState<AmbientRing>(null);
   const [wakeIndicator, setWakeIndicator] = useState<AmbientWakeIndicator>(null);
-  const wakeRef = useRef(wakeIndicator);
-  wakeRef.current = wakeIndicator;
   const selectedAppHref = activeAppHref(location.pathname, packageAreaApps(usePackageAreas().areas));
   const statusAppsQuery = useStatusApps();
   // LEFTNAV-APPS-01: the installed package apps this person may open (the hub's list, minus an Incognito-blocked app
@@ -213,33 +211,27 @@ function RoutesWithIncognito({ person, onPersonChange, onSignedOut }: { person: 
   const [coarse, setCoarse] = useState(() => typeof matchMedia !== "undefined" && matchMedia("(pointer: coarse)").matches);
   const [previewOpen, setPreviewOpen] = useState(false);
   const [paneState, setPaneState] = useState(readAmbientPaneState);
+  const [paneRing, setPaneRing] = useState<AmbientRing>(null);
   const [lastLine, setLastLine] = useState("");
   const paneOpenRef = useRef(paneState.open);
   paneOpenRef.current = paneState.open;
-  const sideReplyStateRef = useRef<"waiting" | "responding" | "ready" | "error" | "idle">("idle");
-  const onSideReplyState = useCallback((state: "waiting" | "responding" | "ready" | "error" | "idle") => {
-    sideReplyStateRef.current = state;
-    if (paneOpenRef.current) return;
-    setRing(state === "waiting" ? "thinking" : ambientRingFromWake(wakeRef.current ? { listening: wakeRef.current.listening } : null));
-  }, []);
   const onSideReply = useCallback((text: string) => {
     if (paneOpenRef.current || !text.trim()) return;
     setLastLine(text.split(/(?<=[.!?])\s+/).filter(Boolean).at(-1) ?? text.trim());
   }, []);
-  const sideChat = useSideChat(person, ambient?.companion.id ?? "", incognito, onSideReply, onSideReplyState);
-  useEffect(() => {
-    if (!paneState.open && sideReplyStateRef.current === "waiting") setRing("thinking");
-  }, [paneState.open]);
-  useEffect(() => {
-    try { window.localStorage.setItem("maipai.ambient.pane", JSON.stringify(paneState)); } catch { /* local storage may be unavailable */ }
-  }, [paneState]);
+  const onPaneRing = useCallback((next: AmbientRing | undefined) => setPaneRing(next ?? null), []);
+  const sideChat = useSideChat(person, ambient?.companion.id ?? "", incognito, onSideReply);
+  const updatePaneState = (next: AmbientPaneState) => {
+    setPaneState(next);
+    try { window.localStorage.setItem("maipai.ambient.pane", JSON.stringify(next)); } catch { /* local storage may be unavailable */ }
+    if (next.open) { setLastLine(""); setPreviewOpen(false); }
+  };
   useEffect(() => {
     if (!lastLine || paneState.open) return;
     setPreviewOpen(true);
     const timer = window.setTimeout(() => { setPreviewOpen(false); setLastLine(""); }, 6000);
     return () => window.clearTimeout(timer);
   }, [lastLine, paneState.open]);
-  useEffect(() => { if (!ambient) setPaneState((current) => ({ ...current, open: false })); }, [ambient]);
   useEffect(() => {
     if (typeof matchMedia === "undefined") return;
     const media = matchMedia("(pointer: coarse)");
@@ -247,19 +239,20 @@ function RoutesWithIncognito({ person, onPersonChange, onSignedOut }: { person: 
     media.addEventListener?.("change", update);
     return () => media.removeEventListener?.("change", update);
   }, []);
-  useEffect(() => { setRing(ambientRingFromWake(shellListeningLine ? { listening: shellListeningLine } : null)); }, [shellListeningLine]);
   useEffect(() => {
     if (shellListeningLine && shellTurnOff) setWakeIndicator({ listening: shellListeningLine, onTurnOff: shellTurnOff });
     else if (!onChatPage) setWakeIndicator(null);
   }, [shellListeningLine, shellTurnOff, onChatPage]);
   useEffect(() => { if (coarse && wakeIndicator) setPreviewOpen(true); }, [coarse, wakeIndicator]);
+  const effectiveRing = effectiveAmbientRing(paneRing, ring, ambientRingFromWake(shellListeningLine ? { listening: shellListeningLine } : null));
+  const paneControlRef = useRef<AmbientPaneControl | null>(null);
   const currentApp = appCatalog.find((app) => location.pathname === app.to || location.pathname.startsWith(`${app.to}/`));
   const appName = currentApp?.label ?? (location.pathname === "/" ? "Home" : undefined);
   const ambientTrigger = ambient ? <button type="button" aria-label={wakeIndicator?.listening.startsWith("Listening for") ? `${ambient.companion.name}, listening` : ambient.companion.name} onClick={() => {
     if (coarse && wakeIndicator) { setPreviewOpen((value) => !value); return; }
-    setPaneState((current) => ({ ...current, open: true }));
+    updatePaneState({ ...paneState, open: true });
   }}>
-    {ambient.clips ? <CompanionAvatar name={ambient.companion.name} clips={ambient.clips} size="xs" animated={false} ring={ring} /> : ambient.still ? <Avatar><AvatarImage src={ambient.still} alt="" /></Avatar> : <SeededAvatar name={ambient.companion.name} seed={ambient.companion.id} />}
+    {ambient.clips ? <CompanionAvatar name={ambient.companion.name} clips={ambient.clips} size="xs" animated={false} ring={effectiveRing} /> : ambient.still ? <Avatar><AvatarImage src={ambient.still} alt="" /></Avatar> : <SeededAvatar name={ambient.companion.name} seed={ambient.companion.id} />}
   </button> : null;
   const ambientTopRight = ambient ? <CompanionPreview
     name={ambient.companion.name}
@@ -269,9 +262,7 @@ function RoutesWithIncognito({ person, onPersonChange, onSignedOut }: { person: 
     lastLine={lastLine || undefined}
     askPlaceholder={`Ask ${ambient.companion.name}`}
     onAsk={(text) => {
-      setLastLine(""); setPreviewOpen(false);
-      setPaneState((current) => ({ ...current, open: true }));
-      window.setTimeout(() => window.dispatchEvent(new CustomEvent("maipai:ambient-ask-side", { detail: text })), 0);
+      paneControlRef.current?.ask(text);
     }}
     action={ambient.action ? <Button type="button" onClick={ambient.action.onClick}>{ambient.action.label}</Button> : undefined}
     listeningLine={wakeIndicator?.listening}
@@ -279,16 +270,17 @@ function RoutesWithIncognito({ person, onPersonChange, onSignedOut }: { person: 
     open={lastLine ? previewOpen : coarse ? (wakeIndicator ? true : previewOpen) : undefined}
     onOpenChange={setPreviewOpen}
   /> : undefined;
-  const ambientAvatar = ambient ? <button type="button" aria-label={ambient.companion.name} onClick={() => { setPaneState((current) => ({ ...current, open: true })); }}>
-    {ambient.clips ? <CompanionAvatar name={ambient.companion.name} clips={ambient.clips} size="xs" animated={false} ring={ring} /> : ambient.still ? <Avatar><AvatarImage src={ambient.still} alt="" /></Avatar> : <SeededAvatar name={ambient.companion.name} seed={ambient.companion.id} />}
+  const ambientAvatar = ambient ? <button type="button" aria-label={ambient.companion.name} onClick={() => { updatePaneState({ ...paneState, open: true }); }}>
+    {ambient.clips ? <CompanionAvatar name={ambient.companion.name} clips={ambient.clips} size="xs" animated={false} ring={effectiveRing} /> : ambient.still ? <Avatar><AvatarImage src={ambient.still} alt="" /></Avatar> : <SeededAvatar name={ambient.companion.name} seed={ambient.companion.id} />}
   </button> : null;
   const ambientPaneProps = useAmbientCompanionPane({
     person, companionName: ambient?.companion.name ?? "Companion", companionId: ambient?.companion.id ?? "",
-    avatar: ambientAvatar, incognito, state: paneState, onStateChange: setPaneState,
-    onReply: onSideReply,
-    onContinue: (id) => { if (id) void api.setConversationPlacement(id, "chat").then(() => navigate(`/chat?conversation=${encodeURIComponent(id)}`)).catch(() => toast.error("Could not continue this side chat. Try again.")); },
+    avatar: ambientAvatar, incognito, state: paneState, onStateChange: updatePaneState,
+    onRing: onPaneRing,
+    onContinue: (id) => { if (id) navigate(`/chat?conversation=${encodeURIComponent(id)}`); },
     side: sideChat,
   });
+  paneControlRef.current = ambientPaneProps.control;
   const ambientRightPane = ambient ? <RightPane {...ambientPaneProps} /> : undefined;
   const { pinned: pinnedRoutes, togglePin } = usePinnedApps(person.id);
   const locked = useSessionLocked();

@@ -5,6 +5,9 @@ export type AmbientWakeIndicator = { listening: string; onTurnOff: () => void } 
 export function ambientRingFromWake(indicator: Pick<NonNullable<AmbientWakeIndicator>, "listening"> | null): AmbientRing {
   return indicator ? "listening" : null;
 }
+export function effectiveAmbientRing(pane: AmbientRing, chat: AmbientRing, wake: AmbientRing): AmbientRing {
+  return pane === "thinking" || pane === "speaking" ? pane : chat ?? wake;
+}
 const noopRing: Dispatch<SetStateAction<AmbientRing>> = () => {};
 const noopWake: Dispatch<SetStateAction<AmbientWakeIndicator>> = () => {};
 const AmbientRingContext = createContext<[AmbientRing, Dispatch<SetStateAction<AmbientRing>>]>([null, noopRing]);

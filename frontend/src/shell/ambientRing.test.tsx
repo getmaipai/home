@@ -3,7 +3,7 @@ import { cleanup, fireEvent, render } from "@testing-library/react";
 import { useEffect } from "react";
 import { CompanionAvatar } from "@maipai/ui/src/elements/companion-avatar";
 import { CompanionPreview } from "@maipai/ui/src/elements/companion-preview";
-import { AmbientRingProvider, ambientRingFromWake, useAmbientRing, useAmbientRingValue, useAmbientWake } from "@/shell/ambientRing";
+import { AmbientRingProvider, ambientRingFromWake, effectiveAmbientRing, useAmbientRing, useAmbientRingValue, useAmbientWake } from "@/shell/ambientRing";
 
 const clips = { idle: { h264: "/idle.mp4", still: "/idle.png", loop: true } };
 
@@ -31,6 +31,13 @@ function WakePreview() {
 afterEach(() => { cleanup(); mock.restore(); });
 
 describe("ambient ring and wake preview", () => {
+  test("pane activity takes precedence, then Chat, then wake listening", () => {
+    expect(effectiveAmbientRing("thinking", "speaking", "listening")).toBe("thinking");
+    expect(effectiveAmbientRing("speaking", null, "listening")).toBe("speaking");
+    expect(effectiveAmbientRing(null, "thinking", "listening")).toBe("thinking");
+    expect(effectiveAmbientRing(null, null, "listening")).toBe("listening");
+    expect(effectiveAmbientRing(null, null, null)).toBeNull();
+  });
   test("shell wake state drives the listening ring", async () => {
     const view = render(<AmbientRingProvider><ShellWakeRing /></AmbientRingProvider>);
     const avatar = await view.findByRole("img", { name: "Companion, listening" });

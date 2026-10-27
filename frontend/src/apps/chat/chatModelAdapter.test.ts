@@ -137,6 +137,23 @@ describe("regenerate model override", () => {
   });
 });
 
+describe("ambient side chat age band", () => {
+  test("a child side chat uses the shared chat turn route and conversation id", async () => {
+    const env = stubEnvironment(ndjsonStream([
+      { type: "done", value: { turn_id: "turn-side-child", reply: { text: "Hello." }, source: "model", safety: SAFETY } },
+    ]));
+    const getAgeBand = mock(() => "child" as const);
+    try {
+      await collect([fakeUserMessage("hello")], undefined, undefined, undefined, undefined, undefined, {
+        getAgeBand,
+        getConversationId: async () => "side-child-conversation",
+      });
+      expect(getAgeBand).toHaveBeenCalled();
+      expect(env.turnBodies[0]).toMatchObject({ surface: "chat", conversation_id: "side-child-conversation", text: "hello" });
+    } finally { env.restore(); }
+  });
+});
+
 describe("TRYIT-01 pinned draft", () => {
   test("sends the pinned id on the first request and omits it when unset", async () => {
     const env = stubEnvironment(ndjsonStream([{ type: "done", value: { turn_id: "try-turn", reply: { text: "Hello." }, source: "model", safety: SAFETY } }]));

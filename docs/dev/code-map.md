@@ -135,7 +135,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `frontend/src/apps/setup/WebSearchStep.tsx` | webSearchFailure, WebSearchStep |
 | `frontend/src/lib/media/micGate.tsx` | useMicGate, micDeviceSteps, micFixSteps, micHelp |
 | `frontend/src/shell/AliasRedirect.tsx` | AliasRedirect |
-| `frontend/src/shell/AmbientCompanionPane.tsx` | readAmbientPaneState, useAmbientCompanionPane |
+| `frontend/src/shell/AmbientCompanionPane.tsx` | readAmbientPaneState, createAmbientAskQueue, useAmbientCompanionPane |
 | `frontend/src/shell/BrowserAlerts.tsx` | shouldShowBrowserAlert, requestBrowserAlertPermission, BrowserAlerts |
 | `frontend/src/shell/InstallDock.tsx` | buildDock, InstallDock |
 | `frontend/src/shell/InstallDockRow.tsx` | InstallDockRow |
@@ -149,7 +149,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `frontend/src/shell/StatusIndicator.tsx` | useStatusSummary, StatusIndicator |
 | `frontend/src/shell/ThemeToggle.tsx` | useIsDark, ThemeToggle |
 | `frontend/src/shell/VoiceStage.tsx` | VoiceStage |
-| `frontend/src/shell/ambientRing.tsx` | ambientRingFromWake, AmbientRingProvider, useAmbientRing, useAmbientRingValue, useAmbientWake, useSetAmbientWake |
+| `frontend/src/shell/ambientRing.tsx` | ambientRingFromWake, effectiveAmbientRing, AmbientRingProvider, useAmbientRing, useAmbientRingValue, useAmbientWake |
 | `frontend/src/shell/audioSessionContext.tsx` | AudioSessionProvider, useAudioSession, useAudioSessionState, useAudioPosition, useMiniBar, useAudioRegistration |
 | `frontend/src/shell/components/DataTableControls.tsx` | DataTableControls |
 | `frontend/src/shell/components/DataTableRowActions.tsx` | DataTableRowActions |
