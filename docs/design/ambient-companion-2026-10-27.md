@@ -11,6 +11,7 @@ pinned pane, per-app help, settings). This note replaces the bottom-corner launc
 - `companions-shared-chat-and-presence-2026-10-24.md` section 7 (launcher at the lower right, hidden on Chat).
 - The dock half of REVAMP-PRESENCE-01 in the open COMPANIONS-REVAMP-01 backlog row, and the WAKEUX-02 row's bottom-corner placement.
 - `ELEMENTS-DECISIONS.md` "not needed: `CompanionDock`" (the dock is retired by this design).
+- Within this note (2026-10-27, after the first build): the pane's companion tab as "the same assistant-ui Thread and Composer as Chat" (sections 3 and 6a) is replaced by the stage in section 2c; the thread lives in History and in Chat. The floating-only top-right avatar is replaced by the standard header row in section 2b.
 
 ## 1. What the person sees
 
@@ -41,6 +42,17 @@ Considered and why each is or is not enough: the kit's shadcn `sidebar.tsx` (rig
 focus open with a delay: the shadcn registry `hover-card` is added to the kit with a `UI-DECISIONS.md` row, then `CompanionPreview` composes it); `canvas-split` (shipped, used by Chat's artifact canvas: its renderer stays as the
 artifact tab, the split itself is replaced by the pane); the unused `chat-panel` Element (a candidate for the pane's Chat tab body; the tab is the same assistant-ui Thread and Composer as Chat, not a mini chat);
 `CompanionDock` and `LauncherBubble` (retired by this design; `ELEMENTS-DECISIONS.md` gets a row saying so).
+
+## 2b. The standard header row (Jesse, 2026-10-27, after seeing the first build)
+
+Every page has one header row of the same height and the same places: title on the left, the app's own buttons at the right, the companion avatar last (36 px, fixed spot, never overlapping a page button). The front dashboard and Chat follow it too.
+- The shell draws the row on every page. A page supplies its title and its buttons through the shell's header slots (`useHeaderExtra` gains a right-hand slot); a page with no title gets its app's name from the app catalog. An app that draws its own header row today (Library, Media, package apps, Settings) moves its title and primary buttons into this row and keeps only content below it (Library's Upload button moves up, for example).
+- Chat's header (the companion picker, history toggle and menu) is the row on Chat: the kit `ChatHeader` takes an end slot for the avatar, so Chat has one row, not two.
+- The pane's header row has the same height and ends the same way (title, the pane's buttons including a settings gear, pin, close, then the avatar), so the avatar stays in one spot with the pane open or closed.
+
+## 2c. The companion tab is a stage (mockup `assets/ambient-companion-2026-10-27/stage-mockup.webp`)
+
+The tab is where you talk with a friend, familiar from Chat but not a replica of it. Top to bottom: the companion's name with its state word (Ready, Listening, Thinking, Speaking, Working; text only, no dot), the character large and transparent (the shipped `CompanionAvatar` playing the matching state clip; no background behind it or its container), what it just said as a speech bubble over the lower left of the character, a short list of quick actions, and a talk pill (microphone at the left, a wave or send at the right). States from the mockup: Idle (calm, always available), Listening (a ring and an audio wave in the pill), Thinking (a thought cloud, no spinner), Speaking (the bubble plus a waveform), Working (a short status line and a thin progress line). The thread is not drawn here: History holds the conversation and Continue in Chat opens it. A second tab, Settings, holds the companion picker, Voice, Appearance, Behavior, Presence (the on/off switch) and Position (AMBIENT-06). The stage is a kit Element (`CompanionStage`) with slots; Home passes data and handlers.
 
 ## 3. Side chats: one store, two placements
 
@@ -73,6 +85,8 @@ the top right brings it back; it never hides while listening, thinking or speaki
 4. **AMBIENT-04 migrate panels:** chat details, sources, artifact, compare into pane tabs; remove the Sheets; each app's inspector as it comes up.
 5. **AMBIENT-05 page context and quick actions:** the typed page context from each app; "Help with this page", "Find something", "Take an action" through the existing tool and Ask gates.
 6. **AMBIENT-06 settings, wake word and shortcut:** the Ambient Companion card, wake word to the pane, global shortcut in the desktop app.
+
+Slice update, 2026-10-27: AMBIENT-04 is now the standard header row on every page (section 2b) and the stage tab with its Settings tab shell (section 2c); the migration of Chat's sheets and other panels into pane tabs is AMBIENT-04c, after those.
 
 ## 6a. Conditions the build must meet (architect, AMBIENT-COMPANION-01)
 

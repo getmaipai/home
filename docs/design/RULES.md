@@ -407,9 +407,22 @@ S2. **Each app area emulates its native app.** Everything to the right of
     standardize the right pane as a component (nothing shows in the right unless
     it uses this component) ... the selected companion is always in the upper
     right"). It is the person's companion as a small avatar (about 32 to 36 px),
-    with that app's own header buttons to its left. Hover or keyboard focus opens
+    with that app's own header buttons to its left. Every page has this one
+    header row, the front dashboard and Chat included (Owner-approved 2026-10-27;
+    his words: "all pages need to conform to this header row per app - every
+    page including the front dashboard"): the page's or app's title on the
+    left, that app's own buttons (settings and the like) at the right, then the
+    companion avatar last, at one fixed size and spot. The row is reserved, so
+    nothing sits under the avatar; an app that draws its own header places its
+    title and buttons in this row instead of drawing a second one. Hover or keyboard focus opens
     a compact preview with a quick ask; a click opens the standard right pane;
     pin keeps it open, behaving like the chat column without a toggle button.
+    The companion's tab is a stage, not a copy of Chat (Owner-approved
+    2026-10-27; his words: "its an area that you talk with a friend. it should
+    feel familiar to chat but not replica of it"): the character large on the
+    page's own surface with no background of its own, its name and one state
+    word, what it just said as a speech bubble, a few quick actions and a
+    talk field; the full conversation lives in History and in Chat.
     The right side of every app is that one pane component: its first tab is
     always the companion; other tabs (details, sources, an artifact, compare,
     whatever an app adds) appear when needed, are shown and selected
