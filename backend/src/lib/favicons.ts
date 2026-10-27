@@ -110,7 +110,7 @@ interface IndexEntry {
   contentType: string | null;
   bytes: number;
   lastUsedAt: string;
-  /** 2 once the home page's own icon links were tried: an older "no icon" entry is asked again. */
+  /** 2 once the home page's own icon links were tried: an older "no icon" entry is asked again. 3 for a large entry fetched with the home page read in part. */
   v?: number;
 }
 
@@ -143,7 +143,7 @@ export type FaviconFetchFn = (url: string, init: { signal: AbortSignal }) => Pro
  * the moment the cap is crossed, the same streamed-and-counted shape
  * `packageHost.ts`'s own `readBodyWithLimit` uses for text, kept
  * separate here because this one has to stay binary-safe for an image. */
-async function readCapped(response: Response, maxBytes: number): Promise<Uint8Array | null> {
+async function readCapped(response: Response, maxBytes: number, truncate = false): Promise<Uint8Array | null> {
   const reader = response.body?.getReader();
   if (!reader) return null;
   const chunks: Uint8Array[] = [];
@@ -154,7 +154,10 @@ async function readCapped(response: Response, maxBytes: number): Promise<Uint8Ar
     total += value.byteLength;
     if (total > maxBytes) {
       await reader.cancel();
-      return null;
+      if (!truncate) return null;
+      chunks.push(value.subarray(0, value.byteLength - (total - maxBytes)));
+      total = maxBytes;
+      break;
     }
     chunks.push(value);
   }
@@ -224,7 +227,8 @@ export async function fetchFaviconBytes(host: string, fetchFn?: FaviconFetchFn, 
     try {
       const response = await get(`https://${host}/`, controller.signal);
       if (!response.ok || !(response.headers.get("content-type") ?? "").toLowerCase().includes("html")) return [];
-      const bytes = await readCapped(response, MAX_HOMEPAGE_BYTES);
+      // A big home page (Deadline's is 800 KB) declares its icons in the head: read the first part, never give up on the whole page.
+      const bytes = await readCapped(response, MAX_HOMEPAGE_BYTES, true);
       return bytes ? iconLinksOf(new TextDecoder().decode(bytes), `https://${host}/`) : [];
     } catch { return []; } finally { clearTimeout(timer); }
   };
@@ -250,7 +254,8 @@ export async function getFavicon(host: string, fetchFn?: FaviconFetchFn, now: Da
   const index = readIndex();
   const key = prefer === "large" ? `hq.${host}` : host;
   const cached = index[key];
-  if (cached && !(cached.ext === null && cached.v !== 2)) {
+  // A large (card) entry made before the home page was read in part (v3) may hold a placeholder or an absence: ask again.
+  if (cached && !(cached.ext === null && cached.v !== 2) && !(prefer === "large" && cached.v !== 3)) {
     cached.lastUsedAt = now.toISOString();
     writeIndex(index);
     if (cached.ext === null || cached.contentType === null) return { found: false };
@@ -274,7 +279,7 @@ export async function getFavicon(host: string, fetchFn?: FaviconFetchFn, now: Da
     return { found: false };
   }
   if (outcome.kind === "confirmed_absent") {
-    index[key] = { ext: null, contentType: null, bytes: 0, lastUsedAt: now.toISOString(), v: 2 };
+    index[key] = { ext: null, contentType: null, bytes: 0, lastUsedAt: now.toISOString(), v: prefer === "large" ? 3 : 2 };
     writeIndex(index);
     return { found: false };
   }
@@ -282,7 +287,7 @@ export async function getFavicon(host: string, fetchFn?: FaviconFetchFn, now: Da
   const ext = EXT_BY_CONTENT_TYPE[outcome.contentType] ?? "img";
   ensureDataDir(faviconsDir);
   writeFileSync(filePath(key, ext), outcome.bytes);
-  index[key] = { ext, contentType: outcome.contentType, bytes: outcome.bytes.byteLength, lastUsedAt: now.toISOString(), v: 2 };
+  index[key] = { ext, contentType: outcome.contentType, bytes: outcome.bytes.byteLength, lastUsedAt: now.toISOString(), v: prefer === "large" ? 3 : 2 };
   writeIndex(index);
   sweepFavicons(now);
   return { found: true, bytes: outcome.bytes, contentType: outcome.contentType };

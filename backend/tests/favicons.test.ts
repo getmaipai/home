@@ -132,6 +132,31 @@ describe("fetchFaviconBytes", () => {
   });
 });
 
+describe("fetchFaviconBytes: a big home page (Deadline's is 800 KB, news-pictures-missing 2026-10-27)", () => {
+  test("a large (card) icon is read from the head of a home page over the 256 KB cap, not the 1x1 apple-touch placeholder", async () => {
+    const calls: string[] = [];
+    const head = '<html><head><link rel="icon" sizes="192x192" href="https://example.com/icon-192.png"></head><body>';
+    const fetchFn = async (url: string) => {
+      calls.push(url);
+      if (url === "https://example.com/") return new Response(head + "x".repeat(800 * 1024), { status: 200, headers: { "content-type": "text/html" } });
+      if (url.endsWith("/icon-192.png")) return pngResponse(3500);
+      return pngResponse(68); // the placeholder the fixed path serves
+    };
+    const result = await fetchFaviconBytes("example.com", fetchFn, "large");
+    expect(result.kind === "found" && result.bytes.byteLength).toBe(3500);
+    expect(calls).toEqual(["https://example.com/", "https://example.com/icon-192.png"]);
+  });
+
+  test("a large entry cached by an earlier version is asked again", async () => {
+    __setFaviconEntryForTests("hq.example.com", { ext: "png", contentType: "image/png", bytes: 68, lastUsedAt: new Date().toISOString(), v: 2 });
+    let calls = 0;
+    const fetchFn = async () => { calls++; return pngResponse(900); };
+    const result = await getFavicon("example.com", fetchFn, new Date(), "large");
+    expect(result.found && result.bytes.byteLength).toBe(900);
+    expect(calls).toBeGreaterThan(0);
+  });
+});
+
 describe("getFavicon", () => {
   test("a miss calls through and caches; the next call is served from cache with no fetch", async () => {
     let calls = 0;
