@@ -32,14 +32,14 @@ import { classifyTurnSignal } from "@/lib/turnSignal";
 import { speakerIsAnonymous, turnAgeBand } from "./speaker";
 import { ASK_SUBMITTED_LINE, RESUMED_ASK_CALL_PREFIX, validateAskValues } from "@/lib/askForm";
 import { carriesCrisisSignal } from "@/lib/safety";
-import { resolvePersona, adaptPersonaToBand, DEFAULT_PERSONA, type Persona } from "@/lib/persona";
+import { resolvePersona, adaptPersonaToBand, DEFAULT_PERSONA, personaFromManifest, type Persona } from "@/lib/persona";
 import { createHash } from "node:crypto";
 import { existsSync } from "node:fs";
 import { loadManifestOnly } from "@/lib/plugins";
-import { getHouseholdCompanion } from "@/lib/householdCompanions";
+import { getHouseholdCompanion, householdCompanionAuthorId } from "@/lib/householdCompanions";
 import { companionAreaOn, mayUseCompanion } from "@/lib/companionsApp";
 import { companionFits, robotCompanionOf } from "@/lib/robotCompanion";
-import { isOwnerOrAdmin } from "@/lib/access";
+import { canHaveTemporaryChat, isOwnerOrAdmin } from "@/lib/access";
 import { speakerAgeBand } from "@/lib/ageBand";
 import { sourcesForChild, structuredPartForBand } from "@/lib/childLinks";
 import { FAILURE_COPY } from "@/lib/failureCopy";
@@ -88,6 +88,7 @@ export interface RunTurnNextOpts {
   deviceId?: string;
   conversationId?: string;
   mentionCompanionId?: string;
+  tryCompanionId?: string;
   turnId?: string;
   images?: import("@/wire").ChatImagePart[];
   temporary?: boolean;
@@ -196,7 +197,7 @@ function buildTurnValue(state: TurnState, startedAt: number, source: TurnValue["
     safety: safety ?? state.safety,
     conversation_id: state.conversationId,
     turn_id: state.turnId,
-    answered_by: state.ephemeral ? null : answeredByFor(state.persona, state.surface === "robot" ? "device" : state.answerVia ?? "conversation"),
+    answered_by: state.ephemeral || state.tryDraft ? null : answeredByFor(state.persona, state.surface === "robot" ? "device" : state.answerVia ?? "conversation"),
     ...(state.offer ? { offer_id: state.offer.id } : {}),
     ...(state.images?.length ? { images: state.images } : {}),
     ...(state.toolEvents.some((event) => event.t === "block")
@@ -481,6 +482,19 @@ async function beginTurn(actor: PersonRow, surface: Surface, text: string, opts:
   // The robot device id is session evidence and is carried through the
   // conversation so its post-turn judge can assign robot-only memories.
   const temporary = isTemporaryConversation(conversation.id) || conversation.mode === "temporary";
+  if (opts.tryCompanionId && surface !== "chat") return { ok: false, result: { ok: false, status: 400, code: "invalid_input", error: "Try it only works in the chat. Open it from the companion's Appearance tab." } };
+  if (opts.tryCompanionId && !temporary) return { ok: false, result: { ok: false, status: 400, code: "invalid_input", error: "Try it only works in a temporary chat. Open it from the companion's Appearance tab." } };
+  let tryPersona: Persona | null = null;
+  if (opts.tryCompanionId) {
+    // Who may try it is decided first and answered the same way for every id, so a refusal never says whether a draft exists.
+    if (!canHaveTemporaryChat(actor) || (householdCompanionAuthorId(opts.tryCompanionId) !== actor.id && !isOwnerOrAdmin(actor))) return { ok: false, result: { ok: false, status: 403, code: "invalid_input", error: "Only the draft's author or an admin can try it in a temporary chat." } };
+    const draft = getHouseholdCompanion(opts.tryCompanionId);
+    if (!draft || draft.companion?.status !== "draft") return { ok: false, result: { ok: false, status: 400, code: "invalid_input", error: "Try it needs a household draft companion. Open a draft from its Appearance tab." } };
+    const candidate = personaFromManifest(opts.tryCompanionId, draft, true);
+    if (!candidate) return { ok: false, result: { ok: false, status: 400, code: "invalid_input", error: "This household draft cannot be tried. Check the draft and try again." } };
+    if (!companionAreaOn(actor) || !companionFits(speakerAgeBand(actor, new Date()), candidate.floor)) return { ok: false, result: { ok: false, status: 403, code: "invalid_input", error: "This draft is unavailable for your account. Check the companion settings and audience, or ask an admin." } };
+    tryPersona = candidate;
+  }
 
   // THIN-0N: the speaker's effective band (an unidentified robot speaker
   // is the child band), for the signal, the plan and the stream gate,
@@ -583,8 +597,8 @@ async function beginTurn(actor: PersonRow, surface: Surface, text: string, opts:
   const mentionedPersona = !robotCompanion && !temporary && !bare && opts.mentionCompanionId
     ? mentionedConversationPersona(actor, opts.mentionCompanionId)
     : null;
-  const persona = adaptPersonaToBand(robotCompanion ?? (temporary || bare ? DEFAULT_PERSONA : mentionedPersona ?? conversationPersona(actor, conversation.companion_id)), band);
-  const answerVia: import("@/wire").AnsweredBy["via"] = surface === "robot" ? "device" : temporary || bare ? "conversation" : opts.mentionCompanionId ? mentionedPersona ? (conversation.companion_id ? mentionedPersona.id === conversation.companion_id : mentionedPersona.id === conversationPersona(actor, null).id) ? "conversation" : "mention" : "fallback" : conversation.companion_id && persona.id !== conversation.companion_id ? "fallback" : "conversation";
+  const persona = adaptPersonaToBand(tryPersona ?? (robotCompanion ?? (temporary || bare ? DEFAULT_PERSONA : mentionedPersona ?? conversationPersona(actor, conversation.companion_id))), band);
+  const answerVia: import("@/wire").AnsweredBy["via"] = surface === "robot" ? "device" : temporary || bare || tryPersona ? "conversation" : opts.mentionCompanionId ? mentionedPersona ? (conversation.companion_id ? mentionedPersona.id === conversation.companion_id : mentionedPersona.id === conversationPersona(actor, null).id) ? "conversation" : "mention" : "fallback" : conversation.companion_id && persona.id !== conversation.companion_id ? "fallback" : "conversation";
   // U4/RESP-01: computed once, the register's only length authority -
   // never recomputed by a later node, the same "decided once" shape
   // `reasoning.emit` already follows in `context`. U4c: everything
@@ -683,6 +697,7 @@ async function beginTurn(actor: PersonRow, surface: Surface, text: string, opts:
     ...(supersedes ? { supersedes } : {}),
     ...(continuation ? { continuation } : {}),
     ...(opts.ephemeral === true ? { ephemeral: true } : {}),
+    ...(tryPersona ? { tryDraft: true } : {}),
     startedAt,
     // Overwritten by the context node's own decideReasoning() whenever
     // `context` runs (machine.ts's own applyContext action). A code
@@ -1189,7 +1204,7 @@ function startStream(actor: PersonRow, surface: Surface, text: string, begunValu
     kind: "stream",
     conversationId: state.conversationId,
     turnId: state.turnId,
-    answerMetadata: state.ephemeral ? undefined : answeredByFor(state.persona, state.surface === "robot" ? "device" : state.answerVia ?? "conversation"),
+    answerMetadata: state.ephemeral || state.tryDraft ? undefined : answeredByFor(state.persona, state.surface === "robot" ? "device" : state.answerVia ?? "conversation"),
     signal: state.signal,
     startedAt,
     cueSuppressed: state.signal.target === "hub" && state.signal.repair !== "none",

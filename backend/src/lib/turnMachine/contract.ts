@@ -277,6 +277,8 @@ export interface TurnState {
    * household member's words. Same model, safety and reply path, but nothing
    * is stored (no turn row, no summary refresh, no parked ask). */
   ephemeral?: boolean;
+  /** Try it (REVAMP-TRYIT-01): the persona is a household draft; the turn is temporary and carries no speaker. */
+  tryDraft?: boolean;
   /** THIN-7C: a continuation of an answer that stopped short: the client's
    * partial text, replayed to the model as its own words with one instruction
    * to continue. No command fires and no tool is offered for the turn;

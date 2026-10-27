@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { db } from "@/db";
-import { people } from "@/db/schema";
+import { people, conversationTurns } from "@/db/schema";
 import { createHouseholdCompanion, setHouseholdCompanionAudience, setHouseholdCompanionStatus } from "@/lib/householdCompanions";
 import { getHouseholdCompanion } from "@/lib/householdCompanions";
 import { loadManifestOnly } from "@/lib/plugins";
@@ -14,7 +14,8 @@ import { join } from "node:path";
 import sharp from "sharp";
 import { companionVoiceVersion, portraitPath, retainCompanionPortrait, voiceVersion } from "@/lib/companionPortrait";
 import { resetDb } from "../../../tests/reset-db";
-import { resolveOrCreateConversation, updateConversationCompanion } from "@/lib/conversationHistory";
+import { getConversation, resolveOrCreateConversation, updateConversationCompanion } from "@/lib/conversationHistory";
+import { withEngine, tableCounts } from "../../../tests/turnMachine/modeHarness";
 
 function addPerson(id: string, role: string) {
   const now = new Date().toISOString();
@@ -36,6 +37,69 @@ beforeEach(() => { resetDb(); __reloadPersonasForTests(); __resetSettingsCacheFo
 afterEach(() => { resetDb(); __reloadPersonasForTests(); __resetSettingsCacheForTests(); });
 
 describe("conversation persona", () => {
+  test("the draft author gets a temporary try-it persona without persisting or changing the conversation companion", async () => {
+    const actor = addPerson("person-compoowner", "adult");
+    addPerson("person-turnother", "adult");
+    const draft = createHouseholdCompanion({ display_name: "Draft Voice", audience: "adult", formality: "formal", complexity: "advanced", engagement: "curious", filler_density: "none", examples: ["DRAFT_EXAMPLE", "DRAFT_EXAMPLE_TWO", "DRAFT_EXAMPLE_THREE"], status: "draft" } as never, { display_name: "Author", person_id: actor.id });
+    if (!draft.ok) throw new Error(draft.error);
+    const conversation = resolveOrCreateConversation(actor, "chat");
+    if (!conversation.ok) throw new Error("Could not create temporary chat");
+    updateConversationCompanion(actor, conversation.value.id, "rivet");
+    const temporary = resolveOrCreateConversation(actor, "chat", undefined, { temporary: true });
+    if (!temporary.ok) throw new Error("Could not create temporary chat");
+    const before = tableCounts();
+    await withEngine(() => "Hello.", async (seen) => {
+      const result = await runTurnNext(actor, "chat", "hello", { conversationId: temporary.value.id, tryCompanionId: draft.value.id });
+      expect(result.ok).toBe(true);
+      if (result.ok) {
+        expect(result.value.answered_by).toBeNull();
+        expect(result.value.reply.text).toBeTruthy();
+      }
+      expect(JSON.stringify(seen.at(-1)?.messages)).toContain("You are Draft Voice");
+    });
+    expect(tableCounts()).toEqual(before);
+    expect(db.select().from(conversationTurns).all().some((row) => row.answeredBy === draft.value.id)).toBe(false);
+    expect(getConversation(actor, conversation.value.id)).toMatchObject({ ok: true, value: { companion_id: "rivet" } });
+  });
+
+  test("try it refuses other surfaces, minors, ready companions and unknown ids, and an ordinary temporary turn keeps its speaker", async () => {
+    const author = addPerson("person-tryauthor", "adult"), child = addPerson("person-trychild", "child");
+    const draft = createHouseholdCompanion({ display_name: "Draft Voice", audience: "adult" } as never, { display_name: "Author", person_id: author.id });
+    const childDraft = createHouseholdCompanion({ display_name: "Child Draft", audience: "adult" } as never, { display_name: "Child", person_id: child.id });
+    if (!draft.ok || !childDraft.ok) throw new Error("Could not create drafts");
+    const temporary = resolveOrCreateConversation(author, "chat", undefined, { temporary: true });
+    if (!temporary.ok) throw new Error("Could not create temporary chat");
+    const refusedSurface = await runTurnNext(author, "robot", "hello", { conversationId: temporary.value.id, tryCompanionId: draft.value.id });
+    expect(refusedSurface).toMatchObject({ ok: false, status: 400 });
+    // Ids that are not the person's own get the same refusal whether or not they exist, so a refusal never reveals a draft.
+    expect(await runTurnNext(author, "chat", "hello", { conversationId: temporary.value.id, tryCompanionId: "rivet" })).toMatchObject({ ok: false, status: 403 });
+    expect(await runTurnNext(author, "chat", "hello", { conversationId: temporary.value.id, tryCompanionId: "no-such-companion" })).toMatchObject({ ok: false, status: 403 });
+    expect(await runTurnNext(author, "chat", "hello", { conversationId: temporary.value.id, tryCompanionId: childDraft.value.id })).toMatchObject({ ok: false, status: 403 });
+    // The author's own companion that is already ready is not a draft.
+    setHouseholdCompanionStatus(draft.value.id, "ready");
+    expect(await runTurnNext(author, "chat", "hello", { conversationId: temporary.value.id, tryCompanionId: draft.value.id })).toMatchObject({ ok: false, status: 400 });
+    const childTemporary = resolveOrCreateConversation(child, "chat", undefined, { temporary: true });
+    if (childTemporary.ok) expect(await runTurnNext(child, "chat", "hello", { conversationId: childTemporary.value.id, tryCompanionId: childDraft.value.id })).toMatchObject({ ok: false });
+    await withEngine(() => "Hello.", async () => {
+      const ordinary = await runTurnNext(author, "chat", "hello", { conversationId: temporary.value.id });
+      expect(ordinary.ok).toBe(true);
+      if (ordinary.ok) expect(ordinary.value.answered_by).not.toBeNull();
+    });
+  });
+
+  test("try it requires a temporary chat and the draft author", async () => {
+    const author = addPerson("person-compoowner", "adult"), other = addPerson("person-turnother", "adult");
+    const draft = createHouseholdCompanion({ display_name: "Draft Voice", audience: "all" } as never, { display_name: "Author", person_id: author.id });
+    if (!draft.ok) throw new Error(draft.error);
+    const ordinary = resolveOrCreateConversation(author, "chat");
+    if (!ordinary.ok) throw new Error("Could not create chat");
+    expect((await runTurnNext(author, "chat", "hello", { conversationId: ordinary.value.id, tryCompanionId: draft.value.id })).ok).toBe(false);
+    const temporary = resolveOrCreateConversation(other, "chat", undefined, { temporary: true });
+    if (!temporary.ok) throw new Error("Could not create temporary chat");
+    const refused = await runTurnNext(other, "chat", "hello", { conversationId: temporary.value.id, tryCompanionId: draft.value.id });
+    expect(refused).toMatchObject({ ok: false, status: 403 });
+  });
+
   test("mentioning the conversation speaker keeps conversation attribution", async () => {
     addPerson("person-compoowner", "adult");
     const actor = addPerson("person-turnadult", "adult");

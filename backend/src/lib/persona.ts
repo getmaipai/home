@@ -113,8 +113,8 @@ export interface Persona {
 // Skips (rather than throws on) a package that fails to load or isn't
 // `kind: "companion"`: this file has no business refusing to boot the
 // whole hub because one unrelated bundled package is malformed.
-function personaFromManifest(id: string, manifest: import("@maipai/spec/gen/ts/manifest.js").PackageManifest): Persona | null {
-  if (manifest.kind !== "companion" || !manifest.companion || (manifest.companion.status && manifest.companion.status !== "ready")) return null;
+export function personaFromManifest(id: string, manifest: import("@maipai/spec/gen/ts/manifest.js").PackageManifest, allowDraft = false): Persona | null {
+  if (manifest.kind !== "companion" || !manifest.companion || (!allowDraft && manifest.companion.status && manifest.companion.status !== "ready")) return null;
   const c = manifest.companion;
   const audience = companionAudienceOf(c.audience, manifest.min_role);
   return { id, display_name: c.display_name, ...(c.tagline !== undefined ? { tagline: c.tagline } : {}), audience, floor: companionFloor(audience), formality: c.formality, complexity: c.complexity, engagement: c.engagement, filler_density: c.filler_density, examples: c.examples, examples_by_band: { ...(c.examples_child ? { child: c.examples_child } : {}), ...(c.examples_teen ? { teen: c.examples_teen } : {}), ...(c.examples_adult ? { adult: c.examples_adult } : {}) }, behavior: c.behavior, status_phrases: c.status_phrases };

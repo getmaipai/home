@@ -540,7 +540,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/personAuthMethods.ts` | pinDigitsHint, getAuthMethods, requiresCredential, roleRequiresCredential |
 | `backend/src/lib/personLifecycle.ts` | MANAGEABLE_BY, canManage, checkRoleChange, commitPersonUpdate, hasSecret, erasePersonData |
 | `backend/src/lib/personShape.ts` | toPerson, toRoster, parsePersonCandidate, personToDbValues, guestExpiryProblem |
-| `backend/src/lib/persona.ts` | PERSONAS, reloadPersonas, __reloadPersonasForTests, PERSONA_IDS, DEFAULT_PERSONA_ID, DEFAULT_PERSONA |
+| `backend/src/lib/persona.ts` | personaFromManifest, PERSONAS, reloadPersonas, __reloadPersonasForTests, PERSONA_IDS, DEFAULT_PERSONA_ID |
 | `backend/src/lib/personaIds.ts` | LIVE_PERSONA_IDS |
 | `backend/src/lib/personaJudge.ts` | judgePersonaConsistency |
 | `backend/src/lib/pictures/adapters.ts` | __resetAdapterCacheForTests, dropAdapterCache, allAdapters, adaptersFor, setAdapterEnabled, forgetAdapterPref |
