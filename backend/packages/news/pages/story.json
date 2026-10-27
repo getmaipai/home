@@ -45,6 +45,27 @@
               "on": "{on}"
             }
           }
+        },
+        "listen": {
+          "play": {
+            "media_id": "story"
+          }
+        },
+        "summarize": {
+          "call": {
+            "target": "/api/plugins/news/actions/summarize",
+            "args": {
+              "id": "{item_id}"
+            }
+          }
+        },
+        "discuss": {
+          "navigate": {
+            "to": "/apps/news/discuss",
+            "state": {
+              "id": "{story_id}"
+            }
+          }
         }
       },
       "empty_state": {

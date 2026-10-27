@@ -9,6 +9,7 @@ import { Button } from "@maipai/ui/src/dashboard/components/ui/button";
 import { getIcon } from "@maipai/ui/src/icons";
 import { api } from "@/lib/api";
 import { isMediaPlayPage, mediaAppOfPath, playPageOf } from "@/shell/mediaApps";
+import { storyIdOfListen } from "@/shell/newsListen";
 import { useMediaDock, type HoistedMedia } from "@/shell/mediaHost";
 import { AudioVisualizer, useVisualizerPref } from "@/shell/media/AudioVisualizer";
 import { NowPlayingStage } from "@/shell/media/NowPlayingStage";
@@ -62,7 +63,10 @@ export function GlobalMiniPlayer() {
   const CloseIcon = getIcon("x"), WaveIcon = getIcon("audio-waveform"), PipIcon = getIcon("picture-in-picture"), FullIcon = getIcon("maximize");
   const el = held.el;
   const pictureInPicture = typeof document !== "undefined" && "pictureInPictureEnabled" in document && document.pictureInPictureEnabled && el instanceof HTMLVideoElement;
-  const openPlayPage = () => navigate(`/apps/${held.appId}/${playPageOf(held.appId)}?id=${encodeURIComponent(held.id)}`, { state: { pageState: { id: held.id } } });
+  // News Listen (NEWS-04) holds a story being read aloud: expanding opens the story, and its place is not a media position to save.
+  const listenStory = storyIdOfListen(held.appId, held.id);
+  const listening = listenStory !== null;
+  const openPlayPage = () => navigate(listening ? `/apps/news/story?id=${encodeURIComponent(listenStory!)}` : `/apps/${held.appId}/${playPageOf(held.appId)}?id=${encodeURIComponent(held.id)}`, listening ? undefined : { state: { pageState: { id: held.id } } });
 
   return (
     <div data-slot="global-mini-player" data-testid="global-mini-player" className="pointer-events-none fixed inset-x-0 bottom-0 z-40 md:start-14 print:hidden">
@@ -79,7 +83,7 @@ export function GlobalMiniPlayer() {
           poster={held.poster}
           mediaSession={false}
           onExpand={openPlayPage}
-          onProgress={(p) => {
+          onProgress={listening ? undefined : (p) => {
             api.mediaProgress(held.appId, { media_id: held.id, position_s: p.position_s, duration_s: p.duration_s, reason: p.reason }, p.reason === "unload").catch(() => {});
           }}
           actionsSlot={

@@ -29,6 +29,7 @@ export function audioKindOfApp(appId: string): AudioKind {
   if (appId === "podcasts") return "podcast";
   if (appId === "music") return "music";
   if (appId === "books") return "audiobook";
+  if (appId === "news") return "spoken_reply";
   return "video";
 }
 
@@ -36,6 +37,8 @@ export function MediaPlayerRegistration({ appId, mediaId, element }: { appId: st
   const item = useQuery({
     queryKey: ["media-registration", appId, mediaId],
     queryFn: async () => {
+      // A story being read aloud (News Listen) has no media item; the host's title is all the audio session needs.
+      if (appId === "news") return { id: mediaId ?? "", title: "Story", channel: null, poster: null, duration_s: null, chapters: [] };
       const found = await api.appData<PlayedItem | PlayedItem[]>(appId, "item", { id: mediaId });
       return Array.isArray(found) ? (found[0] ?? null) : found;
     },

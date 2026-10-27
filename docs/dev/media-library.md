@@ -392,3 +392,5 @@ title, play and pause); tapping the title opens the play page.
   picker (hide or show, the seven scenes), a Full screen button that opens the same stage, and an ambient strip along the bottom of the page, as the pre-rebuild hub's
   Now Playing overlay had. It draws only while the host holds that song. Mini player and page hand off with no restart: the bar opens the page, the page hides the bar.
 
+
+News Listen (NEWS-04) is a second user of this player, not a second player. The story page's `listen` action is a `play` with media id `story`; `MediaHostProvider.onPlay` hands the story id to `createStoryListener` (`frontend/src/shell/newsListen.ts`), which holds one audio element in the host store under app `news` and id `story:<id>`. It speaks the article's `speech[]` lines one at a time through `POST /api/tts`, fetches the next while one plays, and moves the held element with `store.retarget` so the bar's subtitle reads "Paragraph N of M" without a new element. `GlobalMiniPlayer` skips progress saving for it and Expand opens the story; the audio session registers it as `spoken_reply`. The bar clears when the story ends.

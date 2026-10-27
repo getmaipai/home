@@ -14,6 +14,7 @@ import { MediaPlayerRegistration } from "@/shell/MediaPlayerRegistration";
 import { useToast } from "@maipai/ui/src/primitives/Toast";
 import { BUDGET_CHECK_MS, guardMediaBudget, intervalEvery } from "@/shell/mediaBudgetGuard";
 import { NotFoundPage } from "@/shell/pages/NotFoundPage";
+import { createStoryListener } from "@/shell/newsListen";
 
 /** The item loaded in the host's element: what it is, which app played it, and whether the person has started it. */
 export interface HoistedMedia extends MediaItemRef {
@@ -70,6 +71,13 @@ export function createMediaStore() {
       notify();
       return el;
     },
+    /** Point the held element at the next piece of the same item (Listen reads a story paragraph by paragraph) without a new element. */
+    retarget(el: HTMLMediaElement, patch: { src: string; subtitle?: string }) {
+      if (!current || current.el !== el) return;
+      current = { ...current, ...patch };
+      el.setAttribute("src", patch.src);
+      notify();
+    },
     clear() {
       if (!current) return;
       drop(current);
@@ -94,9 +102,15 @@ export function MediaHostProvider({ children }: { children: ReactNode }) {
   pathRef.current = location.pathname;
   const appRef = useRef<string | null>(null);
   appRef.current = mediaAppOfPath(location.pathname);
+  const { push } = useToast();
+  const pushRef = useRef(push);
+  pushRef.current = push;
+  // NEWS-04: Listen on an article reads it into the host's element, which the global mini player then shows.
+  const listener = useMemo(() => createStoryListener(store, (line) => pushRef.current(line)), [store]);
   const host = useMemo<MediaHost>(
     () => ({
       async onPlay(mediaId, item) {
+        if (mediaId === "story" && typeof item.story_id === "string") return listener.listen(item.story_id);
         // A row from a media app carries its kind; any other caller names only the id, and the hub says what it is.
         const kind = typeof item.kind === "string" ? item.kind : (await api.mediaItem(mediaId)).item.kind;
         if (kind === "track") {
@@ -110,7 +124,7 @@ export function MediaHostProvider({ children }: { children: ReactNode }) {
       // Only a media app's player plays in the host's element; anywhere else the Player keeps its own.
       mediaFor: (ref) => (appRef.current && typeof document !== "undefined" ? store.elementFor(ref, appRef.current) : null),
     }),
-    [navigate, store],
+    [navigate, store, listener],
   );
   const current = useSyncExternalStore(store.subscribe, store.get, store.get);
   // The schema Player advances on Now playing. Away from that page, the host keeps the same queue moving.
@@ -141,9 +155,6 @@ export function MediaHostProvider({ children }: { children: ReactNode }) {
   // MEDIA-KID-01: the daily media minutes pause the host's element (every media app, the mini bar, audio and video alike).
   // The words go through the shell's one toast (the kit ToastProvider in App.tsx, the same one the notification bell uses).
   const element = current?.el ?? null;
-  const { push } = useToast();
-  const pushRef = useRef(push);
-  pushRef.current = push;
   const budgetState = useRef({ told: false });
   useEffect(() => {
     if (!element) return;
