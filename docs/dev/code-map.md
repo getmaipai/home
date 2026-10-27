@@ -513,7 +513,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/news/hostBackoff.ts` | NEWS_HOST_BACKOFF_MS, newsHostQuiet, quietNewsHost, __resetNewsHostBackoffForTests |
 | `backend/src/lib/news/mixAffinity.ts` | computeAffinity |
 | `backend/src/lib/news/newsCounters.ts` | NEWS_COUNTER_NAMES, bumpNewsCounter, newsCounters, __resetNewsCountersForTests |
-| `backend/src/lib/news/pictureFallback.ts` | publisherIconPicture |
+| `backend/src/lib/news/pictureFallback.ts` | pngFromIco, publisherIconPicture |
 | `backend/src/lib/news/pictures.ts` | NEWS_PICTURE_WIDTHS, newsPictureDir, pictureRefOf, figureRefOf, newsImagesOn, newsImageCacheBytes |
 | `backend/src/lib/news/prefetch.ts` | prefetchNewsText |
 | `backend/src/lib/news/prefetchBudget.ts` | PREFETCH_SCHEMA, prefetchBudget |
