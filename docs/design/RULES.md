@@ -395,24 +395,34 @@ S2. **Each app area emulates its native app.** Everything to the right of
     records and never other apps (chat's thread search; News's search
     over its own stories, topics, sources and saved items) is part of
     that app's own native layout, not a second copy of Search
-    everywhere, and is allowed beside it. The shell may draw the person's
-    companion launcher at the bottom corner of any app except Chat; it
-    opens Chat or a chat panel, carries no count or status, and the
-    person can turn it off (Owner-approved 2026-10-24, design record
-    companions-shared-chat-and-presence-2026-10-24.md section 7). The one
-    exception to "carries no count or status" is a single Review button,
-    shown only while a task of the viewer's own needs them (Owner-approved
-    2026-10-26, design record companions-handoff-revamp-2026-10-26.md);
-    the launcher shows no count, dot or other status. The one other
-    thing the shell draws there is the listening indicator: one, at the
-    bottom corner of every page, Chat included, for exactly as long as
-    this device's wake word has the microphone open. It says it is
-    listening and carries a Turn off button; when the companion launcher
-    exists it is that launcher's listening state, shown even while the
-    launcher is turned off (Owner-approved 2026-10-27, design record
-    wake-word-ux-2026-10-27.md; his words: "should we combine the ear and
-    companion always on thing so we have 1 thing", answered "Launcher
-    shows listening").
+    everywhere, and is allowed beside it. The shell draws one ambient companion
+    at the top right of every app's header bar, Chat included (Owner-approved
+    2026-10-27, design record ambient-companion-2026-10-27.md; his words: "we
+    standardize the right pane as a component (nothing shows in the right unless
+    it uses this component) ... the selected companion is always in the upper
+    right"). It is the person's companion as a small avatar (about 32 to 36 px),
+    with that app's own header buttons to its left. Hover or keyboard focus opens
+    a compact preview with a quick ask; a click opens the standard right pane;
+    pin keeps it open, behaving like the chat column without a toggle button.
+    The right side of every app is that one pane component: its first tab is
+    always the companion; other tabs (details, sources, an artifact, compare,
+    whatever an app adds) appear when needed, are shown and selected
+    automatically when something opens, and the person can switch between them.
+    Nothing else draws to the right of an app's content. The avatar shows only
+    states the device is really in: a dim still ring while listening, a gentle
+    ring while thinking, a ring while speaking; it carries no count, dot or
+    badge, and the pane header says Ready only when the companion can answer.
+    A single Review button, shown only while a task of the viewer's own needs
+    them, may sit in the preview and the pane (Owner-approved 2026-10-26, design
+    record companions-handoff-revamp-2026-10-26.md). Chats held in the pane are
+    kept by the same one conversation store as Chat, marked as side chats, under
+    the same age, surface and parent-visibility rules as any chat. The person can
+    turn the ambient companion off in settings. While the wake word has the
+    microphone open on this device, the avatar's listening ring is the listening
+    indicator; when the ambient companion is turned off, the shell draws the
+    listening indicator alone, with its Turn off button, at the top right (the
+    wake-word record is wake-word-ux-2026-10-27.md). This supersedes the bottom
+    corner launcher and the companion dock of 2026-10-24 to 2026-10-27.
 S3. **A test holds the rail.** A test fails when the main navigation does
     not render on an app page: the rail at 640 and up, the menu button and
     its drawer below 640, with accessible names, at 360, 402, 874 x 402,
@@ -445,7 +455,7 @@ S6. **System status reaches the person through the existing mechanisms.**
     | Whole-system health | the Status page and the header pill and rail menu, `StatusPage.tsx`, `StatusIndicator.tsx` | `lib/statusApps.ts`, `lib/statusBoard.ts`, `/api/status` (the Stack's health list is synced by `lib/stackHealthSync.ts`) | the Status page everyone; the pill hidden from a child |
     | One job's progress | that job's own card (picture, video, download) | the job record | whoever started it |
     | A companion's summary of one person's jobs (Owner-approved 2026-10-24) | one line on that companion's Yours card, "1 working · 2 waiting on you", the kit Status Element as shipped | the same job records, the viewer's own rows only (rule 6a) | the person whose jobs they are |
-    | A companion's task needs the viewer (Owner-approved 2026-10-26) | one Review button on the outside-chat launcher, the kit Button as shipped; it opens that task's own card and shows no count or dot | the same job and Ask records, the viewer's own rows only (rule 6a), read from the data the launcher already has, with no new polling loop | the person whose task it is; when a parent answers a child's Ask, the child's button disappears and shows nothing in its place |
+    | A companion's task needs the viewer (Owner-approved 2026-10-26) | one Review button in the ambient companion's preview and pane (Owner-approved 2026-10-27), the kit Button as shipped; it opens that task's own card and shows no count or dot | the same job and Ask records, the viewer's own rows only (rule 6a), read from the data the launcher already has, with no new polling loop | the person whose task it is; when a parent answers a child's Ask, the child's button disappears and shows nothing in its place |
     | Needs an admin's attention, not a person's screen | Notifications: the bell, `NotificationBell.tsx`, `BrowserAlerts.tsx` | `lib/notifications.ts`, declared in `lib/notificationTypes.ts` | the audience the type declares |
     | A form or action failed | the kit destructive Alert in that form, with the next step | the failing call's own response, `lib/failureCopy.ts` | the person acting |
     | A spoken turn is not ready | the voice session's spoken line | the same readiness function as the written chat | the person speaking |
