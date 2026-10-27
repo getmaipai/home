@@ -103,6 +103,24 @@ Settings, AI and models shows what companion art uses. Verify ERNIE is installed
 - Open: no independent anime comparison of ERNIE, Z-Image and Klein; Qwen-Image-Edit-2511 licence conflicts between its card and the bakeoff note; LoRA training time on our hardware unmeasured.
 - Bench (COMPANIONS-ART-BENCH-01): 10 mascot prompts (5 animals, 3 anime humanoids, 2 robots) on Klein, ERNIE, Z-Image with no style prompt, a style prompt, and a style prompt plus LoRA; 3 edit views per character; 6 states by 5 characters by 3 seeds on Wan. Pass: 8 of 10 clean single characters, 80 percent same-character on edit views, palette and outline hold over the clip, loop seam under threshold, under 1 percent key fringe.
 
+## 8a. Appearance drafts and Publish (REVAMP-APPEARANCE-01, design 2026-10-27)
+
+Research of the code (2026-10-27) found: approving a state clip copies it into the live `animation/` folder and rewrites the live manifest `companion.animation` in the same request
+(`routes/companions.ts` approve route), unapprove and `clearStateApprovals` delete it, and nothing else writes the live folder. `states/<state>/<take>/` and `look/` are already the working store.
+So the draft is the existing store, the published copy is the existing `animation/` plus the manifest field, and no second store is added (principle 1).
+
+1. **Approve and unapprove touch the draft only.** They keep today's checks (take report present, quality `force`, idle first) and stop writing `animation/` and the manifest.
+2. **Publish** (`POST /api/companions/{id}/appearance/publish`, author or admin, same access as the states routes): requires the sheet approved and idle approved; builds the whole `animation` tree (rest.png, card.json, every approved state's h264/av1/still) in a sibling temp folder,
+   then swaps it in with renames and writes the manifest in the same step; any failure leaves the previous published animation untouched. It records which take each state published (`published` map and time on the states record).
+3. **Review needed** is computed, not stored: the draft differs from the published map (a different take, a newly approved or unapproved state, a changed portrait). The appearance read returns `has_changes`, per-state `assigned`, `published` and `changed`, and `reasons` when Publish is not possible.
+4. A change to the rest picture, card or key clears the draft approvals as today but leaves the live animation in place until the next Publish; the studio says "Changes stay in draft until published."
+5. **Safety, said plainly.** No per-asset safety verdict exists in the companion records today: look uploads and clip uploads are not screened, generation screens the prompt text only, and the post-render check is the open item VIDEO-GEN-12.
+   Approve was equally unchecked, so Publish adds no new exposure and enforces exactly the checks approve enforces. This slice builds no new asset screening and makes no safety claim beyond that; VIDEO-GEN-12 stays open and is not part of this work.
+   (Rule 10 fails closed for a check that exists and cannot run; there is none to fail here.) When VIDEO-GEN-12 lands, Publish is the one place that adds its verdict requirement.
+6. Reuse check (principle 6): the look store (CMEDIA-LOOK-01), the approval step (CMEDIA-STATES-03) and the sheet record are kept as they are; this slice absorbs CMEDIA-REVIEW-01 (the per-state review screen) and the editor part of CMEDIA-EDITOR-05.
+7. Tests that assumed approval is live (`routes/companions.test.ts`: state upload and approval, approval requires force and idle, sheet approve/unapprove and rest change) are rewritten to assert the draft/publish split; the avatar and animation-file tests keep working because the live manifest field and folder stay the published store.
+8. Studio UI follows `mockups/studio.png`: a state list with Assigned/Selected/Optional status, the stage with Test state and Upload clip, "1. Choose a start image" and "2. Animate your selection", a right rail with the character reference, clip checks drawn from the take's real quality report, and recent generation; the header carries "Publish appearance". Slices: 8a backend (this section), 8b the studio layout.
+
 ## 9. Build order and rows
 
 1. COMPANION-ART-MODEL-01 (Codex): section 7. First, small, fixes a real defect.
