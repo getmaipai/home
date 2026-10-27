@@ -45,7 +45,10 @@ function themeHex(variable: string): string {
 /** The palette when there is no art (or it cannot be read): the person's own theme colors, never a fixed color. */
 export function defaultPalette(): Palette {
   const primary = themeHex('--primary'), background = themeHex('--background'), foreground = themeHex('--foreground')
-  return { dominant: primary, vibrant: primary, dark: background, light: foreground, corners: [primary, primary, background, foreground], muted: true }
+  // `dark` is the primary pulled halfway to the background, so the base of a bar reads on a dark or light bar rather than vanishing into it.
+  const dark = hex(...mixRgb(hexToRgb(primary), hexToRgb(background), 0.5))
+  const vibrant = hex(...mixRgb(hexToRgb(primary), hexToRgb(foreground), 0.3))
+  return { dominant: primary, vibrant, dark, light: foreground, corners: [primary, vibrant, dark, foreground], muted: true }
 }
 
 const cache = new Map<string, Palette>()

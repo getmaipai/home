@@ -50,3 +50,19 @@ export function useProgress(el: HTMLMediaElement | null): number {
   }, [el]);
   return fraction;
 }
+
+/** Position and length of `el` in seconds, following its own events. */
+export function useMediaTime(el: HTMLMediaElement | null): { position: number; duration: number } {
+  const read = () => ({ position: el?.currentTime ?? 0, duration: el && Number.isFinite(el.duration) ? el.duration : 0 });
+  const [time, setTime] = useState(read);
+  useEffect(() => {
+    const sync = () => setTime(read());
+    if (!el) { sync(); return; }
+    const events = ["timeupdate", "durationchange", "loadedmetadata", "seeked", "emptied"] as const;
+    events.forEach((name) => el.addEventListener(name, sync));
+    sync();
+    return () => events.forEach((name) => el.removeEventListener(name, sync));
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- read only closes over el
+  }, [el]);
+  return time;
+}

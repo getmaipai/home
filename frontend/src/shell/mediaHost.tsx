@@ -5,7 +5,7 @@
 // leaving the watch page while a video plays keeps it playing: the media app's area shows it in the docked mini bar (the kit Player's
 // `mini` layout, placed by PackageAppPage), and any other app's area draws nothing while the sound carries on (RULES S2 and S6, design
 // note section 6). The element is registered with the shell's one audio session for as long as it is loaded.
-import { createContext, useContext, useEffect, useMemo, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
 import { Navigate, useLocation, useNavigate, useParams } from "react-router-dom";
 import { MediaHostContext, type MediaHost, type MediaItemRef } from "@maipai/ui/src/schema/mediaHost";
 import { api, request } from "@/lib/api";
@@ -27,6 +27,8 @@ export interface MediaDock {
   current: HoistedMedia | null;
   /** Stop and unload the item (the mini bar's Close). */
   clear(): void;
+  /** Play the next song of the music queue (the mini bar's Next); does nothing when there is none. */
+  next(): Promise<void>;
 }
 
 /** One element at a time: a new item replaces the old one (paused and unloaded first). Changes are published after the render
@@ -87,7 +89,7 @@ export function createMediaStore() {
   };
 }
 
-const MediaDockContext = createContext<MediaDock>({ current: null, clear: () => {} });
+const MediaDockContext = createContext<MediaDock>({ current: null, clear: () => {}, next: async () => {} });
 
 /** The item the host holds, for the media app's docked mini bar. */
 export function useMediaDock(): MediaDock {
@@ -127,31 +129,33 @@ export function MediaHostProvider({ children }: { children: ReactNode }) {
     [navigate, store, listener],
   );
   const current = useSyncExternalStore(store.subscribe, store.get, store.get);
+  // MEDIA-VIZ-03: the next song of the music queue, for the mini bar's Next and the Media Session's next track (and, when a song ends
+  // away from Now playing, the host keeps the same queue moving with it). Null when there is no queue or no next song.
+  const advance = useCallback(async () => {
+    const held = store.get();
+    if (!held || held.appId !== "music") return;
+    try {
+      type NextItem = { id: string; src: string; title: string; subtitle?: string; poster?: string; up_next?: { id: string } };
+      const item = await api.appData<NextItem | []>("music", "item", { id: held.id });
+      if (Array.isArray(item) || !item.up_next || store.get()?.id !== held.id) return;
+      const queued = await request<{ id: string }>("/api/plugins/music/queue", { method: "POST", body: JSON.stringify({ id: item.up_next.id }) });
+      const next = await api.appData<NextItem | []>("music", "item", { id: queued.id });
+      if (Array.isArray(next) || store.get()?.id !== held.id) return;
+      const { parkMedia } = await import("@maipai/ui/src/primitives/Player");
+      const el = store.elementFor({ id: next.id, src: next.src, kind: "audio", title: next.title, subtitle: next.subtitle, poster: next.poster }, "music");
+      parkMedia(el);
+      await el.play();
+    } catch {
+      // Keep the last item available for Play when a queue read or browser autoplay fails.
+    }
+  }, [store]);
   // The schema Player advances on Now playing. Away from that page, the host keeps the same queue moving.
   useEffect(() => {
     if (!current || current.appId !== "music") return;
-    let live = true;
-    const ended = async () => {
-      if (pathRef.current === "/apps/music/play") return;
-      try {
-        type NextItem = { id: string; src: string; title: string; subtitle?: string; poster?: string; up_next?: { id: string } };
-        const item = await api.appData<NextItem | []>("music", "item", { id: current.id });
-        if (Array.isArray(item) || !item.up_next || !live || store.get()?.id !== current.id) return;
-        const queued = await request<{ id: string }>("/api/plugins/music/queue", { method: "POST", body: JSON.stringify({ id: item.up_next.id }) });
-        const next = await api.appData<NextItem | []>("music", "item", { id: queued.id });
-        if (Array.isArray(next) || !live || store.get()?.id !== current.id) return;
-        const { parkMedia } = await import("@maipai/ui/src/primitives/Player");
-        if (!live) return;
-        const el = store.elementFor({ id: next.id, src: next.src, kind: "audio", title: next.title, subtitle: next.subtitle, poster: next.poster }, "music");
-        parkMedia(el);
-        await el.play();
-      } catch {
-        // Keep the last item available for Play when a queue read or browser autoplay fails.
-      }
-    };
+    const ended = () => { if (pathRef.current !== "/apps/music/play") void advance(); };
     current.el.addEventListener("ended", ended);
-    return () => { live = false; current.el.removeEventListener("ended", ended); };
-  }, [current, store]);
+    return () => current.el.removeEventListener("ended", ended);
+  }, [current, advance]);
   // MEDIA-KID-01: the daily media minutes pause the host's element (every media app, the mini bar, audio and video alike).
   // The words go through the shell's one toast (the kit ToastProvider in App.tsx, the same one the notification bell uses).
   const element = current?.el ?? null;
@@ -160,13 +164,13 @@ export function MediaHostProvider({ children }: { children: ReactNode }) {
     if (!element) return;
     return guardMediaBudget(element, { fetchBudget: () => api.mediaBudget(), notify: (line) => pushRef.current(line), every: intervalEvery(BUDGET_CHECK_MS), state: budgetState.current });
   }, [element]);
-  const dock = useMemo<MediaDock>(() => ({ current, clear: store.clear }), [current, store]);
+  const dock = useMemo<MediaDock>(() => ({ current, clear: store.clear, next: advance }), [current, store, advance]);
   // The element is unloaded when the person signs out or the shell goes away.
   useEffect(() => () => store.clear(), [store]);
   return (
     <MediaHostContext.Provider value={host}>
       <MediaDockContext.Provider value={dock}>
-        {current ? <MediaPlayerRegistration appId={current.appId} mediaId={current.id} element={current.el} /> : null}
+        {current ? <MediaPlayerRegistration appId={current.appId} mediaId={current.id} element={current.el} next={current.appId === "music" ? () => { void advance(); } : undefined} /> : null}
         {children}
       </MediaDockContext.Provider>
     </MediaHostContext.Provider>

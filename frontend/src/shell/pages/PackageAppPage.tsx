@@ -14,6 +14,7 @@ import { ApiError, api, type Roster } from "@/lib/api";
 import { NotFoundPage } from "@/shell/pages/NotFoundPage";
 import { useAppRows } from "@/shell/useAppCatalog";
 import { useTabItem } from "@/shell/tabIdentity";
+import { MinimizeButton } from "@/shell/media/MinimizeButton";
 import { MusicVisualizerSection } from "@/shell/media/MusicVisualizerSection";
 import { appHomeLabel, isMediaApp, isMediaPlayPage, usesFamilyHeader } from "@/shell/mediaApps";
 import { SectionSidebar } from "@maipai/ui/src/primitives/SectionSidebar";
@@ -226,7 +227,7 @@ export function PackageAppPage({ person }: { person: Roster }) {
   // topic, a source), never the app's own name, which the column already carries. A page whose body draws its own header (a story
   // feed or an article) keeps its title for assistive technology only, so the same words are not drawn twice.
   const content = (
-    <div className={cn("flex min-h-0 min-w-0 flex-1 flex-col", !readingStory && "gap-2", (sidebarProps || media) && !readingStory && "lg:p-4 lg:ps-6", (sidebarProps || media) && !sectionsBar && !readingStory && "py-4")} data-testid="package-app" data-package={packageId}>
+    <div className={cn("flex min-h-0 min-w-0 flex-1 flex-col", packageId === "music" && pageId === "play" && "relative z-10", !readingStory && "gap-2", (sidebarProps || media) && !readingStory && "lg:p-4 lg:ps-6", (sidebarProps || media) && !sectionsBar && !readingStory && "py-4")} data-testid="package-app" data-package={packageId}>
       {sectionsBar ? <PhoneNav variant="floating" label={`${app?.label ?? "App"} sections`} entries={sectionsBar.entries} more={sectionsBar.more} {...(sectionsBar.trailing ? { trailing: sectionsBar.trailing } : {})} /> : null}
       {app ? <AppToolbar inShellBar={inShellBar} sectionsInBar={sectionsBar !== null} hideSectionsOnWide={sidebar !== undefined} to={app.to} homeLabel={appHomeLabel(packageId, media)} sections={app.sections} current={pageId} familyHeader={familyHeader} /> : null}
       <AsyncState
@@ -239,6 +240,7 @@ export function PackageAppPage({ person }: { person: Roster }) {
       >
         {(shown) => { const doc = sectionsBar?.trailing && pageId !== "search" ? withoutSearchBox(shown) : shown; return (hasQuery && !sameQuery ? null : <>
           {packageId === "weather" && pageId === "index" ? null : <SchemaPage key={`${packageId}/${pageId}`} page={doc} packageId={packageId} hideTitle sidebar={sidebarProps !== null} floatingBar={sectionsBar !== null} />}
+          {media && packageId !== "music" && isMediaPlayPage(packageId, pageId) ? <div className="flex"><MinimizeButton appHome={`/apps/${packageId}`} /></div> : null}
           {packageId === "videos" && pageId === "watch" ? <VideoDetails id={new URLSearchParams(location.search).get("id") ?? String((location.state as { pageState?: { id?: string } } | null)?.pageState?.id ?? "")} /> : null}
           {packageId === "music" && pageId === "play" ? <MusicVisualizerSection id={new URLSearchParams(location.search).get("id") ?? String((location.state as { pageState?: { id?: string } } | null)?.pageState?.id ?? "")} /> : null}
           {packageId === "weather" && pageId === "index" ? <>

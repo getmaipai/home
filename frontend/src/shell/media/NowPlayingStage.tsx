@@ -97,7 +97,7 @@ export function NowPlayingStage({ media, onClose }: { media: HoistedMedia; onClo
           <div className="truncate text-2xl font-semibold md:text-4xl">{media.title}</div>
           {media.subtitle ? <div className="mt-1 truncate text-base text-muted-foreground md:text-xl">{media.subtitle}</div> : null}
         </div>
-        <div className="mx-auto flex w-full max-w-3xl items-center gap-3 text-xs tabular-nums text-muted-foreground">
+        <div className="mx-auto flex w-full max-w-3xl items-center gap-3 text-base tabular-nums text-muted-foreground">
           <span>{clock(position)}</span>
           <Slider aria-label="Seek" min={0} max={Math.max(duration, 1)} step={1} value={[Math.min(position, Math.max(duration, 1))]} disabled={duration <= 0} onValueChange={(value) => { const next = Array.isArray(value) ? value[0] : value; if (typeof next === "number") { el.currentTime = next; setPosition(next); } }} />
           <span>{clock(duration)}</span>

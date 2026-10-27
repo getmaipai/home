@@ -33,7 +33,7 @@ export function audioKindOfApp(appId: string): AudioKind {
   return "video";
 }
 
-export function MediaPlayerRegistration({ appId, mediaId, element }: { appId: string; mediaId: string | null; element: HTMLMediaElement | null }) {
+export function MediaPlayerRegistration({ appId, mediaId, element, next }: { appId: string; mediaId: string | null; element: HTMLMediaElement | null; next?: (() => void) | undefined }) {
   const item = useQuery({
     queryKey: ["media-registration", appId, mediaId],
     queryFn: async () => {
@@ -56,7 +56,7 @@ export function MediaPlayerRegistration({ appId, mediaId, element }: { appId: st
     }),
     [played, appId],
   );
-  useAudioRegistration(played ? element : null, { kind: audioKindOfApp(appId), item: audioItem });
+  useAudioRegistration(played ? element : null, { kind: audioKindOfApp(appId), item: audioItem, ...(next ? { next } : {}) });
   useEffect(() => {
     if (appId !== "books" || !element || !mediaId || !played || played.kind !== "chapter") return;
     const report = (reason: string) => { if (Number.isFinite(element.currentTime)) void api.mediaProgress(appId, { media_id: mediaId, position_s: element.currentTime, duration_s: Number.isFinite(element.duration) ? element.duration : played.duration_s ?? 0, reason }, reason === "unload").catch(() => {}); };

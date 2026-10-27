@@ -40,6 +40,25 @@ export function setVisualizerPref(v: VisualizerVariant): void {
   try { localStorage.setItem(PREF_KEY, v) } catch { /* storage unavailable: the choice lasts until reload */ }
   prefListeners.forEach((fn) => fn())
 }
+// MEDIA-VIZ-03: one app-wide on/off for the visualizer (the mini bar's strip, the Music page's backdrop), as the pre-rebuild hub's
+// "None" choice in its visualizer menu. On by default; the scene choice above is kept while it is off.
+const ENABLED_KEY = 'music.visualizer.enabled'
+export function getVisualizerEnabled(): boolean {
+  try { return localStorage.getItem(ENABLED_KEY) !== '0' } catch { return true }
+}
+export function setVisualizerEnabled(on: boolean): void {
+  try { localStorage.setItem(ENABLED_KEY, on ? '1' : '0') } catch { /* storage unavailable: the choice lasts until reload */ }
+  prefListeners.forEach((fn) => fn())
+}
+export function useVisualizerEnabled(): boolean {
+  const [on, setOn] = useState<boolean>(getVisualizerEnabled)
+  useEffect(() => {
+    const fn = () => setOn(getVisualizerEnabled())
+    prefListeners.add(fn)
+    return () => { prefListeners.delete(fn) }
+  }, [])
+  return on
+}
 export function useVisualizerPref(): VisualizerVariant {
   const [variant, setVariant] = useState<VisualizerVariant>(getVisualizerPref)
   useEffect(() => {

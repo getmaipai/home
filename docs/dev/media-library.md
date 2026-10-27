@@ -394,3 +394,18 @@ title, play and pause); tapping the title opens the play page.
 
 
 News Listen (NEWS-04) is a second user of this player, not a second player. The story page's `listen` action is a `play` with media id `story`; `MediaHostProvider.onPlay` hands the story id to `createStoryListener` (`frontend/src/shell/newsListen.ts`), which holds one audio element in the host store under app `news` and id `story:<id>`. It speaks the article's `speech[]` lines one at a time through `POST /api/tts`, fetches the next while one plays, and moves the held element with `store.retarget` so the bar's subtitle reads "Paragraph N of M" without a new element. `GlobalMiniPlayer` skips progress saving for it and Expand opens the story; the audio session registers it as `spoken_reply`. The bar clears when the story ends.
+
+### Mini player and Music page parity (MEDIA-VIZ-03)
+
+Reviewed against the pre-rebuild hub's `RadioMiniBar`, `YoutubeMiniBar`, `PodcastPlayerBar`, `NowPlayingOverlay` and `ImmersivePlayer`. Added, with the kit `Player` untouched:
+
+- **Mini bar** (`shell/GlobalMiniPlayer.tsx`): time and length with a seek slider, Next (the music queue, through the host's `next`, also the Media Session's next track),
+  a visualizer menu (None or a scene, one app-wide choice), the sleep timer (`shell/media/SleepMenu.tsx`, the audio session's own timer), Full screen visualizer for audio, Picture in
+  picture and Full screen for video, Close. The cover's colors wash the bar and the visualizer strip draws above the kit's `z-30` dock. A phone shows the kit's phone row only.
+- **Minimize** (`shell/media/MinimizeButton.tsx`): on Now playing, Watch and every media play page. It goes back inside the app (or to the app's home when the page was opened
+  directly) and the host keeps playing in the mini bar.
+- **Music play page** (`shell/media/MusicVisualizerSection.tsx`): the cover's colors, a soft blurred cover and the visualizer fill the whole page behind the content, with a row for
+  Minimize, the visualizer menu, the sleep timer, Repeat, volume and Full screen.
+- Still open, each a kit (`commons`) change or its own item: a seek bar and Previous inside the kit's bar itself, the video picture inside the bar (the kit's mini hides it), drag and
+  resize, Up next, lyrics, Ask and About on the stage, star rating and a format badge, the equalizer, Cast.
+
