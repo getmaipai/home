@@ -124,7 +124,8 @@ function wmoCode(value: unknown): number | null {
 
 const CARD_HOURS_MAX = 24;
 const CARD_DAYS_MAX = 8;
-const WEATHER_ATTRIBUTION = "Weather data by Open-Meteo.com (CC BY 4.0)";
+// The card draws no attribution line (owner, 2026-10-28); the data source still names its credit in the package manifest.
+const WEATHER_ATTRIBUTION = "";
 
 /** The one `weather_card` block: the current reading, up to 24 hours and 1 to 8
  * days, all from the response the recipe already fetched. Returns null when
@@ -285,7 +286,7 @@ export function blocksForRecipeRun(
     case "list-view":
       return allowed.includes("todo_list") ? todoList(manifest.id, provenance, capture.listItems ?? []) : [];
     case "weather":
-      return weatherBlocks(manifest.id, provenance, result.data, manifest.data_sources?.[0]?.attribution, allowed.includes("weather_card")).filter((block) => allowed.includes(String(block.kind)));
+      return weatherBlocks(manifest.id, provenance, result.data, undefined, allowed.includes("weather_card")).filter((block) => allowed.includes(String(block.kind)));
     default:
       return [];
   }

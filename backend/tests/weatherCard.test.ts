@@ -23,7 +23,7 @@ const CardProps = z.object({
   hourly: z.array(z.object({ time: z.string().min(1), temp: z.number(), pop: Pop }).strict()).max(24).optional(),
   daily: z.array(z.object({ date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/), high: z.number(), low: z.number(), code: z.number().int(), pop: Pop }).strict()).min(1).max(8),
   advice: z.array(z.object({ id: z.string().min(1), label: z.string().min(1).max(24), icon: z.string().optional() }).strict()).max(12).optional(),
-  attribution: z.string().min(1),
+  attribution: z.string(),
 }).strict();
 
 const FORECAST_URL = "https://api.open-meteo.com/v1/forecast?latitude=47.6&longitude=-122.3&current=temperature_2m,weather_code,is_day,apparent_temperature,relative_humidity_2m,precipitation,wind_speed_10m,wind_direction_10m,pressure_msl,visibility&hourly=temperature_2m,precipitation_probability&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max,sunrise,sunset,uv_index_max&forecast_days=10&forecast_hours=24&timezone=auto&temperature_unit=fahrenheit";
@@ -148,5 +148,12 @@ describe("WEATHER-CARD-01: weather_card from the recipe's one forecast response"
     const broken = { ...(result as any), data: { ...(result as any).data, block_day_codes: ["x"] } };
     // No valid day row: no card, so the sheet, chart and table (no codes needed) stand in.
     expect((blocksForRecipeRun(manifest, broken, {}) as { kind: string }[]).map((b) => b.kind)).toEqual(["spec_sheet", "chart", "data_table"]);
+  });
+});
+
+describe("WEATHER card attribution line", () => {
+  test("the card carries no attribution text unless one is passed in", () => {
+    const card = weatherCard("weather", "p", { place: "X", temperature: 50, conditions: "clear", unit: "fahrenheit", block_code: 0, block_is_day: 1, block_day_dates: ["2026-10-28"], block_day_highs: [60], block_day_lows: [40], block_day_codes: [1] });
+    expect((card!.props as { attribution: string }).attribution).toBe("");
   });
 });

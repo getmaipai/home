@@ -152,13 +152,14 @@ export function PackageAppPage({ person }: { person: Roster }) {
     enabled: packageId === "weather" && pageId === "index",
     queryFn: async () => {
       const data = await api.appData<{ blocks?: Array<{ props?: Record<string, unknown> }>; details?: Record<string, unknown> }>("weather", "forecast", { place: place.id });
-      return { location: weatherLocation(place, { ...(data.blocks?.[0]?.props ?? {}), details: data.details }), advice: weatherChips(data.details?.advice) };
+      return { location: weatherLocation(place, { ...(data.blocks?.[0]?.props ?? {}), details: data.details }), advice: weatherChips(data.details?.advice), summary: typeof data.details?.summary === "string" ? data.details.summary : undefined };
     },
   })) });
   const weatherSearchQuery = useQuery({ queryKey: ["weather-search", weatherSearch], queryFn: () => api.searchPlaces(weatherSearch), enabled: packageId === "weather" && pageId === "index" && weatherSearch.trim().length > 1 });
   const weatherLocations = dedupeLocations(weatherVisiblePlaces.map((place, index) => weatherForecasts[index]?.data?.location ?? weatherLocation(place, {})).filter((place) => place.detail));
   const weatherSelectedPlace = weatherLocations.find((place) => place.id === weatherSelectedId) ?? weatherLocations[0];
-  const weatherSelectedAdvice = weatherForecasts.find((query) => query.data?.location.id === weatherSelectedPlace?.id)?.data?.advice;
+  const weatherSelectedForecast = weatherForecasts.find((query) => query.data?.location.id === weatherSelectedPlace?.id)?.data;
+  const weatherSelectedAdvice = weatherSelectedForecast?.advice;
   const rows = useAppRows();
   const app = rows?.find((row) => row.package === packageId);
   useTabItem(app?.label ?? "Apps");
@@ -278,7 +279,7 @@ export function PackageAppPage({ person }: { person: Roster }) {
                 await queryClient.invalidateQueries({ queryKey: ["weather-place-entities", person.id] });
                 setWeatherMessage(`${location?.city ?? "Place"} removed from your list.`);
               }).catch((error: unknown) => setWeatherMessage(error instanceof Error ? error.message : "Could not remove this place."));
-            }} locale={navigator.language} unit={weatherUnit === "celsius" ? "C" : "F"} advice={weatherSelectedAdvice} />
+            }} locale={navigator.language} unit={weatherUnit === "celsius" ? "C" : "F"} advice={weatherSelectedAdvice} summary={weatherSelectedForecast?.summary} />
           </> : null}
         </>); }}
       </AsyncState>
