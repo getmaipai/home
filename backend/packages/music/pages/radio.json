@@ -37,6 +37,11 @@
         "type": "empty_state",
         "icon": "headphones",
         "text": "No stations yet. A parent can save stations for you, or find some in Find stations."
+      },
+      "on_select": {
+        "play": {
+          "media_id": "{id}"
+        }
       }
     }
   ]

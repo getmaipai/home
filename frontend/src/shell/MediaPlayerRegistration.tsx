@@ -33,7 +33,7 @@ export function audioKindOfApp(appId: string): AudioKind {
   return "video";
 }
 
-export function MediaPlayerRegistration({ appId, mediaId, element, next }: { appId: string; mediaId: string | null; element: HTMLMediaElement | null; next?: (() => void) | undefined }) {
+export function MediaPlayerRegistration({ appId, mediaId, element, next, liveSubtitle }: { appId: string; mediaId: string | null; element: HTMLMediaElement | null; next?: (() => void) | undefined; liveSubtitle?: string }) {
   const item = useQuery({
     queryKey: ["media-registration", appId, mediaId],
     queryFn: async () => {
@@ -50,11 +50,12 @@ export function MediaPlayerRegistration({ appId, mediaId, element, next }: { app
   const audioItem = useMemo<AudioItem>(
     () => ({
       title: played?.title ?? (appId === "podcasts" ? "Episode" : appId === "music" ? "Song" : "Video"),
-      ...(played?.channel ? { artist: played.channel } : {}),
+      // A live station: the Media Session shows the station as the title and what is on now as the artist line.
+      ...(liveSubtitle !== undefined ? (liveSubtitle ? { artist: liveSubtitle } : {}) : played?.channel ? { artist: played.channel } : {}),
       ...(played?.poster ? { artworkUrl: played.poster } : {}),
       ...(played ? { chapters: chaptersWithEnds(played.chapters ?? [], played.duration_s) } : {}),
     }),
-    [played, appId],
+    [played, appId, liveSubtitle],
   );
   useAudioRegistration(played ? element : null, { kind: audioKindOfApp(appId), item: audioItem, ...(next ? { next } : {}) });
   useEffect(() => {

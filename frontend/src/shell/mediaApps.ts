@@ -12,6 +12,7 @@ export const MEDIA_APP_FOR_KIND: Readonly<Record<string, MediaAppTarget>> = {
   episode: { app: "shows", page: "watch" },
   film: { app: "shows", page: "watch" },
   track: { app: "music", page: "play" },
+  station: { app: "music", page: "station" },
   podcast_episode: { app: "podcasts", page: "play" },
   book: { app: "books", page: "read" },
   audiobook: { app: "books", page: "listen" },
@@ -46,7 +47,7 @@ export function playPageOf(app: string): string | null {
 }
 
 export function isMediaPlayPage(app: string, page: string): boolean {
-  return page === playPageOf(app) || (app === "books" && page === "read");
+  return page === playPageOf(app) || (app === "books" && page === "read") || Object.values(MEDIA_APP_FOR_KIND).some((target) => target.app === app && target.page === page);
 }
 
 /** The first tab of a media app: "Home" for Videos and Shows, "Listen now" for the audio apps (Apple's and Spotify's word), "Reading now" for Books. */

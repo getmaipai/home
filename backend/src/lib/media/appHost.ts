@@ -14,6 +14,8 @@ import { z } from "zod";
 import { itemDetail } from "./items";
 import type { MediaBudget } from "./watchTime";
 import { listLibrary } from "@/lib/library";
+import { stationItemView } from "./radio";
+import { nowPlayingOf } from "./radioStream";
 import { liveSourceById, noDiscovery, readableItem, sourceVisibleTo } from "./access";
 import { allowedBandsFor, bandAllows, mediaBandOf, trips } from "./band";
 import { addItem, createCollection, removeItemFrom, resolveCollection, listCollections, setItems, setPointer } from "./collections";
@@ -601,6 +603,10 @@ function mediaAppDataRaw(person: PersonRow, appId: MediaAppId, dataId: string, p
       return rowsOf(person, upNextItems(person, appId, item, limit));
     }
     case "item": {
+      if (params.id && appId === "music") {
+        const station = stationItemView(person, params.id, nowPlayingOf(params.id));
+        if (station) return station as never;
+      }
       if (params.id && (appId === "music" || appId === "videos")) {
         const file = madeFileFor(person, appId, params.id);
         if (file) return madeFileItemView(file, appId);

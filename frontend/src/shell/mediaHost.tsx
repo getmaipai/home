@@ -15,6 +15,7 @@ import { useToast } from "@maipai/ui/src/primitives/Toast";
 import { BUDGET_CHECK_MS, guardMediaBudget, intervalEvery } from "@/shell/mediaBudgetGuard";
 import { NotFoundPage } from "@/shell/pages/NotFoundPage";
 import { createStoryListener } from "@/shell/newsListen";
+import { fetchNowPlaying, liveStationIdOf, NOW_FIRST_MS, NOW_POLL_MS, rejoinLiveOnResume } from "@/shell/radioLive";
 
 /** The item loaded in the host's element: what it is, which app played it, and whether the person has started it. */
 export interface HoistedMedia extends MediaItemRef {
@@ -51,8 +52,10 @@ export function createMediaStore() {
     },
     elementFor(ref: MediaItemRef, appId: string): HTMLMediaElement {
       if (current && current.id === ref.id && current.src === ref.src && current.appId === appId) {
-        if (current.title !== ref.title || current.subtitle !== ref.subtitle || current.poster !== ref.poster) {
-          current = { ...current, title: ref.title, subtitle: ref.subtitle, poster: ref.poster };
+        // A live station's subtitle is the song the hub last reported; the page's own copy (fetched earlier) must not put it back.
+        const subtitle = liveStationIdOf(current.src) !== null && current.subtitle ? current.subtitle : ref.subtitle;
+        if (current.title !== ref.title || current.subtitle !== subtitle || current.poster !== ref.poster) {
+          current = { ...current, title: ref.title, subtitle, poster: ref.poster };
           notify();
         }
         return current.el;
@@ -73,6 +76,12 @@ export function createMediaStore() {
       notify();
       return el;
     },
+    /** RADIO-03: the song a live station reports replaces the bar's subtitle (the element and the source stay as they are). */
+    setSubtitle(el: HTMLMediaElement, subtitle: string) {
+      if (!current || current.el !== el || current.subtitle === subtitle) return;
+      current = { ...current, subtitle };
+      notify();
+    },
     /** Point the held element at the next piece of the same item (Listen reads a story paragraph by paragraph) without a new element. */
     retarget(el: HTMLMediaElement, patch: { src: string; subtitle?: string }) {
       if (!current || current.el !== el) return;
@@ -89,7 +98,7 @@ export function createMediaStore() {
   };
 }
 
-const MediaDockContext = createContext<MediaDock>({ current: null, clear: () => {}, next: async () => {} });
+export const MediaDockContext = createContext<MediaDock>({ current: null, clear: () => {}, next: async () => {} });
 
 /** The item the host holds, for the media app's docked mini bar. */
 export function useMediaDock(): MediaDock {
@@ -164,13 +173,33 @@ export function MediaHostProvider({ children }: { children: ReactNode }) {
     if (!element) return;
     return guardMediaBudget(element, { fetchBudget: () => api.mediaBudget(), notify: (line) => pushRef.current(line), every: intervalEvery(BUDGET_CHECK_MS), state: budgetState.current });
   }, [element]);
+  // RADIO-03: a live station. Pause then Play loads the stream again (the live edge, not a stale buffer); the song the station reports is
+  // read from the hub a few seconds after sound starts and then every 15 s, only while it plays and this tab is visible.
+  const liveId = current ? liveStationIdOf(current.src) : null;
+  useEffect(() => {
+    if (!element || liveId === null) return;
+    const stopRejoin = rejoinLiveOnResume(element);
+    let first: ReturnType<typeof setTimeout> | null = null;
+    let busy = false;
+    const look = async () => {
+      if (busy || element.paused || document.visibilityState !== "visible") return;
+      busy = true;
+      const title = await fetchNowPlaying(liveId);
+      busy = false;
+      if (title !== null && store.get()?.el === element) store.setSubtitle(element, title);
+    };
+    const onPlaying = () => { if (first) clearTimeout(first); first = setTimeout(() => void look(), NOW_FIRST_MS); };
+    element.addEventListener("playing", onPlaying);
+    const every = setInterval(() => void look(), NOW_POLL_MS);
+    return () => { stopRejoin(); element.removeEventListener("playing", onPlaying); clearInterval(every); if (first) clearTimeout(first); };
+  }, [element, liveId, store]);
   const dock = useMemo<MediaDock>(() => ({ current, clear: store.clear, next: advance }), [current, store, advance]);
   // The element is unloaded when the person signs out or the shell goes away.
   useEffect(() => () => store.clear(), [store]);
   return (
     <MediaHostContext.Provider value={host}>
       <MediaDockContext.Provider value={dock}>
-        {current ? <MediaPlayerRegistration appId={current.appId} mediaId={current.id} element={current.el} next={current.appId === "music" ? () => { void advance(); } : undefined} /> : null}
+        {current ? <MediaPlayerRegistration appId={current.appId} mediaId={current.id} element={current.el} {...(liveId !== null ? { liveSubtitle: current.subtitle ?? "" } : {})} next={current.appId === "music" ? () => { void advance(); } : undefined} /> : null}
         {children}
       </MediaDockContext.Provider>
     </MediaHostContext.Provider>
