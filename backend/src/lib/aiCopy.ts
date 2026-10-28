@@ -44,5 +44,7 @@ export const aiCopy: AiCopy = {
   },
 };
 
-/** The sentence under an added chat model's name. Until the spec holds this copy (a commons tag), it is written here, once. */
-export const ADDED_CHAT_DESCRIPTION = "Not tested by MaiPai. An admin added it from a link; MaiPai checked its file but has not measured it.";
+/** The sentence under an added chat model's name, from the AI card's copy in the spec. */
+const glanceCard = (areasFile.areas as unknown as Array<{ sections: Array<{ cards?: Array<{ view?: string; copy?: Record<string, string> }> }> }>)
+  .flatMap((area) => area.sections).flatMap((section) => section.cards ?? []).find((card) => card.view === "ai.glance");
+export const ADDED_CHAT_DESCRIPTION = glanceCard?.copy?.added_description ?? "";

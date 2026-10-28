@@ -3,6 +3,11 @@ import { afterEach, expect, test } from "bun:test";
 import { cleanup, fireEvent, waitFor } from "@testing-library/react";
 import { renderWithQueryClient } from "../../../tests/renderWithQueryClient";
 import { AddChatModel } from "@/apps/settings/AddChatModel";
+import areasFile from "@maipai/spec/settings/areas.json";
+
+// The words are the spec's: the same card copy the page hands the panel.
+const copy = (areasFile.areas as unknown as Array<{ sections: Array<{ cards?: Array<{ view?: string; copy?: Record<string, string> }> }> }>)
+  .flatMap((area) => area.sections).flatMap((section) => section.cards ?? []).find((card) => card.view === "ai.glance")?.copy ?? {};
 
 const realFetch = globalThis.fetch;
 afterEach(() => { cleanup(); globalThis.fetch = realFetch; });
@@ -19,7 +24,7 @@ test("reading a link shows name, licence and the untested label; Download and us
     if (path.endsWith("/api/ai/models/add")) return Promise.resolve(Response.json({ ok: true, id: "added-tiny", label: "Tiny-7B", jobs: [] }));
     return Promise.resolve(Response.json({}));
   }) as typeof fetch;
-  const view = renderWithQueryClient(<AddChatModel copy={{}} onAdded={() => { added += 1; }} />);
+  const view = renderWithQueryClient(<AddChatModel copy={copy} onAdded={() => { added += 1; }} />);
   fireEvent.change(view.getByRole("textbox"), { target: { value: "https://huggingface.co/owner/Tiny-7B-GGUF" } });
   fireEvent.click(view.getByRole("button", { name: "Read the link" }));
   const card = await view.findByTestId("ai-add-model-found");
@@ -33,7 +38,7 @@ test("reading a link shows name, licence and the untested label; Download and us
 
 test("a refusal shows its sentence", async () => {
   globalThis.fetch = ((_input: RequestInfo | URL) => Promise.resolve(Response.json({ error: "That repository needs a licence agreement. Pick another.", code: "add_model" }, { status: 400 }))) as typeof fetch;
-  const view = renderWithQueryClient(<AddChatModel copy={{}} />);
+  const view = renderWithQueryClient(<AddChatModel copy={copy} />);
   fireEvent.change(view.getByRole("textbox"), { target: { value: "owner/gated" } });
   fireEvent.click(view.getByRole("button", { name: "Read the link" }));
   expect(await view.findByText("That repository needs a licence agreement. Pick another.")).toBeTruthy();

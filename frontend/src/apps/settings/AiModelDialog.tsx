@@ -42,7 +42,7 @@ export function AiModelChoices({ row, copy, onClose, onSave, onAdded }: AiModelC
                     <FieldTitle>
                       {option.label}
                       {option.recommended ? <Badge tone="success">{copy.recommended}</Badge> : null}
-                      {option.id.startsWith("chat.added.") ? <Badge variant="outline" tone="warning">{copy.not_tested ?? "Not tested by MaiPai"}</Badge> : null}
+                      {option.id.startsWith("chat.added.") ? <Badge variant="outline" tone="warning">{copy.not_tested}</Badge> : null}
                       {option.id === "chat.uncensored" ? <Badge variant="outline" tone="warning">Uncensored</Badge> : null}
                     </FieldTitle>
                     <FieldDescription>{option.description}</FieldDescription>

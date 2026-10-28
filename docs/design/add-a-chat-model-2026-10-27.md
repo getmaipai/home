@@ -132,5 +132,4 @@ beyond what the Stack already loads.
   `startChatModelChoice`, which pins from the model's own record; no `engines.chat.choice` model id is written, and no new setting key exists.
 - The add panel sits in the Chat row's "Choose a model" dialog: paste, read (`POST /api/ai/models/inspect`, nothing downloads), confirm
   (`POST /api/ai/models/add`). Both routes are owner and admin only.
-- The panel's words and the "Not tested by MaiPai" sentence are defaults in the frontend and `ADDED_CHAT_DESCRIPTION` in `aiCopy.ts`, not yet in
-  the spec: moving them there needs a commons tag, which waits for Jesse's yes.
+- The panel's words and the "Not tested by MaiPai" sentence are in the spec (`spec-v0.1.255`, the AI and models card's `copy`); Home holds none of them.
