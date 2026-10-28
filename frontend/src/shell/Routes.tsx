@@ -259,7 +259,7 @@ function RoutesWithIncognito({ person, onPersonChange, onSignedOut }: { person: 
     if (coarse && wakeIndicator) { setPreviewOpen((value) => !value); return; }
     updatePaneState({ ...paneState, open: true });
   }}>
-    {ambient.clips ? <CompanionAvatar name={ambient.companion.name} clips={ambient.portrait ? { idle: { still: ambient.portrait, loop: true } } as never : ambient.clips} size="xs" animated={false} ring={effectiveRing} /> : ambient.still ? <Avatar><AvatarImage src={ambient.still} alt="" /></Avatar> : <SeededAvatar name={ambient.companion.name} seed={ambient.companion.id} />}
+    {ambient.clips ? <CompanionAvatar name={ambient.companion.name} clips={ambient.portrait ? { idle: { still: ambient.portrait, loop: true } } as never : ambient.clips} size="header" animated={false} ring={effectiveRing} /> : ambient.still ? <Avatar><AvatarImage src={ambient.still} alt="" /></Avatar> : <SeededAvatar name={ambient.companion.name} seed={ambient.companion.id} />}
   </button> : null;
   const ambientTopRight = ambient ? <CompanionPreview
     name={ambient.companion.name}
@@ -278,7 +278,7 @@ function RoutesWithIncognito({ person, onPersonChange, onSignedOut }: { person: 
     onOpenChange={setPreviewOpen}
   /> : undefined;
   const ambientAvatar = ambient ? <button type="button" aria-label={ambient.companion.name} onClick={() => { updatePaneState({ ...paneState, open: true }); }}>
-    {ambient.clips ? <CompanionAvatar name={ambient.companion.name} clips={ambient.portrait ? { idle: { still: ambient.portrait, loop: true } } as never : ambient.clips} size="xs" animated={false} ring={effectiveRing} /> : ambient.still ? <Avatar><AvatarImage src={ambient.still} alt="" /></Avatar> : <SeededAvatar name={ambient.companion.name} seed={ambient.companion.id} />}
+    {ambient.clips ? <CompanionAvatar name={ambient.companion.name} clips={ambient.portrait ? { idle: { still: ambient.portrait, loop: true } } as never : ambient.clips} size="header" animated={false} ring={effectiveRing} /> : ambient.still ? <Avatar><AvatarImage src={ambient.still} alt="" /></Avatar> : <SeededAvatar name={ambient.companion.name} seed={ambient.companion.id} />}
   </button> : null;
   const ambientPaneProps = useAmbientCompanionPane({
     person, companionName: ambient?.companion.name ?? "Companion", companionId: ambient?.companion.id ?? "",
