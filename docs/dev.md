@@ -37747,3 +37747,5 @@ whose `.git` is a directory) rather than a worktree or `/usr/local/maipai-home`.
 stays up stops the release with a sentence naming the folder, and nothing is killed harder. It prints one line saying what it stopped and
 that `bun start` in that folder brings it back. Tests: `scripts/stopDevHome.test.ts`. Run servers from your own worktree, never from the
 main checkout.
+
+**NEWS-DEDUPE-01 (2026-10-27): near-duplicate stories collapse on a mixed News page.** Verdict: rebuild as a cheap local rule, not a model call. `backend/src/lib/news/nearDuplicates.ts` merges items published within 24 hours that share a topic and at least 3 content words with a Jaccard of 0.5 or more; the card with a picture, then more outlets, then the newest stays. A topic page does not collapse, so every outlet's story stays reachable there. No network or model call is added to feed assembly.

@@ -22,6 +22,7 @@ import type { PersonRow } from "@/types";
 import { articleBlock, stableBlockId } from "./article";
 import { cardEnv, cardOf, enrichLeadCards, hostOf, itemIdFrom, pictureAlt, publishedAtOf, storyIdOf, topicsShown, type CardEnv, type StoryCard, type Viewer } from "./cards";
 import { rankStories, type RankInput } from "./rankStories";
+import { collapseNearDuplicates } from "./nearDuplicates";
 import { followedChannels, isFollowing, listSaves, recomputeMix, recordRead } from "./records";
 import { TOPICS, topicById, topicOfferedTo, topicsFor } from "./topics";
 import { bumpNewsCounter } from "./newsCounters";
@@ -135,6 +136,11 @@ function feedBlock(env: CardEnv, request: FeedRequest, now: Date): unknown[] {
     ? [{ id: "", label: "All", selected: topic === "" }, ...topicsFor(band).filter((entry) => present.has(entry.id) || entry.id === topic).slice(0, FILTERS_MAX).map((entry) => ({ id: entry.id, label: entry.label, selected: topic === entry.id }))]
     : undefined;
   if (topic) for (const [id, card] of cards) if (!card.topics.includes(topic)) cards.delete(id);
+  // One event, one card on a mixed page; a topic page lists every outlet's story (NEWS-DEDUPE-01).
+  if (!topic && cards.size > 1) {
+    const kept = collapseNearDuplicates([...cards.values()].map((card) => ({ item_id: card.item_id, title: card.title, topics: card.topics, published_at: card.published_at, outlets: card.outlets, has_image: card.image !== undefined })));
+    for (const id of [...cards.keys()]) if (!kept.has(id)) cards.delete(id);
+  }
   const ranked = cards.size === 0 ? { hero: undefined, featured: [], rest: [] } : rankStories({ stories: [...cards.values()].map((card) => rankInputOf(byItem.get(card.item_id)!, card)), now, followed: request.followed, mode: request.signal ? "mix" : "today", signal: request.signal });
   const cardFor = (input: RankInput): StoryCard => cards.get(input.item_id)!;
   const hero = ranked.hero ? withKicker(cardFor(ranked.hero), band, true) : undefined;

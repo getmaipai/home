@@ -525,6 +525,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/news/focal.ts` | __setNewsFocalForTests, focalCentre, focalPointOf |
 | `backend/src/lib/news/hostBackoff.ts` | NEWS_HOST_BACKOFF_MS, newsHostQuiet, quietNewsHost, __resetNewsHostBackoffForTests |
 | `backend/src/lib/news/mixAffinity.ts` | computeAffinity |
+| `backend/src/lib/news/nearDuplicates.ts` | DUPLICATE_WINDOW_H, SHARED_MIN, JACCARD_MIN, titleTokens, collapseNearDuplicates |
 | `backend/src/lib/news/newsCounters.ts` | NEWS_COUNTER_NAMES, bumpNewsCounter, newsCounters, __resetNewsCountersForTests |
 | `backend/src/lib/news/pictureFallback.ts` | pngFromIco, publisherIconPicture |
 | `backend/src/lib/news/pictures.ts` | NEWS_PICTURE_WIDTHS, newsPictureDir, pictureRefOf, figureRefOf, newsPictureFocal, newsImagesOn |
