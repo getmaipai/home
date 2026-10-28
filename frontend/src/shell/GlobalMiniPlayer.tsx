@@ -11,6 +11,7 @@ import { getIcon } from "@maipai/ui/src/icons";
 import { api } from "@/lib/api";
 import { isMediaPlayPage, mediaAppOfPath, playPageOf } from "@/shell/mediaApps";
 import { storyIdOfListen } from "@/shell/newsListen";
+import { liveStationIdOf } from "@/shell/radioLive";
 import { useMediaDock, type HoistedMedia } from "@/shell/mediaHost";
 import { AudioVisualizer, useVisualizerEnabled, useVisualizerPref } from "@/shell/media/AudioVisualizer";
 import { NowPlayingStage } from "@/shell/media/NowPlayingStage";
@@ -73,7 +74,9 @@ export function GlobalMiniPlayer() {
   // News Listen (NEWS-04) holds a story being read aloud: expanding opens the story, and its place is not a media position to save.
   const listenStory = storyIdOfListen(held.appId, held.id);
   const listening = listenStory !== null;
-  const openPlayPage = () => navigate(listening ? `/apps/news/story?id=${encodeURIComponent(listenStory!)}` : `/apps/${held.appId}/${playPageOf(held.appId)}?id=${encodeURIComponent(held.id)}`, listening ? undefined : { state: { pageState: { id: held.id } } });
+  // RADIO-03: a station has no length and no saved place; its page is the station page, and the bar shows the kit's Live badge with no seek.
+  const live = liveStationIdOf(held.src) !== null;
+  const openPlayPage = () => navigate(listening ? `/apps/news/story?id=${encodeURIComponent(listenStory!)}` : `/apps/${held.appId}/${live ? "station" : playPageOf(held.appId)}?id=${encodeURIComponent(held.id)}`, listening ? undefined : { state: { pageState: { id: held.id } } });
 
   return (
     <div data-slot="global-mini-player" data-testid="global-mini-player" className="pointer-events-none fixed inset-x-0 bottom-0 z-40 md:start-14 print:hidden">
@@ -88,15 +91,16 @@ export function GlobalMiniPlayer() {
           title={held.title}
           subtitle={held.subtitle}
           poster={held.poster}
+          live={live}
           mediaSession={false}
           onExpand={openPlayPage}
-          {...(held.appId === "music" ? { onNext: () => { void dock.next(); } } : {})}
-          onProgress={listening ? undefined : (p) => {
+          {...(held.appId === "music" && !live ? { onNext: () => { void dock.next(); } } : {})}
+          onProgress={listening || live ? undefined : (p) => {
             api.mediaProgress(held.appId, { media_id: held.id, position_s: p.position_s, duration_s: p.duration_s, reason: p.reason }, p.reason === "unload").catch(() => {});
           }}
           actionsSlot={
             <>
-              {duration > 0 ? (
+              {!live && duration > 0 && Number.isFinite(duration) ? (
                 <span className="flex items-center gap-2 pe-2 text-base tabular-nums text-muted-foreground" data-testid="mini-time">
                   <span>{clock(position)}</span>
                   <div className="w-28 lg:w-40">

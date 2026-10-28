@@ -1,0 +1,25 @@
+{
+  "type": "page",
+  "id": "station",
+  "title": "Now playing",
+  "body": [
+    {
+      "type": "player",
+      "bind": {
+        "source": "package",
+        "path": "item",
+        "params": {
+          "id": "$state.id"
+        }
+      },
+      "kind": "audio",
+      "details": false,
+      "layout": "audio",
+      "empty_state": {
+        "type": "empty_state",
+        "icon": "headphones",
+        "text": "This station is not in your list. Go back to Radio and pick one."
+      }
+    }
+  ]
+}

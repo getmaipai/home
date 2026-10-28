@@ -45,3 +45,13 @@ The owner's request of 2026-10-27 permits Music to read the public Radio Browser
 | RADIO-02 | Popular stations, or a search by name, country code or genre | None | A burst of five, then one every three seconds across the household | Search words capped at 80 characters, 30 results | A mirror that refuses is skipped; all three refusing pauses the directory for one hour |
 
 The privacy table lists this traffic as `platform:radio-directory` only while the switch is on. Each station's own stream host is a separate outbound call made at play time (RADIO-03).
+
+## RADIO-03: playing a saved station
+
+Pressing Play on a saved station makes the hub open that station's own address and pass the audio to the person's browser from the hub's own address (the page may load media from itself only). It needs no household switch: the person's saved list decides what plays, and a child plays only what a parent saved. Only a person's own Play makes the request; the hub never connects in the background and sends no listen report.
+
+| Backlog row | Request | Lifetime limit | Pace | Site limit | Stop rule |
+|---|---|---|---|---|---|
+| RADIO-03 | One GET of the station's stream address, asking for in-band song titles (`Icy-MetaData: 1`); no cookies, no referrer | None | A burst of six per station host, then one every five seconds (a Pause then Play connects again) | One station per person (a new Play replaces it), four at once in the home; at most four redirects, each one re-checked against the address guard; audio content types only; HLS is refused until RADIO-06 | The hub closes the station's connection when the listener leaves, pauses or switches; no answer in 10 seconds is an error the person sees |
+
+The song title the station sends stays in the hub's memory while the stream is open and is never stored or logged. This traffic is the same destination the person saved the station for; it is not listed as a platform connection because the person chose the address.

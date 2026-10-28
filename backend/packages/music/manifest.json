@@ -1,6 +1,6 @@
 {
   "id": "music",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "kind": "plugin",
   "category": "Media",
   "display": "Music",
@@ -183,6 +183,14 @@
         "nav": false,
         "kind": "schema",
         "module": "play"
+      },
+      {
+        "id": "station",
+        "label": "Station",
+        "icon": "headphones",
+        "nav": false,
+        "kind": "schema",
+        "module": "station"
       }
     ],
     "data": [

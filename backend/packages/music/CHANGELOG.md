@@ -2,6 +2,13 @@
 
 All notable changes to the Music package, in [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) format.
 
+## [0.3.1] - 2026-10-28
+
+### Added
+
+- Play a saved station from Radio. It plays in the one mini player with a Live badge and no seek, shows the song the station is
+  sending when it sends one, and starts at the live edge again after Pause. HLS stations still say they are not supported yet.
+
 ## [0.3.0] - 2026-10-28
 
 ### Added

@@ -65,6 +65,20 @@ export function listSavedStations(actor: PersonRow): SavedStation[] {
     .sort((a, b) => a.name.localeCompare(b.name));
 }
 
+/** One saved station the person may play: their own (a child's are the ones a parent saved), never an adult-tagged one for a minor. */
+export const savedStationFor = (actor: PersonRow, id: string): SavedStation | null => listSavedStations(actor).find((station) => station.id === id) ?? null;
+
+/** The player's item for a saved station (RADIO-03): it plays from the hub's stream route and has no length, so the bar says Live. */
+export function stationItemView(actor: PersonRow, id: string, nowPlaying: string | null): Record<string, unknown> | null {
+  const station = savedStationFor(actor, id);
+  if (!station) return null;
+  const detail = [station.country_code, station.tags.slice(0, 2).join(", ")].filter(Boolean).join(" · ");
+  return {
+    id: station.id, kind: "station", title: station.name, channel: station.name, subtitle: nowPlaying ?? (detail || "Live radio"), src: `/api/plugins/music/radio/stream/${encodeURIComponent(station.id)}`,
+    live: true, poster: null, description: "", chapters: [], captions: [], liked: false, watch_later: false, can_edit: false, cover_choices: [],
+  };
+}
+
 /** The addresses a person already has, for the `added` flag on directory rows. */
 export const savedAddressesOf = (actor: PersonRow): string[] => listSavedStations(actor).map((station) => station.url);
 

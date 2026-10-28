@@ -6,7 +6,8 @@ import type { Context } from "hono";
 import type { PersonRow } from "@/types";
 import { mediaAppAllowed } from "@/lib/media/appHost";
 import { mediaBandOf } from "@/lib/media/band";
-import { addStation, directoryRowsFor, listSavedStations, removeStation, type SavedStation } from "@/lib/media/radio";
+import { addStation, directoryRowsFor, listSavedStations, removeStation, savedStationFor, type SavedStation } from "@/lib/media/radio";
+import { nowPlayingOf, openStationStream, type StreamDeps } from "@/lib/media/radioStream";
 import { findStations, radioDirectoryAllowed, type DirectoryStation } from "@/lib/media/radioDirectory";
 import { MINOR_QUERY_PERSONAL_NOTE, minorQueryHit } from "@/lib/retrieval/minorQueryCheck";
 import { getHouseholdSettingValue } from "@/lib/settings";
@@ -38,9 +39,9 @@ export const radioGenreRows = () => GENRES.map((genre) => ({ id: genre, label: g
 const subtitleOf = (station: { country_code: string | null; tags: string[]; hls: boolean }): string =>
   station.hls ? "Not supported yet" : [countryName(station.country_code), station.tags.slice(0, 2).join(", ")].filter(Boolean).join(" · ");
 
-export type RadioRow = { id: string; title: string; summary: string; thumbnail: null; url: string; favicon: string; tags_csv: string; country_code: string; codec: string; bitrate_kbps: string; action_label: string };
+export type RadioRow = { id: string; kind: "station"; title: string; summary: string; thumbnail: null; url: string; favicon: string; tags_csv: string; country_code: string; codec: string; bitrate_kbps: string; action_label: string };
 const rowOf = (station: DirectoryStation | SavedStation, label: string): RadioRow => ({
-  id: station.id, title: station.name, summary: subtitleOf(station), thumbnail: null, url: station.url, favicon: station.favicon ?? "", tags_csv: station.tags.join(","),
+  id: station.id, kind: "station", title: station.name, summary: subtitleOf(station), thumbnail: null, url: station.url, favicon: station.favicon ?? "", tags_csv: station.tags.join(","),
   country_code: station.country_code ?? "", codec: station.codec ?? "", bitrate_kbps: station.bitrate_kbps === null ? "" : String(station.bitrate_kbps), action_label: label,
 });
 
@@ -57,6 +58,10 @@ export async function radioDirectoryRows(person: PersonRow, query: { q: string; 
   const result = name === "" && country === "" && tag === "" ? await findStations({ kind: "popular" }) : await findStations({ kind: "search", name, country, tag });
   return result.ok ? directoryRowsFor(person, result.stations).map((station) => rowOf(station, station.added ? "Added" : "Add")) : [];
 }
+
+let streamDeps: StreamDeps = {};
+/** Tests point the station fetch at an injected upstream; production uses the pinned guarded fetch. */
+export function __setRadioStreamDepsForTests(deps: StreamDeps): void { streamDeps = deps; }
 
 export function radioRoutes() {
   const routes = apiRouter();
@@ -107,6 +112,27 @@ export function radioRoutes() {
       bitrate_kbps: typeof body.bitrate_kbps === "number" ? body.bitrate_kbps : typeof body.bitrate_kbps === "string" && /^\d+$/.test(body.bitrate_kbps) ? Number(body.bitrate_kbps) : null, for_person_id: typeof body.for_person_id === "string" ? body.for_person_id : null, fromDirectory,
     });
     return result.ok ? c.json({ ok: true as const, station: result.value, label: "Added to Your stations" }, 200) : c.json({ error: result.error }, result.status as 400);
+  });
+
+  // RADIO-03: playing a saved station. Same-origin audio; the person's own saved list decides what plays (a child: what a parent saved),
+  // so no directory switch is needed and an unsaved id is a 404. A station address never comes from the request.
+  routes.get("/stream/:id", requireAuth, async (c, next) => {
+    const person = c.get("person");
+    if (!mediaAppAllowed(person, "music")) return next();
+    const station = savedStationFor(person, c.req.param("id"));
+    if (!station) return c.json({ error: "That station is not in your list. Open Radio and pick one of Your stations." }, 404);
+    const opened = await openStationStream(person.id, station, streamDeps, c.req.raw.signal);
+    return opened.ok ? opened.response : c.json({ error: opened.error }, opened.status);
+  });
+
+  // The song the station says is on now, kept in memory while a stream is open. Same gate as the stream; nothing is stored.
+  routes.get("/now/:id", requireAuth, async (c, next) => {
+    const person = c.get("person");
+    if (!mediaAppAllowed(person, "music")) return next();
+    const station = savedStationFor(person, c.req.param("id"));
+    if (!station) return c.json({ error: "That station is not in your list. Open Radio and pick one of Your stations." }, 404);
+    c.header("Cache-Control", "no-store");
+    return c.json({ ok: true as const, title: nowPlayingOf(station.id) }, 200);
   });
 
   routes.delete("/stations/:id", requireAuth, async (c, next) => {
