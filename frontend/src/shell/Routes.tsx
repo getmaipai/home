@@ -261,7 +261,7 @@ function RoutesWithIncognito({ person, onPersonChange, onSignedOut, appCatalog }
   const effectiveRing = effectiveAmbientRing(paneRing, ring, ambientRingFromWake(shellListeningLine ? { listening: shellListeningLine } : null));
   const currentApp = appCatalog.find((app) => location.pathname === app.to || location.pathname.startsWith(`${app.to}/`));
   const appName = currentApp?.label ?? (location.pathname === "/" ? "Home" : undefined);
-  const ambientTrigger = ambient ? <button type="button" aria-label={wakeIndicator?.listening.startsWith("Listening for") ? `${ambient.companion.name}, listening` : ambient.companion.name} onClick={() => {
+  const ambientTrigger = ambient ? <button type="button" className="flex size-12 items-center justify-center" aria-label={wakeIndicator?.listening.startsWith("Listening for") ? `${ambient.companion.name}, listening` : ambient.companion.name} onClick={() => {
     if (coarse && wakeIndicator) { setPreviewOpen((value) => !value); return; }
     updatePaneState({ ...paneState, open: true });
   }}>
@@ -283,7 +283,7 @@ function RoutesWithIncognito({ person, onPersonChange, onSignedOut, appCatalog }
     open={lastLine ? previewOpen : coarse ? (wakeIndicator ? true : previewOpen) : undefined}
     onOpenChange={setPreviewOpen}
   /> : undefined;
-  const ambientAvatar = ambient ? <button type="button" aria-label={ambient.companion.name} onClick={() => { updatePaneState({ ...paneState, open: true }); }}>
+  const ambientAvatar = ambient ? <button type="button" className="flex size-12 items-center justify-center" aria-label={ambient.companion.name} onClick={() => { updatePaneState({ ...paneState, open: true }); }}>
     {ambient.clips ? <CompanionAvatar name={ambient.companion.name} clips={ambient.portrait ? { idle: { still: ambient.portrait, loop: true } } as never : ambient.clips} size="header" animated={false} ring={effectiveRing ?? "idle"} /> : ambient.still ? <Avatar><AvatarImage src={ambient.still} alt="" /></Avatar> : <SeededAvatar name={ambient.companion.name} seed={ambient.companion.id} />}
   </button> : null;
   const ambientPaneProps = useAmbientCompanionPane({

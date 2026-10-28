@@ -194,6 +194,8 @@ describe("ambient companion shell slot", () => {
       );
       const avatar = await view.findByRole("button", { name: "Companion" });
       expect(avatar.closest('[data-slot="rail-top-right"]')).toBeTruthy();
+      // The tap target is at least 48px square (the header avatar itself is 40px).
+      expect(avatar.className).toContain("size-12");
       // On a page with no header of its own the avatar sits in the title bar, so nothing goes under it.
       expect(avatar.closest('[data-slot="rail-page-header"]')).toBeTruthy();
       fireEvent.click(avatar);
