@@ -2,6 +2,15 @@
 
 All notable changes to the Podcasts package, in [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) format.
 
+## [0.2.11] - 2026-10-28
+
+- Made show details readable below the artwork and polished episode dates, descriptions and cover thumbnails.
+- Removed the misleading follow-to-play episode overlay.
+
+## [0.2.10] - 2026-10-28
+
+- Added show detail pages and directory feed previews; preview episodes prompt the person to follow before playback.
+
 ## [0.2.9] - 2026-10-28
 
 - Added cached teen-safe episode summaries and takeaways when a transcript is available.

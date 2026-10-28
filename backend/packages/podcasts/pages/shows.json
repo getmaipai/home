@@ -22,9 +22,9 @@
       "orientation": "vertical",
       "on_select": {
         "navigate": {
-          "to": "/apps/podcasts/episodes",
+          "to": "/apps/podcasts/show",
           "state": {
-            "show": "{title}"
+            "id": "{id}"
           }
         }
       },

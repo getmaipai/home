@@ -192,7 +192,7 @@ export function platformConnections(): PrivacyConnection[] {
       what: "a request for the show's feed file that asks only for what changed since last time (a plain conditional request). Feed, episode and picture hosts, including CDNs and redirect hosts, receive the requested address and your home's internet address. No name, device ID or cookie goes with it. No chat or listening history is sent.",
     }),
     // PODCAST-PORT-01: the directory search behind Find shows, listed only while the household switch is on.
-    row("platform:podcast-directory", getHouseholdSettingValue("podcasts.directory.enabled") === true ? "itunes.apple.com, rss.applemarketingtools.com" : null, {
+    row("platform:podcast-directory", getHouseholdSettingValue("podcasts.directory.enabled") === true ? "itunes.apple.com, rss.marketingtools.apple.com" : null, {
       when: "only when an allowed person searches or opens the top list in Podcasts, at most about one request every three seconds across the home. Nothing runs in the background.",
       what: "the words that were searched, or a request for the top list, plus your home's internet address. No name, device ID, cookie or listening history goes with it. A child never searches, and a teen's search words are checked for household names first.",
     }),

@@ -3,6 +3,7 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { __resetRateLimiterForTests } from "@/lib/rateLimiter";
 import { __resetDirectoryForTests } from "@/lib/media/podcastDirectory";
+import { __resetPodcastPreviewForTests, __setPodcastFetchDepsForTests } from "@/lib/media/podcasts";
 import { checkAppPackage } from "@maipai/spec/ui/app-check.js";
 import { PackageManifest } from "@maipai/spec/gen/ts/manifest.js";
 import UI_SCHEMA from "@maipai/spec/ui/schema.json" with { type: "json" };
@@ -24,10 +25,12 @@ beforeEach(() => {
   setHouseholdSettingValue("podcasts.directory.teens", false);
   __resetRateLimiterForTests();
   __resetDirectoryForTests();
+  __resetPodcastPreviewForTests();
+  __setPodcastFetchDepsForTests({});
   urls = [];
   globalThis.fetch = (async (input: URL | string | Request, init?: RequestInit) => {
     const url = typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
-    if (!url.includes("itunes.apple.com") && !url.includes("applemarketingtools.com")) return realFetch(input as never, init);
+    if (!url.includes("itunes.apple.com") && !url.includes("marketingtools.apple.com")) return realFetch(input as never, init);
     urls.push(url);
     return new Response(JSON.stringify(SEARCH), { status: 200 });
   }) as typeof fetch;
@@ -80,7 +83,7 @@ describe("the podcast directory routes", () => {
     const { client } = await owner();
     const response = await client.get("/api/plugins/podcasts/directory/top");
     expect([200, 502]).toContain(response.status);
-    expect(urls.some((url) => url.includes("applemarketingtools.com"))).toBe(true);
+    expect(urls.some((url) => url.includes("marketingtools.apple.com"))).toBe(true);
   });
 
   test("the privacy table lists the directory only while the switch is on", async () => {
@@ -131,6 +134,55 @@ describe("podcast dashboard directory rows", () => {
   });
 });
 
+describe("podcast show details", () => {
+  const feed = `<?xml version="1.0"?><rss version="2.0" xmlns:itunes="http://www.itunes.com/dtds/podcast-1.0.dtd"><channel><title>Cabin Radio</title><itunes:author>Sage</itunes:author><description>A quiet show from the woods.</description><item><title>First cabin episode</title><description>Welcome to the cabin.</description><pubDate>Mon, 26 Oct 2026 12:00:00 GMT</pubDate><enclosure url="https://audio.example.com/one.mp3" type="audio/mpeg" length="12345"/><itunes:duration>60</itunes:duration></item></channel></rss>`;
+
+  test("directory preview parses once, caches for five minutes, and refuses an unknown feed", async () => {
+    on();
+    const { client } = await owner();
+    let feedCalls = 0;
+    __setPodcastFetchDepsForTests({ dnsLookup: async () => ({ address: "93.184.216.34", family: 4 }), fetch: (async (input) => {
+      const url = typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
+      if (url.includes("itunes.apple.com")) { urls.push(url); return new Response(JSON.stringify(SEARCH), { status: 200 }); }
+      feedCalls++;
+      return new Response(feed, { status: 200, headers: { "content-type": "application/rss+xml" } });
+    }) as typeof fetch });
+    await client.get("/api/plugins/podcasts/directory/search?q=cabin");
+    const url = "https://feeds.example.com/cabin.xml";
+    const first = await client.post("/api/plugins/podcasts/data/directory", { scope: "show", id: url });
+    expect(first.status).toBe(200);
+    expect((await first.json() as Array<{ description: string }>)[0]?.description).toBe("A quiet show from the woods.");
+    const episodes = await client.post("/api/plugins/podcasts/data/directory", { scope: "show-episodes", id: url });
+    const episodeRows = await episodes.json() as Array<{ title: string; summary: string; description: string; thumbnail: string | null; action_label?: string }>;
+    expect(episodeRows[0]).toMatchObject({ title: "First cabin episode", summary: "Oct 26, 2026", description: "Welcome to the cabin.", thumbnail: "/api/plugins/podcasts/directory/art?u=https%3A%2F%2Fis1-ssl.mzstatic.com%2Fimage%2Fx%2F200x200bb.jpg" });
+    expect(episodeRows[0]?.action_label).toBeUndefined();
+    expect(feedCalls).toBe(1);
+    const unknown = await client.post("/api/plugins/podcasts/data/directory", { scope: "show", id: "https://unknown.example.com/feed.xml" });
+    expect(await unknown.json()).toEqual([]);
+    expect(feedCalls).toBe(1);
+  });
+
+  test("children do not fetch a directory show feed", async () => {
+    on(true);
+    const { client } = await owner();
+    const adult = await client.post("/api/plugins/podcasts/data/directory", { q: "cabin" });
+    const url = (await adult.json() as Array<{ feed_url: string }>)[0]!.feed_url;
+    const childClient = await child(client);
+    let calls = 0;
+    __setPodcastFetchDepsForTests({ fetch: (async () => { calls++; return new Response("", { status: 200 }); }) as unknown as typeof fetch });
+    expect(await (await childClient.client.post("/api/plugins/podcasts/data/directory", { scope: "show", id: url })).json()).toEqual([]);
+    expect(calls).toBe(0);
+  });
+
+  test("a followed show has details from its readable episodes", async () => {
+    const { client } = await owner();
+    const subscribed = await client.post("/api/plugins/podcasts/subscribe", { url: "https://feeds.example.com/followed.xml" });
+    const { source_id } = await subscribed.json() as { source_id: string };
+    const detail = await client.post("/api/plugins/podcasts/data/directory", { scope: "show", id: source_id });
+    expect((await detail.json() as Array<{ title: string; followed: boolean }>)[0]).toMatchObject({ title: "feeds.example.com", followed: true });
+  });
+});
+
 describe("the cover art route", () => {
   test("off, or a child: refused (403); an off-host address is not found", async () => {
     const { client } = await owner();
@@ -159,4 +211,9 @@ test("podcast manifest and all referenced schema pages validate at boot", () => 
   const ajv = new Ajv2020({ strict: false });
   for (const entry of manifest.contributes.pages) expect(ajv.validate(UI_SCHEMA, read(entry.module))).toBe(true);
   expect(manifest.contributes.pages.some((page: { id: string }) => page.id === "find")).toBe(false);
+  const show = read("show");
+  const billboard = show.body.find((node: { type: string }) => node.type === "billboard");
+  expect(billboard.primary.label).toBe("Follow");
+  expect(billboard.secondary).toEqual([]);
+  expect(show.body.some((node: { type: string; item_label_field?: string }) => (node.type === "list" || node.type === "media_shelf") && node.item_label_field === "description")).toBe(true);
 });

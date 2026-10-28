@@ -1,7 +1,7 @@
 // MEDIA-PODCASTS-01: the Podcasts routes that sit beside the shared media-app ones (data, progress, queue). Everything under
 // /api/plugins/podcasts; adults and admins only where noted. The shows an admin follows live in `feeds` (purpose podcast) and `media_sources`.
 import type { Context } from "hono";
-import { readableIn } from "@/lib/media/appHost";
+import { allowedSources, queryItems, readableIn } from "@/lib/media/appHost";
 import { correctedStamp, getProgress, writeProgress } from "@/lib/media/progress";
 import { coerceNumber, mediaAppAllowed } from "@/lib/media/appHost";
 import { queuePodcastAutoRules, exportOpml, getPodcastTranscript, importOpml, pollPodcastNow, saveEpisode, searchPodcastTranscripts, subscribePodcast, unsaveEpisode, unsubscribePodcast, updatePodcastSource } from "@/lib/media/podcasts";
@@ -13,9 +13,11 @@ import { getHouseholdSettingValue } from "@/lib/settings";
 import { MINOR_QUERY_PERSONAL_NOTE, minorQueryHit } from "@/lib/retrieval/minorQueryCheck";
 import { deleteCollection, resolveCollection } from "@/lib/media/collections";
 import { personFilters, saveFilter, viewOf } from "@/lib/media/podcastFilters";
-import { artProxyAddress, directoryAllowed, fetchDirectoryArt, searchDirectory, topShows } from "@/lib/media/podcastDirectory";
-import { queryItems } from "@/lib/media/appHost";
+import { artProxyAddress, directoryAllowed, fetchDirectoryArt, searchDirectory, topShows, directoryShowForFeed } from "@/lib/media/podcastDirectory";
 import { podcastSnipLabel, podcastSnipRowsForRoute } from "@/lib/media/podcastApp";
+import { previewPodcastFeed } from "@/lib/media/podcasts";
+import { mediaItems } from "@/db/schema";
+import { eq } from "drizzle-orm";
 
 type Body = Record<string, unknown>;
 const bodyOf = async (c: Context): Promise<Body> => {
@@ -39,6 +41,47 @@ export async function podcastDirectoryRows(person: PersonRow, q: string, scope =
   if (!result.ok) return local;
   const directory = result.shows.map((show) => ({ id: show.id, title: show.title, author: show.author, summary: show.genre ?? "", thumbnail: artProxyAddress(show.art), feed_url: show.feed_url, ...(admin ? { action_label: "Follow" } : {}) }));
   return [...local, ...directory];
+}
+
+/** One existing directory data id serves both directory previews and followed show details. */
+export async function podcastShowRows(person: PersonRow, id: string, scope: string): Promise<unknown[]> {
+  const adult = mediaBandOf(person) === "adult";
+  const canFollow = adult && (person.role === "owner" || person.role === "admin");
+  const source = allowedSources(person).find((row) => row.id === id && row.kind === "feed");
+  if (source) {
+    const items = queryItems(person, "podcasts", { where: eq(mediaItems.sourceId, source.id), limit: 200 }).sort((a, b) => (b.external?.published_at ?? "").localeCompare(a.external?.published_at ?? ""));
+    const first = items[0];
+    return [{ id: source.id, title: source.label, author: first?.artist ?? "", genre: first?.genre ?? "", description: first?.description ?? "", thumbnail: first ? `/api/media/items/${encodeURIComponent(first.id)}/art` : null, followed: true, can_follow: canFollow, feed_url: source.url ?? "" }];
+  }
+  if (mediaBandOf(person) === "child") return [];
+  const address = id;
+  if (!directoryShowForFeed(address)) return [];
+  const result = await previewPodcastFeed(person, address);
+  if (!result.ok) return [];
+  const show = result.value.show;
+  const directory = directoryShowForFeed(address);
+  return [{ id: address, title: show.title || directory?.title, author: show.author || directory?.author, genre: directory?.genre ?? "", description: show.description, thumbnail: directory?.art ? artProxyAddress(directory.art) : null, followed: false, can_follow: canFollow, feed_url: address }];
+}
+
+function podcastDate(value: string | null | undefined): string {
+  if (!value) return "";
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? "" : new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", year: "numeric", timeZone: "UTC" }).format(date);
+}
+
+export async function podcastShowEpisodeRows(person: PersonRow, id: string): Promise<unknown[]> {
+  const source = allowedSources(person).find((row) => row.id === id && row.kind === "feed");
+  if (source) {
+    const items = queryItems(person, "podcasts", { where: eq(mediaItems.sourceId, source.id), limit: 200 }).sort((a, b) => (b.external?.published_at ?? "").localeCompare(a.external?.published_at ?? ""));
+    const showArt = items[0]?.artwork ? `/api/media/items/${encodeURIComponent(items[0].id)}/art` : null;
+    return items.map((item) => ({ id: item.id, title: item.title, summary: podcastDate(item.external?.published_at), description: item.description?.slice(0, 140) ?? "", date: podcastDate(item.external?.published_at), duration_s: item.duration_s, thumbnail: item.artwork ? `/api/media/items/${encodeURIComponent(item.id)}/art` : showArt, followed: true }));
+  }
+  if (mediaBandOf(person) === "child" || !directoryShowForFeed(id)) return [];
+  const result = await previewPodcastFeed(person, id);
+  if (!result.ok) return [];
+  const directory = directoryShowForFeed(id);
+  const artwork = directory?.art ? artProxyAddress(directory.art) : null;
+  return result.value.show.episodes.map((episode, index) => ({ id: `${encodeURIComponent(id)}#${index}`, title: episode.title, summary: podcastDate(episode.publishedAt), description: episode.description.slice(0, 140), date: podcastDate(episode.publishedAt), duration_s: episode.durationS, thumbnail: artwork, followed: false }));
 }
 
 export function podcastRoutes() {

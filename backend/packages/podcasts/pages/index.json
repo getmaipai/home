@@ -48,7 +48,7 @@
       "item_media_field": "thumbnail",
       "aspect": "square",
       "variant": "plain",
-      "on_select": { "navigate": { "to": "/apps/podcasts/episodes", "state": { "show": "{title}" } } },
+      "on_select": { "navigate": { "to": "/apps/podcasts/show", "state": { "id": "{id}" } } },
       "hide_when_empty": true
     },
     {
@@ -61,6 +61,7 @@
       "item_media_field": "thumbnail",
       "aspect": "square",
       "variant": "plain",
+      "on_select": { "navigate": { "to": "/apps/podcasts/show", "state": { "id": "{feed_url}" } } },
       "row_actions": [
         {
           "icon": "plus",

@@ -22,6 +22,7 @@
       "variant": "plain",
       "orientation": "vertical",
       "density": "compact",
+      "on_select": { "navigate": { "to": "/apps/podcasts/show", "state": { "id": "{feed_url}" } } },
       "row_actions": [
         {
           "icon": "plus",

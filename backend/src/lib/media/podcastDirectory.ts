@@ -16,7 +16,19 @@ const MAX_RESULTS = 25;
 let pausedUntil = 0;
 const CACHE_MS = 15 * 60 * 1000;
 const cache = new Map<string, { until: number; result: DirectoryResult }>();
-export function __resetDirectoryForTests(): void { pausedUntil = 0; cache.clear(); }
+// Feed addresses are usable for previews only after Apple returned them in a result.
+const approvedFeeds = new Map<string, { until: number; show: DirectoryShow }>();
+export function __resetDirectoryForTests(): void { pausedUntil = 0; cache.clear(); approvedFeeds.clear(); }
+
+export function directoryShowForFeed(address: string, now = Date.now()): DirectoryShow | null {
+  const approved = approvedFeeds.get(address);
+  if (!approved || approved.until <= now) { approvedFeeds.delete(address); return null; }
+  return approved.show;
+}
+
+function rememberShows(shows: DirectoryShow[], now: number): void {
+  for (const show of shows) approvedFeeds.set(show.feed_url, { show, until: now + CACHE_MS });
+}
 
 /** The household switches and the person's band decide; a child never reaches the directory. */
 export function directoryAllowed(person: { band: "adult" | "teen" | "child" }, switches: { enabled: boolean; teens: boolean }): boolean {
@@ -59,11 +71,12 @@ export async function searchDirectory(term: string, deps: DirectoryDeps = {}): P
   const now = deps.nowMs?.() ?? Date.now();
   const key = `search:${words.toLocaleLowerCase()}`;
   const cached = cache.get(key);
-  if (!deps.fetch && cached && cached.until > now) return cached.result;
+  if (!deps.fetch && cached && cached.until > now) { if (cached.result.ok) rememberShows(cached.result.shows, now); return cached.result; }
   const url = `https://itunes.apple.com/search?${new URLSearchParams({ media: "podcast", entity: "podcast", limit: String(MAX_RESULTS), term: words })}`;
   const body = (await get(url, deps)) as { results?: unknown } | null;
   if (!body || !Array.isArray(body.results)) return { ok: false, status: 502, error: DOWN };
   const result: DirectoryResult = { ok: true, shows: (body.results as Array<Record<string, unknown>>).map(showOf).filter((show): show is DirectoryShow => show !== null) };
+  rememberShows(result.shows, now);
   cache.set(key, { until: now + CACHE_MS, result });
   return result;
 }
@@ -72,8 +85,8 @@ export async function searchDirectory(term: string, deps: DirectoryDeps = {}): P
 export async function topShows(deps: DirectoryDeps = {}): Promise<DirectoryResult> {
   const now = deps.nowMs?.() ?? Date.now();
   const cached = cache.get("top");
-  if (!deps.fetch && cached && cached.until > now) return cached.result;
-  const list = (await get(`https://rss.applemarketingtools.com/api/v2/us/podcasts/top/${MAX_RESULTS}/podcasts.json`, deps)) as { feed?: { results?: Array<Record<string, unknown>> } } | null;
+  if (!deps.fetch && cached && cached.until > now) { if (cached.result.ok) rememberShows(cached.result.shows, now); return cached.result; }
+  const list = (await get(`https://rss.marketingtools.apple.com/api/v2/us/podcasts/top/${MAX_RESULTS}/podcasts.json`, deps)) as { feed?: { results?: Array<Record<string, unknown>> } } | null;
   const entries = list?.feed?.results;
   if (!Array.isArray(entries) || entries.length === 0) {
     const result: DirectoryResult = { ok: false, status: 502, error: DOWN };
@@ -92,6 +105,7 @@ export async function topShows(deps: DirectoryDeps = {}): Promise<DirectoryResul
     shows.push({ id, title: text(entry.name), author: text(entry.artistName), feed_url: feed, art: artOrNull(entry.artworkUrl100), genre: null, explicit: false });
   }
   const result: DirectoryResult = shows.length > 0 ? { ok: true, shows } : { ok: false, status: 502, error: DOWN };
+  rememberShows(shows, now);
   cache.set("top", { until: now + CACHE_MS, result });
   return result;
 }

@@ -10,7 +10,7 @@ import { hashSessionToken } from "@/lib/session";
 import "@/lib/media/podcastApp"; // registers the Podcasts data ids and item view with the shared host
 import "@/lib/media/musicApp"; // registers the Music lyrics fields with the shared host
 import "@/lib/media/radioRecordings"; // adds the Recordings scope to Music's existing radio data id
-import { podcastRoutes, podcastDirectoryRows } from "./podcastApp";
+import { podcastRoutes, podcastDirectoryRows, podcastShowRows, podcastShowEpisodeRows } from "./podcastApp";
 import { radioRoutes, radioDirectoryRows, radioSavedRows, radioStationRow, radioCountryRows, radioGenreRows } from "./radioApp";
 import { fetchRadioArt } from "@/lib/media/radioArt";
 import { radioDirectoryAllowed, radioDirectoryHasFavicon } from "@/lib/media/radioDirectory";
@@ -82,6 +82,8 @@ export function createMediaAppRoutes(appId: MediaAppId) {
     // PODCAST-PORT-01: the directory is a network lookup, so it is answered here (async) beside the sync host data. Same gates as its routes.
     if (appId === "podcasts" && c.req.param("dataId") === "directory") {
       const body = await bodyOf(c.req.raw);
+      if (body.scope === "show") return c.json(await podcastShowRows(person, typeof body.id === "string" ? body.id : "", "show") as never, 200);
+      if (body.scope === "show-episodes") return c.json(await podcastShowEpisodeRows(person, typeof body.id === "string" ? body.id : "") as never, 200);
       return c.json(await podcastDirectoryRows(person, typeof body.q === "string" ? body.q : "", typeof body.scope === "string" ? body.scope : "search") as never, 200);
     }
     // RADIO-02: Music's Radio pages. The directory is a network lookup (async); the rest are sync rows. Same gates as the radio routes.

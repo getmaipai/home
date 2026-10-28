@@ -1,0 +1,90 @@
+{
+  "type": "page",
+  "id": "show",
+  "title": "Podcast show",
+  "body": [
+    {
+      "type": "billboard",
+      "bind": {
+        "source": "package",
+        "path": "directory",
+        "params": {
+          "scope": "show",
+          "id": "$state.id"
+        }
+      },
+      "label": "Podcasts",
+      "size": "hero",
+      "autoplay": false,
+      "item_key_field": "id",
+      "item_title_field": "title",
+      "item_subtitle_field": "{author} · {genre}",
+      "item_art_field": "thumbnail",
+      "primary": {
+        "label": "Follow",
+        "icon": "plus",
+        "action": {
+          "call": {
+            "target": "/api/plugins/podcasts/directory/add",
+            "args": {
+              "url": "{feed_url}"
+            }
+          }
+        }
+      },
+      "hide_when_empty": false,
+      "secondary": []
+    },
+    {
+      "type": "media_shelf",
+      "heading": "About",
+      "bind": {
+        "source": "package",
+        "path": "directory",
+        "params": {
+          "scope": "show",
+          "id": "$state.id"
+        }
+      },
+      "item_key_field": "id",
+      "item_label_field": "description",
+      "aspect": "square",
+      "variant": "plain",
+      "orientation": "vertical",
+      "hide_when_empty": true,
+      "item_media_field": "thumbnail",
+      "density": "compact"
+    },
+    {
+      "type": "media_shelf",
+      "heading": "Recent episodes",
+      "bind": {
+        "source": "package",
+        "path": "directory",
+        "params": {
+          "scope": "show-episodes",
+          "id": "$state.id"
+        }
+      },
+      "item_key_field": "id",
+      "item_label_field": "title",
+      "item_subtitle_field": "{date} · {description}",
+      "item_media_field": "thumbnail",
+      "item_meta_field": "duration_s",
+      "item_badge_field": "action_label",
+      "aspect": "wide",
+      "variant": "plain",
+      "orientation": "vertical",
+      "on_select": {
+        "play": {
+          "media_id": "{id}"
+        }
+      },
+      "empty_state": {
+        "type": "empty_state",
+        "icon": "headphones",
+        "text": "No recent episodes."
+      }
+    }
+  ]
+}

@@ -1,6 +1,6 @@
 {
   "id": "podcasts",
-  "version": "0.2.9",
+  "version": "0.2.11",
   "kind": "app",
   "category": "Media",
   "display": "Podcasts",
@@ -57,6 +57,14 @@
         "nav": false,
         "kind": "schema",
         "module": "search"
+      },
+      {
+        "id": "show",
+        "label": "Podcast show",
+        "icon": "mic",
+        "nav": false,
+        "kind": "schema",
+        "module": "show"
       },
       {
         "id": "shows",

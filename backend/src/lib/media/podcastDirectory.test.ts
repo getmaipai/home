@@ -71,7 +71,7 @@ describe("search", () => {
 
 describe("charts", () => {
   test("reads the top list then looks up the feed addresses in one request", async () => {
-    const out = await topShows(deps((url) => (url.includes("rss.applemarketingtools.com") ? CHARTS : LOOKUP)));
+    const out = await topShows(deps((url) => (url.includes("rss.marketingtools.apple.com") ? CHARTS : LOOKUP)));
     expect(out.ok).toBe(true);
     if (!out.ok) return;
     expect(out.shows.map((s) => [s.title, s.feed_url])).toEqual([["Top One", "https://feeds.example.com/one.xml"], ["Top Two", "https://feeds.example.com/two.xml"]]);

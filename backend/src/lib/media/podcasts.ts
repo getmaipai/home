@@ -29,6 +29,8 @@ import { reportShelfEvent } from "@/lib/shelf/shelfEvents";
 import { archivePath, removeSource } from "./sources";
 import { completeBackground, type LlmMessage } from "@/lib/llm";
 import { evaluateReply } from "@/lib/safety";
+import { tryConsume } from "@/lib/rateLimiter";
+import { directoryShowForFeed } from "./podcastDirectory";
 
 const MAX_EPISODES_PER_FEED = 200;
 const MAX_ENCLOSURE_BYTES = 400 * 1024 * 1024;
@@ -37,6 +39,31 @@ const DOWNLOAD_TIMEOUT_MS = 15 * 60 * 1000;
 const ENCLOSURE_RATE = { prefix: "enclosure", capacity: 5, refillPerSecond: 1 / 10 } as const;
 const TRANSCRIPT_RATE = { prefix: "podcast-transcript", capacity: 5, refillPerSecond: 1 / 10 } as const;
 const ART_RATE = { prefix: "art", capacity: 5, refillPerSecond: 1 / 10 } as const;
+const PREVIEW_RATE = { capacity: 5, refillPerSecond: 1 / 3 } as const;
+const previewCache = new Map<string, { until: number; show: ParsedShow }>();
+
+/** Read-only directory preview. Only an address recently returned by the directory is eligible. */
+export async function previewPodcastFeed(actor: PersonRow, address: string, nowMs = Date.now()): Promise<Outcome<{ show: ParsedShow }>> {
+  const directoryShow = directoryShowForFeed(address, nowMs);
+  if (!directoryShow) return { ok: false, status: 404, error: "That show is not in the podcast directory results." };
+  const cached = previewCache.get(address);
+  if (cached && cached.until > nowMs) return { ok: true, value: { show: cached.show } };
+  if (!tryConsume(`podcast-preview:${actor.id}`, PREVIEW_RATE, nowMs)) return { ok: false, status: 502, error: "The show preview is paced. Try again shortly." };
+  try {
+    const checked = checkFeedAddress(address);
+    if (!checked.ok || checked.url !== address) return { ok: false, status: 404, error: "That show is not available for preview." };
+    const response = await guardedGet(address, routeDeps, () => nowMs, AbortSignal.timeout(8000), { maxRedirects: 5, accept: "application/rss+xml, application/atom+xml, application/feed+json, application/xml, text/xml, */*;q=0.5", bucket: { prefix: "podcast-preview", capacity: 5, refillPerSecond: 1 / 3 } });
+    if (!response.ok) return { ok: false, status: 502, error: "The show feed did not answer." };
+    const body = await response.text();
+    const show = parsePodcastFeed(body, nowMs);
+    const result = { ...show, title: show.title || directoryShow.title, author: show.author || directoryShow.author };
+    previewCache.set(address, { until: nowMs + 5 * 60 * 1000, show: result });
+    return { ok: true, value: { show: result } };
+  } catch {
+    return { ok: false, status: 502, error: "The show feed did not answer." };
+  }
+}
+export function __resetPodcastPreviewForTests(): void { previewCache.clear(); }
 
 export type Outcome<T> = { ok: true; value: T } | { ok: false; status: 400 | 403 | 404 | 409 | 422 | 502; error: string };
 
