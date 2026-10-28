@@ -25,6 +25,8 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/packages/music/pages/play.json` | music | Now playing |
 | `backend/packages/music/pages/playlist.json` | music | Playlist |
 | `backend/packages/music/pages/playlists.json` | music | Playlists |
+| `backend/packages/music/pages/radio-find.json` | music | Find stations |
+| `backend/packages/music/pages/radio.json` | music | Radio |
 | `backend/packages/music/pages/songs.json` | music | Songs |
 | `backend/packages/news/pages/channel.json` | news | Channel |
 | `backend/packages/news/pages/following.json` | news | Following |
