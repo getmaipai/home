@@ -18,7 +18,7 @@ The installer and the setup wizard size the disk from one table. It adds up what
 | Recommended | 64 GB of memory | 112 GB |
 | Recommended | 128 GB of memory (adds Quick videos) | 141 GB |
 | Moderate | 32 GB | 34 GB |
-| Minimal | 16 or 24 GB | 16 GB |
+| Minimal | 16 or 24 GB | 17 GB |
 
 On a Mac with 128 GB of memory the plan also includes Quick videos. **Detailed videos** (LTX-2.3, longer clips with sound and speech, about 74 GB) are optional and unticked: tick the row to add them. You accept the licences of the AI models and tools Home installs once, on the **Before you start** page, in the item **Home goes online for you**; the plan then lists the licence with its terms and never asks again. A Home set up before this wording shows one prompt, **Accept the licences for the AI models Home installs**, in **Repairs** and at the top of **Models and storage**: press **See the licences**, then **Accept** once. The Detailed videos licence is free to use under 10 million dollars of yearly revenue, and the model's own markings stay on what it makes. The total and the free-space check update at once. An upgrade never downloads them by itself: **Settings**, **AI and models** lists them with a **Get** button. The same screen offers more picture looks (Z-Image Turbo, slower but with more styles to add). Adding every extra on the plan screen (including Detailed videos and the faster chat engine) brings the Recommended plan to about 298 GB. The plan screen shows each part with its size, the total, and the free space on this computer. It turns the check green, amber or red as you turn parts on and off. Choose a smaller plan with `--plan moderate` or `--plan minimal` if the installer says there is not enough room.
 
