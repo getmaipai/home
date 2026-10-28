@@ -738,7 +738,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/stackInstall.ts` | NO_ENGINE_INSTALL, __setEngineInstallRunnerForTests, engineInstallStatus, startEngineInstall |
 | `backend/src/lib/stackRequirement.ts` | STACK_REQUIREMENT_ISSUE, syncStackRequirementIssue |
 | `backend/src/lib/stackRestart.ts` | STACK_BACK_MAX_MS, isStackRestart, waitForStackBack |
-| `backend/src/lib/stackSelfHeal.ts` | UNREACHABLE_NOTICE_MS, UNREACHABLE_GAVE_UP_MS, HEAL_NOTICE_PER_ROLE_MS, __setNotifierForTests, healNoticeText, pollStackSelfHeal |
+| `backend/src/lib/stackSelfHeal.ts` | UNREACHABLE_NOTICE_MS, UNREACHABLE_GAVE_UP_MS, HEAL_NOTICE_PER_ROLE_MS, PORT_PROBE_AFTER_MS, __setNotifierForTests, __setStackPortProbeForTests |
 | `backend/src/lib/stackUpdates.ts` | getStackUpdatesState, checkStackUpdates, applyStackEngineUpdate, rollbackStackEngine, sweepStackStorage, runStackReadinessCheck |
 | `backend/src/lib/stackWarmup.ts` | WARM_POLL_MS, WARM_MAX_MS, warmupInFlight, __resetWarmupForTests, warmStack |
 | `backend/src/lib/stackchanInstall.ts` | FLASH_BACKUP_BYTES, FLASH_BACKUP_MAX_BYTES, verifyStackChanManifest, verifiedStackChanManifest, verifiedFlashPart, saveEncryptedFlashBackup |

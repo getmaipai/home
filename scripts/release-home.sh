@@ -80,7 +80,8 @@ sleep 5
 ok=1
 [[ "$(cat "$LIVE/.installed-tag")" == "$TAG" ]] || { echo "FAIL: installed tag is not $TAG"; ok=0; }
 [[ "$(curl -s -o /dev/null -w '%{http_code}' localhost:3000/)" == 200 ]] || { echo "FAIL: web page is not 200"; ok=0; }
-curl -s -m 5 127.0.0.1:8770/healthz | grep -q '"ok":true' || { echo "FAIL: Stack health check is not ok"; ok=0; }
+STACK_PORT="$(tr -dc 0-9 < "$LIVE/stack/.port" 2>/dev/null)"; STACK_PORT="${STACK_PORT:-8770}"
+curl -s -m 5 "127.0.0.1:${STACK_PORT}/healthz" | grep -q '"ok":true' || { echo "FAIL: Stack health check is not ok"; ok=0; }
 AFTER_MIGRATIONS="$(sqlite3 -readonly "$LIVE/data/hub.db" 'select count(*) from __drizzle_migrations')"
 (( AFTER_MIGRATIONS >= BEFORE_MIGRATIONS )) || { echo "FAIL: migrations went from $BEFORE_MIGRATIONS to $AFTER_MIGRATIONS"; ok=0; }
 [[ "$(grep -c 'app refused' "$LIVE/data/logs/launchd.err.log" 2>/dev/null || true)" == 0 ]] || { echo "FAIL: 'app refused' in the launchd log"; ok=0; }

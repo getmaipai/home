@@ -2,7 +2,8 @@ import { afterEach, beforeEach, expect, test } from "bun:test";
 import { listIssues } from "@/lib/issues";
 import { __resetStackEngineForTests, __setStackClientForTests } from "@/lib/stackEngine";
 import { StackError } from "@/lib/stack/errors";
-import { __resetStackSelfHealForTests, __setNotifierForTests, engineCrashSummary, healNoticeText, pollStackSelfHeal, UNREACHABLE_GAVE_UP_MS, UNREACHABLE_NOTICE_MS } from "@/lib/stackSelfHeal";
+import { setHouseholdSettingValue, getHouseholdSettingValue } from "@/lib/settings";
+import { __setStackPortProbeForTests, __resetStackSelfHealForTests, __setNotifierForTests, engineCrashSummary, healNoticeText, pollStackSelfHeal, UNREACHABLE_GAVE_UP_MS, UNREACHABLE_NOTICE_MS } from "@/lib/stackSelfHeal";
 
 const sent: Array<{ type: string; text: string }> = [];
 let up = true;
@@ -17,7 +18,7 @@ beforeEach(() => {
     selfHeal: async () => ({ enabled: true, crashesByDay: [{ day: "2026-10-17", crashes: 2, healed: 1, gaveUp: 1 }], events, stopped: [], healing: [] }),
   } as never);
 });
-afterEach(() => { __setNotifierForTests(null); __resetStackEngineForTests(); __resetStackSelfHealForTests(); });
+afterEach(() => { __setStackPortProbeForTests(null); __setNotifierForTests(null); __resetStackEngineForTests(); __resetStackSelfHealForTests(); });
 
 const healed = (id: string, role = "chat") => ({ id, kind: "healed", at: "2026-10-17T14:48:12.000Z", role, cause: "x", causeKind: "killed", seconds: 12, crashedAt: "2026-10-17T14:48:00.000Z" });
 
@@ -58,4 +59,27 @@ test("the Status page line counts today's crashes", async () => {
   await pollStackSelfHeal(now);
   expect(engineCrashSummary(new Date(now))).toMatchObject({ count: 2, healed: 1, gave_up: 1, line: "Engines crashed 2 times today; the Stack restarted 1 of them and gave up on 1." });
   expect(engineCrashSummary(new Date("2026-10-18T10:00:00Z")).line).toBe("No engine has crashed today.");
+});
+
+test("a Stack that moved to another local port is found and Home is repointed, once, after a minute", async () => {
+  setHouseholdSettingValue("engines.stack.url", "http://127.0.0.1:8770");
+  __setStackPortProbeForTests(async (port) => port === 8771);
+  up = false;
+  await pollStackSelfHeal(now);
+  await pollStackSelfHeal(now + 30_000);
+  expect(getHouseholdSettingValue("engines.stack.url")).toBe("http://127.0.0.1:8770");
+  await pollStackSelfHeal(now + 60_000);
+  expect(getHouseholdSettingValue("engines.stack.url")).toBe("http://127.0.0.1:8771");
+  expect(sent).toHaveLength(1);
+  expect(sent[0]!.text).toContain("http://127.0.0.1:8771");
+});
+
+test("two Stacks answering, or none, leaves the address alone and Repairs names the address tried", async () => {
+  setHouseholdSettingValue("engines.stack.url", "http://127.0.0.1:8770");
+  __setStackPortProbeForTests(async (port) => port === 8771 || port === 8772);
+  up = false;
+  await pollStackSelfHeal(now);
+  await pollStackSelfHeal(now + UNREACHABLE_NOTICE_MS);
+  expect(getHouseholdSettingValue("engines.stack.url")).toBe("http://127.0.0.1:8770");
+  expect(listIssues().find((i) => i.key === "unreachable")?.detail).toContain("http://127.0.0.1:8770");
 });

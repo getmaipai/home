@@ -16,17 +16,24 @@
 // Engines the Stack gave up on already appear as the Stack's own Repairs
 // item (stackHealthSync.ts) with the Restart engine fix and the log lines.
 import { and, eq } from "drizzle-orm";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import { db } from "@/db";
 import { notificationDeliveries } from "@/db/schema";
 import { raiseIssue, resolveIssue } from "@/lib/issues";
 import { trigger as realTrigger } from "@/lib/notifications";
-import { dropStackClientCache, getStackClient, isStackConfigured } from "@/lib/stackEngine";
+import { installRoot } from "@/lib/localStackService";
+import { DEFAULT_STACK_PORT } from "@/lib/ports";
+import { getHouseholdSettingValue, setHouseholdSettingValue } from "@/lib/settings";
+import { dropStackClientCache, getStackClient, getStackUrl, isStackConfigured } from "@/lib/stackEngine";
 import { StackError } from "@/lib/stack/errors";
 import type { StackSelfHeal, StackSelfHealEvent } from "@/lib/stack/types";
 
 export const UNREACHABLE_NOTICE_MS = 2 * 60_000;
 export const UNREACHABLE_GAVE_UP_MS = 6 * 60_000;
 export const HEAL_NOTICE_PER_ROLE_MS = 10 * 60_000;
+export const PORT_PROBE_AFTER_MS = 60_000;
+const LOCAL_PREFIX = "http://127.0.0.1:";
 const ISSUE_KEY = "unreachable";
 const ROLE_WORDS: Record<string, string> = { chat: "Chat", embed: "Memory search", judge: "Safety check", router: "Router", stt: "Speech to text", tts: "Voice", vision: "Picture reading", image: "Picture" };
 const roleWord = (role: string): string => ROLE_WORDS[role] ?? `The ${role}`;
@@ -37,6 +44,60 @@ let latest: StackSelfHeal | null = null;
 const lastRoleNotice = new Map<string, number>();
 let trigger: (typeId: string, vars: Record<string, string>) => Promise<void> = realTrigger;
 export function __setNotifierForTests(fn: typeof trigger | null): void { trigger = fn ?? realTrigger; }
+
+/** Which local port a MaiPai Stack answers on, or null. A Stack is told apart
+ * from any other service by its /healthz body (ok plus a contract number). */
+export type StackPortProbe = (port: number) => Promise<boolean>;
+const realProbe: StackPortProbe = async (port) => {
+  if (process.env.NODE_ENV === "test") return false;
+  try {
+    const res = await fetch(`${LOCAL_PREFIX}${port}/healthz`, { signal: AbortSignal.timeout(1500) });
+    const body = (await res.json()) as { ok?: unknown; contract?: unknown };
+    return body.ok === true && typeof body.contract === "number";
+  } catch { return false; }
+};
+let probe: StackPortProbe = realProbe;
+export function __setStackPortProbeForTests(fn: StackPortProbe | null): void { probe = fn ?? realProbe; }
+
+function recordedStackPort(): number | null {
+  try {
+    const port = Number(readFileSync(join(installRoot(), "stack", ".port"), "utf8").trim());
+    return Number.isInteger(port) && port > 0 && port <= 65535 ? port : null;
+  } catch { return null; }
+}
+
+function configuredLocalPort(): number | null {
+  const raw = getHouseholdSettingValue("engines.stack.url");
+  if (typeof raw !== "string" || !raw.trim().startsWith(LOCAL_PREFIX)) return null;
+  const port = Number(new URL(raw.trim()).port);
+  return Number.isInteger(port) && port > 0 ? port : null;
+}
+
+/** GUARD (2026-10-28): the installer once moved the Stack to 8771 while Home
+ * still pointed at 8770, so chat was down with a healthy Stack running. When
+ * Home's own local address does not answer, look for a Stack on the port the
+ * installer recorded and the few above the default. Exactly one answer on a
+ * different port repoints the setting; anything else is left for Repairs.
+ * Never touches a remote Stack or an address the household typed in. */
+async function healStackPort(): Promise<boolean> {
+  if (getHouseholdSettingValue("engines.stack.where") === "another_computer") return false;
+  const configured = configuredLocalPort();
+  if (configured === null) return false;
+  const candidates = [...new Set([recordedStackPort(), ...Array.from({ length: 11 }, (_, i) => DEFAULT_STACK_PORT + i)].filter((p): p is number => p !== null && p !== configured))];
+  const answering: number[] = [];
+  for (const port of candidates) if (await probe(port)) answering.push(port);
+  if (answering.length !== 1) {
+    if (answering.length > 1) console.error(`[self-heal] more than one Stack answers (${answering.join(", ")}); not changing engines.stack.url from port ${configured}.`);
+    return false;
+  }
+  const url = `${LOCAL_PREFIX}${answering[0]}`;
+  const result = setHouseholdSettingValue("engines.stack.url", url);
+  if (!result.ok) { console.error(`[self-heal] could not repoint engines.stack.url to ${url}: ${result.error}`); return false; }
+  console.error(`[self-heal] the Stack answers on port ${answering[0]}, not ${configured}; engines.stack.url repointed to ${url}.`);
+  dropStackClientCache();
+  await trigger("stack.restarting", { text: `The AI was running on a different port than Home expected. Home found it at ${url} and reconnected.` });
+  return true;
+}
 
 function clock(at: string): string {
   const date = new Date(at);
@@ -70,16 +131,18 @@ async function noticeHeals(events: StackSelfHealEvent[], now: number): Promise<v
 async function noticeUnreachable(now: number): Promise<void> {
   if (unreachableSince === null) return;
   const down = now - unreachableSince;
+  if (down >= PORT_PROBE_AFTER_MS && stage < 1 && (await healStackPort())) { unreachableSince = null; return; }
+  const tried = getStackUrl() ?? "its saved address";
   if (down >= UNREACHABLE_NOTICE_MS && stage < 1) {
     stage = 1;
     dropStackClientCache();
-    await raiseIssue({ source: "stack", key: ISSUE_KEY, severity: "warning", title: "The AI stopped and is restarting itself", detail: "The Stack has not answered for 2 minutes. Its service restarts it by itself; nothing is needed yet.", notifyOnEscalation: true });
+    await raiseIssue({ source: "stack", key: ISSUE_KEY, severity: "warning", title: "The AI stopped and is restarting itself", detail: `The Stack has not answered at ${tried} for 2 minutes. Its service restarts it by itself; nothing is needed yet.`, notifyOnEscalation: true });
     await trigger("stack.restarting", { text: "The AI stopped and is restarting itself." });
   }
   if (down >= UNREACHABLE_GAVE_UP_MS && stage < 2) {
     stage = 2;
     dropStackClientCache();
-    await raiseIssue({ source: "stack", key: ISSUE_KEY, severity: "error", title: "The AI could not restart itself: open Repairs", detail: "The Stack has not answered for 6 minutes. Restart the computer's AI service from the Engines page, or restart the computer it runs on.", notifyOnEscalation: true });
+    await raiseIssue({ source: "stack", key: ISSUE_KEY, severity: "error", title: "The AI could not restart itself: open Repairs", detail: `The Stack has not answered at ${tried} for 6 minutes, and no Stack was found on a nearby port. Restart the computer's AI service from the Engines page. If that does not help, the service may be installed but not loaded: on the computer it runs on, run the Stack's start command or restart the computer.`, notifyOnEscalation: true });
   }
 }
 

@@ -163,6 +163,12 @@ port_in_use() {
   return 1
 }
 
+# True when a MaiPai Stack answers its liveness check on this port, so a
+# port held by the Stack being upgraded is not mistaken for a stranger's.
+stack_answers_on() {
+  curl -sf -m 3 "http://127.0.0.1:${1}/healthz" 2>/dev/null | grep -q '"ok":true'
+}
+
 find_free_port() {
   local port="$1"
   local tries=0
@@ -1464,8 +1470,17 @@ install_stack_service() {
     return 0
   fi
 
-  local stack_port
-  stack_port=$(find_free_port "$STACK_PORT_BASE")
+  # An upgrade keeps the port the Stack already uses. Without this the old
+  # Stack still held its own port while this ran, find_free_port moved to
+  # the next one (8771), and Home kept pointing at 8770: chat was down
+  # until the setting was fixed by hand (2026-10-28).
+  local stack_port previous_stack_port
+  previous_stack_port=$(read_marker "${stack_dir}/.port")
+  if valid_port "$previous_stack_port" && { stack_answers_on "$previous_stack_port" || ! port_in_use "$previous_stack_port"; }; then
+    stack_port="$previous_stack_port"
+  else
+    stack_port=$(find_free_port "$STACK_PORT_BASE")
+  fi
 
   # `set -e` is suppressed for this whole function (called under `if !`
   # in main()/setup_stack()), which also suppresses bash's normal
@@ -1497,6 +1512,13 @@ install_stack_service() {
   [ -n "${STACK_HEALTH_TRIES:-}" ] && max_tries="$STACK_HEALTH_TRIES"
   while ! curl -sf "http://127.0.0.1:${stack_port}/healthz" >/dev/null 2>&1; do
     tries=$((tries + 1))
+    # install-service can leave the new service file written but not loaded
+    # (2026-10-28: the Stack stayed down until `launchctl bootstrap` was run
+    # by hand). Halfway through the wait, ask the Stack to start itself once.
+    if [ "$tries" -eq $((max_tries / 2)) ]; then
+      log "The Stack has not answered yet. Asking its service to start."
+      run_as_console_user "$os" "$stack_user" "STACK_DATA_DIR=${stack_data_dir}" "PORT=${stack_port}" "STACK_BUN_BIN=${bun_bin}" "$binary" start >/dev/null 2>&1 || log "The Stack's start command did not succeed; still waiting."
+    fi
     if [ "$tries" -ge "$max_tries" ]; then
       log "The Stack did not answer /healthz in time. The MaiPai Stack is required; installation cannot continue. Its log is ${stack_data_dir}/logs/stack.error.log."
       return 1

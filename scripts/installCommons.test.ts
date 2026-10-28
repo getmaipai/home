@@ -314,6 +314,38 @@ describe("required Stack setup failures", () => {
 });
 
 
+describe("Stack port on upgrade (2026-10-28 outage)", () => {
+  const run = (setup: string, recordedPort: string | null) => {
+    const root = mkdtempSync(join(tmpdir(), "maipai-install-stack-port-"));
+    mkdirSync(join(root, "stack"));
+    writeFileSync(join(root, "stack", "maipai-stack-darwin-arm64"), "", { mode: 0o755 });
+    if (recordedPort) writeFileSync(join(root, "stack", ".port"), `${recordedPort}\n`);
+    const calls = join(root, "calls.log");
+    try {
+      const result = Bun.spawnSync(["bash", "-c", `source "${INSTALL_SH}"; STACK_PORT_BASE=8770; find_console_user() { echo marlow; }; chown() { return 0; }; clear_quarantine_and_sign() { :; }; sleep() { :; }; find_free_port() { echo 8771; }; run_as_console_user() { shift 2; echo "$*" >> "${calls}"; }; ${setup}; install_stack_service "${root}" "${root}/bun" darwin arm64 no`], { env: { ...process.env, STACK_HEALTH_TRIES: "4" } });
+      const log = Bun.file(calls).size ? require("node:fs").readFileSync(calls, "utf8") : "";
+      return { result, log, port: require("node:fs").readFileSync(join(root, "stack", ".port"), "utf8").trim() };
+    } finally { rmSync(root, { recursive: true, force: true }); }
+  };
+
+  test("the old Stack still holds its port: the upgrade keeps that port", () => {
+    const { log, port } = run("port_in_use() { return 0; }; stack_answers_on() { return 0; }; curl() { return 0; }; (cd() { :; }; true)", "8770");
+    expect(port).toBe("8770");
+    expect(log).toContain("PORT=8770");
+  });
+
+  test("a stranger holds the recorded port: a free one is chosen", () => {
+    const { port } = run("port_in_use() { return 0; }; stack_answers_on() { return 1; }; curl() { return 0; }", "8770");
+    expect(port).toBe("8771");
+  });
+
+  test("a service that was written but never loaded is asked to start", () => {
+    const { log } = run('port_in_use() { return 1; }; n=0; curl() { n=$((n+1)); [ "$n" -gt 3 ]; }', null);
+    expect(log).toContain("maipai-stack-darwin-arm64 start");
+  });
+});
+
+
 describe("find_console_user", () => {
   test("darwin: the real console user, not root, even sourced under sudo-like output", () => {
     const out = bashCall("find_console_user darwin").stdout;
