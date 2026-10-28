@@ -39,6 +39,7 @@ import type { StructuredPart } from "@/wire";
 import { evaluateSafety, forOutput } from "@/lib/safety";
 import type { SurfaceClass } from "@/lib/surfaceClass";
 import { certaintyFields, type CertaintyGate } from "@/lib/certainty";
+import { sayFields } from "@/lib/sayEvidence";
 import { START_PROJECT_TOOL_ID } from "@/lib/projects/tool";
 import { SPEC_SHEET_BOUND, SPEC_SHEET_READY } from "@/lib/structuredPartIds";
 
@@ -1062,6 +1063,7 @@ export function toolResultContent(outcome: ToolExecutionOutcome, searchMaxChars?
           ...bands,
           ...(usableReply(outcome) ? { reply: usableReply(outcome)!.text } : {}),
           ...(outcome.result?.data !== undefined ? { data: boundedData(outcome.result.data) } : {}),
+          ...(sayFields(outcome) ? { say: sayFields(outcome) } : {}),
           ...(typeof outcome.result?.synthesis_hint === "string" ? { synthesis_hint: outcome.result.synthesis_hint } : {}),
         }
       : outcome.status === "pending"

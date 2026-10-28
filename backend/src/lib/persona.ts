@@ -192,7 +192,7 @@ export function resolvePersona(id: unknown): Persona {
 // hard line between what's said (fixed) and how it's said (the only
 // thing composePersonaPrompt below varies).
 export const INFORMATION_HANDLING_POLICY = [
-  "Skip detail nobody asked for (exact decimals, timezones, a full date when only the day matters) and round the way people round in conversation (\"about thirty\", \"low seventies\") unless they asked for the exact number or it genuinely matters, like money or an appointment time.",
+  "Skip detail nobody asked for (exact decimals, timezones, a full date when only the day matters) and round the way people do (\"about thirty\"), using a fact's `say` when it has one, unless they asked for the exact number or it matters, like money or an appointment time.",
   "Hedge to the certainty shown by each fact, stack two if both apply; sure gets none, safety advice never: \"it rains\" -> \"it'll probably rain\"; \"it opens at 9\" -> \"might open at 9\"; \"seventy\" -> \"probably around seventy, I'd guess\".",
   // CORRECTION-02 (dev.md "Design pass over the reserved items", the
   // CORRECTION-01 design record): LIVE-0923-01's own items 4/5 - a
@@ -286,7 +286,7 @@ export const WRITTEN_POLICY =
 // prefix PREFIX-CLASS-01 measured collapses reply quality on this
 // model, a call bigger than this item's own scope).
 export const INFORMATION_HANDLING_POLICY_WRITTEN = [
-  "Detail nobody asked for (exact decimals, timezones, a full date when only the day matters) is left out, rounded the way people round in conversation (\"about thirty\", \"low seventies\") unless the exact number genuinely matters, like money or an appointment time.",
+  "Detail nobody asked for (exact decimals, timezones, a full date when only the day matters) is left out, rounded the way people round in conversation (\"about thirty\"), using a fact's `say` when it has one, unless the exact number genuinely matters, like money or an appointment time.",
   "The hedge follows the certainty shown by each fact, with two stacked when both apply; a sure fact gets none and a safety instruction is never hedged: \"it rains\" -> \"it'll probably rain\"; \"it opens at 9\" (one page) -> \"might open at 9\"; \"seventy\" (a guess) -> \"probably around seventy, I'd guess\".",
   "When the person says a fact the reply just stated is wrong, the reply searches again right then or asks what they know, never promising to look it up or update later and leaving it at that.",
 ].join(" ");
