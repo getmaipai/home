@@ -251,6 +251,8 @@ words. The existing `formality` dimension is an input to the defaults so authors
 
 ### 3.8 NAT-07: warmth over time (M, separate design)
 
+Designed in [warmth-over-time-2026-10-28.md](warmth-over-time-2026-10-28.md).
+
 Open threads ("how'd the interview go?"), a relationship arc ("it's been a few weeks"), a short-lived mood tier (3 to 7 days),
 and a part-of-day line. Backlog competencies B3 and F1 already name the first as missing; Loki Doki's review ranked it the best
 warmth for the fewest tokens. It needs the memory judge and recall to change, so it gets its own design note after NAT-01 to
@@ -345,7 +347,7 @@ slice: a spec change with no measurement behind it yet.
 5. **NAT-05 (S-M):** the `echo` move and the last-answer record in turn state.
 6. **NAT-06 (S):** `clock_style`, `hedging` and `social` (humor, warmth, initiative) dials, the `wants_advice` signal field,
    Companions app control (kit parts only).
-7. **NAT-07 (M):** warmth over time, its own note.
+7. **NAT-07 (M):** warmth over time, designed in [warmth-over-time-2026-10-28.md](warmth-over-time-2026-10-28.md) (approved, not built).
 8. **NAT-08 (S):** two bench rows for contractions, no new prompt sentence (section 3.10). Built 2026-10-28: `contraction_casual` (buddy) and `contraction_formal` (tutor), spoken surface, scored in `register.ts`; no real-model run yet.
 9. **NAT-09 (S-M):** the `repeat` sound kind, after SPEECH-STYLE-02 (section 3.10).
 
