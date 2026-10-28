@@ -30,7 +30,7 @@ import { archivePath, removeSource } from "./sources";
 import { completeBackground, type LlmMessage } from "@/lib/llm";
 import { evaluateReply } from "@/lib/safety";
 import { tryConsume } from "@/lib/rateLimiter";
-import { directoryShowForFeed } from "./podcastDirectory";
+import { artProxyAddress, directoryShowForFeed } from "./podcastDirectory";
 
 const MAX_EPISODES_PER_FEED = 200;
 const MAX_ENCLOSURE_BYTES = 400 * 1024 * 1024;
@@ -64,6 +64,31 @@ export async function previewPodcastFeed(actor: PersonRow, address: string, nowM
   }
 }
 export function __resetPodcastPreviewForTests(): void { previewCache.clear(); }
+
+const safeDecode = (value: string): string => { try { return decodeURIComponent(value); } catch { return value; } };
+
+/** The address of one previewed episode's audio (a public https address from the show's feed), or null once the preview is no longer held. */
+export function previewEpisodeAddress(actor: PersonRow, id: string, nowMs = Date.now()): string | null {
+  const cut = id.lastIndexOf("#");
+  if (cut < 0 || mediaBandOf(actor) === "child") return null;
+  const held = previewCache.get(safeDecode(id.slice(0, cut)));
+  const episode = held && held.until > nowMs ? held.show.episodes[Number(id.slice(cut + 1))] : undefined;
+  return episode && /^https?:\/\//i.test(episode.enclosureUrl) ? episode.enclosureUrl.replace(/^http:\/\//i, "https://") : null;
+}
+
+/** The item view of one episode of a show the person is previewing (id `<feed address>#<position>`), played from its own address like a stream-only episode. Null once the preview is no longer held. */
+export function previewEpisodeView(actor: PersonRow, id: string, nowMs = Date.now()): Record<string, unknown> | null {
+  const cut = id.lastIndexOf("#");
+  if (cut < 0 || mediaBandOf(actor) === "child") return null;
+  const address = safeDecode(id.slice(0, cut));
+  const index = Number(id.slice(cut + 1));
+  const held = previewCache.get(address);
+  const episode = held && held.until > nowMs && Number.isInteger(index) ? held.show.episodes[index] : undefined;
+  const directory = directoryShowForFeed(address, nowMs);
+  if (!held || !episode || !directory || !/^https?:\/\//i.test(episode.enclosureUrl)) return null;
+  const poster = artProxyAddress(directory.art);
+  return { id, kind: "podcast_episode", title: episode.title, channel: held.show.title, subtitle: held.show.title, src: `/api/plugins/podcasts/preview/${encodeURIComponent(id)}`, live: false, poster, art: poster, description: episode.description, chapters: [], captions: [], liked: false, watch_later: false, can_edit: false, cover_choices: [] };
+}
 
 export type Outcome<T> = { ok: true; value: T } | { ok: false; status: 400 | 403 | 404 | 409 | 422 | 502; error: string };
 

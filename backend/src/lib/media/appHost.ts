@@ -16,6 +16,7 @@ import type { MediaBudget } from "./watchTime";
 import { listLibrary } from "@/lib/library";
 import { stationItemView, previewStationItemView } from "./radio";
 import { previewStationFor } from "./radioDirectory";
+import { previewEpisodeView } from "./podcasts";
 import { nowPlayingOf } from "./radioStream";
 import { liveSourceById, noDiscovery, readableItem, sourceVisibleTo } from "./access";
 import { allowedBandsFor, bandAllows, mediaBandOf, trips } from "./band";
@@ -612,6 +613,10 @@ function mediaAppDataRaw(person: PersonRow, appId: MediaAppId, dataId: string, p
         if (station) return station as never;
         const preview = previewStationFor("household", params.id);
         if (preview && mediaBandOf(person) !== "child" && !(/adult|porn|xxx|erotic/i.test(preview.tags.join(" ")) && mediaBandOf(person) !== "adult")) return previewStationItemView(person, preview, nowPlayingOf(params.id)) as never;
+      }
+      if (params.id && appId === "podcasts" && params.id.includes("#")) {
+        const preview = previewEpisodeView(person, params.id);
+        if (preview) return preview as never;
       }
       if (params.id && (appId === "music" || appId === "videos")) {
         const file = madeFileFor(person, appId, params.id);

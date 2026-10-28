@@ -15,7 +15,9 @@ import { deleteCollection, resolveCollection } from "@/lib/media/collections";
 import { personFilters, saveFilter, viewOf } from "@/lib/media/podcastFilters";
 import { artProxyAddress, directoryAllowed, fetchDirectoryArt, searchDirectory, topShows, directoryShowForFeed } from "@/lib/media/podcastDirectory";
 import { podcastSnipLabel, podcastSnipRowsForRoute } from "@/lib/media/podcastApp";
-import { previewPodcastFeed } from "@/lib/media/podcasts";
+import { previewEpisodeAddress, previewPodcastFeed } from "@/lib/media/podcasts";
+import { guardedFetch, type DnsLookup } from "@maipai/core/src/ssrfGuard";
+import { lookup } from "node:dns/promises";
 import { mediaItems } from "@/db/schema";
 import { eq } from "drizzle-orm";
 
@@ -81,7 +83,7 @@ export async function podcastShowEpisodeRows(person: PersonRow, id: string): Pro
   if (!result.ok) return [];
   const directory = directoryShowForFeed(id);
   const artwork = directory?.art ? artProxyAddress(directory.art) : null;
-  return result.value.show.episodes.map((episode, index) => ({ id: `${encodeURIComponent(id)}#${index}`, title: episode.title, summary: podcastDate(episode.publishedAt), description: episode.description.slice(0, 140), date: podcastDate(episode.publishedAt), duration_s: episode.durationS, thumbnail: artwork, followed: false }));
+  return result.value.show.episodes.map((episode, index) => ({ id: `${encodeURIComponent(id)}#${index}`, title: episode.title, summary: podcastDate(episode.publishedAt), description: episode.description.slice(0, 140), date: podcastDate(episode.publishedAt), duration_s: episode.durationS, thumbnail: artwork, followed: false, kind: "podcast_episode" }));
 }
 
 export function podcastRoutes() {
@@ -92,6 +94,36 @@ export function podcastRoutes() {
     if (!mediaAppAllowed(person, "podcasts")) return next();
     const body = await bodyOf(c);
     return c.json(await podcastDirectoryRows(person, typeof body.q === "string" ? body.q : "", typeof body.scope === "string" ? body.scope : "search"), 200);
+  });
+
+  /** A host that answers on both address families is reached over IPv4 first: a home network with no working IPv6 route would otherwise fail on the first (IPv6) address. */
+const lookupPreferringV4: DnsLookup = async (hostname) => {
+  try { const found = await lookup(hostname, { family: 4 }); return { address: found.address, family: 4 }; } catch { const found = await lookup(hostname); return { address: found.address, family: found.family as 4 | 6 }; }
+};
+
+// Playing an episode of a show the person has not followed: the bytes pass through here (every redirect hop checked), so the player
+  // keeps to same-origin addresses. Range requests pass on, so seeking works. Nothing is stored.
+  routes.get("/preview/:id", requireAuth, async (c, next) => {
+    const person = c.get("person");
+    if (!mediaAppAllowed(person, "podcasts")) return next();
+    const address = previewEpisodeAddress(person, c.req.param("id"));
+    if (!address) return c.json({ error: "That episode is no longer available. Open the show again." }, 404);
+    const abort = new AbortController();
+    const timer = setTimeout(() => abort.abort(), 10000);
+    c.req.raw.signal.addEventListener("abort", () => abort.abort(), { once: true });
+    try {
+      const range = c.req.header("range");
+      const upstream = await guardedFetch(address, { method: "GET", headers: { "User-Agent": "MaiPai-Home", Accept: "audio/*", ...(range ? { Range: range } : {}) }, signal: abort.signal, maxRedirects: 5 }, lookupPreferringV4);
+      clearTimeout(timer);
+      const type = (upstream.headers.get("content-type") ?? "").split(";")[0]!.trim().toLowerCase();
+      if ((upstream.status !== 200 && upstream.status !== 206) || !(type.startsWith("audio/") || type === "application/octet-stream" || type === "video/mp4")) { upstream.body?.cancel().catch(() => {}); return c.json({ error: "The show did not give this episode. Try again later." }, 502); }
+      const headers = new Headers({ "content-type": type === "application/octet-stream" ? "audio/mpeg" : type, "accept-ranges": "bytes", "cache-control": "private, no-store", "x-content-type-options": "nosniff", "cross-origin-resource-policy": "same-origin" });
+      for (const name of ["content-length", "content-range"]) { const value = upstream.headers.get(name); if (value) headers.set(name, value); }
+      return new Response(upstream.body, { status: upstream.status, headers });
+    } catch {
+      clearTimeout(timer);
+      return c.json({ error: "The show did not answer. Try again later." }, 502);
+    }
   });
 
   routes.get("/transcript/:media_id", requireAuth, async (c, next) => {

@@ -27,6 +27,8 @@ export function onPlayPageOf(held: HoistedMedia, pathname: string, search: strin
   const app = mediaAppOfPath(pathname);
   if (app !== held.appId) return false;
   const page = pathname.split("/")[3] || "index";
+  // A station's page has no player of its own (it is a billboard and shelves), so the bar stays up while its sound plays.
+  if (app === "music" && page === "station") return false;
   if (!isMediaPlayPage(app, page)) return false;
   const id = new URLSearchParams(search).get("id") ?? stateId;
   return id === held.id || (app === "books" && page === "listen");

@@ -494,7 +494,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/media/podcastDirectory.ts` | __resetDirectoryForTests, directoryShowForFeed, directoryAllowed, searchDirectory, topShows, smallArt |
 | `backend/src/lib/media/podcastFilters.ts` | MAX_FILTERS, parseRules, matchesRules, evaluateFilter, filterSummary, draftRows |
 | `backend/src/lib/media/podcastStats.ts` | aggregatePodcastStats, podcastStats, podcastStatsRows |
-| `backend/src/lib/media/podcasts.ts` | previewPodcastFeed, __resetPodcastPreviewForTests, __setPodcastFetchDepsForTests, podcastFetchDeps, plainNotes, chaptersFromNotes |
+| `backend/src/lib/media/podcasts.ts` | previewPodcastFeed, __resetPodcastPreviewForTests, previewEpisodeAddress, previewEpisodeView, __setPodcastFetchDepsForTests, podcastFetchDeps |
 | `backend/src/lib/media/prober.ts` | probeResultFrom, createStackProber |
 | `backend/src/lib/media/progress.ts` | LATCH_PERCENT, BOOK_END_PERCENT, correctedStamp, percentOf, reachesLatch, mergeProgress |
 | `backend/src/lib/media/radio.ts` | adultTagged, stationVisibleAtBand, listSavedStations, savedStationFor, stationItemView, previewStationItemView |

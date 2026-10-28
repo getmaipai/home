@@ -156,6 +156,13 @@ describe("podcast show details", () => {
     const episodeRows = await episodes.json() as Array<{ title: string; summary: string; description: string; thumbnail: string | null; action_label?: string }>;
     expect(episodeRows[0]).toMatchObject({ title: "First cabin episode", summary: "Oct 26, 2026", description: "Welcome to the cabin.", thumbnail: "/api/plugins/podcasts/directory/art?u=https%3A%2F%2Fis1-ssl.mzstatic.com%2Fimage%2Fx%2F200x200bb.jpg" });
     expect(episodeRows[0]?.action_label).toBeUndefined();
+    // A previewed episode plays: its row names its kind, its item view points at the hub's own stream address, and an unheld one is refused.
+    expect((episodeRows[0] as { kind?: string }).kind).toBe("podcast_episode");
+    const played = await (await client.post("/api/plugins/podcasts/data/item", { scope: "item", id: (episodeRows[0] as unknown as { id: string }).id })).json() as { kind: string; src: string; title: string };
+    expect(played).toMatchObject({ kind: "podcast_episode", title: "First cabin episode" });
+    expect(played.src).toStartWith("/api/plugins/podcasts/preview/");
+    expect(await (await client.post("/api/plugins/podcasts/data/item", { scope: "item", id: "https://unknown.example.com/feed.xml#0" })).json()).toEqual([]);
+    expect((await client.get("/api/plugins/podcasts/preview/" + encodeURIComponent("https://unknown.example.com/feed.xml#0"))).status).toBe(404);
     expect(feedCalls).toBe(1);
     const unknown = await client.post("/api/plugins/podcasts/data/directory", { scope: "show", id: "https://unknown.example.com/feed.xml" });
     expect(await unknown.json()).toEqual([]);

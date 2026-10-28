@@ -74,11 +74,11 @@ describe("station helpers", () => {
     expect(liveStationIdOf("/api/plugins/music/radio/stream/")).toBeNull();
   });
 
-  test("a station plays on its own page, and that page hides the bar", () => {
+  test("a station plays on its own page, and the bar stays up there because the page has no player", () => {
     expect(playRoute("station", "source-abc123")).toBe("/apps/music/station?id=source-abc123");
     expect(isMediaPlayPage("music", "station")).toBe(true);
     expect(isMediaPlayPage("music", "radio")).toBe(false);
-    expect(onPlayPageOf(held(STREAM, ""), "/apps/music/station", "?id=source-abc123", undefined)).toBe(true);
+    expect(onPlayPageOf(held(STREAM, ""), "/apps/music/station", "?id=source-abc123", undefined)).toBe(false);
   });
 
   test("the song the station reports stays when the page asks for the same item again", () => {
