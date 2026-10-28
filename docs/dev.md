@@ -8688,7 +8688,7 @@ right shape for a real companion package's own name later.
 "(as of Sep 2, 8 days ago)" off `record.created_at` (when the fact was
 first asserted, not `last_used_at` - "as of" asks when it became true).
 The block ends with one fixed reminder line, `MEMORY_TRUST_REMINDER`
-("Prefer these facts over guessing when they're relevant.") - both
+("Use a fact only when it changes or completes your answer; never bring up a person, pet or detail from it just because you know it.") - both
 ported from legacy's `formatMemoriesForPrompt`/the BACKLOG's own
 "dated memories... small models drift toward the freshest tokens"
 finding.
@@ -23711,7 +23711,7 @@ the code:
   them into the first system message with the clock and the roster, no
   frame, before the window and the utterance. The old path frames them
   under "What you already know about this household:", with the trust
-  line "Prefer these facts over guessing when they're relevant." and
+  line "Use a fact only when it changes or completes your answer; never bring up a person, pet or detail from it just because you know it." and
   "Nothing stored here bears on this message." when nothing matched.
 
 Ruling, `CONTEXT-RECALL-01`, in the design's own terms and no rule: the

@@ -11,7 +11,7 @@ describe("memoryFraming", () => {
   });
 
   test("trust reminder tells the model to prefer stored facts", () => {
-    expect(MEMORY_TRUST_REMINDER).toBe("Prefer these facts over guessing when they're relevant.");
+    expect(MEMORY_TRUST_REMINDER).toBe("Use a fact only when it changes or completes your answer; never bring up a person, pet or detail from it just because you know it.");
   });
 
   test("nothing-stored line is the exact fixed sentence", () => {
@@ -26,5 +26,13 @@ describe("memoryFraming", () => {
     expect(lengths.every(l => l > 0)).toBe(true);
     expect(hasNewlines.every(n => n === false)).toBe(true);
     expect(set.size).toBe(3);
+  });
+});
+
+describe("memory is background, not a topic (weather turn regression)", () => {
+  test("the trust line says to use a fact only when it changes the answer and never to volunteer a person", () => {
+    expect(MEMORY_TRUST_REMINDER).toContain("only when it changes or completes your answer");
+    expect(MEMORY_TRUST_REMINDER).toContain("never bring up a person, pet or detail");
+    expect(MEMORY_TRUST_REMINDER).not.toContain("Prefer these facts");
   });
 });
