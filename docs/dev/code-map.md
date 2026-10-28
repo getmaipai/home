@@ -573,7 +573,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/packageCache.ts` | LEGACY_ENTRY_GRACE_S, CACHE_NOT_MODIFIED, PACKAGE_CACHE_RESPONSE, packageCacheResponse, __setTestCacheBudgetBytes, OTHER_CACHE_SOURCE |
 | `backend/src/lib/packageHost.ts` | __resetPackageQuietWindowsForTests, __getHostRateLimitsForTests, __getHostBlockFloorsForTests, __getQuietUntilForTests, resolveDataSourceProvenance, __setPackageFetchForTests |
 | `backend/src/lib/packageResolve.ts` | getActiveInstall, listInstalledPackageIds, resolvePackageDir |
-| `backend/src/lib/pageContext.ts` | resolvePageContext |
+| `backend/src/lib/pageContext.ts` | resolvePageContext, pageContextForTurn |
 | `backend/src/lib/partialRestore.ts` | PartialRestoreRefused, restorePersonFromBackup |
 | `backend/src/lib/passkeys.ts` | __resetPasskeyChallengesForTests, registrationOptions, verifyRegistration, authenticationOptions, verifyAuthentication, listPasskeys |
 | `backend/src/lib/paths.ts` | PACKAGES_DIR, isValidPackageId, repoRoot, defaultDataDir, dataDirIsExplicit, dataDir |
