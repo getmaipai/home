@@ -2073,6 +2073,8 @@ export const podcastTranscripts = sqliteTable("podcast_transcripts", {
   source: text("source"), // publisher | stack
   text: text("text"),
   segments: text("segments").notNull().default("[]"), // JSON array of {start_s, text}
+  summary: text("summary"),
+  takeaways: text("takeaways"), // JSON array of strings
   jobId: text("job_id"),
   updatedAt: text("updated_at").notNull(),
   hlc: text("hlc").notNull(),

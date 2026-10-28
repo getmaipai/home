@@ -6,12 +6,12 @@ import { eq } from "drizzle-orm";
 import { mediaItems } from "@/db/schema";
 import type { PersonRow } from "@/types";
 import { liveSourceById } from "./access";
-import { allowedSources, readableIn, artworkUrl, collectionIds, contextFor, copyLabelOf, queryItems, registerItemView, registerMediaAppData, rowOf, rowsOf, type DataParams, type MediaRow } from "./appHost";
+import { allowedSources, readableIn, artworkUrl, collectionIds, contextFor, copyLabelOf, queryItems, registerItemView, registerMediaAppData, rowOf, rowsOf, type DataParams, type MediaItemView, type MediaRow } from "./appHost";
 import { getProgress, getProgressMany, recentProgress } from "./progress";
 import type { MediaItem, MediaSource } from "./model";
 import { draftRows, filterEpisodes, personFilters, viewOf } from "./podcastFilters";
 import { podcastStatsRows } from "./podcastStats";
-import { searchPodcastTranscripts } from "./podcasts";
+import { podcastSummaryFor, searchPodcastTranscripts } from "./podcasts";
 import { podcastDirectoryRows } from "@/routes/podcastApp";
 
 const APP = "podcasts" as const;
@@ -142,9 +142,14 @@ registerItemView(APP, (person, item, view) => {
   const source = liveSourceById(item.source_id);
   const saved = !(item.location as { url?: string }).url;
   const out = { ...view, saved, queued: collectionIds(person, "queue").includes(item.id), copy_label: copyLabelOf(item) };
-  if (!source) return out;
+  let summaryFacts: string | undefined;
+  if (item.kind === "podcast_episode") {
+    const generated = podcastSummaryFor(person, item.id);
+    if (generated) summaryFacts = `Summary\n${generated.summary}\n\nTakeaways\n${generated.takeaways.map((line, index) => `${index + 1}. ${line}`).join("\n")}`;
+  }
+  if (!source) return { ...out, ...(summaryFacts ? { facts: summaryFacts } : {}) } as MediaItemView;
   // The show's "skip the first N seconds": a first listen starts there. (A resume keeps the person's own place.)
   const progress = getProgress(person.id, item.id);
   if (out.position_s === undefined && !progress && source.skip_intro_s > 0) out.position_s = source.skip_intro_s;
-  return { ...out, ...(source.speed ? { speed: source.speed } : {}), skip_intro_s: source.skip_intro_s, skip_outro_s: source.skip_outro_s };
+  return { ...out, ...(source.speed ? { speed: source.speed } : {}), skip_intro_s: source.skip_intro_s, skip_outro_s: source.skip_outro_s, ...(summaryFacts ? { facts: summaryFacts } : {}) } as MediaItemView;
 });

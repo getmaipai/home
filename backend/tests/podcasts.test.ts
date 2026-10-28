@@ -4,7 +4,7 @@ import { existsSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { eq } from "drizzle-orm";
 import { db } from "@/db";
-import { attachments, conversationTurns, fileReferences, mediaCollections, mediaItems, mediaSources, shares, people } from "@/db/schema";
+import { attachments, conversationTurns, fileReferences, mediaCollections, mediaItems, mediaSources, podcastTranscripts, shares, people } from "@/db/schema";
 import { evaluateFilter, filterSummary } from "@/lib/media/podcastFilters";
 import { sharedWith } from "@/lib/media/collections";
 import { TestClient } from "./client";
@@ -12,7 +12,7 @@ import { resetDb } from "./reset-db";
 import { __resetRateLimiterForTests } from "@/lib/rateLimiter";
 import { __resetProgressForTests, flushProgress } from "@/lib/media/progress";
 import { removeItem } from "@/lib/media/items";
-import { __setPodcastFetchDepsForTests, applyAutoRules, queuePodcastAutoRules, drainPodcastAutoRules, saveEpisode, chaptersFromNotes, parsePodcastFeed, plainNotes } from "@/lib/media/podcasts";
+import { __setPodcastFetchDepsForTests, __setPodcastSummaryCompleterForTests, __resetPodcastSummaryForTests, podcastSummaryFor, applyAutoRules, queuePodcastAutoRules, drainPodcastAutoRules, saveEpisode, chaptersFromNotes, parsePodcastFeed, plainNotes } from "@/lib/media/podcasts";
 import { getFeed, listFeeds, updateFeed } from "@/lib/shelf/feedStore";
 import { privacyConnections } from "@/lib/privacy";
 import { pollFeed, type PollDeps } from "@/lib/shelf/shelfPoller";
@@ -78,6 +78,7 @@ beforeEach(() => {
   __resetRateLimiterForTests();
   __resetShelfCountersForTests();
   __resetProgressForTests();
+  __resetPodcastSummaryForTests();
   calls = [];
   feedXml = feedFor();
   feedEtag = '"v1"';
@@ -138,6 +139,35 @@ describe("parsing", () => {
 });
 
 describe("podcast transcripts", () => {
+  test("one cached summary job serves an episode and children receive none", async () => {
+    const { owner, adult, child, subscribe, poll, idOf } = await setup();
+    feedXml = feedFor(episode4);
+    const { feedId, sourceId } = await subscribe([adult.id, child.id]); await poll(feedId);
+    const id = await idOf("Question 4");
+    expect(podcastSummaryFor(personRow(adult.id), id)).toBeNull();
+    const now = new Date().toISOString();
+    db.insert(podcastTranscripts).values({ itemId: id, transcriptUrl: null, source: "stack", text: "A careful discussion of ocean habitats and how researchers study them.", segments: "[]", jobId: null, updatedAt: now, hlc: nextHlc() }).run();
+    const teenMade = await owner.post("/api/people", { displayName: "Rowan", role: "teen", secret: "0000", birthdate: "2010-03-01" });
+    const teenInfo = await teenMade.json() as { id: string };
+    db.update(mediaSources).set({ visibleTo: JSON.stringify([adult.id, child.id, teenInfo.id]) }).where(eq(mediaSources.id, sourceId)).run();
+    const teen = new TestClient(); await teen.post("/api/auth/verify-secret", { personId: teenInfo.id, secret: "0000" });
+    let calls = 0;
+    __setPodcastSummaryCompleterForTests(async () => {
+      calls++;
+      return { ok: true, text: JSON.stringify({ summary: "Researchers study ocean habitats. They observe how animals use different parts of the sea. Their work helps people understand marine life.", takeaways: ["Ocean habitats support varied marine life."] }) };
+    });
+    expect(podcastSummaryFor(personRow(child.id), id)).toBeNull();
+    expect(podcastSummaryFor(personRow(teenInfo.id), id)).toBeNull();
+    expect(podcastSummaryFor(personRow(adult.id), id)).toBeNull();
+    await new Promise((resolve) => setTimeout(resolve, 30));
+    const cached = podcastSummaryFor(personRow(teenInfo.id), id);
+    expect(cached?.summary).toContain("Researchers study ocean habitats.");
+    expect(calls).toBe(1);
+    const pageItem = await teen.post("/api/plugins/podcasts/data/item", { id });
+    expect(pageItem.status).toBe(200);
+    expect((await pageItem.json() as { facts: string }).facts).toContain("Takeaways");
+  });
+
   test("stores a publisher VTT transcript and searches its timestamp without any search network call", async () => {
     const { adult, data, subscribe, poll, idOf } = await setup();
     feedXml = feedFor(`<item><title>Transcript episode</title><guid>transcript-ep</guid><pubDate>Wed, 14 Oct 2026 06:00:00 GMT</pubDate><enclosure url="${HOST}/sprout-ep4.mp3" type="audio/mpeg"/><podcast:transcript url="${HOST}/transcript.vtt" type="text/vtt"/></item>`);

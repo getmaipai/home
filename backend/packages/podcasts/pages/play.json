@@ -13,12 +13,14 @@
             "source": "package",
             "path": "item",
             "params": {
+              "scope": "item",
               "id": "$state.id"
             }
           },
           "kind": "audio",
           "autoplay_next": true,
           "details": true,
+          "details_show": ["title", "facts", "description", "chapters"],
           "actions": [
             {
               "label": "Add to queue",

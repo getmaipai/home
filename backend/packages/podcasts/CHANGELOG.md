@@ -2,6 +2,10 @@
 
 All notable changes to the Podcasts package, in [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) format.
 
+## [0.2.9] - 2026-10-28
+
+- Added cached teen-safe episode summaries and takeaways when a transcript is available.
+
 ## [0.2.8] - 2026-10-28
 
 - Added private podcast snips with notes, plus a Snips shelf on Saved.
