@@ -797,7 +797,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/turnMachine/nodes/safety.ts` | safetyNode, safetyRoute, inputSafetyAfterFailure, applySafety |
 | `backend/src/lib/turnMachine/nodes/tool.ts` | modelFacingArgs, toolStatusMoment, toolNode |
 | `backend/src/lib/turnMachine/speaker.ts` | speakerIsAnonymous, turnAgeBand, touchesMemory |
-| `backend/src/lib/turnMachine/toolGates.ts` | budgetWithTurnToolGates |
+| `backend/src/lib/turnMachine/toolGates.ts` | __resetToolGateLatchForTests, budgetWithTurnToolGates |
 | `backend/src/lib/turnMachine/trace.ts` | TraceRecorder |
 | `backend/src/lib/turnMachine/turnNext.ts` | answeredByFor, conversationPersona, mentionedConversationPersona, runTurnNext, runTurnNextStream |
 | `backend/src/lib/turnMachine/warmup.ts` | turnWarmupPrompt |
