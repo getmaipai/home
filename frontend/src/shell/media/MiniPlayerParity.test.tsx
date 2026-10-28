@@ -34,3 +34,11 @@ describe("defaultPalette", () => {
     for (const color of [palette.dominant, palette.vibrant, palette.dark, palette.light, ...palette.corners]) expect(color).toMatch(/^#[0-9a-f]{6}$/i);
   });
 });
+
+describe("VisualizerMenu icon", () => {
+  test("is not the waveform, which chat uses for voice", async () => {
+    const { readFileSync } = await import("node:fs");
+    const source = readFileSync(new URL("./VisualizerMenu.tsx", import.meta.url), "utf8");
+    expect(source).not.toContain("audio-waveform");
+  });
+});
