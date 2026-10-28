@@ -27,7 +27,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/packages/music/pages/playlists.json` | music | Playlists |
 | `backend/packages/music/pages/radio.json` | music | Radio |
 | `backend/packages/music/pages/songs.json` | music | Songs |
-| `backend/packages/music/pages/station.json` | music | Now playing |
+| `backend/packages/music/pages/station.json` | music | Station |
 | `backend/packages/news/pages/channel.json` | news | Channel |
 | `backend/packages/news/pages/following.json` | news | Following |
 | `backend/packages/news/pages/index.json` | news | Today |
@@ -495,7 +495,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/media/podcasts.ts` | __setPodcastFetchDepsForTests, podcastFetchDeps, plainNotes, chaptersFromNotes, parsePodcastFeed, sourceRowForFeed |
 | `backend/src/lib/media/prober.ts` | probeResultFrom, createStackProber |
 | `backend/src/lib/media/progress.ts` | LATCH_PERCENT, BOOK_END_PERCENT, correctedStamp, percentOf, reachesLatch, mergeProgress |
-| `backend/src/lib/media/radio.ts` | adultTagged, stationVisibleAtBand, listSavedStations, savedStationFor, stationItemView, savedAddressesOf |
+| `backend/src/lib/media/radio.ts` | adultTagged, stationVisibleAtBand, listSavedStations, savedStationFor, stationItemView, previewStationItemView |
 | `backend/src/lib/media/radioArt.ts` | __setRadioArtDepsForTests, __resetRadioArtForTests, radioArtAddressOk, fetchRadioArt |
 | `backend/src/lib/media/radioDirectory.ts` | __resetRadioDirectoryForTests, rememberPreviewStations, previewStationFor, radioDirectoryHasFavicon, __rememberRadioFaviconForTests, radioDirectoryAllowed |
 | `backend/src/lib/media/radioHls.ts` | openHlsResource, hlsResourceUrl, decodeHlsResource |
