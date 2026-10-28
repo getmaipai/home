@@ -79,3 +79,33 @@ describe("charts", () => {
     expect(new URL(urls[1]!).searchParams.get("id")).toBe("10,11");
   });
 });
+
+describe("cover art", () => {
+  const { artAddressOk, artProxyAddress, fetchDirectoryArt, smallArt } = require("@/lib/media/podcastDirectory") as typeof import("@/lib/media/podcastDirectory");
+  const png = new Uint8Array([137, 80, 78, 71]);
+  const art = (body: Uint8Array, type = "image/png", status = 200): DirectoryDeps => ({ fetch: (async () => new Response(body, { status, headers: { "content-type": type } })) as unknown as typeof fetch, nowMs: () => 1 });
+  test("only https pictures on Apple's image host", () => {
+    expect(artAddressOk("https://is1-ssl.mzstatic.com/image/a.jpg")).toBe(true);
+    for (const bad of ["http://is1-ssl.mzstatic.com/a.jpg", "https://evil.example.com/a.jpg", "https://mzstatic.com.evil.example/a.jpg", "https://user:pw@a.mzstatic.com/a.jpg", "not a url", "file:///etc/passwd"]) expect(artAddressOk(bad)).toBe(false);
+  });
+  test("a list tile asks for the small size, through Home's own address", () => {
+    expect(smallArt("https://is1-ssl.mzstatic.com/image/x/600x600bb.jpg")).toBe("https://is1-ssl.mzstatic.com/image/x/200x200bb.jpg");
+    expect(artProxyAddress("https://is1-ssl.mzstatic.com/image/x/600x600bb.jpg")).toStartWith("/api/plugins/podcasts/directory/art?u=");
+    expect(artProxyAddress(null)).toBeNull();
+  });
+  test("a picture is returned, a wrong type, empty body or oversize body is not", async () => {
+    const ok = "https://is1-ssl.mzstatic.com/a.png";
+    expect((await fetchDirectoryArt(ok, art(png)))?.type).toBe("image/png");
+    expect(await fetchDirectoryArt(ok, art(png, "image/svg+xml"))).toBeNull();
+    expect(await fetchDirectoryArt(ok, art(png, "text/html"))).toBeNull();
+    expect(await fetchDirectoryArt(ok, art(new Uint8Array(0)))).toBeNull();
+    expect(await fetchDirectoryArt(ok, art(new Uint8Array(1024 * 1024 + 1)))).toBeNull();
+    expect(await fetchDirectoryArt(ok, art(png, "image/png", 404))).toBeNull();
+  });
+  test("an address off Apple's host makes no request", async () => {
+    let calls = 0;
+    const deps2: DirectoryDeps = { fetch: (async () => { calls += 1; return new Response(png); }) as unknown as typeof fetch, nowMs: () => 1 };
+    expect(await fetchDirectoryArt("https://evil.example.com/a.png", deps2)).toBeNull();
+    expect(calls).toBe(0);
+  });
+});

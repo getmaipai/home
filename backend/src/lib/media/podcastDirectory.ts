@@ -34,10 +34,11 @@ async function get(address: string, deps: DirectoryDeps): Promise<unknown | null
   if (!tryConsume(BUCKET, PACE, now)) return null;
   try {
     const response = await (deps.fetch ?? fetch)(address, { method: "GET", headers: { "User-Agent": "MaiPai-Home", Accept: "application/json" }, credentials: "omit", referrerPolicy: "no-referrer", signal: AbortSignal.timeout(8000) });
-    if (response.status === 403 || response.status === 429 || response.status >= 500) { pausedUntil = now + PAUSE_MS; return null; }
-    if (response.status !== 200) return null;
+    if (response.status === 403 || response.status === 429 || response.status >= 500) { pausedUntil = now + PAUSE_MS; console.warn(`[podcast-directory] paused one hour: status ${response.status}`); return null; }
+    if (response.status !== 200) { console.warn(`[podcast-directory] unexpected status ${response.status}`); return null; }
     return await response.json();
-  } catch {
+  } catch (err) {
+    console.warn(`[podcast-directory] request failed: ${err instanceof Error ? err.name : "error"}`);
     return null;
   }
 }
@@ -76,4 +77,41 @@ export async function topShows(deps: DirectoryDeps = {}): Promise<DirectoryResul
     shows.push({ id, title: text(entry.name), author: text(entry.artistName), feed_url: feed, art: artOrNull(entry.artworkUrl100), genre: null, explicit: false });
   }
   return shows.length > 0 ? { ok: true, shows } : { ok: false, status: 502, error: DOWN };
+}
+
+// ---- cover art: the browser may only load pictures from Home itself (img-src 'self'), so a directory cover is fetched here, once checked ----
+
+const ART_BUCKET = "net:podcast-directory-art:mzstatic.com";
+const ART_PACE = { capacity: 40, refillPerSecond: 5 } as const;
+const MAX_ART_BYTES = 1024 * 1024;
+const ART_TYPES = new Set(["image/jpeg", "image/png", "image/webp"]);
+
+/** Apple's cover addresses carry a size; a list tile needs 200 pixels, not 600. */
+export const smallArt = (address: string): string => address.replace(/\/\d+x\d+(?:bb)?\.(jpg|png)$/i, "/200x200bb.$1");
+
+export const artProxyAddress = (art: string | null): string | null => (art ? `/api/plugins/podcasts/directory/art?${new URLSearchParams({ u: smallArt(art) })}` : null);
+
+/** Only https pictures on Apple's own image host, no logins in the address, a real picture type, one megabyte at most. */
+export function artAddressOk(address: string): boolean {
+  try {
+    const url = new URL(address);
+    return url.protocol === "https:" && url.username === "" && url.password === "" && (url.hostname === "mzstatic.com" || url.hostname.endsWith(".mzstatic.com"));
+  } catch {
+    return false;
+  }
+}
+
+export async function fetchDirectoryArt(address: string, deps: DirectoryDeps = {}): Promise<{ bytes: Uint8Array; type: string } | null> {
+  if (!artAddressOk(address)) return null;
+  const now = deps.nowMs?.() ?? Date.now();
+  if (!tryConsume(ART_BUCKET, ART_PACE, now)) return null;
+  try {
+    const response = await (deps.fetch ?? fetch)(address, { method: "GET", headers: { "User-Agent": "MaiPai-Home", Accept: "image/*" }, credentials: "omit", referrerPolicy: "no-referrer", redirect: "error", signal: AbortSignal.timeout(8000) });
+    const type = (response.headers.get("content-type") ?? "").split(";")[0]!.trim().toLowerCase();
+    if (response.status !== 200 || !ART_TYPES.has(type)) return null;
+    const bytes = new Uint8Array(await response.arrayBuffer());
+    return bytes.byteLength > 0 && bytes.byteLength <= MAX_ART_BYTES ? { bytes, type } : null;
+  } catch {
+    return null;
+  }
 }

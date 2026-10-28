@@ -11,7 +11,7 @@ import type { PersonRow } from "@/types";
 import { mediaBandOf } from "@/lib/media/band";
 import { getHouseholdSettingValue } from "@/lib/settings";
 import { MINOR_QUERY_PERSONAL_NOTE, minorQueryHit } from "@/lib/retrieval/minorQueryCheck";
-import { directoryAllowed, searchDirectory, topShows } from "@/lib/media/podcastDirectory";
+import { artProxyAddress, directoryAllowed, fetchDirectoryArt, searchDirectory, topShows } from "@/lib/media/podcastDirectory";
 
 type Body = Record<string, unknown>;
 const bodyOf = async (c: Context): Promise<Body> => {
@@ -30,7 +30,7 @@ export async function podcastDirectoryRows(person: PersonRow, q: string): Promis
   if (words !== "" && minorQueryHit(words, band)) return [];
   const result = words === "" ? await topShows() : await searchDirectory(words);
   if (!result.ok) return [];
-  return result.shows.map((show) => ({ id: show.id, title: show.title, summary: [show.author, show.genre].filter(Boolean).join(" · "), thumbnail: show.art, feed_url: show.feed_url }));
+  return result.shows.map((show) => ({ id: show.id, title: show.title, summary: [show.author, show.genre].filter(Boolean).join(" · "), thumbnail: artProxyAddress(show.art), feed_url: show.feed_url }));
 }
 
 export function podcastRoutes() {
@@ -69,7 +69,7 @@ export function podcastRoutes() {
     const result = subscribePodcast(person, { url: typeof body.url === "string" ? body.url : "", visibleTo: Array.isArray(body.visible_to) ? (body.visible_to as string[]) : "household" });
     if (!result.ok) return fail(c, result);
     void pollPodcastNow(result.value.feed.id);
-    return c.json({ ok: true as const, source_id: result.value.source.id }, 200);
+    return c.json({ ok: true as const, source_id: result.value.source.id, label: "Added to Shows" }, 200);
   });
 
   routes.post("/unsubscribe", requireAuth, async (c, next) => {
@@ -141,6 +141,14 @@ export function podcastRoutes() {
     if (!directoryGate(c).allowed) return c.json({ error: NOT_ON }, 403);
     const result = await topShows();
     return result.ok ? c.json({ ok: true as const, shows: result.shows }, 200) : c.json({ error: result.error }, result.status);
+  });
+
+  routes.get("/directory/art", requireAuth, async (c, next) => {
+    if (!mediaAppAllowed(c.get("person"), "podcasts")) return next();
+    if (!directoryGate(c).allowed) return c.body(null, 403);
+    const art = await fetchDirectoryArt(c.req.query("u") ?? "");
+    if (!art) return c.body(null, 404);
+    return new Response(art.bytes, { status: 200, headers: { "content-type": art.type, "cache-control": "private, max-age=86400", "x-content-type-options": "nosniff", "content-security-policy": "default-src 'none'", "cross-origin-resource-policy": "same-origin" } });
   });
 
   return routes;

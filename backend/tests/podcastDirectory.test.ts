@@ -105,3 +105,22 @@ describe("the Find shows rows", () => {
     expect(urls).toEqual([]);
   });
 });
+
+describe("the cover art route", () => {
+  test("off, or a child: refused (403); an off-host address is not found", async () => {
+    const { client } = await owner();
+    expect((await client.get("/api/plugins/podcasts/directory/art?u=https%3A%2F%2Fis1-ssl.mzstatic.com%2Fa.png")).status).toBe(403);
+    on(true);
+    const { client: childClient } = await child(client);
+    expect((await childClient.get("/api/plugins/podcasts/directory/art?u=https%3A%2F%2Fis1-ssl.mzstatic.com%2Fa.png")).status).toBe(403);
+    expect((await client.get("/api/plugins/podcasts/directory/art?u=https%3A%2F%2Fevil.example.com%2Fa.png")).status).toBe(404);
+  });
+  test("the Find rows point covers at Home, never at Apple's image host", async () => {
+    on();
+    const { client } = await owner();
+    const body = { results: [{ collectionId: 1, collectionName: "Cabin Radio", artistName: "Sage", feedUrl: "https://feeds.example.com/cabin.xml", artworkUrl600: "https://is1-ssl.mzstatic.com/image/x/600x600bb.jpg" }] };
+    globalThis.fetch = (async (input: URL | string | Request) => { urls.push(typeof input === "string" ? input : input instanceof URL ? input.href : input.url); return new Response(JSON.stringify(body), { status: 200 }); }) as typeof fetch;
+    const rows = (await (await client.post("/api/plugins/podcasts/data/directory", { q: "cabin" })).json()) as Array<{ thumbnail: string }>;
+    expect(rows[0]!.thumbnail).toStartWith("/api/plugins/podcasts/directory/art?u=");
+  });
+});
