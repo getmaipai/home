@@ -36,3 +36,16 @@ export async function fetchRadioArt(address: string, deps: RadioArtDeps = testDe
     return { bytes, type };
   } catch { return null; }
 }
+
+const escapeXml = (text: string): string => text.replace(/[&<>"']/g, (ch) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&apos;" })[ch] ?? ch);
+
+/** The picture for a station with no working logo: a gradient from the name and its first letters over a broadcast mark. Generated here, so nothing leaves the home. */
+export function radioArtCard(name: string): { bytes: Uint8Array; type: string } {
+  const label = name.trim().slice(0, 40) || "Radio";
+  let hash = 0;
+  for (const ch of label) hash = (hash * 31 + ch.codePointAt(0)!) >>> 0;
+  const hue = hash % 360;
+  const initials = label.split(/\s+/).filter(Boolean).slice(0, 2).map((word) => word[0]!.toUpperCase()).join("");
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200"><defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="hsl(${hue} 62% 46%)"/><stop offset="1" stop-color="hsl(${(hue + 40) % 360} 58% 28%)"/></linearGradient></defs><rect width="200" height="200" fill="url(#g)"/><g fill="none" stroke="#fff" stroke-opacity=".55" stroke-width="6" stroke-linecap="round"><path d="M62 62a54 54 0 0 0 0 76"/><path d="M138 62a54 54 0 0 1 0 76"/><path d="M80 80a28 28 0 0 0 0 40"/><path d="M120 80a28 28 0 0 1 0 40"/></g><circle cx="100" cy="100" r="9" fill="#fff" fill-opacity=".8"/><text x="100" y="172" text-anchor="middle" font-family="system-ui,sans-serif" font-size="30" font-weight="700" fill="#fff" fill-opacity=".92">${escapeXml(initials)}</text></svg>`;
+  return { bytes: new TextEncoder().encode(svg), type: "image/svg+xml" };
+}

@@ -291,9 +291,34 @@ describe("radio station art", () => {
       await client.post("/api/plugins/music/data/radio", { scope: "popular" });
       const address = encodeURIComponent("https://icons.example.com/cabin.png");
       __rememberRadioFaviconForTests("https://icons.example.com/cabin.png");
-      expect((await client.get(`${BASE}/art?u=${address}`)).status).toBe(404);
+      // Upstream bytes that are not an image, or too big, are never passed on: the station gets its generated picture instead.
+      const refused = await client.get(`${BASE}/art?u=${address}&n=${encodeURIComponent("Cabin FM")}`);
+      expect(refused.status).toBe(200);
+      expect(refused.headers.get("content-type")).toBe("image/svg+xml");
+      expect(await refused.text()).toContain(">CF<");
       mode = "size";
-      expect((await client.get(`${BASE}/art?u=${address}`)).status).toBe(404);
+      const oversized = await client.get(`${BASE}/art?u=${address}`);
+      expect(oversized.headers.get("content-type")).toBe("image/svg+xml");
     } finally { globalThis.fetch = realFetch; __setRadioArtDepsForTests({}); }
+  });
+
+  test("a station with no logo gets a generated picture and a list honors its limit", async () => {
+    on();
+    const { client } = await owner();
+    const card = await client.get(`${BASE}/card?n=${encodeURIComponent("Radio Armisa")}`);
+    expect(card.status).toBe(200);
+    expect(card.headers.get("content-type")).toBe("image/svg+xml");
+    expect(await card.text()).toContain(">RA<");
+    const realFetch = globalThis.fetch;
+    globalThis.fetch = (async (input: URL | string | Request) => {
+      const url = typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
+      return url.includes("radio-browser.info") ? new Response(JSON.stringify(ROWS), { status: 200 }) : new Response("{}", { status: 404 });
+    }) as typeof fetch;
+    try {
+      const all = await client.post("/api/plugins/music/data/radio", { scope: "popular" });
+      const few = await client.post("/api/plugins/music/data/radio", { scope: "popular", limit: "1" });
+      expect(((await few.json()) as unknown[]).length).toBe(1);
+      expect(((await all.json()) as unknown[]).length).toBeGreaterThanOrEqual(1);
+    } finally { globalThis.fetch = realFetch; }
   });
 });

@@ -12,7 +12,7 @@ import "@/lib/media/musicApp"; // registers the Music lyrics fields with the sha
 import "@/lib/media/radioRecordings"; // adds the Recordings scope to Music's existing radio data id
 import { podcastRoutes, podcastDirectoryRows, podcastShowRows, podcastShowEpisodeRows } from "./podcastApp";
 import { radioRoutes, radioDirectoryRows, radioSavedRows, radioStationRow, radioCountryRows, radioGenreRows } from "./radioApp";
-import { fetchRadioArt } from "@/lib/media/radioArt";
+import { fetchRadioArt, radioArtCard } from "@/lib/media/radioArt";
 import { radioDirectoryAllowed, radioDirectoryHasFavicon } from "@/lib/media/radioDirectory";
 import { listSavedStations } from "@/lib/media/radio";
 import { radioRecordingRows } from "@/lib/media/radioRecordings";
@@ -50,6 +50,12 @@ function paramsOf(body: Body): DataParams {
   };
 }
 
+/** A page that asks for a few rows (a billboard's six slides) gets at most that many. */
+function withLimit<T>(body: Record<string, unknown>, rows: T[]): T[] {
+  const limit = Number(body.limit);
+  return Number.isInteger(limit) && limit > 0 ? rows.slice(0, Math.min(limit, 200)) : rows;
+}
+
 /** One media app's routes. `data/:dataId` serves the package's `contributes.data[]` ids; `progress`, `watch-later` and `like` are its actions. */
 export function createMediaAppRoutes(appId: MediaAppId) {
   const routes = apiRouter();
@@ -66,9 +72,13 @@ export function createMediaAppRoutes(appId: MediaAppId) {
       if (!radioDirectoryAllowed({ band: mediaBandOf(person) }, getHouseholdSettingValue("radio.directory.enabled") === true)) return c.body(null, 403);
       if (!radioDirectoryHasFavicon(normalizedAddress)) return c.body(null, 404);
     }
-    const art = await fetchRadioArt(normalizedAddress);
-    if (!art) return c.body(null, 404);
+    const art = (await fetchRadioArt(normalizedAddress)) ?? radioArtCard(c.req.query("n") ?? "");
     return new Response(art.bytes, { status: 200, headers: { "content-type": art.type, "cache-control": "private, max-age=86400", "x-content-type-options": "nosniff", "content-security-policy": "default-src 'none'", "cross-origin-resource-policy": "same-origin" } });
+    });
+    radio.get("/card", requireAuth, async (c, next) => {
+      if (!mediaAppAllowed(c.get("person"), "music")) return next();
+      const art = radioArtCard(c.req.query("n") ?? "");
+      return new Response(art.bytes, { status: 200, headers: { "content-type": art.type, "cache-control": "private, max-age=86400", "x-content-type-options": "nosniff", "content-security-policy": "default-src 'none'", "cross-origin-resource-policy": "same-origin" } });
     });
     routes.route("/radio", radio);
   }
@@ -84,7 +94,7 @@ export function createMediaAppRoutes(appId: MediaAppId) {
       const body = await bodyOf(c.req.raw);
       if (body.scope === "show") return c.json(await podcastShowRows(person, typeof body.id === "string" ? body.id : "", "show") as never, 200);
       if (body.scope === "show-episodes") return c.json(await podcastShowEpisodeRows(person, typeof body.id === "string" ? body.id : "") as never, 200);
-      return c.json(await podcastDirectoryRows(person, typeof body.q === "string" ? body.q : "", typeof body.scope === "string" ? body.scope : "search") as never, 200);
+      return c.json(withLimit(body, await podcastDirectoryRows(person, typeof body.q === "string" ? body.q : "", typeof body.scope === "string" ? body.scope : "search")) as never, 200);
     }
     // RADIO-02: Music's Radio pages. The directory is a network lookup (async); the rest are sync rows. Same gates as the radio routes.
     if (appId === "music") {
@@ -96,7 +106,7 @@ export function createMediaAppRoutes(appId: MediaAppId) {
           const row = radioStationRow(person, field("id"));
           return row ? c.json([row] as never, 200) : c.json([] as never, 200);
         }
-        if (["directory", "popular", "genre-rock", "genre-jazz", "genre-chill", "genre-classical", "genre-news", "genre-hip-hop", "world-us", "world-gb", "world-jp"].includes(scope)) return c.json(await radioDirectoryRows(person, { q: field("q"), country: field("country"), tag: field("tag"), scope: scope as import("./radioApp").RadioScope }) as never, 200);
+        if (["directory", "popular", "genre-rock", "genre-jazz", "genre-chill", "genre-classical", "genre-news", "genre-hip-hop", "world-us", "world-gb", "world-jp"].includes(scope)) return c.json(withLimit(body, await radioDirectoryRows(person, { q: field("q"), country: field("country"), tag: field("tag"), scope: scope as import("./radioApp").RadioScope })) as never, 200);
         if (scope === "saved") return c.json(radioSavedRows(person) as never, 200);
         if (scope === "recordings") return c.json(radioRecordingRows(person) as never, 200);
         if (scope === "countries") return c.json({ as_of: new Date().toISOString(), rows: radioCountryRows() } as never, 200);

@@ -2,6 +2,10 @@
 
 All notable changes to the Podcasts package, in [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) format.
 
+## [0.2.12] - 2026-10-28
+
+- The front page opens on a rotating Featured shows banner of six top shows; each opens its show page.
+
 ## [0.2.11] - 2026-10-28
 
 - Made show details readable below the artwork and polished episode dates, descriptions and cover thumbnails.

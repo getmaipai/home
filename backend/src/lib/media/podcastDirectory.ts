@@ -15,6 +15,8 @@ const MAX_RESULTS = 25;
 
 let pausedUntil = 0;
 const CACHE_MS = 15 * 60 * 1000;
+/** A failed lookup is retried soon: one blocked or slow call must not blank the front page for the full cache time. */
+const FAILURE_CACHE_MS = 20 * 1000;
 const cache = new Map<string, { until: number; result: DirectoryResult }>();
 // Feed addresses are usable for previews only after Apple returned them in a result.
 const approvedFeeds = new Map<string, { until: number; show: DirectoryShow }>();
@@ -90,7 +92,7 @@ export async function topShows(deps: DirectoryDeps = {}): Promise<DirectoryResul
   const entries = list?.feed?.results;
   if (!Array.isArray(entries) || entries.length === 0) {
     const result: DirectoryResult = { ok: false, status: 502, error: DOWN };
-    cache.set("top", { until: now + CACHE_MS, result });
+    cache.set("top", { until: now + FAILURE_CACHE_MS, result });
     return result;
   }
   const ids = entries.map((entry) => text(entry.id)).filter((id) => /^\d+$/.test(id));
@@ -106,7 +108,7 @@ export async function topShows(deps: DirectoryDeps = {}): Promise<DirectoryResul
   }
   const result: DirectoryResult = shows.length > 0 ? { ok: true, shows } : { ok: false, status: 502, error: DOWN };
   rememberShows(shows, now);
-  cache.set("top", { until: now + CACHE_MS, result });
+  cache.set("top", { until: now + (result.ok ? CACHE_MS : FAILURE_CACHE_MS), result });
   return result;
 }
 

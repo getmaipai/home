@@ -4,6 +4,37 @@
   "title": "Listen now",
   "body": [
     {
+      "type": "billboard",
+      "bind": {
+        "source": "package",
+        "path": "radio",
+        "params": {
+          "scope": "popular",
+          "limit": "6"
+        }
+      },
+      "label": "Featured stations",
+      "size": "banner",
+      "item_key_field": "id",
+      "item_title_field": "title",
+      "item_subtitle_field": "{summary}",
+      "item_art_field": "thumbnail",
+      "primary": {
+        "label": "Open station",
+        "icon": "play",
+        "action": {
+          "navigate": {
+            "to": "/apps/music/station",
+            "state": {
+              "id": "{id}"
+            }
+          }
+        }
+      },
+      "secondary": [],
+      "hide_when_empty": true
+    },
+    {
       "type": "media_shelf",
       "heading": "Created by you",
       "bind": {
@@ -122,18 +153,54 @@
     {
       "type": "media_shelf",
       "heading": "Your stations",
-      "bind": { "source": "package", "path": "radio", "params": { "scope": "saved" } },
-      "item_key_field": "id", "item_label_field": "title", "item_subtitle_field": "{summary}", "item_media_field": "thumbnail",
-      "aspect": "square", "variant": "plain", "hide_when_empty": true,
-      "on_select": { "navigate": { "to": "/apps/music/station", "state": { "id": "{id}" } } }
+      "bind": {
+        "source": "package",
+        "path": "radio",
+        "params": {
+          "scope": "saved"
+        }
+      },
+      "item_key_field": "id",
+      "item_label_field": "title",
+      "item_subtitle_field": "{summary}",
+      "item_media_field": "thumbnail",
+      "aspect": "square",
+      "variant": "plain",
+      "hide_when_empty": true,
+      "on_select": {
+        "navigate": {
+          "to": "/apps/music/station",
+          "state": {
+            "id": "{id}"
+          }
+        }
+      }
     },
     {
       "type": "media_shelf",
       "heading": "Popular radio",
-      "bind": { "source": "package", "path": "radio", "params": { "scope": "popular" } },
-      "item_key_field": "id", "item_label_field": "title", "item_subtitle_field": "{summary}", "item_media_field": "thumbnail",
-      "aspect": "square", "variant": "plain", "hide_when_empty": true,
-      "on_select": { "navigate": { "to": "/apps/music/station", "state": { "id": "{id}" } } }
+      "bind": {
+        "source": "package",
+        "path": "radio",
+        "params": {
+          "scope": "popular"
+        }
+      },
+      "item_key_field": "id",
+      "item_label_field": "title",
+      "item_subtitle_field": "{summary}",
+      "item_media_field": "thumbnail",
+      "aspect": "square",
+      "variant": "plain",
+      "hide_when_empty": true,
+      "on_select": {
+        "navigate": {
+          "to": "/apps/music/station",
+          "state": {
+            "id": "{id}"
+          }
+        }
+      }
     }
   ]
 }

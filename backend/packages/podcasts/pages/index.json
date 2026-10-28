@@ -4,16 +4,57 @@
   "title": "Podcasts",
   "body": [
     {
+      "type": "billboard",
+      "bind": {
+        "source": "package",
+        "path": "directory",
+        "params": {
+          "scope": "top",
+          "limit": "6"
+        }
+      },
+      "label": "Featured shows",
+      "size": "banner",
+      "item_key_field": "id",
+      "item_title_field": "title",
+      "item_subtitle_field": "{author}",
+      "item_art_field": "thumbnail",
+      "primary": {
+        "label": "Open show",
+        "icon": "play",
+        "action": {
+          "navigate": {
+            "to": "/apps/podcasts/show",
+            "state": {
+              "id": "{feed_url}"
+            }
+          }
+        }
+      },
+      "secondary": [],
+      "hide_when_empty": true
+    },
+    {
       "type": "search",
       "state": "q",
       "label": "Search podcasts",
       "placeholder": "Search podcasts",
-      "submit": { "navigate": { "to": "/apps/podcasts/search", "state": { "q": "{q}" } } }
+      "submit": {
+        "navigate": {
+          "to": "/apps/podcasts/search",
+          "state": {
+            "q": "{q}"
+          }
+        }
+      }
     },
     {
       "type": "media_shelf",
       "heading": "Up Next",
-      "bind": { "source": "package", "path": "continue" },
+      "bind": {
+        "source": "package",
+        "path": "continue"
+      },
       "item_key_field": "id",
       "item_label_field": "title",
       "item_subtitle_field": "{channel}",
@@ -21,13 +62,20 @@
       "item_meta_field": "duration_s",
       "aspect": "wide",
       "variant": "plain",
-      "on_select": { "play": { "media_id": "{id}" } },
+      "on_select": {
+        "play": {
+          "media_id": "{id}"
+        }
+      },
       "hide_when_empty": true
     },
     {
       "type": "media_shelf",
       "heading": "New episodes",
-      "bind": { "source": "package", "path": "new" },
+      "bind": {
+        "source": "package",
+        "path": "new"
+      },
       "item_key_field": "id",
       "item_label_field": "title",
       "item_subtitle_field": "{channel}",
@@ -35,39 +83,73 @@
       "item_meta_field": "duration_s",
       "aspect": "square",
       "variant": "plain",
-      "on_select": { "play": { "media_id": "{id}" } },
+      "on_select": {
+        "play": {
+          "media_id": "{id}"
+        }
+      },
       "hide_when_empty": true
     },
     {
       "type": "media_shelf",
       "heading": "Your shows",
-      "bind": { "source": "package", "path": "shows" },
+      "bind": {
+        "source": "package",
+        "path": "shows"
+      },
       "item_key_field": "id",
       "item_label_field": "title",
       "item_subtitle_field": "{summary}",
       "item_media_field": "thumbnail",
       "aspect": "square",
       "variant": "plain",
-      "on_select": { "navigate": { "to": "/apps/podcasts/show", "state": { "id": "{id}" } } },
+      "on_select": {
+        "navigate": {
+          "to": "/apps/podcasts/show",
+          "state": {
+            "id": "{id}"
+          }
+        }
+      },
       "hide_when_empty": true
     },
     {
       "type": "media_shelf",
       "heading": "Top shows",
-      "bind": { "source": "package", "path": "directory", "params": { "scope": "top" } },
+      "bind": {
+        "source": "package",
+        "path": "directory",
+        "params": {
+          "scope": "top"
+        }
+      },
       "item_key_field": "id",
       "item_label_field": "title",
       "item_subtitle_field": "{author}",
       "item_media_field": "thumbnail",
       "aspect": "square",
       "variant": "plain",
-      "on_select": { "navigate": { "to": "/apps/podcasts/show", "state": { "id": "{feed_url}" } } },
+      "on_select": {
+        "navigate": {
+          "to": "/apps/podcasts/show",
+          "state": {
+            "id": "{feed_url}"
+          }
+        }
+      },
       "row_actions": [
         {
           "icon": "plus",
           "label": "Follow",
           "label_field": "action_label",
-          "action": { "call": { "target": "/api/plugins/podcasts/directory/add", "args": { "url": "{feed_url}" } } }
+          "action": {
+            "call": {
+              "target": "/api/plugins/podcasts/directory/add",
+              "args": {
+                "url": "{feed_url}"
+              }
+            }
+          }
         }
       ],
       "hide_when_empty": true
