@@ -4,15 +4,33 @@
   "title": "Radio",
   "body": [
     {
+      "type": "search",
+      "state": "q",
+      "label": "Search stations",
+      "placeholder": "Search stations"
+    },
+    {
+      "type": "media_shelf",
+      "heading": "Search results",
+      "bind": { "source": "package", "path": "radio", "params": { "scope": "directory", "q": "$state.q" } },
+      "item_key_field": "id",
+      "item_label_field": "title",
+      "item_subtitle_field": "{summary}",
+      "item_media_field": "thumbnail",
+      "aspect": "square",
+      "variant": "plain",
+      "orientation": "vertical",
+      "density": "compact",
+      "hide_when_empty": true,
+      "row_actions": [
+        { "icon": "plus", "label": "Add", "label_field": "action_label", "action": { "call": { "target": "/api/plugins/music/radio/stations", "args": { "from": "directory", "name": "{title}", "url": "{url}", "favicon": "{favicon}", "tags": "{tags_csv}", "country_code": "{country_code}", "codec": "{codec}", "bitrate_kbps": "{bitrate_kbps}" } } } }
+      ],
+      "on_select": { "play": { "media_id": "{id}" } }
+    },
+    {
       "type": "media_shelf",
       "heading": "Your stations",
-      "bind": {
-        "source": "package",
-        "path": "radio",
-        "params": {
-          "scope": "saved"
-        }
-      },
+      "bind": { "source": "package", "path": "radio", "params": { "scope": "saved" } },
       "item_key_field": "id",
       "item_label_field": "title",
       "item_subtitle_field": "{summary}",
@@ -22,27 +40,20 @@
       "orientation": "vertical",
       "density": "compact",
       "row_actions": [
-        {
-          "icon": "trash",
-          "label": "Remove",
-          "action": {
-            "call": {
-              "target": "/api/plugins/music/radio/stations/{id}",
-              "method": "DELETE"
-            }
-          }
-        }
+        { "icon": "trash", "label": "Remove", "action": { "call": { "target": "/api/plugins/music/radio/stations/{id}", "method": "DELETE" } } }
       ],
-      "empty_state": {
-        "type": "empty_state",
-        "icon": "headphones",
-        "text": "No stations yet. Open Find stations to add some. If Find stations is empty, an adult can turn on Find radio stations online in Settings, Household, Media online."
-      },
-      "on_select": {
-        "play": {
-          "media_id": "{id}"
-        }
-      }
-    }
+      "empty_state": { "type": "empty_state", "icon": "headphones", "text": "No stations yet. Tap Add on any station to save one here." },
+      "on_select": { "play": { "media_id": "{id}" } }
+    },
+    { "type": "media_shelf", "heading": "Popular now", "bind": { "source": "package", "path": "radio", "params": { "scope": "popular" } }, "item_key_field": "id", "item_label_field": "title", "item_subtitle_field": "{summary}", "item_media_field": "thumbnail", "aspect": "square", "variant": "plain", "orientation": "horizontal", "hide_when_empty": true, "on_select": { "play": { "media_id": "{id}" } }, "row_actions": [{ "icon": "plus", "label": "Add", "label_field": "action_label", "action": { "call": { "target": "/api/plugins/music/radio/stations", "args": { "from": "directory", "name": "{title}", "url": "{url}", "favicon": "{favicon}", "tags": "{tags_csv}", "country_code": "{country_code}", "codec": "{codec}", "bitrate_kbps": "{bitrate_kbps}" } } } }] },
+    { "type": "media_shelf", "heading": "Rock", "bind": { "source": "package", "path": "radio", "params": { "scope": "genre-rock" } }, "item_key_field": "id", "item_label_field": "title", "item_subtitle_field": "{summary}", "item_media_field": "thumbnail", "aspect": "square", "variant": "plain", "orientation": "horizontal", "hide_when_empty": true, "on_select": { "play": { "media_id": "{id}" } }, "row_actions": [{ "icon": "plus", "label": "Add", "label_field": "action_label", "action": { "call": { "target": "/api/plugins/music/radio/stations", "args": { "from": "directory", "name": "{title}", "url": "{url}", "favicon": "{favicon}", "tags": "{tags_csv}", "country_code": "{country_code}", "codec": "{codec}", "bitrate_kbps": "{bitrate_kbps}" } } } }] },
+    { "type": "media_shelf", "heading": "Jazz", "bind": { "source": "package", "path": "radio", "params": { "scope": "genre-jazz" } }, "item_key_field": "id", "item_label_field": "title", "item_subtitle_field": "{summary}", "item_media_field": "thumbnail", "aspect": "square", "variant": "plain", "orientation": "horizontal", "hide_when_empty": true, "on_select": { "play": { "media_id": "{id}" } }, "row_actions": [{ "icon": "plus", "label": "Add", "label_field": "action_label", "action": { "call": { "target": "/api/plugins/music/radio/stations", "args": { "from": "directory", "name": "{title}", "url": "{url}", "favicon": "{favicon}", "tags": "{tags_csv}", "country_code": "{country_code}", "codec": "{codec}", "bitrate_kbps": "{bitrate_kbps}" } } } }] },
+    { "type": "media_shelf", "heading": "Chill", "bind": { "source": "package", "path": "radio", "params": { "scope": "genre-chill" } }, "item_key_field": "id", "item_label_field": "title", "item_subtitle_field": "{summary}", "item_media_field": "thumbnail", "aspect": "square", "variant": "plain", "orientation": "horizontal", "hide_when_empty": true, "on_select": { "play": { "media_id": "{id}" } }, "row_actions": [{ "icon": "plus", "label": "Add", "label_field": "action_label", "action": { "call": { "target": "/api/plugins/music/radio/stations", "args": { "from": "directory", "name": "{title}", "url": "{url}", "favicon": "{favicon}", "tags": "{tags_csv}", "country_code": "{country_code}", "codec": "{codec}", "bitrate_kbps": "{bitrate_kbps}" } } } }] },
+    { "type": "media_shelf", "heading": "Classical", "bind": { "source": "package", "path": "radio", "params": { "scope": "genre-classical" } }, "item_key_field": "id", "item_label_field": "title", "item_subtitle_field": "{summary}", "item_media_field": "thumbnail", "aspect": "square", "variant": "plain", "orientation": "horizontal", "hide_when_empty": true, "on_select": { "play": { "media_id": "{id}" } }, "row_actions": [{ "icon": "plus", "label": "Add", "label_field": "action_label", "action": { "call": { "target": "/api/plugins/music/radio/stations", "args": { "from": "directory", "name": "{title}", "url": "{url}", "favicon": "{favicon}", "tags": "{tags_csv}", "country_code": "{country_code}", "codec": "{codec}", "bitrate_kbps": "{bitrate_kbps}" } } } }] },
+    { "type": "media_shelf", "heading": "News", "bind": { "source": "package", "path": "radio", "params": { "scope": "genre-news" } }, "item_key_field": "id", "item_label_field": "title", "item_subtitle_field": "{summary}", "item_media_field": "thumbnail", "aspect": "square", "variant": "plain", "orientation": "horizontal", "hide_when_empty": true, "on_select": { "play": { "media_id": "{id}" } }, "row_actions": [{ "icon": "plus", "label": "Add", "label_field": "action_label", "action": { "call": { "target": "/api/plugins/music/radio/stations", "args": { "from": "directory", "name": "{title}", "url": "{url}", "favicon": "{favicon}", "tags": "{tags_csv}", "country_code": "{country_code}", "codec": "{codec}", "bitrate_kbps": "{bitrate_kbps}" } } } }] },
+    { "type": "media_shelf", "heading": "Hip hop", "bind": { "source": "package", "path": "radio", "params": { "scope": "genre-hip-hop" } }, "item_key_field": "id", "item_label_field": "title", "item_subtitle_field": "{summary}", "item_media_field": "thumbnail", "aspect": "square", "variant": "plain", "orientation": "horizontal", "hide_when_empty": true, "on_select": { "play": { "media_id": "{id}" } }, "row_actions": [{ "icon": "plus", "label": "Add", "label_field": "action_label", "action": { "call": { "target": "/api/plugins/music/radio/stations", "args": { "from": "directory", "name": "{title}", "url": "{url}", "favicon": "{favicon}", "tags": "{tags_csv}", "country_code": "{country_code}", "codec": "{codec}", "bitrate_kbps": "{bitrate_kbps}" } } } }] },
+    { "type": "media_shelf", "heading": "Around the world · United States", "bind": { "source": "package", "path": "radio", "params": { "scope": "world-us" } }, "item_key_field": "id", "item_label_field": "title", "item_subtitle_field": "{summary}", "item_media_field": "thumbnail", "aspect": "square", "variant": "plain", "orientation": "horizontal", "hide_when_empty": true, "on_select": { "play": { "media_id": "{id}" } }, "row_actions": [{ "icon": "plus", "label": "Add", "label_field": "action_label", "action": { "call": { "target": "/api/plugins/music/radio/stations", "args": { "from": "directory", "name": "{title}", "url": "{url}", "favicon": "{favicon}", "tags": "{tags_csv}", "country_code": "{country_code}", "codec": "{codec}", "bitrate_kbps": "{bitrate_kbps}" } } } }] },
+    { "type": "media_shelf", "heading": "Around the world · United Kingdom", "bind": { "source": "package", "path": "radio", "params": { "scope": "world-gb" } }, "item_key_field": "id", "item_label_field": "title", "item_subtitle_field": "{summary}", "item_media_field": "thumbnail", "aspect": "square", "variant": "plain", "orientation": "horizontal", "hide_when_empty": true, "on_select": { "play": { "media_id": "{id}" } }, "row_actions": [{ "icon": "plus", "label": "Add", "label_field": "action_label", "action": { "call": { "target": "/api/plugins/music/radio/stations", "args": { "from": "directory", "name": "{title}", "url": "{url}", "favicon": "{favicon}", "tags": "{tags_csv}", "country_code": "{country_code}", "codec": "{codec}", "bitrate_kbps": "{bitrate_kbps}" } } } }] },
+    { "type": "media_shelf", "heading": "Around the world · Japan", "bind": { "source": "package", "path": "radio", "params": { "scope": "world-jp" } }, "item_key_field": "id", "item_label_field": "title", "item_subtitle_field": "{summary}", "item_media_field": "thumbnail", "aspect": "square", "variant": "plain", "orientation": "horizontal", "hide_when_empty": true, "on_select": { "play": { "media_id": "{id}" } }, "row_actions": [{ "icon": "plus", "label": "Add", "label_field": "action_label", "action": { "call": { "target": "/api/plugins/music/radio/stations", "args": { "from": "directory", "name": "{title}", "url": "{url}", "favicon": "{favicon}", "tags": "{tags_csv}", "country_code": "{country_code}", "codec": "{codec}", "bitrate_kbps": "{bitrate_kbps}" } } } }] }
   ]
 }

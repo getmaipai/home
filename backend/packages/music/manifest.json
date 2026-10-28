@@ -1,6 +1,6 @@
 {
   "id": "music",
-  "version": "0.3.3",
+  "version": "0.3.4",
   "kind": "plugin",
   "category": "Media",
   "display": "Music",
@@ -158,18 +158,7 @@
           "radio",
           "station",
           "stations",
-          "live radio"
-        ]
-      },
-      {
-        "id": "radio-find",
-        "label": "Find stations",
-        "icon": "search",
-        "nav": true,
-        "kind": "schema",
-        "module": "radio-find",
-        "min_role": "teen",
-        "keywords": [
+          "live radio",
           "find radio",
           "add station",
           "radio stations",

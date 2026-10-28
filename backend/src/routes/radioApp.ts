@@ -9,7 +9,8 @@ import { mediaBandOf } from "@/lib/media/band";
 import { addStation, directoryRowsFor, listSavedStations, removeStation, savedStationFor, type SavedStation } from "@/lib/media/radio";
 import { nowPlayingOf, openStationStream, type StreamDeps } from "@/lib/media/radioStream";
 import { decodeHlsResource, openHlsResource } from "@/lib/media/radioHls";
-import { findStations, radioDirectoryAllowed, type DirectoryStation } from "@/lib/media/radioDirectory";
+import { findStations, radioDirectoryAllowed, radioDirectoryHasFavicon, type DirectoryStation } from "@/lib/media/radioDirectory";
+import { fetchRadioArt } from "@/lib/media/radioArt";
 import { MINOR_QUERY_PERSONAL_NOTE, minorQueryHit } from "@/lib/retrieval/minorQueryCheck";
 import { getHouseholdSettingValue } from "@/lib/settings";
 import { apiRouter } from "@/lib/openapi";
@@ -23,8 +24,7 @@ const bodyOf = async (c: Context): Promise<Body> => {
 const str = (value: unknown): string => (typeof value === "string" ? value : "");
 const NOT_ON = "Finding radio stations is not turned on for you. Ask the person who runs this home.";
 
-// RADIO-02 (Radio pages): the rows the schema pages bind. Art is left out on purpose: station pictures live on other hosts and the page
-// may load same-origin images only (CSP img-src 'self'), so the tiles show the kit's placeholder until a proxy is built.
+// RADIO-02 (Radio pages): station art is allowlisted and served from Home.
 const COUNTRIES: ReadonlyArray<readonly [string, string]> = [
   ["US", "United States"], ["GB", "United Kingdom"], ["CA", "Canada"], ["AU", "Australia"], ["IE", "Ireland"], ["DE", "Germany"], ["FR", "France"],
   ["ES", "Spain"], ["IT", "Italy"], ["NL", "Netherlands"], ["SE", "Sweden"], ["NO", "Norway"], ["BR", "Brazil"], ["MX", "Mexico"], ["AR", "Argentina"],
@@ -40,23 +40,31 @@ export const radioGenreRows = () => GENRES.map((genre) => ({ id: genre, label: g
 const subtitleOf = (station: { country_code: string | null; tags: string[] }): string =>
   [countryName(station.country_code), station.tags.slice(0, 2).join(", ")].filter(Boolean).join(" · ");
 
-export type RadioRow = { id: string; kind: "station"; title: string; summary: string; thumbnail: null; url: string; favicon: string; tags_csv: string; country_code: string; codec: string; bitrate_kbps: string; action_label: string };
+export type RadioRow = { id: string; kind: "station"; title: string; summary: string; thumbnail: string | null; url: string; favicon: string; tags_csv: string; country_code: string; codec: string; bitrate_kbps: string; action_label: string };
 const rowOf = (station: DirectoryStation | SavedStation, label: string): RadioRow => ({
-  id: station.id, kind: "station", title: station.name, summary: subtitleOf(station), thumbnail: null, url: station.url, favicon: station.favicon ?? "", tags_csv: station.tags.join(","),
+  id: station.id, kind: "station", title: station.name, summary: [subtitleOf(station), station.bitrate_kbps ? `${station.bitrate_kbps} kbps` : "", station.codec?.toUpperCase() ?? ""].filter(Boolean).join(" · "), thumbnail: station.favicon ? `/api/plugins/music/radio/art?u=${encodeURIComponent(station.favicon)}` : station.favicon === null ? `/api/favicon?domain=${encodeURIComponent(new URL(station.url).hostname)}` : null, url: station.url, favicon: station.favicon ?? "", tags_csv: station.tags.join(","),
   country_code: station.country_code ?? "", codec: station.codec ?? "", bitrate_kbps: station.bitrate_kbps === null ? "" : String(station.bitrate_kbps), action_label: label,
 });
 
 /** Saved stations for the page: a child sees exactly what a parent saved for them. */
-export const radioSavedRows = (person: PersonRow): RadioRow[] => listSavedStations(person).map((station) => rowOf(station, "Remove"));
+export const radioSavedRows = (person: PersonRow): RadioRow[] => listSavedStations(person).map((station) => ({ ...rowOf(station, "Remove"), action_label: "Remove" }));
 
 /** Find rows for the page. Off, a child, an adult-tag filter or a down directory all give an empty list (the page says so), never an error. */
-export async function radioDirectoryRows(person: PersonRow, query: { q: string; country: string; tag: string }): Promise<RadioRow[]> {
+export type RadioScope = "directory" | "popular" | "genre-rock" | "genre-jazz" | "genre-chill" | "genre-classical" | "genre-news" | "genre-hip-hop" | "world-us" | "world-gb" | "world-jp";
+const SCOPE_QUERY: Partial<Record<RadioScope, { kind: "popular" } | { kind: "search"; tag?: string; country?: string }>> = {
+  popular: { kind: "popular" }, "genre-rock": { kind: "search", tag: "rock" }, "genre-jazz": { kind: "search", tag: "jazz" },
+  "genre-chill": { kind: "search", tag: "chill" }, "genre-classical": { kind: "search", tag: "classical" }, "genre-news": { kind: "search", tag: "news" },
+  "genre-hip-hop": { kind: "search", tag: "hip hop" }, "world-us": { kind: "search", country: "US" }, "world-gb": { kind: "search", country: "GB" }, "world-jp": { kind: "search", country: "JP" },
+};
+export async function radioDirectoryRows(person: PersonRow, query: { q: string; country: string; tag: string; scope?: RadioScope }): Promise<RadioRow[]> {
   const band = mediaBandOf(person);
   if (!radioDirectoryAllowed({ band }, getHouseholdSettingValue("radio.directory.enabled") === true)) return [];
   const any = (value: string) => (value === "all" ? "" : value.trim());
+  const scopeQuery = query.scope && query.scope !== "directory" ? SCOPE_QUERY[query.scope] : undefined;
   const name = query.q.trim(), country = any(query.country), tag = any(query.tag);
   if (minorQueryHit([name, tag].filter(Boolean).join(" "), band)) return [];
-  const result = name === "" && country === "" && tag === "" ? await findStations({ kind: "popular" }) : await findStations({ kind: "search", name, country, tag });
+  if (query.scope === "directory" && name === "" && country === "" && tag === "") return [];
+  const result = scopeQuery ? await findStations(scopeQuery) : name === "" && country === "" && tag === "" ? await findStations({ kind: "popular" }) : await findStations({ kind: "search", name, country, tag });
   return result.ok ? directoryRowsFor(person, result.stations).map((station) => rowOf(station, station.added ? "Added" : "Add")) : [];
 }
 

@@ -24,10 +24,16 @@ const BUCKET = "net:radio-directory:radio-browser.info";
 const PACE = { capacity: 5, refillPerSecond: 1 / 3 } as const;
 const PAUSE_MS = 60 * 60 * 1000;
 const DOWN = "The radio directory did not answer. Try again in a few minutes.";
-const MAX_RESULTS = 30;
+const MAX_RESULTS = 24;
+const CACHE_MS = 5 * 60 * 1000;
+const cache = new Map<string, { expiresAt: number; stations: DirectoryStation[] }>();
+const inFlight = new Map<string, Promise<RadioResult>>();
+const knownFaviconAddresses = new Set<string>();
 
 let pausedUntil = 0;
-export function __resetRadioDirectoryForTests(): void { pausedUntil = 0; }
+export function __resetRadioDirectoryForTests(): void { pausedUntil = 0; cache.clear(); inFlight.clear(); knownFaviconAddresses.clear(); }
+export function radioDirectoryHasFavicon(address: string): boolean { return knownFaviconAddresses.has(address); }
+export function __rememberRadioFaviconForTests(address: string): void { knownFaviconAddresses.add(address); }
 
 /** The household switch and the person's band decide; a child never reaches the directory (a parent saves stations for them). */
 export function radioDirectoryAllowed(person: { band: "adult" | "teen" | "child" }, enabled: boolean): boolean {
@@ -68,10 +74,25 @@ function pathOf(query: RadioQuery): string {
   return `/json/stations/search?${params}`;
 }
 
+const cacheKey = (query: RadioQuery): string => JSON.stringify(query.kind === "popular"
+  ? { kind: "popular" }
+  : { kind: "search", name: query.name?.trim().toLowerCase() ?? "", country: query.country?.trim().toUpperCase() ?? "", tag: query.tag?.trim().toLowerCase() ?? "" });
+
 export async function findStations(query: RadioQuery, deps: RadioDeps = {}): Promise<RadioResult> {
   const now = deps.nowMs?.() ?? Date.now();
   if (query.kind === "search" && !query.name?.trim() && !query.country?.trim() && !query.tag?.trim()) return { ok: true, stations: [] };
+  const key = cacheKey(query);
+  const cached = cache.get(key);
+  if (cached && cached.expiresAt > now) return { ok: true, stations: cached.stations };
   if (now < pausedUntil) return { ok: false, status: 502, error: DOWN };
+  const pending = inFlight.get(key);
+  if (pending) return pending;
+  const request = fetchStations(query, deps, now, key);
+  inFlight.set(key, request);
+  try { return await request; } finally { inFlight.delete(key); }
+}
+
+async function fetchStations(query: RadioQuery, deps: RadioDeps, now: number, key: string): Promise<RadioResult> {
   const path = pathOf(query);
   for (const host of HOSTS) {
     if (!tryConsume(BUCKET, PACE, now)) return { ok: false, status: 502, error: DOWN };
@@ -80,7 +101,10 @@ export async function findStations(query: RadioQuery, deps: RadioDeps = {}): Pro
       if (response.status !== 200) { console.warn(`[radio-directory] ${host}: status ${response.status}`); continue; }
       const body = await response.json();
       if (!Array.isArray(body)) continue;
-      return { ok: true, stations: (body as Array<Record<string, unknown>>).map(stationOf).filter((station): station is DirectoryStation => station !== null) };
+      const stations = (body as Array<Record<string, unknown>>).map(stationOf).filter((station): station is DirectoryStation => station !== null);
+      for (const station of stations) if (station.favicon) knownFaviconAddresses.add(station.favicon);
+      cache.set(key, { expiresAt: now + CACHE_MS, stations });
+      return { ok: true, stations };
     } catch (err) {
       console.warn(`[radio-directory] ${host}: ${err instanceof Error ? err.name : "error"}`);
     }

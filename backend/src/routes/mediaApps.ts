@@ -11,6 +11,11 @@ import "@/lib/media/podcastApp"; // registers the Podcasts data ids and item vie
 import "@/lib/media/musicApp"; // registers the Music lyrics fields with the shared host
 import { podcastRoutes, podcastDirectoryRows } from "./podcastApp";
 import { radioRoutes, radioDirectoryRows, radioSavedRows, radioCountryRows, radioGenreRows } from "./radioApp";
+import { fetchRadioArt } from "@/lib/media/radioArt";
+import { radioDirectoryAllowed, radioDirectoryHasFavicon } from "@/lib/media/radioDirectory";
+import { listSavedStations } from "@/lib/media/radio";
+import { mediaBandOf } from "@/lib/media/band";
+import { getHouseholdSettingValue } from "@/lib/settings";
 import { editMediaItem } from "@/lib/media/mediaEdit";
 import { saveMediaCover } from "@/lib/media/mediaCover";
 import { lookupLyricsFor } from "@/lib/media/lyricsAction";
@@ -47,11 +52,31 @@ function paramsOf(body: Body): DataParams {
 export function createMediaAppRoutes(appId: MediaAppId) {
   const routes = apiRouter();
 
+  if (appId === "music") {
+    const radio = radioRoutes();
+    radio.get("/art", requireAuth, async (c, next) => {
+    const person = c.get("person");
+    if (!mediaAppAllowed(person, "music")) return next();
+    const address = c.req.query("u") ?? "";
+    const normalizedAddress = address.replace(/^http:\/\//i, "https://");
+    const saved = listSavedStations(person).some((station) => station.favicon === normalizedAddress);
+    if (!saved) {
+      if (!radioDirectoryAllowed({ band: mediaBandOf(person) }, getHouseholdSettingValue("radio.directory.enabled") === true)) return c.body(null, 403);
+      if (!radioDirectoryHasFavicon(normalizedAddress)) return c.body(null, 404);
+    }
+    const art = await fetchRadioArt(normalizedAddress);
+    if (!art) return c.body(null, 404);
+    return new Response(art.bytes, { status: 200, headers: { "content-type": art.type, "cache-control": "private, max-age=86400", "x-content-type-options": "nosniff", "content-security-policy": "default-src 'none'", "cross-origin-resource-policy": "same-origin" } });
+    });
+    routes.route("/radio", radio);
+  }
+
   routes.post("/data/:dataId", requireAuth, async (c, next) => {
     const person = c.get("person");
     if (!mediaAppAllowed(person, appId)) return next();
     // NEWS-00 review: a data id a raised page binds needs that page's floor; ids the media host serves that no page binds stay under the host's own rules.
-    if (!appRouteAllowed(person, appId, "data", c.req.param("dataId"), undefined, "open")) return next();
+    const isRadioDirectoryScope = appId === "music" && c.req.param("dataId") === "radio";
+    if (!isRadioDirectoryScope && !appRouteAllowed(person, appId, "data", c.req.param("dataId"), undefined, "open")) return next();
     // PODCAST-PORT-01: the directory is a network lookup, so it is answered here (async) beside the sync host data. Same gates as its routes.
     if (appId === "podcasts" && c.req.param("dataId") === "directory") {
       const body = await bodyOf(c.req.raw);
@@ -63,7 +88,7 @@ export function createMediaAppRoutes(appId: MediaAppId) {
         const body = await bodyOf(c.req.raw);
         const field = (key: string) => (typeof body[key] === "string" ? (body[key] as string) : "");
         const scope = field("scope");
-        if (scope === "directory") return c.json(await radioDirectoryRows(person, { q: field("q"), country: field("country"), tag: field("tag") }) as never, 200);
+        if (["directory", "popular", "genre-rock", "genre-jazz", "genre-chill", "genre-classical", "genre-news", "genre-hip-hop", "world-us", "world-gb", "world-jp"].includes(scope)) return c.json(await radioDirectoryRows(person, { q: field("q"), country: field("country"), tag: field("tag"), scope: scope as import("./radioApp").RadioScope }) as never, 200);
         if (scope === "saved") return c.json(radioSavedRows(person) as never, 200);
         if (scope === "countries") return c.json({ as_of: new Date().toISOString(), rows: radioCountryRows() } as never, 200);
         if (scope === "genres") return c.json({ as_of: new Date().toISOString(), rows: radioGenreRows() } as never, 200);
@@ -156,7 +181,6 @@ export function createMediaAppRoutes(appId: MediaAppId) {
   }
 
   if (appId === "podcasts") routes.route("/", podcastRoutes());
-  if (appId === "music") routes.route("/radio", radioRoutes());
 
   return routes;
 }

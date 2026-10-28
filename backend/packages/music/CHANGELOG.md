@@ -2,6 +2,13 @@
 
 All notable changes to the Music package, in [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) format.
 
+## [0.3.4] - 2026-10-28
+
+### Changed
+
+- Turn Radio into one searchable dashboard with saved stations, popular and genre shelves, and country shelves. Station artwork uses a same-origin, allowlisted image route.
+- Remove the separate Find stations page.
+
 ## [0.3.2] - 2026-10-28
 
 ### Added
