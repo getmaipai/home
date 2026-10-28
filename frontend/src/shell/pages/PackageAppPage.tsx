@@ -45,6 +45,11 @@ function VideoDetails({ id }: { id: string }) {
 
 const PAGE_FRESH_MS = 5 * 60_000;
 
+/** The advice chips the Weather app's details carry (the host builds them as short labels); anything else draws nothing. */
+function weatherChips(value: unknown): Array<{ id: string; label: string; icon?: string }> {
+  return Array.isArray(value) ? value.filter((item): item is { id: string; label: string; icon?: string } => !!item && typeof item.id === "string" && typeof item.label === "string") : [];
+}
+
 function weatherLocation(place: { id: string; label: string; geo?: { lat?: number; lon?: number; area?: string | null } | null }, props: Record<string, unknown>): WeatherLocation {
   const current = (props.current && typeof props.current === "object" ? props.current : {}) as Record<string, unknown>;
   const daily = Array.isArray(props.daily) ? props.daily as Array<Record<string, unknown>> : [];
@@ -146,12 +151,13 @@ export function PackageAppPage({ person }: { person: Roster }) {
     enabled: packageId === "weather" && pageId === "index",
     queryFn: async () => {
       const data = await api.appData<{ blocks?: Array<{ props?: Record<string, unknown> }>; details?: Record<string, unknown> }>("weather", "forecast", { place: place.id });
-      return weatherLocation(place, { ...(data.blocks?.[0]?.props ?? {}), details: data.details });
+      return { location: weatherLocation(place, { ...(data.blocks?.[0]?.props ?? {}), details: data.details }), advice: weatherChips(data.details?.advice) };
     },
   })) });
   const weatherSearchQuery = useQuery({ queryKey: ["weather-search", weatherSearch], queryFn: () => api.searchPlaces(weatherSearch), enabled: packageId === "weather" && pageId === "index" && weatherSearch.trim().length > 1 });
-  const weatherLocations = dedupeLocations(weatherVisiblePlaces.map((place, index) => weatherForecasts[index]?.data ?? weatherLocation(place, {})).filter((place) => place.detail));
+  const weatherLocations = dedupeLocations(weatherVisiblePlaces.map((place, index) => weatherForecasts[index]?.data?.location ?? weatherLocation(place, {})).filter((place) => place.detail));
   const weatherSelectedPlace = weatherLocations.find((place) => place.id === weatherSelectedId) ?? weatherLocations[0];
+  const weatherSelectedAdvice = weatherForecasts.find((query) => query.data?.location.id === weatherSelectedPlace?.id)?.data?.advice;
   const rows = useAppRows();
   const app = rows?.find((row) => row.package === packageId);
   useTabItem(app?.label ?? "Apps");
@@ -271,7 +277,7 @@ export function PackageAppPage({ person }: { person: Roster }) {
                 await queryClient.invalidateQueries({ queryKey: ["weather-place-entities", person.id] });
                 setWeatherMessage(`${location?.city ?? "Place"} removed from your list.`);
               }).catch((error: unknown) => setWeatherMessage(error instanceof Error ? error.message : "Could not remove this place."));
-            }} locale={navigator.language} unit={weatherUnit === "celsius" ? "C" : "F"} />
+            }} locale={navigator.language} unit={weatherUnit === "celsius" ? "C" : "F"} advice={weatherSelectedAdvice} />
           </> : null}
         </>); }}
       </AsyncState>

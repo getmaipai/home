@@ -94,3 +94,18 @@ export function adviceFromRecipeData(data: Record<string, unknown> | undefined):
     hourTimes: Array.isArray(data.block_hour_times) ? data.block_hour_times.filter((t): t is string => typeof t === "string") : [],
   });
 }
+
+const CHIP_LABELS: Record<string, string> = {
+  "hat-gloves": "Hat and gloves", "heavy-coat": "Heavy coat", jacket: "Jacket", "light-jacket": "Light jacket",
+  "rain-gear": "Rain gear", umbrella: "Umbrella", boots: "Waterproof shoes",
+  sunscreen: "Sunscreen", shade: "Seek shade", sunglasses: "Sunglasses", windy: "Windy", breezy: "Breezy",
+};
+
+/** The advice as short chips for the kit weather elements: a label of a few words, a sun icon on the sun items. */
+export function adviceChips(items: readonly AdviceItem[]): Array<{ id: string; label: string; icon?: string }> {
+  return items.slice(0, 12).map((item) => ({
+    id: item.id,
+    label: item.id === "rain-timing" ? item.text.replace(/^Rain is likely around /, "Rain around ").replace(/\.$/, "") : CHIP_LABELS[item.id] ?? item.text,
+    ...(item.kind === "sun" ? { icon: "sun" } : {}),
+  }));
+}

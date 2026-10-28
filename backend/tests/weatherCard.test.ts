@@ -22,6 +22,7 @@ const CardProps = z.object({
   current: z.object({ temp: z.number(), condition: z.string().min(1), code: z.number().int(), is_day: z.boolean() }).strict(),
   hourly: z.array(z.object({ time: z.string().min(1), temp: z.number(), pop: Pop }).strict()).max(24).optional(),
   daily: z.array(z.object({ date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/), high: z.number(), low: z.number(), code: z.number().int(), pop: Pop }).strict()).min(1).max(8),
+  advice: z.array(z.object({ id: z.string().min(1), label: z.string().min(1).max(24), icon: z.string().optional() }).strict()).max(12).optional(),
   attribution: z.string().min(1),
 }).strict();
 
@@ -73,6 +74,15 @@ describe("WEATHER-CARD-01: weather_card from the recipe's one forecast response"
     expect(props.hourly).toHaveLength(24);
     expect(props.hourly![0]).toEqual({ time: "2026-10-16T14:00", temp: fixture("clear-day").hourly.temperature_2m[0], pop: 0 });
     expect(props.attribution).toBe(manifest.data_sources![0]!.attribution!);
+  });
+
+  // WEATHER-PORT-02: the card carries short advice chips the pinned spec accepts.
+  test("the card carries advice chips that the spec accepts", async () => {
+    const { card } = await runWeather("rain-night");
+    expect(AnswerBlock.safeParse(card).success).toBe(true);
+    const advice = (card!.props as { advice?: Array<{ id: string; label: string }> }).advice ?? [];
+    expect(advice.length).toBeGreaterThan(0);
+    expect(advice.every((chip) => chip.id !== "" && chip.label !== "" && chip.label.length <= 24)).toBe(true);
   });
 
   // WEATHER-FOLLOWUP-01: the daily arrays used to sit only under block_* keys, which the turn strips

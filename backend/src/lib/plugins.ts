@@ -23,7 +23,7 @@ import { HostError } from "@maipai/spec/emulators/ts/host-emulator.js";
 import { ComputeError } from "@maipai/spec/interpreters/ts/compute.js";
 import { createHost } from "@/lib/packageHost";
 import { blocksForRecipeRun, withoutBlockOnlyData, type BlockCapture } from "@/lib/packageBlocks";
-import { adviceFromRecipeData, adviceLine } from "@/lib/weatherAdvice";
+import { adviceChips, adviceFromRecipeData, adviceLine } from "@/lib/weatherAdvice";
 import { summaryFor } from "@/lib/weatherSummary";
 import { callTier1Handle } from "@/lib/denoHost";
 import { speakerAgeBand } from "@/lib/ageBand";
@@ -676,7 +676,7 @@ export async function runPlugin(
       : adviceLine(advice);
     if (advice.length > 0) answer.data = { ...(answer.data ?? {}), advice, advice_line: adviceLine(advice), summary };
     const appDetails = id === "weather"
-      ? { ...Object.fromEntries(Object.entries(value.data ?? {}).filter(([key]) => key.startsWith("block_detail_")).map(([key, item]) => [key.slice("block_detail_".length), item])), ...(advice.length > 0 ? { advice, summary } : {}) }
+      ? { ...Object.fromEntries(Object.entries(value.data ?? {}).filter(([key]) => key.startsWith("block_detail_")).map(([key, item]) => [key.slice("block_detail_".length), item])), ...(advice.length > 0 ? { advice: adviceChips(advice), summary } : {}) }
       : undefined;
     return { ok: true, value: blocks.length > 0 ? ({ ...answer, blocks, ...(appDetails ? { appDetails } : {}) } as PluginResult) : answer };
   } catch (err) {

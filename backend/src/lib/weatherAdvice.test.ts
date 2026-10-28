@@ -89,3 +89,14 @@ describe("adviceFromRecipeData", () => {
   });
   test("no data is no advice", () => expect(adviceFromRecipeData(undefined)).toEqual([]));
 });
+
+describe("adviceChips", () => {
+  const { adviceChips } = require("@/lib/weatherAdvice") as typeof import("@/lib/weatherAdvice");
+  test("short labels, a sun icon on the sun items, rain timing kept", () => {
+    const chips = adviceChips(weatherAdvice({ ...base, feelsLike: 45, uvIndex: 7 }));
+    expect(chips.find((chip) => chip.id === "jacket")?.label).toBe("Jacket");
+    expect(chips.find((chip) => chip.id === "sunscreen")).toEqual({ id: "sunscreen", label: "Sunscreen", icon: "sun" });
+    expect(chips.every((chip) => chip.label.length <= 24)).toBe(true);
+  });
+  test("no advice, no chips", () => expect(adviceChips([])).toEqual([]));
+});

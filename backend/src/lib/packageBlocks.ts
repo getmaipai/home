@@ -13,6 +13,7 @@
 // nothing; the package reply is never affected.
 import { AnswerBlock } from "@maipai/spec/gen/ts/answer-block.js";
 import { nextHlc } from "@/lib/hlc";
+import { adviceChips, adviceFromRecipeData } from "@/lib/weatherAdvice";
 
 /** Rows a host read already holds, handed to the block producers of the same
  * run. Filled by packageHost.ts (never by a package). */
@@ -170,10 +171,12 @@ export function weatherCard(producer: string, provenance: string, data: Record<s
 
   const today = daily[0]!;
   const alt = `Weather in ${place} now: ${temp}°${unit} and ${condition}; today's high ${today.high}°${unit}, low ${today.low}°${unit}.`;
+  const advice = adviceChips(adviceFromRecipeData(data));
   return blockEnvelope("weather_card", producer, alt, provenance, {
     place,
     unit,
     current: { temp, condition, code, is_day: isDay },
+    ...(advice.length > 0 ? { advice } : {}),
     ...(hourly.length > 0 ? { hourly } : {}),
     daily,
     attribution,
