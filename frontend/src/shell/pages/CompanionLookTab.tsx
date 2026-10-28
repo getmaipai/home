@@ -13,6 +13,7 @@ import { Section } from "@maipai/ui/src/primitives/Section";
 import { AsyncState } from "@maipai/ui/src/primitives/AsyncState";
 import { Select } from "@maipai/ui/src/primitives/Select";
 import { DestructiveConfirm } from "@maipai/ui/src/primitives/DestructiveConfirm";
+import { PictureCropper, cropToFile, initialFrame, loadPicture } from "@/shell/pages/PictureCropper";
 import { ApiError, api, type CompanionLook, type CompanionLookJob, type CompanionLookVersion } from "@/lib/api";
 
 const queryKey = (id: string) => ["companions", id, "look"] as const;
@@ -28,6 +29,8 @@ export function CompanionLookTab({ id, prompt, promptError, onPromptChange, acti
   const jobQuery = useQuery<CompanionLookJob>({ queryKey: [...queryKey(id), "job", jobId], queryFn: () => api.companionLookJob(id, jobId!), enabled: active && jobId !== null, retry: false, refetchInterval: (q) => q.state.data?.state === "queued" || q.state.data?.state === "running" || q.state.data === undefined ? 1500 : false });
   const [formOpen, setFormOpen] = useState(false);
   const [file, setFile] = useState<File | null>(null);
+  const [picture, setPicture] = useState<HTMLImageElement | null>(null);
+  const [frame, setFrame] = useState({ zoom: 1, x: 0, y: 0 });
   const [editId, setEditId] = useState<string | null>(null);
   const [instruction, setInstruction] = useState("");
   const [cardText, setCardText] = useState("");
@@ -44,7 +47,16 @@ export function CompanionLookTab({ id, prompt, promptError, onPromptChange, acti
   useEffect(() => { if (data?.sheet?.card) setCardText(data.sheet.card.text); }, [data?.sheet?.card]);
   async function perform(action: () => Promise<unknown>) { setError(""); setNotice(""); setBusy(true); try { await action(); await client.invalidateQueries({ queryKey: queryKey(id) }); } catch (e) { setError(errorText(e)); } finally { setBusy(false); } }
   async function startJob(action: () => Promise<{ job: string }>) { setError(""); try { setJobId((await action()).job); } catch (e) { setError(errorText(e)); } }
-  async function upload() { if (!file) return; const body = new FormData(); body.append("image", file); await perform(async () => { await api.uploadCompanionLook(id, body); setFormOpen(false); setFile(null); }); }
+  async function choose(chosen: File | null) {
+    setFile(chosen); setPicture(null); if (!chosen) return;
+    const loaded = await loadPicture(chosen); setPicture(loaded); if (loaded) setFrame(initialFrame(loaded.naturalWidth, loaded.naturalHeight));
+  }
+  async function upload() {
+    if (!file) return; const body = new FormData();
+    // The cropped copy when this browser could read the picture; otherwise the file as chosen, and Home reads it.
+    body.append("image", (picture ? await cropToFile(picture, frame, file.name) : null) ?? file);
+    await perform(async () => { await api.uploadCompanionLook(id, body); setFormOpen(false); setFile(null); setPicture(null); });
+  }
   async function copyPrompt() {
     setCopyFallback("");
     try {
@@ -60,7 +72,7 @@ export function CompanionLookTab({ id, prompt, promptError, onPromptChange, acti
   return <div className="flex flex-col gap-4">
     <Section heading="Look prompt"><div className="flex flex-col gap-2"><p className="text-sm text-muted-foreground">Describe how the character looks: species, colours, clothes. Keep it simple and friendly.</p><Label htmlFor="look-prompt">Look prompt ({prompt.length}/600)</Label><Textarea id="look-prompt" aria-label="Look prompt" aria-invalid={Boolean(promptError)} maxLength={600} value={prompt} onChange={(e) => onPromptChange(e.target.value)} />{promptError ? <p role="alert" className="text-sm text-destructive">{promptError}</p> : null}</div></Section>
     <Section heading="Start"><div className="flex flex-wrap gap-2"><Button disabled={running || busy || !prompt.trim() || !data.can_generate} onClick={() => void startJob(() => api.generateCompanionLook(id, { prompt, count: 4 }))}>Generate 4 pictures</Button><Button type="button" variant="outline" disabled={running || busy} onClick={() => setFormOpen((v) => !v)}>Upload a picture</Button><Button type="button" variant="outline" onClick={() => void copyPrompt()}>Copy prompt</Button></div>{copyFallback ? <div className="flex flex-col gap-2"><Label htmlFor="copy-picture-prompt">Copy this text yourself.</Label><Textarea id="copy-picture-prompt" readOnly value={copyFallback} onFocus={(event) => event.currentTarget.select()} /></div> : null}{!data.can_generate && data.generate_reason ? <p className="text-sm text-muted-foreground">{data.generate_reason}</p> : null}{!prompt.trim() ? <p className="text-sm text-muted-foreground">Write a look prompt before generating pictures.</p> : null}
-      {formOpen ? <div className="flex flex-col gap-3"><div className="flex flex-col gap-1"><Label htmlFor="look-upload">Picture (PNG, JPEG or WebP)</Label><Input id="look-upload" type="file" accept="image/png,image/jpeg,image/webp" disabled={running || busy} onChange={(e) => setFile(e.target.files?.[0] ?? null)} /></div><Button disabled={!file || running || busy} onClick={() => void upload()}>Upload</Button></div> : null}
+      {formOpen ? <div className="flex flex-col gap-3"><div className="flex flex-col gap-1"><Label htmlFor="look-upload">Picture</Label><Input id="look-upload" type="file" accept="image/*" disabled={running || busy} onChange={(e) => void choose(e.target.files?.[0] ?? null)} /></div>{picture ? <PictureCropper image={picture} frame={frame} onChange={setFrame} /> : null}<Button disabled={!file || running || busy} onClick={() => void upload()}>Upload</Button></div> : null}
     </Section>
     {running ? <Section heading="Picture progress"><p>{job?.label ?? "Starting picture"}</p><Progress value={job?.percent ?? 0} aria-label={job?.label ?? "Picture progress"} /><Button variant="outline" onClick={() => void perform(async () => { await api.cancelCompanionLookJob(id, jobId!); setJobId(null); })}>Stop</Button></Section> : null}
     <Section heading="Pictures">

@@ -206,6 +206,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `frontend/src/shell/pages/PackageAppPage.tsx` | contextTitleFor, PackageAppPage |
 | `frontend/src/shell/pages/PerformancePage.tsx` | PerformanceIcon, PerformancePage |
 | `frontend/src/shell/pages/PersonProfilePage.tsx` | PersonProfilePage |
+| `frontend/src/shell/pages/PictureCropper.tsx` | visibleRegion, loadPicture, cropToFile, initialFrame, PictureCropper |
 | `frontend/src/shell/pages/PrivacyPage.tsx` | PrivacyIcon, PrivacyPage |
 | `frontend/src/shell/pages/ProjectsPage.tsx` | ProjectsIcon, ProjectsPage |
 | `frontend/src/shell/pages/ReferencePage.tsx` | ReferencePage |
@@ -339,7 +340,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/commands.ts` | __resetCommandsCacheForTests, createCommand, listCommands, deleteCommand, matchCommand, runCommand |
 | `backend/src/lib/companionArt.ts` | COMPANION_STILL_MODEL_MISSING_LINE, COMPANION_CLIP_MODEL_MISSING_LINE, COMPANION_MODEL_MISMATCH_LINE, COMPANION_EDIT_MODEL, __setCompanionArtStatusReadersForTests, promptHash |
 | `backend/src/lib/companionArtCheck.ts` | ArtWithheldError, audienceLane, companionAudience, checkCompanionArt, requireCompanionPictureOk, takeAssets |
-| `backend/src/lib/companionLook.ts` | LookSchema, EMPTY_LOOK, LOOK_LIMIT_LINE, SMALL_PICTURE_LINE, lookPromptFor, KEY_ALPHA_START |
+| `backend/src/lib/companionLook.ts` | LookSchema, EMPTY_LOOK, LOOK_LIMIT_LINE, lookPromptFor, KEY_ALPHA_START, KEY_ALPHA_END |
 | `backend/src/lib/companionLookJobs.ts` | LOOK_JOB_BUSY_LINE, LOOK_PROMPT_REQUIRED_LINE, LOOK_EDIT_PROMPT_LINE, LOOK_ENGINE_NOT_READY_LINE, __clearCompanionLookJobsForTests, activeLookJob |
 | `backend/src/lib/companionPortrait.ts` | portraitPath, retainedPortraitExists, readRetainedPortrait, retainCompanionPortrait, voiceVersion, companionVoiceVersion |
 | `backend/src/lib/companionPromptPack.ts` | picturePromptPack, clipPromptPack |

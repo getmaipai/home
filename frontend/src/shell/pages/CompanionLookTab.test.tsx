@@ -48,7 +48,7 @@ test("Copy prompt shows selectable text when clipboard access is denied", async 
 
 test("upload sends the picture without content or rights confirmation fields", async () => {
   let sent: FormData | undefined; api.uploadCompanionLook = async (_id, body) => { sent = body; throw new ApiError("Use a PNG, JPEG or WebP picture.", 400); };
-  const view = open(); await showLook(view); fireEvent.click(view.getByRole("button", { name: "Upload a picture" })); fireEvent.change(view.getByLabelText("Picture (PNG, JPEG or WebP)"), { target: { files: [new File(["png"], "fox.png", { type: "image/png" })] } }); fireEvent.click(view.getByRole("button", { name: "Upload" })); await waitFor(() => expect(view.getByText("Use a PNG, JPEG or WebP picture.")).toBeTruthy()); expect(sent?.get("rights_confirmed")).toBeNull(); expect(sent?.get("shows_real_person")).toBeNull(); expect(sent?.get("image")).toBeTruthy();
+  const view = open(); await showLook(view); fireEvent.click(view.getByRole("button", { name: "Upload a picture" })); fireEvent.change(view.getByLabelText("Picture"), { target: { files: [new File(["png"], "fox.png", { type: "image/png" })] } }); fireEvent.click(view.getByRole("button", { name: "Upload" })); await waitFor(() => expect(view.getByText("Use a PNG, JPEG or WebP picture.")).toBeTruthy()); expect(sent?.get("rights_confirmed")).toBeNull(); expect(sent?.get("shows_real_person")).toBeNull(); expect(sent?.get("image")).toBeTruthy();
 });
 
 

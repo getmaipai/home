@@ -435,7 +435,7 @@ companionsRoutes.openapi(uploadRoute, async (c) => {
     if (!(file instanceof File)) return c.json({ error: "Choose a PNG, JPEG or WebP picture to upload." }, 400);
     if (file.size > media.image.max_upload_bytes) return c.json({ error: "That picture is over 20 MB. Choose a smaller PNG, JPEG or WebP picture." }, 413);
     const bytes = new Uint8Array(await file.arrayBuffer()), detected = await fileTypeFromBuffer(bytes);
-    if (!detected || !["image/png", "image/jpeg", "image/webp"].includes(detected.mime)) return c.json({ error: "Use a PNG, JPEG or WebP picture." }, 400);
+    if (!detected || !["image/png", "image/jpeg", "image/webp", "image/gif", "image/avif", "image/tiff"].includes(detected.mime)) return c.json({ error: "Use a PNG, JPEG, WebP, GIF, AVIF or TIFF picture." }, 400);
     const png = await normalizePicture(bytes, { removeBackground: (image) => removePictureBackground(c.get("person"), image) });
     const checked = await checkCompanionArt(id, c.get("person"), [{ label: "That picture", bytes }]);
     if (!checked.ok) return c.json({ error: checked.reasons.join(" ") }, 422);

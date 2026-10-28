@@ -16,7 +16,6 @@ export type CompanionLook = z.infer<typeof LookSchema>;
 export type CompanionSheet = z.infer<typeof Sheet>;
 export const EMPTY_LOOK: CompanionLook = { version: 1, versions: [], rest: null, key: media.key.default, sheet: null };
 export const LOOK_LIMIT_LINE = "This companion already has 60 pictures. Delete some before adding another.";
-export const SMALL_PICTURE_LINE = `Use a picture that is at least ${media.image.min_upload_short_side} pixels on its short side.`;
 
 /** The generated character stays isolated on the companion's chosen key colour until Home removes it. */
 export function lookPromptFor(lookPrompt: string, keyHex: string): string {
@@ -263,8 +262,6 @@ export async function normalizePicture(bytes: Uint8Array, options: { removeBackg
   try { metadata = await sharp(bytes, { limitInputPixels: 40_000_000, failOn: "error" }).metadata(); }
   catch { throw new Error("That picture could not be read. Use a PNG, JPEG or WebP picture and try again."); }
   if (!metadata.width || !metadata.height) throw new Error("That picture could not be read. Use a PNG, JPEG or WebP picture and try again.");
-  const oriented = metadata.orientation && metadata.orientation >= 5 && metadata.orientation <= 8 ? { width: metadata.height, height: metadata.width } : { width: metadata.width, height: metadata.height };
-  if (Math.min(oriented.width, oriented.height) < media.image.min_upload_short_side) throw new Error(SMALL_PICTURE_LINE);
   try { source = new Uint8Array(await sharp(bytes, { limitInputPixels: 40_000_000, failOn: "error" }).rotate().png().toBuffer()); }
   catch { throw new Error("That picture could not be read. Use a PNG, JPEG or WebP picture and try again."); }
   let transparent = false;

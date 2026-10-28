@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { existsSync, readFileSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import sharp from "sharp";
-import { addVersion, approveSheet, chooseKeyColour, compositeOnKey, deleteLook, deleteVersion, describeCharacter, dominantColours, keyOut, lookPromptFor, normalizePicture, readLook, setRest, updateSheet, versionOriginalPath, versionPath, KEY_ALPHA_END, KEY_ALPHA_START, __setCharacterCompletionForTests, __setCharacterPictureCapabilityForTests, LOOK_LIMIT_LINE, SMALL_PICTURE_LINE } from "@/lib/companionLook";
+import { addVersion, approveSheet, chooseKeyColour, compositeOnKey, deleteLook, deleteVersion, describeCharacter, dominantColours, keyOut, lookPromptFor, normalizePicture, readLook, setRest, updateSheet, versionOriginalPath, versionPath, KEY_ALPHA_END, KEY_ALPHA_START, __setCharacterCompletionForTests, __setCharacterPictureCapabilityForTests, LOOK_LIMIT_LINE } from "@/lib/companionLook";
 import { createHouseholdCompanion, deleteHouseholdCompanion } from "@/lib/householdCompanions";
 import { loadManifestOnly } from "@/lib/plugins";
 
@@ -147,9 +147,10 @@ describe("companion look store", () => {
     expect(Math.abs((top + bottom) / 2 - 511.5)).toBeLessThanOrEqual(1);
   });
 
-  test("refuses a picture below the minimum short side", async () => {
-    const input = new Uint8Array(await sharp({ create: { width: 511, height: 700, channels: 3, background: "red" } }).png().toBuffer());
-    await expect(normalizePicture(input, { removeBackground: async (bytes) => bytes })).rejects.toThrow(SMALL_PICTURE_LINE);
+  test("enlarges a small picture instead of refusing it", async () => {
+    const input = new Uint8Array(await sharp({ create: { width: 64, height: 90, channels: 3, background: "red" } }).png().toBuffer());
+    const output = await normalizePicture(input, { removeBackground: async (bytes) => bytes });
+    const meta = await sharp(output).metadata(); expect(meta.width).toBe(1024); expect(meta.height).toBe(1024);
   });
 
   test("keeps an existing transparent background without calling the remover", async () => {
