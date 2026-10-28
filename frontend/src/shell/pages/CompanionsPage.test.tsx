@@ -48,6 +48,8 @@ test("directory cards show status, meta, actions and the new companion link", as
   expect(view.container.querySelectorAll('img[src^="data:image/svg+xml"]').length).toBe(1);
   expect(view.getAllByRole("button", { name: "New companion" }).length).toBe(1);
   expect(view.queryByText("Robots")).toBeNull();
+  // A pictured card uses the large avatar so its face is not smaller than the seeded faces beside it.
+  expect(view.container.querySelector('[data-slot="avatar"][data-size="lg"]')).not.toBeNull();
 });
 
 test("directory own-job and latest-activity meta lines render, and search filters name and tagline", async () => {
