@@ -8,6 +8,7 @@ pinned pane, per-app help, settings). This note replaces the bottom-corner launc
 
 - `companions-handoff-revamp-2026-10-26.md` section 5a items 3, 5 and 6 (the `CompanionDock`, its hide-on-Chat rule, the bottom-corner shell mount).
 - `wake-word-ux-2026-10-27.md` item 2 and Slice 2 (the indicator at the bottom corner with `LauncherBubble` `docked` as its home): the indicator is now the avatar's listening ring, or the top-right indicator alone.
+- `wake-word-ux-2026-10-27.md` item 3 ("from any other page Chat opens with the call running"): a wake call opens the pane and starts the call there (AMBIENT-06a, `openChatWithCall`); Chat opens only when the companion is off.
 - `companions-shared-chat-and-presence-2026-10-24.md` section 7 (launcher at the lower right, hidden on Chat).
 - The dock half of REVAMP-PRESENCE-01 in the open COMPANIONS-REVAMP-01 backlog row, and the WAKEUX-02 row's bottom-corner placement.
 - `ELEMENTS-DECISIONS.md` "not needed: `CompanionDock`" (the dock is retired by this design).
@@ -43,6 +44,13 @@ focus open with a delay: the shadcn registry `hover-card` is added to the kit wi
 artifact tab, the split itself is replaced by the pane); the unused `chat-panel` Element (a candidate for the pane's Chat tab body; the tab is the same assistant-ui Thread and Composer as Chat, not a mini chat);
 `CompanionDock` and `LauncherBubble` (retired by this design; `ELEMENTS-DECISIONS.md` gets a row saying so).
 
+### AMBIENT-05 reuse check (architect, 2026-10-28)
+
+- **Quick-actions list:** the kit `Suggestions` Element (`onSuggestion`, `pills` and `list` variants) is the list; its `elements-adoption.json` entry moves from "no-fit" to adopted with this reason; no wrapper and no `className`; a missing look is an additive commons prop first.
+- **Model context:** assistant-ui's `makeAssistantVisible` and `useAssistantInstructions` are turned down: they put browser text into the system instructions, which breaks "the title reaches the model as data, never as instructions" and the server's `canRead` check on the record.
+- **Carrier:** the existing untrusted-data `ContextItem` in `backend/src/lib/turnMachine/contract.ts` gets a new `page` source, fenced by `isToolOrPageContext` in `messages.ts`; no second wrapper.
+- **Type:** the page context crosses the wire, so it is defined once in `@maipai/spec` (app id, route, one record id, record kind, title) and the React side extends the existing `PageContext` in `frontend/src/shell/pages/chatProjectPageContext.ts`; no second type with that name.
+
 ## 2b. The standard header row (Jesse, 2026-10-27, after seeing the first build)
 
 Every page has one header row of the same height and the same places: title on the left, the app's own buttons at the right, the companion avatar last (36 px, fixed spot, never overlapping a page button). The front dashboard and Chat follow it too.
@@ -65,7 +73,7 @@ The tab is where you talk with a friend, familiar from Chat but not a replica of
 ## 4. Settings (the Ambient Companion card, person scope)
 
 From the mockup: Ambient companion on/off (reuses the shipped `companions.dock` key, label changed, default on), default companion, position (top right only for now), hover preview, idle animation, speaking ring,
-auto-hide when inactive, wake word (with a Test button, the existing per-device setting), global shortcut (desktop app only). Auto-hide hides the avatar after a period of inactivity and any pointer move at
+auto-hide when inactive, wake word (a link to the existing per-device setting in This device, no second control). The global shortcut is not part of this card; it waits on a desktop-app verdict. Auto-hide hides the avatar after a period of inactivity and any pointer move at
 the top right brings it back; it never hides while listening, thinking or speaking.
 
 ## 5. What changes in what exists
@@ -85,7 +93,7 @@ the top right brings it back; it never hides while listening, thinking or speaki
 3. **AMBIENT-03 side chats:** backend `placement`, pane Chat tab on the same turn engine, History, "Continue in Chat", child lane tests.
 4. **AMBIENT-04 migrate panels:** chat details, sources, artifact, compare into pane tabs; remove the Sheets; each app's inspector as it comes up.
 5. **AMBIENT-05 page context and quick actions:** the typed page context from each app; "Help with this page", "Find something", "Take an action" through the existing tool and Ask gates.
-6. **AMBIENT-06 settings, wake word and shortcut:** the Ambient Companion card, wake word to the pane, global shortcut in the desktop app.
+6. **AMBIENT-06 settings and wake word:** the Ambient Companion card (spec first, one tag, `companions.dock` relabelled "Ambient companion" with true help text), the pane Settings tab as a link into the settings shell or the kit Select as shipped (no raw `<select>`), the wake word check (already built in AMBIENT-06a). The global shortcut is removed from this slice: Home has no desktop app, so it becomes its own backlog row that waits on a desktop-app verdict and carries its own reuse check (Electron or Tauri `globalShortcut`, PWA shortcuts).
 
 Slice update, 2026-10-27: AMBIENT-04 is now the standard header row on every page (section 2b) and the stage tab with its Settings tab shell (section 2c); the migration of Chat's sheets and other panels into pane tabs is AMBIENT-04c, after those.
 
@@ -109,5 +117,5 @@ Slice update, 2026-10-27: AMBIENT-04 is now the standard header row on every pag
 
 - Which apps give page context first (Models, Photos, Settings are in the mockup).
 - Whether Memory and Activity inside the pane reuse the profile page's Activity feed as shipped (expected: yes, `ActivityFeed` as is).
-- The global shortcut needs the desktop app; the web build ignores it.
+- The global shortcut moved out of AMBIENT-06 (no desktop app yet); a separate backlog row waits on a desktop-app verdict.
 - A parent's view of a child's side chats: same as chats today; check the Parent area when AMBIENT-03 lands.
