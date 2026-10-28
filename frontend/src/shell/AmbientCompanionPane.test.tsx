@@ -94,7 +94,8 @@ describe("ambient companion pane controls", () => {
       expect((await view.findByRole("link", { name: "Voice" })).getAttribute("href")).toBe("/companions/companion-1");
       expect(view.getByRole("link", { name: "Appearance" }).getAttribute("href")).toBe("/companions/companion-1");
       expect(view.getByRole("link", { name: "Presence" }).getAttribute("href")).toBe("/settings/chat?tab=personalization");
-      fireEvent.change(view.getByRole("combobox", { name: "Choose companion" }), { target: { value: "companion-2" } });
+      fireEvent.click(view.getByRole("combobox", { name: "Choose companion" }));
+      fireEvent.click(await view.findByRole("option", { name: "Another companion" }));
       await waitFor(() => expect(save).toHaveBeenCalledWith("person:person-1", "persona.active_id", "companion-2"));
     } finally {
       api.companions = originals.companions;

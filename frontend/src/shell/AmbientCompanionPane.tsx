@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } fro
 import { AssistantRuntimeProvider, useAui, useAuiState } from "@assistant-ui/react";
 import { TalkPill } from "@maipai/ui/src/elements/thread.aui";
 import { TooltipIconButton } from "@maipai/ui/src/elements/tooltip-icon-button";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@maipai/ui/src/ui/select";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@maipai/ui/src/ui/dialog";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { getIcon } from "@maipai/ui/src/icons";
@@ -104,7 +105,7 @@ function CompanionSettings({ person, companionId }: { person: Roster; companionI
   const queryClient = useQueryClient();
   const companions = useQuery({ queryKey: ["companions"], queryFn: api.companions });
   return <section aria-label="Companion settings" className="flex flex-col gap-4 p-4">
-    <label className="flex flex-col gap-2 text-sm">Companion<select aria-label="Choose companion" className="min-h-11 rounded-lg border border-border bg-background px-3" value={companionId} onChange={(event) => { void api.setSetting(`person:${person.id}`, "persona.active_id", event.currentTarget.value).then(() => { void queryClient.invalidateQueries({ queryKey: ["settingsValues", `person:${person.id}`] }); void queryClient.invalidateQueries({ queryKey: ["companion-avatar"] }); }).catch(() => toast.error("Could not change the companion. Check your connection and try again.")); }}>{(companions.data?.companions ?? []).map((entry) => <option key={entry.id} value={entry.id}>{entry.name}</option>)}</select></label>
+    <div className="flex flex-col gap-2 text-sm">Companion<Select value={companionId} onValueChange={(value: string) => { void api.setSetting(`person:${person.id}`, "persona.active_id", value).then(() => { void queryClient.invalidateQueries({ queryKey: ["settingsValues", `person:${person.id}`] }); void queryClient.invalidateQueries({ queryKey: ["companion-avatar"] }); }).catch(() => toast.error("Could not change the companion. Check your connection and try again.")); }}><SelectTrigger aria-label="Choose companion"><SelectValue /></SelectTrigger><SelectContent>{(companions.data?.companions ?? []).map((entry) => <SelectItem key={entry.id} value={entry.id}>{entry.name}</SelectItem>)}</SelectContent></Select></div>
     <nav aria-label="Companion options" className="flex flex-col gap-3"><Link to={`/companions/${encodeURIComponent(companionId)}`}>Voice</Link><Link to={`/companions/${encodeURIComponent(companionId)}`}>Appearance</Link><Link to="/settings/chat?tab=personalization">Presence</Link></nav>
   </section>;
 }
