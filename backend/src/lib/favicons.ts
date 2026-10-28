@@ -230,9 +230,10 @@ export type FaviconFetchOutcome =
  * thrown - a site with no favicon is the ordinary case, not an error. */
 export async function fetchFaviconBytes(host: string, fetchFn?: FaviconFetchFn, prefer: "small" | "large" = "small"): Promise<FaviconFetchOutcome> {
   let sawDefiniteAnswer = false;
-  const get = (url: string, signal: AbortSignal) => fetchFn
+  // Nature sends its home page through five cookie-check redirects, so the home page gets more hops than an icon file (every hop is still SSRF-checked).
+  const get = (url: string, signal: AbortSignal, maxRedirects = 3) => fetchFn
     ? fetchFn(url, { signal })
-    : guardedFetch(url, { signal, redirect: "follow", maxRedirects: 3 });
+    : guardedFetch(url, { signal, redirect: "follow", maxRedirects });
   const tryIcon = async (url: string): Promise<FaviconFetchOutcome | null> => {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
@@ -262,7 +263,7 @@ export async function fetchFaviconBytes(host: string, fetchFn?: FaviconFetchFn, 
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
     try {
-      const response = await get(`https://${host}/`, controller.signal);
+      const response = await get(`https://${host}/`, controller.signal, 6);
       if (!response.ok || !(response.headers.get("content-type") ?? "").toLowerCase().includes("html")) return [];
       // A big home page (Deadline's is 800 KB) declares its icons in the head: read the first part, never give up on the whole page.
       const bytes = await readCapped(response, MAX_HOMEPAGE_BYTES, true);
