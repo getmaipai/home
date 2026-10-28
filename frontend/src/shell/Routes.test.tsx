@@ -202,10 +202,10 @@ describe("ambient companion shell slot", () => {
       fireEvent.click(view.getByRole("button", { name: "Close pane" }));
       fireEvent.click(view.getByRole("button", { name: "Open /chat" }));
       await waitFor(() => expect(document.querySelector('[data-slot="rail-workspace"] [data-slot="hover-card-trigger"]')).toBeTruthy());
+      // Chat uses the same standard top row as every page, and shows the avatar once: not again in the chat's own header.
       const chatAvatar = document.querySelector('[data-slot="rail-workspace"] [data-slot="hover-card-trigger"]');
-      expect(chatAvatar?.closest("header")).toBeTruthy();
-      expect(chatAvatar?.closest('[data-slot="rail-page-header"]')).toBeNull();
-      expect(chatAvatar?.closest("header")?.querySelectorAll('[data-slot="hover-card-trigger"]')).toHaveLength(1);
+      expect(chatAvatar?.closest('[data-slot="rail-page-header"]')).toBeTruthy();
+      expect(document.querySelectorAll('[data-slot="rail-workspace"] [data-slot="hover-card-trigger"]')).toHaveLength(1);
     } finally {
       globalThis.fetch = originalFetch;
       window.matchMedia = originalMatchMedia;

@@ -28,6 +28,7 @@ import { IncognitoProvider, INCOGNITO_DISCARDED_EVENT, useIncognitoContext } fro
 import { MemoriesRedirect, LegacyProfileMemoriesRedirect } from "@/shell/MemoriesRedirect";
 import { InstallDock } from "@/shell/InstallDock";
 import { CompanionPreview } from "@maipai/ui/src/elements/companion-preview";
+import { WakeWordPersonContext } from "@/apps/chat/chatThreadContexts";
 import { CompanionAvatar } from "@maipai/ui/src/elements/companion-avatar";
 import { Avatar, AvatarImage } from "@maipai/ui/src/elements/ui/avatar";
 import { Avatar as SeededAvatar } from "@maipai/ui/src/primitives/Avatar";
@@ -354,7 +355,8 @@ function RoutesWithIncognito({ person, onPersonChange, onSignedOut }: { person: 
       ) : null}
       <ChatAvailabilityContext.Provider value={chatAvailability}>
       <AmbientRingProvider value={ring} onChange={setRing} wake={wakeIndicator} onWakeChange={setWakeIndicator}>
-      <AmbientHeaderProvider value={paneState.open ? null : ambientTopRight}>
+      <AmbientHeaderProvider value={paneState.open || onChatPage ? null : ambientTopRight}>
+      <WakeWordPersonContext.Provider value={person}>
       <RouterRoutes>
         {/* HOME-UI-02d: the old Memories page now lives on the signed-in
             person's own profile. Preserve both old bookmarks and deep
@@ -379,7 +381,7 @@ function RoutesWithIncognito({ person, onPersonChange, onSignedOut }: { person: 
             Notifications, System status, Incognito, Settings, Help and Log
             out. Pages draw their own slim title bar; chat draws its own
             beside the history column. */}
-        <Route element={<FullLayout rail topRight={onChatPage || paneState.open ? undefined : ambientTopRight} topRightBand={!onChatPage} fallbackTitle={location.pathname.startsWith("/settings") ? "Settings" : appName ?? (location.pathname === "/" ? "Home" : undefined)} rightPane={ambientRightPane} mobileSections={drawerSections} activeAppHref={selectedAppHref} railApps={railApps(appCatalog, pinnedRoutes)} railCoreDestinations={[{ name: "Media", url: "/media", icon: "cast" }]} onRailAppPinChange={(url) => togglePin(url)} railAllAppsHref={ALL_APPS_PATH} settingsHref="/settings" headerSearchRemote={api.search} railTourId="shell.rail" railItemTourId={(item) => item.name === "Chat" ? "rail.chat" : undefined} incognitoTourId="shell.incognito" railProfile={<RailProfile person={person} incognito={incognito} onIncognitoChange={onIncognitoChange} onSignedOut={onSignedOut} helpEntries={helpEntries} />} sidebarItemStatus={(item) => sidebarItemStatus(statusAppsQuery.data ?? [], item)} />}>
+        <Route element={<FullLayout rail topRight={paneState.open ? undefined : ambientTopRight} topRightBand fallbackTitle={location.pathname.startsWith("/settings") ? "Settings" : appName ?? (location.pathname === "/" ? "Home" : undefined)} rightPane={ambientRightPane} mobileSections={drawerSections} activeAppHref={selectedAppHref} railApps={railApps(appCatalog, pinnedRoutes)} railCoreDestinations={[{ name: "Media", url: "/media", icon: "cast" }]} onRailAppPinChange={(url) => togglePin(url)} railAllAppsHref={ALL_APPS_PATH} settingsHref="/settings" headerSearchRemote={api.search} railTourId="shell.rail" railItemTourId={(item) => item.name === "Chat" ? "rail.chat" : undefined} incognitoTourId="shell.incognito" railProfile={<RailProfile person={person} incognito={incognito} onIncognitoChange={onIncognitoChange} onSignedOut={onSignedOut} helpEntries={helpEntries} />} sidebarItemStatus={(item) => sidebarItemStatus(statusAppsQuery.data ?? [], item)} />}>
           <Route path="chat" element={<ChatPage person={person} />} />
           <Route path="chat/projects" element={<ProjectsPage person={person} />} />
           <Route path="chat/projects/:id" element={<ChatPage person={person} />} />
@@ -442,6 +444,7 @@ function RoutesWithIncognito({ person, onPersonChange, onSignedOut }: { person: 
           </Route>
         </Route>
       </RouterRoutes>
+      </WakeWordPersonContext.Provider>
       </AmbientHeaderProvider>
       </AmbientRingProvider>
       </ChatAvailabilityContext.Provider>
