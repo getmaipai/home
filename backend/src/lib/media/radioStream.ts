@@ -11,9 +11,23 @@ import { tryConsume } from "@/lib/rateLimiter";
 import { RateLimited, RedirectLimitError } from "@/lib/shelf/shelfPoller";
 import { IcyDemuxer, usableMetaint } from "./radioIcy";
 import type { SavedStation } from "./radio";
+import { resolvePublicTarget } from "@maipai/core/src/ssrfGuard";
 
 export const MAX_REDIRECTS = 4;
 export const CONNECT_TIMEOUT_MS = 10_000;
+/** Resolve and validate the station before handing its address to Stack. Stack receives this public, already-resolved address,
+ * preventing a DNS change or redirect from turning a previously checked station into a private-network request. */
+export async function publicRecordingAddress(station: SavedStation, dnsLookup?: DnsLookup): Promise<string> {
+  const url = new URL(station.url);
+  if (url.protocol !== "https:" || url.username || url.password) throw new Error("The station must use a public HTTPS address.");
+  const answer = await resolvePublicTarget(url.hostname, dnsLookup ?? (async (hostname) => {
+    const dns = await import("node:dns/promises");
+    const result = await dns.lookup(hostname, { verbatim: true });
+    return { address: result.address, family: result.family };
+  }));
+  url.hostname = answer.address.includes(":") ? `[${answer.address}]` : answer.address;
+  return url.toString();
+}
 export const MAX_STREAMS_PER_HOME = 4;
 const HLS_TYPE = /mpegurl/i;
 const HOST_PACE = { capacity: 6, refillPerSecond: 1 / 5 } as const;

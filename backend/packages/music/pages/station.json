@@ -20,6 +20,30 @@
         "icon": "headphones",
         "text": "This station is not in your list. Go back to Radio and pick one."
       }
+    },
+    {
+      "type": "media_shelf",
+      "heading": "Recordings",
+      "bind": {
+        "source": "package",
+        "path": "radio",
+        "params": {
+          "scope": "recordings"
+        }
+      },
+      "item_key_field": "id",
+      "item_label_field": "title",
+      "item_subtitle_field": "{channel}",
+      "item_media_field": "thumbnail",
+      "aspect": "square",
+      "variant": "plain",
+      "orientation": "vertical",
+      "hide_when_empty": true,
+      "on_select": {
+        "play": {
+          "media_id": "{id}"
+        }
+      }
     }
   ]
 }

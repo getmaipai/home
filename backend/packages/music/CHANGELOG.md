@@ -2,6 +2,12 @@
 
 All notable changes to the Music package, in [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) format.
 
+## [0.3.6] - 2026-10-28
+
+### Added
+
+- Record saved radio stations to the Music library through Stack media.fetch jobs, with timed stop and playback.
+
 ## [0.3.5] - 2026-10-28
 
 ### Added

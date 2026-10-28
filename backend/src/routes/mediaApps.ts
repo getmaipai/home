@@ -9,11 +9,13 @@ import { getCookie } from "hono/cookie";
 import { hashSessionToken } from "@/lib/session";
 import "@/lib/media/podcastApp"; // registers the Podcasts data ids and item view with the shared host
 import "@/lib/media/musicApp"; // registers the Music lyrics fields with the shared host
+import "@/lib/media/radioRecordings"; // adds the Recordings scope to Music's existing radio data id
 import { podcastRoutes, podcastDirectoryRows } from "./podcastApp";
 import { radioRoutes, radioDirectoryRows, radioSavedRows, radioCountryRows, radioGenreRows } from "./radioApp";
 import { fetchRadioArt } from "@/lib/media/radioArt";
 import { radioDirectoryAllowed, radioDirectoryHasFavicon } from "@/lib/media/radioDirectory";
 import { listSavedStations } from "@/lib/media/radio";
+import { radioRecordingRows } from "@/lib/media/radioRecordings";
 import { mediaBandOf } from "@/lib/media/band";
 import { getHouseholdSettingValue } from "@/lib/settings";
 import { editMediaItem } from "@/lib/media/mediaEdit";
@@ -90,6 +92,7 @@ export function createMediaAppRoutes(appId: MediaAppId) {
         const scope = field("scope");
         if (["directory", "popular", "genre-rock", "genre-jazz", "genre-chill", "genre-classical", "genre-news", "genre-hip-hop", "world-us", "world-gb", "world-jp"].includes(scope)) return c.json(await radioDirectoryRows(person, { q: field("q"), country: field("country"), tag: field("tag"), scope: scope as import("./radioApp").RadioScope }) as never, 200);
         if (scope === "saved") return c.json(radioSavedRows(person) as never, 200);
+        if (scope === "recordings") return c.json(radioRecordingRows(person) as never, 200);
         if (scope === "countries") return c.json({ as_of: new Date().toISOString(), rows: radioCountryRows() } as never, 200);
         if (scope === "genres") return c.json({ as_of: new Date().toISOString(), rows: radioGenreRows() } as never, 200);
       }

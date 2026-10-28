@@ -13,6 +13,7 @@ import { findStations, radioDirectoryAllowed, radioDirectoryHasFavicon, remember
 import { checkFeedAddress } from "@/lib/shelf/feedAddresses";
 import { assertNotPrivateHost } from "@maipai/core/src/ssrfGuard";
 import { fetchRadioArt } from "@/lib/media/radioArt";
+import { radioRecordingRows, startRadioRecording, stopRadioRecording } from "@/lib/media/radioRecordings";
 import { MINOR_QUERY_PERSONAL_NOTE, minorQueryHit } from "@/lib/retrieval/minorQueryCheck";
 import { getHouseholdSettingValue } from "@/lib/settings";
 import { apiRouter } from "@/lib/openapi";
@@ -82,6 +83,7 @@ export async function radioDirectoryRows(person: PersonRow, query: { q: string; 
 let streamDeps: StreamDeps = {};
 /** Tests point the station fetch at an injected upstream; production uses the pinned guarded fetch. */
 export function __setRadioStreamDepsForTests(deps: StreamDeps): void { streamDeps = deps; }
+export function radioAddressDeps(): StreamDeps { return streamDeps; }
 
 export function radioRoutes() {
   const routes = apiRouter();
@@ -124,6 +126,22 @@ export function radioRoutes() {
     const person = c.get("person");
     if (!mediaAppAllowed(person, "music")) return next();
     return c.json({ ok: true as const, stations: listSavedStations(person) }, 200);
+  });
+
+  routes.post("/recordings/:id/start", requireAuth, async (c, next) => {
+    const person = c.get("person");
+    if (!mediaAppAllowed(person, "music")) return next();
+    const station = savedStationFor(person, c.req.param("id"));
+    if (!station) return c.json({ error: "That station is not in your list." }, 404);
+    const result = await startRadioRecording(person, station, str((await bodyOf(c)).length));
+    return result.ok ? c.json(result.value, 200) : c.json({ error: result.error }, result.status);
+  });
+
+  routes.post("/recordings/:id/stop", requireAuth, async (c, next) => {
+    const person = c.get("person");
+    if (!mediaAppAllowed(person, "music")) return next();
+    const result = await stopRadioRecording(person, c.req.param("id"));
+    return result.ok ? c.json(result.value, 200) : c.json({ error: result.error }, result.status);
   });
 
   routes.post("/stations", requireAuth, async (c, next) => {
