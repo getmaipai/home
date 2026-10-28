@@ -372,7 +372,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/faceModelPins.ts` | SFACE_MODEL_ID, SFACE_SHA256, SFACE_DIM |
 | `backend/src/lib/factoryReset.ts` | FACTORY_RESET_CONFIRMATION_PHRASE, stageFactoryReset, pendingFactoryReset, cancelPendingFactoryReset, applyPendingFactoryReset |
 | `backend/src/lib/failureCopy.ts` | VOICE_FAILURE_COPY, voiceFailureLine, FAILURE_COPY, composerNotice, adminPauseLine, stackRefusalKind |
-| `backend/src/lib/favicons.ts` | faviconsDir, iconLinksOf, __setFaviconDnsLookupForTests, __setFaviconFetchForTests, validateFaviconHost, fetchFaviconBytes |
+| `backend/src/lib/favicons.ts` | faviconsDir, pngFromIco, isUsableIcon, iconLinksOf, __setFaviconDnsLookupForTests, __setFaviconFetchForTests |
 | `backend/src/lib/fileBlobs.ts` | digestOfFile, reclaimQueuedBlobs, reclaimQueuedBlobsInBackground |
 | `backend/src/lib/fileContent.ts` | FILE_REFERENCE_KINDS, contentFor, ensureContent, expectedReferences, syncFileReferences, syncAllFileReferences |
 | `backend/src/lib/fileThumbnails.ts` | thumbnailsDir, previewStats, clearPreviews, fileThumbnail, trashedFileThumbnail |
@@ -527,7 +527,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/news/mixAffinity.ts` | computeAffinity |
 | `backend/src/lib/news/nearDuplicates.ts` | DUPLICATE_WINDOW_H, SHARED_MIN, JACCARD_MIN, titleTokens, collapseNearDuplicates |
 | `backend/src/lib/news/newsCounters.ts` | NEWS_COUNTER_NAMES, bumpNewsCounter, newsCounters, __resetNewsCountersForTests |
-| `backend/src/lib/news/pictureFallback.ts` | pngFromIco, publisherIconPicture |
+| `backend/src/lib/news/pictureFallback.ts` | publisherIconPicture |
 | `backend/src/lib/news/pictures.ts` | NEWS_PICTURE_WIDTHS, newsPictureDir, pictureRefOf, figureRefOf, newsPictureFocal, newsImagesOn |
 | `backend/src/lib/news/prefetch.ts` | prefetchNewsText |
 | `backend/src/lib/news/prefetchBudget.ts` | PREFETCH_SCHEMA, prefetchBudget |
