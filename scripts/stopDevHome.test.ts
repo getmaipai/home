@@ -1,8 +1,8 @@
 import { afterEach, describe, expect, test } from "bun:test";
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { spawnSync, type ChildProcess } from "node:child_process";
+import { spawn, spawnSync, type ChildProcess } from "node:child_process";
 
 // A development Home from the main checkout blocked the live Home installer three times on 2026-10-23. scripts/stop-dev-home.sh stops exactly
 // that process (the lock file's pid or the 8787 listener, running src/index.ts from the main checkout) and nothing else.
@@ -76,3 +76,27 @@ describe("stop-dev-home.sh", () => {
 });
 
 process.on("exit", () => rmSync(scratch, { recursive: true, force: true }));
+
+// A dev Home outliving its worktree kept 37 connections to the shared Stack for hours and stalled live chat (2026-10-27): the watcher `dev.sh start` launches stops it.
+describe("dev.sh watch", () => {
+  test("stops the dev Home once its worktree no longer exists", async () => {
+    const root = join(scratch, "gone-wt");
+    mkdirSync(join(root, "data", "dev"), { recursive: true });
+    const spawned = spawnSync("bash", ["-c", `(bash -c 'while true; do sleep 1; done' bun src/index.ts >/dev/null 2>&1 </dev/null & echo $!)`], { encoding: "utf8" });
+    const pid = Number(spawned.stdout.trim());
+    started.push({ kill: () => { try { process.kill(pid, "SIGKILL"); } catch { /* gone */ } } } as ChildProcess);
+    writeFileSync(join(root, "data", "dev", "backend.pid"), `${pid}\n`);
+    await sleep(300);
+    expect(alive(pid)).toBe(true);
+    // The watcher starts while the worktree exists, then the worktree is removed under it.
+    writeFileSync(join(root, ".git"), "gitdir: elsewhere\n");
+    const watcher = spawn("bash", [join(import.meta.dir, "dev.sh"), "watch"], { stdio: "ignore", env: { ...process.env, MAIPAI_DEV_ROOT: root, MAIPAI_DEV_WATCH_SECONDS: "1" } });
+    started.push(watcher);
+    await sleep(2500);
+    expect(alive(pid)).toBe(true);
+    rmSync(join(root, ".git"));
+    for (let i = 0; i < 40 && alive(pid); i++) await sleep(250);
+    expect(alive(pid)).toBe(false);
+    expect(readFileSync(join(root, "data", "dev", "watch.log"), "utf8")).toContain("its worktree was removed");
+  }, 30000);
+});

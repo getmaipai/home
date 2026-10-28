@@ -17,6 +17,7 @@ common="$(git rev-parse --git-common-dir)"
 case "$common" in /*) ;; *) common="$(cd "$common" && pwd)" ;; esac
 std="$(cd "$common/.." && pwd)/../.github"
 
+case "${1:-}" in done) [[ ! -f scripts/dev.sh ]] || bash scripts/dev.sh stop >/dev/null 2>&1 || true;; esac
 if [[ -n "${MAIPAI_WT_SHARED:-}" ]]; then exec bash "$MAIPAI_WT_SHARED" "$@"; fi
 [[ -d "$std/.git" || -f "$std/.git" ]] || { echo "wt: getmaipai/.github is missing at $std; clone it next to this repo and retry." >&2; exit 1; }
 case "${1:-}" in start|land) git -C "$std" fetch -q origin main 2>/dev/null || echo "wt: could not fetch .github; using its last known origin/main." >&2;; esac

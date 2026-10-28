@@ -3,6 +3,8 @@
 # State and demo data live under data/dev; this never builds the frontend,
 # takes a port lease, or uses the machine-wide app lock. Use `bun run dev`
 # to start and `bun run dev:stop` to stop this checkout's development Home.
+# `start` also launches a watcher that stops it when the worktree is removed or no browser has been
+# connected for MAIPAI_DEV_IDLE_MINUTES (30); `wt.sh done` stops it too.
 set -euo pipefail
 
 script_dir="$(cd "$(dirname "$0")" && pwd -P)"
@@ -11,6 +13,7 @@ state="$root/data/dev"
 hub="$state/hub"
 backend_pid_file="$state/backend.pid"
 vite_pid_file="$state/vite.pid"
+watch_pid_file="$state/watch.pid"
 backend_log="$state/backend.log"
 vite_log="$state/vite.log"
 seed_marker="$state/seeded"
@@ -142,7 +145,7 @@ stop_one() {
   candidate="$(pid_value "$file" 2>/dev/null || true)"
   if [[ -n "$candidate" ]] && kill -0 "$candidate" 2>/dev/null; then
     command="$(process_command "$candidate")"
-    if [[ ( "$label" == backend && "$command" == *"src/index.ts"* && "$command" == *bun* ) || ( "$label" == vite && ( "$command" == *vite* || "$command" == *"bun run dev"* ) ) ]]; then
+    if [[ ( "$label" == backend && "$command" == *"src/index.ts"* && "$command" == *bun* ) || ( "$label" == vite && ( "$command" == *vite* || "$command" == *"bun run dev"* ) ) || ( "$label" == watch && "$command" == *dev.sh*watch* ) ]]; then
       kill -TERM "$candidate" 2>/dev/null || true
       for ((attempt=0; attempt<100; attempt++)); do
         if ! kill -0 "$candidate" 2>/dev/null; then break; fi
@@ -170,11 +173,13 @@ case "$action" in
     process_status vite "$vite_pid_file"
     ;;
   stop)
+    stop_one watch "$watch_pid_file"
     stop_one backend "$backend_pid_file"
     stop_one vite "$vite_pid_file"
     echo "Dev Home stopped."
     ;;
   reseed)
+    stop_one watch "$watch_pid_file"
     stop_one backend "$backend_pid_file"
     stop_one vite "$vite_pid_file"
     rm -rf "$hub"
@@ -284,11 +289,38 @@ case "$action" in
       echo "Inspect $vite_log, fix the startup error, then run dev start again." >&2
       exit 1
     fi
+    rm -f "$watch_pid_file"
+    MAIPAI_DEV_ROOT="$root" nohup bash "$script_dir/dev.sh" watch </dev/null >/dev/null 2>&1 &
+    echo $! > "$watch_pid_file"
     print_urls
     echo "Data: $hub"
     echo "Backend log: $backend_log"
     echo "Vite log: $vite_log"
     echo "Sign in as Sage with the secret correcthorsebattery."
+    ;;
+  watch)
+    # Hidden: started by `start`. Stops this dev Home when its worktree is deleted or no browser
+    # has been connected for MAIPAI_DEV_IDLE_MINUTES (default 30), so a forgotten one cannot keep
+    # holding connections to the shared Stack (2026-10-27: one stalled chat for hours).
+    idle_limit=$(( ${MAIPAI_DEV_IDLE_MINUTES:-30} * 60 ))
+    interval="${MAIPAI_DEV_WATCH_SECONDS:-30}"
+    idle=0
+    while sleep "$interval"; do
+      if ! live_backend && ! live_vite; then rm -f "$watch_pid_file"; exit 0; fi
+      reason=""
+      if [[ ! -e "$root/.git" ]]; then reason="its worktree was removed"; fi
+      if [[ -z "$reason" ]]; then
+        if lsof -nP -iTCP:"$vite_port" -sTCP:ESTABLISHED >/dev/null 2>&1; then idle=0; else idle=$((idle + interval)); fi
+        if ((idle >= idle_limit)); then reason="no browser was connected for $((idle_limit / 60)) minutes"; fi
+      fi
+      if [[ -n "$reason" ]]; then
+        echo "$(date '+%F %T') stopping dev Home: $reason" >> "$state/watch.log"
+        rm -f "$watch_pid_file"
+        stop_one backend "$backend_pid_file" || true
+        stop_one vite "$vite_pid_file" || true
+        exit 0
+      fi
+    done
     ;;
   *)
     echo "Usage: bash scripts/dev.sh <start|stop|status|url|port|reseed> [--no-stack] [--stack <url>] [--port <n>]" >&2
