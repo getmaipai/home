@@ -77,7 +77,7 @@ export function sourceFromRow(row: MediaSourceRow): MediaSource {
   return MediaSource.parse({
     id: row.id, kind: row.kind, scope: row.scope, owner_person_id: row.ownerPersonId, label: row.label,
     root: row.kind === "root" && row.rootPath ? { mount_id: row.rootMountId, path: row.rootPath, kinds: json(row.rootKinds, []) } : null,
-    feed_id: row.feedId, url: row.url, extractor: row.extractor, auto: { ...DEFAULT_AUTO, ...json<Record<string, unknown>>(row.auto, {}) }, speed: row.speed, skip_intro_s: row.skipIntroS, skip_outro_s: row.skipOutroS,
+    feed_id: row.feedId, url: row.url, station: json(row.station, null), extractor: row.extractor, auto: { ...DEFAULT_AUTO, ...json<Record<string, unknown>>(row.auto, {}) }, speed: row.speed, skip_intro_s: row.skipIntroS, skip_outro_s: row.skipOutroS,
     poll_minutes: row.pollMinutes, paused: row.paused, last_checked_at: row.lastCheckedAt, last_status: row.lastStatus, failures: row.failures, backoff_until: row.backoffUntil,
     visible_to: json(row.visibleTo, "household"), archive: json(row.archive, []), deleted_at: row.deletedAt, trash_until: row.trashUntil,
     created_at: row.createdAt, hlc: row.hlc, provenance: row.provenance,

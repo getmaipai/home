@@ -1938,6 +1938,7 @@ export const mediaSources = sqliteTable(
     rootKinds: text("root_kinds"), // JSON array of the media kinds the root holds
     feedId: text("feed_id"),
     url: text("url"),
+    station: text("station"), // JSON (spec MediaSource.station), kind station only (RADIO-02)
     extractor: text("extractor"),
     auto: text("auto").notNull().default("{}"), // JSON (spec MediaSource.auto)
     speed: real("speed"),

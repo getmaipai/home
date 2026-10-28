@@ -10,6 +10,7 @@ import { hashSessionToken } from "@/lib/session";
 import "@/lib/media/podcastApp"; // registers the Podcasts data ids and item view with the shared host
 import "@/lib/media/musicApp"; // registers the Music lyrics fields with the shared host
 import { podcastRoutes, podcastDirectoryRows } from "./podcastApp";
+import { radioRoutes } from "./radioApp";
 import { editMediaItem } from "@/lib/media/mediaEdit";
 import { saveMediaCover } from "@/lib/media/mediaCover";
 import { lookupLyricsFor } from "@/lib/media/lyricsAction";
@@ -136,6 +137,7 @@ export function createMediaAppRoutes(appId: MediaAppId) {
   }
 
   if (appId === "podcasts") routes.route("/", podcastRoutes());
+  if (appId === "music") routes.route("/radio", radioRoutes());
 
   return routes;
 }

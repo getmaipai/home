@@ -1,0 +1,1 @@
+ALTER TABLE `media_sources` ADD `station` text;
