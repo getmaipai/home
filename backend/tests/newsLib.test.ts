@@ -43,16 +43,22 @@ describe("the child gate", () => {
     expect(out).toHaveLength(3);
     expect(out[2]).toMatchObject({ type: "list", items: [[{ type: "text", text: "Kept item." }]] });
   });
-  test("speech is cut at paragraph boundaries into chunks of at most 4,000 characters and holds the title first", () => {
-    const long = `${"Word ".repeat(300)}end.`;
-    const blocks = Array.from({ length: 8 }, () => para(long));
+  test("speech is chunked small so the first sound starts fast: the title alone first, then paragraphs of at most 900 characters, nothing dropped", () => {
+    const mid = `${"Word ".repeat(100)}end.`; // 504 characters: one chunk each, two never share
+    const blocks = Array.from({ length: 8 }, () => para(mid));
     const speech = speechFor("The title", blocks);
-    expect(speech[0]!.startsWith("The title\n\n")).toBe(true);
-    expect(speech.length).toBeGreaterThan(1);
+    expect(speech[0]).toBe("The title");
+    expect(speech.length).toBe(9);
     expect(speech.every((chunk) => chunk.length <= SPEECH_CHUNK_MAX)).toBe(true);
-    expect(speech.join("\n\n").split("\n\n").filter((p) => p === long)).toHaveLength(8); // no paragraph is split
+    expect(speech.slice(1).every((chunk) => chunk === mid)).toBe(true);
+    const shorts = speechFor("T", [para("One."), para("Two."), para("Three.")]);
+    expect(shorts).toEqual(["T\n\nOne.\n\nTwo.\n\nThree."]);
     const giant = speechFor("T", [para(`${"A sentence of some length goes here. ".repeat(300)}`)]);
     expect(giant.every((chunk) => chunk.length <= SPEECH_CHUNK_MAX)).toBe(true);
+    expect(giant.join(" ").replace(/\s+/g, " ").split("A sentence of some length goes here.").length - 1).toBe(300);
+    const oneSentence = speechFor("T", [para(`${"Word ".repeat(1000)}end.`)]);
+    expect(oneSentence.every((chunk) => chunk.length <= SPEECH_CHUNK_MAX)).toBe(true);
+    expect(oneSentence.join(" ").split(/\s+/).filter((w) => w === "Word")).toHaveLength(1000);
   });
   test("sentencesOf keeps an unterminated tail", () => {
     expect(sentencesOf("One. Two! Three")).toEqual(["One.", "Two!", "Three"]);

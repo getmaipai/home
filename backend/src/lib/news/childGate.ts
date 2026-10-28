@@ -134,25 +134,43 @@ function speakableUnits(block: ArticleBlock): string[] {
   }
 }
 
-export const SPEECH_CHUNK_MAX = 4000;
+/** Listen speaks one chunk at a time and the voice takes about as long to make a chunk as it takes to say it, so a chunk is a paragraph
+ * or two, not a page (2026-10-27: 4,000-character chunks meant three minutes of silence before the first word). The first chunk is
+ * the headline plus at most a short lead, so sound starts within seconds. */
+export const SPEECH_CHUNK_MAX = 900;
+export const SPEECH_FIRST_CHUNK_MAX = 400;
 
-/** What Listen speaks: the headline first, then the body, cut into chunks of at most 4,000 characters at paragraph
- * boundaries (a single paragraph longer than that is cut at a sentence). Built from the same blocks the page shows, so a
- * sentence the gate dropped is in neither. */
+/** What Listen speaks: the headline first, then the body, one chunk per paragraph (short paragraphs share a chunk up to
+ * SPEECH_CHUNK_MAX characters; a longer paragraph is cut at sentences, a longer sentence at a word). Built from the same blocks the
+ * page shows, so a sentence the gate dropped is in neither. */
 export function speechFor(title: string, blocks: readonly ArticleBlock[]): string[] {
   const units = [title, ...blocks.flatMap(speakableUnits)].map((unit) => unit.trim()).filter(Boolean);
   const chunks: string[] = [];
   let current = "";
+  const limit = (): number => (chunks.length === 0 ? SPEECH_FIRST_CHUNK_MAX : SPEECH_CHUNK_MAX);
   const push = (piece: string): void => {
-    if (current && current.length + 2 + piece.length > SPEECH_CHUNK_MAX) { chunks.push(current); current = ""; }
+    if (current && current.length + 2 + piece.length > limit()) { chunks.push(current); current = ""; }
     current = current ? `${current}\n\n${piece}` : piece;
+  };
+  // A single sentence longer than the limit is cut at a space, never dropped.
+  const wordsCut = (sentence: string, max: number): string[] => {
+    const cuts: string[] = [];
+    let rest = sentence;
+    while (rest.length > max) {
+      const at = rest.lastIndexOf(" ", max);
+      const end = at > 0 ? at : max;
+      cuts.push(rest.slice(0, end).trim());
+      rest = rest.slice(end).trim();
+    }
+    if (rest) cuts.push(rest);
+    return cuts;
   };
   for (const unit of units) {
     if (unit.length <= SPEECH_CHUNK_MAX) { push(unit); continue; }
     let piece = "";
-    for (const sentence of sentencesOf(unit)) {
-      if (piece && piece.length + 1 + sentence.length > SPEECH_CHUNK_MAX) { push(piece); piece = ""; }
-      piece = piece ? `${piece} ${sentence}` : sentence.slice(0, SPEECH_CHUNK_MAX);
+    for (const sentence of sentencesOf(unit).flatMap((one) => (one.length > SPEECH_CHUNK_MAX ? wordsCut(one, SPEECH_CHUNK_MAX) : [one]))) {
+      if (piece && piece.length + 1 + sentence.length > limit()) { push(piece); piece = ""; }
+      piece = piece ? `${piece} ${sentence}` : sentence;
     }
     if (piece) push(piece);
   }

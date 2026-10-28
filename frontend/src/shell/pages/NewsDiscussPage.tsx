@@ -6,7 +6,7 @@ import type { ArticleBlockData, ArticleInlineData } from "@maipai/ui/src/primiti
 import { EmptyState } from "@maipai/ui/src/primitives/EmptyState";
 import type { Roster } from "@/lib/api";
 
-export const DISCUSS_PROMPT = "Read this article and tell me what you think, including anything that looks one-sided or missing.";
+export const DISCUSS_PROMPT = "I'd like to talk about this story.";
 
 const inlineText = (inlines: ArticleInlineData[]): string => inlines.map((inline) => inline.text).join("");
 
