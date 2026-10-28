@@ -24,6 +24,7 @@ import { ComputeError } from "@maipai/spec/interpreters/ts/compute.js";
 import { createHost } from "@/lib/packageHost";
 import { blocksForRecipeRun, withoutBlockOnlyData, type BlockCapture } from "@/lib/packageBlocks";
 import { adviceFromRecipeData, adviceLine } from "@/lib/weatherAdvice";
+import { summaryFor } from "@/lib/weatherSummary";
 import { callTier1Handle } from "@/lib/denoHost";
 import { speakerAgeBand } from "@/lib/ageBand";
 import { applyNewsMinorFloor } from "@/lib/newsMinorFloor";
@@ -663,9 +664,16 @@ export async function runPlugin(
     const answer = withoutBlockOnlyData(value);
     // WEATHER-PORT-01: what to wear and bring, from this run's own numbers. It rides in the answer's data (chat) and the app details.
     const advice = id === "weather" ? adviceFromRecipeData(value.data) : [];
-    if (advice.length > 0) answer.data = { ...(answer.data ?? {}), advice, advice_line: adviceLine(advice) };
+    // WEATHER-PORT-03: the written summary, once the background model has made it for this place and hour; the advice line until then.
+    // Current-location runs carry the person's own coordinates, so they are never cached or summarized by name.
+    const weatherData = value.data as Record<string, unknown> | undefined;
+    const placeName = typeof weatherData?.place === "string" ? weatherData.place : "";
+    const summary = advice.length > 0 && placeName !== "" && !options.uncached
+      ? summaryFor({ place: placeName, unit: weatherData?.unit === "celsius" ? "celsius" : "fahrenheit", temp: typeof weatherData?.temperature === "number" ? weatherData.temperature : undefined, condition: typeof weatherData?.conditions === "string" ? weatherData.conditions : undefined, high: typeof weatherData?.high === "number" ? weatherData.high : undefined, low: typeof weatherData?.low === "number" ? weatherData.low : undefined, advice })
+      : adviceLine(advice);
+    if (advice.length > 0) answer.data = { ...(answer.data ?? {}), advice, advice_line: adviceLine(advice), summary };
     const appDetails = id === "weather"
-      ? { ...Object.fromEntries(Object.entries(value.data ?? {}).filter(([key]) => key.startsWith("block_detail_")).map(([key, item]) => [key.slice("block_detail_".length), item])), ...(advice.length > 0 ? { advice } : {}) }
+      ? { ...Object.fromEntries(Object.entries(value.data ?? {}).filter(([key]) => key.startsWith("block_detail_")).map(([key, item]) => [key.slice("block_detail_".length), item])), ...(advice.length > 0 ? { advice, summary } : {}) }
       : undefined;
     return { ok: true, value: blocks.length > 0 ? ({ ...answer, blocks, ...(appDetails ? { appDetails } : {}) } as PluginResult) : answer };
   } catch (err) {
