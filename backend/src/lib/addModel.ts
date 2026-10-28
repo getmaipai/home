@@ -2,7 +2,7 @@
 // Stack reads the repository (size, hash, licence, layer shape) without
 // downloading it; this turns that reading into one ModelCapabilities record,
 // stores it, and hands the download to the same switch every chat model uses.
-import { ModelCapabilities } from "@maipai/spec/gen/ts/model-capabilities.js";
+import { addedModelId, recordFor, type InspectedModel } from "@/lib/addModelRecord";
 import { saveAddedModel } from "@/lib/addedModels";
 import { startChatModelChoice, type ChatSwitchState } from "@/lib/chatModelSwitch";
 import { catalogEntries } from "@/lib/modelCatalog";
@@ -11,13 +11,6 @@ import { StackError } from "@/lib/stack/errors";
 
 export class AddModelError extends Error {
   constructor(readonly status: 400 | 409 | 502, message: string) { super(message); this.name = "AddModelError"; }
-}
-
-export interface InspectedModel {
-  repo: string; file: string; url: string; revision: string; sizeBytes: number; sha256: string; licence: string | null;
-  architecture: string; verifiedArchitecture: boolean;
-  shape: { paramCountBillion: number; bitsPerWeight: number; layers: number; kvHeads: number; headDim: number; maxContext: number };
-  ramBytes: number;
 }
 
 function sentence(error: unknown): string {
@@ -52,34 +45,6 @@ export async function inspectForAdd(source: string, file?: string): Promise<Insp
   };
 }
 
-/** A plain model id the Stack accepts as a directory name: lowercase letters, digits and dashes. */
-export function addedModelId(repo: string, file: string): string {
-  const slug = `${repo.split("/").pop() ?? repo}-${file.replace(/\.gguf$/i, "")}`.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 80);
-  return `added-${slug}`;
-}
-
-/** The record an admin's add makes. Sampling stays the engine's own: published values are shown, never applied. */
-export function recordFor(inspected: InspectedModel, addedBy: string, now: Date = new Date()): ModelCapabilities {
-  return ModelCapabilities.parse({
-    id: addedModelId(inspected.repo, inspected.file),
-    role: "chat",
-    label: `${inspected.repo.split("/").pop() ?? inspected.repo} (${inspected.file.replace(/\.gguf$/i, "")})`,
-    license: inspected.licence ?? "Not stated by the repository",
-    engine: "llama-server",
-    implemented: true,
-    origin: "added",
-    added_by: addedBy,
-    added_at: now.toISOString(),
-    tags: ["not-tested"],
-    download: { url: inspected.url, sha256: inspected.sha256, approx_bytes: inspected.sizeBytes },
-    sizing: {
-      kind: "transformer_gguf", param_count_billion: inspected.shape.paramCountBillion, bits_per_weight: inspected.shape.bitsPerWeight,
-      num_layers: inspected.shape.layers, num_kv_heads: inspected.shape.kvHeads, head_dim: inspected.shape.headDim, max_context: inspected.shape.maxContext,
-    },
-    sampling: { source: "engine defaults, not tuned" },
-  });
-}
-
 /** Reads the link, stores the record and starts the download (or the load, when the Stack already has the file). */
 export async function addChatModel(source: string, file: string | undefined, addedBy: string): Promise<{ id: string; label: string; state: ChatSwitchState }> {
   const inspected = await inspectForAdd(source, file);
@@ -90,3 +55,5 @@ export async function addChatModel(source: string, file: string | undefined, add
   if ("error" in started) throw new AddModelError(started.status === 502 ? 502 : 409, started.error);
   return { id: record.id, label: record.label, state: started };
 }
+
+export { addedModelId, recordFor, type InspectedModel };

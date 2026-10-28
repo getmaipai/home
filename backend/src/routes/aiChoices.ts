@@ -51,7 +51,7 @@ function choicesInput(state: AiState): AiChoicesInput {
 }
 
 function unusedInput(state: AiState): UnusedInput {
-  return { copy: aiCopy, plan: state.plan, components: state.components, settings: state.settings, freeBytes: state.freeBytes };
+  return { copy: aiCopy, plan: state.plan, components: state.components, settings: state.settings, freeBytes: state.freeBytes, addedChats: state.addedChats.map((added) => ({ ...added, description: ADDED_CHAT_DESCRIPTION })) };
 }
 
 // The disk plan this computer's AI runs on: the Stack's own rows when it answers (previewPlan never throws;

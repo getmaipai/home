@@ -239,3 +239,14 @@ test("whyKept refuses a saved style by id, so a cleanup can never remove one", (
   const input = unusedInput(p, [part({ id: "chat-m" }), part({ id: "lora.picture.cinema", kind: "lora", size_bytes: 500 })]);
   expect(whyKept(input, "lora.picture.cinema")).toBe("A saved style is removed from its own page, not here.");
 });
+
+test("an added chat model is listed for removal when it is not the one in use, and kept while it is", () => {
+  const p = plan([{ id: "chat", need: "required", model_ids: ["chat-m"] }]);
+  const components = [part({ id: "chat-m" }), part({ id: "added-tiny", group: "chat", size_bytes: 4000 })];
+  const addedChat = (running: boolean) => ({ id: "added-tiny", label: "Tiny", description: "Not tested by MaiPai.", installed: true, running, downloadBytes: 4000, installedBytes: 4000 });
+  const idle = { ...unusedInput(p, components), addedChats: [addedChat(false)] };
+  expect(findUnused(idle).items.map((item) => item.id)).toEqual(["added-tiny"]);
+  const running = { ...unusedInput(p, components), addedChats: [addedChat(true)] };
+  expect(findUnused(running).items).toEqual([]);
+  expect(whyKept(running, "added-tiny")).toBe("You use it now.");
+});

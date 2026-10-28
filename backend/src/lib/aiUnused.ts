@@ -76,6 +76,8 @@ function buildContext(input: UnusedInput): UnusedContext {
     for (const choice of card.choices) {
       if (!choice.current) continue;
       for (const component of input.components) {
+        // An added chat model has no plan row; its choice id names its model.
+        if (choice.id === `chat.added.${component.id}`) selected.add(component.id);
         // The same row-to-component match as aiChoices: the component is its
         // own row or one of the row's models.
         if (choice.rowIds.some((rowId) => component.id === rowId || (rows.get(rowId)?.model_ids.includes(component.id) ?? false))) {
