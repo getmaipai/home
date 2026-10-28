@@ -10,7 +10,8 @@ import { existsSync, readFileSync, writeFileSync, unlinkSync } from "node:fs";
 import { resolve, join } from "node:path";
 import sharp from "sharp";
 import { dataDir, ensureDataDir } from "@/lib/paths";
-import { assertNotPrivateHost, guardedFetch, SsrfBlockedError, type DnsLookup } from "@maipai/core/src/ssrfGuard";
+import { fetchTryingEachAddress } from "@/lib/addressFallback";
+import { assertNotPrivateHost, SsrfBlockedError, type DnsLookup } from "@maipai/core/src/ssrfGuard";
 
 export const faviconsDir = resolve(dataDir, "favicons");
 const indexPath = (): string => join(faviconsDir, "index.json");
@@ -281,7 +282,7 @@ export async function fetchFaviconBytes(host: string, fetchFn?: FaviconFetchFn, 
   // Nature sends its home page through five cookie-check redirects, so the home page gets more hops than an icon file (every hop is still SSRF-checked).
   const get = (url: string, signal: AbortSignal, maxRedirects = 3) => fetchFn
     ? fetchFn(url, { signal })
-    : guardedFetch(url, { signal, redirect: "follow", maxRedirects });
+    : fetchTryingEachAddress(url, { signal, redirect: "follow", maxRedirects });
   const tryIcon = async (url: string): Promise<FaviconFetchOutcome | null> => {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);

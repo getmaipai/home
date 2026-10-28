@@ -17,7 +17,8 @@ import { existsSync, mkdirSync, readFileSync, renameSync, statSync, unlinkSync, 
 import { join } from "node:path";
 import sharp from "sharp";
 import { lookup as defaultLookup } from "node:dns/promises";
-import { assertNotPrivateHost, guardedFetch, SsrfBlockedError, type DnsLookup, type PinnedRequest } from "@maipai/core/src/ssrfGuard";
+import { fetchTryingEachAddress } from "@/lib/addressFallback";
+import { assertNotPrivateHost, SsrfBlockedError, type DnsLookup, type PinnedRequest } from "@maipai/core/src/ssrfGuard";
 import { cacheDir } from "@/lib/paths";
 import { HOME_USER_AGENT } from "@/lib/outbound";
 import { tryConsume } from "@/lib/rateLimiter";
@@ -200,10 +201,13 @@ async function downloadOnce(imageUrl: string, band: AgeBand, lane: Lane = "view"
       for (let hop = 0; ; hop++) {
         if (!/^https?:$/.test(current.protocol) || current.username || current.password || !urlAllowedFor(band, current.href)) return null;
         if (newsHostQuiet(current.hostname.toLowerCase(), clock())) return null;
-        response = await guardedFetch(current, {
+        response = await fetchTryingEachAddress(current, {
           method: "GET", redirect: "manual", signal: controller.signal,
           headers: { "User-Agent": HOME_USER_AGENT, Accept: "image/avif,image/webp,image/jpeg,image/png" },
-        }, lookup, deps.request);
+        }, {
+          lookupAll: deps.dnsLookup ? async (name) => [await deps.dnsLookup!(name)] : undefined,
+          request: deps.request, onAttempt: (attemptFamily) => { family = attemptFamily; },
+        });
         if (response.status === 403 || response.status === 429) quietNewsHost(current.hostname.toLowerCase(), clock());
         const location = response.status >= 300 && response.status < 400 ? response.headers.get("location") : null;
         if (!location) break;

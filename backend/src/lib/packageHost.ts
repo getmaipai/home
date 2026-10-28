@@ -65,6 +65,7 @@ import { tryConsume } from "@/lib/rateLimiter";
 import { recordSearchHealth } from "@/lib/searchHealthState";
 import { classifyServiceOutcome, recordServiceOutcome } from "@/lib/serviceHealth";
 import { assertNotPrivateHost, guardedFetch, SsrfBlockedError } from "@maipai/core/src/ssrfGuard";
+import { fetchTryingEachAddress } from "@/lib/addressFallback";
 import * as memory from "@/lib/memory";
 import { deleteAttachmentsForPerson } from "@/lib/attachments";
 import * as settings from "@/lib/settings";
@@ -1737,16 +1738,16 @@ async function pageFetch(url: string, countsAgainstPace = true, signal?: AbortSi
     let response: Response;
     if (background) {
       // A redirect needs its own robots and budget checks. Leave it for an explicit open.
-      response = await guardedFetch(url, { ...fetchOptions, redirect: "manual" });
+      response = await fetchTryingEachAddress(url, { ...fetchOptions, redirect: "manual" });
     } else if (!minorBand && !siteBlocksActive("adult")) {
-      response = await guardedFetch(url, { ...fetchOptions, redirect: "follow", maxRedirects: MAX_FETCH_REDIRECTS });
+      response = await fetchTryingEachAddress(url, { ...fetchOptions, redirect: "follow", maxRedirects: MAX_FETCH_REDIRECTS });
     } else {
       const hopBand = minorBand ?? "adult";
       // MINOR-SEARCH-01e-5: a child or teen's page follows each redirect by hand so a hop onto a blocked site is
       // refused before it is fetched, not discovered afterwards.
       let current = url;
       for (let hop = 0; ; hop++) {
-        response = await guardedFetch(current, { ...fetchOptions, redirect: "manual" });
+        response = await fetchTryingEachAddress(current, { ...fetchOptions, redirect: "manual" });
         const location = response.status >= 300 && response.status < 400 ? response.headers.get("location") : null;
         if (!location) break;
         if (hop >= MAX_FETCH_REDIRECTS) return { ok: false, networkFailure: false, error: new HostError("network_unreachable", `${url} redirected too many times`) };

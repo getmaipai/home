@@ -267,6 +267,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/addModel.ts` | AddModelError, inspectForAdd, addChatModel |
 | `backend/src/lib/addModelRecord.ts` | addedModelId, recordFor |
 | `backend/src/lib/addedModels.ts` | listAddedModels, saveAddedModel, removeAddedModel |
+| `backend/src/lib/addressFallback.ts` | ADDRESS_ATTEMPT_MS, ipv4First, isConnectFailure, fetchTryingEachAddress |
 | `backend/src/lib/ageBand.ts` | speakerAgeBand |
 | `backend/src/lib/aiChoicesState.ts` | readAiSettings, SETUP_CHOICE_KEYS, setupCards |
 | `backend/src/lib/aiCopy.ts` | aiCopy, ADDED_CHAT_DESCRIPTION |
