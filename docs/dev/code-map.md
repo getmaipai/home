@@ -34,6 +34,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/packages/news/pages/search.json` | news | Search |
 | `backend/packages/news/pages/story.json` | news | Story |
 | `backend/packages/podcasts/pages/episodes.json` | podcasts | Episodes |
+| `backend/packages/podcasts/pages/filters.json` | podcasts | Filters |
 | `backend/packages/podcasts/pages/find.json` | podcasts | Find shows |
 | `backend/packages/podcasts/pages/index.json` | podcasts | Listen now |
 | `backend/packages/podcasts/pages/play.json` | podcasts | Listen |
@@ -461,7 +462,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/media/access.ts` | isMediaAdmin, discoveryAllowed, allowlistMode, noDiscovery, sourceVisibleTo, liveSourceById |
 | `backend/src/lib/media/appHost.ts` | MEDIA_APPS, MEDIA_APP_IDS, isMediaAppId, laterKindOf, mediaAppAllowed, allowlistOnly |
 | `backend/src/lib/media/band.ts` | trips, bandOkAtIngest, mediaBandOf, allowedBandsFor, bandAllows |
-| `backend/src/lib/media/collections.ts` | SINGLETON_KINDS, MADE_KINDS, ensureStandingCollections, listCollections, resolveCollection, createCollection |
+| `backend/src/lib/media/collections.ts` | SINGLETON_KINDS, MADE_KINDS, ensureStandingCollections, listCollections, resolveCollection, createFilterCollection |
 | `backend/src/lib/media/duplicates.ts` | findDuplicates |
 | `backend/src/lib/media/fetchedFiles.ts` | createFetchedFile, createFetchedFileFromResponse, removeFetchedFile |
 | `backend/src/lib/media/heal.ts` | healMadeSources |
@@ -484,6 +485,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/media/parsers/zip.ts` | openZip |
 | `backend/src/lib/media/podcastApp.ts` | showRulesLine |
 | `backend/src/lib/media/podcastDirectory.ts` | __resetDirectoryForTests, directoryAllowed, searchDirectory, topShows, smallArt, artProxyAddress |
+| `backend/src/lib/media/podcastFilters.ts` | MAX_FILTERS, parseRules, matchesRules, evaluateFilter, filterSummary, draftRows |
 | `backend/src/lib/media/podcasts.ts` | __setPodcastFetchDepsForTests, podcastFetchDeps, plainNotes, chaptersFromNotes, parsePodcastFeed, sourceRowForFeed |
 | `backend/src/lib/media/prober.ts` | probeResultFrom, createStackProber |
 | `backend/src/lib/media/progress.ts` | LATCH_PERCENT, BOOK_END_PERCENT, correctedStamp, percentOf, reachesLatch, mergeProgress |
