@@ -5,5 +5,6 @@
   "news.default_topics.adult",
   "news.default_topics.teen",
   "news.default_topics.child",
-  "music.lyrics_online"
+  "music.lyrics_online",
+  "stack.engines.stt.smart_turn"
 ]

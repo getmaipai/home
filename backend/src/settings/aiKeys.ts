@@ -132,6 +132,18 @@ export const AI_SETTINGS_KEYS: SettingsKey[] = [
     honoured_by: ["home"],
   }),
   SettingsKey.parse({
+    key: "stack.engines.stt.smart_turn",
+    scope: "household",
+    selector: "boolean",
+    default: false,
+    label: "Wait for the end of a sentence before replying",
+    copy: { does: "Listens to the tone of a pause, so a mid-sentence \"um\" does not cut the speaker off." },
+    help: "Off by default until measured. When on, Home asks the MaiPai Stack's end-of-turn model whether a pause is the end of the sentence before it answers. If the Stack cannot answer in a quarter of a second, Home answers after the usual short silence.",
+    level: "expert",
+    lives_in: "household.ai_developer",
+    honoured_by: ["home"],
+  }),
+  SettingsKey.parse({
     key: "engines.stack.url",
     scope: "household",
     selector: "text",

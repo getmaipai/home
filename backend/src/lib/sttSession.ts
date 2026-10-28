@@ -15,6 +15,8 @@
 // A complete WAV with a long silent pre-roll can decode to an empty string,
 // so finalize() retries once from the voiced onset before giving up.
 import { transcribeUtterance } from "@/lib/stt";
+import { getHouseholdSettingValue } from "@/lib/settings";
+import { getStackClient } from "@/lib/stackEngine";
 import { voiceFailureLine } from "@/lib/failureCopy";
 import { getSileroStream, type SileroVadStream } from "@/lib/sileroVad";
 import type { SttWireEvent } from "@maipai/spec/voice/ts/sttTypes.js";
@@ -30,10 +32,19 @@ export interface Endpointer {
   isComplete(audio: Float32Array, sampleRate: number): Promise<boolean>;
 }
 
-/** Production lookup remains empty until the Stack-served endpointer client lands. */
+/** The Stack-served Smart Turn endpointer, only while `stack.engines.stt.smart_turn` is on. */
 export async function getEndpointer(): Promise<Endpointer | null> {
-  return null;
+  return getHouseholdSettingValue("stack.engines.stt.smart_turn") === true ? stackEndpointer : null;
 }
+
+const stackEndpointer: Endpointer = {
+  async isComplete(audio, sampleRate) {
+    const form = new FormData();
+    form.append("file", new File([encodeWav(audio, sampleRate)], "utterance.wav", { type: "audio/wav" }));
+    const result = await getStackClient().endpoint(form);
+    return result.data.complete;
+  },
+};
 
 let sileroLoader: typeof getSileroStream = getSileroStream;
 export function __setSileroLoaderForTests(loader: typeof getSileroStream): void { sileroLoader = loader; }

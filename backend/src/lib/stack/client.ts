@@ -4,6 +4,7 @@
 // of probing a process.
 
 import { withTimeout } from "@maipai/core/src/withTimeout";
+import type { SttEndpointResponse } from "@maipai/spec/voice/ts/sttTypes.js";
 import { StackJob as StackJobSchema } from "@maipai/spec/stack/ts/stack-job.js";
 import { hostLabel, type EngineIdentity } from "../engineIdentity";
 import { StackError, type StackErrorKind } from "./errors";
@@ -120,6 +121,8 @@ export interface StackClient {
    * count, never an estimate. */
   tokenize(request: TokenCountRequest, opts?: { signal?: AbortSignal }): Promise<{ data: TokenCountResponse; identity: EngineIdentity }>;
   transcribe(form: FormData, opts?: { signal?: AbortSignal }): Promise<{ data: { text: string }; identity: EngineIdentity }>;
+  /** POST /v1/audio/endpoint: has the speaker finished? (DUPLEX-02, Smart Turn v3.2 in the Stack). */
+  endpoint(form: FormData, opts?: { signal?: AbortSignal }): Promise<{ data: SttEndpointResponse; identity: EngineIdentity }>;
   /** POST /v1/audio/speech; returns the streamed WAV Response. */
   speak(form: FormData, opts?: { signal?: AbortSignal }): Promise<Response>;
   /** POST /stack/v1/voices/{id}/preview; an intentionally unbounded first download/render. */
@@ -378,6 +381,7 @@ export function createStackClient(options: StackClientOptions = {}): StackClient
     embeddings: (request, opts) => call("/v1/embeddings", jsonInit(request), rawJson<Record<string, unknown>>, opts),
     tokenize: (request, opts) => call("/v1/tokenize", jsonInit(request), rawJson<TokenCountResponse>, opts),
     transcribe: (form, opts) => call("/v1/audio/transcriptions", formInit(form), rawJson<{ text: string }>, opts),
+    endpoint: (form, opts) => call("/v1/audio/endpoint", formInit(form), rawJson<SttEndpointResponse>, opts),
     async speak(form, opts) {
       let res: Response;
       try {
