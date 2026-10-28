@@ -31,11 +31,20 @@ function storyResumesAfter(kept: readonly ArticleBlock[], from: number): boolean
   return prose >= 2;
 }
 
+/** A paragraph that says exactly what the paragraph before it said (The Verge repeats its lede when the page carries both the standfirst and the body). */
+function repeatsPrevious(blocks: readonly ArticleBlock[], i: number): boolean {
+  const block = blocks[i]!;
+  if (block.type !== "paragraph" || i === 0) return false;
+  const text = textOf(block).replace(/\s+/g, " ").trim();
+  const before = blocks[i - 1]!;
+  return text.length >= 40 && before.type === "paragraph" && textOf(before).replace(/\s+/g, " ").trim() === text;
+}
+
 /** The story's own blocks: everything from the first tail marker on is dropped, and an embedded post quote is dropped anywhere.
  * A marker among the first three blocks is left alone (a short story may itself begin with such a word). A "Related" box with the
  * story still running after it (The Verge puts one mid-story) is dropped with its link list and the story goes on. */
 export function trimArticleTail(blocks: readonly ArticleBlock[]): ArticleBlock[] {
-  const kept = blocks.filter((block) => !(block.type === "quote" && EMBEDDED_POST.test(textOf(block))));
+  const kept = blocks.filter((block, i) => !(block.type === "quote" && EMBEDDED_POST.test(textOf(block))) && !repeatsPrevious(blocks, i));
   const out: ArticleBlock[] = kept.slice(0, Math.min(3, kept.length));
   for (let i = 3; i < kept.length; i++) {
     const text = textOf(kept[i]!).replace(/\s+/g, " ").trim();

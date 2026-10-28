@@ -33,3 +33,9 @@ test("iconLinksOf lists declared icons, largest first, https only", () => {
   const html = '<link rel="icon" href="/f.ico"><link rel="apple-touch-icon" sizes="180x180" href="/a.png"><link rel="icon" href="http://x/y.png">';
   expect(iconLinksOf(html, "https://s.example/")).toEqual(["https://s.example/a.png", "https://s.example/f.ico"]);
 });
+
+test("trimArticleTail drops a paragraph that repeats the one before it", () => {
+  const lede = "Reddit's homepage is now going to offer For You and Following feeds, which could be a big shift.";
+  expect(trimArticleTail([p(lede), p(lede), p("A second, different paragraph.")]).map((b) => (b.type === "paragraph" ? b.inlines[0]!.text : ""))).toEqual([lede, "A second, different paragraph."]);
+  expect(trimArticleTail([p("Short."), p("Short.")])).toHaveLength(2);
+});
