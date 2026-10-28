@@ -157,7 +157,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `frontend/src/shell/StatusIndicator.tsx` | useStatusSummary, StatusIndicator |
 | `frontend/src/shell/ThemeToggle.tsx` | useIsDark, ThemeToggle |
 | `frontend/src/shell/VoiceStage.tsx` | VoiceStage |
-| `frontend/src/shell/ambientRing.tsx` | ambientRingFromWake, effectiveAmbientRing, AmbientRingProvider, useAmbientRing, useAmbientRingValue, useAmbientWake |
+| `frontend/src/shell/ambientRing.tsx` | ambientRingFromWake, effectiveAmbientRing, chatAmbientRing, AmbientRingProvider, useAmbientRing, useAmbientRingValue |
 | `frontend/src/shell/audioSessionContext.tsx` | AudioSessionProvider, useAudioSession, useAudioSessionState, useAudioPosition, useMiniBar, useAudioRegistration |
 | `frontend/src/shell/components/DataTableControls.tsx` | DataTableControls |
 | `frontend/src/shell/components/DataTableRowActions.tsx` | DataTableRowActions |
