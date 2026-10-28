@@ -5580,7 +5580,8 @@
                               "enum": [
                                 "turn",
                                 "code",
-                                "settings"
+                                "settings",
+                                "diagnose"
                               ]
                             }
                           },
@@ -5715,11 +5716,12 @@
                       "enum": [
                         "turn",
                         "code",
-                        "settings"
+                        "settings",
+                        "diagnose"
                       ]
                     },
                     "minItems": 1,
-                    "maxItems": 3
+                    "maxItems": 4
                   },
                   "expires_in_days": {
                     "anyOf": [
@@ -5787,7 +5789,8 @@
                             "enum": [
                               "turn",
                               "code",
-                              "settings"
+                              "settings",
+                              "diagnose"
                             ]
                           }
                         },
@@ -6097,7 +6100,8 @@
                               "enum": [
                                 "turn",
                                 "code",
-                                "settings"
+                                "settings",
+                                "diagnose"
                               ]
                             }
                           },
