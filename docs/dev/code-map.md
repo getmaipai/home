@@ -849,7 +849,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/weatherAdvice.ts` | weatherAdvice, adviceLine, adviceFromRecipeData, adviceChips |
 | `backend/src/lib/weatherAlerts.ts` | __resetWeatherAlertsForTests, isUsAlertCoordinate, weatherAlerts |
 | `backend/src/lib/weatherMoon.ts` | __resetMoonForTests, moonTile |
-| `backend/src/lib/weatherSummary.ts` | __setWeatherSummaryCompleterForTests, __resetWeatherSummaryForTests, summaryFor |
+| `backend/src/lib/weatherSummary.ts` | __setWeatherSummaryCompleterForTests, __resetWeatherSummaryForTests, factualLine, summaryFor |
 | `backend/src/lib/webSearchBudget.ts` | SEARXNG_CONNECT_LIMIT_MS, SEARXNG_ATTEMPT_LIMIT_MS, ADULT_WRITTEN_WEBSEARCH_DEADLINE_MS, webSearchToolDeadlineMs |
 | `backend/src/lib/wellFormed.ts` | visibleText, analysisLead, thinkingPrefix, newThinkSplitState, feedThinkSplit, flushThinkSplit |
 | `backend/src/lib/widgets.ts` | widgetCardBlock, listWidgets, orderHomeCards, getWidgetData |
