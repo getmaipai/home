@@ -49,7 +49,7 @@ export function MusicVisualizerSection({ id }: { id: string }) {
   const toggleLoop = () => { mine.el.loop = !mine.el.loop; setLoop(mine.el.loop); };
   return (
     <>
-      <div aria-hidden="true" data-testid="music-page-backdrop" className="pointer-events-none fixed inset-x-0 bottom-0 top-10 z-0 overflow-hidden md:start-14">
+      <div aria-hidden="true" data-testid="music-page-backdrop" className="pointer-events-none fixed inset-x-0 bottom-0 top-13 z-0 overflow-hidden md:start-14">
         {mine.poster ? <img src={mine.poster} alt="" className="absolute inset-0 size-full scale-125 object-cover opacity-20 blur-3xl" /> : null}
         <div className="absolute inset-0 opacity-20 dark:opacity-25" style={{ background: `linear-gradient(135deg, ${palette.corners[0]}, ${palette.corners[1]} 40%, ${palette.corners[2]} 70%, ${palette.corners[3]})` }} />
         {vizOn ? <AudioVisualizer variant={variant} mode="full" getAnalyser={getAnalyser} palette={palette} active={playing} progress={progress} opacity={0.4} className="absolute inset-0 size-full" /> : null}
