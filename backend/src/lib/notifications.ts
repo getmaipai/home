@@ -104,6 +104,9 @@ function resolveChannelsFor(type: NotificationType, recipient: PersonRow): Notif
 }
 
 export interface TriggerOptions {
+  /** Stable producer event identity. The notification store deduplicates
+   * this key per type and recipient, including after a Home restart. */
+  repeatKey?: string;
   /** Required when `type.audience === "person"`, ignored otherwise. */
   personId?: string;
   /** Which OTHER person this notification is about, when it's about one -
@@ -180,6 +183,8 @@ export async function trigger(typeId: string, vars: Record<string, string> = {},
   const text = renderTemplate(type.template, vars);
 
   for (const recipient of recipients) {
+    if (opts.repeatKey && db.select({ id: notificationDeliveries.id }).from(notificationDeliveries)
+      .where(and(eq(notificationDeliveries.typeId, type.id), eq(notificationDeliveries.recipientId, recipient.id), eq(notificationDeliveries.repeatKey, opts.repeatKey))).get()) continue;
     const now = new Date();
     if (type.level === "immediate") {
       await deliver(type, recipient, text, opts, now);
@@ -243,6 +248,7 @@ async function deliver(type: NotificationType, recipient: PersonRow, text: strin
         subjectPersonId: opts.subjectPersonId ?? null,
         subjectTurnId: opts.subjectTurnId ?? null,
         memoryIds: opts.memoryIds ? JSON.stringify(opts.memoryIds) : null,
+        repeatKey: opts.repeatKey ?? null,
       })
       .run();
     if (channels.includes("robot")) {

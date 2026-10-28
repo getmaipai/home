@@ -1,6 +1,6 @@
 {
   "id": "weather",
-  "version": "0.3.4",
+  "version": "0.3.5",
   "kind": "plugin",
   "category": "Utilities",
   "display": "Weather",
@@ -103,7 +103,16 @@
     "net:api.open-meteo.com",
     "net:api.weather.gov"
   ],
-  "notifications": [],
+  "notifications": [
+    {
+      "id": "weather.alert",
+      "level": "time_sensitive",
+      "audience": "household",
+      "template": "{event}: {headline}",
+      "configurable": true,
+      "default_channels": ["in_app"]
+    }
+  ],
   "cache": {
     "key_template": "weather:{place}",
     "ttl_s": 1800,

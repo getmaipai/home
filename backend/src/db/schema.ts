@@ -1094,7 +1094,11 @@ export const notificationDeliveries = sqliteTable("notification_deliveries", {
   // text. Nullable: every notification type other than memory.updated
   // leaves this unset.
   memoryIds: text("memory_ids"),
-});
+  // A producer supplied durable event identity, unique per recipient.
+  // Notification fan-out remains one row per person, while retries across
+  // process restarts cannot deliver the same event twice.
+  repeatKey: text("repeat_key"),
+}, (table) => [uniqueIndex("notification_deliveries_repeat_key_idx").on(table.typeId, table.recipientId, table.repeatKey)]);
 
 export const notificationHolds = sqliteTable("notification_holds", {
   id: text("id").primaryKey(),

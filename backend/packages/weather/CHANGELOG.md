@@ -2,6 +2,12 @@
 
 All notable changes to the Weather package, in [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) format.
 
+## [0.3.5] - 2026-10-28
+
+### Added
+
+- Active alerts for the household home place raise one household notification per alert while weather alerts are on.
+
 ## [0.3.4] - 2026-10-28
 
 ### Added

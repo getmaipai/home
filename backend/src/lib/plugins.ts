@@ -39,12 +39,12 @@ import type { ProjectPlan } from "@/lib/projects/types";
 import { parseWhen } from "@/lib/scheduler";
 import { listActivePeople } from "@/lib/access";
 import { householdHomeCountryName, householdHomePlaceName, householdHomeSkyInput } from "@/lib/places";
+import { getHouseholdSettingValue } from "@/lib/settings";
 import { PACKAGES_DIR, statMtimeMs, isValidPackageId } from "@/lib/paths";
 import { resolvePackageDir, listInstalledPackageIds } from "@/lib/packageResolve";
 import { promptNow, seededOutcomeFor } from "@/lib/benchSampling";
 import { moonTile } from "@/lib/weatherMoon";
-import { weatherAlerts } from "@/lib/weatherAlerts";
-import { getHouseholdSettingValue } from "@/lib/settings";
+import { weatherAlerts, notifyWeatherAlertsForHome } from "@/lib/weatherAlerts";
 import { ROLE_LADDER, type Role } from "@/middleware/auth";
 import type { PersonRow } from "@/types";
 
@@ -778,6 +778,10 @@ export async function warmPackage(id: string, manifest: PackageManifest): Promis
     try {
       const result = await runPlugin(id, actor, { place });
       if (!result.ok) console.error(`[warm] ${id} failed: ${warmErrorCode(result)}`);
+      // WEATHER-PORT-06: alert notifications use only the configured home
+      // point and never run when the household switch is off.
+      const point = householdHomeSkyInput();
+      if (point) await notifyWeatherAlertsForHome(point);
     } catch (err) {
       console.error(`[warm] ${id} failed: ${warmErrorCode(err)}`);
     }
