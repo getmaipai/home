@@ -106,6 +106,12 @@ describe("mergeProgress: the completed latch per kind", () => {
 });
 
 describe("mergeProgress: marks and counters", () => {
+  test("a deleted snip's tombstone wins over the snip it replaces, and a stale copy of the snip does not bring it back", () => {
+    const tomb = { at_s: 10, label: "podcast-snip:deleted:12" };
+    const live = { at_s: 10, label: "podcast-snip:12:note" };
+    expect(mergeProgress("audiobook", state({ marks: [live] }), write({ marks: [tomb] })).state.marks).toEqual([tomb]);
+    expect(mergeProgress("audiobook", state({ marks: [tomb], updated_at: T(300) }), write({ marks: [live], stamp: T(250) })).state.marks).toEqual([tomb]);
+  });
   test("marks union by at_s; the newer write's label wins for a shared time", () => {
     const merged = mergeProgress("audiobook", state({ marks: [{ at_s: 10, label: "old" }, { at_s: 50, label: "keep" }] }), write({ marks: [{ at_s: 10, label: "new" }, { at_s: 5, label: null }] }));
     expect(merged.state.marks).toEqual([{ at_s: 5, label: null }, { at_s: 10, label: "new" }, { at_s: 50, label: "keep" }]);

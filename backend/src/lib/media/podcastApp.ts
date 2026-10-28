@@ -74,6 +74,35 @@ function bookmarkRows(person: PersonRow, limit: number): MediaRow[] {
   return rows.slice(0, limit);
 }
 
+// Snips share the existing person-owned progress marks. A reserved label prefix
+// carries the clip length and optional note without changing the media schema.
+const SNIP_PREFIX = "podcast-snip:";
+export function podcastSnipLabel(lengthS: number, note: string): string {
+  return `${SNIP_PREFIX}${lengthS}:${encodeURIComponent(note)}`;
+}
+function parsePodcastSnip(label: string | null): { length_s: number; note: string } | null {
+  if (!label?.startsWith(SNIP_PREFIX)) return null;
+  const match = label.slice(SNIP_PREFIX.length).match(/^(\d+):(.*)$/);
+  if (!match) return null;
+  try { return { length_s: Number(match[1]), note: decodeURIComponent(match[2]!) }; } catch { return null; }
+}
+type SnipRow = MediaRow & { start_s: number; length_s: number; note: string; snip_label: string; snip_id: string };
+export function podcastSnipRowsForRoute(person: PersonRow, limit = 200): SnipRow[] {
+  const rows: SnipRow[] = [];
+  const ids = recentProgress(person.id, 200).map((progress) => progress.media_id);
+  for (const progress of getProgressMany(person.id, ids)) {
+    const item = readableIn(person, APP, progress.media_id);
+    if (!item) continue;
+    for (const mark of progress.marks) {
+      const snip = parsePodcastSnip(mark.label);
+      if (!snip) continue;
+      rows.push({ ...rowOf(item, contextFor(person, [item])), id: item.id, title: item.title, summary: snip.note, duration_s: snip.length_s, start_s: mark.at_s, length_s: snip.length_s, note: snip.note, snip_label: mark.label!, snip_id: `${encodeURIComponent(item.id)}:${mark.at_s}:${encodeURIComponent(mark.label!)}` });
+    }
+    if (rows.length >= limit) break;
+  }
+  return rows.slice(0, limit);
+}
+
 const clock = (seconds: number): string => {
   const whole = Math.max(0, Math.floor(seconds));
   const h = Math.floor(whole / 3600);
@@ -95,7 +124,7 @@ registerMediaAppData(APP, (person, dataId, params) => {
       const starts = new Map(searchPodcastTranscripts(person, q).map((hit) => [hit.episode_id, hit.start_s]));
       return rows.map((row) => ({ ...row, start_s: starts.get(String((row as { id?: string }).id)) ?? 0 }));
     }
-    case "saved": return episodeRows(person, episodesOf(person, params, limit, true));
+    case "saved": return params.scope === "snips" ? podcastSnipRowsForRoute(person, limit).map(({ start_s, snip_id, ...row }) => ({ ...row, id: snip_id, media_id: row.id, start_s })) : episodeRows(person, episodesOf(person, params, limit, true));
     case "bookmarks": return bookmarkRows(person, limit);
     // PODCAST-PORT-03: the person's own saved filters, and the episodes one of them shows now.
     case "filters": return personFilters(person).map((collection) => { const view = viewOf(person, collection); return { id: view.id, title: view.title, summary: view.summary }; });

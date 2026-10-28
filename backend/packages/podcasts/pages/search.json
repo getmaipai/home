@@ -4,12 +4,19 @@
   "title": "Search podcasts",
   "body": [
     {
+      "type": "search",
+      "state": "q",
+      "label": "Search podcasts",
+      "placeholder": "Search podcasts",
+      "submit": { "navigate": { "to": "/apps/podcasts/search", "state": { "q": "{q}" } } }
+    },
+    {
       "type": "media_shelf",
       "heading": "Search results",
       "bind": { "source": "package", "path": "directory", "params": { "q": "$state.q", "scope": "search" } },
       "item_key_field": "id",
       "item_label_field": "title",
-      "item_subtitle_field": "{author} · {summary}",
+      "item_subtitle_field": "{author}",
       "item_media_field": "thumbnail",
       "aspect": "square",
       "variant": "plain",

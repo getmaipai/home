@@ -84,7 +84,14 @@ export function reachesLatch(kind: ProgressKind, position: Position, duration: n
 
 function unionMarks(a: readonly Mark[], b: readonly Mark[], bWins: boolean): Mark[] {
   const byTime = new Map<number, Mark>();
-  for (const mark of [...(bWins ? a : b), ...(bWins ? b : a)]) byTime.set(mark.at_s, mark);
+  for (const mark of [...(bWins ? a : b), ...(bWins ? b : a)]) {
+    const prior = byTime.get(mark.at_s);
+    if (bWins && mark.label?.startsWith("podcast-snip:deleted:") && prior?.label?.startsWith("podcast-snip:") && !prior.label.startsWith("podcast-snip:deleted:")) {
+      byTime.set(mark.at_s, mark);
+    } else if (!(bWins && mark.label === null && prior?.label?.startsWith("podcast-snip:"))) {
+      byTime.set(mark.at_s, mark);
+    }
+  }
   return [...byTime.values()].sort((x, y) => x.at_s - y.at_s);
 }
 

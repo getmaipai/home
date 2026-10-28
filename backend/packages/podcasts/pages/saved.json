@@ -5,6 +5,33 @@
   "body": [
     {
       "type": "media_shelf",
+      "heading": "Snips",
+      "bind": { "source": "package", "path": "saved", "params": { "scope": "snips" } },
+      "item_key_field": "id",
+      "item_label_field": "title",
+      "item_subtitle_field": "{summary}",
+      "item_media_field": "thumbnail",
+      "aspect": "square",
+      "variant": "plain",
+      "orientation": "vertical",
+      "hide_when_empty": true,
+      "on_select": { "play": { "media_id": "{media_id}", "position_s": "{start_s}" } },
+      "row_actions": [
+        {
+          "icon": "trash",
+          "label": "Delete snip",
+          "action": {
+            "call": {
+              "target": "/api/plugins/podcasts/snips",
+              "method": "DELETE",
+              "args": { "media_id": "{media_id}", "start_s": "{start_s}", "snip_label": "{snip_label}" }
+            }
+          }
+        }
+      ]
+    },
+    {
+      "type": "media_shelf",
       "heading": "Saved on the hub",
       "bind": {
         "source": "package",

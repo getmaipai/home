@@ -15,6 +15,7 @@ import { deleteCollection, resolveCollection } from "@/lib/media/collections";
 import { personFilters, saveFilter, viewOf } from "@/lib/media/podcastFilters";
 import { artProxyAddress, directoryAllowed, fetchDirectoryArt, searchDirectory, topShows } from "@/lib/media/podcastDirectory";
 import { queryItems } from "@/lib/media/appHost";
+import { podcastSnipLabel, podcastSnipRowsForRoute } from "@/lib/media/podcastApp";
 
 type Body = Record<string, unknown>;
 const bodyOf = async (c: Context): Promise<Body> => {
@@ -88,6 +89,48 @@ export function podcastRoutes() {
     const now = new Date();
     const outcome = writeProgress(person, item, { position: current?.position ?? { seconds: at }, marks: [{ at_s: Math.max(0, Math.round(at)), label }], stamp: correctedStamp({ serverNow: now }) }, { now, immediate: true });
     return outcome.ok ? c.json({ ok: true as const, at_s: Math.max(0, Math.round(at)), label: "Bookmarked" }, 200) : c.json({ error: "That place could not be saved." }, 422);
+  });
+
+  routes.post("/snips", requireAuth, async (c, next) => {
+    const person = c.get("person");
+    if (!mediaAppAllowed(person, "podcasts")) return next();
+    if (mediaBandOf(person) === "child") return c.json({ error: "Snips are not available for child accounts." }, 403);
+    const body = await bodyOf(c);
+    const item = typeof body.media_id === "string" ? readableIn(person, "podcasts", body.media_id) : null;
+    if (!item) return c.json({ error: "That episode is not in your podcasts." }, 404);
+    const at = coerceNumber(body.start_s);
+    const length = coerceNumber(body.length_s);
+    if (at === null || at === undefined || at < 0 || length === null || length === undefined || !Number.isInteger(length) || length < 5 || length > 60) return c.json({ error: "Choose a start time and a clip length from 5 to 60 seconds." }, 400);
+    const note = typeof body.note === "string" ? body.note.trim() : "";
+    if (note.length > 280) return c.json({ error: "A snip note can be up to 280 characters." }, 400);
+    const current = getProgress(person.id, item.id);
+    const mark = { at_s: Math.round(at), label: podcastSnipLabel(length, note) };
+    const outcome = writeProgress(person, item, { position: current?.position ?? { seconds: at }, marks: [mark], stamp: correctedStamp({ serverNow: new Date() }) }, { immediate: true });
+    return outcome.ok ? c.json({ ok: true, start_s: mark.at_s, length_s: length, note }, 201) : c.json({ error: "That snip could not be saved." }, 422);
+  });
+
+  routes.get("/snips", requireAuth, async (c, next) => {
+    const person = c.get("person");
+    if (!mediaAppAllowed(person, "podcasts")) return next();
+    if (mediaBandOf(person) === "child") return c.json({ error: "Snips are not available for child accounts." }, 403);
+    return c.json({ ok: true, rows: podcastSnipRowsForRoute(person) }, 200);
+  });
+
+  routes.delete("/snips", requireAuth, async (c, next) => {
+    const person = c.get("person");
+    if (!mediaAppAllowed(person, "podcasts")) return next();
+    if (mediaBandOf(person) === "child") return c.json({ error: "Snips are not available for child accounts." }, 403);
+    const body = await bodyOf(c);
+    const mediaId = typeof body.media_id === "string" ? body.media_id : "";
+    const at = coerceNumber(body.start_s);
+    const label = typeof body.snip_label === "string" ? body.snip_label : "";
+    const item = readableIn(person, "podcasts", mediaId);
+    if (!item || at === null || at === undefined) return c.json({ error: "That snip is not yours or no longer exists." }, 404);
+    const current = getProgress(person.id, item.id);
+    const mark = current?.marks.find((candidate) => candidate.at_s === at && candidate.label?.startsWith("podcast-snip:") && (!label || candidate.label === label));
+    if (!current || !mark) return c.json({ error: "That snip is not yours or no longer exists." }, 404);
+    const outcome = writeProgress(person, item, { position: current.position, marks: [{ at_s: mark.at_s, label: `podcast-snip:deleted:${encodeURIComponent(mark.label ?? "")}` }], stamp: correctedStamp({ serverNow: new Date() }) }, { immediate: true });
+    return outcome.ok ? c.json({ ok: true }, 200) : c.json({ error: "That snip could not be deleted." }, 422);
   });
 
   routes.post("/subscribe", requireAuth, async (c, next) => {

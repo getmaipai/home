@@ -2,6 +2,11 @@
 
 All notable changes to the Podcasts package, in [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) format.
 
+## [0.2.8] - 2026-10-28
+
+- Added private podcast snips with notes, plus a Snips shelf on Saved.
+- Fixed dashboard subtitles and added search refinement to Search.
+
 ## [0.2.7] - 2026-10-28
 
 - Made Podcasts home a dashboard with Up Next, new episodes, shows and a top shows shelf; moved search onto the home page and removed Find shows navigation.

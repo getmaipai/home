@@ -280,6 +280,36 @@ describe("the one poller reads a podcast feed", () => {
     expect((await data(adult.client, "queue")).map((row) => row.id)).toEqual([one]);
   });
 
+  test("snips are private, playable from their start, and validate their length and note", async () => {
+    const { owner, adult, child, data, subscribe, poll, idOf } = await setup();
+    const otherMade = await owner.post("/api/people", { displayName: "Other", role: "adult", secret: "0000" });
+    const otherId = ((await otherMade.json()) as { id: string }).id;
+    const other = new TestClient();
+    await other.post("/api/auth/verify-secret", { personId: otherId, secret: "0000" });
+    const { feedId } = await subscribe([adult.id]); await poll(feedId);
+    const mediaId = await idOf("Question 3");
+    const endpoint = "/api/plugins/podcasts/snips";
+    expect((await child.client.post(endpoint, { media_id: mediaId, start_s: 2, length_s: 20 })).status).toBe(403);
+    expect((await adult.client.post(endpoint, { media_id: mediaId, start_s: 2, length_s: 4 })).status).toBe(400);
+    expect((await adult.client.post(endpoint, { media_id: mediaId, start_s: 2, length_s: 61 })).status).toBe(400);
+    expect((await adult.client.post(endpoint, { media_id: mediaId, start_s: 2, length_s: 20, note: "x".repeat(281) })).status).toBe(400);
+    expect((await adult.client.post(endpoint, { media_id: "missing", start_s: 2, length_s: 20 })).status).toBe(404);
+    const created = await adult.client.post(endpoint, { media_id: mediaId, start_s: 7, length_s: 20, note: "Good bit" });
+    expect(created.status).toBe(201);
+    const shelf = await data<Array<{ id: string; media_id: string; start_s: number; snip_label: string; summary: string }>>(adult.client, "saved", { scope: "snips" });
+    expect(shelf).toMatchObject([{ media_id: mediaId, start_s: 7, summary: "Good bit" }]);
+    expect(shelf[0]!.id).toContain(encodeURIComponent(mediaId));
+    expect(shelf[0]!.id).toBeTruthy(); // saved.json selects using media_id and starts at this row's start_s
+    expect((await adult.client.get(endpoint)).status).toBe(200);
+    const listed = (await adult.client.get(endpoint).then((response) => response.json())) as { rows: Array<{ start_s: number; note: string }> };
+    expect(listed.rows).toMatchObject([{ start_s: 7, note: "Good bit" }]);
+    expect((await other.get(endpoint).then((response) => response.json()) as { rows: unknown[] }).rows).toHaveLength(0);
+    expect((await other.delete(endpoint, { media_id: mediaId, start_s: 7, snip_label: shelf[0]!.snip_label })).status).toBe(404);
+    const removed = await adult.client.delete(endpoint, { media_id: mediaId, start_s: 7, snip_label: shelf[0]!.snip_label });
+    expect(removed.status).toBe(200);
+    expect(await data(adult.client, "saved", { scope: "snips" })).toHaveLength(0);
+  });
+
   test("auto keep-latest saves the newest N after a poll, never prunes a manual save, and removes played copies", async () => {
     const { owner, adult, data, subscribe, poll, idOf } = await setup();
     const { sourceId, feedId } = await subscribe();
