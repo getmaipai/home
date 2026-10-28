@@ -1,0 +1,44 @@
+{
+  "type": "page",
+  "id": "find",
+  "title": "Find shows",
+  "body": [
+    {
+      "type": "search",
+      "state": "q",
+      "label": "Search podcasts",
+      "placeholder": "Search podcasts"
+    },
+    {
+      "type": "media_shelf",
+      "heading": "Shows",
+      "bind": {
+        "source": "package",
+        "path": "directory",
+        "params": {
+          "q": "$state.q"
+        }
+      },
+      "item_key_field": "id",
+      "item_label_field": "title",
+      "item_subtitle_field": "{summary}",
+      "item_media_field": "thumbnail",
+      "aspect": "square",
+      "variant": "plain",
+      "orientation": "vertical",
+      "on_select": {
+        "call": {
+          "target": "/api/plugins/podcasts/subscribe",
+          "args": {
+            "url": "{feed_url}"
+          }
+        }
+      },
+      "empty_state": {
+        "type": "empty_state",
+        "icon": "search",
+        "text": "Nothing to show. Finding podcasts may be turned off, or try other words."
+      }
+    }
+  ]
+}

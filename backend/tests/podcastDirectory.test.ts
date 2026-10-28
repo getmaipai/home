@@ -100,7 +100,8 @@ describe("the Find shows rows", () => {
     expect(await (await client.post("/api/plugins/podcasts/data/directory", { q: "cabin" })).json()).toEqual([]);
     on(true);
     const { client: childClient } = await child(client);
-    expect(await (await childClient.post("/api/plugins/podcasts/data/directory", { q: "cabin" })).json()).toEqual([]);
+    // The Find page needs a teen, so a child is refused outright (no data, no request).
+    expect((await childClient.post("/api/plugins/podcasts/data/directory", { q: "cabin" })).status).toBe(404);
     expect(urls).toEqual([]);
   });
 });
