@@ -28,6 +28,7 @@ and a proposed design; otherwise the household IP gets blocked.
 | [child-safety-text-2026-10-19.md](child-safety-text-2026-10-19.md) | built (S1 to S3); owner-approved 2026-10-19 | CSAM-TEXT-01 |
 | [content-policy-2026-10-18.md](content-policy-2026-10-18.md) | proposed, design only; architect has not ruled | CONTENT-POLICY-01 to -05; LIKENESS-SIMPLIFY-01 |
 | [companion-speech-style-2026-10-25.md](companion-speech-style-2026-10-25.md) | proposed, design only; architect ruling in `data-scratch/architect/SPEECH-STYLE-2026-10-25.verdict` | SPEECH-STYLE-01 to -05 |
+| [natural-speech-register-2026-10-27.md](natural-speech-register-2026-10-27.md) | proposed, design only; architect has not ruled | NAT-01 to NAT-07 |
 | [quick-reply-chips-2026-10-25.md](quick-reply-chips-2026-10-25.md) | current, design only; architect APPROVED 2026-10-25 (QR-DESIGN-2026-10-25) | QR-01, QR-02 |
 | [full-duplex-voice-2026-10-24.md](full-duplex-voice-2026-10-24.md) | proposed, design only; architect ruling in `data-scratch/architect/DUPLEX-DESIGN-2026-10-24.verdict` | DUPLEX-00 to -03, -05, DUPLEX-BENCH-01 (rows added after the verdict) |
 | [parakeet-stt-tier-2026-10-25.md](parakeet-stt-tier-2026-10-25.md) | proposed, design only; architect verdict in `data-scratch/architect/PARAKEET-STT-2026-10-25.verdict` | STT-PARAKEET-01 to -04, STT-WORDS-01 (named in the note, not yet backlog rows) |
