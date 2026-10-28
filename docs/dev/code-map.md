@@ -34,6 +34,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/packages/news/pages/search.json` | news | Search |
 | `backend/packages/news/pages/story.json` | news | Story |
 | `backend/packages/podcasts/pages/episodes.json` | podcasts | Episodes |
+| `backend/packages/podcasts/pages/find.json` | podcasts | Find shows |
 | `backend/packages/podcasts/pages/index.json` | podcasts | Listen now |
 | `backend/packages/podcasts/pages/play.json` | podcasts | Listen |
 | `backend/packages/podcasts/pages/queue.json` | podcasts | Queue |
