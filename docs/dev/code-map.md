@@ -44,6 +44,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/packages/podcasts/pages/queue.json` | podcasts | Queue |
 | `backend/packages/podcasts/pages/saved.json` | podcasts | Saved |
 | `backend/packages/podcasts/pages/shows.json` | podcasts | Shows |
+| `backend/packages/podcasts/pages/stats.json` | podcasts | Stats |
 | `backend/packages/shows/pages/film.json` | shows | Film |
 | `backend/packages/shows/pages/films.json` | shows | Films |
 | `backend/packages/shows/pages/index.json` | shows | Shows and Films |
@@ -490,6 +491,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/media/podcastApp.ts` | showRulesLine |
 | `backend/src/lib/media/podcastDirectory.ts` | __resetDirectoryForTests, directoryAllowed, searchDirectory, topShows, smallArt, artProxyAddress |
 | `backend/src/lib/media/podcastFilters.ts` | MAX_FILTERS, parseRules, matchesRules, evaluateFilter, filterSummary, draftRows |
+| `backend/src/lib/media/podcastStats.ts` | aggregatePodcastStats, podcastStats, podcastStatsRows |
 | `backend/src/lib/media/podcasts.ts` | __setPodcastFetchDepsForTests, podcastFetchDeps, plainNotes, chaptersFromNotes, parsePodcastFeed, sourceRowForFeed |
 | `backend/src/lib/media/prober.ts` | probeResultFrom, createStackProber |
 | `backend/src/lib/media/progress.ts` | LATCH_PERCENT, BOOK_END_PERCENT, correctedStamp, percentOf, reachesLatch, mergeProgress |
