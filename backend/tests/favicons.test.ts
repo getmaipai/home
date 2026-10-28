@@ -1,5 +1,7 @@
+import sharp from "sharp";
 import { describe, expect, test, beforeEach } from "bun:test";
 import {
+  iconLinksOf,
   validateFaviconHost,
   fetchFaviconBytes,
   getFavicon,
@@ -11,8 +13,15 @@ import {
 
 beforeEach(() => __clearFaviconCacheForTests());
 
+// A real 32x32 PNG padded with trailing zeros to `bytes` (icons are decoded before they are accepted).
+const REAL_PNG = new Uint8Array(await sharp({ create: { width: 32, height: 32, channels: 3, background: "#336699" } }).png().toBuffer());
+function pngBytes(bytes: number): Uint8Array {
+  const out = new Uint8Array(Math.max(bytes, REAL_PNG.byteLength));
+  out.set(REAL_PNG);
+  return out;
+}
 function pngResponse(bytes: number, contentType = "image/png"): Response {
-  return new Response(new Uint8Array(bytes), { status: 200, headers: { "content-type": contentType } });
+  return new Response(pngBytes(bytes), { status: 200, headers: { "content-type": contentType } });
 }
 
 describe("validateFaviconHost", () => {
@@ -61,7 +70,7 @@ describe("fetchFaviconBytes", () => {
     };
     const result = await fetchFaviconBytes("example.com", fetchFn);
     expect(result).toEqual({ kind: "found", bytes: expect.any(Uint8Array), contentType: "image/png" });
-    expect(calls).toEqual(["https://example.com/favicon.ico"]);
+    expect(calls).toEqual(["https://example.com/", "https://example.com/favicon.ico"]);
   });
 
   test("falls back to apple-touch-icon.png when favicon.ico 404s", async () => {
@@ -73,7 +82,7 @@ describe("fetchFaviconBytes", () => {
     };
     const result = await fetchFaviconBytes("example.com", fetchFn);
     expect(result.kind).toBe("found");
-    expect(calls).toEqual(["https://example.com/favicon.ico", "https://example.com/apple-touch-icon.png"]);
+    expect(calls).toEqual(["https://example.com/", "https://example.com/favicon.ico", "https://example.com/apple-touch-icon.png"]);
   });
 
   test("a non-image content type is rejected as confirmed-absent, not passed through", async () => {
@@ -168,7 +177,7 @@ describe("getFavicon", () => {
     const second = await getFavicon("cache-hit.example.com", fetchFn);
     expect(first.found).toBe(true);
     expect(second.found).toBe(true);
-    expect(calls).toBe(1);
+    expect(calls).toBe(2); // the home page, then the icon; the second call is the cache
   });
 
   test("a confirmed absence is also cached, so a favicon-less site is asked once", async () => {
@@ -230,5 +239,31 @@ describe("sweepFavicons", () => {
     // The oldest-unused entry is the one that goes first.
     expect(__getFaviconEntryForTests("a.example.com")).toBeUndefined();
     expect(__getFaviconEntryForTests("c.example.com")).toBeDefined();
+  });
+});
+
+describe("source icons that were blank (news-source-icons 2026-10-27)", () => {
+  test("icon links with no quotes are read, and a mask-icon is not an icon", () => {
+    const html = '<link rel="mask-icon" href=/m.svg color="#000"><link rel=apple-touch-icon sizes=180x180 href=/static/a.png><link rel="shortcut icon" href=/static/f.ico>';
+    expect(iconLinksOf(html, "https://www.example.com/")).toEqual(["https://www.example.com/static/a.png", "https://www.example.com/static/f.ico"]);
+  });
+
+  test("a declared icon wins over a blank 1x1 favicon.ico, in both sizes", async () => {
+    for (const prefer of ["small", "large"] as const) {
+      __clearFaviconCacheForTests();
+      const fetchFn = async (url: string) => {
+        if (url === "https://example.com/") return new Response('<link rel="icon" href="/real.png">', { status: 200, headers: { "content-type": "text/html" } });
+        if (url.endsWith("/real.png")) return pngResponse(900);
+        return new Response(new Uint8Array(await sharp({ create: { width: 1, height: 1, channels: 3, background: "#fff" } }).png().toBuffer()), { status: 200, headers: { "content-type": "image/png" } });
+      };
+      const result = await fetchFaviconBytes("example.com", fetchFn, prefer);
+      expect(result.kind === "found" && result.bytes.byteLength).toBe(900);
+    }
+  });
+
+  test("an entry from before this version, found or absent, is asked again", async () => {
+    __setFaviconEntryForTests("old.example.com", { ext: null, contentType: null, bytes: 0, lastUsedAt: new Date().toISOString(), v: 2 });
+    const result = await getFavicon("old.example.com", async () => pngResponse(500));
+    expect(result.found).toBe(true);
   });
 });

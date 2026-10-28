@@ -8,6 +8,7 @@
 // past a fixed ceiling.
 import { existsSync, readFileSync, writeFileSync, unlinkSync } from "node:fs";
 import { resolve, join } from "node:path";
+import sharp from "sharp";
 import { dataDir, ensureDataDir } from "@/lib/paths";
 import { assertNotPrivateHost, guardedFetch, SsrfBlockedError, type DnsLookup } from "@maipai/core/src/ssrfGuard";
 
@@ -25,25 +26,59 @@ const UNUSED_EXPIRY_MS = 30 * 24 * 60 * 60 * 1000; // 30 days unused
 // nothing else tried beyond it.
 const CANDIDATE_PATHS = ["/favicon.ico", "/apple-touch-icon.png"];
 
+const ICON_VERSION = 4;
 const MAX_HOMEPAGE_BYTES = 256 * 1024;
+
+/** One attribute's value, quoted or bare (Nature writes `href=/static/x.png` with no quotes). */
+function attrOf(tag: string, name: string): string | undefined {
+  const m = new RegExp(`\\b${name}\\s*=\\s*(?:"([^"]*)"|'([^']*)'|([^\\s>"']+))`, "i").exec(tag);
+  return m ? (m[1] ?? m[2] ?? m[3]) : undefined;
+}
+
+/** The largest PNG inside an .ico file (sharp cannot open an .ico; most modern ones carry PNG entries), or null. */
+export function pngFromIco(bytes: Uint8Array): Uint8Array | null {
+  if (bytes.byteLength < 22 || bytes[0] !== 0 || bytes[1] !== 0 || bytes[2] !== 1 || bytes[3] !== 0) return null;
+  const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+  let best: Uint8Array | null = null;
+  let bestSize = -1;
+  for (let i = 0; i < view.getUint16(4, true); i++) {
+    const at = 6 + i * 16;
+    if (at + 16 > bytes.byteLength) break;
+    const size = view.getUint32(at + 8, true);
+    const offset = view.getUint32(at + 12, true);
+    const entry = bytes.subarray(offset, offset + size);
+    const isPng = entry.byteLength > 8 && entry[0] === 0x89 && entry[1] === 0x50 && entry[2] === 0x4e && entry[3] === 0x47;
+    const side = (bytes[at] || 256);
+    if (isPng && side > bestSize) { best = entry; bestSize = side; }
+  }
+  return best;
+}
+
+/** True when the bytes are a picture a card tile can be made from: sharp opens it (or the PNG inside an .ico) and it is at least 16 px. */
+export async function isUsableIcon(bytes: Uint8Array): Promise<boolean> {
+  try {
+    const meta = await sharp(Buffer.from(pngFromIco(bytes) ?? bytes)).metadata();
+    return (meta.width ?? 0) >= 16 && (meta.height ?? 0) >= 16;
+  } catch { return false; }
+}
 
 /** The icon addresses a home page declares (`<link rel="icon" | "apple-touch-icon">`), largest declared size first. A site that serves
  * nothing at the two fixed paths (many do not) usually names its icon here. */
 export function iconLinksOf(html: string, baseUrl: string): string[] {
   const found: Array<{ href: string; size: number }> = [];
   for (const tag of html.match(/<link\b[^>]*>/gi) ?? []) {
-    const rel = /\brel\s*=\s*["']([^"']*)["']/i.exec(tag)?.[1]?.toLowerCase() ?? "";
-    if (!/\b(?:icon|apple-touch-icon(?:-precomposed)?)\b/.test(rel)) continue;
-    const href = /\bhref\s*=\s*["']([^"']+)["']/i.exec(tag)?.[1];
+    const rel = attrOf(tag, "rel")?.toLowerCase() ?? "";
+    if (!/(?:^|\s)(?:shortcut\s+icon|icon|apple-touch-icon(?:-precomposed)?)(?:\s|$)/.test(rel)) continue; // not mask-icon
+    const href = attrOf(tag, "href");
     if (!href) continue;
-    const sizes = /\bsizes\s*=\s*["'](\d+)x\d+/i.exec(tag)?.[1];
+    const sizes = /^(\d+)x\d+/i.exec(attrOf(tag, "sizes") ?? "")?.[1];
     const size = sizes ? Number(sizes) : rel.includes("apple-touch") ? 180 : 16;
     try {
       const url = new URL(href.replace(/&amp;/g, "&"), baseUrl);
       if (url.protocol === "https:") found.push({ href: url.toString(), size });
     } catch { /* a malformed address is skipped */ }
   }
-  return found.sort((a, b) => b.size - a.size).map((entry) => entry.href).slice(0, 4);
+  return found.sort((a, b) => b.size - a.size).map((entry) => entry.href).slice(0, 5);
 }
 
 const EXT_BY_CONTENT_TYPE: Record<string, string> = {
@@ -110,7 +145,7 @@ interface IndexEntry {
   contentType: string | null;
   bytes: number;
   lastUsedAt: string;
-  /** 2 once the home page's own icon links were tried: an older "no icon" entry is asked again. 3 for a large entry fetched with the home page read in part. */
+  /** ICON_VERSION when made: an entry from before (a blank placeholder kept, an absence from a page whose unquoted icon links were missed) is asked again. */
   v?: number;
 }
 
@@ -214,6 +249,8 @@ export async function fetchFaviconBytes(host: string, fetchFn?: FaviconFetchFn, 
       const bytes = await readCapped(response, MAX_ICON_BYTES);
       // readCapped returns null only for its own deliberate size-cap decision (a definitive fact); a dropped connection throws.
       if (!bytes) { sawDefiniteAnswer = true; return null; }
+      // A 1x1 placeholder or a file sharp cannot read is not an icon: try the next address (a card tile and the source row both need a real one).
+      if (!(await isUsableIcon(bytes))) { sawDefiniteAnswer = true; return null; }
       return { kind: "found", bytes, contentType };
     } catch {
       return null; // a timeout, DNS failure, TLS error, or dropped connection - try the next candidate
@@ -232,9 +269,9 @@ export async function fetchFaviconBytes(host: string, fetchFn?: FaviconFetchFn, 
       return bytes ? iconLinksOf(new TextDecoder().decode(bytes), `https://${host}/`) : [];
     } catch { return []; } finally { clearTimeout(timer); }
   };
-  const fixed = async (): Promise<string[]> => CANDIDATE_PATHS.map((path) => `https://${host}${path}`);
-  // Small: the two fixed paths, then what the home page declares. Large (a card's stand-in picture): the declared icons first, largest first.
-  const rungs = prefer === "large" ? [homepageLinks, async () => [`https://${host}/apple-touch-icon.png`, `https://${host}/favicon.ico`]] : [fixed, homepageLinks];
+  const fixed = async (): Promise<string[]> => (prefer === "large" ? [...CANDIDATE_PATHS].reverse() : CANDIDATE_PATHS).map((path) => `https://${host}${path}`);
+  // What the home page declares first, largest first (Variety and Deadline serve a blank 16 px /favicon.ico but declare a real icon), then the two fixed paths.
+  const rungs = [homepageLinks, fixed];
   for (const rung of rungs) {
     for (const url of await rung()) {
       const icon = await tryIcon(url);
@@ -255,7 +292,7 @@ export async function getFavicon(host: string, fetchFn?: FaviconFetchFn, now: Da
   const key = prefer === "large" ? `hq.${host}` : host;
   const cached = index[key];
   // A large (card) entry made before the home page was read in part (v3) may hold a placeholder or an absence: ask again.
-  if (cached && !(cached.ext === null && cached.v !== 2) && !(prefer === "large" && cached.v !== 3)) {
+  if (cached && cached.v === ICON_VERSION) {
     cached.lastUsedAt = now.toISOString();
     writeIndex(index);
     if (cached.ext === null || cached.contentType === null) return { found: false };
@@ -279,7 +316,7 @@ export async function getFavicon(host: string, fetchFn?: FaviconFetchFn, now: Da
     return { found: false };
   }
   if (outcome.kind === "confirmed_absent") {
-    index[key] = { ext: null, contentType: null, bytes: 0, lastUsedAt: now.toISOString(), v: prefer === "large" ? 3 : 2 };
+    index[key] = { ext: null, contentType: null, bytes: 0, lastUsedAt: now.toISOString(), v: ICON_VERSION };
     writeIndex(index);
     return { found: false };
   }
@@ -287,7 +324,7 @@ export async function getFavicon(host: string, fetchFn?: FaviconFetchFn, now: Da
   const ext = EXT_BY_CONTENT_TYPE[outcome.contentType] ?? "img";
   ensureDataDir(faviconsDir);
   writeFileSync(filePath(key, ext), outcome.bytes);
-  index[key] = { ext, contentType: outcome.contentType, bytes: outcome.bytes.byteLength, lastUsedAt: now.toISOString(), v: prefer === "large" ? 3 : 2 };
+  index[key] = { ext, contentType: outcome.contentType, bytes: outcome.bytes.byteLength, lastUsedAt: now.toISOString(), v: ICON_VERSION };
   writeIndex(index);
   sweepFavicons(now);
   return { found: true, bytes: outcome.bytes, contentType: outcome.contentType };
