@@ -101,11 +101,16 @@ const CHIP_LABELS: Record<string, string> = {
   sunscreen: "Sunscreen", shade: "Seek shade", sunglasses: "Sunglasses", windy: "Windy", breezy: "Breezy",
 };
 
+const CHIP_ICONS: Record<string, string> = {
+  "hat-gloves": "snowflake", "heavy-coat": "shirt", jacket: "shirt", "light-jacket": "shirt", "rain-gear": "cloud-rain", umbrella: "umbrella",
+  boots: "footprints", sunscreen: "sun", shade: "tree-pine", sunglasses: "glasses", windy: "wind", breezy: "wind", "rain-timing": "cloud-rain",
+};
+
 /** The advice as short chips for the kit weather elements: a label of a few words, a sun icon on the sun items. */
 export function adviceChips(items: readonly AdviceItem[]): Array<{ id: string; label: string; icon?: string }> {
   return items.slice(0, 12).map((item) => ({
     id: item.id,
     label: item.id === "rain-timing" ? item.text.replace(/^Rain is likely around /, "Rain around ").replace(/\.$/, "") : CHIP_LABELS[item.id] ?? item.text,
-    ...(item.kind === "sun" ? { icon: "sun" } : {}),
+    ...(CHIP_ICONS[item.id] ? { icon: CHIP_ICONS[item.id] } : {}),
   }));
 }

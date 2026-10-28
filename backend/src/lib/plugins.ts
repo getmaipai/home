@@ -24,7 +24,7 @@ import { ComputeError } from "@maipai/spec/interpreters/ts/compute.js";
 import { createHost } from "@/lib/packageHost";
 import { blocksForRecipeRun, withoutBlockOnlyData, type BlockCapture } from "@/lib/packageBlocks";
 import { adviceChips, adviceFromRecipeData, adviceLine } from "@/lib/weatherAdvice";
-import { summaryFor } from "@/lib/weatherSummary";
+import { factualLine, summaryFor } from "@/lib/weatherSummary";
 import { callTier1Handle } from "@/lib/denoHost";
 import { speakerAgeBand } from "@/lib/ageBand";
 import { applyNewsMinorFloor } from "@/lib/newsMinorFloor";
@@ -676,19 +676,19 @@ export async function runPlugin(
     const severity = alertPayload[0]?.severity.toLowerCase();
     const alert = alertPayload.length ? { title: alertPayload[0]!.event, text: alertPayload[0]!.headline, ...(severity === "extreme" || severity === "severe" ? { severity: "severe" as const } : severity === "moderate" ? { severity: "warn" as const } : { severity: "info" as const }) } : undefined;
     if (alert && answer.data) answer.data = { ...answer.data, alert };
-    // WEATHER-PORT-03: the written summary, once the background model has made it for this place and hour; the advice line until then.
+    // WEATHER-PORT-03: the written summary (facts only, no advice), once the background model has made it for this place and hour; a plain factual line until then.
     // Current-location runs carry the person's own coordinates, so they are never cached or summarized by name.
     const placeName = typeof weatherData?.place === "string" ? weatherData.place : "";
-    const summary = advice.length > 0 && placeName !== "" && !options.uncached
-      ? summaryFor({ place: placeName, unit: weatherData?.unit === "celsius" ? "celsius" : "fahrenheit", temp: typeof weatherData?.temperature === "number" ? weatherData.temperature : undefined, condition: typeof weatherData?.conditions === "string" ? weatherData.conditions : undefined, high: typeof weatherData?.high === "number" ? weatherData.high : undefined, low: typeof weatherData?.low === "number" ? weatherData.low : undefined, advice })
-      : adviceLine(advice);
-    if (advice.length > 0) answer.data = { ...(answer.data ?? {}), advice, advice_line: adviceLine(advice), summary };
+    const summaryInput = { place: placeName, unit: weatherData?.unit === "celsius" ? "celsius" as const : "fahrenheit" as const, temp: typeof weatherData?.temperature === "number" ? weatherData.temperature : undefined, condition: typeof weatherData?.conditions === "string" ? weatherData.conditions : undefined, high: typeof weatherData?.high === "number" ? weatherData.high : undefined, low: typeof weatherData?.low === "number" ? weatherData.low : undefined };
+    const summary = id !== "weather" ? "" : placeName !== "" && !options.uncached ? summaryFor(summaryInput) : factualLine(summaryInput);
+    if (advice.length > 0) answer.data = { ...(answer.data ?? {}), advice, advice_line: adviceLine(advice) };
+    if (summary !== "") answer.data = { ...(answer.data ?? {}), summary };
     // WEATHER-PORT-04: the Weather page's moon tile comes from the almanac-moon app's own answer (one run per day).
     const moon = id === "weather"
       ? await moonTile(async () => { const run = await runPlugin("almanac-moon", actor, {}, undefined, { band: options.band }); return run.ok ? run.value.data as { phase?: unknown; illumination?: unknown } | undefined : undefined; })
       : undefined;
     const appDetails = id === "weather"
-      ? { ...Object.fromEntries(Object.entries(value.data ?? {}).filter(([key]) => key.startsWith("block_detail_")).map(([key, item]) => [key.slice("block_detail_".length), item])), ...(advice.length > 0 ? { advice: adviceChips(advice), summary } : {}), ...(moon ? { moon } : {}), ...(alert ? { alert } : {}) }
+      ? { ...Object.fromEntries(Object.entries(value.data ?? {}).filter(([key]) => key.startsWith("block_detail_")).map(([key, item]) => [key.slice("block_detail_".length), item])), ...(advice.length > 0 ? { advice: adviceChips(advice) } : {}), ...(summary !== "" ? { summary } : {}), ...(moon ? { moon } : {}), ...(alert ? { alert } : {}) }
       : undefined;
     if (alert && blocks.length) {
       const card = blocks.find((block) => block.kind === "weather_card");
