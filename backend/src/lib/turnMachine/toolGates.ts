@@ -14,6 +14,7 @@ import { withTurnToolGates } from "./budget";
 import type { TurnBudget } from "./contract";
 
 export interface TurnToolGateInput {
+  conversationId?: string;
   budget: TurnBudget;
   actor: PersonRow;
   band: AgeBand;
@@ -25,6 +26,21 @@ export interface TurnToolGateInput {
   ephemeral: boolean;
   text: string;
   musicEditAvailable: () => boolean;
+}
+
+interface LatchedToolGates {
+  pictureEngineReady: boolean;
+  videoEngineReady: boolean;
+  musicEngineReady: boolean;
+  musicEditOk: boolean;
+  itemRefOk: boolean;
+}
+
+const MAX_LATCHED_CONVERSATIONS = 500;
+const conversationToolGateLatches = new Map<string, LatchedToolGates>();
+
+export function __resetToolGateLatchForTests(): void {
+  conversationToolGateLatches.clear();
 }
 
 export interface TurnToolGateResult {
@@ -52,13 +68,31 @@ export async function budgetWithTurnToolGates(input: TurnToolGateInput): Promise
   const pictureEligible = !input.bare && safeGate(() => picturesAllowed(audience));
   const videoEligible = !input.bare && safeGate(() => videosAllowed(audience));
   const musicEligible = !input.bare && safeGate(() => musicsAllowed(audience));
-  const [picturesOk, videosOk, musicOk] = await Promise.all([
+  const [pictureReadyNow, videoReadyNow, musicReadyNow] = await Promise.all([
     pictureEligible ? readiness(pictureEngineReady) : false,
     videoEligible ? readiness(videoEngineReady) : false,
     musicEligible ? readiness(musicEngineReady) : false,
   ]);
-  const musicEditOk = musicOk && safeGate(input.musicEditAvailable);
-  const itemRefOk = !input.bare && input.actor.role !== "guest" && input.band !== "child" && input.surfaceClass === "written" && safeGate(() => itemRefsIn(input.text).length > 0);
+  const latchKey = input.conversationId ? `${input.actor.id}\u0000${input.conversationId}` : undefined;
+  const latch = latchKey ? getConversationLatch(latchKey) : null;
+  const picturesOk = pictureEligible && (pictureReadyNow || latch?.pictureEngineReady === true);
+  const videosOk = videoEligible && (videoReadyNow || latch?.videoEngineReady === true);
+  const musicOk = musicEligible && (musicReadyNow || latch?.musicEngineReady === true);
+  if (latch) {
+    latch.pictureEngineReady ||= pictureEligible && pictureReadyNow;
+    latch.videoEngineReady ||= videoEligible && videoReadyNow;
+    latch.musicEngineReady ||= musicEligible && musicReadyNow;
+  }
+
+  const musicEditPermission = musicOk && musicEligible;
+  const musicEditAvailable = musicEditPermission && safeGate(input.musicEditAvailable);
+  if (latch && musicEditAvailable) latch.musicEditOk = true;
+  const musicEditOk = musicEditPermission && (musicEditAvailable || latch?.musicEditOk === true);
+
+  const itemRefPermission = !input.bare && input.actor.role !== "guest" && input.band !== "child" && input.surfaceClass === "written";
+  const itemRefInMessage = itemRefPermission && safeGate(() => itemRefsIn(input.text).length > 0);
+  if (latch && itemRefInMessage) latch.itemRefOk = true;
+  const itemRefOk = itemRefPermission && (itemRefInMessage || latch?.itemRefOk === true);
   return {
     budget: withTurnToolGates(input.budget, answerImagesOk, picturesOk, videosOk, musicOk, musicEditOk, itemRefOk),
     answerImagesOk,
@@ -68,6 +102,23 @@ export async function budgetWithTurnToolGates(input: TurnToolGateInput): Promise
     musicEditOk,
     itemRefOk,
   };
+}
+
+function getConversationLatch(conversationId: string): LatchedToolGates {
+  let latch = conversationToolGateLatches.get(conversationId);
+  if (latch) {
+    // Keep recently used conversations resident when the bounded map is full.
+    conversationToolGateLatches.delete(conversationId);
+    conversationToolGateLatches.set(conversationId, latch);
+    return latch;
+  }
+  latch = { pictureEngineReady: false, videoEngineReady: false, musicEngineReady: false, musicEditOk: false, itemRefOk: false };
+  conversationToolGateLatches.set(conversationId, latch);
+  if (conversationToolGateLatches.size > MAX_LATCHED_CONVERSATIONS) {
+    const oldest = conversationToolGateLatches.keys().next().value;
+    if (oldest !== undefined) conversationToolGateLatches.delete(oldest);
+  }
+  return latch;
 }
 
 function safeGate(gate: () => boolean): boolean {

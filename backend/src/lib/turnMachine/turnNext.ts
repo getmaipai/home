@@ -628,6 +628,7 @@ async function beginTurn(actor: PersonRow, surface: Surface, text: string, opts:
   // model's own record offers it AND this turn may show pictures; the
   // record keeps it out until ANSWER-IMG-05's bench passes.
   const gated = await budgetWithTurnToolGates({
+    conversationId: conversation.id,
     budget: thinkingBudget,
     actor,
     band,
