@@ -487,6 +487,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/media/podcasts.ts` | __setPodcastFetchDepsForTests, podcastFetchDeps, plainNotes, chaptersFromNotes, parsePodcastFeed, sourceRowForFeed |
 | `backend/src/lib/media/prober.ts` | probeResultFrom, createStackProber |
 | `backend/src/lib/media/progress.ts` | LATCH_PERCENT, BOOK_END_PERCENT, correctedStamp, percentOf, reachesLatch, mergeProgress |
+| `backend/src/lib/media/radio.ts` | adultTagged, stationVisibleAtBand, listSavedStations, savedAddressesOf, directoryRowsFor, addStation |
 | `backend/src/lib/media/radioDirectory.ts` | __resetRadioDirectoryForTests, radioDirectoryAllowed, stationOf, findStations |
 | `backend/src/lib/media/scan.ts` | DEFAULT_PRUNE_GRACE_MS, probePending, scanRoot, isScanning, syncMediaScanner, stopMediaScanner |
 | `backend/src/lib/media/search.ts` | searchMedia |
