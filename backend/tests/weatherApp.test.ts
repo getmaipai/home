@@ -159,6 +159,9 @@ describe("the forecast data call", () => {
     expect(blocks[0]!.props.daily.length).toBe(3);
     expect(blocks[0]!.props.hourly.length).toBe(2);
     expect((result as { value: { details: Record<string, unknown> } }).value.details).toMatchObject({ feels_like: 37.8, humidity: 84, precipitation: 0.1, wind_speed: 8.2, wind_direction: 225, pressure: 1012.4, visibility: 10000, sunrise: "2026-10-17T07:22", sunset: "2026-10-17T18:10", uv_index: 2.1 });
+    // WEATHER-PORT-01: the same run carries what to wear and bring (37.8 F feels-like, 70 percent rain, night: no sun advice).
+    const advice = ((result as { value: { details: { advice?: Array<{ id: string }> } } }).value.details.advice ?? []).map((item) => item.id);
+    expect(advice).toEqual(["jacket", "rain-gear", "boots", "rain-timing"]);
     expect(blocks[0]!.props.attribution).toContain("Open-Meteo");
     const hosts = new Set(urls.map((url) => new URL(url).host));
     expect([...hosts].every((host) => host === "api.open-meteo.com" || host === "geocoding-api.open-meteo.com")).toBe(true);

@@ -23,6 +23,7 @@ import { HostError } from "@maipai/spec/emulators/ts/host-emulator.js";
 import { ComputeError } from "@maipai/spec/interpreters/ts/compute.js";
 import { createHost } from "@/lib/packageHost";
 import { blocksForRecipeRun, withoutBlockOnlyData, type BlockCapture } from "@/lib/packageBlocks";
+import { adviceFromRecipeData, adviceLine } from "@/lib/weatherAdvice";
 import { callTier1Handle } from "@/lib/denoHost";
 import { speakerAgeBand } from "@/lib/ageBand";
 import { applyNewsMinorFloor } from "@/lib/newsMinorFloor";
@@ -660,8 +661,11 @@ export async function runPlugin(
     }
     // GENUI-04: data bound only to feed the blocks never reaches the composer.
     const answer = withoutBlockOnlyData(value);
+    // WEATHER-PORT-01: what to wear and bring, from this run's own numbers. It rides in the answer's data (chat) and the app details.
+    const advice = id === "weather" ? adviceFromRecipeData(value.data) : [];
+    if (advice.length > 0) answer.data = { ...(answer.data ?? {}), advice, advice_line: adviceLine(advice) };
     const appDetails = id === "weather"
-      ? Object.fromEntries(Object.entries(value.data ?? {}).filter(([key]) => key.startsWith("block_detail_")).map(([key, item]) => [key.slice("block_detail_".length), item]))
+      ? { ...Object.fromEntries(Object.entries(value.data ?? {}).filter(([key]) => key.startsWith("block_detail_")).map(([key, item]) => [key.slice("block_detail_".length), item])), ...(advice.length > 0 ? { advice } : {}) }
       : undefined;
     return { ok: true, value: blocks.length > 0 ? ({ ...answer, blocks, ...(appDetails ? { appDetails } : {}) } as PluginResult) : answer };
   } catch (err) {
