@@ -36,3 +36,8 @@ export function resolvePageContext(actor: PersonRow, raw: unknown): ContextItem 
     return null;
   }
 }
+
+/** Page context is honoured on a side-chat turn only. The check lives here, not in the turn gate modules, which never branch on where a conversation lives. */
+export function pageContextForTurn(conversation: { placement?: string | null }, surface: string, raw: unknown): { pageContextRaw?: unknown } {
+  return conversation.placement === "side" && surface === "chat" && raw !== undefined ? { pageContextRaw: raw } : {};
+}

@@ -1,5 +1,6 @@
 import { isLookupPackage } from "@/lib/ruleNames";
 import { conversationHasMusic } from "@/lib/music/jobs";
+import { pageContextForTurn } from "@/lib/pageContext";
 // U2b/c (docs/plans/turn-machine-state-record-2026-09-22.md, "Files"):
 // the entry `routes/turn.ts` calls, with the same TurnStreamResult shape
 // runTurnStream() already returns (the old engine file, imported here, never
@@ -676,7 +677,7 @@ async function beginTurn(actor: PersonRow, surface: Surface, text: string, opts:
     crisis: false,
     engineUnavailable: false,
     context: [],
-    ...(conversation.placement === "side" && surface === "chat" && opts.pageContext !== undefined ? { pageContextRaw: opts.pageContext } : {}),
+    ...pageContextForTurn(conversation, surface, opts.pageContext),
     messages: [],
     proposals: [],
     outcomes: [],
