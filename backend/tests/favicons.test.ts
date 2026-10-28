@@ -2,6 +2,9 @@ import sharp from "sharp";
 import { describe, expect, test, beforeEach } from "bun:test";
 import {
   iconLinksOf,
+  isUsableIcon,
+  iconImageBytes,
+  parentHostOf,
   validateFaviconHost,
   fetchFaviconBytes,
   getFavicon,
@@ -193,7 +196,7 @@ describe("getFavicon", () => {
     // The first call tries both candidates (favicon.ico, then
     // apple-touch-icon.png) before giving up; the second call is a
     // cache hit and makes no network call at all.
-    expect(calls).toBe(3); // favicon.ico, apple-touch-icon.png, then the home page
+    expect(calls).toBe(6); // the home page, favicon.ico, apple-touch-icon.png, then the same three for the parent host
   });
 
   test("a network failure (timeout, DNS) is never cached - the next call retries for real", async () => {
@@ -208,7 +211,7 @@ describe("getFavicon", () => {
     expect(second.found).toBe(false);
     // Both calls hit the network for real (2 candidates each) - unlike
     // the confirmed-absence case above, nothing here was ever cached.
-    expect(calls).toBe(6);
+    expect(calls).toBe(12); // two asks of six (the host and its parent)
     expect(__getFaviconEntryForTests("flaky.example.com")).toBeUndefined();
   });
 });
@@ -265,5 +268,39 @@ describe("source icons that were blank (news-source-icons 2026-10-27)", () => {
     __setFaviconEntryForTests("old.example.com", { ext: null, contentType: null, bytes: 0, lastUsedAt: new Date().toISOString(), v: 2 });
     const result = await getFavicon("old.example.com", async () => pngResponse(500));
     expect(result.found).toBe(true);
+  });
+});
+
+describe("more sites get an icon (news-source-icons 2026-10-27, part 2)", () => {
+  // A 2x2 32-bit bitmap .ico, the only kind Economist, Inc and Smithsonian serve; 16x16 so it counts as an icon.
+  function bmpIco(side: number): Uint8Array {
+    const pixels = side * side * 4;
+    const out = new Uint8Array(22 + 40 + pixels + side * Math.ceil(side / 32) * 4);
+    const v = new DataView(out.buffer);
+    v.setUint16(2, 1, true); v.setUint16(4, 1, true);
+    out[6] = side; out[7] = side; v.setUint16(10, 1, true); v.setUint16(12, 32, true);
+    v.setUint32(14, out.byteLength - 22, true); v.setUint32(18, 22, true);
+    v.setUint32(22, 40, true); v.setInt32(26, side, true); v.setInt32(30, side * 2, true); v.setUint16(34, 1, true); v.setUint16(36, 32, true);
+    for (let i = 0; i < side * side; i++) { out[62 + i * 4] = 200; out[62 + i * 4 + 3] = 255; }
+    return out;
+  }
+
+  test("a bitmap .ico is converted to a PNG sharp can open", async () => {
+    const png = await iconImageBytes(bmpIco(16));
+    expect(png).not.toBeNull();
+    expect((await sharp(Buffer.from(png!)).metadata()).width).toBe(16);
+    expect(await isUsableIcon(bmpIco(16))).toBe(true);
+    expect(await isUsableIcon(new Uint8Array([1, 2, 3]))).toBe(false);
+  });
+
+  test("a feed-only host borrows the icon of the site it belongs to", async () => {
+    expect(parentHostOf("feeds.npr.org")).toBe("npr.org");
+    expect(parentHostOf("npr.org")).toBeNull();
+    expect(parentHostOf("news.bbc.co.uk")).toBe("bbc.co.uk");
+    expect(parentHostOf("www.bbc.co.uk")).toBe("bbc.co.uk");
+    expect(parentHostOf("bbc.co.uk")).toBeNull();
+    const fetchFn = async (url: string) => url.startsWith("https://npr.org/favicon.ico") ? pngResponse(300) : new Response(null, { status: 404 });
+    const result = await fetchFaviconBytes("feeds.npr.org", fetchFn);
+    expect(result.kind).toBe("found");
   });
 });

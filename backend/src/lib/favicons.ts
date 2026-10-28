@@ -54,10 +54,58 @@ export function pngFromIco(bytes: Uint8Array): Uint8Array | null {
   return best;
 }
 
-/** True when the bytes are a picture a card tile can be made from: sharp opens it (or the PNG inside an .ico) and it is at least 16 px. */
+/** The largest 24 or 32 bit bitmap entry of an .ico as PNG bytes (Economist, Inc and Smithsonian serve only these; sharp cannot open them), or null. */
+async function bmpIcoToPng(bytes: Uint8Array): Promise<Uint8Array | null> {
+  if (bytes.byteLength < 22 || bytes[0] !== 0 || bytes[1] !== 0 || bytes[2] !== 1 || bytes[3] !== 0) return null;
+  const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+  let best: { at: number; side: number } | null = null;
+  for (let i = 0; i < view.getUint16(4, true); i++) {
+    const at = 6 + i * 16;
+    if (at + 16 > bytes.byteLength) break;
+    const side = bytes[at] || 256;
+    if (!best || side > best.side) best = { at, side };
+  }
+  if (!best) return null;
+  const size = view.getUint32(best.at + 8, true);
+  const offset = view.getUint32(best.at + 12, true);
+  if (offset + 40 > bytes.byteLength) return null;
+  const header = new DataView(bytes.buffer, bytes.byteOffset + offset, Math.min(size, bytes.byteLength - offset));
+  const width = header.getInt32(4, true);
+  const height = Math.abs(header.getInt32(8, true)) / 2; // an .ico stores the picture and its mask: twice the height
+  const bits = header.getUint16(14, true);
+  if (header.getUint32(16, true) !== 0 || (bits !== 32 && bits !== 24) || width < 1 || height < 1 || width > 512) return null;
+  const pixelBytes = bits / 8;
+  const stride = Math.ceil((width * bits) / 32) * 4;
+  const data = offset + header.getUint32(0, true);
+  if (data + stride * height > bytes.byteLength) return null;
+  const rgba = Buffer.alloc(width * height * 4);
+  for (let y = 0; y < height; y++) {
+    const row = data + stride * (height - 1 - y); // bottom-up
+    for (let x = 0; x < width; x++) {
+      const from = row + x * pixelBytes;
+      const to = (y * width + x) * 4;
+      rgba[to] = bytes[from + 2]!; rgba[to + 1] = bytes[from + 1]!; rgba[to + 2] = bytes[from]!;
+      rgba[to + 3] = bits === 32 ? bytes[from + 3]! : 255;
+    }
+  }
+  return new Uint8Array(await sharp(rgba, { raw: { width, height, channels: 4 } }).png().toBuffer());
+}
+
+/** The bytes sharp can open for an icon: the icon itself, the PNG inside an .ico, or a bitmap .ico converted. Null when none can be. */
+export async function iconImageBytes(bytes: Uint8Array): Promise<Uint8Array | null> {
+  const png = pngFromIco(bytes);
+  if (png) return png;
+  const isIco = bytes[0] === 0 && bytes[1] === 0 && bytes[2] === 1 && bytes[3] === 0;
+  if (isIco) { try { return await bmpIcoToPng(bytes); } catch { return null; } }
+  return bytes;
+}
+
+/** True when the bytes are a picture a card tile can be made from: sharp opens it (an .ico through iconImageBytes) and it is at least 16 px. */
 export async function isUsableIcon(bytes: Uint8Array): Promise<boolean> {
   try {
-    const meta = await sharp(Buffer.from(pngFromIco(bytes) ?? bytes)).metadata();
+    const image = await iconImageBytes(bytes);
+    if (!image) return false;
+    const meta = await sharp(Buffer.from(image)).metadata();
     return (meta.width ?? 0) >= 16 && (meta.height ?? 0) >= 16;
   } catch { return false; }
 }
@@ -279,7 +327,22 @@ export async function fetchFaviconBytes(host: string, fetchFn?: FaviconFetchFn, 
       if (icon) return icon;
     }
   }
+  // A feed-only host (feeds.npr.org, rss.dw.com) has no icon of its own: the site it belongs to does.
+  const parent = parentHostOf(host);
+  if (parent) {
+    const fromParent = await fetchFaviconBytes(parent, fetchFn, prefer);
+    if (fromParent.kind === "found") return fromParent;
+  }
   return sawDefiniteAnswer ? { kind: "confirmed_absent" } : { kind: "network_failure" };
+}
+
+/** `feeds.npr.org` -> `npr.org`; null for a name with no subdomain to drop (and for `x.co.uk`-style names, where dropping a label would leave a bare suffix). */
+export function parentHostOf(host: string): string | null {
+  const labels = host.split(".");
+  if (labels.length < 3) return null;
+  const parent = labels.slice(1);
+  if (parent.length === 2 && parent[0]!.length <= 3 && parent[1]!.length === 2) return null;
+  return parent.join(".");
 }
 
 export type FaviconResult = { found: true; bytes: Uint8Array; contentType: string } | { found: false };
