@@ -11,6 +11,8 @@ import type { PersonRow } from "@/types";
 import { mediaBandOf } from "@/lib/media/band";
 import { getHouseholdSettingValue } from "@/lib/settings";
 import { MINOR_QUERY_PERSONAL_NOTE, minorQueryHit } from "@/lib/retrieval/minorQueryCheck";
+import { deleteCollection, resolveCollection } from "@/lib/media/collections";
+import { personFilters, saveFilter, viewOf } from "@/lib/media/podcastFilters";
 import { artProxyAddress, directoryAllowed, fetchDirectoryArt, searchDirectory, topShows } from "@/lib/media/podcastDirectory";
 
 type Body = Record<string, unknown>;
@@ -97,6 +99,30 @@ export function podcastRoutes() {
     // A changed keep rule takes effect now, not at the next poll.
     if (auto) queuePodcastAutoRules(result.value.id);
     return c.json({ ok: true as const }, 200);
+  });
+
+  // PODCAST-PORT-03: saved episode filters, each the person's own private media-collection of kind filter. A filter only narrows the
+  // episodes the person can already read, so the child and band gates are the Episodes page's own.
+  routes.get("/filters", requireAuth, async (c, next) => {
+    const person = c.get("person");
+    if (!mediaAppAllowed(person, "podcasts")) return next();
+    return c.json({ ok: true as const, filters: personFilters(person).map((collection) => viewOf(person, collection)) }, 200);
+  });
+
+  routes.post("/filters", requireAuth, async (c, next) => {
+    const person = c.get("person");
+    if (!mediaAppAllowed(person, "podcasts")) return next();
+    const result = saveFilter(person, await bodyOf(c));
+    return result.ok ? c.json({ ok: true as const, filter: result.filter, label: "Filter saved" }, 200) : fail(c, result);
+  });
+
+  routes.delete("/filters/:id", requireAuth, async (c, next) => {
+    const person = c.get("person");
+    if (!mediaAppAllowed(person, "podcasts")) return next();
+    const own = resolveCollection(person.id, c.req.param("id"));
+    if (!own || own.kind !== "filter") return c.json({ error: "That filter is not yours or no longer exists. Reload the page." }, 404);
+    deleteCollection(own);
+    return c.json({ ok: true as const, label: "Filter deleted" }, 200);
   });
 
   routes.post("/opml/import", requireAuth, async (c, next) => {

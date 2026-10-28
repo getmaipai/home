@@ -4,7 +4,9 @@ import { existsSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { eq } from "drizzle-orm";
 import { db } from "@/db";
-import { attachments, conversationTurns, fileReferences, mediaItems, mediaSources, shares, people } from "@/db/schema";
+import { attachments, conversationTurns, fileReferences, mediaCollections, mediaItems, mediaSources, shares, people } from "@/db/schema";
+import { evaluateFilter, filterSummary } from "@/lib/media/podcastFilters";
+import { sharedWith } from "@/lib/media/collections";
 import { TestClient } from "./client";
 import { resetDb } from "./reset-db";
 import { __resetRateLimiterForTests } from "@/lib/rateLimiter";
@@ -666,5 +668,123 @@ describe("Podcasts review regressions", () => {
     expect(db.select().from(attachments).where(eq(attachments.id, copy.id)).get()).toBeDefined();
     const sprout = db.select().from(people).where(eq(people.id, child.id)).get()!;
     expect(readAttachment(sprout, copy.id).ok).toBe(false);
+  });
+});
+
+// PODCAST-PORT-03: saved episode filters (media-collection kind filter, rules from spec-v0.1.261).
+describe("smart filters", () => {
+  const ep = (id: string, over: Partial<{ duration_s: number | null; url: boolean; at: string; source: string }> = {}) => ({
+    id, source_id: over.source ?? "msrc-aaaaaa", duration_s: over.duration_s === undefined ? 600 : over.duration_s, added_at: "2026-10-01T00:00:00Z",
+    location: over.url === false ? { path: "x" } : { url: "https://pod.example.com/x.mp3" }, external: { published_at: over.at ?? "2026-10-10T00:00:00Z" },
+  }) as unknown as import("@/lib/media/model").MediaItem;
+  const prog = (id: string, seconds: number, completed = false) => ({ media_id: id, position: { seconds }, completed }) as unknown as import("@/lib/media/model").MediaProgress;
+  const NOW = Date.parse("2026-10-20T00:00:00Z");
+  const run = (rules: import("@/lib/media/podcastFilters").FilterRules, items: ReturnType<typeof ep>[], progress: ReturnType<typeof prog>[] = []) =>
+    evaluateFilter(rules, items, progress, NOW).map((item) => item.id);
+
+  test("unplayed, in progress and saved read the person's own progress and the copy on the hub", () => {
+    const items = [ep("media-new"), ep("media-half"), ep("media-done"), ep("media-kept", { url: false })];
+    const progress = [prog("media-half", 30), prog("media-done", 600, true)];
+    expect(run({ unplayed: true }, items, progress).sort()).toEqual(["media-kept", "media-new"]);
+    expect(run({ in_progress: true }, items, progress)).toEqual(["media-half"]);
+    expect(run({ saved: true }, items, progress)).toEqual(["media-kept"]);
+    expect(run({}, items, progress)).toHaveLength(4);
+  });
+  test("length edges are inclusive and an episode with no length never matches a length rule", () => {
+    const items = [ep("media-a", { duration_s: 600 }), ep("media-b", { duration_s: 601 }), ep("media-c", { duration_s: null })];
+    expect(run({ max_minutes: 10 }, items)).toEqual(["media-a"]);
+    expect(run({ min_minutes: 10 }, items).sort()).toEqual(["media-a", "media-b"]);
+    expect(run({ min_minutes: 10, max_minutes: 10 }, items)).toEqual(["media-a"]);
+  });
+  test("released within N days counts back from now, and a show rule keeps only those shows", () => {
+    const items = [ep("media-a", { at: "2026-10-13T00:00:00Z", source: "msrc-aaaaaa" }), ep("media-b", { at: "2026-10-12T23:59:59Z", source: "msrc-bbbbbb" })];
+    expect(run({ released_within_days: 7 }, items)).toEqual(["media-a"]);
+    expect(run({ source_ids: ["msrc-bbbbbb"] }, items)).toEqual(["media-b"]);
+    expect(run({ source_ids: ["msrc-bbbbbb"], released_within_days: 7 }, items)).toEqual([]);
+  });
+  test("a summary says what the filter does", () => {
+    expect(filterSummary({ unplayed: true, max_minutes: 30, released_within_days: 14 })).toBe("Unplayed · Under 30 min · Last 14 days");
+    expect(filterSummary(null)).toBe("Every episode");
+  });
+
+  test("make, apply, list, survive a restart, and delete a filter by the routes", async () => {
+    const { adult, owner, data, subscribe, poll, idOf } = await setup();
+    const { sourceId, feedId } = await subscribe();
+    await poll(feedId);
+    const made = await adult.client.post("/api/plugins/podcasts/filters", { title: "Short and new", unplayed: "true", max_minutes: "1", released_within_days: "3650", show: "sprout" });
+    expect(made.status).toBe(200);
+    const filter = ((await made.json()) as { filter: { id: string; rules: Record<string, unknown> } }).filter;
+    expect(filter.rules).toEqual({ unplayed: true, max_minutes: 1, source_ids: [sourceId], released_within_days: 3650 });
+    expect((await data<{ id: string; title: string; summary: string }[]>(adult.client, "filters")).map((r) => [r.id, r.title, r.summary])).toEqual([[filter.id, "Short and new", "Unplayed · Under 1 min · Sprout Science · Last 3650 days"]]);
+    expect((await data(adult.client, "filter-episodes", { filter: filter.id })).map((r) => r.title)).toEqual(["Question 3", "Question 2", "Question 1"]);
+    // Playing one finishes it: it leaves an unplayed filter.
+    await adult.client.post("/api/plugins/podcasts/progress", { media_id: await idOf("Question 3"), position_s: "12", duration_s: "12", reason: "ended" });
+    flushProgress(adult.id);
+    expect((await data(adult.client, "filter-episodes", { filter: filter.id })).map((r) => r.title)).toEqual(["Question 2", "Question 1"]);
+    // The rules are stored on the collection row, so a restart (a fresh process reading the same database) finds them.
+    const row = db.select().from(mediaCollections).where(eq(mediaCollections.id, filter.id)).get()!;
+    expect(row).toMatchObject({ kind: "filter", personId: adult.id, items: "[]" });
+    expect(JSON.parse(row.rules!)).toEqual(filter.rules);
+    __resetProgressForTests();
+    expect((await data(adult.client, "filter-episodes", { filter: filter.id })).map((r) => r.title)).toEqual(["Question 2", "Question 1"]);
+    // Edit in place, keep the id.
+    const edited = await adult.client.post("/api/plugins/podcasts/filters", { id: filter.id, title: "Anything", max_minutes: "0" });
+    expect(((await edited.json()) as { filter: { id: string } }).filter.id).toBe(filter.id);
+    expect(await data<unknown[]>(adult.client, "filter-episodes", { filter: filter.id })).toEqual([]);
+    // Private: another person sees none of it and cannot delete or read it.
+    expect(await data<unknown[]>(owner, "filters")).toEqual([]);
+    expect(await data<unknown[]>(owner, "filter-episodes", { filter: filter.id })).toEqual([]);
+    expect((await owner.request(`/api/plugins/podcasts/filters/${filter.id}`, { method: "DELETE" })).status).toBe(404);
+    expect((await adult.client.request(`/api/plugins/podcasts/filters/${filter.id}`, { method: "DELETE" })).status).toBe(200);
+    expect(await data<unknown[]>(adult.client, "filters")).toEqual([]);
+  });
+
+  test("the new-filter pickers give one Save row that posts the chosen rules, and none when nothing is chosen", async () => {
+    const { adult, data, subscribe, poll } = await setup();
+    const { sourceId, feedId } = await subscribe();
+    await poll(feedId);
+    expect(await data<unknown[]>(adult.client, "filter-draft", {})).toEqual([]);
+    const [row] = await data<Array<Record<string, string>>>(adult.client, "filter-draft", { status: "unplayed", length: "u30", within: "7", show: sourceId });
+    expect(row).toMatchObject({ title: "Save this filter", summary: "Unplayed · Under 30 min · Sprout Science · Last 7 days", unplayed: "true", in_progress: "", max_minutes: "30", released_within_days: "7", source_id: sourceId });
+    const { id: _id, title: _title, summary: _summary, ...fields } = row!;
+    const saved = await adult.client.post("/api/plugins/podcasts/filters", fields);
+    expect(((await saved.json()) as { filter: { rules: unknown } }).filter.rules).toEqual({ unplayed: true, max_minutes: 30, source_ids: [sourceId], released_within_days: 7 });
+    // An option that is not one of the offered values means nothing.
+    expect(await data<unknown[]>(adult.client, "filter-draft", { length: "u999", within: "1", status: "x" })).toEqual([]);
+  });
+
+  test("bad rules say what to fix; a filter is never a standing or shared collection", async () => {
+    const { adult, subscribe } = await setup();
+    await subscribe();
+    const post = async (body: Record<string, unknown>) => { const res = await adult.client.post("/api/plugins/podcasts/filters", body); return { status: res.status, body: (await res.json()) as { error?: string } }; };
+    expect((await post({ unplayed: true, in_progress: true })).status).toBe(400);
+    expect((await post({ min_minutes: "abc" })).status).toBe(400);
+    expect((await post({ min_minutes: 30, max_minutes: 5 })).body.error).toMatch(/Swap them/);
+    expect((await post({ show: "no such show" })).body.error).toMatch(/No show of yours/);
+    expect((await post({ source_ids: ["msrc-zzzzzz"] })).status).toBe(400);
+    expect((await post({ id: "mcol-nothere", unplayed: true })).status).toBe(404);
+    for (let i = 0; i < 20; i++) expect((await post({ unplayed: true, title: `F${i}` })).status).toBe(200);
+    expect((await post({ unplayed: true })).status).toBe(409);
+    // Not offered as shared playlists, whatever shared_to holds.
+    db.update(mediaCollections).set({ sharedTo: JSON.stringify("household") }).where(eq(mediaCollections.kind, "filter")).run();
+    expect(sharedWith("person-someoneelse").filter((c) => c.kind === "filter")).toEqual([]);
+  });
+
+  test("child gates: a child's filter sees only the child-cleared episodes of shows named for them, and cannot reach another person's filter", async () => {
+    const { adult, child, data, subscribe, poll } = await setup();
+    const { feedId } = await subscribe([child.id, adult.id]);
+    await poll(feedId);
+    // The adult's all-episodes filter includes the explicit episode; the child's identical filter does not.
+    const adultFilter = ((await (await adult.client.post("/api/plugins/podcasts/filters", { title: "All" })).json()) as { filter: { id: string } }).filter.id;
+    const childFilter = ((await (await child.client.post("/api/plugins/podcasts/filters", { title: "All" })).json()) as { filter: { id: string } }).filter.id;
+    expect((await data(adult.client, "filter-episodes", { filter: adultFilter })).map((r) => r.title)).toEqual(["Question 3", "Question 2", "Question 1"]);
+    expect((await data(child.client, "filter-episodes", { filter: childFilter })).map((r) => r.title)).toEqual(["Question 3", "Question 1"]);
+    // The child cannot evaluate, list or delete the adult's filter.
+    expect(await data<unknown[]>(child.client, "filter-episodes", { filter: adultFilter })).toEqual([]);
+    expect((await data<{ id: string }[]>(child.client, "filters")).map((r) => r.id)).toEqual([childFilter]);
+    expect((await child.client.request(`/api/plugins/podcasts/filters/${adultFilter}`, { method: "DELETE" })).status).toBe(404);
+    // A child cannot name a show nobody cleared for them, and a name that trips the word floor is refused.
+    expect((await child.client.post("/api/plugins/podcasts/filters", { show: "nothing" })).status).toBe(400);
+    expect((await child.client.post("/api/plugins/podcasts/filters", { title: "hardcore porn" })).status).toBe(400);
   });
 });

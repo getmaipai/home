@@ -107,6 +107,6 @@ export function progressFromRow(row: MediaProgressRow): MediaProgress {
 export function collectionFromRow(row: MediaCollectionRow): MediaCollection {
   return MediaCollection.parse({
     id: row.id, person_id: row.personId, kind: row.kind, title: row.title, items: json(row.items, []), pointer: row.pointer, shared_to: json(row.sharedTo, null),
-    rules: null, deleted_at: row.deletedAt, trash_until: row.trashUntil, created_at: row.createdAt, hlc: row.hlc, provenance: row.provenance,
+    rules: json(row.rules, null), deleted_at: row.deletedAt, trash_until: row.trashUntil, created_at: row.createdAt, hlc: row.hlc, provenance: row.provenance,
   });
 }

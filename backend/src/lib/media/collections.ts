@@ -42,6 +42,17 @@ export function resolveCollection(personId: string, idOrKind: string): MediaColl
   return row ? collectionFromRow(row) : null;
 }
 
+/** PODCAST-PORT-03: a saved episode filter. Always the person's own and private; `items` stay empty and `rules` say what matches. */
+export function createFilterCollection(personId: string, title: string, rules: object): MediaCollection {
+  const id = newMediaCollectionId();
+  db.insert(mediaCollections).values({ id, personId, kind: "filter", title: title.trim() || "Untitled", rules: JSON.stringify(rules), createdAt: new Date().toISOString(), hlc: nextHlc(), provenance: `person:${personId}` }).run();
+  return collectionFromRow(db.select().from(mediaCollections).where(eq(mediaCollections.id, id)).get()!);
+}
+
+export function saveFilterRules(collection: MediaCollection, rules: object): MediaCollection {
+  return save(collection.id, { rules: JSON.stringify(rules) });
+}
+
 export function createCollection(personId: string, kind: (typeof MADE_KINDS)[number], title: string): MediaCollection {
   const id = newMediaCollectionId();
   db.insert(mediaCollections).values({ id, personId, kind, title: title.trim() || "Untitled", createdAt: new Date().toISOString(), hlc: nextHlc(), provenance: `person:${personId}` }).run();
@@ -120,7 +131,7 @@ export function deleteCollection(collection: MediaCollection): boolean {
 /** Collections other people shared with this person (to the household or to them). */
 export function sharedWith(personId: string): MediaCollection[] {
   return db.select().from(mediaCollections).where(isNull(mediaCollections.deletedAt)).all().map(collectionFromRow)
-    .filter((c) => c.person_id !== personId && (c.shared_to === "household" || (Array.isArray(c.shared_to) && c.shared_to.includes(personId))));
+    .filter((c) => c.kind !== "filter" && c.person_id !== personId && (c.shared_to === "household" || (Array.isArray(c.shared_to) && c.shared_to.includes(personId))));
 }
 
 /** The collections shared with this person that they may see: a minor never sees one whose title trips the floor (an adult's shared

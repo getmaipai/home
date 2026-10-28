@@ -9,6 +9,7 @@ import { liveSourceById } from "./access";
 import { allowedSources, readableIn, artworkUrl, collectionIds, contextFor, copyLabelOf, queryItems, registerItemView, registerMediaAppData, rowOf, rowsOf, type DataParams, type MediaRow } from "./appHost";
 import { getProgress, getProgressMany, recentProgress } from "./progress";
 import type { MediaItem, MediaSource } from "./model";
+import { draftRows, filterEpisodes, personFilters, viewOf } from "./podcastFilters";
 
 const APP = "podcasts" as const;
 const publishedOf = (item: MediaItem): string => item.external?.published_at ?? item.added_at;
@@ -77,6 +78,12 @@ registerMediaAppData(APP, (person, dataId, params) => {
     case "episodes": return episodeRows(person, episodesOf(person, params, limit));
     case "saved": return episodeRows(person, episodesOf(person, params, limit, true));
     case "bookmarks": return bookmarkRows(person, limit);
+    // PODCAST-PORT-03: the person's own saved filters, and the episodes one of them shows now.
+    case "filters": return personFilters(person).map((collection) => { const view = viewOf(person, collection); return { id: view.id, title: view.title, summary: view.summary }; });
+    case "filter-shows": return { as_of: new Date().toISOString(), rows: showRows(person).map((row) => ({ id: row.id, label: row.title })) };
+    case "filter-choices": return { as_of: new Date().toISOString(), rows: personFilters(person).map((collection) => ({ id: collection.id, label: collection.title })) };
+    case "filter-draft": return draftRows(person, params);
+    case "filter-episodes": return episodeRows(person, filterEpisodes(person, params.filter ?? "", limit));
     default: return null;
   }
 });

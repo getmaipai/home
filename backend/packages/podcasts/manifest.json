@@ -83,6 +83,22 @@
         "module": "episodes"
       },
       {
+        "id": "filters",
+        "label": "Filters",
+        "icon": "filter",
+        "nav": true,
+        "kind": "schema",
+        "module": "filters",
+        "keywords": [
+          "filter",
+          "filters",
+          "smart filter",
+          "unplayed",
+          "in progress",
+          "short episodes"
+        ]
+      },
+      {
         "id": "queue",
         "label": "Queue",
         "icon": "list",
@@ -150,6 +166,26 @@
       },
       {
         "id": "directory",
+        "rows": "list"
+      },
+      {
+        "id": "filters",
+        "rows": "list"
+      },
+      {
+        "id": "filter-episodes",
+        "rows": "list"
+      },
+      {
+        "id": "filter-draft",
+        "rows": "list"
+      },
+      {
+        "id": "filter-shows",
+        "rows": "list"
+      },
+      {
+        "id": "filter-choices",
         "rows": "list"
       }
     ],

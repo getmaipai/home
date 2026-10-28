@@ -4,6 +4,7 @@ All notable changes to the Podcasts package, in [Keep a Changelog](https://keepa
 
 ## [0.2.0] - 2026-10-27
 
+- Filters: save a filter of episodes by unplayed or in progress, saved on the hub, length, shows and how recently released, and see what matches. A filter is private to the person who made it and only narrows what that person can already see.
 - Find shows: search Apple's podcast directory or browse its top list, and add a show with a tap (an adult admin adds; the page is off until the household turns on Find podcasts online). A child never sees it.
 
 ## [0.1.0] - 2026-10-17

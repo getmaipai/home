@@ -32,6 +32,11 @@ function paramsOf(body: Body): DataParams {
     season: coerceNumber(body.season),
     genre: typeof body.genre === "string" ? body.genre : undefined,
     status: typeof body.status === "string" ? body.status : undefined,
+    copy: typeof body.copy === "string" ? body.copy : undefined,
+    length: typeof body.length === "string" ? body.length : undefined,
+    within: typeof body.within === "string" ? body.within : undefined,
+    show: typeof body.show === "string" ? body.show : undefined,
+    filter: typeof body.filter === "string" && body.filter !== "" ? body.filter : undefined,
     limit: coerceNumber(body.limit),
   };
 }

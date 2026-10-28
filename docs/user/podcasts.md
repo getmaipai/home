@@ -40,6 +40,10 @@ Under the player you see three buttons:
 
 **Saved** lists the episodes stored on your hub, and your bookmarks. Saved episodes stay when the internet is down. If Home says the internet is down, everything saved still plays.
 
+## Filters
+
+**Filters** saves a list of episodes that match what you pick. Use the boxes to choose any of: unplayed or in progress, saved on the hub, a length (under 15 minutes, under 30, under 1 hour, over 1 hour), released in the last 7, 30 or 90 days, and one show. Then choose **Save this filter**. Pick a saved filter at the top to see the episodes that match it now. The trash can deletes a filter and leaves your episodes alone. Filters are yours alone: nobody else can see them.
+
 ## If you are a child
 
 You see only the shows a grown-up chose for you, and only the episodes marked clean. An episode marked explicit never shows up. You do not see lists of new episodes, so nothing surprising appears. If you cannot find an episode, ask a grown-up.

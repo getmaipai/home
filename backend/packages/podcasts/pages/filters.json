@@ -1,0 +1,205 @@
+{
+  "type": "page",
+  "id": "filters",
+  "title": "Filters",
+  "body": [
+    {
+      "type": "picker",
+      "state": "filter",
+      "label": "Filter",
+      "placeholder": "Choose a filter",
+      "bind": {
+        "source": "package",
+        "path": "filter-choices"
+      },
+      "item_key_field": "id",
+      "item_label_field": "label"
+    },
+    {
+      "type": "media_shelf",
+      "heading": "Matching episodes",
+      "bind": {
+        "source": "package",
+        "path": "filter-episodes",
+        "params": {
+          "filter": "$state.filter"
+        }
+      },
+      "item_key_field": "id",
+      "item_label_field": "title",
+      "item_subtitle_field": "{channel}",
+      "item_media_field": "thumbnail",
+      "item_progress_field": "progress",
+      "item_badge_field": "copy_label",
+      "item_meta_field": "duration_s",
+      "aspect": "square",
+      "variant": "plain",
+      "orientation": "vertical",
+      "on_select": {
+        "play": {
+          "media_id": "{id}"
+        }
+      },
+      "empty_state": {
+        "type": "empty_state",
+        "icon": "filter",
+        "text": "Choose a filter above, or make one below. Episodes that match it appear here."
+      }
+    },
+    {
+      "type": "list",
+      "bind": {
+        "source": "package",
+        "path": "filters"
+      },
+      "item_key_field": "id",
+      "item_label_field": "title",
+      "item_subtitle_field": "{summary}",
+      "row_action": {
+        "icon": "trash",
+        "label": "Delete {title}",
+        "action": {
+          "confirm": {
+            "prompt": "Delete the filter {title}? Your episodes are not touched.",
+            "on_confirm": {
+              "call": {
+                "target": "/api/plugins/podcasts/filters/{id}",
+                "method": "DELETE"
+              }
+            }
+          }
+        }
+      },
+      "empty_state": {
+        "type": "empty_state",
+        "icon": "filter",
+        "text": "No filters yet. Make one below."
+      }
+    },
+    {
+      "type": "picker",
+      "state": "status",
+      "label": "Progress",
+      "placeholder": "Any progress",
+      "leading": [
+        {
+          "value": "unplayed",
+          "label": "Unplayed"
+        },
+        {
+          "value": "in_progress",
+          "label": "In progress"
+        }
+      ]
+    },
+    {
+      "type": "picker",
+      "state": "copy",
+      "label": "Copy",
+      "placeholder": "Streamed or saved",
+      "leading": [
+        {
+          "value": "saved",
+          "label": "Saved on the hub"
+        }
+      ]
+    },
+    {
+      "type": "picker",
+      "state": "length",
+      "label": "Length",
+      "placeholder": "Any length",
+      "leading": [
+        {
+          "value": "u15",
+          "label": "Under 15 minutes"
+        },
+        {
+          "value": "u30",
+          "label": "Under 30 minutes"
+        },
+        {
+          "value": "u60",
+          "label": "Under 1 hour"
+        },
+        {
+          "value": "o60",
+          "label": "Over 1 hour"
+        }
+      ]
+    },
+    {
+      "type": "picker",
+      "state": "within",
+      "label": "Released",
+      "placeholder": "Any time",
+      "leading": [
+        {
+          "value": "7",
+          "label": "Last 7 days"
+        },
+        {
+          "value": "30",
+          "label": "Last 30 days"
+        },
+        {
+          "value": "90",
+          "label": "Last 90 days"
+        }
+      ]
+    },
+    {
+      "type": "picker",
+      "state": "show",
+      "label": "Show",
+      "placeholder": "Any show",
+      "bind": {
+        "source": "package",
+        "path": "filter-shows"
+      },
+      "item_key_field": "id",
+      "item_label_field": "label"
+    },
+    {
+      "type": "media_shelf",
+      "heading": "Save this filter",
+      "bind": {
+        "source": "package",
+        "path": "filter-draft",
+        "params": {
+          "status": "$state.status",
+          "copy": "$state.copy",
+          "length": "$state.length",
+          "within": "$state.within",
+          "show": "$state.show"
+        }
+      },
+      "item_key_field": "id",
+      "item_label_field": "title",
+      "item_subtitle_field": "{summary}",
+      "aspect": "square",
+      "variant": "plain",
+      "orientation": "vertical",
+      "on_select": {
+        "call": {
+          "target": "/api/plugins/podcasts/filters",
+          "args": {
+            "unplayed": "{unplayed}",
+            "in_progress": "{in_progress}",
+            "saved": "{saved}",
+            "min_minutes": "{min_minutes}",
+            "max_minutes": "{max_minutes}",
+            "released_within_days": "{released_within_days}",
+            "source_id": "{source_id}"
+          }
+        }
+      },
+      "empty_state": {
+        "type": "empty_state",
+        "icon": "filter",
+        "text": "Choose what to keep above, then save it here."
+      },
+      "item_media_field": "thumbnail"
+    }
+  ]
+}
