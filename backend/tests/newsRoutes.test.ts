@@ -323,6 +323,19 @@ describe("the picture route", () => {
     expect(response.status).toBe(200);
     expect(response.headers.get("content-type")).toBe("image/webp");
     expect((await response.arrayBuffer()).byteLength).toBeGreaterThan(100);
+    // The stand-in is revalidated every time, so the story's own picture shows as soon as the hub has it (it was cached an hour).
+    expect(response.headers.get("cache-control")).toBe("private, no-cache");
+  });
+
+  test("the lead story is one with its own picture, never an imageless story wearing the publisher-icon stand-in", async () => {
+    installNewsApp();
+    const who = await household();
+    const fresher = putItem(feeds.household, ADULT_HOST, { image: null, path: "/no-picture", title: "Fresher story with no picture", ageHours: 0 });
+    const pictured = putItem(feeds.household, ADULT_HOST, { path: "/pictured", title: "Story with its own photo", ageHours: 2 });
+    expect(fresher.id).not.toBe(pictured.id);
+    const json = await (await post(who.adult, "data/today")).json() as { blocks: Array<{ props: { hero?: { title?: string }; featured: Array<{ title?: string }> } }> };
+    const lead = json.blocks[0]!.props.hero ?? json.blocks[0]!.props.featured[0]!;
+    expect(lead.title).toBe("Story with its own photo");
   });
 
   test("a 429 stops that host: the next picture from it makes no request", async () => {

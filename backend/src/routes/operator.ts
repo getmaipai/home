@@ -4,7 +4,7 @@ import { Hono } from "hono";
 import { bodyLimit } from "hono/body-limit";
 import { requireApiKey } from "@/middleware/auth";
 import { operatorSettingsView, setOperatorSetting } from "@/lib/operatorSettings";
-import { DEFAULT_TURNS, MAX_TURNS, engineState, runCacheProbe, summaryView, turnsView } from "@/lib/operatorDiagnose";
+import { DEFAULT_TURNS, MAX_TURNS, engineState, newsView, runCacheProbe, summaryView, turnsView } from "@/lib/operatorDiagnose";
 import { tryConsume } from "@/lib/rateLimiter";
 import type { AppEnv } from "@/types";
 
@@ -49,6 +49,11 @@ operatorRoutes.get("/diagnose/summary", (c) => {
   const limited = slow(c as never); if (limited) return limited;
   const turns = count(c.req.query("turns"), 20, MAX_TURNS);
   return turns === null ? c.json(badCount("turns", MAX_TURNS), 400) : c.json(summaryView(turns));
+});
+
+operatorRoutes.get("/diagnose/news", (c) => {
+  const limited = slow(c as never); if (limited) return limited;
+  return c.json(newsView());
 });
 
 operatorRoutes.get("/diagnose/engines", async (c) => {

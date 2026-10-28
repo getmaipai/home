@@ -55,6 +55,13 @@ function extract(html: string, item: ShelfItem, band: AgeBand): Pick<Enrichment,
   return { image_url, description };
 }
 
+/** True for a failure that is not the page's answer: Home's shared page pace said wait, the read timed out or the network failed. */
+export function transientPageError(error: unknown): boolean {
+  if (error instanceof HostError) return error.code === "rate_limited" || (error.code === "network_unreachable" && /^could not reach /.test(error.message));
+  const name = (error as Error | undefined)?.name;
+  return name === "AbortError" || name === "TimeoutError";
+}
+
 async function perHost<T>(host: string, deadlineAt: number, task: () => Promise<T>): Promise<T | null | undefined> {
   let state = hosts.get(host);
   if (!state) {
@@ -81,6 +88,9 @@ async function perHost<T>(host: string, deadlineAt: number, task: () => Promise<
   if (admitted === "quiet") { bumpNewsCounter("enrichment_blocked"); return null; }
   try { return await task(); }
   catch (error) {
+    // A refusal from Home's own page pace, a timeout or a network failure says nothing about the page: nothing is stored, so the next
+    // screen asks again. Stored as "none" it hid the story's picture behind the publisher icon for 12 hours.
+    if (transientPageError(error)) return undefined;
     if (error instanceof PageDeclinedError || (error instanceof HostError && error.code === "invalid_input")) {
       quietNewsHost(host, now());
       bumpNewsCounter("enrichment_blocked");

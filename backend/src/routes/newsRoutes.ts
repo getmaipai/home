@@ -115,7 +115,9 @@ newsRoutes.get("/images/:item", requireAuth, async (c) => {
   const picture = own ?? (newsImagesOn() ? (await publisherIconPicture(item, width as NewsPictureWidth)) ?? (await genericPicture(width as NewsPictureWidth)) : null);
   if (!picture) return c.json({ error: "no such picture" }, 404);
   c.header("Content-Type", "image/webp");
-  c.header("Cache-Control", own ? "private, max-age=86400" : "private, max-age=3600");
+  // A stand-in is checked again on every view (its ETag makes that a 304), so the story's own picture shows as soon as the hub has it,
+  // instead of the browser keeping the icon for an hour after a refused or slow first fetch.
+  c.header("Cache-Control", own ? "private, max-age=86400" : "private, no-cache");
   c.header("ETag", picture.etag);
   c.header("X-Content-Type-Options", "nosniff");
   c.header("Content-Security-Policy", "default-src 'none'");

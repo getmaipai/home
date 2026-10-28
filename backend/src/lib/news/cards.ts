@@ -12,6 +12,7 @@ import { newsImagesOn, newsPictureFocal } from "./pictures";
 import { enrichItem, enrichmentFresh } from "./enrich";
 import { topicOfferedTo } from "./topics";
 import { plainSummary } from "./text";
+import { isSiteArt } from "@/lib/shelf/imageAddress";
 
 export interface StoryCard {
   story_id: string;
@@ -103,6 +104,15 @@ export function imageOf(item: ShelfItem, title: string, publisher: string, env: 
   if (!env.imagesOn) return undefined;
   const focal = newsPictureFocal(item.id);
   return { w480: `/api/plugins/news/images/${item.id}?w=480`, w1280: `/api/plugins/news/images/${item.id}?w=1280`, alt: pictureAlt(title, publisher), ...(focal ? { focal } : {}) };
+}
+
+/** Whether a story has a picture of its own (a feed picture, a stored one or one its page named), as opposed to the publisher icon
+ * the picture route stands in. Ranking uses this, never `image`, which every card carries since the icon fallback: without it a
+ * story with no picture (a Nature paper) took the lead slot and showed a giant icon. */
+export function hasOwnPicture(item: ShelfItem, env: CardEnv): boolean {
+  if (!env.imagesOn) return false;
+  if (item.image_ref || (item.image_url && !isSiteArt(item.image_url))) return true;
+  return !!env.store.getEnrichment(item.id, env.viewer.band)?.image_url;
 }
 
 const DEK_MAX = 220;

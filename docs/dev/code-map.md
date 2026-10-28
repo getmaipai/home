@@ -540,7 +540,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/news/data.ts` | __releasedForBandForTests, viewerOf, finishBlocks, blockBase, topicParam, withKicker |
 | `backend/src/lib/news/dayParts.ts` | hubTimeZone, datelineOf, localDayKey, dayGroupOf |
 | `backend/src/lib/news/discuss.ts` | DISCUSS_MAX_CHARS, readNewsStory |
-| `backend/src/lib/news/enrich.ts` | ENRICHMENT_NONE_MS, __setNewsEnrichClockForTests, __resetNewsEnrichForTests, enrichmentFresh, enrichItem |
+| `backend/src/lib/news/enrich.ts` | ENRICHMENT_NONE_MS, __setNewsEnrichClockForTests, __resetNewsEnrichForTests, enrichmentFresh, transientPageError, enrichItem |
 | `backend/src/lib/news/enrichmentStore.ts` | ENRICHMENT_SCHEMA, enrichmentStore |
 | `backend/src/lib/news/feedLabels.ts` | feedLabels |
 | `backend/src/lib/news/focal.ts` | __setNewsFocalForTests, focalCentre, focalPointOf |
@@ -568,7 +568,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/offline/media.ts` | matches, playableItem, keepRefusal, missing, mediaManifest, mediaFile |
 | `backend/src/lib/offline/registry.ts` | registerOfflineProvider, offlineProvider |
 | `backend/src/lib/openapi.ts` | apiRouter, emptyJsonBodyAsObject |
-| `backend/src/lib/operatorDiagnose.ts` | MAX_TURNS, DEFAULT_TURNS, BIG_PROMPT_TOKENS, turnsView, summaryView, engineState |
+| `backend/src/lib/operatorDiagnose.ts` | newsView, MAX_TURNS, DEFAULT_TURNS, BIG_PROMPT_TOKENS, turnsView, summaryView |
 | `backend/src/lib/operatorSettings.ts` | OPERATOR_SETTING_KEYS, OPERATOR_DENIED_PREFIXES, isOperatorSettingKey, operatorSettingsView, setOperatorSetting |
 | `backend/src/lib/outbound.ts` | HOME_USER_AGENT |
 | `backend/src/lib/packageBlocks.ts` | blockEnvelope, BLOCK_ONLY_DATA_PREFIX, withoutBlockOnlyData, weatherCard, blocksForRecipeRun |

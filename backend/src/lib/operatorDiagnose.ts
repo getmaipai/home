@@ -7,6 +7,19 @@ import { getStackClient } from "@/lib/stackEngine";
 import { redactCredentials } from "@/lib/memoryContentPolicy";
 import { activeTurnCount, acquireTurnLease } from "@/lib/turnActivity";
 import { tryConsume } from "@/lib/rateLimiter";
+import { NEWS_COUNTER_NAMES, newsCounters } from "@/lib/news/newsCounters";
+import { newsImagesOn, newsPictureCount } from "@/lib/news/pictures";
+
+/** Why News cards show a stand-in: every closed News counter since the hub started (zero when never bumped), whether pictures are on
+ * and how many pictures the cache holds. Fixed names and numbers only, never an item, address or host (RULES 6a). */
+export function newsView() {
+  const counts = newsCounters();
+  return {
+    pictures_on: newsImagesOn(),
+    pictures_cached: newsPictureCount(),
+    counters: Object.fromEntries(NEWS_COUNTER_NAMES.map((name) => [name, counts[`news.${name}`] ?? 0])),
+  };
+}
 
 export const MAX_TURNS = 50;
 export const DEFAULT_TURNS = 10;

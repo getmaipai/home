@@ -1,7 +1,8 @@
 import { afterEach, beforeEach, expect, test } from "bun:test";
 import { __resetNewsEnrichForTests, __setNewsEnrichClockForTests, enrichItem } from "@/lib/news/enrich";
 import { articleBlock, STORY_GRACE_MS } from "@/lib/news/article";
-import { cardEnv, cardOf, enrichLeadCards, ENRICH_GRACE_MS } from "@/lib/news/cards";
+import { cardEnv, cardOf, enrichLeadCards, ENRICH_GRACE_MS, hasOwnPicture } from "@/lib/news/cards";
+import { HostError } from "@maipai/spec/emulators/ts/host-emulator.js";
 import { newsPicture } from "@/lib/news/pictures";
 import { newsCounters, __resetNewsCountersForTests } from "@/lib/news/newsCounters";
 import { sharedShelfStore, __resetSharedShelfStoreForTests } from "@/lib/shelf/shelfStore";
@@ -244,4 +245,36 @@ test("a story whose page is slow opens on its summary within the grace, and the 
   const second = await articleBlock(item, env) as { props: { content_source: string } };
   expect(second.props.content_source).toBe("fetched");
   expect(publisher.requests.filter((path) => path === "/story")).toHaveLength(1);
+});
+
+test("a spent page pace or a timeout is not remembered as no picture: nothing is stored and the next pass tries again", async () => {
+  const { __setPageFetchForTests } = await import("@/lib/packageHost");
+  let fail: Error | null = new HostError("rate_limited", "Web pages are rate-limited - try again shortly");
+  __setPageFetchForTests((async (url: string) => {
+    if (url.endsWith("/robots.txt")) return { ok: false, status: 404, networkFailure: false, error: new HostError("network_unreachable", "none") };
+    if (fail) throw fail;
+    return { ok: true, value: OG, status: 200 };
+  }) as never);
+  try {
+    const item = putItem(feeds.household, ADULT_HOST, { path: "/paced", image: null, summary: "" });
+    const env = cardEnv({ personId: null, band: "adult" })!;
+    await enrichItem(item, "adult");
+    expect(sharedShelfStore()!.getEnrichment(item.id, "adult")).toBeNull();
+    fail = Object.assign(new Error("timed out"), { name: "TimeoutError" });
+    __resetNewsEnrichForTests();
+    await enrichItem(item, "adult");
+    expect(sharedShelfStore()!.getEnrichment(item.id, "adult")).toBeNull();
+    expect(hasOwnPicture(item, env)).toBe(false);
+    fail = null;
+    __resetNewsEnrichForTests();
+    expect(await enrichItem(item, "adult")).toMatchObject({ status: "ok", image_url: `${ADULT_HOST}/img/og.png` });
+    expect(hasOwnPicture(item, env)).toBe(true);
+  } finally { __setPageFetchForTests(null); }
+});
+
+test("own picture means a feed photo or a found page photo, never site art or the stand-in", () => {
+  const env = cardEnv({ personId: null, band: "adult" })!;
+  expect(hasOwnPicture(putItem(feeds.household, ADULT_HOST, { path: "/a" }), env)).toBe(true);
+  expect(hasOwnPicture(putItem(feeds.household, ADULT_HOST, { path: "/b", image: null }), env)).toBe(false);
+  expect(hasOwnPicture(putItem(feeds.household, ADULT_HOST, { path: "/c", image: `${ADULT_HOST}/images/twitter_icon_large.png` }), env)).toBe(false);
 });

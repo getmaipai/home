@@ -20,7 +20,7 @@ import { sharedShelfStore, type ShelfItem } from "@/lib/shelf/shelfStore";
 import { FEED_LISTS, shelfEnabled } from "@/lib/shelf/shelfPolicy";
 import type { PersonRow } from "@/types";
 import { articleBlock, stableBlockId } from "./article";
-import { cardEnv, cardOf, enrichLeadCards, hostOf, itemIdFrom, pictureAlt, publishedAtOf, storyIdOf, topicsShown, type CardEnv, type StoryCard, type Viewer } from "./cards";
+import { cardEnv, cardOf, enrichLeadCards, hasOwnPicture, hostOf, itemIdFrom, pictureAlt, publishedAtOf, storyIdOf, topicsShown, type CardEnv, type StoryCard, type Viewer } from "./cards";
 import { rankStories, type RankInput } from "./rankStories";
 import { collapseNearDuplicates } from "./nearDuplicates";
 import { followedChannels, isFollowing, listSaves, recomputeMix, recordRead } from "./records";
@@ -100,10 +100,10 @@ interface FeedRequest {
 
 const ageMs = (item: ShelfItem, now: Date): number => now.getTime() - Date.parse(publishedAtOf(item));
 
-function rankInputOf(item: ShelfItem, card: StoryCard): RankInput {
+function rankInputOf(item: ShelfItem, card: StoryCard, env: CardEnv): RankInput {
   return {
     story_id: card.story_id, item_id: item.id, title: card.title, publisher: card.publisher, topics: card.topics,
-    published_at: card.published_at, publisher_count: card.outlets, has_image: card.image !== undefined, feed_id: item.feed_id,
+    published_at: card.published_at, publisher_count: card.outlets, has_image: hasOwnPicture(item, env), feed_id: item.feed_id,
   };
 }
 
@@ -139,10 +139,10 @@ function feedBlock(env: CardEnv, request: FeedRequest, now: Date): unknown[] {
   if (topic) for (const [id, card] of cards) if (!card.topics.includes(topic)) cards.delete(id);
   // One event, one card on a mixed page; a topic page lists every outlet's story (NEWS-DEDUPE-01).
   if (!topic && cards.size > 1) {
-    const kept = collapseNearDuplicates([...cards.values()].map((card) => ({ item_id: card.item_id, title: card.title, topics: card.topics, published_at: card.published_at, outlets: card.outlets, has_image: card.image !== undefined })));
+    const kept = collapseNearDuplicates([...cards.values()].map((card) => ({ item_id: card.item_id, title: card.title, topics: card.topics, published_at: card.published_at, outlets: card.outlets, has_image: hasOwnPicture(byItem.get(card.item_id)!, env) })));
     for (const id of [...cards.keys()]) if (!kept.has(id)) cards.delete(id);
   }
-  const ranked = cards.size === 0 ? { hero: undefined, featured: [], rest: [] } : rankStories({ stories: [...cards.values()].map((card) => rankInputOf(byItem.get(card.item_id)!, card)), now, followed: request.followed, mode: request.signal ? "mix" : "today", signal: request.signal });
+  const ranked = cards.size === 0 ? { hero: undefined, featured: [], rest: [] } : rankStories({ stories: [...cards.values()].map((card) => rankInputOf(byItem.get(card.item_id)!, card, env)), now, followed: request.followed, mode: request.signal ? "mix" : "today", signal: request.signal });
   const cardFor = (input: RankInput): StoryCard => cards.get(input.item_id)!;
   const hero = ranked.hero ? withKicker(cardFor(ranked.hero), band, true) : undefined;
   const featured = ranked.featured.map(cardFor).map((card) => withKicker(card, band));
@@ -427,7 +427,7 @@ export function fullTextCandidates(person: PersonRow, now = new Date()): ShelfIt
     .filter((item) => ageMs(item, now) <= TODAY_WINDOW_H * HOUR_MS);
   const inputs = items.flatMap((item) => {
     const card = cardOf(item, env);
-    return card ? [rankInputOf(item, card)] : [];
+    return card ? [rankInputOf(item, card, env)] : [];
   });
   const ranked = rankStories({ stories: inputs, now, followed, mode: "today" });
   const chosen = new Set([ranked.hero?.item_id, ...ranked.featured.map((story) => story.item_id)]);

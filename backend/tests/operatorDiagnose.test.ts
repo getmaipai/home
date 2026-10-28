@@ -180,3 +180,20 @@ describe("cache probe", () => {
     expect((await call("GET", "/api/operator/diagnose/cache-probe", secret)).status).toBe(404);
   });
 });
+
+describe("news", () => {
+  test("reports News counters and the picture cache as fixed names and numbers only", async () => {
+    const { bumpNewsCounter, __resetNewsCountersForTests } = await import("@/lib/news/newsCounters");
+    __resetNewsCountersForTests();
+    bumpNewsCounter("picture_failed", 2);
+    const res = await call("GET", "/api/operator/diagnose/news", diagnoseKey().secret);
+    expect(res.status).toBe(200);
+    const body = await res.json() as { pictures_on: boolean; pictures_cached: number; counters: Record<string, number> };
+    expect(body.counters.picture_failed).toBe(2);
+    expect(body.counters.enrichment_none).toBe(0);
+    expect(typeof body.pictures_on).toBe("boolean");
+    expect(typeof body.pictures_cached).toBe("number");
+    for (const value of Object.values(body.counters)) expect(typeof value).toBe("number");
+    expect((await call("GET", "/api/operator/diagnose/news", null)).status).toBe(401);
+  });
+});
