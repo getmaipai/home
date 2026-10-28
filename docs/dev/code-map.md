@@ -810,7 +810,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/turnMachine/warmup.ts` | turnWarmupPrompt |
 | `backend/src/lib/turnShared.ts` | validateTurnInput, judgeStatusAtInsert, deriveCrisisResources, identityLine, PRIVACY_SENTENCE, PHOTO_IDENTITY_SENTENCE |
 | `backend/src/lib/turnSignal.ts` | EVERYDAY_IMPERATIVES, COMMAND_CONFIDENCE, fallbackSignal, classifyTurnSignal, freezeDirective, asBackchannelOnLiveSubject |
-| `backend/src/lib/turnStats.ts` | buildTurnStats |
+| `backend/src/lib/turnStats.ts` | firstTokenFromGenerations, buildTurnStats |
 | `backend/src/lib/uiFixtureBlocks.ts` | SHOWCASE_BLOCKS |
 | `backend/src/lib/uiFixtures.ts` | fixtureListing, DEFAULT_PACE, remaining, UI_FIXTURES, findFixture |
 | `backend/src/lib/unknownNames.ts` | pronounFamiliesIn, relationFramesIn, properNounsIn, resolveNames, framedName, looksLikeWhoAnswer |
