@@ -42,6 +42,7 @@ import { householdHomeCountryName, householdHomePlaceName, householdHomeSkyInput
 import { PACKAGES_DIR, statMtimeMs, isValidPackageId } from "@/lib/paths";
 import { resolvePackageDir, listInstalledPackageIds } from "@/lib/packageResolve";
 import { promptNow, seededOutcomeFor } from "@/lib/benchSampling";
+import { moonTile } from "@/lib/weatherMoon";
 import { ROLE_LADDER, type Role } from "@/middleware/auth";
 import type { PersonRow } from "@/types";
 
@@ -675,8 +676,12 @@ export async function runPlugin(
       ? summaryFor({ place: placeName, unit: weatherData?.unit === "celsius" ? "celsius" : "fahrenheit", temp: typeof weatherData?.temperature === "number" ? weatherData.temperature : undefined, condition: typeof weatherData?.conditions === "string" ? weatherData.conditions : undefined, high: typeof weatherData?.high === "number" ? weatherData.high : undefined, low: typeof weatherData?.low === "number" ? weatherData.low : undefined, advice })
       : adviceLine(advice);
     if (advice.length > 0) answer.data = { ...(answer.data ?? {}), advice, advice_line: adviceLine(advice), summary };
+    // WEATHER-PORT-04: the Weather page's moon tile comes from the almanac-moon app's own answer (one run per day).
+    const moon = id === "weather"
+      ? await moonTile(async () => { const run = await runPlugin("almanac-moon", actor, {}, undefined, { band: options.band }); return run.ok ? run.value.data as { phase?: unknown; illumination?: unknown } | undefined : undefined; })
+      : undefined;
     const appDetails = id === "weather"
-      ? { ...Object.fromEntries(Object.entries(value.data ?? {}).filter(([key]) => key.startsWith("block_detail_")).map(([key, item]) => [key.slice("block_detail_".length), item])), ...(advice.length > 0 ? { advice: adviceChips(advice), summary } : {}) }
+      ? { ...Object.fromEntries(Object.entries(value.data ?? {}).filter(([key]) => key.startsWith("block_detail_")).map(([key, item]) => [key.slice("block_detail_".length), item])), ...(advice.length > 0 ? { advice: adviceChips(advice), summary } : {}), ...(moon ? { moon } : {}) }
       : undefined;
     return { ok: true, value: blocks.length > 0 ? ({ ...answer, blocks, ...(appDetails ? { appDetails } : {}) } as PluginResult) : answer };
   } catch (err) {

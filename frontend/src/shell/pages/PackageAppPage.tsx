@@ -76,6 +76,7 @@ function weatherLocation(place: { id: string; label: string; geo?: { lat?: numbe
     wind: number(details, "wind_speed") !== undefined ? { speed: number(details, "wind_speed")!, direction: number(details, "wind_direction") ?? 0 } : undefined,
     pressure: number(details, "pressure"), visibility: number(details, "visibility") === undefined ? undefined : number(details, "visibility")! / 1000,
     sunrise: string(details, "sunrise") ? clock(string(details, "sunrise")!) : undefined, sunset: string(details, "sunset") ? clock(string(details, "sunset")!) : undefined, uvIndex: number(details, "uv_index"),
+    moon: details.moon && typeof details.moon === "object" && typeof (details.moon as Record<string, unknown>).phase === "string" && typeof (details.moon as Record<string, unknown>).illumination === "number" ? { phase: (details.moon as { phase: string }).phase, illumination: (details.moon as { illumination: number }).illumination } : undefined,
   } : undefined, localTime: string(details, "timezone") ? new Intl.DateTimeFormat(undefined, { hour: "numeric", minute: "2-digit", timeZone: string(details, "timezone") }).format(new Date()) : undefined };
 }
 
