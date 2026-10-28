@@ -16,7 +16,10 @@ import {
   warmPackage,
   __resetWarmStateForTests,
   __resetPackageCachesForTests,
+  runPlugin,
 } from "@/lib/plugins";
+import { __setSeededOutcomesForBench } from "@/lib/benchSampling";
+import { people } from "@/db/schema";
 import { getProjectType, __resetProjectTypesForTests } from "@/lib/projects/projectTypes";
 import { installedPackageVersionDir, PACKAGES_DIR } from "@/lib/paths";
 import { db } from "@/db";
@@ -1294,5 +1297,29 @@ describe("PROJECT-PACK-01: the real bundled bedtime-storybook package", () => {
     const steps = plan.steps as unknown as { id: string; params: { promptTemplate?: string } }[];
     const outline = steps.find((s) => s.id === "outline");
     expect(outline?.params.promptTemplate).toContain("9-year-old");
+  });
+});
+
+describe("NAT-01 bench seam: runPlugin and seeded outcomes", () => {
+  afterEach(() => __setSeededOutcomesForBench(null));
+
+  async function actor() {
+    await new TestClient().post("/api/auth/setup", { displayName: "Sage", secret: "correcthorse" });
+    return db.select().from(people).where(eq(people.displayName, "Sage")).get()!;
+  }
+
+  test("default path: with nothing seeded, a package runs as before (argument validation still refuses)", async () => {
+    const sage = await actor();
+    const result = await runPlugin("math", sage, {});
+    expect(result).toMatchObject({ ok: false, status: 400, code: "bad_arguments" });
+  });
+
+  test("override: a seeded package answers with the seeded typed result, other packages are untouched", async () => {
+    const sage = await actor();
+    const seeded = { reply: { text: "70% chance of rain this afternoon." }, actions: [], data: { precipitation_probability: 70 } };
+    __setSeededOutcomesForBench({ weather: seeded });
+    const result = await runPlugin("weather", sage, { place: "Springfield" });
+    expect(result).toEqual({ ok: true, value: seeded });
+    expect(await runPlugin("math", sage, {})).toMatchObject({ ok: false, status: 400 });
   });
 });

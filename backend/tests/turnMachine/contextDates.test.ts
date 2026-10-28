@@ -11,6 +11,7 @@ import { withTurnDefaults } from "./turnStateDefaults";
 import { useDefaultScriptedStack } from "../stackFixture";
 import { setHouseholdSettingValue } from "@/lib/settings";
 import { CATALOG } from "@/lib/modelCatalog";
+import { __setPromptClockForBench } from "@/lib/benchSampling";
 import { registerSidecar, __resetSidecarsForTests } from "@/lib/sidecars";
 import { KIWIX_SIDECAR_ID } from "@/lib/kiwixSidecar";
 import { __resetReferenceReaderCachesForTests } from "@/lib/retrieval/referenceReader";
@@ -118,5 +119,23 @@ describe("KS-02E: the prefix's three date lines", () => {
   test("IMG-REPLY-LEAK-01: the date line says it is reference only, not to be stated unasked", () => {
     const text = datesText({ now: new Date("2026-10-10T12:00:00Z"), locale: "en-US", modelCutoff: null, librarySnapshot: null });
     expect(text).toContain("The date and time are for your reference only: do not state them unless the person asks.");
+  });
+});
+
+describe("NAT-01 bench seam: the model-visible clock follows the pinned prompt clock", () => {
+  afterEach(() => __setPromptClockForBench(null));
+
+  test("default path: unpinned, the line reads the real current time", async () => {
+    const before = Date.now();
+    const text = await clockText();
+    const expected = (ms: number) => new Date(ms).toLocaleString("en-US", { dateStyle: "full", timeStyle: "short" });
+    // Same text the unseamed code made: "Today is <full date, short time>." from the live clock.
+    expect([expected(before), expected(Date.now())].some((day) => text.startsWith(`Today is ${day}.`))).toBe(true);
+  });
+
+  test("override: a pinned instant is the one the line states", async () => {
+    __setPromptClockForBench(() => new Date(2026, 9, 28, 14, 30, 0));
+    const text = await clockText();
+    expect(text).toMatch(/^Today is Wednesday, October 28, 2026 at 2:30\sPM\./);
   });
 });

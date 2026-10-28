@@ -23,7 +23,13 @@ export interface RegisterRow {
   clocks?: string[];
   /** Household memory lines seeded before the conversation (the evidence the turn recalls). */
   seed?: string[];
-  /** A recorded search result the lookup returns (news rows); delivery depends on the model choosing to search. */
+  /**
+   * The typed outcome a package returns (NAT-01 seam: seeded by package id and
+   * the tool call is scripted, so the model composes from it every run). The
+   * hedge and price rows use this.
+   */
+  outcome?: { package: string; args: Record<string, unknown>; result: { reply: { text: string }; actions: { kind: string; payload?: unknown }[]; data?: Record<string, unknown> } };
+  /** A recorded search result the lookup returns (news rows); the bench scripts the search call, so delivery no longer depends on the model choosing it. */
   search?: { prompt: string; title: string; content: string; as_of: string };
   /** The re-ask rows run on the spoken surface only. */
   surface?: "chat" | "robot";
@@ -76,4 +82,15 @@ export function checkEvidence(evidence: RowEvidence, received: string | null): E
   // The spoken form only counts when the seeded value itself reached the model; generic prompt words must not match.
   const shaped = evidence.shaped === undefined ? null : rawFound > 0 && new RegExp(evidence.shaped, "i").test(received ?? "");
   return { rawFound, rawTotal: evidence.raw.length, shaped };
+}
+
+/**
+ * Everything the model really received for a turn: each request's system
+ * messages and tool-result messages, with the person's own words cut out so a
+ * value only the utterance holds cannot count as delivered. Null when the
+ * turn made no model call.
+ */
+export function receivedByModel(requests: readonly { contextText: string; toolText?: string }[]): string | null {
+  if (requests.length === 0) return null;
+  return requests.map((r) => [r.contextText.split("The person's words:")[0]!, r.toolText ?? ""].filter(Boolean).join("\n")).join("\n");
 }

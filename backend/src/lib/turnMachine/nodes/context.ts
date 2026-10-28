@@ -30,6 +30,7 @@ import type { SubjectRef } from "@/lib/unknownNames";
 import { getHouseholdSettingValue } from "@/lib/settings";
 import { evaluateSafety } from "@/lib/safety";
 import { speakerAgeBand } from "@/lib/ageBand";
+import { promptNow } from "@/lib/benchSampling";
 import { MAX_MEMORY_SNIPPETS } from "@/lib/turnShared";
 import { recallEpisodes, formatEpisodesForPrompt, episodeQueryEligible, asksWhatHubSaid, earliestDroppedTurn, contentTerms, PROMPT_BLOCK_MAX_LINES, EARLIER_HEADER, ASKS_ABOUT_START_RE, type EpisodeMatch } from "@/lib/episodes";
 import { isBareSocialTurn } from "@/lib/guards";
@@ -397,7 +398,8 @@ export const contextNode: Node<ContextInput, ContextOutput> = async (state, inpu
   // The clock: always real, never a memory - the almanac's own
   // "computed, not recalled" rule (RULES-AND-LEARNED-COMPONENTS.md).
   const locale = (getHouseholdSettingValue("household.locale") as string | undefined) ?? "en-US";
-  const now = new Date();
+  // promptNow() is new Date() unless a bench pinned the prompt clock (benchSampling.ts).
+  const now = promptNow();
   // KS-02E: three dated facts and one guidance sentence (KNOWLEDGE-SEARCH-
   // DESIGN 3.2), data only: no answer-length text, no voice text. The cutoff
   // and the snapshot print nothing when unknown. Replaces the one sentence

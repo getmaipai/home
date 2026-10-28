@@ -4,14 +4,18 @@ import {
   __setSamplingSeedForBench,
   promptNow,
   __setPromptClockForBench,
+  seededOutcomeFor,
+  __setSeededOutcomesForBench,
 } from "@/lib/benchSampling";
 
 beforeEach(() => {
+  __setSeededOutcomesForBench(null);
   __setSamplingSeedForBench(null);
   __setPromptClockForBench(null);
 });
 
 afterEach(() => {
+  __setSeededOutcomesForBench(null);
   __setSamplingSeedForBench(null);
   __setPromptClockForBench(null);
 });
@@ -61,5 +65,20 @@ describe("promptNow", () => {
     __setPromptClockForBench(null);
     const d = promptNow();
     expect(Math.abs(d.getTime() - Date.now())).toBeLessThan(1000);
+  });
+});
+
+describe("seeded outcomes (NAT-01 bench seam)", () => {
+  test("default: nothing is seeded for any package", () => {
+    expect(seededOutcomeFor("weather")).toBeNull();
+  });
+
+  test("override: the seeded result is returned for its package only, and clears", () => {
+    const result = { reply: { text: "70% chance of rain this afternoon." }, actions: [] };
+    __setSeededOutcomesForBench({ weather: result });
+    expect(seededOutcomeFor("weather")).toBe(result);
+    expect(seededOutcomeFor("websearch")).toBeNull();
+    __setSeededOutcomesForBench(null);
+    expect(seededOutcomeFor("weather")).toBeNull();
   });
 });

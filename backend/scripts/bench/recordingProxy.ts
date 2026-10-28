@@ -8,6 +8,8 @@
 
 export interface RecordedRequest {
   contextText: string;
+  /** The tool-result messages of a composition, joined: the outcome the model composes from. Empty on an ordinary request. */
+  toolText: string;
   tools: string[];
   messages: number;
   /** The model's own raw text for this request (the SSE deltas'
@@ -59,6 +61,11 @@ export interface RecordingProxy {
    * through the reply boundary like any model reply (the read, the
    * forced lookup, the guards), never a reply pasted past it. */
   scriptNextReply(text: string): void;
+  /** NAT-01: the next ordinary completion proposes this one tool call (the
+   * engine's own wire shape), so a row that needs a package's outcome does
+   * not depend on the model choosing the tool. The composition that follows
+   * the tool result still goes to the real engine. */
+  scriptNextToolCall(name: string, args: Record<string, unknown>): void;
   reset(): void;
   /** Resolves once every teed reply has been read to its end. */
   settled(): Promise<void>;
@@ -151,6 +158,7 @@ export function startRecordingProxy(upstream: string): RecordingProxy {
   const requests: RecordedRequest[] = [];
   const pending = new Set<Promise<void>>();
   let scripted: string | null = null;
+  let scriptedCall: { name: string; args: Record<string, unknown> } | null = null;
   const base = upstream.replace(/\/$/, "");
   // The Stack intentionally exposes /healthz and role names, while the
   // Home bench clients expect llama-server's /health and model names.
@@ -201,6 +209,7 @@ export function startRecordingProxy(upstream: string): RecordingProxy {
               ...(parsed.messages ?? []).filter((m) => m.role === "system").map((m) => m.content),
               (parsed.messages ?? []).filter((m) => m.role === "user").at(-1)?.content,
             ].filter((content): content is string => typeof content === "string").join("\n"),
+            toolText: (parsed.messages ?? []).filter((m) => m.role === "tool" && typeof m.content === "string").map((m) => m.content).join("\n"),
             tools: (parsed.tools ?? []).map((t) => t.function?.name ?? "?"),
             messages: parsed.messages?.length ?? 0,
             responseText: "",
@@ -228,6 +237,30 @@ export function startRecordingProxy(upstream: string): RecordingProxy {
       // CHAT-16: a composition (tool-result messages before its last
       // user-role instruction) is never the seeded draft's request.
       const isTurn = (parsedBody?.messages ?? []).length > 0 && parsedBody!.messages![parsedBody!.messages!.length - 1]!.role === "user" && !parsedBody!.messages!.some((m) => m.role === "tool");
+      if (recorded && scriptedCall !== null && parsedBody && parsedBody.tool_choice !== "required" && isTurn) {
+        const call = scriptedCall;
+        scriptedCall = null;
+        recorded.completed = true;
+        recorded.hasToolCalls = true;
+        recorded.toolCalls.push({ index: 0, name: call.name, arguments: JSON.stringify(call.args) });
+        const id = `seed-${Date.now()}`;
+        const model = parsedBody.model ?? "seed";
+        const toolCall = { index: 0, id: "call_seeded_0", type: "function", function: { name: call.name, arguments: JSON.stringify(call.args) } };
+        if (parsedBody.stream) {
+          const encoder = new TextEncoder();
+          const line = (choice: unknown) => encoder.encode(`data: ${JSON.stringify({ id, model, choices: [choice] })}\n\n`);
+          const stream = new ReadableStream<Uint8Array>({
+            start(controller) {
+              controller.enqueue(line({ index: 0, delta: { role: "assistant", tool_calls: [toolCall] }, finish_reason: null }));
+              controller.enqueue(line({ index: 0, delta: {}, finish_reason: "tool_calls" }));
+              controller.enqueue(encoder.encode("data: [DONE]\n\n"));
+              controller.close();
+            },
+          });
+          return new Response(stream, { headers: { "content-type": "text/event-stream" } });
+        }
+        return Response.json({ id, model, choices: [{ index: 0, message: { role: "assistant", content: null, tool_calls: [{ id: toolCall.id, type: "function", function: toolCall.function }] }, finish_reason: "tool_calls" }], usage: { prompt_tokens: 0, completion_tokens: 0, total_tokens: 0 } });
+      }
       if (recorded && scripted !== null && parsedBody && parsedBody.tool_choice !== "required" && isTurn) {
         const text = scripted;
         scripted = null;
@@ -339,7 +372,13 @@ export function startRecordingProxy(upstream: string): RecordingProxy {
     scriptNextReply: (text) => {
       scripted = text;
     },
-    reset: () => void requests.splice(0),
+    scriptNextToolCall: (name, args) => {
+      scriptedCall = { name, args };
+    },
+    reset: () => {
+      requests.splice(0);
+      scriptedCall = null; // an unconsumed scripted call (a turn answered without the model) must not leak into the next turn
+    },
     settled: async () => void (await Promise.race([Promise.all([...pending]), new Promise<void>((resolve) => setTimeout(resolve, 5_000))])),
     stop: () => server.stop(true),
   };

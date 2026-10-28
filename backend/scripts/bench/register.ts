@@ -5,21 +5,25 @@
 // way a turn really gets it, scored by regex (registerScore.ts). Design:
 // docs/design/natural-speech-register-2026-10-27.md section 3.2.
 //
-// How evidence reaches the model, per mechanic (no backend/src change):
-//   clock, date, reask  the pinned prompt clock. Only the almanac packages
-//                       read it, and they answer with no model call; the
-//                       "[clock]" line the model sees uses real time and
-//                       cannot be pinned without editing backend/src.
-//   hedge, evidential,
-//   price, opinion      a household memory record the turn recalls. Recall
-//                       needs a real embedder; under the stub it returns
-//                       nothing, so these rows report "raw 0/N in context".
-//                       A tool OUTCOME with certainty/say fields (the real
-//                       source of hedge and price shaping) cannot be
-//                       seeded without editing backend/src.
-//   news                a recorded search result behind search.searxng_url;
-//                       the model must choose to search, so delivery is
-//                       reported per row
+// How evidence reaches the model, per mechanic (two test-only seams in
+// backend/src/lib/benchSampling.ts, inert unless this bench sets them):
+//   clock, date, reask  the pinned prompt clock (__setPromptClockForBench).
+//                       It sets both the almanac packages' clock and the
+//                       "Today is ..." line the model sees (context.ts).
+//   hedge, price        a typed package outcome (__setSeededOutcomesForBench,
+//                       read by runPlugin). The bench also scripts the tool
+//                       call through the recording proxy, so the model
+//                       composes from the outcome every run, never by its
+//                       own choice of tool. Hedge rows seed weather; price
+//                       rows seed websearch (a lookup that returns a price).
+//   news                the same scripted websearch call against a recorded
+//                       search result behind search.searxng_url.
+//   clock-with-bus,
+//   evidential, opinion an ordinary household memory record the turn recalls
+//                       (not a pinned profile line, which never surfaces as
+//                       a recalled record). Recall needs an embedder that
+//                       tells texts apart; a constant-vector stub returns
+//                       nothing and those rows report "raw 0/N in context".
 // Each row also asserts what the model actually received (the recording
 // proxy keeps the system messages and last user message): "raw" counts the
 // seeded values present as the tools hand them over today; "shaped" asks
@@ -36,7 +40,7 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { startRecordingProxy } from "./recordingProxy";
 import { sanitizeEngineUrl } from "@/lib/engineIdentity";
-import { MECHANICS, checkEvidence, scoreHedgePair, scoreRegisterReply, type Mechanic, type RegisterRow, type Verdict } from "./registerScore";
+import { MECHANICS, checkEvidence, receivedByModel, scoreHedgePair, scoreRegisterReply, type Mechanic, type RegisterRow, type Verdict } from "./registerScore";
 
 const upstream = process.env.MAIPAI_LLAMA_SERVER_URL;
 if (!upstream) {
@@ -51,7 +55,7 @@ const runner = await import("./conversationRunner");
 const { startFixtureSearch } = await import("./fixtureSearch");
 const { setHouseholdSettingValue } = await import("@/lib/settings");
 const { getEngineStatus } = await import("@/lib/llmSupervisor");
-const { __setPromptClockForBench } = await import("@/lib/benchSampling");
+const { __setPromptClockForBench, __setSeededOutcomesForBench } = await import("@/lib/benchSampling");
 
 const corpus = JSON.parse(readFileSync(join(import.meta.dir, "datasets", "register-corpus.json"), "utf8")) as RegisterRow[];
 
@@ -91,7 +95,7 @@ async function main(): Promise<number> {
         id: `register-${row.id}`,
         category: "knowledge",
         surface: row.surface ?? "chat",
-        seedRecords: (row.seed ?? []).map((text) => ({ text, category: "fact", scope: "household" as const, asProfile: true })),
+        seedRecords: (row.seed ?? []).map((text) => ({ text, category: "fact", scope: "household" as const })),
         turns: row.utterances.map((say) => ({ say, expect: {} })),
       }, {
         people, proxy, log,
@@ -101,6 +105,13 @@ async function main(): Promise<number> {
         beforeTurn: async () => {
           const clock = clocks[Math.min(turnNo, clocks.length - 1)];
           __setPromptClockForBench(clock ? () => new Date(clock) : null);
+          // The scripted call: a typed outcome row proposes its package, a news row its search.
+          if (row.outcome) {
+            __setSeededOutcomesForBench({ [row.outcome.package]: row.outcome.result });
+            proxy.scriptNextToolCall(row.outcome.package, row.outcome.args);
+          } else if (row.search) {
+            proxy.scriptNextToolCall("websearch", { expression: row.search.prompt });
+          }
           turnNo++;
         },
       }).catch((err: Error) => {
@@ -108,6 +119,7 @@ async function main(): Promise<number> {
         return { scores: [], turnIds: [] as string[] };
       });
       __setPromptClockForBench(null);
+      __setSeededOutcomesForBench(null);
       executed += run.scores.length;
       const first = run.scores[0]?.observed.reply;
       const last = run.scores[run.scores.length - 1]?.observed;
@@ -121,15 +133,20 @@ async function main(): Promise<number> {
       // cut out first so a seeded value that only the utterance contains
       // cannot count as delivered.
       const plugin = (last as { pluginId?: string | null } | undefined)?.pluginId ?? null;
-      const received = last?.contextMessage ? last.contextMessage.split("The person's words:")[0]! : null;
-      const ev = checkEvidence(row.evidence, plugin ? reply : received);
+      const received = receivedByModel(proxy.requests);
+      const toolRan = proxy.requests.some((r) => r.toolText !== "");
+      // A tool-outcome row is judged on the tool message itself: the system text has its own
+      // hedge words, and a shaped form that only the prompt carries must not count.
+      const toolMessages = proxy.requests.map((r) => r.toolText).filter(Boolean).join("\n");
+      const ev = checkEvidence(row.evidence, plugin && proxy.requests.length === 0 ? reply : row.outcome || row.search ? toolMessages || null : received);
       const searched = row.search ? search.queries.slice(queriesBefore).some((q) => q.rows > 0 && q.fixtureId === row.id) : null;
       t.rawRows++;
       if (searched === true || (searched === null && ev.rawFound === ev.rawTotal)) t.rawOk++;
       if (searched === true) t.delivered++;
       if (ev.shaped !== null) { t.shapedRows++; if (ev.shaped) t.shapedYes++; }
       let delivery: string;
-      if (searched !== null) delivery = `lookup ${searched ? "returned the recorded result" : "not run (the model did not search)"}`;
+      if (searched !== null) delivery = `lookup ${searched ? "returned the recorded result" : "not run"}; raw ${ev.rawFound}/${ev.rawTotal} in what the model received`;
+      else if (row.outcome) delivery = `${row.outcome.package} outcome ${toolRan ? "reached the model" : "not delivered (no tool message)"}; raw ${ev.rawFound}/${ev.rawTotal} in what the model received`;
       else if (plugin) delivery = `answered by package ${plugin}, no model call; raw ${ev.rawFound}/${ev.rawTotal} in its reply`;
       else if (received === null) delivery = "no model call, nothing received";
       else delivery = `raw ${ev.rawFound}/${ev.rawTotal} in context`;
@@ -154,7 +171,7 @@ async function main(): Promise<number> {
     console.log(`${mechanic.padEnd(12)} ${String(rows).padStart(4)}  ${String(t.pass).padStart(4)}  ${String(t.fail).padStart(4)}  ${String(t.ambiguous).padStart(9)}  ${`${t.rawOk}/${t.rawRows}`.padStart(15)}  ${`${t.shapedYes}/${t.shapedRows}`.padStart(10)}`);
   }
   console.log("(hedge also counts the 30%-versus-90% pair as one extra scored check)");
-  console.log("Known limits (need backend/src seams, not bench changes): the model-visible [clock] line uses real time; tool outcomes with certainty or say cannot be seeded; news rows depend on the model choosing to search; seeded memory may not surface under the stub embedder. A baseline needs a real engine.");
+  console.log("Memory rows (clock-with-bus, evidential, opinion) need an embedder that separates texts. A baseline needs a real engine.");
   runner.cleanupBenchPeople(people);
   return executed;
 }

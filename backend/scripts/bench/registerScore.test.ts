@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { MECHANICS, checkEvidence, scoreHedgePair, scoreRegisterReply, type RegisterRow } from "./registerScore";
+import { MECHANICS, checkEvidence, receivedByModel, scoreHedgePair, scoreRegisterReply, type RegisterRow } from "./registerScore";
 
 const rows = JSON.parse(readFileSync(join(import.meta.dir, "datasets", "register-corpus.json"), "utf8")) as RegisterRow[];
 
@@ -60,5 +60,17 @@ describe("scoring edges", () => {
   test("checkEvidence counts raw values present and ignores case", () => {
     expect(checkEvidence({ raw: ["4:10 PM", "70%"] }, "x 4:10 pm y").rawFound).toBe(1);
     expect(checkEvidence({ raw: ["a"] }, null).rawFound).toBe(0);
+  });
+});
+
+describe("receivedByModel", () => {
+  test("no request means nothing received", () => {
+    expect(receivedByModel([])).toBeNull();
+  });
+  test("keeps the system text and the tool outcome, drops the person's words", () => {
+    const text = receivedByModel([{ contextText: "Today is Wednesday, 2:30 PM.\nThe person's words:\nIs it going to rain?", toolText: "70% chance of rain" }])!;
+    expect(text).toContain("2:30 PM");
+    expect(text).toContain("70% chance of rain");
+    expect(text).not.toContain("going to rain");
   });
 });

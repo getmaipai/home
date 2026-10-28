@@ -8,6 +8,7 @@
 // (the judge) on every request.
 import { CATALOG } from "@/lib/modelCatalog";
 import { chatSamplingOf } from "@/lib/llmSampling";
+import type { PluginResult } from "@maipai/spec/interpreters/ts/recipe-interpreter.js";
 
 /** Bench-only: the sampling the first shipped chat record sends, for arms
  * that state production's set explicitly. The app reads each model's own
@@ -43,4 +44,22 @@ export function promptNow(): Date {
  * local-time line reads. */
 export function __setPromptClockForBench(now: (() => Date) | null): void {
   pinnedNow = now;
+}
+
+// NAT-01 bench seam: the typed outcome a package returns, seeded by package
+// id. runPlugin() (the one runner every tool call goes through) answers a
+// package with its seeded result instead of running it, so the tool message
+// the model composes from is the typed outcome the row names. Process-level
+// and null by default, like the clock and seed above: the app never sets it,
+// so a real turn runs the package exactly as before.
+let seededOutcomes: Readonly<Record<string, PluginResult>> | null = null;
+
+/** The seeded result for a package id, or null (always null outside a bench). */
+export function seededOutcomeFor(packageId: string): PluginResult | null {
+  return seededOutcomes?.[packageId] ?? null;
+}
+
+/** Bench-only: seed (or with `null` clear) package results by package id. */
+export function __setSeededOutcomesForBench(outcomes: Readonly<Record<string, PluginResult>> | null): void {
+  seededOutcomes = outcomes;
 }

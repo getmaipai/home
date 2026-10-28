@@ -41,7 +41,7 @@ import { listActivePeople } from "@/lib/access";
 import { householdHomeCountryName, householdHomePlaceName, householdHomeSkyInput } from "@/lib/places";
 import { PACKAGES_DIR, statMtimeMs, isValidPackageId } from "@/lib/paths";
 import { resolvePackageDir, listInstalledPackageIds } from "@/lib/packageResolve";
-import { promptNow } from "@/lib/benchSampling";
+import { promptNow, seededOutcomeFor } from "@/lib/benchSampling";
 import { ROLE_LADDER, type Role } from "@/middleware/auth";
 import type { PersonRow } from "@/types";
 
@@ -574,6 +574,9 @@ export async function runPlugin(
   }
   const argsError = validateArgs(id, manifest, inputs);
   if (argsError) return { ok: false, status: 400, error: `${id}'s inputs failed validation: ${argsError}`, code: "bad_arguments" };
+  // NAT-01 bench seam (benchSampling.ts): null outside a bench, so a real call falls through.
+  const seeded = seededOutcomeFor(id);
+  if (seeded) return { ok: true, value: seeded };
   if (id === "weather" && typeof inputs.place !== "string" && options.hostInputs?.latitude === undefined) {
     // No place named and none resolved (no home, no default, no Current location): not a malformed call and not a
     // failure. The model gets the plain fact and words the ask itself (a city, or the Home location setting).
