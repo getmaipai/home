@@ -52,6 +52,11 @@ describe("ambient ring and wake preview", () => {
   });
 });
 
+test("the header avatar shows the idle ring when no state is active", () => {
+  const view = render(<CompanionAvatar name="Companion" clips={clips} size="xs" animated={false} ring={effectiveAmbientRing(null, null, null) ?? "idle"} />);
+  expect(view.getByRole("img", { name: "Companion, idle" }).getAttribute("data-ring")).toBe("idle");
+});
+
 describe("chatAmbientRing", () => {
   const idle = { listening: false, speaking: false, thinking: false, responding: false, forAmbientCompanion: true };
   test("thinking, then responding while text streams, then nothing", () => {

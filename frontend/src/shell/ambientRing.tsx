@@ -1,6 +1,6 @@
 import { createContext, useContext, useEffect, useState, type Dispatch, type ReactNode, type SetStateAction } from "react";
 
-export type AmbientRing = "listening" | "thinking" | "speaking" | null;
+export type AmbientRing = "idle" | "listening" | "thinking" | "speaking" | null;
 export type AmbientWakeIndicator = { listening: string; onTurnOff: () => void } | null;
 export function ambientRingFromWake(indicator: Pick<NonNullable<AmbientWakeIndicator>, "listening"> | null): AmbientRing {
   return indicator ? "listening" : null;
