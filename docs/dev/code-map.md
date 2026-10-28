@@ -488,7 +488,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/media/parsers/text.ts` | decodeEntities, plainText, stripExtension, extensionOf, spaced, naturalCompare |
 | `backend/src/lib/media/parsers/tv.ts` | seasonFolderNumber, parseTvName, findFolderArt, isImageName |
 | `backend/src/lib/media/parsers/zip.ts` | openZip |
-| `backend/src/lib/media/podcastApp.ts` | showRulesLine |
+| `backend/src/lib/media/podcastApp.ts` | showRulesLine, podcastSnipLabel, podcastSnipRowsForRoute |
 | `backend/src/lib/media/podcastDirectory.ts` | __resetDirectoryForTests, directoryAllowed, searchDirectory, topShows, smallArt, artProxyAddress |
 | `backend/src/lib/media/podcastFilters.ts` | MAX_FILTERS, parseRules, matchesRules, evaluateFilter, filterSummary, draftRows |
 | `backend/src/lib/media/podcastStats.ts` | aggregatePodcastStats, podcastStats, podcastStatsRows |
