@@ -41,7 +41,7 @@ export interface ContextItem {
    * contextQuoteGrounded excludes it, and messages.ts never re-prints
    * it into the prompt's context block, since it is already the final
    * user message contextToMessages() appends). */
-  source: "window" | "memory" | "episode" | "profile" | "clock" | "roster" | "subjects" | "tool_result" | "search_result" | "document" | "notification" | "quoted" | "utterance" | "attachment" | "project" | "camera" | "interrupted";
+  source: "window" | "memory" | "episode" | "profile" | "clock" | "roster" | "subjects" | "tool_result" | "search_result" | "document" | "notification" | "quoted" | "utterance" | "attachment" | "project" | "camera" | "interrupted" | "page";
   /** Entity ids the item mentions (household-subject rule, grounding). */
   subjects: string[];
   disclosure: "child_ok" | "teen_ok" | "adult_only";
@@ -247,6 +247,8 @@ export interface TurnState {
   failedGenerationReply?: boolean;
   /** The filtered list; the only prompt input. */
   context: ContextItem[];
+  /** Raw one-turn page metadata, resolved in nodes/context.ts. */
+  pageContextRaw?: unknown;
   /** Set by the `context` node (ContextOutput.temporary). Not in the
    * design record's own TurnState listing, which otherwise fixes this
    * contract exactly; added because `policy`'s own "temporary mode (no

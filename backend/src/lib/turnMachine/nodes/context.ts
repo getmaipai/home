@@ -49,6 +49,7 @@ import { dropInterruptedReply, mayCarryInterruptedReply, takeInterruptedReply } 
 import { surfaceClassOf } from "@/lib/surfaceClass";
 import { carriesCrisisSignal } from "@/lib/safety";
 import { librarySnapshotDate } from "@/lib/retrieval/referenceReader";
+import { resolvePageContext } from "@/lib/pageContext";
 
 /** MEMORY-FLOOR-01: the floor on recall()'s own composite `score`
  * below which a match never becomes a context item, a pinned record
@@ -170,6 +171,8 @@ export const contextNode: Node<ContextInput, ContextOutput> = async (state, inpu
   // source "utterance" is excluded from grounding checks and messages.ts
   // uses its explicit utterance argument exactly once as the final words.
   items.push({ id: "utterance", text: input.utterance, source: "utterance", subjects: [], disclosure: "child_ok" });
+  const pageContext = resolvePageContext(state.actor, state.pageContextRaw);
+  if (pageContext) items.push(pageContext);
   // UPLOAD-IMG-02: pictures sent with this message. Not for a bare turn
   // (the route refuses pictures there). VISION-02c: when the chat model
   // reads pictures and this person may send them, they go to the model as

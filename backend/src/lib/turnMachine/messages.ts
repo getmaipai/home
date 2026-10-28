@@ -53,6 +53,7 @@ const SOURCE_LABEL: Record<Exclude<ContextItem["source"], "window" | "utterance"
   camera: "the robot's camera look",
   // DUPLEX-06: the part of the last spoken reply the person cut in on before hearing it (lib/interruptedReply.ts).
   interrupted: "the part of your last reply the person did not hear",
+  page: "page",
 };
 
 function renderContextLine(item: ContextItem): string {
@@ -74,6 +75,7 @@ function isToolOrPageContext(item: ContextItem): boolean {
   if (item.source === "tool_result") return true;
   if (item.source === "search_result") return true;
   if (item.source === "document") return true;
+  if (item.source === "page") return true;
   return false;
 }
 

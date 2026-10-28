@@ -79,6 +79,7 @@ export interface RunTurnNextOpts {
   robotName?: string;
   deviceId?: string;
   conversationId?: string;
+  pageContext?: unknown;
   mentionCompanionId?: string;
   tryCompanionId?: string;
   turnId?: string;
@@ -675,6 +676,7 @@ async function beginTurn(actor: PersonRow, surface: Surface, text: string, opts:
     crisis: false,
     engineUnavailable: false,
     context: [],
+    ...(conversation.placement === "side" && surface === "chat" && opts.pageContext !== undefined ? { pageContextRaw: opts.pageContext } : {}),
     messages: [],
     proposals: [],
     outcomes: [],
