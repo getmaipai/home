@@ -678,6 +678,7 @@ since it's a distinct concern added after that cap was already sized).
 `backend/scripts/bench/naturalness.ts` scores a model and prompt against
 the full corpus via regex classification (natural/robotic/ambiguous),
 the same on-demand-bench shape as every other bench in this directory.
+`backend/scripts/bench/register.ts` is the NAT-01 seeded-evidence register probe; run it with `cd backend && bun run scripts/bench/register.ts`.
 Run for real against the same live Qwen3 8B: 1 natural, 0 robotic, 7
 ambiguous of 8 - the one clean pass ("what's on the grocery list" ->
 "You've got milk, eggs, and bread.") is exactly the list-as-sentence
