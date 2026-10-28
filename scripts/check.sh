@@ -420,7 +420,7 @@ export MAIPAI_STANDARDS_DIR="$STANDARDS_DIR"
 # package.json reference these pins by path, so bun install fails
 # without them resolved first, regardless of which scope's tests run.
 if [ "$SCOPE" != "docs" ]; then
-  CORE_TAG="core-v0.1.6"
+  CORE_TAG="core-v0.1.7"
   UI_TAG="ui-v0.5.401"
   SPEC_TAG="spec-v0.1.262"
   SHARED_REPO="${MAIPAI_COMMONS_DIR:-../commons}"
