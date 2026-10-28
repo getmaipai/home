@@ -53,7 +53,7 @@ process.env.MAIPAI_LLAMA_SERVER_URL = proxy.url;
 const { finishBench, startBench } = await import("./setup");
 const runner = await import("./conversationRunner");
 const { startFixtureSearch } = await import("./fixtureSearch");
-const { setHouseholdSettingValue } = await import("@/lib/settings");
+const { getPersonSettingValue, setHouseholdSettingValue, setValue } = await import("@/lib/settings");
 const { getEngineStatus } = await import("@/lib/llmSupervisor");
 const { __setPromptClockForBench, __setSeededOutcomesForBench } = await import("@/lib/benchSampling");
 
@@ -91,6 +91,12 @@ async function main(): Promise<number> {
       let turnNo = 0;
       const clocks = row.clocks ?? [];
       const queriesBefore = search.queries.length;
+      // NAT-08: a companion row runs as that bundled companion, then the person's own choice is put back.
+      const priorCompanion = getPersonSettingValue(people.owner, "persona.active_id");
+      if (row.companion) {
+        const picked = setValue(people.owner, `person:${people.owner.id}`, "persona.active_id", row.companion);
+        if (!picked.ok) throw new Error(`could not set the companion ${row.companion}: ${picked.error}`);
+      }
       const run = await runner.runConversation({
         id: `register-${row.id}`,
         category: "knowledge",
@@ -120,6 +126,7 @@ async function main(): Promise<number> {
       });
       __setPromptClockForBench(null);
       __setSeededOutcomesForBench(null);
+      if (row.companion) setValue(people.owner, `person:${people.owner.id}`, "persona.active_id", priorCompanion ?? "default");
       executed += run.scores.length;
       const first = run.scores[0]?.observed.reply;
       const last = run.scores[run.scores.length - 1]?.observed;

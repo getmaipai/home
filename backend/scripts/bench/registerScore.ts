@@ -1,8 +1,8 @@
 // NAT-01 register bench, pure half: scoring by regex, no engine, no database.
 // Rule 6a: a verdict carries a pattern or rule id, never reply text.
-export type Mechanic = "clock" | "hedge" | "evidential" | "reask" | "price" | "date" | "opinion" | "news";
+export type Mechanic = "clock" | "hedge" | "evidential" | "reask" | "price" | "date" | "opinion" | "news" | "contraction";
 export type Verdict = "pass" | "fail" | "ambiguous";
-export const MECHANICS: readonly Mechanic[] = ["clock", "hedge", "evidential", "reask", "price", "date", "opinion", "news"];
+export const MECHANICS: readonly Mechanic[] = ["clock", "hedge", "evidential", "reask", "price", "date", "opinion", "news", "contraction"];
 
 /** The evidence a row seeds and what the bench expects the model to have been given. */
 export interface RowEvidence {
@@ -31,6 +31,8 @@ export interface RegisterRow {
   outcome?: { package: string; args: Record<string, unknown>; result: { reply: { text: string }; actions: { kind: string; payload?: unknown }[]; data?: Record<string, unknown> } };
   /** A recorded search result the lookup returns (news rows); the bench scripts the search call, so delivery no longer depends on the model choosing it. */
   search?: { prompt: string; title: string; content: string; as_of: string };
+  /** NAT-08: the bundled companion (package id) the bench person uses for this row; absent keeps the person's own. */
+  companion?: string;
   /** The re-ask rows run on the spoken surface only. */
   surface?: "chat" | "robot";
   /** "shorter": the scored (second) reply must be shorter than the first. */

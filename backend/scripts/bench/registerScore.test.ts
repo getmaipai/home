@@ -31,6 +31,7 @@ describe("register scoring", () => {
       date: { robotic: "No, today is Wednesday, October 28, 2026.", natural: "No, it's Wednesday." },
       opinion: { robotic: "No, that movie was bad.", natural: "It was a little slow for me, though." },
       news: { robotic: "City council approves a new park.", natural: "Apparently, city council approved a new park." },
+      contraction: { id: "contraction_casual", robotic: "It is a mix of English and German, and I do not know more.", natural: "It's kind of a mix of English and German, and I don't know more." },
     };
     for (const [mechanic, example] of Object.entries(examples)) {
       const row = rows.find((item) => item.id === (example as { id?: string }).id) ?? rows.find((item) => item.mechanic === mechanic)!;
@@ -42,6 +43,15 @@ describe("register scoring", () => {
     }
     expect(scoreHedgePair("It might rain.", "It will probably rain.").verdict).toBe("pass");
     expect(scoreHedgePair("It might rain.", "It might rain.").verdict).toBe("fail");
+  });
+});
+
+describe("NAT-08 contraction rows", () => {
+  test("the formal companion is scored the other way round", () => {
+    const formal = rows.find((r) => r.id === "contraction_formal")!;
+    expect(formal.companion).toBe("tutor");
+    expect(scoreRegisterReply(formal, "It's a mix of English and German, and I don't know more.").verdict).toBe("fail");
+    expect(scoreRegisterReply(formal, "It is a mix of English and German, and I do not know more.").verdict).toBe("pass");
   });
 });
 

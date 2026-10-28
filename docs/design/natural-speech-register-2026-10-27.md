@@ -346,7 +346,7 @@ slice: a spec change with no measurement behind it yet.
 6. **NAT-06 (S):** `clock_style`, `hedging` and `social` (humor, warmth, initiative) dials, the `wants_advice` signal field,
    Companions app control (kit parts only).
 7. **NAT-07 (M):** warmth over time, its own note.
-8. **NAT-08 (S):** two bench rows for contractions, no new prompt sentence (section 3.10).
+8. **NAT-08 (S):** two bench rows for contractions, no new prompt sentence (section 3.10). Built 2026-10-28: `contraction_casual` (buddy) and `contraction_formal` (tutor), spoken surface, scored in `register.ts`; no real-model run yet.
 9. **NAT-09 (S-M):** the `repeat` sound kind, after SPEECH-STYLE-02 (section 3.10).
 
 Order: 01, then 02 and 03 in parallel (different repos), then 04, 05, 06, 08, then 07 and 09 (09 waits for SPEECH-STYLE-02). After each slice the bench is re-run and the pass
