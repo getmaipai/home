@@ -61,6 +61,14 @@ describe("policy and offer", () => {
     const allowed = await policyNode(stateFor(people.owner, ask, true), call(refOf(storyId)), new AbortController().signal);
     expect(allowed.output.entries[0]?.decision.allow).toBe(true);
   });
+  test("allowed when the model quotes the reference loosely or passes only the id", async () => {
+    const ask = `Read this article and tell me what you think.\n\n${refOf(storyId)}`;
+    for (const given of [`"${refOf(storyId)}"`, `${refOf(storyId)}.`, `<${refOf(storyId)}>`, storyId, ` ${refOf(storyId)} `]) {
+      const result = await policyNode(stateFor(people.owner, ask, true), call(given), new AbortController().signal);
+      expect(result.output.entries[0]?.decision.allow).toBe(true);
+      expect(((result.output.entries[0]?.proposal as unknown as { request: { args: { ref: string } } }).request.args.ref)).toBe(refOf(storyId));
+    }
+  });
   test("offered only when the gate is on", () => {
     const base = resolveTurnBudget("qwen3-8b-instruct-q4-k-m", "adult");
     expect(withTurnToolGates(base, false).tools_offered).not.toContain(READ_ITEM_TOOL_ID);

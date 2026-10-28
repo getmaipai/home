@@ -366,7 +366,11 @@ export const policyNode: Node<PolicyInput, PolicyOutput> = async (state, input) 
     if (call.tool === READ_ITEM_TOOL_ID) {
       const callArgs = (call.args ?? {}) as Record<string, unknown>;
       const itemProposal: ActionProposal = { kind: "read_only", request: { tool: call.tool, args: callArgs, callId: call.id ?? call.tool } };
-      const asked = typeof callArgs.ref === "string" && itemRefsIn(state.utterance).some((item) => item.ref === (callArgs.ref as string).trim());
+      // The model may quote the reference with punctuation around it or pass only the id; both name what the person typed.
+      const given = typeof callArgs.ref === "string" ? callArgs.ref.trim() : "";
+      const typed = itemRefsIn(state.utterance);
+      const asked = given ? (typed.find((item) => item.ref === (itemRefsIn(given)[0]?.ref ?? given)) ?? typed.find((item) => item.id === given.replace(/^["'<(\[\s]+|["'>)\].,;:!?\s]+$/g, ""))) : undefined;
+      if (asked) callArgs.ref = asked.ref;
       if (!state.itemReferenceAllowed || !asked) {
         noteRefusal("item_not_here");
         entries.push({ proposal: itemProposal, decision: { allow: false, reason: "item_not_here" } });
