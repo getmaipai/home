@@ -307,7 +307,7 @@ describe("the picture route", () => {
     expect((await who.adult.get(`/api/plugins/news/images/${grown.id}?w=999`)).status).toBe(400);
     expect((await who.child.get(`/api/plugins/news/images/${grown.id}?w=480`)).status).toBe(404); // not in the child's released set
     expect((await who.adult.get(`/api/plugins/news/images/${kid.id}?w=480`)).status).toBe(404); // the Kids' feed is not an adult list
-    expect((await who.adult.get(`/api/plugins/news/images/${bare.id}?w=480`)).status).toBe(404);
+    expect((await who.adult.get(`/api/plugins/news/images/${bare.id}?w=480`)).status).toBe(200); // no picture of its own: a plain tile, never a 404
     expect((await who.adult.get(`/api/plugins/news/images/news-doesnotexist?w=480`)).status).toBe(404);
     expect(publisher.requests).toEqual(["/no-picture"]);
     const body = await text(await post(who.adult, "data/today"));
@@ -315,14 +315,24 @@ describe("the picture route", () => {
     expect(body).not.toMatch(/"(?:w480|w1280)":"https?:/);
   });
 
+  test("a story whose picture cannot be fetched is answered with a webp tile, never a 404", async () => {
+    installNewsApp();
+    const who = await household();
+    const bare = putItem(feeds.household, ADULT_HOST, { image: null, path: "/no-picture" });
+    const response = await who.adult.get(`/api/plugins/news/images/${bare.id}?w=1280`);
+    expect(response.status).toBe(200);
+    expect(response.headers.get("content-type")).toBe("image/webp");
+    expect((await response.arrayBuffer()).byteLength).toBeGreaterThan(100);
+  });
+
   test("a 429 stops that host: the next picture from it makes no request", async () => {
     installNewsApp();
     const who = await household();
     const first = putItem(feeds.household, ADULT_HOST, { image: `${ADULT_HOST}/limited/a.png` });
     const second = putItem(feeds.household, ADULT_HOST, { image: `${ADULT_HOST}/img/b.png` });
-    expect((await who.adult.get(`/api/plugins/news/images/${first.id}?w=480`)).status).toBe(404);
+    expect((await who.adult.get(`/api/plugins/news/images/${first.id}?w=480`)).status).toBe(200);
     expect(publisher.requests).toHaveLength(1);
-    expect((await who.adult.get(`/api/plugins/news/images/${second.id}?w=480`)).status).toBe(404);
+    expect((await who.adult.get(`/api/plugins/news/images/${second.id}?w=480`)).status).toBe(200);
     expect(publisher.requests).toHaveLength(1);
   });
 
@@ -330,11 +340,11 @@ describe("the picture route", () => {
     installNewsApp();
     const who = await household();
     const text1 = putItem(feeds.household, ADULT_HOST, { image: `${ADULT_HOST}/text/a.png` });
-    expect((await who.adult.get(`/api/plugins/news/images/${text1.id}?w=480`)).status).toBe(404);
+    expect((await who.adult.get(`/api/plugins/news/images/${text1.id}?w=480`)).status).toBe(200);
     const priv = putItem(feeds.household, ADULT_HOST, { image: "http://192.168.1.5/x.png" });
     publisher.requests.length = 0;
     const before = publisher.requests.length;
-    expect((await who.adult.get(`/api/plugins/news/images/${priv.id}?w=480`)).status).toBe(404);
+    expect((await who.adult.get(`/api/plugins/news/images/${priv.id}?w=480`)).status).toBe(200);
     expect(publisher.requests.length).toBe(before + 1); // failed feed image still tries the story's own page
     const ok = putItem(feeds.household, ADULT_HOST);
     setHouseholdSettingValue("news.images", false);
@@ -837,6 +847,23 @@ describe("pictures inside the article (NEWS-ARTICLE-FIGURES-01)", () => {
     expect(figures.map((figure) => figure.src)).toEqual([`/api/plugins/news/images/${wire.id}/figure/0?w=1280`, `/api/plugins/news/images/${wire.id}/figure/1?w=1280`]);
     // The address the page draws is the address that must load (it once lacked the width, so every figure was a broken picture).
     for (const figure of figures) expect((await who.adult.get(String(figure.src))).status).toBe(200);
+  });
+
+  test("a figure the publisher refuses is left out of the article, so no 404 reaches the screen", async () => {
+    publisher.stop();
+    const html = articleHtml().replace("<blockquote>", [
+      `<figure><img src="${ADULT_HOST}/img/real-one.png" alt="The harbor at dawn" width="1200" height="800"><figcaption>The harbor at dawn.</figcaption></figure>`,
+      `<figure><img src="${ADULT_HOST}/text/not-a-picture.png" alt="Blocked one" width="1200" height="800"><figcaption>Blocked.</figcaption></figure>`,
+      "<blockquote>",
+    ].join(""));
+    publisher = await startPublisher({ "/story/page": html });
+    publisher.attach();
+    installNewsApp();
+    const who = await household();
+    const wire = putItem(feeds.household, ADULT_HOST, { path: "/story/page", title: "Harbor plan" });
+    const figures = (await open(who.adult, wire.id)).filter((block) => block.type === "figure");
+    expect(figures.map((figure) => figure.caption)).toEqual(["The harbor at dawn."]);
+    expect(figures[0]!.src).toBe(`/api/plugins/news/images/${wire.id}/figure/0?w=1280`);
   });
 
   test("the publisher's address is in no figure source, and a figure comes through the hub as a cached WebP", async () => {

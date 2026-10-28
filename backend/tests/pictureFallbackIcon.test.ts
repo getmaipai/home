@@ -46,3 +46,21 @@ describe("publisher icon tile", () => {
     } finally { __setFaviconFetchForTests(null); __setFaviconDnsLookupForTests(null); }
   });
 });
+
+describe("the last stand-in and the bigger BBC thumbnail", () => {
+  test("genericPicture is a real webp tile at both card widths", async () => {
+    const { genericPicture } = await import("@/lib/news/pictureFallback");
+    for (const width of [480, 1280] as const) {
+      const tile = await genericPicture(width);
+      const meta = await (await import("sharp")).default(Buffer.from(tile.bytes)).metadata();
+      expect([meta.format, meta.width, meta.height]).toEqual(["webp", width, Math.round((width * 9) / 16)]);
+    }
+  });
+
+  test("a BBC 240 px thumbnail is asked for at 976 px; other addresses are left alone", async () => {
+    const { largerVariantOf } = await import("@/lib/news/pictures");
+    expect(largerVariantOf("https://ichef.bbci.co.uk/ace/standard/240/cpsprodpb/9995/live/a.jpg")).toBe("https://ichef.bbci.co.uk/ace/standard/976/cpsprodpb/9995/live/a.jpg");
+    expect(largerVariantOf("https://ichef.bbci.co.uk/ace/standard/976/cpsprodpb/a.jpg")).toBeNull();
+    expect(largerVariantOf("https://example.com/ace/standard/240/a.jpg")).toBeNull();
+  });
+});

@@ -280,6 +280,12 @@ function ensureShared(item: ShelfItem, band: AgeBand, lane: Lane = "view"): Prom
   return pending;
 }
 
+/** A bigger copy of a feed's thumbnail the publisher serves under the same name, or null. */
+export function largerVariantOf(imageUrl: string): string | null {
+  const match = /^(https:\/\/ichef\.bbci\.co\.uk\/ace\/standard\/)(\d+)(\/.+)$/.exec(imageUrl);
+  return match && Number(match[2]) < 976 ? `${match[1]}976${match[3]}` : null;
+}
+
 /** Fetches, resizes and stores an item's picture if it is not cached yet. True when the cache holds it afterwards. */
 async function ensure(item: ShelfItem, band: AgeBand, lane: Lane): Promise<boolean> {
   const ref = pictureRefOf(item.id);
@@ -287,7 +293,10 @@ async function ensure(item: ShelfItem, band: AgeBand, lane: Lane): Promise<boole
   if (index[ref] && NEWS_PICTURE_WIDTHS.every((width) => existsSync(fileOf(ref, width)))) return true;
   const failureKey = `${item.id}:${band}`;
   if ((failed.get(failureKey) ?? 0) > clock()) return false;
-  const bytes = item.image_url ? await downloadOnce(item.image_url, band, lane) : null;
+  // BBC's feed names a 240 px thumbnail; the same file is served at 976 px, which a full-width card needs.
+  const larger = item.image_url ? largerVariantOf(item.image_url) : null;
+  const bigBytes = larger ? await downloadOnce(larger, band, lane) : null;
+  const bytes = bigBytes ?? (item.image_url ? await downloadOnce(item.image_url, band, lane) : null);
   let sizes = bytes ? await resizeBoth(bytes) : null;
   if (!sizes) {
     const enriched = await enrichItem(item, band);
@@ -335,17 +344,37 @@ async function ensureFigure(itemId: string, n: number, address: string, band: Ag
   return existsSync(fileOf(ref, 480));
 }
 
-/** A figure of an article at one width. `address` comes from the item's own stored article (the route looks it up), never from a
- * request. Null when pictures are off, the host is backed off or the fetch failed. */
-export async function newsFigurePicture(itemId: string, n: number, address: string, width: NewsPictureWidth, band: AgeBand = "adult"): Promise<{ bytes: Uint8Array; etag: string } | null> {
-  if (!newsImagesOn()) return null;
+function ensureFigureShared(itemId: string, n: number, address: string, band: AgeBand): Promise<boolean> {
   const key = `${figureRefOf(itemId, n)}:${band}`;
   let pending = inFlight.get(key);
   if (!pending) {
     pending = ensureFigure(itemId, n, address, band).finally(() => inFlight.delete(key));
     inFlight.set(key, pending);
   }
-  if (!(await pending)) return null;
+  return pending;
+}
+
+/** The numbers of an article's pictures that could not be fetched (the host refused, backed off or sent a non-picture), so the article
+ * leaves them out instead of showing a broken image and a 404 in the console. A picture still downloading when `waitMs` ends is not
+ * counted as failed: it is kept and arrives from the cache. */
+export async function failedFigureNumbers(itemId: string, figures: Array<{ n: number; address: string }>, band: AgeBand, waitMs: number): Promise<Set<number>> {
+  if (!newsImagesOn() || figures.length === 0) return new Set();
+  const failedNow = new Set<number>();
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const deadline = new Promise<void>((resolve) => { timer = setTimeout(resolve, waitMs); });
+  await Promise.race([
+    Promise.all(figures.map(async ({ n, address }) => { if (!(await ensureFigureShared(itemId, n, address, band))) failedNow.add(n); })),
+    deadline,
+  ]);
+  clearTimeout(timer);
+  return failedNow;
+}
+
+/** A figure of an article at one width. `address` comes from the item's own stored article (the route looks it up), never from a
+ * request. Null when pictures are off, the host is backed off or the fetch failed. */
+export async function newsFigurePicture(itemId: string, n: number, address: string, width: NewsPictureWidth, band: AgeBand = "adult"): Promise<{ bytes: Uint8Array; etag: string } | null> {
+  if (!newsImagesOn()) return null;
+  if (!(await ensureFigureShared(itemId, n, address, band))) return null;
   const ref = figureRefOf(itemId, n);
   const path = fileOf(ref, width);
   if (!existsSync(path)) return null;

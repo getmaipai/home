@@ -32,3 +32,17 @@ export async function publisherIconPicture(item: Pick<ShelfItem, "canonical_url"
     return null; // an icon sharp cannot read (an .ico) leaves the card as it was
   }
 }
+
+/** The last stand-in, for a story whose picture and publisher icon are both unavailable: the same quiet card with a plain page glyph
+ * (drawn as shapes, so it needs no font on the hub). The picture route never answers 404 for a released story, so a screen never logs
+ * a failed picture and never falls back to the kit's camera. */
+export async function genericPicture(width: NewsPictureWidth): Promise<{ bytes: Uint8Array; etag: string }> {
+  const height = Math.round((width * 9) / 16);
+  const side = Math.round(height * 0.4);
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${side}" height="${side}" viewBox="0 0 100 100" fill="none" stroke="#8a8a93" stroke-width="5" stroke-linecap="round">`
+    + `<rect x="18" y="10" width="64" height="80" rx="8"/><path d="M32 32h36M32 46h36M32 60h22"/></svg>`;
+  const glyph = await sharp(Buffer.from(svg)).png().toBuffer();
+  const bytes = new Uint8Array(await sharp({ create: { width, height, channels: 3, background: { r: 38, g: 38, b: 42 } } })
+    .composite([{ input: glyph, gravity: "centre" }]).webp({ quality: 82 }).toBuffer());
+  return { bytes, etag: `"${createHash("sha1").update(bytes).digest("hex").slice(0, 24)}"` };
+}

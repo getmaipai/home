@@ -17,7 +17,7 @@ import { gateBlocks, inlineText, speechFor } from "./childGate";
 import { hostOf, imageOf, publishedAtOf, publisherOf, storyIdOf, topicsShown, type CardEnv } from "./cards";
 import { bumpNewsCounter } from "./newsCounters";
 import { topicById } from "./topics";
-import { newsImagesOn } from "./pictures";
+import { failedFigureNumbers, newsImagesOn } from "./pictures";
 import { plainSummary } from "./text";
 import { trimArticleTail } from "./tail";
 
@@ -196,6 +196,9 @@ async function loadContentOnce(item: ShelfItem, band: "child" | "teen" | "adult"
   }
 }
 
+/** How long an opening article waits to learn whether its pictures can be fetched. */
+const FIGURE_WAIT_MS = 2500;
+
 /** How long opening a story waits for the publisher before it shows the feed's own summary. */
 export const STORY_GRACE_MS = 600;
 
@@ -230,12 +233,25 @@ export async function articleBlock(item: ShelfItem, env: CardEnv, options: { ret
   let figureNumber = 0;
   const leadKey = item.image_url ? pictureKey(item.image_url) : undefined;
   const shownKeys = new Set<string>(leadKey ? [leadKey] : []);
+  const figures: Array<{ n: number; address: string; key: string }> = [];
+  if (newsImagesOn()) {
+    for (const block of loaded.blocks) {
+      if (block.type !== "figure") continue;
+      const n = figureNumber++;
+      const key = pictureKey(block.src);
+      if (shownKeys.has(key)) continue;
+      shownKeys.add(key);
+      figures.push({ n, address: block.src, key });
+    }
+  }
+  // A picture the publisher refuses is left out of the article, so no broken image and no 404 reaches the screen.
+  const refused = band === "child" ? new Set<number>() : await failedFigureNumbers(item.id, figures, band, FIGURE_WAIT_MS);
+  const keptNumbers = new Set(figures.filter((figure) => !refused.has(figure.n)).map((figure) => figure.n));
+  let seenNumber = 0;
   const shown: ArticleBlock[] = newsImagesOn() ? loaded.blocks.flatMap((block): ArticleBlock[] => {
     if (block.type !== "figure") return [block];
-    const number = figureNumber++;
-    const key = pictureKey(block.src);
-    if (shownKeys.has(key)) return [];
-    shownKeys.add(key);
+    const number = seenNumber++;
+    if (!keptNumbers.has(number)) return [];
     return [{ ...block, src: `/api/plugins/news/images/${item.id}/figure/${number}?w=1280` }];
   }) : loaded.blocks.filter((block) => block.type !== "figure");
   const blocks = band === "child" ? gateBlocks(loaded.blocks, gate) : shown;

@@ -15,7 +15,7 @@ import { recentRows, searchData } from "@/lib/news/search";
 import { releasedItem } from "@/lib/news/cards";
 import { bumpNewsCounter } from "@/lib/news/newsCounters";
 import { NEWS_PICTURE_WIDTHS, newsFigurePicture, newsImagesOn, newsPicture, type NewsPictureWidth } from "@/lib/news/pictures";
-import { publisherIconPicture } from "@/lib/news/pictureFallback";
+import { genericPicture, publisherIconPicture } from "@/lib/news/pictureFallback";
 import { figureAddressesOf } from "@/lib/news/article";
 
 export const newsRoutes = new Hono<AppEnv>();
@@ -111,7 +111,8 @@ newsRoutes.get("/images/:item", requireAuth, async (c) => {
   const item = releasedItem(viewerOf(person), c.req.param("item"));
   if (!item) return c.json({ error: "no such picture" }, 404);
   const own = await newsPicture(item, width as NewsPictureWidth, viewerOf(person).band);
-  const picture = own ?? (newsImagesOn() ? await publisherIconPicture(item, width as NewsPictureWidth) : null);
+  // Never a 404 for a released story: its picture, else its publisher's icon, else a plain tile (a failed picture would log an error and show the camera).
+  const picture = own ?? (newsImagesOn() ? (await publisherIconPicture(item, width as NewsPictureWidth)) ?? (await genericPicture(width as NewsPictureWidth)) : null);
   if (!picture) return c.json({ error: "no such picture" }, 404);
   c.header("Content-Type", "image/webp");
   c.header("Cache-Control", own ? "private, max-age=86400" : "private, max-age=3600");
