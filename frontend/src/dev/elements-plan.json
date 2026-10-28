@@ -3599,6 +3599,23 @@
       "verdictReason": "No current Home feature needs this Element\u2019s specific data and interaction; the audit records the current scope decision."
     },
     {
+      "file": "weather-advice.tsx",
+      "name": "weather-advice",
+      "group": "answer/weather",
+      "verdict": "support",
+      "verdictReason": "The advice chips and alert banner that weather-card and weather-forecast-page draw (WEATHER-PORT-02, WEATHER-PORT-07); not a standalone Home surface.",
+      "backendNeeded": null,
+      "effort": null,
+      "specTagNeeded": false,
+      "newDependency": false,
+      "bindings": [],
+      "size": "S",
+      "showcaseScenario": null,
+      "batch": null,
+      "replacesHandBuilt": [],
+      "realTurnToday": true
+    },
+    {
       "file": "weather-card.tsx",
       "name": "weather-card",
       "group": "answer/weather",

@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-10-28T05:55:11.957Z",
+  "generatedAt": "2026-10-28T06:03:12.187Z",
   "kitTag": "ui-v0.5.400",
   "items": [
     {
@@ -1714,9 +1714,9 @@
     {
       "file": "weather-advice.tsx",
       "name": "weather-advice",
-      "group": "weather",
-      "verdict": "unassessed",
-      "verdictReason": "Recorded unassessed verdict in elements-plan.json; see the plan entry for its dependency or scope.",
+      "group": "answer/weather",
+      "verdict": "support",
+      "verdictReason": "The advice chips and alert banner that weather-card and weather-forecast-page draw (WEATHER-PORT-02, WEATHER-PORT-07); not a standalone Home surface.",
       "implemented": false
     },
     {
