@@ -500,7 +500,8 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/media/radioDirectory.ts` | __resetRadioDirectoryForTests, rememberPreviewStations, previewStationFor, radioDirectoryHasFavicon, __rememberRadioFaviconForTests, radioDirectoryAllowed |
 | `backend/src/lib/media/radioHls.ts` | openHlsResource, hlsResourceUrl, decodeHlsResource |
 | `backend/src/lib/media/radioIcy.ts` | usableMetaint, parseStreamTitle, IcyDemuxer |
-| `backend/src/lib/media/radioStream.ts` | MAX_REDIRECTS, CONNECT_TIMEOUT_MS, MAX_STREAMS_PER_HOME, unplayable, activeStreamCount, __resetRadioStreamsForTests |
+| `backend/src/lib/media/radioRecordings.ts` | startRadioRecording, stopRadioRecording, radioRecordingRows, radioRecordingItem, __resetRadioRecordingsForTests |
+| `backend/src/lib/media/radioStream.ts` | MAX_REDIRECTS, CONNECT_TIMEOUT_MS, publicRecordingAddress, MAX_STREAMS_PER_HOME, unplayable, activeStreamCount |
 | `backend/src/lib/media/scan.ts` | DEFAULT_PRUNE_GRACE_MS, probePending, scanRoot, isScanning, syncMediaScanner, stopMediaScanner |
 | `backend/src/lib/media/search.ts` | searchMedia |
 | `backend/src/lib/media/serve.ts` | parseRange, resolveUnderRoot, serveItemBytes, serveItemArtwork, itemByteMetadata |
