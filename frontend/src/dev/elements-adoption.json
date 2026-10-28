@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-10-28T14:54:38.012Z",
+  "generatedAt": "2026-10-28T14:59:57.635Z",
   "kitTag": "ui-v0.5.405",
   "items": [
     {
@@ -1370,9 +1370,9 @@
       "file": "suggestions.tsx",
       "name": "suggestions",
       "group": "composer",
-      "verdict": "no-fit",
-      "verdictReason": "No current Home feature needs this Element’s specific data and interaction; the audit records the current scope decision.",
-      "implemented": false
+      "verdict": "wire-now",
+      "verdictReason": "Selected for the ambient pane's quick actions (AMBIENT-05)",
+      "implemented": true
     },
     {
       "file": "surfaces.tsx",

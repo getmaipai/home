@@ -143,7 +143,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `frontend/src/apps/setup/WebSearchStep.tsx` | webSearchFailure, WebSearchStep |
 | `frontend/src/lib/media/micGate.tsx` | useMicGate, micDeviceSteps, micFixSteps, micHelp |
 | `frontend/src/shell/AliasRedirect.tsx` | AliasRedirect |
-| `frontend/src/shell/AmbientCompanionPane.tsx` | readAmbientPaneState, isProtectedReply, createAmbientAskQueue, useAmbientCompanionPane |
+| `frontend/src/shell/AmbientCompanionPane.tsx` | AMBIENT_QUICK_ACTIONS, ambientQuickActionsForApp, ambientQuickActionPrompt, readAmbientPaneState, isProtectedReply, createAmbientAskQueue |
 | `frontend/src/shell/BrowserAlerts.tsx` | shouldShowBrowserAlert, requestBrowserAlertPermission, BrowserAlerts |
 | `frontend/src/shell/GlobalMiniPlayer.tsx` | onPlayPageOf, GlobalMiniPlayer |
 | `frontend/src/shell/InstallDock.tsx` | buildDock, InstallDock |
@@ -179,6 +179,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `frontend/src/shell/media/SleepMenu.tsx` | SleepMenu |
 | `frontend/src/shell/media/VisualizerMenu.tsx` | VisualizerMenu |
 | `frontend/src/shell/mediaHost.tsx` | createMediaStore, MediaDockContext, useMediaDock, MediaHostProvider, MediaLinkRedirect |
+| `frontend/src/shell/pageContext.tsx` | ambientPageContextForRoute, AmbientPageContextProvider, useAmbientPageContext, useSetPageContext |
 | `frontend/src/shell/pageHeaderTitle.tsx` | PageHeaderTitle |
 | `frontend/src/shell/pages/AllAppsPage.tsx` | AllAppsPage |
 | `frontend/src/shell/pages/BackupsPage.tsx` | BackupsIcon, BackupsPage |
