@@ -476,13 +476,14 @@ export const DISCOVERY_IDS = ["featured", "new", "recent", "more-from"] as const
 
 /** An app's own data ids (Podcasts adds shows, episodes, queue, saved): answered after the shared ones, so a package cannot shadow them. */
 export type AppDataHook = (person: PersonRow, dataId: string, params: DataParams) => unknown | null;
-const appDataHooks = new Map<MediaAppId, AppDataHook>();
-export function registerMediaAppData(appId: MediaAppId, hook: AppDataHook): void { appDataHooks.set(appId, hook); }
+// More than one module may extend an app (Music: the library views and the radio recordings): hooks chain, the first non-null answer wins.
+const appDataHooks = new Map<MediaAppId, AppDataHook[]>();
+export function registerMediaAppData(appId: MediaAppId, hook: AppDataHook): void { appDataHooks.set(appId, [...(appDataHooks.get(appId) ?? []), hook]); }
 
 /** A hook that adds fields to an item view for its app (stream address, saved, queued, per-show skips). */
 export type ItemViewHook = (person: PersonRow, item: MediaItem, view: MediaItemView) => MediaItemView;
-const itemViewHooks = new Map<MediaAppId, ItemViewHook>();
-export function registerItemView(appId: MediaAppId, hook: ItemViewHook): void { itemViewHooks.set(appId, hook); }
+const itemViewHooks = new Map<MediaAppId, ItemViewHook[]>();
+export function registerItemView(appId: MediaAppId, hook: ItemViewHook): void { itemViewHooks.set(appId, [...(itemViewHooks.get(appId) ?? []), hook]); }
 
 function mediaAppDataRaw(person: PersonRow, appId: MediaAppId, dataId: string, params: DataParams): MediaRow[] | MediaItemView | MediaItemView[] | { as_of: string; rows: Array<{ id: string; label: string }> } | null {
   const limit = Math.min(Math.max(params.limit ?? 20, 1), 200);
@@ -622,7 +623,11 @@ function mediaAppDataRaw(person: PersonRow, appId: MediaAppId, dataId: string, p
       return actionRows(person, item) as never;
     }
     default:
-      return (appDataHooks.get(appId)?.(person, dataId, params) as MediaRow[] | null | undefined) ?? null;
+      for (const hook of appDataHooks.get(appId) ?? []) {
+        const rows = hook(person, dataId, params) as MediaRow[] | null | undefined;
+        if (rows != null) return rows;
+      }
+      return null;
   }
 }
 
@@ -718,7 +723,7 @@ function itemView(person: PersonRow, appId: MediaAppId, item: MediaItem): MediaI
     liked: collectionIds(person, "liked").includes(item.id), watch_later: collectionIds(person, "watch_later").includes(item.id),
     ...(queue ? { up_next: { id: queue.id, title: queue.title, ...(queue.subtitle ? { subtitle: queue.subtitle } : {}), ...(artworkUrl(queue) ? { art: artworkUrl(queue)! } : {}) } } : {}),
   };
-  return itemViewHooks.get(appId)?.(person, item, view) ?? view;
+  return (itemViewHooks.get(appId) ?? []).reduce((current, hook) => hook(person, item, current) ?? current, view);
 }
 
 /** Books keep their locator; folder audiobooks resolve to the latest part or the next unfinished one. */
