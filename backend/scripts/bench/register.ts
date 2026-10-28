@@ -16,6 +16,11 @@
 //                       composes from the outcome every run, never by its
 //                       own choice of tool. Hedge rows seed weather; price
 //                       rows seed websearch (a lookup that returns a price).
+//   opening             (NAT-07a) a dated person-scope record whose end date has
+//                       passed (archived by the hub's own maintenance), an earlier
+//                       conversation backdated by days, and a greeting or a task
+//                       opener as the first turn of the next one. The child and
+//                       Incognito rows must never be asked about the thread.
 //   news                the same scripted websearch call against a recorded
 //                       search result behind search.searxng_url.
 //   clock-with-bus,
@@ -101,12 +106,15 @@ async function main(): Promise<number> {
         id: `register-${row.id}`,
         category: "knowledge",
         surface: row.surface ?? "chat",
-        seedRecords: (row.seed ?? []).map((text) => ({ text, category: "fact", scope: "household" as const })),
-        turns: row.utterances.map((say) => ({ say, expect: {} })),
+        seedRecords: [
+          ...(row.seed ?? []).map((text) => ({ text, category: "fact", scope: "household" as const })),
+          ...(row.datedSeed ?? []).map((d) => ({ text: d.text, category: d.category, scope: "person" as const, validToDaysAgo: d.validToDaysAgo, forChild: d.forChild })),
+        ],
+        turns: row.utterances.map((say, i) => ({ say, ...(row.turns?.[i] ?? {}), expect: {} })),
       }, {
         people, proxy, log,
         drainJudge: async () => {},
-        backdate: () => {},
+        backdate: (days, turnIds) => runner.backdateBenchRows(people, days, turnIds),
         homeAssistant: null,
         beforeTurn: async () => {
           const clock = clocks[Math.min(turnNo, clocks.length - 1)];

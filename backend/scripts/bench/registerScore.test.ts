@@ -73,6 +73,36 @@ describe("scoring edges", () => {
   });
 });
 
+describe("NAT-07a opening rows", () => {
+  const row = (id: string) => rows.find((r) => r.id === id)!;
+  test("the five rows exist, end on a conversation after a gap, and seed one dated record", () => {
+    const opening = rows.filter((r) => r.mechanic === "opening");
+    expect(opening.map((r) => r.id)).toEqual(["opening_thread_greeting", "opening_thread_task_opener", "opening_thread_not_twice", "opening_thread_child_never", "opening_thread_incognito_never"]);
+    for (const r of opening) {
+      expect(r.turns?.length).toBe(r.utterances.length);
+      expect(r.datedSeed?.length).toBe(1);
+      expect(r.turns!.slice(1).every((t) => t.newConversation && (t.daysLater ?? 0) >= 1)).toBe(true);
+    }
+    expect(row("opening_thread_child_never").datedSeed![0]!.forChild).toBe(true);
+    expect(row("opening_thread_incognito_never").turns![1]!.temporary).toBe(true);
+  });
+  test("asking about the interview passes the greeting row; a plain greeting is ambiguous, not a pass", () => {
+    const greeting = row("opening_thread_greeting");
+    expect(scoreRegisterReply(greeting, "Morning! How did the interview go on Monday?").verdict).toBe("pass");
+    expect(scoreRegisterReply(greeting, "Good morning! What can I do for you?").verdict).toBe("ambiguous");
+  });
+  test("mentioning the thread fails a task opener, the second day, the child and the Incognito rows", () => {
+    expect(scoreRegisterReply(row("opening_thread_task_opener"), "About six minutes. Also, how's the interview?").verdict).toBe("fail");
+    expect(scoreRegisterReply(row("opening_thread_task_opener"), "About six minutes for a soft yolk.").verdict).toBe("pass");
+    for (const id of ["opening_thread_not_twice", "opening_thread_incognito_never"]) {
+      expect(scoreRegisterReply(row(id), "Good morning! Did the bakery interview go well?").verdict).toBe("fail");
+      expect(scoreRegisterReply(row(id), "Good morning!").verdict).toBe("pass");
+    }
+    expect(scoreRegisterReply(row("opening_thread_child_never"), "Hi! How was the spelling test?").verdict).toBe("fail");
+    expect(scoreRegisterReply(row("opening_thread_child_never"), "Hi there!").verdict).toBe("pass");
+  });
+});
+
 describe("receivedByModel", () => {
   test("no request means nothing received", () => {
     expect(receivedByModel([])).toBeNull();

@@ -23,7 +23,7 @@ import { speakerAgeBand } from "@/lib/ageBand";
 import { evaluateSafety } from "@/lib/safety";
 import { newConversationTurnId } from "@/lib/id";
 import { activeTurnCount } from "@/lib/turnActivity";
-import { remember, PROFILE_SOURCE } from "@/lib/memory";
+import { remember, runMaintenance, PROFILE_SOURCE } from "@/lib/memory";
 import { deleteEpisodesForPerson } from "@/lib/episodes";
 import { newPersonId, randomSuffix } from "@/lib/id";
 import { nextHlc } from "@/lib/hlc";
@@ -631,16 +631,20 @@ function seedEntities(conv: BenchConversation, owner: PersonRow): void {
   }
 }
 
-function seedRecords(conv: BenchConversation, owner: PersonRow): void {
+function seedRecords(conv: BenchConversation, owner: PersonRow, child: PersonRow): void {
+  let dated = false;
   for (const record of conv.seedRecords ?? []) {
-    const subject = record.subject ? findEntityByName(owner, record.subject)?.id : undefined;
-    const seeded = remember(owner, {
+    const who = record.forChild ? child : owner;
+    const subject = record.subject ? findEntityByName(who, record.subject)?.id : undefined;
+    if (record.validToDaysAgo !== undefined) dated = true;
+    const seeded = remember(who, {
       text: record.text,
       category: record.category,
       tier: "durable",
       scope: record.scope,
-      person: record.scope === "person" ? owner.id : undefined,
+      person: record.scope === "person" ? who.id : undefined,
       subject_id: subject,
+      valid_to: record.validToDaysAgo === undefined ? undefined : new Date(Date.now() - record.validToDaysAgo * 86_400_000).toISOString(),
       source: record.asProfile ? PROFILE_SOURCE : `bench:${conv.id}`,
       importance: 0.9,
       pinned: record.asProfile ?? false,
@@ -649,6 +653,7 @@ function seedRecords(conv: BenchConversation, owner: PersonRow): void {
     });
     if (!seeded.ok) throw new Error(`seeding ${conv.id}: ${seeded.error}`);
   }
+  if (dated) runMaintenance();
 }
 
 /** The live relationships touching the person's own entity, the other
@@ -720,7 +725,7 @@ export async function runConversation(conv: BenchConversation, deps: RunDeps): P
     if (!seeded.ok) throw new Error(`seeding ${conv.id}: ${seeded.error}`);
   }
   seedEntities(conv, deps.people.owner);
-  seedRecords(conv, deps.people.owner);
+  seedRecords(conv, deps.people.owner, deps.people.child);
   // Every conversation starts with empty lists: the household's one
   // shopping list is shared, and the live run found "the second one"
   // pointing at an item a conversation twenty rows earlier had added.
@@ -768,7 +773,7 @@ export async function runConversation(conv: BenchConversation, deps: RunDeps): P
       // directly, `conversationBench.test.ts` stays 44/44 clean with
       // this fix). One definition: the conversation's own stored
       // surface and the turn's driven surface are the same field.
-      const created = createConversation(actor, { surface: conv.surface ?? "chat" });
+      const created = createConversation(actor, { surface: conv.surface ?? "chat", ...(turn.temporary ? { mode: "temporary" as const } : {}) });
       if (!created.ok) throw new Error(`createConversation: ${created.error}`);
       conversationIds[speaker] = created.value.id;
     }

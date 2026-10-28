@@ -315,6 +315,8 @@ export interface BenchTurn {
   drainJudge?: boolean;
   /** Abort this turn after its first delta, then send the next turn. */
   interrupt?: boolean;
+  /** NAT-07a: this turn starts a temporary (Incognito-style) conversation. */
+  temporary?: boolean;
   /** Re-send: this turn supersedes the turn at that index (#88). */
   supersedesTurn?: number;
   /** The runner scripts this exact text as the hub's own reply for the
@@ -365,6 +367,10 @@ export interface BenchSeedRecord {
   sensitive?: boolean;
   status?: "active" | "superseded" | "archived" | "retracted";
   subject?: string;
+  /** NAT-07a: the record's end date, this many days before the bench runs; the runner then runs the hub's own maintenance, so a past end date archives it the way a real one does. */
+  validToDaysAgo?: number;
+  /** NAT-07a: seed the record for the bench child instead of the owner (person scope only). */
+  forChild?: boolean;
   /** MEMORY-RELEVANCE-01: seed this as the consolidated profile record
    * (memory.ts's own PROFILE_SOURCE) instead of an ordinary bench
    * memory - the one way a replay row can test what the profile line

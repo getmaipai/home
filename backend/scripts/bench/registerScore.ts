@@ -1,8 +1,8 @@
 // NAT-01 register bench, pure half: scoring by regex, no engine, no database.
 // Rule 6a: a verdict carries a pattern or rule id, never reply text.
-export type Mechanic = "clock" | "hedge" | "evidential" | "reask" | "price" | "date" | "opinion" | "news" | "contraction";
+export type Mechanic = "clock" | "hedge" | "evidential" | "reask" | "price" | "date" | "opinion" | "news" | "contraction" | "opening";
 export type Verdict = "pass" | "fail" | "ambiguous";
-export const MECHANICS: readonly Mechanic[] = ["clock", "hedge", "evidential", "reask", "price", "date", "opinion", "news", "contraction"];
+export const MECHANICS: readonly Mechanic[] = ["clock", "hedge", "evidential", "reask", "price", "date", "opinion", "news", "contraction", "opening"];
 
 /** The evidence a row seeds and what the bench expects the model to have been given. */
 export interface RowEvidence {
@@ -33,6 +33,10 @@ export interface RegisterRow {
   search?: { prompt: string; title: string; content: string; as_of: string };
   /** NAT-08: the bundled companion (package id) the bench person uses for this row; absent keeps the person's own. */
   companion?: string;
+  /** NAT-07a: per-utterance conversation shape, aligned with `utterances` (who speaks, days since the earlier turns, a new conversation, a temporary one). */
+  turns?: { as?: "owner" | "child"; daysLater?: number; newConversation?: boolean; temporary?: boolean }[];
+  /** NAT-07a: dated person-scope records seeded before the conversation; the end date is that many days before the run, then the hub's maintenance archives them. */
+  datedSeed?: { text: string; category: string; validToDaysAgo: number; forChild?: boolean }[];
   /** The re-ask rows run on the spoken surface only. */
   surface?: "chat" | "robot";
   /** "shorter": the scored (second) reply must be shorter than the first. */

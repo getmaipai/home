@@ -158,7 +158,7 @@ companion dials decide how the question sounds, the item only supplies the fact.
 
 ## 4. Slices
 
-1. **NAT-07a (S, first, fail-first):** bench rows. Five rows with seeded records and a backdated previous turn (the bench's
+1. **NAT-07a (S, first, fail-first; built 2026-10-28, real-model run owed):** bench rows. Five rows with seeded records and a backdated previous turn (the bench's
    `backdate` and prompt-clock seams): a greeting after an interview date (asked about: pass); the same record with a weather
    question as the opener (mentioned: fail, this is the 2026-10-27 regression); a second conversation the next day (not asked
    twice); a child and an incognito turn (never). All fail or ambiguous today for the first row.
