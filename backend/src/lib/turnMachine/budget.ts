@@ -5,7 +5,7 @@
 // call site. THIN-6B (rule 8) narrows it to a child's or teen's turn: an
 // adult's turn on a model without a record gets tools and thinking.
 import { getHouseholdSettingValue } from "@/lib/settings";
-import { CATALOG, chatCatalogEntry, thinkingModeFor } from "@/lib/modelCatalog";
+import { CATALOG, catalogEntries, chatCatalogEntry, thinkingModeFor } from "@/lib/modelCatalog";
 import { listInstalledManifests } from "@/lib/plugins";
 import { allPackageStatuses } from "@/lib/smoke";
 import { VIRTUAL_TOOL_REGISTRY } from "@/lib/projects/tool";
@@ -153,7 +153,7 @@ export async function resolveTurnBudgetAndEngineModel(modelId?: string, band?: A
 }
 
 function modelHasRecord(id: string): boolean {
-  return CATALOG.some((m) => m.role === "chat" && m.id === id);
+  return catalogEntries().some((m) => m.role === "chat" && m.id === id);
 }
 
 function offerPassesGate(offer: { mode: string; gate?: string; bench_row?: string }, answerImagesOk: boolean, picturesOk: boolean, videosOk = false, musicOk = false, musicEditOk = false, itemRefOk = false): boolean {

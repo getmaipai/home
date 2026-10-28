@@ -257,6 +257,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | File | Exported names |
 |---|---|
 | `backend/src/lib/access.ts` | isOwnerOrAdmin, canHaveTemporaryChat, rolesById, getPersonRole, canAccessPerson, listActivePeople |
+| `backend/src/lib/addedModels.ts` | listAddedModels, saveAddedModel, removeAddedModel |
 | `backend/src/lib/ageBand.ts` | speakerAgeBand |
 | `backend/src/lib/aiChoicesState.ts` | readAiSettings, SETUP_CHOICE_KEYS, setupCards |
 | `backend/src/lib/aiCopy.ts` | aiCopy |

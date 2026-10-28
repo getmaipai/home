@@ -31,7 +31,7 @@ import { LlamaServerClient } from "@maipai/spec/llm/ts/client.js";
 import type { ToolDefinition } from "@maipai/spec/llm/ts/types.js";
 import { startStubLlmServer } from "@maipai/spec/llm/ts/stubServer.js";
 import type { ModelCapabilities } from "@maipai/spec/gen/ts/model-capabilities.js";
-import { CATALOG } from "@/lib/modelCatalog";
+import { catalogEntries } from "@/lib/modelCatalog";
 import { detectHardware } from "@/lib/hardware";
 import { selectEngineBinary, ENGINE_READY_MARKER } from "@/lib/engineCatalog";
 import { modelsDir, enginesDir } from "@/lib/paths";
@@ -426,7 +426,7 @@ async function trySpawnFromSelection(): Promise<ChatBackend | null> {
   // after a crash-boot, just not the real engine for 30 minutes.
   assertNotInCrashBootHold();
 
-  const model: ModelCapabilities | undefined = CATALOG.find(
+  const model: ModelCapabilities | undefined = catalogEntries().find(
     (m) => m.id === modelId && m.role === "chat" && m.implemented,
   );
   if (!model) {
@@ -519,7 +519,7 @@ async function startChatBackend(): Promise<ChatBackend> {
     let launchFlags: LaunchFlags | undefined;
     let detectedModel: ModelCapabilities | undefined;
     if (modelId) {
-      detectedModel = CATALOG.find(
+      detectedModel = catalogEntries().find(
         (m) => m.id === modelId && m.role === "chat" && m.implemented && m.sizing.kind === "transformer_gguf",
       );
       if (detectedModel) {

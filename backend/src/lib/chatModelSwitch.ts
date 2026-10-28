@@ -6,7 +6,7 @@
 // model the Stack has installed is loaded: the Stack stores the choice, so
 // it survives a restart. Progress of a download rides the existing job
 // feed; the outcome of a load is read back from the chat role itself.
-import { CATALOG } from "@/lib/modelCatalog";
+import { catalogEntries } from "@/lib/modelCatalog";
 import { getStackClient, isStackConfigured } from "@/lib/stackEngine";
 import { StackError } from "@/lib/stack/errors";
 import { trackBackgroundWork } from "@/lib/backgroundWork";
@@ -50,7 +50,7 @@ async function chatRole(): Promise<{ modelId: string | null; state: string; inst
 
 /** Starts the choice of one catalog chat model: loads it when the Stack has it, otherwise starts its downloads. */
 export async function startChatModelChoice(modelId: string): Promise<ChatSwitchState | { error: string; status: 404 | 409 | 502 }> {
-  const entry = CATALOG.find((model) => model.id === modelId && model.role === "chat" && model.implemented);
+  const entry = catalogEntries().find((model) => model.id === modelId && model.role === "chat" && model.implemented);
   if (!entry?.download) return { error: "That model is not in the list. Pick one of the models shown on this page.", status: 404 };
   let role: Awaited<ReturnType<typeof chatRole>>;
   try { role = await chatRole(); }
@@ -135,7 +135,7 @@ export async function chatModelChoiceState(modelId: string): Promise<ChatSwitchS
 
 /** The catalog's optional uncensored chat model, the one record tagged `uncensored`. */
 export function uncensoredChatEntry() {
-  return CATALOG.find((model) => model.role === "chat" && model.implemented && model.download && model.tags?.includes("uncensored"));
+  return catalogEntries().find((model) => model.role === "chat" && model.implemented && model.download && model.tags?.includes("uncensored"));
 }
 
 /** What the AI and models page needs to draw the uncensored choice: its sizes from the catalog, whether the Stack has it, whether it is the running chat model. Null when the catalog has none or the Stack does not answer. */

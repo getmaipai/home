@@ -27,6 +27,7 @@ export { compareHlc };
 // repeating this exact bug.
 export const HLC_BEARING_TABLES = [
   "people",
+  "added_models",
   "api_keys",
   "memory_records",
   "memory_embeddings",

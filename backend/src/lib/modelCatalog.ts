@@ -623,12 +623,25 @@ export const SERVED_AS_RECORD: Readonly<Record<string, string>> = {
   "muse-glimmer-30b-mlx-4bit": "muse-glimmer-30b-q4-k-xl",
 };
 
+/** MODEL-ADD-01: records an admin added, supplied by lib/addedModels.ts once
+ * the hub's database is open. Nothing here imports the database, so a test
+ * of pure catalog logic never opens one. */
+let addedSource: () => ModelCapabilities[] = () => [];
+export function setAddedModelSource(source: () => ModelCapabilities[]): void { addedSource = source; }
+
+/** Every record, shipped then added: the one list choices, fit, sampling
+ * and the turn budget read. An added record never shadows a shipped id. */
+export function catalogEntries(): ModelCapabilities[] {
+  const added = addedSource().filter((record) => !CATALOG.some((shipped) => shipped.id === record.id));
+  return added.length ? [...CATALOG, ...added] : CATALOG;
+}
+
 /** The chat record for a model id the Stack reports or the person picked,
  * following SERVED_AS_RECORD. */
 export function chatCatalogEntry(modelId: string | undefined): ModelCapabilities | undefined {
   if (!modelId) return undefined;
   const id = SERVED_AS_RECORD[modelId] ?? modelId;
-  return CATALOG.find((model) => model.role === "chat" && model.id === id);
+  return catalogEntries().find((model) => model.role === "chat" && model.id === id);
 }
 
 /** VISION-02a/02d: whether a chat model can reason before it answers, from

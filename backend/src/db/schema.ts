@@ -2218,3 +2218,15 @@ export const newsStorySummaries = sqliteTable("news_story_summaries", {
   hlc: text("hlc").notNull(),
   provenance: text("provenance").notNull(),
 }, (table) => [uniqueIndex("news_story_summaries_story_band_idx").on(table.storyId, table.band)]);
+
+// MODEL-ADD-01 S3: chat models an admin added from a Hugging Face link, the
+// same ModelCapabilities shape as a shipped record (record is its JSON, with
+// origin "added", added_by and added_at inside it). The catalog reader merges
+// these with the shipped list; nothing else reads this table.
+export const addedModels = sqliteTable("added_models", {
+  id: text("id").primaryKey(),
+  record: text("record").notNull(),
+  createdAt: text("created_at").notNull(),
+  hlc: text("hlc").notNull(),
+  provenance: text("provenance").notNull(),
+});

@@ -1,3 +1,4 @@
+import "@/lib/addedModels";
 import { libraryRoutes } from "@/routes/library";
 import { musicRoutes } from "@/routes/music";
 import { serveStatic } from "hono/bun";

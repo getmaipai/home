@@ -19,7 +19,7 @@ import { recordedLevel, shippedPlanForLevel } from "@/lib/diskPlan";
 import { systemAvailableBytes } from "@/lib/resourceGovernor";
 import { ensureWakewordAssets, removeWakewordAssets, wakewordAssetState } from "@/lib/wakewordAssets";
 import { setHouseholdSettingValue } from "@/lib/settings";
-import { CATALOG } from "@/lib/modelCatalog";
+import { catalogEntries } from "@/lib/modelCatalog";
 import { startChatModelChoice, uncensoredChoiceState } from "@/lib/chatModelSwitch";
 import { readAiSettings } from "@/lib/aiChoicesState";
 import { resetInstallStatusCache } from "@/lib/installStatus";
@@ -138,7 +138,7 @@ const CHAT_MODEL_CHOICES = ["chat.standard", "chat.uncensored"];
 // The model "Standard chat AI" means on this computer: the last catalog chat model the tier's chat row holds (its starter model comes first).
 function standardChatModelId(state: AiState): string | null {
   const row = state.plan.rows.find((candidate) => candidate.id === "chat");
-  const ids = (row?.model_ids ?? []).filter((id) => CATALOG.some((model) => model.id === id && model.role === "chat" && model.implemented && !model.tags?.includes("uncensored")));
+  const ids = (row?.model_ids ?? []).filter((id) => catalogEntries().some((model) => model.id === id && model.role === "chat" && model.implemented && !model.tags?.includes("uncensored")));
   return ids.at(-1) ?? null;
 }
 const SETTING_ONLY_SWITCHES: Record<string, string> = { "music.make": "generation.music.enabled", "picturesdetailed.zimage": "generation.picture_detailed.enabled" };

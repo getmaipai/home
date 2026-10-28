@@ -13,7 +13,7 @@ import { join } from "node:path";
 import { eq } from "drizzle-orm";
 import { db } from "@/db";
 import { modelDownloadJobs } from "@/db/schema";
-import { CATALOG } from "@/lib/modelCatalog";
+import { catalogEntries } from "@/lib/modelCatalog";
 import { detectHardware } from "@/lib/hardware";
 import { selectEngineBinary, ENGINE_READY_MARKER, type EngineArchive } from "@/lib/engineCatalog";
 import { modelsDir, enginesDir } from "@/lib/paths";
@@ -184,7 +184,7 @@ async function downloadArchiveVerified(
  * lib/scheduler.ts's jobs already use. */
 async function runSelectJob(modelId: string): Promise<void> {
   try {
-    const model = CATALOG.find((m) => m.id === modelId && m.role === "chat");
+    const model = catalogEntries().find((m) => m.id === modelId && m.role === "chat");
     if (!model) throw new Error(`unknown chat catalog model: ${modelId}`);
     if (!model.implemented) throw new Error(`${modelId} has no real backend yet`);
     if (!model.download) throw new Error(`${modelId} has no pinned download source`);
@@ -262,7 +262,7 @@ async function runSelectJob(modelId: string): Promise<void> {
   } catch (err) {
     const message = (err as Error).message;
     upsertJob(modelId, { status: "failed", phase: "failed", error: message });
-    const label = CATALOG.find((m) => m.id === modelId)?.label ?? modelId;
+    const label = catalogEntries().find((m) => m.id === modelId)?.label ?? modelId;
     trackBackgroundWork(
       trigger("model.download_failed", { modelName: label, error: message }).catch((notifyErr: unknown) =>
         console.error(`[models] model.download_failed notification failed: ${(notifyErr as Error).message}`),
