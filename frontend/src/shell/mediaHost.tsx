@@ -16,7 +16,7 @@ import { BUDGET_CHECK_MS, guardMediaBudget, intervalEvery } from "@/shell/mediaB
 import { NotFoundPage } from "@/shell/pages/NotFoundPage";
 import { createStoryListener } from "@/shell/newsListen";
 import { fetchNowPlaying, liveStationIdOf, NOW_FIRST_MS, NOW_POLL_MS, rejoinLiveOnResume } from "@/shell/radioLive";
-import Hls from "hls.js";
+import type Hls from "hls.js";
 
 export const hlsPathFor = (src: string, canPlayNative: boolean): "native" | "hls" | "direct" => {
   if (!/[?&]hls=1(?:&|$)/i.test(src) && !/\.m3u8(?:[?#]|$)/i.test(src)) return "direct";
@@ -182,11 +182,17 @@ export function MediaHostProvider({ children }: { children: ReactNode }) {
     const src = current?.src ?? "";
     const mode = hlsPathFor(src, element.canPlayType("application/vnd.apple.mpegurl") !== "");
     if (mode !== "hls") return;
-    const hls = new Hls({ enableWorker: true, lowLatencyMode: true });
-    hlsRef.current = hls;
-    hls.loadSource(src.replace(/[?&]hls=1(?:&|$)/, ""));
-    hls.attachMedia(element);
-    return () => { hls.destroy(); if (hlsRef.current === hls) hlsRef.current = null; };
+    // hls.js is loaded only when a station needs it, so the main bundle stays under the PWA precache limit (BUNDLE-SPLIT-01).
+    let cancelled = false;
+    let hls: Hls | null = null;
+    void import("hls.js").then(({ default: HlsClass }) => {
+      if (cancelled) return;
+      hls = new HlsClass({ enableWorker: true, lowLatencyMode: true });
+      hlsRef.current = hls;
+      hls.loadSource(src.replace(/[?&]hls=1(?:&|$)/, ""));
+      hls.attachMedia(element);
+    }).catch(() => undefined);
+    return () => { cancelled = true; if (hls) { hls.destroy(); if (hlsRef.current === hls) hlsRef.current = null; } };
   }, [element, current?.src, liveId]);
   const budgetState = useRef({ told: false });
   useEffect(() => {
