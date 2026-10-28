@@ -844,6 +844,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/voiceResolve.ts` | voiceMatchesStored, voicePresetName, resolveVoice, getOfferedVoices, __setOfferedVoicesForTests |
 | `backend/src/lib/wakewordAssets.ts` | WAKEWORD_SHARED_ASSETS, WAKEWORD_STOCK_DETECTOR, WAKEWORD_ALL_ASSETS, wakewordAssetPath, isWakewordAssetInstalled, areWakewordAssetsInstalled |
 | `backend/src/lib/weatherAdvice.ts` | weatherAdvice, adviceLine, adviceFromRecipeData, adviceChips |
+| `backend/src/lib/weatherAlerts.ts` | __resetWeatherAlertsForTests, isUsAlertCoordinate, weatherAlerts |
 | `backend/src/lib/weatherMoon.ts` | __resetMoonForTests, moonTile |
 | `backend/src/lib/weatherSummary.ts` | __setWeatherSummaryCompleterForTests, __resetWeatherSummaryForTests, summaryFor |
 | `backend/src/lib/webSearchBudget.ts` | SEARXNG_CONNECT_LIMIT_MS, SEARXNG_ATTEMPT_LIMIT_MS, ADULT_WRITTEN_WEBSEARCH_DEADLINE_MS, webSearchToolDeadlineMs |
