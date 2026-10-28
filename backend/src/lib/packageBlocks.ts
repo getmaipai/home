@@ -173,11 +173,15 @@ export function weatherCard(producer: string, provenance: string, data: Record<s
   const today = daily[0]!;
   const alt = `Weather in ${place} now: ${temp}°${unit} and ${condition}; today's high ${today.high}°${unit}, low ${today.low}°${unit}.`;
   const advice = adviceChips(adviceFromRecipeData(data));
+  const alert = data.alert && typeof data.alert === "object" ? data.alert as Record<string, unknown> : undefined;
+  const alertTitle = alert && typeof alert.title === "string" ? alert.title.trim() : "";
+  const alertDescription = alert && typeof alert.text === "string" ? alert.text.trim() : "";
   return blockEnvelope("weather_card", producer, alt, provenance, {
     place,
     unit,
     current: { temp, condition, code, is_day: isDay },
     ...(advice.length > 0 ? { advice } : {}),
+    ...(alertTitle ? { alert: { title: alertTitle, ...(alertDescription ? { text: alertDescription } : {}), ...(alert?.severity === "info" || alert?.severity === "warn" || alert?.severity === "severe" ? { severity: alert.severity } : {}) } } : {}),
     ...(hourly.length > 0 ? { hourly } : {}),
     daily,
     attribution,

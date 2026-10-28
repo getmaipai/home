@@ -20,7 +20,7 @@ tokens, no vendored files; the chat card ships first.
 Reuses the Element for its hero, plus a places list: Current location first, the household home, then the person's saved places
 (PLACE-HUB-01, PLACE-WEATHER-01, PLACE-ELEMENT-01b own storage, resolver and the settings list; no new place store). Pages are schema
 data per the `app` kind decision in dev.md. Old reference only: loki-doki `WeatherPage.tsx`, `useWeatherLocations.ts`.
-Privacy is unchanged: Open-Meteo is the one outbound host, coordinates rounded per PLACE-WEATHER-01, no one sees another person's places.
+Privacy is unchanged for the forecast: Open-Meteo receives coordinates rounded per PLACE-WEATHER-01, and no one sees another person's places. WEATHER-PORT-05 adds `api.weather.gov` for US active alerts only when `weather.alerts` is on.
 
 ## Order
 

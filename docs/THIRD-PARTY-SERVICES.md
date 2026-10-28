@@ -2,6 +2,16 @@
 
 The org's [third-party service rules](https://github.com/getmaipai/.github/blob/main/docs/THIRD-PARTY-SERVICES.md) apply to every connection. This file records Home's named exception and its budget.
 
+## WEATHER-PORT-05: US active weather alerts
+
+`weather.alerts` is a household switch, off by default. When on, Home checks `api.weather.gov` only when someone opens or asks for weather at a US place. It sends the coordinates already rounded for that person's band (about 1 km for adults and teens, about 10 km for a child), with an app-identifying User-Agent and no name or other household information. Non-US coordinates never make a request. The response is cached for five minutes; the first 403 or 429 pauses requests for one hour. A failed alert lookup never fails the forecast.
+
+| Backlog row | Request | Lifetime limit | Pace | Site limit | Stop rule |
+|---|---|---|---|---|---|
+| WEATHER-PORT-05 | Active alerts at one US coordinate | One cached response per coordinate per five minutes | One every five minutes across the household | None beyond the pace | The first 403 or 429 pauses requests for one hour |
+
+The privacy table lists this connection only while the switch is on.
+
 ## Owner's written exception of 2026-09-24: NEWS-07
 
 The [News design, section 8](design/news-app-2026-10-17.md) records the owner's exception for background full text. `news.full_text_prefetch` is a household switch, off by default. It permits the existing reader to fetch items on a person's explicitly followed channels or in their Today top set. It permits no background pictures, related-page expansion, redirect follow-ups or Archive requests.

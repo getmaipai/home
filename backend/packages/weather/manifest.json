@@ -1,6 +1,6 @@
 {
   "id": "weather",
-  "version": "0.3.3",
+  "version": "0.3.4",
   "kind": "plugin",
   "category": "Utilities",
   "display": "Weather",
@@ -100,7 +100,8 @@
   ],
   "permissions": [
     "net:geocoding-api.open-meteo.com",
-    "net:api.open-meteo.com"
+    "net:api.open-meteo.com",
+    "net:api.weather.gov"
   ],
   "notifications": [],
   "cache": {

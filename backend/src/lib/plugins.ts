@@ -43,6 +43,8 @@ import { PACKAGES_DIR, statMtimeMs, isValidPackageId } from "@/lib/paths";
 import { resolvePackageDir, listInstalledPackageIds } from "@/lib/packageResolve";
 import { promptNow, seededOutcomeFor } from "@/lib/benchSampling";
 import { moonTile } from "@/lib/weatherMoon";
+import { weatherAlerts } from "@/lib/weatherAlerts";
+import { getHouseholdSettingValue } from "@/lib/settings";
 import { ROLE_LADDER, type Role } from "@/middleware/auth";
 import type { PersonRow } from "@/types";
 
@@ -668,9 +670,14 @@ export async function runPlugin(
     const answer = withoutBlockOnlyData(value);
     // WEATHER-PORT-01: what to wear and bring, from this run's own numbers. It rides in the answer's data (chat) and the app details.
     const advice = id === "weather" ? adviceFromRecipeData(value.data) : [];
+    const weatherData = value.data as Record<string, unknown> | undefined;
+    const alertPayload = id === "weather" && getHouseholdSettingValue("weather.alerts") === true && typeof options.hostInputs?.latitude === "number" && typeof options.hostInputs?.longitude === "number"
+      ? await weatherAlerts(options.hostInputs.latitude, options.hostInputs.longitude).catch(() => []) : [];
+    const severity = alertPayload[0]?.severity.toLowerCase();
+    const alert = alertPayload.length ? { title: alertPayload[0]!.event, text: alertPayload[0]!.headline, ...(severity === "extreme" || severity === "severe" ? { severity: "severe" as const } : severity === "moderate" ? { severity: "warn" as const } : { severity: "info" as const }) } : undefined;
+    if (alert && answer.data) answer.data = { ...answer.data, alert };
     // WEATHER-PORT-03: the written summary, once the background model has made it for this place and hour; the advice line until then.
     // Current-location runs carry the person's own coordinates, so they are never cached or summarized by name.
-    const weatherData = value.data as Record<string, unknown> | undefined;
     const placeName = typeof weatherData?.place === "string" ? weatherData.place : "";
     const summary = advice.length > 0 && placeName !== "" && !options.uncached
       ? summaryFor({ place: placeName, unit: weatherData?.unit === "celsius" ? "celsius" : "fahrenheit", temp: typeof weatherData?.temperature === "number" ? weatherData.temperature : undefined, condition: typeof weatherData?.conditions === "string" ? weatherData.conditions : undefined, high: typeof weatherData?.high === "number" ? weatherData.high : undefined, low: typeof weatherData?.low === "number" ? weatherData.low : undefined, advice })
@@ -681,8 +688,12 @@ export async function runPlugin(
       ? await moonTile(async () => { const run = await runPlugin("almanac-moon", actor, {}, undefined, { band: options.band }); return run.ok ? run.value.data as { phase?: unknown; illumination?: unknown } | undefined : undefined; })
       : undefined;
     const appDetails = id === "weather"
-      ? { ...Object.fromEntries(Object.entries(value.data ?? {}).filter(([key]) => key.startsWith("block_detail_")).map(([key, item]) => [key.slice("block_detail_".length), item])), ...(advice.length > 0 ? { advice: adviceChips(advice), summary } : {}), ...(moon ? { moon } : {}) }
+      ? { ...Object.fromEntries(Object.entries(value.data ?? {}).filter(([key]) => key.startsWith("block_detail_")).map(([key, item]) => [key.slice("block_detail_".length), item])), ...(advice.length > 0 ? { advice: adviceChips(advice), summary } : {}), ...(moon ? { moon } : {}), ...(alert ? { alert } : {}) }
       : undefined;
+    if (alert && blocks.length) {
+      const card = blocks.find((block) => block.kind === "weather_card");
+      if (card && card.props && typeof card.props === "object") card.props = { ...(card.props as Record<string, unknown>), alert };
+    }
     return { ok: true, value: blocks.length > 0 ? ({ ...answer, blocks, ...(appDetails ? { appDetails } : {}) } as PluginResult) : answer };
   } catch (err) {
     if (err instanceof HostError) {

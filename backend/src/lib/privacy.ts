@@ -201,6 +201,11 @@ export function platformConnections(): PrivacyConnection[] {
       when: "only when an adult or teen browses or searches stations in Radio, at most about one request every three seconds across the home. Nothing runs in the background.",
       what: "the words, country or genre that were searched, or a request for popular stations, plus your home's internet address. No name, device ID, cookie or listening history goes with it. A child never browses; a parent saves stations for them.",
     }),
+    // WEATHER-PORT-05: optional active alerts for the current US weather coordinates.
+    row("platform:weather-alerts", getHouseholdSettingValue("weather.alerts") === true ? "api.weather.gov" : null, {
+      when: "only when Show weather alerts is on and someone opens weather for a US place; at most once every five minutes across the home. Nothing runs in the background.",
+      what: "coordinates rounded to about 1 km for adults and teens, or about 10 km for a child, plus your home's internet address. No name, device ID, cookie or question is sent.",
+    }),
     row("platform:news-full-text-prefetch", shelfEnabled() && getHouseholdSettingValue(NEWS_FULL_TEXT_PREFETCH_KEY) === true ? "the publishers of followed channels and the top stories in Today" : null, {
       when: "only when Load News stories ahead of time is on and nobody is using MaiPai. Each item is tried once, at most one every 30 seconds for each site and 150 pages per site in 24 hours; story pictures follow the same pace. Home follows robots rules and pauses on the first block.",
       what: "a request for that story page and the site's robots rules, plus your home's internet address. Nothing anyone in the house said or saved is sent: no name, question, follow list, cookie or reading history. Background requests never ask the Internet Archive.",
