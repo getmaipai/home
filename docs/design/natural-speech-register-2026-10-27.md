@@ -4,8 +4,10 @@ Owner's request (Jesse, 2026-10-27): compare Home against Loki Doki's work on hu
 examples: people are rarely absolute ("it's probably going to rain", not "it's going to rain"), and rarely formal ("it's four
 o'clock", not "it's 4 PM"). Design only; nothing here is built.
 
-Architect verdict: first ruling REJECTED (2026-10-27, record `data-scratch/architect/NAT-2026-10-27.verdict`); this revision answers each
-required edit and awaits a second ruling. Nothing is built before an APPROVED.
+Architect verdict: APPROVED on the third ruling (2026-10-27, record `data-scratch/architect/NAT-2026-10-27.r3.verdict`, note text at
+f8c338e1a; rulings one and two rejected, `.verdict` and `.r2.verdict`). Two points to settle in NAT-03 and NAT-06 before building:
+"two agreeing `web` sources" must become a typed count, and `clock_style: loose` maps to `timeStyle: plain` with the looseness coming
+from the plan.
 
 ## Supersedes
 
