@@ -1048,7 +1048,8 @@ function searchContent(payload: Record<string, unknown>, maxChars = SEARCH_SOURC
  * diagnostic. */
 export function toolResultContent(outcome: ToolExecutionOutcome, searchMaxChars?: number, spoken = false, certainty?: CertaintyGate): string {
   // NAT-03: the certainty band rides beside the fact (certainty.ts), gated by the listener.
-  const bands = certainty ? certaintyFields(outcome, certainty.ageBand, certainty.safetyFlagged) : {};
+  const repeat = certainty?.repeats?.get(outcome.callId);
+  const bands = { ...(certainty ? certaintyFields(outcome, certainty.ageBand, certainty.safetyFlagged) : {}), ...(repeat ? { repeat } : {}) };
   if (outcome.status === "succeeded" && outcome.packageId === "websearch") {
     const search = websearchPayload(outcome, spoken);
     if (search) Object.assign(search, bands);

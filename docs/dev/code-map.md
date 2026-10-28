@@ -367,6 +367,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/diskPlan.ts` | SHIPPED_DISK_PLAN_DATE, shippedDiskPlan, machineTier, shippedPlanForLevel, recordedLevel, nearestExisting |
 | `backend/src/lib/documentExtraction.ts` | MAX_DOCUMENT_BYTES, MAX_EXTRACTED_TEXT_BYTES, LOCAL_PARSER_TIMEOUT_MS, __setTikaRunnerForTests, __setRapidOcrRunnerForTests, extractDocument |
 | `backend/src/lib/documentMediaTypes.ts` | DOCUMENT_MEDIA_TYPES, isDocumentMediaType |
+| `backend/src/lib/echo.ts` | ECHO_WINDOW_MS, subjectOf, fingerprintOf, repeatNotes, resetEchoRecords |
 | `backend/src/lib/emergencyKit.ts` | generateEmergencyKit |
 | `backend/src/lib/engineAutotune.ts` | autotuneContextSize, resolveLaunchFlags, launchFlagsToArgs |
 | `backend/src/lib/engineBoot.ts` | engineWarmupsForStackRoles |

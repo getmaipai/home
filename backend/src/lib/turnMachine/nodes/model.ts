@@ -27,6 +27,7 @@ import { isWrittenAdultTurn, promptSurfaceClassFor, type SurfaceClass } from "@/
 import { toolCallAssistantMessage, toolResultMessages, phrasingInstruction, picturesOnlyInstruction, searchEvidenceMaxChars, musicForOutcomes } from "@/lib/composer";
 import { SHOW_IMAGES_TOOL_ID } from "@/lib/answerImages/turn";
 import { planLineForTurnMachine } from "@/lib/register";
+import { repeatNotes } from "@/lib/echo";
 import { askAppendFor, NO_ASK_APPEND } from "@/lib/askNames";
 import { pickStatusPhrase } from "@/lib/statusPhrases";
 import { contextToMessages, bareMessages, continuationMessages } from "../messages";
@@ -857,7 +858,12 @@ const modelRound: Node<ModelInput, ModelOutput> = async (state, input, signal) =
     const phrasedOutcomes = state.outcomes.filter((o) => !lookupMissed(o));
     const assistantMessage = toolCallAssistantMessage(phrasedOutcomes);
     // NAT-03: the listener's band and the turn's safety verdict gate which certainty bands the model sees.
-    const certaintyGate = { ageBand: state.planBasis.band, safetyFlagged: state.safety.flagged };
+    // NAT-05: the same subject asked again inside the window adds a typed `repeat` note beside the fact (echo.ts).
+    const certaintyGate = {
+      ageBand: state.planBasis.band,
+      safetyFlagged: state.safety.flagged,
+      repeats: repeatNotes(phrasedOutcomes, { conversationId: state.conversationId, turnId: state.turnId, surfaceClass: surfaceClass === "spoken" ? "spoken" : "written", ageBand: state.planBasis.band, safetyFlagged: state.safety.flagged, nowMs: Date.now() }),
+    };
     // THIN-4F: a spoken surface's answering round re-reads only the top rows' short text.
     const resultMessages = toolResultMessages(phrasedOutcomes, searchEvidenceMaxChars(state.budget.context_tokens), surfaceClass === "spoken", certaintyGate);
     // SEARCH-ROWS-01 (#169): `allSnippetsEmpty` rides the same reduce as

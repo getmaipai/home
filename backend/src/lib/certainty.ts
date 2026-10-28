@@ -26,6 +26,8 @@ export type CertaintyBand = "sure" | "likely" | "maybe" | "unlikely" | "recalled
 export interface CertaintyGate {
   ageBand: "child" | "teen" | "adult";
   safetyFlagged: boolean;
+  /** NAT-05: per call id, the typed "same question again" note (echo.ts); rides beside the band in the evidence. */
+  repeats?: ReadonlyMap<string, import("@/lib/echo").RepeatNote>;
 }
 
 /** Distinct `web` hosts that turn a single-source "maybe" into "likely". */

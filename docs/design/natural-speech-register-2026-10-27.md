@@ -229,6 +229,8 @@ written chat `echo` may only require naming a change; no instruction shortens th
 state (subject id, fingerprint, elapsed time), never from matching the person's words; it never applies on a child or teen
 safety subject; the record holds ids and fingerprints, not reply text (rule 6a).
 
+**As built (2026-10-28):** `backend/src/lib/echo.ts` keeps the record in memory per conversation and subject (package id plus bound arguments), with a 5 minute window. The ReplyPlan spec declares exactly eight moves ("no item may add a ninth"), so `echo` is not a plan move: a typed `repeat` note (`unchanged` or `changed`, seconds since, one instruction) rides in the tool evidence beside the fact, like the NAT-03 band. Shortening is suggested only on spoken turns and on child or teen chat; adult written chat only gets "say what changed" or "answer as completely as usual". A flagged safety turn gets no note.
+
 ### 3.7 NAT-06: formality and hedging as companion dials (S, after the speech-style slices)
 
 Two persona fields, spec first, defaults leaving every current companion unchanged:
