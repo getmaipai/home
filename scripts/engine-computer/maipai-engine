@@ -8,7 +8,7 @@ STACK_ROOT=/opt/maipai-stack
 STACK_STORE=/data/stack/engines
 PAIR_FILE="${MAIPAI_ENGINE_PAIR_FILE:-/var/lib/maipai-stack/paired-home.json}"
 AUTH_KEYS="${MAIPAI_ENGINE_AUTH_KEYS:-$STACK_HOME/.ssh/authorized_keys}"
-STACK_TAG="01c459977f4eceb79311d59c9c20ac51607e8dd1"
+STACK_TAG="d0fa36d9295e59218e96666a50f3eb6a420b4a21"
 STACK_REPO=getmaipai/stack
 DRY_RUN=no
 # The scratch folder update() builds in. A global on purpose: a trap that names a function's local variable
