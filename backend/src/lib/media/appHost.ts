@@ -14,7 +14,8 @@ import { z } from "zod";
 import { itemDetail } from "./items";
 import type { MediaBudget } from "./watchTime";
 import { listLibrary } from "@/lib/library";
-import { stationItemView } from "./radio";
+import { stationItemView, previewStationItemView } from "./radio";
+import { previewStationFor } from "./radioDirectory";
 import { nowPlayingOf } from "./radioStream";
 import { liveSourceById, noDiscovery, readableItem, sourceVisibleTo } from "./access";
 import { allowedBandsFor, bandAllows, mediaBandOf, trips } from "./band";
@@ -609,6 +610,8 @@ function mediaAppDataRaw(person: PersonRow, appId: MediaAppId, dataId: string, p
       if (params.id && appId === "music") {
         const station = stationItemView(person, params.id, nowPlayingOf(params.id));
         if (station) return station as never;
+        const preview = previewStationFor("household", params.id);
+        if (preview && mediaBandOf(person) !== "child" && !(/adult|porn|xxx|erotic/i.test(preview.tags.join(" ")) && mediaBandOf(person) !== "adult")) return previewStationItemView(person, preview, nowPlayingOf(params.id)) as never;
       }
       if (params.id && (appId === "music" || appId === "videos")) {
         const file = madeFileFor(person, appId, params.id);

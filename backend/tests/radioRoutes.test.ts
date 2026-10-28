@@ -217,6 +217,30 @@ describe("radio dashboard scopes", () => {
     expect(((await (await client.post("/api/plugins/music/data/radio", { scope: "directory", q: "cabin" })).json()) as Array<{ title: string }>).map((row) => row.title)).toContain("Cabin FM");
     expect(urls.length).toBe(1);
   });
+
+  test("station scope returns saved and recently shown directory details, never an unknown id", async () => {
+    on();
+    const { client } = await owner();
+    const directory = await client.post("/api/plugins/music/data/radio", { scope: "popular" });
+    const rows = await directory.json() as Array<{ id: string }>;
+    expect(rows.map((row) => row.id)).toContain("s-1");
+    const shown = await client.post("/api/plugins/music/data/radio", { scope: "station", id: "s-1" });
+    expect(await shown.json()).toMatchObject([{ id: "s-1", title: "Cabin FM", saved: false, play_label: "Preview" }]);
+    expect(await (await client.post("/api/plugins/music/data/radio", { scope: "station", id: "stranger" })).json()).toEqual([]);
+    const saved = await client.post(`${BASE}/stations`, { from: "directory", name: "Cabin FM", url: ROWS[0]!.url_resolved, tags: ["jazz"] });
+    const savedId = ((await saved.json()) as { station: { id: string } }).station.id;
+    expect(await (await client.post("/api/plugins/music/data/radio", { scope: "station", id: savedId })).json()).toMatchObject([{ id: savedId, title: "Cabin FM", saved: true, play_label: "Play" }]);
+  });
+
+  test("a child gets station details only for a parent-saved station", async () => {
+    on();
+    const { client } = await owner();
+    const { client: childClient, row } = await child(client);
+    const created = await client.post(`${BASE}/stations`, { name: "Kids Tunes", url: "https://stream.example.com/kids.mp3", for_person_id: row.id });
+    const id = ((await created.json()) as { station: { id: string } }).station.id;
+    expect(await (await childClient.post("/api/plugins/music/data/radio", { scope: "station", id })).json()).toMatchObject([{ id, saved: true }]);
+    expect(await (await childClient.post("/api/plugins/music/data/radio", { scope: "station", id: "s-1" })).json()).toEqual([]);
+  });
 });
 
 describe("radio station art", () => {

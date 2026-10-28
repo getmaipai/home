@@ -3,6 +3,8 @@
 // not audio is refused, HLS says "not supported yet", a child plays only what a parent saved, and the stream caps hold.
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { __setRadioStreamDepsForTests } from "@/routes/radioApp";
+import { __resetRadioDirectoryForTests, rememberPreviewStations } from "@/lib/media/radioDirectory";
+import { setHouseholdSettingValue } from "@/lib/settings";
 import { __resetRadioStreamsForTests, MAX_STREAMS_PER_HOME, openStationStream } from "@/lib/media/radioStream";
 import { __resetRateLimiterForTests } from "@/lib/rateLimiter";
 import { child, owner, teen } from "./support/testAuth";
@@ -43,6 +45,8 @@ beforeEach(() => {
   resetDb();
   __resetRateLimiterForTests();
   __resetRadioStreamsForTests();
+  __resetRadioDirectoryForTests();
+  setHouseholdSettingValue("radio.directory.enabled", true);
   calls = [];
   handler = () => new Response(null, { status: 404 });
   __setRadioStreamDepsForTests({
@@ -150,6 +154,38 @@ describe("the stream route", () => {
     expect(body).toContain("#EXTM3U");
     expect(body).toContain(`/hls/${id}/resource/`);
     expect(body).not.toContain("https://stream.example.com/seg1.ts");
+  });
+
+  test("a directory HLS preview rewrites its playlist and serves previewed segments", async () => {
+    const { client } = await owner();
+    const preview = { id: "dir-hls", name: "RTL", url: "https://stream.example.com/rtl.m3u8", favicon: null, tags: ["pop"], country_code: null, codec: "aac", bitrate_kbps: 128, hls: true };
+    rememberPreviewStations("household", [preview]);
+    handler = (url) => url.pathname.endsWith(".m3u8")
+      ? new Response("#EXTM3U\n#EXTINF:4,\nhttps://stream.example.com/segment.ts\n", { status: 200, headers: { "content-type": "application/vnd.apple.mpegurl" } })
+      : new Response(A1, { status: 200, headers: { "content-type": "video/mp2t" } });
+    const playlist = await client.get(`${BASE}/preview/${preview.id}`);
+    expect(playlist.status).toBe(200);
+    const text = await playlist.text();
+    expect(text).toContain(`/hls/${preview.id}/resource/`);
+    expect(text).not.toContain("https://stream.example.com/segment.ts");
+    const resourcePath = new URL(text.split("\n").at(-2)!, "http://home").pathname;
+    const segment = await client.get(resourcePath);
+    expect(segment.status).toBe(200);
+    expect(new Uint8Array(await segment.arrayBuffer())).toEqual(A1);
+    expect((await client.get(`${BASE}/preview/missing`)).status).toBe(404);
+    const { client: childClient } = await child(client);
+    expect((await childClient.get(`${BASE}/preview/${preview.id}`)).status).toBe(403);
+  });
+
+  test("a directory audio/mpeg preview still streams directly", async () => {
+    handler = () => icyResponse();
+    const { client } = await owner();
+    const preview = { id: "dir-mp3", name: "Cabin", url: "https://stream.example.com/cabin.mp3", favicon: null, tags: ["jazz"], country_code: null, codec: "mp3", bitrate_kbps: 128, hls: false };
+    rememberPreviewStations("household", [preview]);
+    const response = await client.get(`${BASE}/preview/${preview.id}`);
+    expect(response.status).toBe(200);
+    expect(response.headers.get("content-type")).toBe("audio/mpeg");
+    await response.body!.cancel();
   });
 
   test("a playlist content type is treated as HLS, and a web page is refused", async () => {

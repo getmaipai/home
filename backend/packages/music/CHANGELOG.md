@@ -2,6 +2,13 @@
 
 All notable changes to the Music package, in [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) format.
 
+## [0.3.7] - 2026-10-28
+
+### Added
+
+- Open radio station details from every station shelf, play recent directory stations as previews, and surface saved and popular stations on Listen now.
+- Preview HLS directory stations through the same guarded playlist and segment proxy as saved stations.
+
 ## [0.3.6] - 2026-10-28
 
 ### Added

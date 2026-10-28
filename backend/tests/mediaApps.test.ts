@@ -13,10 +13,12 @@ import { eq } from "drizzle-orm";
 import { storeFile } from "@/lib/attachments";
 import { getHouseholdSettingValue, setHouseholdSettingValue } from "@/lib/settings";
 import { getRegistryKey } from "@/lib/settingsRegistry";
+import { rememberPreviewStations, __resetRadioDirectoryForTests } from "@/lib/media/radioDirectory";
 
 beforeEach(() => {
   resetDb();
   __resetProgressForTests();
+  __resetRadioDirectoryForTests();
 });
 
 type Row = { id: string; title: string; channel: string | null; progress?: number; completed?: boolean; copy_label: string; thumbnail: string | null };
@@ -49,6 +51,19 @@ async function setup() {
 const progress = (client: TestClient, body: Record<string, unknown>) => client.post("/api/plugins/videos/progress", body);
 
 describe("the media-app host: data ids", () => {
+  test("Music resolves a just-shown directory station as a preview item only for the eligible person", async () => {
+    const { adult, child } = await setup();
+    const person = db.select().from(people).where(eq(people.id, adult.id)).get()!;
+    rememberPreviewStations("household", [{ id: "preview-1", name: "Cabin FM", url: "https://radio.example/live", favicon: null, tags: ["jazz"], country_code: "US", codec: "mp3", bitrate_kbps: 128, hls: false }]);
+    const view = await (await adult.client.post("/api/plugins/music/data/item", { id: "preview-1" })).json() as Record<string, unknown>;
+    expect(view).toMatchObject({ id: "preview-1", title: "Cabin FM", kind: "station", live: true, src: "/api/plugins/music/radio/preview/preview-1" });
+    // An HLS station's preview item is marked so the shell attaches hls.js (a plain audio element cannot play a playlist).
+    rememberPreviewStations("household", [{ id: "preview-hls", name: "Hill HLS", url: "https://radio.example/hill.m3u8", favicon: null, tags: [], country_code: "US", codec: "aac", bitrate_kbps: 64, hls: true }]);
+    expect(await (await adult.client.post("/api/plugins/music/data/item", { id: "preview-hls" })).json()).toMatchObject({ src: "/api/plugins/music/radio/preview/preview-hls?hls=1" });
+    expect(await (await adult.client.post("/api/plugins/music/data/item", { id: "stranger" })).json()).toEqual([]);
+    expect(await (await child.client.post("/api/plugins/music/data/item", { id: "preview-1" })).json()).toEqual([]);
+  });
+
   test("Music item views gate lyrics and expose lookup eligibility", async () => {
     const { adult, child } = await setup();
     expect(getRegistryKey("music.lyrics_online")).toMatchObject({ default: true, label: "Look up song lyrics online", lives_in: "household.pictures", honoured_by: ["home"] });

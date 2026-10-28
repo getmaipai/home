@@ -38,6 +38,8 @@ export interface SavedStation {
   country_code: string | null;
   codec: string | null;
   bitrate_kbps: number | null;
+  language?: string | null;
+  homepage?: string | null;
   /** True when the station address is an HLS playlist. */
   hls: boolean;
   /** The person this station is saved for. */
@@ -51,6 +53,7 @@ function savedOf(source: MediaSource): SavedStation | null {
   return {
     id: source.id, name: source.label, url: source.url, favicon: detail?.favicon_url ?? null, tags: detail?.tags ?? [], country_code: detail?.country_code ?? null,
     codec: detail?.codec ?? null, bitrate_kbps: detail?.bitrate_kbps ?? null, hls: hlsAddress(source.url), for_person_id: source.owner_person_id,
+    language: null, homepage: null,
     added_by_person_id: source.provenance.startsWith("person:") ? source.provenance.slice("person:".length) : null,
   };
 }
@@ -72,11 +75,17 @@ export const savedStationFor = (actor: PersonRow, id: string): SavedStation | nu
 export function stationItemView(actor: PersonRow, id: string, nowPlaying: string | null): Record<string, unknown> | null {
   const station = savedStationFor(actor, id);
   if (!station) return null;
-  const detail = [station.country_code, station.tags.slice(0, 2).join(", ")].filter(Boolean).join(" · ");
+  const detail = [station.country_code, station.tags.slice(0, 2).join(", "), station.language, station.codec?.toUpperCase(), station.bitrate_kbps ? `${station.bitrate_kbps} kbps` : null].filter(Boolean).join(" · ");
   return {
     id: station.id, kind: "station", title: station.name, channel: station.name, subtitle: nowPlaying ?? (detail || "Live radio"), src: `/api/plugins/music/radio/stream/${encodeURIComponent(station.id)}${station.hls ? "?hls=1" : ""}`,
     live: true, poster: null, description: "", chapters: [], captions: [], liked: false, watch_later: false, can_edit: false, cover_choices: [],
   };
+}
+
+/** A directory station may become an item only while the household's recent-result grant is live. */
+export function previewStationItemView(actor: PersonRow, station: DirectoryStation, nowPlaying: string | null): Record<string, unknown> {
+  const detail = [station.country_code, station.tags.join(", "), station.language, station.codec?.toUpperCase(), station.bitrate_kbps ? `${station.bitrate_kbps} kbps` : null].filter(Boolean).join(" · ");
+  return { id: station.id, kind: "station", title: station.name, channel: station.name, subtitle: nowPlaying ?? (detail || "Live radio"), src: `/api/plugins/music/radio/preview/${encodeURIComponent(station.id)}${hlsAddress(station.url) ? "?hls=1" : ""}`, live: true, poster: station.favicon ? `/api/plugins/music/radio/art?u=${encodeURIComponent(station.favicon)}` : null, description: detail || "Live radio station.", chapters: [], captions: [], liked: false, watch_later: false, can_edit: false, cover_choices: [] };
 }
 
 /** The addresses a person already has, for the `added` flag on directory rows. */
@@ -98,6 +107,8 @@ export interface AddStationInput {
   country_code?: string | null;
   codec?: string | null;
   bitrate_kbps?: number | null;
+  language?: string | null;
+  homepage?: string | null;
   /** The person the station is for. Omitted means the actor; a parent names one of the household's children. */
   for_person_id?: string | null;
   /** True when the row came from the directory (the address may be http, as the directory lists it). */

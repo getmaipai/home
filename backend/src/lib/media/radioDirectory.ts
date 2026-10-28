@@ -12,6 +12,8 @@ export interface DirectoryStation {
   country_code: string | null;
   codec: string | null;
   bitrate_kbps: number | null;
+  language?: string | null;
+  homepage?: string | null;
   /** HLS playlists are listed but not playable yet (RADIO-06). */
   hls: boolean;
 }
@@ -70,6 +72,8 @@ export function stationOf(row: Record<string, unknown>): DirectoryStation | null
     country_code: /^[A-Z]{2}$/.test(country) ? country : null,
     codec: text(row.codec).toLowerCase() || null,
     bitrate_kbps: bitrate,
+    language: text(row.language).split(",").map((item) => item.trim()).filter(Boolean).slice(0, 3).join(", ") || null,
+    homepage: /^https:\/\//i.test(text(row.homepage)) ? text(row.homepage) : null,
     hls: row.hls === 1 || row.hls === true || /\.m3u8(\?|$)/i.test(url),
   };
 }

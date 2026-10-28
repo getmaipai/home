@@ -3,15 +3,15 @@
 // package, or an id it does not know, it passes on, so the generic route (and its 404) still decide. The rules live in
 // lib/media/appHost.ts; this file is the wire.
 import { apiRouter } from "@/lib/openapi";
-import { requireAuth } from "@/middleware/auth";
 import { appRouteAllowed } from "@/lib/apps";
+import { requireAuth } from "@/middleware/auth";
 import { getCookie } from "hono/cookie";
 import { hashSessionToken } from "@/lib/session";
 import "@/lib/media/podcastApp"; // registers the Podcasts data ids and item view with the shared host
 import "@/lib/media/musicApp"; // registers the Music lyrics fields with the shared host
 import "@/lib/media/radioRecordings"; // adds the Recordings scope to Music's existing radio data id
 import { podcastRoutes, podcastDirectoryRows } from "./podcastApp";
-import { radioRoutes, radioDirectoryRows, radioSavedRows, radioCountryRows, radioGenreRows } from "./radioApp";
+import { radioRoutes, radioDirectoryRows, radioSavedRows, radioStationRow, radioCountryRows, radioGenreRows } from "./radioApp";
 import { fetchRadioArt } from "@/lib/media/radioArt";
 import { radioDirectoryAllowed, radioDirectoryHasFavicon } from "@/lib/media/radioDirectory";
 import { listSavedStations } from "@/lib/media/radio";
@@ -78,7 +78,7 @@ export function createMediaAppRoutes(appId: MediaAppId) {
     if (!mediaAppAllowed(person, appId)) return next();
     // NEWS-00 review: a data id a raised page binds needs that page's floor; ids the media host serves that no page binds stay under the host's own rules.
     const isRadioDirectoryScope = appId === "music" && c.req.param("dataId") === "radio";
-    if (!isRadioDirectoryScope && !appRouteAllowed(person, appId, "data", c.req.param("dataId"), undefined, "open")) return next();
+    if (!appRouteAllowed(person, appId, "data", c.req.param("dataId"), undefined, "open")) return next();
     // PODCAST-PORT-01: the directory is a network lookup, so it is answered here (async) beside the sync host data. Same gates as its routes.
     if (appId === "podcasts" && c.req.param("dataId") === "directory") {
       const body = await bodyOf(c.req.raw);
@@ -90,6 +90,10 @@ export function createMediaAppRoutes(appId: MediaAppId) {
         const body = await bodyOf(c.req.raw);
         const field = (key: string) => (typeof body[key] === "string" ? (body[key] as string) : "");
         const scope = field("scope");
+        if (scope === "station") {
+          const row = radioStationRow(person, field("id"));
+          return row ? c.json([row] as never, 200) : c.json([] as never, 200);
+        }
         if (["directory", "popular", "genre-rock", "genre-jazz", "genre-chill", "genre-classical", "genre-news", "genre-hip-hop", "world-us", "world-gb", "world-jp"].includes(scope)) return c.json(await radioDirectoryRows(person, { q: field("q"), country: field("country"), tag: field("tag"), scope: scope as import("./radioApp").RadioScope }) as never, 200);
         if (scope === "saved") return c.json(radioSavedRows(person) as never, 200);
         if (scope === "recordings") return c.json(radioRecordingRows(person) as never, 200);

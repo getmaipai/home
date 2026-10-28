@@ -6,7 +6,7 @@ import type { Context } from "hono";
 import type { PersonRow } from "@/types";
 import { mediaAppAllowed } from "@/lib/media/appHost";
 import { mediaBandOf } from "@/lib/media/band";
-import { addStation, directoryRowsFor, listSavedStations, removeStation, savedStationFor, type SavedStation } from "@/lib/media/radio";
+import { addStation, directoryRowsFor, listSavedStations, removeStation, savedStationFor, stationVisibleAtBand, type SavedStation } from "@/lib/media/radio";
 import { nowPlayingOf, openStationStream, type StreamDeps } from "@/lib/media/radioStream";
 import { decodeHlsResource, openHlsResource } from "@/lib/media/radioHls";
 import { findStations, radioDirectoryAllowed, radioDirectoryHasFavicon, rememberPreviewStations, previewStationFor, type DirectoryStation } from "@/lib/media/radioDirectory";
@@ -43,14 +43,24 @@ export const radioGenreRows = () => GENRES.map((genre) => ({ id: genre, label: g
 const subtitleOf = (station: { country_code: string | null; tags: string[] }): string =>
   [countryName(station.country_code), station.tags.slice(0, 2).join(", ")].filter(Boolean).join(" · ");
 
-export type RadioRow = { id: string; kind: "station"; title: string; summary: string; thumbnail: string | null; url: string; preview_url?: string; favicon: string; tags_csv: string; country_code: string; codec: string; bitrate_kbps: string; action_label: string };
+export type RadioRow = { id: string; kind: "station"; title: string; summary: string; thumbnail: string | null; url: string; preview_url?: string; favicon: string; tags_csv: string; country_code: string; codec: string; bitrate_kbps: string; language: string; homepage: string; action_label: string };
 const rowOf = (station: DirectoryStation | SavedStation, label: string): RadioRow => ({
   id: station.id, kind: "station", title: station.name, summary: [subtitleOf(station), station.bitrate_kbps ? `${station.bitrate_kbps} kbps` : "", station.codec?.toUpperCase() ?? ""].filter(Boolean).join(" · "), thumbnail: station.favicon ? `/api/plugins/music/radio/art?u=${encodeURIComponent(station.favicon)}` : station.favicon === null ? `/api/favicon?domain=${encodeURIComponent(new URL(station.url).hostname)}` : null, url: station.url, favicon: station.favicon ?? "", tags_csv: station.tags.join(","),
-  country_code: station.country_code ?? "", codec: station.codec ?? "", bitrate_kbps: station.bitrate_kbps === null ? "" : String(station.bitrate_kbps), action_label: label,
+  country_code: station.country_code ?? "", codec: station.codec ?? "", bitrate_kbps: station.bitrate_kbps === null ? "" : String(station.bitrate_kbps), language: "language" in station && station.language ? station.language : "", homepage: "homepage" in station && station.homepage ? station.homepage : "", action_label: label,
 });
 
 /** Saved stations for the page: a child sees exactly what a parent saved for them. */
 export const radioSavedRows = (person: PersonRow): RadioRow[] => listSavedStations(person).map((station) => ({ ...rowOf(station, "Remove"), action_label: "Remove" }));
+
+/** Station page data resolves saved stations first, then only directory stations recently shown to this household. */
+export function radioStationRow(person: PersonRow, id: string): (RadioRow & { description: string; saved: boolean; homepage: string; play_label: string; remove_label: string; record_label: string }) | null {
+  const saved = listSavedStations(person).find((station) => station.id === id);
+  const station = saved ?? previewStationFor("household", id);
+  if (!station || !stationVisibleAtBand(person, station.tags)) return null;
+  const facts = [countryName(station.country_code), "language" in station ? station.language : null, station.codec?.toUpperCase() ?? "", station.bitrate_kbps ? `${station.bitrate_kbps} kbps` : "", station.tags.join(", "), "homepage" in station ? station.homepage : null].filter((part): part is string => typeof part === "string" && part !== "").join(" · ");
+  const homepage = "homepage" in station && typeof station.homepage === "string" ? station.homepage : "";
+  return { ...rowOf(station, saved ? "Remove" : "Add to Your stations"), summary: facts, description: facts ? `Live radio from ${facts}.` : "Live radio station.", saved: !!saved, homepage, action_label: saved ? "Added to Your stations" : "Add to Your stations", play_label: saved ? "Play" : "Preview", remove_label: saved ? "Remove" : "", record_label: saved ? "Record" : "" };
+}
 
 /** Find rows for the page. Off, a child, an adult-tag filter or a down directory all give an empty list (the page says so), never an error. */
 export type RadioScope = "directory" | "popular" | "genre-rock" | "genre-jazz" | "genre-chill" | "genre-classical" | "genre-news" | "genre-hip-hop" | "world-us" | "world-gb" | "world-jp";
@@ -66,7 +76,7 @@ export async function radioDirectoryRows(person: PersonRow, query: { q: string; 
     if (band !== "adult") return [];
     const checked = checkFeedAddress(query.q.trim());
     if (!checked.ok) return [];
-    return [{ id: "address", kind: "station", title: "Add this address", summary: checked.url, thumbnail: null, url: checked.url, favicon: "", tags_csv: "", country_code: "", codec: "", bitrate_kbps: "", action_label: "Add" }];
+    return [{ id: "address", kind: "station", title: "Add this address", summary: checked.url, thumbnail: null, url: checked.url, favicon: "", tags_csv: "", country_code: "", codec: "", bitrate_kbps: "", language: "", homepage: "", action_label: "Add" }];
   }
   if (!radioDirectoryAllowed({ band }, getHouseholdSettingValue("radio.directory.enabled") === true)) return [];
   const any = (value: string) => (value === "all" ? "" : value.trim());
@@ -161,6 +171,7 @@ export function radioRoutes() {
     const result = addStation(person, {
       name: str(body.name), url: str(body.url), favicon: typeof body.favicon === "string" && body.favicon !== "" ? body.favicon : null, tags: Array.isArray(body.tags) ? (body.tags as string[]) : typeof body.tags === "string" ? body.tags.split(",") : [],
       country_code: typeof body.country_code === "string" && body.country_code !== "" ? body.country_code : null, codec: typeof body.codec === "string" && body.codec !== "" ? body.codec : null,
+      language: typeof body.language === "string" ? body.language : null, homepage: typeof body.homepage === "string" ? body.homepage : null,
       bitrate_kbps: typeof body.bitrate_kbps === "number" ? body.bitrate_kbps : typeof body.bitrate_kbps === "string" && /^\d+$/.test(body.bitrate_kbps) ? Number(body.bitrate_kbps) : null, for_person_id: typeof body.for_person_id === "string" ? body.for_person_id : null, fromDirectory,
     });
     return result.ok ? c.json({ ok: true as const, station: result.value, label: "Added to Your stations" }, 200) : c.json({ error: result.error }, result.status as 400);
@@ -187,7 +198,9 @@ export function radioRoutes() {
     if (!radioDirectoryAllowed({ band: mediaBandOf(person) }, getHouseholdSettingValue("radio.directory.enabled") === true)) return c.json({ error: NOT_ON }, 403);
     const station = previewStationFor("household", c.req.param("id"));
     if (!station || (mediaBandOf(person) !== "adult" && /adult|porn|xxx|erotic/i.test(station.tags.join(" ")))) return c.json({ error: "That preview is no longer available. Find the station again." }, 404);
-    const opened = await openStationStream(person.id, { ...station, for_person_id: null, added_by_person_id: null }, streamDeps, c.req.raw.signal);
+    const opened = station.hls
+      ? await openHlsResource(person.id, { ...station, for_person_id: null, added_by_person_id: null }, station.url, streamDeps, c.req.raw.signal)
+      : await openStationStream(person.id, { ...station, for_person_id: null, added_by_person_id: null }, streamDeps, c.req.raw.signal);
     return opened.ok ? opened.response : c.json({ error: opened.error }, opened.status);
   });
   routes.post("/preview", requireAuth, async (c, next) => {
@@ -197,7 +210,9 @@ export function radioRoutes() {
     const id = str((await bodyOf(c)).id);
     const station = previewStationFor("household", id);
     if (!station || (mediaBandOf(person) !== "adult" && /adult|porn|xxx|erotic/i.test(station.tags.join(" ")))) return c.json({ error: "That preview is no longer available. Find the station again." }, 404);
-    const opened = await openStationStream(person.id, { ...station, for_person_id: null, added_by_person_id: null }, streamDeps, c.req.raw.signal);
+    const opened = station.hls
+      ? await openHlsResource(person.id, { ...station, for_person_id: null, added_by_person_id: null }, station.url, streamDeps, c.req.raw.signal)
+      : await openStationStream(person.id, { ...station, for_person_id: null, added_by_person_id: null }, streamDeps, c.req.raw.signal);
     return opened.ok ? opened.response : c.json({ error: opened.error }, opened.status);
   });
 
@@ -206,7 +221,10 @@ export function radioRoutes() {
   routes.get("/hls/:id/resource/:token", requireAuth, async (c, next) => {
     const person = c.get("person");
     if (!mediaAppAllowed(person, "music")) return next();
-    const station = savedStationFor(person, c.req.param("id"));
+    const id = c.req.param("id");
+    const saved = savedStationFor(person, id);
+    const preview = !saved && radioDirectoryAllowed({ band: mediaBandOf(person) }, getHouseholdSettingValue("radio.directory.enabled") === true) ? previewStationFor("household", id) : null;
+    const station = saved ?? (preview && (mediaBandOf(person) === "adult" || !/adult|porn|xxx|erotic/i.test(preview.tags.join(" "))) ? { ...preview, for_person_id: null, added_by_person_id: null } : null);
     if (!station) return c.json({ error: "That station is not in your list. Open Radio and pick one of Your stations." }, 404);
     const address = decodeHlsResource(c.req.param("token"));
     if (!address) return c.json({ error: "That playlist resource is not available." }, 404);

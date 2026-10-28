@@ -199,6 +199,13 @@ export function MediaHostProvider({ children }: { children: ReactNode }) {
     if (!element) return;
     return guardMediaBudget(element, { fetchBudget: () => api.mediaBudget(), notify: (line) => pushRef.current(line), every: intervalEvery(BUDGET_CHECK_MS), state: budgetState.current });
   }, [element]);
+  // Tell the person when a station or other media item cannot be decoded or fetched.
+  useEffect(() => {
+    if (!element || liveId === null) return;
+    const onError = () => pushRef.current("This station could not be played. Try again or choose another station.");
+    element.addEventListener("error", onError);
+    return () => element.removeEventListener("error", onError);
+  }, [element, liveId]);
   // RADIO-03: a live station. Pause then Play loads the stream again (the live edge, not a stale buffer); the song the station reports is
   // read from the hub a few seconds after sound starts and then every 15 s, only while it plays and this tab is visible.
   useEffect(() => {

@@ -1,36 +1,49 @@
 {
   "type": "page",
   "id": "station",
-  "title": "Now playing",
+  "title": "Station",
   "body": [
     {
+      "type": "billboard",
+      "bind": { "source": "package", "path": "radio", "params": { "scope": "station", "id": "$state.id" } },
+      "label": "Radio",
+      "size": "hero",
+      "autoplay": false,
+      "item_key_field": "id",
+      "item_title_field": "title",
+      "item_subtitle_field": "{summary}",
+      "item_art_field": "thumbnail",
+      "primary": { "label": "Play", "icon": "play", "action": { "play": { "media_id": "{id}" } } }
+    },
+    {
+      "type": "media_shelf",
+      "heading": "Station",
+      "bind": { "source": "package", "path": "radio", "params": { "scope": "station", "id": "$state.id" } },
+      "item_key_field": "id",
+      "item_label_field": "title",
+      "item_subtitle_field": "{summary}",
+      "item_media_field": "thumbnail",
+      "aspect": "square",
+      "variant": "plain",
+      "hide_when_empty": true,
+      "row_actions": [
+        { "icon": "circle-record", "label": "Record", "label_field": "record_label", "action": { "call": { "target": "/api/plugins/music/radio/recordings/{id}/start", "args": { "length": "15" } } } },
+        { "icon": "trash", "label": "Remove", "label_field": "remove_label", "action": { "call": { "target": "/api/plugins/music/radio/stations/{id}", "method": "DELETE" } } }
+      ],
+      "on_select": { "navigate": { "to": "/apps/music/station", "state": { "id": "{id}" } } }
+    },
+    {
       "type": "player",
-      "bind": {
-        "source": "package",
-        "path": "item",
-        "params": {
-          "id": "$state.id"
-        }
-      },
+      "bind": { "source": "package", "path": "item", "params": { "id": "$state.id" } },
       "kind": "audio",
       "details": false,
       "layout": "audio",
-      "empty_state": {
-        "type": "empty_state",
-        "icon": "headphones",
-        "text": "This station is not in your list. Go back to Radio and pick one."
-      }
+      "empty_state": { "type": "empty_state", "icon": "headphones", "text": "This station is no longer available. Go back to Radio and find it again." }
     },
     {
       "type": "media_shelf",
       "heading": "Recordings",
-      "bind": {
-        "source": "package",
-        "path": "radio",
-        "params": {
-          "scope": "recordings"
-        }
-      },
+      "bind": { "source": "package", "path": "radio", "params": { "scope": "recordings" } },
       "item_key_field": "id",
       "item_label_field": "title",
       "item_subtitle_field": "{channel}",
@@ -39,11 +52,7 @@
       "variant": "plain",
       "orientation": "vertical",
       "hide_when_empty": true,
-      "on_select": {
-        "play": {
-          "media_id": "{id}"
-        }
-      }
+      "on_select": { "play": { "media_id": "{id}" } }
     }
   ]
 }

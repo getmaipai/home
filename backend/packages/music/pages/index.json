@@ -118,6 +118,22 @@
         }
       },
       "hide_when_empty": true
+    },
+    {
+      "type": "media_shelf",
+      "heading": "Your stations",
+      "bind": { "source": "package", "path": "radio", "params": { "scope": "saved" } },
+      "item_key_field": "id", "item_label_field": "title", "item_subtitle_field": "{summary}", "item_media_field": "thumbnail",
+      "aspect": "square", "variant": "plain", "hide_when_empty": true,
+      "on_select": { "navigate": { "to": "/apps/music/station", "state": { "id": "{id}" } } }
+    },
+    {
+      "type": "media_shelf",
+      "heading": "Popular radio",
+      "bind": { "source": "package", "path": "radio", "params": { "scope": "popular" } },
+      "item_key_field": "id", "item_label_field": "title", "item_subtitle_field": "{summary}", "item_media_field": "thumbnail",
+      "aspect": "square", "variant": "plain", "hide_when_empty": true,
+      "on_select": { "navigate": { "to": "/apps/music/station", "state": { "id": "{id}" } } }
     }
   ]
 }
