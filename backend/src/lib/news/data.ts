@@ -28,6 +28,7 @@ import { TOPICS, topicById, topicOfferedTo, topicsFor } from "./topics";
 import { bumpNewsCounter } from "./newsCounters";
 import { feedLabels } from "./feedLabels";
 import { datelineOf, dayGroupOf } from "./dayParts";
+import { spreadPublishers } from "./spread";
 
 export interface BlocksData { as_of: string; blocks: unknown[]; degraded?: true }
 export type RowsData = Array<Record<string, unknown>>;
@@ -148,7 +149,9 @@ function feedBlock(env: CardEnv, request: FeedRequest, now: Date): unknown[] {
   const shown = new Set([hero?.item_id, ...featured.map((card) => card.item_id)]);
   const recent = ranked.rest.map(cardFor).filter((card) => now.getTime() - Date.parse(card.published_at) <= ROWS_WINDOW_H * HOUR_MS || request.channelRows);
   recent.sort((a, b) => b.published_at.localeCompare(a.published_at));
-  const rows = recent.slice(0, Math.min(ROWS_MAX, ROWS_PAGE * Math.max(1, request.page)))
+  // The main Today list gives one publisher a few rows per day heading; a topic, a channel or a followed source shows everything it has.
+  const listed = request.match || topic || request.channelRows ? recent : spreadPublishers(recent, (card) => dayGroupOf(new Date(card.published_at), now));
+  const rows = listed.slice(0, Math.min(ROWS_MAX, ROWS_PAGE * Math.max(1, request.page)))
     .map((card) => ({ ...withKicker(card, band), group: dayGroupOf(new Date(card.published_at), now) }));
   const shelves = request.shelf && !topic ? channelShelf(env, request.followed, shown, now) : [];
   const total = (hero ? 1 : 0) + featured.length + rows.length + shelves.reduce((sum, shelf) => sum + shelf.stories.length, 0);
