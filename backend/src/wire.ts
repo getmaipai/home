@@ -175,6 +175,8 @@ export interface TurnGeneration {
    * time its own tokens were consumed (null if none ever were). */
   request_sent_ms: number;
   first_delta_ms: number | null;
+  /** DIAG-PREFIX-01: how much of this request matched the conversation's previous one; sizes and a part label, no text. */
+  prefix?: { request_chars: number; shared_chars: number; first_diff: string | null; had_previous: boolean };
   /** ENGINE-CONTRACT-02 (home/docs/dev.md 2026-09-23, "U6: the flip
    * verdict" regression A): the engine's own raw, unparsed `arguments`
    * string for the websearch call this generation verified, forced or

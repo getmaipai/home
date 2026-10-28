@@ -4,6 +4,7 @@ import { formatEngineIdentity } from "@/lib/engineIdentity";
 import type { TurnTimings } from "@/lib/turnContext";
 import type { TurnStats, TurnGeneration, ContextSegmentKey } from "@/wire";
 import type { StackFailureFacts } from "@/lib/stackEngine";
+import type { PromptPrefix } from "@/lib/promptPrefix";
 import type { FailureKind } from "@/lib/failureCopy";
 
 export type { TurnStats } from "@/wire";
@@ -20,6 +21,8 @@ export interface GenerationInput {
   maxTokens: number | null;
   requestSentMs: number;
   firstDeltaMs: number | null;
+  /** How much of the request matched the conversation's previous one (lib/promptPrefix.ts). */
+  prefix?: PromptPrefix;
   stats: ChatCompletionStreamStats | null | undefined;
   /** ENGINE-CONTRACT-02 ("U6: the flip verdict" regression A): the
    * engine's own raw `arguments` string for the call this generation's
@@ -84,6 +87,7 @@ function projectGeneration(gen: GenerationInput): TurnGeneration {
     predicted_ms: finite(gen.stats?.timings?.predicted_ms),
     request_sent_ms: gen.requestSentMs,
     first_delta_ms: gen.firstDeltaMs,
+    ...(gen.prefix ? { prefix: gen.prefix } : {}),
     tool_call_raw_args: gen.toolCallRawArgs ?? null,
     envelope_parsed: gen.envelopeParsed ?? false,
     error: gen.error ?? null,

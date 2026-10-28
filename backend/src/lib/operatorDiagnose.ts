@@ -22,7 +22,7 @@ export function turnsView(limit: number) {
     tokens_per_second: stats.tokens_per_second ?? null,
     generations: (stats.generations ?? []).map((g) => ({
       reason: g.reason, prompt_n: g.prompt_n, cache_n: g.cache_n, prompt_ms: g.prompt_ms, predicted_n: g.predicted_n,
-      request_sent_ms: g.request_sent_ms, first_delta_ms: g.first_delta_ms })),
+      request_sent_ms: g.request_sent_ms, first_delta_ms: g.first_delta_ms, ...(g.prefix ? { prefix: g.prefix } : {}) })),
   }));
 }
 

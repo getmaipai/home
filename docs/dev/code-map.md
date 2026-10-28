@@ -621,6 +621,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/projects/store.ts` | createProject, loadProject, saveProject, listResumableProjects, projectsByTurn |
 | `backend/src/lib/projects/tool.ts` | VIRTUAL_TOOL_REGISTRY, START_PROJECT_TOOL_ID, paramsSummary, startProjectToolSpec, projectTypeForArgs, validateProjectParams |
 | `backend/src/lib/projects/types.ts` | planSteps, stepStateFor |
+| `backend/src/lib/promptPrefix.ts` | comparePrompt |
 | `backend/src/lib/promptSanitize.ts` | sanitizeForPrompt |
 | `backend/src/lib/quickConnect.ts` | createQuickConnect, approveQuickConnect, consumeQuickConnect, isQuickConnectPending, quickConnectKindForCode, __resetQuickConnectForTests |
 | `backend/src/lib/rateLimiter.ts` | tryConsume, __resetRateLimiterForTests, __setRateLimiterClockForTests |

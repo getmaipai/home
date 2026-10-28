@@ -1,3 +1,4 @@
+import { comparePrompt } from "@/lib/promptPrefix";
 import { EMPTY_LENGTH_RETRY_EXTRA_TOKENS } from "@/lib/reasoningReserve";
 // U2c, the `model` node (turn-machine-state-record-2026-09-22.md's
 // state table): one call, the fixed tool set from the budget, offered with
@@ -374,6 +375,7 @@ async function runWatchedGeneration(state: TurnState, messages: LlmMessage[], to
     if (signal.aborted) roundAbort.abort(signal.reason);
     else signal.addEventListener("abort", () => roundAbort.abort(signal.reason), { once: true });
   }
+  const prefix = comparePrompt(state.conversationId, messages, tools);
   const started = await startCompleteStreamPieces("chat", messages, { model: state.modelId, tools: tools.length > 0 ? tools : undefined, tool_choice, thinking, max_tokens: maxTokens, dropReasoning: !state.reasoning.emit }, roundAbort?.signal ?? signal);
   if (!started.ok) {
     // GENFAIL-01 (dev.md "generation_failed is never blind again"): a
@@ -398,7 +400,7 @@ async function runWatchedGeneration(state: TurnState, messages: LlmMessage[], to
     // earlier failure (an invalid request never reaches the Stack at all).
     // The kind is read now, while the refusal it may name is current.
     const facts = started.facts ?? null;
-    state.generations.push({ reason, thinking, maxTokens, requestSentMs: failedAtMs - state.startedAt, firstDeltaMs: null, stats: null, error: boundedError, offlineReason: facts?.offline_reason ?? null, facts, failureKind: generationFailureKind(facts, boundedError), failedMs: failedAtMs - state.startedAt, failedAt: new Date(failedAtMs).toISOString() });
+    state.generations.push({ reason, thinking, maxTokens, requestSentMs: failedAtMs - state.startedAt, firstDeltaMs: null, prefix, stats: null, error: boundedError, offlineReason: facts?.offline_reason ?? null, facts, failureKind: generationFailureKind(facts, boundedError), failedMs: failedAtMs - state.startedAt, failedAt: new Date(failedAtMs).toISOString() });
     return { ok: false, code: started.code, message: boundedError, released: false };
   }
 
@@ -502,7 +504,7 @@ async function runWatchedGeneration(state: TurnState, messages: LlmMessage[], to
     // engine and model that were answering (llm.ts's StackStreamError).
     const failedAtMs = Date.now();
     const facts = err instanceof StackStreamError ? err.facts : null;
-    state.generations.push({ reason, thinking, maxTokens, requestSentMs: requestSentMs - state.startedAt, firstDeltaMs, stats: started.stats, error: message, offlineReason: facts?.offline_reason ?? null, facts, failureKind: generationFailureKind(facts, message), failedMs: failedAtMs - state.startedAt, failedAt: new Date(failedAtMs).toISOString() });
+    state.generations.push({ reason, thinking, maxTokens, requestSentMs: requestSentMs - state.startedAt, firstDeltaMs, prefix, stats: started.stats, error: message, offlineReason: facts?.offline_reason ?? null, facts, failureKind: generationFailureKind(facts, message), failedMs: failedAtMs - state.startedAt, failedAt: new Date(failedAtMs).toISOString() });
     return { ok: false, code: "generation_failed", message, released: (!holdAll && raw.length - (hold?.held.length ?? 0) > 0) || (state.reasoning.emit && nativeReasoning.length > 0) };
   }
 
@@ -514,7 +516,7 @@ async function runWatchedGeneration(state: TurnState, messages: LlmMessage[], to
   gate?.endReasoning();
 
   if (rescued) {
-    state.generations.push({ reason, thinking, maxTokens, requestSentMs: requestSentMs - state.startedAt, firstDeltaMs, stats: started.stats, toolCallRawArgs: null, envelopeParsed: false });
+    state.generations.push({ reason, thinking, maxTokens, requestSentMs: requestSentMs - state.startedAt, firstDeltaMs, prefix, stats: started.stats, toolCallRawArgs: null, envelopeParsed: false });
     return { ok: true, text: "", reasoning: nativeReasoning || undefined, toolCalls: undefined, thinking, hold: "rescue", ...(rescuedAtBudget ? { holdAtBudget: true } : {}) };
   }
 
@@ -554,7 +556,7 @@ async function runWatchedGeneration(state: TurnState, messages: LlmMessage[], to
   // verify, since a parse failure or a literal "{}" is exactly what a
   // later read of the trace needs to tell apart from a real query.
   const websearchRawArgs = toolCalls?.find((c) => c.tool === "websearch")?.rawArgs ?? null;
-  state.generations.push({ reason, thinking, maxTokens, requestSentMs: requestSentMs - state.startedAt, firstDeltaMs, stats: started.stats, toolCallRawArgs: websearchRawArgs, envelopeParsed });
+  state.generations.push({ reason, thinking, maxTokens, requestSentMs: requestSentMs - state.startedAt, firstDeltaMs, prefix, stats: started.stats, toolCallRawArgs: websearchRawArgs, envelopeParsed });
   // ROUTER-BUILD-01e: how the hold ended. The model's own call always wins.
   let heldEnd: GenerationAttempt["hold"];
   if (hold) {
