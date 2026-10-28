@@ -258,15 +258,19 @@ export function __ageCheckStateForTests(): { runner: boolean; vision: boolean; d
 
 function sleep(ms: number): Promise<void> { return new Promise((resolve) => setTimeout(resolve, ms)); }
 
-/** Whether the resident chat model is up and declares picture input. This is the model's own capability; the per-picture token bound that chat turns need for window accounting is not needed for a single small image. Any failure to read the Stack reads as "no". */
-async function chatReadsPictures(): Promise<boolean> {
+/** The Stack role that reads the pictures of a safety check: the resident chat model when it is up and declares picture input, else the separate vision role when it is installed and declares it (Splash chat loads no projector, so the vision role keeps chat fast). null means no reader, and the check fails closed. Any failure to read the Stack reads as null. */
+export type PictureReader = "chat" | "vision";
+export async function pictureReader(): Promise<PictureReader | null> {
   try {
     const { roles } = await getStackClient().roles({ signal: AbortSignal.timeout(5_000) });
-    const row = roles.find((role) => role.id === "chat");
-    const state = row?.state.state;
-    return (state === "ready" || state === "loaded" || state === "installed") && row?.model?.imageInput === true;
+    for (const id of ["chat", "vision"] as const) {
+      const row = roles.find((role) => role.id === id);
+      const state = row?.state.state;
+      if ((state === "ready" || state === "loaded" || state === "installed") && row?.model?.imageInput === true) return id;
+    }
+    return null;
   } catch {
-    return false;
+    return null;
   }
 }
 
@@ -286,14 +290,14 @@ async function memoryIsCritical(): Promise<boolean> {
   }
 }
 
-async function askModel(dataUrl: string, signal: AbortSignal): Promise<string> {
+async function askModel(dataUrl: string, signal: AbortSignal, reader: PictureReader): Promise<string> {
   if (visionForTests) return visionForTests({ dataUrl });
   const messages: LlmMessage[] = [
     { role: "system", content: AGE_CHECK_SYSTEM_PROMPT },
     { role: "user", content: AGE_USER_TEXT, images: [{ id: "agecheck", name: "image", url: dataUrl, reservedTokens: 2560 }] },
   ];
-  const result = await completeViaStackRequest("chat", {
-    model: "chat",
+  const result = await completeViaStackRequest(reader, {
+    model: reader,
     messages,
     stream: false,
     temperature: 0,
@@ -317,7 +321,7 @@ function exclusive<T>(work: () => Promise<T>): Promise<T> {
   return next;
 }
 
-async function checkOne(bytes: Uint8Array): Promise<ImageCheck> {
+async function checkOne(bytes: Uint8Array, reader: PictureReader): Promise<ImageCheck> {
   let jpeg: Uint8Array;
   try { jpeg = await downscaleForCheck(bytes); } catch { return { ok: false, why: "unparsed" }; }
   const dataUrl = `data:image/jpeg;base64,${Buffer.from(jpeg).toString("base64")}`;
@@ -325,7 +329,7 @@ async function checkOne(bytes: Uint8Array): Promise<ImageCheck> {
   const timer = setTimeout(() => controller.abort(), CHECK_DEADLINE_MS);
   try {
     const raw = await Promise.race([
-      askModel(dataUrl, controller.signal),
+      askModel(dataUrl, controller.signal, reader),
       new Promise<never>((_, reject) => controller.signal.addEventListener("abort", () => reject(new Error("timeout")), { once: true })),
     ]);
     const verdict = parseVerdict(raw);
@@ -342,12 +346,15 @@ async function checkOne(bytes: Uint8Array): Promise<ImageCheck> {
 export async function checkImages(images: readonly Uint8Array[], kind: CheckedKind): Promise<ImageCheck[]> {
   if (runForTests) return runForTests(images, kind);
   return exclusive(async () => {
+    let reader: PictureReader = "chat";
     if (!visionForTests) {
-      if (!(await chatReadsPictures())) return images.map((): ImageCheck => ({ ok: false, why: "no_vision" }));
+      const found = await pictureReader();
+      if (!found) return images.map((): ImageCheck => ({ ok: false, why: "no_vision" }));
+      reader = found;
       if (await memoryIsCritical()) return images.map((): ImageCheck => ({ ok: false, why: "memory" }));
     }
     const checks: ImageCheck[] = [];
-    for (const image of images) checks.push(await checkOne(image));
+    for (const image of images) checks.push(await checkOne(image, reader));
     return checks;
   });
 }

@@ -6,10 +6,9 @@
 //     including no answer, withholds.
 // The line a withheld picture gets is ONE short friendly sentence for the lane, never a lecture. The admin hears of it (no image), at most
 // once in ten minutes for one person (ageCheck.recordWithheld).
-import { decideAgeCheck, downscaleForCheck, recordWithheld, showsPossibleMinor, type AgeDecision, type CheckedKind, type ImageCheck } from "./ageCheck";
+import { decideAgeCheck, downscaleForCheck, pictureReader, type PictureReader, recordWithheld, showsPossibleMinor, type AgeDecision, type CheckedKind, type ImageCheck } from "./ageCheck";
 import { speakerAgeBand } from "@/lib/ageBand";
 import type { PersonRow } from "@/types";
-import { getStackClient } from "@/lib/stackEngine";
 import { completeViaStackRequest, type LlmMessage } from "@/lib/llm";
 import { CHILD_CONTENT_LINE, laneOf, markKidWithheld, type Lane } from "./lane";
 
@@ -84,15 +83,6 @@ let runnerForTests: ((images: readonly Uint8Array[]) => Promise<ChildSafetyCheck
 export function __setChildSafetyRunnerForTests(fn: typeof runnerForTests): void { runnerForTests = fn; }
 const DEADLINE_MS = 20_000;
 
-async function chatReadsPictures(): Promise<boolean> {
-  try {
-    const { roles } = await getStackClient().roles({ signal: AbortSignal.timeout(5_000) });
-    const row = roles.find((role) => role.id === "chat");
-    const state = row?.state.state;
-    return (state === "ready" || state === "loaded" || state === "installed") && row?.model?.imageInput === true;
-  } catch { return false; }
-}
-
 let chain: Promise<unknown> = Promise.resolve();
 function exclusive<T>(work: () => Promise<T>): Promise<T> {
   const next = chain.then(work, work);
@@ -100,7 +90,7 @@ function exclusive<T>(work: () => Promise<T>): Promise<T> {
   return next;
 }
 
-async function askOne(bytes: Uint8Array): Promise<ChildSafetyCheck> {
+async function askOne(bytes: Uint8Array, reader: PictureReader): Promise<ChildSafetyCheck> {
   let jpeg: Uint8Array;
   try { jpeg = await downscaleForCheck(bytes); } catch { return { ok: false, why: "unparsed" }; }
   const dataUrl = `data:image/jpeg;base64,${Buffer.from(jpeg).toString("base64")}`;
@@ -111,8 +101,8 @@ async function askOne(bytes: Uint8Array): Promise<ChildSafetyCheck> {
       { role: "system", content: CHILD_SAFETY_SYSTEM_PROMPT },
       { role: "user", content: "Classify this image.", images: [{ id: "childcheck", name: "image", url: dataUrl, reservedTokens: 2560 }] },
     ];
-    const result = await completeViaStackRequest("chat", {
-      model: "chat", messages, stream: false, temperature: 0, max_tokens: 160, // answer-budget
+    const result = await completeViaStackRequest(reader, {
+      model: reader, messages, stream: false, temperature: 0, max_tokens: 160, // answer-budget
       response_format: { type: "json_schema", json_schema: CHILD_SAFETY_SCHEMA }, chat_template_kwargs: { enable_thinking: false },
     }, controller.signal);
     if (!result.ok) return { ok: false, why: controller.signal.aborted ? "timeout" : "unavailable" };
@@ -128,9 +118,10 @@ async function askOne(bytes: Uint8Array): Promise<ChildSafetyCheck> {
 export async function checkChildSafety(images: readonly Uint8Array[]): Promise<ChildSafetyCheck[]> {
   if (runnerForTests) return runnerForTests(images);
   return exclusive(async () => {
-    if (!(await chatReadsPictures())) return images.map((): ChildSafetyCheck => ({ ok: false, why: "no_vision" }));
+    const reader = await pictureReader();
+    if (!reader) return images.map((): ChildSafetyCheck => ({ ok: false, why: "no_vision" }));
     const out: ChildSafetyCheck[] = [];
-    for (const image of images) out.push(await askOne(image));
+    for (const image of images) out.push(await askOne(image, reader));
     return out;
   });
 }
