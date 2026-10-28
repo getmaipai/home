@@ -6,7 +6,7 @@ import { urlAllowedFor } from "@/lib/blocklists/hostLists";
 import { pageHtml, PageDeclinedError } from "@/lib/packageHost";
 import { extractFullArticle } from "@/lib/retrieval/extractArticle";
 import { tripsMinorFloor } from "@/lib/retrieval/minorFloor";
-import { feedImageAddress } from "@/lib/shelf/imageAddress";
+import { feedImageAddress, isSiteArt } from "@/lib/shelf/imageAddress";
 import { releaseShelfItem } from "@/lib/shelf/shelfRead";
 import { sharedShelfStore, type ShelfItem, type ShelfStore } from "@/lib/shelf/shelfStore";
 import { acceptArticleText } from "./contentQuality";
@@ -43,7 +43,7 @@ function extract(html: string, item: ShelfItem, band: AgeBand): Pick<Enrichment,
     .map((node) => node.getAttribute("content") ?? "");
   // A site-wide logo or default share image is not this story's picture: the card shows the publisher tile instead.
   const siteImage = /(?:logo|favicon|sprite|placeholder|default[-_]?(?:image|share|og|social)|site[-_]?(?:image|share))/i;
-  const image_url = [...meta("og:image"), ...meta("twitter:image")].map(feedImageAddress).find((address) => !!address && !siteImage.test(new URL(address).pathname)) ?? null;
+  const image_url = [...meta("og:image"), ...meta("twitter:image")].map(feedImageAddress).find((address) => !!address && !siteImage.test(new URL(address).pathname) && !isSiteArt(address)) ?? null;
   let description = [...meta("og:description"), ...meta("description")].map(plain).find(Boolean) ?? null;
   if (!description) {
     const article = extractFullArticle(html, { book: "news", allowedBooks: new Set(), allowLinks: false, allowImages: false, mode: "news", baseUrl: item.canonical_url });

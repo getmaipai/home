@@ -20,7 +20,7 @@
 // topic within two ticks.
 import { assertNotPrivateHost, guardedFetch, SsrfBlockedError, type DnsLookup } from "@maipai/core/src/ssrfGuard";
 import { parseFeed } from "feedsmith";
-import { feedImageAddress, largerFeedImage } from "./imageAddress";
+import { feedImageAddress, isSiteArt, largerFeedImage } from "./imageAddress";
 import { NewsItem } from "@maipai/spec/gen/ts/news-item.js";
 import { tryConsume } from "@/lib/rateLimiter";
 import { nextHlc } from "@/lib/hlc";
@@ -200,7 +200,7 @@ function feedImage(e: Record<string, any>, links: { href?: string; rel?: string;
   const inline = /<img\b[^>]*\bsrc\s*=\s*["']([^"']+)["']/i.exec(html)?.[1];
   for (const candidate of [...candidates, inline]) {
     const image = feedImageAddress(candidate);
-    if (image) return largerFeedImage(image);
+    if (image && !isSiteArt(image)) return largerFeedImage(image);
   }
   return undefined;
 }
