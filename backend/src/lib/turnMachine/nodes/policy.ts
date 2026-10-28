@@ -76,6 +76,16 @@ function gateRefusalReason(reason: import("@/lib/gate/types").DenyReason): Extra
 // rule: grounding.pure_number (docs/plans/turn-machine-state-record-2026-09-22.md, "Grounding, stated exactly", 2a28e4e8)
 const PURE_NUMBER_RE = /^\d+$/;
 
+// Quotes, brackets and sentence punctuation the model may leave around an item id; not a policy rule, so no regex.
+const ITEM_QUOTING = "\"'<>()[].,;:!? \t\n";
+function trimItemQuoting(text: string): string {
+  let start = 0;
+  let end = text.length;
+  while (start < end && ITEM_QUOTING.includes(text[start]!)) start += 1;
+  while (end > start && ITEM_QUOTING.includes(text[end - 1]!)) end -= 1;
+  return text.slice(start, end);
+}
+
 /** GROUND-01 step 2 ("Ground the query, not every field"): the shape a
  * manifest's `args` JSON Schema carries for one property - only what
  * this function reads from it, never a schema validator of its own
@@ -369,7 +379,7 @@ export const policyNode: Node<PolicyInput, PolicyOutput> = async (state, input) 
       // The model may quote the reference with punctuation around it or pass only the id; both name what the person typed.
       const given = typeof callArgs.ref === "string" ? callArgs.ref.trim() : "";
       const typed = itemRefsIn(state.utterance);
-      const asked = given ? (typed.find((item) => item.ref === (itemRefsIn(given)[0]?.ref ?? given)) ?? typed.find((item) => item.id === given.replace(/^["'<(\[\s]+|["'>)\].,;:!?\s]+$/g, ""))) : undefined;
+      const asked = given ? (typed.find((item) => item.ref === (itemRefsIn(given)[0]?.ref ?? given)) ?? typed.find((item) => item.id === trimItemQuoting(given))) : undefined;
       if (asked) callArgs.ref = asked.ref;
       if (!state.itemReferenceAllowed || !asked) {
         noteRefusal("item_not_here");
