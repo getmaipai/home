@@ -4,7 +4,24 @@ Owner's request (Jesse, 2026-10-27): compare Home against Loki Doki's work on hu
 examples: people are rarely absolute ("it's probably going to rain", not "it's going to rain"), and rarely formal ("it's four
 o'clock", not "it's 4 PM"). Design only; nothing here is built.
 
-Architect verdict: not yet run. Needs one before any slice is built.
+Architect verdict: first ruling REJECTED (2026-10-27, record `data-scratch/architect/NAT-2026-10-27.verdict`); this revision answers each
+required edit and awaits a second ruling. Nothing is built before an APPROVED.
+
+## Supersedes
+
+Nothing is replaced wholesale. NAT-03 replaces the two hedging sentences in `INFORMATION_HANDLING_POLICY` and its `_WRITTEN` twin with
+one paragraph. NAT-02 changes the clock-time branch of `normalizeForSpeech` in `commons/spec`. NAT-06 adds fields beside
+`speech_style` and folds the humor dial into REG-02 (below) instead of opening a second disfluency item.
+
+## Reuse check (done 2026-10-27)
+
+| Candidate | Finding |
+|---|---|
+| `Intl.DateTimeFormat` with `dayPeriod` | Gives "in the evening" for a time; it cannot drop the part of day when obvious or say "quarter to four". Used for the zone math, not the wording. |
+| `Intl.RelativeTimeFormat`, `Intl.NumberFormat` | Produce "in 3 hours" and "about 30"; no spoken rounding ("low seventies"). Not a fit for `say`. |
+| date-fns, humanize-duration | Duration and relative-date phrasing in written form; a new dependency for a narrow gain (RELEASES-AND-DEPENDENCIES). Rejected. |
+| `backend/src/lib/timezones.ts` | `resolveZone(place)` maps a place name to a zone. Not the household clock. |
+| `backend/src/lib/news/dayParts.ts` | `hubTimeZone()`, `localDayKey`, `dayGroupOf`: the household's zone already exists and is what `now` is built from. Answers the time-zone question. |
 
 ## Answer
 
@@ -132,7 +149,9 @@ Extend `spec/llm/naturalness-corpus.json` from 9 rows to about 30, and make the 
 
 Each row has a seeded evidence record, so the check reads the reply, and the same row also checks the evidence the model got
 (that the shaping slices actually reached it). The bench runs against the local coder model through `local-lane` and against
-the chat model, and prints a pass count per mechanic. **Baseline recorded before NAT-02 starts.**
+the chat model, and prints a pass count per mechanic. **Baseline recorded before NAT-02 starts.** Acceptance for NAT-03 and
+NAT-04 is a CHAT-AB-01 row each: the hedge and rounding rows must pass at least as often as the recorded baseline on the chat
+model, and the A/B comparison against the pre-slice prompt must show no loss on the other mechanics.
 
 ### 3.3 NAT-02: clock times the way a person says them (S-M, spec first)
 
@@ -146,15 +165,16 @@ the chat model, and prints a pass count per mechanic. **Baseline recorded before
 | 6:00 am | tomorrow | "six in the morning tomorrow" |
 | 6:00 am | now is 9:00 pm, no day given | "six in the morning" (cannot be today, so say the part of day) |
 | 12:00 pm / 12:00 am | any | "noon" / "midnight" (unchanged) |
-| 3:45 | rounding allowed (`exact` false) | "quarter to four", companion permitting |
+| 3:45 | any | "three forty-five" |
 
-The part of day is dropped only when the listener could not mistake it, never otherwise. `exact` values keep the minute
-("three forty-five") but still drop the part of day when it is obvious. Where the household's time zone comes from is the first
-thing the architect checks (`now` must be the household's clock, not the server's; Loki Doki's own review flagged server-local
-time as wrong for remote clients).
+The normalizer only pronounces; it never rounds or softens a minute, so it cannot change a fact. The part of day is dropped only
+when the listener could not mistake it. `now` is the household's clock from `hubTimeZone()` (`news/dayParts.ts`), never the
+server's; Loki Doki's own review flagged server-local time as wrong for remote clients. Rounding ("quarter to four", "like four")
+is not done here; it is `say` in NAT-04, chosen by the model from evidence.
 
 The written reply gets the same help from the evidence (3.5), not from rewriting: a time field arrives as
-`{ exact: "15:47", say: "quarter to four" }`, and the model picks.
+`{ exact: "15:47", say: "quarter to four" }`, and the model picks. CHAT-CLOCK-01's position and day granularity rules
+still govern when a time or date opens a reply; `say` changes only how a time is worded, never whether it is stated.
 
 ### 3.4 NAT-03: an uncertainty ladder that scales and stacks (S-M)
 
@@ -163,8 +183,8 @@ Replace the two hedging sentences with one short paragraph in both policy twins,
 | Certainty | Comes from | Typical words |
 |---|---|---|
 | sure | the household's own record, a live reading | no hedge ("It's 72 in the living room.") |
-| likely | forecast at or above 60%, a well-sourced search hit | "probably", "looks like", "should be" |
-| maybe | forecast 30 to 60%, a single weak source | "might", "could", "maybe" |
+| likely | forecast at or above 60%, a well-sourced search hit (a result whose typed `source` is a primary or official page) | "probably", "looks like", "should be" |
+| maybe | forecast 30 to 60%, a single weak source (any other typed `source`) | "might", "could", "maybe" |
 | unlikely | forecast under 30% | "probably not", "doubt it" |
 | recalled | a stored memory with low confidence or age | "if I remember right", "I think" |
 | reported | a web page, a news item, something the person told it about someone else | "apparently", "it says", "they're saying" |
@@ -173,11 +193,13 @@ The paragraph states the principle (match the hedge to the certainty and the sou
 seventy, I'd guess") and gives three before-and-after pairs. The word lists above are guidance for authors, not code that scans a
 reply. A typed outcome (CHAT-15's `source`, `as_of`) gains `certainty`; the weather package maps its probability to the band
 (spec first, then the package). Child and teen listeners get the sure and likely bands only for anything touching safety; a
-safety instruction is never hedged.
+safety instruction is never hedged. "Touching safety" is the typed outcome's existing safety flag (the child floor's own marker),
+not a reading of the person's words.
 
 ### 3.5 NAT-04: a spoken form beside every exact value (M)
 
-Typed outcomes gain an optional `say` beside the exact value, built by the package that knows the unit:
+Typed outcomes gain an optional `say` beside the exact value, built by the package that knows the unit. A time value keeps the
+CHAT-CLOCK-01 position and day granularity rules; `say` for a time is wording only:
 
 | Exact | `say` |
 |---|---|
@@ -197,7 +219,9 @@ catalog weather, price and distance packages adopt it one at a time; nothing bre
 The turn state keeps the last answer's subject, its evidence fingerprint and its `say` text. If the same subject is asked again
 within a short window, the reply plan gains a move `echo`: unchanged evidence allows "Still X." or a shorter paraphrase; changed
 evidence requires naming the change ("Seven minutes now, was ten."). Unless the person said they did not hear it. This reuses
-the existing move table in `register.ts` and needs no new subsystem.
+the existing move table in `register.ts` and needs no new subsystem. Constraints: `echo` is a reply-plan move chosen from typed
+state (subject id, fingerprint, elapsed time), never from matching the person's words; it never applies on a child or teen
+safety subject; the record holds ids and fingerprints, not reply text (rule 6a).
 
 ### 3.7 NAT-06: formality and hedging as companion dials (S, after the speech-style slices)
 
@@ -205,10 +229,11 @@ Two persona fields, spec first, defaults leaving every current companion unchang
 
 | Dial | Values | Effect |
 |---|---|---|
-| `clock_style` | formal, plain, loose | "four P M" / "four o'clock" / "like four" (read by the normalizer and the prompt) |
+| `clock_style` | formal, plain, loose | "four P M" / "four o'clock" / "like four" (read by the prompt as a per-request mechanism, not prompt prose; the normalizer never rounds) |
 | `hedging` | low, medium, high | how often a hedge appears when certainty is below sure |
 
-The English professor gets formal and low; the valley girl, loose and high; the grandfather, plain and medium. This sits beside
+The English professor gets formal and low; the valley girl, loose and high; the grandfather, plain and medium. Per rule 14 these are per-request mechanisms (the dial value becomes a plan input, not a paragraph of persona text), and the
+humor, disfluency and filler side is the same surface as REG-02, so NAT-06 extends REG-02 instead of opening a parallel item. This sits beside
 `speech_style` in the same Companions app form and follows the same rule: the household changes the rate, the author owns the
 words. The existing `formality` dimension is an input to the defaults so authors do not set three dials by hand.
 
