@@ -1,6 +1,6 @@
 {
-  "generatedAt": "2026-10-28T01:37:24.142Z",
-  "kitTag": "ui-v0.5.399",
+  "generatedAt": "2026-10-28T05:55:11.957Z",
+  "kitTag": "ui-v0.5.400",
   "items": [
     {
       "file": "ActivityCardsShowcase.tsx",
@@ -1709,6 +1709,14 @@
       "group": "voice",
       "verdict": "wire-now",
       "verdictReason": "Selected for current Home UI adoption because the shipped Element fits a current or accepted Home feature.",
+      "implemented": false
+    },
+    {
+      "file": "weather-advice.tsx",
+      "name": "weather-advice",
+      "group": "weather",
+      "verdict": "unassessed",
+      "verdictReason": "Recorded unassessed verdict in elements-plan.json; see the plan entry for its dependency or scope.",
       "implemented": false
     },
     {
