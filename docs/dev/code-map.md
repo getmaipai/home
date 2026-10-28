@@ -724,7 +724,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/shelf/canonicalUrl.ts` | canonicalUrl |
 | `backend/src/lib/shelf/feedAddresses.ts` | MAX_FEED_ADDRESSES_PER_BOX, splitFeedAddresses, checkFeedAddress, checkFeedAddressBox |
 | `backend/src/lib/shelf/feedStore.ts` | MIN_POLL_INTERVAL_S, listFeeds, getFeed, findFeedByUrl, createFeed, updateFeed |
-| `backend/src/lib/shelf/imageAddress.ts` | feedImageAddress, largerFeedImage |
+| `backend/src/lib/shelf/imageAddress.ts` | feedImageAddress, largerFeedImage, isSiteArt |
 | `backend/src/lib/shelf/shelfCounters.ts` | SHELF_COUNTER_NAMES, bumpShelfCounter, shelfCounters, __resetShelfCountersForTests |
 | `backend/src/lib/shelf/shelfEvents.ts` | reportShelfEvent |
 | `backend/src/lib/shelf/shelfFeeds.ts` | __resetTopicHintsForTests, topicsHintFor, adminAddresses, shelfAdminHosts, syncShelfFeeds |
