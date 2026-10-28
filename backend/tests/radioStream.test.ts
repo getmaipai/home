@@ -140,13 +140,16 @@ describe("the stream route", () => {
     expect((await new TestClient().get(`${BASE}/stream/x`)).status).toBe(401);
   });
 
-  test("an HLS station answers 415 and nothing is requested", async () => {
+  test("an HLS station is served as a rewritten same-origin playlist (RADIO-06)", async () => {
     const { client } = await owner();
     const id = await save(client, "Hill HLS", "https://stream.example.com/hill.m3u8");
+    handler = () => new Response("#EXTM3U\n#EXT-X-TARGETDURATION:4\n#EXTINF:4,\nhttps://stream.example.com/seg1.ts\n", { status: 200, headers: { "content-type": "application/vnd.apple.mpegurl" } });
     const response = await client.get(`${BASE}/stream/${id}`);
-    expect(response.status).toBe(415);
-    expect(((await response.json()) as { error: string }).error).toContain("HLS stations are not supported yet");
-    expect(calls).toEqual([]);
+    expect(response.status).toBe(200);
+    const body = await response.text();
+    expect(body).toContain("#EXTM3U");
+    expect(body).toContain(`/hls/${id}/resource/`);
+    expect(body).not.toContain("https://stream.example.com/seg1.ts");
   });
 
   test("a playlist content type is treated as HLS, and a web page is refused", async () => {
