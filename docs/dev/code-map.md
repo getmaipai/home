@@ -38,11 +38,11 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/packages/news/pages/story.json` | news | Story |
 | `backend/packages/podcasts/pages/episodes.json` | podcasts | Episodes |
 | `backend/packages/podcasts/pages/filters.json` | podcasts | Filters |
-| `backend/packages/podcasts/pages/find.json` | podcasts | Find shows |
-| `backend/packages/podcasts/pages/index.json` | podcasts | Listen now |
+| `backend/packages/podcasts/pages/index.json` | podcasts | Podcasts |
 | `backend/packages/podcasts/pages/play.json` | podcasts | Listen |
 | `backend/packages/podcasts/pages/queue.json` | podcasts | Queue |
 | `backend/packages/podcasts/pages/saved.json` | podcasts | Saved |
+| `backend/packages/podcasts/pages/search.json` | podcasts | Search podcasts |
 | `backend/packages/podcasts/pages/shows.json` | podcasts | Shows |
 | `backend/packages/podcasts/pages/stats.json` | podcasts | Stats |
 | `backend/packages/shows/pages/film.json` | shows | Film |
