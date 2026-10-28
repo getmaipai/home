@@ -497,7 +497,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/media/progress.ts` | LATCH_PERCENT, BOOK_END_PERCENT, correctedStamp, percentOf, reachesLatch, mergeProgress |
 | `backend/src/lib/media/radio.ts` | adultTagged, stationVisibleAtBand, listSavedStations, savedStationFor, stationItemView, savedAddressesOf |
 | `backend/src/lib/media/radioArt.ts` | __setRadioArtDepsForTests, __resetRadioArtForTests, radioArtAddressOk, fetchRadioArt |
-| `backend/src/lib/media/radioDirectory.ts` | __resetRadioDirectoryForTests, radioDirectoryHasFavicon, __rememberRadioFaviconForTests, radioDirectoryAllowed, stationOf, findStations |
+| `backend/src/lib/media/radioDirectory.ts` | __resetRadioDirectoryForTests, rememberPreviewStations, previewStationFor, radioDirectoryHasFavicon, __rememberRadioFaviconForTests, radioDirectoryAllowed |
 | `backend/src/lib/media/radioHls.ts` | openHlsResource, hlsResourceUrl, decodeHlsResource |
 | `backend/src/lib/media/radioIcy.ts` | usableMetaint, parseStreamTitle, IcyDemuxer |
 | `backend/src/lib/media/radioStream.ts` | MAX_REDIRECTS, CONNECT_TIMEOUT_MS, MAX_STREAMS_PER_HOME, unplayable, activeStreamCount, __resetRadioStreamsForTests |
