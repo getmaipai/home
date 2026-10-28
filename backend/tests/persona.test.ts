@@ -159,7 +159,7 @@ describe("composePersonaPrompt", () => {
 describe("INFORMATION_HANDLING_POLICY", () => {
   test("is a real, non-empty, persona-independent policy - the same string regardless of which persona composed it", () => {
     expect(INFORMATION_HANDLING_POLICY.length).toBeGreaterThan(0);
-    expect(INFORMATION_HANDLING_POLICY).toContain("hedged");
+    expect(INFORMATION_HANDLING_POLICY).toContain("Hedge to the certainty");
   });
 });
 

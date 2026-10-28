@@ -38,6 +38,7 @@ import type { AgeBand } from "@/lib/ageBand";
 import type { StructuredPart } from "@/wire";
 import { evaluateSafety, forOutput } from "@/lib/safety";
 import type { SurfaceClass } from "@/lib/surfaceClass";
+import { certaintyFields, type CertaintyGate } from "@/lib/certainty";
 import { START_PROJECT_TOOL_ID } from "@/lib/projects/tool";
 import { SPEC_SHEET_BOUND, SPEC_SHEET_READY } from "@/lib/structuredPartIds";
 
@@ -1044,9 +1045,12 @@ function searchContent(payload: Record<string, unknown>, maxChars = SEARCH_SOURC
 /** The tool message's content for one outcome: the result as JSON data
  * (the reply, the data, the hint), or the failure; never a developer
  * diagnostic. */
-export function toolResultContent(outcome: ToolExecutionOutcome, searchMaxChars?: number, spoken = false): string {
+export function toolResultContent(outcome: ToolExecutionOutcome, searchMaxChars?: number, spoken = false, certainty?: CertaintyGate): string {
+  // NAT-03: the certainty band rides beside the fact (certainty.ts), gated by the listener.
+  const bands = certainty ? certaintyFields(outcome, certainty.ageBand, certainty.safetyFlagged) : {};
   if (outcome.status === "succeeded" && outcome.packageId === "websearch") {
     const search = websearchPayload(outcome, spoken);
+    if (search) Object.assign(search, bands);
     // THIN-4F: a spoken turn's cap is the smaller of the window-sized cap and the spoken one.
     if (search) return searchContent(search, spoken ? Math.min(searchMaxChars ?? Infinity, SPOKEN_EVIDENCE_TOKENS_MAX * 4) : searchMaxChars);
   }
@@ -1055,6 +1059,7 @@ export function toolResultContent(outcome: ToolExecutionOutcome, searchMaxChars?
       ? {
           status: "succeeded",
           package: outcome.packageId,
+          ...bands,
           ...(usableReply(outcome) ? { reply: usableReply(outcome)!.text } : {}),
           ...(outcome.result?.data !== undefined ? { data: boundedData(outcome.result.data) } : {}),
           ...(typeof outcome.result?.synthesis_hint === "string" ? { synthesis_hint: outcome.result.synthesis_hint } : {}),
@@ -1151,8 +1156,8 @@ export function toolCallAssistantMessage(outcomes: readonly ToolExecutionOutcome
  * payload as its content - the array-building half `toolResultContent`
  * itself doesn't cover, extracted the same way and for the same reason
  * as `toolCallAssistantMessage` above. */
-export function toolResultMessages(outcomes: readonly ToolExecutionOutcome[], searchMaxChars?: number, spoken = false): LlmMessage[] {
-  return outcomes.map((o) => ({ role: "tool", content: toolResultContent(o, searchMaxChars, spoken), tool_call_id: callIdOf(o) }));
+export function toolResultMessages(outcomes: readonly ToolExecutionOutcome[], searchMaxChars?: number, spoken = false, certainty?: CertaintyGate): LlmMessage[] {
+  return outcomes.map((o) => ({ role: "tool", content: toolResultContent(o, searchMaxChars, spoken, certainty), tool_call_id: callIdOf(o) }));
 }
 
 /** PHRASE-01's own phrasing-round instruction (dev.md "The written

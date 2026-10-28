@@ -856,8 +856,10 @@ const modelRound: Node<ModelInput, ModelOutput> = async (state, input, signal) =
     // result.
     const phrasedOutcomes = state.outcomes.filter((o) => !lookupMissed(o));
     const assistantMessage = toolCallAssistantMessage(phrasedOutcomes);
+    // NAT-03: the listener's band and the turn's safety verdict gate which certainty bands the model sees.
+    const certaintyGate = { ageBand: state.planBasis.band, safetyFlagged: state.safety.flagged };
     // THIN-4F: a spoken surface's answering round re-reads only the top rows' short text.
-    const resultMessages = toolResultMessages(phrasedOutcomes, searchEvidenceMaxChars(state.budget.context_tokens), surfaceClass === "spoken");
+    const resultMessages = toolResultMessages(phrasedOutcomes, searchEvidenceMaxChars(state.budget.context_tokens), surfaceClass === "spoken", certaintyGate);
     // SEARCH-ROWS-01 (#169): `allSnippetsEmpty` rides the same reduce as
     // `searchResultCount` - a falsy `snippet` (missing or empty string,
     // the exact shape turn-dbyu1niupc actually stored) on EVERY counted
@@ -899,10 +901,10 @@ const modelRound: Node<ModelInput, ModelOutput> = async (state, input, signal) =
       const baseEvidenceChars = searchEvidenceMaxChars(state.budget.context_tokens);
       withEvidenceLimit = (maxChars) => {
         const resultMessages = maxChars > 0
-          ? toolResultMessages(phrasedOutcomes, maxChars, surfaceClass === "spoken")
+          ? toolResultMessages(phrasedOutcomes, maxChars, surfaceClass === "spoken", certaintyGate)
           : phrasedOutcomes.flatMap((outcome) => outcome.status === "succeeded" && outcome.packageId === "websearch"
             ? [{ role: "tool" as const, tool_call_id: outcome.callId, content: JSON.stringify({ status: "succeeded", package: "websearch", instruction: "The search results could not be read because they did not fit in the available context. Do not claim to have read them." }) }]
-            : toolResultMessages([outcome]));
+            : toolResultMessages([outcome], undefined, false, certaintyGate));
         const retryInstruction = maxChars === 0
           ? { ...instruction, content: `${instruction.content} The search results could not be read because they did not fit in the available context. Say that in your own words, and do not claim facts from those results.` }
           : instruction;

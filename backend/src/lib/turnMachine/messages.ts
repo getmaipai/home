@@ -58,7 +58,8 @@ const SOURCE_LABEL: Record<Exclude<ContextItem["source"], "window" | "utterance"
 function renderContextLine(item: ContextItem): string {
   const label = SOURCE_LABEL[item.source as Exclude<ContextItem["source"], "window" | "utterance">];
   const dated = item.at ? ` (${item.at.slice(0, 10)})` : "";
-  return `[${label}${dated}] ${item.text}`;
+  const band = item.certainty ? `, certainty: ${item.certainty}` : "";
+  return `[${label}${dated}${band}] ${item.text}`;
 }
 
 function isMemoryContext(item: ContextItem): boolean {

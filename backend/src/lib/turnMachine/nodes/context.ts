@@ -27,6 +27,7 @@ import { subjectRosterFor } from "@/lib/subjects";
 import { subjectsForTurn } from "@/lib/askNames";
 import { autoLeadImageAllowed } from "@/lib/answerImages/turn";
 import type { SubjectRef } from "@/lib/unknownNames";
+import { gateBand, memoryBand } from "@/lib/certainty";
 import { getHouseholdSettingValue } from "@/lib/settings";
 import { evaluateSafety } from "@/lib/safety";
 import { speakerAgeBand } from "@/lib/ageBand";
@@ -349,6 +350,7 @@ export const contextNode: Node<ContextInput, ContextOutput> = async (state, inpu
         subjects: r.subject_id ? [r.subject_id] : [],
         disclosure: r.child_disclosure ?? "adult_only",
         at: r.created_at,
+        ...memoryCertainty(r.fact_confidence, r.created_at, now, ageBand, state.safety?.flagged === true),
       });
     }
 
@@ -590,4 +592,10 @@ export function applyContext(state: import("../contract").TurnState, output: Con
     state.planBasis = { ...state.planBasis, disclosureWithheld: true, deferred };
     state.plan = planFor({ ...state.planBasis, evidence: { choices: 0, sources: 0, deliverable: false } });
   }
+}
+
+/** NAT-03: the gated certainty band for one remembered fact, as spread-able item fields. */
+function memoryCertainty(factConfidence: number | null | undefined, createdAt: string, now: Date, ageBand: "child" | "teen" | "adult", safetyFlagged: boolean): { certainty?: NonNullable<ContextItem["certainty"]> } {
+  const band = gateBand(memoryBand(factConfidence, createdAt, now), ageBand, safetyFlagged);
+  return band ? { certainty: band } : {};
 }

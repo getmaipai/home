@@ -47,6 +47,8 @@ export interface ContextItem {
   disclosure: "child_ok" | "teen_ok" | "adult_only";
   /** ISO date for dated items ("remembered Sep 15"). */
   at?: string;
+  /** NAT-03: the certainty band shown beside a remembered fact (lib/certainty.ts memoryBand), already gated for the listener. */
+  certainty?: import("@/lib/certainty").CertaintyBand;
 }
 
 export interface ToolRequest {
