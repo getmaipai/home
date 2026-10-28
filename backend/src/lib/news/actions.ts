@@ -119,8 +119,7 @@ export async function runNewsAction(person: PersonRow, action: NewsActionName, b
       const item = releasedItem(viewer, body.id);
       if (!item) return gone();
       const summary = await summarizeStory(storyIdOf(item), viewer.band);
-      // A silent 200 left the button looking dead; the reader says so and stays readable (the page shows this line under the article).
-      if (!summary) return { ok: false, status: 503, error: "Key points are not ready for this story yet. Try again in a minute." };
+      // Not ready is not an error: the reader keeps showing progress and asks again, so the answer is a plain 200 with no summary.
       return ok({ summary });
     }
     case "follow": return follow(person, viewer, body);
