@@ -35,3 +35,13 @@ The owner's request of 2026-10-27 permits Podcasts to search Apple's public podc
 | PODCAST-PORT-01 | A search, the top list (plus one id lookup) | None | A burst of five, then one every three seconds across the household | Search words capped at 80 characters, 25 results | A 403, 429 or server error pauses the directory for one hour |
 
 The privacy table lists this traffic as `platform:podcast-directory` only while the switch is on.
+
+## RADIO-02: finding radio stations
+
+The owner's request of 2026-10-27 permits Music to read the public Radio Browser directory (three mirrors) for a Radio tab. `radio.directory.enabled` is a household switch, off by default. Adults and teens may browse; a child never reaches it and plays only stations a parent saved. Only a person's own browse or search makes a request; nothing runs in the background and no listen report is sent.
+
+| Backlog row | Request | Lifetime limit | Pace | Site limit | Stop rule |
+|---|---|---|---|---|---|
+| RADIO-02 | Popular stations, or a search by name, country code or genre | None | A burst of five, then one every three seconds across the household | Search words capped at 80 characters, 30 results | A mirror that refuses is skipped; all three refusing pauses the directory for one hour |
+
+The privacy table lists this traffic as `platform:radio-directory` only while the switch is on. Each station's own stream host is a separate outbound call made at play time (RADIO-03).
