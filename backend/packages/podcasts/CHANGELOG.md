@@ -21,3 +21,7 @@ All notable changes to the Podcasts package, in [Keep a Changelog](https://keepa
 ## [0.1.0] - 2026-10-17
 
 - First version: Listen now, Shows, Episodes, Queue, Saved and Listen (the player with Add to queue, Save on the hub and Bookmark). Stream by default, save on request or by keep rules; a child sees only child-cleared episodes.
+
+## [0.2.4] - 2026-10-28
+
+- The saved-filter pickers share one data id, `filter-options` (scope `filters` or `shows`), so the manifest stays within its 16 data ids.

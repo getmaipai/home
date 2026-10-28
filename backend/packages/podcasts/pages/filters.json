@@ -10,7 +10,8 @@
       "placeholder": "Choose a filter",
       "bind": {
         "source": "package",
-        "path": "filter-choices"
+        "path": "filter-options",
+        "params": { "scope": "filters" }
       },
       "item_key_field": "id",
       "item_label_field": "label"
@@ -155,7 +156,8 @@
       "placeholder": "Any show",
       "bind": {
         "source": "package",
-        "path": "filter-shows"
+        "path": "filter-options",
+        "params": { "scope": "shows" }
       },
       "item_key_field": "id",
       "item_label_field": "label"

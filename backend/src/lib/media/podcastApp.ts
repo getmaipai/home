@@ -81,8 +81,9 @@ registerMediaAppData(APP, (person, dataId, params) => {
     case "bookmarks": return bookmarkRows(person, limit);
     // PODCAST-PORT-03: the person's own saved filters, and the episodes one of them shows now.
     case "filters": return personFilters(person).map((collection) => { const view = viewOf(person, collection); return { id: view.id, title: view.title, summary: view.summary }; });
-    case "filter-shows": return { as_of: new Date().toISOString(), rows: showRows(person).map((row) => ({ id: row.id, label: row.title })) };
-    case "filter-choices": return { as_of: new Date().toISOString(), rows: personFilters(person).map((collection) => ({ id: collection.id, label: collection.title })) };
+    case "filter-options": return params.scope === "shows"
+      ? { as_of: new Date().toISOString(), rows: showRows(person).map((row) => ({ id: row.id, label: row.title })) }
+      : { as_of: new Date().toISOString(), rows: personFilters(person).map((collection) => ({ id: collection.id, label: collection.title })) };
     case "filter-draft": return draftRows(person, params);
     case "filter-episodes": return episodeRows(person, filterEpisodes(person, params.filter ?? "", limit));
     case "stats": return podcastStatsRows(person, params.year ?? new Date().getFullYear());

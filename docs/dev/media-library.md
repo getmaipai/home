@@ -304,7 +304,7 @@ seen by episode, picture, CDN and redirect hosts.
 PODCAST-PORT-03 (smart filters): a saved filter is a `media-collection` of kind `filter` (spec-v0.1.261; `rules` is an object of `unplayed`, `in_progress`, `saved`,
 `min_minutes`, `max_minutes`, `source_ids`, `released_within_days`, all ANDed). `lib/media/podcastFilters.ts` parses, evaluates (`evaluateFilter`, pure) and names rules; evaluation runs
 over `queryItems`, so band, source `visible_to` and the child allowlist apply as on Episodes. Routes under `/api/plugins/podcasts`: `GET /filters`, `POST /filters` (create, or edit with `id`),
-`DELETE /filters/:id`; data ids `filters`, `filter-choices`, `filter-shows` (picker rows), `filter-episodes` (`filter` param) and `filter-draft` (the pickers' state becomes one Save row).
+`DELETE /filters/:id`; data ids `filters`, `filter-options` (picker rows, `scope` filters or shows), `filter-episodes` (`filter` param) and `filter-draft` (the pickers' state becomes one Save row).
 A package page has no `form` node and a `list` reads no page state, so the Filters page builds a filter from pickers and a `media_shelf` Save row. A filter is never shared (`sharedWith` skips the kind),
 at most 20 per person.
 
