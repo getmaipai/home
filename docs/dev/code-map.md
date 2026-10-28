@@ -25,7 +25,6 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/packages/music/pages/play.json` | music | Now playing |
 | `backend/packages/music/pages/playlist.json` | music | Playlist |
 | `backend/packages/music/pages/playlists.json` | music | Playlists |
-| `backend/packages/music/pages/radio-find.json` | music | Find stations |
 | `backend/packages/music/pages/radio.json` | music | Radio |
 | `backend/packages/music/pages/songs.json` | music | Songs |
 | `backend/packages/music/pages/station.json` | music | Now playing |
@@ -497,7 +496,8 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/media/prober.ts` | probeResultFrom, createStackProber |
 | `backend/src/lib/media/progress.ts` | LATCH_PERCENT, BOOK_END_PERCENT, correctedStamp, percentOf, reachesLatch, mergeProgress |
 | `backend/src/lib/media/radio.ts` | adultTagged, stationVisibleAtBand, listSavedStations, savedStationFor, stationItemView, savedAddressesOf |
-| `backend/src/lib/media/radioDirectory.ts` | __resetRadioDirectoryForTests, radioDirectoryAllowed, stationOf, findStations |
+| `backend/src/lib/media/radioArt.ts` | __setRadioArtDepsForTests, __resetRadioArtForTests, radioArtAddressOk, fetchRadioArt |
+| `backend/src/lib/media/radioDirectory.ts` | __resetRadioDirectoryForTests, radioDirectoryHasFavicon, __rememberRadioFaviconForTests, radioDirectoryAllowed, stationOf, findStations |
 | `backend/src/lib/media/radioHls.ts` | openHlsResource, hlsResourceUrl, decodeHlsResource |
 | `backend/src/lib/media/radioIcy.ts` | usableMetaint, parseStreamTitle, IcyDemuxer |
 | `backend/src/lib/media/radioStream.ts` | MAX_REDIRECTS, CONNECT_TIMEOUT_MS, MAX_STREAMS_PER_HOME, unplayable, activeStreamCount, __resetRadioStreamsForTests |
