@@ -29,3 +29,7 @@ All notable changes to the Podcasts package, in [Keep a Changelog](https://keepa
 ## [0.2.4] - 2026-10-28
 
 - The saved-filter pickers share one data id, `filter-options` (scope `filters` or `shows`), so the manifest stays within its 16 data ids.
+
+## [0.2.6] - 2026-10-28
+
+- The Find page says where to turn on the podcast directory when nothing shows.

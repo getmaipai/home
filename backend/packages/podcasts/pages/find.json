@@ -37,7 +37,7 @@
       "empty_state": {
         "type": "empty_state",
         "icon": "search",
-        "text": "Nothing to show. Finding podcasts may be turned off, or try other words."
+        "text": "Nothing to show. If this stays empty, an adult can turn on Find podcasts online in Settings, Household, Media online. Otherwise try other words."
       }
     }
   ]

@@ -79,3 +79,7 @@ All notable changes to the Music package, in [Keep a Changelog](https://keepacha
 ### Added
 
 - Typed, bounded result data for CHAT-16.
+
+## [0.3.3] - 2026-10-28
+
+- The Radio pages say where to turn on Find radio stations online when no stations show.

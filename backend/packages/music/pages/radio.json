@@ -36,7 +36,7 @@
       "empty_state": {
         "type": "empty_state",
         "icon": "headphones",
-        "text": "No stations yet. A parent can save stations for you, or find some in Find stations."
+        "text": "No stations yet. Open Find stations to add some. If Find stations is empty, an adult can turn on Find radio stations online in Settings, Household, Media online."
       },
       "on_select": {
         "play": {

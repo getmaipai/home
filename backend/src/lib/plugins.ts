@@ -24,7 +24,7 @@ import { ComputeError } from "@maipai/spec/interpreters/ts/compute.js";
 import { createHost } from "@/lib/packageHost";
 import { blocksForRecipeRun, withoutBlockOnlyData, type BlockCapture } from "@/lib/packageBlocks";
 import { adviceChips, adviceFromRecipeData, adviceLine } from "@/lib/weatherAdvice";
-import { factualLine, summaryFor } from "@/lib/weatherSummary";
+import { factualLine, hoursOf, summaryFor } from "@/lib/weatherSummary";
 import { callTier1Handle } from "@/lib/denoHost";
 import { speakerAgeBand } from "@/lib/ageBand";
 import { applyNewsMinorFloor } from "@/lib/newsMinorFloor";
@@ -679,7 +679,7 @@ export async function runPlugin(
     // WEATHER-PORT-03: the written summary (facts only, no advice), once the background model has made it for this place and hour; a plain factual line until then.
     // Current-location runs carry the person's own coordinates, so they are never cached or summarized by name.
     const placeName = typeof weatherData?.place === "string" ? weatherData.place : "";
-    const summaryInput = { place: placeName, unit: weatherData?.unit === "celsius" ? "celsius" as const : "fahrenheit" as const, temp: typeof weatherData?.temperature === "number" ? weatherData.temperature : undefined, condition: typeof weatherData?.conditions === "string" ? weatherData.conditions : undefined, high: typeof weatherData?.high === "number" ? weatherData.high : undefined, low: typeof weatherData?.low === "number" ? weatherData.low : undefined };
+    const summaryInput = { place: placeName, unit: weatherData?.unit === "celsius" ? "celsius" as const : "fahrenheit" as const, temp: typeof weatherData?.temperature === "number" ? weatherData.temperature : undefined, condition: typeof weatherData?.conditions === "string" ? weatherData.conditions : undefined, high: typeof weatherData?.high === "number" ? weatherData.high : undefined, low: typeof weatherData?.low === "number" ? weatherData.low : undefined, hours: hoursOf(weatherData) };
     const summary = id !== "weather" ? "" : placeName !== "" && !options.uncached ? summaryFor(summaryInput) : factualLine(summaryInput);
     if (advice.length > 0) answer.data = { ...(answer.data ?? {}), advice, advice_line: adviceLine(advice) };
     if (summary !== "") answer.data = { ...(answer.data ?? {}), summary };
