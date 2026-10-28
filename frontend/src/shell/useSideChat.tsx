@@ -11,6 +11,7 @@ import { useVoiceAvailable } from "@/apps/chat/useChatAvailability";
 import { toast } from "sonner";
 import { api, type Roster } from "@/lib/api";
 import { INCOGNITO_DISCARDED_EVENT } from "@/shell/incognitoContext";
+import { useAmbientPageContext } from "@/shell/pageContext";
 
 function rememberedKey(personId: string, companionId: string) { return `maipai.ambient.side.${personId}.${companionId}`; }
 function readRemembered(key: string) {
@@ -18,6 +19,7 @@ function readRemembered(key: string) {
 }
 
 export function useSideChat(person: Roster, companionId: string, incognito: boolean, onReplyText?: (text: string) => void, onReplyState?: (state: "waiting" | "responding" | "ready" | "error" | "idle") => void) {
+  const pageContext = useAmbientPageContext();
   const storageKey = rememberedKey(person.id, companionId);
   const conversationIdRef = useRef<string | undefined>(undefined);
   const createPromiseRef = useRef<Promise<string> | null>(null);
@@ -83,13 +85,14 @@ export function useSideChat(person: Roster, companionId: string, incognito: bool
     consumeAskAnswer: () => { const value = askAnswerRef.current; askAnswerRef.current = undefined; return value; },
     consumeRetryWithCurrentCompanion: () => false,
     getConversationId: resolveConversationId,
+    getPageContext: pageContext ? () => pageContext : undefined,
     onReplyText,
     onReplyState,
     onSpeakingChange: voiceTurn.onSpeakingChange,
     onSpeechError: voiceTurn.onSpeechError,
     activeTurnRef,
     speakReplies: () => liveVoiceActiveRef.current || (ttsAvailable && readAloudRef.current),
-  }), [activeTurnRef, askAnswerRef, incognito, liveVoiceActiveRef, onReplyState, onReplyText, pendingSpokenRef, person.age_band, resolveConversationId, ttsAvailable, turnSchedulerRef, voiceTurn.onSpeakingChange, voiceTurn.onSpeechError]);
+  }), [activeTurnRef, askAnswerRef, incognito, liveVoiceActiveRef, onReplyState, onReplyText, pageContext, pendingSpokenRef, person.age_band, resolveConversationId, ttsAvailable, turnSchedulerRef, voiceTurn.onSpeakingChange, voiceTurn.onSpeechError]);
   const history = useMemo(() => createChatHistoryAdapter(person.display_name, () => conversationIdRef.current), [person.display_name]);
   const runtime = useLocalRuntime(model, { adapters: { history, speech, dictation } });
 

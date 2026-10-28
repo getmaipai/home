@@ -5,8 +5,13 @@ import { MemoryRouter } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { api, type Roster } from "@/lib/api";
 import { MarkdownText } from "@maipai/ui/src/elements/markdown-text";
-import { createAmbientAskQueue, isProtectedReply, useAmbientCompanionPane, type AmbientPaneState } from "@/shell/AmbientCompanionPane";
+import { AMBIENT_QUICK_ACTIONS, ambientQuickActionPrompt, ambientQuickActionsForApp, createAmbientAskQueue, isProtectedReply, useAmbientCompanionPane, type AmbientPaneState } from "@/shell/AmbientCompanionPane";
 import type { useSideChat } from "@/shell/useSideChat";
+import { Suggestions } from "@maipai/ui/src/elements/suggestions";
+import { createChatModelAdapter } from "@/apps/chat/chatModelAdapter";
+import { assistantStreamWriter, ASSISTANT_STREAM_HEADERS } from "../../tests/assistantStreamBody";
+import { FakeAudioContext } from "../../tests/fakeAudioContext";
+import type { ChatModelRunOptions } from "@assistant-ui/react";
 
 const person = { id: "person-1", display_name: "Sage", role: "adult", age_band: "adult" } as Roster;
 const noop = () => {};
@@ -100,6 +105,59 @@ describe("ambient companion pane controls", () => {
     } finally {
       api.companions = originals.companions;
       api.setSetting = originals.setSetting;
+    }
+  });
+});
+
+describe("ambient pane quick actions and page context", () => {
+  test("the three quick actions render and send fixed prompts through ask", () => {
+    const ask = mock((_prompt: string) => undefined);
+    const view = render(<Suggestions suggestions={ambientQuickActionsForApp("photos")} selectedSuggestion={null} cycle={0} variant="list" onSuggestion={(suggestion) => {
+      const prompt = ambientQuickActionPrompt(suggestion);
+      if (prompt) ask(prompt);
+    }} />);
+    for (const action of AMBIENT_QUICK_ACTIONS) expect(view.getByRole("button", { name: action })).toBeTruthy();
+    fireEvent.click(view.getByRole("button", { name: "Help with this page" }));
+    fireEvent.click(view.getByRole("button", { name: "Find something" }));
+    fireEvent.click(view.getByRole("button", { name: "Take an action" }));
+    expect(ask.mock.calls).toEqual([["Help me with this page."], ["Help me find something in this app."], ["Help me take an action in this app."]]);
+  });
+
+  test("quick action visibility comes from app id and defaults to all three", () => {
+    expect(ambientQuickActionsForApp("settings")).toEqual(["Help with this page", "Take an action"]);
+    expect(ambientQuickActionsForApp("media")).toEqual(AMBIENT_QUICK_ACTIONS);
+  });
+
+  test("only side-chat turn adapters provide page context", async () => {
+    (globalThis as unknown as { AudioContext: unknown }).AudioContext = FakeAudioContext;
+    const pageContext = { app_id: "library", route: "/files/photo-17", record_kind: "photo", record_id: "photo-17", title: "Family photo" };
+    async function run(getPageContext?: () => typeof pageContext) {
+      const writer = assistantStreamWriter();
+      writer.write([{ type: "done", value: { turn_id: "turn-page-context", reply: { text: "Done." }, source: "model", safety: { flagged: false, categories: [], action: "allow", notify_parent: false, matched_signals: [], checked_at: "2026-10-28T00:00:00.000Z" } } }]);
+      writer.end();
+      let body: Record<string, unknown> | undefined;
+      const originalFetch = globalThis.fetch;
+      globalThis.fetch = mock((_input: RequestInfo | URL, init?: RequestInit) => {
+        body = JSON.parse(String(init?.body ?? "{}")) as Record<string, unknown>;
+        return Promise.resolve(new Response(writer.body, { status: 200, headers: ASSISTANT_STREAM_HEADERS }));
+      }) as unknown as typeof fetch;
+      const adapter = createChatModelAdapter({ consumeSupersedes: () => undefined, turnSchedulerRef: { current: null }, getConversationId: async () => "conversation-1", getPageContext, speakReplies: false });
+      const messages = [{ id: "user-1", createdAt: new Date(), role: "user", content: [{ type: "text", text: "Help" }], attachments: [], metadata: { custom: {} } }] as never;
+      const runOptions = { messages, runConfig: {}, abortSignal: new AbortController().signal, context: {}, unstable_getMessage: () => messages[0] } as unknown as ChatModelRunOptions;
+      try {
+        for await (const result of adapter.run(runOptions) as AsyncGenerator<unknown>) void result;
+        return body ?? {};
+      } finally {
+        globalThis.fetch = originalFetch;
+      }
+    }
+    try {
+      expect(await run(() => pageContext)).toMatchObject({ page_context: pageContext });
+      mock.restore();
+      expect((await run()).page_context).toBeUndefined();
+    } finally {
+      mock.restore();
+      (globalThis as unknown as { AudioContext: unknown }).AudioContext = undefined;
     }
   });
 });

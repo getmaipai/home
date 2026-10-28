@@ -22,6 +22,7 @@ import { askFormFailureLine, failureLine } from "@maipai/home-backend/src/lib/fa
 import { isFormAnswer, parseTurnAsk, type AskAnswerArm } from "@/apps/chat/chatAsk";
 import { randomUuid } from "@/lib/randomUuid";
 import { unstable_defaultDirectiveFormatter } from "@assistant-ui/react";
+import type { PageContext as SpecPageContext } from "@maipai/spec/gen/ts/page-context.js";
 
 // The backend already emits the song job id; the pinned spec has not added it yet.
 const MusicToolResultEvent = ToolTurnStreamEvent.options[1].extend({
@@ -159,6 +160,8 @@ export interface ChatModelAdapterDeps {
   consumeRetryWithCurrentCompanion?(): boolean;
   findReplacedSpeaker?(input: { parentId: string; newMessageId: string }): string | undefined;
   getConversationId?(): Promise<string>;
+  /** Ambient side chat only. The main Chat adapter does not provide this. */
+  getPageContext?(): SpecPageContext;
   resumeConversationIfClosed?(conversationId: string): Promise<void>;
   // The live reply's own sentence-by-sentence speech (2026-09-04): a
   // separate player from the per-message "Listen" replay (chatListen.ts),
@@ -431,6 +434,7 @@ export function createChatModelAdapter(deps: ChatModelAdapterDeps): ChatModelAda
             temporary: reconnectAttempts === 0 ? temporary : undefined,
             spoken: reconnectAttempts === 0 ? quote ? quoteSpoken : deps.consumeSpoken?.() : undefined,
             currentLocation,
+            pageContext: reconnectAttempts === 0 ? deps.getPageContext?.() : undefined,
             // APPROVE-CARD-01: the same reconnectAttempts===0 gate as
             // packageScope/temporary/spoken above - a single-shot field
             // only ever meaningful on the first attempt of this send,

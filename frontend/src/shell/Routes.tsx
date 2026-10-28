@@ -59,6 +59,7 @@ import { RightPane } from "@maipai/ui/src/elements/right-pane";
 import { useAmbientCompanionPane, readAmbientPaneState, type AmbientPaneControl, type AmbientPaneState } from "@/shell/AmbientCompanionPane";
 import { useSideChat } from "@/shell/useSideChat";
 import { AmbientHeaderProvider } from "@/shell/ambientHeaderContext";
+import { AmbientPageContextProvider, ambientPageContextForRoute } from "@/shell/pageContext";
 
 // BUNDLE-SPLIT-01 (2026-10-17): every page but the two a person lands on (Home and Chat) loads on first visit, not
 // with the shell. The shell chunk had grown to 3.84 MB against the 4 MiB PWA precache ceiling; the pages below hold
@@ -169,6 +170,8 @@ function ShellInstallStrip({ person }: { person: Roster }) {
 // which needs to return `<ThemeProvider>` before anything inside it
 // can call a hook that reads from it.
 function RoutesInner({ person, onPersonChange, onSignedOut }: { person: Roster; onPersonChange: () => void | Promise<void>; onSignedOut: () => void }) {
+  const location = useLocation();
+  const appCatalog = useAppCatalog();
   // The kit's phone layouts keep one column and the larger kid targets for a child (docs/design/phone-minimal-2026-10-25.md P4a):
   // the page says whose band it is, the kit's CSS reads it.
   useEffect(() => {
@@ -180,18 +183,21 @@ function RoutesInner({ person, onPersonChange, onSignedOut }: { person: Roster; 
   useEase(person.id);
   useAccent(person.accent);
 
+  const pageContext = ambientPageContextForRoute(location.pathname, appCatalog);
   return (
     <AudioSessionProvider personId={person.id}>
       <MediaHostProvider>
         <IncognitoProvider>
-          <RoutesWithIncognito person={person} onPersonChange={onPersonChange} onSignedOut={onSignedOut} />
+          <AmbientPageContextProvider base={pageContext}>
+            <RoutesWithIncognito person={person} onPersonChange={onPersonChange} onSignedOut={onSignedOut} appCatalog={appCatalog} />
+          </AmbientPageContextProvider>
         </IncognitoProvider>
       </MediaHostProvider>
     </AudioSessionProvider>
   );
 }
 
-function RoutesWithIncognito({ person, onPersonChange, onSignedOut }: { person: Roster; onPersonChange: () => void | Promise<void>; onSignedOut: () => void }) {
+function RoutesWithIncognito({ person, onPersonChange, onSignedOut, appCatalog }: { person: Roster; onPersonChange: () => void | Promise<void>; onSignedOut: () => void; appCatalog: ReturnType<typeof useAppCatalog> }) {
   const location = useLocation();
   // WAKEUX-02: ChatPage listens for the word itself (it owns the call); on every other page this does, and Chat opens with the call running.
   const navigate = useNavigate();
@@ -205,7 +211,6 @@ function RoutesWithIncognito({ person, onPersonChange, onSignedOut }: { person: 
   const statusAppsQuery = useStatusApps();
   // LEFTNAV-APPS-01: the installed package apps this person may open (the hub's list, minus an Incognito-blocked app
   // while Incognito is on), pinned ones in the rail and all of them in the launcher at its foot.
-  const appCatalog = useAppCatalog();
   const { on: incognito, setOn: setIncognito } = useIncognitoContext();
   const chatAvailability = useChatAvailability();
   const [coarse, setCoarse] = useState(() => typeof matchMedia !== "undefined" && matchMedia("(pointer: coarse)").matches);

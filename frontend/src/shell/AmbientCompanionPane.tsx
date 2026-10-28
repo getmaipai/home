@@ -29,6 +29,20 @@ import { api, type Roster, type ConversationSummary } from "@/lib/api";
 import { useLiveVoiceSession, WAKE_SESSION_IDLE_CLOSE_MS } from "@/apps/chat/liveVoiceSession";
 import { useMicGate, micHelp } from "@/lib/media/micGate";
 import { voiceFailureLine } from "@maipai/home-backend/src/lib/failureCopy";
+import { Suggestions } from "@maipai/ui/src/elements/suggestions";
+import { useAmbientPageContext } from "@/shell/pageContext";
+
+export const AMBIENT_QUICK_ACTIONS = ["Help with this page", "Find something", "Take an action"] as const;
+const QUICK_ACTION_PROMPTS: Record<(typeof AMBIENT_QUICK_ACTIONS)[number], string> = {
+  "Help with this page": "Help me with this page.",
+  "Find something": "Help me find something in this app.",
+  "Take an action": "Help me take an action in this app.",
+};
+const QUICK_ACTIONS_BY_APP: Record<string, readonly (typeof AMBIENT_QUICK_ACTIONS)[number][]> = {
+  settings: ["Help with this page", "Take an action"],
+};
+export function ambientQuickActionsForApp(appId: string) { return QUICK_ACTIONS_BY_APP[appId] ?? AMBIENT_QUICK_ACTIONS; }
+export function ambientQuickActionPrompt(suggestion: string): string | undefined { return QUICK_ACTION_PROMPTS[suggestion as (typeof AMBIENT_QUICK_ACTIONS)[number]]; }
 
 const ContinueIcon = getIcon("arrow-up-right");
 const PhoneIcon = getIcon("phone");
@@ -122,11 +136,12 @@ function RuntimeControls({ register, registerCall, side }: { register: (actions:
   return null;
 }
 
-function SideChat({ person, companionName, clips, still, incognito, onContinue, onRing, register, registerCall, side }: {
+function SideChat({ person, companionName, clips, still, incognito, onContinue, onRing, register, registerCall, side, ask }: {
   person: Roster; companionName: string; clips?: CompanionClips; still?: string; incognito: boolean;
   onContinue: (id?: string) => void; onRing: (ring: AmbientRing | undefined) => void;
   register: (actions: Pick<AmbientPaneControl, "ask"> | null) => void; registerCall: (start: (() => void) | null) => void;
   side: ReturnType<typeof useSideChat>;
+  ask(text: string): void;
 }) {
   return <AssistantRuntimeProvider runtime={side.runtime}>
     <ChatAgeBandContext.Provider value={person.age_band ?? "adult"}>
@@ -134,14 +149,14 @@ function SideChat({ person, companionName, clips, still, incognito, onContinue, 
           <TemporaryChatContext.Provider value={{ on: incognito }}>
             <RuntimeControls register={register} registerCall={registerCall} side={side} />
             <ThreadSignal onRing={onRing} />
-            <StageBody person={person} personId={person.id} companionName={companionName} clips={clips} still={still} onContinue={onContinue} registerCall={registerCall} side={side} />
+            <StageBody person={person} personId={person.id} companionName={companionName} clips={clips} still={still} onContinue={onContinue} registerCall={registerCall} side={side} ask={ask} />
           </TemporaryChatContext.Provider>
         </AdminContext.Provider>
       </ChatAgeBandContext.Provider>
   </AssistantRuntimeProvider>;
 }
 
-function StageBody({ person, personId, companionName, clips, still, onContinue, registerCall, side }: { person: Roster; personId: string; companionName: string; clips?: CompanionClips; still?: string; onContinue: (id?: string) => void; registerCall: (start: (() => void) | null) => void; side: ReturnType<typeof useSideChat> }) {
+function StageBody({ person, personId, companionName, clips, still, onContinue, registerCall, side, ask }: { person: Roster; personId: string; companionName: string; clips?: CompanionClips; still?: string; onContinue: (id?: string) => void; registerCall: (start: (() => void) | null) => void; side: ReturnType<typeof useSideChat>; ask(text: string): void }) {
   const aui = useAui();
   const messages = useAuiState((state) => state.thread.messages) as unknown as Array<Record<string, unknown>>;
   const running = useAuiState((state) => state.thread.isRunning);
@@ -192,9 +207,11 @@ function StageBody({ person, personId, companionName, clips, still, onContinue, 
   ];
   const callDisabled = status !== "ready" || !side.sttInstalled;
   const callReason = status !== "ready" ? engineDownReason(status) : !side.sttInstalled ? "Voice input is not installed. Install it in Settings to start a call." : undefined;
+  const pageContext = useAmbientPageContext() ?? { app_id: "home", route: "/" };
+  const quickActions = ambientQuickActionsForApp(pageContext.app_id);
   const talk = voiceOpen
     ? <div className="flex items-center justify-center gap-2"><TooltipIconButton tooltip="Mute microphone" aria-label="Mute microphone" aria-pressed={session.muted} onClick={session.onToggleMute}><MicIcon aria-hidden="true" /></TooltipIconButton><TooltipIconButton tooltip="End the call" aria-label="End the call" onClick={session.onEnd}><PhoneIcon aria-hidden="true" /></TooltipIconButton></div>
-    : <div className="flex items-center gap-2"><div className="min-w-0 flex-1" title="The microphone writes a transcript in the talk box. Use Call for a live voice conversation."><TalkPill placeholder={`Talk to ${companionName}...`} /></div><Button type="button" aria-label={callDisabled ? `Call ${companionName}, unavailable: ${callReason}` : `Call ${companionName}`} title={callReason} disabled={callDisabled} onClick={openCall}><PhoneIcon aria-hidden="true" /></Button></div>;
+    : <div className="flex flex-col gap-3"><Suggestions suggestions={quickActions} selectedSuggestion={null} cycle={0} variant="list" onSuggestion={(suggestion) => { const prompt = ambientQuickActionPrompt(suggestion); if (prompt) ask(prompt); }} /><div className="flex items-center gap-2"><div className="min-w-0 flex-1" title="The microphone writes a transcript in the talk box. Use Call for a live voice conversation."><TalkPill placeholder={`Talk to ${companionName}...`} /></div><Button type="button" aria-label={callDisabled ? `Call ${companionName}, unavailable: ${callReason}` : `Call ${companionName}`} title={callReason} disabled={callDisabled} onClick={openCall}><PhoneIcon aria-hidden="true" /></Button></div></div>;
   const help = micGate.problem ? micHelp(micGate.problem) : null;
   return <><CompanionStage name={companionName} stateWord={stateWord} mode={mode} character={character} bubble={bubble} onDismissBubble={bubble ? () => setDismissed(bubbleId ?? lastId) : undefined} workingLine={workingLine} actions={actions} talk={talk} showHeader={false} heard={heardText ? <p className="truncate">{heardText}</p> : undefined} /><Dialog open={micGate.problem !== null} onOpenChange={(open) => { if (!open) micGate.dismiss(); }}><DialogContent aria-label="Microphone help">{help ? <><DialogHeader><DialogTitle>{help.title}</DialogTitle><DialogDescription>{help.cause}</DialogDescription></DialogHeader>{help.steps.length ? <ol className="list-decimal space-y-1 pl-5 text-sm">{help.steps.map((step) => <li key={step}>{step}</li>)}</ol> : null}<DialogFooter><Button variant="outline" onClick={micGate.dismiss}>Close</Button><Button onClick={() => void micGate.request()}>{micGate.problem === "safari_ask" ? "Continue" : "Try again"}</Button></DialogFooter></> : null}</DialogContent></Dialog></>;
 }
@@ -250,7 +267,7 @@ export function useAmbientCompanionPane({ person, companionName, companionId, av
       else navigate(`/chat?conversation=${encodeURIComponent(row.id)}`);
     }}>Open</Button> };
   }) }];
-  const companionTab = { id: "companion", label: "Talk", content: companionId ? <>{openError ? <p role="alert">Could not open that conversation. Check your connection and try again.</p> : null}<SideChat person={person} companionName={companionName} clips={clips} still={still} incognito={incognito} onContinue={(id) => { if (id) onContinue(id); }} onRing={onRing} register={register} registerCall={(start) => askQueueRef.current?.registerCall(start)} side={side} /></> : null };
+  const companionTab = { id: "companion", label: "Talk", content: companionId ? <>{openError ? <p role="alert">Could not open that conversation. Check your connection and try again.</p> : null}<SideChat person={person} companionName={companionName} clips={clips} still={still} incognito={incognito} onContinue={(id) => { if (id) onContinue(id); }} onRing={onRing} register={register} registerCall={(start) => askQueueRef.current?.registerCall(start)} side={side} ask={ask} /></> : null };
   const historyTab = { id: "history", label: "History", content: conversations.isLoading ? <p role="status">Loading conversations…</p> : conversations.isError ? <p role="alert">Could not load conversations. Check your connection and try again.</p> : <ActivityFeed label={`${companionName} conversations`} groups={activityGroups} empty={<p>No conversations with {companionName} yet.</p>} /> };
   const toggleReadAloud = () => { const next = !side.readAloud; side.setReadAloud(next); if (next && !side.ttsAvailable) toast.error("Read aloud is unavailable because voice output is not ready. Check Voice settings and try again.", { id: "voice-problem" }); };
   const ReadIcon = side.readAloud ? SpeakerIcon : SpeakerOffIcon;

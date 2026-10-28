@@ -2703,7 +2703,7 @@
       "file": "suggestions.tsx",
       "name": "suggestions",
       "group": "composer",
-      "verdict": "no-fit",
+      "verdict": "wire-now",
       "backendNeeded": null,
       "effort": null,
       "specTagNeeded": false,
@@ -2714,7 +2714,7 @@
       "batch": null,
       "replacesHandBuilt": [],
       "realTurnToday": null,
-      "verdictReason": "No current Home feature needs this Element\u2019s specific data and interaction; the audit records the current scope decision."
+      "verdictReason": "Selected for the ambient pane's quick actions (AMBIENT-05)"
     },
     {
       "file": "surfaces.test.tsx",
