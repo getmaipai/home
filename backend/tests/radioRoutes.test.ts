@@ -26,6 +26,8 @@ beforeEach(() => {
     return new Response(JSON.stringify(ROWS), { status: 200 });
   }) as typeof fetch;
 });
+// The switch defaults to on (spec 0.1.267); each test starts from off and turns it on itself.
+beforeEach(() => setHouseholdSettingValue("radio.directory.enabled", false));
 afterEach(() => { globalThis.fetch = realFetch; setHouseholdSettingValue("radio.directory.enabled", false); });
 
 const on = () => setHouseholdSettingValue("radio.directory.enabled", true);

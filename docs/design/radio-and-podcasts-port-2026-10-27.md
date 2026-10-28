@@ -76,7 +76,7 @@ opt-in; the privacy page lists what leaves the home.
 
 ## Opt-in, minors and gates
 
-Outside radio and podcast directories are off until a household switch turns them on (RADIO-08, PODCAST-PORT-12), each with a privacy
+Outside radio and podcast directories were off until a household switch turned them on (RADIO-08, PODCAST-PORT-12); the owner made both default to on on 2026-10-28, each with a privacy
 row and a budget row in `docs/THIRD-PARTY-SERVICES.md`. A child never reaches a directory; a minor's search text passes the
 household-name and PII check before it leaves; a teen gets no adult-tagged stations, and teen access to the podcast directory is
 the owner's call (an open question, closed to teens until answered). Generated and summarized output passes the person's band

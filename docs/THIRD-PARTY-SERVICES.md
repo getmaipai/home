@@ -38,7 +38,7 @@ The privacy table lists this traffic as `platform:music-lyrics-lookup` only whil
 
 ## PODCAST-PORT-01: finding new podcasts
 
-The owner's request of 2026-10-27 permits Podcasts to search Apple's public podcast directory (iTunes Search, Apple's top list and its id lookup). `podcasts.directory.enabled` is a household switch, off by default; `podcasts.directory.teens` adds teens. A child never reaches it, and a minor's search words pass the household-name check first. Only a person's own search or opening the top list makes a request; nothing runs in the background.
+The owner's request of 2026-10-27 permits Podcasts to search Apple's public podcast directory (iTunes Search, Apple's top list and its id lookup). `podcasts.directory.enabled` is a household switch, on by default since the owner's decision of 2026-10-28 (spec 0.1.267); `podcasts.directory.teens` (off by default) adds teens. A child never reaches it, and a minor's search words pass the household-name check first. Only a person's own search or opening the top list makes a request; nothing runs in the background.
 
 | Backlog row | Request | Lifetime limit | Pace | Site limit | Stop rule |
 |---|---|---|---|---|---|
@@ -48,7 +48,7 @@ The privacy table lists this traffic as `platform:podcast-directory` only while 
 
 ## RADIO-02: finding radio stations
 
-The owner's request of 2026-10-27 permits Music to read the public Radio Browser directory (three mirrors) for a Radio tab. `radio.directory.enabled` is a household switch, off by default. Adults and teens may browse; a child never reaches it and plays only stations a parent saved. Only a person's own browse or search makes a request; nothing runs in the background and no listen report is sent.
+The owner's request of 2026-10-27 permits Music to read the public Radio Browser directory (three mirrors) for a Radio tab. `radio.directory.enabled` is a household switch, on by default since the owner's decision of 2026-10-28 (spec 0.1.267); a household that turned it off keeps it off. Adults and teens may browse; a child never reaches it and plays only stations a parent saved. Only a person's own browse or search makes a request; nothing runs in the background and no listen report is sent.
 
 | Backlog row | Request | Lifetime limit | Pace | Site limit | Stop rule |
 |---|---|---|---|---|---|

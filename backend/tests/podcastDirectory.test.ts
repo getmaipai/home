@@ -13,6 +13,9 @@ const realFetch = globalThis.fetch;
 let urls: string[];
 beforeEach(() => {
   resetDb();
+  // The switch defaults to on (spec 0.1.267); each test starts from off and turns it on itself.
+  setHouseholdSettingValue("podcasts.directory.enabled", false);
+  setHouseholdSettingValue("podcasts.directory.teens", false);
   __resetRateLimiterForTests();
   __resetDirectoryForTests();
   urls = [];
@@ -31,7 +34,7 @@ const on = (teens = false) => {
 };
 
 describe("the podcast directory routes", () => {
-  test("off by default: nobody may search and nothing leaves the home", async () => {
+  test("switch off: nobody may search and nothing leaves the home", async () => {
     const { client } = await owner();
     const response = await client.get("/api/plugins/podcasts/directory/search?q=cabin");
     expect(response.status).toBe(403);
