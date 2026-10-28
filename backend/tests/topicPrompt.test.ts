@@ -178,6 +178,7 @@ const EXEMPT: Record<string, string> = {
   "lib/pictures/ageCheck.ts": "labels a picture as a possible minor in JSON; no text reaches the person, a doubt withholds the picture",
   "lib/pictures/laneGate.ts": "labels a picture child-safe or not in JSON; no text reaches the person, a doubt withholds the picture",
   "lib/robotVision.ts": "describes one robot camera picture in a single sentence kept for 90 seconds as background data in that robot's own turn; it is never shown to the person, and the turn that reads it carries the topic block and passes the output gate",
+  "lib/weatherSummary.ts": "a one or two sentence forecast summary from the day's numbers, shared by everyone who sees the place, so the text must pass the child floor before it is stored; it never blocks a page, and a refusal shows the advice line instead; gives no advice of its own",
   "lib/memoryJudge.ts": "classifies memory candidates into a JSON verdict; no text reaches the person",
   "lib/personaJudge.ts": "admin evaluation judge; no person-facing text",
   "lib/replyParityJudge.ts": "admin evaluation judge; no person-facing text",
