@@ -5581,7 +5581,8 @@
                                 "turn",
                                 "code",
                                 "settings",
-                                "diagnose"
+                                "diagnose",
+                                "engine"
                               ]
                             }
                           },
@@ -5717,11 +5718,12 @@
                         "turn",
                         "code",
                         "settings",
-                        "diagnose"
+                        "diagnose",
+                        "engine"
                       ]
                     },
                     "minItems": 1,
-                    "maxItems": 4
+                    "maxItems": 5
                   },
                   "expires_in_days": {
                     "anyOf": [
@@ -5790,7 +5792,8 @@
                               "turn",
                               "code",
                               "settings",
-                              "diagnose"
+                              "diagnose",
+                              "engine"
                             ]
                           }
                         },
@@ -6101,7 +6104,8 @@
                                 "turn",
                                 "code",
                                 "settings",
-                                "diagnose"
+                                "diagnose",
+                                "engine"
                               ]
                             }
                           },
