@@ -55,7 +55,7 @@ export function createMediaAppRoutes(appId: MediaAppId) {
     // PODCAST-PORT-01: the directory is a network lookup, so it is answered here (async) beside the sync host data. Same gates as its routes.
     if (appId === "podcasts" && c.req.param("dataId") === "directory") {
       const body = await bodyOf(c.req.raw);
-      return c.json(await podcastDirectoryRows(person, typeof body.q === "string" ? body.q : "") as never, 200);
+      return c.json(await podcastDirectoryRows(person, typeof body.q === "string" ? body.q : "", typeof body.scope === "string" ? body.scope : "search") as never, 200);
     }
     // RADIO-02: Music's Radio pages. The directory is a network lookup (async); the rest are sync rows. Same gates as the radio routes.
     if (appId === "music") {

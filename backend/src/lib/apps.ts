@@ -485,6 +485,11 @@ export async function getAppData(person: PersonRow, packageId: string, dataId: s
   if (!app) return NOT_FOUND;
   const entry: AppDataEntry | undefined = app.contributes.data?.find((d) => d.id === dataId);
   if (!entry || !appRouteAllowed(person, packageId, "data", dataId, app)) return { ok: false, status: 404, error: "no such data" };
+  if (packageId === "podcasts" && dataId === "directory") {
+    const input = body && typeof body === "object" ? body as Record<string, unknown> : {};
+    const { podcastDirectoryRows } = await import("@/routes/podcastApp");
+    return { ok: true, status: 200, value: await podcastDirectoryRows(person, typeof input.q === "string" ? input.q : "", typeof input.scope === "string" ? input.scope : "search") as never };
+  }
   const asOf = new Date().toISOString();
   if (entry.rows === "places") return { ok: true, status: 200, value: { as_of: asOf, rows: entry.surface ? savedPlaceRows(person, entry.surface) : [] } };
 

@@ -14,6 +14,7 @@ import { MINOR_QUERY_PERSONAL_NOTE, minorQueryHit } from "@/lib/retrieval/minorQ
 import { deleteCollection, resolveCollection } from "@/lib/media/collections";
 import { personFilters, saveFilter, viewOf } from "@/lib/media/podcastFilters";
 import { artProxyAddress, directoryAllowed, fetchDirectoryArt, searchDirectory, topShows } from "@/lib/media/podcastDirectory";
+import { queryItems } from "@/lib/media/appHost";
 
 type Body = Record<string, unknown>;
 const bodyOf = async (c: Context): Promise<Body> => {
@@ -22,21 +23,32 @@ const bodyOf = async (c: Context): Promise<Body> => {
 };
 const fail = (c: Context, result: { status: number; error: string }) => c.json({ error: result.error }, result.status as 400);
 
-type DirectoryRow = { id: string; title: string; summary: string; thumbnail: string | null; feed_url: string };
+type DirectoryRow = { id: string; title: string; author: string; summary: string; thumbnail: string | null; feed_url: string; action_label?: string };
 
 /** The Find shows rows for the page's shelf: the search when words are typed, else Apple's top list. Not allowed, or no answer, is an empty list (the page says so). */
-export async function podcastDirectoryRows(person: PersonRow, q: string): Promise<DirectoryRow[]> {
+export async function podcastDirectoryRows(person: PersonRow, q: string, scope = "search"): Promise<DirectoryRow[]> {
   const band = mediaBandOf(person);
-  if (!directoryAllowed({ band }, { enabled: getHouseholdSettingValue("podcasts.directory.enabled") === true, teens: getHouseholdSettingValue("podcasts.directory.teens") === true })) return [];
+  const allowed = directoryAllowed({ band }, { enabled: getHouseholdSettingValue("podcasts.directory.enabled") === true, teens: getHouseholdSettingValue("podcasts.directory.teens") === true });
   const words = q.trim();
-  if (words !== "" && minorQueryHit(words, band)) return [];
-  const result = words === "" ? await topShows() : await searchDirectory(words);
-  if (!result.ok) return [];
-  return result.shows.map((show) => ({ id: show.id, title: show.title, summary: [show.author, show.genre].filter(Boolean).join(" · "), thumbnail: artProxyAddress(show.art), feed_url: show.feed_url }));
+  const admin = (person.role === "owner" || person.role === "admin") && band === "adult";
+  const local = words.length >= 2 ? queryItems(person, "podcasts", { limit: 200 }).filter((item) => `${item.title} ${item.subtitle ?? ""} ${item.description ?? ""}`.toLocaleLowerCase().includes(words.toLocaleLowerCase())).slice(0, 12).map((item) => ({ id: item.id, title: item.title, author: item.subtitle ?? "", summary: item.description ?? "", thumbnail: item.artwork ? `/api/media/items/${encodeURIComponent(item.id)}/art` : null, feed_url: "", ...(admin ? { action_label: "Listen" } : {}) })) : [];
+  if (scope === "search" && words === "") return [];
+  if (!allowed || words !== "" && minorQueryHit(words, band)) return local;
+  const result = scope === "top" ? await topShows() : words !== "" ? await searchDirectory(words) : { ok: true as const, shows: [] };
+  if (!result.ok) return local;
+  const directory = result.shows.map((show) => ({ id: show.id, title: show.title, author: show.author, summary: show.genre ?? "", thumbnail: artProxyAddress(show.art), feed_url: show.feed_url, ...(admin ? { action_label: "Follow" } : {}) }));
+  return [...local, ...directory];
 }
 
 export function podcastRoutes() {
   const routes = apiRouter();
+
+  routes.post("/data/directory", requireAuth, async (c, next) => {
+    const person = c.get("person");
+    if (!mediaAppAllowed(person, "podcasts")) return next();
+    const body = await bodyOf(c);
+    return c.json(await podcastDirectoryRows(person, typeof body.q === "string" ? body.q : "", typeof body.scope === "string" ? body.scope : "search"), 200);
+  });
 
   routes.get("/transcript/:media_id", requireAuth, async (c, next) => {
     const person = c.get("person");
@@ -181,6 +193,15 @@ export function podcastRoutes() {
     if (!directoryGate(c).allowed) return c.json({ error: NOT_ON }, 403);
     const result = await topShows();
     return result.ok ? c.json({ ok: true as const, shows: result.shows }, 200) : c.json({ error: result.error }, result.status);
+  });
+
+  routes.post("/directory/add", requireAuth, async (c, next) => {
+    if (!mediaAppAllowed(c.get("person"), "podcasts")) return next();
+    const body = await bodyOf(c);
+    const result = subscribePodcast(c.get("person"), { url: typeof body.url === "string" ? body.url : "" });
+    if (!result.ok) return fail(c, result);
+    void pollPodcastNow(result.value.feed.id);
+    return c.json({ ok: true as const, source_id: result.value.source.id, label: "Added to Shows" }, 200);
   });
 
   routes.get("/directory/art", requireAuth, async (c, next) => {

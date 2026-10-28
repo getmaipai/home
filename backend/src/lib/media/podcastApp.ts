@@ -12,6 +12,7 @@ import type { MediaItem, MediaSource } from "./model";
 import { draftRows, filterEpisodes, personFilters, viewOf } from "./podcastFilters";
 import { podcastStatsRows } from "./podcastStats";
 import { searchPodcastTranscripts } from "./podcasts";
+import { podcastDirectoryRows } from "@/routes/podcastApp";
 
 const APP = "podcasts" as const;
 const publishedOf = (item: MediaItem): string => item.external?.published_at ?? item.added_at;
@@ -85,6 +86,7 @@ registerMediaAppData(APP, (person, dataId, params) => {
   const limit = Math.min(Math.max(params.limit ?? 40, 1), 200);
   switch (dataId) {
     case "shows": return showRows(person);
+    case "directory": return podcastDirectoryRows(person, params.query ?? "", params.scope ?? "search");
     case "episodes": {
       const rows = episodeRows(person, episodesOf(person, params, limit));
       const q = params.query?.trim();

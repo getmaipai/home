@@ -1,0 +1,29 @@
+{
+  "type": "page",
+  "id": "search",
+  "title": "Search podcasts",
+  "body": [
+    {
+      "type": "media_shelf",
+      "heading": "Search results",
+      "bind": { "source": "package", "path": "directory", "params": { "q": "$state.q", "scope": "search" } },
+      "item_key_field": "id",
+      "item_label_field": "title",
+      "item_subtitle_field": "{author} · {summary}",
+      "item_media_field": "thumbnail",
+      "aspect": "square",
+      "variant": "plain",
+      "orientation": "vertical",
+      "density": "compact",
+      "row_actions": [
+        {
+          "icon": "plus",
+          "label": "Follow",
+          "label_field": "action_label",
+          "action": { "call": { "target": "/api/plugins/podcasts/directory/add", "args": { "url": "{feed_url}" } } }
+        }
+      ],
+      "hide_when_empty": true
+    }
+  ]
+}

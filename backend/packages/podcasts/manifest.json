@@ -1,6 +1,6 @@
 {
   "id": "podcasts",
-  "version": "0.2.6",
+  "version": "0.2.7",
   "kind": "app",
   "category": "Media",
   "display": "Podcasts",
@@ -51,28 +51,20 @@
         ]
       },
       {
+        "id": "search",
+        "label": "Search",
+        "icon": "search",
+        "nav": false,
+        "kind": "schema",
+        "module": "search"
+      },
+      {
         "id": "shows",
         "label": "Shows",
         "icon": "library",
         "nav": true,
         "kind": "schema",
         "module": "shows"
-      },
-      {
-        "id": "find",
-        "label": "Find shows",
-        "icon": "search",
-        "nav": true,
-        "kind": "schema",
-        "module": "find",
-        "min_role": "teen",
-        "keywords": [
-          "find",
-          "search",
-          "new podcasts",
-          "discover",
-          "add show"
-        ]
       },
       {
         "id": "episodes",

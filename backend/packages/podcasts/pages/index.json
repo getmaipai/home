@@ -1,138 +1,75 @@
 {
   "type": "page",
   "id": "index",
-  "title": "Listen now",
+  "title": "Podcasts",
   "body": [
     {
-      "type": "split_view",
-      "aside_label": "Your shows",
-      "main": [
+      "type": "search",
+      "state": "q",
+      "label": "Search podcasts",
+      "placeholder": "Search podcasts",
+      "submit": { "navigate": { "to": "/apps/podcasts/search", "state": { "q": "{q}" } } }
+    },
+    {
+      "type": "media_shelf",
+      "heading": "Up Next",
+      "bind": { "source": "package", "path": "continue" },
+      "item_key_field": "id",
+      "item_label_field": "title",
+      "item_subtitle_field": "{channel} · {summary}",
+      "item_media_field": "thumbnail",
+      "item_meta_field": "duration_s",
+      "aspect": "wide",
+      "variant": "plain",
+      "on_select": { "play": { "media_id": "{id}" } },
+      "hide_when_empty": true
+    },
+    {
+      "type": "media_shelf",
+      "heading": "New episodes",
+      "bind": { "source": "package", "path": "new" },
+      "item_key_field": "id",
+      "item_label_field": "title",
+      "item_subtitle_field": "{channel}",
+      "item_media_field": "thumbnail",
+      "item_meta_field": "duration_s",
+      "aspect": "square",
+      "variant": "plain",
+      "on_select": { "play": { "media_id": "{id}" } },
+      "hide_when_empty": true
+    },
+    {
+      "type": "media_shelf",
+      "heading": "Your shows",
+      "bind": { "source": "package", "path": "shows" },
+      "item_key_field": "id",
+      "item_label_field": "title",
+      "item_subtitle_field": "{summary}",
+      "item_media_field": "thumbnail",
+      "aspect": "square",
+      "variant": "plain",
+      "on_select": { "navigate": { "to": "/apps/podcasts/episodes", "state": { "show": "{title}" } } },
+      "hide_when_empty": true
+    },
+    {
+      "type": "media_shelf",
+      "heading": "Top shows",
+      "bind": { "source": "package", "path": "directory", "params": { "scope": "top" } },
+      "item_key_field": "id",
+      "item_label_field": "title",
+      "item_subtitle_field": "{author} · {summary}",
+      "item_media_field": "thumbnail",
+      "aspect": "square",
+      "variant": "plain",
+      "row_actions": [
         {
-          "type": "media_shelf",
-          "heading": "Up next",
-          "bind": {
-            "source": "package",
-            "path": "queue"
-          },
-          "item_key_field": "id",
-          "item_label_field": "title",
-          "item_subtitle_field": "{channel}",
-          "item_media_field": "thumbnail",
-          "item_progress_field": "progress",
-          "item_badge_field": "copy_label",
-          "item_meta_field": "duration_s",
-          "aspect": "square",
-          "variant": "plain",
-          "orientation": "vertical",
-          "hide_when_empty": true,
-          "see_all": {
-            "label": "See all",
-            "action": {
-              "navigate": {
-                "to": "/apps/podcasts/queue"
-              }
-            }
-          },
-          "on_select": {
-            "play": {
-              "media_id": "{id}"
-            }
-          }
-        },
-        {
-          "type": "media_shelf",
-          "heading": "Continue listening",
-          "bind": {
-            "source": "package",
-            "path": "continue"
-          },
-          "item_key_field": "id",
-          "item_label_field": "title",
-          "item_subtitle_field": "{channel}",
-          "item_media_field": "thumbnail",
-          "item_progress_field": "progress",
-          "item_badge_field": "copy_label",
-          "item_meta_field": "duration_s",
-          "aspect": "square",
-          "variant": "plain",
-          "orientation": "vertical",
-          "hide_when_empty": true,
-          "on_select": {
-            "play": {
-              "media_id": "{id}"
-            }
-          }
-        },
-        {
-          "type": "media_shelf",
-          "heading": "New episodes",
-          "bind": {
-            "source": "package",
-            "path": "new"
-          },
-          "item_key_field": "id",
-          "item_label_field": "title",
-          "item_subtitle_field": "{channel}",
-          "item_media_field": "thumbnail",
-          "item_progress_field": "progress",
-          "item_badge_field": "copy_label",
-          "item_meta_field": "duration_s",
-          "aspect": "square",
-          "variant": "plain",
-          "orientation": "vertical",
-          "see_all": {
-            "label": "See all",
-            "action": {
-              "navigate": {
-                "to": "/apps/podcasts/episodes"
-              }
-            }
-          },
-          "on_select": {
-            "play": {
-              "media_id": "{id}"
-            }
-          },
-          "hide_when_empty": true
+          "icon": "plus",
+          "label": "Follow",
+          "label_field": "action_label",
+          "action": { "call": { "target": "/api/plugins/podcasts/directory/add", "args": { "url": "{feed_url}" } } }
         }
       ],
-      "aside": [
-        {
-          "type": "media_shelf",
-          "heading": "Your shows",
-          "bind": {
-            "source": "package",
-            "path": "shows"
-          },
-          "item_key_field": "id",
-          "item_label_field": "title",
-          "item_subtitle_field": "{summary}",
-          "item_media_field": "thumbnail",
-          "item_progress_field": "progress",
-          "item_badge_field": "copy_label",
-          "item_meta_field": "duration_s",
-          "aspect": "square",
-          "variant": "plain",
-          "orientation": "vertical",
-          "see_all": {
-            "label": "See all",
-            "action": {
-              "navigate": {
-                "to": "/apps/podcasts/shows"
-              }
-            }
-          },
-          "on_select": {
-            "navigate": {
-              "to": "/apps/podcasts/episodes",
-              "state": {
-                "show": "{title}"
-              }
-            }
-          },
-          "hide_when_empty": true
-        }
-      ]
+      "hide_when_empty": true
     }
   ]
 }

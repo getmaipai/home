@@ -14,7 +14,9 @@ const DOWN = "The podcast directory did not answer. Try again in a few minutes."
 const MAX_RESULTS = 25;
 
 let pausedUntil = 0;
-export function __resetDirectoryForTests(): void { pausedUntil = 0; }
+const CACHE_MS = 15 * 60 * 1000;
+const cache = new Map<string, { until: number; result: DirectoryResult }>();
+export function __resetDirectoryForTests(): void { pausedUntil = 0; cache.clear(); }
 
 /** The household switches and the person's band decide; a child never reaches the directory. */
 export function directoryAllowed(person: { band: "adult" | "teen" | "child" }, switches: { enabled: boolean; teens: boolean }): boolean {
@@ -54,17 +56,30 @@ function showOf(row: Record<string, unknown>): DirectoryShow | null {
 export async function searchDirectory(term: string, deps: DirectoryDeps = {}): Promise<DirectoryResult> {
   const words = term.trim().slice(0, 80);
   if (words.length < 2) return { ok: true, shows: [] };
+  const now = deps.nowMs?.() ?? Date.now();
+  const key = `search:${words.toLocaleLowerCase()}`;
+  const cached = cache.get(key);
+  if (!deps.fetch && cached && cached.until > now) return cached.result;
   const url = `https://itunes.apple.com/search?${new URLSearchParams({ media: "podcast", entity: "podcast", limit: String(MAX_RESULTS), term: words })}`;
   const body = (await get(url, deps)) as { results?: unknown } | null;
   if (!body || !Array.isArray(body.results)) return { ok: false, status: 502, error: DOWN };
-  return { ok: true, shows: (body.results as Array<Record<string, unknown>>).map(showOf).filter((show): show is DirectoryShow => show !== null) };
+  const result: DirectoryResult = { ok: true, shows: (body.results as Array<Record<string, unknown>>).map(showOf).filter((show): show is DirectoryShow => show !== null) };
+  cache.set(key, { until: now + CACHE_MS, result });
+  return result;
 }
 
 /** Apple's top list, then one lookup for the feed addresses (the list carries none). */
 export async function topShows(deps: DirectoryDeps = {}): Promise<DirectoryResult> {
+  const now = deps.nowMs?.() ?? Date.now();
+  const cached = cache.get("top");
+  if (!deps.fetch && cached && cached.until > now) return cached.result;
   const list = (await get(`https://rss.applemarketingtools.com/api/v2/us/podcasts/top/${MAX_RESULTS}/podcasts.json`, deps)) as { feed?: { results?: Array<Record<string, unknown>> } } | null;
   const entries = list?.feed?.results;
-  if (!Array.isArray(entries) || entries.length === 0) return { ok: false, status: 502, error: DOWN };
+  if (!Array.isArray(entries) || entries.length === 0) {
+    const result: DirectoryResult = { ok: false, status: 502, error: DOWN };
+    cache.set("top", { until: now + CACHE_MS, result });
+    return result;
+  }
   const ids = entries.map((entry) => text(entry.id)).filter((id) => /^\d+$/.test(id));
   const looked = (await get(`https://itunes.apple.com/lookup?${new URLSearchParams({ id: ids.join(",") })}`, deps)) as { results?: Array<Record<string, unknown>> } | null;
   const feeds = new Map<string, string>();
@@ -76,7 +91,9 @@ export async function topShows(deps: DirectoryDeps = {}): Promise<DirectoryResul
     if (!feed || !feed.startsWith("https://") || text(entry.name) === "") continue;
     shows.push({ id, title: text(entry.name), author: text(entry.artistName), feed_url: feed, art: artOrNull(entry.artworkUrl100), genre: null, explicit: false });
   }
-  return shows.length > 0 ? { ok: true, shows } : { ok: false, status: 502, error: DOWN };
+  const result: DirectoryResult = shows.length > 0 ? { ok: true, shows } : { ok: false, status: 502, error: DOWN };
+  cache.set("top", { until: now + CACHE_MS, result });
+  return result;
 }
 
 // ---- cover art: the browser may only load pictures from Home itself (img-src 'self'), so a directory cover is fetched here, once checked ----
