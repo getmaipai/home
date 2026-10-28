@@ -1,6 +1,6 @@
 {
   "id": "weather",
-  "version": "0.3.5",
+  "version": "0.3.6",
   "kind": "plugin",
   "category": "Utilities",
   "display": "Weather",
@@ -15,7 +15,12 @@
       "what's the weather like in Portland",
       "weather in Denver",
       "how's the weather in Miami today",
-      "is it going to rain in Portland today"
+      "is it going to rain in Portland today",
+      "what should I wear today",
+      "what should I wear in Seattle today",
+      "do I need an umbrella",
+      "do I need sunscreen",
+      "is it going to get colder"
     ],
     "patterns": []
   },

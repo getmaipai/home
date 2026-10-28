@@ -2,8 +2,28 @@
 // one utterance embedding for memory recall; package examples no longer
 // have embedding rows or participate in routing decisions.
 import { describe, test, expect } from "bun:test";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import { embedUtterance, conversationShaped, utteranceShape, commandOpenersFrom } from "@/lib/routing";
 import { classifyTurnSignal } from "@/lib/turnSignal";
+
+const weatherManifest = JSON.parse(readFileSync(join(import.meta.dir, "../packages/weather/manifest.json"), "utf-8")) as {
+  routing: { examples: string[]; patterns: string[] };
+};
+
+describe("weather advice routing examples", () => {
+  for (const phrase of [
+    "what should I wear today",
+    "do I need an umbrella",
+    "do I need sunscreen",
+    "is it going to get colder",
+  ]) {
+    test(`routes ${phrase} to the weather tool`, () => {
+      expect(weatherManifest.routing.examples).toContain(phrase);
+      expect(weatherManifest.routing.patterns).toEqual([]);
+    });
+  }
+});
 
 describe("embedUtterance() for memory recall", () => {
   test("returns a real vector for real text", async () => {
