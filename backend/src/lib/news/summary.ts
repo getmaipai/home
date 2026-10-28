@@ -16,7 +16,6 @@ import { publishedAtOf, releasedItem, storyIdOf } from "./cards";
 import { gateFor, sentencesOf } from "./childGate";
 import { rankStories } from "./rankStories";
 
-export const SUMMARY_SOURCE_NOTE = "Written on this hub from the article";
 const Summary = z.object({ intro: z.string().trim().min(1), points: z.array(z.string().trim().min(1)).min(3).max(5) });
 export type StorySummary = z.infer<typeof Summary>;
 let model = completeBackground;

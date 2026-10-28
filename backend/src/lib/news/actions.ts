@@ -13,7 +13,7 @@ import { addSave, clearRecents, itemIsSaved, recordRecent, recordRead, removeSav
 import { topicOfferedTo } from "./topics";
 import { viewerOf } from "./data";
 
-import { summarizeStory, SUMMARY_SOURCE_NOTE } from "./summary";
+import { summarizeStory } from "./summary";
 
 export type ActionResult = { ok: true; status: 200; value: Record<string, unknown> } | { ok: false; status: 400 | 403 | 404 | 503; error: string };
 
@@ -121,7 +121,7 @@ export async function runNewsAction(person: PersonRow, action: NewsActionName, b
       const summary = await summarizeStory(storyIdOf(item), viewer.band);
       // A silent 200 left the button looking dead; the reader says so and stays readable (the page shows this line under the article).
       if (!summary) return { ok: false, status: 503, error: "Key points are not ready for this story yet. Try again in a minute." };
-      return ok({ summary: { ...summary, source_note: SUMMARY_SOURCE_NOTE } });
+      return ok({ summary });
     }
     case "follow": return follow(person, viewer, body);
     case "save": return save(person, viewer, body);

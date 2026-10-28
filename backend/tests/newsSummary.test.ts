@@ -2,7 +2,7 @@ import { afterEach, beforeEach, expect, test } from "bun:test";
 import { db } from "@/db";
 import { newsStorySummaries } from "@/db/schema";
 import type { AgeBand } from "@/lib/ageBand";
-import { __setNewsSummaryModelForTests, summarizeStory, runNewsSummaryTick, summaryArticleText, SUMMARY_SOURCE_NOTE } from "@/lib/news/summary";
+import { __setNewsSummaryModelForTests, summarizeStory, runNewsSummaryTick, summaryArticleText } from "@/lib/news/summary";
 import { runNewsAction } from "@/lib/news/actions";
 import { sharedShelfStore } from "@/lib/shelf/shelfStore";
 import { acquireTurnLease } from "@/lib/turnActivity";
@@ -81,7 +81,7 @@ test("action returns source note and unreleased ids are 404", async () => {
   const { client, row } = await owner(); installNewsApp(); const item = seed("adult");
   const response = await client.post("/api/plugins/news/actions/summarize", { id: item.id });
   expect(response.status).toBe(200);
-  expect(await response.json()).toEqual({ ok: true, summary: { ...good, source_note: SUMMARY_SOURCE_NOTE } });
+  expect(await response.json()).toEqual({ ok: true, summary: good });
   expect((await runNewsAction(row, "summarize", { id: "news-unknown0001" })).status).toBe(404);
 });
 test("idle skips a running turn and handles at most 24 stories per band", async () => {
