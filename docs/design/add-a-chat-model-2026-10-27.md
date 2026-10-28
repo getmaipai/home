@@ -125,3 +125,12 @@ beyond what the Stack already loads.
 
 - The spec tag for S1 (`commons`): only Jesse says yes to a new tag. S1 can land in its own worktree; the tag waits.
 - The reading of rule 3's tool-decision clause (section 6), if Jesse wants it the other way.
+
+## Built differently from the text above (S4, 2026-10-27)
+
+- An added model is one more radio in the Chat card, id `chat.added.<modelId>`, beside Standard and Uncensored. It is chosen through
+  `startChatModelChoice`, which pins from the model's own record; no `engines.chat.choice` model id is written, and no new setting key exists.
+- The add panel sits in the Chat row's "Choose a model" dialog: paste, read (`POST /api/ai/models/inspect`, nothing downloads), confirm
+  (`POST /api/ai/models/add`). Both routes are owner and admin only.
+- The panel's words and the "Not tested by MaiPai" sentence are defaults in the frontend and `ADDED_CHAT_DESCRIPTION` in `aiCopy.ts`, not yet in
+  the spec: moving them there needs a commons tag, which waits for Jesse's yes.

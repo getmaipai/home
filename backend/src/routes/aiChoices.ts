@@ -11,7 +11,7 @@ import { apiRouter, errorResponses } from "@/lib/openapi";
 import { requireRole } from "@/middleware/auth";
 import { buildAiCards, recommendedPlan, type AiChoicesInput, type AiChoice } from "../../../shared/aiChoices";
 import type { DiskPlan } from "../../../shared/diskPlanMath";
-import { aiCopy } from "@/lib/aiCopy";
+import { aiCopy, ADDED_CHAT_DESCRIPTION } from "@/lib/aiCopy";
 import { findUnused, plainPartName, qualified, whyKept, type UnusedInput } from "@/lib/aiUnused";
 import { installStackComponent, listStackComponents, StackComponentError, uninstallStackComponent, type StackComponent, type StackComponentList } from "@/lib/stackComponents";
 import { previewPlan } from "@/lib/installActions";
@@ -20,7 +20,7 @@ import { systemAvailableBytes } from "@/lib/resourceGovernor";
 import { ensureWakewordAssets, removeWakewordAssets, wakewordAssetState } from "@/lib/wakewordAssets";
 import { setHouseholdSettingValue } from "@/lib/settings";
 import { catalogEntries } from "@/lib/modelCatalog";
-import { startChatModelChoice, uncensoredChoiceState } from "@/lib/chatModelSwitch";
+import { addedChatChoiceStates, startChatModelChoice, uncensoredChoiceState } from "@/lib/chatModelSwitch";
 import { addChatModel, AddModelError, inspectForAdd } from "@/lib/addModel";
 import { readAiSettings } from "@/lib/aiChoicesState";
 import { resetInstallStatusCache } from "@/lib/installStatus";
@@ -43,10 +43,11 @@ interface AiState {
   freeBytes: number | null;
   list: StackComponentList;
   uncensored: Awaited<ReturnType<typeof uncensoredChoiceState>>;
+  addedChats: Awaited<ReturnType<typeof addedChatChoiceStates>>;
 }
 
 function choicesInput(state: AiState): AiChoicesInput {
-  return { copy: aiCopy, plan: state.plan, components: state.components, settings: state.settings, freeBytes: state.freeBytes, wakeword: wakewordAssetState(), uncensored: state.uncensored };
+  return { copy: aiCopy, plan: state.plan, components: state.components, settings: state.settings, freeBytes: state.freeBytes, wakeword: wakewordAssetState(), uncensored: state.uncensored, addedChats: state.addedChats.map((added) => ({ ...added, description: ADDED_CHAT_DESCRIPTION })) };
 }
 
 function unusedInput(state: AiState): UnusedInput {
@@ -61,8 +62,8 @@ async function loadPlan(): Promise<DiskPlan> {
 }
 
 async function loadAiState(): Promise<AiState> {
-  const [plan, list, uncensored] = await Promise.all([loadPlan(), listStackComponents(), uncensoredChoiceState()]);
-  return { plan, components: list.components, settings: readAiSettings(), freeBytes: list.free_disk_bytes, list, uncensored };
+  const [plan, list, uncensored, addedChats] = await Promise.all([loadPlan(), listStackComponents(), uncensoredChoiceState(), addedChatChoiceStates()]);
+  return { plan, components: list.components, settings: readAiSettings(), freeBytes: list.free_disk_bytes, list, uncensored, addedChats };
 }
 
 // The Stack's refusal, passed through as its own sentence (routes/components.ts does the same mapping).
@@ -189,7 +190,7 @@ aiChoicesRoutes.openapi(choicesRoute, async (c) => {
   if (list === null) {
     return c.json({ stack: "unreachable" as const, message, tier: null, free_disk_bytes: null, installed_bytes: 0, cards: [], alwaysOn: { bytes: 0, rowIds: [] }, recommended: null, unused_bytes: 0, memory_available_bytes: null }, 200);
   }
-  const state: AiState = { plan: await planned, components: list.components, settings: readAiSettings(), freeBytes: list.free_disk_bytes, list, uncensored: await uncensoredChoiceState() };
+  const state: AiState = { plan: await planned, components: list.components, settings: readAiSettings(), freeBytes: list.free_disk_bytes, list, uncensored: await uncensoredChoiceState(), addedChats: await addedChatChoiceStates() };
   const { cards, alwaysOn } = buildAiCards(choicesInput(state));
   return c.json({
     stack: "ok" as const, message: null, tier: list.tier, free_disk_bytes: list.free_disk_bytes, installed_bytes: list.installed_bytes,
@@ -247,8 +248,10 @@ aiChoicesRoutes.openapi(chooseRoute, async (c) => {
       }
       if (choice.action === "remove") { removeWakewordAssets(); return c.json({ ok: true as const, started: [], removed: [choice.id] }, 200); }
     }
-    if (CHAT_MODEL_CHOICES.includes(choice.id) && (choice.action === "get" || choice.action === "use")) {
-      const modelId = choice.id === "chat.uncensored" ? state.uncensored?.id ?? null : standardChatModelId(state);
+    if ((CHAT_MODEL_CHOICES.includes(choice.id) || choice.id.startsWith("chat.added.")) && (choice.action === "get" || choice.action === "use")) {
+      const modelId = choice.id === "chat.uncensored" ? state.uncensored?.id ?? null
+        : choice.id.startsWith("chat.added.") ? state.addedChats.find((added) => `chat.added.${added.id}` === choice.id)?.id ?? null
+        : standardChatModelId(state);
       if (!modelId) return c.json({ error: "That chat model is not available on this computer.", code: "unknown_choice" }, 404) as never;
       const started = await startChatModelChoice(modelId);
       if ("error" in started) return c.json({ error: started.error, code: "chat_model" }, started.status === 404 ? 404 : started.status === 409 ? 409 : 503) as never;

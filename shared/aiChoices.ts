@@ -19,7 +19,9 @@ export interface AiCopy {
 export interface AiWakewordInput { installed: boolean; bytes: number }
 /** The optional uncensored chat model: not in any tier's disk plan and not a Stack component of its own, so the hub reads it from the chat role (installed, running) and its catalog record (sizes). */
 export interface AiUncensoredInput { /** The model's own name, shown in the option's parts line. */ label?: string; installed: boolean; running: boolean; /** A download of its files is in flight, and how far along (null when unknown). */ downloading?: boolean; percent?: number | null; downloadBytes: number; installedBytes: number }
-export interface AiChoicesInput { copy: AiCopy; plan: DiskPlan; components: AiComponentLike[] | null; settings: AiSettingsInput; freeBytes: number | null; wakeword?: AiWakewordInput | null; uncensored?: AiUncensoredInput | null }
+/** A chat model an admin added from a link (MODEL-ADD-01): a radio beside Standard, named by its own record and labelled untested. */
+export interface AiAddedChatInput extends AiUncensoredInput { id: string; label: string; /** The sentence under its name; the hub writes it from the spec's words. */ description: string }
+export interface AiChoicesInput { copy: AiCopy; plan: DiskPlan; components: AiComponentLike[] | null; settings: AiSettingsInput; freeBytes: number | null; wakeword?: AiWakewordInput | null; uncensored?: AiUncensoredInput | null; addedChats?: AiAddedChatInput[] }
 export interface AiChoice {
   id: string;
   job: AiJobId; kind: "radio" | "switch" | "fixed";
@@ -133,7 +135,9 @@ function stateSize(bytes: number): string {
 }
 
 interface ChoiceSpec {
-  id: AiCopyKey;
+  id: AiCopyKey | `chat.added.${string}`;
+  /** Words that come with the record (an added model names itself) instead of from the spec's choice list. */
+  words?: { label: string; description: string };
   job: AiJobId;
   kind: AiChoice["kind"];
   row: DiskRow;
@@ -154,7 +158,7 @@ function buildChoice(copyOf: AiCopy, plan: DiskPlan, components: AiComponentLike
   else if (state.state === "installing") action = "none";
   else if (state.state === "installed") action = spec.current ? (spec.kind === "switch" ? "remove" : "none") : "use";
   else action = "get";
-  const copy = copyOf.choice(spec.id);
+  const copy = spec.words ?? copyOf.choice(spec.id);
   return {
     id: spec.id,
     job: spec.job,
@@ -199,6 +203,7 @@ function chipFor(card: { id: AiJobId; rows: string[] }, present: boolean, choice
   if (!present) return "Not on this computer";
   switch (card.id) {
     case "chat":
+      { const added = choices.find((choice) => choice.id.startsWith("chat.added.") && choice.current); if (added) return `Using ${added.label}`; }
       return choices.some((choice) => choice.id === "chat.uncensored" && choice.current) ? "Using Uncensored" : "Using Standard";
     case "pictures": {
       const current = choices.find((choice) => choice.kind === "radio" && choice.current);
@@ -229,12 +234,14 @@ function chipFor(card: { id: AiJobId; rows: string[] }, present: boolean, choice
 
 export function buildAiCards(input: AiChoicesInput): AiChoicesResult {
   const { components, settings, freeBytes, copy, wakeword, uncensored } = input;
+  const addedChats = input.addedChats ?? [];
   const plan = withLiveInstalled(input.plan, components);
   const rows = byRowId(plan);
   // The wake word files are not in the disk plan; a row stands in for them so the card reads like every other.
   if (wakeword) rows.set("wakeword-detector", { id: "wakeword-detector", label: "Hey Jarvis wake word", note: "", kind: "model", need: "optional", selectable: true, download_bytes: wakeword.bytes, installed_bytes: wakeword.bytes, peak_temp_bytes: 0, model_ids: [], engines: [], installed: wakeword.installed, basis: "pins" });
   // The uncensored chat model is no plan row either; a row stands in for it so its choice reads like every other.
   if (uncensored) rows.set("chat-uncensored", { id: "chat-uncensored", label: uncensored.label ?? "Uncensored chat AI", note: "", kind: "model", need: "optional", selectable: true, download_bytes: uncensored.downloadBytes, installed_bytes: uncensored.installedBytes, peak_temp_bytes: 0, model_ids: [], engines: [], installed: uncensored.installed, basis: "pins" });
+  for (const added of addedChats) rows.set(`chat-added-${added.id}`, { id: `chat-added-${added.id}`, label: added.label, note: "", kind: "model", need: "optional", selectable: true, download_bytes: added.downloadBytes, installed_bytes: added.installedBytes, peak_temp_bytes: 0, model_ids: [], engines: [], installed: added.installed, basis: "pins" });
   const has = (id: string): boolean => rows.has(id);
   const need = (id: string): DiskNeedLike => rows.get(id)?.need ?? "optional";
 
@@ -249,9 +256,10 @@ export function buildAiCards(input: AiChoicesInput): AiChoicesResult {
     const specs: ChoiceSpec[] = [];
     switch (meta.id) {
       case "chat": {
-        if (has("chat")) specs.push({ id: "chat.standard", job: "chat", kind: "fixed", row: rows.get("chat")!, current: !uncensored?.running, recommended: true, setting: null });
+        if (has("chat")) specs.push({ id: "chat.standard", job: "chat", kind: "fixed", row: rows.get("chat")!, current: !uncensored?.running && !addedChats.some((added) => added.running), recommended: true, setting: null });
         if (has("chat-mlx")) specs.push({ id: "chat.mlx", job: "chat", kind: "switch", row: rows.get("chat-mlx")!, current: rowIsInstalled(rows.get("chat-mlx")!, components), recommended: need("chat-mlx") === "recommended", setting: null });
         if (has("chat") && uncensored) specs.push({ id: "chat.uncensored", job: "chat", kind: "radio", row: rows.get("chat-uncensored")!, current: uncensored.running, recommended: false, setting: null });
+        if (has("chat")) for (const added of addedChats) specs.push({ id: `chat.added.${added.id}`, job: "chat", kind: "radio", row: rows.get(`chat-added-${added.id}`)!, current: added.running, recommended: false, setting: null, words: { label: added.label, description: added.description } });
         if (has("reads-pictures")) specs.push({ id: "chat.pictures", job: "chat", kind: "switch", row: rows.get("reads-pictures")!, current: rowIsInstalled(rows.get("reads-pictures")!, components), recommended: need("reads-pictures") === "recommended", setting: null });
         break;
       }
@@ -301,6 +309,8 @@ export function buildAiCards(input: AiChoicesInput): AiChoicesResult {
     const choices = specs.map((spec) => {
       const built = buildChoice(copy, plan, components, freeBytes, spec);
       // The model's files are coming down: no Stack component carries that, so the hub's reading of the download sets it.
+      const addedNow = addedChats.find((added) => spec.id === `chat.added.${added.id}`);
+      if (addedNow?.downloading && built.state !== "installed") return { ...built, state: "installing" as const, percent: addedNow.percent ?? null, stateText: "Installing", blockedReason: null, action: "none" as const };
       if (spec.id === "chat.uncensored" && uncensored?.downloading && built.state !== "installed") return { ...built, state: "installing" as const, percent: uncensored.percent ?? null, stateText: "Installing", blockedReason: null, action: "none" as const };
       return built;
     });

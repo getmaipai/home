@@ -360,3 +360,17 @@ test("every option's parts line names a model, never a job label (issue 250)", (
     }
   }
 });
+
+test("chat: an added model is a radio beside Standard, named by its record, and the chip says so when it runs", () => {
+  const added = { id: "added-tiny", label: "Tiny 7B", description: "Not tested by MaiPai.", installed: true, running: true, downloadBytes: 4e9, installedBytes: 4e9 };
+  const chat = buildAiCards({ copy, plan: TIERS.p128, components: null, settings: SETTINGS, freeBytes: null, addedChats: [added] }).cards.find((c) => c.id === "chat")!;
+  const choice = chat.choices.find((c) => c.id === "chat.added.added-tiny")!;
+  expect(choice.kind).toBe("radio");
+  expect(choice.label).toBe("Tiny 7B");
+  expect(choice.recommended).toBe(false);
+  expect(choice.current).toBe(true);
+  expect(chat.choices.find((c) => c.id === "chat.standard")!.current).toBe(false);
+  expect(chat.chip).toBe("Using Tiny 7B");
+  const downloading = buildAiCards({ copy, plan: TIERS.p128, components: null, settings: SETTINGS, freeBytes: null, addedChats: [{ ...added, installed: false, running: false, downloading: true, percent: 40 }] });
+  expect(downloading.cards.find((c) => c.id === "chat")!.choices.find((c) => c.id === "chat.added.added-tiny")).toMatchObject({ state: "installing", percent: 40 });
+});

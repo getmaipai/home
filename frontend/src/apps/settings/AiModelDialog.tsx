@@ -7,6 +7,7 @@ import { DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@mai
 import { RadioGroup, RadioGroupItem } from "@maipai/ui/src/dashboard/components/ui/radio-group";
 import { Field, FieldContent, FieldDescription, FieldLabel, FieldTitle } from "@maipai/ui/src/dashboard/components/ui/field";
 import { sizeGb } from "../../../../shared/diskPlanMath";
+import { AddChatModel } from "@/apps/settings/AddChatModel";
 import { OFF, fill, type GlanceRow } from "@/apps/settings/aiGlanceRows";
 
 export interface AiModelChoicesProps {
@@ -14,10 +15,12 @@ export interface AiModelChoicesProps {
   copy: Record<string, string>;
   onClose: () => void;
   onSave: (row: GlanceRow, pick: string) => void;
+  /** A model was added and its download has started: the page reloads the cards. */
+  onAdded?: () => void;
 }
 
 /** The dialog's content; the page renders the kit Dialog around it (rule 9: no Home wrapper around an Element). */
-export function AiModelChoices({ row, copy, onClose, onSave }: AiModelChoicesProps) {
+export function AiModelChoices({ row, copy, onClose, onSave, onAdded }: AiModelChoicesProps) {
   const start = !row.shownEnabled ? OFF : row.shown?.id ?? OFF;
   const [pick, setPick] = useState(start);
   return (
@@ -39,6 +42,7 @@ export function AiModelChoices({ row, copy, onClose, onSave }: AiModelChoicesPro
                     <FieldTitle>
                       {option.label}
                       {option.recommended ? <Badge tone="success">{copy.recommended}</Badge> : null}
+                      {option.id.startsWith("chat.added.") ? <Badge variant="outline" tone="warning">{copy.not_tested ?? "Not tested by MaiPai"}</Badge> : null}
                       {option.id === "chat.uncensored" ? <Badge variant="outline" tone="warning">Uncensored</Badge> : null}
                     </FieldTitle>
                     <FieldDescription>{option.description}</FieldDescription>
@@ -61,6 +65,7 @@ export function AiModelChoices({ row, copy, onClose, onSave }: AiModelChoicesPro
           </Field>
         </FieldLabel>
       </RadioGroup>
+      {row.job === "chat" ? <AddChatModel copy={copy} onAdded={onAdded} /> : null}
       <DialogFooter>
         {row.recommended ? <Button type="button" variant="link" onClick={() => setPick(row.recommended!.id)}>{copy.use_recommended}</Button> : null}
         <Button type="button" variant="outline" onClick={onClose}>{copy.cancel}</Button>

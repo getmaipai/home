@@ -170,7 +170,7 @@ export function AiGlance({ card }: SettingsViewProps) {
       </p>
 
       <Dialog open={editing !== null} onOpenChange={(open) => { if (!open) setEditing(null); }}>
-        <DialogContent scroll="viewport">{editing ? <AiModelChoices key={editing.job} row={editing} copy={copy} onClose={() => setEditing(null)} onSave={stage} /> : null}</DialogContent>
+        <DialogContent scroll="viewport">{editing ? <AiModelChoices key={editing.job} row={editing} copy={copy} onClose={() => setEditing(null)} onSave={stage} onAdded={refresh} /> : null}</DialogContent>
       </Dialog>
     <div className="sticky bottom-0 z-10 flex flex-col gap-2 bg-background pb-2" data-testid="ai-action-bar">
       {error ? <Alert variant="destructive"><AlertTitle>That did not work</AlertTitle><AlertDescription>{error}</AlertDescription></Alert> : null}

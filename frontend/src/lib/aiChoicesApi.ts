@@ -13,6 +13,9 @@ export interface UnusedList { items: UnusedModel[]; total_bytes: number }
 export interface RecommendedResult { ok: boolean; changed: string[]; started: string[]; already: string[]; skipped: Array<{ rowId?: string; id?: string; label: string; reason: string }>; needs_licence: Array<{ id: string; label: string }> }
 export interface CleanupResult { results: Array<{ id: string; status: "removed" | "kept" | "failed"; freed_bytes: number; message: string }>; freed_bytes: number; kept: number; failed: number }
 
+export interface InspectedChatModel { repo: string; file: string; sizeBytes: number; sha256: string; licence: string | null; architecture: string; verifiedArchitecture: boolean; ramBytes: number; fits: "fits" | "estimate" }
+export interface AddedChatModel { ok: true; id: string; label: string; jobs: string[] }
+
 async function send<T>(path: string, init: RequestInit = {}): Promise<T> {
   const res = await fetch(path, { credentials: "include", ...init });
   const body = (await res.json().catch(() => ({}))) as { error?: string; code?: string };
@@ -26,5 +29,7 @@ export const aiChoicesApi = {
   unused: () => send<UnusedList>("/api/ai/unused"),
   choose: (job: string, choice: string) => send<{ ok: true; started: string[] }>(`/api/ai/choices/${encodeURIComponent(job)}`, post({ choice })),
   applyRecommended: () => send<RecommendedResult>("/api/ai/recommended", post()),
+  inspectModel: (source: string) => send<InspectedChatModel>("/api/ai/models/inspect", post({ source })),
+  addModel: (source: string) => send<AddedChatModel>("/api/ai/models/add", post({ source })),
   cleanup: (ids: string[]) => send<CleanupResult>("/api/ai/cleanup", post({ ids })),
 };

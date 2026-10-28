@@ -90,6 +90,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `frontend/src/apps/people/NewPersonForm.tsx` | NewPersonForm |
 | `frontend/src/apps/people/ProfileForm.tsx` | ProfileForm |
 | `frontend/src/apps/people/VoiceEnrollmentBody.tsx` | VoiceEnrollmentBody |
+| `frontend/src/apps/settings/AddChatModel.tsx` | AddChatModel |
 | `frontend/src/apps/settings/AddRobotSection.tsx` | AddRobotSection |
 | `frontend/src/apps/settings/AddVoiceForm.tsx` | AddVoiceForm |
 | `frontend/src/apps/settings/AdminGatedContent.tsx` | AdminGatedContent |
@@ -261,7 +262,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/addedModels.ts` | listAddedModels, saveAddedModel, removeAddedModel |
 | `backend/src/lib/ageBand.ts` | speakerAgeBand |
 | `backend/src/lib/aiChoicesState.ts` | readAiSettings, SETUP_CHOICE_KEYS, setupCards |
-| `backend/src/lib/aiCopy.ts` | aiCopy |
+| `backend/src/lib/aiCopy.ts` | aiCopy, ADDED_CHAT_DESCRIPTION |
 | `backend/src/lib/aiUnused.ts` | plainPartName, notUsedSince, whyKept, qualified, findUnused |
 | `backend/src/lib/allowance.ts` | dailyMinutesAllowed |
 | `backend/src/lib/almanacCompute.ts` | WEEKDAYS, parseDateQuestion, computeDateAnswer, dateRelation |
@@ -313,7 +314,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/capabilityReconcile.ts` | packagesLosingCapability, removalConfirmation, reconcileCapabilities |
 | `backend/src/lib/chatFolders.ts` | ChatFolderView, MAX_SHARES, canManageFolders, folderAccess, visibleFolder, listChatFolders |
 | `backend/src/lib/chatImageNote.ts` | cleanPictureName, picturesAttachedNote, picturesNotReadNote, picturesWindowNote, pictureFailureWords, storedImages |
-| `backend/src/lib/chatModelSwitch.ts` | __resetChatSwitchForTests, startChatModelChoice, chatModelChoiceState, uncensoredChatEntry, uncensoredChoiceState |
+| `backend/src/lib/chatModelSwitch.ts` | __resetChatSwitchForTests, startChatModelChoice, chatModelChoiceState, uncensoredChatEntry, uncensoredChoiceState, addedChatChoiceStates |
 | `backend/src/lib/chatPause.ts` | chatPausedByAdmin, chatPauseMessage |
 | `backend/src/lib/chatPictures.ts` | __setChatPictureCapabilityForTests, chatModelReadsPictures, photoUploadsAllowed, picturePartsAllowed, loadPictureParts |
 | `backend/src/lib/chatTemplateTokens.ts` | stripChatTemplateTokens, ChatTemplateTokenFilter |

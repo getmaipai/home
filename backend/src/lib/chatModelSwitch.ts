@@ -6,6 +6,8 @@
 // model the Stack has installed is loaded: the Stack stores the choice, so
 // it survives a restart. Progress of a download rides the existing job
 // feed; the outcome of a load is read back from the chat role itself.
+import type { ModelCapabilities } from "@maipai/spec/gen/ts/model-capabilities.js";
+import type { StackClient } from "@/lib/stack/client";
 import { catalogEntries } from "@/lib/modelCatalog";
 import { getStackClient, isStackConfigured } from "@/lib/stackEngine";
 import { StackError } from "@/lib/stack/errors";
@@ -149,32 +151,41 @@ export function uncensoredChatEntry() {
   return catalogEntries().find((model) => model.role === "chat" && model.implemented && model.download && model.tags?.includes("uncensored"));
 }
 
-/** What the AI and models page needs to draw the uncensored choice: its sizes from the catalog, whether the Stack has it, whether it is the running chat model. Null when the catalog has none or the Stack does not answer. */
-export async function uncensoredChoiceState(): Promise<{ id: string; label: string; installed: boolean; running: boolean; downloading: boolean; percent: number | null; downloadBytes: number; installedBytes: number } | null> {
-  const entry = uncensoredChatEntry();
-  if (!entry?.download) return null;
-  let role: Awaited<ReturnType<typeof chatRole>> = null;
-  try { role = await chatRole(); } catch { return null; }
-  if (!role) return null;
-  const bytes = entry.download.approx_bytes + (entry.image_input?.projector.download.approx_bytes ?? 0);
-  // A download of its weights or its picture file in flight, read from the Stack's own job list.
-  let active: Array<{ completedBytes: number; totalBytes: number }> = [];
-  try {
-    // The Stack's install jobs are kind "model.install" and name their model in input.model (the weights and the picture file are separate jobs).
-    active = (await getStackClient().jobs())
-      .filter((job) => job.kind === "model.install" && (job.state === "queued" || job.state === "running" || job.state === "paused" || job.state === "stalled"))
-      .filter((job) => { const model = job.input?.model; return typeof model === "string" && model.startsWith("qwen3-8-27b-huihui-abliterated"); });
-  } catch { /* the job list failing only hides the progress */ }
+export interface ChatChoiceState { id: string; label: string; installed: boolean; running: boolean; downloading: boolean; percent: number | null; downloadBytes: number; installedBytes: number }
+
+/** One catalog chat model as the AI and models page draws it: sizes from its record, whether the Stack has it, whether it is the running chat model, and any download in flight (read from the Stack's own job list). */
+async function choiceStateOf(entry: ModelCapabilities, role: NonNullable<Awaited<ReturnType<typeof chatRole>>>, jobs: Awaited<ReturnType<StackClient["jobs"]>> | null): Promise<ChatChoiceState> {
+  const bytes = (entry.download?.approx_bytes ?? 0) + (entry.image_input?.projector.download.approx_bytes ?? 0);
+  // The Stack's install jobs are kind "model.install" and name their model in input.model (the weights and the picture file are separate jobs).
+  const active = (jobs ?? [])
+    .filter((job) => job.kind === "model.install" && (job.state === "queued" || job.state === "running" || job.state === "paused" || job.state === "stalled"))
+    .filter((job) => { const model = job.input?.model; return typeof model === "string" && model.startsWith(entry.id.startsWith("added-") ? entry.id : "qwen3-8-27b-huihui-abliterated"); });
   const total = active.reduce((sum, job) => sum + job.totalBytes, 0);
   const done = active.reduce((sum, job) => sum + job.completedBytes, 0);
   return {
-    id: entry.id,
-    label: entry.label,
-    installed: role.installed.includes(entry.id),
-    running: role.modelId === entry.id,
-    downloading: active.length > 0,
-    percent: active.length > 0 && total > 0 ? Math.min(99, Math.round((done / total) * 100)) : null,
-    downloadBytes: bytes,
-    installedBytes: bytes,
+    id: entry.id, label: entry.label, installed: role.installed.includes(entry.id), running: role.modelId === entry.id, downloading: active.length > 0,
+    percent: active.length > 0 && total > 0 ? Math.min(99, Math.round((done / total) * 100)) : null, downloadBytes: bytes, installedBytes: bytes,
   };
+}
+
+async function readChatChoices(entries: ModelCapabilities[]): Promise<ChatChoiceState[]> {
+  if (entries.length === 0) return [];
+  let role: Awaited<ReturnType<typeof chatRole>> = null;
+  try { role = await chatRole(); } catch { return []; }
+  if (!role) return [];
+  let jobs: Awaited<ReturnType<StackClient["jobs"]>> | null = null;
+  try { jobs = await getStackClient().jobs(); } catch { /* the job list failing only hides the progress */ }
+  return Promise.all(entries.map((entry) => choiceStateOf(entry, role!, jobs)));
+}
+
+/** What the AI and models page needs to draw the uncensored choice. Null when the catalog has none or the Stack does not answer. */
+export async function uncensoredChoiceState(): Promise<ChatChoiceState | null> {
+  const entry = uncensoredChatEntry();
+  if (!entry?.download) return null;
+  return (await readChatChoices([entry]))[0] ?? null;
+}
+
+/** The chat models an admin added from a link, drawn as radios beside Standard. Empty when there are none or the Stack does not answer. */
+export async function addedChatChoiceStates(): Promise<ChatChoiceState[]> {
+  return readChatChoices(catalogEntries().filter((model) => model.origin === "added" && model.role === "chat" && model.implemented && model.download));
 }

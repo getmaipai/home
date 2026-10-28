@@ -43,3 +43,6 @@ export const aiCopy: AiCopy = {
     return { label: id, description: "" };
   },
 };
+
+/** The sentence under an added chat model's name. Until the spec holds this copy (a commons tag), it is written here, once. */
+export const ADDED_CHAT_DESCRIPTION = "Not tested by MaiPai. An admin added it from a link; MaiPai checked its file but has not measured it.";
