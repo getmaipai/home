@@ -12,6 +12,8 @@ import { COMPUTED_WILDCARD_RESOLVERS } from "@/lib/manifestLint";
 import { notifyIfFlagged } from "@/lib/notifications";
 import { hasEligibleClause } from "@/lib/turnSignal";
 import { splitIntoSentences } from "@/lib/guards";
+import { hubTimeZone } from "@/lib/news/dayParts";
+import { promptNow } from "@/lib/benchSampling";
 import { pickRefusalVariant, varyKnownConstant } from "@/lib/replyVariation";
 import { StatusChannel } from "@/lib/statusChannel";
 import { composePersonaPrompt, DEFAULT_PERSONA, INFORMATION_HANDLING_POLICY, NATURALNESS_POLICY, type Persona } from "@/lib/persona";
@@ -515,6 +517,11 @@ export function variedConstantReply(personId: string, source: TurnValue["source"
   return text;
 }
 
+/** NAT-02: the household clock the speech normalizer reads, so "4:00 pm" said at 3 pm is "four o'clock". */
+function spokenClock() {
+  return { now: promptNow(), timeZone: hubTimeZone(), timeStyle: "plain" as const };
+}
+
 /** The server-side speech text of a spoken reply, and the one way any
  * of it reaches a speaker: every spoken surface, the robot included,
  * goes through normalizeForSpeech() (numbers, times, units,
@@ -526,9 +533,9 @@ export function variedConstantReply(personId: string, source: TurnValue["source"
  * turnMachine/turnNext.ts calls this function (THIN-0J, rule 12). The
  * output is for TTS only; the visible text is never replaced by it. */
 export function speechTextFor(surface: Surface, text: string, authoredSpeech: string | undefined): string {
-  if (authoredSpeech !== undefined && authoredSpeech !== text) return normalizeForSpeech(authoredSpeech);
+  if (authoredSpeech !== undefined && authoredSpeech !== text) return normalizeForSpeech(authoredSpeech, spokenClock());
   const spoken = surface === "robot" && authoredSpeech === undefined ? splitIntoSentences(text)[0]?.replace(/https?:\/\/\S+|www\.\S+/g, "").replace(/\s+/g, " ").trim() ?? "" : text;
-  return normalizeForSpeech(spoken);
+  return normalizeForSpeech(spoken, spokenClock());
 }
 
 /** FAST-04: what a turn's token stream resolves to once its deltas are

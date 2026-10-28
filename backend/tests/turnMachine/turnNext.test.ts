@@ -1,3 +1,4 @@
+import { __setPromptClockForBench } from "@/lib/benchSampling";
 // U2 (docs/plans/turn-machine-state-record-2026-09-22.md, "Acceptance"):
 // the new path's own tests, mirroring conversationBench.test.ts's own
 // stub pattern (the real runner, a stub chat backend, a fake SearXNG) -
@@ -3968,6 +3969,9 @@ describe("turnNext.ts: THIN-0I, per-companion confirmation and refusal pools on 
 // expected speech is the identical normalizeForSpeech() the old path's
 // own route test (tests/chatTurn.test.ts) asserts on.
 describe("turnNext.ts: THIN-0J, server-side speech text for spoken turns on the default path", () => {
+  // NAT-02: a time within 12 hours of the household clock loses its part of day; pin the clock 13 hours off the fixture time so the fixture stays about the written form.
+  beforeEach(() => __setPromptClockForBench(() => new Date(2026, 9, 28, 23, 0)));
+  afterEach(() => __setPromptClockForBench(null));
   // A number, a unit and an abbreviation in one sentence, each one a
   // thing a TTS engine reads wrong when handed the written form. The
   // utterance is the U4 suite's own plain one-call question (no command
@@ -4024,6 +4028,7 @@ describe("turnNext.ts: THIN-0J, server-side speech text for spoken turns on the 
   });
 
   test("an authored speech text on a spoken turn goes through the same normalizer", async () => {
+    __setPromptClockForBench(() => new Date(2026, 9, 28, 6, 0)); // 13.5 hours before the fixture time, so it keeps its part of day
     const { createCommand } = await import("@/lib/commands");
     const created = createCommand(people.owner, "movie night", "child", { kind: "reply", text: "Starting movie night mode.", speech: "Movie night starts at 7:30 pm." });
     if (!created.ok) throw new Error(created.error);

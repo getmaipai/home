@@ -1,0 +1,21 @@
+import { describe, expect, test, afterEach } from "bun:test";
+import { __setPromptClockForBench } from "@/lib/benchSampling";
+import { speechTextFor } from "@/lib/turnShared";
+
+// NAT-02: spoken times read against the household clock.
+afterEach(() => __setPromptClockForBench(null));
+
+describe("speechTextFor with the household clock", () => {
+  test("a time later today drops its part of day", () => {
+    __setPromptClockForBench(() => new Date(2026, 9, 28, 15, 0));
+    const spoken = speechTextFor("phone", "Dinner is at 4:00 pm.", undefined);
+    expect(spoken).toContain("four o'clock");
+    expect(spoken).not.toContain("afternoon");
+  });
+
+  test("a time on another day keeps its part of day", () => {
+    __setPromptClockForBench(() => new Date(2026, 9, 28, 21, 0));
+    const spoken = speechTextFor("phone", "The alarm is at 6:00 am.", undefined);
+    expect(spoken).toContain("morning");
+  });
+});
