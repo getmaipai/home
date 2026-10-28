@@ -481,6 +481,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/media/parsers/tv.ts` | seasonFolderNumber, parseTvName, findFolderArt, isImageName |
 | `backend/src/lib/media/parsers/zip.ts` | openZip |
 | `backend/src/lib/media/podcastApp.ts` | showRulesLine |
+| `backend/src/lib/media/podcastDirectory.ts` | __resetDirectoryForTests, directoryAllowed, searchDirectory, topShows |
 | `backend/src/lib/media/podcasts.ts` | __setPodcastFetchDepsForTests, podcastFetchDeps, plainNotes, chaptersFromNotes, parsePodcastFeed, sourceRowForFeed |
 | `backend/src/lib/media/prober.ts` | probeResultFrom, createStackProber |
 | `backend/src/lib/media/progress.ts` | LATCH_PERCENT, BOOK_END_PERCENT, correctedStamp, percentOf, reachesLatch, mergeProgress |
