@@ -82,6 +82,15 @@ export const NOTIFICATION_TYPES: readonly NotificationType[] = [
     toast: true,
   },
   {
+    id: "engines.chat_engine_changed",
+    level: "passive",
+    audience: "admins",
+    template: "The chat engine was switched from {from} to {to} with an assistant key.",
+    configurable: false,
+    defaultChannels: ["in_app"],
+    toast: false,
+  },
+  {
     id: "safety.alarm",
     level: "immediate",
     audience: "adults",

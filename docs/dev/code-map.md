@@ -571,6 +571,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/offline/registry.ts` | registerOfflineProvider, offlineProvider |
 | `backend/src/lib/openapi.ts` | apiRouter, emptyJsonBodyAsObject |
 | `backend/src/lib/operatorDiagnose.ts` | newsView, MAX_TURNS, DEFAULT_TURNS, BIG_PROMPT_TOKENS, turnsView, summaryView |
+| `backend/src/lib/operatorEngine.ts` | ENGINE_SETTING_KEY, ENGINE_CHOICES, ENGINE_CHANGES_PER_DAY, __resetOperatorEngineForTests, operatorEngineView, setOperatorEngine |
 | `backend/src/lib/operatorSettings.ts` | OPERATOR_SETTING_KEYS, OPERATOR_DENIED_PREFIXES, isOperatorSettingKey, operatorSettingsView, setOperatorSetting |
 | `backend/src/lib/outbound.ts` | HOME_USER_AGENT |
 | `backend/src/lib/packageBlocks.ts` | blockEnvelope, BLOCK_ONLY_DATA_PREFIX, withoutBlockOnlyData, weatherCard, blocksForRecipeRun |

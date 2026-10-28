@@ -5,6 +5,7 @@ import { bodyLimit } from "hono/body-limit";
 import { requireApiKey } from "@/middleware/auth";
 import { operatorSettingsView, setOperatorSetting } from "@/lib/operatorSettings";
 import { DEFAULT_TURNS, MAX_TURNS, engineState, newsView, runCacheProbe, summaryView, turnsView } from "@/lib/operatorDiagnose";
+import { operatorEngineView, setOperatorEngine } from "@/lib/operatorEngine";
 import { tryConsume } from "@/lib/rateLimiter";
 import type { AppEnv } from "@/types";
 
@@ -65,4 +66,21 @@ operatorRoutes.post("/diagnose/cache-probe", async (c) => {
   const limited = slow(c as never); if (limited) return limited;
   const result = await runCacheProbe();
   return result.ok ? c.json({ calls: result.calls }) : c.json({ error: result.error }, result.status);
+});
+
+// SPLASH-KEY-01 (docs/dev/engine-key-api.md): an `engine` key chooses the chat engine and applies it, nothing else.
+operatorRoutes.get("/engine", requireApiKey("engine"), async (c) => {
+  const limited = slow(c as never); if (limited) return limited;
+  try {
+    const view = await operatorEngineView(c.get("apiKey")?.id ?? "unknown");
+    return view ? c.json(view) : c.json({ error: "The engine service does not list this setting yet. Update the engine service from Settings and try again." }, 503);
+  } catch { return c.json({ error: "The engine service did not answer. Check that it is running on the status page and try again." }, 503); }
+});
+
+operatorRoutes.put("/engine", requireApiKey("engine"), bodyLimit({ maxSize: 1024 }), async (c) => {
+  const limited = slow(c as never); if (limited) return limited;
+  let body: unknown;
+  try { body = await c.req.json(); } catch { return c.json({ error: "Send JSON like {\"engine\": \"splash\"}." }, 400); }
+  const result = await setOperatorEngine(c.get("apiKey")?.id ?? "unknown", (body as { engine?: unknown } | null)?.engine);
+  return result.ok ? c.json({ key: result.key, previous: result.previous, value: result.value }) : c.json({ error: result.error }, result.status);
 });

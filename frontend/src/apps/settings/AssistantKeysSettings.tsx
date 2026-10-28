@@ -15,15 +15,15 @@ import { Item, ItemActions, ItemContent, ItemDescription, ItemGroup, ItemTitle }
 import { api, ApiError, type PersonalApiKey } from "@/lib/api";
 
 const KEYS = ["settings-api-keys"] as const;
-type Kind = "settings" | "diagnose";
-const kindOf = (key: PersonalApiKey): Kind => key.scopes.includes("diagnose") ? "diagnose" : "settings";
+type Kind = "settings" | "diagnose" | "engine";
+const kindOf = (key: PersonalApiKey): Kind => key.scopes.includes("engine") ? "engine" : key.scopes.includes("diagnose") ? "diagnose" : "settings";
 const dateText = (date: string | null) => date ? new Date(date).toLocaleDateString() : "Never";
 const messageOf = (error: unknown, fallback: string) => error instanceof ApiError ? error.message : fallback;
 
 export function AssistantKeysSettings() {
   const client = useQueryClient();
   const query = useQuery({ queryKey: KEYS, queryFn: () => api.apiKeys() });
-  const keys = (query.data?.keys ?? []).filter((key) => (key.scopes.includes("settings") || key.scopes.includes("diagnose")) && key.status !== "revoked" && key.status !== "expired");
+  const keys = (query.data?.keys ?? []).filter((key) => (key.scopes.includes("settings") || key.scopes.includes("diagnose") || key.scopes.includes("engine")) && key.status !== "revoked" && key.status !== "expired");
   const [createOpen, setCreateOpen] = useState(false);
   const [name, setName] = useState("");
   const [kind, setKind] = useState<Kind>("settings");
@@ -34,7 +34,7 @@ export function AssistantKeysSettings() {
   const refresh = () => client.invalidateQueries({ queryKey: KEYS });
   const create = async () => {
     setError(null);
-    try { setCreated(await api.createApiKey({ name: name.trim(), scopes: [kind], expires_in_days: kind === "diagnose" && days === 90 ? 30 : days })); setName(""); setCreateOpen(false); await refresh(); }
+    try { setCreated(await api.createApiKey({ name: name.trim(), scopes: [kind], expires_in_days: kind !== "settings" && days === 90 ? 30 : days })); setName(""); setCreateOpen(false); await refresh(); }
     catch (reason) { setError(messageOf(reason, "Could not make this key. Try again.")); }
   };
   const confirmRevoke = async () => {
@@ -56,7 +56,7 @@ export function AssistantKeysSettings() {
               <Item key={key.id}>
                 <ItemContent>
                   <ItemTitle>{key.name} <Badge variant="secondary">{key.status === "active" ? "Active" : "Paused"}</Badge></ItemTitle>
-                  <ItemDescription clamp={false}>{kindOf(key) === "diagnose" ? "Diagnostics key. " : "Settings key. "}Ends {dateText(key.expires_at)}. Last used {dateText(key.last_used_at)}. Ends in …{key.hint}</ItemDescription>
+                  <ItemDescription clamp={false}>{kindOf(key) === "engine" ? "Chat engine key. " : kindOf(key) === "diagnose" ? "Diagnostics key. " : "Settings key. "}Ends {dateText(key.expires_at)}. Last used {dateText(key.last_used_at)}. Ends in …{key.hint}</ItemDescription>
                 </ItemContent>
                 <ItemActions><Button type="button" size="sm" variant="outline" onClick={() => setRevoke(key)}>Revoke</Button></ItemActions>
               </Item>
@@ -75,9 +75,9 @@ export function AssistantKeysSettings() {
           <div className="flex flex-col gap-2"><Label htmlFor="assistant-key-name">Name</Label><Input id="assistant-key-name" value={name} onChange={(event) => setName(event.target.value)} maxLength={60} /></div>
           <div className="flex flex-col gap-2">
             <Label htmlFor="assistant-key-kind">What it can do</Label>
-            <Select value={kind} onValueChange={(value) => { setKind(value as Kind); if (value === "diagnose" && days === 90) setDays(30); }}>
+            <Select value={kind} onValueChange={(value) => { setKind(value as Kind); if (value !== "settings" && days === 90) setDays(30); }}>
               <SelectTrigger id="assistant-key-kind"><SelectValue /></SelectTrigger>
-              <SelectContent><SelectItem value="settings">Change a few settings</SelectItem><SelectItem value="diagnose">Read diagnostics only</SelectItem></SelectContent>
+              <SelectContent><SelectItem value="settings">Change a few settings</SelectItem><SelectItem value="diagnose">Read diagnostics only</SelectItem><SelectItem value="engine">Switch the chat engine only</SelectItem></SelectContent>
             </Select>
           </div>
           <div className="flex flex-col gap-2">
