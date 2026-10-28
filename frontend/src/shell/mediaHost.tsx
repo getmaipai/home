@@ -16,6 +16,12 @@ import { BUDGET_CHECK_MS, guardMediaBudget, intervalEvery } from "@/shell/mediaB
 import { NotFoundPage } from "@/shell/pages/NotFoundPage";
 import { createStoryListener } from "@/shell/newsListen";
 import { fetchNowPlaying, liveStationIdOf, NOW_FIRST_MS, NOW_POLL_MS, rejoinLiveOnResume } from "@/shell/radioLive";
+import Hls from "hls.js";
+
+export const hlsPathFor = (src: string, canPlayNative: boolean): "native" | "hls" | "direct" => {
+  if (!/[?&]hls=1(?:&|$)/i.test(src) && !/\.m3u8(?:[?#]|$)/i.test(src)) return "direct";
+  return canPlayNative ? "native" : "hls";
+};
 
 /** The item loaded in the host's element: what it is, which app played it, and whether the person has started it. */
 export interface HoistedMedia extends MediaItemRef {
@@ -109,6 +115,7 @@ export function MediaHostProvider({ children }: { children: ReactNode }) {
   const navigate = useNavigate();
   const location = useLocation();
   const [store] = useState(createMediaStore);
+  const hlsRef = useRef<Hls | null>(null);
   const pathRef = useRef(location.pathname);
   pathRef.current = location.pathname;
   const appRef = useRef<string | null>(null);
@@ -168,6 +175,19 @@ export function MediaHostProvider({ children }: { children: ReactNode }) {
   // MEDIA-KID-01: the daily media minutes pause the host's element (every media app, the mini bar, audio and video alike).
   // The words go through the shell's one toast (the kit ToastProvider in App.tsx, the same one the notification bell uses).
   const element = current?.el ?? null;
+  const liveId = current ? liveStationIdOf(current.src) : null;
+  // RADIO-06: attach hls.js to this same host-owned element only when the browser lacks native HLS.
+  useEffect(() => {
+    if (!element || liveId === null) return;
+    const src = current?.src ?? "";
+    const mode = hlsPathFor(src, element.canPlayType("application/vnd.apple.mpegurl") !== "");
+    if (mode !== "hls") return;
+    const hls = new Hls({ enableWorker: true, lowLatencyMode: true });
+    hlsRef.current = hls;
+    hls.loadSource(src.replace(/[?&]hls=1(?:&|$)/, ""));
+    hls.attachMedia(element);
+    return () => { hls.destroy(); if (hlsRef.current === hls) hlsRef.current = null; };
+  }, [element, current?.src, liveId]);
   const budgetState = useRef({ told: false });
   useEffect(() => {
     if (!element) return;
@@ -175,10 +195,11 @@ export function MediaHostProvider({ children }: { children: ReactNode }) {
   }, [element]);
   // RADIO-03: a live station. Pause then Play loads the stream again (the live edge, not a stale buffer); the song the station reports is
   // read from the hub a few seconds after sound starts and then every 15 s, only while it plays and this tab is visible.
-  const liveId = current ? liveStationIdOf(current.src) : null;
   useEffect(() => {
     if (!element || liveId === null) return;
-    const stopRejoin = rejoinLiveOnResume(element);
+    const stopRejoin = rejoinLiveOnResume(element, () => {
+      if (hlsRef.current) { hlsRef.current.stopLoad(); hlsRef.current.startLoad(-1); }
+    });
     let first: ReturnType<typeof setTimeout> | null = null;
     let busy = false;
     const look = async () => {

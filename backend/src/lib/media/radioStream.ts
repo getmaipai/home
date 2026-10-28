@@ -15,6 +15,7 @@ import type { SavedStation } from "./radio";
 export const MAX_REDIRECTS = 4;
 export const CONNECT_TIMEOUT_MS = 10_000;
 export const MAX_STREAMS_PER_HOME = 4;
+const HLS_TYPE = /mpegurl/i;
 const HOST_PACE = { capacity: 6, refillPerSecond: 1 / 5 } as const;
 const platformFetch = globalThis.fetch;
 
@@ -28,9 +29,6 @@ export interface StreamDeps {
 export type StreamFailure = { ok: false; status: 415 | 422 | 429 | 502 | 504; error: string };
 export type StreamOpen = { ok: true; response: Response };
 
-const hlsAddress = (url: string): boolean => /\.m3u8(\?|$)/i.test(url);
-const HLS_TYPE = /mpegurl/i;
-export const HLS_MESSAGE = "HLS stations are not supported yet. Pick another station for now.";
 
 /** One guarded GET with `Icy-MetaData: 1`. Every hop (the first and each redirect) passes the address guard before a byte is sent. */
 async function getUpstream(station: SavedStation, deps: StreamDeps, signal: AbortSignal): Promise<Response> {
@@ -65,8 +63,8 @@ async function getUpstream(station: SavedStation, deps: StreamDeps, signal: Abor
   }
 }
 
-/** A station that is not a stream the hub can play: HLS today. Checked before any connection. */
-export const unplayable = (station: SavedStation): StreamFailure | null => (station.hls || hlsAddress(station.url) ? { ok: false, status: 415, error: HLS_MESSAGE } : null);
+/** No saved station currently has a format-level refusal; HLS is served through radioHls. */
+export const unplayable = (_station: SavedStation): StreamFailure | null => null;
 
 interface Active { personId: string; stationId: string; stop: () => void }
 const active = new Set<Active>();
@@ -81,6 +79,23 @@ export function __resetRadioStreamsForTests(): void {
 
 /** The latest song text the station sent, while a stream of it is open (null otherwise). Memory only. */
 export function nowPlayingOf(stationId: string): string | null { return titles.get(stationId) ?? null; }
+
+/** RADIO-06 shares the same person replacement and home-wide cap as ordinary radio. */
+export function claimRadioSlot(personId: string, stationId: string, stopNew: (stop: () => void) => void): (() => void) | StreamFailure {
+  const existing = [...active].find((entry) => entry.personId === personId && entry.stationId === stationId);
+  if (existing) { stopNew(() => {}); return () => {}; }
+  if (homeFull(personId)) return failure(429, `${MAX_STREAMS_PER_HOME} radio streams are already playing in this home. Stop one, then press Play again.`);
+  for (const entry of [...active]) if (entry.personId === personId) entry.stop();
+  const placeholder: Active = { personId, stationId, stop: () => {} };
+  active.add(placeholder);
+  let released = false;
+  const release = () => { if (released) return; released = true; active.delete(placeholder); };
+  placeholder.stop = release;
+  stopNew(release);
+  return release;
+}
+
+export function releaseRadioSlot(release: () => void): void { release(); }
 
 /** Whether this person's play would be refused for the home's cap (their own current stream does not count: it is replaced). */
 function homeFull(personId: string): boolean {
@@ -134,7 +149,7 @@ export async function openStationStream(personId: string, station: SavedStation,
     release();
     return failure(502, `The station's server answered with an error (${upstream.status}). Try again later or pick another station.`);
   }
-  if (HLS_TYPE.test(type)) { await dropBody(upstream); release(); return failure(415, HLS_MESSAGE); }
+  if (HLS_TYPE.test(type)) { await dropBody(upstream); release(); return failure(415, "This station uses an HLS playlist. Play it from its saved station row."); }
   if (!(type.startsWith("audio/") || type === "application/ogg")) {
     await dropBody(upstream);
     release();

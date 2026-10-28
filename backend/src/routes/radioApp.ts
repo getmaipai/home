@@ -8,6 +8,7 @@ import { mediaAppAllowed } from "@/lib/media/appHost";
 import { mediaBandOf } from "@/lib/media/band";
 import { addStation, directoryRowsFor, listSavedStations, removeStation, savedStationFor, type SavedStation } from "@/lib/media/radio";
 import { nowPlayingOf, openStationStream, type StreamDeps } from "@/lib/media/radioStream";
+import { decodeHlsResource, openHlsResource } from "@/lib/media/radioHls";
 import { findStations, radioDirectoryAllowed, type DirectoryStation } from "@/lib/media/radioDirectory";
 import { MINOR_QUERY_PERSONAL_NOTE, minorQueryHit } from "@/lib/retrieval/minorQueryCheck";
 import { getHouseholdSettingValue } from "@/lib/settings";
@@ -36,8 +37,8 @@ const countryName = (code: string | null): string => (code ? (COUNTRIES.find(([c
 export const radioCountryRows = () => COUNTRIES.map(([id, label]) => ({ id, label }));
 export const radioGenreRows = () => GENRES.map((genre) => ({ id: genre, label: genre.replace(/^./, (ch) => ch.toUpperCase()) }));
 
-const subtitleOf = (station: { country_code: string | null; tags: string[]; hls: boolean }): string =>
-  station.hls ? "Not supported yet" : [countryName(station.country_code), station.tags.slice(0, 2).join(", ")].filter(Boolean).join(" · ");
+const subtitleOf = (station: { country_code: string | null; tags: string[] }): string =>
+  [countryName(station.country_code), station.tags.slice(0, 2).join(", ")].filter(Boolean).join(" · ");
 
 export type RadioRow = { id: string; kind: "station"; title: string; summary: string; thumbnail: null; url: string; favicon: string; tags_csv: string; country_code: string; codec: string; bitrate_kbps: string; action_label: string };
 const rowOf = (station: DirectoryStation | SavedStation, label: string): RadioRow => ({
@@ -121,7 +122,24 @@ export function radioRoutes() {
     if (!mediaAppAllowed(person, "music")) return next();
     const station = savedStationFor(person, c.req.param("id"));
     if (!station) return c.json({ error: "That station is not in your list. Open Radio and pick one of Your stations." }, 404);
+    if (station.hls) {
+      const opened = await openHlsResource(person.id, station, station.url, streamDeps, c.req.raw.signal);
+      return opened.ok ? opened.response : c.json({ error: opened.error }, opened.status);
+    }
     const opened = await openStationStream(person.id, station, streamDeps, c.req.raw.signal);
+    return opened.ok ? opened.response : c.json({ error: opened.error }, opened.status);
+  });
+
+  // RADIO-06: playlists and segment bytes remain same-origin. The token is a URL rewritten into a playlist; the route
+  // still resolves a saved station first, then the proxy checks every destination and redirect hop.
+  routes.get("/hls/:id/resource/:token", requireAuth, async (c, next) => {
+    const person = c.get("person");
+    if (!mediaAppAllowed(person, "music")) return next();
+    const station = savedStationFor(person, c.req.param("id"));
+    if (!station) return c.json({ error: "That station is not in your list. Open Radio and pick one of Your stations." }, 404);
+    const address = decodeHlsResource(c.req.param("token"));
+    if (!address) return c.json({ error: "That playlist resource is not available." }, 404);
+    const opened = await openHlsResource(person.id, station, address, streamDeps, c.req.raw.signal);
     return opened.ok ? opened.response : c.json({ error: opened.error }, opened.status);
   });
 

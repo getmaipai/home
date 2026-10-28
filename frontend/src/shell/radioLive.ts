@@ -11,8 +11,10 @@ export const NOW_FIRST_MS = 4_000;
 
 /** The station id when `src` is a station's stream on this hub, else null. */
 export function liveStationIdOf(src: string): string | null {
-  if (!src.startsWith(STREAM_PREFIX)) return null;
-  const id = src.slice(STREAM_PREFIX.length).split(/[?#]/)[0] ?? "";
+  const prefix = src.startsWith(STREAM_PREFIX) ? STREAM_PREFIX : null;
+  if (!prefix) return null;
+  const raw = src.slice(prefix.length).split(/[?#]/)[0] ?? "";
+  const id = raw;
   try { return id === "" ? null : decodeURIComponent(id); } catch { return null; }
 }
 
@@ -27,7 +29,7 @@ export async function fetchNowPlaying(stationId: string): Promise<string | null>
 }
 
 /** Pause then Play on a live stream loads the source again so it joins the live edge. Returns the cleanup. */
-export function rejoinLiveOnResume(el: HTMLMediaElement): () => void {
+export function rejoinLiveOnResume(el: HTMLMediaElement, reload?: () => void): () => void {
   let pausedAt: number | null = null;
   let reloading = false;
   const paused = () => { if (!reloading && !el.ended) pausedAt = Date.now(); };
@@ -35,7 +37,7 @@ export function rejoinLiveOnResume(el: HTMLMediaElement): () => void {
     if (reloading || pausedAt === null) return;
     pausedAt = null;
     reloading = true;
-    el.load();
+    if (reload) reload(); else el.load();
     void el.play().catch(() => undefined).finally(() => { reloading = false; });
   };
   el.addEventListener("pause", paused);

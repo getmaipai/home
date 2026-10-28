@@ -38,7 +38,7 @@ export interface SavedStation {
   country_code: string | null;
   codec: string | null;
   bitrate_kbps: number | null;
-  /** HLS playlists are stored but not playable yet (RADIO-06): the page says "not supported yet". */
+  /** True when the station address is an HLS playlist. */
   hls: boolean;
   /** The person this station is saved for. */
   for_person_id: string | null;
@@ -74,7 +74,7 @@ export function stationItemView(actor: PersonRow, id: string, nowPlaying: string
   if (!station) return null;
   const detail = [station.country_code, station.tags.slice(0, 2).join(", ")].filter(Boolean).join(" · ");
   return {
-    id: station.id, kind: "station", title: station.name, channel: station.name, subtitle: nowPlaying ?? (detail || "Live radio"), src: `/api/plugins/music/radio/stream/${encodeURIComponent(station.id)}`,
+    id: station.id, kind: "station", title: station.name, channel: station.name, subtitle: nowPlaying ?? (detail || "Live radio"), src: `/api/plugins/music/radio/stream/${encodeURIComponent(station.id)}${station.hls ? "?hls=1" : ""}`,
     live: true, poster: null, description: "", chapters: [], captions: [], liked: false, watch_later: false, can_edit: false, cover_choices: [],
   };
 }

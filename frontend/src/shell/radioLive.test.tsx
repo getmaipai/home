@@ -8,7 +8,7 @@ import { TooltipProvider } from "@maipai/ui/src/ui/tooltip";
 import { createQueryClient } from "@maipai/ui/src/queryClient";
 import { ToastProvider } from "@maipai/ui/src/primitives/Toast";
 import { GlobalMiniPlayer, onPlayPageOf } from "@/shell/GlobalMiniPlayer";
-import { createMediaStore, MediaDockContext, type HoistedMedia } from "@/shell/mediaHost";
+import { createMediaStore, MediaDockContext, hlsPathFor, type HoistedMedia } from "@/shell/mediaHost";
 import { liveStationIdOf, rejoinLiveOnResume } from "@/shell/radioLive";
 import { isMediaPlayPage, playRoute } from "@/shell/mediaApps";
 
@@ -61,6 +61,11 @@ describe("a live station in the mini player", () => {
 });
 
 describe("station helpers", () => {
+  test("selects native HLS or hls.js for an m3u8 source", () => {
+    expect(hlsPathFor("/api/plugins/music/radio/stream/station-1.m3u8", true)).toBe("native");
+    expect(hlsPathFor("/api/plugins/music/radio/stream/station-1.m3u8", false)).toBe("hls");
+    expect(hlsPathFor("/api/plugins/music/radio/stream/station-1", false)).toBe("direct");
+  });
   test("liveStationIdOf reads only the hub's own stream route", () => {
     expect(liveStationIdOf(STREAM)).toBe("source-abc123");
     expect(liveStationIdOf("/api/plugins/music/radio/stream/a%20b?x=1")).toBe("a b");
