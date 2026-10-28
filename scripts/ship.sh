@@ -21,7 +21,7 @@ stop_cmd="${MAIPAI_SHIP_STOP_DEV_CMD:-bash scripts/stop-dev-home.sh --live $live
 health_cmd="${MAIPAI_SHIP_HEALTH_CMD:-}"
 web_url="${MAIPAI_SHIP_WEB_URL:-http://localhost:3000/}"
 # The installer records the port it gave the Stack; 8770 only when nothing was recorded.
-stack_port="$(tr -dc '0-9' < "$live/stack/.port" 2>/dev/null)"; stack_port="${stack_port:-8770}"
+stack_port="$({ tr -dc '0-9' < "$live/stack/.port"; } 2>/dev/null || true)"; stack_port="${stack_port:-8770}"
 stack_url="${MAIPAI_SHIP_STACK_URL:-http://127.0.0.1:${stack_port}/healthz}"
 migrations_cmd="${MAIPAI_SHIP_MIGRATIONS_CMD:-sqlite3 -readonly $live/data/hub.db 'select count(*) from __drizzle_migrations'}"
 publish_cmd="${MAIPAI_PUBLISH_CMD:-bash scripts/publish-release.sh TAG --latest NOTES}"
