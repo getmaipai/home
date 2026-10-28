@@ -1,5 +1,5 @@
 // MEDIA-VIZ-03: the scene menu on the mini bar and the Music page: None, then each scene. One app-wide choice (AudioVisualizer's prefs),
-// the pre-rebuild hub's visualizer menu. Its icon is the palette: the waveform is the voice icon in chat.
+// the pre-rebuild hub's visualizer menu. Its icon is the equalizer bars: the waveform is the voice icon in chat.
 import { Button } from "@maipai/ui/src/dashboard/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@maipai/ui/src/dashboard/components/ui/dropdown-menu";
 import { getIcon } from "@maipai/ui/src/icons";
@@ -8,7 +8,7 @@ import { VISUALIZERS, setVisualizerEnabled, setVisualizerPref, useVisualizerEnab
 export function VisualizerMenu({ withLabel = false }: { withLabel?: boolean }) {
   const enabled = useVisualizerEnabled();
   const variant = useVisualizerPref();
-  const SceneIcon = getIcon("palette");
+  const SceneIcon = getIcon("equalizer");
   const current = enabled ? VISUALIZERS.find((v) => v.id === variant)?.label ?? "On" : "Off";
   return (
     <span className="inline-flex">
