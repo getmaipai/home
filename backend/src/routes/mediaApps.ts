@@ -37,6 +37,7 @@ function paramsOf(body: Body): DataParams {
     within: typeof body.within === "string" ? body.within : undefined,
     show: typeof body.show === "string" ? body.show : undefined,
     filter: typeof body.filter === "string" && body.filter !== "" ? body.filter : undefined,
+    year: coerceNumber(body.year),
     limit: coerceNumber(body.limit),
   };
 }

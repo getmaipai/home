@@ -304,6 +304,7 @@ export interface DataParams {
   status?: string;
   /** Podcasts: the id of a saved episode filter. */
   filter?: string;
+  year?: number;
   /** Podcasts, the new-filter pickers: copy (saved), length, within (days) and show (a source id). `status` is unplayed or in_progress. */
   copy?: string;
   length?: string;

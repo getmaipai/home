@@ -10,6 +10,7 @@ import { allowedSources, readableIn, artworkUrl, collectionIds, contextFor, copy
 import { getProgress, getProgressMany, recentProgress } from "./progress";
 import type { MediaItem, MediaSource } from "./model";
 import { draftRows, filterEpisodes, personFilters, viewOf } from "./podcastFilters";
+import { podcastStatsRows } from "./podcastStats";
 
 const APP = "podcasts" as const;
 const publishedOf = (item: MediaItem): string => item.external?.published_at ?? item.added_at;
@@ -84,6 +85,7 @@ registerMediaAppData(APP, (person, dataId, params) => {
     case "filter-choices": return { as_of: new Date().toISOString(), rows: personFilters(person).map((collection) => ({ id: collection.id, label: collection.title })) };
     case "filter-draft": return draftRows(person, params);
     case "filter-episodes": return episodeRows(person, filterEpisodes(person, params.filter ?? "", limit));
+    case "stats": return podcastStatsRows(person, params.year ?? new Date().getFullYear());
     default: return null;
   }
 });

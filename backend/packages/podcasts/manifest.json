@@ -1,6 +1,6 @@
 {
   "id": "podcasts",
-  "version": "0.2.2",
+  "version": "0.2.3",
   "kind": "app",
   "category": "Media",
   "display": "Podcasts",
@@ -99,6 +99,15 @@
         ]
       },
       {
+        "id": "stats",
+        "label": "Stats",
+        "icon": "chart-no-axes-column-increasing",
+        "nav": true,
+        "kind": "schema",
+        "module": "stats",
+        "keywords": ["stats", "listening time", "year in review"]
+      },
+      {
         "id": "queue",
         "label": "Queue",
         "icon": "list",
@@ -186,6 +195,10 @@
       },
       {
         "id": "filter-choices",
+        "rows": "list"
+      },
+      {
+        "id": "stats",
         "rows": "list"
       }
     ],

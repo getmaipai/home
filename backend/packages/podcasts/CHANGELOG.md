@@ -6,6 +6,10 @@ All notable changes to the Podcasts package, in [Keep a Changelog](https://keepa
 
 - The pages match the hub's own copy again (the cinema tone is gone from the page headers).
 
+## [0.2.3] - 2026-10-28
+
+- Added private listening stats and a year in review from each person's own podcast progress.
+
 ## [0.2.1] - 2026-10-28
 
 - Filters: save a filter of episodes by unplayed or in progress, saved on the hub, length, shows and how recently released, and see what matches. A filter is private to the person who made it and only narrows what that person can already see.

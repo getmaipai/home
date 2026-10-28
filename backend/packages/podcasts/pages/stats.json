@@ -1,0 +1,34 @@
+{
+  "type": "page",
+  "id": "stats",
+  "title": "Stats",
+  "body": [
+    {
+      "type": "picker",
+      "state": "year",
+      "label": "Year",
+      "placeholder": "This year",
+      "leading": [
+        { "value": "2024", "label": "2024" },
+        { "value": "2025", "label": "2025" },
+        { "value": "2026", "label": "2026" }
+      ]
+    },
+    {
+      "type": "list",
+      "bind": {
+        "source": "package",
+        "path": "stats",
+        "params": { "year": "$state.year" }
+      },
+      "item_key_field": "id",
+      "item_label_field": "label",
+      "item_subtitle_field": "{value}",
+      "empty_state": {
+        "type": "empty_state",
+        "icon": "chart-no-axes-column-increasing",
+        "text": "Your listening stats will appear here as you listen to episodes."
+      }
+    }
+  ]
+}
