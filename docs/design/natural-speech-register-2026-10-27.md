@@ -286,6 +286,42 @@ What is genuinely new and worth taking:
 What is not taken: training separate perception and turn-taking models on a 210-hour annotated dataset (the duplex note already
 picks off-the-shelf end-of-turn models and measures them), and percentage sliders.
 
+### 3.10 What Dessa adds (audited 2026-10-28; Block's own claims and press clips only, no weights, paper or benchmark)
+
+Dessa (Block, a speech-to-speech model with no text step) cannot be adopted: no weights, no license, and a text-free model would bypass
+the age gates, memory and model choice that Home runs on text. What its clips show is a speaking style, and that is measurable here.
+Jesse's transcription of it: "I'm", "yeah, it's pretty much what I say", "I, I like to", "yeah, yeah", "ah, I wish I was", "is like, ah, a
+combination between English and German so it's kinda like a". Five mechanics, checked against what Home already designs:
+
+| Dessa mechanic | Already in Home? | Verdict |
+|---|---|---|
+| Fillers and interjections ("ah", "like", "oh") | Yes: REG-02 `voiceCues.ts` and SPEECH-STYLE-01 to 05 (master list, rate, placement, adults only, spoken only) | Reuse. Add "ah" as a thinking-sound candidate to the master list; no new mechanism. |
+| Backchannels and continuers while the person talks ("yeah", "got it") | Yes: `full-duplex-voice-2026-10-24.md` 3b and SPEECH-STYLE-05 | Reuse. Correction to the Dessa summary given 2026-10-28: this was already designed; nothing new here. |
+| Contractions and casual wording ("I'm", "kinda", "yeah" as an opener, "pretty much") | Yes in the prompt: `FORMALITY_FRAGMENT` in `persona.ts` (spoken class) already asks casual companions for contractions and easygoing phrasing, neutral for contractions, formal for none; `COMPLEXITY_FRAGMENT` asks for everyday language. Not measured: the bench has no row for it | **Measure only, NAT-08.** |
+| Restarts and repeats ("I, I like to", "yeah, yeah") | No: the master list has fillers, interjections and tags, not repeats | **Gap, NAT-09.** |
+| Trailing off ("so it's kinda like a") | No | **Rejected.** An unfinished reply is an incomplete answer; Dessa can trail off because the other speaker can chime in (real full duplex). Home answers completely (rule 1). Revisit only with DUPLEX playback that can accept a cut-in. |
+
+**NAT-08, measure the informal spoken register (S, bench only; architect 2026-10-28 rejected a new sentence under rule 14).** The
+existing `FORMALITY_FRAGMENT` already asks for contractions, so adding a second sentence would copy it and put companion voice in
+prompt prose. NAT-08 adds only the two fail-first rows to the NAT-01 corpus: the contraction rate on a casual-companion spoken turn
+(expected high) and the rate on the formal professor (expected zero). If the casual row fails on the chat model, the fix goes through
+the per-request mechanism, with `formality` as a plan input the way NAT-06 carried `clock_style` and `hedging`, and that fix gets its own
+ruling and its own entry in `## Supersedes`. No output rewriting either way.
+
+**NAT-09, restarts and repeats (S-M, after SPEECH-STYLE-02).** A new sound kind `repeat` in the master list (`spec/voice/speech-sounds.json`):
+the composer doubles one word from a closed list of eligible function words (named in the `repeat` entry, floor-tested for every band like every master-list entry) at a clause start ("I, I like", "yeah, yeah") in the spoken text only, as REG-02 inserts a
+cue. Gates: adults only; spoken only (typed, stored and heard-prefix text never carry it); never in numbers, names, steps, safety lines
+or `exact` values; at most one per reply; and it only fires when the plan marks the turn as musing (a `say` or `react` move on
+opinion, memory or explanation, or a NAT-03 certainty band below sure; the trigger reads typed plan fields only, never the reply's wording), because the research already recorded in
+`persona.ts` says prompted hesitation in a confident answer lowers perceived confidence. The rate comes from the companion's
+speech-style rate, so `none` (the professor) never repeats and `lively` does. This is the composer's insertion, not a rewrite of
+the model's wording, the same standing as REG-02's cues; architect ruling NAT-09, 2026-10-28 (`data-scratch/architect/NAT-09.verdict`): approved on that reading. A repeat never doubles a filler or interjection the composer itself inserted, and per-voice `says_badly` is judged by ear in SPEECH-STYLE-04. A repeat carries a `rule:` marker, a
+counts-only counter and a test row that fires it (the learned-components rule).
+
+**Not changed by Dessa:** NAT-07 (warmth over time) is untouched; Dessa's emotion handling is audio-side and has no text analogue.
+Audio-derived tags on the turn signal (laugh, sigh, raised voice) are recorded as a later idea behind DUPLEX-02's measurements, not a
+slice: a spec change with no measurement behind it yet.
+
 ## 4. Gates
 
 - **Rule 0 and the child floor:** a child or teen turn never receives hedged safety content; `say` forms for a child are plain
@@ -310,8 +346,10 @@ picks off-the-shelf end-of-turn models and measures them), and percentage slider
 6. **NAT-06 (S):** `clock_style`, `hedging` and `social` (humor, warmth, initiative) dials, the `wants_advice` signal field,
    Companions app control (kit parts only).
 7. **NAT-07 (M):** warmth over time, its own note.
+8. **NAT-08 (S):** two bench rows for contractions, no new prompt sentence (section 3.10).
+9. **NAT-09 (S-M):** the `repeat` sound kind, after SPEECH-STYLE-02 (section 3.10).
 
-Order: 01, then 02 and 03 in parallel (different repos), then 04, 05, 06, 07. After each slice the bench is re-run and the pass
+Order: 01, then 02 and 03 in parallel (different repos), then 04, 05, 06, 08, then 07 and 09 (09 waits for SPEECH-STYLE-02). After each slice the bench is re-run and the pass
 counts recorded in the BACKLOG item; a slice that does not move its rows is reverted.
 
 ## 6. What I did not verify
