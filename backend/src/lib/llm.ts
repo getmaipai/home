@@ -1022,6 +1022,21 @@ export async function completeBackground(messages: LlmMessage[], options: LlmCom
   return typeof content === "string" ? { ok: true, text: content } : { ok: false, unavailable: true };
 }
 
+export interface ProbeReading { prompt_n: number | null; cache_n: number | null; prompt_ms: number | null }
+/** DIAG-KEY-01: one chat-engine request built by the same body builder chat uses (cache_prompt on, tools rendered), read back as the
+ * three numbers that show whether the engine reused its prompt. Reads only counts from the reply, never its text. */
+export async function probeChatEngine(messages: LlmMessage[], tools: ToolSpec[]): Promise<{ ok: true; reading: ProbeReading } | { ok: false; error: string }> {
+  const { body } = chatRequestBody(messages, { tools, max_tokens: 8, dropReasoning: true });
+  const result = await completeViaStackRequest("chat", { ...body, model: "chat" }, undefined, { exactCeiling: true });
+  if (!result.ok) return { ok: false, error: result.failure.error };
+  const data = result.data as { usage?: { prompt_tokens?: unknown; prompt_tokens_details?: { cached_tokens?: unknown } }; timings?: { prompt_n?: unknown; cache_n?: unknown; prompt_ms?: unknown } };
+  const num = (v: unknown) => typeof v === "number" && Number.isFinite(v) ? v : null;
+  return { ok: true, reading: {
+    prompt_n: num(data.usage?.prompt_tokens) ?? num(data.timings?.prompt_n),
+    cache_n: num(data.usage?.prompt_tokens_details?.cached_tokens) ?? num(data.timings?.cache_n),
+    prompt_ms: num(data.timings?.prompt_ms) } };
+}
+
 export interface EmbedValue {
   /** One vector per input text, in the SAME order as the request - never
    * trusts llama-server's own response order, which the OpenAI-compatible

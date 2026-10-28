@@ -108,14 +108,14 @@ export interface SiteBlocksView {
 }
 
 export interface PersonalApiKey {
-  id: string; person_id: string; name: string; scopes: Array<"turn" | "code" | "settings">; created_at: string; expires_at: string;
+  id: string; person_id: string; name: string; scopes: Array<"turn" | "code" | "settings" | "diagnose">; created_at: string; expires_at: string;
   revoked_at: string | null; status: "active" | "expired" | "revoked" | "suspended"; last_used_at: string | null;
   suspended_reason: string | null;
   last_used_from: { place: "home_network" | "away"; address: string } | null; limits: { requests_per_minute: number };
   hint: string; provenance: string; hlc: string;
 }
 export interface AdminApiKey {
-  id: string; person_id: string; scopes: Array<"turn" | "code" | "settings">; status: PersonalApiKey["status"];
+  id: string; person_id: string; scopes: Array<"turn" | "code" | "settings" | "diagnose">; status: PersonalApiKey["status"];
   created_at: string; expires_at: string; revoked_at: string | null; hint?: string;
 }
 export interface CodingPiece {
@@ -1238,7 +1238,7 @@ export const api = {
   installCodingPiece: (id: CodingPiece["id"]) => request<{ job: string | null; piece: CodingPiece["id"] }>(`/api/coding/pieces/${id}/install`, { method: "POST" }),
   removeCodingPiece: (id: CodingPiece["id"]) => request<{ piece: CodingPiece["id"]; removed: true }>(`/api/coding/pieces/${id}`, { method: "DELETE" }),
   apiKeys: () => request<{ keys: PersonalApiKey[] }>("/api/settings/api-keys"),
-  createApiKey: (input: { name: string; scopes: Array<"turn" | "code" | "settings">; expires_in_days: 7 | 30 | 90 | 365 }) =>
+  createApiKey: (input: { name: string; scopes: Array<"turn" | "code" | "settings" | "diagnose">; expires_in_days: 7 | 30 | 90 | 365 }) =>
     request<{ key: PersonalApiKey; secret: string }>("/api/settings/api-keys", { method: "POST", body: JSON.stringify(input) }),
   renameApiKey: (id: string, name: string) => request<{ success: true }>(`/api/settings/api-keys/${encodeURIComponent(id)}`, { method: "PATCH", body: JSON.stringify({ name }) }),
   revokeApiKey: (id: string) => request<{ success: true }>(`/api/settings/api-keys/${encodeURIComponent(id)}`, { method: "DELETE" }),

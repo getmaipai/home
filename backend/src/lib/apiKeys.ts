@@ -13,16 +13,16 @@ import { getHouseholdSettingValue, getPersonSettingValue } from "@/lib/settings"
 import { missingCodingPiece } from "@/lib/stackCodingPieces";
 import type { PersonRow } from "@/types";
 
-export type ApiKeyScope = "turn" | "code" | "settings";
+export type ApiKeyScope = "turn" | "code" | "settings" | "diagnose";
 export type KeyOrigin = { place: "home_network" | "away"; address: string };
 type KeyRow = typeof apiKeys.$inferSelect;
 const DAY = 86_400_000;
 export const API_KEY_REFUSAL = "This key is not valid or its access has changed. Check its expiry and permissions in Settings, or make a new key.";
 export const CreateApiKeyInput = z.object({
   name: z.string().trim().min(1).max(60),
-  scopes: z.array(z.enum(["turn", "code", "settings"])).min(1).max(3).refine(s => new Set(s).size === s.length)
-    // OPS-KEY-01: a settings key does one thing, so it never shares a key with another scope.
-    .refine(s => !s.includes("settings") || s.length === 1),
+  scopes: z.array(z.enum(["turn", "code", "settings", "diagnose"])).min(1).max(4).refine(s => new Set(s).size === s.length)
+    // OPS-KEY-01, DIAG-KEY-01: a settings or diagnose key does one thing, so it never shares a key with another scope.
+    .refine(s => !(s.includes("settings") || s.includes("diagnose")) || s.length === 1),
   expires_in_days: z.union([z.literal(7), z.literal(30), z.literal(90), z.literal(365)]).default(90),
 }).strict();
 
@@ -66,6 +66,10 @@ export function codeAdmission(person: PersonRow): CodeAdmission {
   if (missingCodingPiece()) return "piece_missing"; // CODE-STACK-01 H1: the engine or model is not installed; keys are held suspended until it is.
   return getPersonSettingValue(person, "coding.person.api_keys") === true ? "ok" : "keys_off";
 }
+/** DIAG-KEY-01: a diagnose key is read-only but shows the hub's inner workings, so it has the same holders as a settings key. */
+export const mayHoldDiagnoseKey = (person: PersonRow) => mayHoldSettingsKey(person);
+/** The longest a diagnose key lives. */
+export const DIAGNOSE_KEY_MAX_DAYS = 30;
 /** OPS-KEY-01: a settings key belongs to an owner or admin who is still enabled; it stops working the moment that stops being true. */
 export function mayHoldSettingsKey(person: PersonRow): boolean {
   return !person.deletedAt && person.enabled && !person.memorializedAt && (person.role === "owner" || person.role === "admin");
@@ -75,6 +79,7 @@ export const SETTINGS_KEY_MAX_DAYS = 90;
 function mayHoldKey(person: PersonRow, scope: ApiKeyScope): boolean {
   if (person.deletedAt) return false;
   if (scope === "settings") return mayHoldSettingsKey(person);
+  if (scope === "diagnose") return mayHoldDiagnoseKey(person);
   if (scope === "turn") return true; // Preserve the interim voice token's admission rules.
   return codeAdmission(person) === "ok";
 }
@@ -87,7 +92,7 @@ function status(row: KeyRow, person: PersonRow): KeyRow["status"] {
 function wire(row: KeyRow, person: PersonRow) {
   const currentStatus = status(row, person);
   const admission = row.scopes.includes("code") ? codeAdmission(person) : "ok";
-  const suspendedReason = currentStatus !== "suspended" ? null : row.scopes.includes("settings") ? "Your account is no longer an owner or admin."
+  const suspendedReason = currentStatus !== "suspended" ? null : row.scopes.includes("settings") || row.scopes.includes("diagnose") ? "Your account is no longer an owner or admin."
     : admission === "coding_off" ? "Coding is turned off by an admin."
     : admission === "coding_paused" ? "An admin paused Coding."
       : admission === "piece_missing" ? missingCodingPiece() ?? "A Coding piece is missing."
@@ -119,11 +124,15 @@ function base32(bytes: Uint8Array): string {
 }
 export function createApiKey(person: PersonRow, input: z.input<typeof CreateApiKeyInput>, compatibility = false) {
   const body = CreateApiKeyInput.safeParse(input);
-  if (!body.success) throw new Error("The key details are invalid. Use a name of 1 to 60 characters, turn or code scopes, and 7, 30, 90 or 365 days.");
+  if (!body.success) throw new Error("The key details are invalid. Use a name of 1 to 60 characters, turn, code, settings or diagnose scopes, and 7, 30, 90 or 365 days.");
   const { name, scopes, expires_in_days: days } = body.data;
   if (scopes.includes("settings")) {
     if (!mayHoldSettingsKey(person)) throw new Error("Only an owner or admin can make a settings key. Sign in as an owner or admin and try again.");
     if (days > SETTINGS_KEY_MAX_DAYS) throw new Error("A settings key lasts at most 90 days. Choose 7, 30 or 90 days.");
+  }
+  if (scopes.includes("diagnose")) {
+    if (!mayHoldDiagnoseKey(person)) throw new Error("Only an owner or admin can make a diagnostics key. Sign in as an owner or admin and try again.");
+    if (days > DIAGNOSE_KEY_MAX_DAYS) throw new Error("A diagnostics key lasts at most 30 days. Choose 7 or 30 days.");
   }
   if (!scopes.every(s => mayHoldKey(person, s))) throw new Error("Keys are not allowed with your current access. Ask an admin to check your Coding access in Settings.");
   // Design 3.7 rule 9: the minor limits (30 days, 3 keys) are coding limits. A voice (turn) key keeps the ordinary rules.
@@ -189,6 +198,7 @@ export function resolveApiKeyOutcome(secret: string, scope: ApiKeyScope, origin?
   }
   // OPS-KEY-01: read fresh on every call, so a person who stops being an owner or admin loses the key at once.
   if (scope === "settings" && !mayHoldSettingsKey(person)) return invalid;
+  if (scope === "diagnose" && !mayHoldDiagnoseKey(person)) return invalid;
   const at = new Date().toISOString();
   if (legacy || !row.lastUsedAt || Date.now() - Date.parse(row.lastUsedAt) >= 60_000) {
     db.update(apiKeys).set({ lastUsedAt: at, ...(origin ? { lastUsedFrom: origin } : {}),

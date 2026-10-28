@@ -23,13 +23,15 @@ const key = (over: Record<string, unknown> = {}) => ({ id: "key_abc123", person_
 const view = () => render(<QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}><AssistantKeysSettings /></QueryClientProvider>);
 
 describe("AssistantKeysSettings", () => {
-  test("lists only settings keys, hides coding keys, and says what the key can and cannot do", async () => {
-    const stub = stubFetch({ "/api/settings/api-keys": () => ({ keys: [key(), key({ id: "key_code01", name: "OpenCode", scopes: ["code"] })] }) });
+  test("lists settings and diagnostics keys, hides coding keys, and says what the key can and cannot do", async () => {
+    const stub = stubFetch({ "/api/settings/api-keys": () => ({ keys: [key(), key({ id: "key_diag01", name: "Slow chat helper", scopes: ["diagnose"] }), key({ id: "key_code01", name: "OpenCode", scopes: ["code"] })] }) });
     try {
       const { findByText, queryByText } = view();
       expect(await findByText("Claude Code")).toBeTruthy();
+      expect(await findByText("Slow chat helper")).toBeTruthy();
+      expect(document.body.textContent).toContain("Diagnostics key.");
       expect(queryByText("OpenCode")).toBeNull();
-      expect(document.body.textContent).toContain("It cannot change people, passwords, safety or anything else");
+      expect(document.body.textContent).toContain("Neither can change people, passwords, safety or anything else");
     } finally { stub.restore(); }
   });
   test("making a key sends the settings scope and shows the secret once", async () => {

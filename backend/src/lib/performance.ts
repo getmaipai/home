@@ -7,7 +7,7 @@
 // live against DB rows rather than depending on that weekly script
 // having run), and the Stack client - the same shape lib/dashboard.ts's
 // getDashboard() already takes for GET /api/dashboard.
-import { and, gte, isNotNull } from "drizzle-orm";
+import { and, desc, gte, isNotNull } from "drizzle-orm";
 import { sqlite, db } from "@/db";
 import { conversationTurns, entities, pendingEmbeddings, pendingMemoryWork } from "@/db/schema";
 import { listActivePeople } from "@/lib/access";
@@ -44,7 +44,7 @@ import { labelOf, weeklyReport, type LabelRow, type Label } from "../../scripts/
 const DEFAULT_WINDOW_DAYS = 30;
 const MAX_WINDOW_DAYS = 90;
 
-function median(sorted: readonly number[]): number | null {
+export function median(sorted: readonly number[]): number | null {
   if (sorted.length === 0) return null;
   const mid = Math.floor(sorted.length / 2);
   return sorted.length % 2 === 0 ? (sorted[mid - 1]! + sorted[mid]!) / 2 : sorted[mid]!;
@@ -101,6 +101,22 @@ function statsRows(since: string): Array<{ createdAt: string; stats: TurnStats }
       // "aggregation degrades, never 500s" posture dashboard.ts's own
       // engineStatusCounts() takes for a Stack call that fails.
     }
+  }
+  return parsed;
+}
+
+/** DIAG-KEY-01: the newest turns that carry stats, with only the columns the diagnose routes may show (never a message, reply or person). */
+export function recentTurnStats(limit: number): Array<{ id: string; createdAt: string; source: string; stats: TurnStats }> {
+  const rows = db
+    .select({ id: conversationTurns.id, createdAt: conversationTurns.createdAt, source: conversationTurns.source, stats: conversationTurns.stats })
+    .from(conversationTurns)
+    .where(isNotNull(conversationTurns.stats))
+    .orderBy(desc(conversationTurns.createdAt))
+    .limit(limit)
+    .all();
+  const parsed: Array<{ id: string; createdAt: string; source: string; stats: TurnStats }> = [];
+  for (const row of rows) {
+    try { parsed.push({ id: row.id, createdAt: row.createdAt, source: row.source, stats: JSON.parse(row.stats!) as TurnStats }); } catch { /* a malformed blob is skipped, as in statsRows */ }
   }
   return parsed;
 }

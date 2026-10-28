@@ -4,6 +4,7 @@ import { Hono } from "hono";
 import { bodyLimit } from "hono/body-limit";
 import { requireApiKey } from "@/middleware/auth";
 import { operatorSettingsView, setOperatorSetting } from "@/lib/operatorSettings";
+import { DEFAULT_TURNS, MAX_TURNS, engineState, runCacheProbe, summaryView, turnsView } from "@/lib/operatorDiagnose";
 import { tryConsume } from "@/lib/rateLimiter";
 import type { AppEnv } from "@/types";
 
@@ -28,4 +29,35 @@ operatorRoutes.put("/settings", requireApiKey("settings"), bodyLimit({ maxSize: 
   const result = setOperatorSetting(c.get("apiKey")?.id ?? "unknown", key, value);
   if (!result.ok) return c.json({ error: result.error }, result.status);
   return c.json({ key: result.key, previous: result.previous, value: result.value });
+});
+
+// DIAG-KEY-01 (docs/dev/diagnose-api.md): read-only, numbers only, under a `diagnose` key. Same bearer-only door and the same per-key limit.
+const count = (raw: string | undefined, fallback: number, max: number) => {
+  const n = raw === undefined ? fallback : Number(raw);
+  return Number.isInteger(n) && n >= 1 ? Math.min(n, max) : null;
+};
+const badCount = (name: string, max: number) => ({ error: `Send ${name} as a whole number from 1 to ${max}, for example ?${name}=10.` });
+operatorRoutes.use("/diagnose/*", requireApiKey("diagnose"));
+
+operatorRoutes.get("/diagnose/turns", (c) => {
+  const limited = slow(c as never); if (limited) return limited;
+  const limit = count(c.req.query("limit"), DEFAULT_TURNS, MAX_TURNS);
+  return limit === null ? c.json(badCount("limit", MAX_TURNS), 400) : c.json({ turns: turnsView(limit) });
+});
+
+operatorRoutes.get("/diagnose/summary", (c) => {
+  const limited = slow(c as never); if (limited) return limited;
+  const turns = count(c.req.query("turns"), 20, MAX_TURNS);
+  return turns === null ? c.json(badCount("turns", MAX_TURNS), 400) : c.json(summaryView(turns));
+});
+
+operatorRoutes.get("/diagnose/engines", async (c) => {
+  const limited = slow(c as never); if (limited) return limited;
+  try { return c.json(await engineState()); } catch { return c.json({ error: "The engine service did not answer. Check that it is running on the status page and try again." }, 503); }
+});
+
+operatorRoutes.post("/diagnose/cache-probe", async (c) => {
+  const limited = slow(c as never); if (limited) return limited;
+  const result = await runCacheProbe();
+  return result.ok ? c.json({ calls: result.calls }) : c.json({ error: result.error }, result.status);
 });

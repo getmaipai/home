@@ -282,7 +282,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/answerImages/select.ts` | __setAnswerImageDepsForTests, mergeDepicts, selectAnswerImages |
 | `backend/src/lib/answerImages/turn.ts` | SHOW_IMAGES_TOOL_ID, ANSWER_IMAGES_BUDGET_MS, SHOW_IMAGES_MAX_SUBJECTS, showImagesNames, showImagesResultLine, showImagesPendingResultLine |
 | `backend/src/lib/answerImages/wikimedia.ts` | wikimediaFetchJson, kindScore, wikimediaLiveBlocked, resolveWikimediaSubject, isUnder18, isNonPhotoFile |
-| `backend/src/lib/apiKeys.ts` | API_KEY_REFUSAL, CreateApiKeyInput, keyOriginOf, constantTimeHashEqual, codeAdmission, mayHoldSettingsKey |
+| `backend/src/lib/apiKeys.ts` | API_KEY_REFUSAL, CreateApiKeyInput, keyOriginOf, constantTimeHashEqual, codeAdmission, mayHoldDiagnoseKey |
 | `backend/src/lib/appNeeds.ts` | __setStatusAppsForTests, __resetStatusAppsForTests, appsFromManifests, listStatusApps, configuredServiceComponents |
 | `backend/src/lib/approvals.ts` | summarizeApproval, requestApproval, listApprovals, decideApproval |
 | `backend/src/lib/apps.ts` | settingsAreaProblems, sidebarFor, appPackageProblems, appVisibleTo, pageMinRole, pageVisibleTo |
@@ -564,6 +564,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/offline/media.ts` | matches, playableItem, keepRefusal, missing, mediaManifest, mediaFile |
 | `backend/src/lib/offline/registry.ts` | registerOfflineProvider, offlineProvider |
 | `backend/src/lib/openapi.ts` | apiRouter, emptyJsonBodyAsObject |
+| `backend/src/lib/operatorDiagnose.ts` | MAX_TURNS, DEFAULT_TURNS, BIG_PROMPT_TOKENS, turnsView, summaryView, engineState |
 | `backend/src/lib/operatorSettings.ts` | OPERATOR_SETTING_KEYS, OPERATOR_DENIED_PREFIXES, isOperatorSettingKey, operatorSettingsView, setOperatorSetting |
 | `backend/src/lib/outbound.ts` | HOME_USER_AGENT |
 | `backend/src/lib/packageBlocks.ts` | blockEnvelope, BLOCK_ONLY_DATA_PREFIX, withoutBlockOnlyData, weatherCard, blocksForRecipeRun |
@@ -574,7 +575,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/passkeys.ts` | __resetPasskeyChallengesForTests, registrationOptions, verifyRegistration, authenticationOptions, verifyAuthentication, listPasskeys |
 | `backend/src/lib/paths.ts` | PACKAGES_DIR, isValidPackageId, repoRoot, defaultDataDir, dataDirIsExplicit, dataDir |
 | `backend/src/lib/perfWatch.ts` | markBusy, markIdle, getPerfSnapshot, slowRequestMiddleware, startPerfWatch, __resetPerfWatchForTests |
-| `backend/src/lib/performance.ts` | getPerformance |
+| `backend/src/lib/performance.ts` | median, recentTurnStats, getPerformance |
 | `backend/src/lib/permissions.ts` | effectivePermissions |
 | `backend/src/lib/personAuthMethods.ts` | pinDigitsHint, getAuthMethods, requiresCredential, roleRequiresCredential |
 | `backend/src/lib/personLifecycle.ts` | MANAGEABLE_BY, canManage, checkRoleChange, commitPersonUpdate, hasSecret, erasePersonData |

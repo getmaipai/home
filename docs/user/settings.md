@@ -56,7 +56,7 @@ If a download stops, the row says why and offers **Try again**. The same item is
 
 ### Assistant access
 
-An owner or admin can let an assistant, such as Claude Code, change a few settings for them. Open **Settings**, **Engines and AI**, and find **Assistant access**. Press **Make an assistant key**, name it, choose how long it lasts (7, 30 or 90 days) and copy the key when Home shows it. Home shows it only once. Give the key to the assistant. It can change only the short list of settings Home allows, today how Home helps the chat remember to search the web, and nothing else: it cannot change people, passwords, safety rules or ages. It stops working on its end date, when you revoke it here, or if the person who made it is no longer an owner or admin.
+An owner or admin can let an assistant, such as Claude Code, change a few settings for them. Open **Settings**, **Engines and AI**, and find **Assistant access**. Press **Make an assistant key**, name it, choose the kind (change settings, or read diagnostics) and how long it lasts (7, 30 or 90 days; a diagnostics key is 7 or 30) and copy the key when Home shows it. Home shows it only once. Give the key to the assistant. It can change only the short list of settings Home allows, today how Home helps the chat remember to search the web, and nothing else: it cannot change people, passwords, safety rules or ages. It stops working on its end date, when you revoke it here, or if the person who made it is no longer an owner or admin. A diagnostics key cannot change anything. It reads how fast chat is answering and how the engines are doing, as numbers only, never what anyone said.
 
 ### Choosing which chat model answers
 
