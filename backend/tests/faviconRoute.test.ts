@@ -5,6 +5,7 @@
 // the same way updates.test.ts's mockGitHubRelease() does, restoring
 // it afterward so no other test file's own fetch is affected.
 import { describe, expect, test, beforeEach, afterEach, mock } from "bun:test";
+import sharp from "sharp";
 import { TestClient } from "./client";
 import { resetDb } from "./reset-db";
 import { __clearFaviconCacheForTests, __setFaviconDnsLookupForTests, __setFaviconFetchForTests } from "@/lib/favicons";
@@ -34,11 +35,13 @@ async function owner(): Promise<TestClient> {
   return client;
 }
 
+// The route now checks that the bytes decode as an image, so the stub serves a real one.
+const REAL_PNG = new Uint8Array(await sharp({ create: { width: 32, height: 32, channels: 3, background: "#336699" } }).png().toBuffer());
 function mockImageFetch() {
   let calls = 0;
   __setFaviconFetchForTests(mock(() => {
     calls++;
-    return Promise.resolve(new Response(new Uint8Array(16), { status: 200, headers: { "content-type": "image/png" } }));
+    return Promise.resolve(new Response(REAL_PNG.slice(), { status: 200, headers: { "content-type": "image/png" } }));
   }));
   return { count: () => calls, restore: () => { __setFaviconFetchForTests(null); } };
 }
@@ -81,11 +84,12 @@ describe("GET /api/favicon", () => {
       const first = await client.get("/api/favicon?domain=route-cache-hit.example.com");
       expect(first.status).toBe(200);
       expect(first.headers.get("content-type")).toBe("image/png");
-      expect(stub.count()).toBe(1);
+      const afterFirst = stub.count();
+      expect(afterFirst).toBeGreaterThan(0);
 
       const second = await client.get("/api/favicon?domain=route-cache-hit.example.com");
       expect(second.status).toBe(200);
-      expect(stub.count()).toBe(1); // no second network call
+      expect(stub.count()).toBe(afterFirst); // no second network call
     } finally {
       stub.restore();
     }

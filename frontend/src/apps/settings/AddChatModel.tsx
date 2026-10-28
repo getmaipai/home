@@ -12,7 +12,7 @@ import { ApiError } from "@/lib/api";
 import { aiChoicesApi, type InspectedChatModel } from "@/lib/aiChoicesApi";
 import { sizeGb } from "../../../../shared/diskPlanMath";
 
-const messageOf = (error: unknown) => (error instanceof ApiError ? error.message : "The model could not be read. Check the link, then try again.");
+const messageOf = (error: unknown) => (error instanceof ApiError ? error.message : "The model link did not open. Check the link, then try again.");
 
 export function AddChatModel({ copy, onAdded }: { copy: Record<string, string>; onAdded?: () => void }) {
   const [link, setLink] = useState("");
