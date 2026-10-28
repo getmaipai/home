@@ -1424,8 +1424,11 @@ export async function reAskForShowImages(state: TurnState, replyText: string, si
   state.streamGate = undefined;
   try {
     const messages: LlmMessage[] = [...state.messages, { role: "assistant", content: replyText }, { role: "user", content: SHOW_IMAGES_REASK_INSTRUCTION }];
-    const only = state.lastTools.filter((t) => t.id === SHOW_IMAGES_TOOL_ID);
-    if (only.length === 0) return null;
+    if (!state.lastTools.some((t) => t.id === SHOW_IMAGES_TOOL_ID)) return null;
+    // The first pass's full tool list, not show_images alone: the tools sit ahead of the messages in the prompt, so a
+    // different list changes the first tokens and the engine reprocesses all of it (~5k tokens, 7 s) on the next turn
+    // too. Any call other than show_images is ignored below.
+    const only = state.lastTools;
     // A short cap of its own: the reply is already shown, so a slow or failing model must not hold the turn open.
     const attempt = await runOneGeneration(state, messages, only, "auto", false, 200, "show_images_reask", AbortSignal.any([signal, AbortSignal.timeout(SHOW_IMAGES_REASK_MAX_MS)]));
     if (!attempt.ok) return null;

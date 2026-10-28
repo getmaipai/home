@@ -104,6 +104,21 @@ describe("IMGQ-09: answer image re-ask", () => {
     }
   });
 
+  test("the re-ask sends the first pass's whole tool list, so the engine's prompt cache still holds the next turn's prefix", async () => {
+    const searxng = startFakeSearxng();
+    setHouseholdSettingValue("search.searxng_url", searxng.url);
+    try {
+      const { seen } = await runPictureQuestion(SEARCH_CALL, ["show_images", "websearch"]);
+      const toolNames = (request: ChatCompletionRequest) => (request.tools ?? []).map((t) => t.function.name);
+      const first = seen.find((request) => !isReAsk(request) && !isToolResultRound(request));
+      const reask = seen.find(isReAsk);
+      expect(first && toolNames(first)).toContain("websearch");
+      expect(reask && toolNames(reask)).toEqual(first && toolNames(first));
+    } finally {
+      searxng.stop();
+    }
+  });
+
   test("a failed outcome skips the re-ask", async () => {
     setupImages(["show_images", "weather"]);
     const pluginSpy = spyOn(plugins, "runPlugin").mockImplementation(async () => ({
