@@ -555,6 +555,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/news/rankStories.ts` | HALF_LIFE_HOURS, PICTURE_BONUS, CHANNEL_BONUS, FEATURED_COUNT, FEATURED_PER_TOPIC, isFollowed |
 | `backend/src/lib/news/records.ts` | defaultTopicsFor, followedChannels, isFollowing, setFollow, resetMix, interestRowsOf |
 | `backend/src/lib/news/search.ts` | SEARCH_ALL, SEARCH_SAVED, SEARCH_TODAY, searchData, recentRows |
+| `backend/src/lib/news/spread.ts` | ROWS_PER_PUBLISHER_PER_GROUP, spreadPublishers |
 | `backend/src/lib/news/summary.ts` | __setNewsSummaryModelForTests, storedKeyPoints, summaryArticleText, summarizeStory, runNewsSummaryTick |
 | `backend/src/lib/news/tail.ts` | trimArticleTail |
 | `backend/src/lib/news/text.ts` | decodeEntities, plainSummary |
