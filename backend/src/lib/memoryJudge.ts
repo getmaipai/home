@@ -72,7 +72,7 @@ import type { ToolExecutionOutcome } from "@/lib/turnContext";
 import type { Entity } from "@maipai/spec/gen/ts/entity.js";
 import { db, sqlite } from "@/db";
 import { conversationTurns, conversations, people, memoryRecords } from "@/db/schema";
-import { complete, embed, completeBackground, type LlmMessage } from "@/lib/llm";
+import { embed, completeBackground, type LlmMessage } from "@/lib/llm";
 import {
   remember,
   supersede,
@@ -91,7 +91,7 @@ import { trigger } from "@/lib/notifications";
 import { sanitizeForPrompt } from "@/lib/promptSanitize";
 import { defaultChildDisclosure } from "@/lib/childDisclosure";
 import { nextHlc } from "@/lib/hlc";
-import { turnActiveWithin, DEFAULT_IDLE_WINDOW_MS } from "@/lib/turnActivity";
+import { turnActiveWithin, JUDGE_IDLE_WINDOW_MS } from "@/lib/turnActivity";
 import type { ConversationTurnRow } from "@/wire";
 import type { PersonRow, MemoryRecordRow } from "@/types";
 
@@ -1579,7 +1579,6 @@ export interface JudgeBatchResult {
 // The idle window was 20s when the judge and chat engine shared a slot;
 // now that background work is on its own engine, a shorter window lets
 // the judge drain faster when idle.
-const JUDGE_IDLE_WINDOW_MS = 5_000;
 const MAX_JUDGE_BATCH_TURNS = 50;
 const MAX_JUDGE_BATCH_MS = 5 * 60 * 1000; // 5 minutes
 

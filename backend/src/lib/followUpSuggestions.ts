@@ -2,6 +2,7 @@ import type { PersonRow } from "@/types";
 import type { ConversationTurnRow } from "@/wire";
 import { speakerAgeBand } from "@/lib/ageBand";
 import { completeBackground, type LlmCompleteOptions, type LlmMessage } from "@/lib/llm";
+import { JUDGE_IDLE_WINDOW_MS, turnActiveWithin } from "@/lib/turnActivity";
 
 export interface FollowUpSuggestion {
   prompt: string;
@@ -59,6 +60,7 @@ export async function generateFollowUpSuggestions(
   allowAnswers = true,
 ): Promise<FollowUpResult> {
   const none: FollowUpResult = { kind: "followups", suggestions: [] };
+  if (turnActiveWithin(JUDGE_IDLE_WINDOW_MS)) return none;
   try {
     const result = await complete([
       {

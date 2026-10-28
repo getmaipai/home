@@ -93,6 +93,7 @@ type CatalogTurnBudget = NonNullable<(typeof CATALOG)[number]["turn_budget"]>;
  * manifest-derived policy below fills it. */
 function internalBudgetFromRecord(record: CatalogTurnBudget): Omit<TurnBudget, "deadlines_ms"> & { deadlines_ms: RecordedDeadlines } {
   const { tools_offered: _deprecatedToolsOffered, max_tools, ...rest } = record;
+  void _deprecatedToolsOffered;
   return { ...rest, max_tools: max_tools ?? 0, tools_offered: [] } as Omit<TurnBudget, "deadlines_ms"> & { deadlines_ms: RecordedDeadlines };
 }
 
@@ -108,12 +109,17 @@ function internalBudgetFromRecord(record: CatalogTurnBudget): Omit<TurnBudget, "
  * is lifted to the reference record's tools and thinking. A band left out
  * reads as a minor. */
 export function resolveTurnBudget(modelId?: string, band?: AgeBand): TurnBudget {
+  return withTurnToolGates(resolveTurnBudgetBase(modelId, band), false);
+}
+
+/** The catalog budget before this turn's conditional offers are evaluated. */
+export function resolveTurnBudgetBase(modelId?: string, band?: AgeBand): TurnBudget {
   let id = modelId;
   if (id === undefined) {
     try {
       id = getHouseholdSettingValue("chat.model_id") as string | undefined;
     } catch {
-      return band === "adult" ? withTurnToolGates(unmeasuredAdultBudget(), false) : NO_RECORD_BUDGET;
+      return band === "adult" ? unmeasuredAdultBudget() : NO_RECORD_BUDGET;
     }
   }
   const entry = chatCatalogEntry(id);
@@ -121,7 +127,7 @@ export function resolveTurnBudget(modelId?: string, band?: AgeBand): TurnBudget 
   // VISION-02d (rule 8): a model whose record declares no thinking mode is
   // never asked to think, whatever the person's toggle says.
   const resolved = thinkingModeFor(id) === "none" ? { ...base, thinking_budget_tokens: 0, thinking_budget_tokens_toggled: 0 } : base;
-  return withTurnToolGates(resolved, false);
+  return resolved;
 }
 
 export async function resolveTurnBudgetWithStack(modelId?: string, band?: AgeBand): Promise<TurnBudget> {

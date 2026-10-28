@@ -5,14 +5,43 @@
 import { toToolDefinition, type ToolSpec } from "@/lib/llm";
 import type { WarmupPrompt } from "@/lib/llmSupervisor";
 import { buildStablePrefix } from "@/lib/turnShared";
-import { resolveTurnBudget } from "@/lib/turnMachine/budget";
+import { DEFAULT_PERSONA } from "@/lib/persona";
+import { db } from "@/db";
+import { people } from "@/db/schema";
+import { and, eq, isNull } from "drizzle-orm";
+import { NO_RECORD_BUDGET, resolveTurnBudgetBase, withTurnToolGates } from "@/lib/turnMachine/budget";
+import { budgetWithTurnToolGates } from "@/lib/turnMachine/toolGates";
 import { toolSpecFor } from "@/lib/turnMachine/nodes/model";
 
-export function turnWarmupPrompt(): WarmupPrompt {
-  const tools = resolveTurnBudget(undefined, "adult")
-    .tools_offered.slice()
-    .sort()
-    .map((id) => toolSpecFor(id))
-    .filter((t): t is ToolSpec => t !== null);
-  return { system: buildStablePrefix(), tools: tools.map(toToolDefinition) };
+export async function turnWarmupPrompt(): Promise<WarmupPrompt> {
+  const system = buildStablePrefix(DEFAULT_PERSONA, "written");
+  let budget = NO_RECORD_BUDGET;
+  try {
+    const baseBudget = resolveTurnBudgetBase(undefined, "adult");
+    const primaryAdult = db.select().from(people).where(and(eq(people.role, "owner"), isNull(people.deletedAt))).get();
+    budget = primaryAdult
+      ? (await budgetWithTurnToolGates({
+        budget: baseBudget,
+        actor: primaryAdult,
+        band: "adult",
+        surface: "chat",
+        surfaceClass: "written",
+        spoken: false,
+        temporary: false,
+        bare: false,
+        ephemeral: false,
+        text: "hi",
+        musicEditAvailable: () => false,
+      })).budget
+      : withTurnToolGates(baseBudget, false);
+  } catch {
+    // A warm-up gate failure must never block startup or offer a conditional tool.
+    try {
+      budget = withTurnToolGates(resolveTurnBudgetBase(undefined, "adult"), false);
+    } catch {
+      budget = NO_RECORD_BUDGET;
+    }
+  }
+  const tools = budget.tools_offered.slice().sort().map((id) => toolSpecFor(id)).filter((t): t is ToolSpec => t !== null);
+  return { system, tools: tools.map(toToolDefinition) };
 }

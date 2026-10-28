@@ -39,12 +39,11 @@ import { resolveLaunchFlags, launchFlagsToArgs, type LaunchFlags, type LaunchFla
 import { runPostLoadCheck, type PostLoadCheckResult } from "@/lib/enginePostLoadCheck";
 import { getHouseholdSettingValue } from "@/lib/settings";
 import { readEngineIdentity, formatEngineIdentity, identityIncomplete, type EngineIdentity } from "@/lib/engineIdentity";
-import { spawnAndWaitHealthy, freePort, sweepOrphanProcesses, watchEngine, probeAlive, engineHealthKind, blockedPortHolderAlive, blockedPortReason, blockedPortDetails, stopBlockedPortHolder, expireStalledStart, cancelEngineRespawn, ForeignPortHolderError, type EngineWatch, type EngineHealth } from "@/lib/sidecars";
+import { spawnAndWaitHealthy, freePort, sweepOrphanProcesses, watchEngine, probeAlive, engineHealthKind, blockedPortHolderAlive, blockedPortReason, expireStalledStart, cancelEngineRespawn, type EngineWatch, type EngineHealth } from "@/lib/sidecars";
 import { hotReloadState } from "@/lib/hotReloadState";
-import { readProcessFacts } from "@/lib/instanceLock";
 import { assertNotInCrashBootHold } from "@/lib/dirtyBoot";
 import { startResourceGovernor } from "@/lib/resourceGovernor";
-import { raiseIssue, resolveIssue, registerFixHandler } from "@/lib/issues";
+import { resolveIssue } from "@/lib/issues";
 import { isStackRoleEnabled } from "@/lib/stackEngine";
 
 let lastChatRecoveryNudgeAt = 0;
@@ -185,16 +184,16 @@ export interface WarmupPrompt {
   system: string;
   tools?: ToolDefinition[];
 }
-let warmupPromptProvider: (() => WarmupPrompt) | null = null;
+let warmupPromptProvider: (() => WarmupPrompt | Promise<WarmupPrompt>) | null = null;
 
-export function setWarmupPrompt(provider: () => WarmupPrompt): void {
+export function setWarmupPrompt(provider: () => WarmupPrompt | Promise<WarmupPrompt>): void {
   warmupPromptProvider = provider;
 }
 
 async function warmChatPrefix(client: LlamaServerClient): Promise<void> {
   if (!warmupPromptProvider) return;
   try {
-    const warmup = warmupPromptProvider();
+    const warmup = await warmupPromptProvider();
     const result = await client.chatComplete({
       model: "chat",
       messages: [

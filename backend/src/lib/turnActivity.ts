@@ -48,6 +48,8 @@ let now: () => number = () => Date.now();
  * not a value quietly re-typed at each call site risking drift. 20s per
  * the 2026-09-06 latency review's own "no turn in the last ~20s."  */
 export const DEFAULT_IDLE_WINDOW_MS = 20_000;
+/** The shorter idle window used by background model judges on the shared chat slot. */
+export const JUDGE_IDLE_WINDOW_MS = 5_000;
 
 export interface TurnLease {
   /** Marks the moment the turn is about to reach an engine (routing's

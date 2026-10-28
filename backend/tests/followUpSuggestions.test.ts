@@ -1,8 +1,9 @@
-import { describe, expect, test } from "bun:test";
+import { describe, expect, test, beforeEach } from "bun:test";
 import { canGenerateFollowUpSuggestions, generateFollowUpSuggestions } from "@/lib/followUpSuggestions";
 import type { PersonRow } from "@/types";
 import type { ConversationTurnRow } from "@/wire";
 import type { LlmMessage } from "@/lib/llm";
+import { acquireTurnLease, __resetTurnActivityForTests } from "@/lib/turnActivity";
 
 const adult = { id: "person-adult", role: "adult", birthdate: null } as PersonRow;
 const baseTurn = {
@@ -46,6 +47,8 @@ const NONE = { kind: "followups" as const, suggestions: [] };
 const reply = (body: unknown) => async () => ({ ok: true as const, text: JSON.stringify(body) });
 
 describe("generateFollowUpSuggestions", () => {
+  beforeEach(() => __resetTurnActivityForTests());
+
   test("a yes/no question returns short answer chips, and a one-word answer is kept", async () => {
     const result = await generateFollowUpSuggestions("add magic night friday", "Got it. Add it?", reply({ kind: "answers", suggestions: ["Yes", "No", "yes", "Yes, add it", "extra"] }));
     expect(result).toEqual({ kind: "answers", suggestions: [{ prompt: "Yes" }, { prompt: "No" }, { prompt: "Yes, add it" }] });
@@ -101,6 +104,28 @@ describe("generateFollowUpSuggestions", () => {
     expect(options?.model).toBeUndefined();
     expect(options?.response_format).toMatchObject({ type: "json_schema" });
     expect(suggestions).toEqual({ kind: "followups", suggestions: [{ prompt: "What colors appear first?" }, { prompt: "Could you show an example?" }] });
+  });
+
+  test("skips the judge while a turn is active", async () => {
+    const lease = acquireTurnLease();
+    let called = false;
+    const result = await generateFollowUpSuggestions("Question", "Reply", async () => {
+      called = true;
+      return { ok: true as const, text: JSON.stringify({ kind: "followups", suggestions: ["What else should I know?"] }) };
+    });
+    expect(called).toBe(false);
+    expect(result).toEqual(NONE);
+    lease.release();
+  });
+
+  test("calls the judge when no turn is active", async () => {
+    let called = false;
+    const result = await generateFollowUpSuggestions("Question", "Reply", async () => {
+      called = true;
+      return { ok: true as const, text: JSON.stringify({ kind: "followups", suggestions: ["What else should I know?"] }) };
+    });
+    expect(called).toBe(true);
+    expect(result).toEqual({ kind: "followups", suggestions: [{ prompt: "What else should I know?" }] });
   });
 
   test("unavailable, malformed, or invalid model output yields no suggestions", async () => {

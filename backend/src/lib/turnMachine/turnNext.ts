@@ -1,10 +1,5 @@
 import { isLookupPackage } from "@/lib/ruleNames";
-import { musicsAllowed } from "@/lib/music/policy";
-import { musicEngineReady } from "@/lib/music/ready";
 import { conversationHasMusic } from "@/lib/music/jobs";
-import { db } from "@/db";
-import { conversations } from "@/db/schema";
-import { eq } from "drizzle-orm";
 // U2b/c (docs/plans/turn-machine-state-record-2026-09-22.md, "Files"):
 // the entry `routes/turn.ts` calls, with the same TurnStreamResult shape
 // runTurnStream() already returns (the old engine file, imported here, never
@@ -44,7 +39,7 @@ import { speakerAgeBand } from "@/lib/ageBand";
 import { sourcesForChild, structuredPartForBand } from "@/lib/childLinks";
 import { FAILURE_COPY } from "@/lib/failureCopy";
 import { pickStatusPhrase } from "@/lib/statusPhrases";
-import { getHouseholdSettingValue, getPersonSettingValue } from "@/lib/settings";
+import { getPersonSettingValue } from "@/lib/settings";
 import { planFor } from "@/lib/register";
 import { surfaceClassOf } from "@/lib/surfaceClass";
 import { AFFIRMATIVE_RE } from "@/lib/consentVocab";
@@ -65,24 +60,20 @@ import { StatusChannel } from "@/lib/statusChannel";
 import { scheduleSummaryRefresh } from "@/lib/summaryRefresh";
 import { scheduleConversationTitle } from "@/lib/conversationTitle";
 import { StreamGate, gateGrainFor } from "./nodes/outputGate";
-import { resolveTurnBudgetAndEngineModel, withTurnToolGates } from "./budget";
-import { picturesAllowed } from "@/lib/pictures/policy";
-import { pictureEngineReady } from "@/lib/pictures/ready";
-import { videosAllowed } from "@/lib/videos/policy";
-import { videoEngineReady } from "@/lib/videos/ready";
+import { resolveTurnBudgetAndEngineModel } from "./budget";
+import { budgetWithTurnToolGates } from "./toolGates";
 import { turnMachine } from "./machine";
 import type { TraceRecorder } from "./trace";
 import type { TurnState, ActionProposal, TurnBudget } from "./contract";
 import type { Source } from "@maipai/spec/gen/ts/source.js";
 import { PARENT_REQUIRED_LINE } from "./nodes/answer";
-import { AnswerImagePlacer, SHOW_IMAGES_TOOL_ID, answerImagesAllowed, settleAnswerBlocks, settleAnswerImages, startAnswerImages } from "@/lib/answerImages/turn";
+import { AnswerImagePlacer, SHOW_IMAGES_TOOL_ID, settleAnswerBlocks, settleAnswerImages, startAnswerImages } from "@/lib/answerImages/turn";
 import { reAskForShowImages } from "./nodes/model";
 import { answerRobotOffer } from "@/lib/robotOffers";
 import { decidePendingAsk } from "@/lib/gate/pendingAskMigration";
 import { readLook } from "@/lib/companionLook";
 import { companionVoiceVersion, portraitPath, retainCompanionPortrait } from "@/lib/companionPortrait";
 import type { GateDecision } from "@/lib/gate/types";
-import { itemRefsIn } from "@/lib/items/tool";
 
 export interface RunTurnNextOpts {
   robotName?: string;
@@ -636,21 +627,20 @@ async function beginTurn(actor: PersonRow, surface: Surface, text: string, opts:
   // ANSWER-IMG-02 (rules 0 and 8): `show_images` is offered only when the
   // model's own record offers it AND this turn may show pictures; the
   // record keeps it out until ANSWER-IMG-05's bench passes.
-  const answerImagesOk = answerImagesAllowed({ actor, band, surfaceClass, spoken: opts.spoken === true, temporary, bare, ephemeral: opts.ephemeral === true });
-  // IMGGEN-HOME-01 (rule 0): `generate_image` is offered only to an adult on their own written screen, with pictures on
-  // for the household and a picture engine installed on the Stack. A child, a teen, a guest, a spoken or shared surface
-  // never sees it.
-  // The video status read starts here so it runs beside the picture engine's, not after it (each can wait on the Stack).
-  const musicReadyNow = !bare && musicsAllowed({ actor, band, surface, surfaceClass, spoken: opts.spoken === true }) ? musicEngineReady() : Promise.resolve(false);
-  const videoReadyNow = !bare && videosAllowed({ actor, band, surface, surfaceClass, spoken: opts.spoken === true }) ? videoEngineReady() : Promise.resolve(false);
-  const picturesOk = !bare && picturesAllowed({ actor, band, surface, surfaceClass, spoken: opts.spoken === true }) && (await pictureEngineReady());
-  // VIDEO-GEN-05 (rule 0): `generate_video` follows the same gate, with the household's video switch and a video model.
-  const videosOk = !bare && videosAllowed({ actor, band, surface, surfaceClass, spoken: opts.spoken === true }) && (await videoReadyNow);
-  const musicOk = await musicReadyNow;
-  const musicEditOk = musicOk && conversationHasMusic(actor, conversation.id, temporary || opts.ephemeral === true);
-  // NEWS-DISCUSS-TOOL-2026-10-27: `read_item` only for a grown person's own typed message that holds a reference (never a robot or spoken turn).
-  const itemRefOk = !bare && actor.role !== "guest" && band !== "child" && surfaceClass === "written" && itemRefsIn(text).length > 0;
-  const budget: TurnBudget = withTurnToolGates(thinkingBudget, answerImagesOk, picturesOk, videosOk, musicOk, musicEditOk, itemRefOk);
+  const gated = await budgetWithTurnToolGates({
+    budget: thinkingBudget,
+    actor,
+    band,
+    surface,
+    surfaceClass,
+    spoken: opts.spoken === true,
+    temporary,
+    bare,
+    ephemeral: opts.ephemeral === true,
+    text,
+    musicEditAvailable: () => conversationHasMusic(actor, conversation.id, temporary || opts.ephemeral === true),
+  });
+  const { budget, answerImagesOk, picturesOk, videosOk, musicOk, musicEditOk, itemRefOk } = gated;
 
   const state: TurnState = {
     turnId,
