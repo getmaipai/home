@@ -178,7 +178,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `frontend/src/shell/media/NowPlayingStage.tsx` | clock, NowPlayingStage |
 | `frontend/src/shell/media/SleepMenu.tsx` | SleepMenu |
 | `frontend/src/shell/media/VisualizerMenu.tsx` | VisualizerMenu |
-| `frontend/src/shell/mediaHost.tsx` | createMediaStore, MediaDockContext, useMediaDock, MediaHostProvider, MediaLinkRedirect |
+| `frontend/src/shell/mediaHost.tsx` | hlsPathFor, createMediaStore, MediaDockContext, useMediaDock, MediaHostProvider, MediaLinkRedirect |
 | `frontend/src/shell/pageContext.tsx` | ambientPageContextForRoute, AmbientPageContextProvider, useAmbientPageContext, useSetPageContext |
 | `frontend/src/shell/pageHeaderTitle.tsx` | PageHeaderTitle |
 | `frontend/src/shell/pages/AllAppsPage.tsx` | AllAppsPage |
@@ -498,8 +498,9 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/media/progress.ts` | LATCH_PERCENT, BOOK_END_PERCENT, correctedStamp, percentOf, reachesLatch, mergeProgress |
 | `backend/src/lib/media/radio.ts` | adultTagged, stationVisibleAtBand, listSavedStations, savedStationFor, stationItemView, savedAddressesOf |
 | `backend/src/lib/media/radioDirectory.ts` | __resetRadioDirectoryForTests, radioDirectoryAllowed, stationOf, findStations |
+| `backend/src/lib/media/radioHls.ts` | openHlsResource, hlsResourceUrl, decodeHlsResource |
 | `backend/src/lib/media/radioIcy.ts` | usableMetaint, parseStreamTitle, IcyDemuxer |
-| `backend/src/lib/media/radioStream.ts` | MAX_REDIRECTS, CONNECT_TIMEOUT_MS, MAX_STREAMS_PER_HOME, HLS_MESSAGE, unplayable, activeStreamCount |
+| `backend/src/lib/media/radioStream.ts` | MAX_REDIRECTS, CONNECT_TIMEOUT_MS, MAX_STREAMS_PER_HOME, unplayable, activeStreamCount, __resetRadioStreamsForTests |
 | `backend/src/lib/media/scan.ts` | DEFAULT_PRUNE_GRACE_MS, probePending, scanRoot, isScanning, syncMediaScanner, stopMediaScanner |
 | `backend/src/lib/media/search.ts` | searchMedia |
 | `backend/src/lib/media/serve.ts` | parseRange, resolveUnderRoot, serveItemBytes, serveItemArtwork, itemByteMetadata |
