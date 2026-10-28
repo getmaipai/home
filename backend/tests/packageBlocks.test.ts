@@ -254,7 +254,7 @@ describe("GENUI-04: weather returns a spec_sheet, a chart and a data_table", () 
     expect(allowed("weather")).toEqual(["weather_card", "spec_sheet", "chart", "data_table"]);
     const loaded = loadManifestOnly("weather");
     if (!loaded.ok) throw new Error(loaded.error);
-    expect(loaded.value.permissions).toEqual(["net:geocoding-api.open-meteo.com", "net:api.open-meteo.com"]);
+    expect(loaded.value.permissions).toEqual(["net:geocoding-api.open-meteo.com", "net:api.open-meteo.com", "net:api.weather.gov"]);
   });
 
   test("the forecast request asks for the next 24 hours of temperature and a 7-day daily from the one permitted host", async () => {
