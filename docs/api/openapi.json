@@ -62107,7 +62107,8 @@
                               "root",
                               "feed",
                               "channel",
-                              "link"
+                              "link",
+                              "station"
                             ]
                           },
                           "scope": {
@@ -62215,18 +62216,103 @@
                               {
                                 "type": "string",
                                 "format": "uri",
-                                "description": "For a channel or a link. Never logged; excluded from an export when it carries a token."
+                                "description": "For a channel, a link or a station (the stream address). Never logged; excluded from an export when it carries a token."
                               },
                               {
                                 "nullable": true,
-                                "description": "For a channel or a link. Never logged; excluded from an export when it carries a token."
+                                "description": "For a channel, a link or a station (the stream address). Never logged; excluded from an export when it carries a token."
                               },
                               {
                                 "nullable": true
                               }
                             ],
                             "default": null,
-                            "description": "For a channel or a link. Never logged; excluded from an export when it carries a token."
+                            "description": "For a channel, a link or a station (the stream address). Never logged; excluded from an export when it carries a token."
+                          },
+                          "station": {
+                            "anyOf": [
+                              {
+                                "type": "object",
+                                "properties": {
+                                  "live": {
+                                    "type": "boolean",
+                                    "enum": [
+                                      true
+                                    ]
+                                  },
+                                  "favicon_url": {
+                                    "anyOf": [
+                                      {
+                                        "type": "string",
+                                        "format": "uri"
+                                      },
+                                      {
+                                        "nullable": true
+                                      }
+                                    ]
+                                  },
+                                  "tags": {
+                                    "type": "array",
+                                    "items": {
+                                      "type": "string",
+                                      "minLength": 1
+                                    }
+                                  },
+                                  "country_code": {
+                                    "anyOf": [
+                                      {
+                                        "type": "string",
+                                        "pattern": "^[A-Z]{2}$"
+                                      },
+                                      {
+                                        "nullable": true
+                                      }
+                                    ]
+                                  },
+                                  "codec": {
+                                    "anyOf": [
+                                      {
+                                        "type": "string",
+                                        "minLength": 1
+                                      },
+                                      {
+                                        "nullable": true
+                                      }
+                                    ]
+                                  },
+                                  "bitrate_kbps": {
+                                    "anyOf": [
+                                      {
+                                        "type": "integer",
+                                        "minimum": 0
+                                      },
+                                      {
+                                        "nullable": true
+                                      }
+                                    ]
+                                  }
+                                },
+                                "required": [
+                                  "live",
+                                  "favicon_url",
+                                  "tags",
+                                  "country_code",
+                                  "codec",
+                                  "bitrate_kbps"
+                                ],
+                                "additionalProperties": false,
+                                "description": "For kind station: what the directory told us about the stream. live is always true; a station has no duration and no seek."
+                              },
+                              {
+                                "nullable": true,
+                                "description": "For kind station: what the directory told us about the stream. live is always true; a station has no duration and no seek."
+                              },
+                              {
+                                "nullable": true
+                              }
+                            ],
+                            "default": null,
+                            "description": "For kind station: what the directory told us about the stream. live is always true; a station has no duration and no seek."
                           },
                           "extractor": {
                             "anyOf": [
@@ -62517,7 +62603,7 @@
                           "provenance"
                         ],
                         "additionalProperties": false,
-                        "description": "MEDIA-SPEC-01 (media design section 7). Where media items come from: a library root folder on the hub or a mounted share, a podcast feed, a web channel followed at a person's pace, or a pasted link. Roots of different kinds may not overlap (enforced at save). A child never adds a source."
+                        "description": "MEDIA-SPEC-01 (media design section 7). Where media items come from: a library root folder on the hub or a mounted share, a podcast feed, a web channel followed at a person's pace, or a pasted link. Roots of different kinds may not overlap (enforced at save). A child never adds a source. RADIO-01: a station is a live internet radio stream; its stream address is url, its name is label, and the station object holds the rest."
                       },
                       "item_count": {
                         "type": "number",
@@ -62720,7 +62806,8 @@
                             "root",
                             "feed",
                             "channel",
-                            "link"
+                            "link",
+                            "station"
                           ]
                         },
                         "scope": {
@@ -62828,18 +62915,103 @@
                             {
                               "type": "string",
                               "format": "uri",
-                              "description": "For a channel or a link. Never logged; excluded from an export when it carries a token."
+                              "description": "For a channel, a link or a station (the stream address). Never logged; excluded from an export when it carries a token."
                             },
                             {
                               "nullable": true,
-                              "description": "For a channel or a link. Never logged; excluded from an export when it carries a token."
+                              "description": "For a channel, a link or a station (the stream address). Never logged; excluded from an export when it carries a token."
                             },
                             {
                               "nullable": true
                             }
                           ],
                           "default": null,
-                          "description": "For a channel or a link. Never logged; excluded from an export when it carries a token."
+                          "description": "For a channel, a link or a station (the stream address). Never logged; excluded from an export when it carries a token."
+                        },
+                        "station": {
+                          "anyOf": [
+                            {
+                              "type": "object",
+                              "properties": {
+                                "live": {
+                                  "type": "boolean",
+                                  "enum": [
+                                    true
+                                  ]
+                                },
+                                "favicon_url": {
+                                  "anyOf": [
+                                    {
+                                      "type": "string",
+                                      "format": "uri"
+                                    },
+                                    {
+                                      "nullable": true
+                                    }
+                                  ]
+                                },
+                                "tags": {
+                                  "type": "array",
+                                  "items": {
+                                    "type": "string",
+                                    "minLength": 1
+                                  }
+                                },
+                                "country_code": {
+                                  "anyOf": [
+                                    {
+                                      "type": "string",
+                                      "pattern": "^[A-Z]{2}$"
+                                    },
+                                    {
+                                      "nullable": true
+                                    }
+                                  ]
+                                },
+                                "codec": {
+                                  "anyOf": [
+                                    {
+                                      "type": "string",
+                                      "minLength": 1
+                                    },
+                                    {
+                                      "nullable": true
+                                    }
+                                  ]
+                                },
+                                "bitrate_kbps": {
+                                  "anyOf": [
+                                    {
+                                      "type": "integer",
+                                      "minimum": 0
+                                    },
+                                    {
+                                      "nullable": true
+                                    }
+                                  ]
+                                }
+                              },
+                              "required": [
+                                "live",
+                                "favicon_url",
+                                "tags",
+                                "country_code",
+                                "codec",
+                                "bitrate_kbps"
+                              ],
+                              "additionalProperties": false,
+                              "description": "For kind station: what the directory told us about the stream. live is always true; a station has no duration and no seek."
+                            },
+                            {
+                              "nullable": true,
+                              "description": "For kind station: what the directory told us about the stream. live is always true; a station has no duration and no seek."
+                            },
+                            {
+                              "nullable": true
+                            }
+                          ],
+                          "default": null,
+                          "description": "For kind station: what the directory told us about the stream. live is always true; a station has no duration and no seek."
                         },
                         "extractor": {
                           "anyOf": [
@@ -63130,7 +63302,7 @@
                         "provenance"
                       ],
                       "additionalProperties": false,
-                      "description": "MEDIA-SPEC-01 (media design section 7). Where media items come from: a library root folder on the hub or a mounted share, a podcast feed, a web channel followed at a person's pace, or a pasted link. Roots of different kinds may not overlap (enforced at save). A child never adds a source."
+                      "description": "MEDIA-SPEC-01 (media design section 7). Where media items come from: a library root folder on the hub or a mounted share, a podcast feed, a web channel followed at a person's pace, or a pasted link. Roots of different kinds may not overlap (enforced at save). A child never adds a source. RADIO-01: a station is a live internet radio stream; its stream address is url, its name is label, and the station object holds the rest."
                     },
                     "item_count": {
                       "type": "number",
@@ -68842,7 +69014,8 @@
                           "queue",
                           "playlist",
                           "watchlist",
-                          "pins"
+                          "pins",
+                          "filter"
                         ]
                       },
                       "title": {
@@ -68933,7 +69106,7 @@
                       },
                       "rules": {
                         "nullable": true,
-                        "description": "Reserved for smart playlists; null today."
+                        "description": "Null for every kind but filter. For kind filter, the saved episode filter: every rule given must match (AND). Omitted rules do not restrict. Evaluated by the hub against the person's own progress and the shows they can see."
                       },
                       "deleted_at": {
                         "anyOf": [
@@ -68996,7 +69169,7 @@
                       "provenance"
                     ],
                     "additionalProperties": false,
-                    "description": "MEDIA-SPEC-01 (media design section 7). A person's ordered references to media items: liked, watch later, the queue, a playlist, the watchlist, pins. One liked, one watch_later and one queue per person exist by construction. The list record stays for text lists (its items are text with a checked state; these are references with order, status and a pointer)."
+                    "description": "MEDIA-SPEC-01 (media design section 7). A person's ordered references to media items: liked, watch later, the queue, a playlist, the watchlist, pins. One liked, one watch_later and one queue per person exist by construction. The list record stays for text lists (its items are text with a checked state; these are references with order, status and a pointer). PODCAST-PORT-03: a filter is a saved episode filter; its items stay empty and its rules say which episodes match."
                   }
                 }
               }
@@ -69071,7 +69244,8 @@
                         "queue",
                         "playlist",
                         "watchlist",
-                        "pins"
+                        "pins",
+                        "filter"
                       ]
                     },
                     "title": {
@@ -69162,7 +69336,7 @@
                     },
                     "rules": {
                       "nullable": true,
-                      "description": "Reserved for smart playlists; null today."
+                      "description": "Null for every kind but filter. For kind filter, the saved episode filter: every rule given must match (AND). Omitted rules do not restrict. Evaluated by the hub against the person's own progress and the shows they can see."
                     },
                     "deleted_at": {
                       "anyOf": [
@@ -69225,7 +69399,7 @@
                     "provenance"
                   ],
                   "additionalProperties": false,
-                  "description": "MEDIA-SPEC-01 (media design section 7). A person's ordered references to media items: liked, watch later, the queue, a playlist, the watchlist, pins. One liked, one watch_later and one queue per person exist by construction. The list record stays for text lists (its items are text with a checked state; these are references with order, status and a pointer)."
+                  "description": "MEDIA-SPEC-01 (media design section 7). A person's ordered references to media items: liked, watch later, the queue, a playlist, the watchlist, pins. One liked, one watch_later and one queue per person exist by construction. The list record stays for text lists (its items are text with a checked state; these are references with order, status and a pointer). PODCAST-PORT-03: a filter is a saved episode filter; its items stay empty and its rules say which episodes match."
                 }
               }
             }
@@ -69275,7 +69449,8 @@
                           "queue",
                           "playlist",
                           "watchlist",
-                          "pins"
+                          "pins",
+                          "filter"
                         ]
                       },
                       "title": {
@@ -69366,7 +69541,7 @@
                       },
                       "rules": {
                         "nullable": true,
-                        "description": "Reserved for smart playlists; null today."
+                        "description": "Null for every kind but filter. For kind filter, the saved episode filter: every rule given must match (AND). Omitted rules do not restrict. Evaluated by the hub against the person's own progress and the shows they can see."
                       },
                       "deleted_at": {
                         "anyOf": [
@@ -69429,7 +69604,7 @@
                       "provenance"
                     ],
                     "additionalProperties": false,
-                    "description": "MEDIA-SPEC-01 (media design section 7). A person's ordered references to media items: liked, watch later, the queue, a playlist, the watchlist, pins. One liked, one watch_later and one queue per person exist by construction. The list record stays for text lists (its items are text with a checked state; these are references with order, status and a pointer)."
+                    "description": "MEDIA-SPEC-01 (media design section 7). A person's ordered references to media items: liked, watch later, the queue, a playlist, the watchlist, pins. One liked, one watch_later and one queue per person exist by construction. The list record stays for text lists (its items are text with a checked state; these are references with order, status and a pointer). PODCAST-PORT-03: a filter is a saved episode filter; its items stay empty and its rules say which episodes match."
                   }
                 }
               }
@@ -69490,7 +69665,8 @@
                         "queue",
                         "playlist",
                         "watchlist",
-                        "pins"
+                        "pins",
+                        "filter"
                       ]
                     },
                     "title": {
@@ -69581,7 +69757,7 @@
                     },
                     "rules": {
                       "nullable": true,
-                      "description": "Reserved for smart playlists; null today."
+                      "description": "Null for every kind but filter. For kind filter, the saved episode filter: every rule given must match (AND). Omitted rules do not restrict. Evaluated by the hub against the person's own progress and the shows they can see."
                     },
                     "deleted_at": {
                       "anyOf": [
@@ -69644,7 +69820,7 @@
                     "provenance"
                   ],
                   "additionalProperties": false,
-                  "description": "MEDIA-SPEC-01 (media design section 7). A person's ordered references to media items: liked, watch later, the queue, a playlist, the watchlist, pins. One liked, one watch_later and one queue per person exist by construction. The list record stays for text lists (its items are text with a checked state; these are references with order, status and a pointer)."
+                  "description": "MEDIA-SPEC-01 (media design section 7). A person's ordered references to media items: liked, watch later, the queue, a playlist, the watchlist, pins. One liked, one watch_later and one queue per person exist by construction. The list record stays for text lists (its items are text with a checked state; these are references with order, status and a pointer). PODCAST-PORT-03: a filter is a saved episode filter; its items stay empty and its rules say which episodes match."
                 }
               }
             }
@@ -69753,7 +69929,8 @@
                         "queue",
                         "playlist",
                         "watchlist",
-                        "pins"
+                        "pins",
+                        "filter"
                       ]
                     },
                     "title": {
@@ -69844,7 +70021,7 @@
                     },
                     "rules": {
                       "nullable": true,
-                      "description": "Reserved for smart playlists; null today."
+                      "description": "Null for every kind but filter. For kind filter, the saved episode filter: every rule given must match (AND). Omitted rules do not restrict. Evaluated by the hub against the person's own progress and the shows they can see."
                     },
                     "deleted_at": {
                       "anyOf": [
@@ -69907,7 +70084,7 @@
                     "provenance"
                   ],
                   "additionalProperties": false,
-                  "description": "MEDIA-SPEC-01 (media design section 7). A person's ordered references to media items: liked, watch later, the queue, a playlist, the watchlist, pins. One liked, one watch_later and one queue per person exist by construction. The list record stays for text lists (its items are text with a checked state; these are references with order, status and a pointer)."
+                  "description": "MEDIA-SPEC-01 (media design section 7). A person's ordered references to media items: liked, watch later, the queue, a playlist, the watchlist, pins. One liked, one watch_later and one queue per person exist by construction. The list record stays for text lists (its items are text with a checked state; these are references with order, status and a pointer). PODCAST-PORT-03: a filter is a saved episode filter; its items stay empty and its rules say which episodes match."
                 }
               }
             }
@@ -70079,7 +70256,8 @@
                         "queue",
                         "playlist",
                         "watchlist",
-                        "pins"
+                        "pins",
+                        "filter"
                       ]
                     },
                     "title": {
@@ -70170,7 +70348,7 @@
                     },
                     "rules": {
                       "nullable": true,
-                      "description": "Reserved for smart playlists; null today."
+                      "description": "Null for every kind but filter. For kind filter, the saved episode filter: every rule given must match (AND). Omitted rules do not restrict. Evaluated by the hub against the person's own progress and the shows they can see."
                     },
                     "deleted_at": {
                       "anyOf": [
@@ -70233,7 +70411,7 @@
                     "provenance"
                   ],
                   "additionalProperties": false,
-                  "description": "MEDIA-SPEC-01 (media design section 7). A person's ordered references to media items: liked, watch later, the queue, a playlist, the watchlist, pins. One liked, one watch_later and one queue per person exist by construction. The list record stays for text lists (its items are text with a checked state; these are references with order, status and a pointer)."
+                  "description": "MEDIA-SPEC-01 (media design section 7). A person's ordered references to media items: liked, watch later, the queue, a playlist, the watchlist, pins. One liked, one watch_later and one queue per person exist by construction. The list record stays for text lists (its items are text with a checked state; these are references with order, status and a pointer). PODCAST-PORT-03: a filter is a saved episode filter; its items stay empty and its rules say which episodes match."
                 }
               }
             }
@@ -70322,7 +70500,8 @@
                         "queue",
                         "playlist",
                         "watchlist",
-                        "pins"
+                        "pins",
+                        "filter"
                       ]
                     },
                     "title": {
@@ -70413,7 +70592,7 @@
                     },
                     "rules": {
                       "nullable": true,
-                      "description": "Reserved for smart playlists; null today."
+                      "description": "Null for every kind but filter. For kind filter, the saved episode filter: every rule given must match (AND). Omitted rules do not restrict. Evaluated by the hub against the person's own progress and the shows they can see."
                     },
                     "deleted_at": {
                       "anyOf": [
@@ -70476,7 +70655,7 @@
                     "provenance"
                   ],
                   "additionalProperties": false,
-                  "description": "MEDIA-SPEC-01 (media design section 7). A person's ordered references to media items: liked, watch later, the queue, a playlist, the watchlist, pins. One liked, one watch_later and one queue per person exist by construction. The list record stays for text lists (its items are text with a checked state; these are references with order, status and a pointer)."
+                  "description": "MEDIA-SPEC-01 (media design section 7). A person's ordered references to media items: liked, watch later, the queue, a playlist, the watchlist, pins. One liked, one watch_later and one queue per person exist by construction. The list record stays for text lists (its items are text with a checked state; these are references with order, status and a pointer). PODCAST-PORT-03: a filter is a saved episode filter; its items stay empty and its rules say which episodes match."
                 }
               }
             }
@@ -70554,7 +70733,8 @@
                         "queue",
                         "playlist",
                         "watchlist",
-                        "pins"
+                        "pins",
+                        "filter"
                       ]
                     },
                     "title": {
@@ -70645,7 +70825,7 @@
                     },
                     "rules": {
                       "nullable": true,
-                      "description": "Reserved for smart playlists; null today."
+                      "description": "Null for every kind but filter. For kind filter, the saved episode filter: every rule given must match (AND). Omitted rules do not restrict. Evaluated by the hub against the person's own progress and the shows they can see."
                     },
                     "deleted_at": {
                       "anyOf": [
@@ -70708,7 +70888,7 @@
                     "provenance"
                   ],
                   "additionalProperties": false,
-                  "description": "MEDIA-SPEC-01 (media design section 7). A person's ordered references to media items: liked, watch later, the queue, a playlist, the watchlist, pins. One liked, one watch_later and one queue per person exist by construction. The list record stays for text lists (its items are text with a checked state; these are references with order, status and a pointer)."
+                  "description": "MEDIA-SPEC-01 (media design section 7). A person's ordered references to media items: liked, watch later, the queue, a playlist, the watchlist, pins. One liked, one watch_later and one queue per person exist by construction. The list record stays for text lists (its items are text with a checked state; these are references with order, status and a pointer). PODCAST-PORT-03: a filter is a saved episode filter; its items stay empty and its rules say which episodes match."
                 }
               }
             }
