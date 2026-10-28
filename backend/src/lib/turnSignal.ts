@@ -109,6 +109,13 @@ const JOKE_RE = /\b(?:jk|j\/k|lol|lmao|haha+|hehe+|kidding|joking|as if)\b|(?:^|
 // Repair: a correction rejects a fact the hub used ("no, Friday, not
 // Thursday", "you added the wrong item", "I meant"), a retraction takes a
 // request or a statement back ("never mind", "scratch that").
+// NAT-06b: the person's own words about advice. "no" (asked to be heard) wins over "yes"; tone never sets either.
+const ADVICE_NO_RE = /\b(?:(?:need|want) to (?:vent|rant)|just (?:venting|ranting|listen)|(?:don'?t|do not) (?:need|want) (?:any )?(?:advice|solutions?|suggestions?|you to fix)|not (?:looking|asking) for (?:any )?(?:advice|solutions?)|no advice)\b/i;
+const ADVICE_YES_RE = /\b(?:what (?:should|can) i do|what would you do|any (?:advice|suggestions|tips)|(?:need|want|could use) (?:some )?(?:advice|suggestions|tips)|how (?:should|can|do) i (?:deal with|cope with|handle|get over)|do you have any (?:advice|suggestions|tips))\b/i;
+export function adviceOf(text: string): "yes" | "no" | undefined {
+  if (ADVICE_NO_RE.test(text)) return "no";
+  return ADVICE_YES_RE.test(text) ? "yes" : undefined;
+}
 const RETRACTION_RE = /\b(?:never ?mind|scratch that|forget (?:it|that|about it)|cancel that|don'?t bother|drop it|leave it|no need)\b/i;
 const CORRECTION_RE = /\b(?:the wrong \w+|(?:you'?re|that'?s|that was|it'?s|it was|you got (?:it|that)) wrong|not that|i meant|no,? not|isn'?t right|that'?s not (?:it|right|what i)|no longer|not (?:\w+ ){0,3}anymore|\w+,\s*not\s+\w+|not \w+,\s*\w+)\b/i;
 // "no, Friday" opens a correction; "no thanks" and "don't forget to
@@ -535,6 +542,7 @@ export function classifyTurnSignal(input: SignalInput): TurnSignal {
     emotion_intensity: emotionClause.emotion_intensity,
     target: targetOf(emotionText, aboutClause.subject),
     repair: repairOf(text, primary),
+    ...(adviceOf(text) ? { wants_advice: adviceOf(text) } : {}),
     refers_to_prior: null,
     clauses,
     act_confidence: actConfidence,

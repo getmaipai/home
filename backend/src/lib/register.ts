@@ -181,6 +181,10 @@ export function planFor(input: PlanInput): ReplyPlan {
   if (social?.warmth === "high" && plan.care !== "required" && (signal.primary_act === "inform" || signal.primary_act === "commissive")) allow("react");
   if (social?.initiative === "low") forbid("ask_back");
   if (social?.initiative === "high" && (signal.primary_act === "inform" || signal.primary_act === "commissive")) allow("ask_back");
+  // NAT-06b: an explicit "I just need to vent" or "what should I do" decides whether this reply listens or advises. Only the person's
+  // own words set it (never tone), and anger at the hub below still wins.
+  if (signal.wants_advice === "no") forbid("say", "pick", "point", "ask_back");
+  if (signal.wants_advice === "yes" && marked) { allow("say"); maxSentences = Math.max(maxSentences, 3); maxWords = Math.max(maxWords, 60); }
   if (input.brevity) forbid("react", "ask_back");
   if (signal.expressed_emotion === "anger" && signal.target === "hub") {
     plan.react = "forbidden";
@@ -243,7 +247,8 @@ function planLineAbout(plan: ReplyPlan, signal: TurnSignal, surfaceClass: Surfac
   const length = `${plan.max_sentences === 1 ? "one" : "one or two"} sentence${plan.max_sentences === 1 ? "" : "s"}`;
   const requirements = required.length ? required.join(", ") : "no required move";
   const bans = [forbidden.includes("ask_back") || required.includes("care") ? "no question" : "", forbidden.includes("point") ? "no tasks" : "", plan.playfulness === "forbidden" ? "no playfulness" : ""].filter(Boolean).join(", ");
-  const lead = required.includes("care") ? "acknowledge the feeling first" : requirements;
+  const feeling = required.includes("care") ? "acknowledge the feeling first" : requirements;
+  const lead = signal.wants_advice === "no" ? `${feeling === requirements ? "just listen" : feeling}, and do not give advice` : signal.wants_advice === "yes" && required.includes("care") ? `${feeling}, then give the advice they asked for` : feeling;
   // PERSONA-LEAK-01: on the written class the length rule is its own sentence.
   // As a bare fragment inside the comma list the model echoed it as reply text.
   // PERSONA-LEAK-02 (live, 2026-10-17, three replies in one session opened or

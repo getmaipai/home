@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import type { TurnSignal } from "@maipai/spec/gen/ts/turn-signal.js";
-import { fallbackSignal } from "@/lib/turnSignal";
+import { adviceOf, fallbackSignal } from "@/lib/turnSignal";
 import { planFor, planLine, planLineForTurnMachine, type PlanInput } from "@/lib/register";
 
 const base = (act: TurnSignal["primary_act"], emotion: TurnSignal["expressed_emotion"] = "neutral", intensity: TurnSignal["emotion_intensity"] = "none"): TurnSignal => ({
@@ -232,5 +232,40 @@ describe("planFor social dials (NAT-06)", () => {
     expect(plan.moves.care).toBe("required");
     expect(plan.moves).toEqual(baseline.moves);
     expect(plan.playfulness).toBe("forbidden");
+  });
+});
+
+describe("wants_advice (NAT-06b)", () => {
+  const sad = (wants?: "yes" | "no") => ({ ...base("inform", "sadness", "moderate"), ...(wants ? { wants_advice: wants } : {}) });
+  test("the cues read the person's words, no wording means no field", () => {
+    expect(adviceOf("I just need to vent about work")).toBe("no");
+    expect(adviceOf("I don't want advice, I'm just tired")).toBe("no");
+    expect(adviceOf("I'm so stressed, what should I do?")).toBe("yes");
+    expect(adviceOf("any advice for getting over a cold")).toBe("yes");
+    expect(adviceOf("I just need to vent, what should I do")).toBe("no");
+    expect(adviceOf("it was a long day")).toBeUndefined();
+    expect(adviceOf("what do you think of the weather")).toBeUndefined();
+  });
+  test("no: care stays, advice moves and questions back are off", () => {
+    const plan = planFor(input(sad("no")));
+    expect(plan.moves.care).toBe("required");
+    for (const move of ["say", "pick", "point", "ask_back"] as const) expect(plan.moves[move]).toBe("forbidden");
+    expect(planLineForTurnMachine(plan, sad("no"))).toContain("do not give advice");
+  });
+  test("yes on an emotional turn allows the answer and a longer reply, care still leads", () => {
+    const plain = planFor(input(sad()));
+    const plan = planFor(input(sad("yes")));
+    expect(plan.moves.care).toBe("required");
+    expect(plan.moves.say).toBe("allowed");
+    expect(plan.max_sentences).toBeGreaterThan(plain.max_sentences);
+    expect(planLineForTurnMachine(plan, sad("yes"))).toContain("then give the advice they asked for");
+  });
+  test("absent changes nothing, and a required say survives no", () => {
+    expect(planFor(input(sad()))).toEqual(planFor(input(sad(undefined))));
+    expect(planFor(input({ ...base("question"), wants_advice: "no" })).moves.say).toBe("required");
+  });
+  test("anger at the hub still wins over yes", () => {
+    const plan = planFor(input({ ...base("inform", "anger", "moderate"), target: "hub", wants_advice: "yes" }));
+    expect(plan.moves.say).toBe("forbidden");
   });
 });
