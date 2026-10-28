@@ -444,7 +444,7 @@ if (ARMS.includes("assist_rescue") && [...BANDS].some((b) => b === "child" || b 
 
 const setup = await import("./setup");
 const runner = await import("./conversationRunner");
-const { CHAT_SAMPLING } = await import("@/lib/llm");
+const { benchChatSampling } = await import("@/lib/benchSampling");
 const { setHouseholdSettingValue } = await import("@/lib/settings");
 const { effectiveMode } = await import("@/lib/retrieval/sourceMode");
 
@@ -531,7 +531,7 @@ async function main(): Promise<void> {
     toolsBlockState: "THIN-Q3 NOT landed: the full tools block rides every adult turn",
     arms: ARMS, reps: REPS, bands: [...BANDS], rows: selected.length,
     thinking: "off (turn path sends thinking false; bare arm sends enable_thinking false)",
-    chatSampling: CHAT_SAMPLING,
+    chatSampling: benchChatSampling(),
     search: "loopback fixture rows only (fixtureSearch.ts); live Wikipedia fallback pointed at an empty loopback server; embed refused at once",
     library: "no ZIM installed in the throwaway backend: scope reference finds nothing here",
     hub: "throwaway seeded backend in a fresh OS-temp data directory, two invented bench people",

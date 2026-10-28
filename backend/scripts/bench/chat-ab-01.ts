@@ -6,7 +6,7 @@
 //   A    bare: POST /v1/chat/completions on the engine, the conversation so
 //        far plus the user message, no system prompt, no sampling fields,
 //        max_tokens 1536, streaming.
-//   A2   A plus CHAT_SAMPLING (imported from src/lib/llm.ts, not copied).
+//   A2   A plus the model record's sampling (imported from src/lib/llm.ts, not copied).
 //   B    the real default turn path as an adult, written chat turn:
 //        runConversation() from conversationRunner.ts (the construction path
 //        every live bench uses) with real tools and
@@ -420,7 +420,7 @@ const teeUrl = `http://127.0.0.1:${teeServer.port}`;
 const setup = await import("./setup");
 const { startBench, finishBench } = setup;
 const runner = await import("./conversationRunner");
-const { CHAT_SAMPLING } = await import("@/lib/llm");
+const { benchChatSampling } = await import("@/lib/benchSampling");
 const { setHouseholdSettingValue } = await import("@/lib/settings");
 
 // ==== arms A and A2 ====
@@ -654,10 +654,10 @@ async function environment(): Promise<Record<string, unknown>> {
     modelFile: engineHeaders["x-maipai-model"],
     stackChatRoleModel: chatRole?.model?.id ?? "n/a",
     contextSizeMeasuredByStack: chatRole?.model?.measuredContextLength ?? null,
-    chatSamplingForA2: CHAT_SAMPLING,
+    chatSamplingForA2: benchChatSampling(),
     hardware: `${sh("sysctl -n machdep.cpu.brand_string")}, ${Math.round(Number(sh("sysctl -n hw.memsize")) / 1024 ** 3)} GB unified memory`,
     thinking: "off in all arms (arms A and A2 send enable_thinking=false; the pipeline sends thinking off)",
-    arms: { A: `no system prompt, no sampling fields, max_tokens ${MAX_TOKENS}, stream`, A2: "A plus CHAT_SAMPLING", C: "the child bench person on the default turn path, chat surface, streamed", S: "the owner on the default turn path, chat surface with the spoken flag, streamed; first word is the first answer delta", B: "runConversation() through a loopback stand-in for the Stack that forwards to the same engine, adult owner, chat surface, memory judge off (no background engine), real SearXNG through a pass-through tee, Wikipedia fallback at its default (on)" },
+    arms: { A: `no system prompt, no sampling fields, max_tokens ${MAX_TOKENS}, stream`, A2: "A plus benchChatSampling()", C: "the child bench person on the default turn path, chat surface, streamed", S: "the owner on the default turn path, chat surface with the spoken flag, streamed; first word is the first answer delta", B: "runConversation() through a loopback stand-in for the Stack that forwards to the same engine, adult owner, chat surface, memory judge off (no background engine), real SearXNG through a pass-through tee, Wikipedia fallback at its default (on)" },
     seeds: "none sent by any arm; the engine and the pipeline sample with their own random seeds, so the two runs of an item differ",
     searchTee: "all arm B searches paced at least 30 s apart; stops at the first rate-limit or block signal",
   };
@@ -836,8 +836,8 @@ async function main(): Promise<void> {
               return copy;
             }) : captured.tools;
             const extra = withT ? { tools, ...(captured.toolChoice !== undefined ? { tool_choice: captured.toolChoice } : {}) } : {};
-            // A is the bare arm with no sampling fields; every other bare arm sends CHAT_SAMPLING, as B does.
-            const r = await retry503(() => bareCompletion(messages, arm === "A" ? {} : { ...CHAT_SAMPLING }, extra));
+            // A is the bare arm with no sampling fields; every other bare arm sends the chat record's sampling, as B does.
+            const r = await retry503(() => bareCompletion(messages, arm === "A" ? {} : { ...benchChatSampling() }, extra));
             runs.push({ ...base, arm, item: item.id, category, rep, turn: null, prompt: item.prompt, reply: r.reply, words: words(r.reply), ttftMs: r.ttftMs, totalMs: r.totalMs, cachedTokens: r.cachedTokens, promptTokens: r.promptTokens, completionTokens: r.completionTokens, finishReason: r.finishReason, correct: null, factsRecalled: null, error: r.error });
           }
           const last = runs[runs.length - 1]!;
@@ -865,7 +865,7 @@ async function main(): Promise<void> {
             runs.push({ ...base, ...t, arm, item: item.id, category, rep, turn: null, prompt: item.prompt, correct: correct(t.reply), factsRecalled: null });
           }
         } else {
-          const r = await bareCompletion([{ role: "user", content: item.prompt }], arm === "A2" ? { ...CHAT_SAMPLING } : {});
+          const r = await bareCompletion([{ role: "user", content: item.prompt }], arm === "A2" ? { ...benchChatSampling() } : {});
           runs.push({ ...base, arm, item: item.id, category, rep, turn: null, prompt: item.prompt, reply: r.reply, words: words(r.reply), ttftMs: r.ttftMs, totalMs: r.totalMs, promptTokens: r.promptTokens, completionTokens: r.completionTokens, finishReason: r.finishReason, correct: correct(r.reply), factsRecalled: null, error: r.error });
         }
         save(runs, env);
@@ -899,7 +899,7 @@ async function main(): Promise<void> {
           const turn = i + 1;
           await waitForHubQuiet(undefined, (m) => console.log(m));
           history.push({ role: "user", content: prompt });
-          const r = await bareCompletion(history, arm === "A2" ? { ...CHAT_SAMPLING } : {});
+          const r = await bareCompletion(history, arm === "A2" ? { ...benchChatSampling() } : {});
           history.push({ role: "assistant", content: r.reply });
           runs.push({ ...base, arm, item: script.id, category: "multiturn", rep: 1, turn, prompt, reply: r.reply, words: words(r.reply), ttftMs: r.ttftMs, totalMs: r.totalMs, promptTokens: r.promptTokens, completionTokens: r.completionTokens, finishReason: r.finishReason, correct: null, factsRecalled: turn >= 8 ? recall(r.reply) : null, error: r.error });
           save(runs, env);

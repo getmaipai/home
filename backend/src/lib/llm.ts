@@ -31,6 +31,8 @@ import type { RoleRequest } from "@/lib/stack/types";
 
 import { cachedRoleHealth } from "@/lib/roleHealth";
 import { getActiveChatEngineIdentity } from "@/lib/stackEngine";
+import { chatCatalogEntry } from "@/lib/modelCatalog";
+import { chatSamplingOf } from "@/lib/llmSampling";
 import { availableAnswerTokens, ContextTooLargeError, setCeilingEngineIdentity, reasoningReserveFor, rememberCeilingSpentInvisibly, EmptyLengthError, logEmptyLengthRetry, type ReasoningContext } from "@/lib/reasoningReserve";
 
 // Session C step 0 (wave-2.md): a person every couple of seconds, burst
@@ -427,26 +429,16 @@ function recoverFromDeadBackend(err: unknown): void {
  * when the caller passed neither a `response_format` (a JSON-schema
  * answer must be the single most likely one) nor its own `temperature`
  * (a caller that chose one is choosing its own sampling). The values
- * are llama.cpp's own documented defaults for the three samplers; the
- * temperature is the item's 0.7, which is a change: plain chat used
- * to run at llama-server's own default of 0.8, since nothing passed
- * `--temp` or a request temperature. A tools-offered completion (the
- * ordinary chat turn, since websearch is always offered) gets the set
- * too, measured rather than assumed: the tool-calling bench at 10
- * repeats holds every positive and every negative with it on. */
-export const CHAT_SAMPLING = {
-  temperature: 0.7,
-  min_p: 0.05,
-  xtc_probability: 0.5,
-  xtc_threshold: 0.1,
-  dry_multiplier: 0.8,
-  dry_base: 1.75,
-  dry_allowed_length: 2,
-} as const;
-
-function chatSamplingFor(opts: { temperature?: number; response_format?: unknown }): Partial<typeof CHAT_SAMPLING> {
+ * come from the answering model's own record (MODEL-ADD-01 S3), never a
+ * global: shipped records carry the former global set unchanged (see
+ * FORMER_GLOBAL_SAMPLING in modelCatalog.ts for where those numbers came
+ * from), and a model with no record or no values sends none and keeps
+ * the engine's defaults. A tools-offered completion (the ordinary chat
+ * turn, since websearch is always offered) gets the set too. */
+function chatSamplingFor(opts: { temperature?: number; response_format?: unknown; model?: string }): Record<string, number> {
   if (opts.response_format !== undefined || opts.temperature !== undefined) return {};
-  return CHAT_SAMPLING;
+  const model = opts.model && !["chat", "judge"].includes(opts.model) ? opts.model : getActiveChatEngineIdentity()?.model ?? undefined;
+  return chatSamplingOf(chatCatalogEntry(model));
 }
 
 /** The request body shared by complete() and its Stack-routed twin below

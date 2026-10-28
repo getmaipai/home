@@ -11,10 +11,10 @@ import type { ReplyPlan } from "@maipai/spec/gen/ts/reply-plan.js";
 import type { TurnSignal } from "@maipai/spec/gen/ts/turn-signal.js";
 
 export const QUESTION = "how does a prompt cache make a language model faster and why does that matter";
-// llama-server's own documented default (the retired turn engine's CHAT_SAMPLING
+// llama-server's own documented default (the retired turn engine's the chat record's sampling
 // comment: "plain chat used to run at llama-server's own default of
 // 0.8"); passed explicitly wherever a stage means "the engine's own
-// defaults" - llm.ts's chatSamplingFor() only applies CHAT_SAMPLING
+// defaults" - llm.ts's chatSamplingFor() only applies the chat record's sampling
 // when the caller leaves temperature unset, so this is the one real
 // way to opt a stage out of it through the real client.
 export const ENGINE_DEFAULT_TEMPERATURE = 0.8;

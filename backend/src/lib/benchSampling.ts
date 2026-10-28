@@ -4,8 +4,18 @@
 // is a real change, not dice. A process-level pin, because the bench
 // drives real turns through runTurnStream() and nothing threads a
 // per-call option from there down to llm.ts; the app never sets it
-// (production chat stays at CHAT_SAMPLING's 0.7 with no seed), and the
+// (production chat stays at its model record's sampling, 0.7 for the shipped models, with no seed), and the
 // (the judge) on every request.
+import { CATALOG } from "@/lib/modelCatalog";
+import { chatSamplingOf } from "@/lib/llmSampling";
+
+/** Bench-only: the sampling the first shipped chat record sends, for arms
+ * that state production's set explicitly. The app reads each model's own
+ * record (llm.ts); a bench arm names its model if it needs another's. */
+export function benchChatSampling(): Record<string, number> {
+  return chatSamplingOf(CATALOG.find((model) => model.role === "chat"));
+}
+
 let pinnedSeed: number | null = null;
 // The prompt's own clock ("Local time: ..." at the end of the context
 // message) moves every minute, so two runs seeded alike still sent

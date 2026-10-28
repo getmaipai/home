@@ -1,7 +1,7 @@
 // PARITY-BISECT-02's own pure stage-building logic (dev.md's
 // PARITY-BISECT-01 finding: the collapse happens entirely inside the
 // stable system prefix, before the tools block, the volatile message,
-// or CHAT_SAMPLING are ever added). Split from parity-bisect2.ts for
+// or the chat record's sampling are ever added). Split from parity-bisect2.ts for
 // the same reason parity-bisect-stages.ts is: no `import "./setup"` at
 // module scope, so a test can import buildStages2() directly.
 //
@@ -33,7 +33,7 @@ import { STABLE_SYSTEM_SUFFIX } from "./oldStableSuffix";
 
 export const QUESTION = "how does a prompt cache make a language model faster and why does that matter";
 // Matches PARITY-BISECT-01's own floor convention: the engine's own
-// documented default (llama-server's own 0.8), never CHAT_SAMPLING -
+// documented default (llama-server's own 0.8), never the chat record's sampling -
 // this bench isolates the prefix's own fragments, not sampling.
 export const ENGINE_DEFAULT_TEMPERATURE = 0.8;
 

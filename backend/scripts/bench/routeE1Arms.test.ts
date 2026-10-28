@@ -1,12 +1,12 @@
 import { describe, expect, test } from "bun:test";
-import { CHAT_SAMPLING } from "@/lib/llm";
+import { benchChatSampling } from "@/lib/benchSampling";
 import { isRouteE1Arm, routeE1ArmConfig } from "./routeE1Arms";
 
 describe("E1 Stack arm mapping", () => {
   test("maps the five registered arms to their model, sampling and thinking settings", () => {
     expect(routeE1ArmConfig("A0")).toEqual({
       arm: "A0", modelId: "qwen3-8b-instruct-q4-k-m", sampling: "chat", thinking: false,
-      thinkingBudgetTokens: 0, samplingParams: CHAT_SAMPLING,
+      thinkingBudgetTokens: 0, samplingParams: benchChatSampling(),
     });
     expect(routeE1ArmConfig("A0n")).toEqual({
       arm: "A0n", modelId: "qwen3-8b-instruct-q4-k-m", sampling: "nodrx", thinking: false,

@@ -23,7 +23,7 @@ import "../../../scripts/runTemp";
 //      formatting/length guidance for that prompt's surface class (see
 //      neutralReplySystem() in run() - STYLE-CORPUS-01b, 2026-09-28:
 //      identityLine() alone under-represented a real turn), thinking
-//      off, CHAT_SAMPLING (llm.ts's complete() applies it automatically
+//      off, the chat record's sampling (llm.ts's complete() applies it automatically
 //      whenever no temperature is given).
 //   3. The rewrite: a frontier model, given the companion's manifest
 //      fields (display_name, tagline, backstory, interests, the four

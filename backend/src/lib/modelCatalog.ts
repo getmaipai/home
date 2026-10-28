@@ -26,10 +26,29 @@ const OVERHEAD_BYTES = 0.7 * GB;
 // Fraction of the budget we're willing to fill (slack for fragmentation).
 const USABLE_FRACTION = 0.96;
 
+/** The sampling every chat model got before it lived in the record: llm.ts's
+ * former global constant, carried over unchanged so no request body moves.
+ * The temperature is the item's 0.7 (plain chat used to run at llama-server's
+ * own 0.8); the other six are llama.cpp's documented defaults for the three
+ * samplers, held with tools offered by the tool-calling bench at 10 repeats.
+ * Not measured per model: changing any value is its own change and needs
+ * rule 3's three measurements. */
+const FORMER_GLOBAL_SAMPLING = {
+  temperature: 0.7,
+  min_p: 0.05,
+  xtc_probability: 0.5,
+  xtc_threshold: 0.1,
+  dry_multiplier: 0.8,
+  dry_base: 1.75,
+  dry_allowed_length: 2,
+  source: "Home's former global sampling (llm.ts), not measured per model",
+} as const;
+
 export const CATALOG: ModelCapabilities[] = [
   ModelCapabilities.parse({
     id: "qwen3-8b-instruct-q4-k-m",
     role: "chat",
+    sampling: FORMER_GLOBAL_SAMPLING,
     label: "Qwen3 8B Instruct",
     license: "Apache-2.0",
     engine: "llama-server",
@@ -121,6 +140,7 @@ export const CATALOG: ModelCapabilities[] = [
   ModelCapabilities.parse({
     id: "muse-glimmer-30b-q4-k-xl",
     role: "chat",
+    sampling: FORMER_GLOBAL_SAMPLING,
     label: "Muse Glimmer 30B (Q4_K_XL)",
     license: "Apache-2.0",
     engine: "llama-server",
@@ -195,6 +215,7 @@ export const CATALOG: ModelCapabilities[] = [
   ModelCapabilities.parse({
     id: "muse-glimmer-30b-q4-k-m",
     role: "chat",
+    sampling: FORMER_GLOBAL_SAMPLING,
     label: "Muse Glimmer 30B (Q4_K_M)",
     license: "Apache-2.0",
     engine: "llama-server",
@@ -272,6 +293,7 @@ export const CATALOG: ModelCapabilities[] = [
   ModelCapabilities.parse({
     id: "qwen3-6-35b-a3b-ud-q4-k-xl",
     role: "chat",
+    sampling: FORMER_GLOBAL_SAMPLING,
     label: "Qwen3.6 35B A3B (Q4_K_XL)",
     license: "Apache-2.0",
     engine: "llama-server",
@@ -344,6 +366,7 @@ export const CATALOG: ModelCapabilities[] = [
   ModelCapabilities.parse({
     id: "qwen3-8-27b-huihui-abliterated-iq4-xs",
     role: "chat",
+    sampling: FORMER_GLOBAL_SAMPLING,
     label: "Qwen3.8 27B Uncensored (Huihui, IQ4_XS)",
     license: "Apache-2.0",
     engine: "llama-server",
@@ -408,6 +431,7 @@ export const CATALOG: ModelCapabilities[] = [
   ModelCapabilities.parse({
     id: "qwen3-vl-8b-instruct-q4-k-m",
     role: "chat",
+    sampling: FORMER_GLOBAL_SAMPLING,
     label: "Qwen3 VL 8B Instruct",
     license: "Apache-2.0",
     engine: "llama-server",

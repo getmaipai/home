@@ -1,4 +1,4 @@
-import { CHAT_SAMPLING } from "@/lib/llm";
+import { benchChatSampling } from "@/lib/benchSampling";
 
 export type RouteE1Arm = "A0" | "A0n" | "A2" | "A2n" | "A1";
 
@@ -24,7 +24,7 @@ export function routeE1ArmConfig(arm: RouteE1Arm): RouteE1ArmConfig {
     sampling,
     thinking,
     thinkingBudgetTokens: thinking ? 512 : 0,
-    samplingParams: sampling === "chat" ? { ...CHAT_SAMPLING } : { temperature: 0.7, min_p: 0.05 },
+    samplingParams: sampling === "chat" ? { ...benchChatSampling() } : { temperature: 0.7, min_p: 0.05 },
   };
 }
 

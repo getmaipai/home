@@ -112,7 +112,8 @@ import { identityLine } from "@/lib/turnShared";
 import { runTurnNext } from "@/lib/turnMachine/turnNext";
 import { createConversation } from "@/lib/conversationHistory";
 import { deleteEpisodesForPerson } from "@/lib/episodes";
-import { CHAT_SAMPLING, complete } from "@/lib/llm";
+import { complete } from "@/lib/llm";
+import { benchChatSampling } from "@/lib/benchSampling";
 import { COMPOSE_FAILURE_LINE } from "@/lib/composer";
 import { extractModelText } from "./recordingProxy";
 import { replyShape, splitFrame } from "../voice/corpus";
@@ -368,7 +369,7 @@ function extractFullMeta(raw: string): FullMeta {
 /** Every scored measurement (A, B's own seeds 2-3, C, D, E) goes through
  * this one function, direct against the real engine (UPSTREAM_CHAT_URL,
  * never the capture proxy) - the same reason A/D's sampling matches
- * production exactly (CHAT_SAMPLING, spread verbatim) rather than
+ * production exactly (the chat record's sampling, spread verbatim) rather than
  * llama-server's own bare defaults, which a live check against this
  * pinned build found genuinely pathological (near-empty completions) on
  * a plain, unsampled request. */
@@ -418,7 +419,7 @@ function baseBody(messages: { role: string; content: string }[], seed: number): 
   return {
     model: "chat",
     messages,
-    ...CHAT_SAMPLING,
+    ...benchChatSampling(),
     seed,
     max_tokens: MAX_TOKENS_CAP,
     chat_template_kwargs: { enable_thinking: false },

@@ -5,7 +5,7 @@ import { __resetThrottleForTests } from "@/lib/secretThrottle";
 import { __resetLlmSupervisorForTests } from "@/lib/llmSupervisor";
 import * as llmSupervisor from "@/lib/llmSupervisor";
 import { __resetRateLimiterForTests } from "@/lib/rateLimiter";
-import { complete, startCompleteStream, embed, envelopeToolCall, PERSON_TURN_BUDGET, type ToolSpec, type ToolCall, CHAT_SAMPLING } from "@/lib/llm";
+import { complete, startCompleteStream, embed, envelopeToolCall, PERSON_TURN_BUDGET, type ToolSpec, type ToolCall } from "@/lib/llm";
 import { clampMaxTokens } from "@/routes/llm";
 import type { ChatCompletionRequest } from "@maipai/spec/llm/ts/types.js";
 import { setHouseholdSettingValue } from "@/lib/settings";
@@ -373,24 +373,44 @@ describe("lib/llm.ts chat sampling (FAST-06)", () => {
     return capturedRequest!;
   }
 
+  // MODEL-ADD-01 S3: the numbers llm.ts's global constant sent before sampling moved into the records.
+  const SHIPPED_ID = "qwen3-8b-instruct-q4-k-m";
+  const FORMER_SET = { temperature: 0.7, min_p: 0.05, xtc_probability: 0.5, xtc_threshold: 0.1, dry_multiplier: 0.8, dry_base: 1.75, dry_allowed_length: 2 } as const;
+
+  test("every shipped chat model's request body carries exactly the set the global constant sent", async () => {
+    const { CATALOG } = await import("@/lib/modelCatalog");
+    const ids = CATALOG.filter((model) => model.role === "chat").map((model) => model.id);
+    expect(ids.length).toBeGreaterThan(0);
+    for (const id of ids) {
+      const request = await capture(() => complete("chat", [{ role: "user", content: "hi" }], { model: id }));
+      for (const [key, value] of Object.entries(FORMER_SET)) expect((request as unknown as Record<string, unknown>)[key]).toBe(value);
+      for (const key of ["top_p", "top_k", "presence_penalty"]) expect((request as unknown as Record<string, unknown>)[key]).toBeUndefined();
+    }
+  });
+
+  test("a model with no record sends no sampling keys and keeps the engine's defaults", async () => {
+    const request = await capture(() => complete("chat", [{ role: "user", content: "hi" }], { model: "not-in-any-catalog" }));
+    for (const key of [...Object.keys(FORMER_SET), "top_p", "top_k", "presence_penalty"]) expect((request as unknown as Record<string, unknown>)[key]).toBeUndefined();
+  });
+
   test("a plain chat request carries all seven sampler fields", async () => {
-    const request = await capture(() => complete("chat", [{ role: "user", content: "good morning" }]));
-    expect(request.temperature).toBe(CHAT_SAMPLING.temperature);
-    expect(request.min_p).toBe(CHAT_SAMPLING.min_p);
-    expect(request.xtc_probability).toBe(CHAT_SAMPLING.xtc_probability);
-    expect(request.xtc_threshold).toBe(CHAT_SAMPLING.xtc_threshold);
-    expect(request.dry_multiplier).toBe(CHAT_SAMPLING.dry_multiplier);
-    expect(request.dry_base).toBe(CHAT_SAMPLING.dry_base);
-    expect(request.dry_allowed_length).toBe(CHAT_SAMPLING.dry_allowed_length);
+    const request = await capture(() => complete("chat", [{ role: "user", content: "good morning" }], { model: SHIPPED_ID }));
+    expect(request.temperature).toBe(FORMER_SET.temperature);
+    expect(request.min_p).toBe(FORMER_SET.min_p);
+    expect(request.xtc_probability).toBe(FORMER_SET.xtc_probability);
+    expect(request.xtc_threshold).toBe(FORMER_SET.xtc_threshold);
+    expect(request.dry_multiplier).toBe(FORMER_SET.dry_multiplier);
+    expect(request.dry_base).toBe(FORMER_SET.dry_base);
+    expect(request.dry_allowed_length).toBe(FORMER_SET.dry_allowed_length);
   });
 
   test("a streamed plain chat request carries them too", async () => {
     const request = await capture(async () => {
-      const started = await startCompleteStream("chat", [{ role: "user", content: "good morning" }]);
+      const started = await startCompleteStream("chat", [{ role: "user", content: "good morning" }], { model: SHIPPED_ID });
       if (started.ok) for await (const _delta of started.tokens) void _delta;
     });
-    expect(request.min_p).toBe(CHAT_SAMPLING.min_p);
-    expect(request.dry_multiplier).toBe(CHAT_SAMPLING.dry_multiplier);
+    expect(request.min_p).toBe(FORMER_SET.min_p);
+    expect(request.dry_multiplier).toBe(FORMER_SET.dry_multiplier);
   });
 
   test("a json_schema request carries none of them", async () => {
@@ -406,9 +426,9 @@ describe("lib/llm.ts chat sampling (FAST-06)", () => {
   });
 
   test("an explicit `temperature: undefined` (routes/llm.ts's shape) still gets the set, temperature included", async () => {
-    const request = await capture(() => complete("chat", [{ role: "user", content: "hi" }], { temperature: undefined, max_tokens: 64 }));
-    expect(request.temperature).toBe(CHAT_SAMPLING.temperature);
-    expect(request.min_p).toBe(CHAT_SAMPLING.min_p);
+    const request = await capture(() => complete("chat", [{ role: "user", content: "hi" }], { temperature: undefined, max_tokens: 64, model: SHIPPED_ID }));
+    expect(request.temperature).toBe(FORMER_SET.temperature);
+    expect(request.min_p).toBe(FORMER_SET.min_p);
     expect(request.max_tokens).toBe(64);
   });
 
@@ -426,19 +446,19 @@ describe("lib/llm.ts chat sampling (FAST-06)", () => {
   test("no seed unless the bench pins one; the pin rides on plain and streamed requests and comes off with null", async () => {
     const { __setSamplingSeedForBench } = await import("@/lib/benchSampling");
     try {
-      const plain = await capture(() => complete("chat", [{ role: "user", content: "hi" }]));
+      const plain = await capture(() => complete("chat", [{ role: "user", content: "hi" }], { model: SHIPPED_ID }));
       expect(plain.seed).toBeUndefined();
       __setSamplingSeedForBench(20260913);
-      const pinned = await capture(() => complete("chat", [{ role: "user", content: "hi" }]));
+      const pinned = await capture(() => complete("chat", [{ role: "user", content: "hi" }], { model: SHIPPED_ID }));
       expect(pinned.seed).toBe(20260913);
-      expect(pinned.temperature).toBe(CHAT_SAMPLING.temperature); // the samplers stay; only the dice are fixed
+      expect(pinned.temperature).toBe(FORMER_SET.temperature); // the samplers stay; only the dice are fixed
       const streamed = await capture(async () => {
-        const started = await startCompleteStream("chat", [{ role: "user", content: "hi" }]);
+        const started = await startCompleteStream("chat", [{ role: "user", content: "hi" }], { model: SHIPPED_ID });
         if (started.ok) for await (const _delta of started.tokens) void _delta;
       });
       expect(streamed.seed).toBe(20260913);
       __setSamplingSeedForBench(null);
-      const unpinned = await capture(() => complete("chat", [{ role: "user", content: "hi" }]));
+      const unpinned = await capture(() => complete("chat", [{ role: "user", content: "hi" }], { model: SHIPPED_ID }));
       expect(unpinned.seed).toBeUndefined();
     } finally {
       __setSamplingSeedForBench(null);

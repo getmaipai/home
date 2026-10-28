@@ -46,7 +46,7 @@ import { DEFAULT_PERSONA } from "@/lib/persona";
 import { fallbackSignal } from "@/lib/turnSignal";
 import { planFor, type PlanInput } from "@/lib/register";
 import { countTokens } from "@/lib/tokenCount";
-import { CHAT_SAMPLING } from "@/lib/llm";
+import { benchChatSampling } from "@/lib/benchSampling";
 import { mkdirSync, writeFileSync } from "node:fs";
 import { scoreRun } from "./freshScore";
 import { hashValue } from "./routeStats";
@@ -249,7 +249,7 @@ async function routeDecisionPass(): Promise<{ executed: number; engine: string }
   const repeats = Number.isInteger(requested) && requested > 0 ? requested : 5;
   const sampling = stackArm?.sampling ?? process.env.MAIPAI_BENCH_SAMPLING ?? "chat";
   if (!["chat", "nodrx", "greedy"].includes(sampling)) throw new Error("MAIPAI_BENCH_SAMPLING must be chat, nodrx or greedy");
-  const samplingParams = stackArm?.samplingParams ?? (sampling === "chat" ? CHAT_SAMPLING : sampling === "nodrx" ? { temperature: 0.7, min_p: 0.05 } : { temperature: 0 });
+  const samplingParams = stackArm?.samplingParams ?? (sampling === "chat" ? benchChatSampling() : sampling === "nodrx" ? { temperature: 0.7, min_p: 0.05 } : { temperature: 0 });
   const thinking = stackArm?.thinking ?? process.env.MAIPAI_BENCH_THINKING === "on";
   const schema = process.env.MAIPAI_BENCH_WEBSEARCH_SCHEMA ?? "current";
   if (!["current", "query"].includes(schema)) throw new Error("MAIPAI_BENCH_WEBSEARCH_SCHEMA must be current or query");

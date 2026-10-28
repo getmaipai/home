@@ -83,7 +83,7 @@ describe("parity-bisect-stages: buildStages()", () => {
     expect(stage4.messages).toEqual(stage3.messages);
   });
 
-  test("stage 5 drops the explicit temperature (lets CHAT_SAMPLING apply), stage 3 keeps it", () => {
+  test("stage 5 drops the explicit temperature (lets the chat record's sampling apply), stage 3 keeps it", () => {
     const stages = buildStages(DEFAULT_PERSONA, plan, signal, TOOLS);
     const stage3 = stages.find((s) => s.name === "3-plus-volatile")!;
     const stage5 = stages.find((s) => s.name === "5-chat-sampling")!;

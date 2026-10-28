@@ -285,7 +285,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/backup.ts` | cleanupStaleSnapshots, listBackups, runBackup, restoreBackup, pruneBackups, getBackupHealth |
 | `backend/src/lib/backupCrypto.ts` | BACKUP_KEY_NAME, encryptFile, decryptFile |
 | `backend/src/lib/backupTargets.ts` | getSmbTarget, setSmbTarget, removeSmbTarget |
-| `backend/src/lib/benchSampling.ts` | seedFields, __setSamplingSeedForBench, promptNow, __setPromptClockForBench |
+| `backend/src/lib/benchSampling.ts` | benchChatSampling, seedFields, __setSamplingSeedForBench, promptNow, __setPromptClockForBench |
 | `backend/src/lib/biometricPrints.ts` | createBiometricPrint, enrollBiometricPrints, listBiometricPrints, decryptBiometricPrintEmbedding, deleteBiometricPrint, visionWatchOf |
 | `backend/src/lib/blocklists/blockViewer.ts` | runAsBlockViewer, currentBlockViewer |
 | `backend/src/lib/blocklists/customHosts.ts` | HOSTS_DENY_KEY, HOSTS_ALLOW_KEY, MAX_CUSTOM_HOSTS, parseHostEntries, validateCustomHosts, customHostRules |
@@ -445,6 +445,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/lists.ts` | listLists, getList, createList, findOrCreateStandingList, updateList, deleteList |
 | `backend/src/lib/liveView.ts` | LIVE_VIEW_MAX_MS, LIVE_VIEW_ATTACH_GRACE_MS, LIVE_VIEW_MAX_FRAME_BYTES, liveViewAdmits, getLiveView, startLiveView |
 | `backend/src/lib/llm.ts` | PERSON_TURN_BUDGET, EPHEMERAL_TURN_BUDGET, personWithinTurnBudget, personWithinEphemeralBudget, toToolDefinition, envelopeToolCall |
+| `backend/src/lib/llmSampling.ts` | chatSamplingOf |
 | `backend/src/lib/llmSupervisor.ts` | __setBlockedPortRetryForTests, __setBlockedPortRetryIntervalForTests, startBlockedPortRetryForTests, setWarmupPrompt, sweepOrphanEngineProcesses, reportChatBackendUnreachable |
 | `backend/src/lib/localStackService.ts` | HOME_STACK_PORT, installRoot, stopLocalStackService, startLocalStackService, __setStackServiceRunnerForTests |
 | `backend/src/lib/log.ts` | appendLogLine, installConsoleFileMirror, installFatalErrorHandlers |

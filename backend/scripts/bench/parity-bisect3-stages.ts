@@ -25,7 +25,7 @@ import { STABLE_SYSTEM_SUFFIX_SENTENCES } from "./oldStableSuffix";
 
 export const QUESTION = "how does a prompt cache make a language model faster and why does that matter";
 // Matches BISECT-01/02's own floor convention: the engine's own
-// documented default (llama-server's own 0.8), never CHAT_SAMPLING.
+// documented default (llama-server's own 0.8), never the chat record's sampling.
 export const ENGINE_DEFAULT_TEMPERATURE = 0.8;
 
 export interface Stage3 {

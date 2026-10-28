@@ -9,7 +9,7 @@ import { planFor, planLineForTurnMachine } from "@/lib/register";
 import { fallbackSignal } from "@/lib/turnSignal";
 import { contextToMessages } from "@/lib/turnMachine/messages";
 import type { ContextItem } from "@/lib/turnMachine/contract";
-import { CHAT_SAMPLING } from "@/lib/llm";
+import { benchChatSampling } from "@/lib/benchSampling";
 import type { TurnSignal } from "@maipai/spec/gen/ts/turn-signal.js";
 
 const URL_BASE = (process.env.MAIPAI_STACK_URL ?? "http://127.0.0.1:8770").replace(/\/$/, "");
@@ -54,7 +54,7 @@ function planLine(variant: string, base: string): string {
 const item = (id: string, text: string, source: ContextItem["source"]): ContextItem => ({ id, text, source, subjects: [], disclosure: "child_ok" });
 
 async function ask(messages: unknown[]): Promise<string> {
-  const res = await fetch(`${URL_BASE}/v1/chat/completions`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ model: "chat", messages, stream: false, max_tokens: 160, chat_template_kwargs: { enable_thinking: false }, ...CHAT_SAMPLING }) });
+  const res = await fetch(`${URL_BASE}/v1/chat/completions`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ model: "chat", messages, stream: false, max_tokens: 160, chat_template_kwargs: { enable_thinking: false }, ...benchChatSampling() }) });
   if (!res.ok) throw new Error(`stack ${res.status}`);
   const body = (await res.json()) as { choices: { message: { content?: string } }[] };
   return (body.choices[0]?.message.content ?? "").trim();

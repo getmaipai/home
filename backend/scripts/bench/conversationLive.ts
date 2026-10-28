@@ -38,7 +38,7 @@ const { CONVERSATIONS } = await import("./conversationFixture");
 const { runJudgeBatch } = await import("@/lib/memoryJudge");
 const { __setTurnActivityClockForTests } = await import("@/lib/turnActivity");
 const { resolveTurnBudget } = await import("@/lib/turnMachine/budget");
-const { CHAT_SAMPLING } = await import("@/lib/llm");
+const { benchChatSampling } = await import("@/lib/benchSampling");
 const { __setSamplingSeedForBench, __setPromptClockForBench } = await import("@/lib/benchSampling");
 
 // BENCH-01 (docs/plans/baseline-fixes-2026-09-13.md item 5): the
@@ -181,7 +181,7 @@ async function main(): Promise<{ executed: number; engine: string }> {
     judge: await engineLine(process.env.MAIPAI_BACKGROUND_URL!, background),
     embed: await engineLine(process.env.MAIPAI_EMBED_URL!, embed),
     sampling: {
-      hub: CHAT_SAMPLING,
+      hub: benchChatSampling(),
       engineDefaults: chat.default_generation_settings?.params ?? {},
       // The pinned seed, on every chat and judge request of this run;
       // two runs with the same seed on the same commit are expected to

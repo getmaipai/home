@@ -221,7 +221,7 @@ process.env.MAIPAI_EMBED_URL = process.env.MAIPAI_LLAMA_SERVER_URL;
 
 const setup = await import("./setup");
 const runner = await import("./conversationRunner");
-const { CHAT_SAMPLING } = await import("@/lib/llm");
+const { benchChatSampling } = await import("@/lib/benchSampling");
 const { setHouseholdSettingValue } = await import("@/lib/settings");
 const { effectiveMode } = await import("@/lib/retrieval/sourceMode");
 
@@ -263,7 +263,7 @@ async function bareTurn(prompt: string): Promise<{ reply: string; error: string 
   let reply = "";
   let firstWordMs: number | null = null;
   try {
-    const res = await fetch(`${chatUrl}/v1/chat/completions`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ model: "chat", messages: [{ role: "user", content: prompt }], max_tokens: 1536, stream: true, chat_template_kwargs: { enable_thinking: false }, ...CHAT_SAMPLING }), signal: AbortSignal.timeout(300_000) });
+    const res = await fetch(`${chatUrl}/v1/chat/completions`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ model: "chat", messages: [{ role: "user", content: prompt }], max_tokens: 1536, stream: true, chat_template_kwargs: { enable_thinking: false }, ...benchChatSampling() }), signal: AbortSignal.timeout(300_000) });
     if (!res.ok || !res.body) return { reply, error: `HTTP ${res.status}`, firstWordMs, totalMs: performance.now() - t0 };
     const reader = res.body.getReader();
     const decoder = new TextDecoder();
@@ -320,7 +320,7 @@ async function main(): Promise<void> {
     toolsBlockState: "THIN-Q3 NOT landed: the full tools block rides every adult turn",
     arms: ARMS, reps: REPS, bands: [...BANDS], rows: selected.length,
     thinking: "off (turn path sends thinking false; bare arm sends enable_thinking false)",
-    chatSampling: CHAT_SAMPLING,
+    chatSampling: benchChatSampling(),
     search: "loopback fixture rows only (fixtureSearch.ts); live Wikipedia fallback pointed at an empty loopback server; embed refused at once",
     library: "no ZIM installed in the throwaway backend: scope reference finds nothing here",
     hub: "throwaway seeded backend in a fresh OS-temp data directory, two invented bench people",

@@ -208,7 +208,7 @@ export const INFORMATION_HANDLING_POLICY = [
   // FAST-06 (2026-09-12): the third sentence, "Never say the same thing
   // the same way twice: vary how you open a reply and how you phrase
   // something you've already said earlier in the conversation", is
-  // gone. Variety is the sampler's job now (llm.ts's CHAT_SAMPLING:
+  // gone. Variety is the sampler's job now (each chat record's sampling:
   // min-p, XTC and DRY), which is cheaper, more predictable, and does
   // not spend a prompt sentence asking a small model to police itself.
 ].join(" ");
