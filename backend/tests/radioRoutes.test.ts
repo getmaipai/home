@@ -200,6 +200,15 @@ describe("radio dashboard scopes", () => {
     expect(urls).toEqual([]);
   });
 
+  test("pasted stream address offers add only to an adult", async () => {
+    const { client } = await owner();
+    const teenClient = await teen(client);
+    const { client: childClient } = await child(client);
+    expect(((await (await client.post("/api/plugins/music/data/radio", { scope: "directory", q: "https://stream.example.com/live.mp3" })).json()) as Array<{ title: string }>)[0]?.title).toBe("Add this address");
+    expect(await (await teenClient.post("/api/plugins/music/data/radio", { scope: "directory", q: "https://stream.example.com/live.mp3" })).json()).toEqual([]);
+    expect(await childClient.post("/api/plugins/music/data/radio", { scope: "directory", q: "https://stream.example.com/live.mp3" }).then((r) => r.json())).toEqual([]);
+  });
+
   test("blank directory shelf is empty without a lookup; typed directory search still works", async () => {
     on();
     const { client } = await owner();

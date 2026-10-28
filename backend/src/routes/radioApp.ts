@@ -9,7 +9,9 @@ import { mediaBandOf } from "@/lib/media/band";
 import { addStation, directoryRowsFor, listSavedStations, removeStation, savedStationFor, type SavedStation } from "@/lib/media/radio";
 import { nowPlayingOf, openStationStream, type StreamDeps } from "@/lib/media/radioStream";
 import { decodeHlsResource, openHlsResource } from "@/lib/media/radioHls";
-import { findStations, radioDirectoryAllowed, radioDirectoryHasFavicon, type DirectoryStation } from "@/lib/media/radioDirectory";
+import { findStations, radioDirectoryAllowed, radioDirectoryHasFavicon, rememberPreviewStations, previewStationFor, type DirectoryStation } from "@/lib/media/radioDirectory";
+import { checkFeedAddress } from "@/lib/shelf/feedAddresses";
+import { assertNotPrivateHost } from "@maipai/core/src/ssrfGuard";
 import { fetchRadioArt } from "@/lib/media/radioArt";
 import { MINOR_QUERY_PERSONAL_NOTE, minorQueryHit } from "@/lib/retrieval/minorQueryCheck";
 import { getHouseholdSettingValue } from "@/lib/settings";
@@ -40,7 +42,7 @@ export const radioGenreRows = () => GENRES.map((genre) => ({ id: genre, label: g
 const subtitleOf = (station: { country_code: string | null; tags: string[] }): string =>
   [countryName(station.country_code), station.tags.slice(0, 2).join(", ")].filter(Boolean).join(" · ");
 
-export type RadioRow = { id: string; kind: "station"; title: string; summary: string; thumbnail: string | null; url: string; favicon: string; tags_csv: string; country_code: string; codec: string; bitrate_kbps: string; action_label: string };
+export type RadioRow = { id: string; kind: "station"; title: string; summary: string; thumbnail: string | null; url: string; preview_url?: string; favicon: string; tags_csv: string; country_code: string; codec: string; bitrate_kbps: string; action_label: string };
 const rowOf = (station: DirectoryStation | SavedStation, label: string): RadioRow => ({
   id: station.id, kind: "station", title: station.name, summary: [subtitleOf(station), station.bitrate_kbps ? `${station.bitrate_kbps} kbps` : "", station.codec?.toUpperCase() ?? ""].filter(Boolean).join(" · "), thumbnail: station.favicon ? `/api/plugins/music/radio/art?u=${encodeURIComponent(station.favicon)}` : station.favicon === null ? `/api/favicon?domain=${encodeURIComponent(new URL(station.url).hostname)}` : null, url: station.url, favicon: station.favicon ?? "", tags_csv: station.tags.join(","),
   country_code: station.country_code ?? "", codec: station.codec ?? "", bitrate_kbps: station.bitrate_kbps === null ? "" : String(station.bitrate_kbps), action_label: label,
@@ -58,6 +60,13 @@ const SCOPE_QUERY: Partial<Record<RadioScope, { kind: "popular" } | { kind: "sea
 };
 export async function radioDirectoryRows(person: PersonRow, query: { q: string; country: string; tag: string; scope?: RadioScope }): Promise<RadioRow[]> {
   const band = mediaBandOf(person);
+  if (/^https?:\/\//i.test(query.q.trim())) {
+    const band = mediaBandOf(person);
+    if (band !== "adult") return [];
+    const checked = checkFeedAddress(query.q.trim());
+    if (!checked.ok) return [];
+    return [{ id: "address", kind: "station", title: "Add this address", summary: checked.url, thumbnail: null, url: checked.url, favicon: "", tags_csv: "", country_code: "", codec: "", bitrate_kbps: "", action_label: "Add" }];
+  }
   if (!radioDirectoryAllowed({ band }, getHouseholdSettingValue("radio.directory.enabled") === true)) return [];
   const any = (value: string) => (value === "all" ? "" : value.trim());
   const scopeQuery = query.scope && query.scope !== "directory" ? SCOPE_QUERY[query.scope] : undefined;
@@ -65,7 +74,9 @@ export async function radioDirectoryRows(person: PersonRow, query: { q: string; 
   if (minorQueryHit([name, tag].filter(Boolean).join(" "), band)) return [];
   if (query.scope === "directory" && name === "" && country === "" && tag === "") return [];
   const result = scopeQuery ? await findStations(scopeQuery) : name === "" && country === "" && tag === "" ? await findStations({ kind: "popular" }) : await findStations({ kind: "search", name, country, tag });
-  return result.ok ? directoryRowsFor(person, result.stations).map((station) => rowOf(station, station.added ? "Added" : "Add")) : [];
+  if (!result.ok) return [];
+  rememberPreviewStations("household", result.stations);
+  return directoryRowsFor(person, result.stations).map((station) => ({ ...rowOf(station, station.added ? "Added" : "Add"), preview_url: `/api/plugins/music/radio/preview/${encodeURIComponent(station.id)}` }));
 }
 
 let streamDeps: StreamDeps = {};
@@ -85,6 +96,7 @@ export function radioRoutes() {
     const { person, allowed } = gate(c);
     if (!allowed) return c.json({ error: NOT_ON }, 403);
     const result = await findStations({ kind: "popular" });
+    if (result.ok) rememberPreviewStations("household", result.stations);
     return result.ok ? c.json({ ok: true as const, stations: directoryRowsFor(person, result.stations) }, 200) : c.json({ error: result.error }, result.status);
   });
 
@@ -96,8 +108,15 @@ export function radioRoutes() {
     const name = (c.req.query("q") ?? "").trim();
     const country = (c.req.query("country") ?? "").trim();
     const tag = (c.req.query("tag") ?? "").trim();
+    if (/^https?:\/\//i.test(name)) {
+      if (band !== "adult") return c.json({ ok: true as const, stations: [] }, 200);
+      const checked = checkFeedAddress(name);
+      if (!checked.ok) return c.json({ ok: true as const, stations: [] }, 200);
+      return c.json({ ok: true as const, stations: [{ id: "address", name: "Add this address", url: checked.url, tags: [], favicon: null }] }, 200);
+    }
     if (minorQueryHit([name, tag].filter(Boolean).join(" "), band)) return c.json({ ok: true as const, stations: [], note: MINOR_QUERY_PERSONAL_NOTE }, 200);
     const result = await findStations({ kind: "search", name, country, tag });
+    if (result.ok) rememberPreviewStations("household", result.stations);
     return result.ok ? c.json({ ok: true as const, stations: directoryRowsFor(person, result.stations) }, 200) : c.json({ error: result.error }, result.status);
   });
 
@@ -115,6 +134,12 @@ export function radioRoutes() {
     // Adding a directory row is part of the directory: the same switch and band decide. Adding by name and address is not a lookup,
     // so it needs no switch, but a child still cannot do it (a parent names the child as the target).
     if (fromDirectory && !gate(c).allowed) return c.json({ error: NOT_ON }, 403);
+    if (!fromDirectory && !body.for_person_id && str(body.name) === "Add this address") {
+      if (mediaBandOf(person) !== "adult") return c.json({ error: "Only an adult can add a station by address." }, 403);
+      const checked = checkFeedAddress(str(body.url));
+      if (!checked.ok) return c.json({ error: "Use a public https stream address." }, 400);
+      try { await assertNotPrivateHost(new URL(checked.url).hostname); } catch { return c.json({ error: "That station address points to a private device, so it cannot be added." }, 400); }
+    }
     const result = addStation(person, {
       name: str(body.name), url: str(body.url), favicon: typeof body.favicon === "string" && body.favicon !== "" ? body.favicon : null, tags: Array.isArray(body.tags) ? (body.tags as string[]) : typeof body.tags === "string" ? body.tags.split(",") : [],
       country_code: typeof body.country_code === "string" && body.country_code !== "" ? body.country_code : null, codec: typeof body.codec === "string" && body.codec !== "" ? body.codec : null,
@@ -135,6 +160,26 @@ export function radioRoutes() {
       return opened.ok ? opened.response : c.json({ error: opened.error }, opened.status);
     }
     const opened = await openStationStream(person.id, station, streamDeps, c.req.raw.signal);
+    return opened.ok ? opened.response : c.json({ error: opened.error }, opened.status);
+  });
+
+  routes.get("/preview/:id", requireAuth, async (c, next) => {
+    const person = c.get("person");
+    if (!mediaAppAllowed(person, "music")) return next();
+    if (!radioDirectoryAllowed({ band: mediaBandOf(person) }, getHouseholdSettingValue("radio.directory.enabled") === true)) return c.json({ error: NOT_ON }, 403);
+    const station = previewStationFor("household", c.req.param("id"));
+    if (!station || (mediaBandOf(person) !== "adult" && /adult|porn|xxx|erotic/i.test(station.tags.join(" ")))) return c.json({ error: "That preview is no longer available. Find the station again." }, 404);
+    const opened = await openStationStream(person.id, { ...station, for_person_id: null, added_by_person_id: null }, streamDeps, c.req.raw.signal);
+    return opened.ok ? opened.response : c.json({ error: opened.error }, opened.status);
+  });
+  routes.post("/preview", requireAuth, async (c, next) => {
+    const person = c.get("person");
+    if (!mediaAppAllowed(person, "music")) return next();
+    if (!radioDirectoryAllowed({ band: mediaBandOf(person) }, getHouseholdSettingValue("radio.directory.enabled") === true)) return c.json({ error: NOT_ON }, 403);
+    const id = str((await bodyOf(c)).id);
+    const station = previewStationFor("household", id);
+    if (!station || (mediaBandOf(person) !== "adult" && /adult|porn|xxx|erotic/i.test(station.tags.join(" ")))) return c.json({ error: "That preview is no longer available. Find the station again." }, 404);
+    const opened = await openStationStream(person.id, { ...station, for_person_id: null, added_by_person_id: null }, streamDeps, c.req.raw.signal);
     return opened.ok ? opened.response : c.json({ error: opened.error }, opened.status);
   });
 

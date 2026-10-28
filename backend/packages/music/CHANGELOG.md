@@ -2,6 +2,13 @@
 
 All notable changes to the Music package, in [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) format.
 
+## [0.3.5] - 2026-10-28
+
+### Added
+
+- Add public HTTPS radio streams by address and preview directory stations before saving.
+- Keep preview access short-lived and apply the radio age, privacy and stream limits.
+
 ## [0.3.4] - 2026-10-28
 
 ### Changed

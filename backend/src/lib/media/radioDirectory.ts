@@ -29,9 +29,19 @@ const CACHE_MS = 5 * 60 * 1000;
 const cache = new Map<string, { expiresAt: number; stations: DirectoryStation[] }>();
 const inFlight = new Map<string, Promise<RadioResult>>();
 const knownFaviconAddresses = new Set<string>();
+// A directory result is short-lived authority to preview that exact station, scoped to its household.
+const previewable = new Map<string, { expiresAt: number; stations: Map<string, DirectoryStation> }>();
 
 let pausedUntil = 0;
-export function __resetRadioDirectoryForTests(): void { pausedUntil = 0; cache.clear(); inFlight.clear(); knownFaviconAddresses.clear(); }
+export function __resetRadioDirectoryForTests(): void { pausedUntil = 0; cache.clear(); inFlight.clear(); knownFaviconAddresses.clear(); previewable.clear(); }
+export function rememberPreviewStations(householdId: string, stations: readonly DirectoryStation[], now = Date.now()): void {
+  previewable.set(householdId, { expiresAt: now + 10 * 60_000, stations: new Map(stations.map((station) => [station.id, station])) });
+}
+export function previewStationFor(householdId: string, id: string, now = Date.now()): DirectoryStation | null {
+  const entry = previewable.get(householdId);
+  if (!entry || entry.expiresAt <= now) { previewable.delete(householdId); return null; }
+  return entry.stations.get(id) ?? null;
+}
 export function radioDirectoryHasFavicon(address: string): boolean { return knownFaviconAddresses.has(address); }
 export function __rememberRadioFaviconForTests(address: string): void { knownFaviconAddresses.add(address); }
 
@@ -102,6 +112,7 @@ async function fetchStations(query: RadioQuery, deps: RadioDeps, now: number, ke
       const body = await response.json();
       if (!Array.isArray(body)) continue;
       const stations = (body as Array<Record<string, unknown>>).map(stationOf).filter((station): station is DirectoryStation => station !== null);
+      // The route binds the result to the calling household immediately after this lookup.
       for (const station of stations) if (station.favicon) knownFaviconAddresses.add(station.favicon);
       cache.set(key, { expiresAt: now + CACHE_MS, stations });
       return { ok: true, stations };
