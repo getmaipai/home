@@ -44,9 +44,17 @@ else
   else
     [[ "$INSTALLED" == "$LATEST" ]] || { echo "The live hub ($INSTALLED) is not on the latest tag ($LATEST): someone tagged without installing. Install $LATEST first with --install $LATEST, or ask the owner." >&2; exit 1; }
   fi
-  [[ -n "$(git log "$LATEST..origin/main" --oneline | head -1)" ]] || { echo "origin/main has no commits after $LATEST; nothing to release." >&2; exit 1; }
-  IFS=. read -r MA MI PA <<< "${LATEST#v}"; TAG="v$MA.$MI.$((PA + 1))"
-  git ls-remote --tags origin "$TAG" | grep -q . && { echo "$TAG already exists on origin (another session tagged it). Fetch tags and start over." >&2; exit 1; }
+  if [[ -z "$(git log "$LATEST..origin/main" --oneline | head -1)" ]]; then
+    # A tag pushed from another machine (the Studio holds no push credential) and not yet installed: install it, tag nothing.
+    if [[ "$INSTALLED" == sha-* ]] && ! git merge-base --is-ancestor "$LATEST" "${INSTALLED#sha-}" 2>/dev/null && git merge-base --is-ancestor "${INSTALLED#sha-}" "$LATEST" 2>/dev/null; then
+      INSTALL="$LATEST"; TAG="$LATEST"
+    else
+      echo "origin/main has no commits after $LATEST; nothing to release." >&2; exit 1
+    fi
+  else
+    IFS=. read -r MA MI PA <<< "${LATEST#v}"; TAG="v$MA.$MI.$((PA + 1))"
+    git ls-remote --tags origin "$TAG" | grep -q . && { echo "$TAG already exists on origin (another session tagged it). Fetch tags and start over." >&2; exit 1; }
+  fi
 fi
 if [[ "$INSTALLED" != none && "$INSTALLED" != sha-* && "$(version_key "$TAG")" < "$(version_key "$INSTALLED")" && "$DOWNGRADE" != 1 ]]; then
   echo "$TAG is older than the live hub ($INSTALLED): that is a downgrade. Pass --allow-downgrade only if the owner asked for one." >&2; exit 1
