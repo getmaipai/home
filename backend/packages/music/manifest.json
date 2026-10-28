@@ -1,6 +1,6 @@
 {
   "id": "music",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "kind": "plugin",
   "category": "Media",
   "display": "Music",
@@ -148,6 +148,35 @@
         "module": "liked"
       },
       {
+        "id": "radio",
+        "label": "Radio",
+        "icon": "headphones",
+        "nav": true,
+        "kind": "schema",
+        "module": "radio",
+        "keywords": [
+          "radio",
+          "station",
+          "stations",
+          "live radio"
+        ]
+      },
+      {
+        "id": "radio-find",
+        "label": "Find stations",
+        "icon": "search",
+        "nav": true,
+        "kind": "schema",
+        "module": "radio-find",
+        "min_role": "teen",
+        "keywords": [
+          "find radio",
+          "add station",
+          "radio stations",
+          "discover"
+        ]
+      },
+      {
         "id": "play",
         "label": "Now playing",
         "icon": "music",
@@ -218,7 +247,7 @@
         "rows": "list"
       },
       {
-        "id": "playlist-new",
+        "id": "radio",
         "rows": "list"
       }
     ],

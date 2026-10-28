@@ -1062,6 +1062,7 @@ function musicData(person: PersonRow, dataId: string, params: DataParams): unkno
     if (noDiscovery(person)) return [];
     return [...groupTracks(musicLibrary(person), "artist")].map(([, tracks]) => ({ ...rowsOf(person, [tracks.find((item) => item.artwork) ?? tracks[0]!])[0]!, id: tracks[0]!.id, title: `${artistKey(tracks[0]!)} radio`, channel: null, kind: "track", queue_mode: "radio", radio_seed: tracks[0]!.id }));
   }
+  if (dataId === "playlists" && params.scope === "new") return [{ id: "new", title: "New playlist", channel: "Start an empty playlist", kind: "track" }];
   if (dataId === "playlists") return visiblePlaylists(person).map((collection) => playlistTile(person, collection));
   if (dataId === "playlist-new") return [{ id: "new", title: "New playlist", channel: "Start an empty playlist", kind: "track" }];
   if (dataId === "playlist") {

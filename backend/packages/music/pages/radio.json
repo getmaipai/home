@@ -1,0 +1,43 @@
+{
+  "type": "page",
+  "id": "radio",
+  "title": "Radio",
+  "body": [
+    {
+      "type": "media_shelf",
+      "heading": "Your stations",
+      "bind": {
+        "source": "package",
+        "path": "radio",
+        "params": {
+          "scope": "saved"
+        }
+      },
+      "item_key_field": "id",
+      "item_label_field": "title",
+      "item_subtitle_field": "{summary}",
+      "item_media_field": "thumbnail",
+      "aspect": "square",
+      "variant": "plain",
+      "orientation": "vertical",
+      "density": "compact",
+      "row_actions": [
+        {
+          "icon": "trash",
+          "label": "Remove",
+          "action": {
+            "call": {
+              "target": "/api/plugins/music/radio/stations/{id}",
+              "method": "DELETE"
+            }
+          }
+        }
+      ],
+      "empty_state": {
+        "type": "empty_state",
+        "icon": "headphones",
+        "text": "No stations yet. A parent can save stations for you, or find some in Find stations."
+      }
+    }
+  ]
+}

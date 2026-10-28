@@ -2,6 +2,14 @@
 
 All notable changes to the Music package, in [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) format.
 
+## [0.3.0] - 2026-10-28
+
+### Added
+
+- Radio and Find stations pages. Radio lists the stations saved for you (a child sees what a parent saved) with Remove. Find stations
+  (teens and adults, only while the household switch for outside radio is on) searches by name, country and genre, with Add on each
+  result. Stations that use an HLS playlist say "Not supported yet". Playing a station comes later.
+
 ## [0.2.0] - 2026-10-17
 
 ### Added

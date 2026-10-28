@@ -10,7 +10,7 @@ import { hashSessionToken } from "@/lib/session";
 import "@/lib/media/podcastApp"; // registers the Podcasts data ids and item view with the shared host
 import "@/lib/media/musicApp"; // registers the Music lyrics fields with the shared host
 import { podcastRoutes, podcastDirectoryRows } from "./podcastApp";
-import { radioRoutes } from "./radioApp";
+import { radioRoutes, radioDirectoryRows, radioSavedRows, radioCountryRows, radioGenreRows } from "./radioApp";
 import { editMediaItem } from "@/lib/media/mediaEdit";
 import { saveMediaCover } from "@/lib/media/mediaCover";
 import { lookupLyricsFor } from "@/lib/media/lyricsAction";
@@ -54,6 +54,18 @@ export function createMediaAppRoutes(appId: MediaAppId) {
     if (appId === "podcasts" && c.req.param("dataId") === "directory") {
       const body = await bodyOf(c.req.raw);
       return c.json(await podcastDirectoryRows(person, typeof body.q === "string" ? body.q : "") as never, 200);
+    }
+    // RADIO-02: Music's Radio pages. The directory is a network lookup (async); the rest are sync rows. Same gates as the radio routes.
+    if (appId === "music") {
+      if (c.req.param("dataId") === "radio") {
+        const body = await bodyOf(c.req.raw);
+        const field = (key: string) => (typeof body[key] === "string" ? (body[key] as string) : "");
+        const scope = field("scope");
+        if (scope === "directory") return c.json(await radioDirectoryRows(person, { q: field("q"), country: field("country"), tag: field("tag") }) as never, 200);
+        if (scope === "saved") return c.json(radioSavedRows(person) as never, 200);
+        if (scope === "countries") return c.json({ as_of: new Date().toISOString(), rows: radioCountryRows() } as never, 200);
+        if (scope === "genres") return c.json({ as_of: new Date().toISOString(), rows: radioGenreRows() } as never, 200);
+      }
     }
     const value = mediaAppData(person, appId, c.req.param("dataId"), paramsOf(await bodyOf(c.req.raw)));
     if (value === null) return next();

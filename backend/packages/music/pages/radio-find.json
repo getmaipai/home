@@ -1,0 +1,92 @@
+{
+  "type": "page",
+  "id": "radio-find",
+  "title": "Find stations",
+  "body": [
+    {
+      "type": "search",
+      "state": "q",
+      "label": "Search stations",
+      "placeholder": "Search stations by name"
+    },
+    {
+      "type": "picker",
+      "state": "country",
+      "label": "Country",
+      "placeholder": "Any country",
+      "bind": {
+        "source": "package",
+        "path": "radio",
+        "params": {
+          "scope": "countries"
+        }
+      },
+      "item_key_field": "id",
+      "item_label_field": "label"
+    },
+    {
+      "type": "picker",
+      "state": "tag",
+      "label": "Genre",
+      "placeholder": "Any genre",
+      "bind": {
+        "source": "package",
+        "path": "radio",
+        "params": {
+          "scope": "genres"
+        }
+      },
+      "item_key_field": "id",
+      "item_label_field": "label"
+    },
+    {
+      "type": "media_shelf",
+      "heading": "Stations",
+      "bind": {
+        "source": "package",
+        "path": "radio",
+        "params": {
+          "q": "$state.q",
+          "country": "$state.country",
+          "tag": "$state.tag",
+          "scope": "directory"
+        }
+      },
+      "item_key_field": "id",
+      "item_label_field": "title",
+      "item_subtitle_field": "{summary}",
+      "item_media_field": "thumbnail",
+      "aspect": "square",
+      "variant": "plain",
+      "orientation": "vertical",
+      "density": "compact",
+      "row_actions": [
+        {
+          "icon": "plus",
+          "label": "Add",
+          "label_field": "action_label",
+          "action": {
+            "call": {
+              "target": "/api/plugins/music/radio/stations",
+              "args": {
+                "from": "directory",
+                "name": "{title}",
+                "url": "{url}",
+                "favicon": "{favicon}",
+                "tags": "{tags_csv}",
+                "country_code": "{country_code}",
+                "codec": "{codec}",
+                "bitrate_kbps": "{bitrate_kbps}"
+              }
+            }
+          }
+        }
+      ],
+      "empty_state": {
+        "type": "empty_state",
+        "icon": "headphones",
+        "text": "Nothing to show. Finding radio stations may be turned off, or try other words."
+      }
+    }
+  ]
+}

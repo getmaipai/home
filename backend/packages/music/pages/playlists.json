@@ -8,7 +8,10 @@
       "heading": "Start a playlist",
       "bind": {
         "source": "package",
-        "path": "playlist-new"
+        "path": "playlists",
+        "params": {
+          "scope": "new"
+        }
       },
       "item_key_field": "id",
       "item_label_field": "title",
