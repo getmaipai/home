@@ -529,7 +529,7 @@ describe("recall and the prompt know whose fact it is", () => {
     expect(matches.length).toBe(1);
     expect(matches[0]!.record.text).toBe("Quill likes seltzer");
     const context = await promptFor(actor, "what does Quill drink");
-    expect(context).toMatch(/\[remembered \([\d-]+\)\] Quill likes seltzer/);
+    expect(context).toMatch(/\[remembered \([\d-]+\)(?:, certainty: \w+)?\] Quill likes seltzer/);
     expect(context).toContain("<untrusted_data>\nAbout: Quill (your coworker).\n</untrusted_data>");
   });
 
