@@ -28,6 +28,7 @@ function paramsOf(body: Body): DataParams {
     id: typeof body.id === "string" ? body.id : undefined,
     scope: typeof body.scope === "string" && body.scope !== "" ? body.scope : undefined,
     channel: typeof body.channel === "string" && body.channel !== "" ? body.channel : undefined,
+    query: typeof body.q === "string" ? body.q.slice(0, 120) : undefined,
     series: typeof body.series === "string" ? body.series : undefined,
     season: coerceNumber(body.season),
     genre: typeof body.genre === "string" ? body.genre : undefined,

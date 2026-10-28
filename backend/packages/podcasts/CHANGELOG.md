@@ -2,6 +2,10 @@
 
 All notable changes to the Podcasts package, in [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) format.
 
+## [0.2.5] - 2026-10-28
+
+- Publisher transcripts are fetched through the podcast address guard; episodes without one can queue Stack transcription, and Transcript search finds phrases in stored transcripts and opens at the matching time.
+
 ## [0.2.2] - 2026-10-28
 
 - The pages match the hub's own copy again (the cinema tone is gone from the page headers).

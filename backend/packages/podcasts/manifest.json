@@ -1,6 +1,6 @@
 {
   "id": "podcasts",
-  "version": "0.2.4",
+  "version": "0.2.5",
   "kind": "app",
   "category": "Media",
   "display": "Podcasts",
@@ -142,10 +142,6 @@
         "rows": "list"
       },
       {
-        "id": "new",
-        "rows": "list"
-      },
-      {
         "id": "queue",
         "rows": "list"
       },
@@ -155,6 +151,10 @@
       },
       {
         "id": "shows",
+        "rows": "list"
+      },
+      {
+        "id": "new",
         "rows": "list"
       },
       {

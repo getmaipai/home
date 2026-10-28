@@ -4,7 +4,7 @@ import type { Context } from "hono";
 import { readableIn } from "@/lib/media/appHost";
 import { correctedStamp, getProgress, writeProgress } from "@/lib/media/progress";
 import { coerceNumber, mediaAppAllowed } from "@/lib/media/appHost";
-import { queuePodcastAutoRules, exportOpml, importOpml, pollPodcastNow, saveEpisode, subscribePodcast, unsaveEpisode, unsubscribePodcast, updatePodcastSource } from "@/lib/media/podcasts";
+import { queuePodcastAutoRules, exportOpml, getPodcastTranscript, importOpml, pollPodcastNow, saveEpisode, searchPodcastTranscripts, subscribePodcast, unsaveEpisode, unsubscribePodcast, updatePodcastSource } from "@/lib/media/podcasts";
 import { apiRouter } from "@/lib/openapi";
 import { requireAuth } from "@/middleware/auth";
 import type { PersonRow } from "@/types";
@@ -37,6 +37,20 @@ export async function podcastDirectoryRows(person: PersonRow, q: string): Promis
 
 export function podcastRoutes() {
   const routes = apiRouter();
+
+  routes.get("/transcript/:media_id", requireAuth, async (c, next) => {
+    const person = c.get("person");
+    if (!mediaAppAllowed(person, "podcasts")) return next();
+    const result = await getPodcastTranscript(person, c.req.param("media_id"));
+    return result.ok ? c.json({ ok: true as const, ...result.value }, 200) : fail(c, result);
+  });
+
+  routes.get("/transcripts/search", requireAuth, async (c, next) => {
+    const person = c.get("person");
+    if (!mediaAppAllowed(person, "podcasts")) return next();
+    const query = (c.req.query("q") ?? "").trim().slice(0, 120);
+    return c.json({ ok: true as const, hits: searchPodcastTranscripts(person, query) }, 200);
+  });
 
   routes.post("/save", requireAuth, async (c, next) => {
     const person = c.get("person");

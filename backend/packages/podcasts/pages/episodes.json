@@ -16,6 +16,12 @@
       "item_label_field": "label"
     },
     {
+      "type": "search",
+      "state": "transcript_q",
+      "label": "Search transcripts",
+      "placeholder": "Search transcripts"
+    },
+    {
       "type": "media_shelf",
       "heading": "Episodes",
       "bind": {
@@ -44,6 +50,32 @@
         "type": "empty_state",
         "icon": "headphones",
         "text": "No episodes yet."
+      }
+    },
+    {
+      "type": "media_shelf",
+      "heading": "Transcript matches",
+      "bind": {
+        "source": "package",
+        "path": "episodes",
+        "params": {
+          "query": "$state.transcript_q"
+        }
+      },
+      "item_key_field": "id",
+      "item_label_field": "title",
+      "item_subtitle_field": "summary",
+      "item_media_field": "thumbnail",
+      "item_meta_field": "duration_s",
+      "aspect": "square",
+      "variant": "plain",
+      "orientation": "vertical",
+      "hide_when_empty": true,
+      "on_select": {
+        "play": {
+          "media_id": "{id}",
+          "position_s": "{start_s}"
+        }
       }
     }
   ]

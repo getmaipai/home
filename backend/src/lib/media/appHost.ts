@@ -298,6 +298,7 @@ export interface DataParams {
   /** What `id` names, for a data id that serves more than one page (Music's `header`: album, artist or playlist). */
   scope?: string;
   channel?: string;
+  query?: string;
   series?: string;
   season?: number;
   genre?: string;

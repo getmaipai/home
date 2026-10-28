@@ -11,6 +11,7 @@ import { getProgress, getProgressMany, recentProgress } from "./progress";
 import type { MediaItem, MediaSource } from "./model";
 import { draftRows, filterEpisodes, personFilters, viewOf } from "./podcastFilters";
 import { podcastStatsRows } from "./podcastStats";
+import { searchPodcastTranscripts } from "./podcasts";
 
 const APP = "podcasts" as const;
 const publishedOf = (item: MediaItem): string => item.external?.published_at ?? item.added_at;
@@ -42,6 +43,14 @@ function showRows(person: PersonRow): MediaRow[] {
 
 function episodesOf(person: PersonRow, params: DataParams, limit: number, savedOnly = false): MediaItem[] {
   const show = params.channel;
+  const query = params.query?.trim().toLocaleLowerCase();
+  if (query && query.length >= 2) {
+    return searchPodcastTranscripts(person, query).flatMap((hit) => {
+      const item = readableIn(person, APP, hit.episode_id);
+      if (!item) return [];
+      return [{ ...item, description: `${Math.floor(hit.start_s / 60)}:${String(hit.start_s % 60).padStart(2, "0")} · ${hit.text}` }];
+    }).slice(0, limit);
+  }
   const items = queryItems(person, APP, { where: show ? eq(mediaItems.subtitle, show) : undefined, limit: Math.max(limit, 200) });
   return items.filter((item) => !savedOnly || !(item.location as { url?: string }).url).sort((a, b) => publishedOf(b).localeCompare(publishedOf(a))).slice(0, limit);
 }
@@ -76,7 +85,14 @@ registerMediaAppData(APP, (person, dataId, params) => {
   const limit = Math.min(Math.max(params.limit ?? 40, 1), 200);
   switch (dataId) {
     case "shows": return showRows(person);
-    case "episodes": return episodeRows(person, episodesOf(person, params, limit));
+    case "episodes": {
+      const rows = episodeRows(person, episodesOf(person, params, limit));
+      const q = params.query?.trim();
+      if (!q || q.length < 2) return rows;
+      // A transcript search row carries the second its phrase starts, so selecting it seeks there.
+      const starts = new Map(searchPodcastTranscripts(person, q).map((hit) => [hit.episode_id, hit.start_s]));
+      return rows.map((row) => ({ ...row, start_s: starts.get(String((row as { id?: string }).id)) ?? 0 }));
+    }
     case "saved": return episodeRows(person, episodesOf(person, params, limit, true));
     case "bookmarks": return bookmarkRows(person, limit);
     // PODCAST-PORT-03: the person's own saved filters, and the episodes one of them shows now.

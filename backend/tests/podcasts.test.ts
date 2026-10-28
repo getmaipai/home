@@ -28,6 +28,9 @@ import { newConversationTurnId, newMediaItemId, newShareId } from "@/lib/id";
 import { setHouseholdSettingValue } from "@/lib/settings";
 import { syncShelfFeeds } from "@/lib/shelf/shelfFeeds";
 import { runShelfTick } from "@/lib/shelf/shelfJobs";
+import { getPodcastTranscript, searchPodcastTranscripts } from "@/lib/media/podcasts";
+import { __setStackClientForTests } from "@/lib/stackEngine";
+import type { StackJob } from "@maipai/spec/stack/ts/stack-job.js";
 
 const HOST = "https://pod.example.com";
 const EPISODE_BYTES = new Uint8Array(4096).map((_, index) => (index * 7) % 251);
@@ -113,6 +116,9 @@ async function setup() {
   return { owner, adult, child, data, subscribe, poll, idOf };
 }
 
+/** The stored person row the transcript helpers take (the sign-in object is only a client). */
+const personRow = (id: string) => db.select().from(people).where(eq(people.id, id)).get() as never;
+
 describe("parsing", () => {
   test("a feed becomes a show and episodes, newest first, with explicit, duration and chapters from the notes", () => {
     const show = parsePodcastFeed(feedFor(episode4), clock);
@@ -128,6 +134,45 @@ describe("parsing", () => {
     expect(plainNotes("<p>Hi &amp; welcome</p><p>0:00 One</p>")).toBe("Hi & welcome\n0:00 One");
     expect(chaptersFromNotes("0:00 One\n1:00 Two")).toEqual([]);
     expect(chaptersFromNotes("5:00 One\n6:00 Two\n7:00 Three")).toEqual([]);
+  });
+});
+
+describe("podcast transcripts", () => {
+  test("stores a publisher VTT transcript and searches its timestamp without any search network call", async () => {
+    const { adult, data, subscribe, poll, idOf } = await setup();
+    feedXml = feedFor(`<item><title>Transcript episode</title><guid>transcript-ep</guid><pubDate>Wed, 14 Oct 2026 06:00:00 GMT</pubDate><enclosure url="${HOST}/sprout-ep4.mp3" type="audio/mpeg"/><podcast:transcript url="${HOST}/transcript.vtt" type="text/vtt"/></item>`);
+    const { feedId } = await subscribe([adult.id]); await poll(feedId);
+    const id = await idOf("Transcript episode");
+    expect((await data(adult.client, "episodes")).some((row) => row.id === id)).toBe(true);
+    const episodeRow = db.select().from(mediaItems).where(eq(mediaItems.id, id)).get()!;
+    expect(Object.keys(JSON.parse(episodeRow.external!)).some((key) => key.startsWith("transcript_") || key === "transcript_url")).toBe(false);
+    const originalFetch = deps.fetch;
+    const fixtureFetch = (async (input: string | URL | Request, init?: RequestInit) => {
+      const url = new URL(String(input));
+      if (url.pathname === "/transcript.vtt") return new Response("WEBVTT\n\n00:00:12.000 --> 00:00:16.000\nThe harbor seals are sleeping.", { headers: { "content-type": "text/vtt" } });
+      return originalFetch!(input as URL | string, init);
+    }) as typeof fetch;
+    __setPodcastFetchDepsForTests({ ...deps, fetch: fixtureFetch });
+    const result = await getPodcastTranscript(personRow(adult.id), id);
+    expect(result).toMatchObject({ ok: true, value: { transcript: { source: "publisher", segments: [{ start_s: 12, text: "The harbor seals are sleeping." }] } } });
+    const before = calls.length;
+    expect(searchPodcastTranscripts(personRow(adult.id), "harbor seals")).toMatchObject([{ episode_id: id, start_s: 12 }]);
+    expect(calls).toHaveLength(before);
+    // The page row for a hit carries the second to seek to.
+    expect(await data(adult.client, "episodes", { q: "harbor seals" })).toMatchObject([{ id, start_s: 12 }]);
+  });
+
+  test("an episode without a publisher transcript queues one Stack media.fetch job", async () => {
+    const { adult, subscribe, poll, idOf } = await setup();
+    feedXml = feedFor(episode4);
+    const { feedId } = await subscribe([adult.id]); await poll(feedId);
+    const id = await idOf("Question 4");
+    let submitted = 0;
+    const stackJob: StackJob = { id: "stack-transcript-1", kind: "media.fetch", role: null, state: "queued", percent: 0, completedBytes: 0, totalBytes: 0, status: "queued", position: null, input: {}, result: null, reason: null, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() };
+    __setStackClientForTests({ submitJob: async (request: { kind: string; input?: Record<string, unknown> }) => { submitted++; expect(request).toMatchObject({ kind: "media.fetch", input: { kind: "audio", person_initiated: true, subtitles: true } }); return { ...stackJob, input: request.input ?? {} }; } } as never);
+    expect(await getPodcastTranscript(personRow(adult.id), id)).toMatchObject({ ok: true, value: { job_id: "stack-transcript-1" } });
+    expect(await getPodcastTranscript(personRow(adult.id), id)).toMatchObject({ ok: true, value: { job_id: "stack-transcript-1" } });
+    expect(submitted).toBe(1);
   });
 });
 

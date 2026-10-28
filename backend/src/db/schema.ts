@@ -2061,6 +2061,19 @@ export const lyricsLookupState = sqliteTable("lyrics_lookup_state", {
   backoffS: integer("backoff_s").notNull().default(0), // current backoff in seconds, 0 = no refusal run
 });
 
+// Podcast transcript payload and fetch bookkeeping are hub-internal; MediaItem.external
+// remains exactly the spec's extractor identity object.
+export const podcastTranscripts = sqliteTable("podcast_transcripts", {
+  itemId: text("item_id").primaryKey(),
+  transcriptUrl: text("transcript_url"),
+  source: text("source"), // publisher | stack
+  text: text("text"),
+  segments: text("segments").notNull().default("[]"), // JSON array of {start_s, text}
+  jobId: text("job_id"),
+  updatedAt: text("updated_at").notNull(),
+  hlc: text("hlc").notNull(),
+});
+
 export const mediaProgress = sqliteTable(
   "media_progress",
   {
