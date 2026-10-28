@@ -191,6 +191,11 @@ export function platformConnections(): PrivacyConnection[] {
       when: "automatically, about every hour at most (a show's own pace can be slower), only while nobody is using MaiPai, for each show an admin follows in Podcasts. Remove the show to stop it. Home fetches the show's picture when it reads a new show. Pressing Save downloads an episode. Keep rules also download episodes automatically after each poll or a rule change.",
       what: "a request for the show's feed file that asks only for what changed since last time (a plain conditional request). Feed, episode and picture hosts, including CDNs and redirect hosts, receive the requested address and your home's internet address. No name, device ID or cookie goes with it. No chat or listening history is sent.",
     }),
+    // PODCAST-PORT-01: the directory search behind Find shows, listed only while the household switch is on.
+    row("platform:podcast-directory", getHouseholdSettingValue("podcasts.directory.enabled") === true ? "itunes.apple.com, rss.applemarketingtools.com" : null, {
+      when: "only when an allowed person searches or opens the top list in Podcasts, at most about one request every three seconds across the home. Nothing runs in the background.",
+      what: "the words that were searched, or a request for the top list, plus your home's internet address. No name, device ID, cookie or listening history goes with it. A child never searches, and a teen's search words are checked for household names first.",
+    }),
     row("platform:news-full-text-prefetch", shelfEnabled() && getHouseholdSettingValue(NEWS_FULL_TEXT_PREFETCH_KEY) === true ? "the publishers of followed channels and the top stories in Today" : null, {
       when: "only when Load News stories ahead of time is on and nobody is using MaiPai. Each item is tried once, at most one every 30 seconds for each site and 150 pages per site in 24 hours; story pictures follow the same pace. Home follows robots rules and pauses on the first block.",
       what: "a request for that story page and the site's robots rules, plus your home's internet address. Nothing anyone in the house said or saved is sent: no name, question, follow list, cookie or reading history. Background requests never ask the Internet Archive.",

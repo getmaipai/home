@@ -25,3 +25,13 @@ The owner's exception of 2026-10-25 permits the Music app to look a single song 
 | MEDIA-DETAIL-03 | A song lookup on lrclib.net | One per song ever, hit or miss | One a second across the household | None beyond the pace | A refusal pauses lookups one hour, doubling to 24 hours; an answer clears it |
 
 The privacy table lists this traffic as `platform:music-lyrics-lookup` only while the setting is on.
+
+## PODCAST-PORT-01: finding new podcasts
+
+The owner's request of 2026-10-27 permits Podcasts to search Apple's public podcast directory (iTunes Search, Apple's top list and its id lookup). `podcasts.directory.enabled` is a household switch, off by default; `podcasts.directory.teens` adds teens. A child never reaches it, and a minor's search words pass the household-name check first. Only a person's own search or opening the top list makes a request; nothing runs in the background.
+
+| Backlog row | Request | Lifetime limit | Pace | Site limit | Stop rule |
+|---|---|---|---|---|---|
+| PODCAST-PORT-01 | A search, the top list (plus one id lookup) | None | A burst of five, then one every three seconds across the household | Search words capped at 80 characters, 25 results | A 403, 429 or server error pauses the directory for one hour |
+
+The privacy table lists this traffic as `platform:podcast-directory` only while the switch is on.

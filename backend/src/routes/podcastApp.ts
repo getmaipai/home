@@ -7,6 +7,11 @@ import { coerceNumber, mediaAppAllowed } from "@/lib/media/appHost";
 import { queuePodcastAutoRules, exportOpml, importOpml, pollPodcastNow, saveEpisode, subscribePodcast, unsaveEpisode, unsubscribePodcast, updatePodcastSource } from "@/lib/media/podcasts";
 import { apiRouter } from "@/lib/openapi";
 import { requireAuth } from "@/middleware/auth";
+import type { PersonRow } from "@/types";
+import { mediaBandOf } from "@/lib/media/band";
+import { getHouseholdSettingValue } from "@/lib/settings";
+import { MINOR_QUERY_PERSONAL_NOTE, minorQueryHit } from "@/lib/retrieval/minorQueryCheck";
+import { directoryAllowed, searchDirectory, topShows } from "@/lib/media/podcastDirectory";
 
 type Body = Record<string, unknown>;
 const bodyOf = async (c: Context): Promise<Body> => {
@@ -14,6 +19,19 @@ const bodyOf = async (c: Context): Promise<Body> => {
   return parsed && typeof parsed === "object" && !Array.isArray(parsed) ? (parsed as Body) : {};
 };
 const fail = (c: Context, result: { status: number; error: string }) => c.json({ error: result.error }, result.status as 400);
+
+type DirectoryRow = { id: string; title: string; summary: string; thumbnail: string | null; feed_url: string };
+
+/** The Find shows rows for the page's shelf: the search when words are typed, else Apple's top list. Not allowed, or no answer, is an empty list (the page says so). */
+export async function podcastDirectoryRows(person: PersonRow, q: string): Promise<DirectoryRow[]> {
+  const band = mediaBandOf(person);
+  if (!directoryAllowed({ band }, { enabled: getHouseholdSettingValue("podcasts.directory.enabled") === true, teens: getHouseholdSettingValue("podcasts.directory.teens") === true })) return [];
+  const words = q.trim();
+  if (words !== "" && minorQueryHit(words, band)) return [];
+  const result = words === "" ? await topShows() : await searchDirectory(words);
+  if (!result.ok) return [];
+  return result.shows.map((show) => ({ id: show.id, title: show.title, summary: [show.author, show.genre].filter(Boolean).join(" · "), thumbnail: show.art, feed_url: show.feed_url }));
+}
 
 export function podcastRoutes() {
   const routes = apiRouter();
@@ -96,6 +114,33 @@ export function podcastRoutes() {
     if (!mediaAppAllowed(person, "podcasts")) return next();
     if (person.role !== "owner" && person.role !== "admin") return c.json({ error: "Only an admin can export the show list." }, 403);
     return new Response(exportOpml(), { status: 200, headers: { "content-type": "text/x-opml; charset=utf-8", "content-disposition": 'attachment; filename="podcasts.opml"', "cache-control": "no-store" } });
+  });
+
+  // PODCAST-PORT-01: finding new shows. Off until the household switch is on; adults, teens only with their own switch, never a child.
+  // A minor's search words pass the household-name check before they leave the home (PRIVACY.md).
+  const directoryGate = (c: Context) => {
+    const person = c.get("person");
+    const band = mediaBandOf(person);
+    const allowed = directoryAllowed({ band }, { enabled: getHouseholdSettingValue("podcasts.directory.enabled") === true, teens: getHouseholdSettingValue("podcasts.directory.teens") === true });
+    return { person, band, allowed };
+  };
+  const NOT_ON = "Finding new podcasts is not turned on for you. Ask the person who runs this home.";
+
+  routes.get("/directory/search", requireAuth, async (c, next) => {
+    if (!mediaAppAllowed(c.get("person"), "podcasts")) return next();
+    const { band, allowed } = directoryGate(c);
+    if (!allowed) return c.json({ error: NOT_ON }, 403);
+    const q = (c.req.query("q") ?? "").trim();
+    if (minorQueryHit(q, band)) return c.json({ ok: true as const, shows: [], note: MINOR_QUERY_PERSONAL_NOTE }, 200);
+    const result = await searchDirectory(q);
+    return result.ok ? c.json({ ok: true as const, shows: result.shows }, 200) : c.json({ error: result.error }, result.status);
+  });
+
+  routes.get("/directory/top", requireAuth, async (c, next) => {
+    if (!mediaAppAllowed(c.get("person"), "podcasts")) return next();
+    if (!directoryGate(c).allowed) return c.json({ error: NOT_ON }, 403);
+    const result = await topShows();
+    return result.ok ? c.json({ ok: true as const, shows: result.shows }, 200) : c.json({ error: result.error }, result.status);
   });
 
   return routes;

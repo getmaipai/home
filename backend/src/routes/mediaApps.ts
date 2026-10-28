@@ -9,7 +9,7 @@ import { getCookie } from "hono/cookie";
 import { hashSessionToken } from "@/lib/session";
 import "@/lib/media/podcastApp"; // registers the Podcasts data ids and item view with the shared host
 import "@/lib/media/musicApp"; // registers the Music lyrics fields with the shared host
-import { podcastRoutes } from "./podcastApp";
+import { podcastRoutes, podcastDirectoryRows } from "./podcastApp";
 import { editMediaItem } from "@/lib/media/mediaEdit";
 import { saveMediaCover } from "@/lib/media/mediaCover";
 import { lookupLyricsFor } from "@/lib/media/lyricsAction";
@@ -44,6 +44,11 @@ export function createMediaAppRoutes(appId: MediaAppId) {
     if (!mediaAppAllowed(person, appId)) return next();
     // NEWS-00 review: a data id a raised page binds needs that page's floor; ids the media host serves that no page binds stay under the host's own rules.
     if (!appRouteAllowed(person, appId, "data", c.req.param("dataId"), undefined, "open")) return next();
+    // PODCAST-PORT-01: the directory is a network lookup, so it is answered here (async) beside the sync host data. Same gates as its routes.
+    if (appId === "podcasts" && c.req.param("dataId") === "directory") {
+      const body = await bodyOf(c.req.raw);
+      return c.json(await podcastDirectoryRows(person, typeof body.q === "string" ? body.q : "") as never, 200);
+    }
     const value = mediaAppData(person, appId, c.req.param("dataId"), paramsOf(await bodyOf(c.req.raw)));
     if (value === null) return next();
     return c.json(value as never, 200);
