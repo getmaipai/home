@@ -5,7 +5,7 @@ import { MemoryRouter } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { api, type Roster } from "@/lib/api";
 import { MarkdownText } from "@maipai/ui/src/elements/markdown-text";
-import { AMBIENT_QUICK_ACTIONS, ambientQuickActionPrompt, ambientQuickActionsForApp, createAmbientAskQueue, isProtectedReply, useAmbientCompanionPane, type AmbientPaneState } from "@/shell/AmbientCompanionPane";
+import { AMBIENT_QUICK_ACTIONS, ambientHistoryItems, ambientQuickActionPrompt, ambientQuickActionsForApp, createAmbientAskQueue, isProtectedReply, useAmbientCompanionPane, type AmbientPaneState } from "@/shell/AmbientCompanionPane";
 import type { useSideChat } from "@/shell/useSideChat";
 import { Suggestions } from "@maipai/ui/src/elements/suggestions";
 import { createChatModelAdapter } from "@/apps/chat/chatModelAdapter";
@@ -19,9 +19,9 @@ function wrapper({ children }: { children: ReactNode }) {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return <QueryClientProvider client={client}><MemoryRouter>{children}</MemoryRouter></QueryClientProvider>;
 }
-function usePane(side: ReturnType<typeof useSideChat>, onContinue: (id: string) => void) {
+function usePane(side: ReturnType<typeof useSideChat>, onContinue: (id: string) => void, wake?: { listening: string; onTurnOff: () => void }) {
   const [state, setState] = useState<AmbientPaneState>({ open: false, pinned: false });
-  return useAmbientCompanionPane({ person, companionName: "Companion", companionId: "companion-1", avatar: null, incognito: false, state, onStateChange: setState, onContinue, onRing: noop, side });
+  return useAmbientCompanionPane({ person, companionName: "Companion", companionId: "companion-1", avatar: null, incognito: false, state, onStateChange: setState, onContinue, onRing: noop, side, wake });
 }
 
 afterEach(() => { cleanup(); mock.restore(); });
@@ -159,5 +159,43 @@ describe("ambient pane quick actions and page context", () => {
       mock.restore();
       (globalThis as unknown as { AudioContext: unknown }).AudioContext = undefined;
     }
+  });
+});
+
+describe("ambient pane conversation history and header buttons", () => {
+  test("history lists the person and companion turns oldest first and skips turns with no text", () => {
+    const items = ambientHistoryItems([
+      { id: "m1", role: "user", content: [{ type: "text", text: "What is the weather?" }], createdAt: new Date("2026-10-28T14:14:00") },
+      { id: "m2", role: "assistant", content: [{ type: "text", text: "Sunny, 72 degrees." }] },
+      { id: "m3", role: "assistant", content: [{ type: "tool-call", toolName: "weather" }] },
+      { id: "m4", role: "system", content: [{ type: "text", text: "hidden" }] },
+    ]);
+    expect(items.map((item) => [item.id, item.role])).toEqual([["m1", "user"], ["m2", "companion"]]);
+    expect(items[0]?.time).toBeTruthy();
+    expect(items[1]?.time).toBeUndefined();
+    const view = render(<>{items.map((item) => <div key={item.id}>{item.content}</div>)}</>, { wrapper });
+    expect(view.getByText("What is the weather?")).toBeTruthy();
+    expect(view.getByText("Sunny, 72 degrees.")).toBeTruthy();
+    expect(view.queryByText("hidden")).toBeNull();
+  });
+
+  test("an empty thread has no history", () => {
+    expect(ambientHistoryItems([])).toEqual([]);
+  });
+
+  test("the header offers New conversation and Continue, and a wake word button only while the wake word is on", () => {
+    const side = { newSideChat: noop, openConversation: mock(async () => true), handOff: mock(async () => undefined) } as never;
+    spyOn(api, "conversationList").mockResolvedValue([] as never);
+    const off = mock(() => {});
+    const without = renderHook(() => usePane(side, noop), { wrapper });
+    const plain = render(<>{without.result.current.headerActions}</>);
+    expect(plain.getByRole("button", { name: "New conversation" })).toBeTruthy();
+    expect(plain.getByRole("button", { name: "Continue in Chat" })).toBeTruthy();
+    expect(plain.queryByRole("button", { name: /Turn off/ })).toBeNull();
+    cleanup();
+    const withWake = renderHook(() => usePane(side, noop, { listening: "Listening for Hey Companion", onTurnOff: off }), { wrapper });
+    const view = render(<>{withWake.result.current.headerActions}</>);
+    fireEvent.click(view.getByRole("button", { name: "Listening for Hey Companion. Turn off" }));
+    expect(off).toHaveBeenCalledTimes(1);
   });
 });

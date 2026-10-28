@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { AssistantRuntimeProvider, useAui, useAuiState } from "@assistant-ui/react";
 import { TalkPill } from "@maipai/ui/src/elements/thread.aui";
 import { TooltipIconButton } from "@maipai/ui/src/elements/tooltip-icon-button";
@@ -12,7 +12,7 @@ import { Badge } from "@maipai/ui/src/elements/ui/badge";
 import { Button } from "@maipai/ui/src/elements/ui/button";
 import { formatRelative } from "@maipai/ui/src/relativeTime";
 import { toast } from "sonner";
-import { CompanionStage, type StageMode } from "@maipai/ui/src/elements/companion-stage";
+import { CompanionStage, type CompanionStageHistoryItem, type StageMode } from "@maipai/ui/src/elements/companion-stage";
 import { CompanionAvatar } from "@maipai/ui/src/elements/companion-avatar";
 import { Avatar as SeededAvatar } from "@maipai/ui/src/primitives/Avatar";
 import { MarkdownText } from "@maipai/ui/src/elements/markdown-text";
@@ -24,7 +24,7 @@ import { markCitations, parseCitationHref } from "@/apps/chat/chatCitations";
 import type { CompanionClips, StateId } from "@maipai/ui/src/elements/companion-avatar-machine";
 import { ChatAgeBandContext, AdminContext, TemporaryChatContext } from "@/apps/chat/chatThreadContexts";
 import type { useSideChat } from "@/shell/useSideChat";
-import type { AmbientRing } from "@/shell/ambientRing";
+import type { AmbientRing, AmbientWakeIndicator } from "@/shell/ambientRing";
 import { api, type Roster, type ConversationSummary } from "@/lib/api";
 import { useLiveVoiceSession, WAKE_SESSION_IDLE_CLOSE_MS } from "@/apps/chat/liveVoiceSession";
 import { useMicGate, micHelp } from "@/lib/media/micGate";
@@ -49,6 +49,7 @@ const PhoneIcon = getIcon("phone");
 const SpeakerIcon = getIcon("volume-2");
 const SpeakerOffIcon = getIcon("volume-x");
 const MicIcon = getIcon("mic");
+const PlusIcon = getIcon("plus");
 
 export type AmbientPaneState = { open: boolean; pinned: boolean };
 
@@ -86,6 +87,32 @@ export function isProtectedReply(message: Record<string, unknown> | undefined): 
     const toolName = item.toolName ?? item.tool_name;
     return (item.type === "tool-call" || item.type === "tool_call") && (toolName === "confirm" || toolName === "ask");
   });
+}
+
+type Sources = ReturnType<typeof sourcesFromMessage>;
+const StageSourcesContext = createContext<Sources>([]);
+
+/** The thread as friendly bubbles, oldest first: the person's words and the companion's replies, with empty turns left out. */
+export function ambientHistoryItems(messages: Array<Record<string, unknown>>): CompanionStageHistoryItem[] {
+  const items: CompanionStageHistoryItem[] = [];
+  for (const message of messages) {
+    const role = message.role === "user" ? "user" : message.role === "assistant" ? "companion" : null;
+    if (!role) continue;
+    const text = assistantText(message as never).trim();
+    if (!text) continue;
+    const sources = role === "companion" ? sourcesFromMessage(message as never) : [];
+    const created = message.createdAt ? new Date(message.createdAt as string | number | Date) : null;
+    const time = created && !Number.isNaN(created.getTime()) ? created.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" }) : undefined;
+    items.push({
+      id: String(message.id ?? `${role}-${items.length}`),
+      role,
+      time,
+      content: role === "user"
+        ? <p className="whitespace-pre-wrap break-words">{text}</p>
+        : <StageSourcesContext.Provider value={sources}><MarkdownText text={markCitations(text, sources as never)} components={{ a: StageCitationLink }} /></StageSourcesContext.Provider>,
+    });
+  }
+  return items;
 }
 
 export type AmbientPaneControl = {
@@ -136,9 +163,9 @@ function RuntimeControls({ register, registerCall, side }: { register: (actions:
   return null;
 }
 
-function SideChat({ person, companionName, clips, still, incognito, onContinue, onRing, register, registerCall, side, ask }: {
+function SideChat({ person, companionName, clips, still, incognito, onRing, register, registerCall, side, ask }: {
   person: Roster; companionName: string; clips?: CompanionClips; still?: string; incognito: boolean;
-  onContinue: (id?: string) => void; onRing: (ring: AmbientRing | undefined) => void;
+  onRing: (ring: AmbientRing | undefined) => void;
   register: (actions: Pick<AmbientPaneControl, "ask"> | null) => void; registerCall: (start: (() => void) | null) => void;
   side: ReturnType<typeof useSideChat>;
   ask(text: string): void;
@@ -149,23 +176,19 @@ function SideChat({ person, companionName, clips, still, incognito, onContinue, 
           <TemporaryChatContext.Provider value={{ on: incognito }}>
             <RuntimeControls register={register} registerCall={registerCall} side={side} />
             <ThreadSignal onRing={onRing} />
-            <StageBody person={person} personId={person.id} companionName={companionName} clips={clips} still={still} onContinue={onContinue} registerCall={registerCall} side={side} ask={ask} />
+            <StageBody person={person} personId={person.id} companionName={companionName} clips={clips} still={still} registerCall={registerCall} side={side} ask={ask} />
           </TemporaryChatContext.Provider>
         </AdminContext.Provider>
       </ChatAgeBandContext.Provider>
   </AssistantRuntimeProvider>;
 }
 
-function StageBody({ person, personId, companionName, clips, still, onContinue, registerCall, side, ask }: { person: Roster; personId: string; companionName: string; clips?: CompanionClips; still?: string; onContinue: (id?: string) => void; registerCall: (start: (() => void) | null) => void; side: ReturnType<typeof useSideChat>; ask(text: string): void }) {
+function StageBody({ person, personId, companionName, clips, still, registerCall, side, ask }: { person: Roster; personId: string; companionName: string; clips?: CompanionClips; still?: string; registerCall: (start: (() => void) | null) => void; side: ReturnType<typeof useSideChat>; ask(text: string): void }) {
   const aui = useAui();
   const messages = useAuiState((state) => state.thread.messages) as unknown as Array<Record<string, unknown>>;
   const running = useAuiState((state) => state.thread.isRunning);
   const dictating = useAuiState((state) => state.composer.dictation != null);
   const last = [...messages].reverse().find((message) => message.role === "assistant");
-  const lastUser = [...messages].reverse().find((message) => message.role === "user");
-  const heardText = lastUser ? assistantText(lastUser as never).trim() : "";
-  const lastMessage = last as never;
-  const text = assistantText(lastMessage);
   const status = useChatAvailability();
   const [voiceOpen, setVoiceOpen] = useState(false);
   const [wakeOpened, setWakeOpened] = useState(false);
@@ -185,49 +208,34 @@ function StageBody({ person, personId, companionName, clips, still, onContinue, 
   const stateWord = status === "ready" ? (mode === "idle" ? "Ready" : mode[0]!.toUpperCase() + mode.slice(1)) : engineDownReason(status);
   const runningTool = (last?.content as Array<{ type?: string; status?: string | { type?: string }; name?: string; toolName?: string }> | undefined)?.find((part) => (part.type === "tool-call" || part.type === "tool_call") && (typeof part.status === "string" ? part.status : part.status?.type) === "running");
   const workingLine = runningTool ? runningTool.name ?? runningTool.toolName ?? "Working" : undefined;
-  const [dismissed, setDismissed] = useState<string | null>(null);
-  const [protectedReply, setProtectedReply] = useState<{ id: string; text: string } | null>(null);
-  const lastId = String(last?.id ?? text);
-  useEffect(() => {
-    if (last?.role === "assistant" && text.trim() && isProtectedReply(last as Record<string, unknown>)) setProtectedReply((previous) => previous?.id === lastId && previous.text === text ? previous : { id: lastId, text });
-  }, [last, lastId, text]);
-  const sources = last ? sourcesFromMessage(last as never) : [];
-  const showLatest = messages.at(-1)?.role === "assistant" && last?.role === "assistant" && text.trim();
-  const bubbleText = showLatest ? text : protectedReply?.text;
-  const bubbleId = showLatest ? lastId : protectedReply?.id;
-  const bubble = bubbleText && bubbleId && dismissed !== bubbleId ? <div className="max-h-48 overflow-y-auto overscroll-contain"><MarkdownText text={markCitations(bubbleText, sources as never)} components={{ a: StageCitationLink }} /></div> : undefined;
+  const history = useMemo(() => ambientHistoryItems(messages), [messages]);
   const clipKey = mode === "idle" ? "idle" : mode;
   const characterState: StateId = clips?.[clipKey] ? clipKey : "idle";
   const character = clips
     ? <CompanionAvatar name={companionName} clips={clips} size="fill" state={characterState} animated />
     : still ? <img src={still} alt={companionName} className="h-full w-full object-contain" /> : <SeededAvatar name={companionName} seed={companionName} />;
-  const actions = [
-    { id: "continue", label: "Continue in Chat", onSelect: () => { void side.handOff().then((id) => { if (id) onContinue(id); }).catch(() => toast.error("Could not continue this side chat. Try again.")); } },
-    { id: "new", label: "New conversation", onSelect: () => side.newSideChat() },
-  ];
   const callDisabled = status !== "ready" || !side.sttInstalled;
   const callReason = status !== "ready" ? engineDownReason(status) : !side.sttInstalled ? "Voice input is not installed. Install it in Settings to start a call." : undefined;
   const pageContext = useAmbientPageContext() ?? { app_id: "home", route: "/" };
   const quickActions = ambientQuickActionsForApp(pageContext.app_id);
   const talk = voiceOpen
     ? <div className="flex items-center justify-center gap-2"><TooltipIconButton tooltip="Mute microphone" aria-label="Mute microphone" aria-pressed={session.muted} onClick={session.onToggleMute}><MicIcon aria-hidden="true" /></TooltipIconButton><TooltipIconButton tooltip="End the call" aria-label="End the call" onClick={session.onEnd}><PhoneIcon aria-hidden="true" /></TooltipIconButton></div>
-    : <div className="flex flex-col gap-3"><Suggestions suggestions={quickActions} selectedSuggestion={null} cycle={0} variant="list" onSuggestion={(suggestion) => { const prompt = ambientQuickActionPrompt(suggestion); if (prompt) ask(prompt); }} /><div className="flex items-center gap-2"><div className="min-w-0 flex-1" title="The microphone writes a transcript in the talk box. Use Call for a live voice conversation."><TalkPill placeholder={`Talk to ${companionName}...`} /></div><Button type="button" aria-label={callDisabled ? `Call ${companionName}, unavailable: ${callReason}` : `Call ${companionName}`} title={callReason} disabled={callDisabled} onClick={openCall}><PhoneIcon aria-hidden="true" /></Button></div></div>;
+    : <div className="flex flex-col gap-3">{history.length ? null : <Suggestions suggestions={quickActions} selectedSuggestion={null} cycle={0} variant="list" onSuggestion={(suggestion) => { const prompt = ambientQuickActionPrompt(suggestion); if (prompt) ask(prompt); }} />}<div className="flex items-center gap-2"><div className="min-w-0 flex-1" title="The microphone writes a transcript in the talk box. Use Call for a live voice conversation."><TalkPill placeholder={`Talk to ${companionName}...`} /></div><Button type="button" aria-label={callDisabled ? `Call ${companionName}, unavailable: ${callReason}` : `Call ${companionName}`} title={callReason} disabled={callDisabled} onClick={openCall}><PhoneIcon aria-hidden="true" /></Button></div></div>;
   const help = micGate.problem ? micHelp(micGate.problem) : null;
-  return <><CompanionStage name={companionName} stateWord={stateWord} mode={mode} character={character} bubble={bubble} onDismissBubble={bubble ? () => setDismissed(bubbleId ?? lastId) : undefined} workingLine={workingLine} actions={actions} talk={talk} showHeader={false} heard={heardText ? <p className="truncate">{heardText}</p> : undefined} /><Dialog open={micGate.problem !== null} onOpenChange={(open) => { if (!open) micGate.dismiss(); }}><DialogContent aria-label="Microphone help">{help ? <><DialogHeader><DialogTitle>{help.title}</DialogTitle><DialogDescription>{help.cause}</DialogDescription></DialogHeader>{help.steps.length ? <ol className="list-decimal space-y-1 pl-5 text-sm">{help.steps.map((step) => <li key={step}>{step}</li>)}</ol> : null}<DialogFooter><Button variant="outline" onClick={micGate.dismiss}>Close</Button><Button onClick={() => void micGate.request()}>{micGate.problem === "safari_ask" ? "Continue" : "Try again"}</Button></DialogFooter></> : null}</DialogContent></Dialog></>;
+  return <><CompanionStage name={companionName} stateWord={stateWord} mode={mode} character={character} history={history.length ? history : undefined} historyLabel={`Conversation with ${companionName}`} workingLine={workingLine} talk={talk} showHeader={false} /><Dialog open={micGate.problem !== null} onOpenChange={(open) => { if (!open) micGate.dismiss(); }}><DialogContent aria-label="Microphone help">{help ? <><DialogHeader><DialogTitle>{help.title}</DialogTitle><DialogDescription>{help.cause}</DialogDescription></DialogHeader>{help.steps.length ? <ol className="list-decimal space-y-1 pl-5 text-sm">{help.steps.map((step) => <li key={step}>{step}</li>)}</ol> : null}<DialogFooter><Button variant="outline" onClick={micGate.dismiss}>Close</Button><Button onClick={() => void micGate.request()}>{micGate.problem === "safari_ask" ? "Continue" : "Try again"}</Button></DialogFooter></> : null}</DialogContent></Dialog></>;
 }
 
 function StageCitationLink({ href, children, ...props }: React.ComponentProps<"a">) {
   const [open, setOpen] = useState(false);
-  const messages = useAuiState((state) => state.thread.messages) as unknown as Array<Record<string, unknown>>;
-  const last = [...messages].reverse().find((message) => message.role === "assistant");
-  const sources = last ? sourcesFromMessage(last as never) : [];
+  const sources = useContext(StageSourcesContext);
   const index = parseCitationHref(href);
   const source = index ? sources[index - 1] : undefined;
   if (source) return <><Citation index={index! - 1} source={{ domain: source.domain, title: source.title, href: source.url, detail: source.detail }} open={open} onOpenChange={setOpen} /></>;
   return <a href={href} {...props}>{children}</a>;
 }
 
-export function useAmbientCompanionPane({ person, companionName, companionId, avatar, clips, still, incognito, state, onStateChange, onContinue, side, onRing }: {
+export function useAmbientCompanionPane({ person, companionName, companionId, avatar, clips, still, incognito, state, onStateChange, onContinue, side, onRing, wake }: {
+  wake?: AmbientWakeIndicator;
   person: Roster; companionName: string; companionId: string; avatar: ReactNode; clips?: CompanionClips; still?: string; incognito: boolean;
   state: AmbientPaneState; onStateChange: (state: AmbientPaneState) => void;
   onContinue: (id: string) => void; onRing: (ring: AmbientRing | undefined) => void;
@@ -267,10 +275,10 @@ export function useAmbientCompanionPane({ person, companionName, companionId, av
       else navigate(`/chat?conversation=${encodeURIComponent(row.id)}`);
     }}>Open</Button> };
   }) }];
-  const companionTab = { id: "companion", label: "Talk", content: companionId ? <>{openError ? <p role="alert">Could not open that conversation. Check your connection and try again.</p> : null}<SideChat person={person} companionName={companionName} clips={clips} still={still} incognito={incognito} onContinue={(id) => { if (id) onContinue(id); }} onRing={onRing} register={register} registerCall={(start) => askQueueRef.current?.registerCall(start)} side={side} ask={ask} /></> : null };
+  const companionTab = { id: "companion", label: "Talk", content: companionId ? <>{openError ? <p role="alert">Could not open that conversation. Check your connection and try again.</p> : null}<SideChat person={person} companionName={companionName} clips={clips} still={still} incognito={incognito} onRing={onRing} register={register} registerCall={(start) => askQueueRef.current?.registerCall(start)} side={side} ask={ask} /></> : null };
   const historyTab = { id: "history", label: "History", content: conversations.isLoading ? <p role="status">Loading conversations…</p> : conversations.isError ? <p role="alert">Could not load conversations. Check your connection and try again.</p> : <ActivityFeed label={`${companionName} conversations`} groups={activityGroups} empty={<p>No conversations with {companionName} yet.</p>} /> };
   const toggleReadAloud = () => { const next = !side.readAloud; side.setReadAloud(next); if (next && !side.ttsAvailable) toast.error("Read aloud is unavailable because voice output is not ready. Check Voice settings and try again.", { id: "voice-problem" }); };
   const ReadIcon = side.readAloud ? SpeakerIcon : SpeakerOffIcon;
   const settingsTab = { id: "settings", label: "Settings", content: <><div className="flex items-center justify-between gap-3 px-4 py-3"><span>Read replies aloud</span><TooltipIconButton tooltip={side.readAloud ? "Turn off read replies aloud" : "Read replies aloud"} aria-label="Read replies aloud" aria-pressed={side.readAloud} onClick={toggleReadAloud}><ReadIcon aria-hidden="true" /></TooltipIconButton></div><CompanionSettings person={person} companionId={companionId} /></> };
-  return { open: state.open, onOpenChange: (open: boolean) => onStateChange({ ...state, open }), pinned: state.pinned, onPinnedChange: (pinned: boolean) => onStateChange({ ...state, pinned }), companionTab, tabs: [historyTab, settingsTab], activeTab: tab, onActiveTabChange: setTab, title: companionName, control: { ask, newChat, load, continueInChat, startCall: () => { openCompanionPane(); askQueueRef.current?.startCall(); } } satisfies AmbientPaneControl, headerActions: <Button type="button" variant="ghost" size="icon-sm" aria-label="Continue in Chat" title="Continue in Chat" onClick={continueInChat}><ContinueIcon aria-hidden="true" /></Button>, avatar, pinLabel: "Pin pane", closeLabel: "Close pane", label: `${companionName} companion pane` };
+  return { open: state.open, onOpenChange: (open: boolean) => onStateChange({ ...state, open }), pinned: state.pinned, onPinnedChange: (pinned: boolean) => onStateChange({ ...state, pinned }), companionTab, tabs: [historyTab, settingsTab], activeTab: tab, onActiveTabChange: setTab, title: companionName, control: { ask, newChat, load, continueInChat, startCall: () => { openCompanionPane(); askQueueRef.current?.startCall(); } } satisfies AmbientPaneControl, headerActions: <>{wake ? <Button type="button" variant="ghost" size="icon-sm" aria-label={`${wake.listening}. Turn off`} title={`${wake.listening}. Turn off`} onClick={wake.onTurnOff}><MicIcon aria-hidden="true" /></Button> : null}<Button type="button" variant="ghost" size="icon-sm" aria-label="New conversation" title="New conversation" onClick={newChat}><PlusIcon aria-hidden="true" /></Button><Button type="button" variant="ghost" size="icon-sm" aria-label="Continue in Chat" title="Continue in Chat" onClick={continueInChat}><ContinueIcon aria-hidden="true" /></Button></>, avatar, pinLabel: "Pin pane", closeLabel: "Close pane", label: `${companionName} companion pane` };
 }

@@ -289,7 +289,7 @@ function RoutesWithIncognito({ person, onPersonChange, onSignedOut, appCatalog }
   const ambientPaneProps = useAmbientCompanionPane({
     person, companionName: ambient?.companion.name ?? "Companion", companionId: ambient?.companion.id ?? "",
     avatar: ambientAvatar, clips: ambient?.clips, still: ambient?.still, incognito, state: paneState, onStateChange: updatePaneState,
-    onRing: onPaneRing,
+    onRing: onPaneRing, wake: wakeIndicator,
     onContinue: (id) => { if (id) navigate(`/chat?conversation=${encodeURIComponent(id)}`); },
     side: sideChat,
   });

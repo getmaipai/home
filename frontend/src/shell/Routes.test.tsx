@@ -198,7 +198,8 @@ describe("ambient companion shell slot", () => {
       expect(avatar.closest('[data-slot="rail-page-header"]')).toBeTruthy();
       fireEvent.click(avatar);
       expect(await view.findByRole("button", { name: "Close pane" })).toBeTruthy();
-      expect(view.getAllByRole("button", { name: "Continue in Chat" })).toHaveLength(2);
+      expect(view.getAllByRole("button", { name: "Continue in Chat" })).toHaveLength(1);
+      expect(view.getAllByRole("button", { name: "New conversation" })).toHaveLength(1);
       fireEvent.click(view.getByRole("button", { name: "Close pane" }));
       fireEvent.click(view.getByRole("button", { name: "Open /chat" }));
       await waitFor(() => expect(document.querySelector('[data-slot="rail-workspace"] [data-slot="hover-card-trigger"]')).toBeTruthy());
