@@ -6,6 +6,7 @@ import { getFavicon, iconImageBytes, pngFromIco, validateFaviconHost } from "@/l
 import { hostOf } from "./cards";
 import type { NewsPictureWidth } from "./pictures";
 import type { ShelfItem } from "@/lib/shelf/shelfStore";
+import { bumpNewsCounter } from "./newsCounters";
 
 export { pngFromIco };
 
@@ -16,19 +17,20 @@ export async function publisherIconPicture(item: Pick<ShelfItem, "canonical_url"
     const validation = await validateFaviconHost(host);
     if (!validation.ok) return null;
     const icon = await getFavicon(validation.host, undefined, new Date(), "large");
-    if (!icon.found) return null;
+    if (!icon.found) { bumpNewsCounter("picture_icon_missing"); return null; }
     const height = Math.round((width * 9) / 16);
     const size = Math.round(height * 0.5);
     const image = await iconImageBytes(icon.bytes);
-    if (!image) return null;
+    if (!image) { bumpNewsCounter("picture_icon_unreadable"); return null; }
     const source = Buffer.from(image);
     const meta = await sharp(source).metadata();
-    if ((meta.width ?? 0) < 16 || (meta.height ?? 0) < 16) return null; // a 1x1 placeholder is not an icon
+    if ((meta.width ?? 0) < 16 || (meta.height ?? 0) < 16) { bumpNewsCounter("picture_icon_unreadable"); return null; } // a 1x1 placeholder is not an icon
     const glyph = await sharp(source).resize(size, size, { fit: "contain", background: { r: 0, g: 0, b: 0, alpha: 0 } }).png().toBuffer();
     const bytes = new Uint8Array(await sharp({ create: { width, height, channels: 3, background: { r: 38, g: 38, b: 42 } } })
       .composite([{ input: glyph, gravity: "centre" }]).webp({ quality: 82 }).toBuffer());
     return { bytes, etag: `"${createHash("sha1").update(bytes).digest("hex").slice(0, 24)}"` };
   } catch {
+    bumpNewsCounter("picture_icon_unreadable");
     return null; // an icon sharp cannot read (an .ico) leaves the card as it was
   }
 }

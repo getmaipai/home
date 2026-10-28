@@ -16,7 +16,7 @@ import { setHouseholdSettingValue } from "@/lib/settings";
 import { __resetRateLimiterForTests } from "@/lib/rateLimiter";
 import { __resetShelfCountersForTests } from "@/lib/shelf/shelfCounters";
 import { NEWS_COUNTER_NAMES, newsCounters, __resetNewsCountersForTests } from "@/lib/news/newsCounters";
-import { ensureAndPinNewsPicture, newsPicture, newsPictureCount, newsPictureCached, sweepNewsPictures } from "@/lib/news/pictures";
+import { __setNewsPictureDepsForTests, ensureAndPinNewsPicture, newsPicture, pictureFetchFailureReason, newsPictureCount, newsPictureCached, sweepNewsPictures } from "@/lib/news/pictures";
 import { sharedShelfStore } from "@/lib/shelf/shelfStore";
 import { TestClient } from "./client";
 import { child, owner, teen } from "./support/testAuth";
@@ -338,6 +338,39 @@ describe("the picture route", () => {
     expect(lead.title).toBe("Story with its own photo");
   });
 
+  test("each picture failure names one fixed reason, and a failure over IPv6 says so, never the host", async () => {
+    installNewsApp();
+    const who = await household();
+    __setNewsPictureDepsForTests({
+      dnsLookup: async () => ({ address: "2001:db8::1", family: 6 }),
+      request: async (url) => {
+        if (url.pathname.startsWith("/gone/")) return new Response("missing", { status: 404 });
+        throw Object.assign(new Error("connect EHOSTUNREACH"), { code: "EHOSTUNREACH" });
+      },
+    });
+    const gone = putItem(feeds.household, ADULT_HOST, { image: `${ADULT_HOST}/gone/a.png` });
+    const unreachable = putItem(feeds.household, ADULT_HOST, { image: `${ADULT_HOST}/img/a.png` });
+    expect((await who.adult.get(`/api/plugins/news/images/${gone.id}?w=480`)).status).toBe(200);
+    expect((await who.adult.get(`/api/plugins/news/images/${unreachable.id}?w=480`)).status).toBe(200);
+    const counts = newsCounters();
+    expect(counts["news.picture_failed_status"]).toBe(1);
+    expect(counts["news.picture_failed_network"]).toBe(1);
+    expect(counts["news.picture_failed_over_ip_six"]).toBe(2);
+    expect(counts["news.picture_failed"]).toBe(2);
+    expect(Object.keys(counts).join(" ")).not.toContain("example");
+  });
+
+  test("the failure reason comes from the error's code or name alone", () => {
+    const reason = (error: unknown) => pictureFetchFailureReason(error);
+    expect(reason(new DOMException("x", "AbortError"))).toBe("picture_failed_timeout");
+    expect(reason(Object.assign(new Error("getaddrinfo ENOTFOUND a.example"), { code: "ENOTFOUND" }))).toBe("picture_failed_dns");
+    expect(reason(Object.assign(new Error("x"), { code: "UNABLE_TO_VERIFY_LEAF_SIGNATURE" }))).toBe("picture_failed_tls");
+    expect(reason(Object.assign(new Error("x"), { code: "ERR_TLS_CERT_ALTNAME_INVALID" }))).toBe("picture_failed_tls");
+    expect(reason(Object.assign(new Error("x"), { code: "ECONNRESET" }))).toBe("picture_failed_network");
+    expect(reason(new Error("something else"))).toBe("picture_failed_other");
+    expect(reason(undefined)).toBe("picture_failed_other");
+  });
+
   test("a 429 stops that host: the next picture from it makes no request", async () => {
     installNewsApp();
     const who = await household();
@@ -354,6 +387,8 @@ describe("the picture route", () => {
     const who = await household();
     const text1 = putItem(feeds.household, ADULT_HOST, { image: `${ADULT_HOST}/text/a.png` });
     expect((await who.adult.get(`/api/plugins/news/images/${text1.id}?w=480`)).status).toBe(200);
+    expect(newsCounters()["news.picture_failed_type"]).toBe(1);
+    expect(newsCounters()["news.picture_failed"]).toBe(1);
     const priv = putItem(feeds.household, ADULT_HOST, { image: "http://192.168.1.5/x.png" });
     publisher.requests.length = 0;
     const before = publisher.requests.length;

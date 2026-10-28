@@ -16,13 +16,14 @@ import { createHash } from "node:crypto";
 import { existsSync, mkdirSync, readFileSync, renameSync, statSync, unlinkSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import sharp from "sharp";
+import { lookup as defaultLookup } from "node:dns/promises";
 import { assertNotPrivateHost, guardedFetch, SsrfBlockedError, type DnsLookup, type PinnedRequest } from "@maipai/core/src/ssrfGuard";
 import { cacheDir } from "@/lib/paths";
 import { HOME_USER_AGENT } from "@/lib/outbound";
 import { tryConsume } from "@/lib/rateLimiter";
 import { getHouseholdSettingValue } from "@/lib/settings";
 import { NEWS_IMAGES_KEY, NEWS_IMAGE_CACHE_MB_DEFAULT, NEWS_IMAGE_CACHE_MB_KEY, NEWS_IMAGE_CACHE_MB_MIN } from "@/settings/newsKeys";
-import { bumpNewsCounter } from "./newsCounters";
+import { bumpNewsCounter, type NewsCounterName } from "./newsCounters";
 import { focalPointOf, type FocalPoint } from "./focal";
 import { sharedShelfStore, type ShelfItem } from "@/lib/shelf/shelfStore";
 
@@ -154,16 +155,38 @@ async function perHost<T>(host: string, lane: Lane, task: () => Promise<T>): Pro
   }
 }
 
+/** The fixed reason a fetch threw, from the error's code or name alone (never its message, which can name the host). */
+export function pictureFetchFailureReason(error: unknown): NewsCounterName {
+  const err = error as { code?: unknown; name?: unknown; cause?: { code?: unknown } } | null | undefined;
+  const code = String(err?.code ?? err?.cause?.code ?? "");
+  const name = String(err?.name ?? "");
+  if (name === "AbortError" || name === "TimeoutError" || code === "ETIMEDOUT" || code === "ABORT_ERR") return "picture_failed_timeout";
+  if (code === "ENOTFOUND" || code === "EAI_AGAIN" || code === "EAI_NONAME" || code === "EAI_FAIL" || code === "ENODATA") return "picture_failed_dns";
+  if (/^(ERR_TLS|ERR_SSL|CERT_|UNABLE_TO_|DEPTH_ZERO|SELF_SIGNED|ERR_CERT)/.test(code)) return "picture_failed_tls";
+  if (/^(ECONNREFUSED|ECONNRESET|ENETUNREACH|EHOSTUNREACH|EPIPE|EADDRNOTAVAIL|ECONNABORTED|ENETDOWN|EHOSTDOWN|ConnectionRefused|ConnectionClosed|FailedToOpenSocket)$/.test(code)) return "picture_failed_network";
+  return "picture_failed_other";
+}
+
+function pictureFailed(reason: NewsCounterName, family?: number): void {
+  bumpNewsCounter("picture_failed");
+  bumpNewsCounter(reason);
+  if (family === 6) bumpNewsCounter("picture_failed_over_ip_six");
+}
+
 async function downloadOnce(imageUrl: string, band: AgeBand, lane: Lane = "view"): Promise<Uint8Array | null> {
   let url: URL;
   try { url = new URL(imageUrl); } catch { return null; }
   if (!/^https?:$/.test(url.protocol) || url.username || url.password || !urlAllowedFor(band, imageUrl)) return null;
   const host = url.hostname.toLowerCase();
   if (newsHostQuiet(host, clock())) { bumpNewsCounter("picture_host_quiet"); return null; }
+  // The address family the request was pinned to, so a failure can say whether it went over IPv6 (a number, never the address).
+  let family: number | undefined;
+  const lookup: DnsLookup = async (name) => { const found = await (deps.dnsLookup ?? defaultLookup)(name); family = found.family; return found; };
   try {
-    await assertNotPrivateHost(host, deps.dnsLookup);
+    await assertNotPrivateHost(host, lookup);
   } catch (error) {
-    bumpNewsCounter(error instanceof SsrfBlockedError ? "picture_ssrf_blocked" : "picture_failed");
+    if (error instanceof SsrfBlockedError) bumpNewsCounter("picture_ssrf_blocked");
+    else pictureFailed(pictureFetchFailureReason(error), family);
     return null;
   }
   return perHost(host, lane, async () => {
@@ -180,12 +203,12 @@ async function downloadOnce(imageUrl: string, band: AgeBand, lane: Lane = "view"
         response = await guardedFetch(current, {
           method: "GET", redirect: "manual", signal: controller.signal,
           headers: { "User-Agent": HOME_USER_AGENT, Accept: "image/avif,image/webp,image/jpeg,image/png" },
-        }, deps.dnsLookup, deps.request);
+        }, lookup, deps.request);
         if (response.status === 403 || response.status === 429) quietNewsHost(current.hostname.toLowerCase(), clock());
         const location = response.status >= 300 && response.status < 400 ? response.headers.get("location") : null;
         if (!location) break;
         await response.body?.cancel().catch(() => undefined);
-        if (hop >= MAX_REDIRECTS) return null;
+        if (hop >= MAX_REDIRECTS) { pictureFailed("picture_failed_redirects", family); return null; }
         current = new URL(location, current);
       }
       if (response.status === 429 || response.status === 403) {
@@ -194,16 +217,17 @@ async function downloadOnce(imageUrl: string, band: AgeBand, lane: Lane = "view"
         await response.body?.cancel().catch(() => undefined);
         return null;
       }
-      if (response.status !== 200) { await response.body?.cancel().catch(() => undefined); bumpNewsCounter("picture_failed"); return null; }
+      if (response.status !== 200) { await response.body?.cancel().catch(() => undefined); pictureFailed("picture_failed_status", family); return null; }
       const type = (response.headers.get("content-type") ?? "").split(";")[0]!.trim().toLowerCase();
-      if (!ACCEPTED_TYPES.has(type)) { await response.body?.cancel().catch(() => undefined); bumpNewsCounter("picture_failed"); return null; }
+      if (!ACCEPTED_TYPES.has(type)) { await response.body?.cancel().catch(() => undefined); pictureFailed("picture_failed_type", family); return null; }
       const declared = Number(response.headers.get("content-length"));
       if (Number.isFinite(declared) && declared > MAX_BYTES) { await response.body?.cancel().catch(() => undefined); bumpNewsCounter("picture_too_big"); return null; }
       const bytes = await readLimited(response, MAX_BYTES, controller.signal);
       if (!bytes) { bumpNewsCounter("picture_too_big"); return null; }
       return bytes;
     } catch (error) {
-      bumpNewsCounter(error instanceof SsrfBlockedError ? "picture_ssrf_blocked" : "picture_failed");
+      if (error instanceof SsrfBlockedError) bumpNewsCounter("picture_ssrf_blocked");
+      else pictureFailed(controller.signal.aborted ? "picture_failed_timeout" : pictureFetchFailureReason(error), family);
       return null;
     } finally {
       clearTimeout(timer);
@@ -218,6 +242,7 @@ async function resizeBoth(bytes: Uint8Array): Promise<Record<NewsPictureWidth, U
     for (const width of NEWS_PICTURE_WIDTHS) out[width] = new Uint8Array(await source.clone().resize({ width, withoutEnlargement: true }).webp({ quality: 80 }).toBuffer());
     return out;
   } catch {
+    bumpNewsCounter("picture_failed_resize");
     return null;
   }
 }
