@@ -60,3 +60,14 @@ describe("repeatNotes (NAT-05)", () => {
     expect(json.repeat.evidence).toBe("unchanged");
   });
 });
+
+describe("hedging dial hint (NAT-06)", () => {
+  const weatherWithChance = { callId: "c9", packageId: "weather", status: "succeeded", args: {}, result: { data: { precipitation_chance: 40 } } } as unknown as ToolExecutionOutcome;
+  const parse = (hedging?: "low" | "medium" | "high") => JSON.parse(toolResultContent(weatherWithChance, undefined, true, { ageBand: "adult", safetyFlagged: false, hedging }));
+  it("adds the hint only for low or high, beside a band below sure", () => {
+    expect(parse("high").hedging).toBe("high");
+    expect(parse("low").hedging).toBe("low");
+    expect(parse("medium").hedging).toBeUndefined();
+    expect(parse(undefined).hedging).toBeUndefined();
+  });
+});

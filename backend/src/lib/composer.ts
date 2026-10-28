@@ -1049,7 +1049,10 @@ function searchContent(payload: Record<string, unknown>, maxChars = SEARCH_SOURC
 export function toolResultContent(outcome: ToolExecutionOutcome, searchMaxChars?: number, spoken = false, certainty?: CertaintyGate): string {
   // NAT-03: the certainty band rides beside the fact (certainty.ts), gated by the listener.
   const repeat = certainty?.repeats?.get(outcome.callId);
-  const bands = { ...(certainty ? certaintyFields(outcome, certainty.ageBand, certainty.safetyFlagged) : {}), ...(repeat ? { repeat } : {}) };
+  const banded = certainty ? certaintyFields(outcome, certainty.ageBand, certainty.safetyFlagged) : {};
+  // NAT-06: the hedging dial is a per-request hint beside a band that is not "sure", never persona prose (rule 14).
+  const hedgeHint = certainty?.hedging && certainty.hedging !== "medium" && Object.values(banded).some((band) => band !== "sure") ? { hedging: certainty.hedging } : {};
+  const bands = { ...banded, ...hedgeHint, ...(repeat ? { repeat } : {}) };
   if (outcome.status === "succeeded" && outcome.packageId === "websearch") {
     const search = websearchPayload(outcome, spoken);
     if (search) Object.assign(search, bands);

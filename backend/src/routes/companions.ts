@@ -236,11 +236,14 @@ companionsRoutes.openapi(defaultRoute, (c) => {
 const fields = z.object({
   name: z.string().optional(), display_name: z.string().optional(), pronouns: z.string().nullable().optional(), tagline: z.string().optional(), backstory: z.string().optional(), interests: z.array(z.string()).optional(),
   formality: z.enum(["casual", "neutral", "formal"]).optional(), complexity: z.enum(["simple", "standard", "advanced"]).optional(), engagement: z.enum(["brief", "balanced", "curious"]).optional(), filler_density: z.enum(["none", "light", "frequent"]).optional(),
+  clock_style: z.enum(["formal", "plain", "loose"]).optional(), hedging: z.enum(["low", "medium", "high"]).optional(),
+  humor: z.enum(["low", "medium", "high"]).optional(), warmth: z.enum(["low", "medium", "high"]).optional(), initiative: z.enum(["low", "medium", "high"]).optional(),
   behavior: z.array(z.string()).optional(), examples: z.array(z.string()).optional(), examples_child: z.array(z.string()).optional(), examples_teen: z.array(z.string()).optional(), examples_adult: z.array(z.string()).optional(), voice_id: z.string().optional(), look_prompt: z.string().optional(),
 });
 function normalizedFields(value: z.infer<typeof fields>) {
-  const { name, ...rest } = value;
+  const { name, humor, warmth, initiative, ...rest } = value;
   const normalized: Record<string, unknown> = {};
+  if (humor || warmth || initiative) normalized.social = { humor: humor ?? "medium", warmth: warmth ?? "medium", initiative: initiative ?? "medium" };
   for (const [field, raw] of Object.entries(rest)) {
     if (typeof raw === "string") { const trimmed = raw.trim(); if (trimmed) normalized[field] = trimmed; }
     else if (Array.isArray(raw)) { const items = raw.map((item) => typeof item === "string" ? item.trim() : item).filter((item) => item !== ""); if (items.length) normalized[field] = items; }
@@ -646,7 +649,7 @@ companionsRoutes.openapi(editRoute, (c) => {
   const actor = c.get("person"), id = c.req.valid("param").id, manifest = getHouseholdCompanion(id);
   if (!manifest?.companion || !mayEdit(actor, id)) return c.json({ error: "No companion you can edit." }, 404);
   const look = readLook(id);
-  return c.json({ id, ...manifest.companion, name: manifest.companion.display_name, audience: manifest.companion.audience ?? "adult", status: manifest.companion.status ?? "ready", review: manifest.companion.review ?? null, can_edit: true, can_copy: speakerAgeBand(actor, new Date()) === "adult" || isOwnerOrAdmin(actor), can_set_audience: isOwnerOrAdmin(actor), look: { versions: look.versions.length, rest: look.rest, sheet_state: look.sheet?.state ?? "empty" }, states: { approved: Object.values(readStates(id).states).filter((s) => s?.approved).length, total: 12 } }, 200);
+  return c.json({ id, ...manifest.companion, humor: manifest.companion.social?.humor ?? "medium", warmth: manifest.companion.social?.warmth ?? "medium", initiative: manifest.companion.social?.initiative ?? "medium", clock_style: manifest.companion.clock_style ?? "plain", hedging: manifest.companion.hedging ?? "medium", name: manifest.companion.display_name, audience: manifest.companion.audience ?? "adult", status: manifest.companion.status ?? "ready", review: manifest.companion.review ?? null, can_edit: true, can_copy: speakerAgeBand(actor, new Date()) === "adult" || isOwnerOrAdmin(actor), can_set_audience: isOwnerOrAdmin(actor), look: { versions: look.versions.length, rest: look.rest, sheet_state: look.sheet?.state ?? "empty" }, states: { approved: Object.values(readStates(id).states).filter((s) => s?.approved).length, total: 12 } }, 200);
 });
 
 const updateRoute = createRoute({ method: "put", path: "/{id}", tags: ["Companions"], summary: "Edit a household companion", middleware: [requireAuth] as const,

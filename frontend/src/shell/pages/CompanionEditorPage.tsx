@@ -24,12 +24,17 @@ import { companionTemplates } from "@/shell/pages/companionTemplates";
 const key = ["companions"] as const;
 type Form = CompanionFields & Pick<CompanionEditable, "name" | "audience">;
 const splitPronouns = (value: string | null | undefined): string[] => (value ?? "").split(/[\/,]/).map((v) => v.trim()).filter(Boolean);
-const blank: Form = { name: "", pronouns: "", tagline: "", backstory: "", interests: [], formality: "neutral", complexity: "standard", engagement: "balanced", filler_density: "light", behavior: [], examples: [], examples_child: [], examples_teen: [], examples_adult: [], voice_id: "default", look_prompt: "", audience: "adult" };
+const blank: Form = { name: "", pronouns: "", tagline: "", backstory: "", interests: [], formality: "neutral", complexity: "standard", engagement: "balanced", filler_density: "light", clock_style: "plain", hedging: "medium", humor: "medium", warmth: "medium", initiative: "medium", behavior: [], examples: [], examples_child: [], examples_teen: [], examples_adult: [], voice_id: "default", look_prompt: "", audience: "adult" };
 const dialOptions = {
   formality: { label: "Formality", options: ["casual", "neutral", "formal"], words: ["Talks like a friend", "Plain and polite", "Careful and proper"] },
   complexity: { label: "Word choice", options: ["simple", "standard", "advanced"], words: ["Short, simple words", "Everyday words", "Rich, detailed words"] },
   engagement: { label: "Questions back", options: ["brief", "balanced", "curious"], words: ["Keeps it short and moves on", "Asks a follow-up now and then", "Asks you things back and wants to know more"] },
   filler_density: { label: "Casual chatter", options: ["none", "light", "frequent"], words: ["No filler words", "A few casual words, like honestly", "Lots of casual chatter"] },
+  clock_style: { label: "How it says the time", options: ["formal", "plain", "loose"], words: ["Says 4:00 PM", "Says four o'clock", "Says around four"] },
+  hedging: { label: "How sure it sounds", options: ["low", "medium", "high"], words: ["Says it plainly, even when unsure", "Says probably when it is not sure", "Often says probably and I think"] },
+  humor: { label: "Humor", options: ["low", "medium", "high"], words: ["Serious, no jokes", "A light joke now and then", "Jokes and plays often"] },
+  warmth: { label: "Warmth", options: ["low", "medium", "high"], words: ["Keeps feelings out of it", "Warm when it fits", "Warm and quick to react"] },
+  initiative: { label: "Starting things", options: ["low", "medium", "high"], words: ["Answers only what you ask", "Offers a next step sometimes", "Often asks and suggests more"] },
 } as const;
 function errorText(error: unknown) { return error instanceof ApiError ? error.message : "Could not reach Home. Check your connection and try again."; }
 function audienceWords(audience: Form["audience"]) { return audience === "adult" ? "Adults only" : audience === "teen" ? "Teens and adults" : "Everyone"; }
@@ -55,7 +60,7 @@ export function CompanionEditorPage() {
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [tab, setTab] = useState("identity");
   const dirty = isNew ? JSON.stringify(form) !== JSON.stringify(blank) : JSON.stringify(form) !== initial;
-  useEffect(() => { if (query.data) { const data = query.data; const next: Form = { ...blank, name: data.name, pronouns: data.pronouns, tagline: data.tagline, backstory: data.backstory, interests: data.interests, formality: data.formality, complexity: data.complexity, engagement: data.engagement, filler_density: data.filler_density, behavior: data.behavior, examples: data.examples, examples_child: data.examples_child, examples_teen: data.examples_teen, examples_adult: data.examples_adult, voice_id: data.voice_id, look_prompt: data.look_prompt ?? "", audience: data.audience }; setForm(next); setPronounRows(splitPronouns(data.pronouns)); setInitial(JSON.stringify(next)); } }, [query.data]);
+  useEffect(() => { if (query.data) { const data = query.data; const next: Form = { ...blank, name: data.name, pronouns: data.pronouns, tagline: data.tagline, backstory: data.backstory, interests: data.interests, formality: data.formality, complexity: data.complexity, engagement: data.engagement, filler_density: data.filler_density, clock_style: data.clock_style, hedging: data.hedging, humor: data.humor, warmth: data.warmth, initiative: data.initiative, behavior: data.behavior, examples: data.examples, examples_child: data.examples_child, examples_teen: data.examples_teen, examples_adult: data.examples_adult, voice_id: data.voice_id, look_prompt: data.look_prompt ?? "", audience: data.audience }; setForm(next); setPronounRows(splitPronouns(data.pronouns)); setInitial(JSON.stringify(next)); } }, [query.data]);
   useTabItem(form.name || "New companion");
   const showFieldErrors = (failure: unknown) => {
     if (!(failure instanceof ApiError) || !failure.fields) return;
@@ -63,7 +68,7 @@ export function CompanionEditorPage() {
     const first = Object.keys(failure.fields)[0];
     const identity = new Set(["name", "pronouns", "tagline", "backstory", "interests"]);
     setTab(first === "look_prompt" ? "appearance" : identity.has(first ?? "") ? "identity" : "voice");
-    const targetId: Record<string, string> = { name: "companion-name", pronouns: "pronouns 1", tagline: "companion-tagline", backstory: "companion-backstory", interests: "interests 1", formality: "Formality", complexity: "Word choice", engagement: "Questions back", filler_density: "Casual chatter", behavior: "behavior 1", examples: "example-lines 1", examples_child: "child-example-lines 1", examples_teen: "teen-example-lines 1", examples_adult: "adult-example-lines 1", voice_id: "Voice", look_prompt: "look-prompt" };
+    const targetId: Record<string, string> = { name: "companion-name", pronouns: "pronouns 1", tagline: "companion-tagline", backstory: "companion-backstory", interests: "interests 1", formality: "Formality", complexity: "Word choice", engagement: "Questions back", filler_density: "Casual chatter", clock_style: "How it says the time", hedging: "How sure it sounds", humor: "Humor", warmth: "Warmth", initiative: "Starting things", behavior: "behavior 1", examples: "example-lines 1", examples_child: "child-example-lines 1", examples_teen: "teen-example-lines 1", examples_adult: "adult-example-lines 1", voice_id: "Voice", look_prompt: "look-prompt" };
     requestAnimationFrame(() => { const target = targetId[first ?? ""] ?? ""; (document.getElementById(target) ?? document.querySelector(`[aria-label="${target}"]`))?.scrollIntoView({ behavior: "smooth", block: "center" }); });
   };
   const save = useMutation({ mutationFn: (fields: CompanionFields) => isNew ? api.createCompanion(fields) : api.updateCompanion(id!, fields), onSuccess: (result) => { setError(""); setFieldErrors({}); setForm((old) => ({ ...old })); if (isNew) navigate(`/companions/${encodeURIComponent(result.id)}/edit`); else { setInitial(JSON.stringify(form)); setSavedFlash(true); setTimeout(() => setSavedFlash(false), 1800); void queryClient.invalidateQueries({ queryKey: [...key, "edit", id] }); void queryClient.invalidateQueries({ queryKey: key }); } }, onError: (failure) => {

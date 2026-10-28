@@ -605,7 +605,7 @@ async function beginTurn(actor: PersonRow, surface: Surface, text: string, opts:
     surfaceClass,
     brevity: false,
     // ROBOT-COMPANION-01: every turn planned "direct" (no react, no question back); a robot with a companion assigned is not, so its dials decide.
-    companion: { directness: robotCompanion ? "diplomatic" as const : "direct" as const, engagement: persona.engagement, complexity: persona.complexity },
+    companion: { directness: robotCompanion ? "diplomatic" as const : "direct" as const, engagement: persona.engagement, complexity: persona.complexity, social: persona.social },
     band,
     deferred: false,
     disclosureWithheld: false,
@@ -954,11 +954,11 @@ function finalizeNextReply(state: TurnState, rawValue: TurnValue): TurnValue {
   const spokenTurn = surfaceClassOf(state.surface, state.spoken) === "spoken";
   // An authored speech text is kept as authored, and on a spoken turn it
   // is normalized like every other spoken text (one normalizer).
-  if (speech !== undefined && speech !== text) return spokenTurn ? { ...value, reply: { ...value.reply, speech: speechTextFor(state.surface, text, speech) } } : value;
+  if (speech !== undefined && speech !== text) return spokenTurn ? { ...value, reply: { ...value.reply, speech: speechTextFor(state.surface, text, speech, state.persona.clock_style) } } : value;
   const variedText = variedConstantReply(state.actor.id, value.source, text, state.persona.id);
   if (spokenTurn) {
     // A speech that only repeated the text follows the varied text (a review).
-    return { ...value, reply: { ...value.reply, text: variedText, speech: speechTextFor(state.surface, variedText, speech === undefined ? undefined : variedText) } };
+    return { ...value, reply: { ...value.reply, text: variedText, speech: speechTextFor(state.surface, variedText, speech === undefined ? undefined : variedText, state.persona.clock_style) } };
   }
   if (variedText === text) return value;
   return { ...value, reply: { ...value.reply, text: variedText, ...(speech === undefined ? {} : { speech: variedText }) } };

@@ -84,6 +84,12 @@ export interface Persona {
    * serves a real stance/emphasis function in teen speech specifically,
    * not meaningless hesitation noise. */
   filler_density: "none" | "light" | "frequent";
+  /** NAT-06: how this companion says a clock time aloud; absent is plain. Read by speechTextFor() as the normalizer's timeStyle (loose maps to plain). */
+  clock_style?: "formal" | "plain" | "loose";
+  /** NAT-06: how often a hedge appears when the evidence's certainty band is below sure; absent is medium. */
+  hedging?: "low" | "medium" | "high";
+  /** NAT-06: humor, warmth and initiative baselines the turn's signal can override; absent is medium. register.ts reads them. */
+  social?: { humor?: "low" | "medium" | "high"; warmth?: "low" | "medium" | "high"; initiative?: "low" | "medium" | "high" };
   /** 3 to 5 lines in the character's own voice (manifest.schema.json's
    * own field), composed as a short few-shot block by
    * `composePersonaPrompt()` below - legacy's own finding, "the single
@@ -117,7 +123,7 @@ export function personaFromManifest(id: string, manifest: import("@maipai/spec/g
   if (manifest.kind !== "companion" || !manifest.companion || (!allowDraft && manifest.companion.status && manifest.companion.status !== "ready")) return null;
   const c = manifest.companion;
   const audience = companionAudienceOf(c.audience, manifest.min_role);
-  return { id, display_name: c.display_name, ...(c.tagline !== undefined ? { tagline: c.tagline } : {}), audience, floor: companionFloor(audience), formality: c.formality, complexity: c.complexity, engagement: c.engagement, filler_density: c.filler_density, examples: c.examples, examples_by_band: { ...(c.examples_child ? { child: c.examples_child } : {}), ...(c.examples_teen ? { teen: c.examples_teen } : {}), ...(c.examples_adult ? { adult: c.examples_adult } : {}) }, behavior: c.behavior, status_phrases: c.status_phrases };
+  return { id, display_name: c.display_name, ...(c.tagline !== undefined ? { tagline: c.tagline } : {}), audience, floor: companionFloor(audience), formality: c.formality, complexity: c.complexity, engagement: c.engagement, filler_density: c.filler_density, ...(c.clock_style ? { clock_style: c.clock_style } : {}), ...(c.hedging ? { hedging: c.hedging } : {}), ...(c.social ? { social: c.social } : {}), examples: c.examples, examples_by_band: { ...(c.examples_child ? { child: c.examples_child } : {}), ...(c.examples_teen ? { teen: c.examples_teen } : {}), ...(c.examples_adult ? { adult: c.examples_adult } : {}) }, behavior: c.behavior, status_phrases: c.status_phrases };
 }
 function loadPersonaCatalog(): Persona[] {
   const out: Persona[] = [];

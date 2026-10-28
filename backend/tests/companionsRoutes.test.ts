@@ -303,6 +303,17 @@ describe("companion look generation jobs", () => {
 });
 
 describe("household companion routes", () => {
+  test("register dials save flat, store social nested, and read back flat (NAT-06)", async () => {
+    const author = addPerson("person-dials-author", "adult");
+    const created = createHouseholdCompanion({ ...fixture(), display_name: "Dials" }, { display_name: "Author", person_id: "person-dials-author" });
+    if (!created.ok) throw new Error(created.error);
+    const saved = await request(`companions/${created.value.id}`, author, "PUT", { clock_style: "loose", hedging: "high", humor: "low", warmth: "high", initiative: "low" });
+    expect(saved.status).toBe(200);
+    expect(getHouseholdCompanion(created.value.id)?.companion).toMatchObject({ clock_style: "loose", hedging: "high", social: { humor: "low", warmth: "high", initiative: "low" } });
+    expect(await (await request(`companions/${created.value.id}/edit`, author)).json()).toMatchObject({ clock_style: "loose", hedging: "high", humor: "low", warmth: "high", initiative: "low" });
+    expect((await request(`companions/${created.value.id}`, author, "PUT", { hedging: "extreme" })).status).toBe(400);
+  });
+
   test("look upload accepts real person photos without a content consent prompt", async () => {
     const adult = addPerson("person-look-adult", "adult");
     const created = createHouseholdCompanion({ ...fixture(), display_name: "Look upload" }, { display_name: "Author", person_id: "person-look-adult" });

@@ -25,6 +25,7 @@ const fieldLabels: Record<string, string> = {
   behavior: "Behavior lines", examples: "Example lines", examples_child: "Child example lines", examples_teen: "Teen example lines",
   examples_adult: "Adult example lines", voice_id: "Voice", look_prompt: "Look prompt", formality: "Formality",
   complexity: "Word choice", engagement: "Questions back", filler_density: "Casual chatter",
+  clock_style: "How it says the time", hedging: "How sure it sounds", social: "Humor, warmth and initiative",
 };
 type WriteResult = { ok: true; value: Manifest } | { ok: false; error: string; fields?: Record<string, string> };
 function validationMessage(issue: { code: string; path: PropertyKey[]; minimum?: number | bigint; maximum?: number | bigint; origin?: string; message: string }, manifest: Manifest): { field: string; message: string } | null {
@@ -103,7 +104,7 @@ export function createHouseholdCompanion(input: Companion, author: CompanionAuth
 }
 export function updateHouseholdCompanion(id: string, patch: Partial<Companion>): WriteResult {
   const current = read(id); if (!current?.companion) return { ok: false, error: "That household companion could not be found." };
-  const allowed = ["display_name", "pronouns", "tagline", "backstory", "interests", "formality", "complexity", "engagement", "filler_density", "behavior", "examples", "examples_child", "examples_teen", "examples_adult", "voice_id", "look_prompt"] as const;
+  const allowed = ["display_name", "pronouns", "tagline", "backstory", "interests", "formality", "complexity", "engagement", "filler_density", "clock_style", "hedging", "social", "behavior", "examples", "examples_child", "examples_teen", "examples_adult", "voice_id", "look_prompt"] as const;
   const fields = Object.fromEntries(allowed.filter((key) => Object.hasOwn(patch, key)).map((key) => [key, patch[key]]));
   return write({ ...current, companion: { ...current.companion, ...fields } });
 }

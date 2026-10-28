@@ -352,6 +352,7 @@ export type CompanionStatus = "draft" | "ready" | "rendering" | "needs_review";
 export interface CompanionEditable {
   id: string; name: string; pronouns: string | null; tagline: string; backstory: string; interests: string[];
   formality: "casual" | "neutral" | "formal"; complexity: "simple" | "standard" | "advanced"; engagement: "brief" | "balanced" | "curious"; filler_density: "none" | "light" | "frequent";
+  clock_style?: "formal" | "plain" | "loose"; hedging?: "low" | "medium" | "high"; humor?: "low" | "medium" | "high"; warmth?: "low" | "medium" | "high"; initiative?: "low" | "medium" | "high";
   behavior: string[]; examples: string[]; examples_child: string[]; examples_teen: string[]; examples_adult: string[]; voice_id: string; look_prompt: string; audience: "adult" | "teen" | "all"; status: CompanionStatus; review: unknown; can_edit: boolean; can_copy: boolean; can_set_audience: boolean; look: { versions: number; rest: string | null; sheet_state: "empty" | "making" | "needs_review" | "approved" }; states: { approved: number; total: number };
 }
 export type CompanionFields = Partial<Omit<CompanionEditable, "id" | "status" | "review" | "can_edit" | "can_set_audience" | "look" | "states">>;

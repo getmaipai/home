@@ -862,6 +862,7 @@ const modelRound: Node<ModelInput, ModelOutput> = async (state, input, signal) =
     const certaintyGate = {
       ageBand: state.planBasis.band,
       safetyFlagged: state.safety.flagged,
+      hedging: state.persona.hedging,
       repeats: repeatNotes(phrasedOutcomes, { conversationId: state.conversationId, turnId: state.turnId, surfaceClass: surfaceClass === "spoken" ? "spoken" : "written", ageBand: state.planBasis.band, safetyFlagged: state.safety.flagged, nowMs: Date.now() }),
     };
     // THIN-4F: a spoken surface's answering round re-reads only the top rows' short text.

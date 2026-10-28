@@ -18,4 +18,11 @@ describe("speechTextFor with the household clock", () => {
     const spoken = speechTextFor("phone", "The alarm is at 6:00 am.", undefined);
     expect(spoken).toContain("morning");
   });
+
+  test("a formal clock_style keeps the part of day, plain and loose drop it (NAT-06)", () => {
+    __setPromptClockForBench(() => new Date(2026, 9, 28, 15, 0));
+    expect(speechTextFor("phone", "Dinner is at 4:00 pm.", undefined, "formal")).toContain("P M");
+    expect(speechTextFor("phone", "Dinner is at 4:00 pm.", undefined, "plain")).toContain("four o'clock");
+    expect(speechTextFor("phone", "Dinner is at 4:00 pm.", undefined, "loose")).toContain("four o'clock");
+  });
 });

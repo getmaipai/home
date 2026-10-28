@@ -518,8 +518,9 @@ export function variedConstantReply(personId: string, source: TurnValue["source"
 }
 
 /** NAT-02: the household clock the speech normalizer reads, so "4:00 pm" said at 3 pm is "four o'clock". */
-function spokenClock() {
-  return { now: promptNow(), timeZone: hubTimeZone(), timeStyle: "plain" as const };
+function spokenClock(clockStyle?: "formal" | "plain" | "loose") {
+  // NAT-06: formal keeps the part of day; plain and loose read "four o'clock" (the normalizer never rounds, so loose is plain here).
+  return { now: promptNow(), timeZone: hubTimeZone(), timeStyle: clockStyle === "formal" ? ("formal" as const) : ("plain" as const) };
 }
 
 /** The server-side speech text of a spoken reply, and the one way any
@@ -532,10 +533,10 @@ function spokenClock() {
  * every other surface the whole text. The default path's
  * turnMachine/turnNext.ts calls this function (THIN-0J, rule 12). The
  * output is for TTS only; the visible text is never replaced by it. */
-export function speechTextFor(surface: Surface, text: string, authoredSpeech: string | undefined): string {
-  if (authoredSpeech !== undefined && authoredSpeech !== text) return normalizeForSpeech(authoredSpeech, spokenClock());
+export function speechTextFor(surface: Surface, text: string, authoredSpeech: string | undefined, clockStyle?: "formal" | "plain" | "loose"): string {
+  if (authoredSpeech !== undefined && authoredSpeech !== text) return normalizeForSpeech(authoredSpeech, spokenClock(clockStyle));
   const spoken = surface === "robot" && authoredSpeech === undefined ? splitIntoSentences(text)[0]?.replace(/https?:\/\/\S+|www\.\S+/g, "").replace(/\s+/g, " ").trim() ?? "" : text;
-  return normalizeForSpeech(spoken, spokenClock());
+  return normalizeForSpeech(spoken, spokenClock(clockStyle));
 }
 
 /** FAST-04: what a turn's token stream resolves to once its deltas are

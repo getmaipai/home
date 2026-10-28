@@ -22,6 +22,8 @@ export interface PlanInput {
     engagement: Persona["engagement"];
     vocabulary?: Persona["complexity"];
     complexity?: Persona["complexity"];
+    /** NAT-06: low removes the optional move, high allows it; medium or absent changes nothing. */
+    social?: Persona["social"];
   };
   band: TurnSignal["age_band"];
   deferred: boolean;
@@ -171,6 +173,14 @@ export function planFor(input: PlanInput): ReplyPlan {
   // ROBOT-VOICE-02: a lively companion reacts first on a spoken turn whatever the act ("tell me a joke" gets "Ooh!" before the joke); only
   // care (sadness, fear), anger at the hub and brevity take that away, because they run on the lines around this one.
   if (input.companion.engagement === "curious" && (input.surfaceClass ?? "spoken") === "spoken" && !input.brevity && plan.care !== "required" && !(signal.expressed_emotion === "anger" && signal.target === "hub")) allow("react");
+  // NAT-06: the companion's social baselines. They sit before the brevity and anger rules below so those still win, and before
+  // the emotion check on playfulness is applied here (sadness, fear and anger already set it forbidden above and stay so).
+  const social = input.companion.social;
+  if (social?.humor === "low") playfulness = "forbidden";
+  if (social?.warmth === "low") forbid("react");
+  if (social?.warmth === "high" && plan.care !== "required" && (signal.primary_act === "inform" || signal.primary_act === "commissive")) allow("react");
+  if (social?.initiative === "low") forbid("ask_back");
+  if (social?.initiative === "high" && (signal.primary_act === "inform" || signal.primary_act === "commissive")) allow("ask_back");
   if (input.brevity) forbid("react", "ask_back");
   if (signal.expressed_emotion === "anger" && signal.target === "hub") {
     plan.react = "forbidden";

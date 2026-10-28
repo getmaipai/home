@@ -55897,6 +55897,46 @@
                       "frequent"
                     ]
                   },
+                  "clock_style": {
+                    "type": "string",
+                    "enum": [
+                      "formal",
+                      "plain",
+                      "loose"
+                    ]
+                  },
+                  "hedging": {
+                    "type": "string",
+                    "enum": [
+                      "low",
+                      "medium",
+                      "high"
+                    ]
+                  },
+                  "humor": {
+                    "type": "string",
+                    "enum": [
+                      "low",
+                      "medium",
+                      "high"
+                    ]
+                  },
+                  "warmth": {
+                    "type": "string",
+                    "enum": [
+                      "low",
+                      "medium",
+                      "high"
+                    ]
+                  },
+                  "initiative": {
+                    "type": "string",
+                    "enum": [
+                      "low",
+                      "medium",
+                      "high"
+                    ]
+                  },
                   "behavior": {
                     "type": "array",
                     "items": {
@@ -56674,6 +56714,46 @@
                       "none",
                       "light",
                       "frequent"
+                    ]
+                  },
+                  "clock_style": {
+                    "type": "string",
+                    "enum": [
+                      "formal",
+                      "plain",
+                      "loose"
+                    ]
+                  },
+                  "hedging": {
+                    "type": "string",
+                    "enum": [
+                      "low",
+                      "medium",
+                      "high"
+                    ]
+                  },
+                  "humor": {
+                    "type": "string",
+                    "enum": [
+                      "low",
+                      "medium",
+                      "high"
+                    ]
+                  },
+                  "warmth": {
+                    "type": "string",
+                    "enum": [
+                      "low",
+                      "medium",
+                      "high"
+                    ]
+                  },
+                  "initiative": {
+                    "type": "string",
+                    "enum": [
+                      "low",
+                      "medium",
+                      "high"
                     ]
                   },
                   "behavior": {

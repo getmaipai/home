@@ -245,6 +245,8 @@ humor, disfluency and filler side is the same surface as REG-02, so NAT-06 exten
 `speech_style` in the same Companions app form and follows the same rule: the household changes the rate, the author owns the
 words. The existing `formality` dimension is an input to the defaults so authors do not set three dials by hand.
 
+**As built, NAT-06a (2026-10-28):** `spec-v0.1.262` adds `clock_style`, `hedging` and `social` {humor, warmth, initiative} to the companion block. `clock_style` formal keeps "4:00 PM" and plain or loose say "four o'clock" (the normalizer never rounds, so loose equals plain). `hedging` low or high rides in the certainty evidence only when a fact is below sure. `social` shapes the reply plan: low humor forbids playfulness, low warmth forbids `react`, high warmth allows `react` on inform and commissive turns, low initiative forbids `ask_back`, high initiative allows it; required care and age gates always win. The Companions editor shows the five dials beside the existing four; the API takes `humor`, `warmth` and `initiative` flat and stores them under `social`. **Deferred to NAT-06b:** the `wants_advice` signal (needs a TurnSignal spec change, classifier work and another tag).
+
 ### 3.8 NAT-07: warmth over time (M, separate design)
 
 Open threads ("how'd the interview go?"), a relationship arc ("it's been a few weeks"), a short-lived mood tier (3 to 7 days),

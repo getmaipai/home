@@ -208,3 +208,29 @@ describe("ROBOT-VOICE-03: the tie-in is rare, relevant to a turn that says somet
     expect(text).toContain("most replies bring nothing back");
   });
 });
+
+describe("planFor social dials (NAT-06)", () => {
+  const withSocial = (social: NonNullable<PlanInput["companion"]["social"]>, over: Partial<PlanInput> = {}) =>
+    input(base("inform"), { companion: { directness: "diplomatic", engagement: "balanced", social }, ...over });
+  test("absent or medium changes nothing", () => {
+    expect(planFor(withSocial({ humor: "medium", warmth: "medium", initiative: "medium" }))).toEqual(planFor(withSocial({})));
+  });
+  test("low humor forbids playfulness, low warmth drops the optional react, low initiative drops the question back", () => {
+    const plan = planFor(withSocial({ humor: "low", warmth: "low", initiative: "low" }));
+    expect(plan.playfulness).toBe("forbidden");
+    expect(plan.moves.react).toBe("forbidden");
+    expect(plan.moves.ask_back).toBe("forbidden");
+  });
+  test("high initiative allows a question back for a brief companion, but brevity still wins", () => {
+    const brief = { directness: "diplomatic" as const, engagement: "brief" as const, social: { initiative: "high" as const } };
+    expect(planFor(input(base("inform"), { companion: brief })).moves.ask_back).toBe("allowed");
+    expect(planFor(input(base("inform"), { companion: brief, brevity: true })).moves.ask_back).toBe("forbidden");
+  });
+  test("high warmth never overrides required care", () => {
+    const plan = planFor(input(base("inform", "sadness", "moderate"), { companion: { directness: "diplomatic", engagement: "balanced", social: { warmth: "high", humor: "high" } } }));
+    const baseline = planFor(input(base("inform", "sadness", "moderate")));
+    expect(plan.moves.care).toBe("required");
+    expect(plan.moves).toEqual(baseline.moves);
+    expect(plan.playfulness).toBe("forbidden");
+  });
+});

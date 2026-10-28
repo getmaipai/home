@@ -27,6 +27,8 @@ export interface CertaintyGate {
   ageBand: "child" | "teen" | "adult";
   safetyFlagged: boolean;
   /** NAT-05: per call id, the typed "same question again" note (echo.ts); rides beside the band in the evidence. */
+  /** NAT-06: the companion's hedging dial; low or high adds a `hedging` hint beside a band below sure, medium or absent adds nothing. */
+  hedging?: "low" | "medium" | "high";
   repeats?: ReadonlyMap<string, import("@/lib/echo").RepeatNote>;
 }
 
