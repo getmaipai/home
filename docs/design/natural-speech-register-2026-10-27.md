@@ -139,7 +139,7 @@ Extend `spec/llm/naturalness-corpus.json` from 9 rows to about 30, and make the 
 | hedge_scales | the same at 30% and 90% | the same hedge word at both ends |
 | hedge_stack | "how warm will it be" | one bare number with no approximator |
 | evidential_memory | "what did I say Pippa's recital time was" (low-confidence memory) | a flat claim with no "I think" or "if I remember right" |
-| reask_short | the same question twice in a row | the second answer as long as the first |
+| reask_short | the same question twice in a row, spoken surface only | the second answer as long as the first |
 | reask_changed | the same, value changed | no mention that it changed |
 | price_round | "how much was that" ($29.97) | "$29.97" |
 | price_exact | "how much do I owe" ($29.97 due) | a rounded amount |
@@ -155,7 +155,8 @@ model, and the A/B comparison against the pre-slice prompt must show no loss on 
 
 ### 3.3 NAT-02: clock times the way a person says them (S-M, spec first)
 
-`normalizeForSpeech` gains an optional `now` and a `timeStyle`. Rules, in order:
+`normalizeForSpeech` gains an optional `now` and a `timeStyle` (`formal` keeps the part of day and says "four P M"; `plain` is the table
+below; NAT-06's `clock_style` supplies it per companion). Rules, in order:
 
 | Input | Situation | Spoken form |
 |---|---|---|
@@ -183,8 +184,8 @@ Replace the two hedging sentences with one short paragraph in both policy twins,
 | Certainty | Comes from | Typical words |
 |---|---|---|
 | sure | the household's own record, a live reading | no hedge ("It's 72 in the living room.") |
-| likely | forecast at or above 60%, a well-sourced search hit (a result whose typed `source` is a primary or official page) | "probably", "looks like", "should be" |
-| maybe | forecast 30 to 60%, a single weak source (any other typed `source`) | "might", "could", "maybe" |
+| likely | forecast at or above 60%, a retained outcome whose `OutcomeSource.kind` is `reference` (the offline library) | "probably", "looks like", "should be" |
+| maybe | forecast 30 to 60%, a single `web` source (`OutcomeSource.kind` is `web`); two agreeing `web` sources count as likely | "might", "could", "maybe" |
 | unlikely | forecast under 30% | "probably not", "doubt it" |
 | recalled | a stored memory with low confidence or age | "if I remember right", "I think" |
 | reported | a web page, a news item, something the person told it about someone else | "apparently", "it says", "they're saying" |
@@ -193,8 +194,10 @@ The paragraph states the principle (match the hedge to the certainty and the sou
 seventy, I'd guess") and gives three before-and-after pairs. The word lists above are guidance for authors, not code that scans a
 reply. A typed outcome (CHAT-15's `source`, `as_of`) gains `certainty`; the weather package maps its probability to the band
 (spec first, then the package). Child and teen listeners get the sure and likely bands only for anything touching safety; a
-safety instruction is never hedged. "Touching safety" is the typed outcome's existing safety flag (the child floor's own marker),
-not a reading of the person's words.
+safety instruction is never hedged. "Touching safety" is the turn's existing safety result,
+not a reading of the person's words. No new field: it is `state.safety.flagged` (`SafetyResult` in `turnMachine/contract.ts`) on the
+turn, and a listener under the age gate gets sure and likely bands only while it is true. A new "official source" type is not
+added; if one is wanted later it goes into `commons/spec` first.
 
 ### 3.5 NAT-04: a spoken form beside every exact value (M)
 
@@ -218,8 +221,9 @@ catalog weather, price and distance packages adopt it one at a time; nothing bre
 
 The turn state keeps the last answer's subject, its evidence fingerprint and its `say` text. If the same subject is asked again
 within a short window, the reply plan gains a move `echo`: unchanged evidence allows "Still X." or a shorter paraphrase; changed
-evidence requires naming the change ("Seven minutes now, was ten."). Unless the person said they did not hear it. This reuses
-the existing move table in `register.ts` and needs no new subsystem. Constraints: `echo` is a reply-plan move chosen from typed
+evidence requires naming the change ("Seven minutes now, was ten."). The model decides, from the conversation, whether the person did not hear it; the shortening is allowed, never required. This reuses
+the existing move table in `register.ts` and needs no new subsystem. Surface scope (rule 5): the shortening applies only on spoken turns and on child or teen chat, which keep their own limits. On adult
+written chat `echo` may only require naming a change; no instruction shortens the answer. Constraints: `echo` is a reply-plan move chosen from typed
 state (subject id, fingerprint, elapsed time), never from matching the person's words; it never applies on a child or teen
 safety subject; the record holds ids and fingerprints, not reply text (rule 6a).
 
@@ -290,7 +294,7 @@ picks off-the-shelf end-of-turn models and measures them), and percentage slider
 1. **NAT-01 (S):** corpus to about 30 rows, bench prints a pass count per mechanic, baseline run on the chat model and on the
    local coder model. Reported before any other slice starts.
 2. **NAT-02 (S-M):** spec: `now` and `timeStyle` in `normalizeForSpeech`, fixtures from the table in 3.3; pin; hub passes the
-   household clock. Needs the time-zone question answered.
+   household clock from `hubTimeZone()`.
 3. **NAT-03 (S-M):** `certainty` on typed outcomes, the weather package maps it, the policy paragraph replaces two sentences in both
    twins.
 4. **NAT-04 (M):** the shared rounding helper, `say` and `exact` on outcomes, weather, price and distance packages adopt.
@@ -306,7 +310,6 @@ counts recorded in the BACKLOG item; a slice that does not move its rows is reve
 
 - Whether the persona-flavored confirmation rewrite (Loki Doki's `personaFlavorReply`) exists in `turnNext.ts`. A grep matched
   the file; I did not read the code.
-- Whether Home has a household time zone setting the normalizer can read.
 - The text of chat rules 1 to 3 beyond the AGENTS.md summary; the architect should check that shaping the evidence stays on the
   allowed side of "no output rewriting".
 - A real-model run of the current bench. Every statement about how the model behaves today rests on Loki Doki's recorded probe
