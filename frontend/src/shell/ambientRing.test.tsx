@@ -3,7 +3,7 @@ import { cleanup, fireEvent, render } from "@testing-library/react";
 import { useEffect } from "react";
 import { CompanionAvatar } from "@maipai/ui/src/elements/companion-avatar";
 import { CompanionPreview } from "@maipai/ui/src/elements/companion-preview";
-import { AmbientRingProvider, ambientRingFromWake, effectiveAmbientRing, useAmbientRing, useAmbientRingValue, useAmbientWake } from "@/shell/ambientRing";
+import { AmbientRingProvider, ambientRingFromWake, chatAmbientRing, effectiveAmbientRing, useAmbientRing, useAmbientRingValue, useAmbientWake } from "@/shell/ambientRing";
 
 const clips = { idle: { h264: "/idle.mp4", still: "/idle.png", loop: true } };
 
@@ -49,5 +49,21 @@ describe("ambient ring and wake preview", () => {
     const view = render(<AmbientRingProvider wake={{ listening: "Listening for the wake word", onTurnOff }}><WakePreview /></AmbientRingProvider>);
     fireEvent.click(await view.findByRole("button", { name: "Turn off" }));
     expect(onTurnOff).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("chatAmbientRing", () => {
+  const idle = { listening: false, speaking: false, thinking: false, responding: false, forAmbientCompanion: true };
+  test("thinking, then responding while text streams, then nothing", () => {
+    expect(chatAmbientRing({ ...idle, thinking: true })).toBe("thinking");
+    expect(chatAmbientRing({ ...idle, responding: true })).toBe("speaking");
+    expect(chatAmbientRing(idle)).toBeNull();
+  });
+  test("a chat with another companion never thinks or responds on this companion's ring", () => {
+    expect(chatAmbientRing({ ...idle, thinking: true, forAmbientCompanion: false })).toBeNull();
+    expect(chatAmbientRing({ ...idle, responding: true, speaking: true, forAmbientCompanion: false })).toBeNull();
+  });
+  test("the person's own mic still shows listening for any companion", () => {
+    expect(chatAmbientRing({ ...idle, listening: true, forAmbientCompanion: false })).toBe("listening");
   });
 });

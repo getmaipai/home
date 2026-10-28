@@ -8,6 +8,14 @@ export function ambientRingFromWake(indicator: Pick<NonNullable<AmbientWakeIndic
 export function effectiveAmbientRing(pane: AmbientRing, chat: AmbientRing, wake: AmbientRing): AmbientRing {
   return pane === "thinking" || pane === "speaking" ? pane : chat ?? wake;
 }
+/** The ring the chat page asks for. The mic belongs to the person, so listening shows for any companion; thinking and responding show only for the ambient companion
+ * itself, so a chat with another companion never lights the avatar of this one. A reply that is streaming text counts as responding, and the strongest ring shows for it. */
+export function chatAmbientRing(input: { listening: boolean; speaking: boolean; thinking: boolean; responding: boolean; forAmbientCompanion: boolean }): AmbientRing {
+  if (input.listening) return "listening";
+  if (!input.forAmbientCompanion) return null;
+  if (input.speaking || input.responding) return "speaking";
+  return input.thinking ? "thinking" : null;
+}
 const noopRing: Dispatch<SetStateAction<AmbientRing>> = () => {};
 const noopWake: Dispatch<SetStateAction<AmbientWakeIndicator>> = () => {};
 const AmbientRingContext = createContext<[AmbientRing, Dispatch<SetStateAction<AmbientRing>>]>([null, noopRing]);

@@ -69,7 +69,7 @@ import { VoiceSessionProvider } from "@/apps/chat/voiceSessionContext";
 import { DictationLevelMeterProvider } from "@/apps/chat/composerDictationWaveform";
 import { ChatAvailabilityContext, useChatAvailability, useChatComposerNotice, useVoiceAvailable } from "@/apps/chat/useChatAvailability";
 import { useAmbientCompanion } from "@/shell/useAmbientCompanion";
-import { useSetAmbientRing, useSetAmbientWake } from "@/shell/ambientRing";
+import { chatAmbientRing, useSetAmbientRing, useSetAmbientWake } from "@/shell/ambientRing";
 import { assistantText, isListening, isSpeaking as speakingSignal, isThinking, type SignalMessage } from "@/apps/chat/useCompanionSignals";
 import { useLiveVoiceSession, WAKE_SESSION_IDLE_CLOSE_MS } from "@/apps/chat/liveVoiceSession";
 import { createLocalImageAttachmentAdapter } from "@/apps/chat/localImageAttachmentAdapter";
@@ -1043,14 +1043,24 @@ function ProjectResultReload() {
   return null;
 }
 
-function ChatAmbientRing({ isSpeaking, voiceListening, wakeListening }: { isSpeaking: boolean; voiceListening: boolean; wakeListening: boolean }) {
+function ChatAmbientRing({ isSpeaking, voiceListening, wakeListening, person, conversationId }: { isSpeaking: boolean; voiceListening: boolean; wakeListening: boolean; person: Roster; conversationId?: string }) {
   const messages = useAuiState((state) => state.thread.messages);
+  const companionList = useQuery({ queryKey: ["companions"], queryFn: api.companions });
+  const personSettings = useQuery({ queryKey: ["settingsValues", `person:${person.id}`], queryFn: () => api.settingsValues(`person:${person.id}`) });
+  const conversation = useQuery({ queryKey: ["conversation", conversationId], queryFn: () => api.conversation(conversationId!), enabled: Boolean(conversationId) });
+  const pickedId = Array.isArray(personSettings.data) ? personSettings.data.find((setting) => setting.key === "persona.active_id")?.value : undefined;
+  const ambientId = (typeof pickedId === "string" && companionList.data?.companions?.some(({ id }) => id === pickedId) ? pickedId : undefined) ?? companionList.data?.default_id ?? null;
+  const forAmbientCompanion = (conversation.data?.companion_id ?? ambientId) === ambientId;
   const running = useAuiState((state) => state.thread.isRunning);
   const dictating = useAuiState((state) => state.composer.dictation != null);
   const last = [...messages].reverse().find((message) => message.role === "assistant") as SignalMessage | undefined;
-  const ring = isListening(dictating || voiceListening || wakeListening)
-    ? "listening"
-    : speakingSignal(isSpeaking) ? "speaking" : isThinking(running, last) && assistantText(last).length === 0 ? "thinking" : null;
+  const ring = chatAmbientRing({
+    listening: isListening(dictating || voiceListening || wakeListening),
+    speaking: speakingSignal(isSpeaking),
+    thinking: isThinking(running, last) && assistantText(last).length === 0,
+    responding: running && assistantText(last).length > 0,
+    forAmbientCompanion,
+  });
   useSetAmbientRing(ring);
   return null;
 }
@@ -1563,7 +1573,7 @@ export function ChatPage({ person }: { person: Roster }) {
 
   return (
     <AssistantRuntimeProvider runtime={runtime}>
-      <ChatAmbientRing isSpeaking={isSpeaking} voiceListening={voiceSession.mode === "listening"} wakeListening={chatWake.indicator?.listening.startsWith("Listening for") === true} />
+      <ChatAmbientRing isSpeaking={isSpeaking} voiceListening={voiceSession.mode === "listening"} wakeListening={chatWake.indicator?.listening.startsWith("Listening for") === true} person={person} conversationId={temporaryNext ? undefined : draftConversationId} />
       <ChatAvailabilityContext.Provider value={chatAvailability}>
       <ChatComposerNoticeContext.Provider value={composerNotice}>
       <ArtifactOpenContext.Provider value={setOpenArtifactId}>
