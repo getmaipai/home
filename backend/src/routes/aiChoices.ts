@@ -21,6 +21,7 @@ import { ensureWakewordAssets, removeWakewordAssets, wakewordAssetState } from "
 import { setHouseholdSettingValue } from "@/lib/settings";
 import { catalogEntries } from "@/lib/modelCatalog";
 import { startChatModelChoice, uncensoredChoiceState } from "@/lib/chatModelSwitch";
+import { addChatModel, AddModelError, inspectForAdd } from "@/lib/addModel";
 import { readAiSettings } from "@/lib/aiChoicesState";
 import { resetInstallStatusCache } from "@/lib/installStatus";
 import { dropPictureStatusCache } from "@/lib/pictures/ready";
@@ -385,4 +386,45 @@ aiChoicesRoutes.openapi(cleanupRoute, async (c) => {
   }
   if (freed > 0) dropModelCaches();
   return c.json({ results, freed_bytes: freed, kept, failed }, 200);
+});
+
+const SourceBody = z.object({ source: z.string().trim().min(1).max(500), file: z.string().trim().min(1).max(300).optional() });
+const InspectedSchema = z.object({
+  repo: z.string(), file: z.string(), sizeBytes: z.number(), sha256: z.string(), licence: z.string().nullable(), architecture: z.string(),
+  verifiedArchitecture: z.boolean(), ramBytes: z.number(), fits: z.enum(["fits", "estimate"]).describe("fits: the architecture is one MaiPai has verified; estimate: the dry run decides before load"),
+});
+const addRefusals = errorResponses({ 400: "The link or file cannot be added (the message says why)", 401: "Not signed in", 403: "Admins only", 409: "It cannot be added right now (the message says why)", 502: "The engine did not answer" });
+
+function addFailure(c: { json: (body: unknown, status: never) => Response }, error: unknown): Response {
+  if (error instanceof AddModelError) return c.json({ error: error.message, code: "add_model" }, error.status as never);
+  throw error;
+}
+
+const inspectRoute = createRoute({
+  method: "post", path: "/models/inspect", tags: ["AI"], summary: "Read a pasted Hugging Face model link: size, checksum, licence and architecture, without downloading it",
+  middleware: [requireRole("owner", "admin")] as const,
+  request: { body: { required: true, content: { "application/json": { schema: SourceBody } } } },
+  responses: { 200: { content: { "application/json": { schema: InspectedSchema } }, description: "What the repository states about the file." }, ...addRefusals },
+});
+aiChoicesRoutes.openapi(inspectRoute, async (c) => {
+  const { source, file } = c.req.valid("json");
+  try {
+    const found = await inspectForAdd(source, file);
+    return c.json({ repo: found.repo, file: found.file, sizeBytes: found.sizeBytes, sha256: found.sha256, licence: found.licence, architecture: found.architecture, verifiedArchitecture: found.verifiedArchitecture, ramBytes: found.ramBytes, fits: found.verifiedArchitecture ? "fits" as const : "estimate" as const }, 200);
+  } catch (error) { return addFailure(c, error) as never; }
+});
+
+const addRoute = createRoute({
+  method: "post", path: "/models/add", tags: ["AI"], summary: "Add the chat model a pasted link names: store its record, download it (hash checked) and use it",
+  middleware: [requireRole("owner", "admin")] as const,
+  request: { body: { required: true, content: { "application/json": { schema: SourceBody } } } },
+  responses: { 200: { content: { "application/json": { schema: z.object({ ok: z.literal(true), id: z.string(), label: z.string(), jobs: z.array(z.string()) }) } }, description: "The model is stored and its download (or load) has started." }, ...addRefusals },
+});
+aiChoicesRoutes.openapi(addRoute, async (c) => {
+  const { source, file } = c.req.valid("json");
+  try {
+    const added = await addChatModel(source, file, c.get("person").id);
+    dropModelCaches();
+    return c.json({ ok: true as const, id: added.id, label: added.label, jobs: added.state.jobs ?? [] }, 200);
+  } catch (error) { return addFailure(c, error) as never; }
 });

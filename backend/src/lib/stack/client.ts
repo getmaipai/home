@@ -155,6 +155,8 @@ export interface StackClient {
   modelCatalog(opts?: { signal?: AbortSignal }): Promise<Record<string, unknown>>;
   /** POST /stack/v1/models: install a pinned model and start its download job. */
   pullModel(body: { id: string; role: string; repo?: string; url: string; sha256: string; approx_bytes?: number; licence: string; revision: string; engine?: string; archive?: boolean; hub_file?: string; component?: string }, opts?: { signal?: AbortSignal }): Promise<Record<string, unknown>>;
+  /** POST /stack/v1/models/inspect: a Hugging Face model file's size, hash, licence and layer shape, read without downloading it (MODEL-ADD-01). The Stack answers 400 with a sentence for a link it refuses. */
+  inspectModel?(body: { source: string; file?: string }, opts?: { signal?: AbortSignal }): Promise<Record<string, unknown>>;
   modelAction(id: string, action: string, opts?: { signal?: AbortSignal }): Promise<Record<string, unknown>>;
   health(opts?: { signal?: AbortSignal }): Promise<{ health: HealthItem[] }>;
   /** GET /stack/v1/memory. The ledger block is absent on older Stacks. */
@@ -484,6 +486,7 @@ export function createStackClient(options: StackClientOptions = {}): StackClient
     models: (opts) => call("/stack/v1/models", { method: "GET" }, json<Record<string, unknown>>, opts),
     modelCatalog: (opts) => call("/stack/v1/models/catalog", { method: "GET" }, json<Record<string, unknown>>, opts),
     pullModel: (body, opts) => call("/stack/v1/models", jsonInit(body), json<Record<string, unknown>>, opts),
+    inspectModel: (body, opts) => call("/stack/v1/models/inspect", jsonInit(body), json<Record<string, unknown>>, opts),
     modelAction: (id, action, opts) => call(`/stack/v1/models/${encodeURIComponent(id)}/actions`, jsonInit({ action }), json<Record<string, unknown>>, opts),
     health: (opts) => call("/stack/v1/health", { method: "GET" }, json<{ health: HealthItem[] }>, opts),
     memory: (opts) => call("/stack/v1/memory", { method: "GET" }, json<{ ledger?: StackMemoryLedger }>, opts),

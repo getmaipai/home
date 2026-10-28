@@ -39,6 +39,16 @@ function pullBody(pin: StackPin) {
   };
 }
 
+/** The pin an added record stands for. The revision rides in the download link (.../resolve/<revision>/<file>). */
+function pinFromAddedRecord(entry: NonNullable<ReturnType<typeof catalogEntries>[number]>): StackPin {
+  const parts = new URL(entry.download!.url).pathname.split("/").filter(Boolean);
+  const resolve = parts.indexOf("resolve");
+  return {
+    id: entry.id, role: "chat", ...(resolve >= 2 ? { repo: `${parts[0]}/${parts[1]}` } : {}), license: entry.license, revision: resolve >= 0 ? parts[resolve + 1] : "main",
+    engine: entry.engine, download: entry.download,
+  };
+}
+
 /** The chat role as the Stack reports it: the model it runs, its state, and the ids it can start. */
 async function chatRole(): Promise<{ modelId: string | null; state: string; installed: string[] } | null> {
   if (!isStackConfigured()) return null;
@@ -75,7 +85,8 @@ export async function startChatModelChoice(modelId: string): Promise<ChatSwitchS
 
   try {
     const catalog = (await getStackClient().modelCatalog()) as { models?: StackPin[] };
-    const pins = catalog.models ?? [];
+    // An added model is not in the Stack's shipped pins: its own record is the pin (the hash is still checked on download).
+    const pins = entry.origin === "added" ? [pinFromAddedRecord(entry)] : catalog.models ?? [];
     const pin = pins.find((candidate) => candidate.id === modelId && candidate.role === "chat");
     if (!pin) return { error: "The MaiPai Stack does not offer that model yet. Update the Stack, then try again.", status: 409 };
     const projector = pin.imageInput ? pins.find((candidate) => candidate.id === pin.imageInput!.projector) : undefined;
