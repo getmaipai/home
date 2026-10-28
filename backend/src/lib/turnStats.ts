@@ -95,6 +95,17 @@ function projectGeneration(gen: GenerationInput): TurnGeneration {
   };
 }
 
+/** Milliseconds from the turn's start to the first text the household's answer began with: the last generation that streamed anything, its request time plus its own first-delta wait. The turn machine passes no stage timings, so without this the figure was null on every turn (2026-10-28), and "how long until it starts answering" was never measured. */
+export function firstTokenFromGenerations(generations: readonly GenerationInput[]): number | null {
+  for (let i = generations.length - 1; i >= 0; i--) {
+    const gen = generations[i]!;
+    const delta = finite(gen.firstDeltaMs);
+    const sent = finite(gen.requestSentMs);
+    if (delta !== null && sent !== null) return Math.max(0, sent + delta);
+  }
+  return null;
+}
+
 export function buildTurnStats(
   generations: readonly GenerationInput[],
   timings: TurnTimings,
@@ -128,7 +139,7 @@ export function buildTurnStats(
   // "Cache reused"/"Cache reuse %") stayed at zero, contradicting it.
   const cacheTokens = finite(stream?.usage?.prompt_tokens_details?.cached_tokens) ?? finite(stream?.timings?.cache_n);
   const cacheDenominator = cacheTokens !== null && promptTokens !== null ? cacheTokens + promptTokens : 0;
-  const firstToken = finite(timings.first_token_ms);
+  const firstToken = finite(timings.first_token_ms) ?? firstTokenFromGenerations(generations);
   const totalTime = finite(finishedAt - startedAt);
   const validContextSegments = contextSegments && Object.values(contextSegments).every((value) => finite(value) !== null && value! >= 0)
     ? contextSegments as Partial<Record<ContextSegmentKey, number>>
