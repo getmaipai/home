@@ -775,7 +775,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/trustProxy.ts` | TRUST_PROXY |
 | `backend/src/lib/tts.ts` | synthesizeSpeech |
 | `backend/src/lib/ttsCapabilities.ts` | readTtsTags, getTtsTags, __setTtsTagsForTests |
-| `backend/src/lib/turnActivity.ts` | DEFAULT_IDLE_WINDOW_MS, acquireTurnLease, turnActiveWithin, activeTurnCount, __resetTurnActivityForTests, __setTurnActivityClockForTests |
+| `backend/src/lib/turnActivity.ts` | DEFAULT_IDLE_WINDOW_MS, JUDGE_IDLE_WINDOW_MS, acquireTurnLease, turnActiveWithin, activeTurnCount, __resetTurnActivityForTests |
 | `backend/src/lib/turnContext.ts` | worryingConversation, effectiveBand, sensitiveAllowed, isReferenceUrl, referenceFields, asksHowKnown |
 | `backend/src/lib/turnErrorDetail.ts` | canReadErrorDetail, turnOwnerId, turnErrorDetail, turnErrorDetailFrom, missingTurnErrorDetail, statsForViewer |
 | `backend/src/lib/turnMachine/bareCompare.ts` | startBareCompare |
@@ -795,6 +795,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/turnMachine/nodes/safety.ts` | safetyNode, safetyRoute, inputSafetyAfterFailure, applySafety |
 | `backend/src/lib/turnMachine/nodes/tool.ts` | modelFacingArgs, toolStatusMoment, toolNode |
 | `backend/src/lib/turnMachine/speaker.ts` | speakerIsAnonymous, turnAgeBand, touchesMemory |
+| `backend/src/lib/turnMachine/toolGates.ts` | budgetWithTurnToolGates |
 | `backend/src/lib/turnMachine/trace.ts` | TraceRecorder |
 | `backend/src/lib/turnMachine/turnNext.ts` | answeredByFor, conversationPersona, mentionedConversationPersona, runTurnNext, runTurnNextStream |
 | `backend/src/lib/turnMachine/warmup.ts` | turnWarmupPrompt |
