@@ -673,6 +673,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/safeSearch.ts` | safeSearchDefaultFor, safeSearchStrictness, applySafeSearchLimits, resolveSafeSearchLevel, safeSearchNumericLevel |
 | `backend/src/lib/safety.ts` | evaluateSafety, forOutput, carriesCrisisSignal, evaluateReply, refusePackageReplyIfUnsafe |
 | `backend/src/lib/safetyAlarm.ts` | safetySensorMappings, refreshSafetyAlarmSensors, initSafetyAlarm, applyAlarmAction, applyRobotAlarmAction, listActiveSafetyAlarms |
+| `backend/src/lib/sayEvidence.ts` | sayFields |
 | `backend/src/lib/scheduler.ts` | parseWhen, scheduleJob, scheduleCoreJob, ensureCoreJob, listJobs, cancelJob |
 | `backend/src/lib/search/providers.ts` | SEARCH_PROVIDERS |
 | `backend/src/lib/searchAddressSave.ts` | SEARXNG_URL_KEY, __resetSearchTestPassedForTests, testOrSaveSearchAddress, clearSearchAddress |
