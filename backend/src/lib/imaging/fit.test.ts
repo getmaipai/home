@@ -25,4 +25,26 @@ describe("fitToFrame", () => {
   test("rejects fully transparent pictures plainly", async () => {
     await expect(fitToFrame(await image(20, null), { size: 100, marginPercent: 10 })).rejects.toThrow("That picture has no visible subject.");
   });
+  const bounds = async (out: Uint8Array) => {
+    const { data, info } = await sharp(out).ensureAlpha().raw().toBuffer({ resolveWithObject: true });
+    let left = info.width, right = -1, top = info.height, bottom = -1;
+    for (let y = 0; y < info.height; y++) for (let x = 0; x < info.width; x++) if (data[(y * info.width + x) * 4 + 3]! > 10) { left = Math.min(left, x); right = Math.max(right, x); top = Math.min(top, y); bottom = Math.max(bottom, y); }
+    return { left, right, top, bottom, centreX: (left + right) / 2, centreY: (top + bottom) / 2 };
+  };
+  test("placement moves the subject to the chosen centre without resizing it", async () => {
+    const input = await image(100, { left: 40, top: 40, width: 20, height: 20 });
+    const centred = await bounds(await fitToFrame(input, { size: 100, marginPercent: 10 }));
+    const moved = await bounds(await fitToFrame(input, { size: 100, marginPercent: 10, placement: { zoom: 1, x: 0.45, y: 0.55 } }));
+    expect(moved.right - moved.left).toBe(centred.right - centred.left);
+    expect(moved.centreX).toBeCloseTo(44.5, 0); expect(moved.centreY).toBeCloseTo(54.5, 0);
+  });
+  test("placement zoom scales the subject and a subject moved past the edge is cut by the frame", async () => {
+    const input = await image(100, { left: 40, top: 40, width: 20, height: 20 });
+    const normal = await bounds(await fitToFrame(input, { size: 100, marginPercent: 10 }));
+    const zoomed = await bounds(await fitToFrame(input, { size: 100, marginPercent: 10, placement: { zoom: 2, x: 0.5, y: 0.5 } }));
+    expect(zoomed.right - zoomed.left).toBeGreaterThan(normal.right - normal.left);
+    const cut = await bounds(await fitToFrame(input, { size: 100, marginPercent: 10, placement: { zoom: 1, x: 0.95, y: 0.5 } }));
+    expect(cut.right).toBe(99);
+    await expect(fitToFrame(input, { size: 100, marginPercent: 10, placement: { zoom: 1, x: 3, y: 0.5 } })).resolves.toBeDefined();
+  });
 });

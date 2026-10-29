@@ -1229,15 +1229,15 @@ describe("household companion routes", () => {
     expect(logs).toHaveLength(1); expect(logs[0]).toContain('"count":1'); for (const privateValue of [oldEmpty, oldWithPicture, young, "sweep-person", "Old empty draft"]) expect(logs[0]).not.toContain(privateValue);
   });
 
-  test("prepare saves a checked transparent square, records crop and reports clipped edges", async () => {
+  test("prepare saves a checked transparent square, places the character and reports clipped edges", async () => {
     const adult = addPerson("prepare-author", "adult"), made = createHouseholdCompanion({ ...fixture(), display_name: "Prepare fixture" }, { display_name: "Author", person_id: "prepare-author" }); if (!made.ok) throw new Error(made.error);
     const png = await clippedPng("bottom"), original = addVersion(made.value.id, png, { source: "upload", label: "Original", width: 1024, height: 1024, from: null });
     __setAgeCheckRunnerForTests(async (images) => images.map(() => AGE_OK));
-    const prepared = await request(`companions/${made.value.id}/look/prepare`, adult, "POST", { version_id: original.id, remove_background: false, frame: { zoom: 2, x: .5, y: .5 } });
+    const prepared = await request(`companions/${made.value.id}/look/prepare`, adult, "POST", { version_id: original.id, remove_background: false, frame: { zoom: 1, x: .4, y: .5 } });
     expect(prepared.status).toBe(201);
     const responseBody = await prepared.json() as { id: string; clipped: string[] }, resultId = responseBody.id, resultVersion = readLook(made.value.id).versions.find((version) => version.id === resultId)!;
     const imagePath = join(householdCompanionFolder(made.value.id)!, "look", `${resultId}.png`), imageBytes = new Uint8Array(await Bun.file(imagePath).arrayBuffer()), metadata = await sharp(imageBytes).metadata(), alpha = await sharp(imageBytes).stats();
-    expect([metadata.width, metadata.height]).toEqual([1024, 1024]); expect(metadata.hasAlpha).toBe(true); expect(alpha.channels[3]?.min).toBe(0); expect(resultVersion.steps).toContain("crop"); expect(responseBody.clipped).toContain("bottom"); expect(resultVersion.clipped).toContain("bottom");
+    expect([metadata.width, metadata.height]).toEqual([1024, 1024]); expect(metadata.hasAlpha).toBe(true); expect(alpha.channels[3]?.min).toBe(0); expect(resultVersion.steps).toContain("place"); expect(responseBody.clipped).toContain("bottom"); expect(resultVersion.clipped).toContain("bottom");
   });
 
   test("complete sends the clipped picture on key colour and stores a normalized edit", async () => {

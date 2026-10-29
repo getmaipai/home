@@ -4,7 +4,7 @@ import { fitToFrame, type FitOptions } from "./fit";
 import { imagingTargets } from "./targets";
 import { cropToFrame, type Frame } from "./crop";
 
-export type PrepareStep = "upscale" | "crop" | "remove_background" | "background_not_found" | "find_subject" | "fit";
+export type PrepareStep = "upscale" | "crop" | "place" | "remove_background" | "background_not_found" | "find_subject" | "fit";
 export interface PrepareOptions extends FitOptions {
   frame?: Frame;
   skipBackgroundRemoval?: boolean;
@@ -37,6 +37,6 @@ export async function preparePicture(bytes: Uint8Array, options: PrepareOptions 
   }
   const subject = await findSubject(current), edges = await clippedEdges(current); steps.push("find_subject");
   if (!subject.bounds) throw new Error("That picture has no visible subject.");
-  current = await (options.fit ?? fitToFrame)(current, options); steps.push("fit");
+  current = await (options.fit ?? fitToFrame)(current, options); if (options.placement) steps.push("place"); steps.push("fit");
   return { bytes: current, steps, clipped: (Object.keys(edges) as ClippedEdge[]).filter((edge) => edges[edge]) };
 }
