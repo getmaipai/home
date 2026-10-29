@@ -311,6 +311,21 @@ const present = z.array(evidence).nullable();
 // are, since this field genuinely drives a package call when approved.
 const askAnswer = z.union([z.object({ turn_id: z.string(), approved: z.boolean() }).strict(), z.object({ turn_id: z.string(), values: z.record(z.string(), z.union([z.string(), z.number(), z.boolean(), z.null()])) }).strict(), z.object({ offer_id: z.string().min(1).max(128), approved: z.boolean() }).strict()]);
 
+// VOICE-QUICK-02: a short reaction to what the person has said so far, for a pause in the middle of their turn. The small model may say nothing (null).
+const lastReactAt = new Map<string, number>();
+const REACT_MIN_GAP_MS = 3000;
+turnRoutes.post("/react", requireAuth, async (c) => {
+  const person = c.get("person");
+  const body = await c.req.json().catch(() => ({})) as { said?: unknown };
+  const said = typeof body.said === "string" ? body.said.trim().slice(0, 400) : "";
+  const now = Date.now();
+  if (!said || now - (lastReactAt.get(person.id) ?? 0) < REACT_MIN_GAP_MS) return c.json({ text: null }, 200);
+  if (lastReactAt.size > 500) lastReactAt.clear();
+  lastReactAt.set(person.id, now);
+  const text = await quickReaction(person.id, said);
+  return c.json({ text: text ? normalizeForSpeech(text) : null }, 200);
+});
+
 // VOICE-PREWARM-01: a voice session that just opened asks for this person's last prompt prefix to be put back in the engine's cache, so the first word is not the slow one.
 turnRoutes.post("/prewarm", requireAuth, async (c) => {
   const warmed = await prewarmPrefix(c.get("person").id, "spoken");

@@ -1753,6 +1753,7 @@ export const api = {
   // unaffected.
   streamSpeech: (text: string, signal?: AbortSignal, turn?: { turnId: string; generation: number }) =>
     rawStreamPost("/api/tts", { text, ...(turn ? { turn_id: turn.turnId, generation: turn.generation } : {}) }, 185_000, "Timed out waiting for voice", signal),
+  reactTurn: (said: string) => request<{ text: string | null }>("/api/turn/react", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ said }), timeoutMs: 2500 }),
   prewarmTurn: () => request<{ warmed: boolean }>("/api/turn/prewarm", { method: "POST" }),
   cancelTurn: (turnId: string, heardChars?: number) => request<{ cancelled: boolean }>(`/api/turn/${encodeURIComponent(turnId)}/cancel`, { method: "POST", ...(heardChars === undefined ? {} : { body: JSON.stringify({ heard_chars: heardChars }) }) }),
   // A first preview can include the Stack's pinned voice download, so let

@@ -163,6 +163,21 @@ export class SentenceSpeechScheduler {
   /** True once every sentence has played and no more are coming (also when none ever played), so the whole reply was heard. */
   hasEndedNaturally(): boolean { return this.endedNaturally; }
 
+  /** VOICE-QUICK-03: turn the voice down to `level` (0 to 1) without stopping it, so a soft sound from the person is not met with silence. */
+  duck(level = 0.25): void {
+    if (this.stopped) return;
+    const gain = this.playbackBus?.gain;
+    if (gain?.setTargetAtTime) gain.setTargetAtTime(level, this.audioContext.currentTime, 0.03);
+    else if (gain) gain.value = level;
+  }
+
+  /** Back to full volume. */
+  unduck(): void {
+    const gain = this.playbackBus?.gain;
+    if (gain?.setTargetAtTime) gain.setTargetAtTime(1, this.audioContext.currentTime, 0.05);
+    else if (gain) gain.value = 1;
+  }
+
   pause(): void {
     if (this.stopped || this.paused) return;
     this.paused = true;

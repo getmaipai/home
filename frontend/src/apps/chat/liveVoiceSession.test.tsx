@@ -68,7 +68,7 @@ function Harness({ open, onOpenChange, onProblem = () => {}, isSpeaking, speakin
   const activeTurnRef = useRef<{ turnId: string; heardVisibleEnd: () => number } | null>(activeTurn);
   const firstSocketHandlers = useRef<SttSocketHandlers | null>(null);
   activeTurnRef.current = activeTurn;
-  turnSchedulerRef.current = { stop: stopScheduler, pause: pauseScheduler, resume: resumeScheduler, readLevel: () => 0, playedMs: () => 1234 } as unknown as SentenceSpeechScheduler;
+  turnSchedulerRef.current = { stop: stopScheduler, pause: pauseScheduler, resume: resumeScheduler, duck: () => {}, unduck: () => {}, readLevel: () => 0, playedMs: () => 1234 } as unknown as SentenceSpeechScheduler;
   const connectionCount = useRef(0);
   const session = useLiveVoiceSession({
     composer: runtime.thread.composer,
@@ -375,6 +375,44 @@ describe("live voice session", () => {
     }
   });
 
+  test("a pause in a longer stretch of speech asks the small model for a reaction; short speech or a quick restart does not", async () => {
+    const random = spyOn(Math, "random").mockReturnValue(0);
+    const react = spyOn(api, "reactTurn").mockResolvedValue({ text: null });
+    try {
+      const socket = controlledSocket();
+      const view = render(<Harness open onOpenChange={() => {}} isSpeaking={false} speakingEndedAt={0} fixture={[]} sentTexts={[]} socketFactory={socket.createSocket} />);
+      await waitFor(() => expect(view.getByText("Listening")).toBeTruthy());
+      act(() => socket.send({ t: "partial", v: "so yesterday I went to" }));
+      act(() => socket.send({ t: "vad", speaking: false, rms: 0 }));
+      await new Promise((resolve) => setTimeout(resolve, 550));
+      expect(react).not.toHaveBeenCalled(); // six words is the floor; this was five
+      act(() => socket.send({ t: "partial", v: "so yesterday I went to the store and" }));
+      act(() => socket.send({ t: "vad", speaking: false, rms: 0 }));
+      act(() => socket.send({ t: "vad", speaking: true, rms: 0.1 }));
+      await new Promise((resolve) => setTimeout(resolve, 550));
+      expect(react).not.toHaveBeenCalled(); // they started again before the pause was long enough
+      act(() => socket.send({ t: "vad", speaking: false, rms: 0 }));
+      await new Promise((resolve) => setTimeout(resolve, 550));
+      expect(react).toHaveBeenCalledWith("so yesterday I went to the store and");
+    } finally { random.mockRestore(); react.mockRestore(); cleanup(); }
+  });
+
+  test("sound that lasts past the duck window pauses the voice for good; the voice only ducked before that", async () => {
+    const pause = mock();
+    const socket = controlledSocket();
+    const view = render(<Harness open onOpenChange={() => {}} isSpeaking={false} speakingEndedAt={0} fixture={[]} sentTexts={[]} pauseScheduler={pause} socketFactory={socket.createSocket} />);
+    await waitFor(() => expect(view.getByText("Listening")).toBeTruthy());
+    act(() => view.rerender(<Harness open onOpenChange={() => {}} isSpeaking={true} speakingEndedAt={0} fixture={[]} sentTexts={[]} pauseScheduler={pause} socketFactory={socket.createSocket} />));
+    await waitFor(() => expect(view.getByText("Speaking")).toBeTruthy());
+    await new Promise((resolve) => setTimeout(resolve, 600));
+    act(() => socket.send({ t: "vad", speaking: true, rms: 0.1 }));
+    await new Promise((resolve) => setTimeout(resolve, 400));
+    expect(pause).not.toHaveBeenCalled();
+    await new Promise((resolve) => setTimeout(resolve, 700));
+    expect(pause).toHaveBeenCalledTimes(1);
+    cleanup();
+  });
+
   test("a sound shorter than the 150 ms start window does not pause playback", async () => {
     const pause = mock();
     const socket = controlledSocket();
@@ -403,9 +441,11 @@ describe("live voice session", () => {
     await waitFor(() => expect(view.getByText("Speaking")).toBeTruthy());
     await new Promise((resolve) => setTimeout(resolve, 500));
     act(() => socket.send({ t: "reply_pause" }));
-    expect(pause).toHaveBeenCalledTimes(1);
+    expect(pause).not.toHaveBeenCalled(); // VOICE-QUICK-03: the voice ducks first and pauses only if the sound lasts
     act(() => socket.send({ t: "reply_resume" }));
     expect(resume).toHaveBeenCalledTimes(1);
+    await new Promise((resolve) => setTimeout(resolve, 800));
+    expect(pause).not.toHaveBeenCalled(); // the resume cancelled the pending pause
     expect(cancel).not.toHaveBeenCalled(); expect(stop).not.toHaveBeenCalled(); expect(sent).toEqual([]);
     cancel.mockRestore();
   });
@@ -450,7 +490,7 @@ describe("live voice session", () => {
     await new Promise((resolve) => setTimeout(resolve, 600));
     act(() => socket.send({ t: "final", v: "mm-hm" }));
     await new Promise((resolve) => setTimeout(resolve, 300));
-    expect(pause).toHaveBeenCalledTimes(1); expect(resume).toHaveBeenCalledTimes(1);
+    expect(pause).not.toHaveBeenCalled(); expect(resume).toHaveBeenCalledTimes(1); // VOICE-QUICK-03: the voice only ducked; the reaction ended before the pause
     expect(cancel).not.toHaveBeenCalled(); expect(stop).not.toHaveBeenCalled(); expect(sent).toEqual([]);
     cancel.mockRestore();
   });
@@ -467,7 +507,7 @@ describe("live voice session", () => {
     await new Promise((resolve) => setTimeout(resolve, 600));
     act(() => socket.send({ t: "final", v: "oh wow" }));
     await new Promise((resolve) => setTimeout(resolve, 300));
-    expect(pause).toHaveBeenCalledTimes(1); expect(resume).toHaveBeenCalledTimes(1);
+    expect(pause).not.toHaveBeenCalled(); expect(resume).toHaveBeenCalledTimes(1); // VOICE-QUICK-03: the voice only ducked; the reaction ended before the pause
     expect(cancel).not.toHaveBeenCalled(); expect(stop).not.toHaveBeenCalled(); expect(sent).toEqual([]);
     cancel.mockRestore();
   });
@@ -484,7 +524,7 @@ describe("live voice session", () => {
     await new Promise((resolve) => setTimeout(resolve, 600));
     act(() => socket.send({ t: "final", v: "oh my god" }));
     await new Promise((resolve) => setTimeout(resolve, 300));
-    expect(pause).toHaveBeenCalledTimes(1); expect(resume).toHaveBeenCalledTimes(1);
+    expect(pause).not.toHaveBeenCalled(); expect(resume).toHaveBeenCalledTimes(1); // VOICE-QUICK-03: the voice only ducked; the reaction ended before the pause
     expect(cancel).not.toHaveBeenCalled(); expect(stop).not.toHaveBeenCalled(); expect(sent).toEqual([]);
     cancel.mockRestore();
   });
@@ -501,7 +541,7 @@ describe("live voice session", () => {
     await new Promise((resolve) => setTimeout(resolve, 600));
     act(() => socket.send({ t: "final", v: "no way" }));
     await new Promise((resolve) => setTimeout(resolve, 300));
-    expect(pause).toHaveBeenCalledTimes(1); expect(resume).toHaveBeenCalledTimes(1);
+    expect(pause).not.toHaveBeenCalled(); expect(resume).toHaveBeenCalledTimes(1); // VOICE-QUICK-03: the voice only ducked; the reaction ended before the pause
     expect(cancel).not.toHaveBeenCalled(); expect(stop).not.toHaveBeenCalled(); expect(sent).toEqual([]);
     cancel.mockRestore();
   });
@@ -518,7 +558,7 @@ describe("live voice session", () => {
     await new Promise((resolve) => setTimeout(resolve, 600));
     act(() => socket.send({ t: "final", v: "oh yeah" }));
     await new Promise((resolve) => setTimeout(resolve, 300));
-    expect(pause).toHaveBeenCalledTimes(1); expect(resume).toHaveBeenCalledTimes(1);
+    expect(pause).not.toHaveBeenCalled(); expect(resume).toHaveBeenCalledTimes(1); // VOICE-QUICK-03: the voice only ducked; the reaction ended before the pause
     expect(cancel).not.toHaveBeenCalled(); expect(stop).not.toHaveBeenCalled(); expect(sent).toEqual([]);
     cancel.mockRestore();
   });
@@ -535,7 +575,7 @@ describe("live voice session", () => {
     await new Promise((resolve) => setTimeout(resolve, 600));
     act(() => socket.send({ t: "final", v: "uh nice" }));
     await new Promise((resolve) => setTimeout(resolve, 300));
-    expect(pause).toHaveBeenCalledTimes(1); expect(resume).toHaveBeenCalledTimes(1);
+    expect(pause).not.toHaveBeenCalled(); expect(resume).toHaveBeenCalledTimes(1); // VOICE-QUICK-03: the voice only ducked; the reaction ended before the pause
     expect(cancel).not.toHaveBeenCalled(); expect(stop).not.toHaveBeenCalled(); expect(sent).toEqual([]);
     cancel.mockRestore();
   });
@@ -552,7 +592,7 @@ describe("live voice session", () => {
     await new Promise((resolve) => setTimeout(resolve, 600));
     act(() => socket.send({ t: "final", v: "yeah right" }));
     await new Promise((resolve) => setTimeout(resolve, 300));
-    expect(pause).toHaveBeenCalledTimes(1); expect(resume).toHaveBeenCalledTimes(1);
+    expect(pause).not.toHaveBeenCalled(); expect(resume).toHaveBeenCalledTimes(1); // VOICE-QUICK-03: the voice only ducked; the reaction ended before the pause
     expect(cancel).not.toHaveBeenCalled(); expect(stop).not.toHaveBeenCalled(); expect(sent).toEqual([]);
     cancel.mockRestore();
   });
@@ -569,7 +609,7 @@ describe("live voice session", () => {
     await new Promise((resolve) => setTimeout(resolve, 600));
     act(() => socket.send({ t: "final", v: "mmm" }));
     await new Promise((resolve) => setTimeout(resolve, 300));
-    expect(pause).toHaveBeenCalledTimes(1); expect(resume).toHaveBeenCalledTimes(1);
+    expect(pause).not.toHaveBeenCalled(); expect(resume).toHaveBeenCalledTimes(1); // VOICE-QUICK-03: the voice only ducked; the reaction ended before the pause
     expect(cancel).not.toHaveBeenCalled(); expect(stop).not.toHaveBeenCalled(); expect(sent).toEqual([]);
     cancel.mockRestore();
   });
@@ -586,7 +626,7 @@ describe("live voice session", () => {
     await new Promise((resolve) => setTimeout(resolve, 600));
     act(() => socket.send({ t: "final", v: "hmmm" }));
     await new Promise((resolve) => setTimeout(resolve, 300));
-    expect(pause).toHaveBeenCalledTimes(1); expect(resume).toHaveBeenCalledTimes(1);
+    expect(pause).not.toHaveBeenCalled(); expect(resume).toHaveBeenCalledTimes(1); // VOICE-QUICK-03: the voice only ducked; the reaction ended before the pause
     expect(cancel).not.toHaveBeenCalled(); expect(stop).not.toHaveBeenCalled(); expect(sent).toEqual([]);
     cancel.mockRestore();
   });
@@ -603,7 +643,7 @@ describe("live voice session", () => {
     await new Promise((resolve) => setTimeout(resolve, 600));
     act(() => socket.send({ t: "final", v: "wooow" }));
     await new Promise((resolve) => setTimeout(resolve, 300));
-    expect(pause).toHaveBeenCalledTimes(1); expect(resume).toHaveBeenCalledTimes(1);
+    expect(pause).not.toHaveBeenCalled(); expect(resume).toHaveBeenCalledTimes(1); // VOICE-QUICK-03: the voice only ducked; the reaction ended before the pause
     expect(cancel).not.toHaveBeenCalled(); expect(stop).not.toHaveBeenCalled(); expect(sent).toEqual([]);
     cancel.mockRestore();
   });
@@ -620,7 +660,7 @@ describe("live voice session", () => {
     await new Promise((resolve) => setTimeout(resolve, 600));
     act(() => socket.send({ t: "final", v: "yeahhh" }));
     await new Promise((resolve) => setTimeout(resolve, 300));
-    expect(pause).toHaveBeenCalledTimes(1); expect(resume).toHaveBeenCalledTimes(1);
+    expect(pause).not.toHaveBeenCalled(); expect(resume).toHaveBeenCalledTimes(1); // VOICE-QUICK-03: the voice only ducked; the reaction ended before the pause
     expect(cancel).not.toHaveBeenCalled(); expect(stop).not.toHaveBeenCalled(); expect(sent).toEqual([]);
     cancel.mockRestore();
   });

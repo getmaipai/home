@@ -31,7 +31,7 @@ import type { VoiceMode } from "@maipai/ui/src/elements/voice-conversation";
 import { createSttSocket, type SttSocket, type SttSocketHandlers } from "@/lib/voice/sttSocket";
 import { MicCaptureError, startMicCapture, type MicCaptureHandle } from "@/lib/voice/mic-capture";
 import { createLevelMeter, type LevelMeter } from "@/lib/voice/audioLevelMeter";
-import type { SentenceSpeechScheduler } from "@/lib/sentenceSpeechScheduler";
+import { SentenceSpeechScheduler } from "@/lib/sentenceSpeechScheduler";
 import { api } from "@/lib/api";
 
 export interface LiveVoiceSessionProps {
@@ -81,6 +81,16 @@ export const WAKE_SESSION_IDLE_CLOSE_MS = 8000;
 export const BARGE_IN_ARM_DELAY_MS = 400;
 export const DUPLEX_PAUSE_AFTER_MS = 150;
 export const DUPLEX_FALSE_INTERRUPTION_MS = 1200;
+/** VOICE-QUICK-02: a reaction while the person is still talking. It needs a real stretch of speech first (words), a pause that
+ * lasted this long, and this long since the last one; it is also left out some of the time so it never sounds mechanical. */
+export const DUPLEX_DUCK_LEVEL = 0.25;
+/** VOICE-QUICK-03: on the first voiced frame the voice drops to this level and keeps going; if the sound is still there this long later it is
+ * speech and the voice pauses for good, as before. A cough or a soft "mm-hm" that ends sooner gets the voice back at full volume. */
+export const DUPLEX_DUCK_MS = 600;
+export const REACTION_MIN_WORDS = 6;
+export const REACTION_PAUSE_MS = 400;
+export const REACTION_MIN_GAP_MS = 5000;
+export const REACTION_CHANCE = 0.7;
 // rule: duplexReaction (docs/design/full-duplex-voice-2026-10-24.md)
 // A reaction is one of these whole phrases, matched exactly after normalising, and nothing else: "mm-hm", "oh wow", "no way".
 // Benchmarks (Full-Duplex-Bench v1.5) and shipped agents (LiveKit, Retell) treat these as "keep talking", not as a new turn. Anything
@@ -130,12 +140,40 @@ export function useLiveVoiceSession({ composer, open, onOpenChange, onProblem, i
   const speakingStartedAtRef = useRef(0);
   const isSpeakingRef = useRef(isSpeaking);
   const activeSpeechRef = useRef(false);
+  // VOICE-QUICK-02: reactions in the person's pauses.
+  const lastPartialRef = useRef("");
+  const lastReactionAtRef = useRef(0);
+  const reactionTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const reactionEpochRef = useRef(0);
+  const reactionSchedulerRef = useRef<SentenceSpeechScheduler | null>(null);
   const interruptedTurnRef = useRef<string | null>(null);
   const overlapPauseTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const falseInterruptionTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const overlapPausedRef = useRef(false);
   const overlapTranscriptRef = useRef(false);
   const mutedRef = useRef(false);
+  const duckTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const yieldVoice = () => {
+    const scheduler = turnSchedulerRef.current;
+    if (!scheduler) return;
+    scheduler.duck(DUPLEX_DUCK_LEVEL);
+    overlapPausedRef.current = true;
+    if (duckTimerRef.current) clearTimeout(duckTimerRef.current);
+    duckTimerRef.current = setTimeout(() => { duckTimerRef.current = null; turnSchedulerRef.current?.pause(); }, DUPLEX_DUCK_MS);
+  };
+  const restoreVoice = () => {
+    if (duckTimerRef.current) clearTimeout(duckTimerRef.current);
+    duckTimerRef.current = null;
+    turnSchedulerRef.current?.unduck();
+    turnSchedulerRef.current?.resume();
+  };
+  const cancelReaction = () => {
+    reactionEpochRef.current += 1;
+    if (reactionTimerRef.current) clearTimeout(reactionTimerRef.current);
+    reactionTimerRef.current = null;
+    reactionSchedulerRef.current?.stop();
+    reactionSchedulerRef.current = null;
+  };
   const retryCountRef = useRef(0);
   const speechFailureShownRef = useRef(false);
   const lastSpeechFailedRef = useRef(speechFailed);
@@ -262,8 +300,7 @@ export function useLiveVoiceSession({ composer, open, onOpenChange, onProblem, i
             // The server heard the first voiced frame while a reply plays (DUPLEX-02a): pause at once; the transcript, or a later
             // reply_resume, decides what happens next.
             if (voiceBargeIn && !mutedRef.current && isReplySpeaking() && Date.now() - speakingStartedAtRef.current >= BARGE_IN_ARM_DELAY_MS) {
-              turnSchedulerRef.current?.pause();
-              overlapPausedRef.current = true;
+              yieldVoice();
             }
             break;
           case "reply_resume":
@@ -271,12 +308,13 @@ export function useLiveVoiceSession({ composer, open, onOpenChange, onProblem, i
             if (overlapPausedRef.current) {
               if (overlapPauseTimerRef.current) clearTimeout(overlapPauseTimerRef.current);
               overlapPauseTimerRef.current = null;
-              turnSchedulerRef.current?.resume();
+              restoreVoice();
               overlapPausedRef.current = false;
             }
             break;
           case "partial":
             activeSpeechRef.current = true;
+            lastPartialRef.current = message.v;
             setIdleActivity((value) => value + 1);
             if (voiceBargeIn && !mutedRef.current && isReplySpeaking() && Date.now() - speakingStartedAtRef.current >= BARGE_IN_ARM_DELAY_MS) {
               // A partial is only a guess at what is being said, so it never cancels the reply (a cancel cannot be undone, and a wrong guess
@@ -292,6 +330,7 @@ export function useLiveVoiceSession({ composer, open, onOpenChange, onProblem, i
             break;
           case "vad":
             if (message.speaking) {
+              cancelReaction();
               activeSpeechRef.current = true;
               setIdleActivity((value) => value + 1);
               const elapsed = Date.now() - speakingStartedAtRef.current;
@@ -300,26 +339,46 @@ export function useLiveVoiceSession({ composer, open, onOpenChange, onProblem, i
                 overlapPauseTimerRef.current = setTimeout(() => {
                   overlapPauseTimerRef.current = null;
                   if (isReplySpeaking() && activeSpeechRef.current) {
-                    turnSchedulerRef.current?.pause();
-                    overlapPausedRef.current = true;
+                    yieldVoice();
                   }
                 }, Math.max(0, BARGE_IN_ARM_DELAY_MS - elapsed) + DUPLEX_PAUSE_AFTER_MS);
               }
             } else {
               activeSpeechRef.current = false;
+              // VOICE-QUICK-02: a pause in the middle of what the person is saying may get a short, fitting reaction from the small model.
+              const said = lastPartialRef.current.trim();
+              if (open && !mutedRef.current && modeRef.current === "listening" && !isReplySpeaking() && said.split(/\s+/).length >= REACTION_MIN_WORDS
+                && Date.now() - lastReactionAtRef.current >= REACTION_MIN_GAP_MS && Math.random() < REACTION_CHANCE) {
+                cancelReaction();
+                const epoch = reactionEpochRef.current;
+                reactionTimerRef.current = setTimeout(() => {
+                  reactionTimerRef.current = null;
+                  if (activeSpeechRef.current) return;
+                  void api.reactTurn(said).then(({ text }) => {
+                    if (!text || epoch !== reactionEpochRef.current || activeSpeechRef.current || modeRef.current !== "listening") return;
+                    lastReactionAtRef.current = Date.now();
+                    const reaction = new SentenceSpeechScheduler();
+                    reactionSchedulerRef.current = reaction;
+                    reaction.enqueueSentence(text);
+                  }).catch(() => undefined);
+                }, REACTION_PAUSE_MS);
+              }
               if (overlapPauseTimerRef.current) clearTimeout(overlapPauseTimerRef.current);
               overlapPauseTimerRef.current = null;
               if (overlapPausedRef.current && !overlapTranscriptRef.current) {
                 if (falseInterruptionTimerRef.current) clearTimeout(falseInterruptionTimerRef.current);
                 falseInterruptionTimerRef.current = setTimeout(() => {
                   falseInterruptionTimerRef.current = null;
-                  if (overlapPausedRef.current) turnSchedulerRef.current?.resume();
+                  if (overlapPausedRef.current) restoreVoice();
                   overlapPausedRef.current = false;
                 }, DUPLEX_FALSE_INTERRUPTION_MS);
               }
             }
             break;
           case "final": {
+            if (duckTimerRef.current) { clearTimeout(duckTimerRef.current); duckTimerRef.current = null; }
+            cancelReaction();
+            lastPartialRef.current = "";
             activeSpeechRef.current = false;
             setIdleActivity((value) => value + 1);
             const text = message.v.trim();
@@ -332,7 +391,7 @@ export function useLiveVoiceSession({ composer, open, onOpenChange, onProblem, i
               if (!normalized || isReaction(normalized, text)) {
                 // Only noise or a bare reaction: carry on speaking.
                 if (normalized) duplexCounters.reactionResumes++;
-                if (overlapPausedRef.current) turnSchedulerRef.current?.resume();
+                if (overlapPausedRef.current) restoreVoice();
                 overlapPausedRef.current = false;
                 break;
               }
