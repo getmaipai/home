@@ -230,8 +230,11 @@ only after phase A works and the owner says so. The numbering below is kept so e
     and alarm labels and times are sent, encrypted, to the person's own phone through Apple. The existing `platform:telegram` row is
     updated in the same commit to say that reminder and alarm labels and times are sent to Telegram when a person turns that on (Telegram
     does not encrypt them). One row per connection, none per push.
-  - **Who runs `bark-server`:** the Stack supervises it the way it supervises SearXNG, or the owner points one setting at their own
-    instance, checked when saved with its health on the Status page (rule 11).
+  - **Who runs `bark-server`: the household, not Home or the Stack.** Rule 11 has the Stack own what chat needs, search included
+    (`search.searxng_url` only overrides the Stack's own SearXNG). A push relay is not a chat need, so it is bring-your-own: one
+    household setting, empty by default (Bark stays off until it is set, and Home never falls back to the public relay), checked when
+    saved, a failing server raised as a Repairs item the way `searxngHealth.ts` does. The setup page links the `bark-server` README's
+    Docker command.
   - **A failed push never drops the alarm:** in app and the robot still fire, and a failed Bark push does not stop the Telegram one. The label and time only are carried, to the person's own
     device only. A reply from the phone, such as "snooze 10 minutes", is the inbound side and belongs to GATEWAY-01, not to this note. Changing a repeating alarm shows
   its next three firing times in the receipt so a wrong "every day" is visible at once.
@@ -281,7 +284,7 @@ makes the place an **account**, not a different tool.
   previous body inside Home as its undo. A hub on other hardware gets providers 3 and 4 only. Apple data leaving the home through iCloud is
   the person's own account and stays off until they connect it, with a privacy-page row. Full Disk Access, which the Notes server wants for its safety checks, is a large macOS permission for the process that holds it, and gets its own row next to the iCloud row; it is optional and the person may decline it.
 - **No new MaiPai notes or calendar app in this phase.** Family notes and a family calendar app are product designs of their own and are not
-  needed for the agent layer to work. A hub-hosted CalDAV server (Radicale-class, supervised like SearXNG) is the later option for a
+  needed for the agent layer to work. A hub-hosted CalDAV server (Radicale-class: a household-run address, or Stack-supervised like SearXNG if the owner decides) is the later option for a
   household with no Apple accounts; its license and task support are unchecked.
 - **Feasibility check first.** Before any slice: on the Studio, with a throwaway note, reminder list and calendar, name the macOS user the
   bridge runs as (the prompts belong to the logged-in user; whether the hub's service user can hold them is untested) and confirm read, add,
