@@ -8,6 +8,7 @@ import sharp from "sharp";
 import { eq } from "drizzle-orm";
 import { requireAuth } from "@/middleware/auth";
 import { prewarmPrefix } from "@/lib/prefixPrewarm";
+import { quickReaction } from "@/lib/quickReaction";
 import { normalizeForSpeech } from "@maipai/spec/voice/ts/normalizeForSpeech.js";
 import { StreamSafetyRefusal, StreamUnavailable, DocumentAttachmentError, BareModeForbidden, crisisSupportFor, conversationInCrisis, type Surface, type TurnOpResult, type TurnStreamResult } from "@/lib/turnShared";
 import { answeredByFor, runTurnNext, runTurnNextStream } from "@/lib/turnMachine/turnNext";
@@ -108,6 +109,8 @@ interface ResumeSession {
   // sees `ownerId`, a bare string.
   dropReasoning: boolean;
   spokenTurn: boolean;
+  /** VOICE-QUICK-01: what the person said, for the quick reaction. */
+  utterance?: string;
   /** REG-02: set once the turn is known to be a refusal, error, crisis, package or command line; no spoken cue after that. */
   cueBlocked?: boolean;
   modelStatus?: ModelSelectionStatus;
@@ -506,7 +509,7 @@ function startResumeSession(session: ResumeSession): void {
   const generation = session.generation;
   void (async () => {
     try {
-      for await (const rawEvent of streamTurnEvents(session.result, session.ownerId, session.spokenTurn ? SPOKEN_CUE_DELAY_MS : THINKING_CUE_DELAY_MS, session.controller.signal, session.dropReasoning, session.modelStatus, speakerAgeBand(session.viewer, new Date()), () => session.releasedText, () => session.heardChars, { spokenTurn: session.spokenTurn })) {
+      for await (const rawEvent of streamTurnEvents(session.result, session.ownerId, session.spokenTurn ? SPOKEN_CUE_DELAY_MS : THINKING_CUE_DELAY_MS, session.controller.signal, session.dropReasoning, session.modelStatus, speakerAgeBand(session.viewer, new Date()), () => session.releasedText, () => session.heardChars, { spokenTurn: session.spokenTurn, utterance: session.utterance })) {
         // One shared counter for `delta` and `reasoning` alike (REASONING-01):
         // a resuming client's own replay filter (shouldDeliver()) needs a
         // real per-event sequence for both, or a `reasoning` event sitting
@@ -546,13 +549,12 @@ function startResumeSession(session: ResumeSession): void {
 // checking actually takes a moment" logic, applied to the model's own
 // generation latency instead of a tool call's.
 export const THINKING_CUE_DELAY_MS = 900;
-/** VOICE-REPLY-02: a spoken turn's bridge phrase ("One sec.") covers the wait for the first word.
- * Measured 2026-10-29 on the Stack chat model: a spoken turn's first token arrives 2.1 to 3.3 seconds
- * after the request (jokes and weather alike), and no quick lane exists (INSTANT-05: the 4B does not
- * answer spoken turns), so at 2.5 seconds the cue fired late or never and the call felt like a
- * walkie-talkie. It goes out at 1.0 second: the gap it fills is real, and an answer that is faster
- * than that never gets a cue. The cue is never the answer and never the same phrase twice in a row (pickThinkingCue). */
-export const SPOKEN_CUE_DELAY_MS = 1000;
+/** VOICE-REPLY-02 and VOICE-QUICK-01: when a spoken turn's first word is not here after 0.7 s, the small model's
+ * reaction to what the person said goes out (lib/quickReaction.ts), or the fixed bridge phrase ("One sec.") when it has
+ * none. Measured 2026-10-29: the first token takes 0.6 s with the prompt cached and 2 to 5 s without, and the 4B writes a
+ * reaction in 70 to 230 ms, so the reaction is ready before the timer fires. A faster answer gets no cue. The cue is never
+ * the answer and never stored in the thread. */
+export const SPOKEN_CUE_DELAY_MS = 700;
 /** VOICE-FILLER-02: how long after the first cue a spoken turn waits before its second ("Still on it."). */
 export const STILL_CUE_GAP_MS = 3000;
 
@@ -600,7 +602,7 @@ export async function* streamTurnEvents(
   speakerBand: "adult" | "teen" | "child" = "child",
   releasedText?: () => string,
   heardChars?: () => number | undefined,
-  options: { spokenTurn?: boolean; stillCueGapMs?: number; onToolStart?: (packageId: string) => void } = {},
+  options: { spokenTurn?: boolean; utterance?: string; stillCueGapMs?: number; onToolStart?: (packageId: string) => void } = {},
 ): AsyncGenerator<TurnStreamEvent, void, void> {
   let fullText = "";
   // REASONING-01: splits each chunk of the pipeline's own combined text
@@ -670,6 +672,7 @@ export async function* streamTurnEvents(
     const statusWake = () => (result.status.closed ? new Promise<never>(() => {}) : result.status.wait().then(() => "status" as const));
     let pendingStatus = statusWake();
     const firstStep = iterator.next();
+    const quick: Promise<string | null> = options.spokenTurn && options.utterance && !result.cueSuppressed ? quickReaction(actorId, options.utterance, result.bannedPhrases) : Promise.resolve(null);
     const timer = delay(remainingDelayMs);
     // A status line wakes the race without ending the wait: the cue's timer
     // keeps running, so a slow first token still gets its cue (THIN-7C: every
@@ -681,7 +684,8 @@ export async function* streamTurnEvents(
       race = await Promise.race([firstStep, pendingStatus, timer.promise]);
     }
     timer.cancel();
-    if (race === "timeout" && !earlyCueSent && !result.cueSuppressed) { const cue = pickThinkingCue(actorId, result.bannedPhrases); if (cue) yield { type: "spoken_cue", text: normalizeForSpeech(cue) }; } // SPEECH-ROBOT-01: every spoken text passes the one normalizer
+    // VOICE-QUICK-01: the small model's reaction to what was just said, written while the main model works; the fixed bridge phrase is the fallback.
+    if (race === "timeout" && !earlyCueSent && !result.cueSuppressed) { const cue = (await quick) ?? pickThinkingCue(actorId, result.bannedPhrases); if (cue) yield { type: "spoken_cue", text: normalizeForSpeech(cue) }; } // SPEECH-ROBOT-01: every spoken text passes the one normalizer
     // THIN-5B: while the first answer piece is still coming, side events
     // (live reasoning, status lines) keep going out as they are emitted, so
     // an adult's reasoning is shown while the model is still thinking
@@ -1103,6 +1107,7 @@ turnRoutes.post("/stream", requireAuth, streamTurnBodyLimit, async (c) => {
     // withholdSensitive/mayDefer, composer.ts's child-only projection).
     dropReasoning,
     spokenTurn,
+    utterance: typeof body.text === "string" ? body.text : undefined,
     modelStatus: modelSelection.status,
     conversationId: result.conversationId,
     turnId: result.turnId,

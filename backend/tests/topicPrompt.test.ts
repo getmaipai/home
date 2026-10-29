@@ -167,6 +167,7 @@ const CARRIES: Record<string, RegExp> = {
   "routes/llm.ts": /topicMessages\(actor,/,
   "routes/companions.ts": /topicMessages\(actor,/,
   "lib/projects/steps.ts": /topicMessagesForId\(/,
+  "lib/quickReaction.ts": /topicMessagesForId\(/,
 };
 
 const EXEMPT: Record<string, string> = {

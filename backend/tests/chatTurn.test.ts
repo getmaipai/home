@@ -2590,6 +2590,27 @@ describe("routes/turn.ts streamTurnEvents()", () => {
     expect(events.some((e) => e.type === "done")).toBe(true);
   });
 
+  test("a spoken turn's first cue is the small model's reaction when it has one, and the fixed phrase when it has none", async () => {
+    const { __setQuickReactionRunnerForTests, __resetQuickReactionForTests } = await import("@/lib/quickReaction");
+    const slow = async function* (): AsyncGenerator<string, SafetyResult | undefined, void> {
+      await new Promise((r) => setTimeout(r, 60));
+      yield "The answer.";
+      return undefined;
+    };
+    try {
+      __setQuickReactionRunnerForTests((async () => ({ ok: true, text: "Oh no." })) as never);
+      const withReaction: TurnStreamEvent[] = [];
+      for await (const event of streamTurnEvents(fakeResult(slow()), "test-person", 5, undefined, false, undefined, "adult", undefined, undefined, { spokenTurn: true, utterance: "my dog died yesterday", stillCueGapMs: 5000 })) withReaction.push(event);
+      expect((withReaction.find((e) => e.type === "spoken_cue") as { text: string }).text).toBe("Oh no.");
+      __resetQuickReactionForTests();
+      __setQuickReactionRunnerForTests((async () => ({ ok: false, unavailable: true })) as never);
+      const fallback: TurnStreamEvent[] = [];
+      for await (const event of streamTurnEvents(fakeResult(slow()), "test-person", 5, undefined, false, undefined, "adult", undefined, undefined, { spokenTurn: true, utterance: "my dog died yesterday", stillCueGapMs: 5000 })) fallback.push(event);
+      const cue = (fallback.find((e) => e.type === "spoken_cue") as { text: string }).text;
+      expect(["One sec.", "Hmm, let me think.", "Give me a second.", "Let me see."]).toContain(cue);
+    } finally { __resetQuickReactionForTests(); }
+  });
+
   test("a spoken turn that is still silent after the first cue gets one second cue, a written turn never does", async () => {
     const slow = async function* (): AsyncGenerator<string, SafetyResult | undefined, void> {
       await new Promise((r) => setTimeout(r, 80));
