@@ -3,6 +3,8 @@ import sharp from "sharp";
 import media from "@maipai/spec/vocab/companion-media.json";
 import { capOfStyle, type LookStyleId } from "@/lib/companionLookStyles";
 import { addVersion, chooseKeyColour, describeCharacter, keyOut, keyRgb, lookPromptFor, normalizePicture, readLook, updateSheet, versionOriginalPath, versionPath } from "@/lib/companionLook";
+import { fitToFrame } from "@/lib/imaging/fit";
+import { imagingTargets } from "@/lib/imaging/targets";
 import { clippedEdges } from "@/lib/imaging/subject";
 import { removeBackground } from "@/lib/imaging/tools";
 import { compositeOnNeutral, cutOutBackground } from "@/lib/imaging/backdrop";
@@ -46,6 +48,8 @@ export interface LookJob {
   promptHash: string;
   modelReported: string | null;
   style?: string;
+  /** Fit the finished picture to the portrait frame so the subject fills it, for pictures whose subject comes back smaller. */
+  fitSubject?: boolean;
   finalising?: Promise<void>;
 }
 interface SheetJob { companionId: string; personId: string; state: LookJobState; percent: number; versions: string[]; error: string | null; stackJob: string; index: number; model: string; quality: "quick" | "detailed"; promptHash: string; modelReported: string | null; finalising?: Promise<void> }
@@ -132,7 +136,7 @@ export async function startLookGeneration(input: { actor: PersonRow; companionId
   } finally { startingCompanions.delete(input.companionId); }
 }
 
-export async function startLookEdit(input: { actor: PersonRow; companionId: string; versionId: string; instruction: string; style?: LookStyleId; customStyle?: string; forceKeyComposite?: boolean }): Promise<string> {
+export async function startLookEdit(input: { actor: PersonRow; companionId: string; versionId: string; instruction: string; style?: LookStyleId; customStyle?: string; forceKeyComposite?: boolean; fitSubject?: boolean }): Promise<string> {
   const denial = pictureDenial(routeAudience(input.actor));
   if (denial) throw Object.assign(new Error(PICTURE_DENIAL_LINE[denial]), { status: 403 });
   const styleDenied = lookStyleGate(input.actor, input.style ?? "cartoon");
@@ -168,7 +172,7 @@ export async function startLookEdit(input: { actor: PersonRow; companionId: stri
     form.append("model", art.model);
     form.append("seed", String(companionSeed(input.companionId)));
     const submitted = await submitEdit(form);
-    register(submitted.job, { companionId: input.companionId, personId: input.actor.id, state: "queued", percent: 0, versions: [], error: null, count: 1, key: look.key, sourceVersion: version.id, instruction, model: art.model, quality: art.quality, promptHash: promptHash(instruction), modelReported: null, style });
+    register(submitted.job, { companionId: input.companionId, personId: input.actor.id, state: "queued", percent: 0, versions: [], error: null, count: 1, key: look.key, sourceVersion: version.id, instruction, model: art.model, quality: art.quality, promptHash: promptHash(instruction), modelReported: null, style, fitSubject: input.fitSubject });
     return submitted.job;
   } finally { startingCompanions.delete(input.companionId); }
 }
@@ -267,7 +271,8 @@ export async function pollLookJob(id: string, actor: PersonRow, companionId: str
           for (let offset = 3; offset < rgba.data.length; offset += 4) if (rgba.data[offset]! > 0) opaque++;
           const fraction = opaque / (rgba.info.width * rgba.info.height);
           if (fraction < 0.05 || fraction > 0.95) label += " (check the edges)";
-          const normalized = await normalizePicture(picture, { removeBackground: async (bytes) => bytes });
+          const flat = await normalizePicture(picture, { removeBackground: async (bytes) => bytes });
+          const normalized = job.fitSubject ? await fitToFrame(flat, imagingTargets.portrait).catch(() => flat) : flat;
           const clipped = Object.entries(await clippedEdges(normalized)).filter(([, value]) => value).map(([edge]) => edge as "left" | "right" | "top" | "bottom");
           const saved = addVersion(job.companionId, normalized, { source: job.sourceVersion ? "edit" : "generated", label, width: media.image.size, height: media.image.size, from: job.sourceVersion, style: job.style ?? (job.sourceVersion ? readLook(job.companionId).versions.find((item) => item.id === job.sourceVersion)?.style : undefined) ?? "cartoon", clipped, model: job.model, quality: job.quality, prompt_hash: job.promptHash, model_reported: reported }, images[index]!);
           job.versions.push(saved.id);

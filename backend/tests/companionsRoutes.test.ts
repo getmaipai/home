@@ -1258,7 +1258,7 @@ describe("household companion routes", () => {
     const poll = await request(`companions/${made.value.id}/look/jobs/${job}`, adult); const state = await poll.json() as { state: string; versions: Array<{ id: string }> }; expect(state.state).toBe("done");
     const saved = readLook(made.value.id).versions.find((version) => version.id === state.versions[0]?.id)!;
     const resultPath = join(householdCompanionFolder(made.value.id)!, "look", `${saved.id}.png`), metadata = await sharp(readFileSync(resultPath)).metadata(), stats = await sharp(readFileSync(resultPath)).stats();
-    expect(saved).toMatchObject({ source: "edit", from: source.id, style: "anime", clipped: [] }); expect([metadata.width, metadata.height]).toEqual([1024, 1024]); expect(metadata.hasAlpha).toBe(true); expect(stats.channels[3]?.min).toBe(0);
+    expect(saved).toMatchObject({ source: "edit", from: source.id, style: "anime", clipped: [] }); { const fitted = await sharp(readFileSync(join(householdCompanionFolder(made.value.id)!, "look", `${saved.id}.png`))).trim({ threshold: 0 }).metadata(); expect(Math.max(fitted.width ?? 0, fitted.height ?? 0)).toBeGreaterThan(900); /* the filled picture is fitted so the subject fills the frame like a portrait */ } expect([metadata.width, metadata.height]).toEqual([1024, 1024]); expect(metadata.hasAlpha).toBe(true); expect(stats.channels[3]?.min).toBe(0);
   });
 
   test("a picture drawn from a Keep as is photo stays Keep as is, so later pictures are not restyled as cartoons", async () => {

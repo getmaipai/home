@@ -395,7 +395,7 @@ companionsRoutes.openapi(completeRoute, async (c) => {
   try {
     const plan = await planFillCutOff(new Uint8Array(readFileSync(path)), version.clipped);
     if (!plan) return c.json({ error: "Nothing is cut off in this picture." }, 409);
-    const job = await startLookEdit({ actor, companionId: id, versionId: version_id, instruction: plan.instruction, forceKeyComposite: true });
+    const job = await startLookEdit({ actor, companionId: id, versionId: version_id, instruction: plan.instruction, forceKeyComposite: true, fitSubject: true });
     return c.json({ job: driven(c.get("person"), id, job) }, 202);
   } catch (error) { const status = (error as { status?: number }).status ?? 503; return c.json({ error: error instanceof Error ? error.message : "The picture could not be completed. Try again." }, status as 403 | 404 | 409 | 422 | 503); }
 });
@@ -417,7 +417,7 @@ async function drawMissingBody(actor: import("@/types").PersonRow, id: string, v
   const path = versionPath(id, version.id); if (!path) throw new Error(FILL_FAILED_LINE);
   const plan = await planFillCutOff(new Uint8Array(readFileSync(path)), version.clipped as never);
   if (!plan) return version.id;
-  const job = await startLookEdit({ actor, companionId: id, versionId: version.id, instruction: plan.instruction, forceKeyComposite: true });
+  const job = await startLookEdit({ actor, companionId: id, versionId: version.id, instruction: plan.instruction, forceKeyComposite: true, fitSubject: true });
   for (let round = 0; round < 180; round++) {
     await new Promise((resolve) => setTimeout(resolve, process.env.NODE_ENV === "test" ? 5 : 2000));
     const state = await readLookJob(job, actor, id);
