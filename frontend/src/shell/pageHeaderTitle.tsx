@@ -30,7 +30,8 @@ import { CommandsIcon } from "@/shell/pages/CommandsPage";
 import { PrivacyIcon } from "@/shell/pages/PrivacyPage";
 import { UsersIcon } from "@/shell/pages/UsersPage";
 import { NotificationsIcon } from "@/apps/notifications/NotificationsPage";
-import { HouseholdIcon } from "@/apps/household/HouseholdPage";
+import { RemindersIcon } from "@/apps/reminders/RemindersPage";
+import { getIcon } from "@maipai/ui/src/icons";
 import { StatusIcon } from "@/shell/pages/StatusPage";
 
 interface PageHeaderEntry {
@@ -60,7 +61,8 @@ const MANAGE_PAGE_ENTRIES: Record<string, PageHeaderEntry> = {
   "/privacy": { icon: PrivacyIcon, label: "Privacy" },
   "/users": { icon: UsersIcon, label: "Users" },
   "/notifications": { icon: NotificationsIcon, label: "Notifications" },
-  "/household": { icon: HouseholdIcon, label: "Household" },
+  "/reminders": { icon: RemindersIcon, label: "Reminders" },
+  "/clock": { icon: getIcon("clock"), label: "Clock" },
 };
 
 function entryFor(pathname: string): PageHeaderEntry | undefined {

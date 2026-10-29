@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, test, mock } from "bun:test";
 import { cleanup, fireEvent, waitFor } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
-import { ComingUpPage } from "@/apps/household/ComingUpPage";
+import { ComingUpPage } from "@/apps/reminders/ComingUpPage";
 import { renderWithQueryClient } from "../../../tests/renderWithQueryClient";
 
 afterEach(cleanup);
@@ -11,7 +11,7 @@ function stub(items: Array<{ id: string; kind: "alarm" | "reminder" | "timer"; t
   const calls: Array<{ url: string; body: unknown }> = [];
   globalThis.fetch = mock((input: RequestInfo | URL, init?: RequestInit) => {
     const url = String(input);
-    if (url.endsWith("/api/coming-up") && !init?.method) return Promise.resolve(Response.json(items));
+    if (url.endsWith("/api/coming-up") && (!init?.method || init.method === "GET")) return Promise.resolve(Response.json(items));
     calls.push({ url, body: init?.body ? JSON.parse(String(init.body)) : null });
     return Promise.resolve(Response.json({ ok: true }));
   }) as unknown as typeof fetch;
@@ -19,25 +19,31 @@ function stub(items: Array<{ id: string; kind: "alarm" | "reminder" | "timer"; t
 }
 
 describe("ComingUpPage", () => {
-  test("renders Today, Tomorrow and Later in order, actions work and timers count down", async () => {
-    const now = new Date();
-    const today = new Date(now.getTime() + 60_000).toISOString();
-    const tomorrow = new Date(now.getTime() + 86_400_000).toISOString();
-    const later = new Date(now.getTime() + 4 * 86_400_000).toISOString();
-    const api = stub([{ id: "t1", kind: "timer", text: "Tea", at: today }, { id: "r1", kind: "reminder", text: "Milk", at: tomorrow }, { id: "a1", kind: "alarm", text: "Wake", at: later }]);
+  test("Coming up shows reminders only", async () => {
+    const api = stub([{ id: "t1", kind: "timer", text: "Tea", at: new Date(Date.now() + 60_000).toISOString() }, { id: "r1", kind: "reminder", text: "Milk", at: new Date().toISOString() }, { id: "a1", kind: "alarm", text: "Wake", at: new Date().toISOString() }]);
     try {
       const view = renderWithQueryClient(<MemoryRouter><ComingUpPage /></MemoryRouter>);
-      expect(await view.findByText("Tea")).toBeInTheDocument();
+      expect(await view.findByText("Milk")).toBeInTheDocument();
+      expect(view.queryByText("Tea")).toBeNull();
+      expect(view.queryByText("Wake")).toBeNull();
+    } finally { api.restore(); }
+  });
+
+  test("reminder actions work", async () => {
+    const now = new Date();
+    const tomorrow = new Date(now.getTime() + 86_400_000).toISOString();
+    const api = stub([{ id: "r1", kind: "reminder", text: "Milk", at: tomorrow }]);
+    try {
+      const view = renderWithQueryClient(<MemoryRouter><ComingUpPage /></MemoryRouter>);
+      expect(await view.findByText("Milk")).toBeInTheDocument();
       const headings = view.getAllByRole("heading", { level: 2 }).map((heading) => heading.textContent);
-      expect(headings).toEqual(["Today", "Tomorrow", "Later"]);
-      expect(view.getByText(/remaining/)).toBeInTheDocument();
-      expect(view.getByRole("tab", { name: "Lists" })).toBeInTheDocument();
+      expect(headings).toEqual(["Tomorrow"]);
       fireEvent.pointerDown(view.getAllByRole("button", { name: "Snooze" })[0]!, { button: 0, ctrlKey: false });
       await waitFor(() => expect(view.getByText("15 minutes")).toBeInTheDocument());
       fireEvent.click(view.getByText("15 minutes"));
-      await waitFor(() => expect(api.calls.some((call) => call.url.endsWith("/t1/snooze") && JSON.stringify(call.body).includes("15"))).toBe(true));
+      await waitFor(() => expect(api.calls.some((call) => call.url.endsWith("/r1/snooze") && JSON.stringify(call.body).includes("15"))).toBe(true));
       fireEvent.click(view.getAllByRole("button", { name: "Done" })[0]!);
-      await waitFor(() => expect(api.calls.some((call) => call.url.endsWith("/t1/done"))).toBe(true));
+      await waitFor(() => expect(api.calls.some((call) => call.url.endsWith("/r1/done"))).toBe(true));
     } finally { api.restore(); }
   });
 
@@ -45,7 +51,7 @@ describe("ComingUpPage", () => {
     const api = stub([]);
     try {
       const view = renderWithQueryClient(<MemoryRouter><ComingUpPage /></MemoryRouter>);
-      expect(await view.findByText("Nothing is coming up.")).toBeInTheDocument();
+      expect(await view.findByText("No reminders")).toBeInTheDocument();
     } finally { api.restore(); }
   });
 });

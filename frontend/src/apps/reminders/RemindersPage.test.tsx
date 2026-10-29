@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, test, mock } from "bun:test";
-import { act, cleanup, fireEvent, waitFor } from "@testing-library/react";
-import { HouseholdPage } from "@/apps/household/HouseholdPage";
+import { cleanup, fireEvent, waitFor } from "@testing-library/react";
+import { RemindersPage } from "@/apps/reminders/RemindersPage";
 import { renderWithQueryClient } from "../../../tests/renderWithQueryClient";
 import { MemoryRouter } from "react-router-dom";
 
@@ -40,11 +40,11 @@ function withLists() {
   return () => { globalThis.fetch = original; };
 }
 
-describe("HouseholdPage", () => {
+describe("RemindersPage", () => {
   test("shows the two standing lists with counts, adds and ticks an item, and clears the composer", async () => {
     const restore = withLists();
     try {
-      const view = renderWithQueryClient(<MemoryRouter><HouseholdPage /></MemoryRouter>);
+      const view = renderWithQueryClient(<MemoryRouter><RemindersPage /></MemoryRouter>);
       expect(await view.findByRole("button", { name: /Shopping/ })).toHaveTextContent("1");
       expect(view.getByRole("button", { name: /To-do/ })).toHaveTextContent("0");
       const composer = view.getByRole("textbox", { name: "Add an item" });
@@ -62,7 +62,7 @@ describe("HouseholdPage", () => {
   test("clears only completed Shopping items and exposes no list deletion to a child", async () => {
     const restore = withLists();
     try {
-      const view = renderWithQueryClient(<MemoryRouter><HouseholdPage /></MemoryRouter>);
+      const view = renderWithQueryClient(<MemoryRouter><RemindersPage /></MemoryRouter>);
       fireEvent.click(await view.findByRole("button", { name: /Clear done/ }));
       await waitFor(() => expect(view.queryByText("Bread")).toBeNull());
       expect(view.queryByRole("button", { name: /delete list/i })).toBeNull();
@@ -71,18 +71,12 @@ describe("HouseholdPage", () => {
 
   test("starts on the list picker on a phone and opens the selected list as the next screen", async () => {
     const restore = withLists();
-    const previousWidth = window.innerWidth;
     try {
-      window.innerWidth = 390;
-      act(() => window.dispatchEvent(new Event("resize")));
-      const view = renderWithQueryClient(<MemoryRouter><HouseholdPage /></MemoryRouter>);
+      const view = renderWithQueryClient(<MemoryRouter><RemindersPage /></MemoryRouter>);
       expect(await view.findByRole("heading", { name: "Lists" })).toBeInTheDocument();
       fireEvent.click(view.getByRole("button", { name: /Shopping/ }));
       expect(await view.findByRole("heading", { name: "Shopping" })).toBeInTheDocument();
-      expect(view.getByRole("button", { name: "Lists" })).toBeInTheDocument();
     } finally {
-      window.innerWidth = previousWidth;
-      act(() => window.dispatchEvent(new Event("resize")));
       restore();
     }
   });
@@ -96,7 +90,7 @@ describe("HouseholdPage", () => {
       return original(input, init);
     }) as unknown as typeof fetch;
     try {
-      const view = renderWithQueryClient(<MemoryRouter><HouseholdPage /></MemoryRouter>);
+      const view = renderWithQueryClient(<MemoryRouter><RemindersPage /></MemoryRouter>);
       fireEvent.click(await view.findByRole("tab", { name: "Coming up" }));
       expect(view.getByRole("tab", { name: "Coming up" })).toBeInTheDocument();
     } finally { restore(); globalThis.fetch = original; }

@@ -27,6 +27,8 @@ function start(pinnedApps?: string[]) {
   globalThis.fetch = ((input: RequestInfo | URL, init?: RequestInit) => {
     const url = typeof input === "string" ? input : input.toString();
     if (url.startsWith("/api/apps")) return Promise.resolve(Response.json(rows));
+    if (url.endsWith("/api/lists")) return Promise.resolve(Response.json([]));
+    if (url.endsWith("/api/coming-up")) return Promise.resolve(Response.json([]));
     return baseFetch(input, init);
   }) as typeof fetch;
 }
@@ -134,5 +136,23 @@ describe("the rail's apps", () => {
     await act(async () => { fireEvent.click(await view.findByRole("button", { name: "Open menu" })); });
     const drawer = await view.findByRole("dialog");
     await within(drawer).findByRole("link", { name: "Weather" });
+  });
+
+  test.each(["/reminders", "/clock"])("core navigation is present at every S3 width on %s", async (path) => {
+    start();
+    for (const width of [360, 402, 874, 744, 1440]) {
+      const view = open(path, width);
+      if (width >= 640) {
+        expect(await rail(view).findByRole("link", { name: "Reminders" })).toBeTruthy();
+        expect(rail(view).getByRole("link", { name: "Clock" })).toBeTruthy();
+      } else {
+        expect(view.queryByRole("navigation", { name: "Primary navigation" })).toBeNull();
+        await act(async () => { fireEvent.click(await view.findByRole("button", { name: "Open menu" })); });
+        const drawer = await view.findByRole("dialog");
+        expect(within(drawer).getByRole("link", { name: "Reminders" })).toBeTruthy();
+        expect(within(drawer).getByRole("link", { name: "Clock" })).toBeTruthy();
+      }
+      cleanup();
+    }
   });
 });

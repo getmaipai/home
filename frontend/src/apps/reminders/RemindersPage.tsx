@@ -8,16 +8,14 @@ import { Input } from "@maipai/ui/src/ui/input";
 import { api } from "@/lib/api";
 import { getIcon } from "@maipai/ui/src/icons";
 import { useBreakpoint } from "@maipai/ui/src/hooks/useBreakpoint";
-import { Tabs, TabsList, TabsTrigger } from "@maipai/ui/src/ui/tabs";
-import { useNavigate } from "react-router-dom";
+import { RemindersTabs } from "@/apps/reminders/RemindersTabs";
 
-export const HouseholdIcon = getIcon("layout-list");
+export const RemindersIcon = getIcon("layout-list");
 const LISTS_QUERY_KEY = ["household-lists"];
 
-export function HouseholdPage() {
+export function RemindersPage() {
   const queryClient = useQueryClient();
   const isPhone = useBreakpoint().tier === "phone";
-  const navigate = useNavigate();
   const listsQuery = useQuery({ queryKey: LISTS_QUERY_KEY, queryFn: api.lists });
   const lists = useMemo(() => (listsQuery.data ?? []).filter((list) => list.scope === "household" && (list.kind === "shopping" || list.kind === "todo")), [listsQuery.data]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -58,17 +56,11 @@ export function HouseholdPage() {
   }
 
   return (
-    <Page title="Household" hideTitle>
-      <div className="flex min-h-0 flex-1">
-        <nav aria-label="Household sections" className="px-4 py-2">
-          <Tabs value="lists" onValueChange={(value) => { if (value === "coming-up") navigate("/household/coming-up"); }}>
-            <TabsList>
-              <TabsTrigger value="lists">Lists</TabsTrigger>
-              <TabsTrigger value="coming-up">Coming up</TabsTrigger>
-            </TabsList>
-          </Tabs>
-        </nav>
-        {!isPhone ? <aside className="hidden w-64 flex-col gap-2 p-3 md:flex" aria-label="Household lists">
+    <Page title="Reminders" hideTitle>
+      <div className="flex min-h-0 flex-1 flex-col">
+        <RemindersTabs value="lists" />
+        <div className="flex min-h-0 flex-1">
+        {!isPhone ? <aside className="hidden w-64 flex-col gap-2 p-3 md:flex" aria-label="Reminder lists">
           <h2 className="px-3 py-2 text-lg font-semibold">Lists</h2>
           {lists.map((list) => <Button key={list.id} variant={selected?.id === list.id ? "secondary" : "ghost"} onClick={() => { setSelectedId(list.id); setShowDone(false); }}>
             {list.kind === "shopping" ? "Shopping" : "To-do"}
@@ -115,7 +107,7 @@ export function HouseholdPage() {
               </form>
             </>
           ) : (
-            <section className="flex flex-1 flex-col gap-2 p-4 lg:hidden" aria-label="Household lists">
+            <section className="flex flex-1 flex-col gap-2 p-4 lg:hidden" aria-label="Reminder lists">
               <h2 className="text-xl font-semibold">Lists</h2>
               {lists.map((list) => <Button key={list.id} variant="outline" onClick={() => setSelectedId(list.id)}>
                 <span>{list.kind === "shopping" ? "Shopping" : "To-do"}</span>
@@ -125,6 +117,7 @@ export function HouseholdPage() {
           )}
           {listsQuery.isError ? <p role="alert" className="p-4 text-destructive">Could not load household lists.</p> : null}
         </main>
+        </div>
       </div>
     </Page>
   );

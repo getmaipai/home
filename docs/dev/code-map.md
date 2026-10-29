@@ -88,8 +88,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `frontend/src/apps/chat/composerVoiceControls.tsx` | useVoiceCallReady, ComposerVoiceControls |
 | `frontend/src/apps/chat/liveVoiceSession.tsx` | WAKE_SESSION_IDLE_CLOSE_MS, BARGE_IN_ARM_DELAY_MS, DUPLEX_PAUSE_AFTER_MS, DUPLEX_FALSE_INTERRUPTION_MS, DUPLEX_DUCK_LEVEL, DUPLEX_DUCK_MS |
 | `frontend/src/apps/chat/voiceSessionContext.tsx` | VoiceSessionProvider, useVoiceSession |
-| `frontend/src/apps/household/ComingUpPage.tsx` | ComingUpPage |
-| `frontend/src/apps/household/HouseholdPage.tsx` | HouseholdIcon, HouseholdPage |
+| `frontend/src/apps/clock/ClockPage.tsx` | ClockPage |
 | `frontend/src/apps/memory/PeopleAndThings.tsx` | PeopleAndThings |
 | `frontend/src/apps/memory/PersonMemories.tsx` | OtherPersonMemories, OwnMemories |
 | `frontend/src/apps/notifications/NotificationsPage.tsx` | NotificationsIcon, NotificationsPage |
@@ -98,6 +97,10 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `frontend/src/apps/people/NewPersonForm.tsx` | NewPersonForm |
 | `frontend/src/apps/people/ProfileForm.tsx` | ProfileForm |
 | `frontend/src/apps/people/VoiceEnrollmentBody.tsx` | VoiceEnrollmentBody |
+| `frontend/src/apps/reminders/ComingUpPage.tsx` | ComingUpPage |
+| `frontend/src/apps/reminders/ComingUpRow.tsx` | TimerCountdown, ComingUpRow |
+| `frontend/src/apps/reminders/RemindersPage.tsx` | RemindersIcon, RemindersPage |
+| `frontend/src/apps/reminders/RemindersTabs.tsx` | RemindersTabs |
 | `frontend/src/apps/settings/AddChatModel.tsx` | AddChatModel |
 | `frontend/src/apps/settings/AddRobotSection.tsx` | AddRobotSection |
 | `frontend/src/apps/settings/AddVoiceForm.tsx` | AddVoiceForm |

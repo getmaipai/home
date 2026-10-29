@@ -17,6 +17,15 @@ function Location() {
 // target is a bare literal `<Navigate>`, reproduced verbatim below so a
 // typo in that string is a real, caught regression.
 describe("route redirects", () => {
+  test.each(["/household", "/household/coming-up"])("%s redirects to Reminders", (path) => {
+    render(
+      <MemoryRouter initialEntries={[path]}>
+        <Routes><Route path="/household" element={<Navigate to="/reminders" replace />} /><Route path="/household/coming-up" element={<Navigate to="/reminders" replace />} /><Route path="/reminders" element={<Location />} /></Routes>
+      </MemoryRouter>,
+    );
+    expect(document.querySelector('[data-testid="location"]')?.textContent).toBe("/reminders");
+  });
+
   test("/conversations redirects to Chat with its list open", () => {
     render(
       <MemoryRouter initialEntries={["/conversations"]}>

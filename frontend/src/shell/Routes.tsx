@@ -100,8 +100,9 @@ const SetupReviewPage = lazyNamed(() => import("@/apps/setup/SetupReviewPage"), 
 // MEDIA-POLISH-01: package app pages load on demand. They carry the schema interpreter, the kit Player and Media Chrome, which pushed
 // the Routes chunk past the 4 MiB service-worker precache ceiling (vite.config.ts, src/apps/setup/preview/bundle.test.ts).
 const NotificationsPage = lazy(() => import("@/apps/notifications/NotificationsPage").then((m) => ({ default: m.NotificationsPage })));
-const HouseholdPage = lazy(() => import("@/apps/household/HouseholdPage").then((m) => ({ default: m.HouseholdPage })));
-const ComingUpPage = lazy(() => import("@/apps/household/ComingUpPage").then((m) => ({ default: m.ComingUpPage })));
+const RemindersPage = lazy(() => import("@/apps/reminders/RemindersPage").then((m) => ({ default: m.RemindersPage })));
+const ComingUpPage = lazy(() => import("@/apps/reminders/ComingUpPage").then((m) => ({ default: m.ComingUpPage })));
+const ClockPage = lazy(() => import("@/apps/clock/ClockPage").then((m) => ({ default: m.ClockPage })));
 
 /** The migrated root route tree (docs/plans/shell-on-shadcndashboard-
  * 2026-09-21.md, step 1): mounts the template's
@@ -388,7 +389,7 @@ function RoutesWithIncognito({ person, onPersonChange, onSignedOut, appCatalog }
             Notifications, System status, Incognito, Settings, Help and Log
             out. Pages draw their own slim title bar; chat draws its own
             beside the history column. */}
-        <Route element={<FullLayout rail topRight={paneState.open ? undefined : ambientTopRight} topRightBand fallbackTitle={location.pathname.startsWith("/settings") ? "Settings" : appName ?? (location.pathname === "/" ? "Home" : undefined)} rightPane={ambientRightPane} mobileSections={<>{drawerSections}<div className="mt-3 border-t border-border pt-3"><PhoneMenuLinks /></div></>} activeAppHref={selectedAppHref} railApps={railApps(appCatalog, pinnedRoutes)} railCoreDestinations={[{ name: "Media", url: "/media", icon: "cast" }, { name: "Household", url: "/household", icon: "layout-list" }]} onRailAppPinChange={(url) => togglePin(url)} railAllAppsHref={ALL_APPS_PATH} settingsHref="/settings" headerSearchRemote={(query) => searchWithCoreApps(query, appCatalog)} railTourId="shell.rail" railItemTourId={(item) => item.name === "Chat" ? "rail.chat" : undefined} incognitoTourId="shell.incognito" railProfile={<RailProfile person={person} incognito={incognito} onIncognitoChange={onIncognitoChange} onSignedOut={onSignedOut} helpEntries={helpEntries} />} sidebarItemStatus={(item) => sidebarItemStatus(statusAppsQuery.data ?? [], item)} />}>
+        <Route element={<FullLayout rail topRight={paneState.open ? undefined : ambientTopRight} topRightBand fallbackTitle={location.pathname.startsWith("/settings") ? "Settings" : appName ?? (location.pathname === "/" ? "Home" : undefined)} rightPane={ambientRightPane} mobileSections={<>{drawerSections}<div className="mt-3 border-t border-border pt-3"><PhoneMenuLinks /></div></>} activeAppHref={selectedAppHref} railApps={railApps(appCatalog, pinnedRoutes)} railCoreDestinations={[{ name: "Media", url: "/media", icon: "cast" }, { name: "Reminders", url: "/reminders", icon: "layout-list" }, { name: "Clock", url: "/clock", icon: "clock" }]} onRailAppPinChange={(url) => togglePin(url)} railAllAppsHref={ALL_APPS_PATH} settingsHref="/settings" headerSearchRemote={(query) => searchWithCoreApps(query, appCatalog)} railTourId="shell.rail" railItemTourId={(item) => item.name === "Chat" ? "rail.chat" : undefined} incognitoTourId="shell.incognito" railProfile={<RailProfile person={person} incognito={incognito} onIncognitoChange={onIncognitoChange} onSignedOut={onSignedOut} helpEntries={helpEntries} />} sidebarItemStatus={(item) => sidebarItemStatus(statusAppsQuery.data ?? [], item)} />}>
           <Route path="chat" element={<ChatPage person={person} />} />
           <Route path="chat/projects" element={<ProjectsPage person={person} />} />
           <Route path="chat/projects/:id" element={<ChatPage person={person} />} />
@@ -447,8 +448,11 @@ function RoutesWithIncognito({ person, onPersonChange, onSignedOut, appCatalog }
             {/* MEDIA-VIDEOS-01: the Pick up shelf's `/media/<id>` link opens the item in the app that owns its kind. */}
             <Route path="media/:id" element={<MediaLinkRedirect />} />
             <Route path="notifications" element={<Suspense fallback={null}><NotificationsPage /></Suspense>} />
-            <Route path="household" element={<Suspense fallback={null}><HouseholdPage /></Suspense>} />
-            <Route path="household/coming-up" element={<Suspense fallback={null}><ComingUpPage /></Suspense>} />
+            <Route path="household" element={<Navigate to="/reminders" replace />} />
+            <Route path="household/coming-up" element={<Navigate to="/reminders" replace />} />
+            <Route path="reminders" element={<Suspense fallback={null}><RemindersPage /></Suspense>} />
+            <Route path="reminders/coming-up" element={<Suspense fallback={null}><ComingUpPage /></Suspense>} />
+            <Route path="clock" element={<Suspense fallback={null}><ClockPage /></Suspense>} />
             <Route path="dev/ui" element={<UiShowcasePage person={person} />} />
             <Route path="mic-test" element={<MicTestPage />} />
             <Route path="*" element={<NotFoundPage />} />
