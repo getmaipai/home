@@ -56496,9 +56496,9 @@
                           "id": {
                             "type": "string",
                             "enum": [
+                              "photorealistic",
                               "cartoon",
                               "anime",
-                              "photorealistic",
                               "3d",
                               "pixel",
                               "custom",
@@ -57681,9 +57681,9 @@
                           "id": {
                             "type": "string",
                             "enum": [
+                              "photorealistic",
                               "cartoon",
                               "anime",
-                              "photorealistic",
                               "3d",
                               "pixel",
                               "custom",
@@ -58234,9 +58234,9 @@
                   "style": {
                     "type": "string",
                     "enum": [
+                      "photorealistic",
                       "cartoon",
                       "anime",
-                      "photorealistic",
                       "3d",
                       "pixel",
                       "custom",
@@ -58388,9 +58388,9 @@
                   "style": {
                     "type": "string",
                     "enum": [
+                      "photorealistic",
                       "cartoon",
                       "anime",
-                      "photorealistic",
                       "3d",
                       "pixel",
                       "custom",

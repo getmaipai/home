@@ -1,8 +1,8 @@
 /** The styles available to companion makers and the widest audience their art may reach. */
 export const LOOK_STYLES = [
+  { id: "photorealistic", label: "Realistic", phrase: "Photorealistic, lifelike detail and natural lighting, a realistic photograph of the character.", tile: true, teen: true, cap: "teen" },
   { id: "cartoon", label: "Cartoon", phrase: "Simple clean cartoon illustration, flat colours.", tile: true, teen: true, cap: "all" },
   { id: "anime", label: "Anime", phrase: "Anime style illustration, clean line art, cel shading, expressive eyes.", tile: true, teen: true, cap: "teen" },
-  { id: "photorealistic", label: "Realistic", phrase: "Photorealistic, lifelike detail and natural lighting, a realistic photograph of the character.", tile: true, teen: true, cap: "teen" },
   { id: "3d", label: "3D", phrase: "3D animated movie style, soft studio lighting, smooth rounded shapes.", tile: true, teen: true, cap: "teen" },
   { id: "pixel", label: "Pixel", phrase: "Pixel art, crisp square pixels, limited colour palette.", tile: true, teen: true, cap: "teen" },
   { id: "custom", label: "Custom", phrase: "", tile: true, teen: false, cap: "adult" },
@@ -27,5 +27,5 @@ export function capOfStyle(id: string | undefined): LookAudienceCap | null {
 export function lookStylePhrase(style: LookStyleChoice | undefined, customText?: string): string {
   if (style === "keep") return "";
   if (style === "custom") return customText?.trim() ?? "";
-  return LOOK_STYLES.find((item) => item.id === style)?.phrase ?? LOOK_STYLES[0].phrase;
+  return LOOK_STYLES.find((item) => item.id === style)?.phrase ?? LOOK_STYLES.find((item) => item.id === DEFAULT_LOOK_STYLE)!.phrase;
 }

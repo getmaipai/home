@@ -97,7 +97,7 @@ export function AnimateStep({ companionId, name, onBack, onContinue }: { compani
       </DialogSection>
       <div className="flex flex-col gap-6">
         <DialogSection title="Required" aside={`${required.length || 4} animations · Always included`}>
-          <div className="grid grid-cols-4 gap-3">
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
             {required.map((row) => <CharacterTile key={row.id} variant="animation" locked {...tile(row)} />)}
           </div>
           <Button shape="pill" width="full" disabled={running || missingRequired.length === 0} onClick={() => generate(missingRequired)}><Sparkles aria-hidden="true" />Generate Required</Button>

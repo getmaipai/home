@@ -27,8 +27,8 @@ function item(label = "Picture") { return { source: "upload" as const, label, wi
 describe("companion look store", () => {
   test("serves style tiles by band with caps in the single table", () => {
     expect(stylesForBand("child")).toEqual([]);
-    expect(stylesForBand("teen").map(({ id }) => id)).toEqual(["cartoon", "anime", "photorealistic", "3d", "pixel"]);
-    expect(stylesForBand("adult").map(({ id }) => id)).toEqual(["cartoon", "anime", "photorealistic", "3d", "pixel", "custom"]);
+    expect(stylesForBand("teen").map(({ id }) => id)).toEqual(["photorealistic", "cartoon", "anime", "3d", "pixel"]);
+    expect(stylesForBand("adult").map(({ id }) => id)).toEqual(["photorealistic", "cartoon", "anime", "3d", "pixel", "custom"]);
     expect(capOfStyle("cartoon")).toBe("all");
     expect(capOfStyle("anime")).toBe("teen"); expect(capOfStyle("photorealistic")).toBe("teen");
     expect(capOfStyle("3d")).toBe("teen"); expect(capOfStyle("pixel")).toBe("teen"); expect(capOfStyle("custom")).toBe("adult");
