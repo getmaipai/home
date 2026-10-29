@@ -413,6 +413,24 @@ describe("live voice session", () => {
     cleanup();
   });
 
+  test("a transcript that is just Home's own reaction, right after it played, is not sent as the person's turn", async () => {
+    const random = spyOn(Math, "random").mockReturnValue(0);
+    const react = spyOn(api, "reactTurn").mockResolvedValue({ text: "Oh no." });
+    try {
+      const socket = controlledSocket();
+      const sent: string[] = [];
+      const view = render(<Harness open onOpenChange={() => {}} isSpeaking={false} speakingEndedAt={0} fixture={[]} sentTexts={sent} socketFactory={socket.createSocket} />);
+      await waitFor(() => expect(view.getByText("Listening")).toBeTruthy());
+      act(() => socket.send({ t: "partial", v: "my dog died yesterday and I" }));
+      act(() => socket.send({ t: "vad", speaking: false, rms: 0 }));
+      await waitFor(() => expect(react).toHaveBeenCalled(), { timeout: 1500 });
+      await new Promise((resolve) => setTimeout(resolve, 100));
+      act(() => socket.send({ t: "final", v: "Oh no." }));
+      await new Promise((resolve) => setTimeout(resolve, 400));
+      expect(sent).toEqual([]);
+    } finally { random.mockRestore(); react.mockRestore(); cleanup(); }
+  });
+
   test("a sound shorter than the 150 ms start window does not pause playback", async () => {
     const pause = mock();
     const socket = controlledSocket();

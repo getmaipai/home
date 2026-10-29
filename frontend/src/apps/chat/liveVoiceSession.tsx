@@ -143,6 +143,7 @@ export function useLiveVoiceSession({ composer, open, onOpenChange, onProblem, i
   // VOICE-QUICK-02: reactions in the person's pauses.
   const lastPartialRef = useRef("");
   const lastReactionAtRef = useRef(0);
+  const lastReactionTextRef = useRef("");
   const reactionTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const reactionEpochRef = useRef(0);
   const reactionSchedulerRef = useRef<SentenceSpeechScheduler | null>(null);
@@ -357,6 +358,7 @@ export function useLiveVoiceSession({ composer, open, onOpenChange, onProblem, i
                   void api.reactTurn(said).then(({ text }) => {
                     if (!text || epoch !== reactionEpochRef.current || activeSpeechRef.current || modeRef.current !== "listening") return;
                     lastReactionAtRef.current = Date.now();
+                    lastReactionTextRef.current = text;
                     const reaction = new SentenceSpeechScheduler();
                     reactionSchedulerRef.current = reaction;
                     reaction.enqueueSentence(text);
@@ -383,6 +385,11 @@ export function useLiveVoiceSession({ composer, open, onOpenChange, onProblem, i
             setIdleActivity((value) => value + 1);
             const text = message.v.trim();
             const normalized = normalizedTranscript(text);
+            // VOICE-QUICK-02: the microphone can hear Home's own reaction. A transcript that is just that reaction, right after it played, is her voice, not the person's.
+            if (normalized && lastReactionTextRef.current && Date.now() - lastReactionAtRef.current < 4000 && normalized === normalizedTranscript(lastReactionTextRef.current)) {
+              lastReactionTextRef.current = "";
+              break;
+            }
             if (voiceBargeIn && isReplySpeaking() && !mutedRef.current) {
               if (overlapPauseTimerRef.current) clearTimeout(overlapPauseTimerRef.current);
               overlapPauseTimerRef.current = null;
@@ -522,7 +529,7 @@ export function useLiveVoiceSession({ composer, open, onOpenChange, onProblem, i
   // guarantee VOICE-01's future barge-in will build on.
   useEffect(() => {
     liveVoiceActiveRef.current = open;
-    if (!open) turnSchedulerRef.current?.stop();
+    if (!open) { turnSchedulerRef.current?.stop(); cancelReaction(); }
     return () => {
       liveVoiceActiveRef.current = false;
     };
