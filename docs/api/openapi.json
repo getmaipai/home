@@ -57512,6 +57512,18 @@
                             "type": "string",
                             "nullable": true
                           },
+                          "clipped": {
+                            "type": "array",
+                            "items": {
+                              "type": "string",
+                              "enum": [
+                                "left",
+                                "right",
+                                "top",
+                                "bottom"
+                              ]
+                            }
+                          },
                           "url": {
                             "type": "string"
                           }
@@ -58503,6 +58515,114 @@
         }
       }
     },
+    "/api/companions/{id}/look/complete": {
+      "post": {
+        "tags": [
+          "Companions"
+        ],
+        "summary": "Complete a clipped companion picture",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 80
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "version_id": {
+                    "type": "string",
+                    "pattern": "^v-[0-9]+$"
+                  }
+                },
+                "required": [
+                  "version_id"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "Picture completion started.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "job": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "job"
+                  ]
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Only an allowed editor can change this companion's pictures",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No picture",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Nothing is cut off in this picture",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Picture withheld",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Picture creation is not set up",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/companions/{id}/look/restyle": {
       "post": {
         "tags": [
@@ -58705,10 +58825,17 @@
                   "properties": {
                     "id": {
                       "type": "string"
+                    },
+                    "clipped": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
                     }
                   },
                   "required": [
-                    "id"
+                    "id",
+                    "clipped"
                   ]
                 }
               }
@@ -59251,10 +59378,17 @@
                   "properties": {
                     "id": {
                       "type": "string"
+                    },
+                    "clipped": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
                     }
                   },
                   "required": [
-                    "id"
+                    "id",
+                    "clipped"
                   ]
                 }
               }
