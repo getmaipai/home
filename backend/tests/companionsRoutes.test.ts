@@ -1254,17 +1254,17 @@ describe("household companion routes", () => {
   test("complete sends the clipped picture on a neutral backdrop and stores a normalized edit", async () => {
     const adult = addPerson("complete-author", "adult"), made = createHouseholdCompanion({ ...fixture(), display_name: "Complete fixture" }, { display_name: "Author", person_id: "complete-author" }); if (!made.ok) throw new Error(made.error);
     const sourcePng = await clippedPng("bottom"), returned = await transparentPng(); __setPictureStatusForTests(readyStatusForTests()); __setAgeCheckRunnerForTests(async (images) => images.map(() => AGE_OK));
-    const posted: Array<{ instruction: string; image: Uint8Array }> = [];
+    const posted: Array<{ instruction: string; image: Uint8Array; source: string }> = [];
     __setPicturesFetchForTests((async (input, init) => {
       const url = String(input);
-      if (url.endsWith("/v1/images/edits") && init?.method === "POST") { const form = init.body as FormData, file = form.get("image") as File; posted.push({ instruction: String(form.get("instruction")), image: new Uint8Array(await file.arrayBuffer()) }); return Response.json({ job: "complete-job" }, { status: 202 }); }
+      if (url.endsWith("/v1/images/edits") && init?.method === "POST") { const form = init.body as FormData, file = form.get("image") as File; posted.push({ instruction: String(form.get("instruction")), image: new Uint8Array(await file.arrayBuffer()), source: String(form.get("image_source")) }); return Response.json({ job: "complete-job" }, { status: 202 }); }
       if (url.endsWith("/complete-job")) return Response.json({ job: "complete-job", state: "done", progress: 1, data: [] });
       if (url.endsWith("/complete-job/0.png")) return new Response(returned, { headers: { "content-type": "image/png" } });
       return new Response("Not found", { status: 404 });
     }) as typeof fetch);
     const source = addVersion(made.value.id, sourcePng, { source: "upload", label: "Cut picture", width: 1024, height: 1024, from: null, style: "anime", clipped: ["bottom"] });
     const response = await request(`companions/${made.value.id}/look/complete`, adult, "POST", { version_id: source.id }); expect(response.status).toBe(202);
-    const job = (await response.json() as { job: string }).job; expect(posted[0]?.instruction).toContain("at the bottom"); expect(posted[0]?.instruction).toContain("Keep everything already shown exactly as it is");
+    const job = (await response.json() as { job: string }).job; expect(posted[0]?.instruction).toContain("at the bottom"); expect(posted[0]?.source).toBe("uploaded"); expect(posted[0]?.instruction).toContain("Keep everything already shown exactly as it is");
     const keyed = await sharp(posted[0]!.image).raw().toBuffer({ resolveWithObject: true }); expect(keyed.info.width).toBe(1024); expect(keyed.info.height).toBe(1024); expect(keyed.data[1]).toBeGreaterThan(200);
     const poll = await request(`companions/${made.value.id}/look/jobs/${job}`, adult); const state = await poll.json() as { state: string; versions: Array<{ id: string }> }; expect(state.state).toBe("done");
     const saved = readLook(made.value.id).versions.find((version) => version.id === state.versions[0]?.id)!;

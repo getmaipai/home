@@ -161,7 +161,8 @@ export async function startLookEdit(input: { actor: PersonRow; companionId: stri
     const style = input.style ?? (version.style && version.style !== "keep" ? version.style as LookStyleId : undefined);
     const stylePhrase = !style ? "" : lookPromptFor("", look.key, style, input.customStyle).replace(/^\. A single character, full body, centred in the frame, standing in a relaxed neutral pose, facing the viewer, mouth closed, arms down\./, "").replace(/ Plain solid (green|magenta) background, no shadow, no ground, no text, no other objects\.$/, "").trim();
     form.append("instruction", stylePhrase ? `${instruction}. ${stylePhrase}` : instruction);
-    form.append("image_source", originalPath ? "generated" : "uploaded");
+    // Only the exact bytes the picture model made count as generated; a picture put on a backdrop or cropped is sent as a photo.
+    form.append("image_source", originalPath && !input.forceKeyComposite ? "generated" : "uploaded");
     form.append("audience", "all-ages");
     form.append("timeout_ms", "1");
     form.append("model", art.model);
