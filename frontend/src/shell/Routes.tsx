@@ -68,6 +68,7 @@ const FamilyPage = lazyNamed(() => import("@/shell/pages/FamilyPage"), "FamilyPa
 const CompanionsPage = lazyNamed(() => import("@/shell/pages/CompanionsPage"), "CompanionsPage");
 const CompanionDetailPage = lazyNamed(() => import("@/shell/pages/CompanionsPage"), "CompanionDetailPage");
 const CompanionEditorPage = lazyNamed(() => import("@/shell/pages/CompanionEditorPage"), "CompanionEditorPage");
+const CompanionFlowPage = lazyNamed(() => import("@/shell/pages/companionFlow/CompanionFlowPage"), "CompanionFlowPage");
 const CompanionWizardPage = lazyNamed(() => import("@/shell/pages/CompanionWizardPage"), "CompanionWizardPage");
 const ProjectsPage = lazyNamed(() => import("@/shell/pages/ProjectsPage"), "ProjectsPage");
 const PersonProfilePage = lazyNamed(() => import("@/shell/pages/PersonProfilePage"), "PersonProfilePage");
@@ -421,6 +422,8 @@ function RoutesWithIncognito({ person, onPersonChange, onSignedOut, appCatalog }
           <Route element={<PageHeaderLayout />}>
             <Route index element={<DashboardPage person={person} />} />
             <Route path="companions" element={<CompanionsPage />} />
+            <Route path="companions/create" element={<CompanionFlowPage />} />
+            <Route path="companions/:id/create" element={<CompanionFlowPage />} />
             <Route path="companions/start" element={<CompanionWizardPage />} />
             <Route path="companions/new" element={<CompanionEditorPage />} />
             <Route path="companions/:id/edit" element={<CompanionEditorPage />} />
