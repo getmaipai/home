@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type MutableRefObject } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@maipai/ui/src/ui/button";
 import { DialogBody, DialogSection } from "@maipai/ui/src/ui/dialog";
@@ -16,8 +16,8 @@ export const lookKey = (id: string) => ["companions", id, "look"] as const;
 const running = (job: CompanionLookJob | undefined, jobId: string | null) => jobId !== null && (job === undefined || job.state === "queued" || job.state === "running");
 
 /** Screen 1, Create Character. It reports the draft and whether it holds a picture so the dialog can ask keep or discard on close. */
-export function CreateCharacterStep({ companionId, initialName, onDraft, onApproved }: {
-  companionId: string | null; initialName: string;
+export function CreateCharacterStep({ creating, companionId, initialName, onDraft, onApproved }: {
+  creating: MutableRefObject<Promise<string> | null>; companionId: string | null; initialName: string;
   onDraft: (state: { id: string | null; pictures: number; name: string }) => void; onApproved: () => void;
 }) {
   const client = useQueryClient();
@@ -36,7 +36,6 @@ export function CreateCharacterStep({ companionId, initialName, onDraft, onAppro
   const [frame, setFrame] = useState<PictureFrame>(DEFAULT_FRAME);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
-  const creating = useRef<Promise<string> | null>(null);
   const seeded = useRef(false);
   const Sparkles = getIcon("sparkles"), Palette = getIcon("palette"), User = getIcon("user");
 

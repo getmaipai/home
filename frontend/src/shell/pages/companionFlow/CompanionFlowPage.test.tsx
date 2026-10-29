@@ -109,6 +109,23 @@ test("closing with an empty draft asks keep or discard; discard deletes it", asy
   await waitFor(() => expect(view.getByTestId("where").textContent).toBe("/companions"));
 });
 
+test("closing while the draft is still being made waits for it, then asks keep or discard", async () => {
+  const { view, calls } = open();
+  let finish: (value: { id: string }) => void = () => {};
+  api.createCompanionDraft = () => { calls.draft++; return new Promise((resolve) => { finish = resolve; }); };
+  await nameIt(view); await waitFor(() => expect(calls.draft).toBe(1));
+  fireEvent.click(view.getByRole("button", { name: "Close" }));
+  await act(async () => { await Promise.resolve(); });
+  // Still waiting: it neither left the dialog nor asked yet.
+  expect(view.queryByTestId("where")).toBeNull();
+  expect(view.queryByText("Keep this draft or discard it?")).toBeNull();
+  await act(async () => { finish({ id: "hc-one" }); });
+  expect(await view.findByText("Keep this draft or discard it?")).toBeTruthy();
+  fireEvent.click(view.getByRole("button", { name: "Discard" }));
+  await waitFor(() => expect(calls.deleted).toEqual(["hc-one"]));
+  await waitFor(() => expect(view.getByTestId("where").textContent).toBe("/companions"));
+});
+
 test("closing with no draft goes straight back to the companions list", async () => {
   const { view } = open(); await view.findByLabelText("Character name");
   fireEvent.click(view.getByRole("button", { name: "Close" }));
