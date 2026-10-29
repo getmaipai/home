@@ -21,7 +21,11 @@ export MAIPAI_BENCH_SEARCH=fixture MAIPAI_LLAMA_SERVER_URL=http://127.0.0.1:8770
 run() { # label dir
   local D O; D=$(mktemp -d -t spoken-data); O=$(mktemp -d -t spoken-out)
   echo "== $1" | tee -a "$OUT"
-  (cd "$2/backend" && MAIPAI_DATA_DIR="$D" MAIPAI_AB_OUT="$O" bun run scripts/bench/chat-ab-01.ts --group spoken --only k4-seasons,r2-quarters 2>&1 | grep -E "first word|ERROR" | tee -a "$OUT")
+  (cd "$2/backend" && MAIPAI_DATA_DIR="$D" MAIPAI_AB_OUT="$O" bun run scripts/bench/chat-ab-01.ts --group spoken --only k4-seasons,r2-quarters >/dev/null 2>&1)
+  # per-run first word times and the summary, read from the bench's own results before they are removed
+  grep -E "^#+ |first word [0-9]|ERROR" "$O/side-by-side.md" 2>/dev/null | cut -c1-200 | tee -a "$OUT"
+  sed -n '/^## Summary by category/,$p' "$O/side-by-side.md" 2>/dev/null | tee -a "$OUT"
+  [ -f "$O/side-by-side.md" ] || echo "NO RESULTS FILE in $O" | tee -a "$OUT"
   rm -rf "$D" "$O"
 }
 while pgrep -f '[s]cripts/check.sh|[b]un test|[v]ite build' >/dev/null; do echo "   waiting for a gate to end"; sleep 15; done
