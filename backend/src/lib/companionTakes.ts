@@ -3,7 +3,8 @@ import { join } from "node:path";
 import media from "@maipai/spec/vocab/companion-media.json";
 import type { PersonRow } from "@/types";
 import { readLook, versionOriginalPath, versionPath } from "@/lib/companionLook";
-import { addTake, companionHasFinishingJob, finishTake, readStates, recordTakeFailure, recordTakeModelReported, setMotion, setTakeSeed, takePath, TAKE_LIMIT_LINE } from "@/lib/companionStates";
+import { addTake, companionHasFinishingJob, finishTake, readStates, recordTakeFailure, recordTakeModelReported, setMotion, setTakeSeed, takePath, TAKE_LIMIT_LINE, keyframePath, writeKeyframe } from "@/lib/companionStates";
+import { existsSync } from "node:fs";
 import { routeAudience } from "@/lib/pictures/audience";
 import { videoDenial, VIDEO_DENIAL_LINE, VIDEO_NOT_HERE_LINE, refuseVideoPrompt, VIDEO_REFUSAL_LINE } from "@/lib/videos/policy";
 import { videoEngineReady, videoEngineStatus } from "@/lib/videos/ready";
@@ -20,6 +21,7 @@ export const TAKE_RUN_TIMEOUT_LINE = "The video engine took too long. Try again.
 export const TAKE_RETRY_WAIT_MS = 60_000;
 export const TAKE_NEGATIVE_PROMPT = "different character, changed colours, changed face, extra limbs, text, watermark, camera movement, background change, shadows";
 export const TAKE_NO_ORIGINAL_LINE = 'The video model can only start from a picture the picture model made. Use "Change it" on this picture to make a version with the picture model, then pick that one as the starting picture.';
+export const TAKE_NEEDS_KEYFRAME_LINE = "Make the picture for this animation first.";
 
 export type TakeRunState = "queued" | "running" | "done" | "failed" | "cancelled";
 export interface TakeRun {
@@ -65,10 +67,10 @@ async function runTakes(run: TakeRun, count: number, actor: PersonRow, motionOve
   run.state = "running";
   let consecutiveEngineFailures = 0;
   const look = readLook(run.companionId), sheet = readySheet(run.companionId), keyName = sheet.look.sheet!.key === "#FF00FF" ? "magenta" : "green";
-  const pictureB64 = Buffer.from(readFileSync(sheet.originalPath!)).toString("base64");
   try {
     for (let stateIndex = 0; stateIndex < run.states.length; stateIndex++) {
       const state = run.states[stateIndex]!;
+      const pictureB64 = Buffer.from(readFileSync(keyframePath(run.companionId, state))).toString("base64");
       if (run.cancelled) break;
       if (motionOverride !== undefined && run.states.length === 1) setMotion(run.companionId, state, motionOverride);
       const stored = readStates(run.companionId).states[state];
@@ -172,6 +174,16 @@ export async function startStateTakes(input: { actor: PersonRow; companionId: st
   const refused = refuseVideoPrompt(promptText, { lane: "adult" });
   if (refused) throw Object.assign(new Error(VIDEO_REFUSAL_LINE[refused]), { status: 422 });
   const sheet = readySheet(input.companionId);
+  const missingKeyframes: string[] = [];
+  for (const state of input.states) {
+    const path = keyframePath(input.companionId, state);
+    if (!existsSync(path) && state === "idle") {
+      const bytes = new Uint8Array(readFileSync(sheet.restPath)), now = new Date().toISOString();
+      writeKeyframe(input.companionId, state, bytes, { source: "generated", style: readLook(input.companionId).versions.find((version) => version.id === readLook(input.companionId).rest)?.style ?? "keep", prompt_hash: promptHash("Idle keyframe copied from approved rest picture"), model: null, created_at: now, edited_at: now });
+    } else if (!existsSync(path)) missingKeyframes.push(state);
+  }
+  // The screen makes each missing keyframe first (one quick picture job each, through the keyframe route) and then asks again.
+  if (missingKeyframes.length) throw Object.assign(new Error(TAKE_NEEDS_KEYFRAME_LINE), { status: 409, code: "needs_keyframe", missing: missingKeyframes });
   if (!sheet.originalPath) throw Object.assign(new Error(TAKE_NO_ORIGINAL_LINE), { status: 409, code: "no_original" });
   const engineReady = await videoEngineReady(), engineStatus = await videoEngineStatus();
   if (!engineReady && (!engineStatus || engineStatus.available === false || engineStatus.state === "unsupported" || engineStatus.state === "off")) throw Object.assign(new Error(VIDEO_NOT_HERE_LINE), { status: 503 });

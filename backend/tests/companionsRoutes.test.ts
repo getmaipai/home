@@ -19,11 +19,12 @@ import { __setPictureStatusForTests, readyStatusForTests } from "@/lib/pictures/
 import { __clearCompanionLookJobsForTests } from "@/lib/companionLookJobs";
 import { __setCharacterPictureCapabilityForTests } from "@/lib/companionLook";
 import { portraitPath } from "@/lib/companionPortrait";
-import { addTake, takePath, saveStates, readStates, bestTake, __resetCompanionStatesForTests } from "@/lib/companionStates";
+import { addTake, takePath, saveStates, readStates, bestTake, __resetCompanionStatesForTests, keyframePath, writeKeyframe } from "@/lib/companionStates";
 import { __setStackClientForTests } from "@/lib/stackEngine";
 import { __setImageToolsForTests } from "@/lib/imageEdit";
 import type { StackImageToolsStatus } from "@/lib/stack/client";
 import { addVersion, approveSheet, setRest, updateSheet, readLook } from "@/lib/companionLook";
+import { readKeyframeMeta } from "@/lib/companionStates";
 import { getHouseholdCompanion } from "@/lib/householdCompanions";
 import { __setVideosFetchForTests } from "@/lib/videos/stack";
 import { __setVideoStatusForTests, readyVideoStatusForTests } from "@/lib/videos/ready";
@@ -32,6 +33,7 @@ import media from "@maipai/spec/vocab/companion-media.json";
 import { __setAgeCheckRunnerForTests, __resetAgeCheckForTests } from "@/lib/pictures/ageCheck";
 import { __setChildSafetyRunnerForTests } from "@/lib/pictures/laneGate";
 import { __setKeyframesForTests } from "@/lib/pictures/keyframes";
+import { PackageManifest } from "@maipai/spec/gen/ts/manifest.js";
 import { sweepAbandonedDrafts } from "@/lib/sweepAbandonedDrafts";
 
 const app = new OpenAPIHono();
@@ -323,6 +325,79 @@ describe("companion look generation jobs", () => {
 });
 
 describe("household companion routes", () => {
+  test("keyframe upload stores transparent art as a prepared 1024 square and withholds checked art", async () => {
+    const adult = addPerson("key-upload-author", "adult"), made = createHouseholdCompanion({ ...fixture(), display_name: "Key upload" }, { display_name: "Author", person_id: "key-upload-author" }); if (!made.ok) throw new Error(made.error);
+    const id = made.value.id, png = await transparentPng(); let imageToolCalls = 0, checkCalls = 0;
+    __setAgeCheckRunnerForTests(async (images) => { checkCalls += images.length; return images.map(() => AGE_OK); });
+    __setImageToolsForTests({ state: "idle", phase: null, vision: true, models: { isnet: true, lama: true, esrgan: true }, limits: {}, operations: ["remove_background", "erase", "upscale", "resize"], reason: null } satisfies StackImageToolsStatus);
+    __setStackClientForTests({ imageEdit: async () => { imageToolCalls++; return { kind: "done", item: { b64_json: Buffer.from(png).toString("base64"), width: 1024, height: 1024 } }; } } as never);
+    const saved = await upload(`companions/${id}/states/happy/keyframe`, adult, png); expect(saved.status).toBe(201); expect(imageToolCalls).toBe(0); expect(checkCalls).toBeGreaterThan(0);
+    const stored = readFileSync(keyframePath(id, "happy")), info = await sharp(stored).metadata(); expect(info).toMatchObject({ width: 1024, height: 1024, hasAlpha: true }); expect((await sharp(stored).ensureAlpha().stats()).channels[3]?.min).toBe(0);
+    expect(readKeyframeMeta(id, "happy")).toMatchObject({ source: "upload", style: "keep" });
+    const withheldId = createHouseholdCompanion({ ...fixture(), display_name: "Withheld key upload" }, { display_name: "Author", person_id: "key-upload-author" }); if (!withheldId.ok) throw new Error(withheldId.error);
+    __setAgeCheckRunnerForTests(async (images) => images.map(() => AGE_WITHHELD));
+    const withheld = await upload(`companions/${withheldId.value.id}/states/happy/keyframe`, adult, png); expect(withheld.status).toBe(422); expect(((await withheld.json()) as { error: string }).error).toBeTruthy(); expect(existsSync(keyframePath(withheldId.value.id, "happy"))).toBe(false);
+  });
+
+  test("keyframe edit starts from the current keyframe and screened teen inputs are refused", async () => {
+    const adult = addPerson("key-edit-author", "adult"), other = addPerson("key-edit-other", "adult"), admin = addPerson("key-edit-admin", "admin"), teen = addPerson("key-edit-teen", "teen");
+    const made = createHouseholdCompanion({ ...fixture(), display_name: "Key edit" }, { display_name: "Author", person_id: "key-edit-author" }); if (!made.ok) throw new Error(made.error); const id = made.value.id;
+    const current = await transparentPng(); writeKeyframe(id, "happy", current, { source: "upload", style: "keep", prompt_hash: "0".repeat(64), model: null, created_at: now, edited_at: now });
+    __setPictureStatusForTests(readyStatusForTests()); __setAgeCheckRunnerForTests(async (images) => images.map(() => AGE_OK));
+    let submitted: FormData | undefined;
+    __setPicturesFetchForTests((async (input, init) => { if (String(input).endsWith("/v1/images/edits") && init?.method === "POST") { submitted = init.body as FormData; return Response.json({ job: "key-edit-job" }, { status: 202 }); } return new Response("Not found", { status: 404 }); }) as typeof fetch);
+    const edit = await request(`companions/${id}/states/happy/keyframe/edit`, adult, "POST", { instruction: "Raise one paw" }); expect(edit.status).toBe(202);
+    const sentPixels = await sharp(new Uint8Array(await (submitted!.get("image") as File).arrayBuffer())).ensureAlpha().raw().toBuffer(), currentPixels = await sharp(current).flatten({ background: { r: 0, g: 255, b: 0 } }).ensureAlpha().raw().toBuffer();
+    expect(sentPixels).toEqual(currentPixels);
+    expect((await request(`companions/${id}/states/happy/keyframe`, admin)).status).toBe(200); expect((await request(`companions/${id}/states/happy/keyframe`, other)).status).toBe(403);
+    const teenMade = createHouseholdCompanion({ ...fixture(), display_name: "Teen key edit", audience: "teen" }, { display_name: "Teen Author", person_id: "key-edit-teen" }); if (!teenMade.ok) throw new Error(teenMade.error);
+    writeKeyframe(teenMade.value.id, "happy", current, { source: "upload", style: "keep", prompt_hash: "0".repeat(64), model: null, created_at: now, edited_at: now });
+    let screened = 0; __setAgeCheckRunnerForTests(async (images) => { screened += images.length; return images.map(() => AGE_WITHHELD); });
+    const rejected = await request(`companions/${teenMade.value.id}/states/happy/keyframe/edit`, teen, "POST", { instruction: "Raise one paw" }); expect(rejected.status).toBe(422); expect(screened).toBeGreaterThan(0); expect(readKeyframeMeta(teenMade.value.id, "happy")?.edited_at).toBe(now);
+  });
+
+  test("keyframe prepare and state rows preserve approvals while reporting stale clips; get and delete follow access", async () => {
+    const author = addPerson("key-prepare-author", "adult"), child = addPerson("key-prepare-child", "child"); const made = createHouseholdCompanion({ ...fixture(), display_name: "Key prepare" }, { display_name: "Author", person_id: "key-prepare-author" }); if (!made.ok) throw new Error(made.error); const id = made.value.id;
+    const png = await transparentPng(), take = addTake(id, "idle", { source: "upload", label: "Approved" }), states = readStates(id); states.states.idle!.approved = take.id; states.states.idle!.approved_by = "Author"; states.states.idle!.approved_at = now; states.states.idle!.takes[0]!.report = { ok: true, reasons: [], seconds: 3, bytes: { h264: 4, av1: null }, colour_distance: 1, area_ratio: 1, loop_gap: 0, opaque_share: { min: .5, max: .8 } }; saveStates(id, states);
+    mkdirSync(join(takePath(id, "idle", take.id, "clip.h264.mp4")!, ".."), { recursive: true }); writeFileSync(takePath(id, "idle", take.id, "clip.h264.mp4")!, "clip"); writeFileSync(takePath(id, "idle", take.id, "still.png")!, Buffer.from(png));
+    writeKeyframe(id, "idle", png, { source: "upload", style: "keep", prompt_hash: "0".repeat(64), model: null, created_at: now, edited_at: new Date(Date.now() + 1000).toISOString() });
+    __setAgeCheckRunnerForTests(async (images) => images.map(() => AGE_OK));
+    __setImageToolsForTests({ state: "idle", phase: null, vision: true, models: { isnet: true, lama: true, esrgan: true }, limits: {}, operations: ["remove_background", "erase", "upscale", "resize"], reason: null } satisfies StackImageToolsStatus);
+    __setStackClientForTests({ imageEdit: async (form: FormData) => { const input = new Uint8Array(await (form.get("image") as File).arrayBuffer()); return { kind: "done", item: { b64_json: Buffer.from(await sharp(input).resize(1024, 1024, { fit: "inside" }).png().toBuffer()).toString("base64"), width: 1024, height: 1024 } }; } } as never);
+    const prepared = await request(`companions/${id}/states/idle/keyframe/prepare`, author, "POST", { remove_background: false, frame: { zoom: 1.2, x: .5, y: .5 } }); expect(prepared.status).toBe(200);
+    const got = await request(`companions/${id}/states/idle/keyframe`, author); expect(got.status).toBe(200); expect(got.headers.get("content-type")).toBe("image/png");
+    const row = (await (await request(`companions/${id}/states`, author)).json() as any).states.find((state: any) => state.id === "idle"); expect(row.keyframe).toMatchObject({ url: `/api/companions/${id}/states/idle/keyframe` }); expect(row.clip_out_of_date).toBe(true); expect(row.approved.take_id).toBe(take.id);
+    for (const [method, suffix, body] of [["POST", "/keyframe/generate", undefined], ["POST", "/keyframe/edit", { instruction: "Wave" }], ["POST", "/keyframe", undefined], ["POST", "/keyframe/prepare", { remove_background: false }], ["GET", "/keyframe", undefined], ["DELETE", "/keyframe", undefined]] as const) {
+      const path = `companions/${id}/states/happy${suffix}`; const res = method === "POST" && suffix === "/keyframe" ? await upload(path, child, png) : await request(path, child, method, body); expect(res.status).toBe(403);
+    }
+    expect((await request(`companions/${id}/states/idle/keyframe`, child)).status).toBe(403);
+    expect((await request(`companions/${id}/states/idle/keyframe`, author, "DELETE")).status).toBe(204); expect(existsSync(keyframePath(id, "idle"))).toBe(false);
+    const deleted = (await (await request(`companions/${id}/states`, author)).json() as any).states.find((state: any) => state.id === "idle"); expect(deleted.keyframe).toBeNull(); expect(deleted.approved.take_id).toBe(take.id);
+  });
+
+  test("keyframe generation checks before storing and clip generation requires a keyframe except for idle", async () => {
+    const adult = addPerson("key-generate-author", "adult"), made = createHouseholdCompanion({ ...fixture(), display_name: "Key generation" }, { display_name: "Author", person_id: "key-generate-author" }); if (!made.ok) throw new Error(made.error); const id = made.value.id;
+    const png = await transparentPng(), original = await keyedPicture(), rest = addVersion(id, png, { source: "upload", label: "rest", width: 1024, height: 1024, from: null }, original); setRest(id, rest.id); updateSheet(id, { views: { left: null, right: null, mouth: null }, card: { text: "fox", species: "fox", colours: ["#CC3322"] }, key: "#00FF00", state: "needs_review", approved_by: null, approved_at: null }); approveSheet(id, "Author");
+    __setPictureStatusForTests(readyStatusForTests()); __setAgeCheckRunnerForTests(async (images) => images.map(() => AGE_OK));
+    let stackCalls = 0, reads = 0;
+    __setPicturesFetchForTests((async (input, init) => { const url = String(input); if (url.endsWith("/v1/images/edits") && init?.method === "POST") { stackCalls++; return Response.json({ job: "key-gen-job" }, { status: 202 }); } if (url.endsWith("/v1/images/generations/key-gen-job")) { reads++; return Response.json({ job: "key-gen-job", state: "done", progress: 100, data: [] }); } if (url.endsWith("/key-gen-job/0.png")) return new Response(png, { headers: { "content-type": "image/png" } }); return new Response("Not found", { status: 404 }); }) as typeof fetch);
+    const generated = await request(`companions/${id}/states/listening/keyframe/generate`, adult, "POST", {}); expect(generated.status, await generated.clone().text()).toBe(202); expect(stackCalls).toBe(1);
+    const { job } = await generated.json() as { job: string }; let progress: any;
+    for (let attempt = 0; attempt < 100; attempt++) { const response = await request(`companions/${id}/look/jobs/${job}`, adult); progress = await response.json(); if (progress.state === "done" || progress.state === "failed") break; await new Promise((resolve) => setTimeout(resolve, 5)); }
+    expect(progress.state).toBe("done"); expect(reads).toBeGreaterThan(0); const keyInfo = await sharp(readFileSync(keyframePath(id, "listening"))).metadata(); expect(keyInfo).toMatchObject({ width: 1024, height: 1024, hasAlpha: true }); expect(readKeyframeMeta(id, "listening")?.source).toBe("generated");
+    const withheldHouse = createHouseholdCompanion({ ...fixture(), display_name: "Withheld key generation" }, { display_name: "Author", person_id: "key-generate-author" }); if (!withheldHouse.ok) throw new Error(withheldHouse.error);
+    const withheldRest = addVersion(withheldHouse.value.id, png, { source: "upload", label: "rest", width: 1024, height: 1024, from: null }, original); setRest(withheldHouse.value.id, withheldRest.id); updateSheet(withheldHouse.value.id, { views: { left: null, right: null, mouth: null }, card: { text: "fox", species: "fox", colours: ["#CC3322"] }, key: "#00FF00", state: "needs_review", approved_by: null, approved_at: null }); approveSheet(withheldHouse.value.id, "Author");
+    __setAgeCheckRunnerForTests(async (images) => images.map(() => AGE_WITHHELD));
+    // Withheld output is refused during the generation poll and cannot become a keyframe.
+    const denied = await request(`companions/${withheldHouse.value.id}/states/listening/keyframe/generate`, adult, "POST", {}); expect(denied.status).toBe(202); const deniedJob = (await denied.json() as { job: string }).job;
+    for (let attempt = 0; attempt < 100; attempt++) { const response = await request(`companions/${withheldHouse.value.id}/look/jobs/${deniedJob}`, adult); progress = await response.json(); if (progress.state === "done" || progress.state === "failed") break; await new Promise((resolve) => setTimeout(resolve, 5)); }
+    expect(progress.state).toBe("failed"); expect(progress.error).toBeTruthy(); expect(existsSync(keyframePath(withheldHouse.value.id, "listening"))).toBe(false);
+    __setAgeCheckRunnerForTests(async (images) => images.map(() => AGE_OK));
+    __setVideoStatusForTests(readyVideoStatusForTests());
+    const needs = await request(`companions/${id}/states/thinking/generate`, adult, "POST", { count: 1 }); expect(needs.status).toBe(409); expect(await needs.json()).toEqual({ error: "Make the picture for this animation first.", code: "needs_keyframe", missing_keyframes: ["thinking"] });
+    const idle = await request(`companions/${id}/states/idle/generate`, adult, "POST", { count: 1 }); expect(idle.status).toBe(202); expect(existsSync(keyframePath(id, "idle"))).toBe(true);
+    expect(await sharp(readFileSync(keyframePath(id, "idle"))).metadata()).toMatchObject({ width: 1024, height: 1024, hasAlpha: true });
+  });
   test("register dials save flat, store social nested, and read back flat (NAT-06)", async () => {
     const author = addPerson("person-dials-author", "adult");
     const created = createHouseholdCompanion({ ...fixture(), display_name: "Dials" }, { display_name: "Author", person_id: "person-dials-author" });
@@ -710,6 +785,14 @@ describe("household companion routes", () => {
     expect((await (await request(`companions/${id}/states/jobs/run/${job}`, adult)).json() as { state: string }).state).toBe("cancelled");
   });
 
+  test("keyframe reads and edits refuse children", async () => {
+    const child = addPerson("person-keyframe-child", "child"), made = createHouseholdCompanion({ ...fixture(), display_name: "Keyframe child" }, { display_name: "Author", person_id: "person-keyframe-child" });
+    if (!made.ok) throw new Error(made.error);
+    expect((await request(`companions/${made.value.id}/states/idle/keyframe`, child)).status).toBe(403);
+    const denied = await request(`companions/${made.value.id}/states/idle/keyframe/edit`, child, "POST", { instruction: "Change the expression" });
+    expect(denied.status).toBe(403);
+  });
+
   test("states route lists creator vocabulary in spec order and subset generation rejects legacy ids", async () => {
     const adult = addPerson("person-state-subset", "adult"), created = createHouseholdCompanion({ ...fixture(), display_name: "Subset character" }, { display_name: "Author", person_id: "person-state-subset" }); if (!created.ok) throw new Error(created.error); const id = created.value.id;
     const body = await (await request(`companions/${id}/states`, adult)).json() as any;
@@ -717,6 +800,27 @@ describe("household companion routes", () => {
     expect(body.states.filter((state: any) => state.required)).toHaveLength(4); expect(body.states.some((state: any) => state.id === "needs_you")).toBe(false); expect(body.counts.total).toBe(13);
     const rejected = await request(`companions/${id}/states/generate`, adult, "POST", { states: ["needs_you"] });
     expect(rejected.status).toBe(400); expect((await rejected.json() as any).error).toBe("Choose only listed companion states.");
+  });
+
+  test("subset generation names every state that still needs its keyframe and starts no clip", async () => {
+    const author = addPerson("subset-keyframe-order", "adult"), made = createHouseholdCompanion({ ...fixture(), display_name: "Subset order" }, { display_name: "Author", person_id: "subset-keyframe-order" }); if (!made.ok) throw new Error(made.error); const id = made.value.id;
+    const png = await transparentPng(), rest = addVersion(id, png, { source: "upload", label: "rest", width: 1024, height: 1024, from: null }); setRest(id, rest.id); updateSheet(id, { views: { left: null, right: null, mouth: null }, card: { text: "fox", species: "fox", colours: ["#CC3322"] }, key: "#00FF00", state: "needs_review", approved_by: null, approved_at: null }); approveSheet(id, "Author");
+    __setPictureStatusForTests(readyStatusForTests()); __setImageToolsForTests({ state: "running", phase: null, vision: true, models: { resize: true }, limits: {}, operations: [], reason: null }); const events: string[] = [];
+    __setPicturesFetchForTests((async (input, init) => { const url = String(input); if (url.endsWith("/v1/images/edits") && init?.method === "POST") { events.push("keyframe"); return Response.json({ job: `subset-image-${events.filter((v) => v === "keyframe").length}` }, { status: 202 }); } if (url.includes("/v1/images/generations/subset-image-")) return Response.json({ job: url.split("/").at(-1), state: "done", progress: 100, data: [{}] }); if (url.endsWith("/0.png")) return new Response(png, { headers: { "content-type": "image/png" } }); return new Response("Not found", { status: 404 }); }) as typeof fetch);
+    __setVideoStatusForTests(readyVideoStatusForTests()); __setVideosFetchForTests((async (_input, init) => { if (init?.method === "POST") events.push("clip"); return Response.json({ job: "clip-job" }, { status: 202 }); }) as typeof fetch);
+    const response = await request(`companions/${id}/states/generate`, author, "POST", { states: ["listening", "thinking"], count: 1 }); expect(response.status).toBe(409);
+    const body = await response.json() as { code: string; error: string; missing_keyframes: string[] }; expect(body.code).toBe("needs_keyframe"); expect(body.missing_keyframes).toEqual(["listening", "thinking"]); expect(body.error).toBe("Make the picture for this animation first."); expect(events).toEqual([]);
+  });
+
+  test("subset generation lists only the states still missing a keyframe", async () => {
+    const author = addPerson("subset-keyframe-fail", "adult"), made = createHouseholdCompanion({ ...fixture(), display_name: "Subset failure" }, { display_name: "Author", person_id: "subset-keyframe-fail" }); if (!made.ok) throw new Error(made.error); const id = made.value.id;
+    const png = await transparentPng(), rest = addVersion(id, png, { source: "upload", label: "rest", width: 1024, height: 1024, from: null }); setRest(id, rest.id); updateSheet(id, { views: { left: null, right: null, mouth: null }, card: { text: "fox", species: "fox", colours: ["#CC3322"] }, key: "#00FF00", state: "needs_review", approved_by: null, approved_at: null }); approveSheet(id, "Author");
+    __setPictureStatusForTests(readyStatusForTests()); __setImageToolsForTests({ state: "running", phase: null, vision: true, models: { resize: true }, limits: {}, operations: [], reason: null }); __setAgeCheckRunnerForTests(async (images) => images.map(() => AGE_WITHHELD)); let clips = 0;
+    __setPicturesFetchForTests((async (input, init) => { if (String(input).endsWith("/v1/images/edits") && init?.method === "POST") return Response.json({ job: "subset-denied" }, { status: 202 }); if (String(input).includes("/v1/images/generations/subset-denied")) return Response.json({ job: "subset-denied", state: "done", progress: 100, data: [{}] }); if (String(input).endsWith("/subset-denied/0.png")) return new Response(png, { headers: { "content-type": "image/png" } }); return new Response("Not found", { status: 404 }); }) as typeof fetch);
+    __setVideoStatusForTests(readyVideoStatusForTests()); __setVideosFetchForTests((async (_input, init) => { if (init?.method === "POST") clips++; return Response.json({ job: "clip-job" }, { status: 202 }); }) as typeof fetch);
+    writeKeyframe(id, "listening", png, { source: "generated", style: "keep", prompt_hash: "test", model: null, created_at: new Date().toISOString(), edited_at: new Date().toISOString() });
+    const response = await request(`companions/${id}/states/generate`, author, "POST", { states: ["listening", "thinking"] }); expect(response.status).toBe(409);
+    const body = await response.json() as { code: string; missing_keyframes: string[] }; expect(body.code).toBe("needs_keyframe"); expect(body.missing_keyframes).toEqual(["thinking"]); expect(clips).toBe(0);
   });
 
   test("failed quality reports stay unapproved and idle removal clears every draft approval", async () => {
@@ -750,7 +854,17 @@ describe("household companion routes", () => {
     const changedTake = addTake(id, "idle", { source: "upload", label: "replacement" }), changed = readStates(id); changed.states.idle!.takes.find((row) => row.id === changedTake.id)!.report = report; saveStates(id, changed); mkdirSync(join(takePath(id, "idle", changedTake.id, "still.png")!, ".."), { recursive: true }); writeFileSync(takePath(id, "idle", changedTake.id, "clip.h264.mp4")!, "clip2"); writeFileSync(takePath(id, "idle", changedTake.id, "still.png")!, Buffer.from(png));
     const approved = await request(`companions/${id}/states/idle/approve`, author, "PUT", { take_id: changedTake.id }); expect(approved.status).toBe(200);
     __setKeyframesForTests(async () => [new Uint8Array([9])]); __setAgeCheckRunnerForTests(async (images) => images.map(() => ({ ok: true, verdict: { people_count: 0, apparent_min_age_estimate: null, label: "none", is_nude_or_sexual: false, confidence: 1 } })));
-    const pub = await request(`companions/${id}/appearance/publish`, author, "POST"); expect(pub.status).toBe(200); expect(getHouseholdCompanion(id)?.companion?.animation?.states).toHaveProperty("idle"); expect(readStates(id).published?.states.idle).toBe(changedTake.id);
+    writeKeyframe(id, "idle", png, { source: "upload", style: "cartoon", prompt_hash: "a".repeat(64), model: null, created_at: new Date().toISOString(), edited_at: new Date().toISOString() });
+    const pub = await request(`companions/${id}/appearance/publish`, author, "POST"); expect(pub.status).toBe(200); expect(getHouseholdCompanion(id)?.companion?.animation).toMatchObject({ states: { idle: { keyframe: "idle-keyframe.png" } } }); expect(readStates(id).published?.states.idle).toBe(changedTake.id); expect(readFileSync(join(householdCompanionFolder(id)!, "animation", "idle-keyframe.png"))).toEqual(Buffer.from(png));
+    const publishedManifest = JSON.parse(readFileSync(join(householdCompanionFolder(id)!, "manifest.json"), "utf8")); expect(() => PackageManifest.parse(publishedManifest)).not.toThrow();
+  });
+
+  test("Publish without keyframes omits the optional manifest field and validates", async () => {
+    const f = await publishFixture("person-pub-no-keyframes", "adult", "adult");
+    __setKeyframesForTests(async () => [new Uint8Array([9])]); __setAgeCheckRunnerForTests(async (images) => images.map(() => AGE_OK));
+    const pub = await request(`companions/${f.id}/appearance/publish`, f.token, "POST"); expect(pub.status).toBe(200);
+    expect(getHouseholdCompanion(f.id)?.companion?.animation?.states.idle).not.toHaveProperty("keyframe");
+    const manifest = JSON.parse(readFileSync(join(householdCompanionFolder(f.id)!, "manifest.json"), "utf8")); expect(() => PackageManifest.parse(manifest)).not.toThrow();
   });
 
   test("Publish withholds an unrunnable adult check and leaves the live animation untouched", async () => {

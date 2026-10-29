@@ -3,7 +3,8 @@ import { rmSync, writeFileSync, mkdirSync, existsSync, readFileSync } from "node
 import { join } from "node:path";
 import { loadManifestOnly } from "@/lib/plugins";
 import { createHouseholdCompanion } from "@/lib/householdCompanions";
-import { addTake, bestTake, deleteStates, deleteTake, readStates, saveStates, setMotion, takePath, __resetCompanionStatesForTests, finishTake, swapInAnimation } from "@/lib/companionStates";
+import { addTake, bestTake, deleteStates, deleteTake, readStates, saveStates, setMotion, takePath, __resetCompanionStatesForTests, finishTake, swapInAnimation, keyframePath, keyframeMetaPath, readKeyframeMeta, writeKeyframe, meanOpaqueColourDistance } from "@/lib/companionStates";
+import sharp from "sharp";
 import { __setStackClientForTests } from "@/lib/stackEngine";
 import { addVersion, approveSheet, setRest, updateSheet } from "@/lib/companionLook";
 import media from "@maipai/spec/vocab/companion-media.json";
@@ -23,6 +24,21 @@ afterEach(() => {
 function companion() { const result = createHouseholdCompanion({ ...sourceCompanion, display_name: "State fixture" }, { display_name: "Author", person_id: "state-test" }); if (!result.ok) throw new Error(result.error); return result.value.id; }
 
 describe("companion states store", () => {
+  test("stores a keyframe and metadata atomically in its state folder", () => {
+    const id = companion(), bytes = new Uint8Array([1, 2, 3]), now = new Date().toISOString();
+    writeKeyframe(id, "thinking", bytes, { source: "upload", style: "cartoon", prompt_hash: "a".repeat(64), model: null, created_at: now, edited_at: now });
+    expect(readFileSync(keyframePath(id, "thinking"))).toEqual(Buffer.from(bytes));
+    expect(readKeyframeMeta(id, "thinking")).toMatchObject({ source: "upload", style: "cartoon", prompt_hash: "a".repeat(64), created_at: now, edited_at: now });
+    expect(keyframeMetaPath(id, "thinking")).toContain("keyframe.json");
+  });
+
+  test("measures opaque frame colour and detects a frame zero mismatch", async () => {
+    const frame = async (colour: { r: number; g: number; b: number; alpha: number }) => new Uint8Array(await sharp({ create: { width: 32, height: 32, channels: 4, background: colour } }).png().toBuffer());
+    const same = await frame({ r: 200, g: 40, b: 20, alpha: 1 }), shifted = await frame({ r: 20, g: 210, b: 240, alpha: 1 });
+    expect(await meanOpaqueColourDistance(same, same)).toBeLessThan(1);
+    expect(await meanOpaqueColourDistance(same, shifted)).toBeGreaterThan(24);
+  });
+
   test("builds the take prompt and uses the vocabulary's generation size", () => {
     expect(takePrompt({ text: "A red fox." }, "waves once", "magenta")).toBe("A red fox.. waves once. Locked camera, no zoom, no pan, the character stays in the centre of the frame and keeps the same size. Plain solid magenta background, no shadows, no ground, no text, no other objects. Smooth natural motion.");
     expect(media.generate.width).toBeGreaterThan(0); expect(media.generate.height).toBeGreaterThan(0); expect(media.generate.seconds).toBeGreaterThan(0);
