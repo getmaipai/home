@@ -1,5 +1,18 @@
 # MaiPai Home: design record
 
+## Companion animation takes: a finished clip is usable (owner ruling 2026-10-29)
+
+On screen 2 of the companion creator every generated clip was made but none played: the engine's quality report (`loop_gap`,
+`colour_distance`, the first-frame distance, the opaque share) marked each take `ok: false`, nothing was approved, and the screen
+only plays an approved take. The measurements are now advisory notes in the take's `reasons`; a take is usable when its
+`clip.h264.mp4` exists and is non-empty, and only a missing or unreadable clip is a failure (`CLIP_MISSING_LINE`). The best usable take
+(fewest notes, then the closest colours, then the steadiest size) is approved by itself; a person can still approve or unapprove any
+take. Takes saved under the old rules flip once on the next read (`normaliseLegacyReports`) and their state is approved when nobody
+had approved one. The age and audience checks on finished art are unchanged. The engine side (Stack `dada63a`) crossfades loops
+into a seamless cycle, premultiplies the colour half (ffmpeg 8.1.3 left the key colour in it) and keys pure backgrounds by hue so the
+first frames are no longer tinted. Finishing a clip now overlaps the next clip's generation (`companionTakes.ts`), and the engine
+polls are 500 ms and 250 ms instead of 2 s and 1 s.
+
 ## One Settings area (owner-approved 2026-10-23)
 
 Settings is one spec-declared area at `/settings`, with one column grouped into **Yours** and **The home**. Household pages are visible in that same column to owners and admins; section audiences keep them hidden from other roles, and direct non-admin household URLs show the access explanation. Old `/settings/home`, `/settings/account`, and `/settings/chat` routes replace to their mapped page and tab using the pinned spec's `legacy-sections.json`. The owner approved S1's single profile-menu entry: **Settings**.

@@ -21,6 +21,8 @@ export const TAKE_QUICK_NOT_READY_LINE = "Making a character's clips needs the s
 export const TAKE_RUN_NOT_FOUND_LINE = "That clip run could not be found. Start it again.";
 export const TAKE_RUN_TIMEOUT_LINE = "The video engine took too long. Try again.";
 export const TAKE_RETRY_WAIT_MS = 60_000;
+/** How often Home asks the engine about a running video job (a quick clip takes about 70 seconds; the old two second wait added up to two seconds per take). */
+export const TAKE_POLL_MS = 500;
 export const TAKE_NEGATIVE_PROMPT = "different character, changed colours, changed face, extra limbs, text, watermark, camera movement, background change, shadows";
 export const TAKE_NO_REST_LINE = "Choose and approve a starting picture first.";
 export const TAKE_NEEDS_KEYFRAME_LINE = "Make the picture for this animation first.";
@@ -68,6 +70,8 @@ function isEngineFailure(error: unknown): boolean { return error instanceof Stac
 async function runTakes(run: TakeRun, count: number, actor: PersonRow, motionOverride?: string): Promise<void> {
   run.state = "running";
   let consecutiveEngineFailures = 0;
+  // Finishing (key-colour matte, encode, art check) runs while the next clip generates; the run ends only when every finish has settled.
+  const finishing: Promise<void>[] = [];
   const look = readLook(run.companionId), sheet = readySheet(run.companionId), keyName = sheet.look.sheet!.key === "#FF00FF" ? "magenta" : "green";
   try {
     for (let stateIndex = 0; stateIndex < run.states.length; stateIndex++) {
@@ -107,7 +111,7 @@ async function runTakes(run: TakeRun, count: number, actor: PersonRow, motionOve
                 if (status.state === "cancelled") throw Object.assign(new Error("The video engine stopped this clip. Try again."), { cancelled: true });
                 if (status.state === "done") done = status.data;
                 else { const progress = Math.max(0, Math.min(99, status.progress)); run.percent = Math.min(79, Math.round((run.takesMade / (run.states.length * count)) * 100 + progress / (run.states.length * count))); }
-                if (!done) await new Promise((resolve) => setTimeout(resolve, 2_000));
+                if (!done) await new Promise((resolve) => setTimeout(resolve, TAKE_POLL_MS));
               }
               break;
             } catch (error) {
@@ -134,7 +138,8 @@ async function runTakes(run: TakeRun, count: number, actor: PersonRow, motionOve
           const sourcePath = takePath(run.companionId, state, take.id, "source.mp4")!;
           writeFileSync(sourcePath, clip);
           await cancelOrDeleteVideo(completedStackJob); run.stackJob = null; stackJob = null;
-          await finishTake(run.companionId, state, take.id, { alpha: false, actor });
+          // finishTake records its own failure on the take; a finishing failure never stops the run.
+          finishing.push(finishTake(run.companionId, state, take.id, { alpha: false, actor }).catch(() => undefined));
           consecutiveEngineFailures = 0;
         } catch (error) {
           if (stackJob && !run.cancelled) await cancelOrDeleteVideo(stackJob);
@@ -157,6 +162,7 @@ async function runTakes(run: TakeRun, count: number, actor: PersonRow, motionOve
     run.error = error instanceof Error ? error.message : "The clip run could not finish. Try again.";
     run.state = "failed";
   } finally {
+    if (finishing.length) { run.phase = "finishing"; run.label = "Finishing the last clip"; await Promise.allSettled(finishing); }
     if (run.cancelled) run.state = "cancelled";
     else if (run.state !== "failed") { run.state = "done"; run.percent = 100; }
     run.phase = run.state;

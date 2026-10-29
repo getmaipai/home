@@ -374,7 +374,7 @@ export interface CompanionLookSheet { views: { left: CompanionLookView | null; r
 export interface CompanionLook { versions: CompanionLookVersion[]; rest: string | null; key: CompanionLookKey; sheet: CompanionLookSheet | null; ready_for_video: boolean; start_ready: boolean; start_reason?: string; can_generate: boolean; generate_reason?: string; styles: Array<{ id: string; label: string; custom?: boolean }>; keep?: { id: "keep"; label: string }; audience_cap?: "all" | "teen" | "adult" }
 export interface CompanionLookJob { state: "queued" | "running" | "done" | "failed" | "cancelled"; percent: number; label: string; versions: Array<{ id: string; url: string; label: string }>; error: string | null }
 export interface CompanionPromptPack { title: string; prompt: string; negative_prompt: string; text: string }
-export interface CompanionStateUrls { h264: string; av1: string; still: string }
+export interface CompanionStateUrls { h264: string; av1: string | null; still: string }
 /** Signed-in person's ready avatar clips for chat. */
 export interface CompanionAvatarView {
   avatar: null | {
