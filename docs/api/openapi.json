@@ -59722,6 +59722,264 @@
         }
       }
     },
+    "/api/companions/{id}/backstory/generate": {
+      "post": {
+        "tags": [
+          "Companions"
+        ],
+        "summary": "Generate a companion backstory",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 80
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "hint": {
+                    "type": "string",
+                    "maxLength": 300
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Generated editable backstory.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "text": {
+                      "type": "string",
+                      "maxLength": 400
+                    }
+                  },
+                  "required": [
+                    "text"
+                  ]
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Only the author or an admin can generate this backstory",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No household companion",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "The local chat model is unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/companions/{id}/save": {
+      "post": {
+        "tags": [
+          "Companions"
+        ],
+        "summary": "Save companion personality and publish its approved appearance",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 80
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "voice_id": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 120
+                  },
+                  "personality": {
+                    "type": "string",
+                    "enum": [
+                      "friendly",
+                      "funny",
+                      "calm",
+                      "professional",
+                      "playful",
+                      "custom"
+                    ]
+                  },
+                  "style_notes": {
+                    "type": "string",
+                    "maxLength": 300
+                  },
+                  "backstory": {
+                    "type": "string",
+                    "maxLength": 400
+                  }
+                },
+                "required": [
+                  "voice_id",
+                  "personality"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Companion saved and appearance published.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    },
+                    "status": {
+                      "type": "string",
+                      "enum": [
+                        "ready"
+                      ]
+                    },
+                    "published": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "status",
+                    "published"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Companion fields are invalid",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Only the author or an admin can save this companion",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No household companion",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Complete the named screen and save again.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "go_back_to": {
+                      "type": "string",
+                      "enum": [
+                        "look",
+                        "animations"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "error",
+                    "go_back_to"
+                  ]
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "The appearance check blocked publishing.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "go_back_to": {
+                      "type": "string",
+                      "enum": [
+                        "look",
+                        "animations"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "error",
+                    "go_back_to"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/companions/{id}/states/{state}/keyframe/generate": {
       "post": {
         "tags": [
