@@ -76,9 +76,9 @@ async function runTakes(run: TakeRun, count: number, actor: PersonRow, motionOve
   try {
     for (let stateIndex = 0; stateIndex < run.states.length; stateIndex++) {
       const state = run.states[stateIndex]!;
-      // The video model starts from the picture on the key colour it is told to keep, so the clip can be keyed out afterwards; a transparent picture would arrive on black.
+      // The video model starts from the picture on the key colour it is told to keep, so the clip can be keyed out afterwards; a transparent picture would arrive on black. It is shrunk to the clip size here and sharpened there, because the model smooths fine detail and sharpening before the shrink is mostly lost.
       const [keyR, keyG, keyB] = keyRgb(sheet.look.sheet!.key);
-      const pictureB64 = Buffer.from(await sharp(readFileSync(keyframePath(run.companionId, state))).flatten({ background: { r: keyR, g: keyG, b: keyB } }).png().toBuffer()).toString("base64");
+      const pictureB64 = Buffer.from(await sharp(readFileSync(keyframePath(run.companionId, state))).flatten({ background: { r: keyR, g: keyG, b: keyB } }).resize(media.generate.width, media.generate.height, { fit: "fill", kernel: "lanczos3" }).sharpen({ sigma: 1.2, m1: 1, m2: 2 }).png().toBuffer()).toString("base64");
       if (run.cancelled) break;
       if (motionOverride !== undefined && run.states.length === 1) setMotion(run.companionId, state, motionOverride);
       const stored = readStates(run.companionId).states[state];

@@ -809,7 +809,7 @@ describe("household companion routes", () => {
     for (let attempt = 0; attempt < 100; attempt++) { const response = await request(`companions/${id}/states/jobs/run/${job}`, adult); progress = await response.json(); if (progress.state === "done" || progress.state === "failed") break; await new Promise((resolve) => setTimeout(resolve, 5)); }
     expect(progress).toMatchObject({ state: "done", percent: 100, takes_made: 2 }); expect(progress.label).toContain("try 2 of 2");
     expect(submitted).toHaveLength(2); expect(submitted[0]?.seed).not.toBe(submitted[1]?.seed); expect(submitted[0]).toMatchObject({ size: `${media.generate.width}x${media.generate.height}`, seconds: media.generate.seconds, image_source: "generated", audience: "all-ages", timeout_ms: 1 }); expect(submitted[0]).toMatchObject({ model: "wan2.2-ti2v-5b-fastwan-mlx" });
-    expect((await sharp(Buffer.from(String(submitted[0]!.image), "base64")).metadata()).hasAlpha).toBe(false); /* the start picture goes on the key colour, never transparent */
+    { const sent = await sharp(Buffer.from(String(submitted[0]!.image), "base64")).metadata(); expect(sent.hasAlpha).toBe(false); expect([sent.width, sent.height]).toEqual([media.generate.width, media.generate.height]); } /* the start picture goes on the key colour, never transparent */
     expect(fetched).toEqual(["video-1", "video-2"]); expect(deleted).toEqual(["video-1", "video-2"]); expect(finished).toBe(2);
     const takes = readStates(id).states.idle!.takes; expect(takes).toHaveLength(2); expect(takes.every((take) => take.report?.ok)).toBe(true); expect(bestTake(takes)?.id).toBe("take-2");
     const statesApi = await (await request(`companions/${id}/states`, adult)).json() as any;
