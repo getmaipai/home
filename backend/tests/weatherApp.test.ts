@@ -162,9 +162,9 @@ describe("the forecast data call", () => {
     // WEATHER-PORT-01: the same run carries what to wear and bring (37.8 F feels-like, 70 percent rain, night: no sun advice).
     const advice = ((result as { value: { details: { advice?: Array<{ id: string }> } } }).value.details.advice ?? []).map((item) => item.id);
     expect(advice).toEqual(["jacket", "rain-gear", "boots", "rain-timing"]);
-    // WEATHER-PORT-03: with no model answer yet the summary is the advice line, never an error.
-    expect((result as { value: { details: { summary?: string } } }).value.details.summary).toBe("Wear a jacket. Bring rain gear. Wear waterproof shoes. Rain is likely around 9 PM.");
-    expect(blocks[0]!.props.attribution).toContain("Open-Meteo");
+    // WEATHER-PORT-03: with no model answer yet the summary is a plain factual line (facts only, advice is the chips' job), never an error.
+    expect((result as { value: { details: { summary?: string } } }).value.details.summary).toBe("It is 41°F and snowy. Today's high is 44° and the low is 33°.");
+    expect(blocks[0]!.props.attribution).toBe(""); // the card draws no credit line (owner, 2026-10-28); the manifest still names the source
     const hosts = new Set(urls.map((url) => new URL(url).host));
     expect([...hosts].every((host) => host === "api.open-meteo.com" || host === "geocoding-api.open-meteo.com")).toBe(true);
   });
