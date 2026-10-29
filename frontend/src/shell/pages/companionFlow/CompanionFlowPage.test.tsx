@@ -6,7 +6,7 @@ import { api, ApiError, type CompanionLook } from "@/lib/api";
 import { CompanionShellViewer } from "@/lib/companionShells";
 import { CompanionFlowPage } from "@/shell/pages/companionFlow/CompanionFlowPage";
 
-const methods = ["settingsValues", "companions", "editCompanion", "createCompanionDraft", "companionLook", "generateCompanionLook", "companionLookJob", "uploadCompanionLook", "restyleCompanionLook", "prepareCompanionLook", "approveCompanionLook", "deleteCompanion", "updateCompanion", "cancelCompanionLookJob"] as const;
+const methods = ["settingsValues", "companions", "editCompanion", "createCompanionDraft", "companionLook", "generateCompanionLook", "companionLookJob", "uploadCompanionLook", "restyleCompanionLook", "prepareCompanionLook", "approveCompanionLook", "deleteCompanion", "updateCompanion", "cancelCompanionLookJob", "companionStates"] as const;
 const originals = Object.fromEntries(methods.map((key) => [key, api[key]]));
 afterEach(() => { cleanup(); Object.assign(api, originals); });
 
@@ -28,6 +28,7 @@ function open(options: { path?: string; canCreate?: boolean; lookData?: Companio
   api.approveCompanionLook = async (_id, v) => { calls.approved.push(v); return { job: "sheet-1" }; };
   api.prepareCompanionLook = async (_id, body) => { calls.prepare.push(body); return { id: "v-2" }; };
   api.deleteCompanion = async (id) => { calls.deleted.push(id); };
+  api.companionStates = async () => ({ sheet_ready: true, start_ready: true, key: "#00FF00", states: [], run: null, counts: { approved: 0, total: 0, required_missing: [] } });
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   const view = render(<QueryClientProvider client={client}><CompanionShellViewer.Provider value={{ id: "person-sage" } as never}><MemoryRouter initialEntries={[options.path ?? "/companions/create"]}><Routes>
     <Route path="/companions/create" element={<CompanionFlowPage />} /><Route path="/companions/:id/create" element={<CompanionFlowPage />} /><Route path="/companions" element={<Where />} />
@@ -78,8 +79,8 @@ test("Approve is disabled until a picture exists, then approves and moves to ste
   expect(view.getByLabelText("Remove background")).toBeTruthy();
   fireEvent.click(button(view, "Approve & Continue"));
   await waitFor(() => expect(calls.approved).toEqual(["v-1"]));
-  await view.findByText("Step 2 of 3 · Bring it to life");
-  expect(view.getAllByText("This step comes next.").length).toBe(1);
+  await view.findByText("Step 2 of 3 · Generate and review your animations");
+  expect(view.getByText("Generate Required")).toBeTruthy();
 });
 
 test("remove background calls the prepare route", async () => {

@@ -392,6 +392,9 @@ export interface CompanionStateRow {
   id: string; label: string; kind: "loop" | "oneshot"; required: boolean; when_it_plays: string; default_motion: string; motion: string;
   approved: { take_id: string; approved_by: string | null; approved_at: string | null; urls: CompanionStateUrls } | null;
   takes: CompanionStateTake[]; busy: boolean;
+  /** UI-3S-01b: the editable still made before the clip, the clip older than it, and the plain status words from Home. */
+  keyframe?: { url: string; edited_at: string | null } | null; clip_out_of_date?: boolean;
+  status?: "missing" | "ready" | "waiting" | "Needs another try"; status_label?: string;
 }
 export interface CompanionStates {
   sheet_ready: boolean; start_ready: boolean; start_reason?: string; key: string; states: CompanionStateRow[]; run: { job: string; label: string; percent: number } | null;
@@ -1480,7 +1483,12 @@ export const api = {
   uploadCompanionState: (id: string, state: string, form: FormData) => request<{ take_id: string }>(`/api/companions/${encodeURIComponent(id)}/states/${encodeURIComponent(state)}/upload`, { method: "POST", body: form }),
   companionStateJob: (id: string, take: string) => request<CompanionStateJob>(`/api/companions/${encodeURIComponent(id)}/states/jobs/${encodeURIComponent(take)}`),
   generateCompanionState: (id: string, state: string, body: { count: number; motion?: string }) => request<{ job: string }>(`/api/companions/${encodeURIComponent(id)}/states/${encodeURIComponent(state)}/generate`, { method: "POST", body: JSON.stringify(body) }),
-  generateCompanionStates: (id: string, body: { required_only: boolean; count?: number }) => request<{ job: string }>(`/api/companions/${encodeURIComponent(id)}/states/generate`, { method: "POST", body: JSON.stringify(body) }),
+  generateCompanionStates: (id: string, body: { required_only?: boolean; states?: string[]; count?: number }) => request<{ job: string }>(`/api/companions/${encodeURIComponent(id)}/states/generate`, { method: "POST", body: JSON.stringify(body) }),
+  generateCompanionKeyframe: (id: string, state: string) => request<{ job: string }>(`/api/companions/${encodeURIComponent(id)}/states/${encodeURIComponent(state)}/keyframe/generate`, { method: "POST" }),
+  editCompanionKeyframe: (id: string, state: string, instruction: string) => request<{ job: string }>(`/api/companions/${encodeURIComponent(id)}/states/${encodeURIComponent(state)}/keyframe/edit`, { method: "POST", body: JSON.stringify({ instruction }) }),
+  uploadCompanionKeyframe: (id: string, state: string, form: FormData) => request<{ saved: boolean }>(`/api/companions/${encodeURIComponent(id)}/states/${encodeURIComponent(state)}/keyframe`, { method: "POST", body: form }),
+  prepareCompanionKeyframe: (id: string, state: string, body: { remove_background: boolean; frame?: { zoom: number; x: number; y: number } }) => request<{ saved: boolean }>(`/api/companions/${encodeURIComponent(id)}/states/${encodeURIComponent(state)}/keyframe/prepare`, { method: "POST", body: JSON.stringify(body) }),
+  deleteCompanionKeyframe: (id: string, state: string) => request<void>(`/api/companions/${encodeURIComponent(id)}/states/${encodeURIComponent(state)}/keyframe`, { method: "DELETE" }),
   companionStateRun: (id: string, job: string) => request<CompanionStateRun>(`/api/companions/${encodeURIComponent(id)}/states/jobs/run/${encodeURIComponent(job)}`),
   stopCompanionStateRun: (id: string, job: string) => request<void>(`/api/companions/${encodeURIComponent(id)}/states/jobs/run/${encodeURIComponent(job)}`, { method: "DELETE" }),
   approveCompanionState: (id: string, state: string, take_id: string, force?: boolean) => request<{ approved: string }>(`/api/companions/${encodeURIComponent(id)}/states/${encodeURIComponent(state)}/approve`, { method: "PUT", body: JSON.stringify({ take_id, ...(force ? { force: true } : {}) }) }),

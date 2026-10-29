@@ -19,7 +19,7 @@ const errorText = (error: unknown) => error instanceof ApiError ? error.message 
 const sizeText = (bytes: number) => `${Math.round(bytes / 1000)} kB`;
 const AV1_CODEC = 'video/mp4; codecs="av01.0.05M.08"';
 
-function useClipPreview(urls: CompanionStateTake["urls"], label: string) {
+export function useClipPreview(urls: CompanionStateTake["urls"], label: string) {
   const [source, setSource] = useState(urls.h264);
   const [failed, setFailed] = useState(false);
   const [reduced, setReduced] = useState(false);

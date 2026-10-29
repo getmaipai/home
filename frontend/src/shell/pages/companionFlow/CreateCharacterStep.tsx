@@ -12,13 +12,13 @@ import { api, type CompanionLook, type CompanionLookJob } from "@/lib/api";
 import { flowErrorText } from "@/shell/pages/companionFlow/errors";
 import { DEFAULT_FRAME, PreviewControls, type PictureFrame } from "@/shell/pages/companionFlow/PreviewControls";
 
-const lookKey = (id: string) => ["companions", id, "look"] as const;
+export const lookKey = (id: string) => ["companions", id, "look"] as const;
 const running = (job: CompanionLookJob | undefined, jobId: string | null) => jobId !== null && (job === undefined || job.state === "queued" || job.state === "running");
 
 /** Screen 1, Create Character. It reports the draft and whether it holds a picture so the dialog can ask keep or discard on close. */
 export function CreateCharacterStep({ companionId, initialName, onDraft, onApproved }: {
   companionId: string | null; initialName: string;
-  onDraft: (state: { id: string | null; pictures: number }) => void; onApproved: () => void;
+  onDraft: (state: { id: string | null; pictures: number; name: string }) => void; onApproved: () => void;
 }) {
   const client = useQueryClient();
   const [draftId, setDraftId] = useState<string | null>(companionId);
@@ -50,7 +50,7 @@ export function CreateCharacterStep({ companionId, initialName, onDraft, onAppro
   const generating = running(job, jobId);
   const locked = generating || busy;
 
-  useEffect(() => { onDraft({ id: draftId, pictures: look?.versions.length ?? 0 }); }, [draftId, look?.versions.length, onDraft]);
+  useEffect(() => { onDraft({ id: draftId, pictures: look?.versions.length ?? 0, name: draftName }); }, [draftId, look?.versions.length, draftName, onDraft]);
   // Reopening an existing companion starts from its current picture.
   useEffect(() => {
     if (seeded.current || !look || shownId !== null || !look.versions.length) return;
