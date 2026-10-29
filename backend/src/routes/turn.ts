@@ -12,7 +12,7 @@ import { normalizeForSpeech } from "@maipai/spec/voice/ts/normalizeForSpeech.js"
 import { StreamSafetyRefusal, StreamUnavailable, DocumentAttachmentError, BareModeForbidden, crisisSupportFor, conversationInCrisis, type Surface, type TurnOpResult, type TurnStreamResult } from "@/lib/turnShared";
 import { answeredByFor, runTurnNext, runTurnNextStream } from "@/lib/turnMachine/turnNext";
 import { isOwnerOrAdmin, canHaveTemporaryChat } from "@/lib/access";
-import { pickThinkingCue } from "@/lib/replyVariation";
+import { pickThinkingCue, pickStillCue } from "@/lib/replyVariation";
 import { feedThinkSplit, flushThinkSplit, newThinkSplitState, type ThinkSpan } from "@/lib/wellFormed";
 import { speakerAgeBand } from "@/lib/ageBand";
 import { safetyRefusalLine } from "@/lib/failureCopy";
@@ -553,6 +553,8 @@ export const THINKING_CUE_DELAY_MS = 900;
  * walkie-talkie. It goes out at 1.0 second: the gap it fills is real, and an answer that is faster
  * than that never gets a cue. The cue is never the answer and never the same phrase twice in a row (pickThinkingCue). */
 export const SPOKEN_CUE_DELAY_MS = 1000;
+/** VOICE-FILLER-02: how long after the first cue a spoken turn waits before its second ("Still on it."). */
+export const STILL_CUE_GAP_MS = 3000;
 
 /** Returns the timer alongside the promise so the common case (the real
  * token wins the race) can cancel it - a code review (2026-09-05) found
@@ -598,7 +600,7 @@ export async function* streamTurnEvents(
   speakerBand: "adult" | "teen" | "child" = "child",
   releasedText?: () => string,
   heardChars?: () => number | undefined,
-  options: { spokenTurn?: boolean; onToolStart?: (packageId: string) => void } = {},
+  options: { spokenTurn?: boolean; stillCueGapMs?: number; onToolStart?: (packageId: string) => void } = {},
 ): AsyncGenerator<TurnStreamEvent, void, void> {
   let fullText = "";
   // REASONING-01: splits each chunk of the pipeline's own combined text
@@ -686,12 +688,15 @@ export async function* streamTurnEvents(
     // rather than all at once when the answer starts.
     let current = race as Exclude<typeof race, "status" | "timeout">;
     if (race === "timeout") {
-      let waited = await Promise.race([firstStep, pendingStatus]);
-      while (waited === "status") {
-        yield* sideEvents();
-        pendingStatus = statusWake();
-        waited = await Promise.race([firstStep, pendingStatus]);
+      // VOICE-FILLER-02: a spoken turn whose first word is still not here STILL_CUE_GAP_MS after the first cue gets one more short phrase, then waits.
+      let stillTimer = options.spokenTurn && !result.cueSuppressed ? delay(options.stillCueGapMs ?? STILL_CUE_GAP_MS) : null;
+      let waited = await Promise.race([firstStep, pendingStatus, ...(stillTimer ? [stillTimer.promise] : [])]);
+      while (waited === "status" || waited === "timeout") {
+        if (waited === "status") { yield* sideEvents(); pendingStatus = statusWake(); }
+        else { stillTimer = null; const still = pickStillCue(actorId, result.bannedPhrases); if (still) yield { type: "spoken_cue", text: normalizeForSpeech(still) }; }
+        waited = await Promise.race([firstStep, pendingStatus, ...(stillTimer ? [stillTimer.promise] : [])]);
       }
+      stillTimer?.cancel();
       current = waited;
     }
     // TOOL-EVENTS-02: `result.toolEvents` (the machine's own live

@@ -350,3 +350,7 @@ Order: 00 and 01, then 02 and 03, 05 in parallel, 07 after 02 (it needs the end-
 ## Prefix prewarm (VOICE-PREWARM-01, 2026-10-29)
 
 A spoken turn's first token took 2.1 to 3.3 s when the engine had to read the system message and tool block again, and 0.6 s when that prefix was still cached. Home keeps each person's last real prefix in memory (`lib/prefixPrewarm.ts`, recorded where the generation request is built) and the voice overlay calls `POST /api/turn/prewarm` when it opens: one request with that prefix and a one-token answer, at most once every 20 s per person and surface class. A person with no recorded prefix is left to the boot warm-up. Not yet measured on the live hub (a concurrent ship took it down).
+
+## Second filler (VOICE-FILLER-02, 2026-10-29)
+
+A spoken turn whose first word is still missing 3 s after the first bridge phrase ("One sec.") gets one more short phrase from a separate pool ("Still on it.", "Almost there.", "Bear with me.", "Just a bit longer."), never the same one twice in a row, then waits in silence. Written turns and turns with the cue suppressed get none. `STILL_CUE_GAP_MS` in `routes/turn.ts`.

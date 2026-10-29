@@ -2590,6 +2590,23 @@ describe("routes/turn.ts streamTurnEvents()", () => {
     expect(events.some((e) => e.type === "done")).toBe(true);
   });
 
+  test("a spoken turn that is still silent after the first cue gets one second cue, a written turn never does", async () => {
+    const slow = async function* (): AsyncGenerator<string, SafetyResult | undefined, void> {
+      await new Promise((r) => setTimeout(r, 80));
+      yield "The answer.";
+      return undefined;
+    };
+    const spoken: TurnStreamEvent[] = [];
+    for await (const event of streamTurnEvents(fakeResult(slow()), "test-person", 5, undefined, false, undefined, "adult", undefined, undefined, { spokenTurn: true, stillCueGapMs: 20 })) spoken.push(event);
+    const cues = spoken.filter((e) => e.type === "spoken_cue") as { text: string }[];
+    expect(cues).toHaveLength(2);
+    expect(cues[1]!.text).not.toBe(cues[0]!.text);
+    expect(spoken.findIndex((e) => e.type === "delta")).toBeGreaterThan(spoken.lastIndexOf(cues[1] as unknown as TurnStreamEvent));
+    const written: TurnStreamEvent[] = [];
+    for await (const event of streamTurnEvents(fakeResult(slow()), "test-person", 5, undefined, false, undefined, "adult", undefined, undefined, { stillCueGapMs: 20 })) written.push(event);
+    expect(written.filter((e) => e.type === "spoken_cue")).toHaveLength(1);
+  });
+
   test("a fast first token never gets a spoken_cue", async () => {
     async function* fastTokens(): AsyncGenerator<string, SafetyResult | undefined, void> {
       yield "Instant reply.";

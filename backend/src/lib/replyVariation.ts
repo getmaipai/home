@@ -122,6 +122,24 @@ export const THINKING_CUE_VARIANTS: readonly string[] = [
   "Let me see.",
 ];
 
+/** VOICE-FILLER-02: a second bridge phrase for a wait that outlasts the first, so a long wait is not
+ * silence after "One sec." Same rules as THINKING_CUE_VARIANTS: spoken only, never the answer. */
+export const STILL_CUE_VARIANTS: readonly string[] = [
+  "Still on it.",
+  "Almost there.",
+  "Bear with me.",
+  "Just a bit longer.",
+];
+const _lastStillCues = new Map<string, string>();
+export function pickStillCue(personId: string, banned: readonly string[] = []): string | null {
+  const pool = STILL_CUE_VARIANTS.filter((cue) => !banned.some((phrase) => cue.toLowerCase().includes(phrase.toLowerCase())));
+  const available = pool.filter((cue) => cue !== _lastStillCues.get(personId));
+  if (available.length === 0) return null;
+  const cue = pickVariant(personId, "still_cue", available);
+  _lastStillCues.set(personId, cue);
+  return cue;
+}
+
 /** A rotated thinking cue for this person - reuses `pickVariant` under
  * its own dedicated key so it never shares state with any reply-text
  * rotation above. */
