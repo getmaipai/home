@@ -199,7 +199,11 @@ export function companionSeed(companionId: string): number {
   return hash;
 }
 
-export async function startLookSheet(input: { actor: PersonRow; companionId: string; lookPrompt: string }): Promise<{ job: string; card_source: "model" | "look_prompt" }> {
+/**
+ * The character sheet is now only its written description and colours. The three extra pictures it used to draw (turned left, turned right,
+ * mouth open) fed nothing: every clip starts from the approved starting picture (owner ruling 2026-10-29), so the sheet is approved at once and no job runs.
+ */
+export async function startLookSheet(input: { actor: PersonRow; companionId: string; lookPrompt: string }): Promise<{ job: null; card_source: "model" | "look_prompt" }> {
   const gate = lookGenerationGate(input.actor, "Create a consistent character reference picture.");
   if (gate) throw Object.assign(new Error(gate.error), { status: gate.status });
   if (activeLookJob(input.companionId) || companionHasFinishingJob(input.companionId) || companionHasTakeRun(input.companionId)) throw Object.assign(new Error(busyLineFor(input.companionId)), { status: 409 });
@@ -210,16 +214,8 @@ export async function startLookSheet(input: { actor: PersonRow; companionId: str
     if (!version || !path) throw Object.assign(new Error("Choose a rest picture before making the character sheet."), { status: 400 });
     const png = new Uint8Array(readFileSync(path)), key = await chooseKeyColour(png), described = await describeCharacter(png, input.lookPrompt);
     if (!described.card.text) throw Object.assign(new Error(LOOK_PICTURE_UNREAD_LINE), { status: 400 });
-    const sheet = { views: { left: null, right: null, mouth: null }, card: described.card, key, state: "making" as const, approved_by: null, approved_at: null };
-    updateSheet(input.companionId, sheet);
-    const originalPath = versionOriginalPath(input.companionId, version.id), sourceBytes = originalPath ? new Uint8Array(readFileSync(originalPath)) : await compositeOnNeutral(png), instruction = SHEET_VIEWS[0]!.prompt.replaceAll("<key>", key);
-    const art = resolveCompanionEdit();
-    const form = editForm(sourceBytes, instruction, Boolean(originalPath) && !descendsFromUpload(input.companionId, version.id)); form.append("model", art.model); form.append("seed", String(companionSeed(input.companionId)));
-    const submitted = await submitEdit(form);
-    const job = crypto.randomUUID();
-    sheetJobs.set(job, { companionId: input.companionId, personId: input.actor.id, state: "queued", percent: 0, versions: [], error: null, stackJob: submitted.job, index: 0, model: art.model, quality: art.quality, promptHash: promptHash(instruction), modelReported: null });
-    activeByCompanion.set(input.companionId, job);
-    return { job, card_source: described.card_source };
+    updateSheet(input.companionId, { views: { left: null, right: null, mouth: null }, card: described.card, key, state: "approved" as const, approved_by: input.actor.displayName, approved_at: new Date().toISOString() });
+    return { job: null, card_source: described.card_source };
   } catch (error) {
     const look = readLook(input.companionId);
     if (look.sheet?.state === "making") updateSheet(input.companionId, { ...look.sheet, state: "needs_review" });

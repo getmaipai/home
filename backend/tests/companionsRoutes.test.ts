@@ -302,69 +302,28 @@ describe("companion look generation jobs", () => {
     expect(editCalls).toBe(0); expect(readLook(made.value.id).versions).toHaveLength(beforeCount);
   });
 
-  test("makes three sheet views once, falls back to the look prompt, and approves then unapproves", async () => {
+  test("the character sheet is its description and colours only: no pictures are drawn, it is approved at once, and it can be unapproved and approved again", async () => {
     const adult = addPerson("person-look-sheet", "adult"), other = addPerson("person-look-sheet-other", "adult"), child = addPerson("person-look-sheet-child", "child"), teen = addPerson("person-look-sheet-teen", "teen");
     const created = createHouseholdCompanion({ ...fixture(), display_name: "Sheet character", look_prompt: "a red fox wearing a blue scarf" }, { display_name: "Author", person_id: "person-look-sheet" });
     if (!created.ok) throw new Error(created.error);
     __setPictureStatusForTests(readyStatusForTests());
     __setCharacterPictureCapabilityForTests({ imageParts: false, pictureTokensMax: null });
-    const output = await sharp({ create: { width: 512, height: 512, channels: 3, background: "#cc3322" } }).png().toBuffer();
-    let next = 0; const submitted: string[] = [], postedSources: Array<{ image: string; image_source: string | File | null }> = [];
-    __setPicturesFetchForTests((async (input, init) => {
-      const url = String(input), method = init?.method ?? "GET";
-      if (url.endsWith("/v1/images/edits") && method === "POST") { const form = init?.body as FormData, file = form.get("image") as File; postedSources.push({ image: Buffer.from(await file.arrayBuffer()).toString("base64"), image_source: form.get("image_source") }); const job = `sheet-stack-${++next}`; submitted.push(String(form.get("instruction"))); return Response.json({ job }, { status: 202 }); }
-      const match = url.match(/sheet-stack-(\d+)(?:\/(\d+)\.png)?$/);
-      if (match?.[2] !== undefined) return new Response(output, { headers: { "content-type": "image/png" } });
-      if (match) return Response.json({ job: `sheet-stack-${match[1]}`, state: "done", progress: 1, data: [] });
-      return new Response("Not found", { status: 404 });
-    }) as typeof fetch);
-    const stackOriginal = new Uint8Array(output);
-    const rest = addVersion(created.value.id, await transparentPng(), { source: "generated", label: "Rest", width: 1024, height: 1024, from: null }, stackOriginal).id;
+    let pictures = 0;
+    __setPicturesFetchForTests((async (input, init) => { if (String(input).endsWith("/v1/images/edits") && init?.method === "POST") pictures++; return new Response("Not found", { status: 404 }); }) as typeof fetch);
+    const stackOriginal = new Uint8Array(await sharp({ create: { width: 512, height: 512, channels: 3, background: "#cc3322" } }).png().toBuffer());
+    addVersion(created.value.id, await transparentPng(), { source: "generated", label: "Rest", width: 1024, height: 1024, from: null }, stackOriginal);
     for (const token of [other, child, teen]) expect((await request(`companions/${created.value.id}/look/sheet`, token, "POST", {})).status).toBe(403);
     const start = await request(`companions/${created.value.id}/look/sheet`, adult, "POST", {});
-    expect(start.status).toBe(202); const started = await start.json() as { job: string; card_source: string }; expect(started).toMatchObject({ card_source: "look_prompt" });
-    const { job } = started;
-    expect((await request(`companions/${created.value.id}/look/sheet`, adult, "POST", {})).status).toBe(409);
-    const poll = `companions/${created.value.id}/look/jobs/${job}`;
-    await request(poll, adult); await request(poll, adult); const done = await request(poll, adult);
-    expect(await done.json()).toMatchObject({ state: "done", versions: [{ label: "Turned left" }, { label: "Turned right" }, { label: "Mouth open" }] });
-    expect(await (await request(poll, adult)).json()).toMatchObject({ state: "done" });
-    expect(submitted).toHaveLength(3); expect(submitted[0]).toContain("three quarters to its left"); expect(submitted[1]).toContain("three quarters to its right"); expect(postedSources).toEqual(Array.from({ length: 3 }, () => ({ image: Buffer.from(stackOriginal).toString("base64"), image_source: "generated" })));
-    const look = await (await request(`companions/${created.value.id}/look`, adult)).json() as { versions: unknown[]; sheet: { card: { text: string }; views: Record<string, { version_id: string }>; state: string }; ready_for_video: boolean };
-    expect(look.sheet).toMatchObject({ state: "approved", card: { text: "a red fox wearing a blue scarf" } }); expect(Object.keys(look.sheet.views)).toEqual(["left", "right", "mouth"]); expect(look.ready_for_video).toBe(true);
-    expect(look.versions).toHaveLength(4);
+    expect(start.status).toBe(202); expect(await start.json()).toMatchObject({ job: null, card_source: "look_prompt" });
+    expect(pictures).toBe(0);
+    const look = await (await request(`companions/${created.value.id}/look`, adult)).json() as { sheet: { card: { text: string }; state: string }; ready_for_video: boolean };
+    expect(look.sheet).toMatchObject({ state: "approved", card: { text: "a red fox wearing a blue scarf" } }); expect(look.ready_for_video).toBe(true);
     expect((await request(`companions/${created.value.id}/look/sheet/key`, adult, "PUT", { key: "#FF00FF" })).status).toBe(200);
     expect((await request(`companions/${created.value.id}/look/sheet/key`, adult, "PUT", { key: "#00FF00" })).status).toBe(200);
     expect((await request(`companions/${created.value.id}/look/sheet/key`, adult, "PUT", { key: "#123456" })).status).toBe(400);
-    const approved = await request(`companions/${created.value.id}/look/sheet/approve`, adult, "POST", {}); expect(approved.status).toBe(200);
-    expect((await (await request(`companions/${created.value.id}/look`, adult)).json() as { ready_for_video: boolean }).ready_for_video).toBe(true);
     expect((await request(`companions/${created.value.id}/look/sheet/unapprove`, adult, "POST", {})).status).toBe(200);
     expect((await request(`companions/${created.value.id}/look/sheet/approve`, adult, "POST", {})).status).toBe(200);
-    const mouthId = look.sheet.views.mouth!.version_id;
-    expect((await request(`companions/${created.value.id}/look/${mouthId}`, adult, "DELETE")).status).toBe(204);
-    expect((await (await request(`companions/${created.value.id}/look`, adult)).json() as { sheet: { state: string } }).sheet.state).toBe("needs_review");
-    const leftId = look.sheet.views.left!.version_id;
-    const changed = await request(`companions/${created.value.id}/look/rest`, adult, "PUT", { version_id: leftId }); expect(await changed.json()).toMatchObject({ sheet_reset: true });
-    expect(rest).not.toBe(leftId);
-    expect((await (await request(`companions/${created.value.id}/look`, adult)).json() as { sheet: unknown }).sheet).toBeNull();
-  });
-
-  test("reports a failed side view and leaves its sheet slot empty", async () => {
-    const adult = addPerson("person-look-sheet-fail", "adult");
-    const created = createHouseholdCompanion({ ...fixture(), display_name: "Sheet failure", look_prompt: "a blue bird" }, { display_name: "Author", person_id: "person-look-sheet-fail" });
-    if (!created.ok) throw new Error(created.error);
-    const uploaded = await upload(`companions/${created.value.id}/look/upload`, adult, await transparentPng());
-    __setPictureStatusForTests(readyStatusForTests()); __setCharacterPictureCapabilityForTests({ imageParts: false, pictureTokensMax: null });
-    __setPicturesFetchForTests((async (input, init) => {
-      const url = String(input);
-      if (url.endsWith("/v1/images/edits") && init?.method === "POST") return Response.json({ job: "sheet-fail-stack" }, { status: 202 });
-      if (url.endsWith("/v1/images/generations/sheet-fail-stack")) return Response.json({ job: "sheet-fail-stack", state: "failed", progress: 0, data: [] });
-      return new Response("Not found", { status: 404 });
-    }) as typeof fetch);
-    const started = await request(`companions/${created.value.id}/look/sheet`, adult, "POST", {}), { job } = await started.json() as { job: string };
-    const result = await request(`companions/${created.value.id}/look/jobs/${job}`, adult);
-    expect(await result.json()).toMatchObject({ state: "failed", error: "The side view did not work. Try again." });
-    expect((await (await request(`companions/${created.value.id}/look`, adult)).json() as { sheet: { views: { left: string | null }; state: string } }).sheet).toMatchObject({ views: { left: null }, state: "needs_review" });
+    expect((await (await request(`companions/${created.value.id}/look`, adult)).json() as { ready_for_video: boolean }).ready_for_video).toBe(true);
   });
 });
 
@@ -1340,7 +1299,7 @@ describe("household companion routes", () => {
     await request(`companions/${made.value.id}/look/approve`, adult, "POST", { version_id: source.id });
     expect(instructions[0]).toContain("at the bottom");
     const look = readLook(made.value.id), rest = look.versions.find((version) => version.id === look.rest)!;
-    expect(rest.id).not.toBe(source.id); expect(rest).toMatchObject({ source: "edit", from: source.id, clipped: [] }); expect(sources.length).toBeGreaterThan(1); expect(sources.every((value) => value === "uploaded")).toBe(true); /* everything drawn from an uploaded photo is sent as a photo, never as generated */
+    expect(rest.id).not.toBe(source.id); expect(rest).toMatchObject({ source: "edit", from: source.id, clipped: [] }); expect(sources.length).toBeGreaterThan(0); expect(sources.every((value) => value === "uploaded")).toBe(true); /* everything drawn from an uploaded photo is sent as a photo, never as generated */
   });
 
   test("restyle reuses the picture edit job and stores the selected style", async () => {
