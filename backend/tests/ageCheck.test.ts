@@ -12,13 +12,14 @@ import { useDefaultScriptedStack } from "./stackFixture";
 import { listPending } from "@/lib/notifications";
 import {
   AGE_CHECK_SYSTEM_PROMPT, __resetAgeCheckEventsForTests, __setAgeCheckRunnerForTests, __setAgeDeadlineForTests, __setAgeVisionForTests, checkImages, decideAgeCheck,
-  downscaleForCheck, effectiveLabel, isAdultOnlyJob, minorRefusalLine, parseVerdict, promptHash, uncheckedRefusalLine, type AgeLabel, type AgeVerdict, type ImageCheck,
+  downscaleForCheck, effectiveLabel, isAdultOnlyJob, minorRefusalLine, parseVerdict, pictureReader, promptHash, uncheckedRefusalLine, type AgeLabel, type AgeVerdict, type ImageCheck,
 } from "@/lib/pictures/ageCheck";
 import { __setKeyframesForTests, keyframeCount } from "@/lib/pictures/keyframes";
 import { getPictureJob, startPictureJob } from "@/lib/pictures/jobs";
 import { getVideoJobFor, startVideoJob } from "@/lib/videos/jobs";
 import { TEST_LORAS, installFakeImageStack, testPng, until, type FakeImageStack } from "./pictureFixture";
 import { TEST_VIDEO_LORAS, installFakeVideoStack, type FakeVideoStack } from "./videoFixture";
+import { __setStackClientForTests } from "@/lib/stackEngine";
 import { db } from "@/db";
 import { attachments } from "@/db/schema";
 
@@ -154,6 +155,27 @@ describe("the check on this computer", () => {
     __setAgeVisionForTests(() => new Promise<string>(() => undefined));
     expect(await checkImages([png], "picture")).toEqual([{ ok: false, why: "timeout" }]);
     expect(await checkImages([Uint8Array.of(1, 2, 3)], "picture")).toEqual([{ ok: false, why: "unparsed" }]);
+  });
+
+  test("chat declares picture input but cannot read one: the check falls back to the vision role and chat is passed over for a while", async () => {
+    const png = await testPng();
+    const rows = [{ id: "chat", state: { state: "loaded" }, model: { imageInput: true } }, { id: "vision", state: { state: "installed" }, model: { imageInput: true } }];
+    __setStackClientForTests({ roles: async () => ({ roles: rows }), budget: async () => ({ pressure: "normal" }) } as never);
+    const readers: string[] = [];
+    const ok = JSON.stringify({ people_count: 0, apparent_min_age_estimate: null, label: "none", is_nude_or_sexual: false, confidence: 1 });
+    __setAgeVisionForTests(async ({ reader }) => { readers.push(String(reader)); if (reader === "chat") throw new Error("image input is not supported: this model is serving without vision (started with --language-only)"); return ok; });
+    expect(await checkImages([png], "picture")).toEqual([{ ok: true, verdict: verdict("none", false, { people_count: 0, apparent_min_age_estimate: null, confidence: 1 }) }]);
+    expect(readers).toEqual(["chat", "vision"]);
+    expect(await pictureReader()).toBe("vision");
+    __setStackClientForTests(null);
+  });
+
+  test("with no vision role to fall back on, a chat that cannot read pictures still fails closed", async () => {
+    const png = await testPng();
+    __setStackClientForTests({ roles: async () => ({ roles: [{ id: "chat", state: { state: "loaded" }, model: { imageInput: true } }] }), budget: async () => ({ pressure: "normal" }) } as never);
+    __setAgeVisionForTests(async () => { throw new Error("image input is not supported"); });
+    expect(await checkImages([png], "picture")).toEqual([{ ok: false, why: "unavailable" }]);
+    __setStackClientForTests(null);
   });
 
   test("images are checked one at a time, in order, and the model is sent a data URL image", async () => {

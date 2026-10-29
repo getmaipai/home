@@ -6,7 +6,7 @@
 //     including no answer, withholds.
 // The line a withheld picture gets is ONE short friendly sentence for the lane, never a lecture. The admin hears of it (no image), at most
 // once in ten minutes for one person (ageCheck.recordWithheld).
-import { decideAgeCheck, downscaleForCheck, pictureReader, type PictureReader, recordWithheld, showsPossibleMinor, type AgeDecision, type CheckedKind, type ImageCheck } from "./ageCheck";
+import { decideAgeCheck, downscaleForCheck, markChatReaderUnusable, pictureReader, type PictureReader, recordWithheld, showsPossibleMinor, type AgeDecision, type CheckedKind, type ImageCheck } from "./ageCheck";
 import { speakerAgeBand } from "@/lib/ageBand";
 import type { PersonRow } from "@/types";
 import { completeViaStackRequest, type LlmMessage } from "@/lib/llm";
@@ -118,10 +118,18 @@ async function askOne(bytes: Uint8Array, reader: PictureReader): Promise<ChildSa
 export async function checkChildSafety(images: readonly Uint8Array[]): Promise<ChildSafetyCheck[]> {
   if (runnerForTests) return runnerForTests(images);
   return exclusive(async () => {
-    const reader = await pictureReader();
+    let reader = await pictureReader();
     if (!reader) return images.map((): ChildSafetyCheck => ({ ok: false, why: "no_vision" }));
     const out: ChildSafetyCheck[] = [];
-    for (const image of images) out.push(await askOne(image, reader));
+    for (const image of images) {
+      let answer = await askOne(image, reader);
+      if (!answer.ok && answer.why === "unavailable" && reader === "chat") {
+        markChatReaderUnusable();
+        const next = await pictureReader();
+        if (next && next !== "chat") { reader = next; answer = await askOne(image, reader); }
+      }
+      out.push(answer);
+    }
     return out;
   });
 }

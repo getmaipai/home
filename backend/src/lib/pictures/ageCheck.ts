@@ -229,7 +229,7 @@ export async function downscaleForCheck(bytes: Uint8Array): Promise<Uint8Array> 
 }
 
 /** Test seam: answers the model call with the model's raw text for one downscaled image (throw for a failure). While set, the readiness and memory checks are skipped. */
-export type VisionCall = (image: { dataUrl: string }) => Promise<string>;
+export type VisionCall = (image: { dataUrl: string; reader?: PictureReader }) => Promise<string>;
 let visionForTests: VisionCall | null = null;
 export function __setAgeVisionForTests(fn: VisionCall | null): void { visionForTests = fn; }
 
@@ -248,6 +248,7 @@ export function __resetAgeCheckForTests(defaultRunner: RunChecks | null = null):
   visionForTests = null;
   CHECK_DEADLINE_MS = 20_000;
   lastNotifiedAt = null;
+  chatReaderBadUntil = 0;
   chain = Promise.resolve();
 }
 
@@ -260,10 +261,20 @@ function sleep(ms: number): Promise<void> { return new Promise((resolve) => setT
 
 /** The Stack role that reads the pictures of a safety check: the resident chat model when it is up and declares picture input, else the separate vision role when it is installed and declares it (Splash chat loads no projector, so the vision role keeps chat fast). null means no reader, and the check fails closed. Any failure to read the Stack reads as null. */
 export type PictureReader = "chat" | "vision";
+/**
+ * The Stack's chat row can say `imageInput: true` while the running chat process cannot read a picture (2026-10-29: the live hub's chat
+ * server answered "image input is not supported: started with --language-only", so every check failed closed and no picture could be
+ * shown). When a request to the chat role fails, chat is passed over for five minutes and the vision role reads instead.
+ */
+let chatReaderBadUntil = 0;
+const CHAT_READER_BAD_MS = 5 * 60_000;
+export function markChatReaderUnusable(): void { chatReaderBadUntil = Date.now() + CHAT_READER_BAD_MS; }
+
 export async function pictureReader(): Promise<PictureReader | null> {
   try {
     const { roles } = await getStackClient().roles({ signal: AbortSignal.timeout(5_000) });
     for (const id of ["chat", "vision"] as const) {
+      if (id === "chat" && Date.now() < chatReaderBadUntil) continue;
       const row = roles.find((role) => role.id === id);
       const state = row?.state.state;
       if ((state === "ready" || state === "loaded" || state === "installed") && row?.model?.imageInput === true) return id;
@@ -291,7 +302,7 @@ async function memoryIsCritical(): Promise<boolean> {
 }
 
 async function askModel(dataUrl: string, signal: AbortSignal, reader: PictureReader): Promise<string> {
-  if (visionForTests) return visionForTests({ dataUrl });
+  if (visionForTests) return visionForTests({ dataUrl, reader });
   const messages: LlmMessage[] = [
     { role: "system", content: AGE_CHECK_SYSTEM_PROMPT },
     { role: "user", content: AGE_USER_TEXT, images: [{ id: "agecheck", name: "image", url: dataUrl, reservedTokens: 2560 }] },
@@ -354,7 +365,15 @@ export async function checkImages(images: readonly Uint8Array[], kind: CheckedKi
       if (await memoryIsCritical()) return images.map((): ImageCheck => ({ ok: false, why: "memory" }));
     }
     const checks: ImageCheck[] = [];
-    for (const image of images) checks.push(await checkOne(image, reader));
+    for (const image of images) {
+      let check = await checkOne(image, reader);
+      if (!check.ok && check.why === "unavailable" && reader === "chat") {
+        markChatReaderUnusable();
+        const next = await pictureReader();
+        if (next && next !== "chat") { reader = next; check = await checkOne(image, reader); }
+      }
+      checks.push(check);
+    }
     return checks;
   });
 }
