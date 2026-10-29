@@ -14,7 +14,6 @@ import { useClipPreview } from "@/shell/pages/companionFlow/useClipPreview";
 import { lookKey } from "@/shell/pages/companionFlow/CreateCharacterStep";
 import { flowErrorText } from "@/shell/pages/companionFlow/errors";
 import { useSheetWait } from "@/shell/pages/companionFlow/useSheetWait";
-import { useKeyframesFirst } from "@/shell/pages/companionFlow/useKeyframesFirst";
 import { KeyframeEditor } from "@/shell/pages/companionFlow/KeyframeEditor";
 
 const keyframeSrc = (row: CompanionStateRow) => row.keyframe ? `${row.keyframe.url}${row.keyframe.edited_at ? `?v=${encodeURIComponent(row.keyframe.edited_at)}` : ""}` : null;
@@ -48,7 +47,6 @@ function ClipPlayer({ urls, label }: { urls: CompanionStateUrls; label: string }
 export function AnimateStep({ companionId, name, sheetJob = null, autoMake = false, onBack, onContinue }: { companionId: string; name: string; sheetJob?: string | null; autoMake?: boolean; onBack: () => void; onContinue: () => void }) {
   const states = useCompanionStates(companionId, true);
   const look = useQuery({ queryKey: lookKey(companionId), queryFn: () => api.companionLook(companionId), retry: false });
-  const frames = useKeyframesFirst(companionId, states);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [ticked, setTicked] = useState<ReadonlySet<string>>(new Set());
   const [editing, setEditing] = useState(false);
@@ -62,15 +60,14 @@ export function AnimateStep({ companionId, name, sheetJob = null, autoMake = fal
   const sheet = useSheetWait(companionId, sheetJob, rest?.id ?? null);
   const picturing = states.data?.busy ?? null;
   const rowBusy = rows.some((row) => row.busy || row.status === "waiting");
-  const running = states.running || frames.busy || sheet.waiting || picturing !== null || rowBusy || states.data?.run != null;
+  const running = states.running || sheet.waiting || picturing !== null || rowBusy || states.data?.run != null;
   const missingRequired = required.filter((row) => !made(row)).map((row) => row.id);
   const pending = useMemo(() => optional.filter((row) => ticked.has(row.id) && !made(row)).map((row) => row.id), [optional, ticked]);
   const allTicked = optional.length > 0 && optional.every((row) => ticked.has(row.id));
   const label = name.trim() || "Your character";
   const progress = states.run?.percent ?? states.data?.run?.percent ?? 0;
   // What the buttons say while work is under way: the step in plain words, never just a greyed label.
-  const doing = frames.busy ? `Drawing the picture for ${rows.find((row) => row.id === frames.making)?.label ?? "an animation"}...`
-    : sheet.waiting || picturing?.kind === "sheet" ? "Drawing your character..."
+  const doing = sheet.waiting || picturing?.kind === "sheet" ? "Drawing your character..."
     : picturing ? `${picturing.label}...`
     : running ? `${states.run?.label ?? states.data?.run?.label ?? "Making animations"}... ${progress}%` : "";
 
@@ -79,8 +76,8 @@ export function AnimateStep({ companionId, name, sheetJob = null, autoMake = fal
   const [group, setGroup] = useState<"required" | "optional" | "one" | null>(null);
   const [requested, setRequested] = useState<ReadonlySet<string>>(new Set());
   useEffect(() => { if (!running) { setGroup(null); setRequested(new Set()); } }, [running]);
-  const generate = (ids: string[], from: "required" | "optional" | "one") => { setGroup(from); setRequested(new Set(ids)); frames.request(ids); };
-  const stop = () => { frames.stop(); void states.stop(); };
+  const generate = (ids: string[], from: "required" | "optional" | "one") => { setGroup(from); setRequested(new Set(ids)); void states.start(() => api.generateCompanionStates(companionId, { states: ids, count: 1 })); };
+  const stop = () => void states.stop();
   // Once the character is ready, the four required animations start by themselves, once.
   const autoStarted = useRef(false);
   useEffect(() => {
@@ -90,15 +87,15 @@ export function AnimateStep({ companionId, name, sheetJob = null, autoMake = fal
   }, [states.data?.sheet_ready, running, missingRequired.length]);
   const toggle = (id: string, on: boolean) => setTicked((current) => { const next = new Set(current); if (on) next.add(id); else next.delete(id); return next; });
   const tile = (row: CompanionStateRow) => {
-    const base = tileWord(row), word = frames.failed[row.id] ? "Needs another try" : frames.making === row.id ? "Making" : frames.waiting.includes(row.id) ? "Waiting its turn" : running && requested.has(row.id) && !made(row) && base === "No animation yet" ? "Waiting its turn" : base, src = keyframeSrc(row) ?? portrait;
+    const base = tileWord(row), word = running && requested.has(row.id) && !made(row) && base === "No animation yet" ? "Waiting its turn" : base, src = keyframeSrc(row) ?? portrait;
     return {
       name: row.label, selected: selectedId === row.id, onSelect: () => setSelectedId(row.id),
       media: row.approved ? (reducedMotion ? <img src={row.approved.urls.still} alt="" draggable={false} className="size-full object-cover" /> : <StackedAlphaVideo key={row.approved.take_id} src={row.approved.urls.h264} loop label={`${row.label} animation`} />) : src ? <img src={src} alt="" draggable={false} className={`size-full object-cover ${row.keyframe ? "" : "opacity-40"}`} /> : undefined,
       line: <span className="text-xs">{word}</span>,
-      status: word === "Making" ? <Progress mode="determinate" value={frames.making === row.id ? frames.percent : progress} label={`${row.label} progress`} /> : undefined,
+      status: word === "Making" ? <Progress mode="determinate" value={progress} label={`${row.label} progress`} /> : undefined,
     };
   };
-  const errorLine = sheet.message || states.error || Object.values(frames.failed)[0] || (states.query.isError ? flowErrorText(states.query.error) : "");
+  const errorLine = sheet.message || states.error || (states.query.isError ? flowErrorText(states.query.error) : "");
   const generating = running || selected?.busy === true;
   const previewImage = selected ? (keyframeSrc(selected) ?? portrait) : portrait;
 

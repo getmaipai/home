@@ -504,9 +504,9 @@ describe("household companion routes", () => {
     expect(progress.state).toBe("failed"); expect(progress.error).toBeTruthy(); expect(existsSync(keyframePath(withheldHouse.value.id, "listening"))).toBe(false);
     __setAgeCheckRunnerForTests(async (images) => images.map(() => AGE_OK));
     __setVideoStatusForTests(readyVideoStatusForTests());
-    const needs = await request(`companions/${id}/states/thinking/generate`, adult, "POST", { count: 1 }); expect(needs.status).toBe(409); expect(await needs.json()).toEqual({ error: "Make the picture for this animation first.", code: "needs_keyframe", missing_keyframes: ["thinking"] });
-    const idle = await request(`companions/${id}/states/idle/generate`, adult, "POST", { count: 1 }); expect(idle.status).toBe(202); expect(existsSync(keyframePath(id, "idle"))).toBe(true);
-    expect(await sharp(readFileSync(keyframePath(id, "idle"))).metadata()).toMatchObject({ width: 1024, height: 1024, hasAlpha: true });
+    const started = await request(`companions/${id}/states/thinking/generate`, adult, "POST", { count: 1 }); expect(started.status).toBe(202);
+    expect(existsSync(keyframePath(id, "thinking"))).toBe(true); /* an animation with no picture of its own starts from the starting picture */
+    expect(await sharp(readFileSync(keyframePath(id, "thinking"))).metadata()).toMatchObject({ width: 1024, height: 1024, hasAlpha: true });
   });
   test("register dials save flat, store social nested, and read back flat (NAT-06)", async () => {
     const author = addPerson("person-dials-author", "adult");
@@ -912,25 +912,14 @@ describe("household companion routes", () => {
     expect(rejected.status).toBe(400); expect((await rejected.json() as any).error).toBe("Choose only listed companion states.");
   });
 
-  test("subset generation names every state that still needs its keyframe and starts no clip", async () => {
+  test("subset generation starts the clips straight from the starting picture and makes no separate picture first", async () => {
     const author = addPerson("subset-keyframe-order", "adult"), made = createHouseholdCompanion({ ...fixture(), display_name: "Subset order" }, { display_name: "Author", person_id: "subset-keyframe-order" }); if (!made.ok) throw new Error(made.error); const id = made.value.id;
     const png = await transparentPng(), rest = addVersion(id, png, { source: "upload", label: "rest", width: 1024, height: 1024, from: null }); setRest(id, rest.id); updateSheet(id, { views: { left: null, right: null, mouth: null }, card: { text: "fox", species: "fox", colours: ["#CC3322"] }, key: "#00FF00", state: "needs_review", approved_by: null, approved_at: null }); approveSheet(id, "Author");
-    __setPictureStatusForTests(readyStatusForTests()); __setImageToolsForTests({ state: "running", phase: null, vision: true, models: { resize: true }, limits: {}, operations: [], reason: null }); const events: string[] = [];
-    __setPicturesFetchForTests((async (input, init) => { const url = String(input); if (url.endsWith("/v1/images/edits") && init?.method === "POST") { events.push("keyframe"); return Response.json({ job: `subset-image-${events.filter((v) => v === "keyframe").length}` }, { status: 202 }); } if (url.includes("/v1/images/generations/subset-image-")) return Response.json({ job: url.split("/").at(-1), state: "done", progress: 100, data: [{}] }); if (url.endsWith("/0.png")) return new Response(png, { headers: { "content-type": "image/png" } }); return new Response("Not found", { status: 404 }); }) as typeof fetch);
+    __setPictureStatusForTests(readyStatusForTests()); __setAgeCheckRunnerForTests(async (images) => images.map(() => AGE_OK)); const events: string[] = [];
+    __setPicturesFetchForTests((async (input, init) => { if (String(input).endsWith("/v1/images/edits") && init?.method === "POST") events.push("keyframe"); return Response.json({ job: "never" }, { status: 202 }); }) as typeof fetch);
     __setVideoStatusForTests(readyVideoStatusForTests()); __setVideosFetchForTests((async (_input, init) => { if (init?.method === "POST") events.push("clip"); return Response.json({ job: "clip-job" }, { status: 202 }); }) as typeof fetch);
-    const response = await request(`companions/${id}/states/generate`, author, "POST", { states: ["listening", "thinking"], count: 1 }); expect(response.status).toBe(409);
-    const body = await response.json() as { code: string; error: string; missing_keyframes: string[] }; expect(body.code).toBe("needs_keyframe"); expect(body.missing_keyframes).toEqual(["listening", "thinking"]); expect(body.error).toBe("Make the picture for this animation first."); expect(events).toEqual([]);
-  });
-
-  test("subset generation lists only the states still missing a keyframe", async () => {
-    const author = addPerson("subset-keyframe-fail", "adult"), made = createHouseholdCompanion({ ...fixture(), display_name: "Subset failure" }, { display_name: "Author", person_id: "subset-keyframe-fail" }); if (!made.ok) throw new Error(made.error); const id = made.value.id;
-    const png = await transparentPng(), rest = addVersion(id, png, { source: "upload", label: "rest", width: 1024, height: 1024, from: null }); setRest(id, rest.id); updateSheet(id, { views: { left: null, right: null, mouth: null }, card: { text: "fox", species: "fox", colours: ["#CC3322"] }, key: "#00FF00", state: "needs_review", approved_by: null, approved_at: null }); approveSheet(id, "Author");
-    __setPictureStatusForTests(readyStatusForTests()); __setImageToolsForTests({ state: "running", phase: null, vision: true, models: { resize: true }, limits: {}, operations: [], reason: null }); __setAgeCheckRunnerForTests(async (images) => images.map(() => AGE_WITHHELD)); let clips = 0;
-    __setPicturesFetchForTests((async (input, init) => { if (String(input).endsWith("/v1/images/edits") && init?.method === "POST") return Response.json({ job: "subset-denied" }, { status: 202 }); if (String(input).includes("/v1/images/generations/subset-denied")) return Response.json({ job: "subset-denied", state: "done", progress: 100, data: [{}] }); if (String(input).endsWith("/subset-denied/0.png")) return new Response(png, { headers: { "content-type": "image/png" } }); return new Response("Not found", { status: 404 }); }) as typeof fetch);
-    __setVideoStatusForTests(readyVideoStatusForTests()); __setVideosFetchForTests((async (_input, init) => { if (init?.method === "POST") clips++; return Response.json({ job: "clip-job" }, { status: 202 }); }) as typeof fetch);
-    writeKeyframe(id, "listening", png, { source: "generated", style: "keep", prompt_hash: "test", model: null, created_at: new Date().toISOString(), edited_at: new Date().toISOString() });
-    const response = await request(`companions/${id}/states/generate`, author, "POST", { states: ["listening", "thinking"] }); expect(response.status).toBe(409);
-    const body = await response.json() as { code: string; missing_keyframes: string[] }; expect(body.code).toBe("needs_keyframe"); expect(body.missing_keyframes).toEqual(["thinking"]); expect(clips).toBe(0);
+    const response = await request(`companions/${id}/states/generate`, author, "POST", { states: ["listening", "thinking"], count: 1 }); expect(response.status).toBe(202);
+    expect(existsSync(keyframePath(id, "listening"))).toBe(true); expect(existsSync(keyframePath(id, "thinking"))).toBe(true); expect(events).not.toContain("keyframe");
   });
 
   test("failed quality reports stay unapproved and idle removal clears every draft approval", async () => {

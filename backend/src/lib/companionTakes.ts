@@ -178,16 +178,14 @@ export async function startStateTakes(input: { actor: PersonRow; companionId: st
   const refused = refuseVideoPrompt(promptText, { lane: "adult" });
   if (refused) throw Object.assign(new Error(VIDEO_REFUSAL_LINE[refused]), { status: 422 });
   const sheet = readySheet(input.companionId);
-  const missingKeyframes: string[] = [];
   for (const state of input.states) {
     const path = keyframePath(input.companionId, state);
-    if (!existsSync(path) && state === "idle") {
+    // An animation with no picture of its own starts from the approved starting picture, so a clip needs no separate picture step; editing the keyframe later changes it.
+    if (!existsSync(path)) {
       const bytes = new Uint8Array(readFileSync(sheet.restPath)), now = new Date().toISOString();
-      writeKeyframe(input.companionId, state, bytes, { source: "generated", style: readLook(input.companionId).versions.find((version) => version.id === readLook(input.companionId).rest)?.style ?? "keep", prompt_hash: promptHash("Idle keyframe copied from approved rest picture"), model: null, created_at: now, edited_at: now });
-    } else if (!existsSync(path)) missingKeyframes.push(state);
+      writeKeyframe(input.companionId, state, bytes, { source: "generated", style: readLook(input.companionId).versions.find((version) => version.id === readLook(input.companionId).rest)?.style ?? "keep", prompt_hash: promptHash("Keyframe copied from approved rest picture"), model: null, created_at: now, edited_at: now });
+    }
   }
-  // The screen makes each missing keyframe first (one quick picture job each, through the keyframe route) and then asks again.
-  if (missingKeyframes.length) throw Object.assign(new Error(TAKE_NEEDS_KEYFRAME_LINE), { status: 409, code: "needs_keyframe", missing: missingKeyframes });
   const engineReady = await videoEngineReady(), engineStatus = await videoEngineStatus();
   if (!engineReady && (!engineStatus || engineStatus.available === false || engineStatus.state === "unsupported" || engineStatus.state === "off")) throw Object.assign(new Error(VIDEO_NOT_HERE_LINE), { status: 503 });
   if (companionHasTakeRun(input.companionId) || companionHasFinishingJob(input.companionId) || activeLookJob(input.companionId)) throw Object.assign(new Error(TAKE_RUN_BUSY_LINE), { status: 409 });
