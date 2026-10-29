@@ -189,7 +189,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `frontend/src/shell/pages/CommandsPage.tsx` | CommandsIcon, CommandsPage |
 | `frontend/src/shell/pages/CompanionEditorPage.tsx` | CompanionEditorPage |
 | `frontend/src/shell/pages/CompanionLookTab.tsx` | CompanionLookTab |
-| `frontend/src/shell/pages/CompanionStateContent.tsx` | CompanionStateContents |
+| `frontend/src/shell/pages/CompanionStateContent.tsx` | useClipPreview, CompanionStateContents |
 | `frontend/src/shell/pages/CompanionStudioTab.tsx` | CompanionStudioTab |
 | `frontend/src/shell/pages/CompanionWizardPage.tsx` | CompanionWizardPage |
 | `frontend/src/shell/pages/CompanionsPage.tsx` | CompanionsPage, CompanionDetailPage |
@@ -222,9 +222,11 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `frontend/src/shell/pages/UsersPage.tsx` | UsersIcon, UsersPage |
 | `frontend/src/shell/pages/VoicesPage.tsx` | VoicesIcon, VoicesPage |
 | `frontend/src/shell/pages/WhatHomeCanDoPage.tsx` | WhatHomeCanDoPage |
+| `frontend/src/shell/pages/companionFlow/AnimateStep.tsx` | tileWord, AnimateStep |
 | `frontend/src/shell/pages/companionFlow/CompanionFlowDialog.tsx` | CompanionFlowDialog |
 | `frontend/src/shell/pages/companionFlow/CompanionFlowPage.tsx` | CompanionFlowPage |
-| `frontend/src/shell/pages/companionFlow/CreateCharacterStep.tsx` | CreateCharacterStep |
+| `frontend/src/shell/pages/companionFlow/CreateCharacterStep.tsx` | lookKey, CreateCharacterStep |
+| `frontend/src/shell/pages/companionFlow/KeyframeEditor.tsx` | KeyframeEditor |
 | `frontend/src/shell/pages/companionFlow/PreviewControls.tsx` | DEFAULT_FRAME, PreviewControls |
 | `frontend/src/shell/pages/dashboard/AskBox.tsx` | installPlaceholder, askHref, AskBox |
 | `frontend/src/shell/pages/dashboard/GettingStarted.tsx` | GETTING_STARTED_ROWS, openChecklistItems, GettingStarted |
