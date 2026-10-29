@@ -441,8 +441,9 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/imaging/fill.ts` | planFillCutOff |
 | `backend/src/lib/imaging/fit.ts` | fitToFrame |
 | `backend/src/lib/imaging/focal.ts` | __setNewsFocalForTests, focalCentre, focalPointOf |
+| `backend/src/lib/imaging/headSwap.ts` | headSwapInstruction, swapHead |
 | `backend/src/lib/imaging/instructions.ts` | FACE_AND_BODY, restyleInstruction, fillCutOffInstruction, bodyFillInstruction |
-| `backend/src/lib/imaging/outpaint.ts` | OUTPAINT_CANVAS, planBodyCanvas, pasteHead |
+| `backend/src/lib/imaging/outpaint.ts` | OUTPAINT_CANVAS, planBodyCanvas |
 | `backend/src/lib/imaging/prepare.ts` | preparePicture |
 | `backend/src/lib/imaging/subject.ts` | clippedEdges, subjectBounds, findSubject |
 | `backend/src/lib/imaging/targets.ts` | imagingTargets |
