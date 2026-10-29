@@ -52,6 +52,7 @@ const proposal = (tool: string, args: Record<string, unknown>, callId: string): 
 describe("GENUI-05: the manifests name the kinds they return", () => {
   test.each([
     ["remind", ["schedule_card"]],
+    ["alarm", ["schedule_card"]],
     ["timer", ["schedule_card"]],
     ["list-view", ["todo_list"]],
   ])("%s declares returns_blocks %p", (id, kinds) => {
@@ -59,7 +60,7 @@ describe("GENUI-05: the manifests name the kinds they return", () => {
   });
 });
 
-describe("GENUI-05: remind and timer return a schedule_card", () => {
+describe("GENUI-05: remind, alarm and timer return a schedule_card", () => {
   test("remind: a valid card built from the reminder the run just scheduled, reply unchanged", async () => {
     const value = await run("remind", people.owner, { expression: "at 6 to call Nadia" });
     expect(value.reply?.text).toContain("call Nadia");

@@ -1,0 +1,42 @@
+{
+  "id": "alarm",
+  "version": "0.1.0",
+  "kind": "plugin",
+  "category": "Utilities",
+  "display": "Alarms",
+  "description": "Set an alarm for a later time.",
+  "offer": {"mode":"off", "reason": "awaiting a CHAT-AB-01 tool-decision row"},
+  "author": "MaiPai",
+  "license": "AGPL-3.0",
+  "homepage": "https://github.com/getmaipai/home",
+  "routing": {
+    "examples": [
+      "wake me at 6:30",
+      "set an alarm for 7 tomorrow called gym",
+      "wake me tomorrow at 6",
+      "set an alarm for noon",
+      "wake me in 20 minutes"
+    ],
+    "patterns": ["wake me *", "set an alarm *"]
+  },
+  "args": {"type":"object", "required":["expression"], "properties":{"expression":{"type":"string", "minLength":1}}},
+  "incognito": "unaffected",
+  "requires": [],
+  "optional": [],
+  "platforms": ["home"],
+  "min_role": "child",
+  "consequential": false,
+  "offline": "full",
+  "returns_blocks": ["schedule_card"],
+  "config": [],
+  "data_sources": [],
+  "permissions": ["reminders:write"],
+  "notifications": [{"id":"alarm.due", "level":"time_sensitive", "audience":"person", "template":"Alarm: {task}", "configurable":true, "default_channels":["in_app"]}],
+  "backup": "exclude",
+  "background": false,
+  "contributes": {},
+  "min_app": "0.1.0",
+  "tier": 0,
+  "quality_scale": "bronze",
+  "smoke": {"kind":"recipe_fixture", "fixture":"tests/smoke.json"}
+}

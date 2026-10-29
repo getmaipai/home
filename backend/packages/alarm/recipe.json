@@ -1,0 +1,10 @@
+{
+  "id": "alarm",
+  "inputs": [{"name":"expression", "selector":"text"}],
+  "steps": [
+    {"op":"remind", "as":"alarm", "text":"{expression}"},
+    {"op":"pick", "as":"task", "from":"alarm", "path":"task"},
+    {"op":"pick", "as":"when_text", "from":"alarm", "path":"when_text"},
+    {"op":"format", "as":"reply", "text":"Okay, alarm set: {task} ({when_text}).", "speech":"Okay, alarm set: {task} ({when_text}).", "data":{"task":"{task}", "when_text":"{when_text}"}}
+  ]
+}

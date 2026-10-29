@@ -283,6 +283,10 @@ export function blocksForRecipeRun(
       return allowed.includes("schedule_card")
         ? scheduleCard(manifest.id, provenance, "Reminder set", text(result.data?.task), text(result.data?.when_text))
         : [];
+    case "alarm":
+      return allowed.includes("schedule_card")
+        ? scheduleCard(manifest.id, provenance, "Alarm set", text(result.data?.task), text(result.data?.when_text))
+        : [];
     case "timer":
       return allowed.includes("schedule_card")
         ? scheduleCard(manifest.id, provenance, "Timer set", text(result.data?.label), text(result.data?.when_text))

@@ -115,6 +115,8 @@ export const commandsNode: Node<CommandsInput, CommandsOutput> = async (state, i
     // model and `policy` normally; only the instant, un-confirmed path
     // here is closed to it.
     if (manifest.consequential) continue;
+    // Alarms are private to the identified person, even when a robot has a signed-in owner.
+    if (manifest.id === "alarm" && speakerIsAnonymous(state)) continue;
     // CHAT-PARITY-02's own guard (the old engine file ~2792), mirrored here:
     // a temporary chat may run an ordinary command, but never one that
     // declares memory:write - the same invariant `policy`'s own

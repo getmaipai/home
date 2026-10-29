@@ -1,0 +1,12 @@
+{
+  "description": "Alarm recipe wiring fixture. The emulator handles the remind op with its canned reply and reports reminders.fire; real alarm scheduling maps that op to alarms.fire in packageHost.ts and is covered by backend/tests/alarm.test.ts.",
+  "inputs": {"expression":"at 6 to go to bed"},
+  "host_setup": {},
+  "expected": {
+    "reply": {"text":"Okay, alarm set: at 6 to go to bed ([emulator: no real time parsing]).", "speech":"Okay, alarm set: at 6 to go to bed ([emulator: no real time parsing])."},
+    "actions": [],
+    "scheduled_jobs": [{"when":"[emulator: no real time parsing]", "job":"reminders.fire"}],
+    "home_calls": [],
+    "memory_added": []
+  }
+}

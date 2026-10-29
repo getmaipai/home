@@ -446,6 +446,11 @@ export const policyNode: Node<PolicyInput, PolicyOutput> = async (state, input) 
       continue;
     }
     const manifest = loaded.value;
+    if (manifest.id === "alarm" && speakerIsAnonymous(state)) {
+      noteRefusal("anonymous_speaker");
+      entries.push({ proposal: placeholderProposal(call.tool, call), decision: { allow: false, reason: "anonymous_speaker" } });
+      continue;
+    }
     const args = (call.args ?? {}) as Record<string, unknown>;
     // FORM-CHAT-HUB-01: the Home-set flags count only when this call is exactly the turn's own pre-confirmed proposal
     // (same tool, same args); a model's call can never carry them.

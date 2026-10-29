@@ -2538,10 +2538,21 @@ export function createHost(actor: PersonRow, manifest: PackageManifest, secrets:
       // `reminders.fire`), it never re-runs this recipe.
       set(text: string): { task: string; when_text: string } {
         requirePermission("reminders:write");
-        const parsed = parseReminder(text);
-        const result = scheduleCoreJob(actor, "reminders.fire", parsed.when, { task: parsed.task });
+        let parsed;
+        try {
+          parsed = parseReminder(text);
+        } catch (error) {
+          if (manifest.id !== "alarm" || !(error instanceof HostError) || error.message !== "What should I remind you about?") throw error;
+          parsed = parseReminder(`${text} Alarm`);
+        }
+        const task = manifest.id === "alarm"
+          ? (parsed.task.trim().replace(/^(called|named)\s+/i, "") || "Alarm")
+          : parsed.task;
+        // Recipe language has no alarm op yet; adding one needs a commons spec tag, so alarm reuses remind.
+        const job = manifest.id === "alarm" ? "alarms.fire" : "reminders.fire";
+        const result = scheduleCoreJob(actor, job, parsed.when, { task });
         if (!result.ok) mapWriteFailure(result.status, result.error);
-        return { task: parsed.task, when_text: parsed.when_text };
+        return { task, when_text: parsed.when_text };
       },
     },
     timers: {
