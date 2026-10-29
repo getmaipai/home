@@ -190,6 +190,12 @@ export async function trigger(typeId: string, vars: Record<string, string> = {},
       await deliver(type, recipient, text, opts, now);
       continue;
     }
+    // An alarm the person set for themselves rings at its time, so a 6:30 alarm is not held to the
+    // end of quiet hours. A child's alarm still waits (the hours an admin set bind a child).
+    if (RINGS_THROUGH_QUIET_HOURS.has(type.id) && ["adult", "teen"].includes(speakerAgeBand(recipient, now))) {
+      await deliver(type, recipient, text, opts, now);
+      continue;
+    }
     const quiet = quietHours(recipient, now);
     if (quiet.active) {
       db.insert(notificationHolds).values({ id: newNotificationId(), typeId: type.id, recipientId: recipient.id, text, options: JSON.stringify(opts), deliverAfter: quiet.endAt.toISOString() }).run();
@@ -199,6 +205,7 @@ export async function trigger(typeId: string, vars: Record<string, string> = {},
   }
 }
 
+const RINGS_THROUGH_QUIET_HOURS = new Set(["alarm.due"]);
 const QUIET_FROM = "quiet_hours.from";
 const QUIET_TO = "quiet_hours.to";
 function validTime(value: unknown): number | undefined {

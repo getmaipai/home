@@ -219,8 +219,10 @@ only after phase A works and the owner says so. The numbering below is kept so e
     app decrypts it. The device key and the encryption key are credentials: per person in the keystore (`CREDENTIALS.md`), never in a
     log, a prompt or the Activity page. Bark is iPhone only; a person without an iPhone has in app, the robot, and later channels.
   - **Levels.** An alarm is sent `timeSensitive` with `call=1` and `sound=alarm`; a reminder is `timeSensitive`; a timer is `active`.
-    Quiet hours hold a Bark push like any `time_sensitive` one. "Ring anyway" may be set by an adult or teen on their own alarms, and on
-    a child's alarm only by that child's parent; a child cannot set it. Bark's `critical` level, which breaks through silent mode, needs
+    **Quiet hours (owner ruling, 2026-10-29, replaces "ring anyway"):** an alarm an adult or teen set for themselves rings at its time
+    on every channel, quiet hours or not, so a 6:30 alarm is not held to 7:00. A child's alarm and every reminder wait for quiet hours
+    to end, like any `time_sensitive` notice, so a child cannot ring through hours an admin set. A parent letting a child's alarm
+    through is a later slice if wanted. Bark's `critical` level, which breaks through silent mode, needs
     the person to enable it in the Bark app and is never sent by Home on its own.
   - **Minors.** A minor's outside delivery is limited by `backend/src/lib/settingsMinorSnapshot.ts` (`CHILD_VISIBLE_SETTING_KEYS`; its
     `TELEGRAM_EVENTS` list becomes a shared outside-channel event list used by both channels). The three types join it for a child and a

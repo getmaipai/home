@@ -170,6 +170,29 @@ describe("trigger()", () => {
     } finally { globalThis.fetch = originalFetch; mock.restore(); }
   });
 
+  test("an adult's or teen's own alarm rings through quiet hours, a reminder and a child's alarm wait", async () => {
+    setSystemTime(new Date(2026, 9, 6, 2, 0));
+    try {
+      const { client: ownerClient, row } = await owner();
+      const teen = await withRole(ownerClient, "Marlow", "teen");
+      const child = await withRole(ownerClient, "Nova", "child");
+      setHouseholdSettingValue("household.quiet_hours.from", "21:00");
+      setHouseholdSettingValue("household.quiet_hours.to", "07:00");
+      for (const notification of personalDueNotifications) registerPackageNotificationTypes({ id: notification.id.split(".")[0]!, notifications: [notification] });
+      await trigger("alarm.due", { task: "wake up" }, { personId: row.id });
+      await trigger("alarm.due", { task: "school" }, { personId: teen.row.id });
+      await trigger("alarm.due", { task: "bus" }, { personId: child.row.id });
+      await trigger("remind.due", { task: "call Nadia" }, { personId: row.id });
+      expect(listPending(row).map((item) => item.typeId)).toEqual(["alarm.due"]);
+      expect(listPending(teen.row).map((item) => item.typeId)).toEqual(["alarm.due"]);
+      expect(listPending(child.row)).toHaveLength(0);
+      setSystemTime(new Date(2026, 9, 6, 7, 0));
+      await deliverHeldNotifications();
+      expect(listPending(child.row).map((item) => item.typeId)).toEqual(["alarm.due"]);
+      expect(listPending(row).map((item) => item.typeId).sort()).toEqual(["alarm.due", "remind.due"]);
+    } finally { mock.restore(); }
+  });
+
   test("private and unclassified notifications send only the content-free robot waiting form", async () => {
     setSystemTime(new Date(2026, 9, 6, 12, 0));
     const { client, row } = await owner();
