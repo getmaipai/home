@@ -259,10 +259,11 @@ export function setRest(id: string, versionId: string): boolean {
 export function deleteLook(id: string): void { const dir = lookFolder(id); if (dir) rmSync(dir, { recursive: true, force: true }); }
 
 export type BackgroundRemover = (bytes: Uint8Array) => Promise<Uint8Array>;
-export async function normalizePicture(bytes: Uint8Array, options: { removeBackground: BackgroundRemover }): Promise<Uint8Array> {
+export type PictureUpscaler = (bytes: Uint8Array) => Promise<Uint8Array>;
+export async function normalizePicture(bytes: Uint8Array, options: { removeBackground: BackgroundRemover; upscale?: PictureUpscaler }): Promise<Uint8Array> {
   try {
     const source = new Uint8Array(await sharp(bytes, { limitInputPixels: 40_000_000, failOn: "error" }).rotate().png().toBuffer());
-    const result = await preparePicture(source, { ...imagingTargets.portrait, upscaleBelowShortSide: imagingTargets.portrait.size, removeBackground: options.removeBackground, upscale: async (image) => new Uint8Array(await sharp(image, { limitInputPixels: 40_000_000, failOn: "error" }).resize(imagingTargets.portrait.size, imagingTargets.portrait.size, { fit: "inside" }).png().toBuffer()) });
+    const result = await preparePicture(source, { ...imagingTargets.portrait, upscaleBelowShortSide: imagingTargets.portrait.size, removeBackground: options.removeBackground, upscale: options.upscale ?? (async (image) => new Uint8Array(await sharp(image, { limitInputPixels: 40_000_000, failOn: "error" }).resize(imagingTargets.portrait.size, imagingTargets.portrait.size, { fit: "inside" }).png().toBuffer())) });
     return result.bytes;
   } catch (error) {
     if (error instanceof Error && error.message === "That picture has no visible subject.") throw new Error("That picture could not be prepared. Use a PNG, JPEG or WebP picture and try again.");

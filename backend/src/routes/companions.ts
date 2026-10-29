@@ -28,7 +28,7 @@ import { LOOK_EDIT_PROMPT_LINE, LOOK_JOB_BUSY_LINE, LOOK_PROMPT_REQUIRED_LINE, a
 import { fileTypeFromBuffer } from "file-type";
 import { readFileSync, writeFileSync, copyFileSync, mkdirSync, rmSync, existsSync, renameSync } from "node:fs";
 import { join } from "node:path";
-import { removeBackground } from "@/lib/imaging/tools";
+import { removeBackground, upscale } from "@/lib/imaging/tools";
 import media from "@maipai/spec/vocab/companion-media.json";
 import { readStates, addTake, deleteTake, setMotion, takePath, bestTake, finishTake, companionStateJob, companionHasFinishingJob, deleteStates, clearApprovedStates, saveStates, swapInAnimation } from "@/lib/companionStates";
 import { householdCompanionFolder, setHouseholdCompanionAnimation } from "@/lib/householdCompanions";
@@ -413,7 +413,7 @@ companionsRoutes.openapi(uploadRoute, async (c) => {
     if (file.size > media.image.max_upload_bytes) return c.json({ error: "That picture is over 20 MB. Choose a smaller PNG, JPEG or WebP picture." }, 413);
     const bytes = new Uint8Array(await file.arrayBuffer()), detected = await fileTypeFromBuffer(bytes);
     if (!detected || !["image/png", "image/jpeg", "image/webp", "image/gif", "image/avif", "image/tiff"].includes(detected.mime)) return c.json({ error: "Use a PNG, JPEG, WebP, GIF, AVIF or TIFF picture." }, 400);
-    const png = await normalizePicture(bytes, { removeBackground: (image) => removeBackground(c.get("person"), image) });
+    const png = await normalizePicture(bytes, { removeBackground: (image) => removeBackground(c.get("person"), image), upscale: (image) => upscale(c.get("person"), image) });
     const checked = await checkCompanionArt(id, c.get("person"), [{ label: "That picture", bytes }]);
     if (!checked.ok) return c.json({ error: checked.reasons.join(" ") }, 422);
     const version = addVersion(id, png, { source: "upload", label: uploadLabel(file.name), width: media.image.size, height: media.image.size, from: null });

@@ -21,6 +21,8 @@ import { __setCharacterPictureCapabilityForTests } from "@/lib/companionLook";
 import { portraitPath } from "@/lib/companionPortrait";
 import { addTake, takePath, saveStates, readStates, bestTake, __resetCompanionStatesForTests } from "@/lib/companionStates";
 import { __setStackClientForTests } from "@/lib/stackEngine";
+import { __setImageToolsForTests } from "@/lib/imageEdit";
+import type { StackImageToolsStatus } from "@/lib/stack/client";
 import { addVersion, approveSheet, setRest, updateSheet } from "@/lib/companionLook";
 import { getHouseholdCompanion } from "@/lib/householdCompanions";
 import { __setVideosFetchForTests } from "@/lib/videos/stack";
@@ -53,7 +55,7 @@ async function upload(path: string, token: string, png: Uint8Array) {
   return app.request(`http://localhost/api/${path}`, { method: "POST", headers: { cookie: `session=${token}` }, body: form });
 }
 async function transparentPng() {
-  return new Uint8Array(await sharp({ create: { width: 512, height: 512, channels: 4, background: { r: 0, g: 0, b: 0, alpha: 0 } } }).composite([{ input: await sharp({ create: { width: 180, height: 180, channels: 4, background: { r: 0, g: 255, b: 0, alpha: 1 } } }).png().toBuffer(), left: 166, top: 166 }]).png().toBuffer());
+  return new Uint8Array(await sharp({ create: { width: 1024, height: 1024, channels: 4, background: { r: 0, g: 0, b: 0, alpha: 0 } } }).composite([{ input: await sharp({ create: { width: 360, height: 360, channels: 4, background: { r: 0, g: 255, b: 0, alpha: 1 } } }).png().toBuffer(), left: 332, top: 332 }]).png().toBuffer());
 }
 function fixture() {
   const loaded = loadManifestOnly("rivet"); if (!loaded.ok || !loaded.value.companion) throw new Error("rivet fixture is unavailable");
@@ -82,7 +84,7 @@ async function publishFixture(personId: string, role: string, audience: "adult" 
 }
 
 beforeEach(() => { resetDb(); rmSync(companionRoot, { recursive: true, force: true }); __reloadPersonasForTests(); __clearCompanionLookJobsForTests(); __clearCompanionTakeRunsForTests(); __resetCompanionStatesForTests(); __setPicturesFetchForTests(null); __setVideoStatusForTests(undefined); __setVideosFetchForTests(null); __setPictureStatusForTests(undefined); __setCharacterPictureCapabilityForTests(null); __setStackClientForTests(null); });
-afterEach(() => { __resetAgeCheckForTests(); __setChildSafetyRunnerForTests(null); __setKeyframesForTests(null); resetDb(); rmSync(companionRoot, { recursive: true, force: true }); __reloadPersonasForTests(); __clearCompanionLookJobsForTests(); __clearCompanionTakeRunsForTests(); __resetCompanionStatesForTests(); __setPicturesFetchForTests(null); __setVideoStatusForTests(undefined); __setVideosFetchForTests(null); __setPictureStatusForTests(undefined); __setCharacterPictureCapabilityForTests(null); __setStackClientForTests(null); });
+afterEach(() => { __resetAgeCheckForTests(); __setChildSafetyRunnerForTests(null); __setKeyframesForTests(null); __setImageToolsForTests(undefined); resetDb(); rmSync(companionRoot, { recursive: true, force: true }); __reloadPersonasForTests(); __clearCompanionLookJobsForTests(); __clearCompanionTakeRunsForTests(); __resetCompanionStatesForTests(); __setPicturesFetchForTests(null); __setVideoStatusForTests(undefined); __setVideosFetchForTests(null); __setPictureStatusForTests(undefined); __setCharacterPictureCapabilityForTests(null); __setStackClientForTests(null); });
 
 test("activity returns own task details and needs-you agrees with companion waiting counts", async () => {
   const person = addPerson("activity-own", "adult"), other = addPerson("activity-other", "adult");
@@ -292,7 +294,7 @@ describe("companion look generation jobs", () => {
     __setPicturesFetchForTests((async (input, init) => {
       const url = String(input);
       if (url.endsWith("/v1/images/edits") && init?.method === "POST") return Response.json({ job: "sheet-fail-stack" }, { status: 202 });
-      if (url.endsWith("/sheet-fail-stack")) return Response.json({ job: "sheet-fail-stack", state: "failed", progress: 0, data: [] });
+      if (url.endsWith("/v1/images/generations/sheet-fail-stack")) return Response.json({ job: "sheet-fail-stack", state: "failed", progress: 0, data: [] });
       return new Response("Not found", { status: 404 });
     }) as typeof fetch);
     const started = await request(`companions/${created.value.id}/look/sheet`, adult, "POST", {}), { job } = await started.json() as { job: string };
@@ -321,6 +323,19 @@ describe("household companion routes", () => {
     const png = await transparentPng();
     const real = await upload(`companions/${created.value.id}/look/upload`, adult, png);
     expect(real.status).toBe(201);
+  });
+
+  test("a small look upload without an installed upscaler is refused and not stored", async () => {
+    const adult = addPerson("person-look-small-no-upscale", "adult");
+    const created = createHouseholdCompanion({ ...fixture(), display_name: "Small look upload" }, { display_name: "Author", person_id: "person-look-small-no-upscale" });
+    if (!created.ok) throw new Error(created.error);
+    const small = new Uint8Array(await sharp({ create: { width: 512, height: 512, channels: 4, background: { r: 0, g: 0, b: 0, alpha: 0 } } }).composite([{ input: await sharp({ create: { width: 180, height: 180, channels: 4, background: { r: 0, g: 255, b: 0, alpha: 1 } } }).png().toBuffer(), left: 166, top: 166 }]).png().toBuffer());
+    __setImageToolsForTests({ state: "idle", phase: null, vision: true, models: { isnet: true, lama: true, esrgan: true }, limits: {}, operations: ["remove_background", "erase", "resize"], reason: null } satisfies StackImageToolsStatus);
+    __setStackClientForTests({ imageEdit: async () => { throw new Error("The upscaler isn't installed. Install it from the engine's model list, then try again."); } } as never);
+    const result = await upload(`companions/${created.value.id}/look/upload`, adult, small);
+    expect(result.status).toBe(400);
+    expect(((await result.json()) as { error: string }).error).toContain("The upscaler isn't installed");
+    expect(((await (await request(`companions/${created.value.id}/look`, adult)).json()) as { versions: unknown[] }).versions).toHaveLength(0);
   });
 
   test("look upload, GET image and rest management are limited to the author or an admin", async () => {
@@ -898,13 +913,13 @@ describe("household companion routes", () => {
     expect(minor.status).toBe(422);
     expect(((await minor.json()) as { error: string }).error.length).toBeGreaterThan(10);
     // A verdict is kept per file, so each case needs its own picture.
-    const second = new Uint8Array(await sharp({ create: { width: 512, height: 512, channels: 4, background: { r: 0, g: 0, b: 0, alpha: 0 } } }).composite([{ input: await sharp({ create: { width: 170, height: 170, channels: 4, background: { r: 40, g: 40, b: 220, alpha: 1 } } }).png().toBuffer(), left: 160, top: 160 }]).png().toBuffer());
+    const second = new Uint8Array(await sharp({ create: { width: 1024, height: 1024, channels: 4, background: { r: 0, g: 0, b: 0, alpha: 0 } } }).composite([{ input: await sharp({ create: { width: 340, height: 340, channels: 4, background: { r: 40, g: 40, b: 220, alpha: 1 } } }).png().toBuffer(), left: 320, top: 320 }]).png().toBuffer());
     __setAgeCheckRunnerForTests(async (images) => images.map(() => ({ ok: false as const, why: "unavailable" as const })));
     expect((await upload(path, adult, second)).status).toBe(422);
     expect(((await (await request(`companions/${created.value.id}/look`, adult)).json()) as { versions: unknown[] }).versions).toHaveLength(0);
     __setAgeCheckRunnerForTests(async (images) => images.map(() => verdict("adult")));
     // A verdict is kept per file, so a different picture is needed to see the new answer.
-    const other = new Uint8Array(await sharp({ create: { width: 512, height: 512, channels: 4, background: { r: 0, g: 0, b: 0, alpha: 0 } } }).composite([{ input: await sharp({ create: { width: 200, height: 160, channels: 4, background: { r: 200, g: 40, b: 40, alpha: 1 } } }).png().toBuffer(), left: 150, top: 170 }]).png().toBuffer());
+    const other = new Uint8Array(await sharp({ create: { width: 1024, height: 1024, channels: 4, background: { r: 0, g: 0, b: 0, alpha: 0 } } }).composite([{ input: await sharp({ create: { width: 400, height: 320, channels: 4, background: { r: 200, g: 40, b: 40, alpha: 1 } } }).png().toBuffer(), left: 300, top: 340 }]).png().toBuffer());
     expect((await upload(path, adult, other)).status).toBe(201);
   });
 });

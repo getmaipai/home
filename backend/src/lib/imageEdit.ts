@@ -45,6 +45,7 @@ import { pictureEngineStatus } from "@/lib/pictures/ready";
 import { speakerAgeBand } from "@/lib/ageBand";
 import { prepareEditSource } from "@/lib/pictures/editSources";
 import { StackError } from "@/lib/stack/errors";
+import { fetchImageToolResult, submitImageTool } from "@/lib/imaging/tools";
 import type { StackImageToolsStatus } from "@/lib/stack/client";
 import type { PersonRow } from "@/types";
 
@@ -328,20 +329,10 @@ export async function startEdit(actor: PersonRow, conversationId: string, id: st
   const status = await editToolsStatus(actor);
   const tool: EditToolKey = input.operation === "remove_background" ? "remove_background" : input.operation === "erase" ? "erase" : "resize";
   if (!status.tools[tool].enabled) throw new ImageEditError(503, status.tools[tool].reason ?? status.note ?? "This tool isn't available yet.", "unavailable");
-  const form = new FormData();
-  form.append("image", new File([new Uint8Array(source.bytes)], "picture", { type: source.mediaType }));
-  form.append("operation", input.operation);
-  if (input.mask) form.append("mask", new File([new Uint8Array(input.mask)], "mask.png", { type: "image/png" }));
-  if (input.scale !== undefined) form.append("scale", String(input.scale));
-  if (input.width !== undefined) form.append("width", String(input.width));
-  if (input.height !== undefined) form.append("height", String(input.height));
-  if (input.factor !== undefined) form.append("factor", String(input.factor));
-  form.append("timeout_ms", String(EDIT_WAIT_MS));
   try {
-    const reply = await getStackClient().imageEdit(form, { signal });
+    const reply = await submitImageTool(input.operation, source.bytes, input, { signal, timeoutMs: EDIT_WAIT_MS, mediaType: source.mediaType });
     if (reply.kind === "done") {
-      const png = new Uint8Array(Buffer.from(reply.item.b64_json, "base64"));
-      return { state: "done", preview: keepPreview(actor, source, input.operation, png, reply.item) };
+      return { state: "done", preview: keepPreview(actor, source, input.operation, reply.png, reply.item) };
     }
     sweep();
     jobs.set(reply.job, { personId: actor.id, sourceId: id, conversationId, op: input.operation, createdAt: Date.now() });
@@ -374,7 +365,7 @@ export async function pollEdit(actor: PersonRow, jobId: string): Promise<EditPro
     if (outcome?.rejected) { jobs.delete(jobId); return { state: "failed", error: outcome.rejected.message, code: outcome.rejected.code }; }
     const source = loadSource(actor, job.conversationId, job.sourceId, true);
     job.finalising = (async () => {
-      const png = await getStackClient().imageEditResult(jobId);
+      const png = await fetchImageToolResult(jobId);
       const meta = await sharp(png).metadata();
       const made = outcome?.images?.[0];
       return keepPreview(actor, source, job.op, png, { width: meta.width ?? made?.width ?? 0, height: meta.height ?? made?.height ?? 0, engine: made?.engine, model: made?.model, ms: made?.ms });

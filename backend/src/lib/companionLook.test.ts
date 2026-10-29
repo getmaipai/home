@@ -159,6 +159,21 @@ describe("companion look store", () => {
     const meta = await sharp(output).metadata(); expect(meta.width).toBe(1024); expect(meta.height).toBe(1024);
   });
 
+  test("uses the supplied Stack upscaler for a small upload, but not a large one", async () => {
+    let calls = 0;
+    const small = new Uint8Array(await sharp({ create: { width: 600, height: 600, channels: 3, background: "red" } }).png().toBuffer());
+    const enlarged = await normalizePicture(small, { removeBackground: async (bytes) => bytes, upscale: async () => { calls++; return new Uint8Array(await sharp({ create: { width: 1200, height: 1200, channels: 3, background: "red" } }).png().toBuffer()); } });
+    const enlargedMeta = await sharp(enlarged).metadata(); expect(calls).toBe(1); expect(enlargedMeta.width).toBe(1024); expect(enlargedMeta.height).toBe(1024);
+    const large = new Uint8Array(await sharp({ create: { width: 1500, height: 1500, channels: 3, background: "red" } }).png().toBuffer());
+    await normalizePicture(large, { removeBackground: async (bytes) => bytes, upscale: async (bytes) => { calls++; return bytes; } });
+    expect(calls).toBe(1);
+  });
+
+  test("an unavailable upload upscaler keeps the plain missing-upscaler sentence", async () => {
+    const small = new Uint8Array(await sharp({ create: { width: 600, height: 600, channels: 3, background: "red" } }).png().toBuffer());
+    await expect(normalizePicture(small, { removeBackground: async (bytes) => bytes, upscale: async () => { throw new Error("The upscaler isn't installed. Install it from the engine's model list, then try again."); } })).rejects.toThrow("The upscaler isn't installed. Install it from the engine's model list, then try again.");
+  });
+
   test("keeps an existing transparent background without calling the remover", async () => {
     const input = new Uint8Array(await sharp({ create: { width: 512, height: 512, channels: 4, background: { r: 0, g: 0, b: 0, alpha: 0 } } }).composite([{ input: await sharp({ create: { width: 200, height: 200, channels: 4, background: { r: 0, g: 255, b: 0, alpha: 1 } } }).png().toBuffer(), left: 156, top: 156 }]).png().toBuffer());
     let called = false;
