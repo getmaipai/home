@@ -251,7 +251,7 @@ describe("maipai-engine update: its cleanup cannot fire twice or on a name that 
   // Runs update() from a function, the way main() calls it, with every machine-changing step stubbed and every file
   // inside `scratch`. `engine` is the script under test (the tests use the repo's; the proof run used the old one).
   function runUpdate(engine: string, scratch: string, buildFails: boolean) {
-    const build = buildFails ? "exit 1" : 'mkdir -p "$OUT_DIR/migrations" "$OUT_DIR/backend-src" && : > "$OUT_DIR/maipai-stack-linux-x64"';
+    const build = buildFails ? "exit 1" : 'mkdir -p "$OUT_DIR/migrations" "$OUT_DIR/backend-src" "$OUT_DIR/ort-wasm" && : > "$OUT_DIR/maipai-stack-linux-x64"';
     const script = [
       `source "${engine}"`,
       `need_root() { :; }`,

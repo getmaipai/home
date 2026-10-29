@@ -1415,7 +1415,7 @@ fetch_stack_commons() {
 
 # Builds via the Stack's own scripts/build-binary.sh (one definition:
 # this installer never re-implements what that script already does -
-# compile, the migrations/ sibling, and backend-src/, the vendored
+# compile, the migrations/ and ort-wasm/ siblings, and backend-src/, the vendored
 # source the stt worker runs from until getmaipai/stack#8 is fixed
 # upstream). OUT_DIR points straight at the runtime location; the fetched
 # source above is scratch, removed once this returns. SKIP_VERIFY=1: the
@@ -1439,7 +1439,7 @@ build_stack_binary() {
 publish_engine_stack_binary() {
   local built_dir="$1" out_dir="$2" binary_name="$3" artifact
   mkdir -p "$out_dir" || return 1
-  for artifact in "$binary_name" migrations backend-src; do
+  for artifact in "$binary_name" migrations backend-src ort-wasm; do
     [ -e "${built_dir}/${artifact}" ] || return 1
     rm -rf "${out_dir:?}/${artifact}" || return 1
     cp -a "${built_dir}/${artifact}" "$out_dir/" || return 1

@@ -529,7 +529,7 @@ fetch_stack_commons() {
 publish_stack_binary() {
   local built_dir="$1" out_dir="$2" binary_name="$3" artifact
   mkdir -p "$out_dir" || return 1
-  for artifact in "$binary_name" migrations backend-src; do
+  for artifact in "$binary_name" migrations backend-src ort-wasm; do
     [ -e "${built_dir}/${artifact}" ] || return 1
     rm -rf "${out_dir:?}/${artifact}" || return 1
     cp -a "${built_dir}/${artifact}" "$out_dir/" || return 1
@@ -575,7 +575,7 @@ update() {
   case "$arch" in x86_64) arch=x64 ;; aarch64) arch=arm64 ;; esac
   binary_name="maipai-stack-${os}-${arch}"
   publish_stack_binary "$work/output" "$STACK_ROOT" "$binary_name" \
-    || die "The build did not produce $binary_name, migrations and backend-src, so nothing was installed. Run sudo maipai-engine update again; if it repeats, report this."
+    || die "The build did not produce $binary_name, migrations, backend-src and ort-wasm, so nothing was installed. Run sudo maipai-engine update again; if it repeats, report this."
   chown -R "$STACK_USER:$STACK_USER" "$STACK_ROOT"
   loginctl enable-linger "$STACK_USER"
   local uid

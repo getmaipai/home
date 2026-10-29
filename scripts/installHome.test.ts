@@ -74,7 +74,7 @@ describe("upgrade data copy and rollback", () => {
       `fetch_stack_source() { :; }`,
       `fetch_stack_commons() { :; }`,
       // Same behavior as the Stack's build-binary.sh: it deletes its OUT_DIR first.
-      `build_stack_binary() { rm -rf "$2"; mkdir -p "$2/migrations" "$2/backend-src"; : > "$2/maipai-stack-darwin-arm64"; }`,
+      `build_stack_binary() { rm -rf "$2"; mkdir -p "$2/migrations" "$2/backend-src" "$2/ort-wasm"; : > "$2/maipai-stack-darwin-arm64"; }`,
       `install_stack_service() { :; }`,
       `setup_stack "${root}" /bun darwin arm64 no`,
     ].join("; ");

@@ -269,7 +269,7 @@ describe("engine computer Bun recovery", () => {
       "set -euo pipefail",
       "bun --version >/dev/null",
       'rm -rf "$OUT_DIR"',
-      'mkdir -p "$OUT_DIR/migrations" "$OUT_DIR/backend-src"',
+      'mkdir -p "$OUT_DIR/migrations" "$OUT_DIR/backend-src" "$OUT_DIR/ort-wasm"',
       'printf binary > "$OUT_DIR/maipai-stack-linux-x64"',
     ].join("\n"), { mode: 0o755 });
     try {
