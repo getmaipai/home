@@ -81,11 +81,11 @@ No new banner, dot, panel or poll is added.
 
 - Catalog: pin the large model (repo, revision, sha256, sampling from its model card with the source named, rule 3) and its draft; Splash's store accepts only an exact pinned
   model and draft, so both are added there.
-- Engine source (owner's decision, 2026-10-22: "we can't wait for any release or update"): Splash 1.3.2 from the vendor refuses this model's shape, so the Stack ships a pinned
+- Engine source (superseded 2026-10-28: the coding engine is now the vendor's Splash 1.4.1, which serves this model; the fork below was retired and its release deleted. Original decision, 2026-10-22: "we can't wait for any release or update"): Splash 1.3.2 from the vendor refuses this model's shape, so the Stack ships a pinned
   build of a vetted fork as its own component (rule 11: the Stack builds, pins and tests it). The fork is the vendor's 1.3.2 plus the Ornith-122B topic branch (about 380 lines of
   kernel and model-shape code, read before use), built once on a machine with Xcode and its Metal toolchain, packaged in the vendor tarball's layout, hashed, published as a release
   asset of the org, and installed by the Stack's downloader by sha256 like every engine. No household machine builds anything. A vendor release that serves the model later replaces
-  the pin; nothing else changes. Until the build is pinned and installed, readiness item 2 is false and the switch says why.
+  the pin; nothing else changes (that happened with 1.4.1). Until the build is pinned and installed, readiness item 2 is false and the switch says why.
 - Mode: a `stack.engines.coding.home_mode` setting. In `coding` mode `processRoleFor` maps chat, judge and router to the coding process; the resident chat model is unloaded first
   and reloaded on any failure or on return; the governor treats that process as the foreground resident (never evicted by a generator) and holds generators with the reason
   `coding_mode`.

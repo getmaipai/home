@@ -18,8 +18,7 @@ Items 2 to 5 and 8 come from the Stack's `checks`, item 6 from `self_test`, item
 
 - Pins: `ornith-1-5-122b-mlx-4bit` (target, 23 files, about 69.6 GB, MIT) and `ornith-1-5-122b-dflash2-draft` (Apache-2.0) in the Stack's `modelCatalog.ts`; selectable on the 128 GB tier only; the target's `modeVerdict` (`pending`, `offer`,
   `offer_with_limits`, `do_not_offer`) gates `checks.bench`.
-- Engine: the org's build of Splash 1.3.2 with Ornith-1.5-122B support (`1.3.2-ornith.1`), published as a release asset of the Stack repo and pinned by sha256 in the Stack's engine catalog and the Catalog's `engines/index.json`. It is the vendor release
-  with three files replaced (`engine/splash`, `engine/splash.metallib`, `install/families.py`); the archive carries `NOTICE-FORK`. A vendor release that serves the model replaces the pin.
+- Engine: the vendor's Splash 1.4.1 release, unchanged, pinned by sha256 in the Stack's engine catalog and the Catalog's `engines/index.json`. It serves Ornith-1.5-122B itself (a real run on the Mac Studio on 2026-10-28 loaded the pinned MLX model and answered a tool call). The org's earlier fork build (`1.3.2-ornith.1`) is retired and its release asset deleted.
 - Switch order into `coding`: chat shows `cause: "mode_change"`, the Stack stops the chat and judge processes, starts Splash with the heavy model, runs the post-load check (chat turn with thinking off, a tool call, a coding turn), binds chat, judge and router to
   that process, and holds picture, video and music jobs with the governor reason `coding_mode`. Any failure unloads the heavy process and restarts the residents. Back to `normal` reverses it. The two sets never run together.
 - Thinking is per request: off for chat turns, the coding settings (medium and the budget ceiling) for coding requests. Sampling stays from the catalog record; a client's sampling is dropped.
