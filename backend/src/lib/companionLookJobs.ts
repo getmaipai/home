@@ -57,6 +57,12 @@ const SHEET_VIEWS = [
 ];
 const sheetJobs = new Map<string, SheetJob>();
 
+/** The character sheet job still being made for this companion, so a second Approve joins it instead of starting another. */
+export function runningSheetJob(companionId: string): string | null {
+  const id = activeByCompanion.get(companionId), job = id ? sheetJobs.get(id) : undefined;
+  return id && job && !(["done", "failed", "cancelled"] as string[]).includes(job.state) ? id : null;
+}
+
 export function __clearCompanionLookJobsForTests(): void { jobs.clear(); sheetJobs.clear(); activeByCompanion.clear(); startingCompanions.clear(); }
 export function activeLookJob(companionId: string): boolean {
   const id = activeByCompanion.get(companionId), job = id ? jobs.get(id) : null, sheetJob = id ? sheetJobs.get(id) : null;

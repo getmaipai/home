@@ -345,7 +345,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/companionArt.ts` | COMPANION_STILL_MODEL_MISSING_LINE, COMPANION_CLIP_MODEL_MISSING_LINE, COMPANION_MODEL_MISMATCH_LINE, COMPANION_EDIT_MODEL, __setCompanionArtStatusReadersForTests, promptHash |
 | `backend/src/lib/companionArtCheck.ts` | ArtWithheldError, audienceLane, companionAudience, checkCompanionArt, requireCompanionPictureOk, takeAssets |
 | `backend/src/lib/companionLook.ts` | LookSchema, EMPTY_LOOK, LOOK_LIMIT_LINE, lookPromptFor, KEY_ALPHA_START, KEY_ALPHA_END |
-| `backend/src/lib/companionLookJobs.ts` | LOOK_JOB_BUSY_LINE, LOOK_PICTURE_UNREAD_LINE, LOOK_PROMPT_REQUIRED_LINE, LOOK_EDIT_PROMPT_LINE, LOOK_ENGINE_NOT_READY_LINE, __clearCompanionLookJobsForTests |
+| `backend/src/lib/companionLookJobs.ts` | LOOK_JOB_BUSY_LINE, LOOK_PICTURE_UNREAD_LINE, LOOK_PROMPT_REQUIRED_LINE, LOOK_EDIT_PROMPT_LINE, LOOK_ENGINE_NOT_READY_LINE, runningSheetJob |
 | `backend/src/lib/companionLookStyles.ts` | LOOK_STYLES, LOOK_STYLE_IDS, DEFAULT_LOOK_STYLE, stylesForBand, capOfStyle, lookStylePhrase |
 | `backend/src/lib/companionPersonality.ts` | COMPANION_DIALS, PERSONALITY_DIALS, COMPANION_PERSONALITIES, cleanStyleNotes, backstoryTagline, safeExamples |
 | `backend/src/lib/companionPersonalityDials.ts` | COMPANION_DIAL_OPTIONS |

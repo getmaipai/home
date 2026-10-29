@@ -1292,6 +1292,16 @@ describe("household companion routes", () => {
     expect(response.status).toBe(422); expect(readLook(made.value.id).rest).toBe(first.id); expect(readLook(made.value.id).sheet).toBeNull();
   });
 
+  test("approving the picture that is already approved with a finished sheet starts nothing new", async () => {
+    const adult = addPerson("reapprove-author", "adult"), made = createHouseholdCompanion({ ...fixture(), display_name: "Reapprove fixture" }, { display_name: "Author", person_id: "reapprove-author" }); if (!made.ok) throw new Error(made.error);
+    const picture = addVersion(made.value.id, await transparentPng(), { source: "upload", label: "Only", width: 1024, height: 1024, from: null });
+    setRest(made.value.id, picture.id); __setAgeCheckRunnerForTests(async (images) => images.map(() => AGE_OK)); __setPictureStatusForTests(readyStatusForTests());
+    updateSheet(made.value.id, { views: { left: null, right: null, mouth: null }, card: { text: "A character", colours: [], species: "" }, key: readLook(made.value.id).key, state: "approved", approved_by: "Author", approved_at: new Date().toISOString() });
+    let posts = 0; __setPicturesFetchForTests((async (_input, init) => { if (init?.method === "POST") posts++; return Response.json({ job: "never" }, { status: 202 }); }) as typeof fetch);
+    const response = await request(`companions/${made.value.id}/look/approve`, adult, "POST", { version_id: picture.id });
+    expect(response.status).toBe(202); expect(await response.json()).toEqual({ job: null }); expect(posts).toBe(0); expect(readLook(made.value.id).sheet?.state).toBe("approved");
+  });
+
   test("restyle reuses the picture edit job and stores the selected style", async () => {
     const adult = addPerson("restyle-author", "adult"), made = createHouseholdCompanion({ ...fixture(), display_name: "Restyle fixture" }, { display_name: "Author", person_id: "restyle-author" }); if (!made.ok) throw new Error(made.error);
     const image = await transparentPng(), original = await keyedPicture(); __setPictureStatusForTests(readyStatusForTests()); __setAgeCheckRunnerForTests(async (images) => images.map(() => AGE_OK));

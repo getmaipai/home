@@ -13,6 +13,7 @@ import { useCompanionStates } from "@/shell/pages/useCompanionStates";
 import { useClipPreview } from "@/shell/pages/companionFlow/useClipPreview";
 import { lookKey } from "@/shell/pages/companionFlow/CreateCharacterStep";
 import { flowErrorText } from "@/shell/pages/companionFlow/errors";
+import { useSheetWait } from "@/shell/pages/companionFlow/useSheetWait";
 import { useKeyframesFirst } from "@/shell/pages/companionFlow/useKeyframesFirst";
 import { KeyframeEditor } from "@/shell/pages/companionFlow/KeyframeEditor";
 
@@ -44,7 +45,7 @@ function ClipPlayer({ urls, label }: { urls: CompanionStateUrls; label: string }
 }
 
 /** Screen 2, Animate Character: thirteen animations, four required and nine optional, each with an editable keyframe. */
-export function AnimateStep({ companionId, name, onBack, onContinue }: { companionId: string; name: string; onBack: () => void; onContinue: () => void }) {
+export function AnimateStep({ companionId, name, sheetJob = null, onBack, onContinue }: { companionId: string; name: string; sheetJob?: string | null; onBack: () => void; onContinue: () => void }) {
   const states = useCompanionStates(companionId, true);
   const look = useQuery({ queryKey: lookKey(companionId), queryFn: () => api.companionLook(companionId), retry: false });
   const frames = useKeyframesFirst(companionId, states);
@@ -58,7 +59,8 @@ export function AnimateStep({ companionId, name, onBack, onContinue }: { compani
   const selected = rows.find((row) => row.id === selectedId) ?? null;
   const rest = look.data?.versions.find((v) => v.id === look.data?.rest) ?? look.data?.versions[look.data.versions.length - 1] ?? null;
   const portrait = rest?.url ?? null;
-  const running = states.running || frames.busy;
+  const sheet = useSheetWait(companionId, sheetJob, rest?.id ?? null);
+  const running = states.running || frames.busy || sheet.waiting;
   const missingRequired = required.filter((row) => !made(row)).map((row) => row.id);
   const pending = useMemo(() => optional.filter((row) => ticked.has(row.id) && !made(row)).map((row) => row.id), [optional, ticked]);
   const allTicked = optional.length > 0 && optional.every((row) => ticked.has(row.id));
@@ -76,7 +78,7 @@ export function AnimateStep({ companionId, name, onBack, onContinue }: { compani
       status: word === "Making" ? <Progress mode="determinate" value={frames.making === row.id ? frames.percent : progress} label={`${row.label} progress`} /> : undefined,
     };
   };
-  const errorLine = states.error || Object.values(frames.failed)[0] || (states.query.isError ? flowErrorText(states.query.error) : "");
+  const errorLine = sheet.message || states.error || Object.values(frames.failed)[0] || (states.query.isError ? flowErrorText(states.query.error) : "");
   const generating = running || selected?.busy === true;
   const previewImage = selected ? (keyframeSrc(selected) ?? portrait) : portrait;
 
@@ -96,6 +98,9 @@ export function AnimateStep({ companionId, name, onBack, onContinue }: { compani
         {selected ? <p className="text-sm text-muted-foreground">{selected.when_it_plays}</p> : null}
       </DialogSection>
       <div className="flex flex-col gap-6">
+        {sheet.waiting ? <div role="status" className="flex flex-col gap-2"><p className="text-sm text-foreground">Getting your character ready. Animations start when this finishes.</p><Progress mode="determinate" value={sheet.percent} label="Getting your character ready" /></div> : null}
+        {errorLine ? <p role="alert" className="text-sm text-destructive">{errorLine}</p> : null}
+        {sheet.failed ? <Button variant="outline" shape="pill" onClick={() => void sheet.retry()}>Try again</Button> : null}
         <DialogSection title="Required" aside={`${required.length || 4} animations · Always included`}>
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
             {required.map((row) => <CharacterTile key={row.id} variant="animation" locked {...tile(row)} />)}
@@ -105,12 +110,11 @@ export function AnimateStep({ companionId, name, onBack, onContinue }: { compani
         <Separator />
         <DialogSection title="Optional" aside={<Button variant="link" size="sm" disabled={running} onClick={() => setTicked(allTicked ? new Set() : new Set(optional.map((row) => row.id)))}>{allTicked ? "Clear All" : "Select All"}</Button>}>
           <p className="text-sm text-muted-foreground">{`${optional.length || 9} animations · Select the ones you want`}</p>
-          <div className="grid grid-cols-3 gap-3">
+          <div className="grid grid-cols-3 gap-3 xl:grid-cols-5">
             {optional.map((row) => <CharacterTile key={row.id} variant="animation" checked={ticked.has(row.id)} onCheckedChange={(on) => toggle(row.id, on)} {...tile(row)} />)}
           </div>
           <Button variant="secondary" shape="pill" width="full" disabled={running || pending.length === 0} onClick={() => generate(pending)}>{`Generate Optional (${pending.length})`}</Button>
         </DialogSection>
-        {errorLine ? <p role="alert" className="text-sm text-destructive">{errorLine}</p> : null}
         {states.data && !states.data.sheet_ready && !errorLine ? <p className="text-sm text-muted-foreground">Finish your character on the first screen before making animations.</p> : null}
         {running ? <Button variant="outline" shape="pill" onClick={() => void states.stop()}>Stop</Button> : null}
       </div>

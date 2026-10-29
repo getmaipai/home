@@ -176,12 +176,32 @@ test("the cut-off sentence and Fill in button appear only when the picture is cl
   await waitFor(() => expect(asked).toEqual(["v-1"]));
 });
 
-test("a 409 from the complete route just refreshes without an error", async () => {
+test("a 409 from the complete route shows Home's sentence", async () => {
   const { view } = open({ path: "/companions/hc-one/create", lookData: look({ versions: [{ ...version("v-1"), clipped: ["left"] }], rest: "v-1" }) });
-  api.completeCompanionLook = async () => { throw new ApiError("Nothing is cut off in this picture.", 409); };
+  api.completeCompanionLook = async () => { throw new ApiError("A picture is already being made for this companion. Wait for it or stop it.", 409); };
   fireEvent.click(await view.findByRole("button", { name: "Fill in the cut-off parts" }));
-  await act(async () => { await Promise.resolve(); });
-  expect(view.queryByRole("alert")).toBeNull();
+  expect((await view.findByRole("alert")).textContent).toBe("A picture is already being made for this companion. Wait for it or stop it.");
+});
+
+test("Approve opens screen 2 at once and screen 2 waits for the character to be made ready", async () => {
+  const { view, calls } = open({ path: "/companions/hc-one/create", lookData: look({ versions: [version("v-1")], rest: "v-1" }) });
+  api.companionLookJob = async () => ({ state: "running", percent: 40, label: "Making character sheet", versions: [], error: null });
+  api.companionStates = async () => ({ sheet_ready: false, start_ready: false, key: "#00FF00", states: [], run: null, counts: { approved: 0, total: 0, required_missing: [] } });
+  await waitFor(() => expect(button(view, "Approve & Continue").disabled).toBe(false));
+  fireEvent.click(await view.findByRole("button", { name: "Approve & Continue" }));
+  expect(await view.findByText("Getting your character ready. Animations start when this finishes.")).toBeTruthy();
+  expect(calls.approved).toEqual(["v-1"]);
+});
+
+test("when the character could not be made ready, screen 2 says so and Try again approves the picture again", async () => {
+  const { view, calls } = open({ path: "/companions/hc-one/create", lookData: look({ versions: [version("v-1")], rest: "v-1" }) });
+  api.companionLookJob = async () => ({ state: "failed", percent: 0, label: "Failed", versions: [], error: "The side view did not work. Try again." });
+  api.companionStates = async () => ({ sheet_ready: false, start_ready: false, key: "#00FF00", states: [], run: null, counts: { approved: 0, total: 0, required_missing: [] } });
+  await waitFor(() => expect(button(view, "Approve & Continue").disabled).toBe(false));
+  fireEvent.click(await view.findByRole("button", { name: "Approve & Continue" }));
+  expect((await view.findByText("The side view did not work. Try again.")).tagName).toBe("P");
+  fireEvent.click(await view.findByRole("button", { name: "Try again" }));
+  await waitFor(() => expect(calls.approved).toEqual(["v-1", "v-1"]));
 });
 
 test("closing with an empty draft asks keep or discard; discard deletes it", async () => {

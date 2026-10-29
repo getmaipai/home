@@ -20,7 +20,7 @@ const running = (job: CompanionLookJob | undefined, jobId: string | null) => job
 /** Screen 1, Create Character. It reports the draft and whether it holds a picture so the dialog can ask keep or discard on close. */
 export function CreateCharacterStep({ creating, companionId, initialName, onDraft, onApproved }: {
   creating: MutableRefObject<Promise<string> | null>; companionId: string | null; initialName: string;
-  onDraft: (state: { id: string | null; pictures: number; name: string }) => void; onApproved: () => void;
+  onDraft: (state: { id: string | null; pictures: number; name: string }) => void; onApproved: (sheetJob: string | null) => void;
 }) {
   const client = useQueryClient();
   const [draftId, setDraftId] = useState<string | null>(companionId);
@@ -142,8 +142,8 @@ export function CreateCharacterStep({ creating, companionId, initialName, onDraf
     setPreviewError(""); setBusyKind("complete");
     try { setJobId((await api.completeCompanionLook(draftId, shownId)).job); }
     catch (e) {
+      setPreviewError(flowErrorText(e));
       if (e instanceof ApiError && e.status === 409) await client.invalidateQueries({ queryKey: lookKey(draftId) });
-      else setPreviewError(flowErrorText(e));
     } finally { setBusyKind(null); }
   }
   async function approve() {
@@ -151,8 +151,8 @@ export function CreateCharacterStep({ creating, companionId, initialName, onDraf
     setPreviewError(""); setBusyKind("approve");
     try {
       if (name.trim() && name.trim() !== draftName) { await api.updateCompanion(draftId, { name: name.trim() }); setDraftName(name.trim()); }
-      await api.approveCompanionLook(draftId, shownId);
-      await client.invalidateQueries({ queryKey: lookKey(draftId) }); onApproved();
+      const { job: sheetJob } = await api.approveCompanionLook(draftId, shownId);
+      await client.invalidateQueries({ queryKey: lookKey(draftId) }); onApproved(sheetJob);
     } catch (e) { setPreviewError(flowErrorText(e)); } finally { setBusyKind(null); }
   }
   async function stop() {
@@ -178,7 +178,7 @@ export function CreateCharacterStep({ creating, companionId, initialName, onDraf
             : <Input aria-label="Photo" type="file" shape="pill" accept="image/png,image/jpeg,image/webp" disabled={locked} onChange={(e) => setFile(e.target.files?.[0] ?? null)} />}
         </DialogSection>
         <DialogSection title="Choose a style">
-          {tiles.length ? <div className="grid grid-cols-3 gap-3">
+          {tiles.length ? <div className="grid grid-cols-4 gap-3">
             {tiles.map((tile) => <CharacterTile key={tile.id} variant="picture" name={tile.label} selected={style === tile.id}
               media={tile.custom ? <Palette className="size-6 text-muted-foreground" aria-hidden="true" /> : tile.id === "keep" ? <User className="size-6 text-muted-foreground" aria-hidden="true" /> : <Sparkles className="size-6 text-muted-foreground" aria-hidden="true" />}
               onSelect={() => { if (!locked) setStyle(tile.id); }} />)}
@@ -204,8 +204,7 @@ export function CreateCharacterStep({ creating, companionId, initialName, onDraf
             <Progress mode="determinate" value={job?.percent ?? 0} label={job?.label ?? "Making your character"} />
           </div> : null}
         </GenerationStage>
-        <p className="text-sm text-muted-foreground">Change the description or style and generate again until you&apos;re happy with your character.</p>
-        {picture ? <p className="text-sm text-muted-foreground">Drag the character to move it. Use the slider or the mouse wheel to zoom.</p> : null}
+        <p className="text-sm text-muted-foreground">{picture ? "Drag the character to move it. Use the slider or the mouse wheel to zoom. Change the description or style and generate again until you're happy." : "Change the description or style and generate again until you're happy with your character."}</p>
         {generating ? <Button variant="outline" shape="pill" onClick={() => void stop()}>Stop</Button> : null}
         {busyKind === "prepare" ? <p role="status" className="text-sm text-muted-foreground">Placing your character...</p> : null}
         {picture && picture.clipped && picture.clipped.length > 0 ? <div className="flex flex-col gap-2">

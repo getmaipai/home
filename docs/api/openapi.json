@@ -58922,14 +58922,15 @@
         },
         "responses": {
           "202": {
-            "description": "Picture approved and character sheet started.",
+            "description": "Picture approved and character sheet started, running or already made (job is null when it is already made).",
             "content": {
               "application/json": {
                 "schema": {
                   "type": "object",
                   "properties": {
                     "job": {
-                      "type": "string"
+                      "type": "string",
+                      "nullable": true
                     }
                   },
                   "required": [
