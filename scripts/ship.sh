@@ -83,6 +83,30 @@ if (( guard_finding )); then
   (( adopt_empty_live )) || die "$finding Pass --adopt-empty-live only to override this guard."
 fi
 before_tag="$(cat "$live/.installed-tag" 2>/dev/null || echo none)"
+# One ship at a time (2026-10-29: two sessions shipped at once, both installs and both rollbacks collided and the hub was down for minutes).
+# The lock is a directory in the shared ship data folder, so every worktree and session sees it. A second ship waits for the first, then
+# looks again at what is live: a hub that already runs this commit, or a newer one that includes it, needs no install.
+lock_dir="${MAIPAI_SHIP_LOCK:-$data/ship.lock.d}"; lock_wait="${MAIPAI_SHIP_LOCK_WAIT:-900}"; held_lock=0
+release_lock() { if (( held_lock )); then rm -rf "$lock_dir"; held_lock=0; fi; }
+if (( ! dry )); then
+  mkdir -p "$(dirname "$lock_dir")" || die "could not create the ship data folder $(dirname "$lock_dir")."
+  waited=0
+  until mkdir "$lock_dir" 2>/dev/null; do
+    owner_pid="$(cat "$lock_dir/pid" 2>/dev/null || true)"
+    if [[ "$owner_pid" =~ ^[0-9]+$ ]] && ! kill -0 "$owner_pid" 2>/dev/null; then echo "ship.sh: the ship that held the lock (pid $owner_pid) is gone; clearing its lock." >&2; rm -rf "$lock_dir"; continue; fi
+    (( waited < lock_wait )) || die "another ship ($(cat "$lock_dir/what" 2>/dev/null || echo unknown)) is still running after ${lock_wait}s; wait for it, then run ship.sh again."
+    (( waited % 30 )) || echo "ship.sh: waiting for another ship to finish ($(cat "$lock_dir/what" 2>/dev/null || echo starting)); ${waited}s so far." >&2
+    sleep 2; waited=$((waited + 2))
+  done
+  held_lock=1; echo "$$" > "$lock_dir/pid"; echo "$label from $(hostname -s) pid $$" > "$lock_dir/what"
+  trap release_lock EXIT
+  before_tag="$(cat "$live/.installed-tag" 2>/dev/null || echo none)"
+  # A ship that finished while this one waited may already include this commit.
+  live_ref="${before_tag#sha-}"; live_sha="$(git rev-parse --verify -q "${live_ref}^{commit}" 2>/dev/null || true)"
+  if (( ! reinstall )) && [[ -n "$live_sha" && "$live_sha" != "$sha" ]] && git merge-base --is-ancestor "$sha" "$live_sha" 2>/dev/null; then
+    echo "ship.sh: the live hub already runs $before_tag, which includes $label; nothing to do. Pass --reinstall to install it again anyway."; exit 0
+  fi
+fi
 # Re-promoting the commit that is already live gains nothing and can break a working hub: on 2026-10-27 a second ship of an
 # installed commit failed part way, left the install without its dependencies and took the family's hub down. When the live tag
 # is this commit and the hub answers, stop. A hub that is not answering still gets the install (that is a repair), and
@@ -97,6 +121,16 @@ if [[ ! -x "$promote" ]] || [[ "$(eval "$sudo_cmd \"$promote\" --check" 2>/dev/n
 if (( tag_after == 0 )) || [[ "$before_tag" != "$label" ]]; then
   if [[ -n "$gui_check" ]] && ! eval "$gui_check"; then die "this session has no desktop login (launchd gui domain), so the Stack's service cannot install. Nothing was stopped or changed. Run ship.sh from Terminal on the Mac's own screen, logged in as the console user."; fi
   mkdir -p "$data" || die "could not create ship log directory $data."
+  # Do not cut off a picture, clip or chat someone is waiting on: wait for the engine to go quiet, then go on and say what was running.
+  busy_cmd="${MAIPAI_SHIP_BUSY_CMD:-curl -fsS -m 5 http://127.0.0.1:${stack_port}/stack/v1/jobs | python3 -c 'import json,sys; print(sum(1 for j in json.load(sys.stdin).get(\"jobs\", []) if j.get(\"state\") in (\"queued\", \"running\")))'}"
+  quiet_wait="${MAIPAI_SHIP_QUIET_WAIT:-180}"; quiet_for=0
+  while :; do
+    busy="$(eval "$busy_cmd" 2>/dev/null || echo 0)"; [[ "$busy" =~ ^[0-9]+$ ]] || busy=0
+    (( busy > 0 )) || break
+    if (( quiet_for >= quiet_wait )); then echo "ship.sh: $busy engine job(s) are still running after ${quiet_wait}s; installing anyway, they will be interrupted." >&2; break; fi
+    (( quiet_for % 30 )) || echo "ship.sh: waiting for $busy running engine job(s) to finish before the install; ${quiet_for}s so far." >&2
+    sleep 5; quiet_for=$((quiet_for + 5))
+  done
   eval "$stop_cmd" || die "could not stop the development Home; stop it and retry."
   before_migrations="$(eval "$migrations_cmd" 2>/dev/null || echo 0)"; [[ "$before_migrations" =~ ^[0-9]+$ ]] || before_migrations=0
   refused_file="$live/data/logs/launchd.err.log"; before_refused=0
@@ -151,7 +185,7 @@ if (( tag_after )); then
     echo "notes: changelog section"
   else
     notes_file="$(mktemp "${TMPDIR:-/tmp}/maipai-release-notes.XXXXXX")"
-    trap '[[ -z "${notes_file:-}" ]] || rm -f "$notes_file"' EXIT
+    trap '[[ -z "${notes_file:-}" ]] || rm -f "$notes_file"; release_lock' EXIT
     release_date="$(date +%F)"
     printf 'Release %s, cut from commit %s live on the hub on %s.\n' "$next" "${sha:0:7}" "$release_date" > "$notes_file"
     git log --format='- %s' --first-parent --reverse "$latest..$sha" >> "$notes_file"

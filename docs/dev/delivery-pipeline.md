@@ -95,6 +95,7 @@ All under `<main checkout>/data-scratch/` (git-ignored), unless noted.
 | `watch/reds/<sha>.md` | A red note: failing files, culprit commit, last 60 lines of output. |
 | `watch/flake-issues.json`, `watcher.log`, `watcher.pid` | Files already reported as repeat flakes; the log; the pid. |
 | `ship/shipped.jsonl`, `ship/<time>-<sha7>.log` | Every ship and its result; the promote helper's output. |
+| `ship/ship.lock.d/` | The ship lock (`pid`, `what`): one ship at a time. A second `ship.sh` waits up to `MAIPAI_SHIP_LOCK_WAIT` seconds (900), clears a lock whose pid is gone, then re-reads the live tag and does nothing when the live hub already includes its commit. Before stopping anything it waits up to `MAIPAI_SHIP_QUIET_WAIT` seconds (180) for running engine jobs (`/stack/v1/jobs`), then installs anyway and says what it interrupted. |
 | `pipeline-bin/lander.sh`, `watcher.sh` | The copies of the two scripts the daemons actually run (section 8). |
 | Outside the repo | warm checkouts `../home-lander` and `../home-watcher`; `/usr/local/maipai-home-src.git` (root-owned mirror); `/usr/local/libexec/maipai-promote` and its sudoers line; `~/Library/LaunchAgents/com.maipai.lander.plist` and `.watcher.plist`. |
 

@@ -120,5 +120,31 @@ describe("ship pipeline", () => {
     const out = run([sha, "--before-green"], { MAIPAI_SHIP_GUI_CHECK: "false" });
     expect(out.status).toBe(1); expect(out.stderr).toContain("no desktop login"); expect(out.stderr).toContain("Nothing was stopped");
   }, 60_000);
+  describe("one ship at a time", () => {
+    const lockDir = () => join(data, "ship.lock.d");
+    const calls = () => (existsSync(join(scratch, "promote.calls")) ? readFileSync(join(scratch, "promote.calls"), "utf8") : "");
+    beforeEach(() => { rmSync(lockDir(), { recursive: true, force: true }); rmSync(join(scratch, "health.fail"), { force: true }); });
+    test("a ship started while another holds the lock refuses after the wait, and installs nothing", () => {
+      mkdirSync(lockDir(), { recursive: true }); writeFileSync(join(lockDir(), "pid"), String(process.pid)); writeFileSync(join(lockDir(), "what"), "sha-other from test");
+      const before = calls(), out = run([sha, "--before-green", "--reinstall"], { MAIPAI_SHIP_LOCK_WAIT: "2" });
+      expect(out.status).toBe(1); expect(out.stderr).toContain("another ship (sha-other from test) is still running"); expect(calls()).toBe(before); expect(existsSync(lockDir())).toBe(true);
+    }, 60_000);
+    test("a lock whose ship is gone is cleared and the ship goes ahead, then the lock is released", () => {
+      mkdirSync(lockDir(), { recursive: true }); writeFileSync(join(lockDir(), "pid"), "99999999");
+      const out = run([sha, "--before-green", "--reinstall"]);
+      expect(out.status).toBe(0); expect(out.stderr).toContain("clearing its lock"); expect(out.stdout).toContain("shipped:"); expect(existsSync(lockDir())).toBe(false);
+    }, 60_000);
+    test("a live that already includes this commit needs no install", () => {
+      writeFileSync(join(main, "later.txt"), "later\n"); git(main, "add", "."); git(main, "commit", "-m", "later commit"); git(main, "push", "origin", "main"); const later = git(main, "rev-parse", "HEAD");
+      writeFileSync(join(live, ".installed-tag"), `sha-${later.slice(0, 7)}\n`);
+      const before = calls(), out = run([sha, "--before-green"]);
+      expect(out.status).toBe(0); expect(out.stdout).toContain("already runs"); expect(out.stdout).toContain("includes"); expect(calls()).toBe(before); expect(existsSync(lockDir())).toBe(false);
+    }, 60_000);
+    test("running engine jobs are waited for, then the install goes ahead and says what it interrupted", () => {
+      const busy = join(scratch, "busy-cmd"); writeFileSync(busy, "#!/usr/bin/env bash\necho 2\n"); chmodSync(busy, 0o755);
+      const out = run([sha, "--before-green", "--reinstall"], { MAIPAI_SHIP_BUSY_CMD: busy, MAIPAI_SHIP_QUIET_WAIT: "5" });
+      expect(out.status).toBe(0); expect(out.stderr).toContain("waiting for 2 running engine job(s)"); expect(out.stderr).toContain("installing anyway"); expect(out.stdout).toContain("shipped:");
+    }, 60_000);
+  });
 });
 afterAll(() => rmSync(scratch, { recursive: true, force: true }));
