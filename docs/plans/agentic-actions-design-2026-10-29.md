@@ -204,21 +204,36 @@ only after phase A works and the owner says so. The numbering below is kept so e
   **Owner ruling (2026-10-29): a child's alarm for themselves is set at once, like `remind` today** (never looser than `remind`, still
   cancellable, still never for another person). A ringing robot uses the alarm chime and child alarm line already filed in
   ROBOT-CLIPS-02, with its fixed-clip review; this note adds no second chime.
-- **External notifications (owner, 2026-10-29): alarms and reminders must reach a person away from the hub, Telegram first.** Telegram
-  outbound already ships (`telegramChannel.ts`; `notifications.ts` `resolveChannelsFor`: a per-person `notifications.telegram.chat_id` and
-  a per-type `notifications.<type>.telegram` choice, in app always on, robot for `time_sensitive`). Phase A reuses it: `remind.due`, a new
-  `alarm.due` and `timer.done` are declared with a Telegram toggle, **off until the person links their chat and turns it on**, and
-  a minor's outside delivery is limited by `backend/src/lib/settingsMinorSnapshot.ts` (`TELEGRAM_EVENTS`,
-  `CHILD_VISIBLE_SETTING_KEYS`). `remind.due`, `alarm.due` and `timer.done` join `TELEGRAM_EVENTS` for a child and a teen: it is the same
-  delivery to the minor's own linked chat that a minor can already switch on for the events listed there, so nothing is loosened.
-  Quiet hours hold a Telegram alarm like any `time_sensitive` one. "Ring anyway" may be set by an adult or teen on their own alarms, and
-  on a child's alarm only by that child's parent; a child cannot set it, so a child never bypasses hours an admin set. The message
-  carries the label and time only and goes only to the person's own chat. The existing Telegram row on the privacy page
-  (`privacy.ts` `platform:telegram`) is updated in the same commit to say that reminder and alarm labels and times are sent; there is no
-  row per delivery. A
-  failed Telegram send falls back to in app and the robot and never drops the alarm. Further channels (push, email, others) are new
-  channel entries in the same function, not a second path; this note designs none of them. A message coming back from Telegram, such as
-  "snooze 10 minutes", is the inbound side and belongs to GATEWAY-01, not to this note. Changing a repeating alarm shows
+- **External notifications (owner, 2026-10-29, revised: Bark and Telegram, each optional): alarms and reminders must reach a person away from
+  the hub through Bark, Telegram or both.** Bark is an iPhone push app (MIT; push goes through Apple's APNs; a push is one GET or POST to a server with a device key;
+  `level=timeSensitive`, `sound`, `call=1` to repeat the sound for 30 seconds, `group`, and a `ciphertext` parameter for an encrypted
+  body; the server `bark-server`, MIT, runs in Docker or as one binary). Reuse, no custom push code beyond one channel entry:
+  - **Two optional channels, one function.** `notifications.ts` `resolveChannelsFor` gains a `bark` entry beside `in_app`, the existing
+    Telegram entry and robot, with a per-person Bark address and a per-type `notifications.<type>.bark` choice. `remind.due`, `alarm.due`
+    and `timer.done` are declared with both a Bark and a Telegram choice, **each off until the person links it and turns it on**. A person
+    may turn on neither, one or both; with both on, one alarm sends one push to each and in app always fires. Telegram's linking,
+    `telegramChannel.ts` and its existing events are unchanged. Further channels are more entries in the same function, never a
+    second path.
+  - **Server: self-hosted `bark-server` on the hub's network is the default and the public Bark relay is not.** Apple still carries the
+    push either way, so the message is always sent with `ciphertext`: Apple and the relay see only ciphertext, and the phone's Bark
+    app decrypts it. The device key and the encryption key are credentials: per person in the keystore (`CREDENTIALS.md`), never in a
+    log, a prompt or the Activity page. Bark is iPhone only; a person without an iPhone has in app, the robot, and later channels.
+  - **Levels.** An alarm is sent `timeSensitive` with `call=1` and `sound=alarm`; a reminder is `timeSensitive`; a timer is `active`.
+    Quiet hours hold a Bark push like any `time_sensitive` one. "Ring anyway" may be set by an adult or teen on their own alarms, and on
+    a child's alarm only by that child's parent; a child cannot set it. Bark's `critical` level, which breaks through silent mode, needs
+    the person to enable it in the Bark app and is never sent by Home on its own.
+  - **Minors.** A minor's outside delivery is limited by `backend/src/lib/settingsMinorSnapshot.ts` (`CHILD_VISIBLE_SETTING_KEYS`; its
+    `TELEGRAM_EVENTS` list becomes a shared outside-channel event list used by both channels). The three types join it for a child and a
+    teen: the same delivery to the minor's own linked phone or chat that a minor can already switch on for listed events, so nothing is
+    loosened.
+  - **Privacy.** A new row `platform:bark` in `privacy.ts` (only while Bark is linked, naming the configured host) says that reminder
+    and alarm labels and times are sent, encrypted, to the person's own phone through Apple. The existing `platform:telegram` row is
+    updated in the same commit to say that reminder and alarm labels and times are sent to Telegram when a person turns that on (Telegram
+    does not encrypt them). One row per connection, none per push.
+  - **Who runs `bark-server`:** the Stack supervises it the way it supervises SearXNG, or the owner points one setting at their own
+    instance, checked when saved with its health on the Status page (rule 11).
+  - **A failed push never drops the alarm:** in app and the robot still fire, and a failed Bark push does not stop the Telegram one. The label and time only are carried, to the person's own
+    device only. A reply from the phone, such as "snooze 10 minutes", is the inbound side and belongs to GATEWAY-01, not to this note. Changing a repeating alarm shows
   its next three firing times in the receipt so a wrong "every day" is visible at once.
 - **Why this is the right first slice.** It exercises every piece the later providers need (tool call, effect class, receipt, undo,
   account and default resolution by name, a scheduled job that can notify only when something is true) with no outside account, no
@@ -410,6 +425,10 @@ AGENT-ACTION-BENCH-01, run before slice 3 ships and after any change to the offe
   injection is unsolved; this design limits what an injected run can do, and the bench measures it on our own fixtures.
 - The two Apple servers were read from their GitHub pages only (license, stars, version, README claims); no release dates were shown, nothing was run,
   and macOS 26 behavior, the unattended prompt flow and the service-user question are untested. The feasibility check in 3.8 settles them.
+- Bark was read from its two GitHub pages only (MIT, parameters, Docker and binary install). Not read or tested: the `ciphertext`
+  scheme, whether a self-hosted `bark-server` reaches Apple's push service with no outside Bark account, how a phone away from home
+  reaches a hub-side server (a reachable address such as the household's private network is assumed), and whether the server needs
+  authentication. A short feasibility check settles these before the channel is built.
 - Joplin's revision history as the undo path and the hub's access to an optical drive were not tested.
 
 ## 11. Owner answers (2026-10-29) and what they mean for the design
@@ -431,4 +450,5 @@ AGENT-ACTION-BENCH-01, run before slice 3 ships and after any change to the offe
 - Meta, [Agents Rule of Two](https://ai.meta.com/blog/practical-ai-agent-security/); Simon Willison, [The lethal trifecta](https://simonwillison.net/2025/Jun/16/the-lethal-trifecta/) and [Design patterns for securing LLM agents](https://simonwillison.net/2025/Jun/13/prompt-injection-design-patterns/) (CaMeL, dual LLM)
 - LangChain, [LangGraph human-in-the-loop](https://docs.langchain.com/oss/python/langgraph/human-in-the-loop) (interrupt, persist, resume)
 - Microsoft, [Playwright MCP](https://playwright.dev/mcp/introduction); Playwright [browser contexts](https://playwright.dev/docs/browser-contexts) and [authentication](https://playwright.dev/docs/auth)
+- Bark, [app](https://github.com/Finb/Bark) and [server](https://github.com/Finb/bark-server)
 - Connector listings: [Joplin MCP (Glama)](https://glama.ai/mcp/servers/bbw0vyz8zx), [Actual Budget MCP](https://glama.ai/mcp/servers/agigante80/actual-mcp-server), [Firefly III MCP](https://glama.ai/mcp/servers/przbadu/firefly-iii-mcp-server)
