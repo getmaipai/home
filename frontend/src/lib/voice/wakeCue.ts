@@ -35,7 +35,12 @@ function makeContext(): CueContext | null {
   return Ctor ? new Ctor() : null;
 }
 
+let lastWakeCueAt = 0;
+/** Milliseconds since a wake cue last played, so the call sounds (callSounds.ts) do not stack on top of one. */
+export function msSinceWakeCue(now = Date.now()): number { return now - lastWakeCueAt; }
+
 export function playWakeCue(cue: WakeCue): void {
+  lastWakeCueAt = Date.now();
   try {
     const ctx = makeContext();
     if (!ctx) return;

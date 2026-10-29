@@ -26,7 +26,8 @@
 // finishes speaking - the whole state machine is a value the mount
 // effect reacts to, never a manually chained callback tree.
 import { useEffect, useRef, useState } from "react";
-import { playWakeCue } from "@/lib/voice/wakeCue";
+import { msSinceWakeCue, playWakeCue } from "@/lib/voice/wakeCue";
+import { playCallSound } from "@/lib/voice/callSounds";
 import type { VoiceMode } from "@maipai/ui/src/elements/voice-conversation";
 import { createSttSocket, type SttSocket, type SttSocketHandlers } from "@/lib/voice/sttSocket";
 import { MicCaptureError, startMicCapture, type MicCaptureHandle } from "@/lib/voice/mic-capture";
@@ -203,6 +204,14 @@ export function useLiveVoiceSession({ composer, open, onOpenChange, onProblem, i
 
   // Reset all local display state the moment the overlay opens, so a
   // second call never shows the previous one's mode.
+  // VOICE-SOUNDS-01: a bright sound when the call starts, a soft different one when it ends; a wake cue that just played stands in for either.
+  const wasOpenRef = useRef(false);
+  useEffect(() => {
+    if (open === wasOpenRef.current) return;
+    wasOpenRef.current = open;
+    if (msSinceWakeCue() > 3000) playCallSound(open ? "start" : "end");
+  }, [open]);
+
   useEffect(() => {
     if (!open) return;
     setCurrentMode("connecting");

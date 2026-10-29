@@ -431,6 +431,28 @@ describe("live voice session", () => {
     } finally { random.mockRestore(); react.mockRestore(); cleanup(); }
   });
 
+  test("opening the call plays the start sound and closing it plays a different end sound", async () => {
+    const { setCallSoundContextFactory } = await import("@/lib/voice/callSounds");
+    const freqs: number[] = [];
+    setCallSoundContextFactory(() => ({
+      currentTime: 0, destination: {}, resume: async () => {}, close: async () => {},
+      createOscillator: () => ({ type: "sine", frequency: { setValueAtTime: (v: number) => { freqs.push(v); }, exponentialRampToValueAtTime: () => {} }, connect: () => {}, start: () => {}, stop: () => {}, onended: null }),
+      createGain: () => ({ gain: { setValueAtTime: () => {}, exponentialRampToValueAtTime: () => {} }, connect: () => {} }),
+    }));
+    try {
+      const socket = controlledSocket();
+      const view = render(<Harness open={false} onOpenChange={() => {}} isSpeaking={false} speakingEndedAt={0} fixture={[]} sentTexts={[]} socketFactory={socket.createSocket} />);
+      expect(freqs).toEqual([]);
+      act(() => view.rerender(<Harness open onOpenChange={() => {}} isSpeaking={false} speakingEndedAt={0} fixture={[]} sentTexts={[]} socketFactory={socket.createSocket} />));
+      const started = freqs.splice(0);
+      expect(started).toHaveLength(3);
+      act(() => view.rerender(<Harness open={false} onOpenChange={() => {}} isSpeaking={false} speakingEndedAt={0} fixture={[]} sentTexts={[]} socketFactory={socket.createSocket} />));
+      const ended = freqs.splice(0);
+      expect(ended).toHaveLength(2);
+      expect(ended).not.toEqual(started.slice(0, 2));
+    } finally { setCallSoundContextFactory(null); cleanup(); }
+  });
+
   test("a sound shorter than the 150 ms start window does not pause playback", async () => {
     const pause = mock();
     const socket = controlledSocket();
