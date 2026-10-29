@@ -178,7 +178,7 @@ test("a 409 from the automatic fill-in shows Home's sentence", async () => {
   expect((await view.findByRole("alert")).textContent).toBe("A picture is already being made for this companion. Wait for it or stop it.");
 });
 
-test("a chosen photo uploads at once, shows a thumbnail and shows on the right as it is, with no Generate button", async () => {
+test("a chosen photo uploads at once, shows a thumbnail and shows on the right as it is, with Generate switched off", async () => {
   URL.createObjectURL = () => "blob:photo"; URL.revokeObjectURL = () => undefined;
   const { view } = open(); await nameIt(view);
   fireEvent.click(await view.findByRole("radio", { name: "Upload Photo" }));
@@ -190,7 +190,7 @@ test("a chosen photo uploads at once, shows a thumbnail and shows on the right a
   await waitFor(() => expect(uploads).toHaveLength(1));
   expect(await view.findByAltText("Your upload")).toBeTruthy();
   await view.findByRole("application", { name: /Character position/ });
-  expect(view.queryByRole("button", { name: "Generate Character" })).toBeNull();
+  expect(button(view, "Generate Character").disabled).toBe(true);
 });
 
 test("Approve opens screen 2 at once and screen 2 waits for the character to be made ready", async () => {
@@ -199,7 +199,7 @@ test("Approve opens screen 2 at once and screen 2 waits for the character to be 
   api.companionStates = async () => ({ sheet_ready: false, start_ready: false, key: "#00FF00", states: [], run: null, counts: { approved: 0, total: 0, required_missing: [] } });
   await waitFor(() => expect(button(view, "Approve & Continue").disabled).toBe(false));
   fireEvent.click(await view.findByRole("button", { name: "Approve & Continue" }));
-  expect(await view.findByText("Getting your character ready. Animations start when this finishes.")).toBeTruthy();
+  expect(await view.findByText("Drawing your character from the sides and with its mouth open, so every animation matches. This takes a few minutes, and your animations start by themselves when it is done.")).toBeTruthy();
   expect(calls.approved).toEqual(["v-1"]);
 });
 

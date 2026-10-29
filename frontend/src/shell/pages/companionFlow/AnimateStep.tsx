@@ -60,7 +60,8 @@ export function AnimateStep({ companionId, name, sheetJob = null, autoMake = fal
   const rest = look.data?.versions.find((v) => v.id === look.data?.rest) ?? look.data?.versions[look.data.versions.length - 1] ?? null;
   const portrait = rest?.url ?? null;
   const sheet = useSheetWait(companionId, sheetJob, rest?.id ?? null);
-  const running = states.running || frames.busy || sheet.waiting;
+  const picturing = states.data?.busy ?? null;
+  const running = states.running || frames.busy || sheet.waiting || picturing !== null;
   const missingRequired = required.filter((row) => !made(row)).map((row) => row.id);
   const pending = useMemo(() => optional.filter((row) => ticked.has(row.id) && !made(row)).map((row) => row.id), [optional, ticked]);
   const allTicked = optional.length > 0 && optional.every((row) => ticked.has(row.id));
@@ -105,7 +106,7 @@ export function AnimateStep({ companionId, name, sheetJob = null, autoMake = fal
         {selected ? <p className="text-sm text-muted-foreground">{selected.when_it_plays}</p> : null}
       </DialogSection>
       <div className="flex flex-col gap-6">
-        {sheet.waiting ? <div role="status" className="flex flex-col gap-2"><p className="text-sm text-foreground">Getting your character ready. Animations start when this finishes.</p><Progress mode="determinate" value={sheet.percent} label="Getting your character ready" /></div> : null}
+        {sheet.waiting || picturing ? <div role="status" className="flex flex-col gap-2"><p className="text-sm text-foreground">{sheet.waiting || picturing?.kind === "sheet" ? "Drawing your character from the sides and with its mouth open, so every animation matches. This takes a few minutes, and your animations start by themselves when it is done." : `${picturing?.label ?? "Making a picture"} for your animations...`}</p><Progress mode="determinate" value={sheet.waiting ? sheet.percent : picturing?.percent ?? 0} label="Progress" /></div> : null}
         {errorLine ? <p role="alert" className="text-sm text-destructive">{errorLine}</p> : null}
         {sheet.failed ? <Button variant="outline" shape="pill" onClick={() => void sheet.retry()}>Try again</Button> : null}
         <DialogSection title="Required" aside={`${required.length || 4} animations · Always included`}>

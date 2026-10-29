@@ -58,7 +58,11 @@ export function useKeyframesFirst(companionId: string, states: ReturnType<typeof
     setPlan({ ...plan, starting: true });
     api.generateCompanionKeyframe(companionId, plan.queue[0]!).then(
       ({ job: made }) => { const now = planRef.current; if (now) setPlan({ ...now, jobId: made }); },
-      (cause: unknown) => pop(flowErrorText(cause)),
+      (cause: unknown) => {
+        // Another picture is still being made: wait and try this one again, never show that to the person.
+        if (cause instanceof ApiError && cause.status === 409) { setTimeout(() => { const now = planRef.current; if (now) setPlan({ ...now, starting: false }); }, 2500); return; }
+        pop(flowErrorText(cause));
+      },
     );
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [plan]);

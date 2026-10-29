@@ -2,8 +2,9 @@ import { ArtWithheldError, checkCompanionArt, requireCompanionPictureOk } from "
 import sharp from "sharp";
 import media from "@maipai/spec/vocab/companion-media.json";
 import { capOfStyle, type LookStyleId } from "@/lib/companionLookStyles";
-import { addVersion, chooseKeyColour, compositeOnKey, describeCharacter, keyOut, lookPromptFor, normalizePicture, readLook, updateSheet, versionOriginalPath, versionPath } from "@/lib/companionLook";
+import { addVersion, borderLooksKeyed, chooseKeyColour, compositeOnNeutral, describeCharacter, keyOut, lookPromptFor, normalizePicture, readLook, updateSheet, versionOriginalPath, versionPath } from "@/lib/companionLook";
 import { clippedEdges } from "@/lib/imaging/subject";
+import { removeBackground } from "@/lib/imaging/tools";
 import { routeAudience } from "@/lib/pictures/audience";
 import { prepareEditSource } from "@/lib/pictures/editSources";
 import { laneOf } from "@/lib/pictures/lane";
@@ -51,9 +52,9 @@ const jobs = new Map<string, LookJob>();
 const activeByCompanion = new Map<string, string>();
 const startingCompanions = new Set<string>();
 const SHEET_VIEWS = [
-  { slot: "left" as const, label: "Turned left", prompt: "Turn the character to face three quarters to its left. Keep the exact same character: same colours, same face, same nose, same clothes, same proportions. Keep the plain solid <key> background." },
-  { slot: "right" as const, label: "Turned right", prompt: "Turn the character to face three quarters to its right. Keep the exact same character: same colours, same face, same nose, same clothes, same proportions. Keep the plain solid <key> background." },
-  { slot: "mouth" as const, label: "Mouth open", prompt: "Keep the exact same character and pose, but open the mouth as if speaking. Same colours, same face, same nose, same clothes. Keep the plain solid <key> background." },
+  { slot: "left" as const, label: "Turned left", prompt: "Turn the character to face three quarters to its left. Keep the exact same character: same colours, same face, same nose, same clothes, same proportions. Keep a plain solid light grey background." },
+  { slot: "right" as const, label: "Turned right", prompt: "Turn the character to face three quarters to its right. Keep the exact same character: same colours, same face, same nose, same clothes, same proportions. Keep a plain solid light grey background." },
+  { slot: "mouth" as const, label: "Mouth open", prompt: "Keep the exact same character and pose, but open the mouth as if speaking. Same colours, same face, same nose, same clothes. Keep a plain solid light grey background." },
 ];
 const sheetJobs = new Map<string, SheetJob>();
 
@@ -63,7 +64,20 @@ export function runningSheetJob(companionId: string): string | null {
   return id && job && !(["done", "failed", "cancelled"] as string[]).includes(job.state) ? id : null;
 }
 
+/** Takes the background off a picture the model drew: keyed out when the model kept the key colour, otherwise lifted out by the background remover so its own backdrop never tints the character. */
+async function cutOut(actor: PersonRow, png: Uint8Array, key: string): Promise<Uint8Array> {
+  if (await borderLooksKeyed(png, key)) return keyOut(png, key);
+  try { return await removeBackground(actor, png); } catch { return png; }
+}
+
 export function __clearCompanionLookJobsForTests(): void { jobs.clear(); sheetJobs.clear(); activeByCompanion.clear(); startingCompanions.clear(); }
+/** What a picture job is doing for this companion right now, for screens that must not offer a second one. */
+export function activeLookInfo(companionId: string): { kind: "sheet" | "picture"; label: string; percent: number } | null {
+  const id = activeByCompanion.get(companionId), job = id ? jobs.get(id) : undefined, sheetJob = id ? sheetJobs.get(id) : undefined;
+  if (sheetJob && (sheetJob.state === "queued" || sheetJob.state === "running")) return { kind: "sheet", label: "Getting your character ready", percent: sheetJob.percent };
+  if (job && (job.state === "queued" || job.state === "running")) return { kind: "picture", label: "Making a picture", percent: job.percent };
+  return startingCompanions.has(companionId) ? { kind: "picture", label: "Starting a picture", percent: 0 } : null;
+}
 export function activeLookJob(companionId: string): boolean {
   const id = activeByCompanion.get(companionId), job = id ? jobs.get(id) : null, sheetJob = id ? sheetJobs.get(id) : null;
   return startingCompanions.has(companionId) || Boolean((job && (job.state === "queued" || job.state === "running")) || (sheetJob && (sheetJob.state === "queued" || sheetJob.state === "running")));
@@ -139,7 +153,7 @@ export async function startLookEdit(input: { actor: PersonRow; companionId: stri
     const look = readLook(input.companionId), version = look.versions.find((item) => item.id === input.versionId), path = versionPath(input.companionId, input.versionId);
     if (!version || !path) throw Object.assign(new Error("That picture could not be found. Choose one of this companion's pictures."), { status: 404 });
     const png = new Uint8Array(readFileSync(path)), originalPath = versionOriginalPath(input.companionId, version.id);
-    const sourceBytes = originalPath && !input.forceKeyComposite ? new Uint8Array(readFileSync(originalPath)) : await compositeOnKey(png, look.key);
+    const sourceBytes = originalPath && !input.forceKeyComposite ? new Uint8Array(readFileSync(originalPath)) : await compositeOnNeutral(png);
     if (version.source === "upload" && routeAudience(input.actor).band === "teen") {
       const screened = await prepareEditSource({ audience: routeAudience(input.actor), bytes: sourceBytes, generated: false, text: instruction });
       if (!screened.ok) throw Object.assign(new Error(screened.line), { status: screened.status });
@@ -177,7 +191,7 @@ export async function startLookSheet(input: { actor: PersonRow; companionId: str
     if (!described.card.text) throw Object.assign(new Error(LOOK_PICTURE_UNREAD_LINE), { status: 400 });
     const sheet = { views: { left: null, right: null, mouth: null }, card: described.card, key, state: "making" as const, approved_by: null, approved_at: null };
     updateSheet(input.companionId, sheet);
-    const originalPath = versionOriginalPath(input.companionId, version.id), sourceBytes = originalPath ? new Uint8Array(readFileSync(originalPath)) : await compositeOnKey(png, key), instruction = SHEET_VIEWS[0]!.prompt.replaceAll("<key>", key);
+    const originalPath = versionOriginalPath(input.companionId, version.id), sourceBytes = originalPath ? new Uint8Array(readFileSync(originalPath)) : await compositeOnNeutral(png), instruction = SHEET_VIEWS[0]!.prompt.replaceAll("<key>", key);
     const art = resolveCompanionEdit();
     const form = editForm(sourceBytes, instruction, Boolean(originalPath)); form.append("model", art.model);
     const submitted = await submitEdit(form);
@@ -231,15 +245,15 @@ export async function pollLookJob(id: string, actor: PersonRow, companionId: str
           if (wasCancelled()) return;
           const checked = await checkCompanionArt(job.companionId, actor, [{ label: `Candidate ${index + 1}`, bytes: images[index]! }]);
           if (!checked.ok) { withheld.push(...checked.reasons); continue; }
-          let picture = job.sourceVersion ? images[index]! : await keyOut(images[index]!, job.key);
+          let picture = job.sourceVersion ? images[index]! : await cutOut(actor, images[index]!, job.key);
           let label = job.sourceVersion ? (job.instruction ?? "Edited picture").slice(0, 60) : `Candidate ${index + 1}`;
           if (job.sourceVersion) {
             const meta = await sharp(picture).metadata();
-            if (!meta.hasAlpha) picture = await keyOut(picture, job.key);
+            if (!meta.hasAlpha) picture = await cutOut(actor, picture, job.key);
             else {
               // If the edit came back opaque, key it; transparent results retain their alpha.
               const stats = await sharp(picture).ensureAlpha().stats();
-              if ((stats.channels[3]?.min ?? 255) === 255) picture = await keyOut(picture, job.key);
+              if ((stats.channels[3]?.min ?? 255) === 255) picture = await cutOut(actor, picture, job.key);
             }
           }
           const rgba = await sharp(picture).ensureAlpha().raw().toBuffer({ resolveWithObject: true });
@@ -278,7 +292,7 @@ async function pollSheetJob(id: string, job: SheetJob, actor: PersonRow, compani
     } else if (!job.finalising) job.finalising = (async () => {
       const view = SHEET_VIEWS[job.index]!, image = await fetchPicture(job.stackJob, 0), look = readLook(companionId), key = look.sheet?.key ?? look.key, sourceVersion = look.versions.find((item) => item.id === look.rest);
       await requireCompanionPictureOk(companionId, actor, `The ${view.slot === "left" || view.slot === "right" ? "side" : "mouth-open"} view`, image);
-      let keyedOut = await keyOut(image, key); keyedOut = await normalizePicture(keyedOut, { removeBackground: async (bytes) => bytes });
+      let keyedOut = await cutOut(actor, image, key); keyedOut = await normalizePicture(keyedOut, { removeBackground: async (bytes) => bytes });
       const reported = current.data.find((picture) => typeof picture.model === "string")?.model ?? null;
       job.modelReported = reported;
       if (reported && reported !== job.model) throw new Error(COMPANION_MODEL_MISMATCH_LINE);
@@ -289,7 +303,7 @@ async function pollSheetJob(id: string, job: SheetJob, actor: PersonRow, compani
       job.index++;
       if (job.index >= SHEET_VIEWS.length) { const doneLook = readLook(companionId); if (doneLook.sheet) updateSheet(companionId, { ...doneLook.sheet, state: "approved", approved_by: actor.displayName, approved_at: new Date().toISOString() }); job.state = "done"; job.percent = 100; activeByCompanion.delete(companionId); return; }
       const restPath = versionPath(companionId, look.rest!); if (!restPath) throw new Error("The rest picture could not be found. Choose it again and retry the sheet.");
-      const rest = new Uint8Array(readFileSync(restPath)), originalPath = versionOriginalPath(companionId, look.rest!), sourceBytes = originalPath ? new Uint8Array(readFileSync(originalPath)) : await compositeOnKey(rest, key), instruction = SHEET_VIEWS[job.index]!.prompt.replaceAll("<key>", key);
+      const rest = new Uint8Array(readFileSync(restPath)), originalPath = versionOriginalPath(companionId, look.rest!), sourceBytes = originalPath ? new Uint8Array(readFileSync(originalPath)) : await compositeOnNeutral(rest), instruction = SHEET_VIEWS[job.index]!.prompt.replaceAll("<key>", key);
       const nextForm = editForm(sourceBytes, instruction, Boolean(originalPath)); nextForm.append("model", resolveCompanionEdit().model);
       job.promptHash = promptHash(instruction);
       job.stackJob = (await submitEdit(nextForm)).job; job.state = "queued";

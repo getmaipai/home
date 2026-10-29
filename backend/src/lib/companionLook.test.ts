@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { existsSync, readFileSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import sharp from "sharp";
-import { addVersion, approveSheet, chooseKeyColour, compositeOnKey, deleteLook, deleteVersion, describeCharacter, dominantColours, keyOut, lookPromptFor, normalizePicture, readLook, setRest, updateSheet, versionOriginalPath, versionPath, KEY_ALPHA_END, KEY_ALPHA_START, __setCharacterCompletionForTests, __setCharacterPictureCapabilityForTests, LOOK_LIMIT_LINE } from "@/lib/companionLook";
+import { addVersion, approveSheet, borderLooksKeyed, chooseKeyColour, compositeOnKey, deleteLook, deleteVersion, describeCharacter, dominantColours, keyOut, lookPromptFor, normalizePicture, readLook, setRest, updateSheet, versionOriginalPath, versionPath, KEY_ALPHA_END, KEY_ALPHA_START, __setCharacterCompletionForTests, __setCharacterPictureCapabilityForTests, LOOK_LIMIT_LINE } from "@/lib/companionLook";
 import { createHouseholdCompanion, deleteHouseholdCompanion } from "@/lib/householdCompanions";
 import { loadManifestOnly } from "@/lib/plugins";
 import { __setStackClientForTests } from "@/lib/stackEngine";
@@ -279,5 +279,14 @@ describe("companion look store", () => {
     updateSheet(id, { views: { left: view.id, right: null, mouth: null }, card: { text: "A character description with enough words.", colours: [], species: "fox" }, key: "#00FF00", state: "approved", approved_by: "Reviewer", approved_at: new Date().toISOString() });
     expect(deleteVersion(id, view.id)).toBe(true);
     expect(readLook(id).sheet).toMatchObject({ views: { left: null }, state: "needs_review", approved_by: null });
+  });
+});
+
+describe("borderLooksKeyed", () => {
+  const solid = (r: number, g: number, b: number) => sharp({ create: { width: 64, height: 64, channels: 3, background: { r, g, b } } }).png().toBuffer();
+  test("is true when the outer ring is the key colour and false when the model drew its own backdrop", async () => {
+    expect(await borderLooksKeyed(new Uint8Array(await solid(0, 255, 0)), "#00FF00")).toBe(true);
+    expect(await borderLooksKeyed(new Uint8Array(await solid(150, 165, 160)), "#00FF00")).toBe(false);
+    expect(await borderLooksKeyed(new Uint8Array(await solid(150, 165, 160)), "#FF00FF")).toBe(false);
   });
 });

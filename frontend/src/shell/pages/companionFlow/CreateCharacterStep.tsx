@@ -109,6 +109,11 @@ export function CreateCharacterStep({ creating, companionId, initialName, onDraf
     placing.current.seq++;
     setSourceId(id); setShownId(id); setFrame(DEFAULT_FRAME); setBaked(DEFAULT_FRAME);
   }
+  /** Choosing Keep as is again shows the photo as it was uploaded. */
+  function chooseStyle(id: string) {
+    setStyle(id);
+    if (id === "keep" && mode === "upload" && uploadedId) choose(uploadedId);
+  }
   function chooseMode(next: string) {
     if (next !== "describe" && next !== "upload") return;
     setMode(next); setStyle(next === "upload" ? "keep" : "cartoon");
@@ -220,18 +225,18 @@ export function CreateCharacterStep({ creating, companionId, initialName, onDraf
           {tiles.length ? <div className="grid grid-cols-4 gap-3">
             {tiles.map((tile) => <CharacterTile key={tile.id} variant="picture" name={tile.label} selected={style === tile.id}
               media={tile.custom ? <Palette className="size-6 text-muted-foreground" aria-hidden="true" /> : tile.id === "keep" ? <User className="size-6 text-muted-foreground" aria-hidden="true" /> : <Sparkles className="size-6 text-muted-foreground" aria-hidden="true" />}
-              onSelect={() => { if (!locked) setStyle(tile.id); }} />)}
+              onSelect={() => { if (!locked) chooseStyle(tile.id); }} />)}
           </div> : <p className="text-sm text-muted-foreground">{stylesQuery.isError ? flowErrorText(stylesQuery.error) : lookQuery.isError ? flowErrorText(lookQuery.error) : "Loading the styles"}</p>}
           {customSelected ? <Input aria-label="Custom style" shape="pill" placeholder="Type a style, for example paper cut-out" maxLength={120} value={customStyle} disabled={locked} onChange={(e) => setCustomStyle(e.target.value)} /> : null}
         </DialogSection>
         <div className="flex flex-col gap-2">
-          {mode === "upload" && style === "keep" ? null : <Button shape="pill" width="full" disabled={!canGenerate} aria-busy={makingCharacter} onClick={() => void generate()}>{makingCharacter ? <><Spinner className="animate-spin" aria-hidden="true" />Making your character...</> : <><Sparkles aria-hidden="true" />Generate Character</>}</Button>}
+          <Button shape="pill" width="full" disabled={!canGenerate || (mode === "upload" && style === "keep")} aria-busy={makingCharacter} onClick={() => void generate()}>{makingCharacter ? <><Spinner className="animate-spin" aria-hidden="true" />Making your character...</> : <><Sparkles aria-hidden="true" />Generate Character</>}</Button>
           {look && !look.can_generate && look.generate_reason ? <p className="text-sm text-muted-foreground">{look.generate_reason}</p> : null}
           {error ? <p role="alert" className="text-sm text-destructive">{error}</p> : null}
         </div>
       </div>
       <DialogSection title="Character Preview">
-        <GenerationStage generating={generating} shape="panel" frame="strong" transparency="checker" aspectRatio="1 / 1">
+        <GenerationStage generating={generating || preparingPhoto || busyKind === "complete"} shape="panel" frame="strong" transparency="checker" aspectRatio="1 / 1">
           {picture
             ? <DraggablePicture src={picture.url} alt={`${name.trim() || "Your character"}, preview`} frame={frame} baked={baked} disabled={placeLocked} onFrameChange={place} />
             : <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 p-6 text-center text-muted-foreground">
@@ -241,6 +246,9 @@ export function CreateCharacterStep({ creating, companionId, initialName, onDraf
           {generating ? <div className="absolute inset-x-4 bottom-4 flex flex-col gap-2 rounded-2xl bg-background/90 p-3">
             <p className="text-center text-sm text-foreground">{job?.label ?? "Making your character"}</p>
             <Progress mode="determinate" value={job?.percent ?? 0} label={job?.label ?? "Making your character"} />
+          </div> : preparingPhoto || busyKind === "complete" ? <div className="absolute inset-x-4 bottom-4 flex items-center justify-center gap-2 rounded-2xl bg-background/90 p-3">
+            <Progress mode="spinner" label={preparingPhoto ? "Getting your photo ready" : "Filling in the parts that were cut off"} />
+            <p className="text-sm text-foreground">{preparingPhoto ? "Getting your photo ready. This can take up to a minute." : "Filling in the parts that were cut off. This can take a minute."}</p>
           </div> : null}
         </GenerationStage>
         <p className="text-sm text-muted-foreground">{picture ? "Drag the character to move it. Use the mouse wheel to zoom. Change the description or style and generate again until you're happy." : "Change the description or style and generate again until you're happy with your character."}</p>

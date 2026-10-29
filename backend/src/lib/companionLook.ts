@@ -190,6 +190,24 @@ export function keyOutRgbaBuffer(pixels: Uint8Array, width: number, height: numb
   return pixels;
 }
 
+/** The backdrop a transparent picture is flattened onto before the picture model edits it: neutral, so no colour cast leaks into the result. */
+const EDIT_BACKDROP = { r: 217, g: 217, b: 217 };
+export async function compositeOnNeutral(png: Uint8Array): Promise<Uint8Array> {
+  return new Uint8Array(await sharp(png, { limitInputPixels: 40_000_000, failOn: "error" }).flatten({ background: EDIT_BACKDROP }).png().toBuffer());
+}
+
+/** True when most of the picture's outer ring is the key colour, so keying that colour out is safe. A model that ignored the key and drew its own background would be tinted by it. */
+export async function borderLooksKeyed(png: Uint8Array, keyHex: string): Promise<boolean> {
+  const key = keyRgb(keyHex), decoded = await sharp(png, { limitInputPixels: 40_000_000, failOn: "error" }).ensureAlpha().raw().toBuffer({ resolveWithObject: true });
+  const { width, height } = decoded.info; let near = 0, total = 0;
+  for (let y = 0; y < height; y += 2) for (let x = 0; x < width; x += 2) {
+    if (x >= KEY_BACKGROUND_RING && x < width - KEY_BACKGROUND_RING && y >= KEY_BACKGROUND_RING && y < height - KEY_BACKGROUND_RING) continue;
+    const offset = (y * width + x) * 4; total++;
+    if (Math.hypot(decoded.data[offset]! - key[0], decoded.data[offset + 1]! - key[1], decoded.data[offset + 2]! - key[2]) < 110) near++;
+  }
+  return total > 0 && near / total >= 0.6;
+}
+
 /** Makes a transparent look picture opaque on the selected key for a reference edit. */
 export async function compositeOnKey(png: Uint8Array, keyHex: string): Promise<Uint8Array> {
   const [r, g, b] = keyRgb(keyHex);

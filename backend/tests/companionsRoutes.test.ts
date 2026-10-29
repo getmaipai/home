@@ -457,7 +457,7 @@ describe("household companion routes", () => {
     let submitted: FormData | undefined;
     __setPicturesFetchForTests((async (input, init) => { if (String(input).endsWith("/v1/images/edits") && init?.method === "POST") { submitted = init.body as FormData; return Response.json({ job: "key-edit-job" }, { status: 202 }); } return new Response("Not found", { status: 404 }); }) as typeof fetch);
     const edit = await request(`companions/${id}/states/happy/keyframe/edit`, adult, "POST", { instruction: "Raise one paw" }); expect(edit.status).toBe(202);
-    const sentPixels = await sharp(new Uint8Array(await (submitted!.get("image") as File).arrayBuffer())).ensureAlpha().raw().toBuffer(), currentPixels = await sharp(current).flatten({ background: { r: 0, g: 255, b: 0 } }).ensureAlpha().raw().toBuffer();
+    const sentPixels = await sharp(new Uint8Array(await (submitted!.get("image") as File).arrayBuffer())).ensureAlpha().raw().toBuffer(), currentPixels = await sharp(current).flatten({ background: { r: 217, g: 217, b: 217 } }).ensureAlpha().raw().toBuffer();
     expect(sentPixels).toEqual(currentPixels);
     expect((await request(`companions/${id}/states/happy/keyframe`, admin)).status).toBe(200); expect((await request(`companions/${id}/states/happy/keyframe`, other)).status).toBe(403);
     const teenMade = createHouseholdCompanion({ ...fixture(), display_name: "Teen key edit", audience: "teen" }, { display_name: "Teen Author", person_id: "key-edit-teen" }); if (!teenMade.ok) throw new Error(teenMade.error);
@@ -1240,7 +1240,7 @@ describe("household companion routes", () => {
     expect([metadata.width, metadata.height]).toEqual([1024, 1024]); expect(metadata.hasAlpha).toBe(true); expect(alpha.channels[3]?.min).toBe(0); expect(resultVersion.steps).toContain("place"); expect(responseBody.clipped).toContain("bottom"); expect(resultVersion.clipped).toContain("bottom");
   });
 
-  test("complete sends the clipped picture on key colour and stores a normalized edit", async () => {
+  test("complete sends the clipped picture on a neutral backdrop and stores a normalized edit", async () => {
     const adult = addPerson("complete-author", "adult"), made = createHouseholdCompanion({ ...fixture(), display_name: "Complete fixture" }, { display_name: "Author", person_id: "complete-author" }); if (!made.ok) throw new Error(made.error);
     const sourcePng = await clippedPng("bottom"), returned = await transparentPng(); __setPictureStatusForTests(readyStatusForTests()); __setAgeCheckRunnerForTests(async (images) => images.map(() => AGE_OK));
     const posted: Array<{ instruction: string; image: Uint8Array }> = [];
@@ -1253,8 +1253,8 @@ describe("household companion routes", () => {
     }) as typeof fetch);
     const source = addVersion(made.value.id, sourcePng, { source: "upload", label: "Cut picture", width: 1024, height: 1024, from: null, style: "anime", clipped: ["bottom"] });
     const response = await request(`companions/${made.value.id}/look/complete`, adult, "POST", { version_id: source.id }); expect(response.status).toBe(202);
-    const job = (await response.json() as { job: string }).job; expect(posted[0]?.instruction).toContain("at the bottom"); expect(posted[0]?.instruction).toContain("keep everything already shown exactly as it is");
-    const keyed = await sharp(posted[0]!.image).raw().toBuffer({ resolveWithObject: true }); expect(keyed.info.width).toBe(1024); expect(keyed.info.height).toBe(1024); expect(keyed.data[1]).toBeGreaterThan(240);
+    const job = (await response.json() as { job: string }).job; expect(posted[0]?.instruction).toContain("at the bottom"); expect(posted[0]?.instruction).toContain("Keep everything already shown exactly as it is");
+    const keyed = await sharp(posted[0]!.image).raw().toBuffer({ resolveWithObject: true }); expect(keyed.info.width).toBe(1024); expect(keyed.info.height).toBe(1024); expect(keyed.data[1]).toBeGreaterThan(200);
     const poll = await request(`companions/${made.value.id}/look/jobs/${job}`, adult); const state = await poll.json() as { state: string; versions: Array<{ id: string }> }; expect(state.state).toBe("done");
     const saved = readLook(made.value.id).versions.find((version) => version.id === state.versions[0]?.id)!;
     const resultPath = join(householdCompanionFolder(made.value.id)!, "look", `${saved.id}.png`), metadata = await sharp(readFileSync(resultPath)).metadata(), stats = await sharp(readFileSync(resultPath)).stats();

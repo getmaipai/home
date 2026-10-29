@@ -398,7 +398,7 @@ export interface CompanionStateRow {
   status?: "missing" | "ready" | "waiting" | "Needs another try"; status_label?: string;
 }
 export interface CompanionStates {
-  sheet_ready: boolean; start_ready: boolean; start_reason?: string; key: string; states: CompanionStateRow[]; run: { job: string; label: string; percent: number } | null;
+  sheet_ready: boolean; start_ready: boolean; start_reason?: string; busy?: { kind: "sheet" | "picture"; label: string; percent: number } | null; key: string; states: CompanionStateRow[]; run: { job: string; label: string; percent: number } | null;
   counts: { approved: number; total: number; required_missing: string[] };
 }
 export interface CompanionAppearance {
