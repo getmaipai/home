@@ -4,3 +4,6 @@ export * from "./tools";
 export * from "./subject";
 export * from "./fit";
 export * from "./prepare";
+export * from "./instructions";
+export * from "./backdrop";
+export * from "./fill";

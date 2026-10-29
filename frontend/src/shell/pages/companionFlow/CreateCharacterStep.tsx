@@ -10,6 +10,7 @@ import { GenerationStage } from "@maipai/ui/src/elements/generation-stage";
 import { Progress } from "@maipai/ui/src/primitives/Progress";
 import { getIcon } from "@maipai/ui/src/icons";
 import { api, ApiError, type CompanionLook, type CompanionLookJob } from "@/lib/api";
+import { useFillCutOff } from "@/lib/imaging/useFillCutOff";
 import { flowErrorText } from "@/shell/pages/companionFlow/errors";
 import { DraggablePicture } from "@/shell/pages/companionFlow/DraggablePicture";
 import { DEFAULT_FRAME, type PictureFrame } from "@/shell/pages/companionFlow/PreviewControls";
@@ -40,7 +41,6 @@ export function CreateCharacterStep({ creating, companionId, initialName, onDraf
   const [busyKind, setBusyKind] = useState<"generate" | "upload" | "prepare" | "complete" | "approve" | null>(null);
   const [uploadedId, setUploadedId] = useState<string | null>(null);
   const [thumb, setThumb] = useState<string | null>(null);
-  const filled = useRef<Set<string>>(new Set());
   const [error, setError] = useState("");
   const [previewError, setPreviewError] = useState("");
   const placing = useRef<{ timer: ReturnType<typeof setTimeout> | null; seq: number }>({ timer: null, seq: 0 });
@@ -98,11 +98,7 @@ export function CreateCharacterStep({ creating, companionId, initialName, onDraf
   const canGenerate = ready && !locked && (look?.can_generate ?? true);
 
   // A picture that is cut off at an edge has the missing parts drawn in, once, without asking.
-  useEffect(() => {
-    if (!picture?.clipped?.length || locked || picture.id === look?.rest || filled.current.has(picture.id)) return;
-    filled.current.add(picture.id); void complete();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [picture, locked]);
+  useFillCutOff(picture, { skip: locked || picture?.id === look?.rest, fill: () => void complete() });
   /** A new picture (made, uploaded or reopened) starts centred; any pending move for the old one is dropped. */
   function choose(id: string) {
     if (placing.current.timer) { clearTimeout(placing.current.timer); placing.current.timer = null; }

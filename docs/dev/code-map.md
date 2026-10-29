@@ -432,9 +432,12 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/imageSimilarity/geometry.ts` | MIN_INLIERS, MIN_AGREEMENT, __setOpencvLoaderForTests, warmGeometry, geometricFeatures, verifyPair |
 | `backend/src/lib/imageSimilarity/index.ts` | compare |
 | `backend/src/lib/imageUpload.ts` | MAX_CHAT_IMAGE_PIXELS, MAX_CHAT_IMAGE_EDGE, cleanChatImage, chatImageThumbnail, cleanChatImageFile |
+| `backend/src/lib/imaging/backdrop.ts` | compositeOnNeutral, borderLooksKeyed, cutOutBackground |
 | `backend/src/lib/imaging/crop.ts` | cropToFrame |
+| `backend/src/lib/imaging/fill.ts` | planFillCutOff |
 | `backend/src/lib/imaging/fit.ts` | fitToFrame |
 | `backend/src/lib/imaging/focal.ts` | __setNewsFocalForTests, focalCentre, focalPointOf |
+| `backend/src/lib/imaging/instructions.ts` | FACE_AND_BODY, restyleInstruction, fillCutOffInstruction |
 | `backend/src/lib/imaging/prepare.ts` | preparePicture |
 | `backend/src/lib/imaging/subject.ts` | clippedEdges, subjectBounds, findSubject |
 | `backend/src/lib/imaging/targets.ts` | imagingTargets |

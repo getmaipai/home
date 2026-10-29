@@ -2,9 +2,10 @@ import { ArtWithheldError, checkCompanionArt, requireCompanionPictureOk } from "
 import sharp from "sharp";
 import media from "@maipai/spec/vocab/companion-media.json";
 import { capOfStyle, type LookStyleId } from "@/lib/companionLookStyles";
-import { addVersion, borderLooksKeyed, chooseKeyColour, compositeOnNeutral, describeCharacter, keyOut, lookPromptFor, normalizePicture, readLook, updateSheet, versionOriginalPath, versionPath } from "@/lib/companionLook";
+import { addVersion, chooseKeyColour, describeCharacter, keyOut, keyRgb, lookPromptFor, normalizePicture, readLook, updateSheet, versionOriginalPath, versionPath } from "@/lib/companionLook";
 import { clippedEdges } from "@/lib/imaging/subject";
 import { removeBackground } from "@/lib/imaging/tools";
+import { compositeOnNeutral, cutOutBackground } from "@/lib/imaging/backdrop";
 import { routeAudience } from "@/lib/pictures/audience";
 import { prepareEditSource } from "@/lib/pictures/editSources";
 import { laneOf } from "@/lib/pictures/lane";
@@ -64,11 +65,7 @@ export function runningSheetJob(companionId: string): string | null {
   return id && job && !(["done", "failed", "cancelled"] as string[]).includes(job.state) ? id : null;
 }
 
-/** Takes the background off a picture the model drew: keyed out when the model kept the key colour, otherwise lifted out by the background remover so its own backdrop never tints the character. */
-async function cutOut(actor: PersonRow, png: Uint8Array, key: string): Promise<Uint8Array> {
-  if (await borderLooksKeyed(png, key)) return keyOut(png, key);
-  try { return await removeBackground(actor, png); } catch { return png; }
-}
+const cutOut = (actor: PersonRow, png: Uint8Array, key: string) => cutOutBackground(png, { remove: (bytes) => removeBackground(actor, bytes), key: { rgb: keyRgb(key), strip: (bytes) => keyOut(bytes, key) } });
 
 export function __clearCompanionLookJobsForTests(): void { jobs.clear(); sheetJobs.clear(); activeByCompanion.clear(); startingCompanions.clear(); }
 /** What a picture job is doing for this companion right now, for screens that must not offer a second one. */

@@ -38,6 +38,8 @@ All picture work runs through one shared module, `backend/src/lib/imaging/` (reu
 4. **Find the subject**: the saliency focal point from the News auto zoom (FocalNet), refined by the alpha bounds once the background is gone.
 5. **Fit to frame**: centre the subject, zoom to fill the frame with the spec margin (1024 px, 12 percent margin, `companion-media.json`), pad with transparency.
 
+**Shared imaging pieces (UI-3S-01g).** Nothing picture-related is buried in the wizard. `backend/src/lib/imaging/` holds fill-in of cut-off parts (`planFillCutOff`, `fillCutOffInstruction`), the face and whole-body wording every edit carries (`FACE_AND_BODY`, `restyleInstruction`), the neutral edit backdrop (`compositeOnNeutral`) and the tint-free cut-out (`cutOutBackground`, `borderLooksKeyed`). `frontend/src/lib/imaging/useFillCutOff.ts` is the matching hook. The chat image editor calls the same functions; the companion code only supplies its own job runner.
+
 **Reuse check (the module takes over, it does not add a fourth copy).** Existing callers of the Stack's image tools are pointed at `imaging/`: `removePictureBackground` (`routes/companions.ts`, already a real `isnet` call on uploads), `runPictureTool` (`pictures/people.ts`) and `startEdit` (`imageEdit.ts`). The fit-to-frame step replaces `normalizePicture` (`companionLook.ts`), and the missing-tool check is `editToolsStatus` (`imageEdit.ts`), reused. The no-op background remover today sits only in the paths for generated candidates and sheet views (`companionLookJobs.ts`); uploads already remove the background. Each caller moves in IMG-PIPE-01 and its tests stay green.
 
 Rules for the module:
