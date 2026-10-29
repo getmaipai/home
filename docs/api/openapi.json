@@ -61299,7 +61299,7 @@
             }
           },
           "409": {
-            "description": "A clip run is busy, the character sheet is not approved, a keyframe is missing, or the companion has no starting picture.",
+            "description": "A clip run is busy, the character sheet is not approved, or the companion has no starting picture.",
             "content": {
               "application/json": {
                 "schema": {
@@ -61311,8 +61311,7 @@
                     "code": {
                       "type": "string",
                       "enum": [
-                        "no_original",
-                        "needs_keyframe"
+                        "no_original"
                       ]
                     }
                   },
@@ -61441,7 +61440,7 @@
             }
           },
           "409": {
-            "description": "A clip run is busy, the character sheet is not approved, a keyframe is missing, or the companion has no starting picture.",
+            "description": "A clip run is busy, the character sheet is not approved, or the companion has no starting picture.",
             "content": {
               "application/json": {
                 "schema": {
@@ -61453,8 +61452,7 @@
                     "code": {
                       "type": "string",
                       "enum": [
-                        "no_original",
-                        "needs_keyframe"
+                        "no_original"
                       ]
                     }
                   },
