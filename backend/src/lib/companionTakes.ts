@@ -3,7 +3,7 @@ import { join } from "node:path";
 import media from "@maipai/spec/vocab/companion-media.json";
 import type { PersonRow } from "@/types";
 import { readLook, versionOriginalPath, versionPath } from "@/lib/companionLook";
-import { addTake, companionHasFinishingJob, finishTake, readStates, recordTakeFailure, recordTakeModelReported, setMotion, setTakeSeed, takePath, TAKE_LIMIT_LINE, keyframePath, writeKeyframe } from "@/lib/companionStates";
+import { addTake, companionHasFinishingJob, finishTake, readStates, recordTakeFailure, recordTakeModelReported, setMotion, setTakeSeed, takePath, TAKE_LIMIT_LINE, keyframePath, writeKeyframe, readKeyframeMeta } from "@/lib/companionStates";
 import { existsSync } from "node:fs";
 import { routeAudience } from "@/lib/pictures/audience";
 import { videoDenial, VIDEO_DENIAL_LINE, VIDEO_NOT_HERE_LINE, refuseVideoPrompt, VIDEO_REFUSAL_LINE } from "@/lib/videos/policy";
@@ -92,7 +92,7 @@ async function runTakes(run: TakeRun, count: number, actor: PersonRow, motionOve
           let done: Awaited<ReturnType<typeof submitVideo>>["done"] = null;
           for (let attempt = 0; attempt < 2; attempt++) {
             try {
-              const submitted = await submitVideo({ prompt, negative_prompt: TAKE_NEGATIVE_PROMPT, size: `${media.generate.width}x${media.generate.height}`, seconds, model: stackVideoModel(art), seed, image: pictureB64, image_source: "generated", audience: "all-ages", timeout_ms: 1 });
+              const submitted = await submitVideo({ prompt, negative_prompt: TAKE_NEGATIVE_PROMPT, size: `${media.generate.width}x${media.generate.height}`, seconds, model: stackVideoModel(art), seed, image: pictureB64, image_source: sheet.originalPath || readKeyframeMeta(run.companionId, state)?.model ? "generated" : "uploaded", audience: "all-ages", timeout_ms: 1 });
               stackJob = submitted.job; run.stackJob = stackJob; done = submitted.done;
               const deadline = Date.now() + 15 * 60_000;
               while (!done) {
@@ -184,7 +184,8 @@ export async function startStateTakes(input: { actor: PersonRow; companionId: st
   }
   // The screen makes each missing keyframe first (one quick picture job each, through the keyframe route) and then asks again.
   if (missingKeyframes.length) throw Object.assign(new Error(TAKE_NEEDS_KEYFRAME_LINE), { status: 409, code: "needs_keyframe", missing: missingKeyframes });
-  if (!sheet.originalPath) throw Object.assign(new Error(TAKE_NO_ORIGINAL_LINE), { status: 409, code: "no_original" });
+  // An adult may animate a photo kept as it is (owner ruling 2026-10-25, models decide for adults); a teen or child may start only from a picture the picture model made.
+  if (!sheet.originalPath && audience.band !== "adult") throw Object.assign(new Error(TAKE_NO_ORIGINAL_LINE), { status: 409, code: "no_original" });
   const engineReady = await videoEngineReady(), engineStatus = await videoEngineStatus();
   if (!engineReady && (!engineStatus || engineStatus.available === false || engineStatus.state === "unsupported" || engineStatus.state === "off")) throw Object.assign(new Error(VIDEO_NOT_HERE_LINE), { status: 503 });
   if (companionHasTakeRun(input.companionId) || companionHasFinishingJob(input.companionId) || activeLookJob(input.companionId)) throw Object.assign(new Error(TAKE_RUN_BUSY_LINE), { status: 409 });

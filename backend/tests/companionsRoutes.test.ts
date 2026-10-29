@@ -873,13 +873,13 @@ describe("household companion routes", () => {
     const quickMissing = await request(`companions/${id}/states/idle/generate`, adult, "POST", { count: 1 }); expect(quickMissing.status).toBe(503); expect((await quickMissing.json() as { error: string }).error).toContain("standard video model"); expect(calls).toBe(0);
   });
 
-  test("blocks video start without a Stack original before calling the Stack", async () => {
+  test("an adult may start a video from a photo kept as it is, and the Stack is told it is an upload", async () => {
     const adult = addPerson("person-state-no-original", "adult"), created = createHouseholdCompanion({ ...fixture(), display_name: "Upload only rest" }, { display_name: "Author", person_id: "person-state-no-original" }); if (!created.ok) throw new Error(created.error); const id = created.value.id;
     const rest = addVersion(id, await transparentPng(), { source: "upload", label: "rest", width: 1024, height: 1024, from: null }); setRest(id, rest.id); updateSheet(id, { views: { left: null, right: null, mouth: null }, card: { text: "A red fox", species: "fox", colours: ["#CC3322"] }, key: "#00FF00", state: "needs_review", approved_by: null, approved_at: null }); approveSheet(id, "Author");
     let calls = 0; __setVideosFetchForTests((async () => { calls++; return new Response("unexpected", { status: 500 }); }) as unknown as typeof fetch);
     const response = await request(`companions/${id}/states/idle/generate`, adult, "POST", { count: 1 });
-    expect(response.status).toBe(409); expect(await response.json()).toEqual({ error: 'The video model can only start from a picture the picture model made. Use "Change it" on this picture to make a version with the picture model, then pick that one as the starting picture.', code: "no_original" }); expect(calls).toBe(0);
-    const look = await (await request(`companions/${id}/look`, adult)).json() as { start_ready: boolean; start_reason?: string }; expect(look.start_ready).toBe(false); expect(look.start_reason).toContain("Use \"Change it\"");
+    expect((await response.json() as { code?: string }).code).not.toBe("no_original");
+    const look = await (await request(`companions/${id}/look`, adult)).json() as { start_ready: boolean; start_reason?: string }; expect(look.start_ready).toBe(true); expect(look.start_reason).toBeUndefined();
   });
 
   test("keeps one companion run active and cancels its live Stack video job", async () => {
