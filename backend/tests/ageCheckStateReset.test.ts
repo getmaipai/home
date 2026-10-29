@@ -29,7 +29,7 @@ describe("ageCheck module state is restored after every test", () => {
       }
     };
     walk(here);
-    // ageCheck.test.ts sets null inside its own describe to reach the real path and is restored by the preload afterEach: allowed there only.
-    expect(offenders.filter((n) => n !== "ageCheck.test.ts")).toEqual([]);
+    // ageCheck.test.ts and pictureReader.test.ts set null inside a test to reach the real path; the preload afterEach restores it: allowed there only.
+    expect(offenders.filter((n) => n !== "ageCheck.test.ts" && n !== "pictureReader.test.ts")).toEqual([]);
   });
 });
