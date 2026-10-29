@@ -161,7 +161,12 @@ export const commandsNode: Node<CommandsInput, CommandsOutput> = async (state, i
           continue;
         }
       }
-      const args = captured ? { [firstArgName(manifest)]: captured } : {};
+      const args = id === "alarm"
+        ? {
+            action: pattern.startsWith("cancel ") ? "cancel" : pattern.startsWith("what ") ? "list" : "set",
+            expression: captured,
+          }
+        : captured ? { [firstArgName(manifest)]: captured } : {};
       const result = await runPlugin(id, state.actor, args, { id: state.turnId, conversationId: state.conversationId });
       // COMMAND-FAIL-01 (dev.md "The knowledge hijack" (b)): a failed
       // pattern outcome used to return `matched: true` with the raw

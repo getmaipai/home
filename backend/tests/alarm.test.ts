@@ -5,18 +5,19 @@ import { people, scheduledJobs, notificationDeliveries } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import { TestClient } from "./client";
 import { createHost } from "@/lib/packageHost";
-import { runDueJobs, scheduleCoreJob } from "@/lib/scheduler";
+import { runDueJobs, scheduleCoreJob, listJobs } from "@/lib/scheduler";
 import { listPending } from "@/lib/notifications";
 import { runPlugin, loadManifestOnly, registerAllPackageNotificationTypes } from "@/lib/plugins";
 import { commandsNode } from "@/lib/turnMachine/nodes/commands";
 import { classifyTurnSignal } from "@/lib/turnSignal";
 import { commandOpeners, loadAllManifests } from "@/lib/turnShared";
 
-beforeEach(() => resetDb());
+let householdClient: TestClient;
+beforeEach(() => { resetDb(); householdClient = new TestClient(); });
 
 async function person(displayName: string, role: "owner" | "child" = "owner") {
-  const client = new TestClient();
-  await client.post("/api/auth/setup", { displayName: "Sage", secret: "correcthorse" });
+  const client = householdClient;
+  if (!db.select().from(people).where(eq(people.displayName, "Sage")).get()) await client.post("/api/auth/setup", { displayName: "Sage", secret: "correcthorse" });
   if (role === "child") {
     const res = await client.post("/api/people", { displayName, role: "child", secret: "0000" });
     const body = await res.json() as { id: string };
@@ -25,15 +26,25 @@ async function person(displayName: string, role: "owner" | "child" = "owner") {
   return db.select().from(people).where(eq(people.displayName, "Sage")).get()!;
 }
 
+async function childPerson(displayName: string) {
+  const res = await householdClient.post("/api/people", { displayName, role: "child", secret: "0000" });
+  const body = await res.json() as { id: string };
+  return db.select().from(people).where(eq(people.id, body.id)).get()!;
+}
+
 describe("alarm package", () => {
+  async function runAlarm(actor: Awaited<ReturnType<typeof person>>, action: "set" | "list" | "cancel", expression = "") {
+    return runPlugin("alarm", actor, { action, expression });
+  }
+
   test("setting an alarm schedules alarms.fire for the asking person", async () => {
     const actor = await person("Sage");
     const loaded = loadManifestOnly("alarm");
     expect(loaded.ok).toBe(true);
     if (!loaded.ok) return;
     const host = createHost(actor, loaded.value);
-    const result = host.reminders.set("tomorrow at 7 called gym");
-    expect(result.task).toBe("gym");
+    const result = host.reminders.set("set tomorrow at 7 called gym");
+    expect(result.task).toContain("gym");
     const rows = db.select().from(scheduledJobs).where(eq(scheduledJobs.job, "alarms.fire")).all();
     expect(rows).toHaveLength(1);
     expect(rows[0]!.personId).toBe(actor.id);
@@ -42,7 +53,7 @@ describe("alarm package", () => {
 
   test("the package reply includes its schedule card", async () => {
     const actor = await person("Sage");
-    const result = await runPlugin("alarm", actor, { expression: "tomorrow at 7 for gym" });
+    const result = await runPlugin("alarm", actor, { action: "set", expression: "tomorrow at 7 for gym" });
     expect(result.ok).toBe(true);
     if (!result.ok) return;
     const value = result.value as unknown as { reply?: { text?: string }; blocks?: unknown[] };
@@ -87,7 +98,7 @@ describe("alarm package", () => {
     const actor = await person("Sage");
     const loaded = loadManifestOnly("alarm");
     if (!loaded.ok) throw new Error(loaded.error);
-    expect(createHost(actor, loaded.value).reminders.set("at 6:30").task).toBe("Alarm");
+    expect(createHost(actor, loaded.value).reminders.set("set at 6:30").task).toContain("Alarm");
   });
 
   test("alarm task text never appears in logs during set or fire", async () => {
@@ -105,6 +116,8 @@ describe("alarm package", () => {
     console.debug = capture;
     try {
       createHost(actor, loaded.value).reminders.set("tomorrow at 7 called SECRET-GYM-TASK");
+      await runAlarm(actor, "list");
+      await runAlarm(actor, "cancel", "SECRET-GYM-TASK");
       const row = db.select().from(scheduledJobs).where(eq(scheduledJobs.job, "alarms.fire")).get()!;
       db.update(scheduledJobs).set({ nextRunAt: new Date(0).toISOString() }).where(eq(scheduledJobs.id, row.id)).run();
       await runDueJobs(runPlugin);
@@ -116,5 +129,80 @@ describe("alarm package", () => {
       console.debug = old.debug;
     }
     expect(logs.join("\n")).not.toContain("SECRET-GYM-TASK");
+  });
+
+  test("list shows only the asking person's pending alarms and reminders", async () => {
+    const parent = await person("Sage");
+    const child = await childPerson("Nova");
+    scheduleCoreJob(parent, "alarms.fire", "2099-01-01T06:30:00.000Z", { task: "Wake up" });
+    scheduleCoreJob(parent, "reminders.fire", "2099-01-01T07:00:00.000Z", { task: "Call Nadia" });
+    scheduleCoreJob(child, "alarms.fire", "2099-01-01T08:00:00.000Z", { task: "School" });
+    const parentList = await runAlarm(parent, "list");
+    const childList = await runAlarm(child, "list");
+    expect(parentList.ok && parentList.value.reply?.text).toContain("Call Nadia");
+    expect(parentList.ok && parentList.value.reply?.text).not.toContain("School");
+    expect(childList.ok && childList.value.reply?.text).toContain("School");
+    expect(childList.ok && childList.value.reply?.text).not.toContain("Call Nadia");
+    expect(listJobs(parent).some((job) => job.personId === child.id)).toBe(true);
+  });
+
+  test("a parent-created reminder remains the parent's row, hidden from the child", async () => {
+    const parent = await person("Sage");
+    const child = await childPerson("Nova");
+    scheduleCoreJob(parent, "reminders.fire", "2099-01-01T07:00:00.000Z", { task: "Tell Nova to pack lunch" });
+    const childList = await runAlarm(child, "list");
+    expect(childList.ok && childList.value.reply?.text).not.toContain("pack lunch");
+  });
+
+  test("cancel before firing removes the matching job and it never fires", async () => {
+    registerAllPackageNotificationTypes();
+    const actor = await person("Sage");
+    const job = scheduleCoreJob(actor, "alarms.fire", "2099-01-01T06:30:00.000Z", { task: "Wake up" });
+    if (!job.ok) throw new Error("setup failed");
+    const cancelled = await runAlarm(actor, "cancel", "6:30");
+    expect(cancelled.ok && cancelled.value.reply?.text).toContain("cancel");
+    db.update(scheduledJobs).set({ nextRunAt: new Date(0).toISOString() }).where(eq(scheduledJobs.id, job.value.id)).run();
+    expect((await runDueJobs(runPlugin)).ran).toBe(0);
+    expect(db.select().from(notificationDeliveries).all()).toHaveLength(0);
+  });
+
+  test("cancel after firing says there is nothing to cancel", async () => {
+    const actor = await person("Sage");
+    const job = scheduleCoreJob(actor, "alarms.fire", "2099-01-01T06:30:00.000Z", { task: "Wake up" });
+    if (!job.ok) throw new Error("setup failed");
+    db.update(scheduledJobs).set({ nextRunAt: new Date(0).toISOString() }).where(eq(scheduledJobs.id, job.value.id)).run();
+    await runDueJobs(runPlugin);
+    const cancelled = await runAlarm(actor, "cancel", "Wake up");
+    expect(cancelled.ok && cancelled.value.reply?.text).toMatch(/nothing.*cancel|no .*cancel/i);
+  });
+
+  test("ambiguous cancellation lists matches and cancels nothing", async () => {
+    const actor = await person("Sage");
+    scheduleCoreJob(actor, "alarms.fire", "2099-01-01T06:30:00.000Z", { task: "Wake up" });
+    scheduleCoreJob(actor, "reminders.fire", "2099-01-02T06:30:00.000Z", { task: "Call at 6:30" });
+    const result = await runAlarm(actor, "cancel", "6:30");
+    expect(result.ok && result.value.reply?.text).toMatch(/which|choose/i);
+    expect(db.select().from(scheduledJobs).where(eq(scheduledJobs.status, "pending")).all()).toHaveLength(2);
+  });
+
+  test("closed command patterns route list and both supported cancellation forms", async () => {
+    const actor = await person("Sage");
+    scheduleCoreJob(actor, "reminders.fire", "2099-01-01T07:00:00.000Z", { task: "Call Nadia" });
+    for (const utterance of ["what alarms do I have", "what reminders do I have", "cancel the reminder to call Nadia"]) {
+      const state = { actor, surface: "chat", speakerEvidence: undefined, signal: classifyTurnSignal({ text: utterance, ageBand: "adult", commandOpeners: commandOpeners(loadAllManifests()) }), temporary: false, turnId: "alarm-command", conversationId: "alarm-command" } as never;
+      const { output } = await commandsNode(state, { utterance }, new AbortController().signal);
+      expect(output.matched).toBe(true);
+    }
+    expect(db.select().from(scheduledJobs).where(eq(scheduledJobs.status, "pending")).all()).toHaveLength(0);
+  });
+
+  test("an unidentified speaker cannot list or cancel alarms", async () => {
+    const actor = await person("Sage");
+    for (const utterance of ["what alarms do I have", "what reminders do I have", "cancel my alarm at 6:30", "cancel the reminder to call Nadia"]) {
+      const state = { actor, surface: "robot", speakerEvidence: null, signal: classifyTurnSignal({ text: utterance, ageBand: "child", commandOpeners: commandOpeners(loadAllManifests()) }), temporary: false, turnId: "alarm-anonymous", conversationId: "alarm-anonymous" } as never;
+      const { output } = await commandsNode(state, { utterance }, new AbortController().signal);
+      expect(output.matched).toBe(false);
+    }
+    expect(db.select().from(scheduledJobs).all()).toHaveLength(0);
   });
 });

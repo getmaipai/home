@@ -284,9 +284,9 @@ export function blocksForRecipeRun(
         ? scheduleCard(manifest.id, provenance, "Reminder set", text(result.data?.task), text(result.data?.when_text))
         : [];
     case "alarm":
-      return allowed.includes("schedule_card")
-        ? scheduleCard(manifest.id, provenance, "Alarm set", text(result.data?.task), text(result.data?.when_text))
-        : [];
+      if (!allowed.includes("schedule_card")) return [];
+      if (text(result.data?.action) === "list") return [];
+      return scheduleCard(manifest.id, provenance, text(result.data?.action) === "cancel" ? "Alarm or reminder cancelled" : "Alarm set", text(result.data?.schedule_task) || text(result.data?.task), text(result.data?.when_text));
     case "timer":
       return allowed.includes("schedule_card")
         ? scheduleCard(manifest.id, provenance, "Timer set", text(result.data?.label), text(result.data?.when_text))

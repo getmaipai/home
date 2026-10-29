@@ -4,7 +4,7 @@
   "kind": "plugin",
   "category": "Utilities",
   "display": "Alarms",
-  "description": "Set an alarm for a later time.",
+  "description": "Set, cancel, and list your alarms and reminders.",
   "offer": {"mode":"off", "reason": "awaiting a CHAT-AB-01 tool-decision row"},
   "author": "MaiPai",
   "license": "AGPL-3.0",
@@ -15,11 +15,15 @@
       "set an alarm for 7 tomorrow called gym",
       "wake me tomorrow at 6",
       "set an alarm for noon",
-      "wake me in 20 minutes"
+      "wake me in 20 minutes",
+      "cancel my alarm at 6:30",
+      "cancel the reminder to call Nadia",
+      "what alarms do I have",
+      "what reminders do I have"
     ],
-    "patterns": ["wake me *", "set an alarm *"]
+    "patterns": ["wake me *", "set an alarm *", "cancel my alarm *", "cancel my * alarm", "cancel the reminder *", "what alarms do I have", "what reminders do I have"]
   },
-  "args": {"type":"object", "required":["expression"], "properties":{"expression":{"type":"string", "minLength":1}}},
+  "args": {"type":"object", "required":["action", "expression"], "properties":{"action":{"type":"string", "enum":["set", "cancel", "list"]}, "expression":{"type":"string"}}},
   "incognito": "unaffected",
   "requires": [],
   "optional": [],
