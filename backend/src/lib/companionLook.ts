@@ -1,12 +1,14 @@
 import { existsSync, mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from "node:fs";
 import { basename, join } from "node:path";
-import sharp, { type Metadata } from "sharp";
+import sharp from "sharp";
 import { z } from "zod";
 import media from "@maipai/spec/vocab/companion-media.json";
 import { householdCompanionFolder } from "@/lib/householdCompanions";
 import { chatModelReadsPictures } from "@/lib/chatPictures";
 import { complete } from "@/lib/llm";
 import { lookStylePhrase, type LookStyleId } from "@/lib/companionLookStyles";
+import { preparePicture } from "@/lib/imaging/prepare";
+import { imagingTargets } from "@/lib/imaging/targets";
 
 const Source = z.enum(["upload", "generated", "edit"]);
 const Version = z.object({ id: z.string().regex(/^v-[0-9]+$/), created_at: z.string().datetime(), source: Source, label: z.string().max(80), width: z.number().int().positive(), height: z.number().int().positive(), from: z.string().nullable(), has_original: z.boolean().optional(), model: z.string().nullable().optional(), quality: z.enum(["quick", "detailed"]).nullable().optional(), prompt_hash: z.string().regex(/^[a-f0-9]{64}$/).nullable().optional(), model_reported: z.string().nullable().optional() });
@@ -258,23 +260,17 @@ export function deleteLook(id: string): void { const dir = lookFolder(id); if (d
 
 export type BackgroundRemover = (bytes: Uint8Array) => Promise<Uint8Array>;
 export async function normalizePicture(bytes: Uint8Array, options: { removeBackground: BackgroundRemover }): Promise<Uint8Array> {
-  let source: Uint8Array;
-  let metadata: Metadata;
-  try { metadata = await sharp(bytes, { limitInputPixels: 40_000_000, failOn: "error" }).metadata(); }
-  catch { throw new Error("That picture could not be read. Use a PNG, JPEG or WebP picture and try again."); }
-  if (!metadata.width || !metadata.height) throw new Error("That picture could not be read. Use a PNG, JPEG or WebP picture and try again.");
-  try { source = new Uint8Array(await sharp(bytes, { limitInputPixels: 40_000_000, failOn: "error" }).rotate().png().toBuffer()); }
-  catch { throw new Error("That picture could not be read. Use a PNG, JPEG or WebP picture and try again."); }
-  let transparent = false;
-  if (metadata.hasAlpha) {
-    try { const stats = await sharp(source, { limitInputPixels: 40_000_000 }).rotate().stats(); transparent = (stats.channels[3]?.min ?? 255) < 255; } catch { /* a malformed alpha channel will be caught by decode below */ }
-  }
-  if (!transparent) source = await options.removeBackground(source);
-  const contentSize = Math.round(media.image.size * (1 - 2 * media.image.margin_percent / 100));
   try {
-    const margin = Math.floor((media.image.size - contentSize) / 2);
-    return new Uint8Array(await sharp(source, { limitInputPixels: 40_000_000, failOn: "error" }).resize(contentSize, contentSize, { fit: "contain", background: { r: 0, g: 0, b: 0, alpha: 0 } }).extend({ top: margin, bottom: media.image.size - contentSize - margin, left: margin, right: media.image.size - contentSize - margin, background: { r: 0, g: 0, b: 0, alpha: 0 } }).png().toBuffer());
-  } catch { throw new Error("That picture could not be prepared. Use a PNG, JPEG or WebP picture and try again."); }
+    const source = new Uint8Array(await sharp(bytes, { limitInputPixels: 40_000_000, failOn: "error" }).rotate().png().toBuffer());
+    const result = await preparePicture(source, { ...imagingTargets.portrait, upscaleBelowShortSide: imagingTargets.portrait.size, removeBackground: options.removeBackground, upscale: async (image) => new Uint8Array(await sharp(image, { limitInputPixels: 40_000_000, failOn: "error" }).resize(imagingTargets.portrait.size, imagingTargets.portrait.size, { fit: "inside" }).png().toBuffer()) });
+    return result.bytes;
+  } catch (error) {
+    if (error instanceof Error && error.message === "That picture has no visible subject.") throw new Error("That picture could not be prepared. Use a PNG, JPEG or WebP picture and try again.");
+    // Keep the established upload-facing sentences stable.
+    if (error instanceof Error && error.message.startsWith("The background remover")) throw error;
+    if (error instanceof Error && error.message.startsWith("The upscaler")) throw error;
+    throw new Error("That picture could not be prepared. Use a PNG, JPEG or WebP picture and try again.");
+  }
 }
 
 export function uploadLabel(fileName: string): string {

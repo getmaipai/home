@@ -28,9 +28,7 @@ import { LOOK_EDIT_PROMPT_LINE, LOOK_JOB_BUSY_LINE, LOOK_PROMPT_REQUIRED_LINE, a
 import { fileTypeFromBuffer } from "file-type";
 import { readFileSync, writeFileSync, copyFileSync, mkdirSync, rmSync, existsSync, renameSync } from "node:fs";
 import { join } from "node:path";
-import { editToolsStatus } from "@/lib/imageEdit";
-import { getStackClient } from "@/lib/stackEngine";
-import { StackError } from "@/lib/stack/errors";
+import { removeBackground } from "@/lib/imaging/tools";
 import media from "@maipai/spec/vocab/companion-media.json";
 import { readStates, addTake, deleteTake, setMotion, takePath, bestTake, finishTake, companionStateJob, companionHasFinishingJob, deleteStates, clearApprovedStates, saveStates, swapInAnimation } from "@/lib/companionStates";
 import { householdCompanionFolder, setHouseholdCompanionAnimation } from "@/lib/householdCompanions";
@@ -404,29 +402,6 @@ companionsRoutes.openapi(portraitRoute, async (c) => {
   return new Response(bytes, { headers: { "content-type": "image/webp", "cache-control": "private, max-age=31536000, immutable" } });
 });
 
-async function removePictureBackground(actor: import("@/types").PersonRow, bytes: Uint8Array): Promise<Uint8Array> {
-  const status = await editToolsStatus(actor);
-  if (!status.tools.remove_background.enabled) throw new Error(status.tools.remove_background.reason ?? status.note ?? "The background remover isn't available yet. Check the editing tools, then try again.");
-  const form = new FormData(); form.append("image", new File([new Uint8Array(bytes)], "picture", { type: (await fileTypeFromBuffer(bytes))?.mime ?? "image/png" })); form.append("operation", "remove_background"); form.append("timeout_ms", "2500");
-  try {
-    const reply = await getStackClient().imageEdit(form);
-    if (reply.kind === "done") return new Uint8Array(Buffer.from(reply.item.b64_json, "base64"));
-    const until = Date.now() + 60_000;
-    while (Date.now() < until) {
-      await new Promise((resolve) => setTimeout(resolve, 500));
-      const job = await getStackClient().job(reply.job);
-      if (job.state === "failed") throw new Error(job.reason ?? "The background remover could not finish. Try another picture.");
-      if (job.state === "cancelled") throw new Error("The background removal was cancelled. Add the picture again to retry.");
-      if (job.state === "done") return await getStackClient().imageEditResult(reply.job);
-    }
-    throw new Error("The background remover took too long. Try a smaller picture.");
-  } catch (error) {
-    if (error instanceof Error && !(error instanceof StackError)) throw error;
-    if (error instanceof StackError && (error.kind === "unreachable" || error.kind === "offline")) throw new Error("The editing tools aren't running. Check that the engine on this computer is running, then try again.");
-    if (error instanceof StackError && error.kind === "timeout") throw new Error("The background remover took too long. Try a smaller picture.");
-    throw new Error("The background remover could not finish. Check the editing tools and try again.");
-  }
-}
 const uploadRoute = createRoute({ method: "post", path: "/{id}/look/upload", tags: ["Companions"], summary: "Add a look picture by upload", middleware: [requireAuth] as const,
   request: { params: lookIdParam, body: { content: { "multipart/form-data": { schema: z.object({ image: z.any() }) } } } },
   responses: { 201: { content: { "application/json": { schema: z.object({ id: z.string() }) } }, description: "Picture added." }, ...errorResponses({ 400: "Picture or required confirmations are invalid", 401: "Not signed in", 403: "Only the author or an admin can change this companion's pictures", 404: "No household companion", 413: "Picture exceeds the upload size limit", 422: "The picture did not pass the age check", 503: "Background removal is unavailable" }) } });
@@ -438,7 +413,7 @@ companionsRoutes.openapi(uploadRoute, async (c) => {
     if (file.size > media.image.max_upload_bytes) return c.json({ error: "That picture is over 20 MB. Choose a smaller PNG, JPEG or WebP picture." }, 413);
     const bytes = new Uint8Array(await file.arrayBuffer()), detected = await fileTypeFromBuffer(bytes);
     if (!detected || !["image/png", "image/jpeg", "image/webp", "image/gif", "image/avif", "image/tiff"].includes(detected.mime)) return c.json({ error: "Use a PNG, JPEG, WebP, GIF, AVIF or TIFF picture." }, 400);
-    const png = await normalizePicture(bytes, { removeBackground: (image) => removePictureBackground(c.get("person"), image) });
+    const png = await normalizePicture(bytes, { removeBackground: (image) => removeBackground(c.get("person"), image) });
     const checked = await checkCompanionArt(id, c.get("person"), [{ label: "That picture", bytes }]);
     if (!checked.ok) return c.json({ error: checked.reasons.join(" ") }, 422);
     const version = addVersion(id, png, { source: "upload", label: uploadLabel(file.name), width: media.image.size, height: media.image.size, from: null });

@@ -426,6 +426,12 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/imageSimilarity/geometry.ts` | MIN_INLIERS, MIN_AGREEMENT, __setOpencvLoaderForTests, warmGeometry, geometricFeatures, verifyPair |
 | `backend/src/lib/imageSimilarity/index.ts` | compare |
 | `backend/src/lib/imageUpload.ts` | MAX_CHAT_IMAGE_PIXELS, MAX_CHAT_IMAGE_EDGE, cleanChatImage, chatImageThumbnail, cleanChatImageFile |
+| `backend/src/lib/imaging/fit.ts` | fitToFrame |
+| `backend/src/lib/imaging/focal.ts` | __setNewsFocalForTests, focalCentre, focalPointOf |
+| `backend/src/lib/imaging/prepare.ts` | preparePicture |
+| `backend/src/lib/imaging/subject.ts` | subjectBounds, findSubject |
+| `backend/src/lib/imaging/targets.ts` | imagingTargets |
+| `backend/src/lib/imaging/tools.ts` | runImageTool, removeBackground, upscale |
 | `backend/src/lib/installActions.ts` | volumesFor, sanitizeSelection, previewPlan, engineNeedsInstall, ensureEngineInstalling, beginInstall |
 | `backend/src/lib/installPlanWording.ts` | gbText, VOICE_LINE, wordPlan |
 | `backend/src/lib/installPreflight.ts` | isSupportedInstallPlatform, checkInstallPreflight, installPreflightBlockers |
@@ -548,7 +554,6 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/news/enrich.ts` | ENRICHMENT_NONE_MS, __setNewsEnrichClockForTests, __resetNewsEnrichForTests, enrichmentFresh, transientPageError, enrichItem |
 | `backend/src/lib/news/enrichmentStore.ts` | ENRICHMENT_SCHEMA, enrichmentStore |
 | `backend/src/lib/news/feedLabels.ts` | feedLabels |
-| `backend/src/lib/news/focal.ts` | __setNewsFocalForTests, focalCentre, focalPointOf |
 | `backend/src/lib/news/hostBackoff.ts` | NEWS_HOST_BACKOFF_MS, newsHostQuiet, quietNewsHost, __resetNewsHostBackoffForTests |
 | `backend/src/lib/news/mixAffinity.ts` | computeAffinity |
 | `backend/src/lib/news/nearDuplicates.ts` | DUPLICATE_WINDOW_H, SHARED_MIN, JACCARD_MIN, titleTokens, collapseNearDuplicates |
