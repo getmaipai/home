@@ -129,6 +129,7 @@ Reused as they are: `companionArtCheck.ts`, the Stack picture editor tools, the 
 - [companions-app-2026-10-21.md](companions-app-2026-10-21.md): the wizard and editor tabs.
 - [companions-handoff-revamp-2026-10-26.md](companions-handoff-revamp-2026-10-26.md) section 8a.9 (the Studio UI, slice 8b). Appearance drafts and Publish (8a.1 to 8a.8) stay as the engine under Save.
 - [companion-video-characters-2026-10-21.md](companion-video-characters-2026-10-21.md): the 12-state vocabulary (section 7), the teen-editor line and the starting audience (sections 12 and 12.5), and the character sheet, takes and clip-upload screens (their engine stays).
+- [companion-video-characters-2026-10-21.md](companion-video-characters-2026-10-21.md) section 5 item 1 ("every clip starts from the one rest picture") and its frame-0 rows: a clip now starts from its state's keyframe (section 9). The rule that any state can follow any other through the rest pose stays: a clip's last frame returns to the rest pose, so the keyframe sets frame 0 only.
 - Open backlog slices overtaken: DOTS-CREATE-01 and DOTS-STATES-01 (COMPANIONS-DOTS-01), and CMEDIA-EDITOR-05 (COMPANIONS-STUDIO-01), whose all-ages checklist stays as described in section 2.
 
 ## 8. Architect conditions (approved 2026-10-29)
@@ -150,3 +151,12 @@ Each animation requires a keyframe: one still picture of that state, which the c
 - **Extraction.** The published manifest carries one image per state (`keyframe`), beside the clip. A bot or any client that cannot play video reads the keyframe, and the fallback table of section 3 picks which one to show. A client that wants every image can fetch them all in one call; nothing leaves the home.
 - **Spec.** `companion-media.json` and the manifest gain an additive `keyframe` per state (old manifests stay valid; a missing keyframe falls back to the clip's still, then the portrait). Spec first, then the hub, then the robot. The robot and Go adopt it later.
 - **Slices.** ANIM-SPEC-01 adds the field; ANIM-3S-01 makes keyframes before clips and publishes them; UI-3S-01 draws the edit panel; IMG-PIPE-01 is unchanged (the same module edits a keyframe).
+
+### Architect conditions for section 9 (approved 2026-10-29)
+
+6. **Supersedes and clip rules (ANIM-3S-01).** Section 7 names the superseded "starts from the one rest picture" rule. The last frame still returns to the rest pose, so any state can follow any other. Auto-pick measures frame 0 against the keyframe, and identity against the rest picture and the card colours, using the existing take report.
+7. **Spec (ANIM-SPEC-01).** `keyframe` is optional in each manifest state object and in `companion-media.json`, in a minor spec bump (`manifest.schema.json` states have `additionalProperties: false` and `still` is required today; `still` stays required). The catalog publishes `keyframe` only after Home's pin accepts it. The fallback order (keyframe, then still, then portrait) is spec data the kit reads, never recomputed in each client.
+8. **Child bands for keyframes (ANIM-SPEC-01).** Condition 3 covers keyframes: a child gets no emotion keyframe for any label whose `child_band` is not `same`; a picture-only client shows the presence state's image.
+9. **Clip check stays (ANIM-3S-01).** The finished-clip check (still plus clip frames) still runs on every clip. The keyframe check is added before video and never replaces it.
+10. **Fetch-all-images (ANIM-3S-01).** It reuses the published manifest's file path. A new route, if needed, is additive, uses the manifest's companion-audience access, and logs counts only.
+11. **Edit keyframe panel (UI-3S-01).** It uses screen 1's action component itself inside a kit dialog or sheet as shipped, with no `className` override and no wrapper. An out-of-date clip shows as the tile's own word, with no dot, badge or new polling loop.
