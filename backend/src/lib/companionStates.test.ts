@@ -96,3 +96,15 @@ describe("finished clips are usable whatever their quality notes say (owner poli
     expect(after.approved).toBe(made.id);
   });
 });
+
+describe("a clip whose key colour did not come out", () => {
+  const base = { ok: true, reasons: [], seconds: 3, bytes: { h264: 10, av1: null }, colour_distance: 1, frame0_keyframe_distance: null, area_ratio: 1, loop_gap: 0 };
+  test("is not usable: a fully opaque frame, a vanished character or a jump in size leaves a box, not a character", () => {
+    const take = (opaque: { min: number; max: number }, area = 1) => ({ report: { ...base, area_ratio: area, opaque_share: opaque } }) as never;
+    expect(takeUsable(take({ min: 0.3, max: 0.31 }))).toBe(true);
+    expect(takeUsable(take({ min: 0.3, max: 1 }))).toBe(false);
+    expect(takeUsable(take({ min: 0.0, max: 0.3 }))).toBe(false);
+    expect(takeUsable(take({ min: 0.3, max: 0.4 }, 3.2))).toBe(false);
+  });
+});
+

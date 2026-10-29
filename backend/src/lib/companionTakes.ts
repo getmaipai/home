@@ -5,7 +5,7 @@ import { join } from "node:path";
 import media from "@maipai/spec/vocab/companion-media.json";
 import type { PersonRow } from "@/types";
 import { readLook, versionOriginalPath, versionPath } from "@/lib/companionLook";
-import { addTake, companionHasFinishingJob, finishTake, readStates, recordTakeFailure, recordTakeModelReported, setMotion, setTakeSeed, takePath, TAKE_LIMIT_LINE, keyframePath, writeKeyframe, readKeyframeMeta } from "@/lib/companionStates";
+import { takeUsable, addTake, companionHasFinishingJob, finishTake, readStates, recordTakeFailure, recordTakeModelReported, setMotion, setTakeSeed, takePath, TAKE_LIMIT_LINE, keyframePath, writeKeyframe, readKeyframeMeta } from "@/lib/companionStates";
 import { existsSync } from "node:fs";
 import { routeAudience } from "@/lib/pictures/audience";
 import { videoDenial, VIDEO_DENIAL_LINE, VIDEO_NOT_HERE_LINE, refuseVideoPrompt, VIDEO_REFUSAL_LINE } from "@/lib/videos/policy";
@@ -67,7 +67,7 @@ function engineShouldStop(error: unknown): boolean {
 }
 function isEngineFailure(error: unknown): boolean { return error instanceof StackVideoError && (error.status >= 500 || ["generation_failed", "engine_error"].includes(error.code)); }
 
-async function runTakes(run: TakeRun, count: number, actor: PersonRow, motionOverride?: string): Promise<void> {
+async function runTakes(run: TakeRun, count: number, actor: PersonRow, motionOverride?: string, pass = 1): Promise<void> {
   run.state = "running";
   let consecutiveEngineFailures = 0;
   // Finishing (key-colour matte, encode, art check) runs while the next clip generates; the run ends only when every finish has settled.
@@ -163,6 +163,9 @@ async function runTakes(run: TakeRun, count: number, actor: PersonRow, motionOve
     run.state = "failed";
   } finally {
     if (finishing.length) { run.phase = "finishing"; run.label = "Finishing the last clip"; await Promise.allSettled(finishing); }
+    // A clip whose key colour did not come out is a box, not a character: draw that animation once more with a new seed before the run ends.
+    const again = pass === 1 && !run.cancelled && run.state !== "failed" ? run.states.filter((state) => { const takes = readStates(run.companionId).states[state]?.takes ?? []; return takes.some((take) => take.report) && !takes.some((take) => take.report?.ok && takeUsable(take)); }) : [];
+    if (again.length) { run.states = again; run.takesMade = 0; run.percent = 0; run.label = "Making the clips that did not come out again"; await runTakes(run, count, actor, motionOverride, 2); return; }
     if (run.cancelled) run.state = "cancelled";
     else if (run.state !== "failed") { run.state = "done"; run.percent = 100; }
     run.phase = run.state;
