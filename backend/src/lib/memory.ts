@@ -925,7 +925,7 @@ export function archive(actor: PersonRow, id: string): MemoryOpResult<MemoryReco
     return { ok: false, status: 403, error: "only owner or admin may archive an entity or pinned memory" };
   }
   const now = new Date().toISOString();
-  db.update(memoryRecords).set({ status: "archived", expiredAt: now, hlc: nextHlc() }).where(eq(memoryRecords.id, id)).run();
+  db.update(memoryRecords).set({ status: "archived", archivedReason: "person", expiredAt: now, hlc: nextHlc() }).where(eq(memoryRecords.id, id)).run();
   const updated = db.select().from(memoryRecords).where(eq(memoryRecords.id, id)).get()!;
   return { ok: true, value: toMemoryRecord(updated) };
 }
@@ -979,7 +979,7 @@ export function archiveByProvenance(turnId: string): number {
   if (rows.length === 0) return 0;
   const now = new Date().toISOString();
   const ids = rows.map((r) => r.id);
-  db.update(memoryRecords).set({ status: "archived", expiredAt: now, hlc: nextHlc() }).where(inArray(memoryRecords.id, ids)).run();
+  db.update(memoryRecords).set({ status: "archived", archivedReason: "edit", expiredAt: now, hlc: nextHlc() }).where(inArray(memoryRecords.id, ids)).run();
   // The judge's SUPERSEDE chain: when the record being retired had itself
   // replaced an older fact ("likes tea" superseded by "likes tea and
   // coffee" from the edited turn), the older fact comes back, since the
@@ -1171,6 +1171,8 @@ const forgetTransaction = sqlite.transaction((personId: string): number => {
       "DELETE FROM pending_embeddings WHERE memory_id IN (SELECT id FROM memory_records WHERE scope = 'person' AND person = ?)",
     )
     .run(personId);
+  // NAT-07b: a pick-up-thread question names a memory by id and carries its text; it goes with the memories.
+  sqlite.query("DELETE FROM open_questions WHERE person = ? AND kind = 'thread'").run(personId);
   const ids = sqlite.query("SELECT id FROM memory_records WHERE scope = 'person' AND person = ?").all(personId) as {
     id: string;
   }[];
@@ -1183,7 +1185,7 @@ const forgetTransaction = sqlite.transaction((personId: string): number => {
   // memories, not the whole store) keeps this cheap.
   for (const row of ids) {
     sqlite
-      .query("UPDATE memory_records SET status = 'archived', text = ?, embedding_space = NULL, deleted_at = ?, hlc = ? WHERE id = ?")
+      .query("UPDATE memory_records SET status = 'archived', archived_reason = 'forgotten', text = ?, embedding_space = NULL, deleted_at = ?, hlc = ? WHERE id = ?")
       .run(TOMBSTONE_TEXT, now, nextHlc(), row.id);
   }
   // Step 3a: the person's registry rows go with their memories, since
@@ -1224,7 +1226,7 @@ export interface BatchForgetOutcome {
 function tombstone(id: string): void {
   const now = new Date().toISOString();
   sqlite
-    .query("UPDATE memory_records SET status = 'archived', text = ?, embedding_space = NULL, deleted_at = ?, hlc = ? WHERE id = ?")
+    .query("UPDATE memory_records SET status = 'archived', archived_reason = 'forgotten', text = ?, embedding_space = NULL, deleted_at = ?, hlc = ? WHERE id = ?")
     .run(TOMBSTONE_TEXT, now, nextHlc(), id);
   sqlite.query("DELETE FROM memory_embeddings WHERE memory_id = ?").run(id);
   sqlite.query("DELETE FROM pending_embeddings WHERE memory_id = ?").run(id);
@@ -1259,6 +1261,7 @@ export function forgetByIds(actor: PersonRow, ids: string[]): BatchForgetOutcome
       continue;
     }
     tombstone(id);
+    sqlite.query("DELETE FROM open_questions WHERE kind = 'thread' AND subject_id = ?").run(id);
     outcomes.push({ id, deleted: true });
     // Step 3a: the entity and the edges this record brought go with it
     // when nothing else keeps them (subjects.ts has the rule).
@@ -1359,7 +1362,7 @@ export function runMaintenance(): { archived: number } {
       for (const excess of survivors.slice(EPISODIC_CAP_PER_SCOPE)) toArchive.add(excess.row.id);
     }
     for (const id of toArchive) {
-      db.update(memoryRecords).set({ status: "archived", expiredAt: nowIso, hlc: nextHlc() }).where(eq(memoryRecords.id, id)).run();
+      db.update(memoryRecords).set({ status: "archived", archivedReason: "decay", expiredAt: nowIso, hlc: nextHlc() }).where(eq(memoryRecords.id, id)).run();
       archived++;
     }
   }
@@ -1383,7 +1386,7 @@ export function runMaintenance(): { archived: number } {
         : r.validTo! < nowIso,
     );
   for (const row of expiredByValidTo) {
-    db.update(memoryRecords).set({ status: "archived", expiredAt: nowIso, hlc: nextHlc() }).where(eq(memoryRecords.id, row.id)).run();
+    db.update(memoryRecords).set({ status: "archived", archivedReason: "end_date", expiredAt: nowIso, hlc: nextHlc() }).where(eq(memoryRecords.id, row.id)).run();
     archived++;
   }
 
@@ -1405,7 +1408,7 @@ export function runMaintenance(): { archived: number } {
     )
     .all();
   for (const row of staleStates) {
-    db.update(memoryRecords).set({ status: "archived", expiredAt: nowIso, hlc: nextHlc() }).where(eq(memoryRecords.id, row.id)).run();
+    db.update(memoryRecords).set({ status: "archived", archivedReason: "decay", expiredAt: nowIso, hlc: nextHlc() }).where(eq(memoryRecords.id, row.id)).run();
     archived++;
   }
 

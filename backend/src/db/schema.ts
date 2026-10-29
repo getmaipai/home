@@ -175,6 +175,8 @@ export const memoryRecords = sqliteTable("memory_records", {
   sensitive: integer("sensitive", { mode: "boolean" }).notNull().default(false),
   // NAT-07c: the judge's withholding tag at extraction; null on rows written before it existed.
   offerWithheld: integer("offer_withheld", { mode: "boolean" }),
+  // NAT-07b: why the record left the active set (end_date, decay, person, edit, forgotten); null on rows written before it and on archive paths that do not set it.
+  archivedReason: text("archived_reason"),
   childDisclosure: text("child_disclosure").notNull().default("child_ok"),
   childDisclosureSetBy: text("child_disclosure_set_by"),
   childDisclosureSetAt: text("child_disclosure_set_at"),
@@ -1537,7 +1539,7 @@ export const openQuestions = sqliteTable("open_questions", {
     .notNull()
     .references(() => people.id),
   conversationId: text("conversation_id"),
-  kind: text("kind").notNull(), // "who" | "clarify_fact" | "relay"
+  kind: text("kind").notNull(), // "who" | "clarify_fact" | "relay" | "thread" (NAT-07b: a record of an offered pick-up thread, subject_id = the memory id, written already "asked")
   text: text("text").notNull(),
   subjectId: text("subject_id"),
   status: text("status").notNull().default("pending"), // "pending" | "asked" | "answered" | "declined" | "expired"

@@ -161,6 +161,7 @@ function openQuestionName(question: OpenQuestionRow): string | null {
  * name not in play waits. */
 function nextOpenQuestionInPlay(personId: string, utterance: string, ctx: { history: readonly string[]; subjects: readonly SubjectRef[]; conversationId?: string }): OpenQuestionRow | null {
   const pending = pendingOpenQuestionsFor(personId).filter((q) => {
+    if (q.kind === "thread") return false; // NAT-07b: a thread row records an offer, it is never a question to put
     if (!q.subjectId || openQuestionName(q) !== null) return true;
     expireOpenQuestion(q.id);
     console.log(`[ask] the open question ${q.id} lapsed: its subject is gone`);

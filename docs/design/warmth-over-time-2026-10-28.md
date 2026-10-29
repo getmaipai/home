@@ -179,3 +179,7 @@ you already told about the interview; it is off for teens and unavailable for ch
 - That the open-question queue's retention and expiry suit a 14-day thread; I read its record description and the architect's citation, not every path.
 - The exact name of the typed turn-signal field; the note only fixes that it is typed and spec first.
 - Any of this against a real model. The bench rows are written first so that the answer is measured, not argued.
+
+## Build notes (NAT-07b, 2026-10-28)
+
+Built in `backend/src/lib/conversationOpening.ts`; the item rides as source `opening` in the volatile tail ("Opening this conversation:"), never in the stable prefix. The thread offer is recorded as an `open_questions` row of kind `thread`, written already `asked`, so the ask-names queue never puts it. `chat.follow_up_questions` (PREF-01) is not in the spec yet, so the interaction described in section 2.4 is not wired. Still owed: the CHAT-AB-01 rerun with the register rows (rule 13) and a real-model run of the NAT rows.

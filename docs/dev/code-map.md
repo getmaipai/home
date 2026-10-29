@@ -358,6 +358,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/continue/providers.ts` | mediaContinueRows |
 | `backend/src/lib/continue/registry.ts` | CONTINUE_BUDGET, registerContinueProvider, __clearContinueProvidersForTests, continueRows |
 | `backend/src/lib/conversationHistory.ts` | shownPicturesIn, turnOwnerId, applyHeardPrefix, __temporaryReplyForTests, outcomesForConversation, packageLatencyFromRecentOutcomes |
+| `backend/src/lib/conversationOpening.ts` | THREAD_WINDOW_DAYS, MOOD_WINDOW_DAYS, dayPartAt, sinceLastAt, conversationOpening, renderConversationOpening |
 | `backend/src/lib/conversationTitle.ts` | DEFAULT_CHAT_TITLE, provisionalTitleFrom, ensureProvisionalTitle, refreshProvisionalTitle, cleanTitle, generateConversationTitle |
 | `backend/src/lib/credentialLockout.ts` | LOCKOUT_THRESHOLD, lockoutDurationMs, ensureCredentialRowExists, clearFailedAttempts, currentLockout, recordFailedAttempt |
 | `backend/src/lib/dashboard.ts` | getDashboard |
@@ -831,7 +832,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/turnMachine/turnNext.ts` | answeredByFor, conversationPersona, mentionedConversationPersona, runTurnNext, runTurnNextStream |
 | `backend/src/lib/turnMachine/warmup.ts` | turnWarmupPrompt |
 | `backend/src/lib/turnShared.ts` | validateTurnInput, judgeStatusAtInsert, deriveCrisisResources, identityLine, PRIVACY_SENTENCE, PHOTO_IDENTITY_SENTENCE |
-| `backend/src/lib/turnSignal.ts` | adviceOf, EVERYDAY_IMPERATIVES, COMMAND_CONFIDENCE, fallbackSignal, classifyTurnSignal, freezeDirective |
+| `backend/src/lib/turnSignal.ts` | adviceOf, EVERYDAY_IMPERATIVES, carriesNoTask, COMMAND_CONFIDENCE, fallbackSignal, classifyTurnSignal |
 | `backend/src/lib/turnStats.ts` | firstTokenFromGenerations, buildTurnStats |
 | `backend/src/lib/uiFixtureBlocks.ts` | SHOWCASE_BLOCKS |
 | `backend/src/lib/uiFixtures.ts` | fixtureListing, DEFAULT_PACE, remaining, UI_FIXTURES, findFixture |

@@ -341,6 +341,8 @@ export function resolveForResponse(
   let value = rawValue;
   if (keyDef.scope === "person" && subject && source === "default" && band === "child"
     && (keyDef.key === "chat.photo_uploads" || keyDef.key === "reference.images")) value = false;
+  // NAT-07b: off by default for a teen, and never for a child (conversationOpening gates the child whatever is stored).
+  if (keyDef.scope === "person" && subject && source === "default" && band !== "adult" && keyDef.key === "chat.pick_up_threads") value = false;
   const descriptionValue = keyDef.secret ? null : value;
   const description = describeSetting(
     { ...keyDef, copy: keyDef.copy ?? { does: keyDef.label } },

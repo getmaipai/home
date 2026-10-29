@@ -54,6 +54,8 @@ const SOURCE_LABEL: Record<Exclude<ContextItem["source"], "window" | "utterance"
   // DUPLEX-06: the part of the last spoken reply the person cut in on before hearing it (lib/interruptedReply.ts).
   interrupted: "the part of your last reply the person did not hear",
   page: "page",
+  // NAT-07b: how long since the last conversation, the part of the day and at most one thread (lib/conversationOpening.ts).
+  opening: "opening",
 };
 
 function renderContextLine(item: ContextItem): string {
@@ -69,6 +71,10 @@ function isMemoryContext(item: ContextItem): boolean {
 
 function isClockContext(item: ContextItem): boolean {
   return item.source === "clock";
+}
+
+function isOpeningContext(item: ContextItem): boolean {
+  return item.source === "opening";
 }
 
 function isToolOrPageContext(item: ContextItem): boolean {
@@ -191,7 +197,8 @@ export function contextToMessages(context: readonly ContextItem[], utterance: st
   const memoryItems = volatile.filter((item) => item.source === "memory");
   const episodeItems = volatile.filter((item) => item.source === "episode");
   const clockItems = volatile.filter(isClockContext);
-  const dataItems = volatile.filter((item) => !isMemoryContext(item) && !isClockContext(item));
+  const openingItems = volatile.filter(isOpeningContext);
+  const dataItems = volatile.filter((item) => !isMemoryContext(item) && !isClockContext(item) && !isOpeningContext(item));
   const toolAndPageItems = dataItems.filter(isToolOrPageContext);
   const otherDataItems = dataItems.filter((item) => !isToolOrPageContext(item));
 
@@ -241,6 +248,8 @@ export function contextToMessages(context: readonly ContextItem[], utterance: st
   if (memoryDataLines.length > 0) userContent += `\n\nEarlier conversation records:\n${memoryDataLines.join("\n\n")}`;
   if (!cutAfterMemory && dataLines.length > 0) userContent += `\n\nOther labelled context:\n${dataLines.join("\n\n")}`;
   if (!cutAfterMemory && clockLines.length > 0) userContent += `\n\nClock:\n${clockLines.join("\n")}`;
+  // NAT-07b: one optional labelled block beside the clock, in the volatile message only (rule 4).
+  if (!cutAfterMemory && openingItems.length > 0) userContent += `\n\nOpening this conversation:\n${openingItems.map((item) => item.text).join("\n")}`;
   if (!cutAfterMemory) {
     userContent += `\n\nHow to answer this one: ${planLineForTurnMachine(plan, signal, promptSurfaceClass, persona.engagement)}`;
     // ROBOT-VISION-01: the guidance for the camera block sits here, outside the untrusted data wrapper, so it is read as an instruction.

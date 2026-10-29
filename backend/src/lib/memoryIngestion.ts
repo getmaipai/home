@@ -160,6 +160,7 @@ export function supersedeInTx(
         embeddingSpace: fullCandidate.embeddingSpace,
         hlc: fullCandidate.hlc,
         deletedAt: fullCandidate.deletedAt,
+        archivedReason: fullCandidate.archivedReason,
         deviceId: fullCandidate.deviceId,
       })
       .run();
@@ -293,6 +294,7 @@ export function ingestMemory(input: IngestInput): IngestResult {
     embeddingSpace: parsed.data.embedding_space,
     hlc: parsed.data.hlc,
     deletedAt: parsed.data.deleted_at,
+    archivedReason: parsed.data.archived_reason ?? null,
     deviceId: parsed.data.device_id ?? null,
   };
 
@@ -411,6 +413,7 @@ export function supersedeMemory(input: SupersedeInput): SupersedeResult {
     supersededBy: null,
     embeddingSpace: null,
     deletedAt: null,
+    archivedReason: null,
     deviceId: input.oldRecord.deviceId,
   };
 

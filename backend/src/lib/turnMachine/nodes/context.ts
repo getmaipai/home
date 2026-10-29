@@ -38,6 +38,9 @@ import { isBareSocialTurn } from "@/lib/guards";
 import { sanitizeForPrompt } from "@/lib/promptSanitize";
 import { speakerIsAnonymous, turnAgeBand } from "../speaker";
 import { shapeOf } from "@/lib/turnSignal";
+import { conversationOpening, lastTurnBefore, readOpeningRecords, recordThreadOffer, renderConversationOpening } from "@/lib/conversationOpening";
+import { PICK_UP_THREADS_KEY } from "@/settings/chatKeys";
+import { getPersonSettingValue } from "@/lib/settings";
 import { planFor } from "@/lib/register";
 import type { Node, ContextItem, TurnState } from "../contract";
 import { picturesAttachedNote, picturesNotReadNote } from "@/lib/chatImageNote";
@@ -411,6 +414,24 @@ export const contextNode: Node<ContextInput, ContextOutput> = async (state, inpu
   // that stood here: "The model's training knowledge may be older than today."
   const snapshot = await librarySnapshotDate(turnAgeBand(state.surface, state.actor, state.speakerEvidence, now, state.deviceId));
   items.push({ id: "clock", text: datesText({ now, locale, modelCutoff: chatModelCutoff(), librarySnapshot: snapshot, homePlace: householdHomePlaceName() }), source: "clock", subjects: [], disclosure: "child_ok" });
+
+  // NAT-07b: how long since the last conversation, the part of the day and at most one thread, on a first turn that carries
+  // no task. Volatile tail only (rule 4); never in a temporary conversation, on a shared surface or for an unconfirmed speaker.
+  if (!temporary && !state.ephemeral && !state.bare) {
+    const band = turnAgeBand(state.surface, state.actor, state.speakerEvidence, now, state.deviceId);
+    const confirmed = !state.speakerEvidence || state.speakerEvidence.level === "confirmed";
+    const personal = (state.surface === "chat" || state.surface === "phone") && confirmed && !speakerIsAnonymous(state);
+    const opening = conversationOpening(
+      { id: state.actor.id, band, pickUpThreads: getPersonSettingValue(state.actor, PICK_UP_THREADS_KEY) === true },
+      now,
+      { firstTurn: preview.userTexts.length === 0 && !preview.summaryLine, noTask: state.signal.no_task === true, lastTurnAt: personal ? lastTurnBefore(state.actor.id, conversation.id) : null, sharedOrUnidentified: !personal, incognito: false },
+      personal && band !== "child" ? readOpeningRecords(state.actor.id, now) : [],
+    );
+    if (opening) {
+      items.push({ id: "opening", text: renderConversationOpening(opening, { care: state.plan.moves.care === "required" }), source: "opening", subjects: [], disclosure: "child_ok" });
+      if (opening.thread) recordThreadOffer(state.actor.id, conversation.id, opening.thread.record_id, state.turnId);
+    }
+  }
 
   // ROBOT-VISION-01: a robot's short-lived idea of what its camera sees. One labelled line, only for a robot-surface turn whose robot has
   // vision on and a description that has not expired (lib/robotVision.ts); it rides with the volatile data, never the cached prefix.

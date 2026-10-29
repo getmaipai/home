@@ -1404,7 +1404,7 @@ export interface OpenQuestionRow {
   id: string;
   person: string;
   conversationId: string | null;
-  kind: "who" | "clarify_fact" | "relay";
+  kind: "who" | "clarify_fact" | "relay" | "thread";
   text: string;
   subjectId: string | null;
   status: "pending" | "asked" | "answered" | "declined" | "expired";

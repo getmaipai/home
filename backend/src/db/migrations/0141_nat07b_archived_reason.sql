@@ -1,0 +1,1 @@
+ALTER TABLE `memory_records` ADD `archived_reason` text;

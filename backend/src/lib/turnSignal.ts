@@ -179,6 +179,13 @@ function openersFor(input: SignalInput): ReadonlySet<string> {
   return merged;
 }
 
+/** NAT-07b: a turn that carries no task of its own: a bare greeting, or a greeting with only telling beside it ("hey, rough morning").
+ * A question, a directive or a commitment anywhere in the turn is a task. Typed, never a reply rule (rule 1). */
+export function carriesNoTask(text: string, clauses: readonly { act: Act }[]): boolean {
+  if (isBareSocialTurn(text)) return true;
+  return clauses.some((c) => c.act === "greeting") && clauses.every((c) => c.act === "greeting" || c.act === "inform" || c.act === "backchannel");
+}
+
 /** The confidence a directive by construction carries; a proposal read
  * by the rules sits below it (see shapeOf()). */
 export const COMMAND_CONFIDENCE = 0.9;
@@ -543,6 +550,8 @@ export function classifyTurnSignal(input: SignalInput): TurnSignal {
     target: targetOf(emotionText, aboutClause.subject),
     repair: repairOf(text, primary),
     ...(adviceOf(text) ? { wants_advice: adviceOf(text) } : {}),
+    // NAT-07b: a bare greeting carries no task, the one turn an opening thread may follow.
+    ...(carriesNoTask(text, clauses) ? { no_task: true } : {}),
     refers_to_prior: null,
     clauses,
     act_confidence: actConfidence,

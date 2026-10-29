@@ -43,7 +43,7 @@ export const CHILD_VISIBLE_SETTING_KEYS: readonly string[] = [
 
 /** A teen saw everything a child did, plus the chat photo switch (a child's
  * is a parent's to set). */
-export const TEEN_VISIBLE_SETTING_KEYS: readonly string[] = [...CHILD_VISIBLE_SETTING_KEYS, "chat.photo_uploads"];
+export const TEEN_VISIBLE_SETTING_KEYS: readonly string[] = [...CHILD_VISIBLE_SETTING_KEYS, "chat.photo_uploads", "chat.pick_up_threads"];
 
 /** The keys a viewer of this band may be shown, or `undefined` for an adult
  * band, which has no such limit. */
