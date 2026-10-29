@@ -29,7 +29,7 @@ import { recomputeNightlyMixes, pruneReads } from "@/lib/news/records";
 // recipe's own `schedule` step's `inputs` field through for real.
 import { sweepLiveViews } from "@/lib/liveView";
 import { dispatchRobotOffers, sweepRobotOffers } from "@/lib/robotOffers";
-import { eq, and, lte, isNull } from "drizzle-orm";
+import { eq, and, lte, isNull, inArray, notInArray } from "drizzle-orm";
 import { db } from "@/db";
 import { scheduledJobs, people, jobs } from "@/db/schema";
 import { newJobId } from "@/lib/id";
@@ -413,6 +413,24 @@ const CORE_JOBS: Record<string, CoreJobHandler> = {
 // rather than starting a duplicate pass over the same due rows.
 let inFlight: Promise<{ ran: number; errors: number }> | null = null;
 
+// A person's alarm, reminder or timer must go off on time, so these jobs run in their own lane with their own in-flight guard: a
+// background job that is slow or stuck (on 2026-10-29 the news poll held the one shared loop and an alarm waited behind it) never
+// holds one back. The general loop leaves them out so a job is never run by both lanes.
+const TIME_CRITICAL_JOBS = ["alarms.fire", "reminders.fire", "timers.fire"] as const;
+let criticalInFlight: Promise<{ ran: number; errors: number }> | null = null;
+
+/** Runs only the due alarms, reminders and timers. Safe to call often and while the general loop is busy. */
+export function runTimeCriticalJobs(
+  runPluginFn: RunPluginFn,
+  now: Date = new Date(),
+): Promise<{ ran: number; errors: number }> {
+  if (criticalInFlight) return criticalInFlight;
+  criticalInFlight = runDueJobsUnguarded(runPluginFn, now, {}, JOB_TIMEOUT_MS, "critical").finally(() => {
+    criticalInFlight = null;
+  });
+  return criticalInFlight;
+}
+
 // COR-2 (code review, 2026-09-06): one hung job (a wedged llama-server a
 // memory.judge/memory.consolidate tick awaited with no timeout of its
 // own - now fixed at the LLM client itself, spec/llm/ts/client.ts, but
@@ -459,11 +477,14 @@ export function runDueJobs(
   extraCoreJobs: Record<string, CoreJobHandler> = {},
   jobTimeoutMs: number = JOB_TIMEOUT_MS,
 ): Promise<{ ran: number; errors: number }> {
-  if (inFlight) return inFlight;
-  inFlight = runDueJobsUnguarded(runPluginFn, now, extraCoreJobs, jobTimeoutMs).finally(() => {
-    inFlight = null;
-  });
-  return inFlight;
+  // The time-critical lane starts first and is never held by the general one; a caller gets both lanes' totals.
+  const critical = runTimeCriticalJobs(runPluginFn, now);
+  if (!inFlight) {
+    inFlight = runDueJobsUnguarded(runPluginFn, now, extraCoreJobs, jobTimeoutMs, "general").finally(() => {
+      inFlight = null;
+    });
+  }
+  return Promise.all([critical, inFlight]).then(([c, g]) => ({ ran: c.ran + g.ran, errors: c.errors + g.errors }));
 }
 
 // getmaipai/home#63: memory.judge/memory.consolidate can each hold the
@@ -486,12 +507,16 @@ async function runDueJobsUnguarded(
   now: Date,
   extraCoreJobs: Record<string, CoreJobHandler>,
   jobTimeoutMs: number,
+  lane: "general" | "critical",
 ): Promise<{ ran: number; errors: number }> {
+  const laneFilter = lane === "critical"
+    ? and(eq(scheduledJobs.kind, "core"), inArray(scheduledJobs.job, [...TIME_CRITICAL_JOBS]))
+    : notInArray(scheduledJobs.job, [...TIME_CRITICAL_JOBS]);
   const due = sortDueJobsForPriority(
     db
       .select()
       .from(scheduledJobs)
-      .where(and(eq(scheduledJobs.status, "pending"), lte(scheduledJobs.nextRunAt, now.toISOString())))
+      .where(and(eq(scheduledJobs.status, "pending"), lte(scheduledJobs.nextRunAt, now.toISOString()), laneFilter))
       .all(),
   );
 

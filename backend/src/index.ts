@@ -10,7 +10,7 @@ import { startMediaScanner } from "@/lib/media/scan";
 import { resumePictureJobs } from "@/lib/pictures/jobs";
 import { resumeVideoJobs } from "@/lib/videos/jobs";
 import { app } from "@/app";
-import { ensureCoreJob, runDueJobs } from "@/lib/scheduler";
+import { ensureCoreJob, runDueJobs, runTimeCriticalJobs } from "@/lib/scheduler";
 import { warmHostIndex } from "@/lib/blocklists/hostLists";
 import { reverifyStoredLists } from "@/lib/blocklists/listStore";
 import { runPlugin, registerAllPackageNotificationTypes, registerAllPackageProjectTypes, runDueWarmJobs } from "@/lib/plugins";
@@ -308,6 +308,10 @@ setInterval(() => {
     },
   }).catch((err: Error) => console.error(`[scheduler] runDueJobs failed: ${err.message}`));
 }, 60_000);
+// Alarms, reminders and timers get their own, faster tick so they go off on time and never wait behind a slow background job.
+setInterval(() => {
+  runTimeCriticalJobs(runPlugin).catch((err: Error) => console.error(`[scheduler] runTimeCriticalJobs failed: ${err.message}`));
+}, 10_000);
 // engineStats.ts's ring buffer, same 60s cadence as the job poll above -
 // "how busy the machine has been" (Jesse, 2026-09-04) doesn't need finer
 // granularity than that to show a real trend.
