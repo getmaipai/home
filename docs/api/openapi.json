@@ -4032,6 +4032,23 @@
                         "default": null,
                         "description": "AGE-01 (dev.md section 13 part 3 and part 9, the outside review reconciled; the coherence review, question 1: 'child_disclosure wins' over an earlier `audience` field name). Whether a CHILD may hear this record from the hub, separate from `sensitive` (which withholds from non-admins and shared surfaces regardless of age) and from `scope` (whose record it is). Null on person and self scope, where it is meaningless (the org's per-person identity rule already keeps a person-scoped record out of anyone else's context); meaningful on household and companion scope. A household-scope record's write-time default (AGE-01's own engine work, no writer yet) is deterministic, never the judge model's judgment: adult_only when the subject is a memorialized person or the text falls in one of vocab/life-events.json's own adult_to_tell classes, child_ok otherwise. An adult may flip it either way on the Memory page (a confirmed household-scope record's flip is an edit with provenance, like any other); the judge itself never sets or raises a record's disclosure - only the deterministic write-time default and an adult's own edit ever touch this field."
                       },
+                      "offer_withheld": {
+                        "anyOf": [
+                          {
+                            "type": "boolean",
+                            "description": "NAT-07c: the memory judge's one withholding tag at extraction. True means this record must never be offered as an opening thread (\"how did the interview go?\"), even though it is not `sensitive`; the subject is one a person would rather raise themselves. It can only add withholding on top of the hub's deterministic floor, never lift it. Null or absent on records written before it existed, which read as not withheld by the judge. Distinct from `sensitive`, which withholds from shared surfaces and is the person's own."
+                          },
+                          {
+                            "nullable": true,
+                            "description": "NAT-07c: the memory judge's one withholding tag at extraction. True means this record must never be offered as an opening thread (\"how did the interview go?\"), even though it is not `sensitive`; the subject is one a person would rather raise themselves. It can only add withholding on top of the hub's deterministic floor, never lift it. Null or absent on records written before it existed, which read as not withheld by the judge. Distinct from `sensitive`, which withholds from shared surfaces and is the person's own."
+                          },
+                          {
+                            "nullable": true
+                          }
+                        ],
+                        "default": null,
+                        "description": "NAT-07c: the memory judge's one withholding tag at extraction. True means this record must never be offered as an opening thread (\"how did the interview go?\"), even though it is not `sensitive`; the subject is one a person would rather raise themselves. It can only add withholding on top of the hub's deterministic floor, never lift it. Null or absent on records written before it existed, which read as not withheld by the judge. Distinct from `sensitive`, which withholds from shared surfaces and is the person's own."
+                      },
                       "child_disclosure_set_by": {
                         "anyOf": [
                           {
