@@ -25,16 +25,12 @@ type SpokenMessage = { id?: unknown; role?: unknown };
  */
 export function useSpokenReply(messages: SpokenMessage[], scheduler: SentenceSpeechScheduler | null, speaking: boolean): Map<string, string> {
   const [, setTick] = useState(0);
-  const boundRef = useRef(new WeakMap<SentenceSpeechScheduler, string>());
   const cutRef = useRef(new Map<string, number>());
   const trackedRef = useRef<{ scheduler: SentenceSpeechScheduler; id: string } | null>(null);
 
-  const last = [...messages].reverse().find((message) => message.role === "assistant");
-  const lastId = last ? String(last.id) : undefined;
-  if (scheduler && lastId && !boundRef.current.has(scheduler)) boundRef.current.set(scheduler, lastId);
   const tracked = trackedRef.current;
   if (tracked && tracked.scheduler !== scheduler && tracked.scheduler.wasCutOff()) cutRef.current.set(tracked.id, tracked.scheduler.heardVisibleEndFine());
-  const currentId = scheduler ? boundRef.current.get(scheduler) : undefined;
+  const currentId = scheduler?.messageId;
   trackedRef.current = scheduler && currentId ? { scheduler, id: currentId } : null;
   if (scheduler && currentId && scheduler.wasCutOff()) cutRef.current.set(currentId, scheduler.heardVisibleEndFine());
 

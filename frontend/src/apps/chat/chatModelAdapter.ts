@@ -264,6 +264,7 @@ export function createChatModelAdapter(deps: ChatModelAdapterDeps): ChatModelAda
       const speakReplies = typeof deps.speakReplies === "function" ? deps.speakReplies() : (deps.speakReplies ?? true);
       const scheduler = new SentenceSpeechScheduler();
       deps.turnSchedulerRef.current = scheduler;
+      scheduler.messageId = unstable_assistantMessageId;
       scheduler.onFirstAudio = () => deps.onSpeakingChange?.(true);
       scheduler.onError = () => deps.onSpeechError?.();
       scheduler.onEnded = () => deps.onSpeakingChange?.(false);

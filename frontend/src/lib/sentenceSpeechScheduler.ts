@@ -71,6 +71,8 @@ export class SentenceSpeechScheduler {
   private readonly speechStream: typeof api.streamSpeech;
   private readonly scheduledSentences: Array<{ visibleEnd?: number; startTime: number; endTime: number }> = [];
   private heardEndAtStop?: number;
+  /** The thread message this reply voices, set by whoever starts the turn, so a screen can tell which message the voice belongs to. */
+  messageId?: string;
   private heardFineAtStop?: number;
   private endedNaturally = false;
   private cutOff = false;

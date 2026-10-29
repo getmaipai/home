@@ -7,6 +7,7 @@ import { heardText, useSpokenReply } from "@/shell/spokenReply";
 afterEach(cleanup);
 
 class FakeScheduler {
+  constructor(public messageId?: string) {}
   heard = 0;
   cut = false;
   ended = false;
@@ -39,7 +40,7 @@ describe("heardText", () => {
 
 describe("useSpokenReply", () => {
   test("shows only what has been said while the reply is being spoken, then the whole reply when it ends", () => {
-    const scheduler = new FakeScheduler();
+    const scheduler = new FakeScheduler("a1");
     const messages = [{ id: "u1", role: "user", content: [{ type: "text", text: "hi" }] }, reply("a1", FULL)];
     const { result, rerender } = renderHook(() => useSpokenReply(messages, asScheduler(scheduler), true));
     expect(result.current.get("a1")).toBe("");
@@ -51,6 +52,23 @@ describe("useSpokenReply", () => {
     expect(result.current.has("a1")).toBe(false);
   });
 
+  test("the voice belongs to its own message even while the previous reply is still the newest one in the thread", () => {
+    const old = new FakeScheduler("a1");
+    old.ended = true;
+    let scheduler = old;
+    let messages = [reply("a1", FULL)];
+    const { result, rerender } = renderHook(() => useSpokenReply(messages, asScheduler(scheduler), true));
+    expect(result.current.size).toBe(0);
+    scheduler = new FakeScheduler("a2");
+    act(() => rerender());
+    expect(result.current.has("a1")).toBe(false);
+    messages = [reply("a1", FULL), { id: "u2", role: "user", content: [{ type: "text", text: "and?" }] }, reply("a2", "Next one is long enough to cut.")];
+    scheduler.heard = 9;
+    act(() => rerender());
+    expect(result.current.has("a1")).toBe(false);
+    expect(result.current.get("a2")).toBe("Next one");
+  });
+
   test("a reply that is not read aloud is never held back", () => {
     const scheduler = new FakeScheduler();
     const { result } = renderHook(() => useSpokenReply([reply("a1", FULL)], asScheduler(scheduler), false));
@@ -58,7 +76,7 @@ describe("useSpokenReply", () => {
   });
 
   test("a cut-in keeps the heard words with an ellipsis, even after the next turn starts", () => {
-    const first = new FakeScheduler();
+    const first = new FakeScheduler("a1");
     let scheduler = first;
     let messages = [reply("a1", FULL)];
     const { result, rerender } = renderHook(() => useSpokenReply(messages, asScheduler(scheduler), true));
@@ -66,7 +84,7 @@ describe("useSpokenReply", () => {
     first.cut = true;
     act(() => rerender());
     expect(result.current.get("a1")).toBe("How are…");
-    scheduler = new FakeScheduler();
+    scheduler = new FakeScheduler("a2");
     messages = [reply("a1", FULL), { id: "u2", role: "user", content: [{ type: "text", text: "wait" }] }, reply("a2", "")];
     act(() => rerender());
     expect(result.current.get("a1")).toBe("How are…");

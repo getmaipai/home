@@ -205,6 +205,18 @@ describe("companion mention request", () => {
     } finally { env.restore(); }
   });
 
+  test("the reply's voice is tagged with the id of the message it speaks", async () => {
+    const env = stubEnvironment(ndjsonStream([{ type: "done", value: { turn_id: "turn-voice-id", reply: { text: "Hello" }, source: "model", safety: SAFETY } }]));
+    try {
+      const turnSchedulerRef: { current: { messageId?: string } | null } = { current: null };
+      const user = fakeUserMessage("hi");
+      const adapter = createChatModelAdapter({ consumeThinking: () => false, consumeSupersedes: () => undefined, turnSchedulerRef: turnSchedulerRef as never, getConversationId: async () => "conv-1" });
+      const options = { messages: [user], unstable_parentId: "user-1", unstable_assistantMessageId: "reply-7", runConfig: {}, abortSignal: new AbortController().signal, context: {} } as unknown as ChatModelRunOptions;
+      for await (const result of runAdapter(adapter, options)) void result;
+      expect(turnSchedulerRef.current?.messageId).toBe("reply-7");
+    } finally { env.restore(); }
+  });
+
   test("retry for the current speaker and old replies without answered_by send no mention", async () => {
     expect(await retryBody({ companion_id: "current-companion" }, false)).not.toHaveProperty("mention_companion_id");
     expect(await retryBody(null, false)).not.toHaveProperty("mention_companion_id");
