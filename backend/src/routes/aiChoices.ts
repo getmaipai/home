@@ -183,6 +183,9 @@ aiChoicesRoutes.openapi(choicesRoute, async (c) => {
   // The plan and the memory reading do not depend on the list: start them together so the page waits for the slowest, not the sum.
   const planned = loadPlan();
   const memory = systemAvailableBytes();
+  // The two chat-model reads do not depend on the list either; waiting for them after it added their time to the page's.
+  const chatStates = Promise.all([uncensoredChoiceState(), addedChatChoiceStates()]);
+  chatStates.catch(() => undefined);
   try { list = await listStackComponents(); } catch (error) {
     if (error instanceof StackComponentError) message = error.message;
     else throw error;
@@ -190,7 +193,7 @@ aiChoicesRoutes.openapi(choicesRoute, async (c) => {
   if (list === null) {
     return c.json({ stack: "unreachable" as const, message, tier: null, free_disk_bytes: null, installed_bytes: 0, cards: [], alwaysOn: { bytes: 0, rowIds: [] }, recommended: null, unused_bytes: 0, memory_available_bytes: null }, 200);
   }
-  const state: AiState = { plan: await planned, components: list.components, settings: readAiSettings(), freeBytes: list.free_disk_bytes, list, uncensored: await uncensoredChoiceState(), addedChats: await addedChatChoiceStates() };
+  const state: AiState = { plan: await planned, components: list.components, settings: readAiSettings(), freeBytes: list.free_disk_bytes, list, uncensored: (await chatStates)[0], addedChats: (await chatStates)[1] };
   const { cards, alwaysOn } = buildAiCards(choicesInput(state));
   return c.json({
     stack: "ok" as const, message: null, tier: list.tier, free_disk_bytes: list.free_disk_bytes, installed_bytes: list.installed_bytes,

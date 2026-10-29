@@ -11,6 +11,20 @@ afterEach(() => { cleanup(); globalThis.fetch = realFetch; });
 const wakeChoice = { id: "wakeword.detector", job: "wakeword", kind: "switch", label: "Hey Jarvis", description: "Hey Jarvis.", name: "Hey Jarvis", rowIds: [], recommended: true, current: false, state: "notInstalled", percent: null, failure: null, downloadBytes: 3_700_000, installedBytes: 3_700_000, ramBytes: 3_700_000, ramBasis: "estimate", stateText: "", blockedReason: null, action: "get", setting: null, chosenNotReady: false, details: [] };
 const overview = { stack: "ok", message: null, tier: "p128", free_disk_bytes: 1e12, installed_bytes: 0, cards: [{ id: "wakeword", title: "Wake Word", summary: "", chip: "", choices: [wakeChoice], notReady: false, unavailable: null }], alwaysOn: { bytes: 0, rowIds: [] }, recommended: null, unused_bytes: 0 };
 
+describe("AiGlance first paint", () => {
+  test("the page draws the last answer at once while the engine's reply is still on its way", async () => {
+    localStorage.setItem("maipai.ai-choices.v1", JSON.stringify(overview));
+    globalThis.fetch = ((input: RequestInfo | URL) => {
+      const path = (typeof input === "string" ? input : input.toString()).split("?")[0]!;
+      if (path.endsWith("/api/host/hardware")) return Promise.resolve(Response.json({ platform: "darwin", totalRamGb: 24, cpuCount: 8, isAppleSilicon: true, unifiedMemoryGb: 24, cudaDevices: [] }));
+      return new Promise<Response>(() => {});
+    }) as typeof fetch;
+    const view = renderWithQueryClient(<MemoryRouter><AiGlance {...({ card: { copy: {} } } as unknown as Parameters<typeof AiGlance>[0])} /></MemoryRouter>);
+    expect(view.getByTestId("ai-glance")).toBeTruthy();
+    localStorage.removeItem("maipai.ai-choices.v1");
+  });
+});
+
 describe("AiGlance Apply", () => {
   test("a staged switch shows the sticky bar and Apply posts the choice", async () => {
     const posts: string[] = [];

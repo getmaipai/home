@@ -74,21 +74,40 @@ export function counts(rows: GlanceRow[]): { custom: number; recommended: number
 }
 
 export interface Projection {
+  /** The most memory Home's models can hold at once, now and after the staged changes: the always-loaded ones plus what loads when used. */
   ramNow: number; ramAfter: number;
+  /** Of that, what stays loaded all the time (chat, voice, the wake word). */
+  alwaysNow: number; alwaysAfter: number;
   /** Bytes the staged choices still have to download. */
   downloadBytes: number;
 }
 
-export function project(rows: GlanceRow[]): Projection {
-  let ramNow = 0; let ramAfter = 0; let downloadBytes = 0;
+// The engine's memory classes (docs/design/memory-management-2026-10-25.md section 3): chat and voice stay loaded; pictures, the
+// coding model and vision load on first use and give way when something else needs the room; video and music run one at a time.
+// Adding every model's memory together shows a computer that can never hold them, which is not how the engine runs them.
+const ALWAYS_LOADED = new Set<AiJobId>(["chat", "voice", "wakeword"]);
+const ONE_AT_A_TIME = new Set<AiJobId>(["videos", "music"]);
+
+function memoryOf(rows: GlanceRow[], pick: (row: GlanceRow) => AiChoice | null): { always: number; peak: number } {
+  let always = 0; let loadsWhenUsed = 0; let largestTurn = 0; let picturePool = 0;
   for (const row of rows) {
-    if (row.liveEnabled && row.live) ramNow += row.live.ramBytes;
-    if (row.shownEnabled && row.shown) {
-      ramAfter += row.shown.ramBytes;
-      if (row.staged && row.shown.state !== "installed") downloadBytes += row.shown.downloadBytes;
-    }
+    const choice = pick(row);
+    if (!choice) continue;
+    if (ALWAYS_LOADED.has(row.job)) always += choice.ramBytes;
+    else if (ONE_AT_A_TIME.has(row.job)) largestTurn = Math.max(largestTurn, choice.ramBytes);
+    // Quick and detailed pictures are the same pool: one create model is resident at a time.
+    else if (row.job === "pictures" || row.job === "picturesdetailed") picturePool = Math.max(picturePool, choice.ramBytes);
+    else loadsWhenUsed += choice.ramBytes;
   }
-  return { ramNow, ramAfter, downloadBytes };
+  return { always, peak: always + Math.max(loadsWhenUsed + picturePool, largestTurn) };
+}
+
+export function project(rows: GlanceRow[]): Projection {
+  let downloadBytes = 0;
+  for (const row of rows) if (row.shownEnabled && row.shown && row.staged && row.shown.state !== "installed") downloadBytes += row.shown.downloadBytes;
+  const now = memoryOf(rows, (row) => (row.liveEnabled ? row.live : null));
+  const after = memoryOf(rows, (row) => (row.shownEnabled ? row.shown : null));
+  return { ramNow: now.peak, ramAfter: after.peak, alwaysNow: now.always, alwaysAfter: after.always, downloadBytes };
 }
 
 /** The choices Download missing (and Apply) must fetch: chosen and on, not on the computer. */

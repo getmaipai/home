@@ -66,6 +66,22 @@ describe("project and missingRows", () => {
     expect(projection.ramAfter - projection.ramNow).toBe(5e9 - 1.1e9);
   });
 
+  test("memory is what can be loaded at once: video and music take turns, pictures and the coder load when used", () => {
+    const big = (id: string, gb: number) => choice(id, { kind: "switch", current: true, ramBytes: gb * 1e9, setting: { key: "x", value: true } });
+    const all = [
+      card("chat", [choice("chat.standard", { current: true, ramBytes: 21e9 })]),
+      card("voice", [choice("voice.standard", { kind: "fixed", current: true, ramBytes: 4e9 })]),
+      card("pictures", [choice("pictures.klein", { current: true, ramBytes: 16e9 })]),
+      card("coding", [big("coding.helper", 23)]),
+      card("videos", [choice("videos.quick", { current: true, ramBytes: 44e9 })]),
+      card("music", [big("music.make", 33)]),
+    ];
+    const projection = project(buildRows(all, none, {}));
+    expect(projection.alwaysNow).toBe(25e9);
+    // The always-loaded 25 GB, plus the larger of: pictures and the coder together (39 GB) or the biggest single video or song (44 GB).
+    expect(projection.ramNow).toBe(25e9 + 44e9);
+  });
+
   test("missing is a chosen, on, not installed model", () => {
     const missing = [card("chat", [choice("chat.standard", { current: true, state: "notInstalled", downloadBytes: 3e9 })])];
     expect(missingRows(buildRows(missing, none, {})).map((row) => row.job)).toEqual(["chat"]);
