@@ -279,7 +279,7 @@ async function pollSheetJob(id: string, job: SheetJob, actor: PersonRow, compani
       const updated = readLook(companionId), sheet = updated.sheet;
       if (sheet) updateSheet(companionId, { ...sheet, views: { ...sheet.views, [view.slot]: saved.id } });
       job.index++;
-      if (job.index >= SHEET_VIEWS.length) { const doneLook = readLook(companionId); if (doneLook.sheet) updateSheet(companionId, { ...doneLook.sheet, state: "needs_review" }); job.state = "done"; job.percent = 100; activeByCompanion.delete(companionId); return; }
+      if (job.index >= SHEET_VIEWS.length) { const doneLook = readLook(companionId); if (doneLook.sheet) updateSheet(companionId, { ...doneLook.sheet, state: "approved", approved_by: actor.displayName, approved_at: new Date().toISOString() }); job.state = "done"; job.percent = 100; activeByCompanion.delete(companionId); return; }
       const restPath = versionPath(companionId, look.rest!); if (!restPath) throw new Error("The rest picture could not be found. Choose it again and retry the sheet.");
       const rest = new Uint8Array(readFileSync(restPath)), originalPath = versionOriginalPath(companionId, look.rest!), sourceBytes = originalPath ? new Uint8Array(readFileSync(originalPath)) : await compositeOnKey(rest, key), instruction = SHEET_VIEWS[job.index]!.prompt.replaceAll("<key>", key);
       const nextForm = editForm(sourceBytes, instruction, Boolean(originalPath)); nextForm.append("model", resolveCompanionEdit().model);

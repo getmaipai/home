@@ -4,6 +4,7 @@ import { resumeMusicJobs } from "@/lib/music/jobs";
 // later import (app, db, keystore) can open the database.
 import { instanceLock } from "@/lib/bootGuard";
 import { startLiveArtSweep } from "@/lib/companionArtCheck";
+import { sweepAbandonedDrafts } from "@/lib/sweepAbandonedDrafts";
 import { startTrashSweeper } from "@/lib/trash/sweep";
 import { startMediaScanner } from "@/lib/media/scan";
 import { resumePictureJobs } from "@/lib/pictures/jobs";
@@ -111,6 +112,8 @@ void syncStackRequirementIssue();
 void warmStack();
 // COMPANION-ART-CHECK-01: companion art that was live before art was checked is checked once; what fails is narrowed to the audience it does pass.
 startLiveArtSweep();
+try { sweepAbandonedDrafts(); } catch { /* maintenance sweep is disposable */ }
+setInterval(() => { try { sweepAbandonedDrafts(); } catch { /* maintenance sweep is disposable */ } }, 60 * 60 * 1000).unref();
 await recordBootGap();
 void recordStatusSample();
 

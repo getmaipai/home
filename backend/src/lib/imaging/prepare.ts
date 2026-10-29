@@ -2,9 +2,12 @@ import sharp from "sharp";
 import { findSubject } from "./subject";
 import { fitToFrame, type FitOptions } from "./fit";
 import { imagingTargets } from "./targets";
+import { cropToFrame, type Frame } from "./crop";
 
-export type PrepareStep = "upscale" | "remove_background" | "find_subject" | "fit";
+export type PrepareStep = "upscale" | "crop" | "remove_background" | "find_subject" | "fit";
 export interface PrepareOptions extends FitOptions {
+  frame?: Frame;
+  skipBackgroundRemoval?: boolean;
   upscaleBelowShortSide?: number;
   upscale?: (bytes: Uint8Array) => Promise<Uint8Array>;
   removeBackground?: (bytes: Uint8Array) => Promise<Uint8Array>;
@@ -12,6 +15,7 @@ export interface PrepareOptions extends FitOptions {
 }
 export async function preparePicture(bytes: Uint8Array, options: PrepareOptions = imagingTargets.portrait): Promise<{ bytes: Uint8Array; steps: PrepareStep[] }> {
   let current: Uint8Array<ArrayBufferLike> = new Uint8Array(bytes); const steps: PrepareStep[] = [];
+  if (options.frame) { current = await cropToFrame(current, options.frame); steps.push("crop"); }
   let meta = await sharp(current, { limitInputPixels: 40_000_000, failOn: "error" }).metadata();
   if (!meta.width || !meta.height) throw new Error("That picture could not be read. Use a PNG, JPEG or WebP picture and try again.");
   const threshold = options.upscaleBelowShortSide ?? options.size;
@@ -24,7 +28,7 @@ export async function preparePicture(bytes: Uint8Array, options: PrepareOptions 
   if (meta.hasAlpha) {
     try { transparent = (await sharp(current).stats()).channels[3]?.min !== 255; } catch { /* decode at fit gives the caller's normal error */ }
   }
-  if (!transparent) {
+  if (!transparent && !options.skipBackgroundRemoval) {
     if (!options.removeBackground) throw new Error("The background remover isn't installed. Install it from the engine's model list, then try again.");
     current = await options.removeBackground(current); steps.push("remove_background");
   }

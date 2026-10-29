@@ -57,7 +57,10 @@ export async function runImageTool(operation: string, bytes: Uint8Array, options
 
 export async function removeBackground(actor: PersonRow, bytes: Uint8Array): Promise<Uint8Array> {
   const status = await editToolsStatus(actor);
-  if (!status.tools.remove_background.enabled) throw new Error(status.tools.remove_background.reason ?? status.note ?? toolMissing("remove_background"));
+  if (!status.tools.remove_background.enabled) {
+    const reason = status.tools.remove_background.reason ?? status.note ?? toolMissing("remove_background");
+    throw new Error(/background remover.*isn't installed/i.test(reason) ? toolMissing("remove_background") : reason);
+  }
   return (await runImageTool("remove_background", bytes, { timeoutMs: 2500 })).png;
 }
 export async function upscale(actor: PersonRow, bytes: Uint8Array, extra: Record<string, string> = {}): Promise<Uint8Array> {

@@ -426,6 +426,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/imageSimilarity/geometry.ts` | MIN_INLIERS, MIN_AGREEMENT, __setOpencvLoaderForTests, warmGeometry, geometricFeatures, verifyPair |
 | `backend/src/lib/imageSimilarity/index.ts` | compare |
 | `backend/src/lib/imageUpload.ts` | MAX_CHAT_IMAGE_PIXELS, MAX_CHAT_IMAGE_EDGE, cleanChatImage, chatImageThumbnail, cleanChatImageFile |
+| `backend/src/lib/imaging/crop.ts` | cropToFrame |
 | `backend/src/lib/imaging/fit.ts` | fitToFrame |
 | `backend/src/lib/imaging/focal.ts` | __setNewsFocalForTests, focalCentre, focalPointOf |
 | `backend/src/lib/imaging/prepare.ts` | preparePicture |
@@ -792,6 +793,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/subjects.ts` | findEntityByName, ensureSubjectEntity, findSubjectByName, ensurePersonEntity, RELATION_PHRASES, writeRelation |
 | `backend/src/lib/summaryRefresh.ts` | scheduleSummaryRefresh, __setSummaryRefreshDelayForTests, __clearPendingSummaryRefreshesForTests |
 | `backend/src/lib/surfaceClass.ts` | surfaceClassOf, isWrittenAdultTurn, promptSurfaceClassFor |
+| `backend/src/lib/sweepAbandonedDrafts.ts` | sweepAbandonedDrafts |
 | `backend/src/lib/systemFold.ts` | FOLDED_NOTE_LABEL, foldedBlock, foldLateSystemMessages |
 | `backend/src/lib/tailnetNode.ts` | whoisViaSocket, selfLoginViaSocket, __setSelfLoginForTests, __setWhoisForTests, tailnetServeAllows |
 | `backend/src/lib/tailscale.ts` | isTailscaleRequest, interpretTailscaleStatusJson, getTailscaleStatus, getTailscaleLeafForServer, ensureTailscaleCert, setTailscaleRenewalActive |

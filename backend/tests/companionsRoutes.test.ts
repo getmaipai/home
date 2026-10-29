@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { OpenAPIHono } from "@hono/zod-openapi";
 import { createHash } from "node:crypto";
 import { join } from "node:path";
-import { rmSync, mkdirSync, writeFileSync, existsSync } from "node:fs";
+import { rmSync, mkdirSync, writeFileSync, existsSync, utimesSync, readFileSync } from "node:fs";
 import { db } from "@/db";
 import { and, eq } from "drizzle-orm";
 import { devices, people, sessions, settingsValues, jobs, conversations } from "@/db/schema";
@@ -32,6 +32,7 @@ import media from "@maipai/spec/vocab/companion-media.json";
 import { __setAgeCheckRunnerForTests, __resetAgeCheckForTests } from "@/lib/pictures/ageCheck";
 import { __setChildSafetyRunnerForTests } from "@/lib/pictures/laneGate";
 import { __setKeyframesForTests } from "@/lib/pictures/keyframes";
+import { sweepAbandonedDrafts } from "@/lib/sweepAbandonedDrafts";
 
 const app = new OpenAPIHono();
 app.route("/api/companions", companionsRoutes);
@@ -284,7 +285,7 @@ describe("companion look generation jobs", () => {
     expect(await (await request(poll, adult)).json()).toMatchObject({ state: "done" });
     expect(submitted).toHaveLength(3); expect(submitted[0]).toContain("three quarters to its left"); expect(submitted[1]).toContain("three quarters to its right"); expect(postedSources).toEqual(Array.from({ length: 3 }, () => ({ image: Buffer.from(stackOriginal).toString("base64"), image_source: "generated" })));
     const look = await (await request(`companions/${created.value.id}/look`, adult)).json() as { versions: unknown[]; sheet: { card: { text: string }; views: Record<string, { version_id: string }>; state: string }; ready_for_video: boolean };
-    expect(look.sheet).toMatchObject({ state: "needs_review", card: { text: "a red fox wearing a blue scarf" } }); expect(Object.keys(look.sheet.views)).toEqual(["left", "right", "mouth"]); expect(look.ready_for_video).toBe(false);
+    expect(look.sheet).toMatchObject({ state: "approved", card: { text: "a red fox wearing a blue scarf" } }); expect(Object.keys(look.sheet.views)).toEqual(["left", "right", "mouth"]); expect(look.ready_for_video).toBe(true);
     expect(look.versions).toHaveLength(4);
     expect((await request(`companions/${created.value.id}/look/sheet/key`, adult, "PUT", { key: "#FF00FF" })).status).toBe(200);
     expect((await request(`companions/${created.value.id}/look/sheet/key`, adult, "PUT", { key: "#00FF00" })).status).toBe(200);
@@ -967,5 +968,66 @@ describe("household companion routes", () => {
     // A verdict is kept per file, so a different picture is needed to see the new answer.
     const other = new Uint8Array(await sharp({ create: { width: 1024, height: 1024, channels: 4, background: { r: 0, g: 0, b: 0, alpha: 0 } } }).composite([{ input: await sharp({ create: { width: 400, height: 320, channels: 4, background: { r: 200, g: 40, b: 40, alpha: 1 } } }).png().toBuffer(), left: 300, top: 340 }]).png().toBuffer());
     expect((await upload(path, adult, other)).status).toBe(201);
+  });
+
+  test("name-only draft is idempotent for its author and starts in the maker's age band", async () => {
+    const adult = addPerson("draft-author", "adult"), teen = addPerson("draft-teen", "teen");
+    const first = await request("companions/draft", adult, "POST", { name: "New Finch" }), firstBody = await first.json() as { id: string };
+    const second = await request("companions/draft", adult, "POST", { name: "New Finch" });
+    expect(first.status).toBe(201); expect(second.status).toBe(200); expect((await second.json() as { id: string }).id).toBe(firstBody.id);
+    expect(getHouseholdCompanion(firstBody.id)?.companion).toMatchObject({ status: "draft", audience: "adult" });
+    const teenReply = await request("companions/draft", teen, "POST", { name: "Teen Finch" }), teenId = (await teenReply.json() as { id: string }).id;
+    expect(teenReply.status).toBe(201); expect(getHouseholdCompanion(teenId)?.companion?.audience).toBe("teen"); expect(readLook(teenId).versions).toHaveLength(0);
+  });
+
+  test("draft sweep removes only old empty drafts and logs count without identifiers", async () => {
+    const author = { display_name: "Author", person_id: "sweep-person" };
+    const make = (name: string) => { const result = createHouseholdCompanion({ ...fixture(), display_name: name }, author); if (!result.ok) throw new Error(result.error); return result.value.id; };
+    const makeBlank = (name: string) => { const result = createHouseholdCompanion({ display_name: name, formality: "neutral", complexity: "standard", engagement: "balanced", filler_density: "light", status: "draft" } as never, author); if (!result.ok) throw new Error(result.error); return result.value.id; };
+    const oldEmpty = makeBlank("Old empty draft"), oldWithPicture = make("Old pictured draft"), young = makeBlank("Young draft"), oldPersona = make("Old persona draft");
+    for (const marked of [oldEmpty, oldWithPicture, young]) writeFileSync(join(householdCompanionFolder(marked)!, ".name-only-draft"), "");
+        const png = await transparentPng(), picture = addVersion(oldWithPicture, png, { source: "upload", label: "Picture", width: 1024, height: 1024, from: null }); expect(picture.id).toBeTruthy();
+    const old = new Date(Date.now() - 8 * 24 * 60 * 60 * 1000); utimesSync(join(householdCompanionFolder(oldEmpty)!, "manifest.json"), old, old); utimesSync(join(householdCompanionFolder(oldPersona)!, "manifest.json"), old, old); utimesSync(join(householdCompanionFolder(oldWithPicture)!, "manifest.json"), old, old);
+    const logs: string[] = [], prior = console.warn; console.warn = (line?: unknown) => logs.push(String(line));
+    try { expect(sweepAbandonedDrafts()).toBe(1); } finally { console.warn = prior; }
+    expect(getHouseholdCompanion(oldEmpty)).toBeNull(); expect(getHouseholdCompanion(oldPersona)).not.toBeNull(); expect(getHouseholdCompanion(oldWithPicture)).not.toBeNull(); expect(getHouseholdCompanion(young)).not.toBeNull();
+    expect(logs).toHaveLength(1); expect(logs[0]).toContain('"count":1'); for (const privateValue of [oldEmpty, oldWithPicture, young, "sweep-person", "Old empty draft"]) expect(logs[0]).not.toContain(privateValue);
+  });
+
+  test("prepare saves a checked transparent square and records the crop step", async () => {
+    const adult = addPerson("prepare-author", "adult"), made = createHouseholdCompanion({ ...fixture(), display_name: "Prepare fixture" }, { display_name: "Author", person_id: "prepare-author" }); if (!made.ok) throw new Error(made.error);
+    const png = await transparentPng(), original = addVersion(made.value.id, png, { source: "upload", label: "Original", width: 1024, height: 1024, from: null });
+    __setAgeCheckRunnerForTests(async (images) => images.map(() => AGE_OK));
+    const prepared = await request(`companions/${made.value.id}/look/prepare`, adult, "POST", { version_id: original.id, remove_background: false, frame: { zoom: 2, x: .5, y: .5 } });
+    expect(prepared.status).toBe(201);
+    const resultId = (await prepared.json() as { id: string }).id, resultVersion = readLook(made.value.id).versions.find((version) => version.id === resultId)!;
+    const imagePath = join(householdCompanionFolder(made.value.id)!, "look", `${resultId}.png`), imageBytes = new Uint8Array(await Bun.file(imagePath).arrayBuffer()), metadata = await sharp(imageBytes).metadata(), alpha = await sharp(imageBytes).stats();
+    expect([metadata.width, metadata.height]).toEqual([1024, 1024]); expect(metadata.hasAlpha).toBe(true); expect(alpha.channels[3]?.min).toBe(0); expect(resultVersion.steps).toContain("crop");
+  });
+
+  test("withheld picture approval leaves the selected starting picture unchanged", async () => {
+    const adult = addPerson("approve-author", "adult"), made = createHouseholdCompanion({ ...fixture(), display_name: "Approve fixture" }, { display_name: "Author", person_id: "approve-author" }); if (!made.ok) throw new Error(made.error);
+    const png = await transparentPng(), first = addVersion(made.value.id, png, { source: "upload", label: "First", width: 1024, height: 1024, from: null }), next = addVersion(made.value.id, new Uint8Array(await sharp(png).modulate({ hue: 12 }).png().toBuffer()), { source: "upload", label: "Next", width: 1024, height: 1024, from: null });
+    setRest(made.value.id, first.id); __setAgeCheckRunnerForTests(async (images) => images.map(() => AGE_WITHHELD));
+    const response = await request(`companions/${made.value.id}/look/approve`, adult, "POST", { version_id: next.id });
+    expect(response.status).toBe(422); expect(readLook(made.value.id).rest).toBe(first.id); expect(readLook(made.value.id).sheet).toBeNull();
+  });
+
+  test("restyle reuses the picture edit job and stores the selected style", async () => {
+    const adult = addPerson("restyle-author", "adult"), made = createHouseholdCompanion({ ...fixture(), display_name: "Restyle fixture" }, { display_name: "Author", person_id: "restyle-author" }); if (!made.ok) throw new Error(made.error);
+    const image = await transparentPng(), original = await keyedPicture(); __setPictureStatusForTests(readyStatusForTests()); __setAgeCheckRunnerForTests(async (images) => images.map(() => AGE_OK));
+    __setPicturesFetchForTests((async (input, init) => { const url = String(input); if (url.endsWith("/v1/images/edits") && init?.method === "POST") return Response.json({ job: "restyle-job" }, { status: 202 }); if (url.endsWith("/restyle-job")) return Response.json({ job: "restyle-job", state: "done", progress: 1, data: [] }); if (url.endsWith("/restyle-job/0.png")) return new Response(image, { headers: { "content-type": "image/png" } }); return new Response("Not found", { status: 404 }); }) as typeof fetch);
+    const source = addVersion(made.value.id, image, { source: "generated", label: "Source", width: 1024, height: 1024, from: null }, original);
+    const response = await request(`companions/${made.value.id}/look/restyle`, adult, "POST", { version_id: source.id, style: "anime" }); expect(response.status).toBe(202);
+    const job = (await response.json() as { job: string }).job, poll = await request(`companions/${made.value.id}/look/jobs/${job}`, adult), body = await poll.json() as { state: string; versions: Array<{ id: string }> };
+    expect(body.state).toBe("done"); expect(readLook(made.value.id).versions.find((item) => item.id === body.versions[0]?.id)?.style).toBe("anime");
+  });
+
+  test("prepare reports the missing background remover sentence and stores nothing", async () => {
+    const adult = addPerson("prepare-missing-tool", "adult"), made = createHouseholdCompanion({ ...fixture(), display_name: "Missing remover fixture" }, { display_name: "Author", person_id: "prepare-missing-tool" }); if (!made.ok) throw new Error(made.error);
+    const image = await keyedPicture(), original = addVersion(made.value.id, image, { source: "upload", label: "Opaque source", width: 512, height: 512, from: null });
+    __setImageToolsForTests({ state: "idle", phase: null, vision: false, models: { isnet: false, lama: true, esrgan: true }, limits: {}, operations: ["resize"], reason: null } satisfies StackImageToolsStatus);
+    const response = await request(`companions/${made.value.id}/look/prepare`, adult, "POST", { version_id: original.id, remove_background: true });
+    expect(response.status).toBe(400); expect(await response.json()).toEqual({ error: "The background remover isn't installed. Install it from the engine's model list, then try again." }); expect(readLook(made.value.id).versions).toHaveLength(1);
   });
 });
