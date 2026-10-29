@@ -431,7 +431,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/imaging/prepare.ts` | preparePicture |
 | `backend/src/lib/imaging/subject.ts` | subjectBounds, findSubject |
 | `backend/src/lib/imaging/targets.ts` | imagingTargets |
-| `backend/src/lib/imaging/tools.ts` | runImageTool, removeBackground, upscale |
+| `backend/src/lib/imaging/tools.ts` | submitImageTool, fetchImageToolResult, runImageTool, removeBackground, upscale |
 | `backend/src/lib/installActions.ts` | volumesFor, sanitizeSelection, previewPlan, engineNeedsInstall, ensureEngineInstalling, beginInstall |
 | `backend/src/lib/installPlanWording.ts` | gbText, VOICE_LINE, wordPlan |
 | `backend/src/lib/installPreflight.ts` | isSupportedInstallPlatform, checkInstallPreflight, installPreflightBlockers |
