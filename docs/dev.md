@@ -9,7 +9,7 @@ only plays an approved take. The measurements are now advisory notes in the take
 (fewest notes, then the closest colours, then the steadiest size) is approved by itself; a person can still approve or unapprove any
 take. Takes saved under the old rules flip once on the next read (`normaliseLegacyReports`) and their state is approved when nobody
 had approved one. The age and audience checks on finished art are unchanged. The engine side (Stack `dada63a`) crossfades loops
-into a seamless cycle, premultiplies the colour half (ffmpeg 8.1.3 left the key colour in it) and keys pure backgrounds by hue so the
+into a clean loop, premultiplies the colour half (ffmpeg 8.1.3 left the key colour in it) and keys pure backgrounds by hue so the
 first frames are no longer tinted. Finishing a clip now overlaps the next clip's generation (`companionTakes.ts`), and the engine
 polls are 500 ms and 250 ms instead of 2 s and 1 s.
 
