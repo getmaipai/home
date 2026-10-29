@@ -4,6 +4,7 @@ import media from "@maipai/spec/vocab/companion-media.json";
 import { capOfStyle, type LookStyleId } from "@/lib/companionLookStyles";
 import { addVersion, chooseKeyColour, describeCharacter, keyOut, keyRgb, lookPromptFor, normalizePicture, readLook, updateSheet, versionOriginalPath, versionPath } from "@/lib/companionLook";
 import { fitToFrame } from "@/lib/imaging/fit";
+import { pasteHead, type BodyCanvas } from "@/lib/imaging/outpaint";
 import { imagingTargets } from "@/lib/imaging/targets";
 import { clippedEdges } from "@/lib/imaging/subject";
 import { removeBackground } from "@/lib/imaging/tools";
@@ -50,6 +51,8 @@ export interface LookJob {
   style?: string;
   /** Fit the finished picture to the portrait frame so the subject fills it, for pictures whose subject comes back smaller. */
   fitSubject?: boolean;
+  /** The person's own head, laid back over the result so the face is never the model's. */
+  headLayer?: Uint8Array;
   finalising?: Promise<void>;
 }
 interface SheetJob { companionId: string; personId: string; state: LookJobState; percent: number; versions: string[]; error: string | null; stackJob: string; index: number; model: string; quality: "quick" | "detailed"; promptHash: string; modelReported: string | null; finalising?: Promise<void> }
@@ -136,7 +139,7 @@ export async function startLookGeneration(input: { actor: PersonRow; companionId
   } finally { startingCompanions.delete(input.companionId); }
 }
 
-export async function startLookEdit(input: { actor: PersonRow; companionId: string; versionId: string; instruction: string; style?: LookStyleId; customStyle?: string; forceKeyComposite?: boolean; fitSubject?: boolean }): Promise<string> {
+export async function startLookEdit(input: { actor: PersonRow; companionId: string; versionId: string; instruction: string; style?: LookStyleId; customStyle?: string; forceKeyComposite?: boolean; fitSubject?: boolean; body?: BodyCanvas }): Promise<string> {
   const denial = pictureDenial(routeAudience(input.actor));
   if (denial) throw Object.assign(new Error(PICTURE_DENIAL_LINE[denial]), { status: 403 });
   const styleDenied = lookStyleGate(input.actor, input.style ?? "cartoon");
@@ -154,25 +157,26 @@ export async function startLookEdit(input: { actor: PersonRow; companionId: stri
     const look = readLook(input.companionId), version = look.versions.find((item) => item.id === input.versionId), path = versionPath(input.companionId, input.versionId);
     if (!version || !path) throw Object.assign(new Error("That picture could not be found. Choose one of this companion's pictures."), { status: 404 });
     const png = new Uint8Array(readFileSync(path)), originalPath = versionOriginalPath(input.companionId, version.id);
-    const sourceBytes = originalPath && !input.forceKeyComposite ? new Uint8Array(readFileSync(originalPath)) : await compositeOnNeutral(png);
+    const sourceBytes = input.body ? input.body.canvas : originalPath && !input.forceKeyComposite ? new Uint8Array(readFileSync(originalPath)) : await compositeOnNeutral(png);
     if (version.source === "upload" && routeAudience(input.actor).band === "teen") {
       const screened = await prepareEditSource({ audience: routeAudience(input.actor), bytes: sourceBytes, generated: false, text: instruction });
       if (!screened.ok) throw Object.assign(new Error(screened.line), { status: screened.status });
     }
     const form = new FormData();
     form.append("image", new File([new Uint8Array(sourceBytes)], "picture.png", { type: "image/png" }));
-    form.append("operation", "edit");
+    form.append("operation", input.body ? "edit_masked" : "edit");
+    if (input.body) form.append("mask", new File([new Uint8Array(input.body.mask)], "mask.png", { type: "image/png" }));
     const style = input.style ?? (version.style && version.style !== "keep" ? version.style as LookStyleId : undefined);
     const stylePhrase = !style ? "" : lookPromptFor("", look.key, style, input.customStyle).replace(/^\. A single character, full body, centred in the frame, standing in a relaxed neutral pose, facing the viewer, mouth closed, arms down\./, "").replace(/ Plain solid (green|magenta) background, no shadow, no ground, no text, no other objects\.$/, "").trim();
     form.append("instruction", stylePhrase ? `${instruction}. ${stylePhrase}` : instruction);
     // Only the exact bytes the picture model made count as generated; a picture put on a backdrop or cropped is sent as a photo.
-    form.append("image_source", originalPath && !input.forceKeyComposite && !descendsFromUpload(input.companionId, version.id) ? "generated" : "uploaded");
+    form.append("image_source", originalPath && !input.forceKeyComposite && !input.body && !descendsFromUpload(input.companionId, version.id) ? "generated" : "uploaded");
     form.append("audience", "all-ages");
     form.append("timeout_ms", "1");
     form.append("model", art.model);
     form.append("seed", String(companionSeed(input.companionId)));
     const submitted = await submitEdit(form);
-    register(submitted.job, { companionId: input.companionId, personId: input.actor.id, state: "queued", percent: 0, versions: [], error: null, count: 1, key: look.key, sourceVersion: version.id, instruction, model: art.model, quality: art.quality, promptHash: promptHash(instruction), modelReported: null, style, fitSubject: input.fitSubject });
+    register(submitted.job, { companionId: input.companionId, personId: input.actor.id, state: "queued", percent: 0, versions: [], error: null, count: 1, key: look.key, sourceVersion: version.id, instruction, model: art.model, quality: art.quality, promptHash: promptHash(instruction), modelReported: null, style, fitSubject: input.fitSubject, headLayer: input.body?.head });
     return submitted.job;
   } finally { startingCompanions.delete(input.companionId); }
 }
@@ -257,6 +261,7 @@ export async function pollLookJob(id: string, actor: PersonRow, companionId: str
         job.modelReported = reported;
         if (reported && reported !== job.model) throw new Error(COMPANION_MODEL_MISMATCH_LINE);
         const images = await Promise.all(Array.from({ length: job.count }, (_, index) => fetchPicture(id, index)));
+        if (job.headLayer) for (let index = 0; index < images.length; index++) images[index] = await pasteHead(images[index]!, job.headLayer);
         const withheld: string[] = [];
         for (let index = 0; index < images.length; index++) {
           if (wasCancelled()) return;

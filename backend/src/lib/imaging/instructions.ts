@@ -9,3 +9,6 @@ export const restyleInstruction = (): string => `Redraw this same character in t
 
 /** Draw in what the frame cut off, leaving what is already shown untouched. */
 export const fillCutOffInstruction = (edges: readonly string[]): string => `This picture cuts the character off at the ${edges.join(", ")}. Show the whole character: extend the picture to include the shoulders, both arms and hands and the rest of the body that are cut off, drawn naturally to match the clothing. ${FACE_AND_BODY} Keep everything already shown exactly as it is.`;
+
+/** Paint the rest of a person into the empty area around a picture that was placed on a plain canvas; the picture itself is not to change. */
+export const bodyFillInstruction = (): string => "Continue this picture downward and outward: draw the rest of the same one person's body in the empty grey area, with the shoulders, both arms and hands, the torso, legs and shoes, standing naturally with the arms at the sides, in clothing that matches what is already shown, in the same photographic or drawn style and lighting. There is exactly one person and one head. Do not change the part already drawn. Plain light grey background.";

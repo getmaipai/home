@@ -43,6 +43,8 @@ import { pictureDenial, PICTURE_DENIAL_LINE } from "@/lib/pictures/policy";
 import sharp from "sharp";
 import { preparePicture } from "@/lib/imaging/prepare";
 import { planFillCutOff } from "@/lib/imaging/fill";
+import { planBodyCanvas } from "@/lib/imaging/outpaint";
+import { bodyFillInstruction } from "@/lib/imaging/instructions";
 import { restyleInstruction, FACE_AND_BODY } from "@/lib/imaging/instructions";
 import type { Frame } from "@/lib/imaging/crop";
 import { imagingTargets } from "@/lib/imaging/targets";
@@ -393,9 +395,10 @@ companionsRoutes.openapi(completeRoute, async (c) => {
   const { version_id } = c.req.valid("json"), look = readLook(id), version = look.versions.find((item) => item.id === version_id), path = versionPath(id, version_id);
   if (!version || !path) return c.json({ error: "That picture could not be found." }, 404);
   try {
-    const plan = await planFillCutOff(new Uint8Array(readFileSync(path)), version.clipped);
+    const bytes = new Uint8Array(readFileSync(path)), plan = await planFillCutOff(bytes, version.clipped);
     if (!plan) return c.json({ error: "Nothing is cut off in this picture." }, 409);
-    const job = await startLookEdit({ actor, companionId: id, versionId: version_id, instruction: plan.instruction, forceKeyComposite: true, fitSubject: true });
+    const body = (await planBodyCanvas(bytes, plan.edges)) ?? undefined;
+    const job = await startLookEdit({ actor, companionId: id, versionId: version_id, instruction: body ? bodyFillInstruction() : plan.instruction, forceKeyComposite: true, fitSubject: true, ...(body ? { body } : {}) });
     return c.json({ job: driven(c.get("person"), id, job) }, 202);
   } catch (error) { const status = (error as { status?: number }).status ?? 503; return c.json({ error: error instanceof Error ? error.message : "The picture could not be completed. Try again." }, status as 403 | 404 | 409 | 422 | 503); }
 });
@@ -415,9 +418,10 @@ const FILL_FAILED_LINE = "The rest of the body could not be drawn in. Try Approv
  */
 async function drawMissingBody(actor: import("@/types").PersonRow, id: string, version: { id: string; clipped?: readonly string[] }): Promise<string> {
   const path = versionPath(id, version.id); if (!path) throw new Error(FILL_FAILED_LINE);
-  const plan = await planFillCutOff(new Uint8Array(readFileSync(path)), version.clipped as never);
+  const bytes = new Uint8Array(readFileSync(path)), plan = await planFillCutOff(bytes, version.clipped as never);
   if (!plan) return version.id;
-  const job = await startLookEdit({ actor, companionId: id, versionId: version.id, instruction: plan.instruction, forceKeyComposite: true, fitSubject: true });
+  const body = (await planBodyCanvas(bytes, plan.edges)) ?? undefined;
+  const job = await startLookEdit({ actor, companionId: id, versionId: version.id, instruction: body ? bodyFillInstruction() : plan.instruction, forceKeyComposite: true, fitSubject: true, ...(body ? { body } : {}) });
   for (let round = 0; round < 180; round++) {
     await new Promise((resolve) => setTimeout(resolve, process.env.NODE_ENV === "test" ? 5 : 2000));
     const state = await readLookJob(job, actor, id);

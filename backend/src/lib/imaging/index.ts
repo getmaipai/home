@@ -7,3 +7,4 @@ export * from "./prepare";
 export * from "./instructions";
 export * from "./backdrop";
 export * from "./fill";
+export * from "./outpaint";

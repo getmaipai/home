@@ -1210,7 +1210,7 @@ describe("household companion routes", () => {
     }) as typeof fetch);
     const source = addVersion(made.value.id, sourcePng, { source: "upload", label: "Cut picture", width: 1024, height: 1024, from: null, style: "anime", clipped: ["bottom"] });
     const response = await request(`companions/${made.value.id}/look/complete`, adult, "POST", { version_id: source.id }); expect(response.status).toBe(202);
-    const job = (await response.json() as { job: string }).job; expect(posted[0]?.instruction).toContain("at the bottom"); expect(posted[0]?.source).toBe("uploaded"); expect(posted[0]?.instruction).toContain("Keep everything already shown exactly as it is");
+    const job = (await response.json() as { job: string }).job; expect(posted[0]?.instruction).toContain("rest of the same one person"); expect(posted[0]?.source).toBe("uploaded"); expect(posted[0]?.instruction).toContain("Do not change the part already drawn");
     const keyed = await sharp(posted[0]!.image).raw().toBuffer({ resolveWithObject: true }); expect(keyed.info.width).toBe(1024); expect(keyed.info.height).toBe(1024); expect(keyed.data[1]).toBeGreaterThan(200);
     const poll = await request(`companions/${made.value.id}/look/jobs/${job}`, adult); const state = await poll.json() as { state: string; versions: Array<{ id: string }> }; expect(state.state).toBe("done");
     const saved = readLook(made.value.id).versions.find((version) => version.id === state.versions[0]?.id)!;
@@ -1297,7 +1297,7 @@ describe("household companion routes", () => {
     }) as typeof fetch);
     const source = addVersion(made.value.id, cut, { source: "upload", label: "Cut picture", width: 1024, height: 1024, from: null, style: "keep", clipped: ["bottom"] });
     await request(`companions/${made.value.id}/look/approve`, adult, "POST", { version_id: source.id });
-    expect(instructions[0]).toContain("at the bottom");
+    expect(instructions[0]).toContain("rest of the same one person");
     const look = readLook(made.value.id), rest = look.versions.find((version) => version.id === look.rest)!;
     expect(rest.id).not.toBe(source.id); expect(rest).toMatchObject({ source: "edit", from: source.id, clipped: [] }); expect(sources.length).toBeGreaterThan(0); expect(sources.every((value) => value === "uploaded")).toBe(true); /* everything drawn from an uploaded photo is sent as a photo, never as generated */
   });
