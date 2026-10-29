@@ -104,6 +104,28 @@ test("activity returns own task details and needs-you agrees with companion wait
   expect(card?.waiting_count).toBe(1);
 });
 
+describe("companion look styles", () => {
+  test("lists styles by age band before companion id routes and preserves look read styles", async () => {
+    const adult = addPerson("look-styles-adult", "adult"), teen = addPerson("look-styles-teen", "teen"), child = addPerson("look-styles-child", "child");
+    const styles = async (token: string) => (await request("companions/look-styles", token)).json() as Promise<{ styles: Array<{ id: string; label: string; custom: boolean }>; keep: { id: string; label: string } }>;
+    const adultStyles = await styles(adult), teenStyles = await styles(teen);
+    expect(adultStyles.styles).toHaveLength(6);
+    expect(adultStyles.styles.at(-1)).toMatchObject({ id: "custom", label: "Custom", custom: true });
+    expect(adultStyles.keep).toEqual({ id: "keep", label: "Keep as is" });
+    expect(teenStyles.styles).toHaveLength(5);
+    expect(teenStyles.styles.some((style) => style.id === "custom")).toBe(false);
+    const childResult = await request("companions/look-styles", child);
+    expect(childResult.status).toBe(403);
+    expect(await childResult.json()).toEqual({ error: "Only teens and adults can make a companion." });
+
+    const made = createHouseholdCompanion({ ...fixture(), display_name: "Style comparison" }, { display_name: "Adult", person_id: "look-styles-adult" });
+    if (!made.ok) throw new Error(made.error);
+    const look = await (await request(`companions/${made.value.id}/look`, adult)).json() as { styles: typeof adultStyles.styles; keep: typeof adultStyles.keep };
+    expect(look.styles).toEqual(adultStyles.styles);
+    expect(look.keep).toEqual(adultStyles.keep);
+  });
+});
+
 test("companion set routes materialize unset, add and remove per person, and enforce default and age limits", async () => {
   const adult = addPerson("person-set-route", "adult"), other = addPerson("person-set-other", "adult"), child = addPerson("person-set-child", "child"), teen = addPerson("person-set-teen", "teen");
   const created = createHouseholdCompanion({ ...fixture(), display_name: "Set candidate" }, { display_name: "Author", person_id: "person-set-other" });

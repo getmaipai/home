@@ -185,6 +185,19 @@ companionsRoutes.openapi(animationFileRoute, (c) => {
   return rangeResponse(bytes, file.endsWith(".png") ? "image/png" : "video/mp4", c.req.header("range"), { etag, cacheControl: "private, max-age=0, must-revalidate" });
 });
 
+const LookStyleChoice = z.object({ id: z.enum(LOOK_STYLE_IDS), label: z.string(), custom: z.boolean() });
+const KeepLookChoice = z.object({ id: z.literal("keep"), label: z.string() });
+function lookStyleChoices(band: "child" | "teen" | "adult") {
+  return { styles: stylesForBand(band).map(({ id, label }) => ({ id, label, custom: id === "custom" })), keep: { id: "keep" as const, label: "Keep as is" } };
+}
+const lookStylesRoute = createRoute({ method: "get", path: "/look-styles", tags: ["Companions"], summary: "List companion look styles for the signed-in person's age band", middleware: [requireAuth] as const,
+  responses: { 200: { content: { "application/json": { schema: z.object({ styles: z.array(LookStyleChoice), keep: KeepLookChoice }) } }, description: "Look styles available to this person." }, ...errorResponses({ 401: "Not signed in", 403: "Only teens and adults can make a companion." }) } });
+companionsRoutes.openapi(lookStylesRoute, (c) => {
+  const actor = c.get("person"), band = speakerAgeBand(actor, new Date());
+  if (band === "child" && !isOwnerOrAdmin(actor)) return c.json({ error: "Only teens and adults can make a companion." }, 403);
+  return c.json(lookStyleChoices(band), 200);
+});
+
 const detailRoute = createRoute({
   method: "get", path: "/{id}", tags: ["Companions"], summary: "One companion in full",
   middleware: [requireAuth] as const,
@@ -278,7 +291,7 @@ function lookAccess(actor: import("@/types").PersonRow, id: string): { status: 4
 const lookIdParam = z.object({ id: z.string().min(1).max(80).openapi({ param: { name: "id", in: "path" } }) });
 const lookVersionParam = z.object({ id: z.string().min(1).max(80), versionId: z.string().min(1).max(80).openapi({ param: { name: "versionId", in: "path" } }) });
 const SheetResponse = z.object({ views: z.object({ left: z.object({ version_id: z.string(), url: z.string() }).nullable(), right: z.object({ version_id: z.string(), url: z.string() }).nullable(), mouth: z.object({ version_id: z.string(), url: z.string() }).nullable() }), card: z.object({ text: z.string(), colours: z.array(z.string()), species: z.string() }).nullable(), key: z.enum([media.key.default, media.key.alternate]), state: z.enum(["empty", "making", "needs_review", "approved"]), approved_by: z.string().nullable(), approved_at: z.string().nullable() });
-const LookResponse = z.object({ versions: z.array(z.object({ id: z.string(), label: z.string(), source: z.enum(["upload", "generated", "edit"]), width: z.number().int(), height: z.number().int(), created_at: z.string(), from: z.string().nullable(), url: z.string() })), rest: z.string().nullable(), key: z.enum([media.key.default, media.key.alternate]), sheet: SheetResponse.nullable(), ready_for_video: z.boolean(), start_ready: z.boolean(), start_reason: z.string().optional(), can_generate: z.boolean(), generate_reason: z.string().optional(), styles: z.array(z.object({ id: z.enum(LOOK_STYLE_IDS), label: z.string(), custom: z.boolean() })), keep: z.object({ id: z.literal("keep" as const), label: z.string() }), audience_cap: z.enum(["all", "teen", "adult"]) });
+const LookResponse = z.object({ versions: z.array(z.object({ id: z.string(), label: z.string(), source: z.enum(["upload", "generated", "edit"]), width: z.number().int(), height: z.number().int(), created_at: z.string(), from: z.string().nullable(), url: z.string() })), rest: z.string().nullable(), key: z.enum([media.key.default, media.key.alternate]), sheet: SheetResponse.nullable(), ready_for_video: z.boolean(), start_ready: z.boolean(), start_reason: z.string().optional(), can_generate: z.boolean(), generate_reason: z.string().optional(), styles: z.array(LookStyleChoice), keep: KeepLookChoice, audience_cap: z.enum(["all", "teen", "adult"]) });
 const PromptPackResponse = z.object({ title: z.string(), prompt: z.string(), negative_prompt: z.string(), text: z.string() });
 const lookPromptRoute = createRoute({ method: "get", path: "/{id}/look/prompt", tags: ["Companions"], summary: "Get a copyable prompt for a companion picture", middleware: [requireAuth] as const,
   request: { params: lookIdParam }, responses: { 200: { content: { "application/json": { schema: PromptPackResponse } }, description: "A picture prompt and its full generation specification." }, ...errorResponses({ 401: "Not signed in", 403: "Only the author or an admin can read this companion's pictures", 404: "No household companion" }) } });
@@ -311,7 +324,7 @@ companionsRoutes.openapi(lookRoute, async (c) => {
   const startReady = Boolean(look.rest && versionOriginalPath(id, look.rest));
   const band = speakerAgeBand(c.get("person"), new Date()), restStyle = look.versions.find((version) => version.id === look.rest)?.style;
   const audienceCap = restStyle ? capOfStyle(restStyle) ?? "adult" : "all"; // no style recorded (an older companion): no cap, the checklist and art check still gate widening
-  return c.json({ versions: look.versions.map(({ id: versionId, label, source, width, height, created_at, from }) => ({ id: versionId, label, source, width, height, created_at, from: from ?? null, url: `/api/companions/${encodeURIComponent(id)}/look/${versionId}/image` })), rest: look.rest, key: look.key, sheet, ready_for_video: look.sheet?.state === "approved", start_ready: startReady, ...(!startReady ? { start_reason: TAKE_NO_ORIGINAL_LINE } : {}), ...generation, styles: stylesForBand(band).map(({ id: styleId, label }) => ({ id: styleId, label, custom: styleId === "custom" })), keep: { id: "keep" as const, label: "Keep as is"}, audience_cap: audienceCap }, 200);
+  return c.json({ versions: look.versions.map(({ id: versionId, label, source, width, height, created_at, from }) => ({ id: versionId, label, source, width, height, created_at, from: from ?? null, url: `/api/companions/${encodeURIComponent(id)}/look/${versionId}/image` })), rest: look.rest, key: look.key, sheet, ready_for_video: look.sheet?.state === "approved", start_ready: startReady, ...(!startReady ? { start_reason: TAKE_NO_ORIGINAL_LINE } : {}), ...generation, ...lookStyleChoices(band), audience_cap: audienceCap }, 200);
 });
 
 const lookGenerateBody = z.object({ prompt: z.string().max(600).optional(), style: z.enum(LOOK_STYLE_IDS).default("cartoon"), custom_style: z.string().min(1).max(120).optional(), count: z.number().int().min(1).max(4).default(4) }).superRefine((value, ctx) => { if (value.style === "custom" && !value.custom_style?.trim()) ctx.addIssue({ code: "custom", message: "Enter a custom style from 1 to 120 characters", path: ["custom_style"] }); });
