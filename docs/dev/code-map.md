@@ -354,8 +354,8 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/companionPersonalityDials.ts` | COMPANION_DIAL_OPTIONS |
 | `backend/src/lib/companionPortrait.ts` | portraitPath, retainedPortraitExists, readRetainedPortrait, retainCompanionPortrait, voiceVersion, companionVoiceVersion |
 | `backend/src/lib/companionPromptPack.ts` | picturePromptPack, clipPromptPack |
-| `backend/src/lib/companionStates.ts` | TAKE_LIMIT_LINE, MEDIA_ROOT_REMOTE_LINE, keyframePath, keyframeMetaPath, readKeyframeMeta, writeKeyframe |
-| `backend/src/lib/companionTakes.ts` | TAKE_RUN_BUSY_LINE, TAKE_QUICK_NOT_READY_LINE, TAKE_RUN_NOT_FOUND_LINE, TAKE_RUN_TIMEOUT_LINE, TAKE_RETRY_WAIT_MS, TAKE_NEGATIVE_PROMPT |
+| `backend/src/lib/companionStates.ts` | TAKE_LIMIT_LINE, CLIP_MISSING_LINE, FINISH_POLL_MS, MEDIA_ROOT_REMOTE_LINE, keyframePath, keyframeMetaPath |
+| `backend/src/lib/companionTakes.ts` | TAKE_RUN_BUSY_LINE, TAKE_QUICK_NOT_READY_LINE, TAKE_RUN_NOT_FOUND_LINE, TAKE_RUN_TIMEOUT_LINE, TAKE_RETRY_WAIT_MS, TAKE_POLL_MS |
 | `backend/src/lib/companions.ts` | companionsAllowed |
 | `backend/src/lib/companionsApp.ts` | currentCompanionId, mayUseCompanion, companionAreaOn, canCreateCompanion, cardOf, listCompanionCards |
 | `backend/src/lib/composer.ts` | COMPOSE_FALLBACK_LINE, COMPOSING_STATUS_TEXT, COMPOSER_MAX_CALLS, COMPOSE_FAILURE_LINE, DEFAULT_MOVES, groundedIn |
