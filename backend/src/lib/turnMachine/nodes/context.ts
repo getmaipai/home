@@ -421,11 +421,14 @@ export const contextNode: Node<ContextInput, ContextOutput> = async (state, inpu
     const band = turnAgeBand(state.surface, state.actor, state.speakerEvidence, now, state.deviceId);
     const confirmed = !state.speakerEvidence || state.speakerEvidence.level === "confirmed";
     const personal = (state.surface === "chat" || state.surface === "phone") && confirmed && !speakerIsAnonymous(state);
+    // The reads run only when the gates could pass: a later turn or a task-carrying first turn gets nothing, so it pays nothing.
+    const firstNoTask = preview.userTexts.length === 0 && !preview.summaryLine && state.signal.no_task === true;
+    const wantsOpening = firstNoTask && band !== "child" && getPersonSettingValue(state.actor, PICK_UP_THREADS_KEY) === true;
     const opening = conversationOpening(
       { id: state.actor.id, band, pickUpThreads: getPersonSettingValue(state.actor, PICK_UP_THREADS_KEY) === true },
       now,
-      { firstTurn: preview.userTexts.length === 0 && !preview.summaryLine, noTask: state.signal.no_task === true, lastTurnAt: personal ? lastTurnBefore(state.actor.id, conversation.id) : null, sharedOrUnidentified: !personal, incognito: false },
-      personal && band !== "child" ? readOpeningRecords(state.actor.id, now) : [],
+      { firstTurn: preview.userTexts.length === 0 && !preview.summaryLine, noTask: state.signal.no_task === true, lastTurnAt: personal && firstNoTask ? lastTurnBefore(state.actor.id, conversation.id) : null, sharedOrUnidentified: !personal, incognito: false },
+      personal && wantsOpening ? readOpeningRecords(state.actor.id, now) : [],
     );
     if (opening) {
       items.push({ id: "opening", text: renderConversationOpening(opening, { care: state.plan.moves.care === "required" }), source: "opening", subjects: [], disclosure: "child_ok" });

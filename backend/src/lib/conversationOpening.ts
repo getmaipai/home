@@ -6,6 +6,7 @@ import { and, desc, eq, gte, inArray, isNull, ne, or } from "drizzle-orm";
 import { db } from "@/db";
 import { conversationTurns, memoryRecords, openQuestions } from "@/db/schema";
 import { markOpenQuestionAsked, queueOpenQuestion } from "@/lib/conversationHistory";
+import { STATE_EXPIRY_DAYS } from "@/lib/memory";
 import { sanitizeForPrompt } from "@/lib/promptSanitize";
 import { threadOfferFloor } from "@/lib/threadOfferFloor";
 
@@ -77,8 +78,8 @@ export interface OpeningRecord {
 
 /** How far back a thread reaches: an event that ended, or a goal or project set, in the last 14 days. */
 export const THREAD_WINDOW_DAYS = 14;
-/** A state is a mood only this long (the same bound as the maintenance expiry in memory.ts). */
-export const MOOD_WINDOW_DAYS = 7;
+/** A state is a mood only this long: the maintenance expiry in memory.ts, one definition. */
+export const MOOD_WINDOW_DAYS = STATE_EXPIRY_DAYS;
 const DAY_MS = 86_400_000;
 const MAX_SUBJECT_CHARS = 140;
 
@@ -117,9 +118,11 @@ function threadOf(record: OpeningRecord, person: OpeningPerson, now: Date): { th
   if (kind === "event") {
     // Only an event whose own end date passed qualifies; person, decay, edit, forgotten and unset reasons never do.
     if (record.status !== "archived" || record.archivedReason !== "end_date") return null;
-    const age = ageMs(record.expiredAt, now);
+    // The window runs from the event's own end date; the archive time only stands in when no end date was kept.
+    const endedAt = record.validTo ?? record.expiredAt;
+    const age = ageMs(endedAt, now);
     if (age === null || age < 0 || age > window) return null;
-    return { thread: { record_id: record.id, kind, subject: record.text, when: (record.validTo ?? record.expiredAt!).slice(0, 10) }, at: now.getTime() - age };
+    return { thread: { record_id: record.id, kind, subject: record.text, when: endedAt!.slice(0, 10) }, at: now.getTime() - age };
   }
   if (record.status !== "active") return null;
   const age = ageMs(record.createdAt, now);

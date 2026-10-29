@@ -1316,7 +1316,7 @@ const DECAY_FACTOR = 0.995; // score = DECAY_FACTOR ^ hours-since-last-used
 const ARCHIVE_SCORE_THRESHOLD = 0.1;
 const ARCHIVE_MIN_AGE_DAYS = 30;
 const EPISODIC_CAP_PER_SCOPE = 200;
-const STATE_EXPIRY_DAYS = 7; // category "state" always expires hard after this, any tier
+export const STATE_EXPIRY_DAYS = 7; // category "state" always expires hard after this, any tier
 
 function decayScore(importance: number, uses: number, lastUsedAt: string): number {
   const hoursSince = (Date.now() - new Date(lastUsedAt).getTime()) / 3_600_000;
