@@ -56474,6 +56474,101 @@
         }
       }
     },
+    "/api/companions/look-styles": {
+      "get": {
+        "tags": [
+          "Companions"
+        ],
+        "summary": "List companion look styles for the signed-in person's age band",
+        "responses": {
+          "200": {
+            "description": "Look styles available to this person.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "styles": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "enum": [
+                              "cartoon",
+                              "anime",
+                              "photorealistic",
+                              "3d",
+                              "pixel",
+                              "custom",
+                              "watercolor"
+                            ]
+                          },
+                          "label": {
+                            "type": "string"
+                          },
+                          "custom": {
+                            "type": "boolean"
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "label",
+                          "custom"
+                        ]
+                      }
+                    },
+                    "keep": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string",
+                          "enum": [
+                            "keep"
+                          ]
+                        },
+                        "label": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "label"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "styles",
+                    "keep"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Only teens and adults can make a companion.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/companions/{id}": {
       "get": {
         "tags": [
