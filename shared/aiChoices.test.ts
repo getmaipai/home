@@ -42,11 +42,11 @@ function component(overrides: Partial<AiComponentLike> & { id: string }): AiComp
   };
 }
 
-test("builds the eight job cards in order on every tier p16 to p128 from shared/diskPlan.json", () => {
+test("builds the nine job cards in order on every tier p16 to p128 from shared/diskPlan.json", () => {
   for (const tier of TIERS_LIST) {
     const plan = TIERS[tier];
     const result = buildAiCards({ copy, plan, components: null, settings: SETTINGS, freeBytes: null });
-    expect(result.cards.map((card) => card.id)).toEqual(["chat", "pictures", "picturesdetailed", "videos", "music", "voice", "wakeword", "coding"]);
+    expect(result.cards.map((card) => card.id)).toEqual(["chat", "pictures", "picturesdetailed", "videos", "music", "voice", "wakeword", "vision", "coding"]);
     for (const card of result.cards) {
       if (card.choices.length === 0) {
         expect(card.unavailable).not.toBeNull();
@@ -396,8 +396,14 @@ test("vision: p128 shows a recommended Picture reader switch; smaller tiers say 
 });
 
 test("vision: the card stays out while the spec has no words for it", () => {
-  const result = buildAiCards({ copy, plan: TIERS.p128, components: null, settings: SETTINGS, freeBytes: null });
-  if (copy.card("vision").summary === "") expect(result.cards.some((entry) => entry.id === "vision")).toBe(false);
+  const silent = { ...copy, card: (job: Parameters<typeof copy.card>[0]) => job === "vision" ? { title: "vision", summary: "" } : copy.card(job) };
+  const result = buildAiCards({ copy: silent, plan: TIERS.p128, components: null, settings: SETTINGS, freeBytes: null });
+  expect(result.cards.some((entry) => entry.id === "vision")).toBe(false);
+});
+
+test("vision: the shipped spec words give the card its plain title", () => {
+  expect(copy.card("vision").title).toBe("Describing pictures");
+  expect(copy.choice("vision.reader").label).toBe("Picture reader");
 });
 
 test("vision: set-to-recommended downloads the picture reader row and counts its size", () => {
