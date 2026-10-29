@@ -363,8 +363,8 @@ Existing items in capitals are already filed; new ones are proposed and have no 
 0b. **Account record with named accounts and defaults**, against the hub's own provider only.
 1. **Phase A, alarms and reminders (owner's first build):** reminders and timers already ship. Add (a) the effect class, receipt and
    undo path on `remind`, `timer`, `list-add` (the existing tools declare `consequence` per T1, no behavior change for children),
-   (b) the `alarm` job and tool, one-time first, (c) repeating alarms once ROUTINES-01's schedule forms land, (d) HOUSEHOLD-03's
-   "Coming up" page so alarms, reminders and timers show in one place with Done and Snooze. Proves the loop, policy, receipt, undo and
+   (b) the `alarm` job and tool, one-time first, (c) repeating alarms once ROUTINES-01's schedule forms land, (d) alarms and
+   timers in the Clock app and reminders in the Reminders app (CLOCK-01, REMINDERS-01), each with Done and Snooze. Proves the loop, policy, receipt, undo and
    schedule path on data the hub owns. Exit: "wake me at 6:30 on weekdays" sets a repeating alarm, shows its next three times, rings
    on the chosen device, can be cancelled by saying so, and a child cannot set one for a parent.
 2. **Phase A+, notes and memories** (only if step 1 goes well, owner's call): the hub's own notes and memory records as accounts. Their
@@ -388,7 +388,7 @@ Each row is conditional where it says so. Nothing in a conditional row takes eff
 |---|---|---|
 | Non-goal "finance, health and location feeds" | `assistant-layer-2026-10-04.md` line 170 | CONDITIONAL on Q2. Narrowed to: bank feeds, card numbers, health and location stay non-goals; writing entries to the household's own ledger app through a connector is allowed |
 | Non-goal "laptop or computer control" and "No model-driven checkout and no computer use" | same note, lines 169-170 | CONDITIONAL on Q2. Computer control and checkout stay banned. Logged-in browsing with downloads in the browser worker is allowed, never a purchase |
-| Household design line "a reminder is one-shot" and its "no recurring reminders in slice 1" | `docs/design/household-lists-reminders-2026-10-17.md` | UNCHANGED for reminders. Alarms are a new job type; a repeating alarm uses ROUTINES-01's schedule forms, not a new grammar. HOUSEHOLD-03 (Coming up) also lists alarms |
+| Household design line "a reminder is one-shot" and its "no recurring reminders in slice 1" | `docs/design/household-lists-reminders-2026-10-17.md` | UNCHANGED for reminders. Alarms are a new job type; a repeating alarm uses ROUTINES-01's schedule forms, not a new grammar. alarms show in Clock (CLOCK-01) |
 | Calendar row "Needs a design decision first" | `docs/BACKLOG.md:3521` | Decided here as direction (3.8): Apple bridge, then CalDAV; a hub-run calendar is deferred. The bridge feasibility check gates it. The backlog edit is the coordinator's |
 | T1 `consequence: read\|write\|physical` | `tools-ecosystem-design-2026-10-03.md` line 43 | Replaced by the classes of section 3.3 (adds read_external, write_own, write_own_hard, write_shared, send, spend, destructive, account); `physical` is unchanged |
 | Household list gates | `docs/design/household-lists-reminders-2026-10-17.md` lines 20-21; `list-add` `min_role: child` | UNCHANGED. `write_shared` does not apply to the hub's own lists; a child may still add to the shopping list |

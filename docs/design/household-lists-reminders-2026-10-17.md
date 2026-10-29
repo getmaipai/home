@@ -90,7 +90,15 @@ Reminders and Google Keep are the shapes copied; the kit's `sidebar` and `checkb
 
 ## Supersedes
 
-Nothing. It gives the four bundled plugins and GENUI-05 a home; it changes no chat behaviour, no plugin, no gate.
+Nothing at first (2026-10-17). It gives the four bundled plugins and GENUI-05 a home; it changes no chat behaviour, no plugin, no gate.
+
+**Owner ruling, 2026-10-29: the one Household app is split in two, as Apple does.** **Reminders** (`/reminders`, rail name
+"Reminders") holds the Shopping and To-do lists and a "Coming up" tab of the person's pending reminders. **Clock** (`/clock`,
+rail name "Clock") holds alarms and timers, each with Done and Snooze and a live timer countdown. `/household` and
+`/household/coming-up` redirect to `/reminders`. The users and gates table, the data and spec records, the kit parts and the
+offline and privacy sections above are unchanged; only the app boundary and its names move. The old "Household" app name and
+the single "Coming up" timeline that mixed alarms with lists are replaced by this split (HOUSEHOLD-01 and HOUSEHOLD-03 built them;
+REMINDERS-01 and CLOCK-01 move them).
 
 ## Architect verdict
 
