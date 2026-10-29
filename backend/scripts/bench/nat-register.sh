@@ -5,7 +5,7 @@
 set -u
 REPO="$(cd "$(dirname "$0")/../../.." && pwd)"
 echo "1. Checking the Stack answers on 127.0.0.1:8770."
-curl -s -m5 -o /dev/null -w "%{http_code}\n" http://127.0.0.1:8770/health | grep -q 200 || { echo "STOP: the Stack is not answering on 8770. Start it, then run this again."; exit 1; }
+curl -s -m5 -o /dev/null -w "%{http_code}\n" http://127.0.0.1:8770/v1/models | grep -q 200 || { echo "STOP: the Stack is not answering on 8770. Start it, then run this again."; exit 1; }
 D=$(mktemp -d /tmp/nat-bench.XXXXXX)
 trap 'rm -rf "$D"' EXIT
 echo "2. Running the register bench with an empty data dir. It takes a few minutes."
