@@ -1270,6 +1270,15 @@ describe("household companion routes", () => {
     expect((await request(`companions/${made.value.id}/look/complete`, other, "POST", { version_id: cut.id })).status).toBe(403);
   });
 
+  test("complete trusts the stored cut-off edges of a picture that was already fitted into the frame", async () => {
+    const adult = addPerson("complete-fitted-author", "adult"), made = createHouseholdCompanion({ ...fixture(), display_name: "Fitted complete" }, { display_name: "Author", person_id: "complete-fitted-author" }); if (!made.ok) throw new Error(made.error);
+    __setPictureStatusForTests(readyStatusForTests()); __setAgeCheckRunnerForTests(async (images) => images.map(() => AGE_OK));
+    __setPicturesFetchForTests((async (_input, init) => init?.method === "POST" ? Response.json({ job: "fitted-job" }, { status: 202 }) : new Response("Not found", { status: 404 })) as typeof fetch);
+    const fitted = addVersion(made.value.id, await transparentPng(), { source: "upload", label: "Fitted", width: 1024, height: 1024, from: null, style: "keep", clipped: ["bottom"] });
+    const response = await request(`companions/${made.value.id}/look/complete`, adult, "POST", { version_id: fitted.id });
+    expect(response.status).toBe(202);
+  });
+
   test("complete screens teen uploaded inputs and withholds unsafe results without saving", async () => {
     const teen = addPerson("complete-teen-author", "teen"), made = createHouseholdCompanion({ ...fixture(), display_name: "Teen complete", audience: "teen" }, { display_name: "Teen", person_id: "complete-teen-author" }); if (!made.ok) throw new Error(made.error);
     const source = addVersion(made.value.id, await clippedPng("bottom"), { source: "upload", label: "Uploaded", width: 1024, height: 1024, from: null, style: "keep" });

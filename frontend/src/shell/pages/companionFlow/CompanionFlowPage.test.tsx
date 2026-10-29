@@ -163,24 +163,34 @@ test("Approve shows its busy label while the request is in flight and an error u
   expect(button(view, "Approve & Continue").disabled).toBe(false);
 });
 
-test("the cut-off sentence and Fill in button appear only when the picture is clipped, and call the complete route", async () => {
-  const clean = reopened(); await clean.view.findByRole("application", { name: /Character position/ });
-  expect(clean.view.queryByText("Part of the character is cut off by the edge of the picture.")).toBeNull();
-  expect(clean.view.queryByRole("button", { name: "Fill in the cut-off parts" })).toBeNull();
-  cleanup();
-  const { view } = open({ path: "/companions/hc-one/create", lookData: look({ versions: [{ ...version("v-1"), clipped: ["bottom"] }], rest: "v-1" }) });
+test("a cut-off picture is completed once by itself, with no Fill in button", async () => {
+  const { view } = open({ path: "/companions/hc-one/create", lookData: look({ versions: [{ ...version("v-1"), clipped: ["bottom"] }], rest: null }) });
   const asked: string[] = [];
   api.completeCompanionLook = async (_id, versionId) => { asked.push(versionId); return { job: "job-9" }; };
-  expect(await view.findByText("Part of the character is cut off by the edge of the picture.")).toBeTruthy();
-  fireEvent.click(view.getByRole("button", { name: "Fill in the cut-off parts" }));
   await waitFor(() => expect(asked).toEqual(["v-1"]));
+  expect(view.queryByRole("button", { name: "Fill in the cut-off parts" })).toBeNull();
+  expect(view.queryByRole("slider")).toBeNull();
 });
 
-test("a 409 from the complete route shows Home's sentence", async () => {
-  const { view } = open({ path: "/companions/hc-one/create", lookData: look({ versions: [{ ...version("v-1"), clipped: ["left"] }], rest: "v-1" }) });
+test("a 409 from the automatic fill-in shows Home's sentence", async () => {
+  const { view } = open({ path: "/companions/hc-one/create", lookData: look({ versions: [{ ...version("v-1"), clipped: ["left"] }], rest: null }) });
   api.completeCompanionLook = async () => { throw new ApiError("A picture is already being made for this companion. Wait for it or stop it.", 409); };
-  fireEvent.click(await view.findByRole("button", { name: "Fill in the cut-off parts" }));
   expect((await view.findByRole("alert")).textContent).toBe("A picture is already being made for this companion. Wait for it or stop it.");
+});
+
+test("a chosen photo uploads at once, shows a thumbnail and shows on the right as it is, with no Generate button", async () => {
+  URL.createObjectURL = () => "blob:photo"; URL.revokeObjectURL = () => undefined;
+  const { view } = open(); await nameIt(view);
+  fireEvent.click(await view.findByRole("radio", { name: "Upload Photo" }));
+  const uploads: File[] = [];
+  api.uploadCompanionLook = async (_id, body) => { uploads.push(body.get("image") as File); return { id: "v-1", clipped: [] } as never; };
+  api.companionLook = async () => look({ versions: [version("v-1")], rest: null });
+  const input = await view.findByLabelText("Photo"); const photo = new File([new Uint8Array([1])], "me.jpeg", { type: "image/jpeg" });
+  fireEvent.change(input, { target: { files: [photo] } });
+  await waitFor(() => expect(uploads).toHaveLength(1));
+  expect(await view.findByAltText("Your upload")).toBeTruthy();
+  await view.findByRole("application", { name: /Character position/ });
+  expect(view.queryByRole("button", { name: "Generate Character" })).toBeNull();
 });
 
 test("Approve opens screen 2 at once and screen 2 waits for the character to be made ready", async () => {

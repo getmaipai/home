@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Button } from "@maipai/ui/src/ui/button";
 import { DialogBody, DialogFooter, DialogSection } from "@maipai/ui/src/ui/dialog";
@@ -45,7 +45,7 @@ function ClipPlayer({ urls, label }: { urls: CompanionStateUrls; label: string }
 }
 
 /** Screen 2, Animate Character: thirteen animations, four required and nine optional, each with an editable keyframe. */
-export function AnimateStep({ companionId, name, sheetJob = null, onBack, onContinue }: { companionId: string; name: string; sheetJob?: string | null; onBack: () => void; onContinue: () => void }) {
+export function AnimateStep({ companionId, name, sheetJob = null, autoMake = false, onBack, onContinue }: { companionId: string; name: string; sheetJob?: string | null; autoMake?: boolean; onBack: () => void; onContinue: () => void }) {
   const states = useCompanionStates(companionId, true);
   const look = useQuery({ queryKey: lookKey(companionId), queryFn: () => api.companionLook(companionId), retry: false });
   const frames = useKeyframesFirst(companionId, states);
@@ -68,6 +68,13 @@ export function AnimateStep({ companionId, name, sheetJob = null, onBack, onCont
   const progress = states.run?.percent ?? states.data?.run?.percent ?? 0;
 
   const generate = (ids: string[]) => frames.request(ids);
+  // Once the character is ready, the four required animations start by themselves, once.
+  const autoStarted = useRef(false);
+  useEffect(() => {
+    if (!autoMake || autoStarted.current || !states.data?.sheet_ready || running || missingRequired.length === 0 || states.error) return;
+    autoStarted.current = true; frames.request(missingRequired);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [states.data?.sheet_ready, running, missingRequired.length]);
   const toggle = (id: string, on: boolean) => setTicked((current) => { const next = new Set(current); if (on) next.add(id); else next.delete(id); return next; });
   const tile = (row: CompanionStateRow) => {
     const word = frames.failed[row.id] ? "Needs another try" : frames.making === row.id ? "Making" : frames.waiting.includes(row.id) ? "Waiting its turn" : tileWord(row), src = keyframeSrc(row) ?? portrait;

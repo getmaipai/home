@@ -12,7 +12,7 @@ import { getIcon } from "@maipai/ui/src/icons";
 import { api, ApiError, type CompanionLook, type CompanionLookJob } from "@/lib/api";
 import { flowErrorText } from "@/shell/pages/companionFlow/errors";
 import { DraggablePicture } from "@/shell/pages/companionFlow/DraggablePicture";
-import { DEFAULT_FRAME, PreviewControls, type PictureFrame } from "@/shell/pages/companionFlow/PreviewControls";
+import { DEFAULT_FRAME, type PictureFrame } from "@/shell/pages/companionFlow/PreviewControls";
 
 export const lookKey = (id: string) => ["companions", id, "look"] as const;
 const running = (job: CompanionLookJob | undefined, jobId: string | null) => jobId !== null && (job === undefined || job.state === "queued" || job.state === "running");
@@ -37,7 +37,10 @@ export function CreateCharacterStep({ creating, companionId, initialName, onDraf
   const [frame, setFrame] = useState<PictureFrame>(DEFAULT_FRAME);
   // The placement already drawn into the shown picture; the live drag moves only by the difference.
   const [baked, setBaked] = useState<PictureFrame>(DEFAULT_FRAME);
-  const [busyKind, setBusyKind] = useState<"generate" | "prepare" | "complete" | "approve" | null>(null);
+  const [busyKind, setBusyKind] = useState<"generate" | "upload" | "prepare" | "complete" | "approve" | null>(null);
+  const [uploadedId, setUploadedId] = useState<string | null>(null);
+  const [thumb, setThumb] = useState<string | null>(null);
+  const filled = useRef<Set<string>>(new Set());
   const [error, setError] = useState("");
   const [previewError, setPreviewError] = useState("");
   const placing = useRef<{ timer: ReturnType<typeof setTimeout> | null; seq: number }>({ timer: null, seq: 0 });
@@ -59,6 +62,7 @@ export function CreateCharacterStep({ creating, companionId, initialName, onDraf
   // Moving the character stays possible while an earlier placement is being made; only the newest one is shown.
   const placeLocked = generating || (busy && busyKind !== "prepare");
   const makingCharacter = generating || busyKind === "generate" || busyKind === "complete";
+  const preparingPhoto = busyKind === "upload";
 
   useEffect(() => { onDraft({ id: draftId, pictures: look?.versions.length ?? 0, name: draftName }); }, [draftId, look?.versions.length, draftName, onDraft]);
   // Reopening an existing companion starts from its current picture.
@@ -69,6 +73,12 @@ export function CreateCharacterStep({ creating, companionId, initialName, onDraf
     choose(current);
   }, [look, shownId]);
   useEffect(() => () => { if (placing.current.timer) clearTimeout(placing.current.timer); }, []);
+  // A chosen photo shows as a small thumbnail beside its file name.
+  useEffect(() => {
+    if (!file) { setThumb(null); return; }
+    const url = URL.createObjectURL(file); setThumb(url);
+    return () => URL.revokeObjectURL(url);
+  }, [file]);
   useEffect(() => {
     if (!job || !jobId) return;
     if (job.state === "done") {
@@ -87,6 +97,12 @@ export function CreateCharacterStep({ creating, companionId, initialName, onDraf
   const ready = name.trim().length > 0 && (mode === "describe" ? description.trim().length > 0 : file !== null) && (!customSelected || customStyle.trim().length > 0);
   const canGenerate = ready && !locked && (look?.can_generate ?? true);
 
+  // A picture that is cut off at an edge has the missing parts drawn in, once, without asking.
+  useEffect(() => {
+    if (!picture?.clipped?.length || locked || picture.id === look?.rest || filled.current.has(picture.id)) return;
+    filled.current.add(picture.id); void complete();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [picture, locked]);
   /** A new picture (made, uploaded or reopened) starts centred; any pending move for the old one is dropped. */
   function choose(id: string) {
     if (placing.current.timer) { clearTimeout(placing.current.timer); placing.current.timer = null; }
@@ -103,7 +119,26 @@ export function CreateCharacterStep({ creating, companionId, initialName, onDraf
     return creating.current;
   }
   // The draft is made once the name is typed.
-  function nameDone() { if (name.trim() && !draftId) void ensureDraft().catch((e: unknown) => setError(flowErrorText(e))); }
+  function nameDone() {
+    if (name.trim() && !draftId) void ensureDraft().then(() => maybeUpload(file), (e: unknown) => setError(flowErrorText(e)));
+    else maybeUpload(file);
+  }
+  const uploadedFor = useRef<File | null>(null);
+  /** A chosen photo goes up at once (once the name is typed) and shows on the right as it is; a style other than Keep as is is applied by Generate. */
+  function maybeUpload(chosen: File | null) {
+    if (!chosen || !name.trim() || uploadedFor.current === chosen) return;
+    uploadedFor.current = chosen; void uploadPhoto(chosen);
+  }
+  async function uploadPhoto(chosen: File) {
+    setError(""); setPreviewError(""); setBusyKind("upload");
+    try {
+      const id = await ensureDraft();
+      const body = new FormData(); body.append("image", chosen);
+      const uploaded = await api.uploadCompanionLook(id, body);
+      await client.invalidateQueries({ queryKey: lookKey(id) });
+      setUploadedId(uploaded.id); choose(uploaded.id);
+    } catch (e) { uploadedFor.current = null; setError(flowErrorText(e)); } finally { setBusyKind(null); }
+  }
   async function generate() {
     setError(""); setPreviewError(""); setBusyKind("generate");
     try {
@@ -111,11 +146,14 @@ export function CreateCharacterStep({ creating, companionId, initialName, onDraf
       const custom = customSelected ? { custom_style: customStyle.trim() } : {};
       if (mode === "describe") setJobId((await api.generateCompanionLook(id, { prompt: description.trim(), style, ...custom, count: 1 })).job);
       else {
-        const body = new FormData(); body.append("image", file!);
-        const uploaded = await api.uploadCompanionLook(id, body);
-        await client.invalidateQueries({ queryKey: lookKey(id) });
-        if (style === "keep") choose(uploaded.id);
-        else setJobId((await api.restyleCompanionLook(id, { version_id: uploaded.id, style, ...custom })).job);
+        let sourceVersion = uploadedId;
+        if (!sourceVersion) {
+          const body = new FormData(); body.append("image", file!);
+          sourceVersion = (await api.uploadCompanionLook(id, body)).id; setUploadedId(sourceVersion);
+          await client.invalidateQueries({ queryKey: lookKey(id) });
+        }
+        if (style === "keep") choose(sourceVersion);
+        else setJobId((await api.restyleCompanionLook(id, { version_id: sourceVersion, style, ...custom })).job);
       }
     } catch (e) { setError(flowErrorText(e)); } finally { setBusyKind(null); }
   }
@@ -175,7 +213,8 @@ export function CreateCharacterStep({ creating, companionId, initialName, onDraf
           </ToggleGroup>
           {mode === "describe"
             ? <Textarea aria-label="Describe the character" shape="rounded" placeholder="Describe the character you want to create..." maxLength={600} value={description} disabled={locked} onChange={(e) => setDescription(e.target.value)} />
-            : <Input aria-label="Photo" type="file" shape="pill" accept="image/png,image/jpeg,image/webp" disabled={locked} onChange={(e) => setFile(e.target.files?.[0] ?? null)} />}
+            : <Input aria-label="Photo" type="file" shape="pill" accept="image/png,image/jpeg,image/webp" disabled={locked} onChange={(e) => { const chosen = e.target.files?.[0] ?? null; setFile(chosen); setUploadedId(null); maybeUpload(chosen); }} />}
+          {mode === "upload" && thumb ? <div className="flex items-center gap-3"><img src={thumb} alt="Your upload" draggable={false} className="size-14 rounded-xl object-cover" /><p className="min-w-0 truncate text-sm text-muted-foreground">{file?.name}</p></div> : null}
         </DialogSection>
         <DialogSection title="Choose a style">
           {tiles.length ? <div className="grid grid-cols-4 gap-3">
@@ -186,7 +225,7 @@ export function CreateCharacterStep({ creating, companionId, initialName, onDraf
           {customSelected ? <Input aria-label="Custom style" shape="pill" placeholder="Type a style, for example paper cut-out" maxLength={120} value={customStyle} disabled={locked} onChange={(e) => setCustomStyle(e.target.value)} /> : null}
         </DialogSection>
         <div className="flex flex-col gap-2">
-          <Button shape="pill" width="full" disabled={!canGenerate} aria-busy={makingCharacter} onClick={() => void generate()}>{makingCharacter ? <><Spinner className="animate-spin" aria-hidden="true" />Making your character...</> : <><Sparkles aria-hidden="true" />Generate Character</>}</Button>
+          {mode === "upload" && style === "keep" ? null : <Button shape="pill" width="full" disabled={!canGenerate} aria-busy={makingCharacter} onClick={() => void generate()}>{makingCharacter ? <><Spinner className="animate-spin" aria-hidden="true" />Making your character...</> : <><Sparkles aria-hidden="true" />Generate Character</>}</Button>}
           {look && !look.can_generate && look.generate_reason ? <p className="text-sm text-muted-foreground">{look.generate_reason}</p> : null}
           {error ? <p role="alert" className="text-sm text-destructive">{error}</p> : null}
         </div>
@@ -204,14 +243,11 @@ export function CreateCharacterStep({ creating, companionId, initialName, onDraf
             <Progress mode="determinate" value={job?.percent ?? 0} label={job?.label ?? "Making your character"} />
           </div> : null}
         </GenerationStage>
-        <p className="text-sm text-muted-foreground">{picture ? "Drag the character to move it. Use the slider or the mouse wheel to zoom. Change the description or style and generate again until you're happy." : "Change the description or style and generate again until you're happy with your character."}</p>
+        <p className="text-sm text-muted-foreground">{picture ? "Drag the character to move it. Use the mouse wheel to zoom. Change the description or style and generate again until you're happy." : "Change the description or style and generate again until you're happy with your character."}</p>
         {generating ? <Button variant="outline" shape="pill" onClick={() => void stop()}>Stop</Button> : null}
         {busyKind === "prepare" ? <p role="status" className="text-sm text-muted-foreground">Placing your character...</p> : null}
-        {picture && picture.clipped && picture.clipped.length > 0 ? <div className="flex flex-col gap-2">
-          <p className="text-sm text-muted-foreground">Part of the character is cut off by the edge of the picture.</p>
-          <Button variant="outline" shape="pill" disabled={locked} onClick={() => void complete()}><Sparkles aria-hidden="true" />Fill in the cut-off parts</Button>
-        </div> : null}
-        {picture ? <PreviewControls frame={frame} disabled={placeLocked} onFrameChange={place} /> : null}
+        {preparingPhoto ? <p role="status" className="text-sm text-muted-foreground">Getting your photo ready...</p> : null}
+        {busyKind === "complete" ? <p role="status" className="text-sm text-muted-foreground">Filling in the parts that were cut off...</p> : null}
         <Button shape="pill" width="full" disabled={!picture || locked} aria-busy={busyKind === "approve"} onClick={() => void approve()}>
           {busyKind === "approve" ? <><Spinner className="animate-spin" aria-hidden="true" />Getting your character ready...</> : <>Approve &amp; Continue</>}
         </Button>
