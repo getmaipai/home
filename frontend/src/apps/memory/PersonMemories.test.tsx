@@ -32,6 +32,7 @@ function record(overrides: Partial<MemoryRecord> = {}): MemoryRecord {
     pinned: false,
     sensitive: false,
     child_disclosure: null,
+    offer_withheld: null,
     child_disclosure_set_by: null,
     child_disclosure_set_at: null,
     offer_withheld: null,
