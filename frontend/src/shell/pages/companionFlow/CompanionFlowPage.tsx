@@ -11,8 +11,8 @@ import { flowErrorText } from "@/shell/pages/companionFlow/errors";
 export function CompanionFlowPage() {
   const { id } = useParams<{ id: string }>();
   const [search] = useSearchParams();
-  // /companions/:id/create?step=2 opens editing on the animations screen.
-  const initialStep = search.get("step") === "2" ? 1 : 0;
+  // /companions/:id/create?step=2 opens editing on the animations screen, ?step=3 on the customize screen.
+  const initialStep = search.get("step") === "3" ? 2 : search.get("step") === "2" ? 1 : 0;
   const enabled = useCompanionShells();
   const list = useQuery({ queryKey: ["companions"], queryFn: () => api.companions(), enabled: enabled === true, retry: false });
   const existing = useQuery({ queryKey: ["companions", id, "edit"], queryFn: () => api.editCompanion(id!), enabled: enabled === true && Boolean(id) && list.data?.can_create === true, retry: false });

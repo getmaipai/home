@@ -6,7 +6,7 @@ import { api, ApiError, type CompanionLook } from "@/lib/api";
 import { CompanionShellViewer } from "@/lib/companionShells";
 import { CompanionFlowPage } from "@/shell/pages/companionFlow/CompanionFlowPage";
 
-const methods = ["settingsValues", "companions", "editCompanion", "createCompanionDraft", "companionLook", "generateCompanionLook", "companionLookJob", "uploadCompanionLook", "restyleCompanionLook", "prepareCompanionLook", "approveCompanionLook", "deleteCompanion", "updateCompanion", "cancelCompanionLookJob", "companionStates"] as const;
+const methods = ["settingsValues", "companions", "editCompanion", "createCompanionDraft", "companionLook", "generateCompanionLook", "companionLookJob", "uploadCompanionLook", "restyleCompanionLook", "prepareCompanionLook", "approveCompanionLook", "deleteCompanion", "updateCompanion", "cancelCompanionLookJob", "companionStates", "getCompanionLookStyles"] as const;
 const originals = Object.fromEntries(methods.map((key) => [key, api[key]]));
 afterEach(() => { cleanup(); Object.assign(api, originals); });
 
@@ -16,12 +16,13 @@ const version = (id: string) => ({ id, label: `Picture ${id}`, source: "generate
 const look = (overrides: Partial<CompanionLook> = {}): CompanionLook => ({ versions: [], rest: null, key: `#${"00FF00"}`, sheet: null, ready_for_video: false, start_ready: false, can_generate: true, styles: adultStyles, keep: { id: "keep", label: "Keep as is" }, audience_cap: "all", ...overrides });
 function Where() { return <div data-testid="where">{useLocation().pathname}</div>; }
 
-function open(options: { path?: string; canCreate?: boolean; lookData?: CompanionLook } = {}) {
+function open(options: { path?: string; canCreate?: boolean; lookData?: CompanionLook; styles?: typeof adultStyles } = {}) {
   const calls = { draft: 0, generate: [] as unknown[], deleted: [] as string[], approved: [] as string[], prepare: [] as unknown[] };
   api.settingsValues = async () => [{ key: "companions.preview_shells", value: true, source: "user", label: "Preview", level: "basic", secret: false }] as never;
   api.companions = async () => ({ allowed: true, can_create: options.canCreate ?? true, can_discover: false, default_id: "x", companions: [], discover: [], robots: null });
   api.editCompanion = async () => ({ id: "hc-one", name: "Marlow" }) as never;
   api.createCompanionDraft = async () => { calls.draft++; return { id: "hc-one" }; };
+  api.getCompanionLookStyles = async () => ({ styles: options.styles ?? adultStyles, keep: { id: "keep" as const, label: "Keep as is" } });
   api.companionLook = async () => options.lookData ?? look();
   api.generateCompanionLook = async (_id, body) => { calls.generate.push(body); return { job: "job-1" }; };
   api.companionLookJob = async () => ({ state: "done", percent: 100, label: "Done", versions: [{ id: "v-1", url: "/x", label: "Picture v-1" }], error: null });
@@ -49,6 +50,13 @@ test("Generate stays disabled until the name and a description are set", async (
   expect(button(view, "Generate Character").disabled).toBe(false);
 });
 
+test("the style tiles show at once, before a name or a draft exists", async () => {
+  const { view, calls } = open();
+  for (const label of ["Realistic", "Cartoon", "Anime", "3D", "Pixel", "Custom"]) expect(await view.findByRole("button", { name: label })).toBeTruthy();
+  expect(view.queryByText(/Enter a name above/)).toBeNull();
+  expect(calls.draft).toBe(0);
+});
+
 test("the draft is created once and the style tiles come from the look response", async () => {
   const { view, calls } = open(); await nameIt(view);
   for (const label of ["Realistic", "Cartoon", "Anime", "3D", "Pixel", "Custom"]) expect(await view.findByRole("button", { name: label })).toBeTruthy();
@@ -64,7 +72,7 @@ test("Custom shows its one-line input and the teen list has no Custom tile", asy
   fireEvent.click(await adult.view.findByRole("button", { name: "Custom" }));
   const typed = adult.view.getByLabelText("Custom style") as HTMLInputElement; expect(typed.maxLength).toBe(120);
   cleanup();
-  const teen = open({ lookData: look({ styles: teenStyles }) }); await nameIt(teen.view);
+  const teen = open({ styles: teenStyles, lookData: look({ styles: teenStyles }) }); await nameIt(teen.view);
   await teen.view.findByRole("button", { name: "Cartoon" });
   expect(teen.view.queryByRole("button", { name: "Custom" })).toBeNull();
 });
@@ -92,6 +100,8 @@ test("remove background calls the prepare route", async () => {
 
 test("closing with an empty draft asks keep or discard; discard deletes it", async () => {
   const { view, calls } = open(); await nameIt(view); await view.findByRole("button", { name: "Cartoon" });
+  // The tiles show before the draft exists, so wait for the draft and its (empty) look before closing.
+  await waitFor(() => expect(calls.draft).toBe(1)); await act(async () => { await Promise.resolve(); });
   fireEvent.click(view.getByRole("button", { name: "Close" }));
   expect(await view.findByText("Keep this draft or discard it?")).toBeTruthy();
   fireEvent.click(view.getByRole("button", { name: "Discard" }));

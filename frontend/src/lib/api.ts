@@ -348,6 +348,7 @@ export interface CompanionDetail extends CompanionCard {
   about: string; pronouns: string | null; interests: string[]; examples: string[]; voice_value: string; voice_is_own: boolean; voice_setting: string | null;
   used_by: { people: Array<{ id: string; name: string }>; robots: Array<{ id: string; name: string }> } | null;
 }
+export type CompanionPersonality = "friendly" | "funny" | "calm" | "professional" | "playful" | "custom";
 export type CompanionStatus = "draft" | "ready" | "rendering" | "needs_review";
 export interface CompanionEditable {
   id: string; name: string; pronouns: string | null; tagline: string; backstory: string; interests: string[];
@@ -687,6 +688,8 @@ export class ApiError extends Error {
     public reasons?: string[],
     /** A clip request answered 409 needs_keyframe: the animations that have no keyframe yet, in order. */
     public missingKeyframes?: string[],
+    /** A companion save answered 409 or 422 with the screen that fixes it. */
+    public goBackTo?: "look" | "animations",
   ) {
     super(message);
   }
@@ -755,7 +758,7 @@ export async function request<T>(path: string, init?: RequestInit & { timeoutMs?
     const body = await res.json().catch(() => ({}));
     if (!res.ok) {
       if (isDeviceRevoked(res.status, body)) await removeAllOfflineMedia();
-      throw new ApiError(body.error ?? res.statusText, res.status, body.code, typeof body.next === "string" ? body.next : undefined, typeof body.retryAfter === "number" ? body.retryAfter : undefined, body.fields && typeof body.fields === "object" ? body.fields as Record<string, string> : undefined, Array.isArray(body.reasons) ? (body.reasons as unknown[]).filter((reason): reason is string => typeof reason === "string") : undefined, Array.isArray(body.missing_keyframes) ? (body.missing_keyframes as unknown[]).filter((state): state is string => typeof state === "string") : undefined);
+      throw new ApiError(body.error ?? res.statusText, res.status, body.code, typeof body.next === "string" ? body.next : undefined, typeof body.retryAfter === "number" ? body.retryAfter : undefined, body.fields && typeof body.fields === "object" ? body.fields as Record<string, string> : undefined, Array.isArray(body.reasons) ? (body.reasons as unknown[]).filter((reason): reason is string => typeof reason === "string") : undefined, Array.isArray(body.missing_keyframes) ? (body.missing_keyframes as unknown[]).filter((state): state is string => typeof state === "string") : undefined, body.go_back_to === "look" || body.go_back_to === "animations" ? body.go_back_to : undefined);
     }
     return body as T;
   } catch (err) {
@@ -1509,6 +1512,13 @@ export const api = {
   companionLookJob: (id: string, job: string) => request<CompanionLookJob>(`/api/companions/${encodeURIComponent(id)}/look/jobs/${encodeURIComponent(job)}`),
   cancelCompanionLookJob: (id: string, job: string) => request<void>(`/api/companions/${encodeURIComponent(id)}/look/jobs/${encodeURIComponent(job)}`, { method: "DELETE" }),
   /** COMPANION-3S-01: a name-only draft, made the first time the person names a character; Home returns the same draft for the same name. */
+  /** The styles the viewer's age band may use, before any draft exists (screen 1 shows the tiles at once). */
+  getCompanionLookStyles: () => request<{ styles: Array<{ id: string; label: string; custom?: boolean }>; keep: { id: "keep"; label: string } }>("/api/companions/look-styles"),
+  /** COMPANION-3S-01 screen 3: one suggested backstory sentence from the local chat model. `hint` is the personality notes, if any. */
+  generateCompanionBackstory: (id: string, body: { hint?: string } = {}) => request<{ text: string }>(`/api/companions/${encodeURIComponent(id)}/backstory/generate`, { method: "POST", body: JSON.stringify(body) }),
+  /** COMPANION-3S-01 screen 3: save voice, personality and backstory, and publish the approved appearance. A 409 or 422 carries `go_back_to`. */
+  saveCompanion: (id: string, body: { voice_id: string; personality: CompanionPersonality; style_notes?: string; backstory?: string }) => request<{ id: string; status: "ready"; published: boolean }>(`/api/companions/${encodeURIComponent(id)}/save`, { method: "POST", body: JSON.stringify(body) }),
+  setCompanionAudience: (id: string, body: { audience: "adult" | "teen" | "all"; confirmed?: boolean }) => request<{ id: string }>(`/api/companions/${encodeURIComponent(id)}/audience`, { method: "PUT", body: JSON.stringify(body) }),
   createCompanionDraft: (name: string) => request<{ id: string }>("/api/companions/draft", { method: "POST", body: JSON.stringify({ name }) }),
   restyleCompanionLook: (id: string, body: { version_id: string; style: string; custom_style?: string }) => request<{ job: string }>(`/api/companions/${encodeURIComponent(id)}/look/restyle`, { method: "POST", body: JSON.stringify(body) }),
   prepareCompanionLook: (id: string, body: { version_id: string; remove_background: boolean; frame?: { zoom: number; x: number; y: number } }) => request<{ id: string }>(`/api/companions/${encodeURIComponent(id)}/look/prepare`, { method: "POST", body: JSON.stringify(body) }),

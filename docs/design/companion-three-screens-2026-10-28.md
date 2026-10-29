@@ -120,6 +120,22 @@ Order: IMG-PIPE-01, ANIM-SPEC-01 and KIT-3S-01 in parallel (different files); th
 
 **Port or retire before the old screens are deleted (rule 12):** clip upload per state (`uploadStateRoute`), change-with-words edits, picking among look versions and deleting them, the character sheet (which `buildAnimationManifest` and clip upload both require, so it is made automatically behind Approve), takes with their measured numbers, the prompt pack for outside tools, and the all-ages checklist screen. Each is ported into the new flow, moved to the card menu, or retired with a one-line reason written here before UI-3S-01 lands.
 
+Port list (UI-3S-01c, 2026-10-29). Where each old behaviour lives now:
+
+| Old behaviour | Where it lives now |
+|---|---|
+| Clip upload per state (`uploadStateRoute`) | Retired from the UI. Screen 2 makes every clip from its keyframe, and the keyframe can be replaced by upload (section 9). The route stays for the robot and for scripts. |
+| Change-with-words edits | Screen 1 (change the description or style and generate again, plus remove background and zoom on the preview) and the keyframe editor on screen 2 ("describe a change"), both through `lib/imaging/`. |
+| Picking among look versions and deleting them | Automatic: screen 1 keeps every made picture and shows the latest; Approve picks the one that counts. Deleting a version is retired (unapproved versions are swept with abandoned drafts; an approved one is replaced by approving another). |
+| The character sheet | Automatic, behind Approve & Continue on screen 1. Nothing to review by hand. |
+| Takes with their measured numbers | Automatic: screen 2 auto-picks the best take with the existing take report. The numbers are retired from the screen; "Make another" on a tile asks for a new take. |
+| The prompt pack for outside tools | Retired. The three screens make pictures and clips inside Home, and the outside-tool workflow served the old upload path. The routes stay. |
+| The all-ages checklist screen | Card menu, "Audience" (owners and admins only): a small dialog with the checklist for "Everyone" and Home's one-sentence refusal when the artwork or the look's cap does not allow it. |
+| Pronouns and interests | Kept as they are on edit and not shown. Save sends neither, so they are never overwritten. |
+| Make a copy, Delete, Mark ready or Back to draft | Card menu on `/companions`, with the existing mutations and the delete confirmation. |
+| The old wizard, editor and studio pages | Still in the tree and still routed (`/companions/new`, `/companions/:id/edit`), unlinked from the new button when the preview setting is on. Removed in a later slice. |
+
+
 ## 6. Reuse check (principle 6)
 
 Reused as they are: `companionArtCheck.ts`, the Stack picture editor tools, the News focal model, `companionLookStyles.ts`, the household art resolver, the temporary Try it chat, the voice picker and cloned voices, the look store and approval step, the all-ages checklist, `StackedAlphaVideo` (until CMEDIA-PLAYER-02). New: only the `imaging/` orchestration (replacing three callers and `normalizePicture`), the 13-state vocabulary, `sweepAbandonedDrafts` and the three screens.

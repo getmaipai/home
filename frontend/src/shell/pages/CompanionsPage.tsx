@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useContext, useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient, type UseMutationResult } from "@tanstack/react-query";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { AsyncState } from "@maipai/ui/src/primitives/AsyncState";
@@ -17,7 +17,8 @@ import { api, ApiError, type CompanionActivity, type CompanionCard, type Compani
 import { playableVoices, previewIdFor, voiceChoices } from "@/lib/voice/voiceBrowserRows";
 import { voicePreviewPlayer, type VoicePreviewState } from "@/lib/voice/voicePreviewPlayer";
 import { useTabItem } from "@/shell/tabIdentity";
-import { useCompanionShells } from "@/lib/companionShells";
+import { CompanionShellViewer, useCompanionShells } from "@/lib/companionShells";
+import { CompanionAudienceDialog } from "@/shell/pages/CompanionAudienceDialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@maipai/ui/src/ui/tabs";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@maipai/ui/src/ui/alert-dialog";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@maipai/ui/src/ui/dropdown-menu";
@@ -50,15 +51,23 @@ async function openCompanionChat(card: CompanionCard, navigate: ReturnType<typeo
   }
 }
 
-function companionMenu({ card, discover = false, onDelete, onRemove, onSetDefault }: { card: CompanionCard; discover?: boolean; onDelete: (card: CompanionCard) => void; onRemove?: (card: CompanionCard) => void; onSetDefault: (card: CompanionCard) => void }) {
+type MenuActions = { onDelete: (card: CompanionCard) => void; onRemove?: (card: CompanionCard) => void; onSetDefault: (card: CompanionCard) => void; onEdit?: (card: CompanionCard) => void; onCopy?: (card: CompanionCard) => void; onStatus?: (card: CompanionCard, next: "draft" | "ready") => void; onAudience?: (card: CompanionCard) => void };
+
+function companionMenu({ card, discover = false, onDelete, onRemove, onSetDefault, onEdit, onCopy, onStatus, onAudience }: MenuActions & { card: CompanionCard; discover?: boolean }) {
+  const own = card.can_edit && card.is_household;
   const actions = <DropdownMenu>
     <DropdownMenuTrigger asChild>
       <Button type="button" variant="ghost" size="icon" aria-label="Companion actions" onClick={(event) => event.stopPropagation()} onPointerDown={(event) => event.stopPropagation()} onKeyDown={(event) => event.stopPropagation()}><MoreIcon aria-hidden="true" /></Button>
     </DropdownMenuTrigger>
     <DropdownMenuContent align="end" onClick={(event) => event.stopPropagation()} onPointerDown={(event) => event.stopPropagation()} onKeyDown={(event) => event.stopPropagation()}>
+      {own && onEdit ? <DropdownMenuItem onSelect={() => onEdit(card)}>Edit</DropdownMenuItem> : null}
       <DropdownMenuItem disabled={card.is_default} onSelect={() => onSetDefault(card)}>Set as my default</DropdownMenuItem>
+      {card.can_copy && onCopy ? <DropdownMenuItem onSelect={() => onCopy(card)}>Make a copy</DropdownMenuItem> : null}
+      {own && onStatus && card.status === "draft" ? <DropdownMenuItem onSelect={() => onStatus(card, "ready")}>Mark ready</DropdownMenuItem> : null}
+      {own && onStatus && card.status === "ready" ? <DropdownMenuItem onSelect={() => onStatus(card, "draft")}>Back to draft</DropdownMenuItem> : null}
+      {own && onAudience ? <DropdownMenuItem onSelect={() => onAudience(card)}>Audience</DropdownMenuItem> : null}
       {!discover && onRemove ? <DropdownMenuItem disabled={card.is_default} onSelect={() => onRemove(card)}>Remove from Yours</DropdownMenuItem> : null}
-      {card.can_edit && card.is_household ? <DropdownMenuItem variant="destructive" onSelect={() => onDelete(card)}>Delete</DropdownMenuItem> : null}
+      {own ? <DropdownMenuItem variant="destructive" onSelect={() => onDelete(card)}>Delete</DropdownMenuItem> : null}
     </DropdownMenuContent>
   </DropdownMenu>;
   return actions;
@@ -74,12 +83,19 @@ function CompanionsDirectory() {
   const [search, setSearch] = useState("");
   const [actionError, setActionError] = useState<string | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<CompanionCard | null>(null);
+  const [audienceTarget, setAudienceTarget] = useState<CompanionCard | null>(null);
+  const viewer = useContext(CompanionShellViewer);
+  const admin = viewer?.role === "owner" || viewer?.role === "admin";
   const queryClient = useQueryClient();
   const companionStills = useCompanionStills([...(query.data?.companions ?? []), ...(query.data?.discover ?? [])].map(({ id }) => id));
   const saveDefault = useMutation({ mutationFn: (id: string) => api.setDefaultCompanion(id), onSuccess: () => { void queryClient.invalidateQueries({ queryKey: listKey }); }, onError: (error) => setActionError(error instanceof ApiError ? error.message : "Could not set your default. Check your connection and try again.") });
   const remove = useMutation({ mutationFn: (id: string) => api.deleteCompanion(id), onSuccess: () => { setDeleteTarget(null); void queryClient.invalidateQueries({ queryKey: listKey }); }, onError: (error) => setActionError(error instanceof ApiError ? error.message : "Could not delete this companion. Check your connection and try again.") });
   const addToYours = useMutation({ mutationFn: (id: string) => api.addCompanion(id), onSuccess: () => { setActionError(null); void queryClient.invalidateQueries({ queryKey: listKey }); }, onError: (error) => setActionError(error instanceof ApiError ? error.message : "Could not add this companion. Check your connection and try again.") });
   const removeFromYours = useMutation({ mutationFn: (id: string) => api.removeCompanion(id), onSuccess: () => { setActionError(null); void queryClient.invalidateQueries({ queryKey: listKey }); }, onError: (error) => setActionError(error instanceof ApiError ? error.message : "Could not remove this companion. Check your connection and try again.") });
+  const editPath = (id: string) => `/companions/${encodeURIComponent(id)}/${preview === true ? "create" : "edit"}`;
+  const copy = useMutation({ mutationFn: (id: string) => api.copyCompanion(id), onSuccess: (result) => { setActionError(null); void queryClient.invalidateQueries({ queryKey: listKey }); navigate(editPath(result.id)); }, onError: (error) => setActionError(error instanceof ApiError ? error.message : "Could not make a copy. Check your connection and try again.") });
+  const setStatus = useMutation({ mutationFn: (input: { id: string; next: "draft" | "ready" }) => api.setCompanionStatus(input.id, input.next), onSuccess: () => { setActionError(null); void queryClient.invalidateQueries({ queryKey: listKey }); }, onError: (error) => setActionError(error instanceof ApiError ? error.message : "Could not change this companion's status. Check your connection and try again.") });
+  const menuActions: MenuActions = { onDelete: setDeleteTarget, onSetDefault: (item) => saveDefault.mutate(item.id), onEdit: (item) => navigate(editPath(item.id)), onCopy: (item) => copy.mutate(item.id), onStatus: (item, next) => setStatus.mutate({ id: item.id, next }), ...(admin ? { onAudience: setAudienceTarget } : {}) };
   return (
     <>
       {actionError ? <Alert variant="destructive"><AlertDescription>{actionError}</AlertDescription></Alert> : null}
@@ -88,7 +104,7 @@ function CompanionsDirectory() {
           <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">Companions</h1>
           <p className="text-sm text-muted-foreground">Familiar faces. Different ways to help.</p>
         </div>
-        {query.data?.can_create ? <Link to={preview === true ? "/companions/start" : "/companions/new"}><Button>New companion</Button></Link> : null}
+        {query.data?.can_create ? <Link to={preview === true ? "/companions/create" : "/companions/new"}><Button>New companion</Button></Link> : null}
       </div>
       <AsyncState
         data={query.isError ? null : query.data}
@@ -115,7 +131,7 @@ function CompanionsDirectory() {
                 </div>
                 <TabsContent value="Yours">
                   <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
-                    {data.companions.filter((card) => `${card.name} ${card.tagline}`.toLowerCase().includes(search.trim().toLowerCase())).map((card) => { const imageUrl = card.portrait ? api.companionPortrait(card.portrait) : companionStills[card.id]; return <CompanionCardElement key={card.id} name={card.name} line={card.tagline} media={imageUrl ? <Avatar size="lg"><AvatarImage src={imageUrl} alt={card.name} /></Avatar> : <SeededAvatar name={card.name} seed={card.id} />} status={card.is_default ? "Your default" : card.status === "ready" ? "Ready" : card.status === "draft" ? "Draft · needs a portrait" : card.status} menu={companionMenu({ card, onDelete: setDeleteTarget, onRemove: (item) => removeFromYours.mutate(item.id), onSetDefault: (item) => saveDefault.mutate(item.id) })} meta={(card.working_count ?? 0) + (card.waiting_count ?? 0) > 0 ? <Status status={(card.waiting_count ?? 0) > 0 ? "degraded" : "online"}>{card.working_count ?? 0} working · {card.waiting_count ?? 0} waiting on you</Status> : card.latest_activity ? `Last active ${formatRelative(card.latest_activity)} · ${card.chat_count ?? card.chats} chats` : "Choose a conversation to get started"} actions={<><Button type="button" onClick={() => void openCompanionChat(card, navigate, setActionError)}>{(card.chat_count ?? card.chats) > 0 ? "Continue" : "Chat"}</Button><Button type="button" variant="outline" onClick={() => navigate(`/companions/${encodeURIComponent(card.id)}`)}>View profile</Button></>} />; })}
+                    {data.companions.filter((card) => `${card.name} ${card.tagline}`.toLowerCase().includes(search.trim().toLowerCase())).map((card) => { const imageUrl = card.portrait ? api.companionPortrait(card.portrait) : companionStills[card.id]; return <CompanionCardElement key={card.id} name={card.name} line={card.tagline} media={imageUrl ? <Avatar size="lg"><AvatarImage src={imageUrl} alt={card.name} /></Avatar> : <SeededAvatar name={card.name} seed={card.id} />} status={card.is_default ? "Your default" : card.status === "ready" ? "Ready" : card.status === "draft" ? "Draft · needs a portrait" : card.status} menu={companionMenu({ ...menuActions, card, onRemove: (item) => removeFromYours.mutate(item.id) })} meta={(card.working_count ?? 0) + (card.waiting_count ?? 0) > 0 ? <Status status={(card.waiting_count ?? 0) > 0 ? "degraded" : "online"}>{card.working_count ?? 0} working · {card.waiting_count ?? 0} waiting on you</Status> : card.latest_activity ? `Last active ${formatRelative(card.latest_activity)} · ${card.chat_count ?? card.chats} chats` : "Choose a conversation to get started"} actions={<><Button type="button" onClick={() => void openCompanionChat(card, navigate, setActionError)}>{(card.chat_count ?? card.chats) > 0 ? "Continue" : "Chat"}</Button><Button type="button" variant="outline" onClick={() => navigate(`/companions/${encodeURIComponent(card.id)}`)}>View profile</Button></>} />; })}
                   </div>
                 </TabsContent>
                 {data.can_discover ? <TabsContent value="Discover">
@@ -124,12 +140,13 @@ function CompanionsDirectory() {
                       <Chip key={item} selected={discoverFilter === item} onClick={() => setDiscoverFilter(item)}>{item}</Chip>)}
                   </div>
                   <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
-                    {data.discover.filter((card) => `${card.name} ${card.tagline}`.toLowerCase().includes(search.trim().toLowerCase())).filter((card) => discoverFilter === "All" || card.tagline.toLowerCase().includes(discoverFilter.toLowerCase())).map((card) => { const imageUrl = card.portrait ? api.companionPortrait(card.portrait) : companionStills[card.id]; return <CompanionCardElement key={card.id} name={card.name} line={card.tagline} media={imageUrl ? <Avatar size="lg"><AvatarImage src={imageUrl} alt={card.name} /></Avatar> : <SeededAvatar name={card.name} seed={card.id} />} status={card.is_default ? "Your default" : card.status === "ready" ? "Ready" : card.status === "draft" ? "Draft · needs a portrait" : card.status} menu={companionMenu({ card, discover: true, onDelete: setDeleteTarget, onSetDefault: (item) => saveDefault.mutate(item.id) })} meta={(card.working_count ?? 0) + (card.waiting_count ?? 0) > 0 ? <Status status={(card.waiting_count ?? 0) > 0 ? "degraded" : "online"}>{card.working_count ?? 0} working · {card.waiting_count ?? 0} waiting on you</Status> : card.latest_activity ? `Last active ${formatRelative(card.latest_activity)} · ${card.chat_count ?? card.chats} chats` : "Choose a conversation to get started"} actions={<Button disabled={addToYours.isPending} onClick={() => addToYours.mutate(card.id)}>Add</Button>} />; })}
+                    {data.discover.filter((card) => `${card.name} ${card.tagline}`.toLowerCase().includes(search.trim().toLowerCase())).filter((card) => discoverFilter === "All" || card.tagline.toLowerCase().includes(discoverFilter.toLowerCase())).map((card) => { const imageUrl = card.portrait ? api.companionPortrait(card.portrait) : companionStills[card.id]; return <CompanionCardElement key={card.id} name={card.name} line={card.tagline} media={imageUrl ? <Avatar size="lg"><AvatarImage src={imageUrl} alt={card.name} /></Avatar> : <SeededAvatar name={card.name} seed={card.id} />} status={card.is_default ? "Your default" : card.status === "ready" ? "Ready" : card.status === "draft" ? "Draft · needs a portrait" : card.status} menu={companionMenu({ card, discover: true, onDelete: setDeleteTarget, onSetDefault: (item) => saveDefault.mutate(item.id), ...(card.can_copy ? { onCopy: menuActions.onCopy! } : {}) })} meta={(card.working_count ?? 0) + (card.waiting_count ?? 0) > 0 ? <Status status={(card.waiting_count ?? 0) > 0 ? "degraded" : "online"}>{card.working_count ?? 0} working · {card.waiting_count ?? 0} waiting on you</Status> : card.latest_activity ? `Last active ${formatRelative(card.latest_activity)} · ${card.chat_count ?? card.chats} chats` : "Choose a conversation to get started"} actions={<Button disabled={addToYours.isPending} onClick={() => addToYours.mutate(card.id)}>Add</Button>} />; })}
                   </div>
                   <p className="mt-4 text-sm text-muted-foreground">More companions from the catalog are coming soon.</p>
                 </TabsContent> : null}
               </Tabs>
             )}
+            {audienceTarget ? <CompanionAudienceDialog companionId={audienceTarget.id} name={audienceTarget.name} onClose={() => setAudienceTarget(null)} /> : null}
             <AlertDialog open={deleteTarget !== null} onOpenChange={(open) => { if (!open) setDeleteTarget(null); }}>
               <AlertDialogContent onClick={(event) => event.stopPropagation()} onPointerDown={(event) => event.stopPropagation()} onKeyDown={(event) => event.stopPropagation()}>
                 <AlertDialogHeader><AlertDialogTitle>Delete {deleteTarget?.name}?</AlertDialogTitle><AlertDialogDescription>This removes it for the whole home.</AlertDialogDescription></AlertDialogHeader>

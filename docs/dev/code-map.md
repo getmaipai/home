@@ -187,6 +187,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `frontend/src/shell/pages/ChatPage.tsx` | ChatPage |
 | `frontend/src/shell/pages/ChatShortcutReference.tsx` | ChatShortcutReference |
 | `frontend/src/shell/pages/CommandsPage.tsx` | CommandsIcon, CommandsPage |
+| `frontend/src/shell/pages/CompanionAudienceDialog.tsx` | CompanionAudienceDialog |
 | `frontend/src/shell/pages/CompanionEditorPage.tsx` | CompanionEditorPage |
 | `frontend/src/shell/pages/CompanionLookTab.tsx` | CompanionLookTab |
 | `frontend/src/shell/pages/CompanionStateContent.tsx` | useClipPreview, CompanionStateContents |
@@ -226,6 +227,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `frontend/src/shell/pages/companionFlow/CompanionFlowDialog.tsx` | CompanionFlowDialog |
 | `frontend/src/shell/pages/companionFlow/CompanionFlowPage.tsx` | CompanionFlowPage |
 | `frontend/src/shell/pages/companionFlow/CreateCharacterStep.tsx` | lookKey, CreateCharacterStep |
+| `frontend/src/shell/pages/companionFlow/CustomizeStep.tsx` | guessPersonality, NOTES_MAX, BACKSTORY_MAX, CustomizeStep |
 | `frontend/src/shell/pages/companionFlow/KeyframeEditor.tsx` | KeyframeEditor |
 | `frontend/src/shell/pages/companionFlow/PreviewControls.tsx` | DEFAULT_FRAME, PreviewControls |
 | `frontend/src/shell/pages/dashboard/AskBox.tsx` | installPlaceholder, askHref, AskBox |

@@ -42,6 +42,8 @@ export function CreateCharacterStep({ companionId, initialName, onDraft, onAppro
 
   const lookQuery = useQuery({ queryKey: draftId ? lookKey(draftId) : ["companions", "none", "look"], queryFn: () => api.companionLook(draftId!), enabled: draftId !== null, retry: false });
   const look: CompanionLook | undefined = lookQuery.data;
+  // The tiles come from Home for the viewer's age band and need no draft, so they show at once.
+  const stylesQuery = useQuery({ queryKey: ["companions", "look-styles"], queryFn: () => api.getCompanionLookStyles(), retry: false, staleTime: 60_000 });
   const jobQuery = useQuery<CompanionLookJob>({
     queryKey: [...lookKey(draftId ?? "none"), "job", jobId], queryFn: () => api.companionLookJob(draftId!, jobId!), enabled: draftId !== null && jobId !== null, retry: false,
     refetchInterval: (q) => running(q.state.data, jobId) ? 1500 : false,
@@ -68,8 +70,9 @@ export function CreateCharacterStep({ companionId, initialName, onDraft, onAppro
     else if (job.state === "cancelled") setJobId(null);
   }, [job, jobId, draftId, client]);
 
-  const styles = look?.styles ?? [];
-  const tiles = mode === "upload" && look?.keep ? [{ id: look.keep.id as string, label: look.keep.label, custom: false }, ...styles] : styles;
+  const styles = look?.styles ?? stylesQuery.data?.styles ?? [];
+  const keep = look?.keep ?? stylesQuery.data?.keep;
+  const tiles = mode === "upload" && keep ? [{ id: keep.id as string, label: keep.label, custom: false }, ...styles] : styles;
   const customSelected = style === "custom";
   const picture = look?.versions.find((v) => v.id === shownId) ?? null;
   const ready = name.trim().length > 0 && (mode === "describe" ? description.trim().length > 0 : file !== null) && (!customSelected || customStyle.trim().length > 0);
@@ -84,7 +87,7 @@ export function CreateCharacterStep({ companionId, initialName, onDraft, onAppro
     creating.current ??= api.createCompanionDraft(name.trim()).then(({ id }) => { setDraftId(id); setDraftName(name.trim()); return id; }).finally(() => { creating.current = null; });
     return creating.current;
   }
-  // The style list comes from Home and needs a companion, so the draft is made once the name is typed.
+  // The draft is made once the name is typed.
   function nameDone() { if (name.trim() && !draftId) void ensureDraft().catch((e: unknown) => setError(flowErrorText(e))); }
   async function generate() {
     setError(""); setBusy(true);
@@ -149,7 +152,7 @@ export function CreateCharacterStep({ companionId, initialName, onDraft, onAppro
             {tiles.map((tile) => <CharacterTile key={tile.id} variant="picture" name={tile.label} selected={style === tile.id}
               media={tile.custom ? <Palette className="size-6 text-muted-foreground" aria-hidden="true" /> : tile.id === "keep" ? <User className="size-6 text-muted-foreground" aria-hidden="true" /> : <Sparkles className="size-6 text-muted-foreground" aria-hidden="true" />}
               onSelect={() => { if (!locked) setStyle(tile.id); }} />)}
-          </div> : <p className="text-sm text-muted-foreground">{lookQuery.isError ? flowErrorText(lookQuery.error) : "Enter a name above and the styles appear here."}</p>}
+          </div> : <p className="text-sm text-muted-foreground">{stylesQuery.isError ? flowErrorText(stylesQuery.error) : lookQuery.isError ? flowErrorText(lookQuery.error) : "Loading the styles"}</p>}
           {customSelected ? <Input aria-label="Custom style" shape="pill" placeholder="Type a style, for example paper cut-out" maxLength={120} value={customStyle} disabled={locked} onChange={(e) => setCustomStyle(e.target.value)} /> : null}
         </DialogSection>
         <div className="flex flex-col gap-2">

@@ -6,7 +6,7 @@ import { api, ApiError, type CompanionCard, type CompanionDetail, type Companion
 import { CompanionDetailPage, CompanionsPage } from "@/shell/pages/CompanionsPage";
 import { CompanionShellViewer } from "@/lib/companionShells";
 
-const originals = { companions: api.companions, companion: api.companion, companionActivity: api.companionActivity, conversationList: api.conversationList, createConversation: api.createConversation, setDefaultCompanion: api.setDefaultCompanion, addCompanion: api.addCompanion, removeCompanion: api.removeCompanion, deleteCompanion: api.deleteCompanion, stackVoices: api.stackVoices, setSetting: api.setSetting, settingsValues: api.settingsValues };
+const originals = { copyCompanion: api.copyCompanion, setCompanionStatus: api.setCompanionStatus, setCompanionAudience: api.setCompanionAudience, editCompanion: api.editCompanion, companions: api.companions, companion: api.companion, companionActivity: api.companionActivity, conversationList: api.conversationList, createConversation: api.createConversation, setDefaultCompanion: api.setDefaultCompanion, addCompanion: api.addCompanion, removeCompanion: api.removeCompanion, deleteCompanion: api.deleteCompanion, stackVoices: api.stackVoices, setSetting: api.setSetting, settingsValues: api.settingsValues };
 afterEach(() => { cleanup(); Object.assign(api, originals); });
 
 function card(overrides: Partial<CompanionCard> = {}): CompanionCard {
@@ -248,7 +248,7 @@ test("preview cards show real counts and detail activity, and the detail page is
   await waitFor(() => expect(yours.getAllByText("Choose a conversation to get started").length).toBe(2));
   expect(yours.queryByRole("button", { name: "Add" })).toBeNull();
   expect(yours.getAllByRole("button", { name: "New companion" }).length).toBe(1);
-  expect(yours.getByRole("link", { name: "New companion" }).getAttribute("href")).toBe("/companions/start");
+  expect(yours.getByRole("link", { name: "New companion" }).getAttribute("href")).toBe("/companions/create");
   const discover = yours.getByRole("tab", { name: "Discover" });
   fireEvent.mouseDown(discover, { button: 0 });
   fireEvent.click(discover);
@@ -367,4 +367,55 @@ test("task tabs show their empty copy and activity shows its own empty copy", as
   await view.findByText("Nothing is running.");
   fireEvent.mouseDown(view.getByRole("tab", { name: "Completed" }), { button: 0 });
   await view.findByText("Nothing has finished yet.");
+});
+
+const itemNames = async (view: ReturnType<typeof open>) => { await openCardActions(view); return (await view.findAllByRole("menuitem")).map((item) => item.textContent); };
+
+test("the card menu of a draft household companion has Edit, copy, Mark ready, Delete, and Audience only for an admin", async () => {
+  api.settingsValues = async () => [{ key: "companions.preview_shells", value: true, source: "user", label: "Preview", level: "basic", secret: false }] as never;
+  api.companions = async (): Promise<CompanionList> => ({ allowed: true, can_create: true, can_discover: false, companions: [card({ is_household: true, can_edit: true, can_copy: true, status: "draft" })], discover: [], robots: null, default_id: "" });
+  const member = open("/companions", true, { id: "viewer", role: "member" } as never);
+  await member.findByText("Sprout");
+  const names = await itemNames(member);
+  expect(names).toEqual(["Edit", "Set as my default", "Make a copy", "Mark ready", "Remove from Yours", "Delete"]);
+  cleanup();
+  const admin = open("/companions", true, { id: "viewer", role: "admin" } as never);
+  await admin.findByText("Sprout");
+  expect(await itemNames(admin)).toContain("Audience");
+});
+
+test("a ready companion offers Back to draft, and the menu actions call the right routes", async () => {
+  api.settingsValues = async () => [{ key: "companions.preview_shells", value: true, source: "user", label: "Preview", level: "basic", secret: false }] as never;
+  api.companions = async (): Promise<CompanionList> => ({ allowed: true, can_create: true, can_discover: false, companions: [card({ is_household: true, can_edit: true, can_copy: true, status: "ready" })], discover: [], robots: null, default_id: "" });
+  const calls: string[] = [];
+  api.setCompanionStatus = async (id, next) => { calls.push(`${id}:${next}`); return { id }; };
+  api.copyCompanion = async (id) => { calls.push(`copy:${id}`); return { id: "copy-1" }; };
+  const view = open("/companions", true);
+  await view.findByText("Sprout");
+  await openCardActions(view);
+  fireEvent.click(await view.findByRole("menuitem", { name: "Back to draft" }));
+  await waitFor(() => expect(calls).toEqual(["lively-child:draft"]));
+  await openCardActions(view);
+  fireEvent.click(await view.findByRole("menuitem", { name: "Make a copy" }));
+  await waitFor(() => expect(calls).toContain("copy:lively-child"));
+  await waitFor(() => expect(view.getByTestId("location").textContent).toBe("/companions/copy-1/create"));
+});
+
+test("Edit opens the three-screen flow for that companion, and the Audience dialog shows Home's refusal sentence", async () => {
+  api.settingsValues = async () => [{ key: "companions.preview_shells", value: true, source: "user", label: "Preview", level: "basic", secret: false }] as never;
+  api.companions = async (): Promise<CompanionList> => ({ allowed: true, can_create: true, can_discover: false, companions: [card({ is_household: true, can_edit: true, status: "ready" })], discover: [], robots: null, default_id: "" });
+  api.editCompanion = async () => ({ id: "lively-child", name: "Sprout", audience: "adult" }) as never;
+  api.setCompanionAudience = async () => { throw new ApiError("This look is for adults. Pick a cartoon look to make it for everyone.", 400); };
+  const view = open("/companions", true, { id: "viewer", role: "owner" } as never);
+  await view.findByText("Sprout");
+  await openCardActions(view);
+  fireEvent.click(await view.findByRole("menuitem", { name: "Audience" }));
+  await view.findByText("Who is Sprout for?");
+  fireEvent.click(await view.findByRole("radio", { name: "Teens and adults" }));
+  fireEvent.click(view.getByRole("button", { name: "Save audience" }));
+  expect((await view.findByRole("alert")).textContent).toBe("This look is for adults. Pick a cartoon look to make it for everyone.");
+  fireEvent.click(view.getByRole("button", { name: "Cancel" }));
+  await openCardActions(view);
+  fireEvent.click(await view.findByRole("menuitem", { name: "Edit" }));
+  await waitFor(() => expect(view.getByTestId("location").textContent).toBe("/companions/lively-child/create"));
 });
