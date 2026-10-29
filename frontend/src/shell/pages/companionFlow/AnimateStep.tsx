@@ -13,6 +13,7 @@ import { useCompanionStates } from "@/shell/pages/useCompanionStates";
 import { useClipPreview } from "@/shell/pages/CompanionStateContent";
 import { lookKey } from "@/shell/pages/companionFlow/CreateCharacterStep";
 import { flowErrorText } from "@/shell/pages/companionFlow/errors";
+import { useKeyframesFirst } from "@/shell/pages/companionFlow/useKeyframesFirst";
 import { KeyframeEditor } from "@/shell/pages/companionFlow/KeyframeEditor";
 
 const keyframeSrc = (row: CompanionStateRow) => row.keyframe ? `${row.keyframe.url}${row.keyframe.edited_at ? `?v=${encodeURIComponent(row.keyframe.edited_at)}` : ""}` : null;
@@ -46,6 +47,7 @@ function ClipPlayer({ urls, label }: { urls: CompanionStateUrls; label: string }
 export function AnimateStep({ companionId, name, onBack, onContinue }: { companionId: string; name: string; onBack: () => void; onContinue: () => void }) {
   const states = useCompanionStates(companionId, true);
   const look = useQuery({ queryKey: lookKey(companionId), queryFn: () => api.companionLook(companionId), retry: false });
+  const frames = useKeyframesFirst(companionId, states);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [ticked, setTicked] = useState<ReadonlySet<string>>(new Set());
   const [editing, setEditing] = useState(false);
@@ -56,25 +58,25 @@ export function AnimateStep({ companionId, name, onBack, onContinue }: { compani
   const selected = rows.find((row) => row.id === selectedId) ?? null;
   const rest = look.data?.versions.find((v) => v.id === look.data?.rest) ?? look.data?.versions[look.data.versions.length - 1] ?? null;
   const portrait = rest?.url ?? null;
-  const running = states.running;
+  const running = states.running || frames.busy;
   const missingRequired = required.filter((row) => !made(row)).map((row) => row.id);
   const pending = useMemo(() => optional.filter((row) => ticked.has(row.id) && !made(row)).map((row) => row.id), [optional, ticked]);
   const allTicked = optional.length > 0 && optional.every((row) => ticked.has(row.id));
   const label = name.trim() || "Your character";
   const progress = states.run?.percent ?? states.data?.run?.percent ?? 0;
 
-  const generate = (ids: string[]) => void states.start(() => api.generateCompanionStates(companionId, { states: ids, count: 1 }));
+  const generate = (ids: string[]) => frames.request(ids);
   const toggle = (id: string, on: boolean) => setTicked((current) => { const next = new Set(current); if (on) next.add(id); else next.delete(id); return next; });
   const tile = (row: CompanionStateRow) => {
-    const word = tileWord(row), src = keyframeSrc(row) ?? portrait;
+    const word = frames.failed[row.id] ? "Needs another try" : frames.making === row.id ? "Making" : frames.waiting.includes(row.id) ? "Waiting its turn" : tileWord(row), src = keyframeSrc(row) ?? portrait;
     return {
       name: row.label, selected: selectedId === row.id, onSelect: () => setSelectedId(row.id),
       media: src ? <img src={src} alt="" draggable={false} className={`size-full object-cover ${row.keyframe ? "" : "opacity-40"}`} /> : undefined,
       line: <span className="text-xs">{word}</span>,
-      status: word === "Making" ? <Progress mode="determinate" value={progress} label={`${row.label} progress`} /> : undefined,
+      status: word === "Making" ? <Progress mode="determinate" value={frames.making === row.id ? frames.percent : progress} label={`${row.label} progress`} /> : undefined,
     };
   };
-  const errorLine = states.error || (states.query.isError ? flowErrorText(states.query.error) : "");
+  const errorLine = states.error || Object.values(frames.failed)[0] || (states.query.isError ? flowErrorText(states.query.error) : "");
   const generating = running || selected?.busy === true;
   const previewImage = selected ? (keyframeSrc(selected) ?? portrait) : portrait;
 

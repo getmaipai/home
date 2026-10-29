@@ -685,6 +685,8 @@ export class ApiError extends Error {
     public fields?: Record<string, string>,
     /** Reasons a publish or other decision was blocked. */
     public reasons?: string[],
+    /** A clip request answered 409 needs_keyframe: the animations that have no keyframe yet, in order. */
+    public missingKeyframes?: string[],
   ) {
     super(message);
   }
@@ -753,7 +755,7 @@ export async function request<T>(path: string, init?: RequestInit & { timeoutMs?
     const body = await res.json().catch(() => ({}));
     if (!res.ok) {
       if (isDeviceRevoked(res.status, body)) await removeAllOfflineMedia();
-      throw new ApiError(body.error ?? res.statusText, res.status, body.code, typeof body.next === "string" ? body.next : undefined, typeof body.retryAfter === "number" ? body.retryAfter : undefined, body.fields && typeof body.fields === "object" ? body.fields as Record<string, string> : undefined, Array.isArray(body.reasons) ? (body.reasons as unknown[]).filter((reason): reason is string => typeof reason === "string") : undefined);
+      throw new ApiError(body.error ?? res.statusText, res.status, body.code, typeof body.next === "string" ? body.next : undefined, typeof body.retryAfter === "number" ? body.retryAfter : undefined, body.fields && typeof body.fields === "object" ? body.fields as Record<string, string> : undefined, Array.isArray(body.reasons) ? (body.reasons as unknown[]).filter((reason): reason is string => typeof reason === "string") : undefined, Array.isArray(body.missing_keyframes) ? (body.missing_keyframes as unknown[]).filter((state): state is string => typeof state === "string") : undefined);
     }
     return body as T;
   } catch (err) {

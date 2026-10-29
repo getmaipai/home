@@ -52,7 +52,7 @@ export function useCompanionStates(id: string, active: boolean) {
       } else setError(errorText(cause));
     } finally { setPublishing(false); }
   }
-  return { query, data, run, running, runQuery, error, setError, perform, start, runId, status, publishing, publish, stop: async () => {
+  return { query, data, run, running, runQuery, error, setError, perform, start, adopt: setRunId, runId, status, publishing, publish, stop: async () => {
     if (!runId) return;
     await perform(async () => { await api.stopCompanionStateRun(id, runId); setRunId(null); void client.invalidateQueries({ queryKey: companionStatesKey(id) }); });
   } };

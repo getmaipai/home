@@ -174,3 +174,37 @@ test("a 409 needs_keyframe shows as one plain line", async () => {
   expect(alerts.length).toBe(1);
   expect(alerts[0]!.textContent).toBe("Make the picture for this animation first.");
 });
+
+const needKeyframes = (missing: string[]) => { const e = new ApiError("Make the picture for this animation first.", 409, "needs_keyframe"); e.missingKeyframes = missing; return e; };
+
+test("a 409 needs_keyframe makes the missing keyframes in order, then asks again; idle is exempt", async () => {
+  const { view, calls } = open(() => states());
+  await view.findByRole("button", { name: "Idle" });
+  const order: string[] = [];
+  let asked = 0;
+  api.generateCompanionStates = async (_id, body) => { calls.generate.push(body); order.push("clips"); if (asked++ === 0) throw needKeyframes(["listening", "thinking"]); return { job: "run-1" }; };
+  api.generateCompanionKeyframe = async (_id, state) => { order.push(`keyframe:${state}`); return { job: `kf-${state}` }; };
+  api.companionLookJob = async () => ({ state: "done", percent: 100, label: "Done", versions: [], error: null });
+  await act(async () => { fireEvent.click(btn(view, "Generate Required")); });
+  await waitFor(() => expect(calls.generate.length).toBe(2));
+  expect(order).toEqual(["clips", "keyframe:listening", "keyframe:thinking", "clips"]);
+  expect(calls.generate[1]).toEqual({ states: ["idle", "listening", "thinking", "speaking"], count: 1 });
+});
+
+test("a withheld keyframe skips only that animation and shows one sentence", async () => {
+  const { view, calls } = open(() => states());
+  await view.findByRole("button", { name: "Idle" });
+  let asked = 0;
+  api.generateCompanionStates = async (_id, body) => { calls.generate.push(body); if (asked++ === 0) throw needKeyframes(["listening", "thinking"]); return { job: "run-1" }; };
+  api.generateCompanionKeyframe = async (_id, state) => ({ job: `kf-${state}` });
+  api.companionLookJob = async (_id, job) => job === "kf-listening"
+    ? { state: "failed", percent: 0, label: "Failed", versions: [], error: "That picture was withheld. Change the description and try again." }
+    : { state: "done", percent: 100, label: "Done", versions: [], error: null };
+  await act(async () => { fireEvent.click(btn(view, "Generate Required")); });
+  await waitFor(() => expect(calls.generate.length).toBe(2));
+  expect(calls.generate[1]).toEqual({ states: ["idle", "thinking", "speaking"], count: 1 });
+  const alerts = await view.findAllByRole("alert");
+  expect(alerts.length).toBe(1);
+  expect(alerts[0]!.textContent).toBe("That picture was withheld. Change the description and try again.");
+  expect(view.getAllByText("Needs another try").length).toBe(1);
+});
