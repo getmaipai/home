@@ -21,6 +21,8 @@ import { startStackFixture, IDENTITY_HEADERS, type StackFixture } from "./stackF
 import { db } from "@/db";
 import { conversationTurns } from "@/db/schema";
 import { eq } from "drizzle-orm";
+import { __setPromptClockForBench } from "@/lib/benchSampling";
+import { hubTimeZone } from "@/lib/news/dayParts";
 
 let server: WyomingServerHandle;
 let speechStack: StackFixture | undefined;
@@ -32,6 +34,7 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+  __setPromptClockForBench(null);
   __resetLlmSupervisorForTests();
   server?.stop();
   speechStack?.stop();
@@ -438,6 +441,10 @@ describe("the Wyoming satellite server", () => {
 
     test("the handled text is the server's speech text, and the stored reply is the written text", async () => {
       const written = "It is 72°F at 10:04 am, Dr. Smith said.";
+      // NAT-02: the plain clock drops the part of day within 12 hours of now, so pin the household clock to 11:30 pm (13 hours off) and the test cannot depend on when it runs.
+      const hm = new Intl.DateTimeFormat("en-US", { timeZone: hubTimeZone(), hour: "numeric", minute: "numeric", hourCycle: "h23" }).formatToParts(new Date());
+      const localMinutes = Number(hm.find((x) => x.type === "hour")!.value) % 24 * 60 + Number(hm.find((x) => x.type === "minute")!.value);
+      __setPromptClockForBench(() => new Date(Date.now() + (23 * 60 + 30 - localMinutes) * 60_000));
       const { handled, turnRow } = await handleAs(makePerson(), "how do I make a paper airplane", written);
       expect(handled.type).toBe("handled");
       expect((handled.data as { text: string }).text).toBe("It is seventy-two degrees Fahrenheit at ten oh four in the morning, Doctor Smith said.");
