@@ -20,7 +20,7 @@ export const TAKE_RUN_NOT_FOUND_LINE = "That clip run could not be found. Start 
 export const TAKE_RUN_TIMEOUT_LINE = "The video engine took too long. Try again.";
 export const TAKE_RETRY_WAIT_MS = 60_000;
 export const TAKE_NEGATIVE_PROMPT = "different character, changed colours, changed face, extra limbs, text, watermark, camera movement, background change, shadows";
-export const TAKE_NO_ORIGINAL_LINE = 'The video model can only start from a picture the picture model made. Use "Change it" on this picture to make a version with the picture model, then pick that one as the starting picture.';
+export const TAKE_NO_REST_LINE = "Choose and approve a starting picture first.";
 export const TAKE_NEEDS_KEYFRAME_LINE = "Make the picture for this animation first.";
 
 export type TakeRunState = "queued" | "running" | "done" | "failed" | "cancelled";
@@ -184,8 +184,6 @@ export async function startStateTakes(input: { actor: PersonRow; companionId: st
   }
   // The screen makes each missing keyframe first (one quick picture job each, through the keyframe route) and then asks again.
   if (missingKeyframes.length) throw Object.assign(new Error(TAKE_NEEDS_KEYFRAME_LINE), { status: 409, code: "needs_keyframe", missing: missingKeyframes });
-  // An adult may animate a photo kept as it is (owner ruling 2026-10-25, models decide for adults); a teen or child may start only from a picture the picture model made.
-  if (!sheet.originalPath && audience.band !== "adult") throw Object.assign(new Error(TAKE_NO_ORIGINAL_LINE), { status: 409, code: "no_original" });
   const engineReady = await videoEngineReady(), engineStatus = await videoEngineStatus();
   if (!engineReady && (!engineStatus || engineStatus.available === false || engineStatus.state === "unsupported" || engineStatus.state === "off")) throw Object.assign(new Error(VIDEO_NOT_HERE_LINE), { status: 503 });
   if (companionHasTakeRun(input.companionId) || companionHasFinishingJob(input.companionId) || activeLookJob(input.companionId)) throw Object.assign(new Error(TAKE_RUN_BUSY_LINE), { status: 409 });

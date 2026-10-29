@@ -745,7 +745,7 @@ describe("household companion routes", () => {
     const stateResponse = await request(`companions/${created.value.id}/states`, adult);
     expect(stateResponse.status).toBe(200);
     const stateBody = await stateResponse.json() as { start_ready: boolean; start_reason?: string; states: Array<{ id: string; required: boolean }> };
-    expect(stateBody.start_ready).toBe(false); expect(stateBody.start_reason).toContain("The video model can only start from a picture the picture model made.");
+    expect(stateBody.start_ready).toBe(false); expect(stateBody.start_reason).toContain("Choose and approve a starting picture first.");
     expect(stateBody.states.map((s) => s.id)).toContain("laughing");
     expect(stateBody.states[0]?.required).toBe(true);
     const partial = await app.request(`http://localhost/api/companions/${created.value.id}/states/idle/${take.id}/clip.h264.mp4`, { headers: { cookie: `session=${adult}`, range: "bytes=2-5" } });
@@ -873,7 +873,7 @@ describe("household companion routes", () => {
     const quickMissing = await request(`companions/${id}/states/idle/generate`, adult, "POST", { count: 1 }); expect(quickMissing.status).toBe(503); expect((await quickMissing.json() as { error: string }).error).toContain("standard video model"); expect(calls).toBe(0);
   });
 
-  test("an adult may start a video from a photo kept as it is, and the Stack is told it is an upload", async () => {
+  test("a photo kept as it is can start a video for anyone the video rules allow", async () => {
     const adult = addPerson("person-state-no-original", "adult"), created = createHouseholdCompanion({ ...fixture(), display_name: "Upload only rest" }, { display_name: "Author", person_id: "person-state-no-original" }); if (!created.ok) throw new Error(created.error); const id = created.value.id;
     const rest = addVersion(id, await transparentPng(), { source: "upload", label: "rest", width: 1024, height: 1024, from: null }); setRest(id, rest.id); updateSheet(id, { views: { left: null, right: null, mouth: null }, card: { text: "A red fox", species: "fox", colours: ["#CC3322"] }, key: "#00FF00", state: "needs_review", approved_by: null, approved_at: null }); approveSheet(id, "Author");
     let calls = 0; __setVideosFetchForTests((async () => { calls++; return new Response("unexpected", { status: 500 }); }) as unknown as typeof fetch);

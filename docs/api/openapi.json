@@ -61089,7 +61089,7 @@
             }
           },
           "409": {
-            "description": "A clip run is busy, the character sheet is not approved, a keyframe is missing, or the rest picture has no Stack original.",
+            "description": "A clip run is busy, the character sheet is not approved, a keyframe is missing, or the companion has no starting picture.",
             "content": {
               "application/json": {
                 "schema": {
@@ -61231,7 +61231,7 @@
             }
           },
           "409": {
-            "description": "A clip run is busy, the character sheet is not approved, a keyframe is missing, or the rest picture has no Stack original.",
+            "description": "A clip run is busy, the character sheet is not approved, a keyframe is missing, or the companion has no starting picture.",
             "content": {
               "application/json": {
                 "schema": {
