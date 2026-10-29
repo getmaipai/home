@@ -48,6 +48,7 @@ import type { Frame } from "@/lib/imaging/crop";
 import { imagingTargets } from "@/lib/imaging/targets";
 import { prepareEditSource } from "@/lib/pictures/editSources";
 import { complete } from "@/lib/llm";
+import { topicMessages } from "@/lib/topicPrompt";
 import { COMPANION_PERSONALITIES, cleanStyleNotes, backstoryTagline } from "@/lib/companionPersonality";
 import { evaluateSafety, forOutput, carriesCrisisSignal } from "@/lib/safety";
 
@@ -670,7 +671,7 @@ companionsRoutes.openapi(backstoryRoute, async (c) => {
   if (!mayEdit(actor, id) || speakerAgeBand(actor, new Date()) === "child") return c.json({ error: "Only the author or an admin can generate this backstory." }, 403);
   const companion = getHouseholdCompanion(id)?.companion; if (!companion) return c.json({ error: "That household companion could not be found." }, 404);
   const band = speakerAgeBand(actor, new Date()), hint = c.req.valid("json").hint?.trim();
-  const completion = await (backstoryCompleteForTests ?? complete)("chat", [{ role: "system", content: `Write one kind, plain, non-romantic backstory sentence for an AI companion. No profanity, instructions, tools or claims of real memories. Maximum 400 characters. Viewer age band: ${band}. Return only the sentence.` }, { role: "user", content: `Name: ${companion.display_name}. Personality: ${hint ? "creator's hint follows" : "gentle and helpful"}. ${hint ? `Hint: ${hint}` : ""}` }], { max_tokens: 180, temperature: 0.7 });
+  const completion = await (backstoryCompleteForTests ?? complete)("chat", topicMessages(actor, [{ role: "system", content: `Write one kind, plain, non-romantic backstory sentence for an AI companion. No profanity, instructions, tools or claims of real memories. Maximum 400 characters. Viewer age band: ${band}. Return only the sentence.` }, { role: "user", content: `Name: ${companion.display_name}. Personality: ${hint ? "creator's hint follows" : "gentle and helpful"}. ${hint ? `Hint: ${hint}` : ""}` }]), { max_tokens: 180, temperature: 0.7 });
   if (!completion.ok) return c.json({ error: "The local chat model is unavailable. Try again when it is ready." }, 503);
   const text = completion.value.text.trim().replace(/^['"`]+|['"`]+$/g, "").slice(0, 400).trim();
   if (!text) return c.json({ error: "The local chat model is unavailable. Try again when it is ready." }, 503);

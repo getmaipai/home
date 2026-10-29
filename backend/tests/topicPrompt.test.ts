@@ -165,6 +165,7 @@ const CARRIES: Record<string, RegExp> = {
   "lib/turnMachine/nodes/model.ts": /state\.topicBlock/,
   "lib/packageHost.ts": /topicMessages\(actor,/,
   "routes/llm.ts": /topicMessages\(actor,/,
+  "routes/companions.ts": /topicMessages\(actor,/,
   "lib/projects/steps.ts": /topicMessagesForId\(/,
 };
 
