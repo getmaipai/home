@@ -710,7 +710,16 @@ describe("household companion routes", () => {
     expect((await (await request(`companions/${id}/states/jobs/run/${job}`, adult)).json() as { state: string }).state).toBe("cancelled");
   });
 
-  test("approval requires force and idle first, edits only the draft, and idle removal clears every draft approval", async () => {
+  test("states route lists creator vocabulary in spec order and subset generation rejects legacy ids", async () => {
+    const adult = addPerson("person-state-subset", "adult"), created = createHouseholdCompanion({ ...fixture(), display_name: "Subset character" }, { display_name: "Author", person_id: "person-state-subset" }); if (!created.ok) throw new Error(created.error); const id = created.value.id;
+    const body = await (await request(`companions/${id}/states`, adult)).json() as any;
+    expect(body.states.map((state: any) => state.id)).toEqual(media.states.filter((state) => state.creator).map((state) => state.id));
+    expect(body.states.filter((state: any) => state.required)).toHaveLength(4); expect(body.states.some((state: any) => state.id === "needs_you")).toBe(false); expect(body.counts.total).toBe(13);
+    const rejected = await request(`companions/${id}/states/generate`, adult, "POST", { states: ["needs_you"] });
+    expect(rejected.status).toBe(400); expect((await rejected.json() as any).error).toBe("Choose only listed companion states.");
+  });
+
+  test("failed quality reports stay unapproved and idle removal clears every draft approval", async () => {
     const adult = addPerson("person-state-approve", "adult"), created = createHouseholdCompanion({ ...fixture(), display_name: "Approval flow" }, { display_name: "Author", person_id: "person-state-approve" }); if (!created.ok) throw new Error(created.error); const id = created.value.id;
     const rest = addVersion(id, new Uint8Array([1]), { source: "upload", label: "rest", width: 1024, height: 1024, from: null }); setRest(id, rest.id); updateSheet(id, { views: { left: null, right: null, mouth: null }, card: { text: "fox", species: "fox", colours: ["#CC3322"] }, key: "#00FF00", state: "needs_review", approved_by: null, approved_at: null }); approveSheet(id, "Author");
     const idle = addTake(id, "idle", { source: "upload", label: "idle" }), thinking = addTake(id, "thinking", { source: "upload", label: "thinking" });
@@ -718,9 +727,11 @@ describe("household companion routes", () => {
     const all = readStates(id); all.states.idle!.takes[0]!.report = report(false, ["The loop does not close cleanly."]); all.states.thinking!.takes[0]!.report = report(true, []); saveStates(id, all);
     for (const [state, take] of [["idle", idle], ["thinking", thinking]] as const) { const h264 = takePath(id, state, take.id, "clip.h264.mp4")!, still = takePath(id, state, take.id, "still.png")!; mkdirSync(join(h264, ".."), { recursive: true }); writeFileSync(h264, "h264"); writeFileSync(still, "png"); }
     const idlePath = `companions/${id}/states/idle/approve`;
-    const needsForce = await request(idlePath, adult, "PUT", { take_id: idle.id }); expect(needsForce.status).toBe(409); expect(await needsForce.json()).toMatchObject({ code: "needs_force", error: "This clip missed a quality check: The loop does not close cleanly. Approve it anyway?" });
+    const needsForce = await request(idlePath, adult, "PUT", { take_id: idle.id }); expect(needsForce.status).toBe(409); expect(await needsForce.json()).toEqual({ error: "Needs another try" });
     const beforeIdle = await request(`companions/${id}/states/thinking/approve`, adult, "PUT", { take_id: thinking.id }); expect(beforeIdle.status).toBe(409); expect((await beforeIdle.json() as { error: string }).error).toBe("Approve the idle clip first.");
-    expect((await request(idlePath, adult, "PUT", { take_id: idle.id, force: true })).status).toBe(200);
+    expect((await request(idlePath, adult, "PUT", { take_id: idle.id, force: true })).status).toBe(409);
+    const idleOk = readStates(id); idleOk.states.idle!.takes[0]!.report = report(true, []); saveStates(id, idleOk);
+    expect((await request(idlePath, adult, "PUT", { take_id: idle.id })).status).toBe(200);
     expect((await request(`companions/${id}/states/thinking/approve`, adult, "PUT", { take_id: thinking.id })).status).toBe(200);
     expect(getHouseholdCompanion(id)?.companion?.animation).toBeUndefined();
     expect((await request(`companions/${id}/states/thinking/approve`, adult, "DELETE")).status).toBe(200);

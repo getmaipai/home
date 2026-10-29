@@ -3,7 +3,7 @@ import { rmSync, writeFileSync, mkdirSync, existsSync, readFileSync } from "node
 import { join } from "node:path";
 import { loadManifestOnly } from "@/lib/plugins";
 import { createHouseholdCompanion } from "@/lib/householdCompanions";
-import { addTake, bestTake, deleteStates, deleteTake, readStates, setMotion, takePath, __resetCompanionStatesForTests, finishTake, swapInAnimation } from "@/lib/companionStates";
+import { addTake, bestTake, deleteStates, deleteTake, readStates, saveStates, setMotion, takePath, __resetCompanionStatesForTests, finishTake, swapInAnimation } from "@/lib/companionStates";
 import { __setStackClientForTests } from "@/lib/stackEngine";
 import { addVersion, approveSheet, setRest, updateSheet } from "@/lib/companionLook";
 import media from "@maipai/spec/vocab/companion-media.json";
@@ -34,6 +34,17 @@ describe("companion states store", () => {
     expect(readStates(id).states.idle?.takes).toHaveLength(1);
     expect(() => addTake(id, "../../look", { source: "upload", label: "bad" })).toThrow("Choose one of the listed companion states.");
     expect(() => setMotion(id, "dancing", "spin")).toThrow("Choose one of the listed companion states.");
+    expect(addTake(id, "needs_you", { source: "upload", label: "legacy" }).id).toBe("take-1");
+  });
+
+  test("migrates an approved celebrate take to done once and leaves celebrate intact", () => {
+    const id = companion(), take = addTake(id, "celebrate", { source: "upload", label: "celebrate" }), all = readStates(id);
+    const report = { ok: true, reasons: [], seconds: 3, bytes: { h264: 10, av1: null }, colour_distance: 1, area_ratio: 1, loop_gap: 0, opaque_share: { min: .5, max: .8 } };
+    all.states.celebrate!.takes[0]!.report = report; all.states.celebrate!.approved = take.id; all.states.celebrate!.approved_by = "Author"; all.states.celebrate!.approved_at = new Date().toISOString(); saveStates(id, all);
+    const first = readStates(id), done = first.states.done!;
+    expect(done.approved).toBe("take-1"); expect(done.takes[0]).toMatchObject({ report, source: "upload" });
+    expect(first.states.celebrate?.approved).toBe(take.id); expect(first.states.celebrate?.takes).toHaveLength(1);
+    expect(readStates(id).states.done?.takes).toHaveLength(1);
   });
 
   test("limits a state to twelve takes and removes a deleted take folder", () => {
@@ -106,6 +117,7 @@ describe("companion states store", () => {
     await finishTake(id, "idle", take.id, { alpha: false });
     expect(submitted.kind).toBe("media.companion_clip"); expect(submitted.input).toMatchObject({ output_dir: join(dataRoot, "companions", id, "states", "idle", take.id), output_name: "finished", key: "#FF00FF", kind: "loop", min_seconds: media.states[0]!.min_seconds, max_seconds: media.states[0]!.max_seconds, colours: ["#CC3322"], palette_reference: Buffer.from([1]).toString("base64"), max_bytes: media.ship.max_bytes_per_clip });
     expect(readStates(id).states.idle?.takes[0]?.report).toMatchObject({ ok: true, seconds: 3, bytes: { h264: 123 }, colour_match: { applied: true, strength: .35 }, settle_skipped_frames: 16 }); expect(roots).toBe(0);
+    expect(readStates(id).states.idle).toMatchObject({ approved: take.id, approved_by: "automatic" });
   });
 
   test("omits a missing rest picture palette reference", async () => {
