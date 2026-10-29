@@ -59771,13 +59771,7 @@
                 "laughing",
                 "surprised",
                 "sad",
-                "confused",
-                "idle_look",
-                "needs_you",
-                "greeting",
-                "happy",
-                "oops",
-                "celebrate"
+                "confused"
               ]
             },
             "required": true,
@@ -59908,7 +59902,7 @@
         "tags": [
           "Companions"
         ],
-        "summary": "Generate candidate clips for missing companion states",
+        "summary": "Generate candidate clips for selected companion states",
         "parameters": [
           {
             "schema": {
@@ -59927,11 +59921,17 @@
               "schema": {
                 "type": "object",
                 "properties": {
+                  "states": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
                   "count": {
                     "type": "integer",
                     "minimum": 1,
                     "maximum": 4,
-                    "default": 2
+                    "default": 1
                   },
                   "required_only": {
                     "type": "boolean",
@@ -59957,6 +59957,16 @@
                   "required": [
                     "job"
                   ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "A state is not in the creator vocabulary",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
                 }
               }
             }
