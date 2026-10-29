@@ -88,6 +88,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `frontend/src/apps/chat/composerVoiceControls.tsx` | useVoiceCallReady, ComposerVoiceControls |
 | `frontend/src/apps/chat/liveVoiceSession.tsx` | WAKE_SESSION_IDLE_CLOSE_MS, BARGE_IN_ARM_DELAY_MS, DUPLEX_PAUSE_AFTER_MS, DUPLEX_FALSE_INTERRUPTION_MS, REACTION_PHRASES, duplexCounters |
 | `frontend/src/apps/chat/voiceSessionContext.tsx` | VoiceSessionProvider, useVoiceSession |
+| `frontend/src/apps/household/ComingUpPage.tsx` | ComingUpPage |
 | `frontend/src/apps/household/HouseholdPage.tsx` | HouseholdIcon, HouseholdPage |
 | `frontend/src/apps/memory/PeopleAndThings.tsx` | PeopleAndThings |
 | `frontend/src/apps/memory/PersonMemories.tsx` | OtherPersonMemories, OwnMemories |
@@ -342,6 +343,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/codeStream.ts` | gateStream |
 | `backend/src/lib/codeWire.ts` | WIRE_PATH, CodeRequestError, DROPPED_SAMPLING, parseBody, personText, DEFAULT_OUTPUT_TOKENS |
 | `backend/src/lib/codingMode.ts` | codingModeReason, codingModeReadiness, reconcileCodingModeAtStartup, raiseModeFailure |
+| `backend/src/lib/comingUp.ts` | listComingUp, doneComingUp, snoozeComingUp |
 | `backend/src/lib/commands.ts` | __resetCommandsCacheForTests, createCommand, listCommands, deleteCommand, matchCommand, runCommand |
 | `backend/src/lib/companionArt.ts` | COMPANION_STILL_MODEL_MISSING_LINE, COMPANION_CLIP_MODEL_MISSING_LINE, COMPANION_MODEL_MISMATCH_LINE, COMPANION_EDIT_MODEL, __setCompanionArtStatusReadersForTests, promptHash |
 | `backend/src/lib/companionArtCheck.ts` | ArtWithheldError, audienceLane, companionAudience, checkCompanionArt, requireCompanionPictureOk, takeAssets |

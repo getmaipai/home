@@ -21,6 +21,8 @@ import type { Project } from "@maipai/spec/gen/ts/project.js";
 import type { SetupState } from "@maipai/spec/gen/ts/setup-state.js";
 import type { File as FileRecord } from "@maipai/spec/gen/ts/file.js";
 import type { List as ListRecord } from "@maipai/spec/gen/ts/list.js";
+
+export type ComingUpItem = { id: string; kind: "alarm" | "reminder" | "timer"; text: string; at: string };
 import type { Share } from "@maipai/spec/gen/ts/share.js";
 import type { SttStatusResponse } from "@maipai/spec/voice/ts/sttTypes.js";
 import type { SearchGroup } from "@maipai/ui/src/dashboard/layouts/full/vertical/header/HeaderSearch";
@@ -952,6 +954,9 @@ export interface MediaBudgetResponse { limit_min: number; used_min: number; left
 
 export const api = {
   lists: () => request<ListRecord[]>("/api/lists"),
+  comingUp: () => request<ComingUpItem[]>("/api/coming-up"),
+  doneComingUp: (id: string) => request<{ ok: true }>(`/api/coming-up/${encodeURIComponent(id)}/done`, { method: "POST" }),
+  snoozeComingUp: (id: string, input: { minutes?: number; until?: "tomorrow_morning" }) => request<{ ok: true }>(`/api/coming-up/${encodeURIComponent(id)}/snooze`, { method: "POST", body: JSON.stringify(input) }),
   addListItem: (listId: string, text: string) => request<ListRecord>(`/api/lists/${encodeURIComponent(listId)}/items`, { method: "POST", body: JSON.stringify({ text }) }),
   editListItem: (listId: string, itemId: string, done: boolean) => request<ListRecord>(`/api/lists/${encodeURIComponent(listId)}/items/${encodeURIComponent(itemId)}`, { method: "PATCH", body: JSON.stringify({ done }) }),
   clearDoneListItems: (listId: string) => request<ListRecord>(`/api/lists/${encodeURIComponent(listId)}/clear-done`, { method: "POST" }),

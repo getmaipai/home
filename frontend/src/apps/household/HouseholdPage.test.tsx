@@ -2,6 +2,7 @@ import { afterEach, describe, expect, test, mock } from "bun:test";
 import { act, cleanup, fireEvent, waitFor } from "@testing-library/react";
 import { HouseholdPage } from "@/apps/household/HouseholdPage";
 import { renderWithQueryClient } from "../../../tests/renderWithQueryClient";
+import { MemoryRouter } from "react-router-dom";
 
 afterEach(cleanup);
 
@@ -43,7 +44,7 @@ describe("HouseholdPage", () => {
   test("shows the two standing lists with counts, adds and ticks an item, and clears the composer", async () => {
     const restore = withLists();
     try {
-      const view = renderWithQueryClient(<HouseholdPage />);
+      const view = renderWithQueryClient(<MemoryRouter><HouseholdPage /></MemoryRouter>);
       expect(await view.findByRole("button", { name: /Shopping/ })).toHaveTextContent("1");
       expect(view.getByRole("button", { name: /To-do/ })).toHaveTextContent("0");
       const composer = view.getByRole("textbox", { name: "Add an item" });
@@ -61,7 +62,7 @@ describe("HouseholdPage", () => {
   test("clears only completed Shopping items and exposes no list deletion to a child", async () => {
     const restore = withLists();
     try {
-      const view = renderWithQueryClient(<HouseholdPage />);
+      const view = renderWithQueryClient(<MemoryRouter><HouseholdPage /></MemoryRouter>);
       fireEvent.click(await view.findByRole("button", { name: /Clear done/ }));
       await waitFor(() => expect(view.queryByText("Bread")).toBeNull());
       expect(view.queryByRole("button", { name: /delete list/i })).toBeNull();
@@ -74,7 +75,7 @@ describe("HouseholdPage", () => {
     try {
       window.innerWidth = 390;
       act(() => window.dispatchEvent(new Event("resize")));
-      const view = renderWithQueryClient(<HouseholdPage />);
+      const view = renderWithQueryClient(<MemoryRouter><HouseholdPage /></MemoryRouter>);
       expect(await view.findByRole("heading", { name: "Lists" })).toBeInTheDocument();
       fireEvent.click(view.getByRole("button", { name: /Shopping/ }));
       expect(await view.findByRole("heading", { name: "Shopping" })).toBeInTheDocument();
@@ -84,5 +85,20 @@ describe("HouseholdPage", () => {
       act(() => window.dispatchEvent(new Event("resize")));
       restore();
     }
+  });
+
+  test("opens Coming up and shows a plain empty state", async () => {
+    const restore = withLists();
+    const original = globalThis.fetch;
+    globalThis.fetch = mock((input: RequestInfo | URL, init?: RequestInit) => {
+      if (String(input).endsWith("/api/lists")) return Promise.resolve(Response.json([list("shopping"), list("todo")]));
+      if (String(input).endsWith("/api/coming-up")) return Promise.resolve(Response.json([]));
+      return original(input, init);
+    }) as unknown as typeof fetch;
+    try {
+      const view = renderWithQueryClient(<MemoryRouter><HouseholdPage /></MemoryRouter>);
+      fireEvent.click(await view.findByRole("tab", { name: "Coming up" }));
+      expect(view.getByRole("tab", { name: "Coming up" })).toBeInTheDocument();
+    } finally { restore(); globalThis.fetch = original; }
   });
 });

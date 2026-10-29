@@ -100,6 +100,7 @@ const SetupReviewPage = lazyNamed(() => import("@/apps/setup/SetupReviewPage"), 
 // the Routes chunk past the 4 MiB service-worker precache ceiling (vite.config.ts, src/apps/setup/preview/bundle.test.ts).
 const NotificationsPage = lazy(() => import("@/apps/notifications/NotificationsPage").then((m) => ({ default: m.NotificationsPage })));
 const HouseholdPage = lazy(() => import("@/apps/household/HouseholdPage").then((m) => ({ default: m.HouseholdPage })));
+const ComingUpPage = lazy(() => import("@/apps/household/ComingUpPage").then((m) => ({ default: m.ComingUpPage })));
 
 /** The migrated root route tree (docs/plans/shell-on-shadcndashboard-
  * 2026-09-21.md, step 1): mounts the template's
@@ -446,6 +447,7 @@ function RoutesWithIncognito({ person, onPersonChange, onSignedOut, appCatalog }
             <Route path="media/:id" element={<MediaLinkRedirect />} />
             <Route path="notifications" element={<Suspense fallback={null}><NotificationsPage /></Suspense>} />
             <Route path="household" element={<Suspense fallback={null}><HouseholdPage /></Suspense>} />
+            <Route path="household/coming-up" element={<Suspense fallback={null}><ComingUpPage /></Suspense>} />
             <Route path="dev/ui" element={<UiShowcasePage person={person} />} />
             <Route path="mic-test" element={<MicTestPage />} />
             <Route path="*" element={<NotFoundPage />} />
