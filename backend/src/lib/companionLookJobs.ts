@@ -166,7 +166,7 @@ export async function startLookEdit(input: { actor: PersonRow; companionId: stri
     const stylePhrase = !style ? "" : lookPromptFor("", look.key, style, input.customStyle).replace(/^\. A single character, full body, centred in the frame, standing in a relaxed neutral pose, facing the viewer, mouth closed, arms down\./, "").replace(/ Plain solid (green|magenta) background, no shadow, no ground, no text, no other objects\.$/, "").trim();
     form.append("instruction", stylePhrase ? `${instruction}. ${stylePhrase}` : instruction);
     // Only the exact bytes the picture model made count as generated; a picture put on a backdrop or cropped is sent as a photo.
-    form.append("image_source", originalPath && !input.forceKeyComposite ? "generated" : "uploaded");
+    form.append("image_source", originalPath && !input.forceKeyComposite && !descendsFromUpload(input.companionId, version.id) ? "generated" : "uploaded");
     form.append("audience", "all-ages");
     form.append("timeout_ms", "1");
     form.append("model", art.model);
@@ -175,6 +175,17 @@ export async function startLookEdit(input: { actor: PersonRow; companionId: stri
     register(submitted.job, { companionId: input.companionId, personId: input.actor.id, state: "queued", percent: 0, versions: [], error: null, count: 1, key: look.key, sourceVersion: version.id, instruction, model: art.model, quality: art.quality, promptHash: promptHash(instruction), modelReported: null, style, fitSubject: input.fitSubject });
     return submitted.job;
   } finally { startingCompanions.delete(input.companionId); }
+}
+
+/** True when the picture came, through any number of edits, from a photo someone uploaded. The picture engine only calls a picture "generated" when nothing in its history was a photo, so these are always sent as photos. */
+function descendsFromUpload(companionId: string, versionId: string | null | undefined): boolean {
+  const versions = readLook(companionId).versions;
+  let current = versions.find((item) => item.id === versionId);
+  for (let step = 0; current && step < 100; step++) {
+    if (current.source === "upload") return true;
+    current = current.from ? versions.find((item) => item.id === current!.from) : undefined;
+  }
+  return false;
 }
 
 function editForm(source: Uint8Array, instruction: string, generated: boolean): FormData {
@@ -203,7 +214,7 @@ export async function startLookSheet(input: { actor: PersonRow; companionId: str
     updateSheet(input.companionId, sheet);
     const originalPath = versionOriginalPath(input.companionId, version.id), sourceBytes = originalPath ? new Uint8Array(readFileSync(originalPath)) : await compositeOnNeutral(png), instruction = SHEET_VIEWS[0]!.prompt.replaceAll("<key>", key);
     const art = resolveCompanionEdit();
-    const form = editForm(sourceBytes, instruction, Boolean(originalPath)); form.append("model", art.model); form.append("seed", String(companionSeed(input.companionId)));
+    const form = editForm(sourceBytes, instruction, Boolean(originalPath) && !descendsFromUpload(input.companionId, version.id)); form.append("model", art.model); form.append("seed", String(companionSeed(input.companionId)));
     const submitted = await submitEdit(form);
     const job = crypto.randomUUID();
     sheetJobs.set(job, { companionId: input.companionId, personId: input.actor.id, state: "queued", percent: 0, versions: [], error: null, stackJob: submitted.job, index: 0, model: art.model, quality: art.quality, promptHash: promptHash(instruction), modelReported: null });
@@ -315,7 +326,7 @@ async function pollSheetJob(id: string, job: SheetJob, actor: PersonRow, compani
       if (job.index >= SHEET_VIEWS.length) { const doneLook = readLook(companionId); if (doneLook.sheet) updateSheet(companionId, { ...doneLook.sheet, state: "approved", approved_by: actor.displayName, approved_at: new Date().toISOString() }); job.state = "done"; job.percent = 100; activeByCompanion.delete(companionId); return; }
       const restPath = versionPath(companionId, look.rest!); if (!restPath) throw new Error("The rest picture could not be found. Choose it again and retry the sheet.");
       const rest = new Uint8Array(readFileSync(restPath)), originalPath = versionOriginalPath(companionId, look.rest!), sourceBytes = originalPath ? new Uint8Array(readFileSync(originalPath)) : await compositeOnNeutral(rest), instruction = SHEET_VIEWS[job.index]!.prompt.replaceAll("<key>", key);
-      const nextForm = editForm(sourceBytes, instruction, Boolean(originalPath)); nextForm.append("model", resolveCompanionEdit().model); nextForm.append("seed", String(companionSeed(companionId)));
+      const nextForm = editForm(sourceBytes, instruction, Boolean(originalPath) && !descendsFromUpload(companionId, look.rest)); nextForm.append("model", resolveCompanionEdit().model); nextForm.append("seed", String(companionSeed(companionId)));
       job.promptHash = promptHash(instruction);
       job.stackJob = (await submitEdit(nextForm)).job; job.state = "queued";
     })();
