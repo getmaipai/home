@@ -98,7 +98,7 @@ export function CreateCharacterStep({ creating, companionId, initialName, onDraf
   const canGenerate = ready && !locked && (look?.can_generate ?? true);
 
   // A picture that is cut off at an edge has the missing parts drawn in, once, without asking.
-  useFillCutOff(picture, { skip: locked || picture?.id === look?.rest, fill: () => void complete() });
+  useFillCutOff(picture, { skip: locked || (picture?.id === look?.rest && look?.sheet != null), fill: () => void complete() });
   /** A new picture (made, uploaded or reopened) starts centred; any pending move for the old one is dropped. */
   function choose(id: string) {
     if (placing.current.timer) { clearTimeout(placing.current.timer); placing.current.timer = null; }

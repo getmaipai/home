@@ -1322,6 +1322,24 @@ describe("household companion routes", () => {
     expect(response.status).toBe(202); expect(await response.json()).toEqual({ job: null }); expect(posts).toBe(0); expect(readLook(made.value.id).sheet?.state).toBe("approved");
   });
 
+  test("approving a cut-off starting picture draws the missing body first and makes the drawn picture the starting picture", async () => {
+    const adult = addPerson("approve-fill-author", "adult"), made = createHouseholdCompanion({ ...fixture(), display_name: "Approve fill fixture" }, { display_name: "Author", person_id: "approve-fill-author" }); if (!made.ok) throw new Error(made.error);
+    const cut = await clippedPng("bottom"), returned = await transparentPng(); __setPictureStatusForTests(readyStatusForTests()); __setAgeCheckRunnerForTests(async (images) => images.map(() => AGE_OK));
+    const instructions: string[] = [];
+    __setPicturesFetchForTests((async (input, init) => {
+      const url = String(input);
+      if (url.endsWith("/v1/images/edits") && init?.method === "POST") { instructions.push(String((init.body as FormData).get("instruction"))); return Response.json({ job: "fill-job" }, { status: 202 }); }
+      if (url.endsWith("/fill-job")) return Response.json({ job: "fill-job", state: "done", progress: 1, data: [] });
+      if (url.endsWith("/fill-job/0.png")) return new Response(returned, { headers: { "content-type": "image/png" } });
+      return new Response("Not found", { status: 404 });
+    }) as typeof fetch);
+    const source = addVersion(made.value.id, cut, { source: "upload", label: "Cut picture", width: 1024, height: 1024, from: null, style: "keep", clipped: ["bottom"] });
+    await request(`companions/${made.value.id}/look/approve`, adult, "POST", { version_id: source.id });
+    expect(instructions[0]).toContain("at the bottom");
+    const look = readLook(made.value.id), rest = look.versions.find((version) => version.id === look.rest)!;
+    expect(rest.id).not.toBe(source.id); expect(rest).toMatchObject({ source: "edit", from: source.id, clipped: [] });
+  });
+
   test("restyle reuses the picture edit job and stores the selected style", async () => {
     const adult = addPerson("restyle-author", "adult"), made = createHouseholdCompanion({ ...fixture(), display_name: "Restyle fixture" }, { display_name: "Author", person_id: "restyle-author" }); if (!made.ok) throw new Error(made.error);
     const image = await transparentPng(), original = await keyedPicture(); __setPictureStatusForTests(readyStatusForTests()); __setAgeCheckRunnerForTests(async (images) => images.map(() => AGE_OK));
