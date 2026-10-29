@@ -4,7 +4,8 @@ import media from "@maipai/spec/vocab/companion-media.json";
 import { capOfStyle, type LookStyleId } from "@/lib/companionLookStyles";
 import { addVersion, chooseKeyColour, describeCharacter, keyOut, keyRgb, lookPromptFor, normalizePicture, readLook, updateSheet, versionOriginalPath, versionPath } from "@/lib/companionLook";
 import { fitToFrame } from "@/lib/imaging/fit";
-import { pasteHead, type BodyCanvas } from "@/lib/imaging/outpaint";
+import { swapHead } from "@/lib/imaging/headSwap";
+import type { BodyCanvas } from "@/lib/imaging/outpaint";
 import { imagingTargets } from "@/lib/imaging/targets";
 import { clippedEdges } from "@/lib/imaging/subject";
 import { removeBackground } from "@/lib/imaging/tools";
@@ -51,8 +52,8 @@ export interface LookJob {
   style?: string;
   /** Fit the finished picture to the portrait frame so the subject fills it, for pictures whose subject comes back smaller. */
   fitSubject?: boolean;
-  /** The person's own head, laid back over the result so the face is never the model's. */
-  headLayer?: Uint8Array;
+  /** The person's own picture: after the body is drawn, their real face is put on it with a head swap, so the face is never the model's invention. */
+  faceRef?: Uint8Array;
   finalising?: Promise<void>;
 }
 interface SheetJob { companionId: string; personId: string; state: LookJobState; percent: number; versions: string[]; error: string | null; stackJob: string; index: number; model: string; quality: "quick" | "detailed"; promptHash: string; modelReported: string | null; finalising?: Promise<void> }
@@ -176,7 +177,7 @@ export async function startLookEdit(input: { actor: PersonRow; companionId: stri
     form.append("model", art.model);
     form.append("seed", String(companionSeed(input.companionId)));
     const submitted = await submitEdit(form);
-    register(submitted.job, { companionId: input.companionId, personId: input.actor.id, state: "queued", percent: 0, versions: [], error: null, count: 1, key: look.key, sourceVersion: version.id, instruction, model: art.model, quality: art.quality, promptHash: promptHash(instruction), modelReported: null, style, fitSubject: input.fitSubject, headLayer: input.body?.head });
+    register(submitted.job, { companionId: input.companionId, personId: input.actor.id, state: "queued", percent: 0, versions: [], error: null, count: 1, key: look.key, sourceVersion: version.id, instruction, model: art.model, quality: art.quality, promptHash: promptHash(instruction), modelReported: null, style, fitSubject: input.fitSubject, faceRef: input.body?.face });
     return submitted.job;
   } finally { startingCompanions.delete(input.companionId); }
 }
@@ -261,7 +262,8 @@ export async function pollLookJob(id: string, actor: PersonRow, companionId: str
         job.modelReported = reported;
         if (reported && reported !== job.model) throw new Error(COMPANION_MODEL_MISMATCH_LINE);
         const images = await Promise.all(Array.from({ length: job.count }, (_, index) => fetchPicture(id, index)));
-        if (job.headLayer) for (let index = 0; index < images.length; index++) images[index] = await pasteHead(images[index]!, job.headLayer);
+        // A swap that fails leaves the drawn picture as it is: a whole body with a redrawn face beats no body.
+        if (job.faceRef) for (let index = 0; index < images.length; index++) images[index] = await swapHead({ drawn: images[index]!, face: job.faceRef, model: job.model, seed: companionSeed(job.companionId) }).catch(() => images[index]!);
         const withheld: string[] = [];
         for (let index = 0; index < images.length; index++) {
           if (wasCancelled()) return;

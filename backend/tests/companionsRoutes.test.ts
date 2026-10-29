@@ -1287,10 +1287,10 @@ describe("household companion routes", () => {
   test("approving a cut-off starting picture draws the missing body first and makes the drawn picture the starting picture", async () => {
     const adult = addPerson("approve-fill-author", "adult"), made = createHouseholdCompanion({ ...fixture(), display_name: "Approve fill fixture" }, { display_name: "Author", person_id: "approve-fill-author" }); if (!made.ok) throw new Error(made.error);
     const cut = await clippedPng("bottom"), returned = await transparentPng(); __setPictureStatusForTests(readyStatusForTests()); __setAgeCheckRunnerForTests(async (images) => images.map(() => AGE_OK));
-    const instructions: string[] = [], sources: string[] = [];
+    const instructions: string[] = [], sources: string[] = [], operations: string[] = [];
     __setPicturesFetchForTests((async (input, init) => {
       const url = String(input);
-      if (url.endsWith("/v1/images/edits") && init?.method === "POST") { instructions.push(String((init.body as FormData).get("instruction"))); sources.push(String((init.body as FormData).get("image_source"))); return Response.json({ job: "fill-job" }, { status: 202 }); }
+      if (url.endsWith("/v1/images/edits") && init?.method === "POST") { instructions.push(String((init.body as FormData).get("instruction"))); sources.push(String((init.body as FormData).get("image_source"))); operations.push(String((init.body as FormData).get("operation")) + ((init.body as FormData).get("reference") ? "+reference" : "")); return Response.json({ job: "fill-job" }, { status: 202 }); }
       if (url.endsWith("/fill-job")) return Response.json({ job: "fill-job", state: "done", progress: 1, data: [] });
       if (url.endsWith("/fill-job/0.png")) return new Response(returned, { headers: { "content-type": "image/png" } });
       return new Response("Not found", { status: 404 });
@@ -1299,7 +1299,7 @@ describe("household companion routes", () => {
     await request(`companions/${made.value.id}/look/approve`, adult, "POST", { version_id: source.id });
     expect(instructions[0]).toContain("rest of the same one person");
     const look = readLook(made.value.id), rest = look.versions.find((version) => version.id === look.rest)!;
-    expect(rest.id).not.toBe(source.id); expect(rest).toMatchObject({ source: "edit", from: source.id, clipped: [] }); expect(sources.length).toBeGreaterThan(0); expect(sources.every((value) => value === "uploaded")).toBe(true); /* everything drawn from an uploaded photo is sent as a photo, never as generated */
+    expect(rest.id).not.toBe(source.id); expect(rest).toMatchObject({ source: "edit", from: source.id, clipped: [] }); expect(operations).toEqual(["edit_masked", "edit+reference"]); /* the body is painted around the photo, then the real face is put on it by a reference edit */ expect(sources.length).toBeGreaterThan(0); expect(sources.every((value) => value === "uploaded")).toBe(true); /* everything drawn from an uploaded photo is sent as a photo, never as generated */
   });
 
   test("restyle reuses the picture edit job and stores the selected style", async () => {

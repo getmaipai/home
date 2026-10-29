@@ -1,6 +1,6 @@
 import { expect, test } from "bun:test";
 import sharp from "sharp";
-import { OUTPAINT_CANVAS, pasteHead, planBodyCanvas } from "./outpaint";
+import { OUTPAINT_CANVAS, planBodyCanvas } from "./outpaint";
 
 // A "person": a skin-coloured face on top of a blue shirt, cut off by the left, right and bottom of the frame.
 async function headAndShoulders(): Promise<Uint8Array> {
@@ -25,11 +25,10 @@ test("a picture that is not cut off at the bottom is left to the ordinary fill",
   expect(await planBodyCanvas(await headAndShoulders(), ["left", "right"])).toBeNull();
 });
 
-test("pasting the head puts the person's own pixels back over whatever the model drew, and fades out below the chin", async () => {
+test("the face reference is the person's own picture on a plain background, at its original size", async () => {
   const plan = (await planBodyCanvas(await headAndShoulders(), ["left", "right", "bottom"]))!;
-  const drawn = new Uint8Array(await sharp({ create: { width: 1024, height: 1024, channels: 3, background: { r: 10, g: 200, b: 10 } } }).png().toBuffer());
-  const pasted = await pasteHead(drawn, plan.head);
-  const top = Math.round(OUTPAINT_CANVAS * 0.06);
-  expect((await pixel(pasted, 512, top + 20)).slice(0, 3)).toEqual([200, 140, 100]); // the face is the original's
-  expect((await pixel(pasted, 512, 900)).slice(0, 3)).toEqual([10, 200, 10]); // the body is the model's
+  const meta = await sharp(Buffer.from(plan.face)).metadata();
+  expect([meta.width, meta.height, meta.hasAlpha]).toEqual([1024, 1024, false]);
+  expect((await pixel(plan.face, 512, 300)).slice(0, 3)).toEqual([200, 140, 100]); // the face itself
+  expect((await pixel(plan.face, 5, 5)).slice(0, 3)).toEqual([217, 217, 217]); // plain where the picture was transparent
 });
