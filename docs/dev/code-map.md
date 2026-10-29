@@ -86,7 +86,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `frontend/src/apps/chat/composerDictationWaveform.tsx` | DictationLevelMeterProvider, ComposerDictationWaveform |
 | `frontend/src/apps/chat/composerDraftRestore.tsx` | useComposerDraftRestore |
 | `frontend/src/apps/chat/composerVoiceControls.tsx` | useVoiceCallReady, ComposerVoiceControls |
-| `frontend/src/apps/chat/liveVoiceSession.tsx` | WAKE_SESSION_IDLE_CLOSE_MS, BARGE_IN_ARM_DELAY_MS, DUPLEX_PAUSE_AFTER_MS, DUPLEX_FALSE_INTERRUPTION_MS, REACTION_PHRASES, duplexCounters |
+| `frontend/src/apps/chat/liveVoiceSession.tsx` | WAKE_SESSION_IDLE_CLOSE_MS, BARGE_IN_ARM_DELAY_MS, DUPLEX_PAUSE_AFTER_MS, DUPLEX_FALSE_INTERRUPTION_MS, DUPLEX_DUCK_LEVEL, DUPLEX_DUCK_MS |
 | `frontend/src/apps/chat/voiceSessionContext.tsx` | VoiceSessionProvider, useVoiceSession |
 | `frontend/src/apps/household/ComingUpPage.tsx` | ComingUpPage |
 | `frontend/src/apps/household/HouseholdPage.tsx` | HouseholdIcon, HouseholdPage |
