@@ -23,7 +23,7 @@ import { loadManifestOnly } from "@/lib/plugins";
 import { resolvePackageDir } from "@/lib/packageResolve";
 import { createHouseholdCompanion, copyBundledCompanion, copyHouseholdCompanion, getHouseholdCompanion, updateHouseholdCompanion, deleteHouseholdCompanion, setHouseholdCompanionAudience, setHouseholdCompanionStatus, householdCompanionAuthorId } from "@/lib/householdCompanions";
 import { addVersion, approveSheet, deleteVersion, readLook, setRest, setSheetCard, setSheetKey, unapproveSheet, versionOriginalPath, versionPath, normalizePicture, uploadLabel } from "@/lib/companionLook";
-import { LOOK_STYLES, LOOK_STYLE_IDS } from "@/lib/companionLookStyles";
+import { LOOK_STYLE_IDS, stylesForBand, capOfStyle } from "@/lib/companionLookStyles";
 import { LOOK_EDIT_PROMPT_LINE, LOOK_JOB_BUSY_LINE, LOOK_PROMPT_REQUIRED_LINE, activeLookJob, canGenerateLook, cancelLookJob, pollLookJob, startLookEdit, startLookGeneration, startLookSheet } from "@/lib/companionLookJobs";
 import { fileTypeFromBuffer } from "file-type";
 import { readFileSync, writeFileSync, copyFileSync, mkdirSync, rmSync, existsSync, renameSync } from "node:fs";
@@ -269,7 +269,7 @@ function lookAccess(actor: import("@/types").PersonRow, id: string): { status: 4
 const lookIdParam = z.object({ id: z.string().min(1).max(80).openapi({ param: { name: "id", in: "path" } }) });
 const lookVersionParam = z.object({ id: z.string().min(1).max(80), versionId: z.string().min(1).max(80).openapi({ param: { name: "versionId", in: "path" } }) });
 const SheetResponse = z.object({ views: z.object({ left: z.object({ version_id: z.string(), url: z.string() }).nullable(), right: z.object({ version_id: z.string(), url: z.string() }).nullable(), mouth: z.object({ version_id: z.string(), url: z.string() }).nullable() }), card: z.object({ text: z.string(), colours: z.array(z.string()), species: z.string() }).nullable(), key: z.enum([media.key.default, media.key.alternate]), state: z.enum(["empty", "making", "needs_review", "approved"]), approved_by: z.string().nullable(), approved_at: z.string().nullable() });
-const LookResponse = z.object({ versions: z.array(z.object({ id: z.string(), label: z.string(), source: z.enum(["upload", "generated", "edit"]), width: z.number().int(), height: z.number().int(), created_at: z.string(), from: z.string().nullable(), url: z.string() })), rest: z.string().nullable(), key: z.enum([media.key.default, media.key.alternate]), sheet: SheetResponse.nullable(), ready_for_video: z.boolean(), start_ready: z.boolean(), start_reason: z.string().optional(), can_generate: z.boolean(), generate_reason: z.string().optional(), styles: z.array(z.object({ id: z.enum(LOOK_STYLE_IDS), label: z.string() })) });
+const LookResponse = z.object({ versions: z.array(z.object({ id: z.string(), label: z.string(), source: z.enum(["upload", "generated", "edit"]), width: z.number().int(), height: z.number().int(), created_at: z.string(), from: z.string().nullable(), url: z.string() })), rest: z.string().nullable(), key: z.enum([media.key.default, media.key.alternate]), sheet: SheetResponse.nullable(), ready_for_video: z.boolean(), start_ready: z.boolean(), start_reason: z.string().optional(), can_generate: z.boolean(), generate_reason: z.string().optional(), styles: z.array(z.object({ id: z.enum(LOOK_STYLE_IDS), label: z.string(), custom: z.boolean() })), keep: z.object({ id: z.literal("keep" as const), label: z.string() }), audience_cap: z.enum(["all", "teen", "adult"]) });
 const PromptPackResponse = z.object({ title: z.string(), prompt: z.string(), negative_prompt: z.string(), text: z.string() });
 const lookPromptRoute = createRoute({ method: "get", path: "/{id}/look/prompt", tags: ["Companions"], summary: "Get a copyable prompt for a companion picture", middleware: [requireAuth] as const,
   request: { params: lookIdParam }, responses: { 200: { content: { "application/json": { schema: PromptPackResponse } }, description: "A picture prompt and its full generation specification." }, ...errorResponses({ 401: "Not signed in", 403: "Only the author or an admin can read this companion's pictures", 404: "No household companion" }) } });
@@ -300,10 +300,12 @@ companionsRoutes.openapi(lookRoute, async (c) => {
   const viewUrl = (versionId: string | null) => versionId ? { version_id: versionId, url: `/api/companions/${encodeURIComponent(id)}/look/${versionId}/image` } : null;
   const sheet = look.sheet ? { ...look.sheet, views: { left: viewUrl(look.sheet.views.left), right: viewUrl(look.sheet.views.right), mouth: viewUrl(look.sheet.views.mouth) } } : null;
   const startReady = Boolean(look.rest && versionOriginalPath(id, look.rest));
-  return c.json({ versions: look.versions.map(({ id: versionId, label, source, width, height, created_at, from }) => ({ id: versionId, label, source, width, height, created_at, from: from ?? null, url: `/api/companions/${encodeURIComponent(id)}/look/${versionId}/image` })), rest: look.rest, key: look.key, sheet, ready_for_video: look.sheet?.state === "approved", start_ready: startReady, ...(!startReady ? { start_reason: TAKE_NO_ORIGINAL_LINE } : {}), ...generation, styles: LOOK_STYLES.map(({ id: styleId, label }) => ({ id: styleId, label })) }, 200);
+  const band = speakerAgeBand(c.get("person"), new Date()), restStyle = look.versions.find((version) => version.id === look.rest)?.style;
+  const audienceCap = restStyle ? capOfStyle(restStyle) ?? "adult" : "all"; // no style recorded (an older companion): no cap, the checklist and art check still gate widening
+  return c.json({ versions: look.versions.map(({ id: versionId, label, source, width, height, created_at, from }) => ({ id: versionId, label, source, width, height, created_at, from: from ?? null, url: `/api/companions/${encodeURIComponent(id)}/look/${versionId}/image` })), rest: look.rest, key: look.key, sheet, ready_for_video: look.sheet?.state === "approved", start_ready: startReady, ...(!startReady ? { start_reason: TAKE_NO_ORIGINAL_LINE } : {}), ...generation, styles: stylesForBand(band).map(({ id: styleId, label }) => ({ id: styleId, label, custom: styleId === "custom" })), keep: { id: "keep" as const, label: "Keep as is"}, audience_cap: audienceCap }, 200);
 });
 
-const lookGenerateBody = z.object({ prompt: z.string().max(600).optional(), style: z.enum(LOOK_STYLE_IDS).optional(), count: z.number().int().min(1).max(4).default(4) });
+const lookGenerateBody = z.object({ prompt: z.string().max(600).optional(), style: z.enum(LOOK_STYLE_IDS).default("cartoon"), custom_style: z.string().min(1).max(120).optional(), count: z.number().int().min(1).max(4).default(4) }).superRefine((value, ctx) => { if (value.style === "custom" && !value.custom_style?.trim()) ctx.addIssue({ code: "custom", message: "Enter a custom style from 1 to 120 characters", path: ["custom_style"] }); });
 const lookJobResponse = z.object({ job: z.string() });
 const sheetStartRoute = createRoute({ method: "post", path: "/{id}/look/sheet", tags: ["Companions"], summary: "Make character sheet references", middleware: [requireAuth] as const,
   request: { params: lookIdParam }, responses: { 202: { content: { "application/json": { schema: z.object({ job: z.string(), card_source: z.enum(["model", "look_prompt"]) }) } }, description: "Character sheet job started." }, ...errorResponses({ 400: "Choose a rest picture and write a look prompt first", 403: "Only an allowed editor can make this sheet", 404: "No household companion", 409: "A picture is already being made for this companion", 422: "The picture request cannot be used", 503: "Picture creation is not set up" }) } });
@@ -338,18 +340,18 @@ companionsRoutes.openapi(lookGenerateRoute, async (c) => {
   const body = c.req.valid("json"), lookPrompt = getHouseholdCompanion(id)?.companion?.look_prompt?.trim() ?? "";
   const prompt = body.prompt?.trim() || lookPrompt;
   if (!prompt) return c.json({ error: LOOK_PROMPT_REQUIRED_LINE }, 400);
-  try { const job = await startLookGeneration({ actor: c.get("person"), companionId: id, lookPrompt, prompt: body.prompt, style: body.style, count: body.count }); return c.json({ job }, 202); }
+  try { const job = await startLookGeneration({ actor: c.get("person"), companionId: id, lookPrompt, prompt: body.prompt, style: body.style, customStyle: body.custom_style, count: body.count }); return c.json({ job }, 202); }
   catch (error) { const status = (error as { status?: number }).status ?? 503; return c.json({ error: error instanceof Error ? error.message : "The picture could not be started. Try again." }, status as 400 | 403 | 409 | 422 | 503); }
 });
 
-const lookEditBody = z.object({ version_id: z.string().regex(/^v-[0-9]+$/), instruction: z.string().min(1).max(300) });
+const lookEditBody = z.object({ version_id: z.string().regex(/^v-[0-9]+$/), instruction: z.string().min(1).max(300), style: z.enum(LOOK_STYLE_IDS).optional(), custom_style: z.string().min(1).max(120).optional() }).superRefine((value, ctx) => { if (value.style === "custom" && !value.custom_style?.trim()) ctx.addIssue({ code: "custom", message: "Enter a custom style from 1 to 120 characters", path: ["custom_style"] }); });
 const lookEditRoute = createRoute({ method: "post", path: "/{id}/look/edit", tags: ["Companions"], summary: "Edit a companion look picture with words", middleware: [requireAuth] as const,
   request: { params: lookIdParam, body: { content: { "application/json": { schema: lookEditBody } } } },
   responses: { 202: { content: { "application/json": { schema: lookJobResponse } }, description: "Picture edit started." }, ...errorResponses({ 400: "Describe a change in 1 to 300 characters", 401: "Not signed in", 403: "Only an allowed editor can change this companion's pictures", 404: "No household companion or picture", 409: "A picture is already being made for this companion", 422: "The instruction cannot be used to edit this picture", 503: "Picture creation is not set up" }) } });
 companionsRoutes.openapi(lookEditRoute, async (c) => {
   const { id } = c.req.valid("param"), denied = lookAccess(c.get("person"), id); if (denied) return c.json({ error: denied.error }, denied.status);
   const body = c.req.valid("json");
-  try { const job = await startLookEdit({ actor: c.get("person"), companionId: id, versionId: body.version_id, instruction: body.instruction }); return c.json({ job }, 202); }
+  try { const job = await startLookEdit({ actor: c.get("person"), companionId: id, versionId: body.version_id, instruction: body.instruction, style: body.style, customStyle: body.custom_style }); return c.json({ job }, 202); }
   catch (error) { const status = (error as { status?: number }).status ?? 503; return c.json({ error: error instanceof Error ? error.message : LOOK_EDIT_PROMPT_LINE }, status as 400 | 403 | 404 | 409 | 422 | 503); }
 });
 
@@ -416,7 +418,7 @@ companionsRoutes.openapi(uploadRoute, async (c) => {
     const png = await normalizePicture(bytes, { removeBackground: (image) => removeBackground(c.get("person"), image), upscale: (image) => upscale(c.get("person"), image) });
     const checked = await checkCompanionArt(id, c.get("person"), [{ label: "That picture", bytes }]);
     if (!checked.ok) return c.json({ error: checked.reasons.join(" ") }, 422);
-    const version = addVersion(id, png, { source: "upload", label: uploadLabel(file.name), width: media.image.size, height: media.image.size, from: null });
+    const version = addVersion(id, png, { source: "upload", label: uploadLabel(file.name), width: media.image.size, height: media.image.size, from: null, style: "keep" });
     return c.json({ id: version.id }, 201);
   } catch (error) {
     const message = error instanceof Error ? error.message : "That picture could not be added. Try again.";
@@ -603,8 +605,8 @@ function allUseCounts(id: string) {
 const createCompanionRoute = createRoute({ method: "post", path: "/", tags: ["Companions"], summary: "Create a household companion draft", middleware: [requireAuth] as const,
   request: { body: fieldsJson }, responses: { 201: { content: { "application/json": { schema: z.object({ id: z.string() }) } }, description: "Draft created." }, 400: companionValidationError, ...errorResponses({ 401: "Not signed in", 403: "Only adults can make a companion." }) } });
 companionsRoutes.openapi(createCompanionRoute, (c) => {
-  const actor = c.get("person"); if (speakerAgeBand(actor, new Date()) !== "adult" && !isOwnerOrAdmin(actor)) return c.json({ error: "Only adults can make a companion." }, 403);
-  const result = createHouseholdCompanion(normalizedFields(c.req.valid("json")) as never, { display_name: actor.displayName, person_id: actor.id });
+  const actor = c.get("person"), band = speakerAgeBand(actor, new Date()); if (band === "child" && !isOwnerOrAdmin(actor)) return c.json({ error: "Only teens and adults can make a companion." }, 403);
+  const result = createHouseholdCompanion(normalizedFields(c.req.valid("json")) as never, { display_name: actor.displayName, person_id: actor.id }, band === "teen" ? "teen" : "adult");
   if (!result.ok) return c.json({ error: result.error, ...(result.fields ? { fields: result.fields } : {}) }, 400);
   return c.json({ id: result.value.id }, 201);
 });
@@ -612,7 +614,7 @@ companionsRoutes.openapi(createCompanionRoute, (c) => {
 const copyRoute = createRoute({ method: "post", path: "/{id}/copy", tags: ["Companions"], summary: "Copy a companion into a household draft", middleware: [requireAuth] as const,
   request: { params: idPath }, responses: { 201: { content: { "application/json": { schema: z.object({ id: z.string() }) } }, description: "Draft copied." }, ...errorResponses({ 401: "Not signed in", 403: "Only adults can make a companion.", 404: "No such companion" }) } });
 companionsRoutes.openapi(copyRoute, (c) => {
-  const actor = c.get("person"); if (speakerAgeBand(actor, new Date()) !== "adult" && !isOwnerOrAdmin(actor)) return c.json({ error: "Only adults can make a companion." }, 403);
+  const actor = c.get("person"); if (speakerAgeBand(actor, new Date()) === "child" && !isOwnerOrAdmin(actor)) return c.json({ error: "Only teens and adults can make a companion." }, 403);
   const id = c.req.valid("param").id;
   const author = { display_name: actor.displayName, person_id: actor.id };
   const result = getHouseholdCompanion(id) ? copyHouseholdCompanion(id, author) : copyBundledCompanion(id, author);
@@ -646,9 +648,14 @@ companionsRoutes.openapi(audienceRoute, async (c) => {
   const actor = c.get("person"), id = c.req.valid("param").id, body = c.req.valid("json");
   if (!isOwnerOrAdmin(actor)) return c.json({ error: "Only an admin can change a companion's audience." }, 403);
   if (!getHouseholdCompanion(id)) return c.json({ error: "That household companion could not be found." }, 404);
+  const currentAudience = getHouseholdCompanion(id)?.companion?.audience ?? "adult", bandRank = { adult: 0, teen: 1, all: 2 } as const;
+  if (bandRank[body.audience] > bandRank[currentAudience]) {
+    const look = readLook(id), restStyle = look.versions.find((version) => version.id === look.rest)?.style;
+    const cap = capOfStyle(restStyle ?? "") ?? "adult", capRank = { adult: 0, teen: 1, all: 2 } as const;
+    if (restStyle !== undefined && bandRank[body.audience] > capRank[cap]) return c.json({ error: cap === "teen" ? "This look can reach teens. Pick a cartoon look to make it for everyone." : "This look is for adults. Pick a cartoon look to make it for everyone." }, 400);
+  }
   if (body.audience === "all" && body.confirmed !== true) return c.json({ error: "Review the all ages checklist and confirm before making this companion available to everyone." }, 400);
   const uses = liveUseCounts(id, body.audience); if (uses.robots) return c.json({ error: inUseSentence("robots", uses.robots) }, 409); if (uses.people) return c.json({ error: inUseSentence("people", uses.people) }, 409);
-  const bandRank = { adult: 0, teen: 1, all: 2 } as const, currentAudience = getHouseholdCompanion(id)?.companion?.audience ?? "adult";
   const audienceAssets = bandRank[body.audience] > bandRank[currentAudience] ? await collectLiveAssets(id) : [];
   if (audienceAssets.length > 0) {
     if (getHouseholdCompanion(id)?.companion?.animation) ensurePublishedRecord(id);

@@ -1,9 +1,10 @@
 import { ArtWithheldError, checkCompanionArt, requireCompanionPictureOk } from "@/lib/companionArtCheck";
 import sharp from "sharp";
 import media from "@maipai/spec/vocab/companion-media.json";
-import type { LookStyleId } from "@/lib/companionLookStyles";
+import { capOfStyle, type LookStyleId } from "@/lib/companionLookStyles";
 import { addVersion, chooseKeyColour, compositeOnKey, describeCharacter, keyOut, lookPromptFor, normalizePicture, readLook, updateSheet, versionOriginalPath, versionPath } from "@/lib/companionLook";
 import { routeAudience } from "@/lib/pictures/audience";
+import { prepareEditSource } from "@/lib/pictures/editSources";
 import { laneOf } from "@/lib/pictures/lane";
 import { pictureDenial, PICTURE_DENIAL_LINE, PROMPT_REFUSAL_LINE, refusePrompt } from "@/lib/pictures/policy";
 import { resolveCompanionStill, resolveCompanionEdit, promptHash, COMPANION_MODEL_MISMATCH_LINE } from "@/lib/companionArt";
@@ -41,6 +42,7 @@ export interface LookJob {
   quality: "quick" | "detailed";
   promptHash: string;
   modelReported: string | null;
+  style?: string;
   finalising?: Promise<void>;
 }
 interface SheetJob { companionId: string; personId: string; state: LookJobState; percent: number; versions: string[]; error: string | null; stackJob: string; index: number; model: string; quality: "quick" | "detailed"; promptHash: string; modelReported: string | null; finalising?: Promise<void> }
@@ -69,6 +71,12 @@ export function lookGenerationGate(actor: PersonRow, prompt: string): { status: 
   return null;
 }
 
+export function lookStyleGate(actor: PersonRow, style: LookStyleId): { status: 422; error: string } | null {
+  const band = routeAudience(actor).band, cap = capOfStyle(style);
+  const allowed = band === "adult" || (band === "teen" && cap !== "adult");
+  return allowed ? null : { status: 422, error: "Pick another style that is available for your age." };
+}
+
 export async function canGenerateLook(actor: PersonRow, companionId: string): Promise<{ can_generate: boolean; generate_reason?: string }> {
   const audience = routeAudience(actor);
   const denial = pictureDenial(audience);
@@ -83,10 +91,15 @@ function register(jobId: string, job: LookJob): void {
   activeByCompanion.set(job.companionId, jobId);
 }
 
-export async function startLookGeneration(input: { actor: PersonRow; companionId: string; lookPrompt: string; prompt?: string; style?: LookStyleId; count: number }): Promise<string> {
+export async function startLookGeneration(input: { actor: PersonRow; companionId: string; lookPrompt: string; prompt?: string; style?: LookStyleId; customStyle?: string; count: number }): Promise<string> {
+  const denial = pictureDenial(routeAudience(input.actor));
+  if (denial) throw Object.assign(new Error(PICTURE_DENIAL_LINE[denial]), { status: 403 });
+  const style = input.style ?? "cartoon", styleDenied = lookStyleGate(input.actor, style);
+  if (styleDenied) throw Object.assign(new Error(styleDenied.error), { status: styleDenied.status });
+  if (style === "custom" && (!input.customStyle?.trim() || input.customStyle.trim().length > 120)) throw Object.assign(new Error("Enter a custom style from 1 to 120 characters."), { status: 400 });
   const promptText = input.prompt?.trim() || input.lookPrompt.trim();
   if (!promptText) throw Object.assign(new Error(LOOK_PROMPT_REQUIRED_LINE), { status: 400 });
-  const prompt = lookPromptFor(promptText, readLook(input.companionId).key, input.style);
+  const prompt = lookPromptFor(promptText, readLook(input.companionId).key, style, input.customStyle);
   const denied = lookGenerationGate(input.actor, prompt);
   if (denied) throw Object.assign(new Error(denied.error), { status: denied.status });
   if (!(await pictureEngineReady())) throw Object.assign(new Error(LOOK_ENGINE_NOT_READY_LINE), { status: 503 });
@@ -96,12 +109,17 @@ export async function startLookGeneration(input: { actor: PersonRow; companionId
   startingCompanions.add(input.companionId);
   try {
     const submitted = await submitGeneration({ prompt, model: art.model, size: `${media.image.size}x${media.image.size}`, n: input.count, seed: Math.floor(Math.random() * 2_147_483_647), audience: "all-ages", timeout_ms: 1 });
-    register(submitted.job, { companionId: input.companionId, personId: input.actor.id, state: "queued", percent: 0, versions: [], error: null, count: input.count, key, sourceVersion: null, instruction: null, model: art.model, quality: art.quality, promptHash: promptHash(prompt), modelReported: submitted.done?.[0]?.model ?? null });
+    register(submitted.job, { companionId: input.companionId, personId: input.actor.id, state: "queued", percent: 0, versions: [], error: null, count: input.count, key, sourceVersion: null, instruction: null, model: art.model, quality: art.quality, promptHash: promptHash(prompt), modelReported: submitted.done?.[0]?.model ?? null, style });
     return submitted.job;
   } finally { startingCompanions.delete(input.companionId); }
 }
 
-export async function startLookEdit(input: { actor: PersonRow; companionId: string; versionId: string; instruction: string }): Promise<string> {
+export async function startLookEdit(input: { actor: PersonRow; companionId: string; versionId: string; instruction: string; style?: LookStyleId; customStyle?: string }): Promise<string> {
+  const denial = pictureDenial(routeAudience(input.actor));
+  if (denial) throw Object.assign(new Error(PICTURE_DENIAL_LINE[denial]), { status: 403 });
+  const styleDenied = lookStyleGate(input.actor, input.style ?? "cartoon");
+  if (styleDenied) throw Object.assign(new Error(styleDenied.error), { status: styleDenied.status });
+  if (input.style === "custom" && (!input.customStyle?.trim() || input.customStyle.trim().length > 120)) throw Object.assign(new Error("Enter a custom style from 1 to 120 characters."), { status: 400 });
   const instruction = input.instruction.trim();
   if (!instruction) throw Object.assign(new Error(LOOK_EDIT_PROMPT_LINE), { status: 400 });
   const denied = lookGenerationGate(input.actor, instruction);
@@ -115,16 +133,22 @@ export async function startLookEdit(input: { actor: PersonRow; companionId: stri
     if (!version || !path) throw Object.assign(new Error("That picture could not be found. Choose one of this companion's pictures."), { status: 404 });
     const png = new Uint8Array(readFileSync(path)), originalPath = versionOriginalPath(input.companionId, version.id);
     const sourceBytes = originalPath ? new Uint8Array(readFileSync(originalPath)) : await compositeOnKey(png, look.key);
+    if (version.source === "upload" && routeAudience(input.actor).band === "teen") {
+      const screened = await prepareEditSource({ audience: routeAudience(input.actor), bytes: sourceBytes, generated: false, text: instruction });
+      if (!screened.ok) throw Object.assign(new Error(screened.line), { status: screened.status });
+    }
     const form = new FormData();
     form.append("image", new File([new Uint8Array(sourceBytes)], "picture.png", { type: "image/png" }));
     form.append("operation", "edit");
-    form.append("instruction", instruction);
+    const style = input.style ?? (version.style && version.style !== "keep" ? version.style as LookStyleId : undefined);
+    const stylePhrase = !style ? "" : lookPromptFor("", look.key, style, input.customStyle).replace(/^\. A single character, full body, centred in the frame, standing in a relaxed neutral pose, facing the viewer, mouth closed, arms down\./, "").replace(/ Plain solid (green|magenta) background, no shadow, no ground, no text, no other objects\.$/, "").trim();
+    form.append("instruction", stylePhrase ? `${instruction}. ${stylePhrase}` : instruction);
     form.append("image_source", originalPath ? "generated" : "uploaded");
     form.append("audience", "all-ages");
     form.append("timeout_ms", "1");
     form.append("model", art.model);
     const submitted = await submitEdit(form);
-    register(submitted.job, { companionId: input.companionId, personId: input.actor.id, state: "queued", percent: 0, versions: [], error: null, count: 1, key: look.key, sourceVersion: version.id, instruction, model: art.model, quality: art.quality, promptHash: promptHash(instruction), modelReported: null });
+    register(submitted.job, { companionId: input.companionId, personId: input.actor.id, state: "queued", percent: 0, versions: [], error: null, count: 1, key: look.key, sourceVersion: version.id, instruction, model: art.model, quality: art.quality, promptHash: promptHash(instruction), modelReported: null, style });
     return submitted.job;
   } finally { startingCompanions.delete(input.companionId); }
 }
@@ -217,7 +241,7 @@ export async function pollLookJob(id: string, actor: PersonRow, companionId: str
           const fraction = opaque / (rgba.info.width * rgba.info.height);
           if (fraction < 0.05 || fraction > 0.95) label += " (check the edges)";
           const normalized = await normalizePicture(picture, { removeBackground: async (bytes) => bytes });
-          const saved = addVersion(job.companionId, normalized, { source: job.sourceVersion ? "edit" : "generated", label, width: media.image.size, height: media.image.size, from: job.sourceVersion, model: job.model, quality: job.quality, prompt_hash: job.promptHash, model_reported: reported }, images[index]!);
+          const saved = addVersion(job.companionId, normalized, { source: job.sourceVersion ? "edit" : "generated", label, width: media.image.size, height: media.image.size, from: job.sourceVersion, style: job.style ?? "cartoon", model: job.model, quality: job.quality, prompt_hash: job.promptHash, model_reported: reported }, images[index]!);
           job.versions.push(saved.id);
         }
         if (wasCancelled()) return;
@@ -244,13 +268,13 @@ async function pollSheetJob(id: string, job: SheetJob, actor: PersonRow, compani
       const view = SHEET_VIEWS[job.index]!; job.state = "failed"; job.error = `The ${view.slot === "left" || view.slot === "right" ? "side" : "mouth-open"} view did not work. Try again.`;
       const look = readLook(companionId); if (look.sheet) updateSheet(companionId, { ...look.sheet, state: "needs_review" }); activeByCompanion.delete(companionId);
     } else if (!job.finalising) job.finalising = (async () => {
-      const view = SHEET_VIEWS[job.index]!, image = await fetchPicture(job.stackJob, 0), look = readLook(companionId), key = look.sheet?.key ?? look.key;
+      const view = SHEET_VIEWS[job.index]!, image = await fetchPicture(job.stackJob, 0), look = readLook(companionId), key = look.sheet?.key ?? look.key, sourceVersion = look.versions.find((item) => item.id === look.rest);
       await requireCompanionPictureOk(companionId, actor, `The ${view.slot === "left" || view.slot === "right" ? "side" : "mouth-open"} view`, image);
       let keyedOut = await keyOut(image, key); keyedOut = await normalizePicture(keyedOut, { removeBackground: async (bytes) => bytes });
       const reported = current.data.find((picture) => typeof picture.model === "string")?.model ?? null;
       job.modelReported = reported;
       if (reported && reported !== job.model) throw new Error(COMPANION_MODEL_MISMATCH_LINE);
-      const saved = addVersion(companionId, keyedOut, { source: "edit", label: view.label, width: media.image.size, height: media.image.size, from: look.rest, model: job.model, quality: job.quality, prompt_hash: job.promptHash, model_reported: reported }, image);
+      const saved = addVersion(companionId, keyedOut, { source: "edit", label: view.label, width: media.image.size, height: media.image.size, from: look.rest, style: sourceVersion?.style ?? "cartoon", model: job.model, quality: job.quality, prompt_hash: job.promptHash, model_reported: reported }, image);
       job.versions.push(saved.id);
       const updated = readLook(companionId), sheet = updated.sheet;
       if (sheet) updateSheet(companionId, { ...sheet, views: { ...sheet.views, [view.slot]: saved.id } });

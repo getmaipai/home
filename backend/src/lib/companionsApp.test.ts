@@ -49,11 +49,11 @@ describe("companion app cards", () => {
     expect(listCompanionCards(b!).map((card) => card.id)).toContain("rivet");
     expect(discoverCompanionCards(a!).map((card) => card.id)).toContain("rivet");
   });
-  test("only adults and admins may create companions", () => {
+  test("teens, adults and admins may create companions", () => {
     addPerson("person-adult-create", "adult"); addPerson("person-teen-create", "teen"); addPerson("person-child-create", "child"); addPerson("person-admin-create", "admin");
     const rows = db.select().from(people).all();
     expect(canCreateCompanion(rows.find((row) => row.id === "person-adult-create")!)).toBe(true);
-    expect(canCreateCompanion(rows.find((row) => row.id === "person-teen-create")!)).toBe(false);
+    expect(canCreateCompanion(rows.find((row) => row.id === "person-teen-create")!)).toBe(true);
     expect(canCreateCompanion(rows.find((row) => row.id === "person-child-create")!)).toBe(false);
     expect(canCreateCompanion(rows.find((row) => row.id === "person-admin-create")!, true)).toBe(true);
   });

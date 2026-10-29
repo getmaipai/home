@@ -79,7 +79,7 @@ export function listHouseholdCompanionIds(): string[] {
   try { return readdirSync(root(), { withFileTypes: true }).filter((entry) => entry.isDirectory() && validId(entry.name) && read(entry.name)).map((entry) => entry.name).sort(); }
   catch { return []; }
 }
-export function createHouseholdCompanion(input: Companion, author: CompanionAuthor): WriteResult {
+export function createHouseholdCompanion(input: Companion, author: CompanionAuthor, startingAudience: "adult" | "teen" = "adult"): WriteResult {
   const name = typeof input?.display_name === "string" ? input.display_name.trim() : "";
   if (!name) return { ok: false, error: "Name can't be empty. Add a few words.", fields: { name: "Name can't be empty. Add a few words." } };
   const clean: Record<string, unknown> = {};
@@ -93,7 +93,7 @@ export function createHouseholdCompanion(input: Companion, author: CompanionAuth
   const occupied = new Set([...listPackageIds(), ...listHouseholdCompanionIds()]);
   let id = base, suffix = 2;
   while (occupied.has(id)) { const tail = `-${suffix++}`; id = `${base.slice(0, 40 - tail.length).replace(/-+$/g, "")}${tail}`; }
-  const companion = Object.assign({ formality: "neutral", complexity: "standard", engagement: "balanced", filler_density: "light" }, clean, { display_name: name, audience: "adult", status: "draft" });
+  const companion = Object.assign({ formality: "neutral", complexity: "standard", engagement: "balanced", filler_density: "light" }, clean, { display_name: name, audience: startingAudience, status: "draft" });
   const manifest = { id, version: "0.1.0", kind: "companion", category: "Fun", display: name, description: typeof clean.tagline === "string" ? clean.tagline : "A companion made at home.", author: author.display_name, license: "AGPL-3.0", homepage: "https://github.com/getmaipai/home", companion, incognito: "unaffected", requires: [], optional: [], platforms: ["home", "bot"], min_role: "adult", consequential: false, offline: "full", config: [], notifications: [], backup: "exclude", background: false, contributes: {}, min_app: "0.1.0", tier: 0, quality_scale: "bronze", channel: "stable" } as unknown as Manifest;
   const result = write(manifest);
   if (result.ok && author.person_id) {

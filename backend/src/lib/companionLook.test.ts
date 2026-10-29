@@ -5,6 +5,7 @@ import sharp from "sharp";
 import { addVersion, approveSheet, chooseKeyColour, compositeOnKey, deleteLook, deleteVersion, describeCharacter, dominantColours, keyOut, lookPromptFor, normalizePicture, readLook, setRest, updateSheet, versionOriginalPath, versionPath, KEY_ALPHA_END, KEY_ALPHA_START, __setCharacterCompletionForTests, __setCharacterPictureCapabilityForTests, LOOK_LIMIT_LINE } from "@/lib/companionLook";
 import { createHouseholdCompanion, deleteHouseholdCompanion } from "@/lib/householdCompanions";
 import { loadManifestOnly } from "@/lib/plugins";
+import { capOfStyle, stylesForBand } from "@/lib/companionLookStyles";
 
 const dataRoot = process.env.MAIPAI_DATA_DIR!;
 const companionsRoot = join(dataRoot, "companions");
@@ -24,6 +25,15 @@ function create() {
 function item(label = "Picture") { return { source: "upload" as const, label, width: 1024, height: 1024, from: null }; }
 
 describe("companion look store", () => {
+  test("serves style tiles by band with caps in the single table", () => {
+    expect(stylesForBand("child")).toEqual([]);
+    expect(stylesForBand("teen").map(({ id }) => id)).toEqual(["cartoon", "anime", "photorealistic", "3d", "pixel"]);
+    expect(stylesForBand("adult").map(({ id }) => id)).toEqual(["cartoon", "anime", "photorealistic", "3d", "pixel", "custom"]);
+    expect(capOfStyle("cartoon")).toBe("all");
+    expect(capOfStyle("anime")).toBe("teen"); expect(capOfStyle("photorealistic")).toBe("teen");
+    expect(capOfStyle("3d")).toBe("teen"); expect(capOfStyle("pixel")).toBe("teen"); expect(capOfStyle("custom")).toBe("adult");
+    expect(capOfStyle("watercolor")).toBe("teen");
+  });
   test("chooses magenta for a green frog and green for a red fox or magenta cat", async () => {
     const character = async (colour: string) => {
       const svg = Buffer.from(`<svg width="64" height="64"><ellipse cx="32" cy="38" rx="22" ry="20" fill="${colour}"/><circle cx="22" cy="19" r="7" fill="${colour}"/><circle cx="42" cy="19" r="7" fill="${colour}"/></svg>`);

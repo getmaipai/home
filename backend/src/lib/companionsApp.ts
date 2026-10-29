@@ -109,7 +109,8 @@ export function companionAreaOn(person: PersonRow): boolean {
 
 /** Whether this signed-in person may create a household companion draft. */
 export function canCreateCompanion(person: PersonRow, admin = false): boolean {
-  return admin || speakerAgeBand(person, new Date()) === "adult";
+  const band = speakerAgeBand(person, new Date());
+  return admin || band === "adult" || band === "teen";
 }
 
 function voiceLabel(value: string, own: boolean): string {

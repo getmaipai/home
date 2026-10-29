@@ -6,12 +6,12 @@ import media from "@maipai/spec/vocab/companion-media.json";
 import { householdCompanionFolder } from "@/lib/householdCompanions";
 import { chatModelReadsPictures } from "@/lib/chatPictures";
 import { complete } from "@/lib/llm";
-import { lookStylePhrase, type LookStyleId } from "@/lib/companionLookStyles";
+import { lookStylePhrase, type LookStyleChoice } from "@/lib/companionLookStyles";
 import { preparePicture } from "@/lib/imaging/prepare";
 import { imagingTargets } from "@/lib/imaging/targets";
 
 const Source = z.enum(["upload", "generated", "edit"]);
-const Version = z.object({ id: z.string().regex(/^v-[0-9]+$/), created_at: z.string().datetime(), source: Source, label: z.string().max(80), width: z.number().int().positive(), height: z.number().int().positive(), from: z.string().nullable(), has_original: z.boolean().optional(), model: z.string().nullable().optional(), quality: z.enum(["quick", "detailed"]).nullable().optional(), prompt_hash: z.string().regex(/^[a-f0-9]{64}$/).nullable().optional(), model_reported: z.string().nullable().optional() });
+const Version = z.object({ id: z.string().regex(/^v-[0-9]+$/), created_at: z.string().datetime(), source: Source, label: z.string().max(80), width: z.number().int().positive(), height: z.number().int().positive(), from: z.string().nullable(), style: z.string().optional(), has_original: z.boolean().optional(), model: z.string().nullable().optional(), quality: z.enum(["quick", "detailed"]).nullable().optional(), prompt_hash: z.string().regex(/^[a-f0-9]{64}$/).nullable().optional(), model_reported: z.string().nullable().optional() });
 const Sheet = z.object({ views: z.object({ left: z.string().nullable(), right: z.string().nullable(), mouth: z.string().nullable() }), card: z.object({ text: z.string().max(600), colours: z.array(z.string().regex(/^#[0-9A-F]{6}$/)).max(8), species: z.string().max(60) }).nullable(), key: z.enum([media.key.default, media.key.alternate]), state: z.enum(["empty", "making", "needs_review", "approved"]), approved_by: z.string().nullable(), approved_at: z.string().datetime().nullable() });
 export const LookSchema = z.object({ version: z.literal(1), versions: z.array(Version), rest: z.string().nullable(), key: z.enum([media.key.default, media.key.alternate]), sheet: Sheet.nullable().optional() });
 export type LookVersion = z.infer<typeof Version>;
@@ -21,10 +21,11 @@ export const EMPTY_LOOK: CompanionLook = { version: 1, versions: [], rest: null,
 export const LOOK_LIMIT_LINE = "This companion already has 60 pictures. Delete some before adding another.";
 
 /** The generated character stays isolated on the companion's chosen key colour until Home removes it. */
-export function lookPromptFor(lookPrompt: string, keyHex: string, style?: LookStyleId): string {
+export function lookPromptFor(lookPrompt: string, keyHex: string, style?: LookStyleChoice, customStyle?: string): string {
   const keyName = keyHex.toUpperCase() === "#FF00FF" ? "magenta" : "green";
   const subject = lookPrompt.trim().slice(0, 600);
-  return `${subject}. A single character, full body, centred in the frame, standing in a relaxed neutral pose, facing the viewer, mouth closed, arms down. ${lookStylePhrase(style)} Plain solid ${keyName} background, no shadow, no ground, no text, no other objects.`;
+  const phrase = lookStylePhrase(style, customStyle);
+  return `${subject}. A single character, full body, centred in the frame, standing in a relaxed neutral pose, facing the viewer, mouth closed, arms down.${phrase ? ` ${phrase}` : ""} Plain solid ${keyName} background, no shadow, no ground, no text, no other objects.`;
 }
 
 export const KEY_ALPHA_START = 5;
@@ -220,7 +221,7 @@ export function addVersion(id: string, png: Uint8Array, meta: Omit<LookVersion, 
   mkdirSync(dir, { recursive: true });
   const prior = Number(readFileSyncSafe(seqPath));
   const idNum = Math.max(Number.isSafeInteger(prior) ? prior : 0, ...look.versions.map((v) => Number(v.id.slice(2)))) + 1;
-  const version: LookVersion = { id: `v-${idNum}`, created_at: new Date().toISOString(), source: meta.source, label: meta.label.slice(0, 80), width: meta.width, height: meta.height, from: meta.from, ...(meta.model !== undefined ? { model: meta.model } : {}), ...(meta.quality !== undefined ? { quality: meta.quality } : {}), ...(meta.prompt_hash !== undefined ? { prompt_hash: meta.prompt_hash } : {}), ...(meta.model_reported !== undefined ? { model_reported: meta.model_reported } : {}), ...(original ? { has_original: true } : {}) };
+  const version: LookVersion = { id: `v-${idNum}`, created_at: new Date().toISOString(), source: meta.source, label: meta.label.slice(0, 80), width: meta.width, height: meta.height, from: meta.from, ...(meta.style !== undefined ? { style: meta.style } : {}), ...(meta.model !== undefined ? { model: meta.model } : {}), ...(meta.quality !== undefined ? { quality: meta.quality } : {}), ...(meta.prompt_hash !== undefined ? { prompt_hash: meta.prompt_hash } : {}), ...(meta.model_reported !== undefined ? { model_reported: meta.model_reported } : {}), ...(original ? { has_original: true } : {}) };
   const filePath = versionPath(id, version.id)!;
   const temp = `${filePath}.${crypto.randomUUID()}.tmp`;
   try {

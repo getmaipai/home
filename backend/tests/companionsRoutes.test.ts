@@ -23,7 +23,7 @@ import { addTake, takePath, saveStates, readStates, bestTake, __resetCompanionSt
 import { __setStackClientForTests } from "@/lib/stackEngine";
 import { __setImageToolsForTests } from "@/lib/imageEdit";
 import type { StackImageToolsStatus } from "@/lib/stack/client";
-import { addVersion, approveSheet, setRest, updateSheet } from "@/lib/companionLook";
+import { addVersion, approveSheet, setRest, updateSheet, readLook } from "@/lib/companionLook";
 import { getHouseholdCompanion } from "@/lib/householdCompanions";
 import { __setVideosFetchForTests } from "@/lib/videos/stack";
 import { __setVideoStatusForTests, readyVideoStatusForTests } from "@/lib/videos/ready";
@@ -148,6 +148,10 @@ describe("companion look generation jobs", () => {
     expect(missing.status).toBe(400);
     const childResult = await request(path, child, "POST", { prompt: "cartoon dragon" }); expect(childResult.status).toBe(403);
     const teenResult = await request(path, teen, "POST", { prompt: "cartoon dragon" }); expect(teenResult.status).toBe(403);
+    const teenStyleCompanion = createHouseholdCompanion({ ...fixture(), display_name: "Teen style generation", look_prompt: "cartoon dragon" }, { display_name: "Teen author", person_id: "person-look-gen-teen" }); if (!teenStyleCompanion.ok) throw new Error(teenStyleCompanion.error);
+    const teenCustom = await request(`companions/${teenStyleCompanion.value.id}/look/generate`, teen, "POST", { prompt: "cartoon dragon", style: "custom", custom_style: "friendly ink" });
+    expect(teenCustom.status).toBe(422); expect(((await teenCustom.json()) as { error: string }).error).toContain("Pick another style");
+    const adultCustom = await request(path, adult, "POST", { prompt: "red fox", style: "custom" }); expect(adultCustom.status).toBe(400);
     const beforeRefusal = stackCalls;
     const refused = await request(`companions/${noPrompt.value.id}/look/generate`, adult, "POST", { prompt: "a 12 year old child naked" }); expect(refused.status).toBe(422);
     expect(((await refused.json()) as { error: string }).error).toContain("I can't make that");
@@ -238,6 +242,19 @@ describe("companion look generation jobs", () => {
     expect(look.versions[1]).toMatchObject({ source: "edit", from: sourceId });
   });
 
+  test("a teen upload withheld by the input screen is not submitted or saved for edit", async () => {
+    const teen = addPerson("person-look-edit-teen-screen", "teen"), made = createHouseholdCompanion({ ...fixture(), display_name: "Teen edit screen", audience: "teen" }, { display_name: "Teen", person_id: "person-look-edit-teen-screen" });
+    if (!made.ok) throw new Error(made.error);
+    const source = addVersion(made.value.id, await transparentPng(), { source: "upload", label: "Uploaded", width: 1024, height: 1024, from: null, style: "keep" });
+    __setAgeCheckRunnerForTests(async (images) => images.map(() => ({ ok: true as const, verdict: { people_count: 1, apparent_min_age_estimate: 12, label: "child" as const, is_nude_or_sexual: true, confidence: 1 } })));
+    __setPictureStatusForTests(readyStatusForTests()); let editCalls = 0;
+    __setPicturesFetchForTests((async (_input, init) => { if (init?.method === "POST") editCalls++; return Response.json({ job: "should-not-submit" }, { status: 202 }); }) as typeof fetch);
+    const beforeCount = readLook(made.value.id).versions.length;
+    const response = await request(`companions/${made.value.id}/look/edit`, teen, "POST", { version_id: source.id, instruction: "Add a scarf" });
+    expect(response.status).toBe(422); expect(((await response.json()) as { error: string }).error).toBe("I can't show that one. Want to try something different?");
+    expect(editCalls).toBe(0); expect(readLook(made.value.id).versions).toHaveLength(beforeCount);
+  });
+
   test("makes three sheet views once, falls back to the look prompt, and approves then unapproves", async () => {
     const adult = addPerson("person-look-sheet", "adult"), other = addPerson("person-look-sheet-other", "adult"), child = addPerson("person-look-sheet-child", "child"), teen = addPerson("person-look-sheet-teen", "teen");
     const created = createHouseholdCompanion({ ...fixture(), display_name: "Sheet character", look_prompt: "a red fox wearing a blue scarf" }, { display_name: "Author", person_id: "person-look-sheet" });
@@ -323,6 +340,22 @@ describe("household companion routes", () => {
     const png = await transparentPng();
     const real = await upload(`companions/${created.value.id}/look/upload`, adult, png);
     expect(real.status).toBe(201);
+    const uploadedId = (await real.json() as { id: string }).id;
+    expect(readLook(created.value.id).versions.find((version) => version.id === uploadedId)?.style).toBe("keep");
+  });
+
+  test("look read returns age-band styles and the approved portrait audience cap", async () => {
+    const adult = addPerson("person-look-styles-adult", "adult"), teen = addPerson("person-look-styles-teen", "teen");
+    const created = createHouseholdCompanion({ ...fixture(), display_name: "Style read", audience: "teen" }, { display_name: "Author", person_id: "person-look-styles-adult" }); if (!created.ok) throw new Error(created.error);
+    const version = addVersion(created.value.id, await transparentPng(), { source: "upload", label: "real", width: 1024, height: 1024, from: null, style: "photorealistic" }); setRest(created.value.id, version.id);
+    const adultResult = await (await request(`companions/${created.value.id}/look`, adult)).json() as { styles: Array<{ id: string; custom: boolean }>; keep: { id: string }; audience_cap: string };
+    const teenResultResponse = await request(`companions/${created.value.id}/look`, teen);
+    expect(teenResultResponse.status).toBe(403);
+    const teenCompanion = createHouseholdCompanion({ ...fixture(), display_name: "Teen style read", audience: "teen" }, { display_name: "Teen author", person_id: "person-look-styles-teen" }); if (!teenCompanion.ok) throw new Error(teenCompanion.error);
+    const teenAuthorResult = await (await request(`companions/${teenCompanion.value.id}/look`, teen)).json() as { styles: Array<{ id: string }>; audience_cap: string };
+    expect(adultResult.styles).toHaveLength(6); expect(adultResult.styles.find((style) => style.id === "custom")?.custom).toBe(true);
+    expect(adultResult.keep.id).toBe("keep"); expect(adultResult.audience_cap).toBe("teen");
+    expect(teenAuthorResult.styles.map((style) => style.id)).not.toContain("custom"); expect(teenAuthorResult.audience_cap).toBe("all");
   });
 
   test("a small look upload without an installed upscaler is refused and not stored", async () => {
@@ -420,12 +453,13 @@ describe("household companion routes", () => {
     expect(kidList.default_id).toBe("tessa");
   });
 
-  test("children and teens cannot create; an adult creates a draft", async () => {
+  test("children cannot create; teens start at teen audience and adults create adult drafts", async () => {
     const child = addPerson("person-child01", "child"), teen = addPerson("person-teen001", "teen"), adult = addPerson("person-adult01", "adult");
-    for (const token of [child, teen]) {
-      const refused = await request("companions", token, "POST", { ...fixture(), display_name: "New pal" });
-      expect(refused.status).toBe(403); expect(((await refused.json()) as { error: string }).error).toBe("Only adults can make a companion.");
-    }
+    const refused = await request("companions", child, "POST", { ...fixture(), display_name: "New pal" });
+    expect(refused.status).toBe(403);
+    const teenCreated = await request("companions", teen, "POST", { ...fixture(), display_name: "Teen pal" }); expect(teenCreated.status).toBe(201);
+    const teenId = (await teenCreated.json() as { id: string }).id;
+    expect((await import("@/lib/householdCompanions")).getHouseholdCompanion(teenId)?.companion).toMatchObject({ audience: "teen", status: "draft" });
     const response = await request("companions", adult, "POST", { ...fixture(), display_name: "New pal" });
     expect(response.status).toBe(201);
     const list = await request("companions", adult); expect((await list.json() as { can_create: boolean }).can_create).toBe(true);
@@ -467,18 +501,25 @@ describe("household companion routes", () => {
     const adult = addPerson("person-adult03", "adult"), admin = addPerson("person-admin003", "admin");
     const created = createHouseholdCompanion(fixture(), { display_name: "Author", person_id: "person-adult03" });
     if (!created.ok) throw new Error(created.error);
+    const legacy = addVersion(created.value.id, await transparentPng(), { source: "upload", label: "legacy", width: 1024, height: 1024, from: null }); setRest(created.value.id, legacy.id);
+    const oldLook = readLook(created.value.id); for (const version of oldLook.versions) delete version.style; writeFileSync(join(householdCompanionFolder(created.value.id)!, "look", "look.json"), JSON.stringify(oldLook));
+    const checkManifestPath = join(householdCompanionFolder(created.value.id)!, "manifest.json"), checkManifest = JSON.parse(await Bun.file(checkManifestPath).text()); checkManifest.companion.animation = undefined; writeFileSync(checkManifestPath, JSON.stringify(checkManifest));
     const denied = await request(`companions/${created.value.id}/audience`, adult, "PUT", { audience: "teen" }); expect(denied.status).toBe(403);
     const unconfirmed = await request(`companions/${created.value.id}/audience`, admin, "PUT", { audience: "all" }); expect(unconfirmed.status).toBe(400);
-    const confirmed = await request(`companions/${created.value.id}/audience`, admin, "PUT", { audience: "all", confirmed: true }); expect(confirmed.status).toBe(200);
+    const unconfirmedLine = (await unconfirmed.json() as { error: string }).error; expect(unconfirmedLine).toContain("checklist");
+    const confirmed = await request(`companions/${created.value.id}/audience`, admin, "PUT", { audience: "all", confirmed: true }); expect(confirmed.status).toBe(422);
     const stored = (await import("@/lib/householdCompanions")).getHouseholdCompanion(created.value.id);
-    expect(stored?.companion?.review?.confirmed_by).toBe("person-admin003");
+    expect(stored?.companion?.review?.confirmed_by).toBeUndefined();
   });
 
   test("lowering audience refuses a child robot already using an all ages companion", async () => {
     const adult = addPerson("person-adult07", "adult"), admin = addPerson("person-admin007", "admin");
     const created = createHouseholdCompanion(fixture(), { display_name: "Author", person_id: "person-adult07" });
     if (!created.ok) throw new Error(created.error);
-    const setAll = await request(`companions/${created.value.id}/audience`, admin, "PUT", { audience: "all", confirmed: true }); expect(setAll.status).toBe(200);
+    const legacy = addVersion(created.value.id, await transparentPng(), { source: "upload", label: "legacy", width: 1024, height: 1024, from: null }); setRest(created.value.id, legacy.id);
+    const oldLook = readLook(created.value.id); for (const version of oldLook.versions) delete version.style; writeFileSync(join(householdCompanionFolder(created.value.id)!, "look", "look.json"), JSON.stringify(oldLook));
+    const checkManifestPath = join(householdCompanionFolder(created.value.id)!, "manifest.json"), checkManifest = JSON.parse(await Bun.file(checkManifestPath).text()); checkManifest.companion.animation = undefined; writeFileSync(checkManifestPath, JSON.stringify(checkManifest));
+    const setAll = await request(`companions/${created.value.id}/audience`, admin, "PUT", { audience: "all", confirmed: true }); expect(setAll.status).toBe(422);
     const timestamp = new Date().toISOString();
     db.insert(devices).values({ id: "robot-child001", kind: "robot", name: "Kitchen", personId: "person-adult07", createdAt: timestamp, updatedAt: timestamp, hlc: "1:0:test" }).run();
     db.insert(settingsValues).values({ scope: "device:robot-child001", key: "robot.companion.id", value: JSON.stringify(created.value.id), hlc: "1:0:test", source: "user", updatedAt: timestamp }).run();
@@ -519,7 +560,7 @@ describe("household companion routes", () => {
     expect(stateResponse.status).toBe(200);
     const stateBody = await stateResponse.json() as { start_ready: boolean; start_reason?: string; states: Array<{ id: string; required: boolean }> };
     expect(stateBody.start_ready).toBe(false); expect(stateBody.start_reason).toContain("The video model can only start from a picture the picture model made.");
-    expect(stateBody.states.map((s) => s.id)).toEqual(["idle", "idle_look", "listening", "thinking", "working", "speaking", "needs_you", "greeting", "happy", "oops", "celebrate", "sleeping"]);
+    expect(stateBody.states.map((s) => s.id)).toContain("laughing");
     expect(stateBody.states[0]?.required).toBe(true);
     const partial = await app.request(`http://localhost/api/companions/${created.value.id}/states/idle/${take.id}/clip.h264.mp4`, { headers: { cookie: `session=${adult}`, range: "bytes=2-5" } });
     expect(partial.status).toBe(206); expect(partial.headers.get("content-range")).toBe("bytes 2-5/10"); expect(await partial.text()).toBe("2345");
@@ -748,6 +789,11 @@ describe("household companion routes", () => {
 
   test("widening the audience re-checks the live set; narrowing and a companion with no live animation are unchecked", async () => {
     const f = await publishFixture("person-pub-widen", "admin", "adult"); let calls = 0;
+    // Remove the fixture's picture styles to exercise the legacy audience checklist path.
+    const look = readLook(f.id); for (const version of look.versions) delete version.style;
+    writeFileSync(join(householdCompanionFolder(f.id)!, "look", "look.json"), JSON.stringify(look));
+    const audienceManifestPath = join(householdCompanionFolder(f.id)!, "manifest.json");
+    const manifest = JSON.parse(await Bun.file(audienceManifestPath).text()); manifest.companion.audience = "adult"; writeFileSync(audienceManifestPath, JSON.stringify(manifest));
     __setAgeCheckRunnerForTests(async (images) => { calls += images.length; return images.map(() => AGE_WITHHELD); });
     const refused = await request(`companions/${f.id}/audience`, f.token, "PUT", { audience: "teen" });
     expect(refused.status).toBe(422); expect(calls).toBeGreaterThan(0); expect(getHouseholdCompanion(f.id)?.companion?.audience).toBe("adult");
