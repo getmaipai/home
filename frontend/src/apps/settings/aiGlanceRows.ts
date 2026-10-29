@@ -2,11 +2,11 @@
 // state until Apply) and the Memory and Storage projections are derived here from /api/ai/choices, so the page only draws them.
 import type { AiCard, AiChoice, AiJobId } from "../../../../shared/aiChoices";
 
-export const JOB_ORDER: AiJobId[] = ["chat", "pictures", "picturesdetailed", "videos", "music", "voice", "wakeword", "coding"];
+export const JOB_ORDER: AiJobId[] = ["chat", "pictures", "picturesdetailed", "videos", "music", "voice", "wakeword", "vision", "coding"];
 /** The icon name of each job, shared by Settings and the setup wizard. */
-export const JOB_ICONS: Record<AiJobId, string> = { chat: "message-circle", pictures: "palette", picturesdetailed: "sparkles", videos: "film", music: "music", voice: "mic-vocal", wakeword: "ear", coding: "code" };
+export const JOB_ICONS: Record<AiJobId, string> = { chat: "message-circle", pictures: "palette", picturesdetailed: "sparkles", videos: "film", music: "music", voice: "mic-vocal", wakeword: "ear", vision: "eye", coding: "code" };
 /** The engine role whose `engines.<role>.choice` key is the job's On/Off switch (`off` or `auto`). */
-export const ENGINE_ROLE: Record<AiJobId, string> = { chat: "chat", pictures: "image", picturesdetailed: "image", videos: "video", music: "music", voice: "tts", wakeword: "wakeword", coding: "coding" };
+export const ENGINE_ROLE: Record<AiJobId, string> = { chat: "chat", pictures: "image", picturesdetailed: "image", videos: "video", music: "music", voice: "tts", wakeword: "wakeword", vision: "vision", coding: "coding" };
 export const OFF = "__off";
 
 /** One staged change for a job: the model picked in the dialog and/or the switch flipped. Nothing is written until Apply. */

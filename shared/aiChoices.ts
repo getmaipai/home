@@ -7,7 +7,7 @@
 
 import { sizeGb, needGb, freeGb, selectionTotals, type DiskPlan, type DiskRow } from "./diskPlanMath";
 
-export type AiJobId = "chat" | "pictures" | "picturesdetailed" | "videos" | "music" | "voice" | "wakeword" | "coding";
+export type AiJobId = "chat" | "pictures" | "picturesdetailed" | "videos" | "music" | "voice" | "wakeword" | "vision" | "coding";
 export interface AiComponentLike { id: string; label: string; state: "installed"|"installing"|"notInstalled"|"failed"; size_bytes: number|null; download_bytes: number; requirement: "required"|"optional"|"unsupported"; requirement_reason: string|null; percent: number|null; job: string|null; failure: string|null; can_install: boolean; can_uninstall: boolean; last_used_at: string|null; used_by: string[] }
 export interface AiSettingsInput { pictureQuickModel: "ernie"|"klein"; pictureDetailedEnabled: boolean; videoQuality: "quick"|"detailed"; musicEnabled: boolean }
 /** The words of the cards, read from the spec's card and key copy (rule S5): this file holds none of its own. */
@@ -51,7 +51,7 @@ export interface AiRecommendedPlan {
   text: string;
 }
 
-type AiCopyKey = "chat.standard" | "chat.mlx" | "chat.uncensored" | "chat.pictures" | "pictures.ernie" | "pictures.klein" | "pictures.edit" | "picturesdetailed.zimage" | "wakeword.detector" | "pictures.tools" | "pictures.look" | "videos.quick" | "videos.detailed" | "music.make" | "voice.standard" | "voice.better" | "coding.helper";
+type AiCopyKey = "chat.standard" | "chat.mlx" | "chat.uncensored" | "chat.pictures" | "pictures.ernie" | "pictures.klein" | "pictures.edit" | "picturesdetailed.zimage" | "wakeword.detector" | "pictures.tools" | "pictures.look" | "videos.quick" | "videos.detailed" | "music.make" | "voice.standard" | "voice.better" | "coding.helper" | "vision.reader";
 
 // The rows each job card draws.
 const CARDS: Array<{ id: AiJobId; rows: string[] }> = [
@@ -62,6 +62,7 @@ const CARDS: Array<{ id: AiJobId; rows: string[] }> = [
   { id: "music", rows: ["music"] },
   { id: "voice", rows: ["voice", "voice-better"] },
   { id: "wakeword", rows: [] },
+  { id: "vision", rows: ["vision"] },
   { id: "coding", rows: ["coding"] },
 ];
 
@@ -217,6 +218,7 @@ function chipFor(card: { id: AiJobId; rows: string[] }, present: boolean, choice
       return current.id === "videos.quick" ? "Using Quick" : "Using Detailed";
     }
     case "wakeword":
+    case "vision":
     case "picturesdetailed":
     case "music":
     case "coding": {
@@ -249,6 +251,8 @@ export function buildAiCards(input: AiChoicesInput): AiChoicesResult {
   for (const meta of CARDS) {
     const present = meta.id === "wakeword" ? wakeword != null : meta.rows.some((id) => has(id));
     const words = copy.card(meta.id);
+    // The picture reader's words arrive with the spec pin that carries them (AIMODELS-VISION-01); until then the card stays out of the page.
+    if (meta.id === "vision" && !words.summary) continue;
     if (!present) {
       cards.push({ id: meta.id, title: words.title, summary: words.summary, chip: "Not on this computer", choices: [], notReady: false, unavailable: `${words.title} is not on this computer. It needs more memory.` });
       continue;
@@ -299,6 +303,10 @@ export function buildAiCards(input: AiChoicesInput): AiChoicesResult {
         const betterInstalled = has("voice-better") && rowIsInstalled(rows.get("voice-better")!, components);
         if (has("voice")) specs.push({ id: "voice.standard", job: "voice", kind: "fixed", row: rows.get("voice")!, current: !betterInstalled, recommended: !has("voice-better") || need("voice-better") !== "recommended", setting: null });
         if (has("voice-better")) specs.push({ id: "voice.better", job: "voice", kind: "radio", row: rows.get("voice-better")!, current: betterInstalled, recommended: need("voice-better") === "recommended", setting: null });
+        break;
+      }
+      case "vision": {
+        if (has("vision")) specs.push({ id: "vision.reader", job: "vision", kind: "switch", row: rows.get("vision")!, current: rowIsInstalled(rows.get("vision")!, components), recommended: need("vision") === "recommended", setting: null });
         break;
       }
       case "coding": {

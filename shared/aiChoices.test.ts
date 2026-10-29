@@ -374,3 +374,37 @@ test("chat: an added model is a radio beside Standard, named by its record, and 
   const downloading = buildAiCards({ copy, plan: TIERS.p128, components: null, settings: SETTINGS, freeBytes: null, addedChats: [{ ...added, installed: false, running: false, downloading: true, percent: 40 }] });
   expect(downloading.cards.find((c) => c.id === "chat")!.choices.find((c) => c.id === "chat.added.added-tiny")).toMatchObject({ state: "installing", percent: 40 });
 });
+
+// AIMODELS-VISION-01: the picture reader is a plan row of its own (p128) and a switch card once the spec pin carries its words.
+const withVisionWords = {
+  ...copy,
+  card: (job: Parameters<typeof copy.card>[0]) => job === "vision" ? { title: "Describing pictures", summary: "Home uses it to check finished video clips and pictures for safety when the chat AI cannot read pictures. Without it, clips are held back." } : copy.card(job),
+  choice: (id: string) => id === "vision.reader" ? { label: "Picture reader", description: "A small AI that describes what is in a picture." } : copy.choice(id),
+};
+
+test("vision: p128 shows a recommended Picture reader switch; smaller tiers say it is not on this computer", () => {
+  const big = buildAiCards({ copy: withVisionWords, plan: TIERS.p128, components: null, settings: SETTINGS, freeBytes: null });
+  const card = big.cards.find((entry) => entry.id === "vision")!;
+  expect(card.title).toBe("Describing pictures");
+  expect(card.choices).toHaveLength(1);
+  expect(card.choices[0]).toMatchObject({ id: "vision.reader", kind: "switch", recommended: true, label: "Picture reader" });
+  for (const tier of ["p16", "p32", "p64"] as const) {
+    const small = buildAiCards({ copy: withVisionWords, plan: TIERS[tier], components: null, settings: SETTINGS, freeBytes: null }).cards.find((entry) => entry.id === "vision")!;
+    expect(small.choices).toEqual([]);
+    expect(small.unavailable).not.toBeNull();
+  }
+});
+
+test("vision: the card stays out while the spec has no words for it", () => {
+  const result = buildAiCards({ copy, plan: TIERS.p128, components: null, settings: SETTINGS, freeBytes: null });
+  if (copy.card("vision").summary === "") expect(result.cards.some((entry) => entry.id === "vision")).toBe(false);
+});
+
+test("vision: set-to-recommended downloads the picture reader row and counts its size", () => {
+  const plan = TIERS.p128;
+  const visionRow = plan.rows.find((entry) => entry.id === "vision")!;
+  expect(visionRow.model_ids.length).toBe(2);
+  const result = recommendedPlan({ copy: withVisionWords, plan, components: null, settings: SETTINGS, freeBytes: null });
+  expect(result.installRowIds).toContain("vision");
+  expect(result.downloadBytes).toBeGreaterThanOrEqual(visionRow.download_bytes);
+});

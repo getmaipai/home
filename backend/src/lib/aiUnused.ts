@@ -86,6 +86,11 @@ function buildContext(input: UnusedInput): UnusedContext {
       }
     }
   }
+  // The picture reader's card stays hidden until the spec pin carries its words, so no choice marks its files in use: Home still reads finished clips with them.
+  if (!cards.cards.some((card) => card.id === "vision")) {
+    const visionIds = rows.get("vision")?.model_ids ?? [];
+    for (const component of input.components) if (visionIds.includes(component.id)) selected.add(component.id);
+  }
   return { plan, components: input.components, rows, cards, selected, alwaysOn: new Set(cards.alwaysOn.rowIds) };
 }
 

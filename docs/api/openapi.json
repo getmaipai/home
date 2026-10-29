@@ -27251,6 +27251,7 @@
                               "music",
                               "voice",
                               "wakeword",
+                              "vision",
                               "coding"
                             ]
                           },
@@ -27281,6 +27282,7 @@
                                     "music",
                                     "voice",
                                     "wakeword",
+                                    "vision",
                                     "coding"
                                   ]
                                 },
@@ -27481,6 +27483,7 @@
                                   "music",
                                   "voice",
                                   "wakeword",
+                                  "vision",
                                   "coding"
                                 ]
                               },

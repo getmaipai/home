@@ -157,3 +157,10 @@ The setup wizard step (AIMODELS-SETUP-01) reuses the rows later. Stack-unreachab
 - **Wake word lists the model.** The row is the stock openWakeWord "hey jarvis" detector plus its two shared feature models
   (`wakewordAssets.ts`, pinned and sha256-checked). On installs the files, Off removes them, and the next use downloads them
   again. Listening stays default-off and needs the per-device adult opt-in (`voice.wakeword.enabled`); the row never touches it.
+
+### Describing pictures row (2026-10-28, AIMODELS-VISION-01)
+- The picture reader (Qwen3-VL 4B and its projector, Stack role `vision`) is a real Stack disk-plan row `vision` on p128 only, recommended
+  and removable, so it counts in Download missing, Set to recommended and the header sizes. It is one On/Off switch (`vision.reader`);
+  Off writes `engines.vision.choice = "off"`, and the finished-clip safety check then fails closed (clips are withheld).
+- The words come from the spec (`ai.glance` choices `vision` and `vision-reader`, commons `ea81216`). The card stays out of the page
+  until the pinned `@maipai/spec` carries them (the next spec tag after v0.1.268).
