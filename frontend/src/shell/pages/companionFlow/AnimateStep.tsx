@@ -44,14 +44,6 @@ function ClipPlayer({ urls, label }: { urls: CompanionStateUrls; label: string }
   );
 }
 
-/** A made animation plays in its own tile; where it cannot play (reduced motion, no WebGL) its still shows instead. */
-function TileClip({ urls, label }: { urls: CompanionStateUrls; label: string }) {
-  const preview = useClipPreview(urls, label);
-  return preview.failed || preview.reduced
-    ? <img src={urls.still} alt="" draggable={false} className="size-full object-cover" />
-    : <StackedAlphaVideo src={preview.source} loop label={preview.label} onError={preview.onError} className="size-full" />;
-}
-
 /** Screen 2, Animate Character: thirteen animations, four required and nine optional, each with an editable keyframe. */
 export function AnimateStep({ companionId, name, sheetJob = null, autoMake = false, onBack, onContinue }: { companionId: string; name: string; sheetJob?: string | null; autoMake?: boolean; onBack: () => void; onContinue: () => void }) {
   const states = useCompanionStates(companionId, true);
@@ -82,6 +74,7 @@ export function AnimateStep({ companionId, name, sheetJob = null, autoMake = fal
     : picturing ? `${picturing.label}...`
     : running ? `${states.run?.label ?? states.data?.run?.label ?? "Making animations"}... ${progress}%` : "";
 
+  const reducedMotion = typeof window !== "undefined" && window.matchMedia?.("(prefers-reduced-motion: reduce)").matches === true;
   const generate = (ids: string[]) => frames.request(ids);
   // Once the character is ready, the four required animations start by themselves, once.
   const autoStarted = useRef(false);
@@ -95,7 +88,7 @@ export function AnimateStep({ companionId, name, sheetJob = null, autoMake = fal
     const word = frames.failed[row.id] ? "Needs another try" : frames.making === row.id ? "Making" : frames.waiting.includes(row.id) ? "Waiting its turn" : tileWord(row), src = keyframeSrc(row) ?? portrait;
     return {
       name: row.label, selected: selectedId === row.id, onSelect: () => setSelectedId(row.id),
-      media: row.approved ? <TileClip key={row.approved.take_id} urls={row.approved.urls} label={`${row.label} animation`} /> : src ? <img src={src} alt="" draggable={false} className={`size-full object-cover ${row.keyframe ? "" : "opacity-40"}`} /> : undefined,
+      media: row.approved ? (reducedMotion ? <img src={row.approved.urls.still} alt="" draggable={false} className="size-full object-cover" /> : <StackedAlphaVideo key={row.approved.take_id} src={row.approved.urls.h264} loop label={`${row.label} animation`} />) : src ? <img src={src} alt="" draggable={false} className={`size-full object-cover ${row.keyframe ? "" : "opacity-40"}`} /> : undefined,
       line: <span className="text-xs">{word}</span>,
       status: word === "Making" ? <Progress mode="determinate" value={frames.making === row.id ? frames.percent : progress} label={`${row.label} progress`} /> : undefined,
     };
