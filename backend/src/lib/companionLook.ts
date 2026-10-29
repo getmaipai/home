@@ -6,6 +6,7 @@ import media from "@maipai/spec/vocab/companion-media.json";
 import { householdCompanionFolder } from "@/lib/householdCompanions";
 import { chatModelReadsPictures } from "@/lib/chatPictures";
 import { complete } from "@/lib/llm";
+import { lookStylePhrase, type LookStyleId } from "@/lib/companionLookStyles";
 
 const Source = z.enum(["upload", "generated", "edit"]);
 const Version = z.object({ id: z.string().regex(/^v-[0-9]+$/), created_at: z.string().datetime(), source: Source, label: z.string().max(80), width: z.number().int().positive(), height: z.number().int().positive(), from: z.string().nullable(), has_original: z.boolean().optional(), model: z.string().nullable().optional(), quality: z.enum(["quick", "detailed"]).nullable().optional(), prompt_hash: z.string().regex(/^[a-f0-9]{64}$/).nullable().optional(), model_reported: z.string().nullable().optional() });
@@ -18,10 +19,10 @@ export const EMPTY_LOOK: CompanionLook = { version: 1, versions: [], rest: null,
 export const LOOK_LIMIT_LINE = "This companion already has 60 pictures. Delete some before adding another.";
 
 /** The generated character stays isolated on the companion's chosen key colour until Home removes it. */
-export function lookPromptFor(lookPrompt: string, keyHex: string): string {
+export function lookPromptFor(lookPrompt: string, keyHex: string, style?: LookStyleId): string {
   const keyName = keyHex.toUpperCase() === "#FF00FF" ? "magenta" : "green";
   const subject = lookPrompt.trim().slice(0, 600);
-  return `${subject}. A single character, full body, centred in the frame, standing in a relaxed neutral pose, facing the viewer, mouth closed, arms down. Simple clean cartoon illustration, flat colours. Plain solid ${keyName} background, no shadow, no ground, no text, no other objects.`;
+  return `${subject}. A single character, full body, centred in the frame, standing in a relaxed neutral pose, facing the viewer, mouth closed, arms down. ${lookStylePhrase(style)} Plain solid ${keyName} background, no shadow, no ground, no text, no other objects.`;
 }
 
 export const KEY_ALPHA_START = 5;

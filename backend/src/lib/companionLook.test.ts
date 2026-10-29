@@ -59,6 +59,12 @@ describe("companion look store", () => {
     expect(lookPromptFor("x".repeat(700), "#FF00FF").startsWith("x".repeat(600) + ". A single character")).toBe(true);
     expect(lookPromptFor("cat", "#FF00FF")).toContain("solid magenta background");
   });
+  test("puts the chosen style in the prompt and defaults to cartoon", () => {
+    expect(lookPromptFor("cat", "#00FF00", "anime")).toContain("Anime style");
+    expect(lookPromptFor("cat", "#00FF00", "photorealistic")).toContain("Photorealistic");
+    expect(lookPromptFor("cat", "#00FF00", "photorealistic")).not.toContain("cartoon");
+    expect(lookPromptFor("cat", "#00FF00")).toContain("Simple clean cartoon illustration");
+  });
 
   test("keys out green and magenta without tinting antialiased red edges", async () => {
     for (const key of ["#00FF00", "#FF00FF"]) {

@@ -1,6 +1,7 @@
 import { ArtWithheldError, checkCompanionArt, requireCompanionPictureOk } from "@/lib/companionArtCheck";
 import sharp from "sharp";
 import media from "@maipai/spec/vocab/companion-media.json";
+import type { LookStyleId } from "@/lib/companionLookStyles";
 import { addVersion, chooseKeyColour, compositeOnKey, describeCharacter, keyOut, lookPromptFor, normalizePicture, readLook, updateSheet, versionOriginalPath, versionPath } from "@/lib/companionLook";
 import { routeAudience } from "@/lib/pictures/audience";
 import { laneOf } from "@/lib/pictures/lane";
@@ -15,6 +16,7 @@ import { companionHasFinishingJob } from "@/lib/companionStates";
 import { companionHasTakeRun, TAKE_RUN_BUSY_LINE } from "@/lib/companionTakes";
 
 export const LOOK_JOB_BUSY_LINE = "A picture is already being made for this companion. Wait for it or stop it.";
+export const LOOK_PICTURE_UNREAD_LINE = "Home could not read this picture to describe it. Write a look prompt that says what the character looks like, then try again.";
 export const LOOK_PROMPT_REQUIRED_LINE = "Write a look prompt first: say what the character looks like.";
 export const LOOK_EDIT_PROMPT_LINE = "Say what to change, then send it.";
 export const LOOK_ENGINE_NOT_READY_LINE = "Picture creation isn't set up yet. An admin can add a picture model in Settings, Pictures and videos.";
@@ -81,10 +83,10 @@ function register(jobId: string, job: LookJob): void {
   activeByCompanion.set(job.companionId, jobId);
 }
 
-export async function startLookGeneration(input: { actor: PersonRow; companionId: string; lookPrompt: string; prompt?: string; count: number }): Promise<string> {
+export async function startLookGeneration(input: { actor: PersonRow; companionId: string; lookPrompt: string; prompt?: string; style?: LookStyleId; count: number }): Promise<string> {
   const promptText = input.prompt?.trim() || input.lookPrompt.trim();
   if (!promptText) throw Object.assign(new Error(LOOK_PROMPT_REQUIRED_LINE), { status: 400 });
-  const prompt = lookPromptFor(promptText, readLook(input.companionId).key);
+  const prompt = lookPromptFor(promptText, readLook(input.companionId).key, input.style);
   const denied = lookGenerationGate(input.actor, prompt);
   if (denied) throw Object.assign(new Error(denied.error), { status: denied.status });
   if (!(await pictureEngineReady())) throw Object.assign(new Error(LOOK_ENGINE_NOT_READY_LINE), { status: 503 });
@@ -140,8 +142,8 @@ export async function startLookSheet(input: { actor: PersonRow; companionId: str
     if (!(await pictureEngineReady())) throw Object.assign(new Error(LOOK_ENGINE_NOT_READY_LINE), { status: 503 });
     const look = readLook(input.companionId), version = look.versions.find((item) => item.id === look.rest), path = look.rest ? versionPath(input.companionId, look.rest) : null;
     if (!version || !path) throw Object.assign(new Error("Choose a rest picture before making the character sheet."), { status: 400 });
-    if (!input.lookPrompt.trim()) throw Object.assign(new Error(LOOK_PROMPT_REQUIRED_LINE), { status: 400 });
     const png = new Uint8Array(readFileSync(path)), key = await chooseKeyColour(png), described = await describeCharacter(png, input.lookPrompt);
+    if (!described.card.text) throw Object.assign(new Error(LOOK_PICTURE_UNREAD_LINE), { status: 400 });
     const sheet = { views: { left: null, right: null, mouth: null }, card: described.card, key, state: "making" as const, approved_by: null, approved_at: null };
     updateSheet(input.companionId, sheet);
     const originalPath = versionOriginalPath(input.companionId, version.id), sourceBytes = originalPath ? new Uint8Array(readFileSync(originalPath)) : await compositeOnKey(png, key), instruction = SHEET_VIEWS[0]!.prompt.replaceAll("<key>", key);

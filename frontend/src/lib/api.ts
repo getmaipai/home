@@ -367,7 +367,7 @@ export interface CompanionLookVersion { id: string; label: string; source: "uplo
 export interface CompanionLookView { version_id: string; url: string }
 type CompanionLookKey = `#${"00FF00" | "FF00FF"}`;
 export interface CompanionLookSheet { views: { left: CompanionLookView | null; right: CompanionLookView | null; mouth: CompanionLookView | null }; card: { text: string; colours: string[]; species: string } | null; key: CompanionLookKey; state: "empty" | "making" | "needs_review" | "approved"; approved_by: string | null; approved_at: string | null }
-export interface CompanionLook { versions: CompanionLookVersion[]; rest: string | null; key: CompanionLookKey; sheet: CompanionLookSheet | null; ready_for_video: boolean; start_ready: boolean; start_reason?: string; can_generate: boolean; generate_reason?: string }
+export interface CompanionLook { versions: CompanionLookVersion[]; rest: string | null; key: CompanionLookKey; sheet: CompanionLookSheet | null; ready_for_video: boolean; start_ready: boolean; start_reason?: string; can_generate: boolean; generate_reason?: string; styles: Array<{ id: string; label: string }> }
 export interface CompanionLookJob { state: "queued" | "running" | "done" | "failed" | "cancelled"; percent: number; label: string; versions: Array<{ id: string; url: string; label: string }>; error: string | null }
 export interface CompanionPromptPack { title: string; prompt: string; negative_prompt: string; text: string }
 export interface CompanionStateUrls { h264: string; av1: string; still: string }
@@ -1495,7 +1495,7 @@ export const api = {
   uploadCompanionLook: (id: string, form: FormData) => request<{ id: string }>(`/api/companions/${encodeURIComponent(id)}/look/upload`, { method: "POST", body: form }),
   setCompanionLookRest: (id: string, version_id: string) => request<{ rest: string; sheet_reset: boolean }>(`/api/companions/${encodeURIComponent(id)}/look/rest`, { method: "PUT", body: JSON.stringify({ version_id }) }),
   deleteCompanionLookVersion: (id: string, versionId: string) => request<void>(`/api/companions/${encodeURIComponent(id)}/look/${encodeURIComponent(versionId)}`, { method: "DELETE" }),
-  generateCompanionLook: (id: string, body: { prompt?: string; count?: number } = {}) => request<{ job: string }>(`/api/companions/${encodeURIComponent(id)}/look/generate`, { method: "POST", body: JSON.stringify(body) }),
+  generateCompanionLook: (id: string, body: { prompt?: string; style?: string; count?: number } = {}) => request<{ job: string }>(`/api/companions/${encodeURIComponent(id)}/look/generate`, { method: "POST", body: JSON.stringify(body) }),
   companionLookJob: (id: string, job: string) => request<CompanionLookJob>(`/api/companions/${encodeURIComponent(id)}/look/jobs/${encodeURIComponent(job)}`),
   cancelCompanionLookJob: (id: string, job: string) => request<void>(`/api/companions/${encodeURIComponent(id)}/look/jobs/${encodeURIComponent(job)}`, { method: "DELETE" }),
   editCompanionLook: (id: string, body: { version_id: string; instruction: string }) => request<{ job: string }>(`/api/companions/${encodeURIComponent(id)}/look/edit`, { method: "POST", body: JSON.stringify(body) }),
