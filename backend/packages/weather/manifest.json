@@ -1,6 +1,6 @@
 {
   "id": "weather",
-  "version": "0.3.6",
+  "version": "0.3.8",
   "kind": "plugin",
   "category": "Utilities",
   "display": "Weather",
@@ -154,7 +154,10 @@
           "label": "Places",
           "icon": "map-pin",
           "kind": "keys",
-          "cards": [{ "label": "Places", "group": "weather", "scope": "person" }],
+          "cards": [
+            { "label": "Places", "group": "weather", "scope": "person" },
+            { "label": "Alerts", "group": "household.weather", "scope": "household", "levels": ["advanced"] }
+          ],
           "keywords": ["location", "city", "home", "current location", "saved places"]
         }
       ]
