@@ -28,6 +28,9 @@ import { sharedPlaybackContext } from "@/lib/voice/playbackContext";
 const MAX_PARALLEL_FETCHES = 2;
 
 export interface SpeechSentenceMeta { turnId?: string; generation?: number; visibleEnd?: number }
+interface ScheduledSentence { visibleEnd?: number; startTime: number; endTime: number; complete: boolean }
+/** About how fast the voice speaks, used to guess a sentence's length while its audio is still arriving. */
+const CHARS_PER_SECOND = 14;
 
 /** Pocket TTS's real /tts response ships a bogus placeholder WAV header
  * size (~2,000,000,000 bytes, spec/voice/README.md) regardless of the
@@ -69,7 +72,8 @@ export class SentenceSpeechScheduler {
   private dispatchTail: Promise<void> = Promise.resolve();
   private readonly abortController = new AbortController();
   private readonly speechStream: typeof api.streamSpeech;
-  private readonly scheduledSentences: Array<{ visibleEnd?: number; startTime: number; endTime: number }> = [];
+  /** One entry per sentence, however many small buffers its audio arrives in: `endTime` grows with each buffer and `complete` is set once the last one is scheduled. */
+  private readonly scheduledSentences: ScheduledSentence[] = [];
   private heardEndAtStop?: number;
   /** The thread message this reply voices, set by whoever starts the turn, so a screen can tell which message the voice belongs to. */
   messageId?: string;
@@ -138,8 +142,11 @@ export class SentenceSpeechScheduler {
     for (const sentence of this.scheduledSentences) {
       if (sentence.visibleEnd === undefined) continue;
       if (sentence.startTime <= currentTime) {
+        // A sentence still arriving in small buffers is longer than what is scheduled so far: estimate its length from its characters
+        // so the first buffer's quarter second does not count the whole sentence as heard.
         const span = sentence.endTime - sentence.startTime;
-        const played = span > 0 ? Math.min(1, (currentTime - sentence.startTime) / span) : 1;
+        const expected = sentence.complete ? span : Math.max(span, (sentence.visibleEnd - previousEnd) / CHARS_PER_SECOND);
+        const played = expected > 0 ? Math.min(1, (currentTime - sentence.startTime) / expected) : 1;
         heard = previousEnd + Math.floor((sentence.visibleEnd - previousEnd) * played);
       }
       previousEnd = sentence.visibleEnd;
@@ -191,10 +198,14 @@ export class SentenceSpeechScheduler {
     this.dispatchTail = new Promise<void>((resolve) => {
       resolveThis = resolve;
     });
-    void this.fetchAndSchedule(text, predecessorDone, meta).finally(resolveThis);
+    const track: { entry?: ScheduledSentence } = {};
+    void this.fetchAndSchedule(text, predecessorDone, meta, track).finally(() => {
+      if (track.entry) track.entry.complete = true;
+      resolveThis();
+    });
   }
 
-  private async fetchAndSchedule(text: string, predecessorDone: Promise<void>, meta?: SpeechSentenceMeta): Promise<void> {
+  private async fetchAndSchedule(text: string, predecessorDone: Promise<void>, meta: SpeechSentenceMeta | undefined, track: { entry?: ScheduledSentence }): Promise<void> {
     await this.acquireFetchSlot();
     // Streamed playback (Jesse, 2026-09-04: "streaming responses as you get them instead of generating the entire wav and then
     // just playing that"): the sentence's PCM is cut into small buffers and scheduled as it arrives, so the first sound plays
@@ -206,7 +217,7 @@ export class SentenceSpeechScheduler {
     const pending: AudioBuffer[] = [];
     let scheduledAny = false;
     const emit = (buffer: AudioBuffer) => {
-      this.scheduleBuffer(buffer, scheduledAny ? undefined : meta);
+      this.scheduleBuffer(buffer, scheduledAny ? undefined : meta, track);
       scheduledAny = true;
     };
     const offer = (buffer: AudioBuffer) => {
@@ -336,7 +347,7 @@ export class SentenceSpeechScheduler {
     this.sessionHandle.requestFocus();
   }
 
-  private scheduleBuffer(audioBuffer: AudioBuffer, meta?: SpeechSentenceMeta): void {
+  private scheduleBuffer(audioBuffer: AudioBuffer, meta: SpeechSentenceMeta | undefined, track: { entry?: ScheduledSentence }): void {
     this.joinAudioSession();
     const rate = audioSession.speedFor("spoken_reply");
     const source = this.audioContext.createBufferSource();
@@ -347,7 +358,11 @@ export class SentenceSpeechScheduler {
     source.start(startTime);
     this.sources.add(source);
     const endTime = startTime + audioBuffer.duration / (source.playbackRate && rate !== 1 ? rate : 1);
-    this.scheduledSentences.push({ ...(meta?.visibleEnd === undefined ? {} : { visibleEnd: meta.visibleEnd }), startTime, endTime });
+    if (track.entry) track.entry.endTime = endTime;
+    else {
+      track.entry = { ...(meta?.visibleEnd === undefined ? {} : { visibleEnd: meta.visibleEnd }), startTime, endTime, complete: false };
+      this.scheduledSentences.push(track.entry);
+    }
     this.scheduledCount++;
     if (this.scheduledCount === 1) this.onFirstAudio?.();
     source.onended = () => {

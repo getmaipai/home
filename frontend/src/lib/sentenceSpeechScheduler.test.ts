@@ -141,6 +141,28 @@ describe("sentence speech scheduler", () => {
     expect(scheduler.heardVisibleEndFine()).toBe(midSecond);
   });
 
+  test("a sentence arriving in small buffers counts as heard by its estimated length, not by its first buffer", () => {
+    const context = new FakeAudioContext();
+    const scheduler = new SentenceSpeechScheduler(context as unknown as AudioContext, async () => new Response(new Uint8Array(44)));
+    type Internals = { scheduleBuffer(buffer: AudioBuffer, meta: { visibleEnd?: number } | undefined, track: { entry?: unknown }): void; scheduledSentences: Array<{ complete: boolean }> };
+    const inner = scheduler as unknown as Internals;
+    const track: { entry?: unknown } = {};
+    const buffer = { duration: 0.25 } as AudioBuffer;
+    inner.scheduleBuffer(buffer, { visibleEnd: 140 }, track);
+    inner.scheduleBuffer(buffer, undefined, track);
+    expect(inner.scheduledSentences.length).toBe(1);
+    context.currentTime = 0.5;
+    // 140 characters at about 14 a second last about 10 s; half a second in is a few words, not the whole sentence.
+    expect(scheduler.heardVisibleEndFine()).toBeLessThan(15);
+    context.currentTime = 5;
+    expect(scheduler.heardVisibleEndFine()).toBeGreaterThan(55);
+    expect(scheduler.heardVisibleEndFine()).toBeLessThan(85);
+    (track.entry as { complete: boolean }).complete = true;
+    context.currentTime = 1;
+    // Once the last buffer is in, the real length (0.5 s) replaces the estimate.
+    expect(scheduler.heardVisibleEndFine()).toBe(140);
+  });
+
   test("wasCutOff is true only when stop ran before the reply ended on its own", async () => {
     const context = new FakeAudioContext();
     const cut = new SentenceSpeechScheduler(context as unknown as AudioContext, async () => new Response(new Uint8Array(44)));
