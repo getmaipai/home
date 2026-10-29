@@ -329,7 +329,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/chatPause.ts` | chatPausedByAdmin, chatPauseMessage |
 | `backend/src/lib/chatPictures.ts` | __setChatPictureCapabilityForTests, chatModelReadsPictures, photoUploadsAllowed, picturePartsAllowed, loadPictureParts |
 | `backend/src/lib/chatTemplateTokens.ts` | stripChatTemplateTokens, ChatTemplateTokenFilter |
-| `backend/src/lib/childDisclosure.ts` | defaultChildDisclosure |
+| `backend/src/lib/childDisclosure.ts` | hasAdultToTellCue, defaultChildDisclosure |
 | `backend/src/lib/childLinks.ts` | stripLinksForChild, sourcesForChild, sourcesForBand, stripLinksDeep, blocksForBand, structuredPartForBand |
 | `backend/src/lib/clonedVoices.ts` | MAX_BYTES, listClonedVoices, saveClonedVoice, renameClonedVoice, deleteClonedVoice, getClonedVoiceFile |
 | `backend/src/lib/codeGate.ts` | PROXY_HEADERS, isTailnetAddress, isPublicHost, transportRefusal, requestsPerMinute, rateRefusal |
@@ -791,6 +791,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/tailscaleTls.ts` | onTsLeafRenewed, notifyTsLeafRenewed |
 | `backend/src/lib/telegramChannel.ts` | telegramConfigured, __setTelegramTimeoutMsForTests, sendTelegramMessage |
 | `backend/src/lib/text.ts` | wordsOf, ownWordsQuery, tokenize, isBarePronoun |
+| `backend/src/lib/threadOfferFloor.ts` | threadOfferFloor |
 | `backend/src/lib/timezones.ts` | resolveZone |
 | `backend/src/lib/tokenCount.ts` | countTokens, __clearTokenCountCacheForTests |
 | `backend/src/lib/toolMarkup.ts` | toolMarkupStart, markerPrefixTail, stripToolMarkup |

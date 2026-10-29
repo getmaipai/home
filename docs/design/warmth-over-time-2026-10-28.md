@@ -164,7 +164,7 @@ companion dials decide how the question sounds, the item only supplies the fact.
    twice); a child and an incognito turn (never). All fail or ambiguous today for the first row.
 2. **NAT-07b (M):** `conversationOpening`, its render in the volatile tail, the gates, the `chat.pick_up_threads` key, the `thread`
    open-question kind, the bounded archived-event read, the typed turn-signal field (all spec first, then hub), `archived_reason` written by the five paths above, the forget cleanup.
-3. **NAT-07c (S):** the deterministic floor and the judge's `offer_withheld` tag (a new memory-record field, spec first), with an extraction test per withheld subject.
+3. **NAT-07c (S; floor built 2026-10-28 as `threadOfferFloor`, judge tag and its extraction tests wait on the `offer_withheld` spec tag):** the deterministic floor and the judge's `offer_withheld` tag (a new memory-record field, spec first), with an extraction test per withheld subject.
 4. **NAT-07d (deferred):** relational memory.
 
 Order: 07a, then 07c, then 07b. The register bench's NAT-01 to NAT-08 lane runs them against a real model.
