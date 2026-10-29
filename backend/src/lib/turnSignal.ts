@@ -110,8 +110,8 @@ const JOKE_RE = /\b(?:jk|j\/k|lol|lmao|haha+|hehe+|kidding|joking|as if)\b|(?:^|
 // Thursday", "you added the wrong item", "I meant"), a retraction takes a
 // request or a statement back ("never mind", "scratch that").
 // NAT-06b: the person's own words about advice. "no" (asked to be heard) wins over "yes"; tone never sets either.
-const ADVICE_NO_RE = /\b(?:(?:need|want) to (?:vent|rant)|just (?:venting|ranting|listen)|(?:don'?t|do not) (?:need|want) (?:any )?(?:advice|solutions?|suggestions?|you to fix)|not (?:looking|asking) for (?:any )?(?:advice|solutions?)|no advice)\b/i;
-const ADVICE_YES_RE = /\b(?:what (?:should|can) i do|what would you do|any (?:advice|suggestions|tips)|(?:need|want|could use) (?:some )?(?:advice|suggestions|tips)|how (?:should|can|do) i (?:deal with|cope with|handle|get over)|do you have any (?:advice|suggestions|tips))\b/i;
+const ADVICE_NO_RE = /\b(?:(?:need|want) to (?:vent|rant)|just (?:venting|ranting|listen)|(?:don'?t|do not) (?:need|want) (?:any )?(?:advice|solutions?|suggestions?|you to fix)|not (?:looking|asking) for (?:any )?(?:advice|solutions?)|no advice)\b/i; // rule: signal.rule (docs/BACKLOG.md, "NAT-06b")
+const ADVICE_YES_RE = /\b(?:what (?:should|can) i do|what would you do|any (?:advice|suggestions|tips)|(?:need|want|could use) (?:some )?(?:advice|suggestions|tips)|how (?:should|can|do) i (?:deal with|cope with|handle|get over)|do you have any (?:advice|suggestions|tips))\b/i; // rule: signal.rule (docs/BACKLOG.md, "NAT-06b")
 export function adviceOf(text: string): "yes" | "no" | undefined {
   if (ADVICE_NO_RE.test(text)) return "no";
   return ADVICE_YES_RE.test(text) ? "yes" : undefined;
