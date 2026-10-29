@@ -14,6 +14,9 @@
 # on, someone logs in once after a restart, as for the Stack.
 set -euo pipefail
 
+# launchd starts agents with a bare PATH that lacks Homebrew, where tmux and claude live.
+export PATH="/opt/homebrew/bin:/usr/local/bin:$HOME/.local/bin:$PATH"
+
 label="com.maipai.studio-claude"
 session="${MAIPAI_STUDIO_CLAUDE_SESSION:-studio-claude}"
 agents_dir="${MAIPAI_LAUNCH_AGENTS_DIR:-$HOME/Library/LaunchAgents}"
