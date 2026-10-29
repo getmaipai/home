@@ -57591,18 +57591,49 @@
                               "photorealistic",
                               "3d",
                               "pixel",
+                              "custom",
                               "watercolor"
                             ]
                           },
                           "label": {
                             "type": "string"
+                          },
+                          "custom": {
+                            "type": "boolean"
                           }
                         },
                         "required": [
                           "id",
-                          "label"
+                          "label",
+                          "custom"
                         ]
                       }
+                    },
+                    "keep": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string",
+                          "enum": [
+                            "keep"
+                          ]
+                        },
+                        "label": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "label"
+                      ]
+                    },
+                    "audience_cap": {
+                      "type": "string",
+                      "enum": [
+                        "all",
+                        "teen",
+                        "adult"
+                      ]
                     }
                   },
                   "required": [
@@ -57613,7 +57644,9 @@
                     "ready_for_video",
                     "start_ready",
                     "can_generate",
-                    "styles"
+                    "styles",
+                    "keep",
+                    "audience_cap"
                   ]
                 }
               }
@@ -58111,8 +58144,15 @@
                       "photorealistic",
                       "3d",
                       "pixel",
+                      "custom",
                       "watercolor"
-                    ]
+                    ],
+                    "default": "cartoon"
+                  },
+                  "custom_style": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 120
                   },
                   "count": {
                     "type": "integer",
@@ -58249,6 +58289,23 @@
                     "type": "string",
                     "minLength": 1,
                     "maxLength": 300
+                  },
+                  "style": {
+                    "type": "string",
+                    "enum": [
+                      "cartoon",
+                      "anime",
+                      "photorealistic",
+                      "3d",
+                      "pixel",
+                      "custom",
+                      "watercolor"
+                    ]
+                  },
+                  "custom_style": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 120
                   }
                 },
                 "required": [
