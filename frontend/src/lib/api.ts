@@ -20,6 +20,7 @@ import type { Artifact } from "@maipai/spec/gen/ts/artifact.js";
 import type { Project } from "@maipai/spec/gen/ts/project.js";
 import type { SetupState } from "@maipai/spec/gen/ts/setup-state.js";
 import type { File as FileRecord } from "@maipai/spec/gen/ts/file.js";
+import type { List as ListRecord } from "@maipai/spec/gen/ts/list.js";
 import type { Share } from "@maipai/spec/gen/ts/share.js";
 import type { SttStatusResponse } from "@maipai/spec/voice/ts/sttTypes.js";
 import type { SearchGroup } from "@maipai/ui/src/dashboard/layouts/full/vertical/header/HeaderSearch";
@@ -950,6 +951,10 @@ export type HealthChecks = {
 export interface MediaBudgetResponse { limit_min: number; used_min: number; left_min: number; exhausted: boolean; /** The kid time-up words when time is up (GET /api/media/budget only). */ line?: string | null }
 
 export const api = {
+  lists: () => request<ListRecord[]>("/api/lists"),
+  addListItem: (listId: string, text: string) => request<ListRecord>(`/api/lists/${encodeURIComponent(listId)}/items`, { method: "POST", body: JSON.stringify({ text }) }),
+  editListItem: (listId: string, itemId: string, done: boolean) => request<ListRecord>(`/api/lists/${encodeURIComponent(listId)}/items/${encodeURIComponent(itemId)}`, { method: "PATCH", body: JSON.stringify({ done }) }),
+  clearDoneListItems: (listId: string) => request<ListRecord>(`/api/lists/${encodeURIComponent(listId)}/clear-done`, { method: "POST" }),
   companionAvatar: (companionId?: string) => request<CompanionAvatarView>(`/api/companions/avatar${companionId ? `?companion=${encodeURIComponent(companionId)}` : ""}`),
   mediaBudget: () => request<MediaBudgetResponse>("/api/media/budget"),
   referenceBooks: () => request<ReferenceBookView[]>("/api/reference/books"),

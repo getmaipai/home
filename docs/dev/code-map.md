@@ -88,6 +88,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `frontend/src/apps/chat/composerVoiceControls.tsx` | useVoiceCallReady, ComposerVoiceControls |
 | `frontend/src/apps/chat/liveVoiceSession.tsx` | WAKE_SESSION_IDLE_CLOSE_MS, BARGE_IN_ARM_DELAY_MS, DUPLEX_PAUSE_AFTER_MS, DUPLEX_FALSE_INTERRUPTION_MS, REACTION_PHRASES, duplexCounters |
 | `frontend/src/apps/chat/voiceSessionContext.tsx` | VoiceSessionProvider, useVoiceSession |
+| `frontend/src/apps/household/HouseholdPage.tsx` | HouseholdIcon, HouseholdPage |
 | `frontend/src/apps/memory/PeopleAndThings.tsx` | PeopleAndThings |
 | `frontend/src/apps/memory/PersonMemories.tsx` | OtherPersonMemories, OwnMemories |
 | `frontend/src/apps/notifications/NotificationsPage.tsx` | NotificationsIcon, NotificationsPage |

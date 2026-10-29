@@ -57,6 +57,19 @@ describe("POST /api/lists", () => {
 });
 
 describe("GET /api/lists", () => {
+  test("first read creates the two household standing lists for a child", async () => {
+    const owner = await ownerSession();
+    const childRes = await owner.post("/api/people", { displayName: "Nova", role: "child", secret: "0000" });
+    const child = (await childRes.json()) as { id: string };
+    const childClient = new TestClient();
+    await childClient.post("/api/auth/verify-secret", { personId: child.id, secret: "0000" });
+
+    const response = await childClient.get("/api/lists");
+    expect(response.status).toBe(200);
+    const rows = (await response.json()) as Array<{ kind: string; scope: string }>;
+    expect(rows.filter((row) => row.scope === "household").map((row) => row.kind).sort()).toEqual(["shopping", "todo"]);
+  });
+
   test("a person-scoped list is invisible to someone else, visible to owner/admin", async () => {
     const owner = await ownerSession();
     const adultRes = await owner.post("/api/people", { displayName: "Marlow", role: "adult", secret: "0000" });
@@ -103,6 +116,21 @@ describe("PATCH and DELETE /api/lists/:id", () => {
 
     const listing = (await (await owner.get("/api/lists")).json()) as Array<{ id: string }>;
     expect(listing.some((l) => l.id === list.id)).toBe(false);
+  });
+
+  test("a child cannot delete a household list", async () => {
+    const owner = await ownerSession();
+    const childRes = await owner.post("/api/people", { displayName: "Nova", role: "child", secret: "0000" });
+    const child = (await childRes.json()) as { id: string };
+    const childClient = new TestClient();
+    await childClient.post("/api/auth/verify-secret", { personId: child.id, secret: "0000" });
+    const created = await owner.post("/api/lists", { kind: "shopping" });
+    const list = (await created.json()) as { id: string };
+
+    const deletion = await childClient.request(`/api/lists/${list.id}`, { method: "DELETE" });
+    expect(deletion.status).toBe(403);
+    const listing = (await (await owner.get("/api/lists")).json()) as Array<{ id: string }>;
+    expect(listing.some((entry) => entry.id === list.id)).toBe(true);
   });
 });
 
@@ -189,5 +217,60 @@ describe("POST /api/lists/:id/clear", () => {
     const body = (await res.json()) as { items: unknown[]; id: string };
     expect(body.items).toEqual([]);
     expect(body.id).toBe(list.id);
+  });
+});
+
+describe("POST /api/lists/:id/clear-done", () => {
+  test("a child can clear completed household items while open items stay", async () => {
+    const owner = await ownerSession();
+    const childRes = await owner.post("/api/people", { displayName: "Nova", role: "child", secret: "0000" });
+    const child = (await childRes.json()) as { id: string };
+    const childClient = new TestClient();
+    await childClient.post("/api/auth/verify-secret", { personId: child.id, secret: "0000" });
+    const created = await owner.post("/api/lists", { kind: "shopping" });
+    const list = (await created.json()) as { id: string };
+    const first = await owner.post(`/api/lists/${list.id}/items`, { text: "milk" });
+    const second = await owner.post(`/api/lists/${list.id}/items`, { text: "bread" });
+    const firstId = ((await first.json()) as { items: Array<{ id: string }> }).items[0]!.id;
+    const secondId = ((await second.json()) as { items: Array<{ id: string }> }).items[1]!.id;
+    await childClient.request(`/api/lists/${list.id}/items/${firstId}`, { method: "PATCH", body: { done: true } });
+    await childClient.request(`/api/lists/${list.id}/items/${secondId}`, { method: "PATCH", body: { done: true } });
+
+    const res = await childClient.post(`/api/lists/${list.id}/clear-done`, {});
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { items: Array<{ id: string }> };
+    expect(body.items).toEqual([]);
+  });
+
+  test("keeps open household items when completed ones are cleared", async () => {
+    const owner = await ownerSession();
+    const created = await owner.post("/api/lists", { kind: "shopping" });
+    const list = (await created.json()) as { id: string };
+    const added = await owner.post(`/api/lists/${list.id}/items`, { text: "milk" });
+    const itemId = ((await added.json()) as { items: Array<{ id: string }> }).items[0]!.id;
+    const done = await owner.request(`/api/lists/${list.id}/items/${itemId}`, { method: "PATCH", body: { done: true } });
+    expect(done.status).toBe(200);
+    await owner.post(`/api/lists/${list.id}/items`, { text: "bread" });
+
+    const res = await owner.post(`/api/lists/${list.id}/clear-done`, {});
+    const body = (await res.json()) as { items: Array<{ text: string }> };
+    expect(body.items.map((item) => item.text)).toEqual(["bread"]);
+  });
+
+  test("an admin can clear completed items on the household shopping list", async () => {
+    const owner = await ownerSession();
+    const adminRes = await owner.post("/api/people", { displayName: "Marlow", role: "admin", secret: "0000" });
+    const admin = (await adminRes.json()) as { id: string };
+    const adminClient = new TestClient();
+    await adminClient.post("/api/auth/verify-secret", { personId: admin.id, secret: "0000" });
+    const created = await owner.post("/api/lists", { kind: "shopping" });
+    const list = (await created.json()) as { id: string };
+    const added = await owner.post(`/api/lists/${list.id}/items`, { text: "milk" });
+    const itemId = ((await added.json()) as { items: Array<{ id: string }> }).items[0]!.id;
+    await owner.request(`/api/lists/${list.id}/items/${itemId}`, { method: "PATCH", body: { done: true } });
+
+    const result = await adminClient.post(`/api/lists/${list.id}/clear-done`, {});
+    expect(result.status).toBe(200);
+    expect(((await result.json()) as { items: unknown[] }).items).toEqual([]);
   });
 });

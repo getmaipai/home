@@ -193,6 +193,9 @@ export function updateList(actor: { id: string; role: string }, id: string, edit
 export function deleteList(actor: { id: string; role: string }, id: string): OpResult<{ id: string }> {
   const existing = getList(actor, id);
   if (!existing.ok) return { ok: false, status: existing.status, error: existing.error };
+  if (actor.role === "child" && existing.value.scope === "household") {
+    return { ok: false, status: 403, error: "children cannot delete household lists" };
+  }
   const now = new Date().toISOString();
   db.update(lists).set({ deletedAt: now, updatedAt: now, hlc: nextHlc() }).where(eq(lists.id, id)).run();
   return { ok: true, status: 200, value: { id } };
@@ -283,6 +286,16 @@ export function clearList(actor: { id: string; role: string }, id: string): OpRe
   if (!existing.ok || !existing.value) return existing;
   const now = new Date().toISOString();
   const candidate = List.parse({ ...existing.value, items: [], updated_at: now, hlc: nextHlc() });
+  db.update(lists).set(toRow(candidate)).where(eq(lists.id, id)).run();
+  return { ok: true, status: 200, value: candidate };
+}
+
+/** Removes completed items while keeping open items and the list. */
+export function clearDoneItems(actor: { id: string; role: string }, id: string): OpResult<ListT> {
+  const existing = getList(actor, id);
+  if (!existing.ok || !existing.value) return existing;
+  const now = new Date().toISOString();
+  const candidate = List.parse({ ...existing.value, items: existing.value.items.filter((item) => !item.done), updated_at: now, hlc: nextHlc() });
   db.update(lists).set(toRow(candidate)).where(eq(lists.id, id)).run();
   return { ok: true, status: 200, value: candidate };
 }

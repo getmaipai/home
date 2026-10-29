@@ -9,7 +9,7 @@
 import { createRoute, z } from "@hono/zod-openapi";
 import { apiRouter, errorResponses, idParamSchema } from "@/lib/openapi";
 import { requireAuth } from "@/middleware/auth";
-import { listLists, getList, createList, updateList, deleteList, addItem, editItem, removeItem, clearList } from "@/lib/lists";
+import { listLists, getList, createList, updateList, deleteList, addItem, editItem, removeItem, clearList, clearDoneItems, findOrCreateStandingList } from "@/lib/lists";
 import { List } from "@maipai/spec/gen/ts/list.js";
 
 export const listsRoutes = apiRouter();
@@ -34,6 +34,8 @@ const listRoute = createRoute({
 });
 listsRoutes.openapi(listRoute, (c) => {
   const actor = c.get("person");
+  findOrCreateStandingList("shopping");
+  findOrCreateStandingList("todo");
   return c.json(listLists(actor), 200);
 });
 
@@ -120,13 +122,13 @@ const deleteRoute = createRoute({
   request: { params: idParamSchema("id", "list-a1b2c3") },
   responses: {
     200: { content: { "application/json": { schema: z.object({ id: z.string() }) } }, description: "Removed." },
-    ...errorResponses({ 401: "Not signed in", 404: "No such list" }),
+    ...errorResponses({ 401: "Not signed in", 403: "Children cannot delete household lists", 404: "No such list" }),
   },
 });
 listsRoutes.openapi(deleteRoute, (c) => {
   const actor = c.get("person");
   const result = deleteList(actor, c.req.valid("param").id);
-  if (!result.ok) return c.json({ error: result.error }, 404);
+  if (!result.ok) return c.json({ error: result.error }, result.status === 403 ? 403 : 404);
   return c.json(result.value, 200);
 });
 
@@ -225,6 +227,25 @@ const clearRoute = createRoute({
 listsRoutes.openapi(clearRoute, (c) => {
   const actor = c.get("person");
   const result = clearList(actor, c.req.valid("param").id);
+  if (!result.ok) return c.json({ error: result.error }, 404);
+  return c.json(result.value, 200);
+});
+
+const clearDoneRoute = createRoute({
+  method: "post",
+  path: "/{id}/clear-done",
+  tags: ["Lists"],
+  summary: "Remove completed items, keeping the list and open items",
+  middleware: [requireAuth] as const,
+  request: { params: idParamSchema("id", "list-a1b2c3") },
+  responses: {
+    200: { content: { "application/json": { schema: List } }, description: "Completed items cleared." },
+    ...errorResponses({ 401: "Not signed in", 404: "No such list" }),
+  },
+});
+listsRoutes.openapi(clearDoneRoute, (c) => {
+  const actor = c.get("person");
+  const result = clearDoneItems(actor, c.req.valid("param").id);
   if (!result.ok) return c.json({ error: result.error }, 404);
   return c.json(result.value, 200);
 });
