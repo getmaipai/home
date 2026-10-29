@@ -21,7 +21,7 @@ beforeAll(() => {
   chmodSync(promote, 0o755);
   writeFileSync(join(scratch, "health-check"), "#!/usr/bin/env bash\n[[ ! -f '" + join(scratch, "health.fail") + "' ]]\n"); chmodSync(join(scratch, "health-check"), 0o755);
   writeFileSync(join(scratch, "publish"), "#!/usr/bin/env bash\nprintf '%s\\n' \"$@\" >> '" + join(scratch, "publish.calls") + "'\nwhile (($#)); do if [[ \"$1\" == --notes-file ]]; then echo \"$2\" > '" + join(scratch, "publish.notes.path") + "'; cat \"$2\" > '" + join(scratch, "publish.notes") + "'; shift 2; else shift; fi; done\n"); chmodSync(join(scratch, "publish"), 0o755);
-  Object.assign(baseEnv, { MAIPAI_SHIP_DATA: data, MAIPAI_WATCH_DATA: watch, MAIPAI_SHIP_LIVE: live, MAIPAI_PROMOTE_BIN: promote, MAIPAI_SHIP_SUDO: "", MAIPAI_SHIP_STOP_DEV_CMD: "true", MAIPAI_SHIP_HEALTH_CMD: join(scratch, "health-check"), MAIPAI_SHIP_HEALTH_TIMEOUT: "1", MAIPAI_SHIP_MIGRATIONS_CMD: "echo 3", MAIPAI_PUBLISH_CMD: join(scratch, "publish") + " TAG NOTES", MAIPAI_LAND_GIT_ENV: "", MAIPAI_HUB_LOCK_PATH: join(scratch, "not-running.lock"), MAIPAI_SHIP_WEB_PORT: "45991" });
+  Object.assign(baseEnv, { MAIPAI_SHIP_GUI_CHECK: "true", MAIPAI_SHIP_DATA: data, MAIPAI_WATCH_DATA: watch, MAIPAI_SHIP_LIVE: live, MAIPAI_PROMOTE_BIN: promote, MAIPAI_SHIP_SUDO: "", MAIPAI_SHIP_STOP_DEV_CMD: "true", MAIPAI_SHIP_HEALTH_CMD: join(scratch, "health-check"), MAIPAI_SHIP_HEALTH_TIMEOUT: "1", MAIPAI_SHIP_MIGRATIONS_CMD: "echo 3", MAIPAI_PUBLISH_CMD: join(scratch, "publish") + " TAG NOTES", MAIPAI_LAND_GIT_ENV: "", MAIPAI_HUB_LOCK_PATH: join(scratch, "not-running.lock"), MAIPAI_SHIP_WEB_PORT: "45991" });
 });
 describe("ship pipeline", () => {
   // Each test starts from a hub on the previous release, so a test that promotes does not make the next one a no-op "already live".
@@ -115,6 +115,10 @@ describe("ship pipeline", () => {
   }, 60_000);
   test("preflight names one-time setup when helper is missing", () => {
     const out = run([sha, "--before-green"], { MAIPAI_PROMOTE_BIN: join(scratch, "missing-helper") }); expect(out.status).toBe(2); expect(out.stderr).toContain("install-promote.sh");
+  }, 60_000);
+  test("refuses before stopping anything when the session has no desktop login", () => {
+    const out = run([sha, "--before-green"], { MAIPAI_SHIP_GUI_CHECK: "false" });
+    expect(out.status).toBe(1); expect(out.stderr).toContain("no desktop login"); expect(out.stderr).toContain("Nothing was stopped");
   }, 60_000);
 });
 afterAll(() => rmSync(scratch, { recursive: true, force: true }));

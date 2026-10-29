@@ -587,6 +587,13 @@ print_reboot_note() {
 # ---- Upgrade safety: markers, data snapshot, rollback ----
 read_marker() { if [ -f "$1" ]; then tr -d '[:space:]' < "$1"; fi; }
 
+# Written as soon as the data copy exists, not with the final markers: an upgrade that dies part way
+# never reaches the final markers, and --rollback would otherwise go to an older, stale version.
+record_previous_tag() {
+  local root="$1" installed="$2" target="$3"
+  if [ -n "$installed" ] && [ "$installed" != "$target" ]; then printf '%s\n' "$installed" > "${root}/.previous-tag"; fi
+}
+
 snapshot_data() {
   local root="$1" from_tag="$2" ts dest
   [ -d "${root}/data" ] || return 0
@@ -2053,6 +2060,7 @@ main() {
     if [ "$kind" = "upgrade" ] && [ "$rollback" = "no" ]; then
       snapshot_data "$install_root" "$installed_tag" \
         || die "could not save a copy of your data before upgrading (is the disk full?). Nothing was changed. Free up space, then run the installer again."
+      record_previous_tag "$install_root" "$installed_tag" "$tag"
     fi
     rm -rf "${install_root}.new"
     fetch_release_source "$tag" "${install_root}.new" \

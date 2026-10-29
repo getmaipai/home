@@ -509,7 +509,8 @@ function startResumeSession(session: ResumeSession): void {
         if (!current) continue;
         const stamped = "type" in current && (current.type === "delta" || current.type === "reasoning" || current.type === "status" || current.type === "spoken_cue") ? { ...current, generation } : current;
         const event = "type" in stamped && (stamped.type === "delta" || stamped.type === "reasoning") ? { ...stamped, sequence: ++session.sequence } : stamped;
-        const withLatency = "type" in event && event.type === "done" ? { ...event, value: { ...event.value, latency: { stt_ms: session.sttMs, first_token_ms: event.value.stats?.time_to_first_token_ms ?? null, tts_ttfa_ms: null, e2e_ms: Date.now() - session.startedAtMs } } } : event;
+        // The turn's own clock starts before the session's, so the end-to-end time is never shorter than the turn's first token or total.
+        const withLatency = "type" in event && event.type === "done" ? { ...event, value: { ...event.value, latency: { stt_ms: session.sttMs, first_token_ms: event.value.stats?.time_to_first_token_ms ?? null, tts_ttfa_ms: null, e2e_ms: Math.max(Date.now() - session.startedAtMs, event.value.stats?.time_to_first_token_ms ?? 0, event.value.stats?.total_time_ms ?? 0) } } } : event;
         // THIN-1E and CHAT-CALM-ERRORS-01b (rule 6): the done value and the
         // error event's admin detail pass the one viewer filter.
         const delivered = streamEventForViewer(withLatency as TurnStreamEvent, session.viewer);

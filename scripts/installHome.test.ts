@@ -31,6 +31,18 @@ describe("upgrade data copy and rollback", () => {
     } finally { rmSync(root, { recursive: true, force: true }); }
   });
 
+  test("record_previous_tag points --rollback at the version live before this upgrade", () => {
+    const root = fixture();
+    try {
+      writeFileSync(join(root, ".previous-tag"), "sha-0000001\n");
+      expect(bash(`record_previous_tag "${root}" sha-17e1007 sha-06df9c5`).exitCode).toBe(0);
+      expect(readFileSync(join(root, ".previous-tag"), "utf8").trim()).toBe("sha-17e1007");
+      bash(`record_previous_tag "${root}" sha-06df9c5 sha-06df9c5`);
+      bash(`record_previous_tag "${root}" "" sha-06df9c5`);
+      expect(readFileSync(join(root, ".previous-tag"), "utf8").trim()).toBe("sha-17e1007");
+    } finally { rmSync(root, { recursive: true, force: true }); }
+  });
+
   test("only the newest two copies are kept", () => {
     const root = fixture();
     try {

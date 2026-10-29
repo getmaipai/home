@@ -19,6 +19,8 @@ promote="${MAIPAI_PROMOTE_BIN:-/usr/local/libexec/maipai-promote}"
 sudo_cmd="${MAIPAI_SHIP_SUDO-sudo -n}"
 stop_cmd="${MAIPAI_SHIP_STOP_DEV_CMD:-bash scripts/stop-dev-home.sh --live $live}"
 health_cmd="${MAIPAI_SHIP_HEALTH_CMD:-}"
+# The Stack's launchd service installs into this login's GUI domain; from a session without one the install stops with "Bootstrap failed: 5" (2026-10-28).
+if [[ -n "${MAIPAI_SHIP_GUI_CHECK+x}" ]]; then gui_check="$MAIPAI_SHIP_GUI_CHECK"; elif [[ "$(uname)" == Darwin ]]; then gui_check='launchctl print "gui/$(id -u)" >/dev/null 2>&1'; else gui_check=""; fi
 web_url="${MAIPAI_SHIP_WEB_URL:-http://localhost:3000/}"
 # The installer records the port it gave the Stack; 8770 only when nothing was recorded.
 stack_port="$({ tr -dc '0-9' < "$live/stack/.port"; } 2>/dev/null || true)"; stack_port="${stack_port:-8770}"
@@ -93,6 +95,7 @@ fi
 if (( dry )); then printf 'plan: sha=%s label=%s live=%s current=%s before-green=%s tag=%s\n' "$sha" "$label" "$live" "$before_tag" "$([[ $before_green == 1 ]] && echo yes || echo no)" "$([[ $tag_after == 1 ]] && echo yes || echo no)"; exit 0; fi
 if [[ ! -x "$promote" ]] || [[ "$(eval "$sudo_cmd \"$promote\" --check" 2>/dev/null || true)" != ok ]]; then die "promotion helper is not ready; run: sudo bash $main/scripts/install-promote.sh" 2; fi
 if (( tag_after == 0 )) || [[ "$before_tag" != "$label" ]]; then
+  if [[ -n "$gui_check" ]] && ! eval "$gui_check"; then die "this session has no desktop login (launchd gui domain), so the Stack's service cannot install. Nothing was stopped or changed. Run ship.sh from Terminal on the Mac's own screen, logged in as the console user."; fi
   mkdir -p "$data" || die "could not create ship log directory $data."
   eval "$stop_cmd" || die "could not stop the development Home; stop it and retry."
   before_migrations="$(eval "$migrations_cmd" 2>/dev/null || echo 0)"; [[ "$before_migrations" =~ ^[0-9]+$ ]] || before_migrations=0
