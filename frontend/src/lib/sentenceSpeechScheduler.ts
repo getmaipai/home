@@ -69,8 +69,11 @@ export class SentenceSpeechScheduler {
   private dispatchTail: Promise<void> = Promise.resolve();
   private readonly abortController = new AbortController();
   private readonly speechStream: typeof api.streamSpeech;
-  private readonly scheduledSentences: Array<{ visibleEnd?: number; startTime: number }> = [];
+  private readonly scheduledSentences: Array<{ visibleEnd?: number; startTime: number; endTime: number }> = [];
   private heardEndAtStop?: number;
+  private heardFineAtStop?: number;
+  private endedNaturally = false;
+  private cutOff = false;
   // AUDIO-SESSION-01: the reply's voice is one registration with the shell's audio session, taken at the first sentence.
   private sessionHandle: AudioHandle | null = null;
 
@@ -122,6 +125,31 @@ export class SentenceSpeechScheduler {
     }
     return heardEnd;
   }
+
+  /** How much of the reply's visible text has been spoken so far, counted inside the sentence that is playing (by how far its audio has
+   * played), so a cut-in mid-sentence keeps only the words said. Frozen at the value it had when stop() ran. */
+  heardVisibleEndFine(): number {
+    if (this.heardFineAtStop !== undefined) return this.heardFineAtStop;
+    const currentTime = this.audioContext.currentTime;
+    let previousEnd = 0;
+    let heard = 0;
+    for (const sentence of this.scheduledSentences) {
+      if (sentence.visibleEnd === undefined) continue;
+      if (sentence.startTime <= currentTime) {
+        const span = sentence.endTime - sentence.startTime;
+        const played = span > 0 ? Math.min(1, (currentTime - sentence.startTime) / span) : 1;
+        heard = previousEnd + Math.floor((sentence.visibleEnd - previousEnd) * played);
+      }
+      previousEnd = sentence.visibleEnd;
+    }
+    return heard;
+  }
+
+  /** True when stop() cut the reply off before every sentence had played; false when it played to its end or is still playing. */
+  wasCutOff(): boolean { return this.cutOff; }
+
+  /** True once every sentence has played and no more are coming (also when none ever played), so the whole reply was heard. */
+  hasEndedNaturally(): boolean { return this.endedNaturally; }
 
   pause(): void {
     if (this.stopped || this.paused) return;
@@ -316,7 +344,8 @@ export class SentenceSpeechScheduler {
     const startTime = Math.max(this.audioContext.currentTime, this.nextStartTime);
     source.start(startTime);
     this.sources.add(source);
-    this.scheduledSentences.push({ ...(meta?.visibleEnd === undefined ? {} : { visibleEnd: meta.visibleEnd }), startTime });
+    const endTime = startTime + audioBuffer.duration / (source.playbackRate && rate !== 1 ? rate : 1);
+    this.scheduledSentences.push({ ...(meta?.visibleEnd === undefined ? {} : { visibleEnd: meta.visibleEnd }), startTime, endTime });
     this.scheduledCount++;
     if (this.scheduledCount === 1) this.onFirstAudio?.();
     source.onended = () => {
@@ -325,10 +354,11 @@ export class SentenceSpeechScheduler {
       if (this.streamDone && this.finishedCount === this.scheduledCount) {
         this.sessionHandle?.release();
         this.sessionHandle = null;
+        this.endedNaturally = true;
         this.onEnded?.();
       }
     };
-    this.nextStartTime = startTime + audioBuffer.duration / (source.playbackRate && rate !== 1 ? rate : 1);
+    this.nextStartTime = endTime;
   }
 
   /** Call once no more sentences are coming (the reply finished
@@ -342,7 +372,7 @@ export class SentenceSpeechScheduler {
     void this.dispatchTail.then(() => {
       if (this.stopped) return;
       this.streamDone = true;
-      if (this.scheduledCount === 0) this.onEnded?.();
+      if (this.scheduledCount === 0) { this.endedNaturally = true; this.onEnded?.(); }
     });
   }
 
@@ -354,6 +384,8 @@ export class SentenceSpeechScheduler {
   stop(): void {
     if (this.stopped) return;
     this.heardEndAtStop = this.heardVisibleEnd();
+    this.heardFineAtStop = this.heardVisibleEndFine();
+    this.cutOff = !this.endedNaturally;
     this.stopped = true;
     this.paused = false;
     this.abortController.abort();

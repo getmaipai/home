@@ -31,6 +31,7 @@ import { useMicGate, micHelp } from "@/lib/media/micGate";
 import { voiceFailureLine } from "@maipai/home-backend/src/lib/failureCopy";
 import { Suggestions } from "@maipai/ui/src/elements/suggestions";
 import { useAmbientPageContext } from "@/shell/pageContext";
+import { useSpokenReply } from "@/shell/spokenReply";
 
 export const AMBIENT_QUICK_ACTIONS = ["Help with this page", "Find something", "Take an action"] as const;
 const QUICK_ACTION_PROMPTS: Record<(typeof AMBIENT_QUICK_ACTIONS)[number], string> = {
@@ -93,18 +94,19 @@ type Sources = ReturnType<typeof sourcesFromMessage>;
 const StageSourcesContext = createContext<Sources>([]);
 
 /** The thread as friendly bubbles, oldest first: the person's words and the companion's replies, with empty turns left out. */
-export function ambientHistoryItems(messages: Array<Record<string, unknown>>): CompanionStageHistoryItem[] {
+export function ambientHistoryItems(messages: Array<Record<string, unknown>>, spoken?: Map<string, string>): CompanionStageHistoryItem[] {
   const items: CompanionStageHistoryItem[] = [];
   for (const message of messages) {
     const role = message.role === "user" ? "user" : message.role === "assistant" ? "companion" : null;
     if (!role) continue;
-    const text = assistantText(message as never).trim();
+    const id = String(message.id ?? `${role}-${items.length}`);
+    const text = (role === "companion" ? spoken?.get(id) : undefined) ?? assistantText(message as never).trim();
     if (!text) continue;
     const sources = role === "companion" ? sourcesFromMessage(message as never) : [];
     const created = message.createdAt ? new Date(message.createdAt as string | number | Date) : null;
     const time = created && !Number.isNaN(created.getTime()) ? created.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" }) : undefined;
     items.push({
-      id: String(message.id ?? `${role}-${items.length}`),
+      id,
       role,
       time,
       content: role === "user"
@@ -208,7 +210,8 @@ function StageBody({ person, personId, companionName, clips, still, registerCall
   const stateWord = status === "ready" ? (voiceOpen ? "On a call" : mode === "idle" ? "Ready" : mode[0]!.toUpperCase() + mode.slice(1)) : engineDownReason(status);
   const runningTool = (last?.content as Array<{ type?: string; status?: string | { type?: string }; name?: string; toolName?: string }> | undefined)?.find((part) => (part.type === "tool-call" || part.type === "tool_call") && (typeof part.status === "string" ? part.status : part.status?.type) === "running");
   const workingLine = runningTool ? runningTool.name ?? runningTool.toolName ?? "Working" : undefined;
-  const history = useMemo(() => ambientHistoryItems(messages), [messages]);
+  const spoken = useSpokenReply(messages, side.turnSchedulerRef.current, voiceOpen || (side.ttsAvailable && side.readAloud));
+  const history = ambientHistoryItems(messages, spoken);
   const clipKey = mode === "idle" ? "idle" : mode;
   const characterState: StateId = clips?.[clipKey] ? clipKey : "idle";
   const character = clips

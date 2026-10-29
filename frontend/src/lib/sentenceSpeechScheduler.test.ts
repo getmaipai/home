@@ -122,6 +122,40 @@ describe("sentence speech scheduler", () => {
     expect(scheduler.heardVisibleEnd()).toBe(12);
   });
 
+  test("heardVisibleEndFine counts inside the sentence that is playing and freezes at stop", async () => {
+    const context = new FakeAudioContext();
+    const scheduler = new SentenceSpeechScheduler(context as unknown as AudioContext, async () => new Response(new Uint8Array(44)));
+    scheduler.enqueueSentence("first", { visibleEnd: 10 });
+    scheduler.enqueueSentence("second", { visibleEnd: 30 });
+    await settle(); await settle(); await settle(); await settle();
+    context.currentTime = 1;
+    const midFirst = scheduler.heardVisibleEndFine();
+    expect(midFirst).toBeGreaterThan(0);
+    expect(midFirst).toBeLessThan(10);
+    context.currentTime = 3;
+    const midSecond = scheduler.heardVisibleEndFine();
+    expect(midSecond).toBeGreaterThan(10);
+    expect(midSecond).toBeLessThan(30);
+    scheduler.stop();
+    context.currentTime = 4;
+    expect(scheduler.heardVisibleEndFine()).toBe(midSecond);
+  });
+
+  test("wasCutOff is true only when stop ran before the reply ended on its own", async () => {
+    const context = new FakeAudioContext();
+    const cut = new SentenceSpeechScheduler(context as unknown as AudioContext, async () => new Response(new Uint8Array(44)));
+    cut.enqueueSentence("first", { visibleEnd: 5 });
+    await settle(); await settle(); await settle(); await settle();
+    expect(cut.wasCutOff()).toBe(false);
+    cut.stop();
+    expect(cut.wasCutOff()).toBe(true);
+    const quiet = new SentenceSpeechScheduler(context as unknown as AudioContext, async () => new Response(new Uint8Array(44)));
+    quiet.finish();
+    await settle(); await settle();
+    quiet.stop();
+    expect(quiet.wasCutOff()).toBe(false);
+  });
+
   test("playedMs is 0 before any sentence plays and follows the audio clock after", async () => {
     const context = new FakeAudioContext();
     const scheduler = new SentenceSpeechScheduler(context as unknown as AudioContext, async () => new Response(new Uint8Array(44)));
