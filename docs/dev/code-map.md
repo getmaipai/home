@@ -222,6 +222,10 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `frontend/src/shell/pages/UsersPage.tsx` | UsersIcon, UsersPage |
 | `frontend/src/shell/pages/VoicesPage.tsx` | VoicesIcon, VoicesPage |
 | `frontend/src/shell/pages/WhatHomeCanDoPage.tsx` | WhatHomeCanDoPage |
+| `frontend/src/shell/pages/companionFlow/CompanionFlowDialog.tsx` | CompanionFlowDialog |
+| `frontend/src/shell/pages/companionFlow/CompanionFlowPage.tsx` | CompanionFlowPage |
+| `frontend/src/shell/pages/companionFlow/CreateCharacterStep.tsx` | CreateCharacterStep |
+| `frontend/src/shell/pages/companionFlow/PreviewControls.tsx` | DEFAULT_FRAME, PreviewControls |
 | `frontend/src/shell/pages/dashboard/AskBox.tsx` | installPlaceholder, askHref, AskBox |
 | `frontend/src/shell/pages/dashboard/GettingStarted.tsx` | GETTING_STARTED_ROWS, openChecklistItems, GettingStarted |
 | `frontend/src/shell/pages/dashboard/Greeting.tsx` | Greeting |

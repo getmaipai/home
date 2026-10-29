@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-10-29T04:54:48.653Z",
+  "generatedAt": "2026-10-29T05:04:22.363Z",
   "kitTag": "ui-v0.5.416",
   "items": [
     {
@@ -695,7 +695,7 @@
       "group": "image",
       "verdict": "support",
       "verdictReason": "Supporting file for the shipped kit UI; it is not a standalone Home adoption target.",
-      "implemented": false
+      "implemented": true
     },
     {
       "file": "github.tsx",
