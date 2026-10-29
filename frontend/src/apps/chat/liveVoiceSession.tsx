@@ -169,6 +169,8 @@ export function useLiveVoiceSession({ composer, open, onOpenChange, onProblem, i
     setCurrentMode("connecting");
     setAmplitude(0);
     setListenGeneration(0);
+    // VOICE-PREWARM-01: put this person's prompt prefix back in the engine's cache before they speak. Best effort.
+    void api.prewarmTurn().catch(() => undefined);
   }, [open]);
 
   useEffect(() => {

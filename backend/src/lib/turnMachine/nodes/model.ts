@@ -7,6 +7,7 @@ import { EMPTY_LENGTH_RETRY_EXTRA_TOKENS } from "@/lib/reasoningReserve";
 // rule or list does), streamed so the wire's own `reasoning`/`delta` events
 // come from the same call turnNext.ts forwards to the client.
 import { foldedBlock } from "@/lib/systemFold";
+import { notePrefix } from "@/lib/prefixPrewarm";
 import { startCompleteStreamPieces, envelopeToolCall, StackStreamError } from "@/lib/llm";
 import { roleHealth } from "@/lib/roleHealth";
 import type { LlmMessage, ToolSpec, ToolCall } from "@/lib/llm";
@@ -376,6 +377,7 @@ async function runWatchedGeneration(state: TurnState, messages: LlmMessage[], to
     else signal.addEventListener("abort", () => roundAbort.abort(signal.reason), { once: true });
   }
   const prefix = comparePrompt(state.conversationId, messages, tools);
+  notePrefix(state.actor.id, state.planBasis.surfaceClass ?? "spoken", messages, tools, state.modelId);
   const started = await startCompleteStreamPieces("chat", messages, { model: state.modelId, tools: tools.length > 0 ? tools : undefined, tool_choice, thinking, max_tokens: maxTokens, dropReasoning: !state.reasoning.emit }, roundAbort?.signal ?? signal);
   if (!started.ok) {
     // GENFAIL-01 (dev.md "generation_failed is never blind again"): a

@@ -7,6 +7,7 @@ import { randomBytes } from "node:crypto";
 import sharp from "sharp";
 import { eq } from "drizzle-orm";
 import { requireAuth } from "@/middleware/auth";
+import { prewarmPrefix } from "@/lib/prefixPrewarm";
 import { normalizeForSpeech } from "@maipai/spec/voice/ts/normalizeForSpeech.js";
 import { StreamSafetyRefusal, StreamUnavailable, DocumentAttachmentError, BareModeForbidden, crisisSupportFor, conversationInCrisis, type Surface, type TurnOpResult, type TurnStreamResult } from "@/lib/turnShared";
 import { answeredByFor, runTurnNext, runTurnNextStream } from "@/lib/turnMachine/turnNext";
@@ -306,6 +307,12 @@ const present = z.array(evidence).nullable();
 // new statement. Validated here, the same way evidence/present already
 // are, since this field genuinely drives a package call when approved.
 const askAnswer = z.union([z.object({ turn_id: z.string(), approved: z.boolean() }).strict(), z.object({ turn_id: z.string(), values: z.record(z.string(), z.union([z.string(), z.number(), z.boolean(), z.null()])) }).strict(), z.object({ offer_id: z.string().min(1).max(128), approved: z.boolean() }).strict()]);
+
+// VOICE-PREWARM-01: a voice session that just opened asks for this person's last prompt prefix to be put back in the engine's cache, so the first word is not the slow one.
+turnRoutes.post("/prewarm", requireAuth, async (c) => {
+  const warmed = await prewarmPrefix(c.get("person").id, "spoken");
+  return c.json({ warmed }, 200);
+});
 
 turnRoutes.post("/", requireAuth, bodyLimit({ maxSize: TURN_BODY_LIMIT }), async (c) => {
   const actor = c.get("person");

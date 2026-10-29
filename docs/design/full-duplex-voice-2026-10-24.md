@@ -346,3 +346,7 @@ Order: 00 and 01, then 02 and 03, 05 in parallel, 07 after 02 (it needs the end-
 - Section 6's former exclusion "Home saying mm-hm while the person talks": **removed**; section 3b is its replacement.
 - `SPOKEN_CUE_DELAY_MS` (2500): **replaced** on interruption turns by the delay section 3b names, tested on the bench.
 - The first DUPLEX-03 cut already on `origin/main` (commit 3cce4e9e8, "any words stop the reply"): **replaced** by the reaction rule of section 3, item 3.
+
+## Prefix prewarm (VOICE-PREWARM-01, 2026-10-29)
+
+A spoken turn's first token took 2.1 to 3.3 s when the engine had to read the system message and tool block again, and 0.6 s when that prefix was still cached. Home keeps each person's last real prefix in memory (`lib/prefixPrewarm.ts`, recorded where the generation request is built) and the voice overlay calls `POST /api/turn/prewarm` when it opens: one request with that prefix and a one-token answer, at most once every 20 s per person and surface class. A person with no recorded prefix is left to the boot warm-up. Not yet measured on the live hub (a concurrent ship took it down).
