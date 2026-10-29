@@ -38,6 +38,7 @@ export const HLC_BEARING_TABLES = [
   "chat_folders",
   "conversation_turns",
   "issues",
+  "podcast_transcripts",
   "status_events",
   "status_notes",
   "maintenance_windows",

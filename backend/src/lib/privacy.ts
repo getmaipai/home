@@ -194,12 +194,12 @@ export function platformConnections(): PrivacyConnection[] {
     // PODCAST-PORT-01: the directory search behind Find shows, listed only while the household switch is on.
     row("platform:podcast-directory", getHouseholdSettingValue("podcasts.directory.enabled") === true ? "itunes.apple.com, rss.marketingtools.apple.com" : null, {
       when: "only when an allowed person searches or opens the top list in Podcasts, at most about one request every three seconds across the home. Nothing runs in the background.",
-      what: "the words that were searched, or a request for the top list, plus your home's internet address. No name, device ID, cookie or listening history goes with it. A child never searches, and a teen's search words are checked for household names first.",
+      what: "the words that were searched, or a request for the top list, plus your home's internet address. Nothing anyone in the house said or saved goes with it: no name, device ID, cookie or listening history. A child never searches, and a teen's search words are checked for household names first.",
     }),
     // RADIO-02: the station directory behind the Radio tab, listed only while the household switch is on.
     row("platform:radio-directory", getHouseholdSettingValue("radio.directory.enabled") === true ? "de1.api.radio-browser.info, nl1.api.radio-browser.info, at1.api.radio-browser.info" : null, {
       when: "only when an adult or teen browses or searches stations in Radio, at most about one request every three seconds across the home. Nothing runs in the background.",
-      what: "the words, country or genre that were searched, or a request for popular stations, plus your home's internet address. No name, device ID, cookie or listening history goes with it. A child never browses; a parent saves stations for them.",
+      what: "the words, country or genre that were searched, or a request for popular stations, plus your home's internet address. Nothing anyone in the house said or saved goes with it: no name, device ID, cookie or listening history. A child never browses; a parent saves stations for them.",
     }),
     // WEATHER-PORT-05: optional active alerts for the current US weather coordinates.
     row("platform:weather-alerts", getHouseholdSettingValue("weather.alerts") === true ? "api.weather.gov" : null, {
