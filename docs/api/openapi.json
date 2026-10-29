@@ -57511,6 +57511,32 @@
                     },
                     "generate_reason": {
                       "type": "string"
+                    },
+                    "styles": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "enum": [
+                              "cartoon",
+                              "anime",
+                              "photorealistic",
+                              "3d",
+                              "pixel",
+                              "watercolor"
+                            ]
+                          },
+                          "label": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "label"
+                        ]
+                      }
                     }
                   },
                   "required": [
@@ -57520,7 +57546,8 @@
                     "sheet",
                     "ready_for_video",
                     "start_ready",
-                    "can_generate"
+                    "can_generate",
+                    "styles"
                   ]
                 }
               }
@@ -58009,6 +58036,17 @@
                   "prompt": {
                     "type": "string",
                     "maxLength": 600
+                  },
+                  "style": {
+                    "type": "string",
+                    "enum": [
+                      "cartoon",
+                      "anime",
+                      "photorealistic",
+                      "3d",
+                      "pixel",
+                      "watercolor"
+                    ]
                   },
                   "count": {
                     "type": "integer",
