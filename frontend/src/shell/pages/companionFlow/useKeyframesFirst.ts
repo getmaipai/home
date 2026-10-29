@@ -74,5 +74,10 @@ export function useKeyframesFirst(companionId: string, states: ReturnType<typeof
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [job, jobId]);
 
-  return { request, busy: plan !== null, making: plan?.queue[0] ?? null, waiting: plan?.queue.slice(1) ?? [], percent: job?.percent ?? 0, failed };
+  /** Stops the pictures being made for a clip request: the one under way is cancelled and the rest of the queue is dropped. */
+  function stop() {
+    const current = planRef.current; setPlan(null);
+    if (current?.jobId) void api.cancelCompanionLookJob(companionId, current.jobId).catch(() => undefined);
+  }
+  return { request, stop, ids: plan?.ids ?? [], busy: plan !== null, making: plan?.queue[0] ?? null, waiting: plan?.queue.slice(1) ?? [], percent: job?.percent ?? 0, failed };
 }

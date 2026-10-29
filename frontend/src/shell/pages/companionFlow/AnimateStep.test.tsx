@@ -54,7 +54,7 @@ test("edit mode opens on step 2 with the 13 tiles in spec order, 4 locked and 9 
   expect(view.getAllByRole("checkbox").length).toBe(9);
   expect(view.getByText("4 animations · Always included")).toBeTruthy();
   expect(view.getByText("9 animations · Select the ones you want")).toBeTruthy();
-  expect(view.getAllByText("Not made").length).toBe(13);
+  expect(view.getAllByText("No animation yet").length).toBe(13);
 });
 
 test("Select All and the Generate Optional count follow ticked, not-yet-made animations", async () => {

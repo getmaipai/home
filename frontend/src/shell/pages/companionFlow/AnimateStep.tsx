@@ -21,13 +21,13 @@ const keyframeSrc = (row: CompanionStateRow) => row.keyframe ? `${row.keyframe.u
 const made = (row: CompanionStateRow) => row.approved !== null;
 
 /** The words on one tile: where that animation stands, in the order a person cares about. */
-export function tileWord(row: CompanionStateRow): "Making" | "Waiting its turn" | "Out of date" | "Needs another try" | "Ready" | "Not made" {
+export function tileWord(row: CompanionStateRow): "Making" | "Waiting its turn" | "Out of date" | "Needs another try" | "Ready" | "No animation yet" {
   if (row.busy) return "Making";
   if (row.status === "waiting") return "Waiting its turn";
   if (made(row) && row.clip_out_of_date) return "Out of date";
   if (made(row)) return "Ready";
   if (row.status === "Needs another try") return "Needs another try";
-  return "Not made";
+  return "No animation yet";
 }
 
 /** The selected animation's looping clip. Under reduced motion, or when the clip cannot play, its still shows instead. */
@@ -75,17 +75,22 @@ export function AnimateStep({ companionId, name, sheetJob = null, autoMake = fal
     : running ? `${states.run?.label ?? states.data?.run?.label ?? "Making animations"}... ${progress}%` : "";
 
   const reducedMotion = typeof window !== "undefined" && window.matchMedia?.("(prefers-reduced-motion: reduce)").matches === true;
-  const generate = (ids: string[]) => frames.request(ids);
+  // Which Generate button started the work, so only that one reads as busy; the others stay as they are, disabled.
+  const [group, setGroup] = useState<"required" | "optional" | "one" | null>(null);
+  const [requested, setRequested] = useState<ReadonlySet<string>>(new Set());
+  useEffect(() => { if (!running) { setGroup(null); setRequested(new Set()); } }, [running]);
+  const generate = (ids: string[], from: "required" | "optional" | "one") => { setGroup(from); setRequested(new Set(ids)); frames.request(ids); };
+  const stop = () => { frames.stop(); void states.stop(); };
   // Once the character is ready, the four required animations start by themselves, once.
   const autoStarted = useRef(false);
   useEffect(() => {
     if (!autoMake || autoStarted.current || !states.data?.sheet_ready || running || missingRequired.length === 0 || states.error) return;
-    autoStarted.current = true; frames.request(missingRequired);
+    autoStarted.current = true; generate(missingRequired, "required");
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [states.data?.sheet_ready, running, missingRequired.length]);
   const toggle = (id: string, on: boolean) => setTicked((current) => { const next = new Set(current); if (on) next.add(id); else next.delete(id); return next; });
   const tile = (row: CompanionStateRow) => {
-    const word = frames.failed[row.id] ? "Needs another try" : frames.making === row.id ? "Making" : frames.waiting.includes(row.id) ? "Waiting its turn" : tileWord(row), src = keyframeSrc(row) ?? portrait;
+    const base = tileWord(row), word = frames.failed[row.id] ? "Needs another try" : frames.making === row.id ? "Making" : frames.waiting.includes(row.id) ? "Waiting its turn" : running && requested.has(row.id) && !made(row) && base === "No animation yet" ? "Waiting its turn" : base, src = keyframeSrc(row) ?? portrait;
     return {
       name: row.label, selected: selectedId === row.id, onSelect: () => setSelectedId(row.id),
       media: row.approved ? (reducedMotion ? <img src={row.approved.urls.still} alt="" draggable={false} className="size-full object-cover" /> : <StackedAlphaVideo key={row.approved.take_id} src={row.approved.urls.h264} loop label={`${row.label} animation`} />) : src ? <img src={src} alt="" draggable={false} className={`size-full object-cover ${row.keyframe ? "" : "opacity-40"}`} /> : undefined,
@@ -107,7 +112,7 @@ export function AnimateStep({ companionId, name, sheetJob = null, autoMake = fal
             : previewImage ? <img src={previewImage} alt={`${label}, ${selected ? `${selected.label} keyframe` : "portrait"}`} draggable={false} className="absolute inset-0 size-full object-contain" /> : null}
         </GenerationStage>
         <div className="flex flex-wrap gap-3">
-          <Button shape="pill" disabled={!selected || running} onClick={() => selected && generate([selected.id])}><Sparkles aria-hidden="true" />Make another</Button>
+          <Button shape="pill" disabled={!selected || running} onClick={() => selected && generate([selected.id], "one")}><Sparkles aria-hidden="true" />Make another</Button>
           <Button variant="outline" shape="pill" disabled={!selected || running} onClick={() => setEditing(true)}><Pencil aria-hidden="true" />Edit keyframe</Button>
         </div>
         {selected ? <p className="text-sm text-muted-foreground">{selected.when_it_plays}</p> : null}
@@ -120,7 +125,8 @@ export function AnimateStep({ companionId, name, sheetJob = null, autoMake = fal
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
             {required.map((row) => <CharacterTile key={row.id} variant="animation" locked {...tile(row)} />)}
           </div>
-          <Button shape="pill" width="full" disabled={running || missingRequired.length === 0} onClick={() => generate(missingRequired)}>{running ? <Spinner className="animate-spin" aria-hidden="true" /> : <Sparkles aria-hidden="true" />}{running ? doing : "Generate Required"}</Button>
+          <Button shape="pill" width="full" disabled={running || missingRequired.length === 0} onClick={() => generate(missingRequired, "required")}>{group === "required" ? <Spinner className="animate-spin" aria-hidden="true" /> : <Sparkles aria-hidden="true" />}{group === "required" ? doing : "Generate Required"}</Button>
+          {group === "required" ? <Button variant="outline" shape="pill" width="full" onClick={stop}>Stop</Button> : null}
         </DialogSection>
         <Separator />
         <DialogSection title="Optional" aside={<Button variant="link" size="sm" disabled={running} onClick={() => setTicked(allTicked ? new Set() : new Set(optional.map((row) => row.id)))}>{allTicked ? "Clear All" : "Select All"}</Button>}>
@@ -128,7 +134,8 @@ export function AnimateStep({ companionId, name, sheetJob = null, autoMake = fal
           <div className="grid grid-cols-3 gap-3 xl:grid-cols-5">
             {optional.map((row) => <CharacterTile key={row.id} variant="animation" checked={ticked.has(row.id)} onCheckedChange={(on) => toggle(row.id, on)} {...tile(row)} />)}
           </div>
-          <Button variant="secondary" shape="pill" width="full" disabled={running || pending.length === 0} onClick={() => generate(pending)}>{running ? doing : `Generate Optional (${pending.length})`}</Button>
+          <Button variant="secondary" shape="pill" width="full" disabled={running || pending.length === 0} onClick={() => generate(pending, "optional")}>{group === "optional" ? doing : `Generate Optional (${pending.length})`}</Button>
+          {group === "optional" ? <Button variant="outline" shape="pill" width="full" onClick={stop}>Stop</Button> : null}
         </DialogSection>
         {states.data && !states.data.sheet_ready && !errorLine ? <p className="text-sm text-muted-foreground">Finish your character on the first screen before making animations.</p> : null}
       </div>

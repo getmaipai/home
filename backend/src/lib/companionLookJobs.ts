@@ -269,7 +269,7 @@ export async function pollLookJob(id: string, actor: PersonRow, companionId: str
           if (fraction < 0.05 || fraction > 0.95) label += " (check the edges)";
           const normalized = await normalizePicture(picture, { removeBackground: async (bytes) => bytes });
           const clipped = Object.entries(await clippedEdges(normalized)).filter(([, value]) => value).map(([edge]) => edge as "left" | "right" | "top" | "bottom");
-          const saved = addVersion(job.companionId, normalized, { source: job.sourceVersion ? "edit" : "generated", label, width: media.image.size, height: media.image.size, from: job.sourceVersion, style: job.style ?? "cartoon", clipped, model: job.model, quality: job.quality, prompt_hash: job.promptHash, model_reported: reported }, images[index]!);
+          const saved = addVersion(job.companionId, normalized, { source: job.sourceVersion ? "edit" : "generated", label, width: media.image.size, height: media.image.size, from: job.sourceVersion, style: job.style ?? (job.sourceVersion ? readLook(job.companionId).versions.find((item) => item.id === job.sourceVersion)?.style : undefined) ?? "cartoon", clipped, model: job.model, quality: job.quality, prompt_hash: job.promptHash, model_reported: reported }, images[index]!);
           job.versions.push(saved.id);
         }
         if (wasCancelled()) return;

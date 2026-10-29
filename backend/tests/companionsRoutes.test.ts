@@ -809,7 +809,7 @@ describe("household companion routes", () => {
     for (let attempt = 0; attempt < 100; attempt++) { const response = await request(`companions/${id}/states/jobs/run/${job}`, adult); progress = await response.json(); if (progress.state === "done" || progress.state === "failed") break; await new Promise((resolve) => setTimeout(resolve, 5)); }
     expect(progress).toMatchObject({ state: "done", percent: 100, takes_made: 2 }); expect(progress.label).toContain("try 2 of 2");
     expect(submitted).toHaveLength(2); expect(submitted[0]?.seed).not.toBe(submitted[1]?.seed); expect(submitted[0]).toMatchObject({ size: `${media.generate.width}x${media.generate.height}`, seconds: media.generate.seconds, image_source: "generated", audience: "all-ages", timeout_ms: 1 }); expect(submitted[0]).toMatchObject({ model: "wan2.2-ti2v-5b-fastwan-mlx" });
-    expect(submitted[0]?.image).toBe(Buffer.from(stackOriginal).toString("base64"));
+    expect((await sharp(Buffer.from(submitted[0]!.image, "base64")).metadata()).hasAlpha).toBe(false); /* the start picture goes on the key colour, never transparent */
     expect(fetched).toEqual(["video-1", "video-2"]); expect(deleted).toEqual(["video-1", "video-2"]); expect(finished).toBe(2);
     const takes = readStates(id).states.idle!.takes; expect(takes).toHaveLength(2); expect(takes.every((take) => take.report?.ok)).toBe(true); expect(bestTake(takes)?.id).toBe("take-2");
     const statesApi = await (await request(`companions/${id}/states`, adult)).json() as any;
@@ -1270,6 +1270,22 @@ describe("household companion routes", () => {
     const saved = readLook(made.value.id).versions.find((version) => version.id === state.versions[0]?.id)!;
     const resultPath = join(householdCompanionFolder(made.value.id)!, "look", `${saved.id}.png`), metadata = await sharp(readFileSync(resultPath)).metadata(), stats = await sharp(readFileSync(resultPath)).stats();
     expect(saved).toMatchObject({ source: "edit", from: source.id, style: "anime", clipped: [] }); expect([metadata.width, metadata.height]).toEqual([1024, 1024]); expect(metadata.hasAlpha).toBe(true); expect(stats.channels[3]?.min).toBe(0);
+  });
+
+  test("a picture drawn from a Keep as is photo stays Keep as is, so later pictures are not restyled as cartoons", async () => {
+    const adult = addPerson("keep-style-author", "adult"), made = createHouseholdCompanion({ ...fixture(), display_name: "Keep style fixture" }, { display_name: "Author", person_id: "keep-style-author" }); if (!made.ok) throw new Error(made.error);
+    const sourcePng = await clippedPng("bottom"), returned = await transparentPng(); __setPictureStatusForTests(readyStatusForTests()); __setAgeCheckRunnerForTests(async (images) => images.map(() => AGE_OK));
+    __setPicturesFetchForTests((async (input, init) => {
+      const url = String(input);
+      if (url.endsWith("/v1/images/edits") && init?.method === "POST") return Response.json({ job: "keep-job" }, { status: 202 });
+      if (url.endsWith("/keep-job")) return Response.json({ job: "keep-job", state: "done", progress: 1, data: [] });
+      if (url.endsWith("/keep-job/0.png")) return new Response(returned, { headers: { "content-type": "image/png" } });
+      return new Response("Not found", { status: 404 });
+    }) as typeof fetch);
+    const source = addVersion(made.value.id, sourcePng, { source: "upload", label: "Cut picture", width: 1024, height: 1024, from: null, style: "keep", clipped: ["bottom"] });
+    const response = await request(`companions/${made.value.id}/look/complete`, adult, "POST", { version_id: source.id }), job = (await response.json() as { job: string }).job;
+    const state = await (await request(`companions/${made.value.id}/look/jobs/${job}`, adult)).json() as { versions: Array<{ id: string }> };
+    expect(readLook(made.value.id).versions.find((version) => version.id === state.versions[0]?.id)?.style).toBe("keep");
   });
 
   test("complete refuses a centered image, children and non-authors", async () => {
