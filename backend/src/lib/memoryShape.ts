@@ -22,6 +22,7 @@ export function toMemoryRecord(row: MemoryRecordRow): MemoryRecord {
     importance: row.importance,
     pinned: row.pinned,
     sensitive: row.sensitive,
+    offer_withheld: row.offerWithheld ?? null,
     uses: row.uses,
     created_at: row.createdAt,
     last_used_at: row.lastUsedAt,

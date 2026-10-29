@@ -158,6 +158,8 @@ export interface RememberInput {
   importance: number;
   pinned?: boolean;
   sensitive?: boolean;
+  /** NAT-07c: the judge's opening-thread withholding tag; it can only add withholding. */
+  offer_withheld?: boolean | null;
   child_disclosure?: "child_ok" | "teen_ok" | "adult_only";
   embedding_space?: string | null;
   /** When the fact became/stopped being true (step 6, session-a-
@@ -192,6 +194,7 @@ export function remember(actor: PersonRow, input: RememberInput): MemoryOpResult
     importance: input.importance,
     pinned: input.pinned,
     sensitive: input.sensitive,
+    offerWithheld: input.offer_withheld,
     childDisclosure: input.child_disclosure,
     validFrom: input.valid_from,
     validTo: input.valid_to,
@@ -1017,6 +1020,7 @@ export interface SupersedeInput {
   importance?: number;
   pinned?: boolean;
   sensitive?: boolean;
+  offer_withheld?: boolean | null;
   source: string;
   /** The NEW record's own dated bounds (e.g. a dated state/trip fact
    * that happened to dedupe-match an existing similar record) - distinct
@@ -1091,6 +1095,8 @@ export function supersede(
     importance: input.importance ?? old.importance,
     pinned: input.pinned ?? old.pinned,
     sensitive: input.sensitive ?? old.sensitive,
+    // NAT-07c: withholding only accumulates; a replacement of a withheld record stays withheld.
+    offer_withheld: input.offer_withheld === true || old.offerWithheld === true ? true : null,
     embedding_space: old.embeddingSpace,
     valid_from: input.valid_from ?? null,
     valid_to: input.valid_to ?? null,

@@ -1,0 +1,1 @@
+ALTER TABLE `memory_records` ADD `offer_withheld` integer;

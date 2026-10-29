@@ -343,6 +343,8 @@ CRITICAL - do NOT extract:
 
 SUBJECT AND RELATION - when a fact is about a named person, pet, place, organization or thing, set "subject" to that name and kind (the person the fact is about, never ${speakerName} for ${speakerName}'s own preferences; null when the fact is about ${speakerName} alone or about the world). When ${speakerName}'s own sentence states how a named person or thing relates to ${speakerName} ("my coworker ...", "my sister ...", "our dog ..." followed by the name), set "relation" with the vocabulary type read from ${speakerName}'s side (${speakerName} is the "from" end: ${RELATION_PHRASE_GUIDE}), the name, and "stated": true; "stated": false only when you worked the relation out from context rather than ${speakerName} saying it. Null when there is none.
 
+OFFER RULE - set "offer_withheld": true on a fact about a health matter or appointment, money owed or money trouble, a quarrel or strain with someone close, a loss or a death, or anything else ${speakerName} would rather bring up themselves than be asked about later. Leave it out for everything ordinary (an interview, a trip, a school event, a hobby project).
+
 SCOPE - "person": a fact about ${speakerName} specifically. "household": a fact the whole family should know (the wifi password, the dog's name, the trash pickup day) - use household only when a new family member would need to be told it too.
 ROBOT MEMORY - set robot_memory to "shared" for facts about the person or home; "rapport" for a running relationship between ${speakerName} and this robot; "own" for a fact about this robot itself. Use shared on non-robot turns. Keep the scope for shared facts as above; rapport is person scope; own is household scope.
 
@@ -377,6 +379,10 @@ export interface ExtractedFact {
    * many words ("my coworker Quill"), false when the model worked it out
    * (a co-occurrence, a context). */
   relation: { type: string; name: string; stated: boolean } | null;
+  /** NAT-07c: the model judged this a subject the person would rather raise
+   * themselves (health, money owed, a fight, a death), so it must never be
+   * offered as an opening thread. Only ever adds withholding. */
+  offer_withheld?: boolean;
 }
 
 export function isCategory(value: unknown): value is Category {
@@ -420,6 +426,7 @@ function normalizeFact(raw: unknown): ExtractedFact | null {
     valid_to: normalizeDate(r.valid_to),
     subject,
     relation,
+    offer_withheld: r.offer_withheld === true,
     robot_memory: r.robot_memory === "rapport" || r.robot_memory === "own" ? r.robot_memory : "shared",
   };
 }
@@ -1466,6 +1473,7 @@ export async function judgeTurn(turn: ConversationTurnRow): Promise<JudgeTurnRes
           valid_from: fact.valid_from,
           valid_to: fact.valid_to,
           subject_id: subject?.id,
+          offer_withheld: fact.offer_withheld ? true : null,
         },
         { ...(decision.contradiction ? { closeValidTo: turn.createdAt } : {}), enforcePrivilegedRoute: true },
       );
@@ -1512,6 +1520,7 @@ export async function judgeTurn(turn: ConversationTurnRow): Promise<JudgeTurnRes
         source: turn.id,
         importance: fact.importance,
         child_disclosure: defaultChildDisclosure(fact.text, { sensitive: false, scope: fact.scope }),
+        offer_withheld: fact.offer_withheld ? true : null,
         valid_from: fact.valid_from,
         valid_to: fact.valid_to,
         subject_id: subject?.id ?? null,

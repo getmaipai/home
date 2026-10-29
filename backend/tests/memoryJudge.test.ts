@@ -2512,3 +2512,51 @@ describe("MEMORY-FIX-01: judge grounding and prompt fixes", () => {
     expect(prompt).toContain("Requests or commands to the assistant");
   });
 });
+
+// NAT-07c: the judge's one withholding tag. The hub's own floor (lib/threadOfferFloor.ts) is
+// deterministic; this tag only adds to it, and covers what no word list can (a doctor visit, a quarrel).
+describe("judgeTurn() - offer_withheld (NAT-07c)", () => {
+  const SUBJECTS: [string, string, string][] = [
+    ["a health appointment", "I have a dentist appointment on Tuesday morning", "Marlow has a dentist appointment on Tuesday morning"],
+    ["money owed", "I still owe my brother money and we talk about it Saturday", "Marlow owes his brother money and they talk about it Saturday"],
+    ["a quarrel", "I had a big fight with my roommate and we meet Friday to sort it out", "Marlow had a big fight with his roommate and they meet Friday to sort it out"],
+    ["a loss", "I am flying out Sunday for my grandmother's memorial", "Marlow is flying out Sunday for his grandmother's memorial"],
+  ];
+
+  test.each(SUBJECTS)("%s: the tag the model sets is stored on the record", async (_subject, said, fact) => {
+    const { actor } = await owner();
+    const turn = makeTurn(actor, said, "I'm here if you want to talk about it.");
+    const result = await withScriptedJudge(
+      () => ({ facts: [{ text: fact, category: "event", scope: "person", importance: 0.6, offer_withheld: true }] }),
+      () => judgeTurn(turn),
+    );
+    expect(result.factsWritten).toBe(1);
+    expect(db.select().from(memoryRecords).all()[0]!.offerWithheld).toBe(true);
+  });
+
+  test("an ordinary event without the tag stores null, and a non-boolean tag is not a withhold", async () => {
+    const { actor } = await owner();
+    const turn = makeTurn(actor, "I have a bakery interview on Monday", "Good luck.");
+    await withScriptedJudge(
+      () => ({ facts: [{ text: "Marlow has a bakery interview on Monday", category: "event", scope: "person", importance: 0.6, offer_withheld: "yes" }] }),
+      () => judgeTurn(turn),
+    );
+    expect(db.select().from(memoryRecords).all()[0]!.offerWithheld).toBeNull();
+  });
+
+  test("the extraction prompt names the subjects to withhold", async () => {
+    const { buildExtractionPrompt } = await import("@/lib/memoryJudge");
+    const prompt = buildExtractionPrompt("Marlow", new Date("2026-10-28T12:00:00Z").toISOString());
+    expect(prompt).toContain('"offer_withheld": true');
+    for (const word of ["health", "money owed", "quarrel", "death"]) expect(prompt).toContain(word);
+  });
+
+  test("a replacement of a withheld record stays withheld", async () => {
+    const { actor } = await owner();
+    const first = remember(actor, { text: "Marlow has a biopsy on Tuesday", record_kind: "memory", category: "event", tier: "durable", scope: "person", person: actor.id, source: "t", importance: 0.6, offer_withheld: true });
+    if (!first.ok) throw new Error("setup failed");
+    const next = supersede(actor, first.value.id, { text: "Marlow has a biopsy on Wednesday", source: "t2" });
+    if (!next.ok) throw new Error("supersede failed");
+    expect(next.value.created.offer_withheld).toBe(true);
+  });
+});

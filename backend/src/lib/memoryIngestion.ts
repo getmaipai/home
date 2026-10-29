@@ -146,6 +146,7 @@ export function supersedeInTx(
         importance: fullCandidate.importance,
         pinned: fullCandidate.pinned,
         sensitive: fullCandidate.sensitive,
+        offerWithheld: fullCandidate.offerWithheld,
         childDisclosure: fullCandidate.childDisclosure,
         childDisclosureSetBy: fullCandidate.childDisclosureSetBy,
         childDisclosureSetAt: fullCandidate.childDisclosureSetAt,
@@ -180,6 +181,7 @@ export type IngestInput = {
   importance: number;
   pinned?: boolean;
   sensitive?: boolean;
+  offerWithheld?: boolean | null;
   childDisclosure?: "child_ok" | "teen_ok" | "adult_only";
   validFrom?: string | null;
   validTo?: string | null;
@@ -239,6 +241,7 @@ export function ingestMemory(input: IngestInput): IngestResult {
     importance: input.importance,
     pinned: input.pinned ?? false,
     sensitive: input.sensitive ?? false,
+    offer_withheld: input.offerWithheld ?? null,
     child_disclosure: input.childDisclosure ?? "child_ok",
     child_disclosure_set_by: null,
     child_disclosure_set_at: null,
@@ -276,6 +279,7 @@ export function ingestMemory(input: IngestInput): IngestResult {
     importance: parsed.data.importance,
     pinned: parsed.data.pinned,
     sensitive: parsed.data.sensitive,
+    offerWithheld: parsed.data.offer_withheld ?? null,
     childDisclosure: parsed.data.child_disclosure ?? "child_ok",
     childDisclosureSetBy: parsed.data.child_disclosure_set_by,
     childDisclosureSetAt: parsed.data.child_disclosure_set_at,
@@ -329,6 +333,7 @@ export type SupersedeInput = {
   importance: number;
   pinned?: boolean;
   sensitive?: boolean;
+  offerWithheld?: boolean | null;
   childDisclosure?: "child_ok" | "teen_ok" | "adult_only";
   validFrom?: string | null;
   validTo?: string | null;
@@ -395,6 +400,8 @@ export function supersedeMemory(input: SupersedeInput): SupersedeResult {
     importance: input.importance,
     pinned: input.pinned ?? input.oldRecord.pinned,
     sensitive: input.sensitive ?? input.oldRecord.sensitive,
+    // Withholding only ever accumulates: a merged record stays withheld once either side was.
+    offerWithheld: input.offerWithheld === true || input.oldRecord.offerWithheld === true ? true : (input.offerWithheld ?? input.oldRecord.offerWithheld ?? null),
     childDisclosure: input.childDisclosure ?? (input.oldRecord.childDisclosure as "child_ok" | "teen_ok" | "adult_only"),
     childDisclosureSetBy: input.oldRecord.childDisclosureSetBy,
     childDisclosureSetAt: input.oldRecord.childDisclosureSetAt,

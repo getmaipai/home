@@ -173,6 +173,8 @@ export const memoryRecords = sqliteTable("memory_records", {
   importance: real("importance").notNull(),
   pinned: integer("pinned", { mode: "boolean" }).notNull().default(false),
   sensitive: integer("sensitive", { mode: "boolean" }).notNull().default(false),
+  // NAT-07c: the judge's withholding tag at extraction; null on rows written before it existed.
+  offerWithheld: integer("offer_withheld", { mode: "boolean" }),
   childDisclosure: text("child_disclosure").notNull().default("child_ok"),
   childDisclosureSetBy: text("child_disclosure_set_by"),
   childDisclosureSetAt: text("child_disclosure_set_at"),
