@@ -15,9 +15,21 @@ trap 'rm -rf "$D1" "$D2"' EXIT
 cd "$REPO/backend" || exit 1
 export MAIPAI_BENCH_SEARCH=fixture
 export MAIPAI_LLAMA_SERVER_URL=http://127.0.0.1:8770 MAIPAI_EMBED_URL=http://127.0.0.1:8770
+# The bench refuses to start beside any gate (check.sh, bun test, vite build) on this machine. Wait up to 15 minutes
+# for them to end, naming what is running, then give up with a clear message.
+wait_quiet() {
+  local n=0
+  while pgrep -f '[s]cripts/check.sh|[b]un test|[v]ite build' >/dev/null; do
+    if [ $n -ge 90 ]; then echo "STOP: a gate has been running for 15 minutes. Tell Claude what this shows:"; ps -o pid,etime,command -p "$(pgrep -f '[s]cripts/check.sh|[b]un test|[v]ite build' | paste -sd, -)"; exit 1; fi
+    [ $((n % 6)) -eq 0 ] && { echo "   waiting for a gate to end:"; ps -o pid,etime,command -p "$(pgrep -f '[s]cripts/check.sh|[b]un test|[v]ite build' | paste -sd, -)" | cut -c1-160; }
+    sleep 10; n=$((n+1))
+  done
+}
 : > /tmp/chat-ab-01-studio.out
+wait_quiet
 echo "2. Memory scripts (mt1-party, mt2-move), arms A, A2, B. About 10 to 20 minutes."
 MAIPAI_DATA_DIR="$D1" MAIPAI_AB_OUT="$O/scripts" bun run scripts/bench/chat-ab-01.ts --scripts --only mt1-party,mt2-move 2>&1 | tee -a /tmp/chat-ab-01-studio.out | tail -5
+wait_quiet
 echo "3. Spoken row (arm S), two search-free questions, 3 runs each."
 MAIPAI_DATA_DIR="$D2" MAIPAI_AB_OUT="$O/spoken" bun run scripts/bench/chat-ab-01.ts --group spoken --only k4-seasons,r2-quarters 2>&1 | tee -a /tmp/chat-ab-01-studio.out | tail -5
 echo
