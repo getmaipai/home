@@ -138,3 +138,15 @@ Reused as they are: `companionArtCheck.ts`, the Stack picture editor tools, the 
 3. **Child bands (ANIM-SPEC-01).** A child gets no emotion clip for any label whose `child_band` is not `same`; the presence state plays instead. That covers `sad`, `excited` and `playful`. A robot motion cap has no clip equivalent, so the no-clip result is what the code does.
 4. **Draft sweep log (LOOK-3S-01, rule 6a).** `sweepAbandonedDrafts` writes one typed registry event with a count only. No companion id, name or person id.
 5. **Landing.** The BACKLOG and INDEX rows cite this verdict. The commit message names COMPANION-3S-01 and lands within 24 hours of the record.
+
+## 9. Amendment: every animation has an editable keyframe (Jesse, 2026-10-28)
+
+Each animation requires a keyframe: one still picture of that state, which the creator can edit. It is useful on its own for bots that cannot play video but can show images, and the images can be extracted from the companion.
+
+- **Order of work.** For each state we make the keyframe first (a pose or expression of the approved portrait, an image job, quick and cheap), the creator may edit it, and the clip then animates from that keyframe as its first frame. Images are cheap and videos are slow, so a rejected keyframe costs no video time.
+- **Screen 2.** The tile shows the state's keyframe. Clicking the tile plays the clip in the Preview box. One "Edit keyframe" button under the preview opens a small panel with the same three actions as screen 1: describe a change, upload a replacement, or zoom and position. Editing runs through `lib/imaging/` and the same checks; changing a keyframe after its clip exists marks the clip out of date, and "Make another" offers to redo it.
+- **Required for every made state.** A state without a keyframe cannot be made; a state the creator did not choose has none.
+- **Checks.** The keyframe passes `companionArtCheck.ts` and, for a teen, the input screen of condition 1, before it is shown and before any video is generated. This is the cheapest place to stop an unapproved image.
+- **Extraction.** The published manifest carries one image per state (`keyframe`), beside the clip. A bot or any client that cannot play video reads the keyframe, and the fallback table of section 3 picks which one to show. A client that wants every image can fetch them all in one call; nothing leaves the home.
+- **Spec.** `companion-media.json` and the manifest gain an additive `keyframe` per state (old manifests stay valid; a missing keyframe falls back to the clip's still, then the portrait). Spec first, then the hub, then the robot. The robot and Go adopt it later.
+- **Slices.** ANIM-SPEC-01 adds the field; ANIM-3S-01 makes keyframes before clips and publishes them; UI-3S-01 draws the edit panel; IMG-PIPE-01 is unchanged (the same module edits a keyframe).
