@@ -63,6 +63,11 @@ async function upload(path: string, token: string, png: Uint8Array) {
 async function transparentPng() {
   return new Uint8Array(await sharp({ create: { width: 1024, height: 1024, channels: 4, background: { r: 0, g: 0, b: 0, alpha: 0 } } }).composite([{ input: await sharp({ create: { width: 360, height: 360, channels: 4, background: { r: 0, g: 255, b: 0, alpha: 1 } } }).png().toBuffer(), left: 332, top: 332 }]).png().toBuffer());
 }
+async function clippedPng(edge: "bottom" | "none" = "bottom", colour: string = "red") {
+  const top = edge === "bottom" ? 700 : 332, height = edge === "bottom" ? 324 : 360;
+  const svg = Buffer.from(`<svg width="360" height="${height}"><rect x="0" y="0" width="360" height="${height}" fill="${colour}"/></svg>`);
+  return new Uint8Array(await sharp({ create: { width: 1024, height: 1024, channels: 4, background: { r: 0, g: 0, b: 0, alpha: 0 } } }).composite([{ input: svg, left: 332, top }]).png().toBuffer());
+}
 function fixture() {
   const loaded = loadManifestOnly("rivet"); if (!loaded.ok || !loaded.value.companion) throw new Error("rivet fixture is unavailable");
   return loaded.value.companion;
@@ -161,6 +166,20 @@ async function keyedPicture() {
 }
 
 describe("companion look generation jobs", () => {
+  test("look upload reports clipped edges and look read keeps them per version", async () => {
+    const adult = addPerson("clipped-upload-author", "adult"), made = createHouseholdCompanion({ ...fixture(), display_name: "Clipped upload" }, { display_name: "Author", person_id: "clipped-upload-author" }); if (!made.ok) throw new Error(made.error);
+    __setAgeCheckRunnerForTests(async (images) => images.map(() => AGE_OK));
+    __setImageToolsForTests({ state: "idle", phase: null, vision: true, models: { isnet: true, lama: true, esrgan: true }, limits: {}, operations: ["remove_background", "resize"], reason: null } satisfies StackImageToolsStatus);
+    __setStackClientForTests({ imageEdit: async (form: FormData) => { const file = form.get("image") as File; return { kind: "done", png: new Uint8Array(await file.arrayBuffer()), item: { width: 1024, height: 1024 } }; } } as never);
+    const cut = await upload(`companions/${made.value.id}/look/upload`, adult, await clippedPng("bottom"));
+    expect(cut.status).toBe(201); const cutBody = await cut.json() as { id: string; clipped: string[] }; expect(cutBody.clipped).toContain("bottom");
+    const centered = await upload(`companions/${made.value.id}/look/upload`, adult, await transparentPng());
+    expect(centered.status).toBe(201); const centeredBody = await centered.json() as { id: string; clipped: string[] }; expect(centeredBody.clipped).toEqual([]);
+    const read = await (await request(`companions/${made.value.id}/look`, adult)).json() as { versions: Array<{ id: string; clipped?: string[] }> };
+    expect(read.versions.find((version) => version.id === cutBody.id)?.clipped).toContain("bottom");
+    expect(read.versions.find((version) => version.id === centeredBody.id)?.clipped).toEqual([]);
+  });
+
   test("requires a prompt, refuses minors, refuses policy prompts, and reports engine readiness", async () => {
     const adult = addPerson("person-look-gen", "adult"), child = addPerson("person-look-gen-child", "child"), teen = addPerson("person-look-gen-teen", "teen");
     const created = createHouseholdCompanion({ ...fixture(), display_name: "Look generation", look_prompt: "a red fox" }, { display_name: "Author", person_id: "person-look-gen" });
@@ -1210,15 +1229,59 @@ describe("household companion routes", () => {
     expect(logs).toHaveLength(1); expect(logs[0]).toContain('"count":1'); for (const privateValue of [oldEmpty, oldWithPicture, young, "sweep-person", "Old empty draft"]) expect(logs[0]).not.toContain(privateValue);
   });
 
-  test("prepare saves a checked transparent square and records the crop step", async () => {
+  test("prepare saves a checked transparent square, records crop and reports clipped edges", async () => {
     const adult = addPerson("prepare-author", "adult"), made = createHouseholdCompanion({ ...fixture(), display_name: "Prepare fixture" }, { display_name: "Author", person_id: "prepare-author" }); if (!made.ok) throw new Error(made.error);
-    const png = await transparentPng(), original = addVersion(made.value.id, png, { source: "upload", label: "Original", width: 1024, height: 1024, from: null });
+    const png = await clippedPng("bottom"), original = addVersion(made.value.id, png, { source: "upload", label: "Original", width: 1024, height: 1024, from: null });
     __setAgeCheckRunnerForTests(async (images) => images.map(() => AGE_OK));
     const prepared = await request(`companions/${made.value.id}/look/prepare`, adult, "POST", { version_id: original.id, remove_background: false, frame: { zoom: 2, x: .5, y: .5 } });
     expect(prepared.status).toBe(201);
-    const resultId = (await prepared.json() as { id: string }).id, resultVersion = readLook(made.value.id).versions.find((version) => version.id === resultId)!;
+    const responseBody = await prepared.json() as { id: string; clipped: string[] }, resultId = responseBody.id, resultVersion = readLook(made.value.id).versions.find((version) => version.id === resultId)!;
     const imagePath = join(householdCompanionFolder(made.value.id)!, "look", `${resultId}.png`), imageBytes = new Uint8Array(await Bun.file(imagePath).arrayBuffer()), metadata = await sharp(imageBytes).metadata(), alpha = await sharp(imageBytes).stats();
-    expect([metadata.width, metadata.height]).toEqual([1024, 1024]); expect(metadata.hasAlpha).toBe(true); expect(alpha.channels[3]?.min).toBe(0); expect(resultVersion.steps).toContain("crop");
+    expect([metadata.width, metadata.height]).toEqual([1024, 1024]); expect(metadata.hasAlpha).toBe(true); expect(alpha.channels[3]?.min).toBe(0); expect(resultVersion.steps).toContain("crop"); expect(responseBody.clipped).toContain("bottom"); expect(resultVersion.clipped).toContain("bottom");
+  });
+
+  test("complete sends the clipped picture on key colour and stores a normalized edit", async () => {
+    const adult = addPerson("complete-author", "adult"), made = createHouseholdCompanion({ ...fixture(), display_name: "Complete fixture" }, { display_name: "Author", person_id: "complete-author" }); if (!made.ok) throw new Error(made.error);
+    const sourcePng = await clippedPng("bottom"), returned = await transparentPng(); __setPictureStatusForTests(readyStatusForTests()); __setAgeCheckRunnerForTests(async (images) => images.map(() => AGE_OK));
+    const posted: Array<{ instruction: string; image: Uint8Array }> = [];
+    __setPicturesFetchForTests((async (input, init) => {
+      const url = String(input);
+      if (url.endsWith("/v1/images/edits") && init?.method === "POST") { const form = init.body as FormData, file = form.get("image") as File; posted.push({ instruction: String(form.get("instruction")), image: new Uint8Array(await file.arrayBuffer()) }); return Response.json({ job: "complete-job" }, { status: 202 }); }
+      if (url.endsWith("/complete-job")) return Response.json({ job: "complete-job", state: "done", progress: 1, data: [] });
+      if (url.endsWith("/complete-job/0.png")) return new Response(returned, { headers: { "content-type": "image/png" } });
+      return new Response("Not found", { status: 404 });
+    }) as typeof fetch);
+    const source = addVersion(made.value.id, sourcePng, { source: "upload", label: "Cut picture", width: 1024, height: 1024, from: null, style: "anime", clipped: ["bottom"] });
+    const response = await request(`companions/${made.value.id}/look/complete`, adult, "POST", { version_id: source.id }); expect(response.status).toBe(202);
+    const job = (await response.json() as { job: string }).job; expect(posted[0]?.instruction).toContain("at the bottom"); expect(posted[0]?.instruction).toContain("keep everything already shown exactly as it is");
+    const keyed = await sharp(posted[0]!.image).raw().toBuffer({ resolveWithObject: true }); expect(keyed.info.width).toBe(1024); expect(keyed.info.height).toBe(1024); expect(keyed.data[1]).toBeGreaterThan(240);
+    const poll = await request(`companions/${made.value.id}/look/jobs/${job}`, adult); const state = await poll.json() as { state: string; versions: Array<{ id: string }> }; expect(state.state).toBe("done");
+    const saved = readLook(made.value.id).versions.find((version) => version.id === state.versions[0]?.id)!;
+    const resultPath = join(householdCompanionFolder(made.value.id)!, "look", `${saved.id}.png`), metadata = await sharp(readFileSync(resultPath)).metadata(), stats = await sharp(readFileSync(resultPath)).stats();
+    expect(saved).toMatchObject({ source: "edit", from: source.id, style: "anime", clipped: [] }); expect([metadata.width, metadata.height]).toEqual([1024, 1024]); expect(metadata.hasAlpha).toBe(true); expect(stats.channels[3]?.min).toBe(0);
+  });
+
+  test("complete refuses a centered image, children and non-authors", async () => {
+    const adult = addPerson("complete-gate-author", "adult"), other = addPerson("complete-gate-other", "adult"), child = addPerson("complete-gate-child", "child"), made = createHouseholdCompanion({ ...fixture(), display_name: "Complete gates" }, { display_name: "Author", person_id: "complete-gate-author" }); if (!made.ok) throw new Error(made.error);
+    const center = addVersion(made.value.id, await transparentPng(), { source: "upload", label: "Centered", width: 1024, height: 1024, from: null });
+    const noOp = await request(`companions/${made.value.id}/look/complete`, adult, "POST", { version_id: center.id }); expect(noOp.status).toBe(409); expect(await noOp.json()).toEqual({ error: "Nothing is cut off in this picture." });
+    const cut = addVersion(made.value.id, await clippedPng("bottom"), { source: "upload", label: "Cut", width: 1024, height: 1024, from: null });
+    expect((await request(`companions/${made.value.id}/look/complete`, child, "POST", { version_id: cut.id })).status).toBe(403);
+    expect((await request(`companions/${made.value.id}/look/complete`, other, "POST", { version_id: cut.id })).status).toBe(403);
+  });
+
+  test("complete screens teen uploaded inputs and withholds unsafe results without saving", async () => {
+    const teen = addPerson("complete-teen-author", "teen"), made = createHouseholdCompanion({ ...fixture(), display_name: "Teen complete", audience: "teen" }, { display_name: "Teen", person_id: "complete-teen-author" }); if (!made.ok) throw new Error(made.error);
+    const source = addVersion(made.value.id, await clippedPng("bottom"), { source: "upload", label: "Uploaded", width: 1024, height: 1024, from: null, style: "keep" });
+    __setAgeCheckRunnerForTests(async (images) => images.map(() => AGE_WITHHELD)); __setPictureStatusForTests(readyStatusForTests()); let edits = 0;
+    __setPicturesFetchForTests((async (_input, init) => { if (init?.method === "POST") edits++; return Response.json({ job: "should-not-submit" }, { status: 202 }); }) as typeof fetch);
+    const before = readLook(made.value.id).versions.length, refused = await request(`companions/${made.value.id}/look/complete`, teen, "POST", { version_id: source.id });
+    expect(refused.status).toBe(422); expect(edits).toBe(0); expect(readLook(made.value.id).versions).toHaveLength(before);
+    const adult = addPerson("complete-withheld-author", "adult"), otherHouse = createHouseholdCompanion({ ...fixture(), display_name: "Withheld complete" }, { display_name: "Adult", person_id: "complete-withheld-author" }); if (!otherHouse.ok) throw new Error(otherHouse.error);
+    const input = addVersion(otherHouse.value.id, await clippedPng("bottom"), { source: "generated", label: "Cut generated", width: 1024, height: 1024, from: null });
+    __setAgeCheckRunnerForTests(async (images) => images.map(() => AGE_WITHHELD)); __setPicturesFetchForTests((async (url, init) => { const target = String(url); if (target.endsWith("/v1/images/edits") && init?.method === "POST") return Response.json({ job: "complete-withheld-job" }, { status: 202 }); if (target.endsWith("/complete-withheld-job")) return Response.json({ job: "complete-withheld-job", state: "done", progress: 1, data: [] }); if (target.endsWith("/complete-withheld-job/0.png")) return new Response(await transparentPng(), { headers: { "content-type": "image/png" } }); return new Response("Not found", { status: 404 }); }) as typeof fetch);
+    const count = readLook(otherHouse.value.id).versions.length, started = await request(`companions/${otherHouse.value.id}/look/complete`, adult, "POST", { version_id: input.id }), job = (await started.json() as { job: string }).job;
+    const failed = await request(`companions/${otherHouse.value.id}/look/jobs/${job}`, adult); expect((await failed.json() as { state: string }).state).toBe("failed"); expect(readLook(otherHouse.value.id).versions).toHaveLength(count);
   });
 
   test("withheld picture approval leaves the selected starting picture unchanged", async () => {

@@ -1,5 +1,5 @@
 import sharp from "sharp";
-import { findSubject } from "./subject";
+import { clippedEdges, findSubject, type ClippedEdge } from "./subject";
 import { fitToFrame, type FitOptions } from "./fit";
 import { imagingTargets } from "./targets";
 import { cropToFrame, type Frame } from "./crop";
@@ -13,7 +13,7 @@ export interface PrepareOptions extends FitOptions {
   removeBackground?: (bytes: Uint8Array) => Promise<Uint8Array>;
   fit?: (png: Uint8Array, options: FitOptions) => Promise<Uint8Array>;
 }
-export async function preparePicture(bytes: Uint8Array, options: PrepareOptions = imagingTargets.portrait): Promise<{ bytes: Uint8Array; steps: PrepareStep[] }> {
+export async function preparePicture(bytes: Uint8Array, options: PrepareOptions = imagingTargets.portrait): Promise<{ bytes: Uint8Array; steps: PrepareStep[]; clipped: ClippedEdge[] }> {
   let current: Uint8Array<ArrayBufferLike> = new Uint8Array(bytes); const steps: PrepareStep[] = [];
   if (options.frame) { current = await cropToFrame(current, options.frame); steps.push("crop"); }
   let meta = await sharp(current, { limitInputPixels: 40_000_000, failOn: "error" }).metadata();
@@ -35,8 +35,8 @@ export async function preparePicture(bytes: Uint8Array, options: PrepareOptions 
     // The remover can find nothing to lift out (a drawing, a flat logo, a plain wall). Keep the picture as it was rather than refuse it.
     if (!(await findSubject(current)).bounds) { current = before; steps.push("background_not_found"); } else steps.push("remove_background");
   }
-  const subject = await findSubject(current); steps.push("find_subject");
+  const subject = await findSubject(current), edges = await clippedEdges(current); steps.push("find_subject");
   if (!subject.bounds) throw new Error("That picture has no visible subject.");
   current = await (options.fit ?? fitToFrame)(current, options); steps.push("fit");
-  return { bytes: current, steps };
+  return { bytes: current, steps, clipped: (Object.keys(edges) as ClippedEdge[]).filter((edge) => edges[edge]) };
 }

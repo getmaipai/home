@@ -12,7 +12,7 @@ describe("preparePicture", () => {
     expect(calls).toEqual(["upscale", "remove"]); expect(small.steps).toEqual(["upscale", "remove_background", "find_subject", "fit"]);
     calls.length = 0;
     const large = await preparePicture(await png(true, 40), options);
-    expect(calls).toEqual([]); expect(large.steps).toEqual(["find_subject", "fit"]);
+    expect(calls).toEqual([]); expect(large.steps).toEqual(["find_subject", "fit"]); expect(large.clipped).toEqual(["left", "right", "top", "bottom"]);
   });
   test("removes only when there is no real transparency", async () => {
     let removed = 0;

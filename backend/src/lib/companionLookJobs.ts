@@ -3,6 +3,7 @@ import sharp from "sharp";
 import media from "@maipai/spec/vocab/companion-media.json";
 import { capOfStyle, type LookStyleId } from "@/lib/companionLookStyles";
 import { addVersion, chooseKeyColour, compositeOnKey, describeCharacter, keyOut, lookPromptFor, normalizePicture, readLook, updateSheet, versionOriginalPath, versionPath } from "@/lib/companionLook";
+import { clippedEdges } from "@/lib/imaging/subject";
 import { routeAudience } from "@/lib/pictures/audience";
 import { prepareEditSource } from "@/lib/pictures/editSources";
 import { laneOf } from "@/lib/pictures/lane";
@@ -114,7 +115,7 @@ export async function startLookGeneration(input: { actor: PersonRow; companionId
   } finally { startingCompanions.delete(input.companionId); }
 }
 
-export async function startLookEdit(input: { actor: PersonRow; companionId: string; versionId: string; instruction: string; style?: LookStyleId; customStyle?: string }): Promise<string> {
+export async function startLookEdit(input: { actor: PersonRow; companionId: string; versionId: string; instruction: string; style?: LookStyleId; customStyle?: string; forceKeyComposite?: boolean }): Promise<string> {
   const denial = pictureDenial(routeAudience(input.actor));
   if (denial) throw Object.assign(new Error(PICTURE_DENIAL_LINE[denial]), { status: 403 });
   const styleDenied = lookStyleGate(input.actor, input.style ?? "cartoon");
@@ -132,7 +133,7 @@ export async function startLookEdit(input: { actor: PersonRow; companionId: stri
     const look = readLook(input.companionId), version = look.versions.find((item) => item.id === input.versionId), path = versionPath(input.companionId, input.versionId);
     if (!version || !path) throw Object.assign(new Error("That picture could not be found. Choose one of this companion's pictures."), { status: 404 });
     const png = new Uint8Array(readFileSync(path)), originalPath = versionOriginalPath(input.companionId, version.id);
-    const sourceBytes = originalPath ? new Uint8Array(readFileSync(originalPath)) : await compositeOnKey(png, look.key);
+    const sourceBytes = originalPath && !input.forceKeyComposite ? new Uint8Array(readFileSync(originalPath)) : await compositeOnKey(png, look.key);
     if (version.source === "upload" && routeAudience(input.actor).band === "teen") {
       const screened = await prepareEditSource({ audience: routeAudience(input.actor), bytes: sourceBytes, generated: false, text: instruction });
       if (!screened.ok) throw Object.assign(new Error(screened.line), { status: screened.status });
@@ -241,7 +242,8 @@ export async function pollLookJob(id: string, actor: PersonRow, companionId: str
           const fraction = opaque / (rgba.info.width * rgba.info.height);
           if (fraction < 0.05 || fraction > 0.95) label += " (check the edges)";
           const normalized = await normalizePicture(picture, { removeBackground: async (bytes) => bytes });
-          const saved = addVersion(job.companionId, normalized, { source: job.sourceVersion ? "edit" : "generated", label, width: media.image.size, height: media.image.size, from: job.sourceVersion, style: job.style ?? "cartoon", model: job.model, quality: job.quality, prompt_hash: job.promptHash, model_reported: reported }, images[index]!);
+          const clipped = Object.entries(await clippedEdges(normalized)).filter(([, value]) => value).map(([edge]) => edge as "left" | "right" | "top" | "bottom");
+          const saved = addVersion(job.companionId, normalized, { source: job.sourceVersion ? "edit" : "generated", label, width: media.image.size, height: media.image.size, from: job.sourceVersion, style: job.style ?? "cartoon", clipped, model: job.model, quality: job.quality, prompt_hash: job.promptHash, model_reported: reported }, images[index]!);
           job.versions.push(saved.id);
         }
         if (wasCancelled()) return;
