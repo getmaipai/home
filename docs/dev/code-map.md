@@ -349,6 +349,8 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/companionLook.ts` | LookSchema, EMPTY_LOOK, LOOK_LIMIT_LINE, lookPromptFor, KEY_ALPHA_START, KEY_ALPHA_END |
 | `backend/src/lib/companionLookJobs.ts` | LOOK_JOB_BUSY_LINE, LOOK_PICTURE_UNREAD_LINE, LOOK_PROMPT_REQUIRED_LINE, LOOK_EDIT_PROMPT_LINE, LOOK_ENGINE_NOT_READY_LINE, __clearCompanionLookJobsForTests |
 | `backend/src/lib/companionLookStyles.ts` | LOOK_STYLES, LOOK_STYLE_IDS, DEFAULT_LOOK_STYLE, stylesForBand, capOfStyle, lookStylePhrase |
+| `backend/src/lib/companionPersonality.ts` | COMPANION_DIALS, PERSONALITY_DIALS, COMPANION_PERSONALITIES, cleanStyleNotes, backstoryTagline, safeExamples |
+| `backend/src/lib/companionPersonalityDials.ts` | COMPANION_DIAL_OPTIONS |
 | `backend/src/lib/companionPortrait.ts` | portraitPath, retainedPortraitExists, readRetainedPortrait, retainCompanionPortrait, voiceVersion, companionVoiceVersion |
 | `backend/src/lib/companionPromptPack.ts` | picturePromptPack, clipPromptPack |
 | `backend/src/lib/companionStates.ts` | TAKE_LIMIT_LINE, MEDIA_ROOT_REMOTE_LINE, keyframePath, keyframeMetaPath, readKeyframeMeta, writeKeyframe |

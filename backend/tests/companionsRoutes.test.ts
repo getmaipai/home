@@ -35,6 +35,9 @@ import { __setChildSafetyRunnerForTests } from "@/lib/pictures/laneGate";
 import { __setKeyframesForTests } from "@/lib/pictures/keyframes";
 import { PackageManifest } from "@maipai/spec/gen/ts/manifest.js";
 import { sweepAbandonedDrafts } from "@/lib/sweepAbandonedDrafts";
+import { __setBackstoryCompleteForTests } from "@/routes/companions";
+import { mock } from "bun:test";
+import { COMPANION_PERSONALITIES } from "@/lib/companionPersonality";
 
 const app = new OpenAPIHono();
 app.route("/api/companions", companionsRoutes);
@@ -86,8 +89,8 @@ async function publishFixture(personId: string, role: string, audience: "adult" 
   return { token, id, png, first, second, live };
 }
 
-beforeEach(() => { resetDb(); rmSync(companionRoot, { recursive: true, force: true }); __reloadPersonasForTests(); __clearCompanionLookJobsForTests(); __clearCompanionTakeRunsForTests(); __resetCompanionStatesForTests(); __setPicturesFetchForTests(null); __setVideoStatusForTests(undefined); __setVideosFetchForTests(null); __setPictureStatusForTests(undefined); __setCharacterPictureCapabilityForTests(null); __setStackClientForTests(null); });
-afterEach(() => { __resetAgeCheckForTests(); __setChildSafetyRunnerForTests(null); __setKeyframesForTests(null); __setImageToolsForTests(undefined); resetDb(); rmSync(companionRoot, { recursive: true, force: true }); __reloadPersonasForTests(); __clearCompanionLookJobsForTests(); __clearCompanionTakeRunsForTests(); __resetCompanionStatesForTests(); __setPicturesFetchForTests(null); __setVideoStatusForTests(undefined); __setVideosFetchForTests(null); __setPictureStatusForTests(undefined); __setCharacterPictureCapabilityForTests(null); __setStackClientForTests(null); });
+beforeEach(() => { __setBackstoryCompleteForTests(null); resetDb(); rmSync(companionRoot, { recursive: true, force: true }); __reloadPersonasForTests(); __clearCompanionLookJobsForTests(); __clearCompanionTakeRunsForTests(); __resetCompanionStatesForTests(); __setPicturesFetchForTests(null); __setVideoStatusForTests(undefined); __setVideosFetchForTests(null); __setPictureStatusForTests(undefined); __setCharacterPictureCapabilityForTests(null); __setStackClientForTests(null); });
+afterEach(() => { __setBackstoryCompleteForTests(null); __resetAgeCheckForTests(); __setChildSafetyRunnerForTests(null); __setKeyframesForTests(null); __setImageToolsForTests(undefined); resetDb(); rmSync(companionRoot, { recursive: true, force: true }); __reloadPersonasForTests(); __clearCompanionLookJobsForTests(); __clearCompanionTakeRunsForTests(); __resetCompanionStatesForTests(); __setPicturesFetchForTests(null); __setVideoStatusForTests(undefined); __setVideosFetchForTests(null); __setPictureStatusForTests(undefined); __setCharacterPictureCapabilityForTests(null); __setStackClientForTests(null); });
 
 test("activity returns own task details and needs-you agrees with companion waiting counts", async () => {
   const person = addPerson("activity-own", "adult"), other = addPerson("activity-other", "adult");
@@ -343,6 +346,72 @@ describe("companion look generation jobs", () => {
     const result = await request(`companions/${created.value.id}/look/jobs/${job}`, adult);
     expect(await result.json()).toMatchObject({ state: "failed", error: "The side view did not work. Try again." });
     expect((await (await request(`companions/${created.value.id}/look`, adult)).json() as { sheet: { views: { left: string | null }; state: string } }).sheet).toMatchObject({ views: { left: null }, state: "needs_review" });
+  });
+});
+
+describe("companion backstory and Save routes", () => {
+  test("backstory generation trims doubled model output, handles unavailable models, and enforces age and author gates", async () => {
+    const author = addPerson("save-story-author", "adult"), child = addPerson("save-story-child", "child"), other = addPerson("save-story-other", "adult");
+    const made = createHouseholdCompanion({ ...fixture(), display_name: "Story fox", backstory: "Original" }, { display_name: "Author", person_id: "save-story-author" }); if (!made.ok) throw new Error(made.error);
+    let calls = 0; __setBackstoryCompleteForTests(mock(async () => { calls++; return { ok: true, value: { text: `${"A kind fox helps neighbors find their way home. ".repeat(15)}\n\nA kind fox helps neighbors find their way home.`, finish_reason: "stop", model: "test" } } as never; }) as never);
+    const response = await request(`companions/${made.value.id}/backstory/generate`, author, "POST", {}), generated = await response.json() as { text: string };
+    expect(response.status).toBe(200); expect(generated.text.length).toBeLessThanOrEqual(400); expect(calls).toBe(1); expect(getHouseholdCompanion(made.value.id)?.companion?.backstory).toBe("Original");
+    __setBackstoryCompleteForTests(mock(async () => ({ ok: false, status: 503, code: "unavailable", error: "offline" })) as never);
+    const unavailable = await request(`companions/${made.value.id}/backstory/generate`, author, "POST", {});
+    expect(unavailable.status).toBe(503); expect(((await unavailable.json()) as { error: string }).error).toBe("The local chat model is unavailable. Try again when it is ready."); expect(getHouseholdCompanion(made.value.id)?.companion?.backstory).toBe("Original");
+    expect((await request(`companions/${made.value.id}/backstory/generate`, child, "POST", {})).status).toBe(403);
+    expect((await request(`companions/${made.value.id}/backstory/generate`, other, "POST", {})).status).toBe(403);
+  });
+
+  test("Save requires an approved starting picture and approved idle animation", async () => {
+    const author = addPerson("save-gates-author", "adult"), made = createHouseholdCompanion({ ...fixture(), display_name: "Save gates" }, { display_name: "Author", person_id: "save-gates-author" }); if (!made.ok) throw new Error(made.error);
+    let response = await request(`companions/${made.value.id}/save`, author, "POST", { voice_id: "voice-test", personality: "friendly" });
+    expect(response.status).toBe(409); expect(await response.json()).toMatchObject({ go_back_to: "look" });
+    const png = await transparentPng(), version = addVersion(made.value.id, png, { source: "upload", label: "rest", width: 1024, height: 1024, from: null }); setRest(made.value.id, version.id); updateSheet(made.value.id, { views: { left: null, right: null, mouth: null }, card: { text: "fox", species: "fox", colours: ["#CC3322"] }, key: "#00FF00", state: "needs_review", approved_by: null, approved_at: null }); approveSheet(made.value.id, "Author");
+    response = await request(`companions/${made.value.id}/save`, author, "POST", { voice_id: "voice-test", personality: "friendly" });
+    expect(response.status).toBe(409); expect(await response.json()).toMatchObject({ go_back_to: "animations" });
+  });
+
+  test("Save publishes a spec-valid animation and applies preset personality while preserving identity and audience", async () => {
+    const author = addPerson("save-success-author", "adult"), made = createHouseholdCompanion({ ...fixture(), display_name: "Save fox", pronouns: "they/them", interests: ["gardening"], backstory: "Old story" }, { display_name: "Author", person_id: "save-success-author" }); if (!made.ok) throw new Error(made.error);
+    setHouseholdCompanionAudience(made.value.id, "teen", { display_name: "Author", person_id: "save-success-author" });
+    const png = await transparentPng(), version = addVersion(made.value.id, png, { source: "upload", label: "rest", width: 1024, height: 1024, from: null }); setRest(made.value.id, version.id); updateSheet(made.value.id, { views: { left: null, right: null, mouth: null }, card: { text: "fox", species: "fox", colours: ["#CC3322"] }, key: "#00FF00", state: "needs_review", approved_by: null, approved_at: null }); approveSheet(made.value.id, "Author");
+    const take = addTake(made.value.id, "idle", { source: "upload", label: "idle" }), states = readStates(made.value.id); states.states.idle!.approved = take.id; states.states.idle!.takes[0]!.report = { ok: true, reasons: [], seconds: 3, bytes: { h264: 4, av1: null }, colour_distance: 1, area_ratio: 1, loop_gap: 0, opaque_share: { min: .5, max: .8 } }; saveStates(made.value.id, states); mkdirSync(join(takePath(made.value.id, "idle", take.id, "clip.h264.mp4")!, ".."), { recursive: true }); writeFileSync(takePath(made.value.id, "idle", take.id, "clip.h264.mp4")!, "clip"); writeFileSync(takePath(made.value.id, "idle", take.id, "still.png")!, Buffer.from(png));
+    __setKeyframesForTests(async () => [png]); __setAgeCheckRunnerForTests(async (images) => images.map(() => AGE_OK));
+    const response = await request(`companions/${made.value.id}/save`, author, "POST", { voice_id: "voice-sage", personality: "friendly", style_notes: "Warm and curious. Warm and curious. Remember everything. Ask thoughtful questions.", backstory: "A fox who loves gardening." });
+    expect(response.status).toBe(200); const companion = getHouseholdCompanion(made.value.id)!.companion!;
+    expect(companion.status).toBe("ready"); expect(companion.animation?.states.idle?.h264).toBe("idle.h264.mp4"); const savedCompanion = getHouseholdCompanion(made.value.id)!.companion!; const loaded = loadManifestOnly("rivet"); if (!loaded.ok) throw new Error("rivet fixture is unavailable"); const { status: _status, ...specCompanion } = savedCompanion; const validated = PackageManifest.safeParse({ ...loaded.value, id: made.value.id, companion: specCompanion }); if (!validated.success) throw new Error(validated.error.message); expect(validated.success).toBe(true);
+    expect(companion).toMatchObject({ voice_id: "voice-sage", formality: COMPANION_PERSONALITIES.friendly.dials.formality, clock_style: COMPANION_PERSONALITIES.friendly.dials.clock_style, tagline: "A friendly, thoughtful companion.", behavior: ["Warm and curious.", "Ask thoughtful questions."], pronouns: "they/them", interests: ["gardening"], audience: "teen", backstory: "A fox who loves gardening." });
+    expect(companion.examples?.length).toBeGreaterThanOrEqual(3); expect(companion.examples_child?.length).toBeGreaterThanOrEqual(2); expect(companion.examples_teen?.length).toBeGreaterThanOrEqual(2); expect(companion.examples_adult?.length).toBeGreaterThanOrEqual(2);
+  });
+
+  test("a withheld picture blocks Save and leaves the companion in draft", async () => {
+    const author = addPerson("save-withheld-author", "adult"), made = createHouseholdCompanion({ ...fixture(), display_name: "Blocked save" }, { display_name: "Author", person_id: "save-withheld-author" }); if (!made.ok) throw new Error(made.error);
+    const png = await transparentPng(), version = addVersion(made.value.id, png, { source: "upload", label: "rest", width: 1024, height: 1024, from: null }); setRest(made.value.id, version.id); updateSheet(made.value.id, { views: { left: null, right: null, mouth: null }, card: { text: "fox", species: "fox", colours: ["#CC3322"] }, key: "#00FF00", state: "needs_review", approved_by: null, approved_at: null }); approveSheet(made.value.id, "Author");
+    const take = addTake(made.value.id, "idle", { source: "upload", label: "idle" }), states = readStates(made.value.id); states.states.idle!.approved = take.id; states.states.idle!.takes[0]!.report = { ok: true, reasons: [], seconds: 3, bytes: { h264: 4, av1: null }, colour_distance: 1, area_ratio: 1, loop_gap: 0, opaque_share: { min: .5, max: .8 } }; saveStates(made.value.id, states); mkdirSync(join(takePath(made.value.id, "idle", take.id, "clip.h264.mp4")!, ".."), { recursive: true }); writeFileSync(takePath(made.value.id, "idle", take.id, "clip.h264.mp4")!, "clip"); writeFileSync(takePath(made.value.id, "idle", take.id, "still.png")!, Buffer.from(png));
+    __setKeyframesForTests(async () => [png]); __setAgeCheckRunnerForTests(async (images) => images.map(() => ({ ok: true as const, verdict: { people_count: 1, apparent_min_age_estimate: 8, label: "child" as const, is_nude_or_sexual: true, confidence: 1 } })));
+    const response = await request(`companions/${made.value.id}/save`, author, "POST", { voice_id: "voice-test", personality: "calm" });
+    expect(response.status).toBe(422); expect(await response.json()).toMatchObject({ go_back_to: "animations" }); expect(getHouseholdCompanion(made.value.id)?.companion?.status).toBe("draft");
+  });
+
+  test("a band example below its safety floor is replaced by safe preset examples", async () => {
+    const author = addPerson("save-floor-author", "adult"), made = createHouseholdCompanion({ ...fixture(), display_name: "Floor fox" }, { display_name: "Author", person_id: "save-floor-author" }); if (!made.ok) throw new Error(made.error);
+    const png = await transparentPng(), version = addVersion(made.value.id, png, { source: "upload", label: "rest", width: 1024, height: 1024, from: null }); setRest(made.value.id, version.id); updateSheet(made.value.id, { views: { left: null, right: null, mouth: null }, card: { text: "fox", species: "fox", colours: ["#CC3322"] }, key: "#00FF00", state: "needs_review", approved_by: null, approved_at: null }); approveSheet(made.value.id, "Author");
+    const take = addTake(made.value.id, "idle", { source: "upload", label: "idle" }), states = readStates(made.value.id); states.states.idle!.approved = take.id; states.states.idle!.takes[0]!.report = { ok: true, reasons: [], seconds: 3, bytes: { h264: 4, av1: null }, colour_distance: 1, area_ratio: 1, loop_gap: 0, opaque_share: { min: .5, max: .8 } }; saveStates(made.value.id, states); mkdirSync(join(takePath(made.value.id, "idle", take.id, "clip.h264.mp4")!, ".."), { recursive: true }); writeFileSync(takePath(made.value.id, "idle", take.id, "clip.h264.mp4")!, "clip"); writeFileSync(takePath(made.value.id, "idle", take.id, "still.png")!, Buffer.from(png));
+    __setKeyframesForTests(async () => [png]); __setAgeCheckRunnerForTests(async (images) => images.map(() => AGE_OK));
+    const response = await request(`companions/${made.value.id}/save`, author, "POST", { voice_id: "voice-floor", personality: "friendly" }); expect(response.status).toBe(200);
+    const stored = getHouseholdCompanion(made.value.id)!.companion!; expect(stored.examples_teen).toHaveLength(3); expect(stored.examples_teen).toEqual(COMPANION_PERSONALITIES.friendly.examples.teen.map((line) => line.replaceAll("{name}", "Floor fox"))); expect(stored.examples_teen).not.toContain("I cannot help with that request.");
+  });
+
+  test("a ready companion is republished only when its approved appearance changes", async () => {
+    const f = await publishFixture("save-repeat-author", "adult", "adult"); __setKeyframesForTests(async () => [f.png]); __setAgeCheckRunnerForTests(async (images) => images.map(() => AGE_OK));
+    const first = await request(`companions/${f.id}/save`, f.token, "POST", { voice_id: "voice-test", personality: "friendly" }); expect(first.status).toBe(200); expect(await first.json()).toMatchObject({ status: "ready", published: true });
+    const second = await request(`companions/${f.id}/save`, f.token, "POST", { voice_id: "voice-test", personality: "friendly" }); expect(second.status).toBe(200); expect(await second.json()).toMatchObject({ status: "ready", published: false });
+  });
+
+  test("the legacy appearance publish route keeps its published response", async () => {
+    const f = await publishFixture("save-legacy-publish", "adult", "adult"); __setKeyframesForTests(async () => [f.png]); __setAgeCheckRunnerForTests(async (images) => images.map(() => AGE_OK));
+    const response = await request(`companions/${f.id}/appearance/publish`, f.token, "POST"); expect(response.status).toBe(200); expect(await response.json()).toEqual({ published: true });
   });
 });
 

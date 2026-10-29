@@ -108,6 +108,12 @@ export function updateHouseholdCompanion(id: string, patch: Partial<Companion>):
   const fields = Object.fromEntries(allowed.filter((key) => Object.hasOwn(patch, key)).map((key) => [key, patch[key]]));
   return write({ ...current, companion: { ...current.companion, ...fields } });
 }
+/** Save the screen-three fields while preserving identity data and status until appearance checks pass. */
+export function saveHouseholdCompanionPersonality(id: string, patch: Partial<Companion>): WriteResult {
+  const current = read(id); if (!current?.companion) return { ok: false, error: "That household companion could not be found." };
+  const { status: _status, audience: _audience, pronouns: _pronouns, interests: _interests, ...fields } = patch;
+  return write({ ...current, companion: { ...current.companion, ...fields } });
+}
 export function deleteHouseholdCompanion(id: string): boolean {
   const dir = folder(id); if (!dir || !read(id)) return false;
   try { deleteLook(id); rmSync(dir, { recursive: true, force: true }); return true; } catch { return false; }

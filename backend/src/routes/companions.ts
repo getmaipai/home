@@ -21,7 +21,7 @@ import { companionFits, companionFloor, robotControlsOf, ROBOT_COMPANION_KEY } f
 import { PERSONAS, reloadPersonas, resolvePersona } from "@/lib/persona";
 import { loadManifestOnly } from "@/lib/plugins";
 import { resolvePackageDir } from "@/lib/packageResolve";
-import { createHouseholdCompanion, copyBundledCompanion, copyHouseholdCompanion, getHouseholdCompanion, updateHouseholdCompanion, deleteHouseholdCompanion, setHouseholdCompanionAudience, setHouseholdCompanionStatus, householdCompanionAuthorId } from "@/lib/householdCompanions";
+import { createHouseholdCompanion, copyBundledCompanion, copyHouseholdCompanion, getHouseholdCompanion, updateHouseholdCompanion, saveHouseholdCompanionPersonality, deleteHouseholdCompanion, setHouseholdCompanionAudience, setHouseholdCompanionStatus, householdCompanionAuthorId } from "@/lib/householdCompanions";
 import { addVersion, approveSheet, deleteVersion, readLook, setRest, setSheetCard, setSheetKey, unapproveSheet, versionOriginalPath, versionPath, normalizePicture, uploadLabel } from "@/lib/companionLook";
 import { LOOK_STYLE_IDS, stylesForBand, capOfStyle, type LookStyleId } from "@/lib/companionLookStyles";
 import { LOOK_EDIT_PROMPT_LINE, LOOK_JOB_BUSY_LINE, LOOK_PROMPT_REQUIRED_LINE, activeLookJob, canGenerateLook, cancelLookJob, pollLookJob, startLookEdit, startLookGeneration, startLookSheet } from "@/lib/companionLookJobs";
@@ -45,8 +45,13 @@ import { preparePicture } from "@/lib/imaging/prepare";
 import type { Frame } from "@/lib/imaging/crop";
 import { imagingTargets } from "@/lib/imaging/targets";
 import { prepareEditSource } from "@/lib/pictures/editSources";
+import { complete } from "@/lib/llm";
+import { COMPANION_PERSONALITIES, cleanStyleNotes, backstoryTagline } from "@/lib/companionPersonality";
+import { evaluateSafety, forOutput, carriesCrisisSignal } from "@/lib/safety";
 
 const pendingKeyframeJobs = new Map<string, { state: string; instruction: string; style: string }>();
+let backstoryCompleteForTests: typeof complete | null = null;
+export function __setBackstoryCompleteForTests(value: typeof complete | null) { backstoryCompleteForTests = value; }
 
 export const companionsRoutes = apiRouter();
 
@@ -522,7 +527,7 @@ function matchesEtag(header: string | undefined, etag: string): boolean {
 }
 function statesAccess(actor: import("@/types").PersonRow, id: string) { if (!getHouseholdCompanion(id)) return lookAccess(actor, id); return mayEdit(actor, id) ? null : { status: 403 as const, error: "Only the author or an admin can edit this companion." }; }
 function buildAnimationManifest(id: string, states: Record<string, string>, by: string) {
-  const look = readLook(id), stateRows = readStates(id), root = householdCompanionFolder(id)!;
+  const look = readLook(id);
   if (look.sheet?.state !== "approved" || !look.rest || !look.sheet.card) throw new Error("Approve the character sheet and choose its starting picture first.");
   const built: Record<string, { h264: string; av1?: string; still: string; loop: boolean }> = {};
   for (const [state, takeId] of Object.entries(states)) {
@@ -571,30 +576,86 @@ async function checkAssets(assets: AppearanceAsset[], audience: "adult" | "teen"
   const result = await checkFinishedAssets({ assets, lane: audience === "all" ? "child" : audience, adultOnly: audience === "adult", kind: "video", cache });
   return result.reasons;
 }
-const publishRoute = createRoute({ method: "post", path: "/{id}/appearance/publish", tags: ["Companions"], summary: "Publish the approved companion appearance", middleware: [requireAuth] as const, request: { params: lookIdParam }, responses: { 200: { content: { "application/json": { schema: z.object({ published: z.boolean() }) } }, description: "Appearance published." }, ...errorResponses({ 403: "Only the author or an admin can publish this companion", 404: "No household companion", 409: "Appearance is not ready to publish", 422: "Appearance checks need attention" }) } });
-companionsRoutes.openapi(publishRoute, async (c) => {
-  const { id } = c.req.valid("param"), actor = c.get("person"), denied = statesAccess(actor, id); if (denied) return c.json({ error: denied.error }, denied.status);
-  const status = appearanceStatus(id), { manifest: _manifest, ...safeStatus } = status; let all = readStates(id);
-  if (!safeStatus.can_publish) return c.json({ error: safeStatus.reasons[0] ?? "The appearance is not ready to publish. Fix the listed issue and try again." }, 409);
+async function publishAppearance(id: string, actor: import("@/types").PersonRow): Promise<{ error: string; go_back_to: "look" | "animations"; status: 409 | 422 } | null> {
+  const status = appearanceStatus(id), all = readStates(id);
+  if (!status.can_publish) return { error: status.reasons[0] ?? "Go back to animations and approve the idle animation.", go_back_to: /idle clip|clip run/i.test(status.reasons[0] ?? "") ? "animations" : "look", status: 409 };
   const draft = Object.fromEntries(Object.entries(all.states).filter(([, row]) => row?.approved).map(([state, row]) => [state, row!.approved!]));
   all.checks ??= {}; const audience = getHouseholdCompanion(id)?.companion?.audience ?? "adult", restAtStart = readLook(id).rest, reasons = await checkAssets(await collectDraftAssets(id, draft), audience, all.checks);
-  // The checks can take minutes. Re-read what they were run against; keep only the checks we gained and never write back a stale record.
   const fresh = readStates(id); fresh.checks = { ...(fresh.checks ?? {}), ...all.checks };
-  if (reasons.length) { saveStates(id, fresh); return c.json({ error: reasons.join(" "), reasons }, 422); }
+  if (reasons.length) { saveStates(id, fresh); return { error: reasons.join(" "), go_back_to: /starting picture|character sheet/i.test(reasons.join(" ")) ? "look" : "animations", status: 422 }; }
   const freshDraft = Object.fromEntries(Object.entries(fresh.states).filter(([, row]) => row?.approved).map(([state, row]) => [state, row!.approved!])), currentAudience = getHouseholdCompanion(id)?.companion?.audience ?? "adult";
-  if (JSON.stringify(Object.entries(freshDraft).sort()) !== JSON.stringify(Object.entries(draft).sort()) || readLook(id).rest !== restAtStart || currentAudience !== audience) { saveStates(id, fresh); return c.json({ error: "The artwork or the audience changed while it was being checked. Nothing was published. Try Publish again." }, 409); }
-  all = fresh;
-  const root = householdCompanionFolder(id)!, next = join(root, "animation.next"), look = readLook(id), animation = buildAnimationManifest(id, draft, actor.displayName), previousPublished = all.published;
+  if (JSON.stringify(Object.entries(freshDraft).sort()) !== JSON.stringify(Object.entries(draft).sort()) || readLook(id).rest !== restAtStart || currentAudience !== audience) { saveStates(id, fresh); return { error: "The artwork or audience changed during the check. Go back to the look screen and try Save again.", go_back_to: "look", status: 409 }; }
+  all.checks = fresh.checks;
+  const root = householdCompanionFolder(id)!, next = join(root, "animation.next"), look = readLook(id), animation = buildAnimationManifest(id, draft, actor.displayName), previousPublished = fresh.published;
   try {
     rmSync(next, { recursive: true, force: true }); mkdirSync(next, { recursive: true });
     copyFileSync(versionPath(id, look.rest!)!, join(next, "rest.png")); writeFileSync(join(next, "card.json"), JSON.stringify({ text: look.sheet!.card!.text, species: look.sheet!.card!.species, colours: look.sheet!.card!.colours }, null, 2));
     for (const [state, takeId] of Object.entries(draft)) { copyFileSync(takePath(id, state, takeId, "clip.h264.mp4")!, join(next, `${state}.h264.mp4`)); copyFileSync(takePath(id, state, takeId, "still.png")!, join(next, `${state}.png`)); const keyframe = keyframePath(id, state); if (existsSync(keyframe)) copyFileSync(keyframe, join(next, `${state}-keyframe.png`)); const av1 = takePath(id, state, takeId, "clip.av1.mp4")!; if (existsSync(av1)) copyFileSync(av1, join(next, `${state}.av1.mp4`)); }
-    if (!animation.states.idle) throw new Error("Publish needs an approved idle clip. Approve it and try again.");
-    try {
-      swapInAnimation(root, () => { const result = setHouseholdCompanionAnimation(id, animation as never); if (!result.ok) throw new Error(result.error); all.published = { at: new Date().toISOString(), by: actor.displayName, rest: look.rest!, states: draft }; saveStates(id, all); });
-    } catch (error) { setHouseholdCompanionAnimation(id, status.manifest?.companion?.animation ?? null); const restore = readStates(id); if (previousPublished) restore.published = previousPublished; else delete restore.published; saveStates(id, restore); throw error; }
-  } catch (error) { rmSync(next, { recursive: true, force: true }); return c.json({ error: error instanceof Error ? error.message : "The appearance could not be published. Try again." }, 422); }
+    if (!animation.states.idle) return { error: "Go back to animations and approve the idle animation.", go_back_to: "animations", status: 409 };
+    swapInAnimation(root, () => { const changed = setHouseholdCompanionAnimation(id, animation as never); if (!changed.ok) throw new Error(changed.error); fresh.published = { at: new Date().toISOString(), by: actor.displayName, rest: look.rest!, states: draft }; saveStates(id, fresh); });
+    return null;
+  } catch (error) {
+    rmSync(next, { recursive: true, force: true }); if (previousPublished) fresh.published = previousPublished;
+    return { error: error instanceof Error ? error.message : "The appearance could not be checked. Go back to the look screen.", go_back_to: /idle clip|animation|clip/i.test(error instanceof Error ? error.message : "") ? "animations" : "look", status: 422 };
+  }
+}
+const publishRoute = createRoute({ method: "post", path: "/{id}/appearance/publish", tags: ["Companions"], summary: "Publish the approved companion appearance", middleware: [requireAuth] as const, request: { params: lookIdParam }, responses: { 200: { content: { "application/json": { schema: z.object({ published: z.boolean() }) } }, description: "Appearance published." }, ...errorResponses({ 403: "Only the author or an admin can publish this companion", 404: "No household companion", 409: "Appearance is not ready to publish", 422: "Appearance checks need attention" }) } });
+companionsRoutes.openapi(publishRoute, async (c) => {
+  const { id } = c.req.valid("param"), actor = c.get("person"), denied = statesAccess(actor, id); if (denied) return c.json({ error: denied.error }, denied.status);
+  const result = await publishAppearance(id, actor);
+  if (result) return c.json({ error: result.error, ...(result.status === 422 ? { reasons: [result.error] } : {}) }, result.status);
   return c.json({ published: true }, 200);
+});
+
+const backstoryParams = lookIdParam;
+const backstoryBody = z.object({ hint: z.string().max(300).optional() });
+const backstoryRoute = createRoute({ method: "post", path: "/{id}/backstory/generate", tags: ["Companions"], summary: "Generate a companion backstory", middleware: [requireAuth] as const, request: { params: backstoryParams, body: { content: { "application/json": { schema: backstoryBody } } } }, responses: { 200: { content: { "application/json": { schema: z.object({ text: z.string().max(400) }) } }, description: "Generated editable backstory." }, ...errorResponses({ 403: "Only the author or an admin can generate this backstory", 404: "No household companion", 503: "The local chat model is unavailable" }) } });
+companionsRoutes.openapi(backstoryRoute, async (c) => {
+  const { id } = c.req.valid("param"), actor = c.get("person"), denied = statesAccess(actor, id);
+  if (denied) return c.json({ error: denied.error }, denied.status);
+  if (!mayEdit(actor, id) || speakerAgeBand(actor, new Date()) === "child") return c.json({ error: "Only the author or an admin can generate this backstory." }, 403);
+  const companion = getHouseholdCompanion(id)?.companion; if (!companion) return c.json({ error: "That household companion could not be found." }, 404);
+  const band = speakerAgeBand(actor, new Date()), hint = c.req.valid("json").hint?.trim();
+  const completion = await (backstoryCompleteForTests ?? complete)("chat", [{ role: "system", content: `Write one kind, plain, non-romantic backstory sentence for an AI companion. No profanity, instructions, tools or claims of real memories. Maximum 400 characters. Viewer age band: ${band}. Return only the sentence.` }, { role: "user", content: `Name: ${companion.display_name}. Personality: ${hint ? "creator's hint follows" : "gentle and helpful"}. ${hint ? `Hint: ${hint}` : ""}` }], { max_tokens: 180, temperature: 0.7 });
+  if (!completion.ok) return c.json({ error: "The local chat model is unavailable. Try again when it is ready." }, 503);
+  const text = completion.value.text.trim().replace(/^['"`]+|['"`]+$/g, "").slice(0, 400).trim();
+  if (!text) return c.json({ error: "The local chat model is unavailable. Try again when it is ready." }, 503);
+  return c.json({ text }, 200);
+});
+
+const saveBody = z.object({ voice_id: z.string().min(1).max(120), personality: z.enum(["friendly", "funny", "calm", "professional", "playful", "custom"]), style_notes: z.string().max(300).optional(), backstory: z.string().max(400).optional() });
+const saveRoute = createRoute({ method: "post", path: "/{id}/save", tags: ["Companions"], summary: "Save companion personality and publish its approved appearance", middleware: [requireAuth] as const, request: { params: lookIdParam, body: { content: { "application/json": { schema: saveBody } } } }, responses: { 200: { content: { "application/json": { schema: z.object({ id: z.string(), status: z.literal("ready"), published: z.boolean() }) } }, description: "Companion saved and appearance published." }, 409: { content: { "application/json": { schema: z.object({ error: z.string(), go_back_to: z.enum(["look", "animations"]) }) } }, description: "Complete the named screen and save again." }, 422: { content: { "application/json": { schema: z.object({ error: z.string(), go_back_to: z.enum(["look", "animations"]) }) } }, description: "The appearance check blocked publishing." }, ...errorResponses({ 400: "Companion fields are invalid", 403: "Only the author or an admin can save this companion", 404: "No household companion" }) } });
+companionsRoutes.openapi(saveRoute, async (c) => {
+  const { id } = c.req.valid("param"), actor = c.get("person"), body = c.req.valid("json"), denied = statesAccess(actor, id);
+  if (denied) return c.json({ error: denied.error }, denied.status);
+  if (!mayEdit(actor, id) || speakerAgeBand(actor, new Date()) === "child") return c.json({ error: "Only the author or an admin can save this companion." }, 403);
+  const original = getHouseholdCompanion(id)?.companion; if (!original) return c.json({ error: "That household companion could not be found." }, 404);
+  const look = readLook(id);
+  if (!look.rest || look.sheet?.state !== "approved") return c.json({ error: "Go back to the look screen and approve the starting picture.", go_back_to: "look" as const }, 409);
+  if (!readStates(id).states.idle?.approved) return c.json({ error: "Go back to animations and approve the idle animation.", go_back_to: "animations" as const }, 409);
+  const preset = body.personality === "custom" ? null : COMPANION_PERSONALITIES[body.personality];
+  const band = speakerAgeBand(actor, new Date());
+  const checkedLines = (values: readonly string[], forBand: "child" | "teen" | "adult") => values.map((v) => v.replaceAll("{name}", original.display_name)).filter((line) => { const verdict = forOutput(evaluateSafety(line, forBand, "reply")); return verdict.action !== "refuse" && !carriesCrisisSignal(verdict); });
+  const general = checkedLines(preset?.examples.general ?? [], band), child = checkedLines(preset?.examples.child ?? [], "child"), teen = checkedLines(preset?.examples.teen ?? [], "teen"), adult = checkedLines(preset?.examples.adult ?? [], "adult");
+  const fallback = preset?.examples;
+  const value = {
+    ...(preset ? { formality: preset.dials.formality, complexity: preset.dials.complexity, engagement: preset.dials.engagement, filler_density: preset.dials.filler_density, clock_style: preset.dials.clock_style, hedging: preset.dials.hedging, social: { humor: preset.dials.humor, warmth: preset.dials.warmth, initiative: preset.dials.initiative } } : {}), voice_id: body.voice_id, behavior: cleanStyleNotes(body.style_notes),
+    ...(body.backstory !== undefined ? { backstory: body.backstory.trim() } : {}),
+    ...(preset ? { tagline: preset.tagline.replaceAll("{name}", original.display_name).slice(0, 80), examples: general.length >= 3 ? general : checkedLines(fallback!.general, band), examples_child: child.length >= 2 ? child : checkedLines(fallback!.child, "child"), examples_teen: teen.length >= 2 ? teen : checkedLines(fallback!.teen, "teen"), examples_adult: adult.length >= 2 ? adult : checkedLines(fallback!.adult, "adult") } : body.personality === "custom" && body.backstory ? { tagline: backstoryTagline(body.backstory) } : {}),
+  };
+  // Preserve identity fields through the narrow existing writer.
+  const priorBackstory = body.backstory === undefined ? original.backstory : undefined;
+  const result = saveHouseholdCompanionPersonality(id, { ...value, ...(priorBackstory !== undefined ? { backstory: priorBackstory } : {}) } as never);
+  if (!result.ok) return c.json({ error: result.error }, 400);
+  const appearance = appearanceStatus(id);
+  let published = false;
+  if (appearance.can_publish || !appearance.published) {
+    const publishError = await publishAppearance(id, actor);
+    if (publishError) { const go_back_to = publishError.go_back_to, error = go_back_to === "look" ? "Go back to the look screen and check the starting picture." : "Go back to animations and check the approved clips."; setHouseholdCompanionStatus(id, "draft"); return c.json({ error, go_back_to }, publishError.status); }
+    published = true;
+  }
+  setHouseholdCompanionStatus(id, "ready"); reloadPersonas();
+  return c.json({ id, status: "ready" as const, published }, 200);
 });
 const keyframeParams = statesParams.extend({ state: CompanionStateId });
 const keyframeGenerateRoute = createRoute({ method: "post", path: "/{id}/states/{state}/keyframe/generate", tags: ["Companions"], summary: "Generate a companion state keyframe", middleware: [requireAuth] as const, request: { params: keyframeParams }, responses: { 202: { content: { "application/json": { schema: z.object({ job: z.string() }) } }, description: "Keyframe image job started." }, ...errorResponses({ 400: "The keyframe could not be started", 403: "Only an allowed editor can change this companion", 404: "No starting picture", 409: "Approve the character sheet first", 422: "Picture prompt refused", 503: "Picture engine is not ready" }) } });
