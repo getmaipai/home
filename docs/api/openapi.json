@@ -59627,6 +59627,756 @@
         }
       }
     },
+    "/api/companions/{id}/states/{state}/keyframe/generate": {
+      "post": {
+        "tags": [
+          "Companions"
+        ],
+        "summary": "Generate a companion state keyframe",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 80
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "enum": [
+                "idle",
+                "listening",
+                "thinking",
+                "speaking",
+                "working",
+                "researching",
+                "writing",
+                "done",
+                "sleeping",
+                "laughing",
+                "surprised",
+                "sad",
+                "confused",
+                "idle_look",
+                "needs_you",
+                "greeting",
+                "happy",
+                "oops",
+                "celebrate"
+              ]
+            },
+            "required": true,
+            "name": "state",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 80
+            },
+            "required": false,
+            "name": "take",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 80
+            },
+            "required": false,
+            "name": "file",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "202": {
+            "description": "Keyframe image job started.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "job": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "job"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The keyframe could not be started",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Only an allowed editor can change this companion",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No starting picture",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Approve the character sheet first",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Picture prompt refused",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Picture engine is not ready",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/companions/{id}/states/{state}/keyframe/edit": {
+      "post": {
+        "tags": [
+          "Companions"
+        ],
+        "summary": "Edit a companion state keyframe",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 80
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "enum": [
+                "idle",
+                "listening",
+                "thinking",
+                "speaking",
+                "working",
+                "researching",
+                "writing",
+                "done",
+                "sleeping",
+                "laughing",
+                "surprised",
+                "sad",
+                "confused",
+                "idle_look",
+                "needs_you",
+                "greeting",
+                "happy",
+                "oops",
+                "celebrate"
+              ]
+            },
+            "required": true,
+            "name": "state",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 80
+            },
+            "required": false,
+            "name": "take",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 80
+            },
+            "required": false,
+            "name": "file",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "instruction": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 500
+                  }
+                },
+                "required": [
+                  "instruction"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "Keyframe edit job started.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "job": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "job"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The keyframe edit could not be started",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Only an allowed editor can change this companion",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No keyframe",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "A picture job is busy",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Picture prompt refused",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Picture engine is not ready",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/companions/{id}/states/{state}/keyframe": {
+      "get": {
+        "tags": [
+          "Companions"
+        ],
+        "summary": "Read a companion state keyframe",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 80
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "enum": [
+                "idle",
+                "listening",
+                "thinking",
+                "speaking",
+                "working",
+                "researching",
+                "writing",
+                "done",
+                "sleeping",
+                "laughing",
+                "surprised",
+                "sad",
+                "confused",
+                "idle_look",
+                "needs_you",
+                "greeting",
+                "happy",
+                "oops",
+                "celebrate"
+              ]
+            },
+            "required": true,
+            "name": "state",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 80
+            },
+            "required": false,
+            "name": "take",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 80
+            },
+            "required": false,
+            "name": "file",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Keyframe PNG."
+          },
+          "403": {
+            "description": "Only the author or an admin can read this companion",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No keyframe",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Companions"
+        ],
+        "summary": "Upload a companion state keyframe",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 80
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "enum": [
+                "idle",
+                "listening",
+                "thinking",
+                "speaking",
+                "working",
+                "researching",
+                "writing",
+                "done",
+                "sleeping",
+                "laughing",
+                "surprised",
+                "sad",
+                "confused",
+                "idle_look",
+                "needs_you",
+                "greeting",
+                "happy",
+                "oops",
+                "celebrate"
+              ]
+            },
+            "required": true,
+            "name": "state",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 80
+            },
+            "required": false,
+            "name": "take",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 80
+            },
+            "required": false,
+            "name": "file",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "nullable": true
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Keyframe saved."
+          },
+          "400": {
+            "description": "Picture could not be prepared",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Only an allowed editor can change this companion",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Picture withheld",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Companions"
+        ],
+        "summary": "Delete a companion state keyframe",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 80
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "enum": [
+                "idle",
+                "listening",
+                "thinking",
+                "speaking",
+                "working",
+                "researching",
+                "writing",
+                "done",
+                "sleeping",
+                "laughing",
+                "surprised",
+                "sad",
+                "confused",
+                "idle_look",
+                "needs_you",
+                "greeting",
+                "happy",
+                "oops",
+                "celebrate"
+              ]
+            },
+            "required": true,
+            "name": "state",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 80
+            },
+            "required": false,
+            "name": "take",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 80
+            },
+            "required": false,
+            "name": "file",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Keyframe deleted."
+          },
+          "403": {
+            "description": "Only an allowed editor can change this companion",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/companions/{id}/states/{state}/keyframe/prepare": {
+      "post": {
+        "tags": [
+          "Companions"
+        ],
+        "summary": "Prepare a companion state keyframe",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 80
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "enum": [
+                "idle",
+                "listening",
+                "thinking",
+                "speaking",
+                "working",
+                "researching",
+                "writing",
+                "done",
+                "sleeping",
+                "laughing",
+                "surprised",
+                "sad",
+                "confused",
+                "idle_look",
+                "needs_you",
+                "greeting",
+                "happy",
+                "oops",
+                "celebrate"
+              ]
+            },
+            "required": true,
+            "name": "state",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 80
+            },
+            "required": false,
+            "name": "take",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 80
+            },
+            "required": false,
+            "name": "file",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "remove_background": {
+                    "type": "boolean"
+                  },
+                  "frame": {
+                    "type": "object",
+                    "properties": {
+                      "zoom": {
+                        "type": "number",
+                        "minimum": 1,
+                        "maximum": 4
+                      },
+                      "x": {
+                        "type": "number",
+                        "minimum": 0,
+                        "maximum": 1
+                      },
+                      "y": {
+                        "type": "number",
+                        "minimum": 0,
+                        "maximum": 1
+                      }
+                    },
+                    "required": [
+                      "zoom",
+                      "x",
+                      "y"
+                    ]
+                  }
+                },
+                "required": [
+                  "remove_background"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Keyframe prepared."
+          },
+          "403": {
+            "description": "Only an allowed editor can change this companion",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No keyframe",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Picture withheld",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/companions/{id}/states": {
       "get": {
         "tags": [
@@ -59851,7 +60601,7 @@
             }
           },
           "409": {
-            "description": "A clip run is busy, the character sheet is not approved, or the rest picture has no Stack original.",
+            "description": "A clip run is busy, the character sheet is not approved, a keyframe is missing, or the rest picture has no Stack original.",
             "content": {
               "application/json": {
                 "schema": {
@@ -59863,7 +60613,8 @@
                     "code": {
                       "type": "string",
                       "enum": [
-                        "no_original"
+                        "no_original",
+                        "needs_keyframe"
                       ]
                     }
                   },
@@ -59992,7 +60743,7 @@
             }
           },
           "409": {
-            "description": "A clip run is busy, the character sheet is not approved, or the rest picture has no Stack original.",
+            "description": "A clip run is busy, the character sheet is not approved, a keyframe is missing, or the rest picture has no Stack original.",
             "content": {
               "application/json": {
                 "schema": {
@@ -60004,7 +60755,8 @@
                     "code": {
                       "type": "string",
                       "enum": [
-                        "no_original"
+                        "no_original",
+                        "needs_keyframe"
                       ]
                     }
                   },
