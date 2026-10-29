@@ -80,7 +80,7 @@ async function runTakes(run: TakeRun, count: number, actor: PersonRow, motionOve
         if (run.cancelled) break;
         run.current = { state, take: index, index: stateIndex + 1, of: run.states.length };
         run.phase = "generating"; run.percent = Math.round(((run.takesMade) / (run.states.length * count)) * 100);
-        run.label = `Making take ${index} of ${count} for ${stateLabel(state)}`;
+        run.label = `Making the ${stateLabel(state)} animation${count > 1 ? ` (try ${index} of ${count})` : ""}`;
         let take: CompanionTake | null = null;
         let stackJob: string | null = null;
         let engineFailure = false;
@@ -123,7 +123,7 @@ async function runTakes(run: TakeRun, count: number, actor: PersonRow, motionOve
           const reportedQuality = done?.find((clip) => clip.quality)?.quality ?? null;
           if ((reportedQuality && reportedQuality !== art.quality) || (reported && reported !== take.model && reported !== stackVideoModel(art))) throw new Error(COMPANION_MODEL_MISMATCH_LINE);
           recordTakeModelReported(run.companionId, state, take.id, reported);
-          run.phase = "finishing"; run.label = `Finishing take ${index} of ${count} for ${stateLabel(state)}`; run.percent = Math.min(99, run.percent + 1);
+          run.phase = "finishing"; run.label = `Finishing the ${stateLabel(state)} animation${count > 1 ? ` (try ${index} of ${count})` : ""}`; run.percent = Math.min(99, run.percent + 1);
           const completedStackJob = stackJob!;
           const clip = await fetchClip(completedStackJob);
           if (run.cancelled) { await cancelOrDeleteVideo(completedStackJob); break; }
@@ -193,7 +193,7 @@ export async function startStateTakes(input: { actor: PersonRow; companionId: st
   try {
     if (!quickVideoReady(engineStatus)) throw Object.assign(new Error(TAKE_QUICK_NOT_READY_LINE), { status: 503 });
     const id = crypto.randomUUID();
-    const run: TakeRun = { id, companionId: input.companionId, personId: input.actor.id, states: input.states, current: null, state: "queued", phase: "queued", percent: 0, label: "Waiting to make clips", cancelled: false, error: null, takesMade: 0, stackJob: null };
+    const run: TakeRun = { id, companionId: input.companionId, personId: input.actor.id, states: input.states, current: null, state: "queued", phase: "queued", percent: 0, label: "Getting ready to make animations", cancelled: false, error: null, takesMade: 0, stackJob: null };
     runs.set(id, run); activeByCompanion.set(input.companionId, id);
     void runTakes(run, input.count, input.actor, input.motion).catch(() => undefined);
     return id;

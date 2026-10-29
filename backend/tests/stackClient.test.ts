@@ -17,6 +17,7 @@ const IDENTITY = { host: "local", build: "b10797", model: MODEL, healthy: null }
 const ROUTES: Array<[string, string, (body: unknown, form: FormData | null) => { status: number; body: unknown; headers?: Record<string, string> }]> = [
   ["/stack/v1/coding/mode", "POST", () => ({ status: 409, body: { reason: "A Home mode change is already running." } })],
   ["/healthz", "GET", () => ({ status: 200, body: { ok: true, version: "0.1.0", uptimeSeconds: 42 } })],
+  ["/stack/v1/media/roots", "PUT", (body) => ({ status: 200, body: { roots: body } })],
   [
     "/v1/chat/completions",
     "POST",
@@ -351,6 +352,12 @@ describe("createStackClient", () => {
     expect((failure as StackError).message).toBe("A Home mode change is already running.");
     expect((failure as StackError).reason).toBe("A Home mode change is already running.");
     expect((failure as StackError).status).toBe(409);
+  });
+
+  test("declaring media folders uses PUT, the verb the Stack's route answers", async () => {
+    const client = createStackClient({ baseUrl });
+    const roots = await client.setMediaRoots({ read: ["/a"], write: ["/a"] });
+    expect(roots).toEqual({ read: ["/a"], write: ["/a"] });
   });
 
   test("healthz returns the Stack's version", async () => {

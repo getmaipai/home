@@ -807,7 +807,7 @@ describe("household companion routes", () => {
     const started = await request(`companions/${id}/states/idle/generate`, adult, "POST", { count: 2 }); expect(started.status).toBe(202); const { job } = await started.json() as { job: string };
     let progress: any;
     for (let attempt = 0; attempt < 100; attempt++) { const response = await request(`companions/${id}/states/jobs/run/${job}`, adult); progress = await response.json(); if (progress.state === "done" || progress.state === "failed") break; await new Promise((resolve) => setTimeout(resolve, 5)); }
-    expect(progress).toMatchObject({ state: "done", percent: 100, takes_made: 2 }); expect(progress.label).toContain("take 2 of 2");
+    expect(progress).toMatchObject({ state: "done", percent: 100, takes_made: 2 }); expect(progress.label).toContain("try 2 of 2");
     expect(submitted).toHaveLength(2); expect(submitted[0]?.seed).not.toBe(submitted[1]?.seed); expect(submitted[0]).toMatchObject({ size: `${media.generate.width}x${media.generate.height}`, seconds: media.generate.seconds, image_source: "generated", audience: "all-ages", timeout_ms: 1 }); expect(submitted[0]).toMatchObject({ model: "wan2.2-ti2v-5b-fastwan-mlx" });
     expect(submitted[0]?.image).toBe(Buffer.from(stackOriginal).toString("base64"));
     expect(fetched).toEqual(["video-1", "video-2"]); expect(deleted).toEqual(["video-1", "video-2"]); expect(finished).toBe(2);
@@ -1238,6 +1238,17 @@ describe("household companion routes", () => {
     const responseBody = await prepared.json() as { id: string; clipped: string[] }, resultId = responseBody.id, resultVersion = readLook(made.value.id).versions.find((version) => version.id === resultId)!;
     const imagePath = join(householdCompanionFolder(made.value.id)!, "look", `${resultId}.png`), imageBytes = new Uint8Array(await Bun.file(imagePath).arrayBuffer()), metadata = await sharp(imageBytes).metadata(), alpha = await sharp(imageBytes).stats();
     expect([metadata.width, metadata.height]).toEqual([1024, 1024]); expect(metadata.hasAlpha).toBe(true); expect(alpha.channels[3]?.min).toBe(0); expect(resultVersion.steps).toContain("place"); expect(responseBody.clipped).toContain("bottom"); expect(resultVersion.clipped).toContain("bottom");
+  });
+
+  test("a prepared picture keeps the cut-off record of the photo it came from, so the missing body still gets drawn in", async () => {
+    const adult = addPerson("prepare-inherit-author", "adult"), made = createHouseholdCompanion({ ...fixture(), display_name: "Prepare inherit fixture" }, { display_name: "Author", person_id: "prepare-inherit-author" }); if (!made.ok) throw new Error(made.error);
+    const inside = new Uint8Array(await sharp({ create: { width: 1024, height: 1024, channels: 4, background: { r: 0, g: 0, b: 0, alpha: 0 } } }).composite([{ input: await sharp({ create: { width: 300, height: 500, channels: 4, background: { r: 200, g: 40, b: 40, alpha: 1 } } }).png().toBuffer(), left: 362, top: 262 }]).png().toBuffer());
+    const original = addVersion(made.value.id, inside, { source: "upload", label: "Original", width: 1024, height: 1024, from: null, clipped: ["bottom", "left"] });
+    __setAgeCheckRunnerForTests(async (images) => images.map(() => AGE_OK));
+    const prepared = await request(`companions/${made.value.id}/look/prepare`, adult, "POST", { version_id: original.id, remove_background: false });
+    expect(prepared.status).toBe(201);
+    const { id: preparedId } = await prepared.json() as { id: string };
+    expect(readLook(made.value.id).versions.find((version) => version.id === preparedId)?.clipped).toEqual(["bottom", "left"]);
   });
 
   test("complete sends the clipped picture on a neutral backdrop and stores a normalized edit", async () => {

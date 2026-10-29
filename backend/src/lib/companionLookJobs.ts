@@ -165,6 +165,7 @@ export async function startLookEdit(input: { actor: PersonRow; companionId: stri
     form.append("audience", "all-ages");
     form.append("timeout_ms", "1");
     form.append("model", art.model);
+    form.append("seed", String(companionSeed(input.companionId)));
     const submitted = await submitEdit(form);
     register(submitted.job, { companionId: input.companionId, personId: input.actor.id, state: "queued", percent: 0, versions: [], error: null, count: 1, key: look.key, sourceVersion: version.id, instruction, model: art.model, quality: art.quality, promptHash: promptHash(instruction), modelReported: null, style });
     return submitted.job;
@@ -173,6 +174,13 @@ export async function startLookEdit(input: { actor: PersonRow; companionId: stri
 
 function editForm(source: Uint8Array, instruction: string, generated: boolean): FormData {
   const form = new FormData(); form.append("image", new File([new Uint8Array(source)], "picture.png", { type: "image/png" })); form.append("operation", "edit"); form.append("instruction", instruction); form.append("image_source", generated ? "generated" : "uploaded"); form.append("audience", "all-ages"); form.append("timeout_ms", "1"); return form;
+}
+
+/** One seed per companion, so every picture drawn for it starts from the same noise and the outfit, build and face stay put from frame to frame. */
+export function companionSeed(companionId: string): number {
+  let hash = 2166136261;
+  for (const char of companionId) hash = Math.imul(hash ^ char.charCodeAt(0), 16777619) >>> 0;
+  return hash;
 }
 
 export async function startLookSheet(input: { actor: PersonRow; companionId: string; lookPrompt: string }): Promise<{ job: string; card_source: "model" | "look_prompt" }> {
@@ -190,7 +198,7 @@ export async function startLookSheet(input: { actor: PersonRow; companionId: str
     updateSheet(input.companionId, sheet);
     const originalPath = versionOriginalPath(input.companionId, version.id), sourceBytes = originalPath ? new Uint8Array(readFileSync(originalPath)) : await compositeOnNeutral(png), instruction = SHEET_VIEWS[0]!.prompt.replaceAll("<key>", key);
     const art = resolveCompanionEdit();
-    const form = editForm(sourceBytes, instruction, Boolean(originalPath)); form.append("model", art.model);
+    const form = editForm(sourceBytes, instruction, Boolean(originalPath)); form.append("model", art.model); form.append("seed", String(companionSeed(input.companionId)));
     const submitted = await submitEdit(form);
     const job = crypto.randomUUID();
     sheetJobs.set(job, { companionId: input.companionId, personId: input.actor.id, state: "queued", percent: 0, versions: [], error: null, stackJob: submitted.job, index: 0, model: art.model, quality: art.quality, promptHash: promptHash(instruction), modelReported: null });
@@ -301,7 +309,7 @@ async function pollSheetJob(id: string, job: SheetJob, actor: PersonRow, compani
       if (job.index >= SHEET_VIEWS.length) { const doneLook = readLook(companionId); if (doneLook.sheet) updateSheet(companionId, { ...doneLook.sheet, state: "approved", approved_by: actor.displayName, approved_at: new Date().toISOString() }); job.state = "done"; job.percent = 100; activeByCompanion.delete(companionId); return; }
       const restPath = versionPath(companionId, look.rest!); if (!restPath) throw new Error("The rest picture could not be found. Choose it again and retry the sheet.");
       const rest = new Uint8Array(readFileSync(restPath)), originalPath = versionOriginalPath(companionId, look.rest!), sourceBytes = originalPath ? new Uint8Array(readFileSync(originalPath)) : await compositeOnNeutral(rest), instruction = SHEET_VIEWS[job.index]!.prompt.replaceAll("<key>", key);
-      const nextForm = editForm(sourceBytes, instruction, Boolean(originalPath)); nextForm.append("model", resolveCompanionEdit().model);
+      const nextForm = editForm(sourceBytes, instruction, Boolean(originalPath)); nextForm.append("model", resolveCompanionEdit().model); nextForm.append("seed", String(companionSeed(companionId)));
       job.promptHash = promptHash(instruction);
       job.stackJob = (await submitEdit(nextForm)).job; job.state = "queued";
     })();

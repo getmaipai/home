@@ -9,7 +9,7 @@ const errorText = (error: unknown) => error instanceof ApiError ? error.message 
 
 export function useCompanionStates(id: string, active: boolean) {
   const client = useQueryClient();
-  const query = useQuery({ queryKey: companionStatesKey(id), queryFn: () => api.companionStates(id), enabled: active, retry: false, refetchInterval: (current) => document.hidden ? false : current.state.data?.busy ? 2000 : false });
+  const query = useQuery({ queryKey: companionStatesKey(id), queryFn: () => api.companionStates(id), enabled: active, retry: false, refetchInterval: (current) => document.hidden ? false : current.state.data?.busy || current.state.data?.run || current.state.data?.states.some((row) => row.busy) ? 2000 : false });
   const [runId, setRunId] = useState<string | null>(null);
   const [error, setError] = useState("");
   const [status, setStatus] = useState("");

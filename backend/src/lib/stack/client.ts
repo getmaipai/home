@@ -498,7 +498,7 @@ export function createStackClient(options: StackClientOptions = {}): StackClient
       const body = await json<{ media?: { roots?: { read?: unknown; write?: unknown } } }>(res);
       return { read: Array.isArray(body.media?.roots?.read) ? body.media!.roots!.read as string[] : [], write: Array.isArray(body.media?.roots?.write) ? body.media!.roots!.write as string[] : [] };
     }, opts),
-    setMediaRoots: (roots, opts) => call("/stack/v1/media/roots", jsonInit(roots), json<{ read: string[]; write: string[] }>, opts),
+    setMediaRoots: (roots, opts) => call("/stack/v1/media/roots", { ...jsonInit(roots), method: "PUT" }, async (res) => (await json<{ roots: { read: string[]; write: string[] } }>(res)).roots, opts),
     requestSelfHealRestart: (role, reason, opts) => call("/stack/v1/engines/self-heal/restart", jsonInit({ role, reason }), json<{ accepted: boolean; why: string | null }>, opts),
     selfHeal: (opts) => call("/stack/v1/engines/self-heal", { method: "GET" }, json<StackSelfHeal>, opts),
     healthFix: (code, opts) => call(`/stack/v1/health/${encodeURIComponent(code)}/fix`, { method: "POST" }, json<Record<string, unknown>>, opts),

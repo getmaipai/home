@@ -52,7 +52,7 @@ export function AnimateStep({ companionId, name, sheetJob = null, autoMake = fal
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [ticked, setTicked] = useState<ReadonlySet<string>>(new Set());
   const [editing, setEditing] = useState(false);
-  const Back = getIcon("arrow-left"), Next = getIcon("arrow-right"), Sparkles = getIcon("sparkles"), Pencil = getIcon("pencil");
+  const Back = getIcon("arrow-left"), Next = getIcon("arrow-right"), Sparkles = getIcon("sparkles"), Pencil = getIcon("pencil"), Spinner = getIcon("loader");
 
   const rows = states.data?.states ?? [];
   const required = rows.filter((row) => row.required), optional = rows.filter((row) => !row.required);
@@ -61,12 +61,18 @@ export function AnimateStep({ companionId, name, sheetJob = null, autoMake = fal
   const portrait = rest?.url ?? null;
   const sheet = useSheetWait(companionId, sheetJob, rest?.id ?? null);
   const picturing = states.data?.busy ?? null;
-  const running = states.running || frames.busy || sheet.waiting || picturing !== null;
+  const rowBusy = rows.some((row) => row.busy || row.status === "waiting");
+  const running = states.running || frames.busy || sheet.waiting || picturing !== null || rowBusy || states.data?.run != null;
   const missingRequired = required.filter((row) => !made(row)).map((row) => row.id);
   const pending = useMemo(() => optional.filter((row) => ticked.has(row.id) && !made(row)).map((row) => row.id), [optional, ticked]);
   const allTicked = optional.length > 0 && optional.every((row) => ticked.has(row.id));
   const label = name.trim() || "Your character";
   const progress = states.run?.percent ?? states.data?.run?.percent ?? 0;
+  // What the buttons say while work is under way: the step in plain words, never just a greyed label.
+  const doing = frames.busy ? `Drawing the picture for ${rows.find((row) => row.id === frames.making)?.label ?? "an animation"}...`
+    : sheet.waiting || picturing?.kind === "sheet" ? "Drawing your character..."
+    : picturing ? `${picturing.label}...`
+    : running ? `${states.run?.label ?? states.data?.run?.label ?? "Making animations"}... ${progress}%` : "";
 
   const generate = (ids: string[]) => frames.request(ids);
   // Once the character is ready, the four required animations start by themselves, once.
@@ -113,7 +119,7 @@ export function AnimateStep({ companionId, name, sheetJob = null, autoMake = fal
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
             {required.map((row) => <CharacterTile key={row.id} variant="animation" locked {...tile(row)} />)}
           </div>
-          <Button shape="pill" width="full" disabled={running || missingRequired.length === 0} onClick={() => generate(missingRequired)}><Sparkles aria-hidden="true" />Generate Required</Button>
+          <Button shape="pill" width="full" disabled={running || missingRequired.length === 0} onClick={() => generate(missingRequired)}>{running ? <Spinner className="animate-spin" aria-hidden="true" /> : <Sparkles aria-hidden="true" />}{running ? doing : "Generate Required"}</Button>
         </DialogSection>
         <Separator />
         <DialogSection title="Optional" aside={<Button variant="link" size="sm" disabled={running} onClick={() => setTicked(allTicked ? new Set() : new Set(optional.map((row) => row.id)))}>{allTicked ? "Clear All" : "Select All"}</Button>}>
@@ -121,10 +127,9 @@ export function AnimateStep({ companionId, name, sheetJob = null, autoMake = fal
           <div className="grid grid-cols-3 gap-3 xl:grid-cols-5">
             {optional.map((row) => <CharacterTile key={row.id} variant="animation" checked={ticked.has(row.id)} onCheckedChange={(on) => toggle(row.id, on)} {...tile(row)} />)}
           </div>
-          <Button variant="secondary" shape="pill" width="full" disabled={running || pending.length === 0} onClick={() => generate(pending)}>{`Generate Optional (${pending.length})`}</Button>
+          <Button variant="secondary" shape="pill" width="full" disabled={running || pending.length === 0} onClick={() => generate(pending)}>{running ? doing : `Generate Optional (${pending.length})`}</Button>
         </DialogSection>
         {states.data && !states.data.sheet_ready && !errorLine ? <p className="text-sm text-muted-foreground">Finish your character on the first screen before making animations.</p> : null}
-        {running ? <Button variant="outline" shape="pill" onClick={() => void states.stop()}>Stop</Button> : null}
       </div>
     </DialogBody>
     <DialogFooter align="between">
