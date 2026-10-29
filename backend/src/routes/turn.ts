@@ -539,12 +539,13 @@ function startResumeSession(session: ResumeSession): void {
 // checking actually takes a moment" logic, applied to the model's own
 // generation latency instead of a tool call's.
 export const THINKING_CUE_DELAY_MS = 900;
-/** VOICE-REPLY-02: a spoken turn's bridge phrase ("One sec.") is for an answer that is
- * genuinely late. Rule 13's bar is a first word in 3 seconds and speech takes about half
- * a second to start, so the cue goes out at 2.5 seconds, not at 0.9; the quick lane
- * (nodes/fastSpoken.ts) answers in about a second and no cue is spoken at all. The cue
- * is never the answer and never the same phrase twice in a row (pickThinkingCue). */
-export const SPOKEN_CUE_DELAY_MS = 2500;
+/** VOICE-REPLY-02: a spoken turn's bridge phrase ("One sec.") covers the wait for the first word.
+ * Measured 2026-10-29 on the Stack chat model: a spoken turn's first token arrives 2.1 to 3.3 seconds
+ * after the request (jokes and weather alike), and no quick lane exists (INSTANT-05: the 4B does not
+ * answer spoken turns), so at 2.5 seconds the cue fired late or never and the call felt like a
+ * walkie-talkie. It goes out at 1.0 second: the gap it fills is real, and an answer that is faster
+ * than that never gets a cue. The cue is never the answer and never the same phrase twice in a row (pickThinkingCue). */
+export const SPOKEN_CUE_DELAY_MS = 1000;
 
 /** Returns the timer alongside the promise so the common case (the real
  * token wins the race) can cancel it - a code review (2026-09-05) found

@@ -197,7 +197,7 @@ has none yet.
    (`backend/src/routes/turn.ts`, `backend/src/lib/replyVariation.ts` `THINKING_CUE_VARIANTS`). The acknowledgement therefore **is a
    `spoken_cue`**: a second fixed pool beside `THINKING_CUE_VARIANTS`, rotated the same way with banned phrases, passed through
    `normalizeForSpeech`, and given an interruption-turn delay. Rule 9 names the spoken cue as an allowed gap, so no new chat-path
-   code path is added. The delay is the open number: Home's own record says `SPOKEN_CUE_DELAY_MS` is 2500 and cites
+   code path is added. The delay is the open number: Home's own record said `SPOKEN_CUE_DELAY_MS` was 2500 (changed to 1000 on 2026-10-29 after a spoken turn's first token measured 2.1 to 3.3 s with no quick lane; the end-of-speech silence went 0.8 to 0.6 s and the false-interruption resume window 2.0 to 1.2 s in the same change) and cites
    [arXiv 2507.22352](https://arxiv.org/abs/2507.22352) that fillers hurt at sub-second waits, while people backchannel about 178 ms
    after a pause. So the interruption-turn delay starts at the existing cue value, a shorter value is only tried against the bench's
    new acknowledgement-timing row (rule 13) and by Jesse's ear, and the item is dropped if it does not feel better. OpenAI's

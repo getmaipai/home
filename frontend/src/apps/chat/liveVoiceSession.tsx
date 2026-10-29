@@ -80,7 +80,7 @@ export interface LiveVoiceSessionProps {
 export const WAKE_SESSION_IDLE_CLOSE_MS = 8000;
 export const BARGE_IN_ARM_DELAY_MS = 400;
 export const DUPLEX_PAUSE_AFTER_MS = 150;
-export const DUPLEX_FALSE_INTERRUPTION_MS = 2000;
+export const DUPLEX_FALSE_INTERRUPTION_MS = 1200;
 // rule: duplexReaction (docs/design/full-duplex-voice-2026-10-24.md)
 // A reaction is one of these whole phrases, matched exactly after normalising, and nothing else: "mm-hm", "oh wow", "no way".
 // Benchmarks (Full-Duplex-Bench v1.5) and shipped agents (LiveKit, Retell) treat these as "keep talking", not as a new turn. Anything
