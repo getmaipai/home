@@ -54,6 +54,14 @@ if (!upstream) {
 }
 const proxy = startRecordingProxy(upstream);
 process.env.MAIPAI_LLAMA_SERVER_URL = proxy.url;
+// Against the real Stack (MAIPAI_BENCH_UPSTREAM=stack) this proxy is also the adapter for the embed and background URLs
+// that name the same upstream, and setup.ts must reuse it rather than wrap it again (the same wiring as replay.ts).
+if (process.env.MAIPAI_BENCH_UPSTREAM === "stack") {
+  const same = (url: string | undefined) => url?.replace(/\/$/, "") === upstream.replace(/\/$/, "");
+  if (same(process.env.MAIPAI_EMBED_URL)) process.env.MAIPAI_EMBED_URL = proxy.url;
+  if (same(process.env.MAIPAI_BACKGROUND_URL)) process.env.MAIPAI_BACKGROUND_URL = proxy.url;
+  process.env.MAIPAI_BENCH_STACK_PROXY = proxy.url;
+}
 // setup.ts must load before anything reaches "@/db" (CHAT-22).
 const { finishBench, startBench } = await import("./setup");
 const runner = await import("./conversationRunner");

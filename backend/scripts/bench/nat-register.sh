@@ -10,6 +10,6 @@ D=$(mktemp -d -t nat-bench)
 trap 'rm -rf "$D"' EXIT
 echo "2. Running the register bench with an empty data dir. It takes a few minutes."
 cd "$REPO/backend" || exit 1
-MAIPAI_DATA_DIR="$D" MAIPAI_LLAMA_SERVER_URL=http://127.0.0.1:8770 MAIPAI_EMBED_URL=http://127.0.0.1:8770 bun run scripts/bench/register.ts 2>&1 | tee /tmp/nat-register-bench.out | tail -60
+MAIPAI_BENCH_UPSTREAM=stack MAIPAI_DATA_DIR="$D" MAIPAI_LLAMA_SERVER_URL=http://127.0.0.1:8770 MAIPAI_EMBED_URL=http://127.0.0.1:8770 bun run scripts/bench/register.ts 2>&1 | tee /tmp/nat-register-bench.out | tail -60
 echo
 echo "Done. Tell Claude: bench finished, and paste the last lines above."
