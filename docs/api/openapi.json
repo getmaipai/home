@@ -58282,14 +58282,15 @@
         ],
         "responses": {
           "202": {
-            "description": "Character sheet job started.",
+            "description": "Character sheet written and approved; there is no job (job is null).",
             "content": {
               "application/json": {
                 "schema": {
                   "type": "object",
                   "properties": {
                     "job": {
-                      "type": "string"
+                      "type": "string",
+                      "nullable": true
                     },
                     "card_source": {
                       "type": "string",
