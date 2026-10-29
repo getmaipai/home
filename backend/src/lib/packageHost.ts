@@ -85,7 +85,7 @@ import { wantsSpoken } from "@/lib/spokenArg";
 import { refuseWeb, webSideOff, wikimediaAllowedAfterK, wikimediaGate } from "@/lib/retrieval/sourceMode";
 import { scheduleJob, scheduleCoreJob, listJobs, cancelJob } from "@/lib/scheduler";
 import { findOrCreateStandingList, addItem as addListItem } from "@/lib/lists";
-import { parseReminder, parseTimerDuration } from "@/lib/reminderParsing";
+import { parseAlarmRequest, parseReminder, parseTimerDuration } from "@/lib/reminderParsing";
 import type { BlockCapture } from "@/lib/packageBlocks";
 import { cachedFetch, CACHE_NOT_MODIFIED, packageCacheResponse } from "@/lib/packageCache";
 import { backoffSeconds, parseRetryAfter } from "@/lib/httpCachePolicy";
@@ -2571,16 +2571,8 @@ export function createHost(actor: PersonRow, manifest: PackageManifest, secrets:
           }
         }
         const request = manifest.id === "alarm" ? text.replace(/^set\s*/i, "") : text;
-        let parsed;
-        try {
-          parsed = parseReminder(request);
-        } catch (error) {
-          if (manifest.id !== "alarm" || !(error instanceof HostError) || error.message !== "What should I remind you about?") throw error;
-          parsed = parseReminder(`${request} Alarm`);
-        }
-        const task = manifest.id === "alarm"
-          ? (parsed.task.trim().replace(/^(called|named)\s+/i, "") || "Alarm")
-          : parsed.task;
+        const parsed = manifest.id === "alarm" ? parseAlarmRequest(request) : parseReminder(request);
+        const task = parsed.task;
         // Recipe language has no alarm op yet; adding one needs a commons spec tag, so alarm reuses remind.
         const job = manifest.id === "alarm" ? "alarms.fire" : "reminders.fire";
         const result = scheduleCoreJob(actor, job, parsed.when, { task });

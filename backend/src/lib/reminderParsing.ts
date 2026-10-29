@@ -110,6 +110,41 @@ export function parseReminder(text: string, now: Date = new Date()): ParsedRemin
   return { task, when: date.toISOString(), when_text: formatWhenText(date) };
 }
 
+/** An alarm request is a reminder whose time is often a bare hour ("for 7 tomorrow called gym"), which chrono does
+ * not read as a time. A bare hour gets an am or pm here: for tomorrow, 4 to 11 is the morning and 12 to 3 the
+ * afternoon; otherwise the next time that hour comes round. The label defaults to "Alarm". */
+const BARE_HOUR = /\b(?:at|for)\s+(\d{1,2})(?::(\d{2}))?(?!\s*(?:[:\d]|am\b|pm\b|a\.m|p\.m|minutes?\b|mins?\b|hours?\b|hrs?\b|seconds?\b|secs?\b|st\b|nd\b|rd\b|th\b))/i;
+
+export function parseAlarmRequest(text: string, now: Date = new Date()): ParsedReminder {
+  let request = text;
+  const bare = BARE_HOUR.exec(text);
+  if (bare && Number(bare[1]) >= 1 && Number(bare[1]) <= 12) {
+    const hour = Number(bare[1]);
+    const minute = Number(bare[2] ?? "0");
+    let meridiem: "am" | "pm";
+    if (/\btomorrow\b/i.test(text)) {
+      meridiem = hour >= 4 && hour <= 11 ? "am" : "pm";
+    } else {
+      const at = (pm: boolean) => {
+        const d = new Date(now);
+        d.setHours((hour % 12) + (pm ? 12 : 0), minute, 0, 0);
+        return d.getTime();
+      };
+      const future = [false, true].filter((pm) => at(pm) > now.getTime());
+      meridiem = future[0] === undefined || !future[0] ? "am" : "pm";
+    }
+    request = text.replace(BARE_HOUR, `at ${hour}:${String(minute).padStart(2, "0")} ${meridiem}`);
+  }
+  let parsed: ParsedReminder;
+  try {
+    parsed = parseReminder(request, now);
+  } catch (error) {
+    if (!(error instanceof HostError) || error.message !== "What should I remind you about?") throw error;
+    parsed = parseReminder(`${request} Alarm`, now);
+  }
+  return { ...parsed, task: parsed.task.trim().replace(/^(called|named)\s+/i, "") || "Alarm" };
+}
+
 export interface ParsedTimer {
   label: string;
   when: string; // ISO datetime

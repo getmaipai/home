@@ -659,7 +659,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/referencePresetEngine.ts` | __setReferenceCatalogUrlForTests, planReference, listReferenceCatalog, getReferenceState, applyReference, resumeReferenceJobsOnBoot |
 | `backend/src/lib/register.ts` | planFor, planLine, planLineForTurnMachine |
 | `backend/src/lib/relationships.ts` | createRelationship, listRelationships, calledAdminForOwnSettings, updateRelationship, promoteToStated, findRelationship |
-| `backend/src/lib/reminderParsing.ts` | parseReminder, parseTimerDuration |
+| `backend/src/lib/reminderParsing.ts` | parseReminder, parseAlarmRequest, parseTimerDuration |
 | `backend/src/lib/remoteStackSettings.ts` | REMOTE_ENGINE_HOST_KEY, REMOTE_ALLOW_TAILNET_KEY, ENGINE_WHERE_KEY, REMOTE_ENGINE_ADDRESS_ERROR, REMOTE_ENGINE_TAILNET_ERROR, REMOTE_ENGINE_TAILNET_DISABLE_ERROR |
 | `backend/src/lib/replyConstraints.ts` | parseReplyConstraint, setReplyConstraint, constraintsFor, bannedPhrasesFor, clearReplyConstraints |
 | `backend/src/lib/replyParityJudge.ts` | judgeReplyParity |

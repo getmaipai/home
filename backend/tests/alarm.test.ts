@@ -51,6 +51,19 @@ describe("alarm package", () => {
     expect(JSON.parse(rows[0]!.inputs)).toEqual({ task: "gym" });
   });
 
+  test("a bare hour with a label, as people say it, schedules the morning and keeps only the label", async () => {
+    const actor = await person("Sage");
+    const result = await runPlugin("alarm", actor, { action: "set", expression: "for 7 tomorrow called gym" });
+    expect(result.ok).toBe(true);
+    const rows = db.select().from(scheduledJobs).where(eq(scheduledJobs.job, "alarms.fire")).all();
+    const row = rows[rows.length - 1]!;
+    expect(JSON.parse(row.inputs)).toEqual({ task: "gym" });
+    const when = new Date(row.nextRunAt);
+    expect(when.getHours()).toBe(7);
+    expect(when.getMinutes()).toBe(0);
+    expect(when.getTime()).toBeGreaterThan(Date.now());
+  });
+
   test("the package reply includes its schedule card", async () => {
     const actor = await person("Sage");
     const result = await runPlugin("alarm", actor, { action: "set", expression: "tomorrow at 7 for gym" });

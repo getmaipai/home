@@ -27,7 +27,7 @@ function TimerCountdown({ at }: { at: string }) {
 export function ComingUpPage() {
   const queryClient = useQueryClient();
   const query = useQuery({ queryKey: QUERY_KEY, queryFn: api.comingUp });
-  const items = query.data ?? [];
+  const items = useMemo(() => query.data ?? [], [query.data]);
   const groups = useMemo(() => {
     const now = new Date();
     const today = now.toDateString();

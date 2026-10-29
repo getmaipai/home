@@ -2,7 +2,7 @@
 // store.md step 8). Real chrono-node parsing for remind, no network, no
 // model - deterministic and offline by the org's own testing standard.
 import { describe, expect, test } from "bun:test";
-import { parseReminder, parseTimerDuration } from "@/lib/reminderParsing";
+import { parseAlarmRequest, parseReminder, parseTimerDuration } from "@/lib/reminderParsing";
 import { HostError } from "@maipai/spec/emulators/ts/host-emulator.js";
 
 const REF = new Date("2026-09-06T12:00:00");
@@ -111,5 +111,34 @@ describe("parseTimerDuration", () => {
 
   test("throws invalid_input for zero or negative durations", () => {
     expect(() => parseTimerDuration("0 minutes", REF)).toThrow(HostError);
+  });
+});
+
+describe("parseAlarmRequest", () => {
+  const MORNING = new Date("2026-09-06T12:00:00");
+  test("a bare hour for tomorrow is the morning, and the label is cut out", () => {
+    const result = parseAlarmRequest("for 7 tomorrow called gym", MORNING);
+    expect(result.task).toBe("gym");
+    const when = new Date(result.when);
+    expect(when.getDate()).toBe(7);
+    expect(when.getHours()).toBe(7);
+    expect(when.getMinutes()).toBe(0);
+  });
+  test("a bare hour today picks the next occurrence of that hour", () => {
+    const result = parseAlarmRequest("at 6:30", MORNING);
+    const when = new Date(result.when);
+    expect(when.getHours()).toBe(18);
+    expect(when.getMinutes()).toBe(30);
+    expect(when.getDate()).toBe(6);
+  });
+  test("an explicit am or pm is left alone", () => {
+    expect(new Date(parseAlarmRequest("at 6:30 pm tomorrow", MORNING).when).getHours()).toBe(18);
+    expect(new Date(parseAlarmRequest("tomorrow at 7am for gym", MORNING).when).getHours()).toBe(7);
+  });
+  test("no label defaults to Alarm", () => {
+    expect(parseAlarmRequest("at 6:30", MORNING).task).toBe("Alarm");
+  });
+  test("no time is refused", () => {
+    expect(() => parseAlarmRequest("called gym", MORNING)).toThrow(HostError);
   });
 });
