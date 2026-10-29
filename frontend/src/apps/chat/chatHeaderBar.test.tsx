@@ -389,7 +389,7 @@ describe("ChatHeaderBar", () => {
       await waitFor(() => expect(view.getByTestId("route-path")).toHaveTextContent("/companions"));
       act(() => { fireEvent.pointerDown(view.getByRole("button", { name: "Change companion" }), { button: 0, ctrlKey: false, pointerId: 1 }); fireEvent.click(view.getByRole("button", { name: "Change companion" })); });
       fireEvent.click(await view.findByRole("menuitem", { name: "Create a companion" }));
-      await waitFor(() => expect(view.getByTestId("route-path")).toHaveTextContent("/companions/start"));
+      await waitFor(() => expect(view.getByTestId("route-path")).toHaveTextContent("/companions/create"));
       act(() => { fireEvent.pointerDown(view.getByRole("button", { name: "Change companion" }), { button: 0, ctrlKey: false, pointerId: 1 }); fireEvent.click(view.getByRole("button", { name: "Change companion" })); });
       fireEvent.click(await view.findByRole("menuitemradio", { name: "Rivet" }));
       await waitFor(() => expect(onCompanionChange).toHaveBeenCalled());

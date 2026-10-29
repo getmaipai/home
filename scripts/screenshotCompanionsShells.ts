@@ -36,13 +36,12 @@ try {
   try {
     const shots = [
       ["yours", "/companions", "Yours"], ["discover", "/companions", "Discover"],
-      ["tasks", "/companions/lively-adult", "Tasks"], ["wizard-one", "/companions/start", "Pick a template"],
-      ["wizard-two", "/companions/start", "Name and look"], ["chat-header", "/chat", "Conversation actions"], ["chat-mention", "/chat", "Message input"],
+      ["tasks", "/companions/lively-adult", "Tasks"], ["create", "/companions/create", "Create Character"],
+      ["chat-header", "/chat", "Conversation actions"], ["chat-mention", "/chat", "Message input"],
     ] as const;
     const locatorFor = (page: Page, name: typeof shots[number][0], text: string) => {
       if (name === "chat-header") return page.getByRole("button", { name: "Conversation actions" });
       if (name === "chat-mention") return page.getByRole("textbox", { name: "Message input" });
-      if (name === "wizard-one" || name === "wizard-two") return page.getByTestId("companion-wizard");
       return page.getByText(text, { exact: false });
     };
     for (const theme of ["light", "dark"] as const) for (const width of [1440, 390] as const) {
@@ -59,7 +58,6 @@ try {
           await page.getByRole("tab", { name: "Tasks" }).click();
           await page.getByRole("tab", { name: "Tasks", selected: true }).waitFor();
         }
-        if (name === "wizard-two") { await page.getByRole("button", { name: "Continue" }).click(); await page.getByLabel("Name").waitFor({ timeout: 20000 }); }
         if (name === "chat-header") {
           const companions = await fetch(`${base}/api/companions`, { headers: { Cookie: owner } }).then((response) => response.json()) as { companions: Array<{ id: string; name: string }>; default_id: string };
           const defaultName = companions.companions.find((card) => card.id === companions.default_id)?.name ?? "MaiPai";

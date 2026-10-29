@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-10-29T05:04:22.363Z",
+  "generatedAt": "2026-10-29T05:59:14.385Z",
   "kitTag": "ui-v0.5.416",
   "items": [
     {
@@ -1356,7 +1356,7 @@
       "group": "studio",
       "verdict": "later",
       "verdictReason": "New kit page layout (title, actions, side nav and rail) for studio screens; Home adopts it when the appearance studio screen is built on it.",
-      "implemented": true
+      "implemented": false
     },
     {
       "file": "subagent-list.tsx",

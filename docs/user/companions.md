@@ -22,6 +22,21 @@ Open one of your chats and choose the companion in the chat header to use it for
 
 On a companion's page, you can see your chats with it and start a new chat.
 
+## Make your own
+
+Teens and adults can make a companion. Children cannot. If you are a child, ask an owner or an admin.
+
+1. Open **Companions** and choose **New companion**.
+2. **Create Character.** Describe your companion, or choose **Upload Photo**. Pick a style, such as Cartoon or Anime, then choose **Generate Character**. If you do not like the picture, make another. Choose **Approve & Continue** when you do.
+3. **Animate Character.** Home makes the moving versions of your picture, such as idle, talking and sad. The ones marked **Required** must be done before you go on. Choose **Generate Required** to make them. You can look at each one and redo any you do not like. Then choose **Continue**.
+4. **Customize Companion.** Pick a voice and a personality. Write a short backstory, or choose **Generate** for a suggestion. You can edit it. Choose **Save Companion**.
+
+Home saves your work as a draft while you go. If you close the window early, Home asks if you want to keep the draft or discard it.
+
+## Change a companion
+
+On a companion's card, open the menu and choose **Edit**. It opens on the same three screens, starting from the current picture. Choose **Make a copy** to start from a companion you like.
+
 ## Examples
 
 Names and companions in this guide are examples. What you can pick depends on your age and what the owner has added.

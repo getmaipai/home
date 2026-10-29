@@ -635,3 +635,33 @@ describe("Routes notifications history page", () => {
     }
   });
 });
+
+function PathProbe() {
+  return <div data-testid="path-probe">{useLocation().pathname}</div>;
+}
+
+// COMPANION-3S-01 CUTOVER-3S-01: the old create and edit URLs land on the three-screen flow.
+describe("retired companion routes", () => {
+  for (const [from, to] of [["/companions/start", "/companions/create"], ["/companions/new", "/companions/create"], ["/companions/hc-one/edit", "/companions/hc-one/create"]] as const) {
+    test(`${from} redirects to ${to}`, async () => {
+      const originalFetch = globalThis.fetch;
+      globalThis.fetch = mock((input: RequestInfo | URL) => {
+        const url = new URL(typeof input === "string" ? input : input.toString(), "http://home");
+        if (url.pathname === "/api/health") return Promise.resolve(healthResponse());
+        if (url.pathname === "/api/setup-checklist" || url.pathname === "/api/apps" || url.pathname === "/api/jobs") return Promise.resolve(Response.json([]));
+        if (url.pathname === "/api/settings") return Promise.resolve(Response.json([]));
+        return Promise.resolve(Response.json({}));
+      }) as unknown as typeof fetch;
+      try {
+        const view = renderWithQueryClient(
+          <MemoryRouter initialEntries={[from]}>
+            <ToastProvider><><Routes person={makePerson()} onSignedIn={() => {}} /><PathProbe /></></ToastProvider>
+          </MemoryRouter>,
+        );
+        await waitFor(() => expect(view.getByTestId("path-probe").textContent).toBe(to));
+      } finally {
+        globalThis.fetch = originalFetch;
+      }
+    });
+  }
+});

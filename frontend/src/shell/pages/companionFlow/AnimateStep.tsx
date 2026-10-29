@@ -10,7 +10,7 @@ import { StackedAlphaVideo } from "@maipai/ui/src/elements/stacked-alpha-video";
 import { getIcon } from "@maipai/ui/src/icons";
 import { api, type CompanionStateRow, type CompanionStateUrls } from "@/lib/api";
 import { useCompanionStates } from "@/shell/pages/useCompanionStates";
-import { useClipPreview } from "@/shell/pages/CompanionStateContent";
+import { useClipPreview } from "@/shell/pages/companionFlow/useClipPreview";
 import { lookKey } from "@/shell/pages/companionFlow/CreateCharacterStep";
 import { flowErrorText } from "@/shell/pages/companionFlow/errors";
 import { useKeyframesFirst } from "@/shell/pages/companionFlow/useKeyframesFirst";

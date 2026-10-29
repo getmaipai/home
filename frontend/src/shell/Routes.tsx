@@ -1,7 +1,7 @@
 import { lazy, Suspense, useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { DrawerSectionsContext } from "@/shell/drawerSections";
 import { NotFoundPage } from "@/shell/pages/NotFoundPage";
-import { Navigate, Outlet, Route, Routes as RouterRoutes, useLocation, useMatch, useNavigate } from "react-router-dom";
+import { Navigate, Outlet, Route, Routes as RouterRoutes, useLocation, useMatch, useNavigate, useParams } from "react-router-dom";
 import FullLayout from "@maipai/ui/src/dashboard/layouts/full/FullLayout";
 import BlankLayout from "@maipai/ui/src/dashboard/layouts/blank/BlankLayout";
 import { ThemeProvider } from "@maipai/ui/src/dashboard/context/shadcntheme/ThemeContext";
@@ -67,9 +67,7 @@ import { AmbientPageContextProvider, ambientPageContextForRoute } from "@/shell/
 const FamilyPage = lazyNamed(() => import("@/shell/pages/FamilyPage"), "FamilyPage");
 const CompanionsPage = lazyNamed(() => import("@/shell/pages/CompanionsPage"), "CompanionsPage");
 const CompanionDetailPage = lazyNamed(() => import("@/shell/pages/CompanionsPage"), "CompanionDetailPage");
-const CompanionEditorPage = lazyNamed(() => import("@/shell/pages/CompanionEditorPage"), "CompanionEditorPage");
 const CompanionFlowPage = lazyNamed(() => import("@/shell/pages/companionFlow/CompanionFlowPage"), "CompanionFlowPage");
-const CompanionWizardPage = lazyNamed(() => import("@/shell/pages/CompanionWizardPage"), "CompanionWizardPage");
 const ProjectsPage = lazyNamed(() => import("@/shell/pages/ProjectsPage"), "ProjectsPage");
 const PersonProfilePage = lazyNamed(() => import("@/shell/pages/PersonProfilePage"), "PersonProfilePage");
 const StoragePage = lazyNamed(() => import("@/shell/pages/StoragePage"), "StoragePage");
@@ -424,9 +422,9 @@ function RoutesWithIncognito({ person, onPersonChange, onSignedOut, appCatalog }
             <Route path="companions" element={<CompanionsPage />} />
             <Route path="companions/create" element={<CompanionFlowPage />} />
             <Route path="companions/:id/create" element={<CompanionFlowPage />} />
-            <Route path="companions/start" element={<CompanionWizardPage />} />
-            <Route path="companions/new" element={<CompanionEditorPage />} />
-            <Route path="companions/:id/edit" element={<CompanionEditorPage />} />
+            <Route path="companions/start" element={<Navigate to="/companions/create" replace />} />
+            <Route path="companions/new" element={<Navigate to="/companions/create" replace />} />
+            <Route path="companions/:id/edit" element={<CompanionEditRedirect />} />
             <Route path="companions/:id" element={<CompanionDetailPage />} />
             <Route path="people" element={<FamilyPage person={person} />} />
             <Route path="people/:id" element={location.search.includes("tab=memories") ? <LegacyProfileMemoriesRedirect selfId={person.id} /> : <PersonProfilePage person={person} onPersonChange={onPersonChange} />} />
@@ -475,6 +473,12 @@ function SignedOutRoutes({ onSignedIn }: { onSignedIn: () => void }) {
       <Route path="*" element={<Navigate to="/sign-in" replace />} />
     </RouterRoutes>
   );
+}
+
+/** Old bookmarks to /companions/:id/edit land on the three-screen flow. */
+function CompanionEditRedirect() {
+  const { id } = useParams<{ id: string }>();
+  return <Navigate to={`/companions/${encodeURIComponent(id ?? "")}/create`} replace />;
 }
 
 export function Routes({ person, onSignedIn, onPersonChange = () => {} }: { person: Roster | null; onSignedIn: () => void; onPersonChange?: () => void | Promise<void> }) {

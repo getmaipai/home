@@ -167,7 +167,7 @@ type ShellsProps = { shells?: boolean; onMenu?: (() => void) | undefined; menuEx
 
 function CompanionPickerFooter() {
   const navigate = useNavigate();
-  return <><DropdownMenuItem onSelect={() => navigate("/companions")}>Manage companions</DropdownMenuItem><DropdownMenuItem onSelect={() => navigate("/companions/start")}>Create a companion</DropdownMenuItem></>;
+  return <><DropdownMenuItem onSelect={() => navigate("/companions")}>Manage companions</DropdownMenuItem><DropdownMenuItem onSelect={() => navigate("/companions/create")}>Create a companion</DropdownMenuItem></>;
 }
 
 export function ChatHeaderBar({ phoneRow = false, trailing, shells = false, onMenu, menuExpanded, menuControls, onHistory, onCall }: { phoneRow?: boolean; trailing?: ReactNode } & ShellsProps = {}) {

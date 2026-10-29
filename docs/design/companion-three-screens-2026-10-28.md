@@ -133,7 +133,7 @@ Port list (UI-3S-01c, 2026-10-29). Where each old behaviour lives now:
 | The all-ages checklist screen | Card menu, "Audience" (owners and admins only): a small dialog with the checklist for "Everyone" and Home's one-sentence refusal when the artwork or the look's cap does not allow it. |
 | Pronouns and interests | Kept as they are on edit and not shown. Save sends neither, so they are never overwritten. |
 | Make a copy, Delete, Mark ready or Back to draft | Card menu on `/companions`, with the existing mutations and the delete confirmation. |
-| The old wizard, editor and studio pages | Still in the tree and still routed (`/companions/new`, `/companions/:id/edit`), unlinked from the new button when the preview setting is on. Removed in a later slice. |
+| The old wizard, editor and studio pages | Removed (CUTOVER-3S-01). `/companions/start`, `/companions/new` and `/companions/:id/edit` redirect to `/companions/create` and `/companions/:id/create`; the three screens are the only create and edit flow, no longer behind `companions.preview_shells`. |
 
 
 ## 6. Reuse check (principle 6)

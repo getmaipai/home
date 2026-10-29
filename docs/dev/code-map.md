@@ -188,11 +188,6 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `frontend/src/shell/pages/ChatShortcutReference.tsx` | ChatShortcutReference |
 | `frontend/src/shell/pages/CommandsPage.tsx` | CommandsIcon, CommandsPage |
 | `frontend/src/shell/pages/CompanionAudienceDialog.tsx` | CompanionAudienceDialog |
-| `frontend/src/shell/pages/CompanionEditorPage.tsx` | CompanionEditorPage |
-| `frontend/src/shell/pages/CompanionLookTab.tsx` | CompanionLookTab |
-| `frontend/src/shell/pages/CompanionStateContent.tsx` | useClipPreview, CompanionStateContents |
-| `frontend/src/shell/pages/CompanionStudioTab.tsx` | CompanionStudioTab |
-| `frontend/src/shell/pages/CompanionWizardPage.tsx` | CompanionWizardPage |
 | `frontend/src/shell/pages/CompanionsPage.tsx` | CompanionsPage, CompanionDetailPage |
 | `frontend/src/shell/pages/DashboardPage.tsx` | DashboardPage |
 | `frontend/src/shell/pages/EnginesPage.tsx` | EnginesIcon, EnginesConsole |

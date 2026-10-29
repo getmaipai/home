@@ -43,7 +43,7 @@ test("directory cards show status, meta, actions and the new companion link", as
   expect(view.getAllByRole("button", { name: "Chat" }).length).toBe(2);
   expect(view.getAllByRole("button", { name: "View profile" }).length).toBe(2);
   expect(view.getByRole("searchbox", { name: "Search companions" })).toBeTruthy();
-  expect(view.getByRole("link", { name: "New companion" }).getAttribute("href")).toBe("/companions/new");
+  expect(view.getByRole("link", { name: "New companion" }).getAttribute("href")).toBe("/companions/create");
   // A portrait image only appears once the browser has loaded it, so the pictured card shows no seeded face yet; the card without a picture shows exactly one (never a bare letter).
   expect(view.container.querySelectorAll('img[src^="data:image/svg+xml"]').length).toBe(1);
   expect(view.getAllByRole("button", { name: "New companion" }).length).toBe(1);
@@ -170,7 +170,7 @@ test("the household detail shows settings icon and copy actions", async () => {
   expect(view.getByText(/Talks like a friend/)).toBeTruthy();
   expect(view.getByText(/Wow, a slushie/)).toBeTruthy();
   expect(view.getByRole("button", { name: "Play a sample" })).toBeTruthy();
-  expect(view.getByRole("link", { name: "Edit" }).getAttribute("href")).toBe("/companions/lively-child/edit");
+  expect(view.getByRole("link", { name: "Edit" }).getAttribute("href")).toBe("/companions/lively-child/create");
   expect(view.getByRole("button", { name: "Customize a copy" })).toBeTruthy();
   
   expect(saved).toEqual([]);
@@ -415,6 +415,17 @@ test("Edit opens the three-screen flow for that companion, and the Audience dial
   fireEvent.click(view.getByRole("button", { name: "Save audience" }));
   expect((await view.findByRole("alert")).textContent).toBe("This look is for adults. Pick a cartoon look to make it for everyone.");
   fireEvent.click(view.getByRole("button", { name: "Cancel" }));
+  await openCardActions(view);
+  fireEvent.click(await view.findByRole("menuitem", { name: "Edit" }));
+  await waitFor(() => expect(view.getByTestId("location").textContent).toBe("/companions/lively-child/create"));
+});
+
+test("with the preview setting off, New companion and the card menu Edit still open the three-screen flow", async () => {
+  api.settingsValues = async () => [{ key: "companions.preview_shells", value: false, source: "user", label: "Preview", level: "basic", secret: false }] as never;
+  api.companions = async (): Promise<CompanionList> => ({ allowed: true, can_create: true, can_discover: false, companions: [card({ is_household: true, can_edit: true, status: "ready" })], discover: [], robots: null, default_id: "" });
+  const view = open("/companions");
+  await view.findByText("Sprout");
+  expect(view.getByRole("link", { name: "New companion" }).getAttribute("href")).toBe("/companions/create");
   await openCardActions(view);
   fireEvent.click(await view.findByRole("menuitem", { name: "Edit" }));
   await waitFor(() => expect(view.getByTestId("location").textContent).toBe("/companions/lively-child/create"));
