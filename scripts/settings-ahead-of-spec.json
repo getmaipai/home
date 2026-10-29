@@ -6,5 +6,8 @@
   "news.default_topics.teen",
   "news.default_topics.child",
   "music.lyrics_online",
-  "stack.engines.stt.smart_turn"
+  "stack.engines.stt.smart_turn",
+  "notifications.remind.due.telegram",
+  "notifications.alarm.due.telegram",
+  "notifications.timer.done.telegram"
 ]

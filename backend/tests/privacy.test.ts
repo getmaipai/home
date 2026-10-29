@@ -21,6 +21,13 @@ async function signInAsOwner(client: TestClient) {
 // receives it." These are the tests that keep that table honest as the
 // product grows, which is the only thing that makes it worth having.
 describe("the what-leaves-the-house table", () => {
+  test("the Telegram row names reminder and alarm labels and times and says they are not encrypted", () => {
+    setHouseholdSettingValue("notifications.telegram.bot_token", "test-token");
+    const row = platformConnections().find((connection) => connection.id === "platform:telegram");
+    expect(row?.what).toContain("Reminder and alarm labels and times are sent to Telegram");
+    expect(row?.what).toContain("Telegram does not encrypt them");
+  });
+
   test("every row answers all four questions the standard asks", () => {
     const rows = privacyConnections();
     expect(rows.length).toBeGreaterThan(0);

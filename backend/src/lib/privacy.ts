@@ -167,7 +167,7 @@ export function platformConnections(): PrivacyConnection[] {
     // already follows.
     row("platform:telegram", telegramConfigured() ? "api.telegram.org" : null, {
       when: "when a notification you or your household chose to send to Telegram fires",
-      what: "the rendered notification text and your linked Telegram chat id. Nothing anyone in the house said or asked otherwise.",
+      what: "The rendered notification text and your linked Telegram chat id. Reminder and alarm labels and times are sent to Telegram when you turn those notifications on. Telegram does not encrypt them. Nothing anyone in the house said or asked otherwise is sent.",
     }),
     // THIN-4H: only once an adult has added a hosted search key; with none
     // set, search stays on the household's own SearXNG and nothing is listed.

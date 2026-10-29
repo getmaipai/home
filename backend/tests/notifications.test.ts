@@ -112,6 +112,64 @@ async function setPersonSetting(client: TestClient, personId: string, key: strin
 }
 
 describe("trigger()", () => {
+  const personalDueNotifications = [
+    { id: "remind.due", level: "time_sensitive" as const, audience: "person" as const, template: "Reminder: {task}", configurable: true, default_channels: ["in_app"] },
+    { id: "alarm.due", level: "time_sensitive" as const, audience: "person" as const, template: "Alarm: {task}", configurable: true, default_channels: ["in_app"] },
+    { id: "timer.done", level: "passive" as const, audience: "person" as const, template: "Your {duration_text} timer is up.", configurable: true, default_channels: ["in_app"] },
+  ];
+
+  test("reminders, alarms and timers stay off on Telegram until each person links and opts in", async () => {
+    const originalFetch = globalThis.fetch;
+    let calls = 0;
+    globalThis.fetch = mock(() => { calls++; return Promise.resolve(new Response("{}", { status: 200 })); }) as unknown as typeof fetch;
+    try {
+      const { client, row } = await owner();
+      setHouseholdSettingValue("notifications.telegram.bot_token", "test-token");
+      for (const notification of personalDueNotifications) registerPackageNotificationTypes({ id: notification.id.split(".")[0]!, notifications: [notification] });
+      for (const [type, payload] of [["remind.due", { task: "call Nadia" }], ["alarm.due", { task: "wake up" }], ["timer.done", { duration_text: "ten minutes" }]] as const) {
+        await trigger(type, payload, { personId: row.id });
+      }
+      expect(calls).toBe(0);
+      expect(listPending(row).map((item) => item.channels)).toEqual([["in_app"], ["in_app"], ["in_app"]]);
+      await setPersonSetting(client, row.id, "notifications.telegram.chat_id", "12345");
+      for (const type of ["remind.due", "alarm.due", "timer.done"]) {
+        await expect(setPersonSetting(client, row.id, `notifications.${type}.telegram`, true)).resolves.toBeUndefined();
+      }
+      for (const [type, payload] of [["remind.due", { task: "call Nadia" }], ["alarm.due", { task: "wake up" }], ["timer.done", { duration_text: "ten minutes" }]] as const) {
+        await trigger(type, payload, { personId: row.id });
+      }
+      expect(calls).toBe(3);
+      expect(listPending(row).filter((item) => ["remind.due", "alarm.due", "timer.done"].includes(item.typeId))).toHaveLength(6);
+    } finally { globalThis.fetch = originalFetch; }
+  });
+
+  test("an opted-in child receives the Telegram notification only at their own linked chat, held by quiet hours", async () => {
+    setSystemTime(new Date(2026, 9, 6, 2, 0));
+    const originalFetch = globalThis.fetch;
+    const chats: string[] = [];
+    globalThis.fetch = mock((_url: string, init?: RequestInit) => {
+      chats.push(String(JSON.parse(String(init?.body)).chat_id));
+      return Promise.resolve(new Response("{}", { status: 200 }));
+    }) as unknown as typeof fetch;
+    try {
+      const { client: ownerClient } = await owner();
+      const child = await withRole(ownerClient, "Nova", "child");
+      setHouseholdSettingValue("notifications.telegram.bot_token", "test-token");
+      setHouseholdSettingValue("household.quiet_hours.from", "21:00");
+      setHouseholdSettingValue("household.quiet_hours.to", "07:00");
+      for (const notification of personalDueNotifications) registerPackageNotificationTypes({ id: notification.id.split(".")[0]!, notifications: [notification] });
+      await setPersonSetting(child.client, child.row.id, "notifications.telegram.chat_id", "child-chat");
+      await setPersonSetting(child.client, child.row.id, "notifications.remind.due.telegram", true);
+      await trigger("remind.due", { task: "call Nadia" }, { personId: child.row.id });
+      expect(chats).toEqual([]);
+      expect(listPending(child.row)).toHaveLength(0);
+      setSystemTime(new Date(2026, 9, 6, 7, 0));
+      await deliverHeldNotifications();
+      expect(chats).toEqual(["child-chat"]);
+      expect(listPending(child.row)[0]?.channels).toEqual(["in_app", "telegram"]);
+    } finally { globalThis.fetch = originalFetch; mock.restore(); }
+  });
+
   test("private and unclassified notifications send only the content-free robot waiting form", async () => {
     setSystemTime(new Date(2026, 9, 6, 12, 0));
     const { client, row } = await owner();

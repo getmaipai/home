@@ -8,10 +8,11 @@
 // same way it reads the role helpers, so the page and the server's global
 // search share one definition (principle 4).
 
-const TELEGRAM_EVENTS = [
+const OUTSIDE_CHANNEL_EVENTS = [
   "approvals.requested", "backups.target_failing", "engines.problem", "engines.update_applied", "engines.update_available",
   "engines.update_failed", "file.shared_with_household", "file.shared_with_you", "memory.judge_failed", "memory.updated",
   "model.download_failed", "model.download_ready", "person.band_changed", "repairs.new", "updates.available",
+  "remind.due", "alarm.due", "timer.done",
 ];
 
 /** The ease of use keys (EASE-OF-USE-01c). Comfort, not protection: a child and a teen change
@@ -33,7 +34,7 @@ export const CHILD_VISIBLE_SETTING_KEYS: readonly string[] = [
   "person.quiet_hours.from",
   "person.quiet_hours.to",
   "notifications.telegram.chat_id",
-  ...TELEGRAM_EVENTS.map((event) => `notifications.${event}.telegram`),
+  ...OUTSIDE_CHANNEL_EVENTS.map((event) => `notifications.${event}.telegram`),
   "ui.appearance",
   "ui.look",
   "ui.show_turn_stats",

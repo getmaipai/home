@@ -9,6 +9,12 @@ import { getSettingsAreas } from "@/lib/settingsAreas";
 import { SPEC_DIR } from "@/lib/specDir";
 
 describe("settings registry and the spec's areas", () => {
+  test("reminder, alarm and timer Telegram choices are person-scoped and off by default", () => {
+    for (const key of ["notifications.remind.due.telegram", "notifications.alarm.due.telegram", "notifications.timer.done.telegram"]) {
+      expect(getRegistry().find((entry) => entry.key === key)).toMatchObject({ scope: "person", selector: "boolean", default: false, lives_in: "person.telegram" });
+    }
+  });
+
   test("the emergency key completion fact is household-scoped and contains no key material", () => {
     const key = getRegistry().find((entry) => entry.key === "backups.emergency_kit_saved_at");
     expect(key).toMatchObject({ scope: "household", selector: "text", default: null, secret: false });
