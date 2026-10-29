@@ -1,6 +1,6 @@
 {
   "id": "weather",
-  "version": "0.3.8",
+  "version": "0.3.9",
   "kind": "plugin",
   "category": "Utilities",
   "display": "Weather",
@@ -44,25 +44,40 @@
   "min_role": "child",
   "consequential": false,
   "offline": "unavailable",
-  "returns_blocks": ["weather_card", "spec_sheet", "chart", "data_table"],
+  "returns_blocks": [
+    "weather_card",
+    "spec_sheet",
+    "chart",
+    "data_table"
+  ],
   "config": [
     {
       "key": "weather.places",
       "scope": "person",
       "selector": "location",
-      "range": { "multiple": true, "allow_current": false },
+      "range": {
+        "multiple": true,
+        "allow_current": false
+      },
       "default": [],
       "label": "Weather places",
       "help": "Places saved for weather answers.",
       "level": "basic",
       "lives_in": "weather",
-      "honoured_by": ["home"]
+      "honoured_by": [
+        "home"
+      ]
     },
     {
       "key": "weather.unit",
       "scope": "person",
       "selector": "select",
-      "range": { "options": ["fahrenheit", "celsius"] },
+      "range": {
+        "options": [
+          "fahrenheit",
+          "celsius"
+        ]
+      },
       "default": "fahrenheit",
       "label": "Temperature unit",
       "help": "Whether weather shows degrees Fahrenheit or Celsius.",
@@ -75,26 +90,50 @@
         }
       },
       "lives_in": "weather",
-      "honoured_by": ["home"]
+      "honoured_by": [
+        "home"
+      ]
     },
     {
       "key": "weather.default_place",
       "scope": "person",
       "selector": "location",
-      "range": { "multiple": false, "allow_current": true },
+      "range": {
+        "multiple": false,
+        "allow_current": true
+      },
       "default": "current",
       "label": "Weather default place",
       "help": "The place weather uses when you do not name one.",
       "level": "basic",
       "lives_in": "weather",
-      "honoured_by": ["home"]
+      "honoured_by": [
+        "home"
+      ]
+    },
+    {
+      "key": "weather.alerts",
+      "scope": "household",
+      "selector": "boolean",
+      "default": false,
+      "label": "Show weather alerts",
+      "help": "When on, Home checks active US weather alerts for the place being viewed. It sends coordinates rounded to the same precision as Weather, no more than once every five minutes. No request is made when this is off.",
+      "level": "advanced",
+      "secret": false,
+      "lives_in": "household.weather",
+      "honoured_by": [
+        "home"
+      ]
     }
   ],
   "data_sources": [
     {
       "id": "open-meteo",
       "attribution": "Weather data by Open-Meteo.com (CC BY 4.0)",
-      "hosts": ["geocoding-api.open-meteo.com", "api.open-meteo.com"],
+      "hosts": [
+        "geocoding-api.open-meteo.com",
+        "api.open-meteo.com"
+      ],
       "destination": "Open-Meteo (open-meteo.com), a free public weather API",
       "when": "each time the family asks for the weather somewhere or opens a place in the Weather app, and about once an hour in the background for your home place",
       "what": "the place name you spoke or your saved place name; with Current location on, your device coordinates rounded to about 1 km (about 10 km for a child), sent for that request only and never stored; your home place name for the hourly refresh",
@@ -115,7 +154,9 @@
       "audience": "household",
       "template": "{event}: {headline}",
       "configurable": true,
-      "default_channels": ["in_app"]
+      "default_channels": [
+        "in_app"
+      ]
     }
   ],
   "cache": {
@@ -136,18 +177,53 @@
   "background": false,
   "contributes": {
     "pages": [
-      { "id": "index", "label": "Weather", "icon": "cloud-sun", "nav": true, "kind": "schema", "module": "index", "pinned_by_default": true, "pin_order": 10, "keywords": ["forecast", "rain", "snow", "temperature", "outside", "hourly"] }
+      {
+        "id": "index",
+        "label": "Weather",
+        "icon": "cloud-sun",
+        "nav": true,
+        "kind": "schema",
+        "module": "index",
+        "pinned_by_default": true,
+        "pin_order": 10,
+        "keywords": [
+          "forecast",
+          "rain",
+          "snow",
+          "temperature",
+          "outside",
+          "hourly"
+        ]
+      }
     ],
     "data": [
-      { "id": "places", "surface": "weather", "rows": "places" },
-      { "id": "forecast", "surface": "weather", "refresh_s": 1800 }
+      {
+        "id": "places",
+        "surface": "weather",
+        "rows": "places"
+      },
+      {
+        "id": "forecast",
+        "surface": "weather",
+        "refresh_s": 1800
+      }
     ],
     "settings_area": {
       "id": "weather",
       "title": "Weather",
       "app": "/apps/weather",
-      "audience": { "min_role": "child" },
-      "groups": [{ "label": "Weather", "sections": ["places"] }],
+      "audience": {
+        "min_role": "child"
+      },
+      "groups": [
+        {
+          "label": "Weather",
+          "sections": [
+            "places",
+            "alerts"
+          ]
+        }
+      ],
       "sections": [
         {
           "id": "places",
@@ -155,10 +231,38 @@
           "icon": "map-pin",
           "kind": "keys",
           "cards": [
-            { "label": "Places", "group": "weather", "scope": "person" },
-            { "label": "Alerts", "group": "household.weather", "scope": "household", "levels": ["advanced"] }
+            {
+              "label": "Places",
+              "group": "weather",
+              "scope": "person"
+            }
           ],
-          "keywords": ["location", "city", "home", "current location", "saved places"]
+          "keywords": [
+            "location",
+            "city",
+            "home",
+            "current location",
+            "saved places"
+          ]
+        },
+        {
+          "id": "alerts",
+          "label": "Alerts",
+          "icon": "bell",
+          "kind": "keys",
+          "min_role": "admin",
+          "cards": [
+            {
+              "label": "Alerts",
+              "group": "household.weather",
+              "scope": "household"
+            }
+          ],
+          "keywords": [
+            "alerts",
+            "warnings",
+            "severe weather"
+          ]
         }
       ]
     },

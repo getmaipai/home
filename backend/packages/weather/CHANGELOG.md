@@ -2,6 +2,12 @@
 
 All notable changes to the Weather package, in [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) format.
 
+## [0.3.9] - 2026-10-29
+
+### Fixed
+
+- The weather.alerts key is declared by this package and drawn on its own admin-only Alerts page, so the package's settings area validates.
+
 ## [0.3.8] - 2026-10-29
 
 ### Fixed
