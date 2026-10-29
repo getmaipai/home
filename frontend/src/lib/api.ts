@@ -364,7 +364,7 @@ export interface CompanionList {
   robots: Array<{ id: string; name: string; controls: "child" | "teen" | "adult"; companion_id: string; companion_name: string | null }> | null;
 }
 
-export interface CompanionLookVersion { id: string; label: string; source: "upload" | "generated" | "edit"; width: number; height: number; created_at: string; from: string | null; url: string }
+export interface CompanionLookVersion { id: string; label: string; source: "upload" | "generated" | "edit"; width: number; height: number; created_at: string; from: string | null; clipped?: string[]; url: string }
 export interface CompanionLookView { version_id: string; url: string }
 type CompanionLookKey = `#${"00FF00" | "FF00FF"}`;
 export interface CompanionLookSheet { views: { left: CompanionLookView | null; right: CompanionLookView | null; mouth: CompanionLookView | null }; card: { text: string; colours: string[]; species: string } | null; key: CompanionLookKey; state: "empty" | "making" | "needs_review" | "approved"; approved_by: string | null; approved_at: string | null }
@@ -1505,7 +1505,7 @@ export const api = {
     if (!id || !version || extra.length) throw new Error("Companion portrait key must contain an id and version. Use the saved id/version key.");
     return `/api/companions/portraits/${encodeURIComponent(id)}/${encodeURIComponent(version)}`;
   },
-  uploadCompanionLook: (id: string, form: FormData) => request<{ id: string }>(`/api/companions/${encodeURIComponent(id)}/look/upload`, { method: "POST", body: form }),
+  uploadCompanionLook: (id: string, form: FormData) => request<{ id: string; clipped?: string[] }>(`/api/companions/${encodeURIComponent(id)}/look/upload`, { method: "POST", body: form }),
   setCompanionLookRest: (id: string, version_id: string) => request<{ rest: string; sheet_reset: boolean }>(`/api/companions/${encodeURIComponent(id)}/look/rest`, { method: "PUT", body: JSON.stringify({ version_id }) }),
   deleteCompanionLookVersion: (id: string, versionId: string) => request<void>(`/api/companions/${encodeURIComponent(id)}/look/${encodeURIComponent(versionId)}`, { method: "DELETE" }),
   generateCompanionLook: (id: string, body: { prompt?: string; style?: string; custom_style?: string; count?: number } = {}) => request<{ job: string }>(`/api/companions/${encodeURIComponent(id)}/look/generate`, { method: "POST", body: JSON.stringify(body) }),
@@ -1521,7 +1521,8 @@ export const api = {
   setCompanionAudience: (id: string, body: { audience: "adult" | "teen" | "all"; confirmed?: boolean }) => request<{ id: string }>(`/api/companions/${encodeURIComponent(id)}/audience`, { method: "PUT", body: JSON.stringify(body) }),
   createCompanionDraft: (name: string) => request<{ id: string }>("/api/companions/draft", { method: "POST", body: JSON.stringify({ name }) }),
   restyleCompanionLook: (id: string, body: { version_id: string; style: string; custom_style?: string }) => request<{ job: string }>(`/api/companions/${encodeURIComponent(id)}/look/restyle`, { method: "POST", body: JSON.stringify(body) }),
-  prepareCompanionLook: (id: string, body: { version_id: string; remove_background: boolean; frame?: { zoom: number; x: number; y: number } }) => request<{ id: string }>(`/api/companions/${encodeURIComponent(id)}/look/prepare`, { method: "POST", body: JSON.stringify(body) }),
+  prepareCompanionLook: (id: string, body: { version_id: string; remove_background: boolean; frame?: { zoom: number; x: number; y: number } }) => request<{ id: string; clipped?: string[] }>(`/api/companions/${encodeURIComponent(id)}/look/prepare`, { method: "POST", body: JSON.stringify(body) }),
+  completeCompanionLook: (id: string, version_id: string) => request<{ job: string }>(`/api/companions/${encodeURIComponent(id)}/look/complete`, { method: "POST", body: JSON.stringify({ version_id }) }),
   approveCompanionLook: (id: string, version_id: string) => request<{ job: string }>(`/api/companions/${encodeURIComponent(id)}/look/approve`, { method: "POST", body: JSON.stringify({ version_id }) }),
   editCompanionLook: (id: string, body: { version_id: string; instruction: string }) => request<{ job: string }>(`/api/companions/${encodeURIComponent(id)}/look/edit`, { method: "POST", body: JSON.stringify(body) }),
   makeCompanionLookSheet: (id: string) => request<{ job: string; card_source: "model" | "look_prompt" }>(`/api/companions/${encodeURIComponent(id)}/look/sheet`, { method: "POST" }),

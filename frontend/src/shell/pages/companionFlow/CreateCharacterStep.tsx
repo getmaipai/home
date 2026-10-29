@@ -7,9 +7,11 @@ import { Textarea } from "@maipai/ui/src/ui/textarea";
 import { ToggleGroup, ToggleGroupItem } from "@maipai/ui/src/ui/toggle-group";
 import { CharacterTile } from "@maipai/ui/src/primitives/CharacterTile";
 import { GenerationStage } from "@maipai/ui/src/elements/generation-stage";
+import { Progress } from "@maipai/ui/src/primitives/Progress";
 import { getIcon } from "@maipai/ui/src/icons";
-import { api, type CompanionLook, type CompanionLookJob } from "@/lib/api";
+import { api, ApiError, type CompanionLook, type CompanionLookJob } from "@/lib/api";
 import { flowErrorText } from "@/shell/pages/companionFlow/errors";
+import { DraggablePicture } from "@/shell/pages/companionFlow/DraggablePicture";
 import { DEFAULT_FRAME, PreviewControls, type PictureFrame } from "@/shell/pages/companionFlow/PreviewControls";
 
 export const lookKey = (id: string) => ["companions", id, "look"] as const;
@@ -32,12 +34,15 @@ export function CreateCharacterStep({ creating, companionId, initialName, onDraf
   const [jobId, setJobId] = useState<string | null>(null);
   const [sourceId, setSourceId] = useState<string | null>(null);
   const [shownId, setShownId] = useState<string | null>(null);
-  const [removeBackground, setRemoveBackground] = useState(false);
   const [frame, setFrame] = useState<PictureFrame>(DEFAULT_FRAME);
-  const [busy, setBusy] = useState(false);
+  // The placement already drawn into the shown picture; the live drag moves only by the difference.
+  const [baked, setBaked] = useState<PictureFrame>(DEFAULT_FRAME);
+  const [busyKind, setBusyKind] = useState<"generate" | "prepare" | "complete" | "approve" | null>(null);
   const [error, setError] = useState("");
+  const [previewError, setPreviewError] = useState("");
+  const placing = useRef<{ timer: ReturnType<typeof setTimeout> | null; seq: number }>({ timer: null, seq: 0 });
   const seeded = useRef(false);
-  const Sparkles = getIcon("sparkles"), Palette = getIcon("palette"), User = getIcon("user");
+  const Sparkles = getIcon("sparkles"), Palette = getIcon("palette"), User = getIcon("user"), Spinner = getIcon("loader");
 
   const lookQuery = useQuery({ queryKey: draftId ? lookKey(draftId) : ["companions", "none", "look"], queryFn: () => api.companionLook(draftId!), enabled: draftId !== null, retry: false });
   const look: CompanionLook | undefined = lookQuery.data;
@@ -49,7 +54,11 @@ export function CreateCharacterStep({ creating, companionId, initialName, onDraf
   });
   const job = jobQuery.data;
   const generating = running(job, jobId);
+  const busy = busyKind !== null;
   const locked = generating || busy;
+  // Moving the character stays possible while an earlier placement is being made; only the newest one is shown.
+  const placeLocked = generating || (busy && busyKind !== "prepare");
+  const makingCharacter = generating || busyKind === "generate" || busyKind === "complete";
 
   useEffect(() => { onDraft({ id: draftId, pictures: look?.versions.length ?? 0, name: draftName }); }, [draftId, look?.versions.length, draftName, onDraft]);
   // Reopening an existing companion starts from its current picture.
@@ -57,15 +66,16 @@ export function CreateCharacterStep({ creating, companionId, initialName, onDraf
     if (seeded.current || !look || shownId !== null || !look.versions.length) return;
     seeded.current = true;
     const current = look.rest ?? look.versions[look.versions.length - 1]!.id;
-    setSourceId(current); setShownId(current);
+    choose(current);
   }, [look, shownId]);
+  useEffect(() => () => { if (placing.current.timer) clearTimeout(placing.current.timer); }, []);
   useEffect(() => {
     if (!job || !jobId) return;
     if (job.state === "done") {
       const made = job.versions[job.versions.length - 1];
-      if (made) { setSourceId(made.id); setShownId(made.id); setFrame(DEFAULT_FRAME); setRemoveBackground(false); }
+      if (made) choose(made.id);
       void client.invalidateQueries({ queryKey: lookKey(draftId!) }); setJobId(null);
-    } else if (job.state === "failed") { setError(job.error ?? "The picture could not be made. Change the description and try again."); setJobId(null); }
+    } else if (job.state === "failed") { const text = job.error ?? "The picture could not be made. Change the description and try again."; setError(text); setPreviewError(text); setJobId(null); }
     else if (job.state === "cancelled") setJobId(null);
   }, [job, jobId, draftId, client]);
 
@@ -77,6 +87,12 @@ export function CreateCharacterStep({ creating, companionId, initialName, onDraf
   const ready = name.trim().length > 0 && (mode === "describe" ? description.trim().length > 0 : file !== null) && (!customSelected || customStyle.trim().length > 0);
   const canGenerate = ready && !locked && (look?.can_generate ?? true);
 
+  /** A new picture (made, uploaded or reopened) starts centred; any pending move for the old one is dropped. */
+  function choose(id: string) {
+    if (placing.current.timer) { clearTimeout(placing.current.timer); placing.current.timer = null; }
+    placing.current.seq++;
+    setSourceId(id); setShownId(id); setFrame(DEFAULT_FRAME); setBaked(DEFAULT_FRAME);
+  }
   function chooseMode(next: string) {
     if (next !== "describe" && next !== "upload") return;
     setMode(next); setStyle(next === "upload" ? "keep" : "cartoon");
@@ -89,7 +105,7 @@ export function CreateCharacterStep({ creating, companionId, initialName, onDraf
   // The draft is made once the name is typed.
   function nameDone() { if (name.trim() && !draftId) void ensureDraft().catch((e: unknown) => setError(flowErrorText(e))); }
   async function generate() {
-    setError(""); setBusy(true);
+    setError(""); setPreviewError(""); setBusyKind("generate");
     try {
       const id = await ensureDraft();
       const custom = customSelected ? { custom_style: customStyle.trim() } : {};
@@ -98,35 +114,50 @@ export function CreateCharacterStep({ creating, companionId, initialName, onDraf
         const body = new FormData(); body.append("image", file!);
         const uploaded = await api.uploadCompanionLook(id, body);
         await client.invalidateQueries({ queryKey: lookKey(id) });
-        if (style === "keep") { setSourceId(uploaded.id); setShownId(uploaded.id); setFrame(DEFAULT_FRAME); setRemoveBackground(false); }
+        if (style === "keep") choose(uploaded.id);
         else setJobId((await api.restyleCompanionLook(id, { version_id: uploaded.id, style, ...custom })).job);
       }
-    } catch (e) { setError(flowErrorText(e)); } finally { setBusy(false); }
+    } catch (e) { setError(flowErrorText(e)); } finally { setBusyKind(null); }
   }
-  async function prepare(nextRemove: boolean, nextFrame: PictureFrame) {
+  /** The person moved or zoomed the character: show it at once, and ask Home for the placed picture 400 ms after the last change. */
+  function place(next: PictureFrame) {
     if (!draftId || !sourceId) return;
-    const before = { removeBackground, frame };
-    setRemoveBackground(nextRemove); setFrame(nextFrame); setError("");
-    const plain = !nextRemove && nextFrame.zoom === 1 && nextFrame.x === DEFAULT_FRAME.x && nextFrame.y === DEFAULT_FRAME.y;
-    if (plain) { setShownId(sourceId); return; }
-    setBusy(true);
+    setFrame(next);
+    if (placing.current.timer) clearTimeout(placing.current.timer);
+    placing.current.timer = setTimeout(() => { placing.current.timer = null; void prepare(next); }, 400);
+  }
+  async function prepare(next: PictureFrame) {
+    if (!draftId || !sourceId) return;
+    const seq = ++placing.current.seq;
+    if (next.zoom === DEFAULT_FRAME.zoom && next.x === DEFAULT_FRAME.x && next.y === DEFAULT_FRAME.y) { setShownId(sourceId); setBaked(DEFAULT_FRAME); return; }
+    setPreviewError(""); setBusyKind("prepare");
     try {
-      const made = await api.prepareCompanionLook(draftId, { version_id: sourceId, remove_background: nextRemove, ...(nextFrame.zoom !== 1 || nextFrame.x !== 0.5 || nextFrame.y !== 0.5 ? { frame: nextFrame } : {}) });
-      await client.invalidateQueries({ queryKey: lookKey(draftId) }); setShownId(made.id);
-    } catch (e) { setError(flowErrorText(e)); setRemoveBackground(before.removeBackground); setFrame(before.frame); } finally { setBusy(false); }
+      const made = await api.prepareCompanionLook(draftId, { version_id: sourceId, remove_background: true, frame: next });
+      await client.invalidateQueries({ queryKey: lookKey(draftId) });
+      if (seq === placing.current.seq) { setShownId(made.id); setBaked(next); }
+    } catch (e) { if (seq === placing.current.seq) { setPreviewError(flowErrorText(e)); setFrame(baked); } } finally { if (seq === placing.current.seq) setBusyKind(null); }
+  }
+  async function complete() {
+    if (!draftId || !shownId) return;
+    setPreviewError(""); setBusyKind("complete");
+    try { setJobId((await api.completeCompanionLook(draftId, shownId)).job); }
+    catch (e) {
+      if (e instanceof ApiError && e.status === 409) await client.invalidateQueries({ queryKey: lookKey(draftId) });
+      else setPreviewError(flowErrorText(e));
+    } finally { setBusyKind(null); }
   }
   async function approve() {
     if (!draftId || !shownId) return;
-    setError(""); setBusy(true);
+    setPreviewError(""); setBusyKind("approve");
     try {
       if (name.trim() && name.trim() !== draftName) { await api.updateCompanion(draftId, { name: name.trim() }); setDraftName(name.trim()); }
       await api.approveCompanionLook(draftId, shownId);
       await client.invalidateQueries({ queryKey: lookKey(draftId) }); onApproved();
-    } catch (e) { setError(flowErrorText(e)); } finally { setBusy(false); }
+    } catch (e) { setPreviewError(flowErrorText(e)); } finally { setBusyKind(null); }
   }
   async function stop() {
     if (!draftId || !jobId) return;
-    try { await api.cancelCompanionLookJob(draftId, jobId); setJobId(null); } catch (e) { setError(flowErrorText(e)); }
+    try { await api.cancelCompanionLookJob(draftId, jobId); setJobId(null); } catch (e) { setPreviewError(flowErrorText(e)); }
   }
 
   return (
@@ -155,26 +186,37 @@ export function CreateCharacterStep({ creating, companionId, initialName, onDraf
           {customSelected ? <Input aria-label="Custom style" shape="pill" placeholder="Type a style, for example paper cut-out" maxLength={120} value={customStyle} disabled={locked} onChange={(e) => setCustomStyle(e.target.value)} /> : null}
         </DialogSection>
         <div className="flex flex-col gap-2">
-          <Button shape="pill" width="full" disabled={!canGenerate} onClick={() => void generate()}><Sparkles aria-hidden="true" />Generate Character</Button>
+          <Button shape="pill" width="full" disabled={!canGenerate} aria-busy={makingCharacter} onClick={() => void generate()}>{makingCharacter ? <><Spinner className="animate-spin" aria-hidden="true" />Making your character...</> : <><Sparkles aria-hidden="true" />Generate Character</>}</Button>
           {look && !look.can_generate && look.generate_reason ? <p className="text-sm text-muted-foreground">{look.generate_reason}</p> : null}
           {error ? <p role="alert" className="text-sm text-destructive">{error}</p> : null}
         </div>
       </div>
       <DialogSection title="Character Preview">
-        <GenerationStage generating={generating} shape="panel" aspectRatio="1 / 1">
+        <GenerationStage generating={generating} shape="panel" frame="strong" transparency="checker" aspectRatio="1 / 1">
           {picture
-            ? <img src={picture.url} alt={`${name.trim() || "Your character"}, preview`} draggable={false} className="absolute inset-0 size-full object-contain" />
+            ? <DraggablePicture src={picture.url} alt={`${name.trim() || "Your character"}, preview`} frame={frame} baked={baked} disabled={placeLocked} onFrameChange={place} />
             : <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 p-6 text-center text-muted-foreground">
               <User className="size-12" aria-hidden="true" />
-              <p>{generating ? (job?.label ?? "Starting your character") : "Your character will appear here"}</p>
+              <p>{generating ? "Getting your character started" : "Your character will appear here"}</p>
             </div>}
-          {picture && generating ? <p className="absolute inset-x-0 bottom-3 text-center text-sm text-foreground">{job?.label ?? "Making your character"}</p> : null}
+          {generating ? <div className="absolute inset-x-4 bottom-4 flex flex-col gap-2 rounded-2xl bg-background/90 p-3">
+            <p className="text-center text-sm text-foreground">{job?.label ?? "Making your character"}</p>
+            <Progress mode="determinate" value={job?.percent ?? 0} label={job?.label ?? "Making your character"} />
+          </div> : null}
         </GenerationStage>
         <p className="text-sm text-muted-foreground">Change the description or style and generate again until you&apos;re happy with your character.</p>
+        {picture ? <p className="text-sm text-muted-foreground">Drag the character to move it. Use the slider or the mouse wheel to zoom.</p> : null}
         {generating ? <Button variant="outline" shape="pill" onClick={() => void stop()}>Stop</Button> : null}
-        {picture ? <PreviewControls removeBackground={removeBackground} frame={frame} disabled={locked}
-          onRemoveBackground={(value) => void prepare(value, frame)} onFrameChange={setFrame} onFrameCommit={(next) => void prepare(removeBackground, next)} /> : null}
-        <Button shape="pill" width="full" disabled={!picture || locked} onClick={() => void approve()}>Approve &amp; Continue</Button>
+        {busyKind === "prepare" ? <p role="status" className="text-sm text-muted-foreground">Placing your character...</p> : null}
+        {picture && picture.clipped && picture.clipped.length > 0 ? <div className="flex flex-col gap-2">
+          <p className="text-sm text-muted-foreground">Part of the character is cut off by the edge of the picture.</p>
+          <Button variant="outline" shape="pill" disabled={locked} onClick={() => void complete()}><Sparkles aria-hidden="true" />Fill in the cut-off parts</Button>
+        </div> : null}
+        {picture ? <PreviewControls frame={frame} disabled={placeLocked} onFrameChange={place} /> : null}
+        <Button shape="pill" width="full" disabled={!picture || locked} aria-busy={busyKind === "approve"} onClick={() => void approve()}>
+          {busyKind === "approve" ? <><Spinner className="animate-spin" aria-hidden="true" />Getting your character ready...</> : <>Approve &amp; Continue</>}
+        </Button>
+        {previewError ? <p role="alert" className="text-sm text-destructive">{previewError}</p> : null}
       </DialogSection>
     </DialogBody>
     </>

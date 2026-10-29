@@ -84,7 +84,7 @@ export function AnimateStep({ companionId, name, onBack, onContinue }: { compani
     <>
     <DialogBody columns="two">
       <DialogSection title="Preview">
-        <GenerationStage generating={generating} shape="panel" aspectRatio="1 / 1" caption={selected ? `${label} · ${selected.label}` : `${label} · Character`}>
+        <GenerationStage generating={generating} shape="panel" frame="strong" transparency="checker" aspectRatio="1 / 1" caption={selected ? `${label} · ${selected.label}` : `${label} · Character`}>
           {selected?.approved
             ? <div className="absolute inset-0 flex flex-col items-center justify-center gap-2"><ClipPlayer key={selected.approved.take_id} urls={selected.approved.urls} label={`${label} ${selected.label}`} /></div>
             : previewImage ? <img src={previewImage} alt={`${label}, ${selected ? `${selected.label} keyframe` : "portrait"}`} draggable={false} className="absolute inset-0 size-full object-contain" /> : null}

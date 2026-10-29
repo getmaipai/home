@@ -134,14 +134,15 @@ test("Edit keyframe opens the editor; its three actions call the keyframe routes
   await waitFor(() => expect((inside.getByRole("button", { name: "Change picture" }) as HTMLButtonElement).disabled).toBe(true));
 });
 
-test("remove background in the editor calls the keyframe prepare route", async () => {
-  const { view, calls } = open(() => states([], { idle: { keyframe: { url: "/kf/idle", edited_at: "2026-10-29T12:00:00Z" } } }));
+test("the keyframe editor has no Remove background control and always removes the background when placing", async () => {
+  const { view } = open(() => states([], { idle: { keyframe: { url: "/kf/idle", edited_at: "2026-10-29T12:00:00Z" } } }));
   await view.findByRole("button", { name: "Idle" });
   fireEvent.click(btn(view, "Idle"));
   fireEvent.click(btn(view, "Edit keyframe"));
   const dialog = await view.findByRole("dialog", { name: "Edit keyframe: Idle" });
-  await act(async () => { fireEvent.click(within(dialog).getByRole("switch", { name: "Remove background" })); });
-  expect(calls.prepare).toEqual([["idle", { remove_background: true }]]);
+  expect(within(dialog).queryByRole("switch")).toBeNull();
+  expect(within(dialog).queryByText("Remove background")).toBeNull();
+  expect(within(dialog).getByRole("slider", { name: "Zoom" })).toBeTruthy();
 });
 
 test("an animation with no keyframe offers to make its picture first", async () => {

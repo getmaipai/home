@@ -6,7 +6,7 @@ import { api, ApiError, type CompanionLook } from "@/lib/api";
 import { CompanionShellViewer } from "@/lib/companionShells";
 import { CompanionFlowPage } from "@/shell/pages/companionFlow/CompanionFlowPage";
 
-const methods = ["settingsValues", "companions", "editCompanion", "createCompanionDraft", "companionLook", "generateCompanionLook", "companionLookJob", "uploadCompanionLook", "restyleCompanionLook", "prepareCompanionLook", "approveCompanionLook", "deleteCompanion", "updateCompanion", "cancelCompanionLookJob", "companionStates", "getCompanionLookStyles"] as const;
+const methods = ["settingsValues", "companions", "editCompanion", "createCompanionDraft", "companionLook", "generateCompanionLook", "companionLookJob", "uploadCompanionLook", "restyleCompanionLook", "prepareCompanionLook", "approveCompanionLook", "deleteCompanion", "updateCompanion", "cancelCompanionLookJob", "completeCompanionLook", "companionStates", "getCompanionLookStyles"] as const;
 const originals = Object.fromEntries(methods.map((key) => [key, api[key]]));
 afterEach(() => { cleanup(); Object.assign(api, originals); });
 
@@ -84,18 +84,104 @@ test("Approve is disabled until a picture exists, then approves and moves to ste
   cleanup();
   const { view, calls } = open({ path: "/companions/hc-one/create", lookData: look({ versions: [version("v-1")], rest: "v-1" }) });
   await waitFor(() => expect(button(view, "Approve & Continue").disabled).toBe(false));
-  expect(view.getByLabelText("Remove background")).toBeTruthy();
+  expect(view.queryByLabelText("Remove background")).toBeNull();
   fireEvent.click(button(view, "Approve & Continue"));
   await waitFor(() => expect(calls.approved).toEqual(["v-1"]));
   await view.findByText("Step 2 of 3 · Generate and review your animations");
   expect(view.getByText("Generate Required")).toBeTruthy();
 });
 
-test("remove background calls the prepare route", async () => {
-  const { view, calls } = open({ path: "/companions/hc-one/create", lookData: look({ versions: [version("v-1")], rest: "v-1" }) });
-  await waitFor(() => expect(button(view, "Approve & Continue").disabled).toBe(false));
-  fireEvent.click(view.getByRole("switch", { name: "Remove background" }));
-  await waitFor(() => expect(calls.prepare).toEqual([{ version_id: "v-1", remove_background: true }]));
+const reopened = (overrides: Partial<CompanionLook> = {}) => open({ path: "/companions/hc-one/create", lookData: look({ versions: [version("v-1")], rest: "v-1", ...overrides }) });
+const dragBox = async (view: ReturnType<typeof open>["view"]) => {
+  const box = (await view.findByRole("application", { name: /Character position/ })) as HTMLElement;
+  box.getBoundingClientRect = () => ({ x: 0, y: 0, left: 0, top: 0, right: 200, bottom: 200, width: 200, height: 200, toJSON: () => ({}) });
+  return box;
+};
+
+test("there is no Remove background control anywhere on screen 1", async () => {
+  const { view } = reopened(); await view.findByRole("application", { name: /Character position/ });
+  expect(view.queryByText("Remove background")).toBeNull();
+  expect(view.queryByRole("switch")).toBeNull();
+});
+
+test("the preview gets the strong frame and the checkerboard", async () => {
+  const { view } = reopened(); await view.findByRole("application", { name: /Character position/ });
+  const stage = document.querySelector('[data-slot="generation-stage"]')!;
+  expect(stage.getAttribute("data-frame")).toBe("strong");
+  expect(stage.getAttribute("data-transparency")).toBe("checker");
+});
+
+test("dragging moves the picture live, then asks Home once to place it after the pause", async () => {
+  const { view, calls } = reopened(); const box = await dragBox(view);
+  api.prepareCompanionLook = async (_id, body) => { calls.prepare.push(body); api.companionLook = async () => look({ versions: [version("v-1"), version("v-2")], rest: "v-1" }); return { id: "v-2" }; };
+  fireEvent.pointerDown(box, { clientX: 100, clientY: 100, pointerId: 1 });
+  fireEvent.pointerMove(box, { clientX: 120, clientY: 90, pointerId: 1 });
+  fireEvent.pointerMove(box, { clientX: 140, clientY: 80, pointerId: 1 });
+  fireEvent.pointerUp(box, { clientX: 140, clientY: 80, pointerId: 1 });
+  const picture = box.querySelector("img")!;
+  expect([picture.style.getPropertyValue("--dx"), picture.style.getPropertyValue("--dy")]).toEqual(["20%", "-10%"]);
+  expect(calls.prepare).toEqual([]);
+  await waitFor(() => expect(calls.prepare.length).toBe(1), { timeout: 2000 });
+  const sent = calls.prepare[0] as { version_id: string; remove_background: boolean; frame: { zoom: number; x: number; y: number } };
+  expect(sent.version_id).toBe("v-1"); expect(sent.remove_background).toBe(true);
+  expect(sent.frame.zoom).toBe(1); expect(sent.frame.x).toBeCloseTo(0.7, 5); expect(sent.frame.y).toBeCloseTo(0.4, 5);
+  // The placed picture replaces the live move, so the picture does not jump.
+  await waitFor(() => expect([picture.style.getPropertyValue("--dx"), picture.style.getPropertyValue("--dy")]).toEqual(["0%", "0%"]));
+});
+
+test("the arrow keys move the character and the wheel zooms it", async () => {
+  const { view, calls } = reopened(); const box = await dragBox(view);
+  fireEvent.keyDown(box, { key: "ArrowRight" }); fireEvent.keyDown(box, { key: "ArrowRight" }); fireEvent.keyDown(box, { key: "ArrowDown" });
+  fireEvent.wheel(box, { deltaY: -100 });
+  await waitFor(() => expect(calls.prepare.length).toBe(1), { timeout: 2000 });
+  const sent = calls.prepare[0] as { frame: { zoom: number; x: number; y: number } };
+  expect(sent.frame.x).toBeCloseTo(0.54, 5); expect(sent.frame.y).toBeCloseTo(0.52, 5); expect(sent.frame.zoom).toBeCloseTo(1.5, 5);
+});
+
+test("a running job disables Generate with a busy label and shows the percent and label as a progress bar", async () => {
+  const { view } = open(); await nameIt(view); await view.findByRole("button", { name: "Cartoon" });
+  api.companionLookJob = async () => ({ state: "running", percent: 40, label: "Making the picture", versions: [], error: null });
+  fireEvent.change(view.getByLabelText("Describe the character"), { target: { value: "A fox" } });
+  await act(async () => { fireEvent.click(button(view, "Generate Character")); });
+  const busy = await view.findByRole("button", { name: "Making your character..." }) as HTMLButtonElement;
+  expect(busy.disabled).toBe(true);
+  const bar = await view.findByRole("progressbar", { name: "Making the picture" });
+  expect((bar.querySelector("[data-slot=progress-indicator]") as HTMLElement).style.transform).toBe("translateX(-60%)");
+  expect(view.getByText("Making the picture")).toBeTruthy();
+  expect(view.getByRole("button", { name: "Stop" })).toBeTruthy();
+});
+
+test("Approve shows its busy label while the request is in flight and an error under the button", async () => {
+  const { view } = reopened(); await waitFor(() => expect(button(view, "Approve & Continue").disabled).toBe(false));
+  let fail: (e: Error) => void = () => {};
+  api.approveCompanionLook = () => new Promise((_resolve, reject) => { fail = reject; });
+  fireEvent.click(button(view, "Approve & Continue"));
+  const busy = await view.findByRole("button", { name: "Getting your character ready..." }) as HTMLButtonElement;
+  expect(busy.disabled).toBe(true);
+  await act(async () => { fail(new ApiError("Home could not save this picture. Try again.", 500)); });
+  expect((await view.findByRole("alert")).textContent).toBe("Home could not save this picture. Try again.");
+  expect(button(view, "Approve & Continue").disabled).toBe(false);
+});
+
+test("the cut-off sentence and Fill in button appear only when the picture is clipped, and call the complete route", async () => {
+  const clean = reopened(); await clean.view.findByRole("application", { name: /Character position/ });
+  expect(clean.view.queryByText("Part of the character is cut off by the edge of the picture.")).toBeNull();
+  expect(clean.view.queryByRole("button", { name: "Fill in the cut-off parts" })).toBeNull();
+  cleanup();
+  const { view } = open({ path: "/companions/hc-one/create", lookData: look({ versions: [{ ...version("v-1"), clipped: ["bottom"] }], rest: "v-1" }) });
+  const asked: string[] = [];
+  api.completeCompanionLook = async (_id, versionId) => { asked.push(versionId); return { job: "job-9" }; };
+  expect(await view.findByText("Part of the character is cut off by the edge of the picture.")).toBeTruthy();
+  fireEvent.click(view.getByRole("button", { name: "Fill in the cut-off parts" }));
+  await waitFor(() => expect(asked).toEqual(["v-1"]));
+});
+
+test("a 409 from the complete route just refreshes without an error", async () => {
+  const { view } = open({ path: "/companions/hc-one/create", lookData: look({ versions: [{ ...version("v-1"), clipped: ["left"] }], rest: "v-1" }) });
+  api.completeCompanionLook = async () => { throw new ApiError("Nothing is cut off in this picture.", 409); };
+  fireEvent.click(await view.findByRole("button", { name: "Fill in the cut-off parts" }));
+  await act(async () => { await Promise.resolve(); });
+  expect(view.queryByRole("alert")).toBeNull();
 });
 
 test("closing with an empty draft asks keep or discard; discard deletes it", async () => {

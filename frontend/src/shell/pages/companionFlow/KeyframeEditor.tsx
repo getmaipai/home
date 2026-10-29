@@ -20,7 +20,6 @@ export function KeyframeEditor({ companionId, row, open, onOpenChange }: {
   const [instruction, setInstruction] = useState("");
   const [file, setFile] = useState<File | null>(null);
   const [jobId, setJobId] = useState<string | null>(null);
-  const [removeBackground, setRemoveBackground] = useState(false);
   const [frame, setFrame] = useState<PictureFrame>(DEFAULT_FRAME);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -34,7 +33,7 @@ export function KeyframeEditor({ companionId, row, open, onOpenChange }: {
   const refresh = () => client.invalidateQueries({ queryKey: companionStatesKey(companionId) });
   useEffect(() => {
     if (!job || !jobId) return;
-    if (job.state === "done") { setJobId(null); setInstruction(""); setFrame(DEFAULT_FRAME); setRemoveBackground(false); void refresh(); }
+    if (job.state === "done") { setJobId(null); setInstruction(""); setFrame(DEFAULT_FRAME); void refresh(); }
     else if (job.state === "failed") { setError(job.error ?? "The picture could not be made. Change the description and try again."); setJobId(null); void refresh(); }
     else if (job.state === "cancelled") setJobId(null);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -48,18 +47,18 @@ export function KeyframeEditor({ companionId, row, open, onOpenChange }: {
   const change = () => attempt(async () => setJobId((await api.editCompanionKeyframe(companionId, row.id, instruction.trim())).job));
   const replace = () => attempt(async () => {
     const body = new FormData(); body.append("image", file!);
-    await api.uploadCompanionKeyframe(companionId, row.id, body); setFile(null); setFrame(DEFAULT_FRAME); setRemoveBackground(false); await refresh();
+    await api.uploadCompanionKeyframe(companionId, row.id, body); setFile(null); setFrame(DEFAULT_FRAME); await refresh();
   });
-  const prepare = (nextRemove: boolean, nextFrame: PictureFrame) => {
-    const before = { removeBackground, frame };
-    setRemoveBackground(nextRemove); setFrame(nextFrame);
-    const plain = !nextRemove && nextFrame.zoom === 1 && nextFrame.x === DEFAULT_FRAME.x && nextFrame.y === DEFAULT_FRAME.y;
-    if (plain) return Promise.resolve();
+  // The background is always removed; only the placement changes.
+  const prepare = (nextFrame: PictureFrame) => {
+    const before = frame;
+    setFrame(nextFrame);
+    if (nextFrame.zoom === 1 && nextFrame.x === DEFAULT_FRAME.x && nextFrame.y === DEFAULT_FRAME.y) return Promise.resolve();
     return attempt(async () => {
       try {
-        await api.prepareCompanionKeyframe(companionId, row.id, { remove_background: nextRemove, ...(nextFrame.zoom !== 1 || nextFrame.x !== 0.5 || nextFrame.y !== 0.5 ? { frame: nextFrame } : {}) });
+        await api.prepareCompanionKeyframe(companionId, row.id, { remove_background: true, frame: nextFrame });
         await refresh();
-      } catch (e) { setRemoveBackground(before.removeBackground); setFrame(before.frame); throw e; }
+      } catch (e) { setFrame(before); throw e; }
     });
   };
   const keyframe = row.keyframe;
@@ -84,8 +83,8 @@ export function KeyframeEditor({ companionId, row, open, onOpenChange }: {
             <Input aria-label="Replacement picture" type="file" shape="pill" accept="image/png,image/jpeg,image/webp" disabled={working} onChange={(e) => setFile(e.target.files?.[0] ?? null)} />
             <Button variant="outline" shape="pill" disabled={working || file === null} onClick={() => void replace()}>Use this picture</Button>
           </DialogSection>
-          <PreviewControls idPrefix="keyframe" removeBackground={removeBackground} frame={frame} disabled={working}
-            onRemoveBackground={(value) => void prepare(value, frame)} onFrameChange={setFrame} onFrameCommit={(next) => void prepare(removeBackground, next)} />
+          <PreviewControls idPrefix="keyframe" position frame={frame} disabled={working}
+            onFrameChange={setFrame} onFrameCommit={(next) => void prepare(next)} />
         </> : <Button shape="pill" disabled={working} onClick={() => void make()}><Sparkles aria-hidden="true" />Make picture</Button>}
         {error ? <p role="alert" className="text-sm text-destructive">{error}</p> : null}
         <DialogFooter>

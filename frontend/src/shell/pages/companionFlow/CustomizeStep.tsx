@@ -132,7 +132,7 @@ export function CustomizeStep({ companionId, name, onBack, onGoTo }: { companion
         </DialogSection>
       </div>
       <DialogSection title="Companion Preview" aside={name}>
-        <CompanionStage surface="panel" name={name || "Your companion"} mode="idle" showHeader={false} talk={null}
+        <CompanionStage surface="panel" frame="strong" transparency="checker" name={name || "Your companion"} mode="idle" showHeader={false} talk={null}
           character={portrait ? <img src={portrait} alt={`${name || "Your companion"}, companion preview`} draggable={false} className="aspect-square max-h-96 w-full object-contain" /> : <p className="p-6 text-center text-muted-foreground">Your companion will appear here</p>}
           actions={[
             { id: "test", label: "Test Conversation", onSelect: () => { window.open(`/chat?try=${encodeURIComponent(companionId)}`, "_blank", "noopener"); } },
