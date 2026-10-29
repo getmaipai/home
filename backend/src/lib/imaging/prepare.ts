@@ -4,7 +4,7 @@ import { fitToFrame, type FitOptions } from "./fit";
 import { imagingTargets } from "./targets";
 import { cropToFrame, type Frame } from "./crop";
 
-export type PrepareStep = "upscale" | "crop" | "remove_background" | "find_subject" | "fit";
+export type PrepareStep = "upscale" | "crop" | "remove_background" | "background_not_found" | "find_subject" | "fit";
 export interface PrepareOptions extends FitOptions {
   frame?: Frame;
   skipBackgroundRemoval?: boolean;
@@ -30,7 +30,10 @@ export async function preparePicture(bytes: Uint8Array, options: PrepareOptions 
   }
   if (!transparent && !options.skipBackgroundRemoval) {
     if (!options.removeBackground) throw new Error("The background remover isn't installed. Install it from the engine's model list, then try again.");
-    current = await options.removeBackground(current); steps.push("remove_background");
+    const before = current;
+    current = await options.removeBackground(current);
+    // The remover can find nothing to lift out (a drawing, a flat logo, a plain wall). Keep the picture as it was rather than refuse it.
+    if (!(await findSubject(current)).bounds) { current = before; steps.push("background_not_found"); } else steps.push("remove_background");
   }
   const subject = await findSubject(current); steps.push("find_subject");
   if (!subject.bounds) throw new Error("That picture has no visible subject.");

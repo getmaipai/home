@@ -179,6 +179,20 @@ describe("companion look store", () => {
     expect(calls).toBe(1);
   });
 
+  test("a sentence from a picture tool reaches the person exactly as written, whatever it starts with", async () => {
+    const input = new Uint8Array(await sharp({ create: { width: 1100, height: 1100, channels: 3, background: { r: 200, g: 60, b: 60 } } }).jpeg().toBuffer());
+    for (const line of ["Getting the editing tools ready. This takes a few minutes the first time.", "Picture editing is off for this profile. A parent can turn pictures on in settings.", "The editing tools aren't running. Check that the engine on this computer is running, then try again."]) {
+      await expect(normalizePicture(input, { removeBackground: async () => { throw new Error(line); } })).rejects.toThrow(line);
+    }
+  });
+
+  test("a picture the remover finds nothing in is kept, and a huge photo is shrunk on load instead of failing", async () => {
+    const photo = new Uint8Array(await sharp({ create: { width: 7000, height: 6000, channels: 3, background: { r: 30, g: 120, b: 200 } } }).jpeg({ quality: 40 }).toBuffer());
+    const clear = async (bytes: Uint8Array) => new Uint8Array(await sharp({ create: { width: 800, height: 800, channels: 4, background: { r: 0, g: 0, b: 0, alpha: 0 } } }).png().toBuffer());
+    const output = await normalizePicture(photo, { removeBackground: clear });
+    expect((await sharp(output).metadata()).width).toBe(1024);
+  });
+
   test("an unavailable upload upscaler keeps the plain missing-upscaler sentence", async () => {
     const small = new Uint8Array(await sharp({ create: { width: 600, height: 600, channels: 3, background: "red" } }).png().toBuffer());
     await expect(normalizePicture(small, { removeBackground: async (bytes) => bytes, upscale: async () => { throw new Error("The upscaler isn't installed. Install it from the engine's model list, then try again."); } })).rejects.toThrow("The upscaler isn't installed. Install it from the engine's model list, then try again.");

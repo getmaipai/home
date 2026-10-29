@@ -22,4 +22,11 @@ describe("preparePicture", () => {
   test("throws one plain sentence when a required tool is missing", async () => {
     await expect(preparePicture(await png(false, 20), { size: 40, marginPercent: 10, upscaleBelowShortSide: 40, removeBackground: async (bytes) => bytes, fit })).rejects.toThrow("The upscaler isn't installed. Install it from the engine's model list, then try again.");
   });
+  test("a remover that finds nothing keeps the picture as it was instead of refusing it", async () => {
+    const opaque = await png(false, 40);
+    const clear = async () => new Uint8Array(await sharp({ create: { width: 40, height: 40, channels: 4, background: { r: 0, g: 0, b: 0, alpha: 0 } } }).png().toBuffer());
+    const result = await preparePicture(opaque, { size: 40, marginPercent: 10, upscaleBelowShortSide: 40, removeBackground: clear });
+    expect(result.steps).toEqual(["background_not_found", "find_subject", "fit"]);
+    expect((await sharp(result.bytes).metadata()).width).toBe(40);
+  });
 });

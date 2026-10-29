@@ -261,17 +261,32 @@ export function deleteLook(id: string): void { const dir = lookFolder(id); if (d
 
 export type BackgroundRemover = (bytes: Uint8Array) => Promise<Uint8Array>;
 export type PictureUpscaler = (bytes: Uint8Array) => Promise<Uint8Array>;
+/** A sentence that came from a picture tool (the background remover, the upscaler). It reaches the person exactly as written. */
+class PictureToolFailure extends Error {}
+/** The largest side kept for preparing a picture; the frame is 1024, so a bigger picture only costs memory. */
+const PREPARE_MAX_SIDE = 4096;
+const READ_FAILURE_LINE = "That picture could not be read. Use a PNG, JPEG or WebP picture and try again.";
+const NOTHING_FOUND_LINE = "I couldn't find anything in that picture. Try a different picture.";
+const asToolFailure = (tool: (bytes: Uint8Array) => Promise<Uint8Array>) => async (bytes: Uint8Array): Promise<Uint8Array> => {
+  try { return await tool(bytes); }
+  catch (error) { throw new PictureToolFailure(error instanceof Error && error.message ? error.message : "The picture tools could not finish. Try again in a moment."); }
+};
 export async function normalizePicture(bytes: Uint8Array, options: { removeBackground: BackgroundRemover; upscale?: PictureUpscaler }): Promise<Uint8Array> {
+  let source: Uint8Array;
   try {
-    const source = new Uint8Array(await sharp(bytes, { limitInputPixels: 40_000_000, failOn: "error" }).rotate().png().toBuffer());
-    const result = await preparePicture(source, { ...imagingTargets.portrait, upscaleBelowShortSide: imagingTargets.portrait.size, removeBackground: options.removeBackground, upscale: options.upscale ?? (async (image) => new Uint8Array(await sharp(image, { limitInputPixels: 40_000_000, failOn: "error" }).resize(imagingTargets.portrait.size, imagingTargets.portrait.size, { fit: "inside" }).png().toBuffer())) });
+    // Shrink on load: a 48 megapixel phone photo must not fail the pixel limit or fill memory for a 1024 pixel frame.
+    source = new Uint8Array(await sharp(bytes, { limitInputPixels: 268_402_689, failOn: "error" }).rotate().resize({ width: PREPARE_MAX_SIDE, height: PREPARE_MAX_SIDE, fit: "inside", withoutEnlargement: true }).png().toBuffer());
+  } catch { throw new Error(READ_FAILURE_LINE); }
+  const localUpscale = async (image: Uint8Array) => new Uint8Array(await sharp(image, { limitInputPixels: 40_000_000, failOn: "error" }).resize(imagingTargets.portrait.size, imagingTargets.portrait.size, { fit: "inside" }).png().toBuffer());
+  try {
+    const result = await preparePicture(source, { ...imagingTargets.portrait, upscaleBelowShortSide: imagingTargets.portrait.size, removeBackground: asToolFailure(options.removeBackground), upscale: options.upscale ? asToolFailure(options.upscale) : localUpscale });
     return result.bytes;
   } catch (error) {
-    if (error instanceof Error && error.message === "That picture has no visible subject.") throw new Error("That picture could not be prepared. Use a PNG, JPEG or WebP picture and try again.");
-    // Keep the established upload-facing sentences stable.
-    if (error instanceof Error && error.message.startsWith("The background remover")) throw error;
-    if (error instanceof Error && error.message.startsWith("The upscaler")) throw error;
-    throw new Error("That picture could not be prepared. Use a PNG, JPEG or WebP picture and try again.");
+    if (error instanceof PictureToolFailure) throw new Error(error.message);
+    if (error instanceof Error && error.message === "That picture has no visible subject.") throw new Error(NOTHING_FOUND_LINE);
+    // The missing-tool sentences preparePicture itself throws already say what to install.
+    if (error instanceof Error && (error.message.startsWith("The background remover") || error.message.startsWith("The upscaler"))) throw error;
+    throw new Error("That picture could not be prepared. Try a different picture, or a smaller one.");
   }
 }
 
