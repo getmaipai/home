@@ -20,7 +20,7 @@ type SpokenMessage = { id?: unknown; role?: unknown };
 
 /**
  * What the pane shows for each companion reply that is or was spoken: only the words said so far while the voice is still going, and the
- * words said plus an ellipsis once the person cut in. Replies that were not spoken, or that played to the end, are not listed (full text).
+ * words said plus an ellipsis whenever the voice is paused or the person cut in. Replies that were not spoken, or that played to the end, are not listed (full text).
  * `speaking` is whether replies are read aloud right now (a call, or read-aloud with working voice output).
  */
 export function useSpokenReply(messages: SpokenMessage[], scheduler: SentenceSpeechScheduler | null, speaking: boolean): Map<string, string> {
@@ -48,7 +48,7 @@ export function useSpokenReply(messages: SpokenMessage[], scheduler: SentenceSpe
     if (message.role !== "assistant" || !full) continue;
     const heard = cutRef.current.get(id);
     if (heard !== undefined) result.set(id, heardText(full, heard, true));
-    else if (live && id === currentId && scheduler) result.set(id, heardText(full, scheduler.heardVisibleEndFine(), false));
+    else if (live && id === currentId && scheduler) result.set(id, heardText(full, scheduler.heardVisibleEndFine(), scheduler.isPaused()));
   }
   return result;
 }

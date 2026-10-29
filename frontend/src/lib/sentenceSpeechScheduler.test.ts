@@ -163,6 +163,18 @@ describe("sentence speech scheduler", () => {
     expect(scheduler.heardVisibleEndFine()).toBe(140);
   });
 
+  test("isPaused follows pause and resume and is false once stopped", () => {
+    const scheduler = new SentenceSpeechScheduler(new FakeAudioContext() as unknown as AudioContext, async () => new Response(new Uint8Array(44)));
+    expect(scheduler.isPaused()).toBe(false);
+    scheduler.pause();
+    expect(scheduler.isPaused()).toBe(true);
+    scheduler.resume();
+    expect(scheduler.isPaused()).toBe(false);
+    scheduler.pause();
+    scheduler.stop();
+    expect(scheduler.isPaused()).toBe(false);
+  });
+
   test("wasCutOff is true only when stop ran before the reply ended on its own", async () => {
     const context = new FakeAudioContext();
     const cut = new SentenceSpeechScheduler(context as unknown as AudioContext, async () => new Response(new Uint8Array(44)));

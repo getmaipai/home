@@ -14,6 +14,8 @@ class FakeScheduler {
   heardVisibleEndFine() { return this.heard; }
   wasCutOff() { return this.cut; }
   hasEndedNaturally() { return this.ended; }
+  paused = false;
+  isPaused() { return this.paused; }
 }
 const asScheduler = (fake: FakeScheduler) => fake as unknown as SentenceSpeechScheduler;
 const reply = (id: string, text: string) => ({ id, role: "assistant", content: [{ type: "text", text }] });
@@ -67,6 +69,19 @@ describe("useSpokenReply", () => {
     act(() => rerender());
     expect(result.current.has("a1")).toBe(false);
     expect(result.current.get("a2")).toBe("Next one");
+  });
+
+  test("a paused voice leaves the heard words with an ellipsis, and speaking again takes it away", () => {
+    const scheduler = new FakeScheduler("a1");
+    scheduler.heard = 9;
+    const { result, rerender } = renderHook(() => useSpokenReply([reply("a1", FULL)], asScheduler(scheduler), true));
+    expect(result.current.get("a1")).toBe("How are");
+    scheduler.paused = true;
+    act(() => rerender());
+    expect(result.current.get("a1")).toBe("How are…");
+    scheduler.paused = false;
+    act(() => rerender());
+    expect(result.current.get("a1")).toBe("How are");
   });
 
   test("a reply that is not read aloud is never held back", () => {

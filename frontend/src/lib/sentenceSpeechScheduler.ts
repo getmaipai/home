@@ -154,6 +154,9 @@ export class SentenceSpeechScheduler {
     return heard;
   }
 
+  /** True while the voice is paused (the person started talking over it) and the reply has not been stopped. */
+  isPaused(): boolean { return this.paused && !this.stopped; }
+
   /** True when stop() cut the reply off before every sentence had played; false when it played to its end or is still playing. */
   wasCutOff(): boolean { return this.cutOff; }
 

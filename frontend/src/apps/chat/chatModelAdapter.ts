@@ -267,7 +267,12 @@ export function createChatModelAdapter(deps: ChatModelAdapterDeps): ChatModelAda
       scheduler.messageId = unstable_assistantMessageId;
       scheduler.onFirstAudio = () => deps.onSpeakingChange?.(true);
       scheduler.onError = () => deps.onSpeechError?.();
-      scheduler.onEnded = () => deps.onSpeakingChange?.(false);
+      // The reply is cut in on while it is still being SPOKEN, which is long after it finished generating: the turn stays "active" until
+      // its voice ends, so a cut-in can still tell the server how much was heard (what lets the companion pick the story back up).
+      scheduler.onEnded = () => {
+        deps.onSpeakingChange?.(false);
+        if (deps.activeTurnRef && deps.activeTurnRef.current?.turnId === resumeTurnId) deps.activeTurnRef.current = null;
+      };
 
       // `visible` is the released answer text, exactly as the wire sent it:
       // the server splits <think> spans into reasoning parts before release
@@ -501,7 +506,7 @@ export function createChatModelAdapter(deps: ChatModelAdapterDeps): ChatModelAda
             resumeToken = event.resume_token;
             resumeTurnId = event.turn_id;
             answeredBy = event.answered_by;
-            if (deps.activeTurnRef) deps.activeTurnRef.current = { turnId: event.turn_id, heardVisibleEnd: () => scheduler.heardVisibleEnd() };
+            if (deps.activeTurnRef) deps.activeTurnRef.current = { turnId: event.turn_id, heardVisibleEnd: () => scheduler.heardVisibleEndFine() };
             if (answeredBy) yield { metadata: { custom: { answered_by: answeredBy, turnId: event.turn_id, conversationId } } };
             continue;
           }
@@ -612,7 +617,7 @@ export function createChatModelAdapter(deps: ChatModelAdapterDeps): ChatModelAda
                 { ...(resumeTurnId && resumeGeneration !== undefined ? { turnId: resumeTurnId, generation: resumeGeneration } : {}), visibleEnd: finalText.length },
               );
             }
-            if (deps.activeTurnRef && deps.activeTurnRef.current?.turnId === resumeTurnId) deps.activeTurnRef.current = null;
+            if (!speakReplies && deps.activeTurnRef && deps.activeTurnRef.current?.turnId === resumeTurnId) deps.activeTurnRef.current = null;
             scheduler.finish();
             if (event.value.document_available === true) deps.onResearchDocument?.(event.value.turn_id);
             // THIN-3G: the offer of a new chat that carries the summary.
