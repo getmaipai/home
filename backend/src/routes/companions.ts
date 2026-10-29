@@ -8,7 +8,7 @@ import { statSync } from "node:fs";
 import { apiRouter, errorResponses, idParamSchema } from "@/lib/openapi";
 import { requireAuth } from "@/middleware/auth";
 import { isOwnerOrAdmin } from "@/lib/access";
-import { companionDetail, companionAreaOn, canCreateCompanion, currentCompanionId, listCompanionCards, discoverCompanionCards, heldCompanionIds, mayUseCompanion, pickRefusal, robotAssignments } from "@/lib/companionsApp";
+import { companionDetail, draftPersonaFor, companionAreaOn, canCreateCompanion, currentCompanionId, listCompanionCards, discoverCompanionCards, heldCompanionIds, mayUseCompanion, pickRefusal, robotAssignments } from "@/lib/companionsApp";
 import { publishSettingsChanged } from "@/lib/deviceCommands";
 import { getPersonSettingValue, setValue } from "@/lib/settings";
 import { speakerAgeBand } from "@/lib/ageBand";
@@ -189,8 +189,9 @@ const detailRoute = createRoute({
 });
 companionsRoutes.openapi(detailRoute, (c) => {
   const person = c.get("person");
-  const persona = PERSONAS.find((candidate) => candidate.id === c.req.valid("param").id);
-  if (!persona || !mayUseCompanion(person, persona)) return c.json({ error: "No such companion" }, 404);
+  const id = c.req.valid("param").id, found = PERSONAS.find((candidate) => candidate.id === id);
+  const persona = found && mayUseCompanion(person, found) ? found : found ? null : draftPersonaFor(person, id, isOwnerOrAdmin(person));
+  if (!persona) return c.json({ error: "No such companion" }, 404);
   const detail = companionDetail(person, persona, isOwnerOrAdmin(person));
   return c.json({ ...detail, ...companionCounts(person.id, detail.id), can_edit: detail.is_household && mayEdit(person, detail.id), can_copy: speakerAgeBand(person, new Date()) === "adult" || isOwnerOrAdmin(person) }, 200);
 });

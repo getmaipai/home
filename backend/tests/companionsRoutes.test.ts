@@ -368,6 +368,16 @@ describe("household companion routes", () => {
     expect((await request(`companions/portraits/${draft.value.id}/${version.id}`, other)).status).toBe(404);
   });
 
+  test("a draft companion's profile opens for its author and an admin, not for another adult", async () => {
+    const author = addPerson("profile-draft-author", "adult"), other = addPerson("profile-draft-other", "adult");
+    const draft = createHouseholdCompanion({ ...fixture(), display_name: "Draft profile" }, { display_name: "Author", person_id: "profile-draft-author" });
+    if (!draft.ok) throw new Error(draft.error);
+    const mine = await request(`companions/${draft.value.id}`, author);
+    expect(mine.status).toBe(200);
+    expect(await mine.json()).toMatchObject({ name: "Draft profile", status: "draft", can_edit: true });
+    expect((await request(`companions/${draft.value.id}`, other)).status).toBe(404);
+  });
+
   test("companion lists expose rest portrait keys without creating retained files", async () => {
     const adult = addPerson("portrait-list-adult", "adult");
     const created = createHouseholdCompanion({ ...fixture(), display_name: "Portrait list" }, { display_name: "Author", person_id: "portrait-list-adult" });

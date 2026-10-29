@@ -7,7 +7,7 @@ import { conversations, people } from "@/db/schema";
 import { speakerAgeBand, type AgeBand } from "@/lib/ageBand";
 import { listDevicesByKind } from "@/lib/devices";
 import { loadManifestOnly } from "@/lib/plugins";
-import { PERSONAS, resolvePersona, type Persona } from "@/lib/persona";
+import { PERSONAS, personaFromManifest, resolvePersona, type Persona } from "@/lib/persona";
 import { companionFits, robotCompanionOf, robotControlsOf } from "@/lib/robotCompanion";
 import { companionsAllowed } from "@/lib/companions";
 import { getHouseholdSettingValue, getPersonSettingValue } from "@/lib/settings";
@@ -191,6 +191,13 @@ export function discoverCompanionCards(person: PersonRow): CompanionCard[] {
     cards.push(cardOf(person, persona));
   }
   return cards;
+}
+
+/** A draft household companion this person may open: its author, or an admin. Drafts stay out of PERSONAS, so the profile builds one on the spot. */
+export function draftPersonaFor(person: PersonRow, id: string, admin: boolean): Persona | null {
+  if (!companionAreaOn(person) || !(admin || householdCompanionAuthorId(id) === person.id)) return null;
+  const manifest = getHouseholdCompanion(id);
+  return manifest?.companion?.status === "draft" ? personaFromManifest(id, manifest, true) : null;
 }
 
 export function companionDetail(person: PersonRow, persona: Persona, admin: boolean): CompanionDetail {
