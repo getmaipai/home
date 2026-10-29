@@ -635,6 +635,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/places.ts` | householdHomeCountryName, householdHomeSkyInput, householdHomePlaceName, resolvePlace, PlaceSearchUnavailable, searchPlaces |
 | `backend/src/lib/plugins.ts` | almanacHostInputs, listPackageIds, hasNonDefaultInstalledPackage, __resetPackageCachesForTests, loadManifestOnly, loadPackage |
 | `backend/src/lib/ports.ts` | DEFAULT_HOME_PORT, DEFAULT_STACK_PORT, homePort, stackPort, defaultStackBaseUrl |
+| `backend/src/lib/prefixPrewarm.ts` | notePrefix, prewarmPrefix, __resetPrefixPrewarmForTests |
 | `backend/src/lib/privacy.ts` | platformConnections, pluginConnections, offlinePluginNames, privacyConnections, privacyPageData |
 | `backend/src/lib/projects/assemblers.ts` | registerAssembler, getAssembler |
 | `backend/src/lib/projects/fromManifest.ts` | buildProjectTypeFromManifest |
