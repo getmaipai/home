@@ -5,6 +5,7 @@ import sharp from "sharp";
 import { addVersion, approveSheet, chooseKeyColour, compositeOnKey, deleteLook, deleteVersion, describeCharacter, dominantColours, keyOut, lookPromptFor, normalizePicture, readLook, setRest, updateSheet, versionOriginalPath, versionPath, KEY_ALPHA_END, KEY_ALPHA_START, __setCharacterCompletionForTests, __setCharacterPictureCapabilityForTests, LOOK_LIMIT_LINE } from "@/lib/companionLook";
 import { createHouseholdCompanion, deleteHouseholdCompanion } from "@/lib/householdCompanions";
 import { loadManifestOnly } from "@/lib/plugins";
+import { __setStackClientForTests } from "@/lib/stackEngine";
 import { capOfStyle, stylesForBand } from "@/lib/companionLookStyles";
 
 const dataRoot = process.env.MAIPAI_DATA_DIR!;
@@ -62,6 +63,28 @@ describe("companion look store", () => {
     expect(described.card.colours).toEqual(["#C03020"]);
     expect(call.role).toBe("chat"); expect(call.messages?.[0]?.images?.[0]?.url).toStartWith("data:image/jpeg;base64,");
     expect(call.messages?.[0]?.content).toContain("Say nothing about mood"); expect(call.options?.response_format).toMatchObject({ type: "json_schema", json_schema: { strict: true } });
+  });
+
+  test("chat says it reads pictures but cannot: the picture is described on the vision role, and chat is passed over", async () => {
+    const image = new Uint8Array(await sharp({ create: { width: 64, height: 64, channels: 3, background: { r: 200, g: 80, b: 40 } } }).png().toBuffer());
+    const row = (id: string, state: string) => ({ id, state: { state }, model: { imageInput: true }, picture_tokens_max: 1000 });
+    __setStackClientForTests({ roles: async () => ({ roles: [row("chat", "loaded"), row("vision", "installed")] }), budget: async () => ({ pressure: "normal" }) } as never);
+    const seen: string[] = [];
+    __setCharacterCompletionForTests((async (role: string) => { seen.push(role); return role === "chat" ? { ok: false, status: 400, code: "unavailable", error: "image input is not supported" } : { ok: true, value: { text: JSON.stringify({ species: "fox", description: "A red fox in a blue scarf." }) } }; }) as never);
+    const described = await describeCharacter(image, "");
+    expect(seen).toEqual(["chat", "vision"]);
+    expect(described.card.text).toBe("A red fox in a blue scarf.");
+    expect(described.card_source).toBe("model");
+    __setStackClientForTests(null);
+  });
+
+  test("with no picture reader and no typed prompt the card still says to draw what the picture shows, so Approve never blocks", async () => {
+    const image = new Uint8Array(await sharp({ create: { width: 64, height: 64, channels: 3, background: { r: 200, g: 80, b: 40 } } }).png().toBuffer());
+    __setCharacterPictureCapabilityForTests({ imageParts: false, pictureTokensMax: null });
+    const described = await describeCharacter(image, "");
+    expect(described.card.text).toContain("exactly as it appears");
+    expect(described.card_source).toBe("look_prompt");
+    expect(described.card.colours.length).toBeGreaterThan(0);
   });
 
   test("builds a clipped character prompt with the selected key colour", () => {

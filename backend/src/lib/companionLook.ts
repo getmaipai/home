@@ -5,6 +5,7 @@ import { z } from "zod";
 import media from "@maipai/spec/vocab/companion-media.json";
 import { householdCompanionFolder } from "@/lib/householdCompanions";
 import { chatModelReadsPictures } from "@/lib/chatPictures";
+import { markChatReaderUnusable, pictureReader } from "@/lib/pictures/ageCheck";
 import { complete } from "@/lib/llm";
 import { lookStylePhrase, type LookStyleChoice } from "@/lib/companionLookStyles";
 import { preparePicture } from "@/lib/imaging/prepare";
@@ -88,18 +89,31 @@ let characterCapabilityOverride: { imageParts: boolean; pictureTokensMax: number
 export async function describeCharacter(png: Uint8Array, lookPrompt: string): Promise<{ card: { text: string; colours: string[]; species: string }; card_source: "model" | "look_prompt" }> {
   const colours = await dominantColours(png);
   try {
-    const capability = characterCapabilityOverride ?? await chatModelReadsPictures();
-    if (!capability.imageParts || !capability.pictureTokensMax) throw new Error("Picture reading is unavailable.");
+    const override = characterCapabilityOverride;
+    const capability = override ?? await chatModelReadsPictures();
+    // The Stack's chat row can claim picture input while the running chat server is language-only; the vision role reads then
+    // (the same fallback the picture safety check uses).
+    let role: "chat" | "vision" | null = override ? "chat" : await pictureReader();
+    if (!role || (role === "chat" && (!capability.imageParts || !capability.pictureTokensMax))) role = override ? null : await pictureReader();
+    if (!role) throw new Error("Picture reading is unavailable.");
     const jpeg = await sharp(png, { failOn: "error", limitInputPixels: 40_000_000 }).flatten({ background: "white" }).resize({ width: 1280, height: 1280, fit: "inside", withoutEnlargement: true }).jpeg({ quality: 88 }).toBuffer();
     const schema = { name: "character_description", strict: true, schema: { type: "object", additionalProperties: false, required: ["species", "description"], properties: { species: { type: "string" }, description: { type: "string" } } } } as const;
     const prompt = "Describe only what is visible; do not name a real person. Write one factual paragraph of at most 90 words naming the species, body build, face and nose, fur or skin colours, clothing and accessories. Say nothing about mood.";
-    const result = await characterCompletion("chat", [{ role: "user", content: prompt, images: [{ id: "companion-look", name: "character picture", url: `data:image/jpeg;base64,${jpeg.toString("base64")}`, reservedTokens: capability.pictureTokensMax }] }], { temperature: 0, max_tokens: 180, thinking: false, dropReasoning: true, response_format: { type: "json_schema", json_schema: schema } });
+    const ask = async (reader: "chat" | "vision") => characterCompletion(reader, [{ role: "user", content: prompt, images: [{ id: "companion-look", name: "character picture", url: `data:image/jpeg;base64,${jpeg.toString("base64")}`, reservedTokens: reader === "chat" ? (capability.pictureTokensMax ?? 2560) : 2560 }] }], { temperature: 0, max_tokens: 180, thinking: false, dropReasoning: true, response_format: { type: "json_schema", json_schema: schema } });
+    let result = await ask(role);
+    if (!result.ok && role === "chat" && !override) {
+      markChatReaderUnusable();
+      const next = await pictureReader();
+      if (next && next !== "chat") result = await ask(next);
+    }
     if (!result.ok) throw new Error("The picture description could not be read.");
     const parsed = JSON.parse(result.value.text) as { species?: unknown; description?: unknown };
     if (typeof parsed.species !== "string" || typeof parsed.description !== "string" || !parsed.description.trim()) throw new Error("The picture description was incomplete.");
     return { card: { text: parsed.description.trim().slice(0, 600), colours, species: parsed.species.trim().slice(0, 60) }, card_source: "model" };
   } catch {
-    return { card: { text: lookPrompt.trim().slice(0, 600), colours, species: "" }, card_source: "look_prompt" };
+    // Never block a picture the person chose: with no typed look prompt and no reader, the card says to draw exactly what the picture shows.
+    const typed = lookPrompt.trim().slice(0, 600);
+    return { card: { text: typed || "The character shown in the starting picture, drawn exactly as it appears there, with the same face, colours and clothing.", colours, species: "" }, card_source: "look_prompt" };
   }
 }
 
