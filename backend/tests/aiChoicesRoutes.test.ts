@@ -105,14 +105,14 @@ describe("access", () => {
 });
 
 describe("the cards", () => {
-  test("GET /api/ai/choices returns eight cards with the current Quick picture model from the setting", async () => {
+  test("GET /api/ai/choices returns nine cards with the current Quick picture model from the setting", async () => {
     const { client } = await owner();
     setHouseholdSettingValue("generation.picture_quick_model", "klein");
     const body = await (await client.get("/api/ai/choices")).json() as { stack: string; cards: Card[]; alwaysOn: { bytes: number; rowIds: string[] }; recommended: { changes: Array<{ job: string }> } | null };
     expect(body.stack).toBe("ok");
     const reading = (body as unknown as { memory_available_bytes: number | null }).memory_available_bytes;
     expect(reading === null || reading > 0).toBe(true);
-    expect(body.cards.map((card) => card.id)).toEqual(["chat", "pictures", "picturesdetailed", "videos", "music", "voice", "wakeword", "coding"]);
+    expect(body.cards.map((card) => card.id)).toEqual(["chat", "pictures", "picturesdetailed", "videos", "music", "voice", "wakeword", "vision", "coding"]);
     const pictures = body.cards.find((card) => card.id === "pictures")!;
     expect(pictures.choices.find((choice) => choice.id === "pictures.klein")!.current).toBe(true);
     expect(body.alwaysOn.rowIds.length).toBeGreaterThan(0);

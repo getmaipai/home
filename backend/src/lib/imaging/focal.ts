@@ -27,7 +27,8 @@ async function session(): Promise<InferenceSession | null> {
   if (loadFailed) return null;
   const path = visionAssetPath(VISION_FOCAL_CROP.file);
   if (!existsSync(path)) {
-    void ensureFocalCropAsset().catch((error) => console.warn(`[news] focal model download failed (${(error as Error).message})`));
+    // Tests set MAIPAI_FOCAL_DOWNLOAD=0 (tests/preload.ts): a test run must never fetch a 20 MB model into the shared vision folder.
+    if (process.env.MAIPAI_FOCAL_DOWNLOAD !== "0") void ensureFocalCropAsset().catch((error) => console.warn(`[news] focal model download failed (${(error as Error).message})`));
     return null;
   }
   try {

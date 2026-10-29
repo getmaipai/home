@@ -36,6 +36,10 @@ import { HostError } from "@maipai/spec/emulators/ts/host-emulator.js";
 // script one reply must not see it, so it is off for every test unless a test deletes this variable to turn it on.
 process.env.MAIPAI_IMGQ09_REASK ??= "0";
 
+// The focal-crop model is a 20 MB download the first time a picture is framed; a test run must never fetch it (it also lands in the
+// shared vision folder, which the storage tests count). Framing falls back to the centre, as when the model is not installed.
+process.env.MAIPAI_FOCAL_DOWNLOAD ??= "0";
+
 let defaultScriptedStack: StackFixture;
 
 // FLAKE-LOAD-01 (cause d, port collision): a test server started with `Bun.serve({ port: 0 })` and no hostname binds the
