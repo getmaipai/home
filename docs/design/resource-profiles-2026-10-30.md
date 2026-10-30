@@ -47,7 +47,7 @@ lowered to Reduced at the lowest** (owner, 2026-10-30), and voice never lowers b
 
 Rules:
 
-- **P1. The table is validated, not solved.** On save, each row is checked: the lead job's peak plus the resident models of the other cells fits the
+- **P1. The table is validated on save and fitted live at admission (section 3b).** On save, each row is checked: the lead job's peak plus the resident models of the other cells fits the
   hardware class's budget (the governor's `fits_ever` figures). A row that does not fit cannot be saved, with the numbers. A job whose kind and tier have
   no row runs at Standard beside everything or is not offered at that tier.
 - **P2. Stages.** A row may list stages (pictures, then video), each with its own cells, so chat returns to Standard between stages only if the quiet
@@ -56,6 +56,32 @@ Rules:
 - **P4. Age and surface gates run first** and no profile loosens them; a minor's categories stay at their ceilings (RULES.md rule 8). Reduced chat for a minor keeps the no-tools fail-safe.
 - **P5. Admins can pin a cell** ("chat never below Standard"); a row that needs the pinned cell lowered cannot be used, and the job is not offered at that tier, with the reason.
 - **P6. Admin-editable per row,** through the Priorities panel (section 7); defaults ship in the settings spec.
+
+## 3b. Live fit: the table is the wish, memory decides (owner, 2026-10-30)
+
+The table says what we want. Before a job starts, Home's household queue (the only layer that knows people) walks a short ladder to pick the best
+profile that fits right now. It is not a general solver. Every number comes from the Stack governor, which sees no person: the ledger, `fits_ever`
+and `room_after_eviction`.
+
+1. **Read.** Free memory, the ledger (what each model holds), the pressure level, and who is chatting.
+2. **Clear waste first.** Evict idle warm and burst items in the memory note's section 4.3 order (idle picture pool, finished burst workers), and clear
+   the MLX buffer caches. Cheapest step, nothing anyone is using.
+3. **Try the table row as written.** If it fits, run it.
+4. **Otherwise step down, one move at a time, re-testing after each:**
+   (a) lower the *other* cells further, lowest priority first, but never below the row's floor, which is the P5 pins plus "chat stops at Reduced, voice never drops below its current slot (the Reduced speaking voice of tiers section 2a.3 stays allowed)". A live drop of chat below the table row still waits
+   for the quiet window and the 10-minute rule (S1, S2); step 4 never skips them;
+   (b) lower the job's own *supporting* categories (pictures Boost to Standard for a video's first frame);
+   (c) lower the lead job itself one tier (Max to Boost).
+   Among the candidates that fit, take the one that keeps the highest weighted score (priority weight times tier rank), so supporting work gives way
+   before the thing the person asked for.
+5. **Tell the person, and ask only when it matters.** If the lead job ends up below the tier the person picked, say so before it starts: "Making this
+   at Boost, not Max: there is not enough room right now (Max needs about 80 GB, 62 GB is free). Wait for Max instead?" with two kit Buttons as
+   shipped, on the job's own card (or the existing Max confirm line, tiers section 9). The GB figures show to admins only; assigned adults who are not
+   admins get the same line without figures. Lowering supporting work or an automatic pick never asks; it shows as state text. An admin can set
+   "lower without asking" per category (section 7).
+6. **Nothing fits even at the lowest row:** the job queues with the reason and an estimate (`fits_ever` yes) or is refused with numbers (no), as Q1.
+7. **Record what was applied.** The job stores the profile it actually got, so the Status row, the cards and the reversal at the end show the truth,
+   and the replay simulator can test the ladder as a pure function of (table, memory numbers).
 
 ## 4. Priorities that are not round robin (G2)
 
@@ -98,7 +124,7 @@ Rule S6 of RULES.md: feed the existing status row. Additions are reasons and cop
 
 ## 7. Settings (admin, one panel)
 
-Resources > Priorities: the ordered category list (drag), per-class aging and per-person limits, strict toggles, `quiet_seconds`, `quiet_max_wait` with the wait-or-proceed choice, `cooldown_seconds`, pins ("never lower"), and Reduced on or off. All declared once in the settings spec (no other copies), defaults as in this note.
+Resources > Priorities: the ordered category list (drag), per-class aging and per-person limits, strict toggles, `quiet_seconds`, `quiet_max_wait` with the wait-or-proceed choice, "lower without asking" per category (3b), `cooldown_seconds`, pins ("never lower"), and Reduced on or off. All declared once in the settings spec (no other copies), defaults as in this note.
 
 ## 8. Build slices (proposed backlog rows, evaluations first)
 
@@ -108,10 +134,11 @@ Resources > Priorities: the ordered category list (drag), per-class aging and pe
 | TIER-PRIO-02 | Priority and policy settings spec, defaults, admin panel | One definition; the panel edits the list and the quiet window |
 | TIER-PRIO-03 | Quiet window and cooldown in Home's household queue (S1 to S6; only Home knows who chatted, the Stack's governor sees no person) | Test: a second person chats at second 50, the swap waits; at 61 it proceeds |
 | TIER-PRIO-04 | Profile on the job record and window, phased stages (P2) | Companion video runs end to end on a scratch Stack with chat Reduced, pictures Boost |
+| TIER-PRIO-07 | Live fit ladder (3b): clear waste, step down, ask when the lead job drops below the pick | Replay tests: companion video with 62 GB free runs Boost with pictures Standard and asks; with 95 GB free runs as written |
 | TIER-PRIO-05 | Status row text, new reasons, copy table | Screenshots opened and judged, both widths |
 | TIER-PRIO-06 | Per-class policy (R4), fair-share credit, explainable reasons; replaces the Q3 and Q5 fairness that TIER-HOME-01 builds | Replay shows a heavy user does not block a first-time user |
 
-Order: 01 first (no Stack needed), then 02 and 03, then 04 to 06. Depends on TIER-* rows for the tiers themselves.
+Order: 01 first (no Stack needed), then 02 and 03, then 04 to 07 (07, the live fit, after 03). Depends on TIER-* rows for the tiers themselves.
 
 ## 8a. Reuse check
 
@@ -142,3 +169,4 @@ Changes these decided rules (the older notes get a pointer when this lands):
 - Tiers section 7 T1 (Standard jobs of different categories may run together if they fit) is overridden by a profile row that queues a category (for example Video Boost queues music).
 - Tiers section 7 T6 (Standard jobs that fit run during a Chat Max lease) is overridden by the Chat Max row, which queues pictures, video and music.
 - TIER-HOME-01's fairness rules (T4 b, c) are replaced by TIER-PRIO-06.
+- Tiers section 7.1 ("one that fits waits without a deadline") and memory note Q1 (a queued job that fits has no deadline and is never lowered): section 3b lets a job that would fit later run one tier lower now, when the person agrees, or without asking where an admin set "lower without asking".
