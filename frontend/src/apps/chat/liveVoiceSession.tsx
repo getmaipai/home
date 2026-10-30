@@ -88,10 +88,10 @@ export const DUPLEX_DUCK_LEVEL = 0.25;
 /** VOICE-QUICK-03: on the first voiced frame the voice drops to this level and keeps going; if the sound is still there this long later it is
  * speech and the voice pauses for good, as before. A cough or a soft "mm-hm" that ends sooner gets the voice back at full volume. */
 export const DUPLEX_DUCK_MS = 600;
-export const REACTION_MIN_WORDS = 6;
+export const REACTION_MIN_WORDS = 8;
 export const REACTION_PAUSE_MS = 400;
-export const REACTION_MIN_GAP_MS = 5000;
-export const REACTION_CHANCE = 0.7;
+export const REACTION_MIN_GAP_MS = 8000;
+export const REACTION_CHANCE = 0.4;
 // rule: duplexReaction (docs/design/full-duplex-voice-2026-10-24.md)
 // A reaction is one of these whole phrases, matched exactly after normalising, and nothing else: "mm-hm", "oh wow", "no way".
 // Benchmarks (Full-Duplex-Bench v1.5) and shipped agents (LiveKit, Retell) treat these as "keep talking", not as a new turn. Anything

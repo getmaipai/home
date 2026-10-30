@@ -1214,11 +1214,15 @@ function insertNewConversation(actor: PersonRow, surface: Surface, companionId?:
  * surface) shouldn't normally exist (createConversation() closes the
  * old one), but if one somehow does, the most recently active wins
  * rather than an arbitrary row. */
+/** A spoken turn with no conversation id continues the person's latest open chat only if it was active this recently; after a longer gap a call starts fresh,
+ * so Home does not bring up what was said an hour ago (reported 2026-10-30). The old chat stays open and one tap away. */
+export const SPOKEN_IDLE_NEW_CONVERSATION_MS = 30 * 60 * 1000;
+
 export function resolveOrCreateConversation(
   actor: PersonRow,
   surface: Surface,
   conversationId?: string,
-  opts: { temporary?: boolean; deviceId?: string | null; placement?: Conversation["placement"] } = {},
+  opts: { temporary?: boolean; deviceId?: string | null; placement?: Conversation["placement"]; idleNewMs?: number } = {},
 ): ConversationOpResult<Conversation> {
   const placement = opts.placement ?? "chat";
   if (conversationId) {
@@ -1291,7 +1295,9 @@ export function resolveOrCreateConversation(
     .all().filter((r) => surface !== "robot" || r.deviceId === (opts.deviceId ?? null));
   if (openOnes.length > 0) {
     openOnes.sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
-    return { ok: true, value: toConversationRecord(openOnes[0]!) };
+    const latest = openOnes[0]!;
+    const stale = opts.idleNewMs !== undefined && Date.now() - Date.parse(latest.updatedAt) > opts.idleNewMs;
+    if (!stale) return { ok: true, value: toConversationRecord(latest) };
   }
 
   return { ok: true, value: insertNewConversation(actor, surface, undefined, "chat", placement, surface === "robot" ? opts.deviceId ?? null : null) };

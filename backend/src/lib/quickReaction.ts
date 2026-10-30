@@ -15,10 +15,10 @@ export function __setQuickReactionRunnerForTests(fn: typeof completeBackground |
 export function __resetQuickReactionForTests(): void { recent.clear(); runner = completeBackground; }
 
 const SYSTEM = [
-  "You are the part of a voice assistant that listens. While the real answer is still being worked out, you say the tiny sound or phrase a person makes when they are listening to a friend.",
-  "React to what the person just said, in the way and mood they said it: sympathy for bad news, warmth for good news, interest for a story or a question, a plain 'sure' or 'on it' feel for a request. Sound like a real person, not a script, and do not use the same wording twice.",
-  "Never answer the question, never give advice, never state a fact or a number, never repeat their words back, never ask a question that needs an answer.",
-  "Say one to four words. If nothing natural fits, say exactly NONE.",
+  "You are the listening half of a voice assistant. The person just spoke.",
+  "If they told you something a good friend would react to out loud right away, such as sad news, good news, a frustration, or something surprising or exciting that just happened, say the short words that friend would say, one to four words, in the same mood, as natural speech.",
+  "If they only greeted you, asked a question, gave a command, said okay or mm, or left a sentence unfinished, reply with exactly NONE.",
+  "Never answer, advise, name an emotion, or repeat their words.",
 ].join(" ");
 
 /** The same words back, or a mostly-copied phrase, is an echo, not a reaction. */
@@ -39,6 +39,11 @@ export function cleanReaction(raw: string, said: string, banned: readonly string
     text = text.slice(lead[0].length);
   }
   if (!text || /^none\.?$/i.test(text)) return null;
+  // The model sometimes names the sound instead of making it ("sigh"): that becomes the tag when the engine has it, else nothing.
+  if ((KNOWN_CUE_TAGS as readonly string[]).includes(text.toLowerCase().replace(/[^a-z ]/g, "").trim())) {
+    const name = text.toLowerCase().replace(/[^a-z ]/g, "").trim();
+    return tags.includes(name) ? `[${name}]` : null;
+  }
   if (!/^[\p{L}][\p{L}'’\-, .!?…]*$/u.test(text)) return null;
   const words = text.match(/[\p{L}']+/gu) ?? [];
   if (words.length === 0 || words.length > MAX_WORDS) return null;
@@ -49,25 +54,25 @@ export function cleanReaction(raw: string, said: string, banned: readonly string
   return `${tag}${text}`;
 }
 
-/** One short spoken reaction to `said`, or null (nothing fit, the model was slow or unavailable, or the text failed the checks). Never throws. */
-export async function quickReaction(personId: string, said: string, banned: readonly string[] = [], deadlineMs = QUICK_REACTION_DEADLINE_MS, soundTags: readonly string[] = []): Promise<string | null> {
+/** One short spoken reaction to `said`. null: the model chose to say nothing (or the text failed the checks), so no cue should play. undefined: the model was slow or unavailable, so the caller may use a fixed bridge phrase. Never throws. */
+export async function quickReaction(personId: string, said: string, banned: readonly string[] = [], deadlineMs = QUICK_REACTION_DEADLINE_MS, soundTags: readonly string[] = [], earlier?: string): Promise<string | null | undefined> {
   const tags = normalizeTagList(soundTags).filter((tag) => (KNOWN_CUE_TAGS as readonly string[]).includes(tag));
   const heard = said.trim().slice(0, 400);
   if (!heard) return null;
   const lastFew = recent.get(personId) ?? [];
   const avoid = lastFew.length > 0 ? ` Recent reactions you already used, so say something different: ${lastFew.join(" / ")}.` : "";
   const sounds = tags.length > 0 ? ` You may begin with one real sound in square brackets when it truly fits, chosen only from ${tags.map((t) => `[${t}]`).join(" ")}, for example a sigh with sympathy or a laugh at something funny; most reactions need none.` : "";
-  const messages: LlmMessage[] = topicMessagesForId(personId, [{ role: "system", content: SYSTEM + sounds + avoid }, { role: "user", content: heard }]);
+  const messages: LlmMessage[] = topicMessagesForId(personId, [{ role: "system", content: SYSTEM + sounds + avoid }, { role: "user", content: earlier ? `Earlier, the assistant said: ${earlier.slice(-160)}\nThe person now says: ${heard}` : heard }]);
   const abort = new AbortController();
   const timer = setTimeout(() => abort.abort(), deadlineMs);
   try {
     const result = await runner(messages, { max_tokens: 14, temperature: 0.9, thinking: false, dropReasoning: true, exactCeiling: true, signal: abort.signal });
-    if (!result.ok) return null;
+    if (!result.ok) return undefined;
     const reaction = cleanReaction(result.text, heard, banned, lastFew, tags);
     if (reaction) recent.set(personId, [...lastFew, reaction].slice(-RECENT_KEPT));
     return reaction;
   } catch {
-    return null;
+    return undefined;
   } finally {
     clearTimeout(timer);
   }

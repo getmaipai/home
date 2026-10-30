@@ -2602,6 +2602,13 @@ describe("routes/turn.ts streamTurnEvents()", () => {
       const withReaction: TurnStreamEvent[] = [];
       for await (const event of streamTurnEvents(fakeResult(slow()), "test-person", 5, undefined, false, undefined, "adult", undefined, undefined, { spokenTurn: true, utterance: "my dog died yesterday", stillCueGapMs: 5000 })) withReaction.push(event);
       expect((withReaction.find((e) => e.type === "spoken_cue") as { text: string }).text).toBe("Oh no.");
+      // The model chose to say nothing: no cue at all, and no fixed phrase either.
+      __resetQuickReactionForTests();
+      __setQuickReactionRunnerForTests((async () => ({ ok: true, text: "NONE" })) as never);
+      const silent: TurnStreamEvent[] = [];
+      for await (const event of streamTurnEvents(fakeResult(slow()), "test-person", 5, undefined, false, undefined, "adult", undefined, undefined, { spokenTurn: true, utterance: "set a timer", stillCueGapMs: 5000 })) silent.push(event);
+      expect(silent.some((e) => e.type === "spoken_cue")).toBe(false);
+      // The model was unavailable: the fixed phrase is the fallback.
       __resetQuickReactionForTests();
       __setQuickReactionRunnerForTests((async () => ({ ok: false, unavailable: true })) as never);
       const fallback: TurnStreamEvent[] = [];
@@ -2643,7 +2650,7 @@ describe("routes/turn.ts streamTurnEvents()", () => {
   });
 
   test("a spoken turn with a slow package median gets one cue as the tool starts", async () => {
-    await seedPackageLatency("fixture-slow", [1100, 1200, 1300, 1400, 1500]);
+    await seedPackageLatency("fixture-slow", [2600, 2700, 2800, 2900, 3000]);
     const { surfaceClassOf } = await import("@/lib/surfaceClass");
     const spokenTurn = surfaceClassOf("robot", false) === "spoken";
     expect(spokenTurn).toBe(true);
@@ -2714,7 +2721,7 @@ describe("routes/turn.ts streamTurnEvents()", () => {
   });
 
   test("a written turn never gets the early cue and a suppressed early cue stays suppressed", async () => {
-    await seedPackageLatency("fixture-slow", [1100, 1200, 1300, 1400, 1500]);
+    await seedPackageLatency("fixture-slow", [2600, 2700, 2800, 2900, 3000]);
     const writtenStatus = new StatusChannel();
     async function* delayedTokens(): AsyncGenerator<string, SafetyResult | undefined, void> {
       await new Promise((resolve) => setTimeout(resolve, 15));

@@ -8,7 +8,7 @@ import { useDefaultScriptedStack } from "./stackFixture";
 import { __setChatWindowContextForTests } from "@/lib/roleHealth";
 import { countTokens } from "@/lib/tokenCount";
 import { FAILURE_COPY } from "@/lib/failureCopy";
-import { musicContextNote } from "@/lib/conversationHistory";
+import { musicContextNote, SPOKEN_IDLE_NEW_CONVERSATION_MS } from "@/lib/conversationHistory";
 
 test("finished music history context says the song is ready", () => {
   expect(musicContextNote("done")).toBe("[The song finished and is ready in the player below this message.]");
@@ -176,6 +176,23 @@ describe("logTurn (via runTurn)", () => {
     await runTurnNext(actor, "tv", "hi"); // unsupported_surface
     const rows = db.select().from(conversationTurns).where(eq(conversationTurns.personId, actor.id)).all();
     expect(rows.length).toBe(0);
+  });
+});
+
+describe("a spoken turn with no conversation id after a long gap", () => {
+  test("starts a fresh conversation when the latest one is idle past the limit; a written turn still continues it", async () => {
+    const { actor } = await owner();
+    const first = resolveOrCreateConversation(actor, "chat");
+    if (!first.ok) throw new Error(first.error);
+    expect(resolveOrCreateConversation(actor, "chat", undefined, { idleNewMs: SPOKEN_IDLE_NEW_CONVERSATION_MS })).toMatchObject({ ok: true, value: { id: first.value.id } });
+    const old = new Date(Date.now() - 2 * SPOKEN_IDLE_NEW_CONVERSATION_MS).toISOString();
+    db.update(conversations).set({ updatedAt: old }).where(eq(conversations.id, first.value.id)).run();
+    const spoken = resolveOrCreateConversation(actor, "chat", undefined, { idleNewMs: SPOKEN_IDLE_NEW_CONVERSATION_MS });
+    if (!spoken.ok) throw new Error(spoken.error);
+    expect(spoken.value.id).not.toBe(first.value.id);
+    const written = resolveOrCreateConversation(actor, "chat");
+    if (!written.ok) throw new Error(written.error);
+    expect(written.value.id).toBe(spoken.value.id); // the new chat is now the latest open one
   });
 });
 

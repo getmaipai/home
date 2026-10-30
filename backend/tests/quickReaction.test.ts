@@ -22,4 +22,8 @@ describe("cleanReaction", () => {
     expect(cleanReaction("Oh right.", "x", [], ["oh right."])).toBeNull();
     expect(cleanReaction("Hmm, okay.", "x", ["oh right"], ["Oh right."])).toBe("Hmm, okay.");
   });
+  test("a named sound becomes the tag when the engine has it, and nothing when it does not", () => {
+    expect(cleanReaction("sigh", "my mom is in the hospital", [], [], ["sigh"])).toBe("[sigh]");
+    expect(cleanReaction("Sigh.", "my mom is in the hospital", [], [], [])).toBeNull();
+  });
 });

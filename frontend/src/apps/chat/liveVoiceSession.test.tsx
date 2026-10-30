@@ -382,18 +382,18 @@ describe("live voice session", () => {
       const socket = controlledSocket();
       const view = render(<Harness open onOpenChange={() => {}} isSpeaking={false} speakingEndedAt={0} fixture={[]} sentTexts={[]} socketFactory={socket.createSocket} />);
       await waitFor(() => expect(view.getByText("Listening")).toBeTruthy());
-      act(() => socket.send({ t: "partial", v: "so yesterday I went to" }));
+      act(() => socket.send({ t: "partial", v: "so yesterday I went to the" }));
       act(() => socket.send({ t: "vad", speaking: false, rms: 0 }));
       await new Promise((resolve) => setTimeout(resolve, 550));
-      expect(react).not.toHaveBeenCalled(); // six words is the floor; this was five
-      act(() => socket.send({ t: "partial", v: "so yesterday I went to the store and" }));
+      expect(react).not.toHaveBeenCalled(); // eight words is the floor; this was six
+      act(() => socket.send({ t: "partial", v: "so yesterday I went to the store and then I" }));
       act(() => socket.send({ t: "vad", speaking: false, rms: 0 }));
       act(() => socket.send({ t: "vad", speaking: true, rms: 0.1 }));
       await new Promise((resolve) => setTimeout(resolve, 550));
       expect(react).not.toHaveBeenCalled(); // they started again before the pause was long enough
       act(() => socket.send({ t: "vad", speaking: false, rms: 0 }));
       await new Promise((resolve) => setTimeout(resolve, 550));
-      expect(react).toHaveBeenCalledWith("so yesterday I went to the store and");
+      expect(react).toHaveBeenCalledWith("so yesterday I went to the store and then I");
     } finally { random.mockRestore(); react.mockRestore(); cleanup(); }
   });
 
@@ -421,7 +421,7 @@ describe("live voice session", () => {
       const sent: string[] = [];
       const view = render(<Harness open onOpenChange={() => {}} isSpeaking={false} speakingEndedAt={0} fixture={[]} sentTexts={sent} socketFactory={socket.createSocket} />);
       await waitFor(() => expect(view.getByText("Listening")).toBeTruthy());
-      act(() => socket.send({ t: "partial", v: "my dog died yesterday and I" }));
+      act(() => socket.send({ t: "partial", v: "my dog died yesterday and I have been so sad" }));
       act(() => socket.send({ t: "vad", speaking: false, rms: 0 }));
       await waitFor(() => expect(react).toHaveBeenCalled(), { timeout: 1500 });
       await new Promise((resolve) => setTimeout(resolve, 100));

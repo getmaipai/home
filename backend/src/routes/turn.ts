@@ -5,7 +5,7 @@ import { bodyLimit } from "hono/body-limit";
 import type { MiddlewareHandler } from "hono";
 import { randomBytes } from "node:crypto";
 import sharp from "sharp";
-import { eq } from "drizzle-orm";
+import { desc, eq } from "drizzle-orm";
 import { requireAuth } from "@/middleware/auth";
 import { prewarmPrefix } from "@/lib/prefixPrewarm";
 import { quickReaction } from "@/lib/quickReaction";
@@ -27,7 +27,7 @@ import { streamEventForViewer, valueForViewer } from "@/lib/turnErrorDetail";
 import { apiRouter, errorResponses, idParamSchema } from "@/lib/openapi";
 import { turnOwnerId, isTemporaryConversation, packageLatencyFromRecentOutcomes, applyHeardPrefix } from "@/lib/conversationHistory";
 import { surfaceClassOf } from "@/lib/surfaceClass";
-import { attachments } from "@/db/schema";
+import { attachments, conversationTurns } from "@/db/schema";
 import { db } from "@/db";
 import { readAttachment, getTemporaryChatImage } from "@/lib/attachments";
 import { getStackClient, isStackConfigured } from "@/lib/stackEngine";
@@ -151,6 +151,14 @@ export function isOwnedStaleTurnGeneration(turnId: string, ownerId: string, gene
 /** REG-02: whether the speech route may add a spoken cue to this turn's
  * sentences. Fails closed: only the owner's own, spoken, model-worded turn
  * that has not been a refusal, an error or a crisis qualifies. */
+/** The assistant's reply from the turn before this one in the conversation, so a reaction can tell what the person is answering. */
+function previousReply(conversationId: string): string | undefined {
+  try {
+    const row = db.select({ reply: conversationTurns.replyText }).from(conversationTurns).where(eq(conversationTurns.conversationId, conversationId)).orderBy(desc(conversationTurns.createdAt)).limit(1).get();
+    return row?.reply?.trim() || undefined;
+  } catch { return undefined; }
+}
+
 /** What the person said in this in-flight turn, for the small model that chooses how its reply is delivered. Only the owner's own turn. */
 export function turnUtterance(turnId: string, ownerId: string): string | undefined {
   const session = inFlightTurns.get(turnId);
@@ -333,7 +341,7 @@ turnRoutes.post("/react", requireAuth, async (c) => {
   lastReactAt.set(person.id, now);
   const tags = speakerAgeBand(person, new Date()) === "adult" ? await getTtsTags() : [];
   const text = await quickReaction(person.id, said, [], undefined, tags);
-  return c.json({ text: text ? normalizeForSpeech(text) : null }, 200);
+  return c.json({ text: typeof text === "string" && text ? normalizeForSpeech(text) : null }, 200);
 });
 
 // VOICE-PREWARM-01: a voice session that just opened asks for this person's last prompt prefix to be put back in the engine's cache, so the first word is not the slow one.
@@ -574,12 +582,11 @@ function startResumeSession(session: ResumeSession): void {
 // checking actually takes a moment" logic, applied to the model's own
 // generation latency instead of a tool call's.
 export const THINKING_CUE_DELAY_MS = 900;
-/** VOICE-REPLY-02 and VOICE-QUICK-01: when a spoken turn's first word is not here after 0.7 s, the small model's
- * reaction to what the person said goes out (lib/quickReaction.ts), or the fixed bridge phrase ("One sec.") when it has
- * none. Measured 2026-10-29: the first token takes 0.6 s with the prompt cached and 2 to 5 s without, and the 4B writes a
- * reaction in 70 to 230 ms, so the reaction is ready before the timer fires. A faster answer gets no cue. The cue is never
- * the answer and never stored in the thread. */
-export const SPOKEN_CUE_DELAY_MS = 700;
+/** VOICE-REPLY-02 and VOICE-QUICK-01: a spoken turn whose first word is not here after 1.5 s gets the small model's reaction to what the
+ * person said (lib/quickReaction.ts), if it chose one, or the fixed bridge phrase ("One sec.") only when the small model was unavailable.
+ * The cue waits behind nothing but the answer waits behind the cue, so it must not fire for a normal answer: a warm turn's first token
+ * takes about 1 s (measured from the chat log, 2026-10-30), and a 0.7 s cue made those answers start after the cue finished. */
+export const SPOKEN_CUE_DELAY_MS = 1500;
 /** VOICE-FILLER-02: how long after the first cue a spoken turn waits before its second ("Still on it."). */
 export const STILL_CUE_GAP_MS = 3000;
 
@@ -666,7 +673,7 @@ export async function* streamTurnEvents(
         const latency = options.spokenTurn && !earlyCueSent && !result.cueSuppressed
           ? packageLatencyFromRecentOutcomes(event.package_id)
           : null;
-        if (latency && latency.count >= 5 && latency.medianMs !== null && latency.medianMs > 1_000) {
+        if (latency && latency.count >= 5 && latency.medianMs !== null && latency.medianMs > 2_500) {
           const cue = pickThinkingCue(actorId, result.bannedPhrases);
           if (cue) { earlyCueSent = true; yield { type: "spoken_cue", text: normalizeForSpeech(cue) }; }
         }
@@ -697,7 +704,7 @@ export async function* streamTurnEvents(
     const statusWake = () => (result.status.closed ? new Promise<never>(() => {}) : result.status.wait().then(() => "status" as const));
     let pendingStatus = statusWake();
     const firstStep = iterator.next();
-    const quick: Promise<string | null> = options.spokenTurn && options.utterance && !result.cueSuppressed ? quickReaction(actorId, options.utterance, result.bannedPhrases, undefined, options.reactionTags) : Promise.resolve(null);
+    const quick: Promise<string | null | undefined> = options.spokenTurn && options.utterance && !result.cueSuppressed ? quickReaction(actorId, options.utterance, result.bannedPhrases, undefined, options.reactionTags, previousReply(result.conversationId)) : Promise.resolve(undefined);
     const timer = delay(remainingDelayMs);
     // A status line wakes the race without ending the wait: the cue's timer
     // keeps running, so a slow first token still gets its cue (THIN-7C: every
@@ -710,7 +717,7 @@ export async function* streamTurnEvents(
     }
     timer.cancel();
     // VOICE-QUICK-01: the small model's reaction to what was just said, written while the main model works; the fixed bridge phrase is the fallback.
-    if (race === "timeout" && !earlyCueSent && !result.cueSuppressed) { const cue = (await quick) ?? pickThinkingCue(actorId, result.bannedPhrases); if (cue) yield { type: "spoken_cue", text: normalizeForSpeech(cue) }; } // SPEECH-ROBOT-01: every spoken text passes the one normalizer
+    if (race === "timeout" && !earlyCueSent && !result.cueSuppressed) { const reaction = await quick; const cue = reaction === undefined ? pickThinkingCue(actorId, result.bannedPhrases) : reaction; if (cue) yield { type: "spoken_cue", text: normalizeForSpeech(cue) }; } // SPEECH-ROBOT-01: every spoken text passes the one normalizer
     // THIN-5B: while the first answer piece is still coming, side events
     // (live reasoning, status lines) keep going out as they are emitted, so
     // an adult's reasoning is shown while the model is still thinking
