@@ -8,7 +8,7 @@ import sharp from "sharp";
 import { desc, eq } from "drizzle-orm";
 import { requireAuth } from "@/middleware/auth";
 import { prewarmPrefix } from "@/lib/prefixPrewarm";
-import { quickReaction } from "@/lib/quickReaction";
+import { quickReaction, type QuickCue } from "@/lib/quickReaction";
 import { getTtsTags } from "@/lib/ttsCapabilities";
 import { normalizeForSpeech } from "@maipai/spec/voice/ts/normalizeForSpeech.js";
 import { StreamSafetyRefusal, StreamUnavailable, DocumentAttachmentError, BareModeForbidden, crisisSupportFor, conversationInCrisis, type Surface, type TurnOpResult, type TurnStreamResult } from "@/lib/turnShared";
@@ -340,8 +340,8 @@ turnRoutes.post("/react", requireAuth, async (c) => {
   if (lastReactAt.size > 500) lastReactAt.clear();
   lastReactAt.set(person.id, now);
   const tags = speakerAgeBand(person, new Date()) === "adult" ? await getTtsTags() : [];
-  const text = await quickReaction(person.id, said, [], undefined, tags);
-  return c.json({ text: typeof text === "string" && text ? normalizeForSpeech(text) : null }, 200);
+  const cue = await quickReaction(person.id, said, [], undefined, tags);
+  return c.json({ text: cue && cue.immediate ? normalizeForSpeech(cue.text) : null }, 200);
 });
 
 // VOICE-PREWARM-01: a voice session that just opened asks for this person's last prompt prefix to be put back in the engine's cache, so the first word is not the slow one.
@@ -587,6 +587,8 @@ export const THINKING_CUE_DELAY_MS = 900;
  * The cue waits behind nothing but the answer waits behind the cue, so it must not fire for a normal answer: a warm turn's first token
  * takes about 1 s (measured from the chat log, 2026-10-30), and a 0.7 s cue made those answers start after the cue finished. */
 export const SPOKEN_CUE_DELAY_MS = 1500;
+/** VOICE-OPENER-01: how long a spoken turn waits for its first word before a thinking sound from the small model is spoken. */
+export const ACK_DELAY_MS = 700;
 /** VOICE-FILLER-02: how long after the first cue a spoken turn waits before its second ("Still on it."). */
 export const STILL_CUE_GAP_MS = 3000;
 
@@ -704,20 +706,42 @@ export async function* streamTurnEvents(
     const statusWake = () => (result.status.closed ? new Promise<never>(() => {}) : result.status.wait().then(() => "status" as const));
     let pendingStatus = statusWake();
     const firstStep = iterator.next();
-    const quick: Promise<string | null | undefined> = options.spokenTurn && options.utterance && !result.cueSuppressed ? quickReaction(actorId, options.utterance, result.bannedPhrases, undefined, options.reactionTags, previousReply(result.conversationId)) : Promise.resolve(undefined);
+    const quick: Promise<QuickCue | null | undefined> = options.spokenTurn && options.utterance && !result.cueSuppressed ? quickReaction(actorId, options.utterance, result.bannedPhrases, undefined, options.reactionTags, previousReply(result.conversationId)) : Promise.resolve(undefined);
     const timer = delay(remainingDelayMs);
-    // A status line wakes the race without ending the wait: the cue's timer
-    // keeps running, so a slow first token still gets its cue (THIN-7C: every
-    // turn now carries status lines, which used to cancel the timer).
-    let race = await Promise.race([firstStep, pendingStatus, timer.promise]);
-    while (race === "status") {
-      yield* sideEvents();
-      pendingStatus = statusWake();
-      race = await Promise.race([firstStep, pendingStatus, timer.promise]);
+    // VOICE-OPENER-01: the small model's short reaction or acknowledgment is spoken the moment it is ready (about 0.3 s), not after a
+    // wait: the main model's first word takes 1 to 3 s, and the gap in between is what felt like a walkie-talkie. A status line wakes the
+    // race without ending the wait, so the fixed-phrase timer below keeps running for a small model that failed (THIN-7C: every turn now
+    // carries status lines, which used to cancel the timer).
+    let quickSettled = false;
+    let ackDue = false;
+    let cueSpoken = false;
+    let heldAck: QuickCue | null = null;
+    const ackTimer = delay(ACK_DELAY_MS);
+    const quickWake = quick.then(() => "quick" as const);
+    const ackWake = ackTimer.promise.then(() => "ack" as const);
+    const nextStep = () => Promise.race([firstStep, pendingStatus, timer.promise, ...(quickSettled ? [] : [quickWake]), ...(ackDue ? [] : [ackWake])]);
+    const sayCue = (text: string): TurnStreamEvent => { cueSpoken = true; return { type: "spoken_cue", text: normalizeForSpeech(text) }; };
+    let race = await nextStep();
+    while (race === "status" || race === "quick" || race === "ack") {
+      if (race === "status") { yield* sideEvents(); pendingStatus = statusWake(); }
+      else if (race === "quick") {
+        quickSettled = true;
+        const cue = await quick;
+        if (cue && !earlyCueSent && !result.cueSuppressed && !cueSpoken) {
+          if (cue.immediate) yield sayCue(cue.text);
+          else if (ackDue) yield sayCue(cue.text);
+          else heldAck = cue;
+        }
+      } else {
+        ackDue = true;
+        if (heldAck && !earlyCueSent && !result.cueSuppressed && !cueSpoken) yield sayCue(heldAck.text);
+      }
+      race = await nextStep();
     }
+    ackTimer.cancel();
     timer.cancel();
-    // VOICE-QUICK-01: the small model's reaction to what was just said, written while the main model works; the fixed bridge phrase is the fallback.
-    if (race === "timeout" && !earlyCueSent && !result.cueSuppressed) { const reaction = await quick; const cue = reaction === undefined ? pickThinkingCue(actorId, result.bannedPhrases) : reaction; if (cue) yield { type: "spoken_cue", text: normalizeForSpeech(cue) }; } // SPEECH-ROBOT-01: every spoken text passes the one normalizer
+    // The fixed bridge phrase is only for a small model that was slow or unavailable (undefined), never for one that chose silence (null).
+    if (race === "timeout" && !earlyCueSent && !result.cueSuppressed && !cueSpoken) { const reaction = await quick; const cue = reaction === undefined ? pickThinkingCue(actorId, result.bannedPhrases) : null; if (cue) yield { type: "spoken_cue", text: normalizeForSpeech(cue) }; } // SPEECH-ROBOT-01: every spoken cue is normalized for speech.
     // THIN-5B: while the first answer piece is still coming, side events
     // (live reasoning, status lines) keep going out as they are emitted, so
     // an adult's reasoning is shown while the model is still thinking

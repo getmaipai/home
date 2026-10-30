@@ -2598,7 +2598,7 @@ describe("routes/turn.ts streamTurnEvents()", () => {
       return undefined;
     };
     try {
-      __setQuickReactionRunnerForTests((async () => ({ ok: true, text: "Oh no." })) as never);
+      __setQuickReactionRunnerForTests((async () => ({ ok: true, text: "REACT: Oh no." })) as never);
       const withReaction: TurnStreamEvent[] = [];
       for await (const event of streamTurnEvents(fakeResult(slow()), "test-person", 5, undefined, false, undefined, "adult", undefined, undefined, { spokenTurn: true, utterance: "my dog died yesterday", stillCueGapMs: 5000 })) withReaction.push(event);
       expect((withReaction.find((e) => e.type === "spoken_cue") as { text: string }).text).toBe("Oh no.");
@@ -2617,6 +2617,33 @@ describe("routes/turn.ts streamTurnEvents()", () => {
       expect(["One sec.", "Hmm, let me think.", "Give me a second.", "Let me see."]).toContain(cue);
     } finally { __resetQuickReactionForTests(); }
   });
+
+  test("a thinking sound is spoken only when the first word is late, and a reaction to news is spoken at once", async () => {
+    const { __setQuickReactionRunnerForTests, __resetQuickReactionForTests } = await import("@/lib/quickReaction");
+    const answerAt = (ms: number) => async function* (): AsyncGenerator<string, SafetyResult | undefined, void> {
+      await new Promise((r) => setTimeout(r, ms));
+      yield "The answer.";
+      return undefined;
+    };
+    const run = async (ms: number): Promise<TurnStreamEvent[]> => {
+      const events: TurnStreamEvent[] = [];
+      for await (const event of streamTurnEvents(fakeResult(answerAt(ms)()), "test-person", 5000, undefined, false, undefined, "adult", undefined, undefined, { spokenTurn: true, utterance: "why is the sky blue", stillCueGapMs: 5000 })) events.push(event);
+      return events;
+    };
+    try {
+      __setQuickReactionRunnerForTests((async () => ({ ok: true, text: "ACK: Hmm." })) as never);
+      const quickAnswer = await run(10);
+      expect(quickAnswer.some((e) => e.type === "spoken_cue")).toBe(false); // the answer came before 0.7 s: no sound
+      __resetQuickReactionForTests();
+      __setQuickReactionRunnerForTests((async () => ({ ok: true, text: "ACK: Hmm." })) as never);
+      const lateAnswer = await run(900);
+      expect((lateAnswer.find((e) => e.type === "spoken_cue") as { text: string }).text).toBe("Hmm.");
+      __resetQuickReactionForTests();
+      __setQuickReactionRunnerForTests((async () => ({ ok: true, text: "ACK: Maybe tomorrow." })) as never);
+      const wrong = await run(900);
+      expect(wrong.some((e) => e.type === "spoken_cue")).toBe(false); // not a thinking sound: dropped, and no fixed phrase either
+    } finally { __resetQuickReactionForTests(); }
+  }, 10_000);
 
   test("a spoken turn that is still silent after the first cue gets one second cue, a written turn never does", async () => {
     const slow = async function* (): AsyncGenerator<string, SafetyResult | undefined, void> {

@@ -7,7 +7,7 @@ import { topicMessagesForId } from "@/lib/topicPrompt";
 import { KNOWN_CUE_TAGS, normalizeTagList } from "@/lib/voiceCues";
 
 export const QUICK_REACTION_DEADLINE_MS = 700;
-const MAX_WORDS = 4;
+const MAX_WORDS = 6;
 const RECENT_KEPT = 4;
 const recent = new Map<string, string[]>();
 let runner: typeof completeBackground = completeBackground;
@@ -15,11 +15,37 @@ export function __setQuickReactionRunnerForTests(fn: typeof completeBackground |
 export function __resetQuickReactionForTests(): void { recent.clear(); runner = completeBackground; }
 
 const SYSTEM = [
-  "You are the listening half of a voice assistant. The person just spoke.",
-  "If they told you something a good friend would react to out loud right away, such as sad news, good news, a frustration, or something surprising or exciting that just happened, say the short words that friend would say, one to four words, in the same mood, as natural speech.",
-  "If they only greeted you, asked a question, gave a command, said okay or mm, or left a sentence unfinished, reply with exactly NONE.",
+  "You are the listening half of a voice assistant. The person just spoke. Reply with exactly one line in one of three forms.",
+  "REACT: followed by one to six words a friend would say out loud right away, in the same mood, when the person shares sad or frustrating news, good news, or something surprising or exciting.",
+  "ACK: followed by one or two words, only a natural thinking sound such as hmm, mm, well, okay, right or let's see, when the person asks a question, makes a request or asks for a story; never use any other word, never promise anything, never mention time, and do not use the same sound every time.",
+  "NONE when the person only greeted you, said a plain okay or mm, or left a sentence unfinished.",
   "Never answer, advise, name an emotion, or repeat their words.",
 ].join(" ");
+
+/** A thinking sound is the only thing an ACK may be: the small model's acknowledgments of a question guessed answers and echoed numbers ("Maybe tomorrow.", "Eight seventeen."). */
+const THINKING_SOUND = /^(?:(?:hm+|mm+|mhm|um+|uh+|well|so|okay|ok|alright|right|yeah|let's see|let me see)[,.…]?\s*){1,2}$/i;
+
+export interface QuickCue {
+  text: string;
+  /** A reaction to news is spoken the moment it is ready; a thinking sound only if the answer is not there yet. */
+  immediate: boolean;
+}
+
+/** One line from the model ("REACT: Oh no.", "ACK: Hmm.", "NONE") to a cue, or null. */
+export function parseQuickCue(raw: string, said: string, banned: readonly string[], lastFew: readonly string[], tags: readonly string[]): QuickCue | null {
+  const line = raw.trim().split("\n")[0] ?? "";
+  const match = line.match(/^(REACT|ACK)\s*:\s*(.+)$/i);
+  if (!match) return null;
+  if (match[1]!.toUpperCase() === "REACT") {
+    const text = cleanReaction(match[2]!, said, banned, lastFew, tags);
+    return text ? { text, immediate: true } : null;
+  }
+  const sound = match[2]!.trim();
+  if (!THINKING_SOUND.test(sound)) return null;
+  const lower = sound.toLowerCase();
+  if (banned.some((phrase) => lower.includes(phrase.toLowerCase())) || lastFew.some((previous) => previous.toLowerCase() === lower)) return null;
+  return { text: sound, immediate: false };
+}
 
 /** The same words back, or a mostly-copied phrase, is an echo, not a reaction. */
 function echoes(reaction: string, said: string): boolean {
@@ -55,7 +81,7 @@ export function cleanReaction(raw: string, said: string, banned: readonly string
 }
 
 /** One short spoken reaction to `said`. null: the model chose to say nothing (or the text failed the checks), so no cue should play. undefined: the model was slow or unavailable, so the caller may use a fixed bridge phrase. Never throws. */
-export async function quickReaction(personId: string, said: string, banned: readonly string[] = [], deadlineMs = QUICK_REACTION_DEADLINE_MS, soundTags: readonly string[] = [], earlier?: string): Promise<string | null | undefined> {
+export async function quickReaction(personId: string, said: string, banned: readonly string[] = [], deadlineMs = QUICK_REACTION_DEADLINE_MS, soundTags: readonly string[] = [], earlier?: string): Promise<QuickCue | null | undefined> {
   const tags = normalizeTagList(soundTags).filter((tag) => (KNOWN_CUE_TAGS as readonly string[]).includes(tag));
   const heard = said.trim().slice(0, 400);
   if (!heard) return null;
@@ -66,11 +92,12 @@ export async function quickReaction(personId: string, said: string, banned: read
   const abort = new AbortController();
   const timer = setTimeout(() => abort.abort(), deadlineMs);
   try {
-    const result = await runner(messages, { max_tokens: 14, temperature: 0.9, thinking: false, dropReasoning: true, exactCeiling: true, signal: abort.signal });
+    const result = await runner(messages, { max_tokens: 18, temperature: 0.9, thinking: false, dropReasoning: true, exactCeiling: true, signal: abort.signal });
+    if (process.env.MAIPAI_DEBUG_QUICK === "1") console.log("[quick]", JSON.stringify({ heard: heard.slice(0, 60), ok: result.ok, text: result.ok ? result.text : null }));
     if (!result.ok) return undefined;
-    const reaction = cleanReaction(result.text, heard, banned, lastFew, tags);
-    if (reaction) recent.set(personId, [...lastFew, reaction].slice(-RECENT_KEPT));
-    return reaction;
+    const cue = parseQuickCue(result.text, heard, banned, lastFew, tags);
+    if (cue) recent.set(personId, [...lastFew, cue.text].slice(-RECENT_KEPT));
+    return cue;
   } catch {
     return undefined;
   } finally {

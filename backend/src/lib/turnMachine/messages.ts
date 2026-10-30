@@ -252,6 +252,8 @@ export function contextToMessages(context: readonly ContextItem[], utterance: st
   if (!cutAfterMemory && openingItems.length > 0) userContent += `\n\nOpening this conversation:\n${openingItems.map((item) => item.text).join("\n")}`;
   if (!cutAfterMemory) {
     userContent += `\n\nHow to answer this one: ${planLineForTurnMachine(plan, signal, promptSurfaceClass, persona.engagement)}`;
+    // VOICE-OPENER-01: a short reaction or thinking sound may already have been spoken to the person, so the reply starts with its substance.
+    if (promptSurfaceClass === "spoken") userContent += "\n\nA short reaction or thinking sound may already have been said aloud before your reply, so do not begin with one yourself (no Oh no, Hmm, Sure or Great as an opener); start with what you have to say.";
     // ROBOT-VISION-01: the guidance for the camera block sits here, outside the untrusted data wrapper, so it is read as an instruction.
     if (context.some((item) => item.source === "camera")) userContent += "\n\nAbout the camera look above: it is all the robot knows about what it can see. Say only what it says, never claim to see more, never name or identify anyone from how they look, and when it shows nothing or does not cover the question, say plainly that you cannot see that. Mention it only when it helps the answer.";
     // DUPLEX-06: the guidance sits outside the data wrapper too, so it is read as an instruction.
