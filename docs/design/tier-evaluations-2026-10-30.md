@@ -20,7 +20,7 @@ before quoting them as a promise.
 | TIER-EVAL-07 stem splitting | htdemucs Standard; ft and 6s pending a listen; TIER-STEMS-01 can start | measured; ear check is Jesse's |
 | TIER-EVAL-04 picture Max, Max edit | Qwen-Image 20B is the Max lead; ERNIE base dropped; Max edit empty | 9 of 22 prompts; eye is Jesse's |
 | TIER-EVAL-05 chat Boost and Max | Qwen3.6-35B-A3B leads Standard on speed; 120B class not run (needs a swap window) | partial; real benches missing |
-| TIER-EVAL-03 video | in progress | see "Not run yet" |
+| TIER-EVAL-03 video Standard and Max | Standard and Boost measured; Max slot empty; LTX 4-bit claim not reproduced; licence read done | partial |
 
 ## TIER-EVAL-01: Reduced chat
 
@@ -285,31 +285,59 @@ Reading it:
 **Verdict.** Standard: put Qwen3.6-35B-A3B through MODEL-VET-01 as the replacement candidate for Muse. Boost: Qwen3.8-27B (after an MTP run) or Gemma 4 26B-A4B
 (after the real benches). Max: undecided, needs the 120B-class runs in a swap window. The draft-model choice (CHAT-TPS-02) stays Jesse's, and nothing here plans a draft model for chat.
 
-## Not run yet: TIER-EVAL-03 and the 120B part of 05, with download sizes
+## TIER-EVAL-03: video Standard and Max (first pass)
 
-These rows judge peak memory and minutes per item, and at a load average of 50 both numbers would mislead, so they wait for a quiet window
-on the Studio. Sizes below are what the Hugging Face file lists showed on 2026-10-30 for the builds that have an Apple path; "on disk" means the Studio
-already holds it. Downloads are approved, so these can start the moment a window is agreed.
+**What ran.** The Stack's own two video workers, driven the same way as EVAL-06: the **Standard** worker (Wan2.2 TI2V-5B FastWan, 3-step DMD, 832 x 480) and the
+**Boost** worker (LTX-2.3 22B distilled, bf16, 8 plus 3 steps with the x2 upscaler, sound made in the same pass, 768 x 448), each on two prompts (a cat asleep beside lemons at
+golden hour; a rainy neon street with a person under a clear umbrella), 49 frames (about 2 seconds), fixed seeds, at Studio load average 33 to 40. Frames from each clip were opened
+(sheet and the four clips are in the shared notes folder under `video-eval/`).
 
-| Row | Candidate (Apple path) | Download | Notes |
-|---|---|---|---|
-| 03 video | LTX-2.3 distilled (mlx-video) | on disk | the reference for the Boost slot |
-| 03 | LTX-2.3 MLX q4 builds (`gajesh/LTX-2.3-mlx-q4`; `dgrauet/ltx-2.3-mlx-q4`) | 39.9 GB; 59.7 GB | the community 29.9 GB peak claim; licence is "other": the competing-product clause read comes first |
-| 03 | LTX-2.3 MLX q8 / full (`dgrauet`) | 87.5 GB; 139.7 GB | the dev two-stage run; only if q4 shows a gain |
-| 03 | Wan 5B (FastWan2.2 TI2V bf16) | on disk | VIDEO-GEN-09 and VIDEO-GEN-11 variants to bench |
-| 03 | Wan2.2 A14B | no Apple path found | stays out |
-| 04 pictures | ERNIE-Image base (`mflux-community/ernie-image-base-mflux-q8`) | 12.3 GB | against the Turbo on disk |
-| 04 | Qwen-Image 20B mflux | size to list when searched | Apache-2.0 |
-| 04 | Qwen-Image-Edit-2511 (`mflux-community/qwen-image-edit-2511-mflux-q4`) | 28.9 GB | edits |
-| 05 chat | Qwen3.6-35B-A3B Q4, Qwen3.8-27B (GGUF, MLX, MTP), Ornith-1.5-122B MLX 4-bit, Muse | on disk | Muse is the baseline |
-| 05 | gpt-oss-120b (`mlx-community/gpt-oss-120b-MXFP4-Q4`) | 62.3 GB | Apache-2.0 |
-| 05 | Gemma 4 26B-A4B (MLX 4-bit build to be named; the source is 51.6 GB) | about 15 GB | Apache-2.0 |
-| 05 | Qwen3.5-122B-A10B and Mistral Small 4 119B | no MLX 4-bit build found yet; sources are 250 GB and 242 GB | decide whether to quantise locally or drop |
-| 06 music | ACE-Step 1.5 XL turbo MLX (`ddalcu/ACE-Step-1.5-XL-Turbo-MLX-Serve-8bit`, `-4bit`) | 7.0 GB; 4.3 GB | MIT; XL base or sft has only 15 to 20 GB bf16 builds |
-| 07 stems | htdemucs MLX (`jasonvassallo/demucs-htdemucs-mlx`), htdemucs_ft MLX (`aufklarer/HTDemucs-FT-MLX`), htdemucs_6s Core ML (`GOVO/HTDemucs_6S_CoreML`) | 0.2 GB; 0.6 GB; 0.7 GB | small; needs three songs (the bench songs are not on disk) |
+| | Standard: Wan 5B FastWan | Boost: LTX-2.3 distilled bf16 |
+|---|---|---|
+| Size and length | 832 x 480, 49 frames | 768 x 448, about 2 s (45 frames decoded from the mp4) |
+| Time per clip | 88 s (with model load), then 75 s | 46 s (with load), then 41 s |
+| Peak memory | 25.4 GB | 39.9 GB |
+| Sound | none | yes (AAC, made with the picture) |
+| What the frames show | the cat clip is sharp and warm, the closest to the prompt; the street clip has a person under a pink umbrella and an invented neon sign | the cat clip is darker and further away; the street clip has two people walking and shop signs with garbled letters |
 
-Total for all the listed Apple-path downloads that are not on disk: about 230 to 330 GB, depending on how many LTX builds are kept.
-Disk free on the Studio is 787 GB.
+Honest reading: on these two prompts the lighter Standard model draws the nicer cat, the Boost model is about twice as fast at a slightly smaller frame and adds sound. The two-prompt
+sample is too small to rank the pictures; it is a calibration of the two shipped slots, so a Max has something to beat.
+
+**What did not run, and why.**
+
+- **The community LTX-2.3 4-bit "29.9 GB peak" claim was not reproduced.** The 4-bit weights (`gajesh/LTX-2.3-mlx-q4`, 35 GB, downloaded) are made for a different runtime
+  (`mlx_ltx`) with a different folder layout from the `mlx-video` the Stack pins; that runtime is not on PyPI and installing code from an unreviewed repository needs Jesse's word.
+  The number in its card is for 5 seconds at 576 x 1024 on an M4 Max, not for our setting.
+- **LTX-2.3 dev two-stage with guidance, the tiny Wan decoder (VIDEO-GEN-11) and Wan 5B q8 at 61 frames were not run.** Each needs weights or code not yet in place (the dev
+  checkpoint is a separate 46 GB download from Lightricks) and a quiet machine for honest minutes.
+- **Wan2.2 A14B: no Apple path found.** It stays out.
+
+**Licence read (LTX-2 Community License, dated 2026-01-05, the one that covers LTX-2.3; not legal advice).**
+
+- Free for any purpose for an entity under 10 million dollars of annual revenue; at or above that, a paid commercial licence is required, with double fees as liquidated damages for use without one.
+- A quantised or fine-tuned build is a "Derivative of LTX-2". Anyone who passes one on (the catalog would) must ship it under the same licence with a complete copy, carry the use restrictions
+  in whatever agreement governs its use, and mark modified files. The community 4-bit builds are labelled "other"; they need the licence file with them before the catalog pins one.
+- Item 19 forbids circumventing or disabling safety features or filters (the Stack leaves the engine's watermark and disclosure features as shipped, which complies).
+- Item 20 forbids use "in any product, service, or application that directly competes with Licensor's commercial products or services, or is designed to replace or substitute Licensor's offerings"
+  without a separate licence. Lightricks sells video tools (LTX Studio and an API). Whether a family hub that offers video generation as one feature "directly competes" is a judgment on which a lawyer
+  should have the last word; it is the one clause that could matter to MaiPai and Jesse should decide whether to ask Lightricks. The weights in the catalog are downloaded by the household, not
+  bundled, which helps on distribution but not on item 20.
+- Commercial-use training of other models on outputs is also barred (item 18); not relevant to Home.
+
+**Verdict.** Max video: no candidate has been measured, so the slot stays empty (a Max is catalogued only with a measured gain over Boost). Standard and Boost numbers above stand as the reference.
+Open for a quiet window and Jesse's yes: the LTX dev two-stage run, the 4-bit runtime question, and the item 20 decision.
+
+## Still open, with download sizes
+
+What remains after this pass: the 120B-class chat models (EVAL-05, need a swap window and Jesse's word), the LTX dev two-stage run and the 4-bit runtime question (EVAL-03), the other 13 picture
+prompts and a Qwen-Image-Edit Q4 run (EVAL-04), and listening checks on the music, stems and voice clips. Sizes below are what the Hugging Face file lists showed on 2026-10-30; the models marked
+"on disk" are on the Studio, and everything listed as downloaded is in `~/tier-eval-models` outside the repository.
+
+Downloaded 2026-10-30 into `~/tier-eval-models` (about 283 GB plus the 36 GB Qwen-Image 2512 build, with 787 GB free before): ACE-Step XL turbo MLX 4-bit and 8-bit (4.3 and 7.0 GB), the official ACE-Step XL turbo and SFT
+(19 GB each), htdemucs MLX, htdemucs_ft MLX and htdemucs_6s Core ML (0.2, 0.6, 0.7 GB), ERNIE-Image base Q8 (12.3 GB), Qwen-Image 2.1 Q4 (9.6 GB, needs a custom loader, unused), Qwen-Image-Edit-2511 Q4 (28.9 GB, unused),
+Qwen-Image 2512 Q8 (36 GB), Gemma 4 26B-A4B MLX 4-bit (15.3 GB), LTX-2.3 MLX Q4 (39.9 GB, wrong runtime for the pinned engine), gpt-oss-120b MXFP4-Q4 (62.3 GB), Qwen3.5-122B-A10B MLX 4-bit (69.6 GB) and
+Mistral Small 4 119B MLX 4-bit (67.8 GB). Not downloaded: the LTX-2.3 dev checkpoint (about 46 GB, needed for the two-stage run), the larger LTX builds (87.5 and 139.7 GB) and the 2.1 Qwen-Image weights beyond
+the Q4. Delete what a verdict makes unnecessary.
 
 Also open: CHAT-AB-01 and KS-BENCH-01 are named by the E5 row but their harnesses are not in this repository; the chat comparison needs them
 brought over (or rewritten) first.

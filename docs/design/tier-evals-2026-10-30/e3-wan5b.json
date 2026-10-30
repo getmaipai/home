@@ -1,0 +1,28 @@
+[
+ {
+  "id": "kitchen",
+  "ok": true,
+  "width": 832,
+  "height": 480,
+  "frames": 49,
+  "fps": 24,
+  "seed": 7,
+  "ms": 87959,
+  "peak_bytes": 25427956744,
+  "wall_s": 88.0,
+  "peak_gb": 25.4
+ },
+ {
+  "id": "street",
+  "ok": true,
+  "width": 832,
+  "height": 480,
+  "frames": 49,
+  "fps": 24,
+  "seed": 8,
+  "ms": 75349,
+  "peak_bytes": 25427957148,
+  "wall_s": 75.4,
+  "peak_gb": 25.4
+ }
+]
