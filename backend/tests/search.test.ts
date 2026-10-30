@@ -5,7 +5,9 @@ import { TestClient } from "./client";
 import { resetDb } from "./reset-db";
 import { createConversation, updateConversationTitle } from "@/lib/conversationHistory";
 import { db } from "@/db";
-import { people } from "@/db/schema";
+import { attachments, people } from "@/db/schema";
+import { createHash } from "node:crypto";
+import { nextHlc } from "@/lib/hlc";
 import { eq } from "drizzle-orm";
 import type { PersonRow } from "@/types";
 
@@ -36,6 +38,9 @@ interface SearchResult {
   subtitle?: string;
   href: string;
   match?: [number, number];
+  source?: string;
+  meta?: string;
+  action?: string;
 }
 interface SearchGroup {
   kind: string;
@@ -91,7 +96,7 @@ describe("GET /api/search: conversations", () => {
     updateConversationTitle(actor, conv.value.id, "Pizza night plans");
     const groups = await search(client, "pizza");
     const conversations = group(groups, "conversation");
-    expect(conversations?.results).toEqual([{ kind: "conversation", id: conv.value.id, title: "Pizza night plans", href: `/chat?conversation=${conv.value.id}`, match: [0, 5] }]);
+    expect(conversations?.results).toMatchObject([{ kind: "conversation", id: conv.value.id, title: "Pizza night plans", href: `/chat?conversation=${conv.value.id}`, match: [0, 5], source: "Chat" }]);
   });
 
   test("a temporary chat never appears", async () => {
@@ -281,5 +286,41 @@ describe("GET /api/search: the owning page's visibility holds", () => {
     const found = group(await search(kid, card!.name), "companion")?.results ?? [];
     expect(found.some((r) => r.id === card!.id)).toBe(true);
     for (const r of found) expect(listCompanionCards(actor).some((c) => c.id === r.id)).toBe(true);
+  });
+});
+
+// SEARCH-MODERN-06: Files from the Library and the richer result fields.
+describe("GET /api/search: files and rich results", () => {
+  function addFile(ownerId: string, key: string, fileName: string, mediaType = "application/pdf") {
+    db.insert(attachments).values({ id: key, ownerPersonId: ownerId, conversationId: null, turnId: null, mediaType, size: 24 * 1024 * 1024, name: fileName, sha256: createHash("sha256").update(key).digest("hex"), storagePath: `people/${ownerId}/attachments/${key}`, provenance: "composer:upload", createdAt: "2026-02-03T12:00:00.000Z", hlc: nextHlc() }).run();
+  }
+
+  test("a file is found by name with its source, facts and a link to the Files page; another person's private file is not", async () => {
+    const { client: ownerClient, actor } = await owner();
+    addFile(actor.id, "file-00000000000000a1", "Aurora photo references.pdf");
+    const hit = group(await search(ownerClient, "aurora"), "file")?.results[0];
+    expect(hit?.title).toBe("Aurora photo references.pdf");
+    expect(hit?.source).toBe("Library");
+    expect(hit?.meta).toContain("PDF");
+    expect(hit?.meta).toContain("24 MB");
+    expect(hit?.href).toBe("/files?file=file-00000000000000a1");
+    expect(hit?.action).toBe("Open");
+    const { client: kid } = await addPerson(ownerClient, "Nova", "child");
+    expect(group(await search(kid, "aurora"), "file")).toBeUndefined();
+  });
+
+  test("a chat result carries its source and a date line", async () => {
+    const { client, actor } = await owner();
+    const conv = createConversation(actor, { surface: "chat" });
+    if (!conv.ok) throw new Error(conv.error);
+    updateConversationTitle(actor, conv.value.id, "What causes the northern lights");
+    const hit = group(await search(client, "northern"), "conversation")?.results[0];
+    expect(hit?.source).toBe("Chat");
+    expect(hit?.meta).toMatch(/\d{4}/);
+  });
+
+  test("with no offline library running, the Wikipedia group is simply absent", async () => {
+    const { client } = await owner();
+    expect(group(await search(client, "aurora"), "reference")).toBeUndefined();
   });
 });

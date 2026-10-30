@@ -26,6 +26,11 @@ const SearchResultSchema = z.object({
   subtitle: z.string().optional(),
   href: z.string(),
   match: z.tuple([z.number(), z.number()]).optional().describe("[start, end) of the first match in title, for highlighting."),
+  snippet: z.string().optional().describe("Up to two lines of text under the title."),
+  source: z.string().optional().describe("Where the result lives, shown above the title."),
+  meta: z.string().optional().describe("A line of facts under the snippet."),
+  thumbnail: z.string().optional().describe("A same-origin picture URL for the end of the row."),
+  action: z.string().optional().describe("The label of the button on the highlighted row."),
 });
 
 const SearchGroupSchema = z.object({

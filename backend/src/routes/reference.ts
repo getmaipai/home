@@ -19,6 +19,7 @@ import { getPersonSettingValue } from "@/lib/settings";
 import { extractArticleImages } from "@/lib/retrieval/articleImages";
 import { sourceForBook } from "@/lib/retrieval/referenceSources";
 import { installed, libraryRequest } from "@/lib/kiwixClient";
+import { searchReference } from "@/lib/referenceSearch";
 
 export const referenceRoutes = apiRouter();
 
@@ -73,43 +74,10 @@ referenceRoutes.openapi(SUGGEST_ROUTE, async (c) => {
 });
 
 referenceRoutes.openapi(SEARCH_ROUTE, async (c) => {
-  const { q, book } = c.req.valid("query"); const person = c.get("person"); const band = speakerAgeBand(person, new Date()); const base = kiwixBaseUrl(); if (!base) return c.json([], 200);
-  try {
-    const names = await installed(base); let books = readableBooks(names, band).books; if (book) books = books.filter((x) => x.book === book);
-    const hits: Array<{ title: string; snippet: string; book: string; path: string }> = []; let sidecarTotal = 0;
-    for (const rb of books) {
-      if (hits.length >= 20) break;
-      const res = await libraryRequest(base, `/search?content=${encodeURIComponent(rb.book)}&pattern=${encodeURIComponent(q)}&count=20`); if (!res.ok) continue;
-      const xml = await res.text();
-      const totalText = /<(?:\w+:)?totalResults\b[^>]*>(\d+)<\/(?:\w+:)?totalResults>/i.exec(xml)?.[1];
-      if (totalText) sidecarTotal += Number(totalText);
-      const candidates: Array<{ title: string; snippet: string; path: string }> = [];
-      for (const m of xml.matchAll(/<item>([\s\S]*?)<\/item>/gi)) {
-        const item = m[1]!; const title = /<title>([\s\S]*?)<\/title>/i.exec(item)?.[1]?.replace(/<[^>]+>/g, "").trim(); const href = /<link>([^<]+)<\/link>/i.exec(item)?.[1]?.trim(); const snippet = /<description>([\s\S]*?)<\/description>/i.exec(item)?.[1]?.replace(/<[^>]+>/g, "").trim() ?? "";
-        if (!title || !href) continue;
-        let path = ""; try { path = new URL(href, base).pathname.split("/").slice(3).map(decodeURIComponent).join("/"); } catch { continue; }
-        if (!path || path.split("/").includes("..")) continue;
-        candidates.push({ title, snippet, path }); if (candidates.length >= 20) break;
-      }
-      if (band === "adult") hits.push(...candidates.map((hit) => ({ ...hit, book: rb.book })));
-      else {
-        for (let i = 0; i < candidates.length; i += 4) {
-          const batch = candidates.slice(i, i + 4);
-          const checked = await Promise.all(batch.map(async (hit) => {
-            const articleRes = await libraryRequest(base, `/content/${encodeURIComponent(rb.book)}/${hit.path.split("/").map(encodeURIComponent).join("/")}`); if (!articleRes.ok) return null;
-            const full = extractFullArticle(await articleRes.text(), { book: rb.book, allowedBooks: new Set(names), allowLinks: false, allowImages: false });
-            const plainText = full.blocks.flatMap((b) => b.type === "paragraph" ? b.inlines.map((entry) => entry.text) : b.type === "heading" ? [b.text] : b.type === "rows" ? b.rows.flatMap((row) => [row.label, row.value]) : []).join(" ");
-            if (tripsMinorFloor(`${hit.title}. ${hit.snippet}. ${plainText}`)) return null;
-            return { title: hit.title, snippet: (hit.snippet || plainText).slice(0, 240), book: rb.book, path: hit.path };
-          }));
-          hits.push(...checked.filter((x): x is NonNullable<typeof x> => x !== null));
-        }
-      }
-      if (hits.length >= 20) hits.splice(20);
-    }
-    c.header("X-Total-Results", String(band === "adult" ? sidecarTotal : hits.length));
-    return c.json(hits, 200);
-  } catch { c.header("X-Total-Results", "0"); return c.json([], 200); }
+  const { q, book } = c.req.valid("query");
+  const { hits, total } = await searchReference(c.get("person"), q, book);
+  c.header("X-Total-Results", String(total));
+  return c.json(hits, 200);
 });
 
 async function loadArticle(c: any, book: string, path: string) {

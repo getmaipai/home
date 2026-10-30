@@ -16,6 +16,9 @@ import { listAlarms } from "@/lib/alarms";
 import { listCompanionCards } from "@/lib/companionsApp";
 import { listCommands } from "@/lib/commands";
 import { isOwnerOrAdmin } from "@/lib/access";
+import { listLibrary } from "@/lib/library";
+import { searchReference } from "@/lib/referenceSearch";
+import { sourceForBook } from "@/lib/retrieval/referenceSources";
 
 export interface SearchResult {
   kind: string;
@@ -25,6 +28,16 @@ export interface SearchResult {
   href: string;
   /** SEARCH-MODERN-02: [start, end) of the first match in `title`, so a client can highlight it. */
   match?: [number, number];
+  /** SEARCH-MODERN-06: up to two lines of text under the title (a message excerpt, an article summary). */
+  snippet?: string;
+  /** Where the result lives, shown small above the title ("Wikipedia", "Library", "Chat"). */
+  source?: string;
+  /** A line of facts under the snippet ("PDF - 24 MB - Feb 3"). */
+  meta?: string;
+  /** A same-origin picture URL for the end of the row. */
+  thumbnail?: string;
+  /** The label of the button on the highlighted row. */
+  action?: string;
 }
 
 export interface SearchGroup {
@@ -40,6 +53,17 @@ export interface SearchProvider {
 }
 
 const RESULT_CAP = 8;
+
+function shortDate(iso: string): string {
+  const at = new Date(iso);
+  return Number.isNaN(at.getTime()) ? "" : at.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric", timeZone: "UTC" });
+}
+
+function sizeLabel(bytes: number): string {
+  if (bytes >= 1024 * 1024) return `${Math.round(bytes / (1024 * 1024))} MB`;
+  if (bytes >= 1024) return `${Math.round(bytes / 1024)} KB`;
+  return `${bytes} B`;
+}
 
 // Conversations by title (and body text - listConversations() already
 // searches both, CHAT-13's own thread-list search convention): reuses
@@ -63,6 +87,9 @@ const conversationsProvider: SearchProvider = {
         // already shows everywhere else in the app.
         title: row.title || "New Chat",
         href: `/chat?conversation=${row.id}`,
+        source: "Chat",
+        ...(row.preview ? { snippet: row.preview.slice(0, 200) } : {}),
+        meta: shortDate(row.last_turn_at ?? row.created_at),
       }));
   },
 };
@@ -224,7 +251,47 @@ const commandsProvider: SearchProvider = {
   },
 };
 
-export const SEARCH_PROVIDERS: readonly SearchProvider[] = [conversationsProvider, peopleProvider, appsProvider, settingsProvider, mediaProvider, memoriesProvider, alarmsProvider, companionsProvider, commandsProvider];
+// SEARCH-MODERN-06: the person's Library files by name through listLibrary(), the page's own
+// visibility (own files, files shared with them, the audience rule) and thumbnail URL.
+const filesProvider: SearchProvider = {
+  kind: "file",
+  heading: "Files",
+  async search(query, actor) {
+    return listLibrary(actor, { search: query.trim(), limit: RESULT_CAP }).items.map((file) => ({
+      kind: "file",
+      id: file.id,
+      title: file.name,
+      source: "Library",
+      meta: [file.media_type.split("/")[1]?.toUpperCase() ?? file.kind, sizeLabel(file.size_bytes), shortDate(file.created_at)].filter(Boolean).join(" \u00b7 "),
+      ...(file.kind === "image" || file.kind === "video" ? { thumbnail: file.thumb_url } : {}),
+      href: `/files?file=${encodeURIComponent(file.id)}`,
+      action: "Open",
+    }));
+  },
+};
+
+// SEARCH-MODERN-06: the offline library (Wikipedia and the other installed books) through the
+// same searchReference() as GET /api/reference/search, so the closed book list and a minor's
+// floor are applied once.
+const referenceProvider: SearchProvider = {
+  kind: "reference",
+  heading: "Wikipedia",
+  async search(query, actor) {
+    const { hits } = await searchReference(actor, query.trim());
+    return hits.slice(0, RESULT_CAP).map((hit) => ({
+      kind: "reference",
+      id: `${hit.book}/${hit.path}`,
+      title: hit.title,
+      source: sourceForBook(hit.book)?.label ?? "Offline library",
+      snippet: hit.snippet,
+      meta: "Article",
+      href: `/reference/${encodeURIComponent(hit.book)}/${hit.path.split("/").map(encodeURIComponent).join("/")}`,
+      action: "Open",
+    }));
+  },
+};
+
+export const SEARCH_PROVIDERS: readonly SearchProvider[] = [conversationsProvider, peopleProvider, appsProvider, settingsProvider, mediaProvider, memoriesProvider, alarmsProvider, companionsProvider, commandsProvider, filesProvider, referenceProvider];
 
 // SEARCH-MODERN-02: one score over every provider's matches. Exact title 0,
 // title starts with the query 1, a word in the title starts with it 2, the
