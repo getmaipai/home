@@ -43,7 +43,7 @@ import { getHouseholdSettingValue } from "@/lib/settings";
 import { PACKAGES_DIR, statMtimeMs, isValidPackageId } from "@/lib/paths";
 import { resolvePackageDir, listInstalledPackageIds } from "@/lib/packageResolve";
 import { promptNow, seededOutcomeFor } from "@/lib/benchSampling";
-import { moonTile } from "@/lib/weatherMoon";
+import { cardMoon, moonTile } from "@/lib/weatherMoon";
 import { weatherAlerts, notifyWeatherAlertsForHome } from "@/lib/weatherAlerts";
 import { ROLE_LADDER, type Role } from "@/middleware/auth";
 import type { PersonRow } from "@/types";
@@ -690,9 +690,10 @@ export async function runPlugin(
     const appDetails = id === "weather"
       ? { ...Object.fromEntries(Object.entries(value.data ?? {}).filter(([key]) => key.startsWith("block_detail_")).map(([key, item]) => [key.slice("block_detail_".length), item])), ...(advice.length > 0 ? { advice: adviceChips(advice) } : {}), ...(summary !== "" ? { summary } : {}), ...(moon ? { moon } : {}), ...(alert ? { alert } : {}) }
       : undefined;
-    if (alert && blocks.length) {
+    // MOON-LOOK-02: the chat weather card draws the real moon from the same one-per-day answer; absent when the almanac app could not answer.
+    if ((alert || moon) && blocks.length) {
       const card = blocks.find((block) => block.kind === "weather_card");
-      if (card && card.props && typeof card.props === "object") card.props = { ...(card.props as Record<string, unknown>), alert };
+      if (card && card.props && typeof card.props === "object") card.props = { ...(card.props as Record<string, unknown>), ...(alert ? { alert } : {}), ...(cardMoon(moon) ? { moon: cardMoon(moon) } : {}) };
     }
     return { ok: true, value: blocks.length > 0 ? ({ ...answer, blocks, ...(appDetails ? { appDetails } : {}) } as PluginResult) : answer };
   } catch (err) {

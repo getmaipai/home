@@ -31,3 +31,8 @@ export async function moonTile(run: MoonRun, now: Date = new Date()): Promise<Mo
   if (tile) cached = { day, tile };
   return tile;
 }
+
+/** MOON-LOOK-02: the chat weather card carries only the phase name and percent lit (its schema has no dates). */
+export function cardMoon(tile: MoonTile | undefined): { phase: string; illumination: number } | undefined {
+  return tile ? { phase: tile.phase, illumination: tile.illumination } : undefined;
+}

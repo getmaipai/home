@@ -1,5 +1,7 @@
 import { beforeEach, describe, expect, test } from "bun:test";
-import { __resetMoonForTests, moonTile } from "@/lib/weatherMoon";
+import { AnswerBlock } from "@maipai/spec/gen/ts/answer-block.js";
+import { weatherCard } from "@/lib/packageBlocks";
+import { __resetMoonForTests, cardMoon, moonTile } from "@/lib/weatherMoon";
 
 beforeEach(() => __resetMoonForTests());
 
@@ -29,5 +31,25 @@ describe("moonTile", () => {
   test("drops a date that is not a real calendar date and keeps the tile", async () => {
     const tile = await moonTile(async () => ({ phase: "Full Moon", illumination: 1, next_full_moon: "2026-02-31", next_new_moon: "soon" }));
     expect(tile).toEqual({ phase: "Full Moon", illumination: 100 });
+  });
+});
+
+describe("cardMoon", () => {
+  const data = {
+    place: "Springfield", temperature: 61, unit: "fahrenheit", conditions: "Clear", block_code: 0, block_is_day: 0,
+    block_day_dates: ["2026-10-30"], block_day_highs: [70], block_day_lows: [50], block_day_codes: [0],
+  };
+  test("keeps only the phase and percent lit, and the card still passes the spec", () => {
+    const moon = cardMoon({ phase: "Waning Gibbous", illumination: 87, nextFull: "2026-11-24", nextNew: "2026-11-09" });
+    expect(moon).toEqual({ phase: "Waning Gibbous", illumination: 87 });
+    const card = weatherCard("weather", "weather", data)!;
+    card.props = { ...(card.props as Record<string, unknown>), moon };
+    expect(AnswerBlock.safeParse(card).success).toBe(true);
+  });
+  test("is absent when the almanac app could not answer, so the card stays as before", () => {
+    expect(cardMoon(undefined)).toBeUndefined();
+    const card = weatherCard("weather", "weather", data)!;
+    expect(AnswerBlock.safeParse(card).success).toBe(true);
+    expect((card.props as Record<string, unknown>).moon).toBeUndefined();
   });
 });
