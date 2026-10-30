@@ -175,3 +175,15 @@ test("a refused clip request shows as one plain line", async () => {
   expect(alerts.length).toBe(1);
   expect(alerts[0]!.textContent).toBe("The video engine is not ready. Check it, then try again.");
 });
+
+test("each animation's own clip shows in the preview when its tile is clicked, even when two animations have a take with the same name", async () => {
+  const { view } = open(() => states(["idle", "listening"]));
+  await view.findByRole("button", { name: "Idle" });
+  fireEvent.click(btn(view, "Idle"));
+  await waitFor(() => expect(view.getByText("Marlow · Idle")).toBeTruthy());
+  const first = document.querySelector("[data-slot='companion-stage'] video, [data-slot='generation-stage'] video")?.getAttribute("src") ?? "";
+  fireEvent.click(btn(view, "Listening"));
+  await waitFor(() => expect(view.getByText("Marlow · Listening")).toBeTruthy());
+  const second = document.querySelector("[data-slot='companion-stage'] video, [data-slot='generation-stage'] video")?.getAttribute("src") ?? "";
+  expect(first).not.toBe(""); expect(second).toContain("listening"); expect(second).not.toBe(first);
+});
