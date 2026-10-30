@@ -140,13 +140,17 @@ export async function stackBlocker(): Promise<string | null> {
 }
 
 /** One supervised restart of the chat engine through the Stack's self-heal path. An older Stack has no such route: then nothing restarts. */
-export async function stackRestart(reason: string): Promise<boolean> {
+export async function stackRestart(reason: string, role: "chat" | "image" | "video" = "chat"): Promise<boolean> {
   try {
-    const answer = await getStackClient().requestSelfHealRestart?.("chat", reason.slice(0, 200));
+    const answer = await getStackClient().requestSelfHealRestart?.(role, reason.slice(0, 200));
     return answer?.accepted === true;
   } catch {
     return false;
   }
+}
+
+export async function stackGpuCompile(): Promise<{ ok: boolean; reason: string | null } | null> {
+  try { return (await getStackClient().gpuHealth?.()) ?? null; } catch { return null; }
 }
 
 export function loadIsHigh(): boolean {
@@ -178,6 +182,7 @@ export const realDeps: CanaryDeps = {
   blocker: stackBlocker,
   turnActive: () => turnActiveWithin(IDLE_WINDOW_MS),
   requestRestart: stackRestart,
+  gpuCompile: stackGpuCompile,
   loadHigh: loadIsHigh,
   searchConfigured: () => Boolean(getHouseholdSettingValue("search.searxng_url")),
   restartBudget: fileRestartBudget(),

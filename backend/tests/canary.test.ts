@@ -10,12 +10,16 @@ import { __resetCanaryRunnerForTests, canaryStatus, canaryTick, MANUAL_DEBOUNCE_
 import { __resetCanaryScheduleForTests, dueChecks, emptySchedule, INTERVAL_MS, noteRun, schedule, searchAllowed, SEARCH_PER_DAY } from "@/lib/canary/schedule";
 import { decodeWav } from "@/lib/canary/wav";
 import { encodeWav } from "@/lib/sttSession";
+import { gpuCompilerFault, roleHealth, __resetMakingHealthForTests } from "@/lib/roleHealth";
+import { __resetStackEngineForTests, __setStackClientForTests } from "@/lib/stackEngine";
+import { setHouseholdSettingValue } from "@/lib/settings";
 import type { CanaryDeps, ChatProbe } from "@/lib/canary/types";
 
 const OK_PROBE: ChatProbe = { ok: true, text: "Hello!", toolCalls: [], toolErrors: [], cue: false, firstTokenMs: 120, totalMs: 900, error: null };
 let clock = 1_800_000_000_000;
 let calls: string[] = [];
 let restarts = 0;
+let restartRoles: string[] = [];
 let budgetFree = true;
 const budget = { allowed: () => budgetFree, note: () => { budgetFree = false; } };
 const HUNG: ChatProbe = { ...OK_PROBE, ok: false, text: "", firstTokenMs: null, error: "timeout" };
@@ -37,7 +41,8 @@ function deps(over: Partial<CanaryDeps> = {}): CanaryDeps {
     async visionReady() { return true; },
     async blocker() { return null; },
     turnActive: () => false,
-    async requestRestart() { restarts += 1; return true; },
+    async requestRestart(_reason, role) { restarts += 1; restartRoles.push(role ?? "chat"); return true; },
+    async gpuCompile() { return { ok: true, reason: null }; },
     searchTrouble: () => false,
     loadHigh: () => false,
     searchConfigured: () => true,
@@ -57,6 +62,7 @@ beforeEach(() => {
   clock = 1_800_000_000_000;
   calls = [];
   restarts = 0;
+  restartRoles = [];
   budgetFree = true;
 });
 afterEach(() => { __resetCanaryRunnerForTests(); });
@@ -226,10 +232,11 @@ describe("schedule", () => {
   test("light checks every 5 and 10 minutes, the rest every 30, search at most 3 a day", () => {
     const st = emptySchedule();
     const t0 = 1_800_000_000_000;
-    for (const id of ["chat_hello", "embed", "chat_tool_weather", "spoken_turn", "stt_tts_loopback", "chat_picture_read", "image_tiny"] as const) noteRun(st, id, t0, 0.5);
+    for (const id of ["chat_hello", "embed", "chat_tool_weather", "spoken_turn", "stt_tts_loopback", "chat_picture_read", "image_tiny", "gpu_metal"] as const) noteRun(st, id, t0, 0.5);
     st.nextSearchAt = t0 + 99 * 3_600_000;
     expect(dueChecks(t0 + 6 * 60_000, st, { keepWarm: true })).toEqual(["embed"]);
     expect(dueChecks(t0 + 11 * 60_000, st, { keepWarm: true })).toEqual(["chat_hello", "embed"]);
+    expect(dueChecks(t0 + 16 * 60_000, st, { keepWarm: true })).toContain("gpu_metal");
     expect(dueChecks(t0 + 31 * 60_000, st, { keepWarm: true })).toContain("stt_tts_loopback");
     expect(INTERVAL_MS.chat_hello).toBe(10 * 60_000);
   });
@@ -252,8 +259,8 @@ describe("schedule", () => {
     expect(searchAllowed(st, t0 + 31 * 3_600_000)).toBe(false);
   });
 
-  test("Keep the AI warm off leaves only the daily picture check on a timer", () => {
-    expect(dueChecks(1_800_000_000_000, emptySchedule(), { keepWarm: false })).toEqual(["image_tiny"]);
+  test("Keep the AI warm off leaves only the daily picture check and the graphics compiler check (which wakes nothing) on a timer", () => {
+    expect(dueChecks(1_800_000_000_000, emptySchedule(), { keepWarm: false })).toEqual(["gpu_metal", "image_tiny"]);
   });
 
   test("a search block (tool error) silences the search canary for 24 hours", async () => {
@@ -394,5 +401,57 @@ describe("canary in coding mode", () => {
     const out = await CHECK_BY_ID.get("image_tiny")!.run({ image: async () => { asked = true; return { ok: false }; } } as never, {} as never);
     setHouseholdSettingValue("coding.home_mode", "normal");
     expect(out.kind).toBe("skip"); expect(asked).toBe(false);
+  });
+});
+
+describe("GPU-HEALTH-01: the graphics compiler canary", () => {
+  const BAD = { ok: false, reason: "The Mac's graphics compiler is not responding." };
+  const stackRoles = (chatReady = true) => __setStackClientForTests({
+    roles: async () => ({ roles: [{ id: "chat", state: { state: chatReady ? "ready" : "offline" } }, { id: "image", state: { state: "installed" } }, { id: "video", state: { state: "loaded" } }] }),
+    memory: async () => ({ watchdog: { level: "normal", generation_paused: false } }),
+    getCodingMode: async () => ({ mode: "normal", target: "normal", state: "stable" }),
+  } as never);
+  beforeEach(() => { setHouseholdSettingValue("engines.stack.url", "http://127.0.0.1:8770"); __resetMakingHealthForTests(); stackRoles(); });
+  afterEach(() => { __resetStackEngineForTests(); __resetMakingHealthForTests(); });
+
+  test("a failing compile restarts only chat, image and video through the Stack's restart path, once, and the second failure raises the plain Repairs item", async () => {
+    const d = deps({ gpuCompile: async () => BAD });
+    await runSuite(d, { reason: "manual", only: ["gpu_metal"] });
+    expect(restartRoles).toEqual(["chat", "image", "video"]);
+    expect(canaryIssues()).toHaveLength(0);
+    clock += 60_000; budgetFree = true;
+    await runSuite(d, { reason: "manual", only: ["gpu_metal"] });
+    expect(restartRoles).toHaveLength(3);
+    const [item] = canaryIssues();
+    expect(item!.title).toBe("Pictures, video and chat are paused");
+    expect(item!.detail).toBe("Pictures, video and chat are paused because this Mac's graphics compiler is not responding. Restart the Mac when nobody is using it.");
+  });
+
+  test("two failures disable picture and video with the cause; chat only when its own hello also fails; a pass clears all of it", async () => {
+    const bad = deps({ gpuCompile: async () => BAD });
+    await runSuite(bad, { reason: "manual", only: ["gpu_metal"] });
+    expect(gpuCompilerFault()).toBe(false);
+    expect(await roleHealth("image")).toEqual({ availability: "ready", reason: null });
+    await runSuite(bad, { reason: "manual", only: ["gpu_metal"] });
+    expect(gpuCompilerFault()).toBe(true);
+    expect(await roleHealth("image")).toMatchObject({ availability: "unavailable", cause: "gpu" });
+    expect(await roleHealth("video")).toMatchObject({ availability: "unavailable", cause: "gpu" });
+    expect(await roleHealth("chat")).toMatchObject({ availability: "ready" });
+    await runSuite(deps({ chat: async () => HUNG }), { reason: "manual", only: ["chat_hello"] });
+    expect(await roleHealth("chat")).toMatchObject({ availability: "unavailable", cause: "gpu" });
+    await runSuite(deps(), { reason: "manual", only: ["gpu_metal"] });
+    expect(gpuCompilerFault()).toBe(false);
+    expect(await roleHealth("image")).toEqual({ availability: "ready", reason: null });
+    expect(canaryIssues()).toHaveLength(0);
+  });
+
+  test("a Stack that cannot be asked skips the check and raises nothing", async () => {
+    const out = await runSuite(deps({ gpuCompile: async () => null }), { reason: "manual", only: ["gpu_metal"] });
+    expect(out[0]!.status).toBe("skipped");
+    expect(restartRoles).toEqual([]);
+  });
+
+  test("the check is scheduled even with keep-warm off", () => {
+    expect(dueChecks(clock, emptySchedule(), { keepWarm: false })).toContain("gpu_metal");
   });
 });

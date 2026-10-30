@@ -16,6 +16,8 @@ const PICTURE_PHRASE = "What colour is this picture? Answer in one word.";
 
 const pass = (probe?: ChatProbe): Outcome => ({ kind: "pass", firstTokenMs: probe?.firstTokenMs ?? null });
 const fail = (cause: string, fix: string, life?: "dead" | "hung"): Outcome => ({ kind: "fail", cause, fix, ...(life ? { life } : {}) });
+export const GPU_CAUSE = "Pictures, video and chat are paused because this Mac's graphics compiler is not responding.";
+export const GPU_FIX = "Restart the Mac when nobody is using it.";
 const CHECK_AGAIN = "Open Status, then choose Run checks now. If it fails again, restart the AI from Settings, AI.";
 
 function transport(probe: ChatProbe, what: string): Outcome | null {
@@ -50,6 +52,14 @@ export const CHECKS: CanaryCheck[] = [
     async run(deps) {
       const result = await deps.embed();
       return result.ok && result.dims > 0 ? pass() : fail("The embedding engine did not return a result, so memory and search ranking cannot work.", CHECK_AGAIN);
+    },
+  },
+  {
+    id: "gpu_metal", name: "Graphics compiler", group: "pictures", timeoutMs: 15_000, title: "Pictures, video and chat are paused",
+    async run(deps) {
+      const answer = await deps.gpuCompile();
+      if (!answer) return { kind: "skip", reason: "The Stack could not be asked about the graphics compiler." };
+      return answer.ok ? pass() : fail(GPU_CAUSE, GPU_FIX);
     },
   },
   {

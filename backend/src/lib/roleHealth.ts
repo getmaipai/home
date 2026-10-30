@@ -1,4 +1,5 @@
 
+import * as canaryResults from "@/lib/canary/results";
 import { reducedChatState } from "@/lib/reducedChat";
 import { warmupInFlight } from "@/lib/stackWarmup";
 import { getStackClient, isStackConfigured, stackRefusal } from "@/lib/stackEngine";
@@ -13,7 +14,7 @@ export const MAKING_ROLES: readonly MakingRole[] = ["image", "video"];
  * when the Stack itself refused the role (a 503 with its reason), is
  * that reason in the household's wording - the same line the chat reply
  * carries. `reason` stays the short code the consumers switch on. */
-export type RoleHealth = { availability: "ready" | "starting" | "unavailable"; reason: string | null; /** CHAT-PAUSE-01: why it is unavailable, when known. */ cause?: "restarting" | "memory" | "not_installed" | "mode_change" | "tier_reduced"; detail?: string; contextLength?: number; slots?: number; contextPerSlot?: number; contextScope?: "total" | "per_slot"; /** VISION-02d: the model the Stack's chat role runs (or would start). */ modelId?: string; pictureTokensMax?: number };
+export type RoleHealth = { availability: "ready" | "starting" | "unavailable"; reason: string | null; /** CHAT-PAUSE-01: why it is unavailable, when known. */ cause?: "restarting" | "memory" | "not_installed" | "mode_change" | "gpu"; detail?: string; contextLength?: number; slots?: number; contextPerSlot?: number; contextScope?: "total" | "per_slot"; /** VISION-02d: the model the Stack's chat role runs (or would start). */ modelId?: string; pictureTokensMax?: number };
 let roleHealthForTests: Partial<Record<HealthRole, RoleHealth>> = {};
 export function __setRoleHealthForTests(value: Partial<Record<HealthRole, RoleHealth>>): void { roleHealthForTests = value; cachedHealth.clear(); }
 
@@ -43,8 +44,18 @@ export async function localRoleHealthEntry(role: HealthRole): Promise<EngineHeal
  * may already have room. Every other reader (the health row, the status
  * page, the model node classifying a failed generation) takes the
  * default and sees the refusal. */
+/** GPU-HEALTH-01: the graphics compiler check failed twice in a row and has not passed since. Pictures and video wait on it; chat only when its own hello check
+ * also fails (an engine that already compiled may keep answering while the compiler hangs). */
+export function gpuCompilerFault(): boolean {
+  const gpu = canaryResults.lastReal("gpu_metal");
+  return gpu?.status === "fail" && canaryResults.failuresInARow("gpu_metal") >= canaryResults.RAISE_AFTER;
+}
+function chatBlockedByGpu(): boolean { return gpuCompilerFault() && canaryResults.lastReal("chat_hello")?.status === "fail"; }
+const GPU_HEALTH: RoleHealth = { availability: "unavailable", reason: "gpu_compiler", cause: "gpu" };
+
 export async function roleHealth(role: HealthRole, opts: { live?: boolean } = {}): Promise<RoleHealth> {
   if (roleHealthForTests[role]) return roleHealthForTests[role]!;
+  if (role === "chat" && chatBlockedByGpu()) return GPU_HEALTH;
   if (!isStackConfigured()) return { availability: "unavailable", reason: "stack_unreachable", cause: "restarting" };
   if (role === "image" || role === "video") return makingHealth(role);
   if (role === "chat" && reducedChatState()) {
@@ -114,6 +125,7 @@ async function makingHealth(role: MakingRole): Promise<RoleHealth> {
   if (!row || row.state.state === "notInstalled") return { availability: "unavailable", reason: "not_installed", cause: "not_installed" };
   const refusal = stackRefusal(STACK_REFUSAL_KEY[role]);
   if (refusal) return refusal.kind === "memory" ? { availability: "unavailable", reason: "stack_refused", cause: "memory" } : { availability: "starting", reason: "stack_refused", cause: "restarting" };
+  if (gpuCompilerFault()) return GPU_HEALTH;
   if (coding) return { availability: "unavailable", reason: null, cause: "mode_change" };
   if (paused) return { availability: "unavailable", reason: null, cause: "memory" };
   if (row.state.state === "offline") return { availability: "unavailable", reason: "failed_start", ...(/memory/i.test(row.state.reason ?? "") ? { cause: "memory" as const } : {}) };

@@ -8,6 +8,7 @@ const HOUR = 60 * MIN;
 export const INTERVAL_MS: Record<Exclude<CanaryId, "chat_search_trigger">, number> = {
   chat_hello: 10 * MIN,
   embed: 5 * MIN,
+  gpu_metal: 15 * MIN,
   chat_tool_weather: 30 * MIN,
   spoken_turn: 30 * MIN,
   stt_tts_loopback: 30 * MIN,
@@ -21,7 +22,7 @@ export const SLOW_BACKOFF_MS = 15 * MIN;
 /** A person's turn in the last 30 seconds means they are mid-conversation. */
 export const IDLE_WINDOW_MS = 30_000;
 /** Priority when several are due. */
-export const ORDER: CanaryId[] = ["chat_hello", "embed", "chat_tool_weather", "spoken_turn", "stt_tts_loopback", "chat_search_trigger", "chat_picture_read", "image_tiny"];
+export const ORDER: CanaryId[] = ["chat_hello", "embed", "gpu_metal", "chat_tool_weather", "spoken_turn", "stt_tts_loopback", "chat_search_trigger", "chat_picture_read", "image_tiny"];
 
 export interface ScheduleState {
   lastRun: Partial<Record<CanaryId, number>>;
@@ -53,7 +54,7 @@ export function dueChecks(now: number, st: ScheduleState, opts: { keepWarm: bool
       continue;
     }
     // Keep the AI warm off: only the daily picture check still runs on a timer.
-    if (!opts.keepWarm && id !== "image_tiny") continue;
+    if (!opts.keepWarm && id !== "image_tiny" && id !== "gpu_metal") continue;
     const last = st.lastRun[id];
     if (last === undefined || now - last >= INTERVAL_MS[id]) due.push(id);
   }

@@ -1,5 +1,5 @@
 // CANARY-01 (docs/design/reliability-2026-10-17.md): behavioural checks that run the real pipeline.
-export type CanaryId = "chat_hello" | "embed" | "chat_tool_weather" | "spoken_turn" | "stt_tts_loopback" | "chat_picture_read" | "chat_search_trigger" | "image_tiny";
+export type CanaryId = "chat_hello" | "embed" | "chat_tool_weather" | "spoken_turn" | "stt_tts_loopback" | "chat_picture_read" | "chat_search_trigger" | "image_tiny" | "gpu_metal";
 export type CanaryGroup = "chat" | "tools" | "search" | "voice" | "pictures";
 
 /** What one probe of the chat pipeline saw. No reply text is kept beyond the check that reads it. */
@@ -36,7 +36,9 @@ export interface CanaryDeps {
   /** A person's turn started or finished recently. */
   turnActive(): boolean;
   /** Ask the Stack for ONE supervised restart of the chat engine (its own self-heal path; the breaker keeps its count). False when it declines. */
-  requestRestart(reason: string): Promise<boolean>;
+  requestRestart(reason: string, role?: "chat" | "image" | "video"): Promise<boolean>;
+  /** GPU-HEALTH-01: the Stack compiles one tiny shader. null when the Stack cannot be asked (older Stack, unreachable). */
+  gpuCompile(): Promise<{ ok: boolean; reason: string | null } | null>;
   /** Home's load average is above twice the core count. */
   loadHigh(): boolean;
   /** A web search address is set, so the search check can mean something. */

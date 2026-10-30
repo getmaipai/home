@@ -148,6 +148,8 @@ export interface StackClient {
   engines(opts?: { signal?: AbortSignal }): Promise<EnginesListResponse>;
   voices(opts?: { signal?: AbortSignal }): Promise<StackVoice[]>;
   /** CANARY-01: ask the Stack's own supervised restart path for ONE restart of a role's engine (the circuit breaker keeps its count). An older Stack answers 404. */
+  /** GPU-HEALTH-01: one tiny shader compile through the Mac's graphics compiler. An older Stack answers 404. */
+  gpuHealth?(opts?: { signal?: AbortSignal }): Promise<{ ok: boolean; reason: string | null }>;
   requestSelfHealRestart?(role: string, reason: string, opts?: { signal?: AbortSignal }): Promise<{ accepted: boolean; why: string | null }>;
   engineAction(
     name: string,
@@ -502,6 +504,7 @@ export function createStackClient(options: StackClientOptions = {}): StackClient
     }, opts),
     setMediaRoots: (roots, opts) => call("/stack/v1/media/roots", { ...jsonInit(roots), method: "PUT" }, async (res) => (await json<{ roots: { read: string[]; write: string[] } }>(res)).roots, opts),
     requestSelfHealRestart: (role, reason, opts) => call("/stack/v1/engines/self-heal/restart", jsonInit({ role, reason }), json<{ accepted: boolean; why: string | null }>, opts),
+    gpuHealth: (opts) => call("/stack/v1/engines/gpu-health", { method: "GET" }, json<{ ok: boolean; reason: string | null }>, opts),
     selfHeal: (opts) => call("/stack/v1/engines/self-heal", { method: "GET" }, json<StackSelfHeal>, opts),
     healthFix: (code, opts) => call(`/stack/v1/health/${encodeURIComponent(code)}/fix`, { method: "POST" }, json<Record<string, unknown>>, opts),
     settings: (opts) => call("/stack/v1/settings", { method: "GET" }, json<{ sections: Array<{ id: string; label: string }>; settings: StackSetting[] }>, opts),

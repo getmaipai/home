@@ -129,7 +129,7 @@ const COMPOSER_NOTICE: Record<"paused" | "starting", ComposerNotice> = {
 /** CHAT-PAUSE-01: the same composer line, worded for the cause when Home
  * knows it. Every cause reuses the one notice shape (and so the one
  * composer line, Welcome state and Send hold); only the words differ. */
-const CAUSE_NOTICE: Record<"restarting" | "memory" | "not_installed" | "mode_change" | "paused_by_admin" | "offline", ComposerNotice> = {
+const CAUSE_NOTICE: Record<"restarting" | "memory" | "not_installed" | "mode_change" | "paused_by_admin" | "offline" | "gpu", ComposerNotice> = {
   restarting: {
     adult: "The AI is restarting. Chat will start again by itself in a minute.",
     teen: "The AI is restarting. Chat will start again by itself in a minute.",
@@ -149,6 +149,7 @@ const CAUSE_NOTICE: Record<"restarting" | "memory" | "not_installed" | "mode_cha
     repairs_link: "Open Repairs",
   },
   mode_change: { adult: "Home is getting ready for a big job. Chat will be back in about a minute.", teen: "Home is getting ready for a big job. Chat will be back in about a minute.", child: "I am getting ready for a big job. Try again in a minute.", repairs_link: null },
+  gpu: { adult: "Chat is paused because this Mac's graphics compiler is not responding. An owner can restart the Mac when nobody is using it.", teen: "Chat is paused because this Mac's graphics compiler is not responding. Ask a grown-up to restart the Mac.", child: "I need a rest. Ask a grown-up.", repairs_link: "Open Repairs" },
   paused_by_admin: {
     adult: "Chat is paused by an admin until it is turned back on.",
     teen: "Chat is paused by an admin until it is turned back on.",
@@ -182,7 +183,7 @@ export function composerNotice(availability: "ready" | "starting" | "unavailable
  * the words from the health row (`engines.image.notice`, `engines.video.notice`).
  * No figure (no sizes, no percentages) ever appears in these lines. */
 export type MakingKind = "image" | "video";
-export type MakingCause = "restarting" | "memory" | "not_installed" | "mode_change" | "offline";
+export type MakingCause = "restarting" | "memory" | "not_installed" | "mode_change" | "offline" | "gpu";
 
 const MAKING_NOUN: Record<MakingKind, { thing: string; Thing: string; things: string; engine: string }> = {
   image: { thing: "picture", Thing: "Picture", things: "Pictures", engine: "picture engine" },
@@ -209,6 +210,12 @@ function makingNoticeFor(kind: MakingKind, cause: MakingCause | "starting" | "un
       teen: `Home is busy with a big job, so ${thing} making is paused. It comes back when the job finishes.`,
       child: "I'm busy with a big job. Try again later.",
       repairs_link: null,
+    };
+    case "gpu": return {
+      adult: `${things} are paused because this Mac's graphics compiler is not responding. An owner can restart the Mac when nobody is using it.`,
+      teen: `${things} are paused because this Mac's graphics compiler is not responding. Ask a grown-up to restart the Mac.`,
+      child: `${things} are resting. Ask a grown-up.`,
+      repairs_link: "Open Repairs",
     };
     case "restarting": return {
       adult: `The ${engine} is restarting. ${things} will be back by themselves in a minute.`,

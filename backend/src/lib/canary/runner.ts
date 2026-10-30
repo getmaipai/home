@@ -56,6 +56,7 @@ async function applyResult(check: CanaryCheck, result: CheckResult, outcome: Out
     resolveIssue(ISSUE_SOURCE, check.id);
   }
   if (check.id === "chat_hello" && verdict.raise) await maybeRestart(deps);
+  if (check.id === "gpu_metal" && verdict.firstFailure) await restartOwnEngines(deps);
   // The canary must never become the load: a hello far slower than usual pauses scheduled checks.
   if (check.id === "chat_hello" && result.status === "pass" && before.length >= 5 && result.durationMs > 3 * median(before)) {
     schedule.slowUntil = deps.now() + SLOW_BACKOFF_MS;
@@ -75,6 +76,17 @@ async function maybeRestart(deps: CanaryDeps): Promise<void> {
   deps.restartBudget.note();
   console.log(JSON.stringify({ event: "engine.restart_requested_by_canary", why: dead ? "role_not_ready" : "no_token_three_times" }));
   await deps.requestRestart(dead ? "chat role not ready at a health check" : "chat gave no token at three health checks").catch(() => false);
+}
+
+/** GPU-HEALTH-01: the graphics compiler stopped answering. Once per incident, ask the Stack to restart only its own Metal engines through the
+ * self-heal path (never a process it does not own); the restart cannot repair the Mac itself, so the Repairs item after the second failure tells a person to restart it. */
+async function restartOwnEngines(deps: CanaryDeps): Promise<void> {
+  if (results.restartAlreadyAsked("gpu_metal")) return;
+  if (deps.loadHigh() || (await deps.blocker()) || !deps.restartBudget.allowed()) return;
+  results.markRestartAsked("gpu_metal");
+  deps.restartBudget.note();
+  console.log(JSON.stringify({ event: "engine.restart_requested_by_canary", why: "graphics_compiler" }));
+  for (const role of ["chat", "image", "video"] as const) await deps.requestRestart("the Mac's graphics compiler stopped answering", role).catch(() => false);
 }
 
 export interface RunOptions { reason: RunReason; only?: CanaryId[]; includeSearch?: boolean; includeImage?: boolean }
