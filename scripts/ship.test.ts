@@ -26,6 +26,18 @@ beforeAll(() => {
 describe("ship pipeline", () => {
   // Each test starts from a hub on the previous release, so a test that promotes does not make the next one a no-op "already live".
   beforeEach(() => { writeFileSync(join(live, ".installed-tag"), "v0.0.1\n"); });
+  test("status says no deploy is running and reports the live tag and hub", () => {
+    const out = run(["status"], { MAIPAI_SHIP_HEALTH_CMD: "true", MAIPAI_SHIP_LOCK: join(scratch, "no-such-lock") });
+    expect(out.status).toBe(0); expect(out.stdout).toContain("deploy: none running"); expect(out.stdout).toContain("live tag v0.0.1"); expect(out.stdout).toContain("hub answering: yes");
+  }, 60_000);
+  test("status reports a ship in progress and a hub that is not answering", () => {
+    const sleeper = spawnSync("bash", ["-c", "sleep 30 >/dev/null 2>&1 & echo $!"], { encoding: "utf8" }).stdout.trim();
+    const lock = join(scratch, "status-lock.d"); mkdirSync(lock, { recursive: true }); writeFileSync(join(lock, "pid"), sleeper); writeFileSync(join(lock, "what"), "sha-abc1234 from test pid 1");
+    try {
+      const out = run(["status"], { MAIPAI_SHIP_HEALTH_CMD: "false", MAIPAI_SHIP_LOCK: lock });
+      expect(out.status).toBe(0); expect(out.stdout).toContain("deploy: IN PROGRESS"); expect(out.stdout).toContain("sha-abc1234"); expect(out.stdout).toContain("hub answering: no"); expect(out.stdout).toContain("wait for it");
+    } finally { spawnSync("kill", [sleeper]); rmSync(lock, { recursive: true, force: true }); }
+  }, 60_000);
   test("refuses on a Mac without the live-hub marker", () => {
     const out = run([sha, "--before-green"], { MAIPAI_SHIP_LIVE: "", MAIPAI_SHIP_MARKER: join(scratch, "no-such-marker") });
     expect(out.status).toBe(1); expect(out.stderr).toContain("not marked as the live hub"); expect(out.stderr).toContain("sudo touch");

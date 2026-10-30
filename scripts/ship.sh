@@ -4,7 +4,7 @@
 # --tag labels a shipped commit afterwards;
 # the live .installed-tag remains sha-<first 7> so update checks do not treat it as a release.
 set -euo pipefail
-usage() { echo "usage: bash scripts/ship.sh [<sha>|main] [--before-green] [--tag] [--dry-run] [--adopt-empty-live] [--reinstall] [--retry]" >&2; }
+usage() { echo "usage: bash scripts/ship.sh status | bash scripts/ship.sh [<sha>|main] [--before-green] [--tag] [--dry-run] [--adopt-empty-live] [--reinstall] [--retry]" >&2; }
 die() { echo "ship.sh: $1" >&2; exit "${2:-1}"; }
 common="$(git rev-parse --git-common-dir 2>/dev/null)" || die "run this inside a Home checkout."
 [[ "$common" = /* ]] || common="$(cd "$(dirname "$common")" && pwd -P)/$(basename "$common")"
@@ -28,6 +28,23 @@ stack_url="${MAIPAI_SHIP_STACK_URL:-http://127.0.0.1:${stack_port}/healthz}"
 migrations_cmd="${MAIPAI_SHIP_MIGRATIONS_CMD:-sqlite3 -readonly $live/data/hub.db 'select count(*) from __drizzle_migrations'}"
 publish_cmd="${MAIPAI_PUBLISH_CMD:-bash scripts/publish-release.sh TAG --latest NOTES}"
 health_timeout="${MAIPAI_SHIP_HEALTH_TIMEOUT:-90}"
+# `ship.sh status` answers "is a release deploying right now?" in one line, for people and sessions to run before they say the hub is up or down
+# (2026-10-30: a session reported the hub down without knowing a ship was installing; the lock below was there, nothing read it).
+if [[ "${1:-}" == status ]]; then
+  status_lock="${MAIPAI_SHIP_LOCK:-$data/ship.lock.d}"
+  status_tag="$(cat "$live/.installed-tag" 2>/dev/null || echo unknown)"
+  if [[ -n "$health_cmd" ]]; then if eval "$health_cmd" >/dev/null 2>&1; then status_hub=yes; else status_hub=no; fi
+  elif curl -fsS -m 5 -o /dev/null "${web_url%/}/healthz" 2>/dev/null; then status_hub=yes; else status_hub=no; fi
+  status_pid="$(cat "$status_lock/pid" 2>/dev/null || true)"
+  if [[ "$status_pid" =~ ^[0-9]+$ ]] && kill -0 "$status_pid" 2>/dev/null; then
+    echo "deploy: IN PROGRESS ($(cat "$status_lock/what" 2>/dev/null || echo unknown), running $(ps -o etime= -p "$status_pid" 2>/dev/null | tr -d ' ')); live tag $status_tag; hub answering: $status_hub. The hub can be down for a few minutes while it installs: wait for it, do not restart or ship anything."
+  elif pgrep -f "$promote" >/dev/null 2>&1; then
+    echo "deploy: IN PROGRESS (an install is running outside ship.sh); live tag $status_tag; hub answering: $status_hub. Wait for it to finish."
+  else
+    echo "deploy: none running; live tag $status_tag; hub answering: $status_hub."
+  fi
+  exit 0
+fi
 before_green=0; tag_after=0; dry=0; adopt_empty_live=0; reinstall=0; retry=0; target=main
 while (($#)); do case "$1" in --before-green) before_green=1;; --tag) tag_after=1;; --dry-run) dry=1;; --adopt-empty-live) adopt_empty_live=1;; --reinstall) reinstall=1;; --retry) retry=1;; main) target=main;; --*) usage; exit 2;; *) target="$1";; esac; shift; done
 [[ "$target" == main || "$target" =~ ^[0-9a-f]{7,40}$ ]] || { usage; exit 2; }
