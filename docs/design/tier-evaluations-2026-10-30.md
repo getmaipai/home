@@ -18,7 +18,8 @@ before quoting them as a promise.
 | TIER-EVAL-08 listening side | No, from the 2026-10-25 numbers; household audio needs real recordings | decided, see below |
 | TIER-EVAL-06 music Boost and Max | XL turbo: no slot; XL SFT: Max candidate pending a listen | measured; ear check is Jesse's |
 | TIER-EVAL-07 stem splitting | htdemucs Standard; ft and 6s pending a listen; TIER-STEMS-01 can start | measured; ear check is Jesse's |
-| TIER-EVAL-03, 04, 05 | in progress | see "Not run yet" |
+| TIER-EVAL-04 picture Max, Max edit | Qwen-Image 20B is the Max lead; ERNIE base dropped; Max edit empty | 9 of 22 prompts; eye is Jesse's |
+| TIER-EVAL-03, 05 | in progress | see "Not run yet" |
 
 ## TIER-EVAL-01: Reduced chat
 
@@ -203,7 +204,45 @@ Reading it:
 than the standard; otherwise Boost collapses into Standard, per the tier collapse rule. `htdemucs_6s` is a feature choice (guitar and piano tracks),
 not a tier. Pending: a listen by Jesse, and a run on a real recorded song (these songs are AI-made and clean, so they flatter the separator).
 
-## Not run yet: TIER-EVAL-03, 04 and 05, with download sizes
+## TIER-EVAL-04: picture Max and Max edit
+
+**Method.** The 2026-10-25 bakeoff harness (mflux 0.23.0, seed 7, 1024 x 1024, one process per picture, time includes model load), the same prompts
+and seed as the Z-Image-Turbo 8-bit baseline in that bakeoff. A nine-prompt subset of the 22: all five text prompts (neon sign, bakery sign, jazz
+poster, chalkboard menu, birthday card), two photos (fisherman portrait, kitchen with a cat), one anime street and one pop-culture prompt ("the
+Terminator"). Running all 22 at 3 to 5 minutes each on a busy machine was not practical in this pass. Candidates: **ERNIE-Image base** (Q8, 50 steps,
+`mflux-community/ernie-image-base-mflux-q8`) and **Qwen-Image 20B** (the 2512 release, Q8, 30 steps, `mflux-community/qwen-image-2512-mflux-q8`). Pictures
+opened and compared side by side; the sheets are in the shared notes folder under `picture-eval/`. Studio load average was 35 to 55 during the runs.
+
+| | Z-Image-Turbo (today's Detailed) | ERNIE-Image base | Qwen-Image 20B |
+|---|---|---|---|
+| Steps | 9 | 50 | 30 |
+| Time per picture, 1024 | 45.8 s (bakeoff mean) | 272 to 305 s | 181 to 212 s |
+| Peak memory | 25.8 GB | 18.8 GB | 37.4 GB |
+| Text strings right (5 prompts) | 5 of 5 | 5 of 5 | 5 of 5 |
+| Stray or garbled extra text | yes: a banner "THEVENSTOR" on the Terminator picture, small gibberish in the bakery window | none seen | none seen |
+| Photo prompts | clean, a little flat | richer scenes and props, warm light | sharp and dramatic, the portrait a little over-sharpened |
+| The Terminator | a man in black with sunglasses and the invented banner | an illustrated, Schwarzenegger-like man in a machine room | a photoreal face with the T-800 endoskeleton half and red eye: recognisably the character |
+| Anime | good | good, more saturated | good, the most detailed |
+
+Reading it:
+
+- **Text no longer separates them.** All three spelled every string right. The 2026-10-25 note that Z-Image, ERNIE and MOSS got every string
+  right holds for Qwen-Image too. Where the Max models pull ahead is not text.
+- **ERNIE base does not beat Z-Image-Turbo by a margin worth about six times the wait.** It adds scene richness, loses the stray-text problem on
+  the one prompt where Z-Image showed it, and saves 7 GB, but the pictures are in the same league. The Max slot should not go to ERNIE base.
+- **Qwen-Image 20B is the only candidate with a visible gain**, and it is on knowledge prompts (the Terminator was drawn as the character, which Z-Image
+  and ERNIE did not manage) plus fewer invented words. It costs about four times Z-Image-Turbo's time and 11.6 GB more memory, and it fits the
+  p128 Max cap and the Reduced-chat cap (95 GB) easily. Nine prompts, one seed: this is a lead, not a verdict. The remaining 13 prompts (anime,
+  cartoon, historical figures, four more pop-culture) and Jesse's eye decide whether four minutes a picture is worth it.
+- **Max edit: no new data in this pass.** Qwen-Image-Edit-2511 (8-bit, 20 steps) was measured on 2026-10-25 at 330 to 364 s and 39 GB per edit, all five
+  edits correct, against Klein 4B edit at 20 to 28 s, all five correct (see the bakeoff results). So Max edit has no measured gain over the slot
+  below it yet; the Q4 build (28.9 GB, `mflux-community/qwen-image-edit-2511-mflux-q4`) is downloaded but was not run, and **2K timings were not measured** for any
+  model. The Max edit slot stays empty until a run shows a gain.
+
+**Verdict.** Max picture: Qwen-Image 20B is the one to keep testing (finish the other 13 prompts, then Jesse looks); ERNIE-Image base is dropped as a Max
+candidate. Max edit: no slot yet. Both are catalogued only after Jesse sees a gain he thinks is worth four to six minutes.
+
+## Not run yet: TIER-EVAL-03 and 05, with download sizes
 
 These rows judge peak memory and minutes per item, and at a load average of 50 both numbers would mislead, so they wait for a quiet window
 on the Studio. Sizes below are what the Hugging Face file lists showed on 2026-10-30 for the builds that have an Apple path; "on disk" means the Studio

@@ -1,0 +1,78 @@
+{
+ "ernie-base": {
+  "a1": {
+   "peak_gb": 18.79,
+   "inproc_s": 292.89
+  },
+  "k1": {
+   "peak_gb": 18.79,
+   "inproc_s": 303.8
+  },
+  "p1": {
+   "peak_gb": 18.79,
+   "inproc_s": 292.79
+  },
+  "p2": {
+   "peak_gb": 18.79,
+   "inproc_s": 293.39
+  },
+  "t1": {
+   "peak_gb": 18.79,
+   "inproc_s": 304.42
+  },
+  "t2": {
+   "peak_gb": 18.79,
+   "inproc_s": 288.95
+  },
+  "t3": {
+   "peak_gb": 18.79,
+   "inproc_s": 272.09
+  },
+  "t4": {
+   "peak_gb": 18.79,
+   "inproc_s": 294.28
+  },
+  "t5": {
+   "peak_gb": 18.79,
+   "inproc_s": 298.0
+  }
+ },
+ "qwen-image": {
+  "a1": {
+   "peak_gb": 37.36,
+   "inproc_s": 211.31
+  },
+  "k1": {
+   "peak_gb": 37.35,
+   "inproc_s": 201.97
+  },
+  "p1": {
+   "peak_gb": 37.36,
+   "inproc_s": 212.18
+  },
+  "p2": {
+   "peak_gb": 37.36,
+   "inproc_s": 203.79
+  },
+  "t1": {
+   "peak_gb": 37.35,
+   "inproc_s": 202.7
+  },
+  "t2": {
+   "peak_gb": 37.35,
+   "inproc_s": 183.87
+  },
+  "t3": {
+   "peak_gb": 37.35,
+   "inproc_s": 181.15
+  },
+  "t4": {
+   "peak_gb": 37.36,
+   "inproc_s": 210.19
+  },
+  "t5": {
+   "peak_gb": 37.36,
+   "inproc_s": 199.84
+  }
+ }
+}
