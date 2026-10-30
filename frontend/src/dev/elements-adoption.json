@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-10-30T02:13:42.211Z",
+  "generatedAt": "2026-10-30T02:25:58.750Z",
   "kitTag": "ui-v0.5.425",
   "items": [
     {
@@ -1020,9 +1020,9 @@
     {
       "file": "moon-disc.tsx",
       "name": "moon-disc",
-      "group": "moon",
-      "verdict": "unassessed",
-      "verdictReason": "Recorded unassessed verdict in elements-plan.json; see the plan entry for its dependency or scope.",
+      "group": "weather",
+      "verdict": "later",
+      "verdictReason": "Added to the kit (ui-v0.5.425) for the Weather moon card; no Home screen draws it yet. Wire it when the moon look lands in Home.",
       "implemented": false
     },
     {
