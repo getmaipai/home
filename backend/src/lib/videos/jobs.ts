@@ -145,6 +145,7 @@ registerQueueProvider(() => {
       position: job.position, estimateSeconds: job.estimateSeconds, riseReason: ((job.request as VideoRequest & { memoryRequeues?: number }).memoryRequeues ?? 0) > 0 ? "requeued_memory" : job.riseReason, typicalSeconds: 140,
       headOfClass: ((job.request as VideoRequest & { memoryRequeues?: number }).memoryRequeues ?? 0) > 0 };
     return { job: queued, stackWaiting: job.state === "queued" && !!job.stackJob,
+      applyFit: (fit) => { (job.request as { profile?: unknown }).profile = fit.profile; saveVideoJob(job); },
       release: job.state === "queued" && !job.stackJob ? () => releaseVideo(job) : undefined,
       save: () => { job.position = queued.position ?? null; job.estimateSeconds = queued.estimateSeconds; job.riseReason = queued.riseReason; persistVideoJob(job); } };
   });

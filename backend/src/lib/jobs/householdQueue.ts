@@ -1,5 +1,6 @@
 /** The shared household order for heavy jobs. This module has no database or notification dependency. */
 import { DEFAULT_POLICY, scoreJobs, type JobCategory, type ScoreJob, type ScorePolicy, type ScoreReason } from "./jobScore";
+import { fitForAdmission, admissionFitAskLine, admissionFitProfile, getProfileSource, type BudgetNow } from "./admissionFit";
 export type QueueClass = "picture" | "video" | "other";
 export type QueueState = "queued" | "running" | "paused" | "done" | "failed" | "cancelled";
 
@@ -23,6 +24,7 @@ export interface QueueJob {
   resourcePaused?: boolean;
   childDailyCapReached?: boolean;
   headOfClass?: boolean;
+  fit?: { outcome: "run" | "ask" | "queue" | "refuse"; profile: { lowered: number; queued: number; off: number; closed_apps: number; closed_bytes: number }; askLine: string | null };
 }
 
 export interface QueuePosition { id: string; position: number }
@@ -32,7 +34,7 @@ export interface TierState {
   startedSinceMax: readonly string[];
   lastMaxPersonId: string | null;
 }
-export interface QueueStoreEntry { job: QueueJob; save: () => void; stackWaiting?: boolean; release?: () => Promise<void> }
+export interface QueueStoreEntry { job: QueueJob; save: () => void; stackWaiting?: boolean; release?: () => Promise<void>; applyFit?: (fit: NonNullable<QueueJob["fit"]>) => void }
 type QueueProvider = () => QueueStoreEntry[];
 
 let queuePolicy: ScorePolicy = DEFAULT_POLICY;
@@ -255,6 +257,19 @@ function estimate(jobs: readonly QueueJob[], positions: readonly QueuePosition[]
 const providers = new Set<QueueProvider>();
 let releasing = false;
 let releaseAgain = false;
+const lastFit = new Map<string, string>();
+export function resetFitMemoryForTests(): void { lastFit.clear(); }
+let budgetReader: (() => Promise<BudgetNow>) | null = null;
+export function setBudgetReader(fn: (() => Promise<BudgetNow>) | null): void { budgetReader = fn; }
+async function stackBudget(): Promise<BudgetNow> {
+  if (budgetReader) return budgetReader();
+  try {
+    const client = await import("@/lib/stack/client");
+    if (typeof client.createStackClient !== "function") throw new Error("budget unavailable");
+    const budget = await client.createStackClient().budget();
+    return { freeMemoryBytes: budget.freeMemoryBytes, loaded: budget.loaded.map((item) => ({ class: (item as typeof item & { class?: string }).class ?? item.kind, peakBytes: item.peakBytes, pinned: item.pinned })) };
+  } catch { throw new Error("budget unavailable"); }
+}
 
 export function registerQueueProvider(provider: QueueProvider): () => void {
   providers.add(provider);
@@ -293,6 +308,19 @@ export async function releaseHouseholdQueue(): Promise<void> {
       for (const item of positions) {
         const entry = byId.get(item.id);
         if (!entry?.release || !admitted.has(item.id) || blockedClasses.has(entry.job.jobClass) || runningPeople.has(entry.job.personId)) continue;
+        if ((entry.job.tier === "boost" || entry.job.tier === "max") && getProfileSource() !== null) {
+          try {
+            const fit = await fitForAdmission(entry.job as { jobClass: "picture" | "video" | "other"; category?: string; tier: "boost" | "max" }, stackBudget);
+            if (fit) {
+              const admission = { outcome: fit.outcome, profile: admissionFitProfile(fit), askLine: admissionFitAskLine(fit, (entry.job as QueueJob & { audience?: "adult" | "child" }).audience ?? "adult") } as NonNullable<QueueJob["fit"]>;
+              entry.job.fit = admission;
+              // Save only when the answer changed: a save refreshes the queue, which would run this loop again forever for a job that keeps waiting.
+              const key = JSON.stringify(admission);
+              if (lastFit.get(entry.job.id) !== key) { lastFit.set(entry.job.id, key); entry.applyFit?.(admission); }
+              if (fit.outcome !== "run") continue;
+            }
+          } catch { /* Fit is advisory: admission proceeds as it did before. */ }
+        }
         blockedClasses.add(entry.job.jobClass);
         if (entry.job.tier === "max") { tierState.startedSinceMax = []; tierState.lastMaxPersonId = entry.job.personId; }
         else if (!tierState.startedSinceMax.includes(entry.job.personId)) tierState.startedSinceMax = [...tierState.startedSinceMax, entry.job.personId];

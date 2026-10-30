@@ -35,6 +35,7 @@ registerQueueProvider(() => {
     const queued: QueueJob = { id: job.id, personId: job.personId, jobClass: "other", category: "music", tier: requestTier(job.request), state: job.state === "running" ? "running" : "queued", createdAt: job.createdAt,
       position: job.position, estimateSeconds: job.etaSeconds, typicalSeconds: 180, headOfClass: (request.memoryRequeues ?? 0) > 0 };
     return { job: queued, stackWaiting: job.state === "queued" && !!job.stackJob,
+      applyFit: (fit) => { (job.request as { profile?: unknown }).profile = fit.profile; saveMusicJob(job); },
       release: job.state === "queued" && !job.stackJob ? () => releaseMusic(job) : undefined,
       save: () => { job.position = queued.position ?? null; persistMusicJob(job); } };
   });

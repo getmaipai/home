@@ -484,6 +484,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/jobProducers.ts` | mapStackJobToHomeJob, mapModelDownloadStackJob, modelDownloadJobsAsHomeJobs, listStackModelDownloadJobs, registerProducerJob, updateProducerJob |
 | `backend/src/lib/jobQueueCopy.ts` | JOB_QUEUE_COPY, jobQueueCopy |
 | `backend/src/lib/jobs.ts` | visibleJobFor, createJob, updateJob, listJobsForViewer, listJobsForViewerLive, canStopJob |
+| `backend/src/lib/jobs/admissionFit.ts` | setProfileSource, getProfileSource, memoryNowFromBudget, fitForAdmission, admissionFitProfile, admissionFitAskLine |
 | `backend/src/lib/jobs/householdQueue.ts` | setQueuePolicy, getQueuePolicy, recordUsage, usageLastHour, order, admit |
 | `backend/src/lib/jobs/jobScore.ts` | DEFAULT_POLICY, scoreJobs |
 | `backend/src/lib/jobs/jobSim.ts` | simulate, checkInvariants, seededJobs |

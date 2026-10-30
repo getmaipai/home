@@ -1,8 +1,10 @@
 import { describe, expect, test } from "bun:test";
 import { db } from "../src/db";
 import { notificationDeliveries } from "../src/db/schema";
-import { requestTier, resetTierStateForTests, trackChatLease, DEFAULT_QUIET, chatActivity, decideDownshift, mayRestoreNow, noteChatInFlight, noteChatTurn, quietSecondsFor, resetChatActivityForTests, admit, order, recordUsage, usageLastHour, requeueAfterCritical, registerQueueProvider, releaseHouseholdQueue, stillRunningMinutes, writePositions, type QueueJob, type TierState } from "../src/lib/jobs/householdQueue";
+import { resetFitMemoryForTests, requestTier, resetTierStateForTests, setBudgetReader, trackChatLease, DEFAULT_QUIET, chatActivity, decideDownshift, mayRestoreNow, noteChatInFlight, noteChatTurn, quietSecondsFor, resetChatActivityForTests, admit, order, recordUsage, usageLastHour, requeueAfterCritical, registerQueueProvider, releaseHouseholdQueue, stillRunningMinutes, writePositions, type QueueJob, type TierState } from "../src/lib/jobs/householdQueue";
 import { DEFAULT_POLICY } from "../src/lib/jobs/jobScore";
+import { setProfileSource, type ProfileSource } from "../src/lib/jobs/admissionFit";
+import type { ProfileRow } from "../src/lib/jobs/profileTable";
 
 const now = Date.parse("2026-10-25T12:00:00.000Z");
 const emptyTierState: TierState = { windowOpenFor: null, startedSinceMax: [], lastMaxPersonId: null };
@@ -11,6 +13,59 @@ function job(id: string, personId: string, jobClass: QueueJob["jobClass"], creat
 }
 
 describe("household queue", () => {
+  test("fit admission gates Max release, persists counts, and leaves Standard unchanged", async () => {
+    const maxRow: ProfileRow = { lead: "video", tier: "max", cells: { chat: { state: "standard" }, video: { state: "max" }, picture: { state: "max" }, voice: { state: "standard" } } };
+    const boostRow: ProfileRow = { ...maxRow, tier: "boost", cells: { ...maxRow.cells, video: { state: "boost" } } };
+    const base = { budgetGb: 80, marginGb: 2, peakGb: { video: { max: 60, boost: 45, standard: 35 } }, residentGb: { chat: { standard: 1 }, picture: { boost: 2, standard: 5 }, voice: { standard: 1 } } };
+    const configured: ProfileSource = { table: [maxRow, boostRow], hw: base, pins: {}, priorityWeight: { picture: 1 }, lowerWithoutAsking: { video: true } };
+    const run = async (tier: "max" | "standard", free: number) => {
+      const j = job(`j-${tier}-${free}`, `p-${tier}-${free}`, "video", now, { tier });
+      let calls = 0; let applied: NonNullable<QueueJob["fit"]> | undefined;
+      let released = 0;
+      const remove = registerQueueProvider(() => [{ job: j, save: () => undefined, applyFit: (fit) => { applied = fit; }, release: async () => { released += 1; } }]);
+      setBudgetReader(async () => { calls += 1; return { freeMemoryBytes: free * 1e9, loaded: [] }; });
+      try { await releaseHouseholdQueue(); return { j, calls, applied, released }; }
+      finally { remove(); }
+    };
+    resetTierStateForTests(); setProfileSource(configured);
+    try {
+      const fitting = await run("max", 62);
+      expect(fitting.released).toBe(1);
+      expect(fitting.applied?.outcome).toBe("run");
+      expect(fitting.applied?.profile).toEqual({ lowered: 1, queued: 0, off: 0, closed_apps: 0, closed_bytes: 0 });
+      expect(Object.keys(fitting.applied!.profile).sort()).toEqual(["closed_apps", "closed_bytes", "lowered", "off", "queued"]);
+      const askSource = { ...configured, lowerWithoutAsking: {} };
+      setProfileSource(askSource);
+      const asking = await run("max", 50);
+      expect(asking.released).toBe(0); expect(asking.applied?.outcome).toBe("ask");
+      expect(asking.applied?.profile.lowered).toBe(1);
+      const queueSource: ProfileSource = { ...configured, hw: { ...base, budgetGb: 80, peakGb: { video: { max: 60, boost: 60, standard: 25 } }, residentGb: { ...base.residentGb, picture: { boost: 2, standard: 1, reduced: 0 } } }, table: [maxRow, { ...boostRow, cells: { ...boostRow.cells, picture: { state: "standard" } } }] };
+      setProfileSource(queueSource);
+      const queued = await run("max", 30);
+      expect(queued.released).toBe(0); expect(queued.applied?.outcome).toBe("queue");
+      setProfileSource(configured);
+      const standard = await run("standard", 1);
+      expect(standard.released).toBe(1); expect(standard.calls).toBe(0); expect(standard.applied).toBeUndefined();
+      setProfileSource(null);
+      const unconfigured = await run("max", 1);
+      expect(unconfigured.released).toBe(1);
+    } finally { setProfileSource(null); setBudgetReader(null); resetTierStateForTests(); }
+  });
+  test("a waiting ask is saved once, not on every release pass, and does not block its kind or the fairness memory", async () => {
+    resetTierStateForTests(); resetFitMemoryForTests();
+    const maxRow: ProfileRow = { lead: "video", tier: "max", cells: { chat: { state: "standard" }, video: { state: "max" }, voice: { state: "standard" } } };
+    const boostRow: ProfileRow = { ...maxRow, tier: "boost", cells: { ...maxRow.cells, video: { state: "boost" } } };
+    const hw = { budgetGb: 80, marginGb: 2, peakGb: { video: { max: 60, boost: 45 } }, residentGb: { chat: { standard: 1 }, voice: { standard: 1 } } };
+    setProfileSource({ table: [maxRow, boostRow], hw, pins: {}, priorityWeight: {}, lowerWithoutAsking: {} });
+    setBudgetReader(async () => ({ freeMemoryBytes: 50e9, loaded: [] }));
+    const waiting = job("ask-1", "Z", "video", now, { tier: "max" });
+    let saves = 0;
+    const remove = registerQueueProvider(() => [{ job: waiting, save: () => undefined, applyFit: () => { saves += 1; }, release: async () => undefined }]);
+    try {
+      await releaseHouseholdQueue(); await releaseHouseholdQueue();
+      expect(saves).toBe(1);
+    } finally { remove(); setProfileSource(null); setBudgetReader(null); resetTierStateForTests(); resetFitMemoryForTests(); }
+  });
   test("orders by score and uses oldest-waiting round robin only for ties", () => {
     const jobs = [job("a1", "A", "picture", now - 4000), job("a2", "A", "picture", now - 3000), job("a3", "A", "picture", now - 2000), job("b1", "B", "picture", now - 1000)];
     expect(order(jobs, now)).toEqual([{ id: "a1", position: 1 }, { id: "a2", position: 2 }, { id: "a3", position: 3 }, { id: "b1", position: 4 }]);

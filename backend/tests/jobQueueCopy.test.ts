@@ -38,6 +38,7 @@ describe("job queue copy", () => {
     const cases: Array<[JobQueueState, JobQueueReason]> = [
       ["queued", "queue"], ["queued", "higher_class"], ["queued", "other_person_first"], ["queued", "class_first"], ["queued", "aging_first"], ["queued", "fair_share_first"], ["queued", "boost_first"], ["queued", "moved_up"],
       ["queued", "waiting_long"], ["queued", "behind_chat"], ["waiting_memory", "making_room"],
+      ["queued", "tier_ask"], ["queued", "tier_no_room"],
       ["waiting_memory", "memory_elsewhere"], ["waiting_memory", "requeued_memory"], ["started", "started"],
       ["paused_chat", "paused_chat"], ["held_coding", "coding_mode"],
       ["queued", "bigger_job_ahead"], ["queued", "max_window"], ["queued", "max_drain"], ["started", "still_running"],
@@ -73,6 +74,13 @@ describe("job queue copy", () => {
     expect(jobQueueCopy("started", "still_running", null, null, "adult")).toBe("Still running.");
     expect(jobQueueCopy("started", "still_running", null, null, "child")).toBe("Still running. It will be done soon.");
   });
+});
+
+test("tier admission copy is exact for adults and children", () => {
+  expect(jobQueueCopy("queued", "tier_ask", null, null, "adult")).toBe("Not enough room for the tier you picked. Waiting for your answer on this card.");
+  expect(jobQueueCopy("queued", "tier_ask", null, null, "child")).toBe("Waiting for a grown-up to say yes.");
+  expect(jobQueueCopy("queued", "tier_no_room", null, null, "adult")).toBe("Waiting for room for a bigger job.");
+  expect(jobQueueCopy("queued", "tier_no_room", null, null, "child")).toBe("Waiting for room.");
 });
 
 test("a video waiting for memory with nothing ahead says why, never \"You are next\"", async () => {

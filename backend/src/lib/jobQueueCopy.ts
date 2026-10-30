@@ -4,7 +4,7 @@ export type JobQueueKind = "picture" | "video" | "song";
 export type JobQueueReason =
   | "queue" | "higher_class" | "other_person_first" | "class" | "aging" | "fair_share" | "boost" | "class_first" | "aging_first" | "fair_share_first" | "boost_first" | "moved_up" | "waiting_long"
   | "behind_chat" | "making_room" | "memory_elsewhere" | "requeued_memory" | "low_memory_failure" | "started"
-  | "paused_chat" | "coding_mode"
+  | "paused_chat" | "coding_mode" | "tier_ask" | "tier_no_room"
   | "quiet_wait" | "cooldown_wait" | "reduced_chat" | "bigger_job_ahead" | "max_window" | "max_drain" | "still_running"
   | { kind: "never_fit"; job: JobQueueKind; neededGb: number; availableGb: number; smallerOption?: string };
 
@@ -60,6 +60,8 @@ export const JOB_QUEUE_COPY: Record<Exclude<JobQueueReason, { kind: "never_fit" 
     adult: "Home is in coding mode. Your job starts by itself when it is back to normal, or tap Cancel.",
     child: "Home is busy with a big job. Your job starts when it is done.",
   },
+  tier_ask: { adult: "Not enough room for the tier you picked. Waiting for your answer on this card.", child: "Waiting for a grown-up to say yes." },
+  tier_no_room: { adult: "Waiting for room for a bigger job.", child: "Waiting for room." },
   quiet_wait: { adult: "Waiting for a quiet moment in chat.", child: "Waiting for a quiet moment." },
   cooldown_wait: { adult: "Chat just returned to normal. Your job starts in a few minutes, or tap Cancel.", child: "Your job starts in a few minutes." },
   reduced_chat: { adult: "Chat is simpler while a big job runs (about N minutes). Answers are shorter and some extras may be paused.", child: "Chat is a little simpler for a few minutes." },
