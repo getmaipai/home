@@ -825,7 +825,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/stack/types.ts` | StackVoiceSchema, ROLE_IDS |
 | `backend/src/lib/stackCodingPieces.ts` | CodingPieceError, CODING_ON_REFUSAL, __setCodingStackForTests, missingFrom, missingCodingPiece, __setMissingCodingPieceForTests |
 | `backend/src/lib/stackCodingSync.ts` | CODING_STACK_MAP, isCodingStackKey, codingStackValues, __setCodingSyncClientForTests, pushCodingSettings |
-| `backend/src/lib/stackComponents.ts` | StackComponentError, __setComponentsFetchForTests, listStackComponents, installStackComponent, uninstallStackComponent |
+| `backend/src/lib/stackComponents.ts` | StackComponentError, __setComponentsFetchForTests, listStackComponents, installStackComponent, uninstallStackComponent, listTierCandidates |
 | `backend/src/lib/stackEngine.ts` | getStackUrl, isRemoteStackSelected, engineComputerAwayFromHome, isStackConfigured, STACK_ROLES, isStackRoleEnabled |
 | `backend/src/lib/stackHealthSync.ts` | readStackMemoryLedger, syncStackHealthIssues |
 | `backend/src/lib/stackInstall.ts` | NO_ENGINE_INSTALL, __setEngineInstallRunnerForTests, engineInstallStatus, startEngineInstall |

@@ -20,6 +20,12 @@ export interface StackComponent {
 }
 export interface StackComponentList { tier: string | null; free_disk_bytes: number | null; disk_margin_bytes: number; installed_bytes: number; components: StackComponent[] }
 
+/** TIER-HOME-04: the Stack's tier catalog for one category (GET /stack/v1/tiers/candidates): every candidate under each level with its family, peak, fit and plain refusal. */
+export type TierStackCategory = "chat" | "pictures" | "video" | "music" | "voice";
+export interface TierCandidatePick { id: string; label: string; family: string; peak_bytes: number; verified: boolean; fits: boolean; refusal: string | null }
+export interface TierCandidateLevel { tier: "standard" | "boost" | "max"; cap_bytes: number; recommended: string | null; candidates: TierCandidatePick[] }
+export interface TierCandidates { category: string; profile: string | null; room_bytes: number; levels: TierCandidateLevel[] }
+
 export class StackComponentError extends Error {
   constructor(readonly status: number, readonly code: string, message: string) { super(message); this.name = "StackComponentError"; }
 }
@@ -72,4 +78,10 @@ export async function uninstallStackComponent(id: string): Promise<{ component: 
   const res = await call(`/stack/v1/components/${encodeURIComponent(id)}`, { method: "DELETE" });
   if (!res.ok) return failure(res);
   return await res.json() as { component: string; freed_bytes: number; removed: boolean };
+}
+
+export async function listTierCandidates(category: TierStackCategory): Promise<TierCandidates> {
+  const res = await call(`/stack/v1/tiers/candidates?category=${encodeURIComponent(category)}`);
+  if (!res.ok) return failure(res);
+  return await res.json() as TierCandidates;
 }

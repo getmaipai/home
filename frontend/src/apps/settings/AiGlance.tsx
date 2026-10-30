@@ -83,6 +83,7 @@ export function AiGlance({ card }: SettingsViewProps) {
     const read = (tier: "reduced" | "standard" | "boost" | "max") => draftOf(settings.data?.find((entry) => entry.key === slotKey(role, tier))?.value, tier);
     return { reduced: read("reduced"), standard: read("standard"), boost: read("boost"), max: read("max") };
   };
+  const tierPicks = useQuery({ queryKey: ["ai", "tiers", levels?.job], queryFn: () => aiChoicesApi.tiers(levels!.job), enabled: levels !== null, staleTime: 60_000, retry: false });
   const saveLevels = useMutation({
     mutationFn: async ({ row, drafts }: { row: GlanceRow; drafts: SlotDrafts }) => {
       const before = slotDrafts(row);
@@ -196,7 +197,7 @@ export function AiGlance({ card }: SettingsViewProps) {
         <DialogContent scroll="viewport">{editing ? <AiModelChoices key={editing.job} row={editing} copy={copy} onClose={() => setEditing(null)} onSave={stage} onAdded={refresh} /> : null}</DialogContent>
       </Dialog>
       <Dialog open={levels !== null} onOpenChange={(open) => { if (!open) setLevels(null); }}>
-        <DialogContent scroll="viewport">{levels ? <AiSlotChoices key={levels.job} row={levels} initial={slotDrafts(levels)} copy={copy} saving={saveLevels.isPending} error={levelsError} onClose={() => setLevels(null)} onSave={(drafts) => saveLevels.mutate({ row: levels, drafts })} /> : null}</DialogContent>
+        <DialogContent scroll="viewport">{levels ? <AiSlotChoices key={levels.job} row={levels} initial={slotDrafts(levels)} picks={tierPicks.data ?? null} copy={copy} saving={saveLevels.isPending} error={levelsError} onClose={() => setLevels(null)} onSave={(drafts) => saveLevels.mutate({ row: levels, drafts })} /> : null}</DialogContent>
       </Dialog>
       <StagedApplyBar testId="ai-action-bar" stagedTestId="ai-staged" notices={error ? <Alert variant="destructive"><AlertTitle>That did not work</AlertTitle><AlertDescription>{error}</AlertDescription></Alert> : null} staged={stagedCount > 0} title={fill(copy.staged ?? "", { count: stagedCount })} step={step} applying={apply.isPending} applyLabel={copy.apply ?? "Apply"} discardLabel={copy.discard ?? "Discard"} onApply={() => apply.mutate()} onDiscard={() => setStaged({})} />
       <AlertDialog open={resetting !== null} onOpenChange={(open) => { if (!open) setResetting(null); }}>

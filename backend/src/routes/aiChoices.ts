@@ -13,7 +13,7 @@ import { buildAiCards, recommendedPlan, type AiChoicesInput, type AiChoice } fro
 import type { DiskPlan } from "../../../shared/diskPlanMath";
 import { aiCopy, ADDED_CHAT_DESCRIPTION } from "@/lib/aiCopy";
 import { findUnused, plainPartName, qualified, whyKept, type UnusedInput } from "@/lib/aiUnused";
-import { installStackComponent, listStackComponents, StackComponentError, uninstallStackComponent, type StackComponent, type StackComponentList } from "@/lib/stackComponents";
+import { installStackComponent, listStackComponents, listTierCandidates, type TierStackCategory, StackComponentError, uninstallStackComponent, type StackComponent, type StackComponentList } from "@/lib/stackComponents";
 import { previewPlan } from "@/lib/installActions";
 import { recordedLevel, shippedPlanForLevel } from "@/lib/diskPlan";
 import { systemAvailableBytes } from "@/lib/resourceGovernor";
@@ -199,6 +199,29 @@ aiChoicesRoutes.openapi(choicesRoute, async (c) => {
     stack: "ok" as const, message: null, tier: list.tier, free_disk_bytes: list.free_disk_bytes, installed_bytes: list.installed_bytes,
     cards, alwaysOn, recommended: recommendedPlan(choicesInput(state)), unused_bytes: findUnused(unusedInput(state)).totalBytes, memory_available_bytes: (await memory)?.available ?? null,
   }, 200);
+});
+
+const TIER_STACK_CATEGORY: Record<string, TierStackCategory> = { chat: "chat", pictures: "pictures", videos: "video", music: "music", voice: "voice" };
+const tiersRoute = createRoute({
+  method: "get", path: "/tiers/{job}", tags: ["AI"], summary: "The models each level of a job may use on this computer, by family, with what fits each level's cap (TIER-HOME-04)",
+  middleware: [requireRole("owner", "admin")] as const,
+  request: { params: z.object({ job: z.enum(["chat", "pictures", "videos", "music", "voice"]).openapi({ param: { name: "job", in: "path" } }) }) },
+  responses: {
+    200: { content: { "application/json": { schema: z.object({
+      profile: z.string().nullable(), room_bytes: z.number(),
+      levels: z.array(z.object({ tier: z.enum(["standard", "boost", "max"]), cap_bytes: z.number(), recommended: z.string().nullable(), candidates: z.array(z.object({ id: z.string(), label: z.string(), family: z.string(), peak_bytes: z.number(), verified: z.boolean(), fits: z.boolean(), refusal: z.string().nullable() })) })),
+    }) } }, description: "Every catalog candidate under Standard, Boost and Max, the family it belongs to, and the plain refusal when it does not fit that level." },
+    ...refusals,
+  },
+});
+aiChoicesRoutes.openapi(tiersRoute, async (c) => {
+  try {
+    const found = await listTierCandidates(TIER_STACK_CATEGORY[c.req.valid("param").job]!);
+    return c.json({ profile: found.profile, room_bytes: found.room_bytes, levels: found.levels }, 200);
+  } catch (error) {
+    if (error instanceof StackComponentError) return c.json({ error: error.message, code: error.code }, 503) as never;
+    throw error;
+  }
 });
 
 const unusedRoute = createRoute({

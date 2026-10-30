@@ -11,6 +11,9 @@ import { RadioGroup, RadioGroupItem } from "@maipai/ui/src/dashboard/components/
 import { Field, FieldContent, FieldDescription, FieldLabel, FieldTitle } from "@maipai/ui/src/dashboard/components/ui/field";
 import { Alert, AlertDescription } from "@maipai/ui/src/ui/alert";
 import type { GlanceRow } from "@/apps/settings/aiGlanceRows";
+import type { TierPicks } from "@/lib/aiChoicesApi";
+import { sizeGb } from "../../../../shared/diskPlanMath";
+import { groupByFamily, FAMILY_NOTE, type PickGroup } from "@/apps/settings/aiTierSlots";
 import { TIERED_JOBS, configurableTiers, consequences, isOn, optionDefs, whoChoices, withOn, type SlotDraft, type SlotDrafts, type SlotTier, type SlotWho } from "@/apps/settings/aiTierSlots";
 
 const TIER_TITLE: Record<SlotTier, string> = { standard: "Standard", boost: "Boost", max: "Max", reduced: "Let big jobs simplify chat" };
@@ -25,6 +28,8 @@ const WHO_LABEL: Record<SlotWho, string> = { everyone: "Everyone the age gates a
 export interface AiSlotChoicesProps {
   row: GlanceRow;
   initial: SlotDrafts;
+  /** The Stack's candidates per level (families, what fits each cap). Null while it loads or when the engine cannot say: the dialog then shows the job's own choices. */
+  picks: TierPicks | null;
   copy: Record<string, string>;
   saving: boolean;
   error: string | null;
@@ -32,11 +37,22 @@ export interface AiSlotChoicesProps {
   onSave: (drafts: SlotDrafts) => void;
 }
 
-export function AiSlotChoices({ row, initial, copy, saving, error, onClose, onSave }: AiSlotChoicesProps) {
+export function AiSlotChoices({ row, initial, picks, copy, saving, error, onClose, onSave }: AiSlotChoicesProps) {
   const [drafts, setDrafts] = useState<SlotDrafts>(initial);
   const spec = TIERED_JOBS[row.job]!;
   const defs = optionDefs(spec.category);
   const change = (tier: SlotTier, next: SlotDraft) => setDrafts((previous) => ({ ...previous, [tier]: next }));
+  const level = (tier: SlotTier) => picks?.levels.find((candidate) => candidate.tier === tier) ?? null;
+  const recommendedLabel = (tier: SlotTier) => {
+    const id = level(tier)?.recommended;
+    const named = id ? level(tier)?.candidates.find((candidate) => candidate.id === id)?.label : row.recommended?.label;
+    return `${named ? `${named}. ` : ""}Follows catalog updates.`;
+  };
+  const groupsFor = (tier: SlotTier): PickGroup[] => {
+    const found = level(tier);
+    if (found) return groupByFamily(found.candidates, (bytes) => sizeGb(bytes));
+    return [{ family: "all", heading: null, options: row.options.map((option) => ({ id: option.id, label: option.label, description: option.description, blockedReason: option.blockedReason })) }];
+  };
   const notes = consequences(drafts, row.job, row.title);
   return (
     <>
@@ -65,27 +81,33 @@ export function AiSlotChoices({ row, initial, copy, saving, error, onClose, onSa
                     <Field orientation="horizontal">
                       <FieldContent>
                         <FieldTitle>{copy.use_recommended ?? "Use the recommended model"}</FieldTitle>
-                        <FieldDescription>{row.recommended ? `${row.recommended.label}. Follows catalog updates.` : "Follows catalog updates."}</FieldDescription>
+                        <FieldDescription>{recommendedLabel(tier)}</FieldDescription>
                       </FieldContent>
                       <RadioGroupItem value="recommended" id={`ai-slot-${tier}-recommended`} />
                     </Field>
                   </FieldLabel>
-                  {row.options.map((option) => {
-                    const id = `ai-slot-${tier}-${option.id}`;
-                    const blocked = option.blockedReason !== null && draft.model !== option.id;
-                    return (
-                      <FieldLabel key={option.id} htmlFor={id}>
-                        <Field orientation="horizontal" data-disabled={blocked ? "true" : undefined}>
-                          <FieldContent>
-                            <FieldTitle>{option.label}</FieldTitle>
-                            <FieldDescription>{option.blockedReason ?? option.description}</FieldDescription>
-                          </FieldContent>
-                          <RadioGroupItem value={option.id} id={id} disabled={blocked} />
-                        </Field>
-                      </FieldLabel>
-                    );
-                  })}
+                  {groupsFor(tier).map((group) => (
+                    <div key={group.family} role="group" aria-label={group.family} data-testid={`ai-slot-${tier}-family-${group.family}`} className="flex flex-col gap-2">
+                      {group.heading ? <p className="text-base font-medium uppercase tracking-wide text-muted-foreground">{group.heading}</p> : null}
+                      {group.options.map((option) => {
+                        const id = `ai-slot-${tier}-${option.id}`;
+                        const blocked = option.blockedReason !== null && draft.model !== option.id;
+                        return (
+                          <FieldLabel key={option.id} htmlFor={id}>
+                            <Field orientation="horizontal" data-disabled={blocked ? "true" : undefined}>
+                              <FieldContent>
+                                <FieldTitle>{option.label}</FieldTitle>
+                                <FieldDescription>{option.blockedReason ?? option.description}</FieldDescription>
+                              </FieldContent>
+                              <RadioGroupItem value={option.id} id={id} disabled={blocked} />
+                            </Field>
+                          </FieldLabel>
+                        );
+                      })}
+                    </div>
+                  ))}
                 </RadioGroup>
+                {picks && groupsFor(tier).some((group) => group.heading) ? <p className="text-base text-muted-foreground">{FAMILY_NOTE}</p> : null}
                 {defs.map((def) => {
                   const id = `ai-slot-${tier}-opt-${def.id}`;
                   const value = draft.options[def.id] ?? def.default;

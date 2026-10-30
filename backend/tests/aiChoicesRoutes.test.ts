@@ -104,6 +104,24 @@ describe("access", () => {
   });
 });
 
+describe("tier candidates (TIER-HOME-04)", () => {
+  test("an admin reads the levels for a job with families and refusals; an adult is refused", async () => {
+    const { client, actor } = await owner();
+    __setComponentsFetchForTests((async (input: string | URL | Request) => {
+      const url = new URL(String(input));
+      if (url.pathname === "/stack/v1/tiers/candidates") return Response.json({ category: url.searchParams.get("category"), profile: "p64", room_bytes: 40 * GIB, levels: [{ tier: "standard", cap_bytes: 24 * GIB, recommended: "ernie-image-turbo", candidates: [{ id: "z-image-turbo", label: "Z-Image Turbo", family: "z-image", peak_bytes: 26e9, verified: true, fits: false, refusal: "This needs 26 GB. Standard keeps Home free, so it can't hold it. Use Boost or Max." }] }] });
+      return Response.json({}, { status: 500 });
+    }) as never);
+    const body = await (await client.get("/api/ai/tiers/pictures")).json() as { profile: string; levels: Array<{ candidates: Array<{ family: string; refusal: string | null }> }> };
+    expect(body.profile).toBe("p64");
+    expect(body.levels[0]!.candidates[0]).toMatchObject({ family: "z-image", refusal: expect.stringContaining("Use Boost or Max") });
+    expect((await client.get("/api/ai/tiers/wakeword")).status).toBe(400);
+    db.update(people).set({ role: "adult" }).where(eq(people.id, actor.id)).run();
+    invalidateSessionCacheForPerson(actor.id);
+    expect((await client.get("/api/ai/tiers/pictures")).status).toBe(403);
+  });
+});
+
 describe("the cards", () => {
   test("GET /api/ai/choices returns nine cards with the current Quick picture model from the setting", async () => {
     const { client } = await owner();

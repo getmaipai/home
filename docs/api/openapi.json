@@ -28131,6 +28131,175 @@
         }
       }
     },
+    "/api/ai/tiers/{job}": {
+      "get": {
+        "tags": [
+          "AI"
+        ],
+        "summary": "The models each level of a job may use on this computer, by family, with what fits each level's cap (TIER-HOME-04)",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "enum": [
+                "chat",
+                "pictures",
+                "videos",
+                "music",
+                "voice"
+              ]
+            },
+            "required": true,
+            "name": "job",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Every catalog candidate under Standard, Boost and Max, the family it belongs to, and the plain refusal when it does not fit that level.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "profile": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "room_bytes": {
+                      "type": "number"
+                    },
+                    "levels": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "tier": {
+                            "type": "string",
+                            "enum": [
+                              "standard",
+                              "boost",
+                              "max"
+                            ]
+                          },
+                          "cap_bytes": {
+                            "type": "number"
+                          },
+                          "recommended": {
+                            "type": "string",
+                            "nullable": true
+                          },
+                          "candidates": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "id": {
+                                  "type": "string"
+                                },
+                                "label": {
+                                  "type": "string"
+                                },
+                                "family": {
+                                  "type": "string"
+                                },
+                                "peak_bytes": {
+                                  "type": "number"
+                                },
+                                "verified": {
+                                  "type": "boolean"
+                                },
+                                "fits": {
+                                  "type": "boolean"
+                                },
+                                "refusal": {
+                                  "type": "string",
+                                  "nullable": true
+                                }
+                              },
+                              "required": [
+                                "id",
+                                "label",
+                                "family",
+                                "peak_bytes",
+                                "verified",
+                                "fits",
+                                "refusal"
+                              ]
+                            }
+                          }
+                        },
+                        "required": [
+                          "tier",
+                          "cap_bytes",
+                          "recommended",
+                          "candidates"
+                        ]
+                      }
+                    }
+                  },
+                  "required": [
+                    "profile",
+                    "room_bytes",
+                    "levels"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Admins only",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such job or choice",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "It cannot be installed or removed right now (the message says why)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "The engine is not answering",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/ai/unused": {
       "get": {
         "tags": [

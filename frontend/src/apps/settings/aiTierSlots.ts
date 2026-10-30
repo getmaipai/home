@@ -78,3 +78,25 @@ export function levelsLine(drafts: SlotDrafts, job: AiJobId, models: ReadonlyArr
   if (job === "chat") parts.push(`Simplify chat for big jobs: ${isOn(drafts.reduced) ? "on" : "off"}`);
   return `${parts.join(" · ")}. Max is for admins and anyone an admin assigns.`;
 }
+
+export const FAMILY_NOTE = "Models in one family keep the same look and voice at every level, and switch faster.";
+export interface PickOption { id: string; label: string; description: string; blockedReason: string | null }
+export interface PickGroup { family: string; /** Null when the job's own list is shown with no family to name. */ heading: string | null; options: PickOption[] }
+
+const FAMILY_TITLE: Record<string, string> = { muse: "Muse", qwen3: "Qwen3", "qwen3.8": "Qwen3.8", ornith: "Ornith", ernie: "ERNIE", klein: "FLUX.2 Klein", "z-image": "Z-Image", wan: "Wan", ltx: "LTX", "ace-step": "ACE-Step", chatterbox: "Chatterbox", pocket: "Pocket" };
+const titleOf = (family: string) => FAMILY_TITLE[family] ?? family.replace(/(^|[-_ ])(\w)/g, (_m, sep: string, ch: string) => (sep ? " " : "") + ch.toUpperCase());
+
+/** The Stack's candidates for one level, grouped by family in the order the Stack lists them. A candidate that does not fit says why in the Stack's own sentence; one that does fit says its memory and whether the figure is measured. */
+export function groupByFamily(candidates: ReadonlyArray<{ id: string; label: string; family: string; peak_bytes: number; verified: boolean; fits: boolean; refusal: string | null }>, size: (bytes: number) => string): PickGroup[] {
+  const groups: PickGroup[] = [];
+  for (const candidate of candidates) {
+    let group = groups.find((entry) => entry.family === candidate.family);
+    if (!group) { group = { family: candidate.family, heading: titleOf(candidate.family), options: [] }; groups.push(group); }
+    group.options.push({
+      id: candidate.id, label: candidate.label,
+      description: `Needs about ${size(candidate.peak_bytes)} of memory${candidate.verified ? "" : " (not measured here yet)"}.`,
+      blockedReason: candidate.fits ? null : candidate.refusal ?? "This does not fit this level on this computer.",
+    });
+  }
+  return groups;
+}
