@@ -147,6 +147,43 @@ export function stillRunningMinutes(job: QueueJob): number | null {
   return Math.ceil(job.remainingSeconds / 60);
 }
 
+/** Quiet window and cooldown (resource-profiles note, section 5). In memory only: only turn times are kept, never content. */
+export interface ChatActivity { lastTurnAtByPerson: Record<string, number>; inFlight: number }
+const chatTurns: Record<string, number> = {};
+let chatInFlight = 0;
+export function noteChatTurn(personId: string, now: number): void { chatTurns[personId] = now; }
+export function noteChatInFlight(delta: 1 | -1): void { chatInFlight = Math.max(0, chatInFlight + delta); }
+export function chatActivity(): ChatActivity { return { lastTurnAtByPerson: { ...chatTurns }, inFlight: chatInFlight }; }
+export function resetChatActivityForTests(): void { for (const key of Object.keys(chatTurns)) delete chatTurns[key]; chatInFlight = 0; }
+
+export interface QuietConfig { quietSeconds: number; quietMaxWaitSeconds: number | "never"; cooldownSeconds: number }
+export const DEFAULT_QUIET: QuietConfig = { quietSeconds: 60, quietMaxWaitSeconds: 600, cooldownSeconds: 300 };
+export interface DownshiftState { requestedAt: number | null; restoredAt: number | null; reducedNow: boolean; lastJobEndedAt: number | null }
+export interface DownshiftDecision { action: "go" | "wait"; reason: "quiet_wait" | "cooldown" | "turn_boundary" | null; waitedSeconds: number }
+
+/** Chat is never paused or cancelled; the only outcomes are wait and go. */
+export function decideDownshift(opts: { now: number; requesterId: string; config: QuietConfig; activity: ChatActivity; state: DownshiftState; atTurnBoundary: boolean; chainedWindow?: boolean }): DownshiftDecision {
+  const { now, requesterId, config, activity, state } = opts;
+  const waitedSeconds = state.requestedAt === null ? 0 : Math.max(0, (now - state.requestedAt) / 1000);
+  const chained = !!opts.chainedWindow && state.reducedNow && state.lastJobEndedAt !== null && (now - state.lastJobEndedAt) / 1000 <= config.cooldownSeconds;
+  if (chained) return { action: "go", reason: null, waitedSeconds };
+  if (!opts.chainedWindow && state.restoredAt !== null && (now - state.restoredAt) / 1000 < config.cooldownSeconds) return { action: "wait", reason: "cooldown", waitedSeconds };
+  const quiet = Math.max(20, config.quietSeconds);
+  const othersRecent = Object.entries(activity.lastTurnAtByPerson).some(([person, at]) => person !== requesterId && (now - at) / 1000 < quiet);
+  if (!othersRecent && activity.inFlight === 0) return { action: "go", reason: null, waitedSeconds };
+  if (config.quietMaxWaitSeconds !== "never" && state.requestedAt !== null && waitedSeconds >= config.quietMaxWaitSeconds) {
+    return opts.atTurnBoundary ? { action: "go", reason: null, waitedSeconds } : { action: "wait", reason: "turn_boundary", waitedSeconds };
+  }
+  return { action: "wait", reason: "quiet_wait", waitedSeconds };
+}
+
+/** Upshift has no delay: restore as soon as the window ended and a turn boundary is reached. */
+export function mayRestoreNow(state: { reducedNow: boolean }, atTurnBoundary: boolean): boolean { return state.reducedNow && atTurnBoundary; }
+
+export function quietSecondsFor(category: "chat" | "image" | "video" | "music", config: QuietConfig): number {
+  return category === "chat" ? Math.max(20, config.quietSeconds) : 0;
+}
+
 /** Updates only changed records. The caller supplies its own store writer. */
 export function writePositions<T extends QueueJob>(jobs: readonly T[], now: number, write: (job: T) => void): QueuePosition[] {
   const positions = order(jobs, now, usageLastHour(now));

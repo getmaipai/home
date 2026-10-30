@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import { db } from "../src/db";
 import { notificationDeliveries } from "../src/db/schema";
-import { admit, order, recordUsage, usageLastHour, requeueAfterCritical, registerQueueProvider, releaseHouseholdQueue, stillRunningMinutes, writePositions, type QueueJob, type TierState } from "../src/lib/jobs/householdQueue";
+import { DEFAULT_QUIET, chatActivity, decideDownshift, mayRestoreNow, noteChatInFlight, noteChatTurn, quietSecondsFor, resetChatActivityForTests, admit, order, recordUsage, usageLastHour, requeueAfterCritical, registerQueueProvider, releaseHouseholdQueue, stillRunningMinutes, writePositions, type QueueJob, type TierState } from "../src/lib/jobs/householdQueue";
 import { DEFAULT_POLICY } from "../src/lib/jobs/jobScore";
 
 const now = Date.parse("2026-10-25T12:00:00.000Z");
@@ -215,5 +215,53 @@ describe("household queue", () => {
     writePositions([job("one", "A", "picture", now)], now, (item) => writes.push(item.id));
     expect(writes).toEqual(["one"]);
     expect(db.select({ id: notificationDeliveries.id }).from(notificationDeliveries).all()).toEqual(notificationsBefore);
+  });
+
+  describe("quiet window and cooldown", () => {
+    const base = { requestedAt: now, restoredAt: null, reducedNow: false, lastJobEndedAt: null };
+    const decide = (at: number, extra: Partial<Parameters<typeof decideDownshift>[0]> = {}) =>
+      decideDownshift({ now: at, requesterId: "R", config: DEFAULT_QUIET, activity: chatActivity(), state: base, atTurnBoundary: false, ...extra });
+    test("a second person chatting at second 50 delays, at second 61 it proceeds", () => {
+      resetChatActivityForTests();
+      noteChatTurn("S", now);
+      expect(decide(now + 50_000)).toMatchObject({ action: "wait", reason: "quiet_wait" });
+      expect(decide(now + 61_000)).toMatchObject({ action: "go" });
+    });
+    test("the requester's own turn does not block, an in-flight turn does", () => {
+      resetChatActivityForTests();
+      noteChatTurn("R", now);
+      expect(decide(now + 1000).action).toBe("go");
+      noteChatInFlight(1);
+      expect(decide(now + 1000).action).toBe("wait");
+      noteChatInFlight(-1);
+      expect(chatActivity().inFlight).toBe(0);
+    });
+    test("after quiet_max_wait it goes only at a turn boundary, never when set to never", () => {
+      resetChatActivityForTests();
+      noteChatTurn("S", now + 599_000);
+      expect(decide(now + 600_000)).toMatchObject({ action: "wait", reason: "turn_boundary" });
+      expect(decide(now + 600_000, { atTurnBoundary: true })).toMatchObject({ action: "go" });
+      const never = { ...DEFAULT_QUIET, quietMaxWaitSeconds: "never" as const };
+      noteChatTurn("S", now + 5_990_000);
+      expect(decide(now + 6_000_000, { config: never, atTurnBoundary: true })).toMatchObject({ action: "wait", reason: "quiet_wait" });
+    });
+    test("cooldown blocks a re-lower for 300 s except a chained job", () => {
+      resetChatActivityForTests();
+      const state = { ...base, restoredAt: now };
+      expect(decide(now + 299_000, { state })).toMatchObject({ action: "wait", reason: "cooldown" });
+      expect(decide(now + 301_000, { state }).action).toBe("go");
+      const chained = { requestedAt: now, restoredAt: null, reducedNow: true, lastJobEndedAt: now };
+      expect(decide(now + 100_000, { state: chained, chainedWindow: true })).toEqual({ action: "go", reason: null, waitedSeconds: 100 });
+    });
+    test("quiet seconds clamp to 20, only chat has a window, restore needs a turn boundary", () => {
+      resetChatActivityForTests();
+      noteChatTurn("S", now);
+      expect(decide(now + 19_000, { config: { ...DEFAULT_QUIET, quietSeconds: 5 } }).action).toBe("wait");
+      expect(decide(now + 21_000, { config: { ...DEFAULT_QUIET, quietSeconds: 5 } }).action).toBe("go");
+      expect(quietSecondsFor("chat", { ...DEFAULT_QUIET, quietSeconds: 5 })).toBe(20);
+      expect(quietSecondsFor("video", DEFAULT_QUIET)).toBe(0);
+      expect(mayRestoreNow({ reducedNow: true }, false)).toBe(false);
+      expect(mayRestoreNow({ reducedNow: true }, true)).toBe(true);
+    });
   });
 });

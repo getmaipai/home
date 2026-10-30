@@ -83,3 +83,12 @@ test("a video waiting for memory with nothing ahead says why, never \"You are ne
   expect(adult).not.toContain("You are next");
   expect(phaseLabel(waiting, "child")).toBe(JOB_QUEUE_COPY.memory_elsewhere.child);
 });
+
+test("quiet window and reduced chat lines", () => {
+  expect(jobQueueCopy("queued", "quiet_wait", null, null, "adult")).toBe("Waiting for a quiet moment in chat.");
+  expect(jobQueueCopy("queued", "quiet_wait", null, null, "child")).toBe("Waiting for a quiet moment.");
+  expect(jobQueueCopy("queued", "cooldown_wait", null, null, "child")).toBe("Your job starts in a few minutes.");
+  expect(jobQueueCopy("queued", "reduced_chat", null, 720, "adult")).toContain("about 12 minutes");
+  expect(jobQueueCopy("queued", "reduced_chat", null, null, "adult")).not.toContain("N");
+  expect(jobQueueCopy("queued", "reduced_chat", null, null, "child")).toBe("Chat is a little simpler for a few minutes.");
+});
