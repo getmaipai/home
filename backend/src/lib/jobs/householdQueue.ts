@@ -68,6 +68,12 @@ function heldByPlan(job: QueueJob): boolean {
   return state === "queued" || state === "off";
 }
 
+/** The running Max job as the Status line shows it: counts and minutes only, never an app or a person (RULES.md S6). Null when no Max job runs. */
+export function openMaxWindow(): { minutesLeft: number | null } | null {
+  const job = currentEntries.find((item) => item.job.state === "running" && item.job.tier === "max")?.job;
+  return job ? { minutesLeft: stillRunningMinutes(job) } : null;
+}
+
 /** Admin Stop for the open Max window: ends the running Max job through its own store, which frees the room and lets chat return. False when no Max job runs. */
 export async function endMaxWindow(): Promise<boolean> {
   const entry = currentEntries.find((item) => item.job.state === "running" && item.job.tier === "max");

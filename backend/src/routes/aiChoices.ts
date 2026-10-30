@@ -22,6 +22,7 @@ import { setHouseholdSettingValue } from "@/lib/settings";
 import { catalogEntries } from "@/lib/modelCatalog";
 import { addedChatChoiceStates, startChatModelChoice, uncensoredChoiceState } from "@/lib/chatModelSwitch";
 import { addChatModel, AddModelError, inspectForAdd } from "@/lib/addModel";
+import { endMaxWindow, openMaxWindow } from "@/lib/jobs/householdQueue";
 import { readAiSettings } from "@/lib/aiChoicesState";
 import { resetInstallStatusCache } from "@/lib/installStatus";
 import { dropPictureStatusCache } from "@/lib/pictures/ready";
@@ -202,6 +203,23 @@ aiChoicesRoutes.openapi(choicesRoute, async (c) => {
 });
 
 const TIER_STACK_CATEGORY: Record<string, TierStackCategory> = { chat: "chat", pictures: "pictures", videos: "video", music: "music", voice: "voice" };
+const MAX_RUNNING_LINE = "A Max job is running and everything big waits. Stop it to give the room back; chat returns to normal.";
+const windowRoute = createRoute({
+  method: "get", path: "/tier-window", tags: ["AI"], summary: "Whether a Max job holds the computer, with the one Status line for it (TIER-HOME-03)",
+  middleware: [requireRole("owner", "admin")] as const,
+  responses: { 200: { content: { "application/json": { schema: z.object({ open: z.boolean(), minutes_left: z.number().int().nullable(), line: z.string().nullable() }) } }, description: "The open Max window, if any." }, ...refusals },
+});
+aiChoicesRoutes.openapi(windowRoute, (c) => {
+  const open = openMaxWindow();
+  return c.json({ open: open !== null, minutes_left: open?.minutesLeft ?? null, line: open ? MAX_RUNNING_LINE : null }, 200);
+});
+const stopWindowRoute = createRoute({
+  method: "post", path: "/tier-window/stop", tags: ["AI"], summary: "Stop the running Max job so the room and chat come back (TIER-HOME-03)",
+  middleware: [requireRole("owner", "admin")] as const,
+  responses: { 200: { content: { "application/json": { schema: z.object({ stopped: z.boolean() }) } }, description: "True when a Max job was running and has been stopped." }, ...refusals },
+});
+aiChoicesRoutes.openapi(stopWindowRoute, async (c) => c.json({ stopped: await endMaxWindow() }, 200));
+
 const tiersRoute = createRoute({
   method: "get", path: "/tiers/{job}", tags: ["AI"], summary: "The models each level of a job may use on this computer, by family, with what fits each level's cap (TIER-HOME-04)",
   middleware: [requireRole("owner", "admin")] as const,

@@ -48,6 +48,8 @@ export function AiGlance({ card }: SettingsViewProps) {
   const [staged, setStaged] = useState<StagedMap>({});
   const [editing, setEditing] = useState<GlanceRow | null>(null);
   const [resetting, setResetting] = useState<GlanceRow | null>(null);
+  const maxWindow = useQuery({ queryKey: ["ai", "tier-window"], queryFn: () => aiChoicesApi.tierWindow(), refetchInterval: 10_000, retry: false });
+  const stopWindow = useMutation({ mutationFn: () => aiChoicesApi.stopTierWindow(), onSettled: () => { void maxWindow.refetch(); } });
   const [levels, setLevels] = useState<GlanceRow | null>(null);
   const [levelsError, setLevelsError] = useState<string | null>(null);
   const [cleanup, setCleanup] = useState(false);
@@ -180,6 +182,13 @@ export function AiGlance({ card }: SettingsViewProps) {
           </ItemContent>
         </Item>
       </ItemGroup>
+
+      {maxWindow.data?.open ? (
+        <div className="flex flex-wrap items-center justify-between gap-3 text-base" role="status" data-testid="max-window-line">
+          <p>{maxWindow.data.line}{maxWindow.data.minutes_left !== null ? ` About ${maxWindow.data.minutes_left} ${maxWindow.data.minutes_left === 1 ? "minute" : "minutes"} left.` : ""}</p>
+          <Button type="button" variant="outline" disabled={stopWindow.isPending} onClick={() => stopWindow.mutate()}>Stop the Max job</Button>
+        </div>
+      ) : null}
 
       <div className="flex flex-wrap items-baseline justify-between gap-2">
         <h2 className="text-lg font-semibold">{copy.glance}</h2>
