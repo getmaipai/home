@@ -160,16 +160,16 @@ export function AiGlance({ card }: SettingsViewProps) {
       </ItemGroup>
 
       <div className="flex flex-wrap items-baseline justify-between gap-2">
-        <h3 className="text-lg font-semibold">{copy.glance}</h3>
+        <h2 className="text-lg font-semibold">{copy.glance}</h2>
         <p className="text-base text-muted-foreground" data-testid="ai-counter">{fill(copy.counter ?? "", tally)}</p>
       </div>
-      <ItemGroup variant="card" aria-label={copy.glance}>
+      <ItemGroup variant="card" role="group" aria-label={copy.glance}>
         {rows.map((row) => glanceRow({ row, copy, onSwitch: (on) => stage(row, on ? (row.shown?.id ?? row.recommended?.id ?? OFF) : OFF), onEdit: () => setEditing(row), onReset: () => setResetting(row), onDownload: () => download.mutate([row]) }))}
       </ItemGroup>
 
       <p className="text-base text-muted-foreground">
         {fill(copy.checked ?? "", { when: whenText(query.dataUpdatedAt) })} · {device}{" "}
-        <Link to="/settings/ai?tab=engines" className="underline">{copy.view_device}</Link>
+        <Link to="/settings/ai?tab=engines" className="inline-flex min-h-12 items-center underline">{copy.view_device}</Link>
       </p>
 
       <Dialog open={editing !== null} onOpenChange={(open) => { if (!open) setEditing(null); }}>

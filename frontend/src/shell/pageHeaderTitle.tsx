@@ -19,7 +19,7 @@
 // one definition, that page's own, not a copy of it.
 import { useContext } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
-import { Button } from "@maipai/ui/src/dashboard/components/ui/button";
+import { Button } from "@maipai/ui/src/ui/button";
 import { WakeWordPersonContext } from "@/apps/chat/chatThreadContexts";
 import { settingsPath } from "@/shell/pages/settings/settingsAreas";
 import { getIcon } from "@maipai/ui/src/icons";
@@ -125,5 +125,5 @@ export function PageHeaderActions() {
   const navigate = useNavigate();
   const person = useContext(WakeWordPersonContext);
   if (pathname !== "/" || !person || person.role === "guest") return null;
-  return <><Button type="button" variant="ghost" size="icon-lg" aria-label="Home layout" onClick={() => navigate(settingsPath("appearance", "appearance", "ui.home_layout"))}><GearIcon aria-hidden="true" /></Button></>;
+  return <><Button type="button" variant="ghost" size="icon" aria-label="Home layout" onClick={() => navigate(settingsPath("appearance", "appearance", "ui.home_layout"))}><GearIcon aria-hidden="true" /></Button></>;
 }
