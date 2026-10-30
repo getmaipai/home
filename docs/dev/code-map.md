@@ -272,6 +272,8 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `frontend/src/shell/pages/status/StatusComponents.tsx` | ENGINE_ROWS, engineState, formatUptime, StatusLegend, StatusPartsBody |
 | `frontend/src/shell/pages/status/StatusIncident.tsx` | statusIncidentFacts, StatusIncidentBody |
 | `frontend/src/shell/phoneMenuLinks.tsx` | PhoneMenuLinks, coreAppsGroup, searchWithCoreApps |
+| `frontend/src/shell/reader/ReaderArticle.tsx` | ReaderArticle |
+| `frontend/src/shell/reader/SearchResults.tsx` | SearchResults |
 | `frontend/src/shell/sessionLockContext.tsx` | useSessionLocked, SessionLockGate |
 | `frontend/src/shell/useAmbientCompanion.tsx` | useAmbientCompanion |
 | `frontend/src/shell/useSideChat.tsx` | useSideChat |
