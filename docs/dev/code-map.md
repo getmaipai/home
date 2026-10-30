@@ -122,6 +122,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `frontend/src/apps/settings/AssistantKeysSettings.tsx` | AssistantKeysSettings |
 | `frontend/src/apps/settings/AwaySessionsSection.tsx` | AwaySessionsSection |
 | `frontend/src/apps/settings/BackupsSection.tsx` | EMERGENCY_KIT_SAVED_KEY, BackupsSection |
+| `frontend/src/apps/settings/CloseAppsSettings.tsx` | CloseAppsSettings |
 | `frontend/src/apps/settings/CodingSettings.tsx` | selfTestState, homeModeSentence, CodingAdminSettings, CodingKeysSettings, AdminCodingAccessRow |
 | `frontend/src/apps/settings/CommandsSection.tsx` | CommandsSection |
 | `frontend/src/apps/settings/DevicesSection.tsx` | DevicesSection |
@@ -132,6 +133,8 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `frontend/src/apps/settings/MicrophoneSection.tsx` | MicrophoneSection |
 | `frontend/src/apps/settings/ModelsAndStorageSection.tsx` | sizeWords, lastUsedWords, ModelsAndStorageSection |
 | `frontend/src/apps/settings/ModelsSection.tsx` | ModelsSection, describeHardware |
+| `frontend/src/apps/settings/PerformanceCustomize.tsx` | PerformanceCustomize |
+| `frontend/src/apps/settings/PerformanceSettings.tsx` | PerformanceSettings |
 | `frontend/src/apps/settings/PicturesLibrary.tsx` | PicturesLibrary |
 | `frontend/src/apps/settings/ReferenceLibrarySettings.tsx` | ReferenceLibrarySettings |
 | `frontend/src/apps/settings/RepairsSection.tsx` | RepairsSection |
@@ -315,6 +318,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/answerImages/turn.ts` | SHOW_IMAGES_TOOL_ID, ANSWER_IMAGES_BUDGET_MS, SHOW_IMAGES_MAX_SUBJECTS, showImagesNames, showImagesResultLine, showImagesPendingResultLine |
 | `backend/src/lib/answerImages/wikimedia.ts` | wikimediaFetchJson, kindScore, wikimediaLiveBlocked, resolveWikimediaSubject, isUnder18, isNonPhotoFile |
 | `backend/src/lib/apiKeys.ts` | API_KEY_REFUSAL, CreateApiKeyInput, keyOriginOf, constantTimeHashEqual, codeAdmission, mayHoldDiagnoseKey |
+| `backend/src/lib/appHelperClient.ts` | helperSocketPath, listHelperApps |
 | `backend/src/lib/appNeeds.ts` | __setStatusAppsForTests, __resetStatusAppsForTests, appsFromManifests, listStatusApps, configuredServiceComponents |
 | `backend/src/lib/approvals.ts` | summarizeApproval, requestApproval, listApprovals, decideApproval |
 | `backend/src/lib/apps.ts` | settingsAreaProblems, sidebarFor, appPackageProblems, appVisibleTo, pageMinRole, pageVisibleTo |
@@ -627,6 +631,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/operatorDiagnose.ts` | newsView, MAX_TURNS, DEFAULT_TURNS, BIG_PROMPT_TOKENS, turnsView, summaryView |
 | `backend/src/lib/operatorEngine.ts` | ENGINE_SETTING_KEY, ENGINE_CHOICES, ENGINE_CHANGES_PER_DAY, __resetOperatorEngineForTests, operatorEngineView, setOperatorEngine |
 | `backend/src/lib/operatorSettings.ts` | OPERATOR_SETTING_KEYS, OPERATOR_DENIED_PREFIXES, isOperatorSettingKey, operatorSettingsView, setOperatorSetting |
+| `backend/src/lib/otherApps.ts` | readOtherApps |
 | `backend/src/lib/outbound.ts` | HOME_USER_AGENT |
 | `backend/src/lib/packageBlocks.ts` | blockEnvelope, BLOCK_ONLY_DATA_PREFIX, withoutBlockOnlyData, weatherCard, blocksForRecipeRun |
 | `backend/src/lib/packageCache.ts` | LEGACY_ENTRY_GRACE_S, CACHE_NOT_MODIFIED, PACKAGE_CACHE_RESPONSE, packageCacheResponse, __setTestCacheBudgetBytes, OTHER_CACHE_SOURCE |
