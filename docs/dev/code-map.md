@@ -755,7 +755,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/searchAssist/counters.ts` | SEARCH_ASSIST_COUNTER_NAMES, bumpSearchAssistCounter, searchAssistCounters, __resetSearchAssistCountersForTests |
 | `backend/src/lib/searchAssist/eligible.ts` | MINOR_RESCUE_ENABLED, cappedSearchAssistMode, searchAssistEligibility |
 | `backend/src/lib/searchAssist/embedIdentity.ts` | embedModelFromFile, stackEmbedModel, __setStackEmbedModelReaderForTests |
-| `backend/src/lib/searchAssist/minorGate.ts` | minorSearchGate |
+| `backend/src/lib/searchAssist/minorGate.ts` | websearchGateAllows, minorSearchGate |
 | `backend/src/lib/searchAssist/score.ts` | buildFeatures, scoreHead |
 | `backend/src/lib/searchAssist/shadow.ts` | __setSearchAssistLoaderForTests, readSearchAssistMode, runSearchAssistShadow |
 | `backend/src/lib/searchAssist/weatherAssist.ts` | WEATHER_TOOL, weatherHead, __setWeatherHeadForTests, weatherAssistEligibility, runWeatherAssistShadow |
@@ -919,6 +919,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/weatherMoon.ts` | __resetMoonForTests, moonTile, cardMoon |
 | `backend/src/lib/weatherSummary.ts` | __setWeatherSummaryCompleterForTests, __resetWeatherSummaryForTests, hoursOf, outlookLine, factualLine, summaryFor |
 | `backend/src/lib/webSearchBudget.ts` | SEARXNG_CONNECT_LIMIT_MS, SEARXNG_ATTEMPT_LIMIT_MS, ADULT_WRITTEN_WEBSEARCH_DEADLINE_MS, webSearchToolDeadlineMs |
+| `backend/src/lib/webTabSearch.ts` | WEB_TAB_MAX_RESULTS, WEB_TAB_QUERY_MAX, webTabSearch |
 | `backend/src/lib/wellFormed.ts` | visibleText, analysisLead, thinkingPrefix, newThinkSplitState, feedThinkSplit, flushThinkSplit |
 | `backend/src/lib/widgets.ts` | widgetCardBlock, listWidgets, orderHomeCards, getWidgetData |
 | `backend/src/lib/wikimediaLive.ts` | WIKIMEDIA_LIVE_ID, WIKIMEDIA_LIVE_RATE_LIMIT_KEY, WIKIMEDIA_LIVE_RATE_LIMIT, wikimediaLiveBaseUrl |

@@ -48155,6 +48155,126 @@
         }
       }
     },
+    "/api/search/web-results": {
+      "get": {
+        "tags": [
+          "Search"
+        ],
+        "summary": "One explicit web search from the search palette's Web tab",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 200,
+              "example": "how to brew tea"
+            },
+            "required": true,
+            "name": "q",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Web result rows, or an empty list with a reason in note.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "results": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "kind": {
+                            "type": "string"
+                          },
+                          "id": {
+                            "type": "string"
+                          },
+                          "title": {
+                            "type": "string"
+                          },
+                          "subtitle": {
+                            "type": "string"
+                          },
+                          "href": {
+                            "type": "string"
+                          },
+                          "match": {
+                            "type": "array",
+                            "items": {
+                              "type": "number"
+                            },
+                            "minItems": 2,
+                            "maxItems": 2,
+                            "description": "[start, end) of the first match in title, for highlighting."
+                          },
+                          "snippet": {
+                            "type": "string",
+                            "description": "Up to two lines of text under the title."
+                          },
+                          "source": {
+                            "type": "string",
+                            "description": "Where the result lives, shown above the title."
+                          },
+                          "meta": {
+                            "type": "string",
+                            "description": "A line of facts under the snippet."
+                          },
+                          "thumbnail": {
+                            "type": "string",
+                            "description": "A same-origin picture URL for the end of the row."
+                          },
+                          "action": {
+                            "type": "string",
+                            "description": "The label of the button on the highlighted row."
+                          }
+                        },
+                        "required": [
+                          "kind",
+                          "id",
+                          "title",
+                          "href"
+                        ]
+                      }
+                    },
+                    "note": {
+                      "type": "string",
+                      "description": "Plain words for why there are no rows (off, no source, not allowed, not answering)."
+                    }
+                  },
+                  "required": [
+                    "results"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Missing or too long q",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/search": {
       "get": {
         "tags": [
