@@ -67,6 +67,16 @@ test("the draft is created once and the style tiles come from the look response"
   expect(calls.draft).toBe(1); expect(calls.generate[0]).toEqual({ prompt: "A friendly fox", style: "cartoon", count: 1 });
 });
 
+test("once the draft exists the address names it, so a reload does not start an empty form", async () => {
+  const seen: string[] = [], original = window.history.replaceState.bind(window.history);
+  original(null, "", "/"); // earlier tests in the file already moved the address
+  window.history.replaceState = ((_state: unknown, _title: string, url?: string | URL | null) => { seen.push(String(url)); }) as typeof window.history.replaceState;
+  try {
+    const { view } = open(); await nameIt(view);
+    await waitFor(() => expect(seen).toContain("/companions/hc-one/create"));
+  } finally { window.history.replaceState = original; }
+});
+
 test("Custom shows its one-line input and the teen list has no Custom tile", async () => {
   const adult = open(); await nameIt(adult.view);
   fireEvent.click(await adult.view.findByRole("button", { name: "Custom" }));

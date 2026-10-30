@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState, type MutableRefObject } from "react";
+import { useCallback, useEffect, useRef, useState, type MutableRefObject } from "react";
 import { useNavigate } from "react-router-dom";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@maipai/ui/src/ui/dialog";
 import { Progress } from "@maipai/ui/src/primitives/Progress";
@@ -43,6 +43,13 @@ export function CompanionFlowDialog({ companionId, initialName, initialStep = 0 
     setDiscarding(true); setError("");
     try { await api.deleteCompanion(draft.id!); leave(); } catch (e) { setError(flowErrorText(e)); setDiscarding(false); }
   }
+  // The address always names the draft and the screen, so a reload, a restored tab or a second tab lands back on this companion instead of an empty first screen.
+  // replaceState, not navigate: the router would remount the dialog and drop its state.
+  useEffect(() => {
+    if (!draft.id) return;
+    const url = `/companions/${encodeURIComponent(draft.id)}/create${step > 0 ? `?step=${step + 1}` : ""}`;
+    if (window.location.pathname + window.location.search !== url) window.history.replaceState(window.history.state, "", url);
+  }, [draft.id, step]);
   const current = STEPS[step]!;
   return (
     <>

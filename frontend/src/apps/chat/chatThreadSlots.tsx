@@ -55,7 +55,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { picturesApi } from "@/lib/picturesApi";
 import { videosApi } from "@/lib/videosApi";
 import { ReloadMainThreadContext } from "@/apps/chat/chatThreadContexts";
-import { Link } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import { sourcesFromMessage } from "@/apps/chat/chatSources";
 import { messageText } from "@/apps/chat/chatMessageText";
 import { useStoppedRun } from "@/apps/chat/chatStoppedRun";
@@ -593,10 +593,14 @@ export function ChatWelcome() {
   const settings = Array.isArray(settingsQuery.data) ? settingsQuery.data : [];
   const selectedId = settings.find((setting) => setting.key === "persona.active_id")?.value;
   const fallbackId = typeof selectedId === "string" && companionsQuery.data?.companions?.some(({ id }) => id === selectedId) ? selectedId : companionsQuery.data?.default_id;
-  const companionId = conversationQuery.data?.companion_id ?? fallbackId ?? null;
+  // "Test Conversation" opens /chat?try=<id>: the picture and name on this screen are that draft, not the person's usual companion.
+  const [searchParams] = useSearchParams();
+  const tryId = searchParams.get("try")?.trim() || null;
+  const tryRecord = useQuery({ queryKey: ["companions", tryId, "edit"], queryFn: () => api.editCompanion(tryId!), enabled: Boolean(tryId), retry: false });
+  const companionId = tryId ?? conversationQuery.data?.companion_id ?? fallbackId ?? null;
   const presence = useCompanionPresence(companionId);
   const companion = companionsQuery.data?.companions?.find(({ id }) => id === companionId);
-  const name = presence?.name ?? companion?.name;
+  const name = presence?.name ?? companion?.name ?? (tryId ? tryRecord.data?.name : undefined);
   return (
     <>
       <EngineStartingLoader />
