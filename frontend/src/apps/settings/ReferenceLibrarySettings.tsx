@@ -81,7 +81,7 @@ export function ReferenceLibrarySettings() {
     return { ...set, id, source, flavour, name, language, installed, sizeBytes, snapshotDate, bands, job };
   }) : [];
   return <>
-      <p className="text-sm text-muted-foreground">Offline data: books that live on this Home, like Wikipedia and health information. Choose what to download, and how much detail. Everything here keeps working with no internet, and children and teens only see the books suited to them.</p>
+      <p className="text-sm text-muted-foreground">Offline data. Books that live on this Home, like Wikipedia and health information. Choose what to download, and how much detail. Everything here keeps working with no internet, and children and teens only see the books suited to them.</p>
       {error ? <p role="alert" className="text-sm text-destructive">{error}</p> : null}
       {state.isError || catalog.isError ? <p role="alert" className="text-sm text-destructive">Home could not load the reference library. Check the Home connection, then reload this page.</p> : null}
       <section aria-label="Library shortcuts"><h2 className="text-sm font-medium">Quick choices</h2><ItemGroup variant="card" aria-label="Library shortcuts">{presets.map((preset) => <Item key={preset.id}><ItemContent><ItemTitle>{preset.label}{state.data?.matchesPresets.includes(preset.id) ? " · Current" : ""}</ItemTitle><ItemDescription clamp={false}>{preset.copy}</ItemDescription></ItemContent><ItemFooter><Button type="button" variant={state.data?.matchesPresets.includes(preset.id) ? "default" : "outline"} onClick={() => void planPreset(preset.id as "minimum" | "moderate" | "full")}>Select</Button></ItemFooter></Item>)}</ItemGroup></section>

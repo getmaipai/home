@@ -136,8 +136,8 @@ export function WikipediaPage() {
         {booksQuery.data && !book ? (
           <section className="flex flex-col gap-2" aria-label="Wikipedia is not installed">
             <h2 className="text-xl font-semibold">Wikipedia is not in your library yet</h2>
-            <p className="text-muted-foreground">An owner or admin can download it in Settings, Search and web, Offline data (pick everything with pictures, without pictures, or short introductions only). It downloads once and then works without the internet.</p>
-            <Link className="underline underline-offset-2" to="/settings/search?tab=reference-library">Open offline data settings</Link>
+            <p className="text-muted-foreground">An owner or admin can download it in Settings, Search and web, on the Reference library tab (pick everything with pictures, without pictures, or short introductions only). It downloads once and then works without the internet.</p>
+            <Link className="underline underline-offset-2" to="/settings/search?tab=reference-library">Open the Reference library</Link>
           </section>
         ) : null}
         {book ? (

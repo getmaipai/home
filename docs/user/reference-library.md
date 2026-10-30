@@ -7,7 +7,9 @@ description: Choose which offline books your household can read.
 
 The Reference library stores books on your Home computer. People in your household can read those books even when the internet is down.
 
-Only an owner or admin can change the library. Open **Settings**, then choose **Reference library**. Children, teens, and other adults cannot open this page.
+Only an owner or admin can change the library. Open **Settings**, choose **Search and web**, then open the **Reference library** tab. The Wikipedia app links straight to it. Children, teens, and other adults cannot open this page.
+
+Books are grouped by topic: Encyclopedia, Dictionaries, Health and medicine, Travel and the world, and Books and how-to. Each Wikipedia choice says what you get. Everything with pictures is the biggest. Everything without pictures is smaller. Short introductions only is the smallest.
 
 ## Choose a starting set
 

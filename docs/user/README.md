@@ -20,6 +20,7 @@ day the hub arrives; the rest are for when you need them.
 - [The Library](library.md): find, look at, add, share, keep and delete the pictures, videos, songs and files in your home.
 - [Pictures](pictures.md): ask chat for a picture, stop it, change it, and choose who can make pictures and which styles are on.
 - [Videos](videos.md): ask chat for a short video, stop it, make another, and choose who can make videos and which styles are on.
+- [Wikipedia](wikipedia.md): read Wikipedia from your own library, save articles, and keep them on a device.
 - [Books](books.md): read EPUB and PDF books, and listen to audiobooks.
 - [Shows and Films](shows.md): browse local shows and films, and keep a watchlist.
 - [Songs](songs.md): ask chat to write and make a song, change it by asking, play it, and choose who can make songs.
