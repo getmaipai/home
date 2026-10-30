@@ -17,6 +17,12 @@ If a search cannot reach your search server, the answer does not fail. MaiPai sa
 
 When you search, MaiPai sends your search words to your SearXNG. It does not need a key or an account. Then MaiPai reads up to three of the pages that came back, one from each site, and answers from what they say. The answer shows numbered links to those pages. Each site sees a normal page request from your home's internet address, and never your question. Your SearXNG sends your search words to the search sites it is set up to use.
 
+## Search the web from the Search box
+
+The Search box (the magnifier, or Cmd+K) has a **Web** tab. Type your words, pick **Web**, then press Enter. Nothing is sent to the web until you press Enter, and typing on the other tabs never sends anything.
+
+The Web tab uses the same sources and the same rules as a chat question. It shows each result's site, title and a short line from the site. It does not read the pages and does not show pictures. A result opens in a new browser tab when you press **Open**, and that site then sees your visit. A teen or a child sees only what their rules allow, and a search with a name, address, phone number, email or ID number in it is never sent. If web search is off, or your search server does not answer, the tab says so in plain words. Guests do not get the Web tab. Home does not save what you searched.
+
 ## Get SearXNG ready
 
 1. Use SearXNG's direct address, like `http://192.0.2.10:8888`. Do not use an address that shows a login page first. MaiPai cannot log in, so it gets no results.
