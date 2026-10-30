@@ -17,6 +17,7 @@ import { getIcon } from "@maipai/ui/src/icons";
 import { Link } from "react-router-dom";
 import { api, ApiError } from "@/lib/api";
 import { aiChoicesApi } from "@/lib/aiChoicesApi";
+import { StagedApplyBar } from "@/apps/settings/StagedApplyBar";
 import { InstallStrip } from "@/shell/InstallStrip";
 import { FreeUpSpaceDialog } from "@/apps/settings/FreeUpSpaceDialog";
 import { Dialog, DialogContent } from "@maipai/ui/src/ui/dialog";
@@ -197,21 +198,7 @@ export function AiGlance({ card }: SettingsViewProps) {
       <Dialog open={levels !== null} onOpenChange={(open) => { if (!open) setLevels(null); }}>
         <DialogContent scroll="viewport">{levels ? <AiSlotChoices key={levels.job} row={levels} initial={slotDrafts(levels)} copy={copy} saving={saveLevels.isPending} error={levelsError} onClose={() => setLevels(null)} onSave={(drafts) => saveLevels.mutate({ row: levels, drafts })} /> : null}</DialogContent>
       </Dialog>
-    <div className="sticky bottom-0 z-10 flex flex-col gap-2 bg-background pb-2" data-testid="ai-action-bar">
-      {error ? <Alert variant="destructive"><AlertTitle>That did not work</AlertTitle><AlertDescription>{error}</AlertDescription></Alert> : null}
-      {stagedCount > 0 ? (
-        <Alert data-testid="ai-staged">
-          <AlertTitle>{fill(copy.staged ?? "", { count: stagedCount })}</AlertTitle>
-          <AlertDescription>
-            {apply.isPending && step ? <p className="text-base">{step}</p> : null}
-            <div className="flex gap-2">
-              <Button type="button" variant="outline" size="sm" disabled={apply.isPending} onClick={() => setStaged({})}>{copy.discard}</Button>
-              <Button type="button" size="sm" disabled={apply.isPending} onClick={() => apply.mutate()}>{apply.isPending ? "Applying…" : copy.apply}</Button>
-            </div>
-          </AlertDescription>
-        </Alert>
-      ) : null}
-    </div>
+      <StagedApplyBar testId="ai-action-bar" stagedTestId="ai-staged" notices={error ? <Alert variant="destructive"><AlertTitle>That did not work</AlertTitle><AlertDescription>{error}</AlertDescription></Alert> : null} staged={stagedCount > 0} title={fill(copy.staged ?? "", { count: stagedCount })} step={step} applying={apply.isPending} applyLabel={copy.apply ?? "Apply"} discardLabel={copy.discard ?? "Discard"} onApply={() => apply.mutate()} onDiscard={() => setStaged({})} />
       <AlertDialog open={resetting !== null} onOpenChange={(open) => { if (!open) setResetting(null); }}>
         <AlertDialogContent>
           <AlertDialogHeader>

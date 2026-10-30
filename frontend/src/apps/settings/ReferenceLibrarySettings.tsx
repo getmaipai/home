@@ -10,6 +10,7 @@ import { Button } from "@maipai/ui/src/ui/button";
 import { Chip } from "@maipai/ui/src/primitives/Chip";
 import { Progress } from "@maipai/ui/src/ui/progress";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@maipai/ui/src/ui/select";
+import { StagedApplyBar } from "@/apps/settings/StagedApplyBar";
 import { Switch } from "@maipai/ui/src/ui/switch";
 import { StorageBar } from "@maipai/ui/src/primitives/StorageBar";
 import { Item, ItemActions, ItemContent, ItemDescription, ItemGroup, ItemTitle } from "@maipai/ui/src/dashboard/components/ui/item";
@@ -194,24 +195,18 @@ export function ReferenceLibrarySettings() {
         </section>
       ))}
 
-      <div className="sticky bottom-0 z-10 flex flex-col gap-2 bg-background pb-2" data-testid="offline-action-bar">
-        {error ? <Alert variant="destructive"><AlertTitle>That did not work</AlertTitle><AlertDescription>{error}</AlertDescription></Alert> : null}
-        {planFailed ? <Alert variant="destructive"><AlertTitle>Home could not check the drive space</AlertTitle><AlertDescription>Check that Home is running and online, then switch a book off and on again to retry.</AlertDescription></Alert> : null}
-        {refusal ? <Alert variant="warning"><AlertTitle>There is not enough room</AlertTitle><AlertDescription>{refusal}</AlertDescription></Alert> : null}
-        {stagedCount > 0 ? (
-          <Alert data-testid="offline-staged">
-            <AlertTitle>{stagedCount === 1 ? "1 change is waiting" : `${stagedCount} changes are waiting`}</AlertTitle>
-            <AlertDescription>
-              <p className="text-base">{additions.length > 0 ? `${additions.length} to download (${sizeGb(addBytes)}${plan.data ? `, ${duration(plan.data.estimatedSeconds)}` : ""}). ` : ""}{removals.length > 0 ? `${removals.length} to remove (frees ${sizeGb(freedBytes)}).` : ""}</p>
-              {apply.isPending && step ? <p className="text-base">{step}</p> : null}
-              <div className="flex gap-2">
-                <Button type="button" variant="outline" size="sm" disabled={apply.isPending} onClick={() => setStaged({})}>Discard</Button>
-                <Button type="button" size="sm" disabled={apply.isPending || Boolean(refusal) || (additions.length > 0 && plan.isPending) || planFailed} onClick={() => removals.length > 0 ? setConfirmRemove(true) : apply.mutate()}>{apply.isPending ? "Applying…" : "Apply"}</Button>
-              </div>
-            </AlertDescription>
-          </Alert>
-        ) : null}
-      </div>
+      <StagedApplyBar
+        testId="offline-action-bar" stagedTestId="offline-staged"
+        notices={<>
+          {error ? <Alert variant="destructive"><AlertTitle>That did not work</AlertTitle><AlertDescription>{error}</AlertDescription></Alert> : null}
+          {planFailed ? <Alert variant="destructive"><AlertTitle>Home could not check the drive space</AlertTitle><AlertDescription>Check that Home is running and online, then switch a book off and on again to retry.</AlertDescription></Alert> : null}
+          {refusal ? <Alert variant="warning"><AlertTitle>There is not enough room</AlertTitle><AlertDescription>{refusal}</AlertDescription></Alert> : null}
+        </>}
+        staged={stagedCount > 0} title={stagedCount === 1 ? "1 change is waiting" : `${stagedCount} changes are waiting`}
+        summary={<p className="text-base">{additions.length > 0 ? `${additions.length} to download (${sizeGb(addBytes)}${plan.data ? `, ${duration(plan.data.estimatedSeconds)}` : ""}). ` : ""}{removals.length > 0 ? `${removals.length} to remove (frees ${sizeGb(freedBytes)}).` : ""}</p>}
+        step={step} applying={apply.isPending} applyDisabled={Boolean(refusal) || (additions.length > 0 && plan.isPending) || planFailed}
+        applyLabel="Apply" discardLabel="Discard" onApply={() => removals.length > 0 ? setConfirmRemove(true) : apply.mutate()} onDiscard={() => setStaged({})}
+      />
 
       <AlertDialog open={confirmRemove} onOpenChange={setConfirmRemove}>
         <AlertDialogContent>
