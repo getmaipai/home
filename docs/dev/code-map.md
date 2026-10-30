@@ -148,6 +148,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `frontend/src/apps/settings/SignInSecretSection.tsx` | SignInSecretSection |
 | `frontend/src/apps/settings/SiteBlocksSection.tsx` | SiteBlocksSection |
 | `frontend/src/apps/settings/StackChanInstallDialog.tsx` | StackChanInstallDialog |
+| `frontend/src/apps/settings/StagedApplyBar.tsx` | StagedApplyBar |
 | `frontend/src/apps/settings/UsersSection.tsx` | UsersSection |
 | `frontend/src/apps/settings/VideoLibrary.tsx` | videoStateLine, VideoLibrary |
 | `frontend/src/apps/settings/VoiceBrowserSection.tsx` | VoiceBrowserSection |
