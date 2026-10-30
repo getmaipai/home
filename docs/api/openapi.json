@@ -37407,13 +37407,21 @@
                       },
                       "lon": {
                         "type": "number"
+                      },
+                      "country": {
+                        "type": "string"
+                      },
+                      "zone": {
+                        "type": "string"
                       }
                     },
                     "required": [
                       "name",
                       "area",
                       "lat",
-                      "lon"
+                      "lon",
+                      "country",
+                      "zone"
                     ]
                   }
                 }
@@ -37484,13 +37492,21 @@
                     },
                     "lon": {
                       "type": "number"
+                    },
+                    "country": {
+                      "type": "string"
+                    },
+                    "zone": {
+                      "type": "string"
                     }
                   },
                   "required": [
                     "name",
                     "area",
                     "lat",
-                    "lon"
+                    "lon",
+                    "country",
+                    "zone"
                   ]
                 }
               }
@@ -41342,6 +41358,926 @@
           },
           "404": {
             "description": "No such alarm",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/world-places": {
+      "get": {
+        "tags": [
+          "World places"
+        ],
+        "summary": "List my world places",
+        "responses": {
+          "200": {
+            "description": "Places",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "type": "string",
+                        "pattern": "^place-[a-z0-9]{6,}$",
+                        "description": "Stable id, never reused, even after deleted_at is set."
+                      },
+                      "person": {
+                        "type": "string",
+                        "pattern": "^person-[a-z0-9]{6,}$",
+                        "description": "Person who owns this world place."
+                      },
+                      "name": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 120
+                      },
+                      "country": {
+                        "type": "string",
+                        "maxLength": 120
+                      },
+                      "zone": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 64,
+                        "description": "IANA time zone name accepted by Intl.DateTimeFormat."
+                      },
+                      "position": {
+                        "type": "integer",
+                        "minimum": 0
+                      },
+                      "source": {
+                        "type": "string",
+                        "enum": [
+                          "hub",
+                          "local"
+                        ]
+                      },
+                      "created_at": {
+                        "type": "string",
+                        "format": "date-time"
+                      },
+                      "updated_at": {
+                        "type": "string",
+                        "format": "date-time"
+                      },
+                      "deleted_at": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "format": "date-time"
+                          },
+                          {
+                            "nullable": true
+                          }
+                        ],
+                        "default": null
+                      },
+                      "hlc": {
+                        "type": "string",
+                        "pattern": "^[0-9]+:[0-9]+:[a-z0-9]{6,}$"
+                      }
+                    },
+                    "required": [
+                      "id",
+                      "person",
+                      "name",
+                      "country",
+                      "zone",
+                      "position",
+                      "source",
+                      "created_at",
+                      "updated_at",
+                      "hlc"
+                    ],
+                    "additionalProperties": false,
+                    "description": "A named world clock location for a person. Home enforces a maximum of 12 world places per person; this schema does not."
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "World places"
+        ],
+        "summary": "Add a world place",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string"
+                  },
+                  "country": {
+                    "type": "string"
+                  },
+                  "zone": {
+                    "type": "string"
+                  },
+                  "position": {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  "source": {
+                    "type": "string",
+                    "enum": [
+                      "hub",
+                      "local"
+                    ]
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "pattern": "^place-[a-z0-9]{6,}$",
+                      "description": "Stable id, never reused, even after deleted_at is set."
+                    },
+                    "person": {
+                      "type": "string",
+                      "pattern": "^person-[a-z0-9]{6,}$",
+                      "description": "Person who owns this world place."
+                    },
+                    "name": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 120
+                    },
+                    "country": {
+                      "type": "string",
+                      "maxLength": 120
+                    },
+                    "zone": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 64,
+                      "description": "IANA time zone name accepted by Intl.DateTimeFormat."
+                    },
+                    "position": {
+                      "type": "integer",
+                      "minimum": 0
+                    },
+                    "source": {
+                      "type": "string",
+                      "enum": [
+                        "hub",
+                        "local"
+                      ]
+                    },
+                    "created_at": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "updated_at": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "deleted_at": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "format": "date-time"
+                        },
+                        {
+                          "nullable": true
+                        }
+                      ],
+                      "default": null
+                    },
+                    "hlc": {
+                      "type": "string",
+                      "pattern": "^[0-9]+:[0-9]+:[a-z0-9]{6,}$"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "person",
+                    "name",
+                    "country",
+                    "zone",
+                    "position",
+                    "source",
+                    "created_at",
+                    "updated_at",
+                    "hlc"
+                  ],
+                  "additionalProperties": false,
+                  "description": "A named world clock location for a person. Home enforces a maximum of 12 world places per person; this schema does not."
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid place",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/world-places/{id}": {
+      "patch": {
+        "tags": [
+          "World places"
+        ],
+        "summary": "Update my world place",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "place-abcdef"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string"
+                  },
+                  "country": {
+                    "type": "string"
+                  },
+                  "zone": {
+                    "type": "string"
+                  },
+                  "position": {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  "source": {
+                    "type": "string",
+                    "enum": [
+                      "hub",
+                      "local"
+                    ]
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Updated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "pattern": "^place-[a-z0-9]{6,}$",
+                      "description": "Stable id, never reused, even after deleted_at is set."
+                    },
+                    "person": {
+                      "type": "string",
+                      "pattern": "^person-[a-z0-9]{6,}$",
+                      "description": "Person who owns this world place."
+                    },
+                    "name": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 120
+                    },
+                    "country": {
+                      "type": "string",
+                      "maxLength": 120
+                    },
+                    "zone": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 64,
+                      "description": "IANA time zone name accepted by Intl.DateTimeFormat."
+                    },
+                    "position": {
+                      "type": "integer",
+                      "minimum": 0
+                    },
+                    "source": {
+                      "type": "string",
+                      "enum": [
+                        "hub",
+                        "local"
+                      ]
+                    },
+                    "created_at": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "updated_at": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "deleted_at": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "format": "date-time"
+                        },
+                        {
+                          "nullable": true
+                        }
+                      ],
+                      "default": null
+                    },
+                    "hlc": {
+                      "type": "string",
+                      "pattern": "^[0-9]+:[0-9]+:[a-z0-9]{6,}$"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "person",
+                    "name",
+                    "country",
+                    "zone",
+                    "position",
+                    "source",
+                    "created_at",
+                    "updated_at",
+                    "hlc"
+                  ],
+                  "additionalProperties": false,
+                  "description": "A named world clock location for a person. Home enforces a maximum of 12 world places per person; this schema does not."
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid place",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such place",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "World places"
+        ],
+        "summary": "Delete my world place",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "place-abcdef"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Deleted",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "id"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such place",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/quick-timers": {
+      "get": {
+        "tags": [
+          "Quick timers"
+        ],
+        "summary": "List my quick timers",
+        "responses": {
+          "200": {
+            "description": "Quick timers",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "type": "string",
+                        "pattern": "^qtimer-[a-z0-9]{6,}$",
+                        "description": "Stable id, never reused, even after deleted_at is set."
+                      },
+                      "person": {
+                        "type": "string",
+                        "pattern": "^person-[a-z0-9]{6,}$",
+                        "description": "Person who owns this quick timer."
+                      },
+                      "name": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 120
+                      },
+                      "minutes": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 1440
+                      },
+                      "position": {
+                        "type": "integer",
+                        "minimum": 0
+                      },
+                      "source": {
+                        "type": "string",
+                        "enum": [
+                          "hub",
+                          "local"
+                        ]
+                      },
+                      "created_at": {
+                        "type": "string",
+                        "format": "date-time"
+                      },
+                      "updated_at": {
+                        "type": "string",
+                        "format": "date-time"
+                      },
+                      "deleted_at": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "format": "date-time"
+                          },
+                          {
+                            "nullable": true
+                          }
+                        ],
+                        "default": null
+                      },
+                      "hlc": {
+                        "type": "string",
+                        "pattern": "^[0-9]+:[0-9]+:[a-z0-9]{6,}$"
+                      }
+                    },
+                    "required": [
+                      "id",
+                      "person",
+                      "name",
+                      "minutes",
+                      "position",
+                      "source",
+                      "created_at",
+                      "updated_at",
+                      "hlc"
+                    ],
+                    "additionalProperties": false,
+                    "description": "A saved quick timer duration for a person."
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Quick timers"
+        ],
+        "summary": "Create a quick timer",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string"
+                  },
+                  "minutes": {
+                    "type": "integer"
+                  },
+                  "position": {
+                    "type": "integer",
+                    "minimum": 0
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "pattern": "^qtimer-[a-z0-9]{6,}$",
+                      "description": "Stable id, never reused, even after deleted_at is set."
+                    },
+                    "person": {
+                      "type": "string",
+                      "pattern": "^person-[a-z0-9]{6,}$",
+                      "description": "Person who owns this quick timer."
+                    },
+                    "name": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 120
+                    },
+                    "minutes": {
+                      "type": "integer",
+                      "minimum": 1,
+                      "maximum": 1440
+                    },
+                    "position": {
+                      "type": "integer",
+                      "minimum": 0
+                    },
+                    "source": {
+                      "type": "string",
+                      "enum": [
+                        "hub",
+                        "local"
+                      ]
+                    },
+                    "created_at": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "updated_at": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "deleted_at": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "format": "date-time"
+                        },
+                        {
+                          "nullable": true
+                        }
+                      ],
+                      "default": null
+                    },
+                    "hlc": {
+                      "type": "string",
+                      "pattern": "^[0-9]+:[0-9]+:[a-z0-9]{6,}$"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "person",
+                    "name",
+                    "minutes",
+                    "position",
+                    "source",
+                    "created_at",
+                    "updated_at",
+                    "hlc"
+                  ],
+                  "additionalProperties": false,
+                  "description": "A saved quick timer duration for a person."
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid timer",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/quick-timers/{id}": {
+      "patch": {
+        "tags": [
+          "Quick timers"
+        ],
+        "summary": "Update my quick timer",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "qtimer-abcdef"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string"
+                  },
+                  "minutes": {
+                    "type": "integer"
+                  },
+                  "position": {
+                    "type": "integer",
+                    "minimum": 0
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Updated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "pattern": "^qtimer-[a-z0-9]{6,}$",
+                      "description": "Stable id, never reused, even after deleted_at is set."
+                    },
+                    "person": {
+                      "type": "string",
+                      "pattern": "^person-[a-z0-9]{6,}$",
+                      "description": "Person who owns this quick timer."
+                    },
+                    "name": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 120
+                    },
+                    "minutes": {
+                      "type": "integer",
+                      "minimum": 1,
+                      "maximum": 1440
+                    },
+                    "position": {
+                      "type": "integer",
+                      "minimum": 0
+                    },
+                    "source": {
+                      "type": "string",
+                      "enum": [
+                        "hub",
+                        "local"
+                      ]
+                    },
+                    "created_at": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "updated_at": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "deleted_at": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "format": "date-time"
+                        },
+                        {
+                          "nullable": true
+                        }
+                      ],
+                      "default": null
+                    },
+                    "hlc": {
+                      "type": "string",
+                      "pattern": "^[0-9]+:[0-9]+:[a-z0-9]{6,}$"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "person",
+                    "name",
+                    "minutes",
+                    "position",
+                    "source",
+                    "created_at",
+                    "updated_at",
+                    "hlc"
+                  ],
+                  "additionalProperties": false,
+                  "description": "A saved quick timer duration for a person."
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid timer",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such timer",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Quick timers"
+        ],
+        "summary": "Delete my quick timer",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "qtimer-abcdef"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Deleted",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "id"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such timer",
             "content": {
               "application/json": {
                 "schema": {

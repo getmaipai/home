@@ -38,7 +38,7 @@ placesRoutes.openapi(searchRoute, async (c) => {
   }
 });
 
-const localShape = z.object({ name: z.string(), area: z.string().nullable(), lat: z.number(), lon: z.number() });
+const localShape = z.object({ name: z.string(), area: z.string().nullable(), lat: z.number(), lon: z.number(), country: z.string(), zone: z.string() });
 const localSearchRoute = createRoute({
   method: "get", path: "/local-search", tags: ["Places"], summary: "Find a city by name in the offline gazetteer",
   middleware: [requireAuth] as const,

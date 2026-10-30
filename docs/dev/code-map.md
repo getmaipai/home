@@ -665,6 +665,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/promptSanitize.ts` | sanitizeForPrompt |
 | `backend/src/lib/quickConnect.ts` | createQuickConnect, approveQuickConnect, consumeQuickConnect, isQuickConnectPending, quickConnectKindForCode, __resetQuickConnectForTests |
 | `backend/src/lib/quickReaction.ts` | QUICK_REACTION_DEADLINE_MS, __setQuickReactionRunnerForTests, __resetQuickReactionForTests, cleanReaction, quickReaction |
+| `backend/src/lib/quickTimers.ts` | listQuickTimers, createQuickTimer, updateQuickTimer, deleteQuickTimer |
 | `backend/src/lib/rateLimiter.ts` | tryConsume, __resetRateLimiterForTests, __setRateLimiterClockForTests |
 | `backend/src/lib/reasoningReserve.ts` | EMPTY_LENGTH_RETRY_EXTRA_TOKENS, setCeilingEngineIdentity, rememberCeilingSpentInvisibly, __resetLearnedCeilingsForTests, reasoningReserveFor, availableAnswerTokens |
 | `backend/src/lib/recallShapes.ts` | asksWhatHubSaid, asksAboutEarlierTalk |
@@ -899,5 +900,6 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/wellFormed.ts` | visibleText, analysisLead, thinkingPrefix, newThinkSplitState, feedThinkSplit, flushThinkSplit |
 | `backend/src/lib/widgets.ts` | widgetCardBlock, listWidgets, orderHomeCards, getWidgetData |
 | `backend/src/lib/wikimediaLive.ts` | WIKIMEDIA_LIVE_ID, WIKIMEDIA_LIVE_RATE_LIMIT_KEY, WIKIMEDIA_LIVE_RATE_LIMIT, wikimediaLiveBaseUrl |
+| `backend/src/lib/worldPlaces.ts` | listWorldPlaces, createWorldPlace, updateWorldPlace, deleteWorldPlace |
 | `backend/src/lib/wyoming.ts` | encodeWyomingMessage, WyomingFramer, readWavPcm |
 | `backend/src/lib/wyomingServer.ts` | startWyomingServer |

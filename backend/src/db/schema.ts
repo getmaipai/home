@@ -2263,3 +2263,10 @@ export const addedModels = sqliteTable("added_models", {
   hlc: text("hlc").notNull(),
   provenance: text("provenance").notNull(),
 });
+
+export const worldPlaces = sqliteTable("world_places", {
+  id: text("id").primaryKey(), person: text("person").notNull().references(() => people.id), name: text("name").notNull(), country: text("country").notNull(), zone: text("zone").notNull(), position: integer("position").notNull(), source: text("source").notNull(), createdAt: text("created_at").notNull(), updatedAt: text("updated_at").notNull(), deletedAt: text("deleted_at"), hlc: text("hlc").notNull(),
+});
+export const quickTimers = sqliteTable("quick_timers", {
+  id: text("id").primaryKey(), person: text("person").notNull().references(() => people.id), name: text("name").notNull(), minutes: integer("minutes").notNull(), position: integer("position").notNull(), source: text("source").notNull(), createdAt: text("created_at").notNull(), updatedAt: text("updated_at").notNull(), deletedAt: text("deleted_at"), hlc: text("hlc").notNull(), defaultsInitialized: integer("defaults_initialized", { mode: "boolean" }).notNull().default(false),
+});

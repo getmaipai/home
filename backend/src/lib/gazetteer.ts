@@ -3,12 +3,12 @@
 // Coordinates leave this file rounded to 2 decimals (about 1 km), the precision weather needs and no more.
 import { cityMapping, lookupViaCity, findFromCityStateProvince } from "city-timezones";
 
-export interface LocalPlace { name: string; area: string | null; lat: number; lon: number }
+export interface LocalPlace { name: string; area: string | null; lat: number; lon: number; country: string; zone: string }
 
 const round2 = (n: number): number => Number(n.toFixed(2));
 
-function toPlace(c: { city: string; province: string; country: string; lat: number; lng: number }): LocalPlace {
-  return { name: c.city, area: [c.province, c.country].filter(Boolean).join(", ") || null, lat: round2(c.lat), lon: round2(c.lng) };
+function toPlace(c: { city: string; province: string; country: string; lat: number; lng: number; timezone: string }): LocalPlace {
+  return { name: c.city, area: [c.province, c.country].filter(Boolean).join(", ") || null, lat: round2(c.lat), lon: round2(c.lng), country: c.country, zone: c.timezone };
 }
 
 /** Up to five cities for a typed name ("Seattle", "Springfield MO"), most populous first. */
