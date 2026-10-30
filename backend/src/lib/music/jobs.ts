@@ -8,9 +8,10 @@ import { attachmentFilePath, createAttachment, readAttachmentForConversation, re
 import { checkStorageCap } from "@/lib/storage/usage";
 import { newFileId, newMusicJobId } from "@/lib/id";
 import type { PersonRow } from "@/types";
-import { cancelOrDeleteMusic, musicBody, fetchSong, getMusicJob, StackMusicError, submitMusic, type MusicBody, type StackSong, submitStems, getStemsJob, fetchStem, type StackStem } from "./stack";
+import { cancelOrDeleteMusic, musicBody, fetchSong, getMusicJob, StackMusicError, submitMusic, type MusicBody, type StackSong, submitStems, getStemsJob, fetchStem, type StackStem, stemsStatus, stemsStatusReady } from "./stack";
 import { MUSIC_NOTE, generationOf, type GenerationProvenance, type MusicJob, type MusicRequest, type MusicTask } from "./types";
 import { musicEngineStatus } from "./ready";
+import { prepareMusicEdit } from "./tool";
 import { sungLyricsFromLrc } from "./sections";
 import { startSongCover } from "./cover";
 import { modelStampFor } from "./models";
@@ -19,7 +20,7 @@ import { refuseMusicPrompt } from "./policy";
 import { jobQueueCopy } from "@/lib/jobQueueCopy";
 import { requestTier, refreshHouseholdQueue, registerQueueProvider, releaseHouseholdQueue, type QueueJob } from "@/lib/jobs/householdQueue";
 import { activeMusicJobsFor, dropMusicJob, dropTemporaryMusicConversation, getMusicJobFor, jobsForConversation, forgetRemovedMusicJob, liveJobs, memory, pendingMusicJobs, pruneMusicJobs, saveMusicJob as persistMusicJob, temporarySongs, watching } from "./store";
-export { getMusicJobFor, musicJobIdsByTurn, __resetMusicJobsForTests } from "./store";
+export { getMusicJobFor, jobsForConversation, musicJobIdsByTurn, __resetMusicJobsForTests } from "./store";
 export type { MusicJob, MusicRequest } from "./types";
 
 let POLL_MS = 1000;
@@ -84,6 +85,20 @@ function sleep(ms: number, signal: AbortSignal): Promise<void> {
 export interface StartMusicInput {
   actor: PersonRow; conversationId: string; turnId: string; companionId?: string | null; temporary: boolean; task: MusicTask;
   request: MusicRequest; body: Omit<MusicBody, "timeout_ms">; parentFileId?: string | null;
+}
+/** Shared bytes and Stack body for both the edit_music tool and the song card's stems action. */
+export async function prepareStemsJob(actor: PersonRow, source: MusicJob): Promise<{ ok: true; task: "stems"; request: MusicRequest; body: Omit<MusicBody, "timeout_ms"> } | { ok: false; status: 422 | 503; line: string }> {
+  const status = await stemsStatus();
+  if (!stemsStatusReady(status)) return { ok: false, status: 503, line: plainMusicFailure("stems_unavailable") };
+  if (source.task === "stems" || !source.fileId) return { ok: false, status: 422, line: "A stem cannot be split again. Choose a song instead." };
+  const file = readMusicFile(actor, source, source.fileId);
+  if (!file) return { ok: false, status: 422, line: plainMusicFailure("source_not_made_here") };
+  const plan = prepareMusicEdit(source, { track: source.fileId, change: "stems" });
+  if (!plan.ok) return { ok: false, status: 422, line: plan.line };
+  plan.body.source = Buffer.from(file.bytes).toString("base64");
+  plan.body.source_sha256 = file.sha256;
+  plan.body.task = "edit";
+  return { ok: true, task: "stems", request: plan.request, body: plan.body };
 }
 export async function startMusicJob(input: StartMusicInput): Promise<MusicJob> {
   if (input.task === "text2music") {
@@ -229,6 +244,7 @@ async function finishStems(job: MusicJob, actor: PersonRow, stems: StackStem[], 
   if (!turn) { fail(job, "lost_turn"); return; }
   const parent = job.parentFileId ? provenanceFor(job.parentFileId) : null;
   if (!parent) { fail(job, "source_not_made_here"); return; }
+  const baseTitle = job.request.title ?? "Song"; const batch = job.id;
   for (let i = 0; i < stems.length; i++) {
     const stem = stems[i]!; const bytes = await fetchStem(stem.url);
     if (signal.aborted || stopped(job)) return;
@@ -242,7 +258,7 @@ async function finishStems(job: MusicJob, actor: PersonRow, stems: StackStem[], 
       if (!made.ok) { fail(job, made.status === 403 ? "storage_full" : "save_failed"); return; }
       target.fileId = made.value.id;
     }
-    target.request = { ...job.request, title: `${job.request.title ?? "Song"} (${stem.stem})`, instrumental: stem.stem !== "vocals", seconds: job.request.seconds };
+    target.request = { ...job.request, title: `${baseTitle} (${stem.stem})`, stemsOf: batch, instrumental: stem.stem !== "vocals", seconds: job.request.seconds };
     target.seed = parent.seed ?? job.seed ?? 0; target.durationS = job.request.seconds; target.state = "done"; target.stage = "ready"; target.progress = 1; target.etaSeconds = 0; target.errorCode = null; target.errorLine = null;
     persistMusicJob(target);
   }

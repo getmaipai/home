@@ -8,9 +8,9 @@ import { MUSIC_STARTED_LINE } from "@/lib/mediaClaims";
 import { turnAgeBand } from "@/lib/turnMachine/speaker";
 import { musicDenial, MUSIC_DENIAL_LINE, MUSIC_REFUSAL_LINE, refuseMusicPrompt, type MusicAudience } from "./policy";
 import { musicEngineStatus, musicStatusReady } from "./ready";
-import { plainMusicFailure, readMusicFile, sourceMusicJob, startMusicJob } from "./jobs";
+import { plainMusicFailure, prepareStemsJob, readMusicFile, sourceMusicJob, startMusicJob } from "./jobs";
 import { resolveMusicSection, replaceMusicSection, fitLyricsToLength, secondsForWords, hookOf } from "./sections";
-import { StackMusicError, musicBody, stemsStatus, stemsStatusReady, type MusicBody } from "./stack";
+import { StackMusicError, musicBody, type MusicBody } from "./stack";
 import type { MusicJob, MusicRequest, MusicTask, SongLength } from "./types";
 import { householdSongLength } from "./policy";
 export const GENERATE_MUSIC_TOOL_ID = "generate_music";
@@ -169,15 +169,9 @@ async function runMusic(input: MusicToolInput, editing: boolean): Promise<ToolEx
     const source = sourceMusicJob(actor, state.conversationId, parsed.data.track, temporary);
     if (!source?.fileId) return refused(plainMusicFailure("source_not_made_here"), "source_not_made_here");
     if (parsed.data.change === "stems") {
-      const status = await stemsStatus();
-      if (!stemsStatusReady(status)) return failed("stems_unavailable", "unavailable");
-      const file = readMusicFile(actor, source, source.fileId);
-      if (!file) return refused(plainMusicFailure("source_not_made_here"), "source_not_made_here");
-      const plan = prepareMusicEdit(source, parsed.data);
-      if (!plan.ok) return refused(plan.line, "section_or_range");
-      ({ request, task, body } = plan); parentFileId = source.fileId;
-      body.source = Buffer.from(file.bytes).toString("base64"); body.source_sha256 = file.sha256;
-      body.task = "edit";
+      const prepared = await prepareStemsJob(actor, source);
+      if (!prepared.ok) return failed(prepared.status === 503 ? "stems_unavailable" : "source_not_made_here", prepared.status === 503 ? "unavailable" : "bad_arguments");
+      ({ request, task, body } = prepared); parentFileId = source.fileId;
       const job = await startMusicJob({ actor, conversationId: state.conversationId, turnId: state.turnId, companionId: state.persona?.id ?? null, temporary, task, request, body, parentFileId });
       return outcomeOf({ callId, packageId, status: "succeeded", via: "tool_call", args, durationMs: 0, result: { reply: { text: "The stems are on the way." }, data: { musicJobId: job.id }, actions: [] } });
     }

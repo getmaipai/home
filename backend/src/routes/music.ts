@@ -19,7 +19,7 @@ import { musicDenial, musicViewDenial, MUSIC_DENIAL_LINE } from "@/lib/music/pol
 import { jobQueueCopy } from "@/lib/jobQueueCopy";
 import { laneOf } from "@/lib/pictures/lane";
 import { musicEngineStatus, musicStatusReady } from "@/lib/music/ready";
-import { cancelMusicJob, getMusicJobFor, musicVersions, openMusicFile, plainMusicFailure, startMusicJob, useMusicVersion, type MusicFileHandle, type MusicJob } from "@/lib/music/jobs";
+import { cancelMusicJob, getMusicJobFor, jobsForConversation, musicVersions, openMusicFile, plainMusicFailure, prepareStemsJob, startMusicJob, useMusicVersion, type MusicFileHandle, type MusicJob } from "@/lib/music/jobs";
 import { lengthOf, prepareMusicEdit } from "@/lib/music/tool";
 import { refuseMusicPrompt, MUSIC_REFUSAL_LINE } from "@/lib/music/policy";
 import { StackMusicError } from "@/lib/music/stack";
@@ -49,6 +49,7 @@ const stages = ["Queued", "Loading", "Planning", "Making", "Mixing", "Finishing"
 const musicStagesSchema = z.array(z.object({ id: z.string(), label: z.string() }));
 const cardSchema = z.object({
   id: z.string(), state: z.enum(["queued", "running", "done", "failed", "cancelled"]), stage: z.string().nullable(), stage_label: z.string(),
+  task: z.string(),
   cut: z.enum(["asked", "ceiling"]).nullable(), max_seconds: z.number().nullable(),
   progress: z.number(), eta_seconds: z.number().nullable(), position: z.number().nullable(), error_line: z.string().nullable(),
   stages: musicStagesSchema, stage_index: z.number().int().min(0), started_at: z.number(),
@@ -106,9 +107,18 @@ function cardLyricsOf(job: MusicJob): string | null {
 }
 export async function musicCardView(actor: PersonRow, input: Omit<MusicJob, "coverJobId" | "coverFileId"> & Partial<Pick<MusicJob, "coverJobId" | "coverFileId">>) {
   const root: MusicJob = { coverJobId: null, coverFileId: null, ...input };
-  const versions = musicVersions(actor, root);
-  const current = [...versions].sort((a, b) => (b.chosenAt ?? b.createdAt).localeCompare(a.chosenAt ?? a.createdAt) || b.id.localeCompare(a.id))[0];
+  // A finished split is one card that steps through its tracks (vocals, drums, bass, other), each with its own Download and Share.
+  const stemOrder: Record<string, number> = { vocals: 0, drums: 1, bass: 2, other: 3 };
+  const stemName = (job: MusicJob) => (job.request.title?.match(/\(([^)]+)\)$/)?.[1] ?? "").toLowerCase();
+  const stemSet = root.task === "stems" && root.conversationId && root.parentFileId
+    ? jobsForConversation(actor, root.conversationId, root.temporary)
+      .filter((job) => job.task === "stems" && job.state === "done" && job.parentFileId === root.parentFileId && job.request.stemsOf === root.request.stemsOf && !!job.fileId)
+      .sort((a, b) => (stemOrder[stemName(a)] ?? 9) - (stemOrder[stemName(b)] ?? 9))
+    : [];
+  const versions = stemSet.length ? stemSet : musicVersions(actor, root);
+  const current = stemSet.length ? (stemSet.find((job) => job.id === root.id) ?? stemSet[0]) : [...versions].sort((a, b) => (b.chosenAt ?? b.createdAt).localeCompare(a.chosenAt ?? a.createdAt) || b.id.localeCompare(a.id))[0];
   const shown = current ?? root;
+  const versionLabel = (job: MusicJob, index: number) => stemSet.length ? stemName(job).replace(/^./, (c) => c.toUpperCase()) : `Version ${index + 1}`;
   let covers: { id: string; url: string }[] = [];
   if (shown.coverFileId && shown.conversationId) {
     try { covers = listVersions(actor, shown.conversationId, shown.coverFileId).map(({ id, url }) => ({ id, url })); } catch { /* A deleted cover leaves the song playable. */ }
@@ -125,10 +135,10 @@ export async function musicCardView(actor: PersonRow, input: Omit<MusicJob, "cov
     stage_index: musicStageIndex(root), started_at: Date.parse(root.createdAt),
     cover_pending: coverPending,
     cover_url: covers.at(-1)?.url ?? null, cover_versions: covers,
-    id: root.id, state: root.state, stage: root.stage, stage_label: musicStageLabel(root, laneOf(musicRouteAudience(actor)) === "child" ? "child" : "adult"), progress: root.progress,
+    id: root.id, task: root.task, state: root.state, stage: root.stage, stage_label: musicStageLabel(root, laneOf(musicRouteAudience(actor)) === "child" ? "child" : "adult"), progress: root.progress,
     cut: (current ?? root).request.cut ?? null, max_seconds: (current ?? root).request.max_seconds ?? null,
     eta_seconds: root.etaSeconds, position: root.position, error_line: root.errorLine,
-    versions: versions.map((job, index) => ({ id: job.fileId!, label: `Version ${index + 1}`, url: musicFileUrl(job) })),
+    versions: versions.map((job, index) => ({ id: job.fileId!, label: versionLabel(job, index), url: musicFileUrl(job) })),
     current_id: current?.fileId ?? null, length: lengthOf((current ?? root).request, (current ?? root).durationS), title: current?.request.title ?? root.request.title ?? null,
     description: current?.request.description ?? root.request.description ?? null,
     timed_lyrics: shown.lrc && !shown.request.instrumental ? sungLyricsFromLrc(shown.lrc, shown.durationS).map(({ t, line, section }) => ({ t, line, section })) : null,
@@ -183,6 +193,21 @@ musicRoutes.openapi(reviseRoute, async (c) => {
   try { await startMusicJob({ actor, conversationId: source.conversationId, turnId: source.turnId, temporary: source.temporary, task: plan.task, request: plan.request, body: plan.body, parentFileId: source.fileId }); }
   catch (error) { return c.json({ error: plainMusicFailure(error instanceof StackMusicError ? error.code : "failed") }, 503) as never; }
   return c.json(await musicCardView(actor, root), 200);
+});
+const stemsRoute = createRoute({ method: "post", path: "/jobs/{id}/stems", tags: ["Music"], summary: "Split the shown song into stems", middleware,
+  request: { params, body: { content: { "application/json": { schema: z.object({ file_id: z.string().min(1).max(80).optional() }) } } } },
+  responses: { 200: { content: { "application/json": { schema: cardSchema } }, description: "The card with stems coming." }, 422: { description: "The source cannot be split." }, ...refusals, ...errorResponses({ 503: "Stem splitting is unavailable" }) } });
+musicRoutes.openapi(stemsRoute, async (c) => {
+  const actor = c.get("person"); const root = getMusicJobFor(actor, c.req.valid("param").id); const { file_id } = c.req.valid("json");
+  const versions = root ? musicVersions(actor, root).filter((j) => j.state === "done" && j.fileId && j.task !== "stems") : [];
+  const source = (file_id ? versions.find((j) => j.fileId === file_id) : versions.sort((a, b) => (b.chosenAt ?? b.createdAt).localeCompare(a.chosenAt ?? a.createdAt))[0]) ?? null;
+  if (!root || !source || !source.conversationId || !source.turnId) return c.json({ error: "That song isn't available any more. Ask for it again." }, 404) as never;
+  const prepared = await prepareStemsJob(actor, source);
+  if (!prepared.ok) return c.json({ error: prepared.line }, prepared.status) as never;
+  let stemsJob: MusicJob;
+  try { stemsJob = await startMusicJob({ actor, conversationId: source.conversationId, turnId: source.turnId, temporary: source.temporary, task: prepared.task, request: prepared.request, body: prepared.body, parentFileId: source.fileId }); }
+  catch (error) { return c.json({ error: plainMusicFailure(error instanceof StackMusicError ? error.code : "failed") }, 503) as never; }
+  return c.json(await musicCardView(actor, stemsJob!), 200);
 });
 const cancelRoute = createRoute({ method: "delete", path: "/jobs/{id}", tags: ["Music"], summary: "Stop a song being made", middleware: viewMiddleware, request: { params },
   responses: { 200: { content: { "application/json": { schema: cardSchema } }, description: "The stopped card." }, ...refusals } });

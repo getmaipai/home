@@ -6,7 +6,8 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { MemoryRouter } from "react-router-dom";
 import { cleanup, fireEvent, render, waitFor } from "@testing-library/react";
 import { MusicTrack } from "@maipai/ui/src/elements/music-track";
-import { MusicToolRender, musicFileName, musicHint } from "@/apps/chat/chatToolUis";
+import { MusicToolRender } from "@/apps/chat/chatToolUis";
+import { musicFileName, musicHint } from "@/apps/chat/chatToolUis";
 import { TOOL_BINDINGS } from "@/apps/chat/elementBindings";
 import type { MusicCard } from "@/lib/musicApi";
 import type { Roster } from "@/lib/api";
@@ -20,7 +21,7 @@ let card: MusicCard;
 const V1 = { id: "file-one", label: "Version 1", url: "/api/music/jobs/mus-1/files/file-one" };
 const V2 = { id: "file-two", label: "Version 2", url: "/api/music/jobs/mus-2/files/file-two" };
 function make(over: Partial<MusicCard>): MusicCard {
-  return { id: "mus-1", state: "running", stage: "planning", stage_label: "Planning", stages: [{ id: "queued", label: "Queued" }, { id: "model", label: "Loading" }, { id: "planning", label: "Planning" }, { id: "making", label: "Making" }, { id: "mixing", label: "Mixing" }, { id: "finishing", label: "Finishing" }], stage_index: 2, progress: 0.25, eta_seconds: 40, position: null, error_line: null, cover_url: null, cover_versions: [], cover_pending: false, versions: [], current_id: null, length: "quick", cut: null, max_seconds: 240,
+  return { id: "mus-1", task: "text2music", state: "running", stage: "planning", stage_label: "Planning", stages: [{ id: "queued", label: "Queued" }, { id: "model", label: "Loading" }, { id: "planning", label: "Planning" }, { id: "making", label: "Making" }, { id: "mixing", label: "Mixing" }, { id: "finishing", label: "Finishing" }], stage_index: 2, progress: 0.25, eta_seconds: 40, position: null, error_line: null, cover_url: null, cover_versions: [], cover_pending: false, versions: [], current_id: null, length: "quick", cut: null, max_seconds: 240,
     title: "Pancakes", description: "a gentle folk song with an original voice", lyrics: "[Verse]\nMorning light\n[Chorus]\nPancakes rise", duration_s: 60, timed_lyrics: null, started_at: Date.now() - 30_000, ...over };
 }
 const done = (over: Partial<MusicCard> = {}): MusicCard => make({ state: "done", stage: "ready", stage_label: "", progress: 1, eta_seconds: 0, versions: [V1], current_id: V1.id, ...over });
@@ -139,9 +140,10 @@ describe("MusicToolRender", () => {
     card = done({ length: "quick" });
     const view = mount();
     await waitFor(() => expect(view.container.querySelector("audio")).not.toBeNull());
-    fireEvent.click(view.getByRole("button", { name: "Edit" }));
+    const edit = view.getByRole("button", { name: "Edit" });
+    if (edit.getAttribute("aria-expanded") !== "true") fireEvent.click(edit);
     expect(view.getByRole("dialog", { name: "Edit song" })).toBeTruthy();
-    for (const label of ["Remix", "New cover", "Full song"]) expect(view.getByRole("tab", { name: label })).toBeTruthy();
+    for (const label of ["Remix", "New cover", "Full song", "Stems"]) expect(view.getByRole("tab", { name: label })).toBeTruthy();
     expect(view.getByText("Describe a song change to enable Remix.")).toBeTruthy();
     fireEvent.change(view.getByLabelText("How should it change? For example: heavy metal"), { target: { value: "make it heavy metal" } });
     fireEvent.click(view.getByRole("button", { name: "Remix" }));
@@ -154,6 +156,25 @@ describe("MusicToolRender", () => {
     fireEvent.change(view.getByLabelText("Describe the new cover"), { target: { value: "a red guitar under stage lights" } });
     fireEvent.click(view.getByRole("button", { name: "Make new cover" }));
     await waitFor(() => expect(calls.some((call) => call.url.endsWith("/cover") && call.body === JSON.stringify({ prompt: "a red guitar under stage lights" }))).toBe(true));
+  });
+
+  test("the Stems mode submits the shown version and a done stems card steps through its four tracks", async () => {
+    card = done();
+    const view = mount();
+    await waitFor(() => expect(view.container.querySelector("audio")).not.toBeNull());
+    fireEvent.click(view.getByRole("button", { name: "Edit" }));
+    fireEvent.keyDown(view.getByRole("tab", { name: "Full song" }), { key: "ArrowRight" });
+    await waitFor(() => expect(view.getByRole("tab", { name: "Stems" }).getAttribute("aria-selected")).toBe("true"));
+    fireEvent.click(view.getByRole("button", { name: "Split into stems" }));
+    await waitFor(() => expect(calls.some((call) => call.url.endsWith("/stems") && call.body === JSON.stringify({ file_id: V1.id }))).toBe(true));
+    cleanup();
+    card = done({ task: "stems", title: "Pancakes (vocals)", current_id: "audio-0", versions: ["Vocals", "Drums", "Bass", "Other"].map((label, index) => ({ id: `audio-${index}`, label, url: `/audio-${index}` })) });
+    const result = mount();
+    await waitFor(() => expect(result.container.querySelector("audio")).not.toBeNull());
+    expect(result.container.textContent).toContain("Track 1 of 4");
+    expect(result.container.textContent).toContain("Pancakes (vocals)");
+    expect(result.queryByRole("button", { name: "Edit" })).toBeNull();
+    expect(result.queryByRole("button", { name: /use this version/i })).toBeNull();
   });
 
   test("Edit shows a plain next step when a song change fails", async () => {

@@ -6,6 +6,7 @@ import { ApiError } from "@/lib/api";
 export interface MusicVersion { id: string; label: string; url: string }
 export interface MusicCard {
   id: string;
+  task: string;
   state: "queued" | "running" | "done" | "failed" | "cancelled";
   stage: string | null;
   /** The plain stage label for the current short stage, or the shared busy line while queued. */
@@ -53,6 +54,7 @@ export const musicApi = {
   /** Make it full / Make it quick: the same song made again at the other length, as a new version on this card. */
   setLength: (id: string, length: "quick" | "full", fileId?: string) => send<MusicCard>(`/api/music/jobs/${encodeURIComponent(id)}/length`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ length, ...(fileId ? { file_id: fileId } : {}) }) }),
   revise: (id: string, change: string, fileId?: string) => send<MusicCard>(`/api/music/jobs/${encodeURIComponent(id)}/revise`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ change, ...(fileId ? { file_id: fileId } : {}) }) }),
+  stems: (id: string, fileId?: string) => send<MusicCard>(`/api/music/jobs/${encodeURIComponent(id)}/stems`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(fileId ? { file_id: fileId } : {}) }),
   newCover: (id: string, prompt: string) => send<MusicCard>(`/api/music/jobs/${encodeURIComponent(id)}/cover`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ prompt }) }),
   useVersion: (id: string, fileId: string) => send<MusicCard>(`/api/music/jobs/${encodeURIComponent(id)}/use`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ file_id: fileId }) }),
   /** A personal download of one version (never the commercial purpose). */

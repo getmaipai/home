@@ -41,7 +41,33 @@ function entrances(job: MusicJob) {
     { path: `/api/music/files/${job.fileId}?purpose=commercial`, method: "GET" },
   ];
 }
+async function makeStems(client: TestClient, source: MusicJob) {
+  const response = await client.post(`/api/music/jobs/${source.id}/stems`, { file_id: source.fileId });
+  return { response, client };
+}
 describe("music routes", () => {
+  test("splits the shown song and shows its stems as one card that steps through them in order", async () => {
+    const { actor, client } = await owner(); const { job } = await song(actor);
+    fake.stems = true;
+    const { response } = await makeStems(client, job);
+    expect(response.status).toBe(200);
+    const card = await response.json() as { id: string; task: string };
+    expect(card.task).toBe("stems");
+    await waitForMusic(() => getMusicJobFor(actor, card.id)?.state === "done");
+    const stemsCard = await (await client.get(`/api/music/jobs/${card.id}`)).json() as { versions: { id: string; label: string }[]; title: string };
+    expect(stemsCard.versions.map((version) => version.label)).toEqual(["Vocals", "Drums"]);
+  });
+  test("refuses splitting a stem and reports an unavailable stem engine", async () => {
+    const { actor, client } = await owner(); const { job } = await song(actor); fake.stems = true; const { response } = await makeStems(client, job);
+    expect(response.status).toBe(200); const stemsCard = await response.json() as { id: string };
+    await waitForMusic(() => getMusicJobFor(actor, stemsCard.id)?.state === "done");
+    const stemJob = getMusicJobFor(actor, stemsCard.id)!;
+    expect((await client.post(`/api/music/jobs/${stemJob.id}/stems`, { file_id: stemJob.fileId })).status).toBe(404);
+    fake.stems = false;
+    const unavailable = await client.post(`/api/music/jobs/${job.id}/stems`, { file_id: job.fileId });
+    expect(unavailable.status).toBe(503);
+    expect((await unavailable.json() as { error: string }).error).toContain("Try again");
+  });
   test("every route requires authentication, and refuses a child, teen or guest even when they own the song", async () => {
     const { client, actor } = await owner(); const { job } = await song(actor);
     for (const route of entrances(job)) expect((await new TestClient().request(route.path, route)).status).toBe(401);

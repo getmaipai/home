@@ -58,6 +58,7 @@ describe("music jobs and their private files", () => {
       expect(generationOf(row.provenance)).toMatchObject({ task: "text2music", parent_file_id: parent.fileId, source_kind: "made_here" });
       expect(row.provenance).toContain(parent.fileId!);
     }
+    expect(jobs.map((job) => (JSON.parse(job.request) as { title?: string }).title ?? "").every((title) => /\((vocals|drums|bass|other)\)$/.test(title) && !title.includes(") ("))).toBe(true);
     // A stem is its own track: the song's versions stay the song's, and a stem has no versions but itself.
     const song = getMusicJobFor(people.owner, parent.id)!;
     expect(musicVersions(people.owner, song).map((v) => v.fileId)).toEqual([parent.fileId]);
