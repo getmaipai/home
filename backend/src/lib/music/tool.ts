@@ -10,7 +10,7 @@ import { musicDenial, MUSIC_DENIAL_LINE, MUSIC_REFUSAL_LINE, refuseMusicPrompt, 
 import { musicEngineStatus, musicStatusReady } from "./ready";
 import { plainMusicFailure, readMusicFile, sourceMusicJob, startMusicJob } from "./jobs";
 import { resolveMusicSection, replaceMusicSection, fitLyricsToLength, secondsForWords, hookOf } from "./sections";
-import { StackMusicError, musicBody, type MusicBody } from "./stack";
+import { StackMusicError, musicBody, stemsStatus, stemsStatusReady, type MusicBody } from "./stack";
 import type { MusicJob, MusicRequest, MusicTask, SongLength } from "./types";
 import { householdSongLength } from "./policy";
 export const GENERATE_MUSIC_TOOL_ID = "generate_music";
@@ -25,7 +25,7 @@ const common = {
 };
 export const generateMusicArgs = z.object({ ...common, description: common.description.unwrap(), instrumental: z.boolean().optional(), length: z.enum(["quick", "full"]).optional(), tier: z.enum(["standard", "boost", "max"]).optional(), seconds: z.number().finite().min(10).optional(), language: z.string().max(20).regex(/^([a-z]{2,3}(-[A-Za-z]{2,4})?|unknown)$/).optional(), title: z.string().max(200).optional() });
 export const editMusicArgs = z.object({
-  ...common, track: z.string().min(1).max(80), change: z.enum(["remake", "restyle", "instrumental", "rewrite_section", "extend", "variation", "trim", "fade", "loudness", "make_full", "make_quick"]),
+  ...common, track: z.string().min(1).max(80), change: z.enum(["remake", "restyle", "instrumental", "rewrite_section", "extend", "variation", "trim", "fade", "loudness", "make_full", "make_quick", "stems"]),
   section: z.string().max(80).optional(), from_s: z.number().finite().min(0).optional(), to_s: z.number().finite().positive().optional(),
   seconds: z.number().finite().positive().optional(), at: z.enum(["start", "end"]).optional(), where: z.enum(["in", "out", "both"]).optional(),
   strength: z.number().finite().min(0.3).max(1).optional(), lufs: z.number().finite().min(-70).max(-5).optional(),
@@ -104,6 +104,7 @@ export function prepareMusicEdit(source: MusicJob, args: z.infer<typeof editMusi
   delete request.retried;
   let task: MusicTask; let stackTask: MusicBody["task"];
   switch (args.change) {
+    case "stems": task = "stems"; stackTask = "edit"; break;
     case "remake": task = "remake"; stackTask = "text2music"; if (args.seconds !== undefined) request.seconds = args.seconds; break;
     case "make_full": case "make_quick": {
       // The same song made again at the other length: same words, description and seed.
@@ -158,16 +159,30 @@ async function runMusic(input: MusicToolInput, editing: boolean): Promise<ToolEx
   const refused = (line: string, why: string) => outcomeOf({ callId, packageId, status: "succeeded", via: "tool_call", args, durationMs: 0, result: { reply: { text: `No song was made. Say this to the person and keep its meaning: ${line}` }, data: { refused: why }, actions: [] } });
   const refusal = musicRefusalFor(musicAudienceOf(state, input.spoken), args);
   if (refusal) return refused(refusal.line, refusal.why);
-  const engine = await musicEngineStatus();
-  if (!musicStatusReady(engine)) return failed("no_engine", "unavailable");
   const temporary = state.temporary === true || state.ephemeral === true;
   const actor = state.actor as PersonRow;
+  let engine: Awaited<ReturnType<typeof musicEngineStatus>> = null;
   let request: MusicRequest; let task: MusicTask; let body: Omit<MusicBody, "timeout_ms">; let parentFileId: string | null = null;
   if (editing) {
     const parsed = editMusicArgs.safeParse(args); if (!parsed.success) return failed("bad_arguments", "bad_arguments");
     // sourceMusicJob already proved the song is this person's, made here, in this chat: no bytes are read for it.
     const source = sourceMusicJob(actor, state.conversationId, parsed.data.track, temporary);
     if (!source?.fileId) return refused(plainMusicFailure("source_not_made_here"), "source_not_made_here");
+    if (parsed.data.change === "stems") {
+      const status = await stemsStatus();
+      if (!stemsStatusReady(status)) return failed("stems_unavailable", "unavailable");
+      const file = readMusicFile(actor, source, source.fileId);
+      if (!file) return refused(plainMusicFailure("source_not_made_here"), "source_not_made_here");
+      const plan = prepareMusicEdit(source, parsed.data);
+      if (!plan.ok) return refused(plan.line, "section_or_range");
+      ({ request, task, body } = plan); parentFileId = source.fileId;
+      body.source = Buffer.from(file.bytes).toString("base64"); body.source_sha256 = file.sha256;
+      body.task = "edit";
+      const job = await startMusicJob({ actor, conversationId: state.conversationId, turnId: state.turnId, companionId: state.persona?.id ?? null, temporary, task, request, body, parentFileId });
+      return outcomeOf({ callId, packageId, status: "succeeded", via: "tool_call", args, durationMs: 0, result: { reply: { text: "The stems are on the way." }, data: { musicJobId: job.id }, actions: [] } });
+    }
+    engine = await musicEngineStatus();
+    if (!musicStatusReady(engine)) return failed("no_engine", "unavailable");
     const plan = prepareMusicEdit(source, parsed.data, engine!.limits);
     if (!plan.ok) return refused(plan.line, "section_or_range");
     ({ request, task, body } = plan); parentFileId = source.fileId;
@@ -178,6 +193,8 @@ async function runMusic(input: MusicToolInput, editing: boolean): Promise<ToolEx
       body.source = Buffer.from(file.bytes).toString("base64"); body.source_sha256 = file.sha256;
     }
   } else {
+    engine = await musicEngineStatus();
+    if (!musicStatusReady(engine)) return failed("no_engine", "unavailable");
     const parsed = generateMusicArgs.safeParse(args); if (!parsed.success) return failed("bad_arguments", "bad_arguments");
     const value = parsed.data;
     const lyrics = value.instrumental ? "[Instrumental]" : value.lyrics;

@@ -594,7 +594,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/music/policy.ts` | MUSIC_ENABLED_KEY, MUSIC_DENIAL_LINE, MUSIC_NOT_HERE_LINE, MUSIC_LENGTH_KEY, householdSongLength, householdAllowsMusic |
 | `backend/src/lib/music/ready.ts` | settleMusicStatus, __setMusicStatusForTests, musicEngineStatus, dropMusicStatusCache, musicStatusReady, musicEngineReady |
 | `backend/src/lib/music/sections.ts` | resolveMusicSection, replaceMusicSection, secondsForWords, hookOf, sungSecondsFor, fitLyricsToLength |
-| `backend/src/lib/music/stack.ts` | musicBody, StackMusicError, __setMusicFetchForTests, submitMusic, getMusicJob, fetchSong |
+| `backend/src/lib/music/stack.ts` | musicBody, StackMusicError, __setMusicFetchForTests, __setStemsFetchForTests, submitMusic, getMusicJob |
 | `backend/src/lib/music/store.ts` | TEMP_MS, memory, liveJobs, watching, temporarySongs, storedMusicState |
 | `backend/src/lib/music/tool.ts` | GENERATE_MUSIC_TOOL_ID, EDIT_MUSIC_TOOL_ID, musicAudienceOf, generateMusicArgs, editMusicArgs, musicRefusalFor |
 | `backend/src/lib/music/types.ts` | MUSIC_NOTE, generationOf |

@@ -3,6 +3,8 @@ import type { MusicRequest } from "./types";
 import { getStackUrl } from "@/lib/stackEngine";
 export type MusicState = "queued" | "running" | "done" | "failed" | "cancelled";
 export interface StackSong { url?: string; duration_s: number; seed: number; lrc?: string; bpm?: number; key?: string; model?: string }
+export interface StackStem { url: string; name: "vocals" | "drums" | "bass" | "other"; duration_s: number }
+export interface StackStemsStatus { available: boolean; state: string; install?: unknown }
 export interface StackMusicStatus {
   available: boolean; state: string; limits: { min_seconds: number; max_seconds: number };
   quality: string[]; default_quality?: "quick" | "detailed"; install?: unknown;
@@ -30,6 +32,7 @@ export class StackMusicError extends Error {
 }
 let fetchForTests: typeof fetch | null = null;
 export function __setMusicFetchForTests(fn: typeof fetch | null): void { fetchForTests = fn; }
+export const __setStemsFetchForTests = __setMusicFetchForTests;
 async function request(path: string, init: RequestInit = {}, timeoutMs = 15_000): Promise<Response> {
   const base = fetchForTests ? "http://127.0.0.1:1" : getStackUrl();
   if (!base) throw new StackMusicError(503, "no_stack");
@@ -64,4 +67,29 @@ export async function musicStatus(): Promise<StackMusicStatus | null> {
     const body = await (await checked(await request("/stack/v1/music", {}, 5_000))).json() as { music?: StackMusicStatus } & Partial<StackMusicStatus>;
     return body.music ?? (typeof body.available === "boolean" ? body as StackMusicStatus : null);
   } catch { return null; }
+}
+export async function stemsStatus(): Promise<StackStemsStatus | null> {
+  try {
+    const body = await (await checked(await request("/stack/v1/stems", {}, 5_000))).json() as { stems?: StackStemsStatus } & Partial<StackStemsStatus>;
+    return body.stems ?? (typeof body.available === "boolean" ? body as StackStemsStatus : null);
+  } catch { return null; }
+}
+export function stemsStatusReady(status: StackStemsStatus | null): boolean { return !!status && status.available && !["unsupported", "off", "not-installed"].includes(status.state); }
+export async function submitStems(source: string, source_sha256: string): Promise<string> {
+  const res = await checked(await request("/v1/audio/stems", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ source, source_sha256, model: "htdemucs" }) }, 60_000));
+  const parsed = await res.json() as { job?: string };
+  if (!parsed.job) throw new StackMusicError(502, "bad_reply");
+  return parsed.job;
+}
+export async function getStemsJob(job: string): Promise<StackMusicJob> {
+  return await (await checked(await request(`/v1/audio/stems/${encodeURIComponent(job)}`))).json() as StackMusicJob;
+}
+export async function fetchStem(url: string): Promise<Uint8Array> {
+  const base = fetchForTests ? "http://127.0.0.1:1" : getStackUrl();
+  if (!base) throw new StackMusicError(503, "no_stack");
+  let parsed: URL;
+  try { parsed = new URL(url, base); } catch { throw new StackMusicError(502, "bad_reply"); }
+  if (parsed.origin !== new URL(base).origin) throw new StackMusicError(502, "bad_reply");
+  const path = `${parsed.pathname}${parsed.search}`;
+  return new Uint8Array(await (await checked(await request(path, {}, 120_000))).arrayBuffer());
 }

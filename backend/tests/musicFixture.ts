@@ -19,6 +19,7 @@ export function installFakeMusicStack() {
     refuse: null as { status: number; code: string; error: string } | null,
     lrc: LRC as string | ((seconds: number) => string),
     immediate: false, queued: false, model: "ace-step-1-5-turbo" as string | undefined, beforeSubmit: undefined as (() => Promise<void>) | undefined,
+    stems: false,
     restore() { __setMusicFetchForTests(null); __setMusicStatusForTests(undefined); __setMusicPollMsForTests(null); __resetMusicJobsForTests(); },
   };
   __resetMusicJobsForTests(); __setMusicPollMsForTests(2); __setMusicStatusForTests(readyMusicStatusForTests());
@@ -26,6 +27,13 @@ export function installFakeMusicStack() {
     const path = new URL(typeof input === "string" ? input : input instanceof URL ? input.href : input.url).pathname;
     const method = init?.method ?? "GET";
     if (path === "/stack/v1/music") return json(readyMusicStatusForTests());
+    if (path === "/stack/v1/stems") return json({ available: fake.stems, state: fake.stems ? "idle" : "not-installed" });
+    if (path === "/v1/audio/stems" && method === "POST") { fake.stems = true; fake.polls.set("stems-job", 0); return json({ job: "stems-job" }, 202); }
+    if (path.startsWith("/v1/audio/stems/") && path.endsWith(".m4a")) return new Response(testM4a(), { headers: { "content-type": "audio/mp4" } });
+    if (path === "/v1/audio/stems/stems-job") {
+      const polls = (fake.polls.get("stems-job") ?? 0) + 1; fake.polls.set("stems-job", polls);
+      return json(polls >= fake.pollsToFinish ? { state: "done", data: [{ url: "/v1/audio/stems/vocals.m4a", name: "vocals", duration_s: 52 }, { url: "/v1/audio/stems/drums.m4a", name: "drums", duration_s: 52 }] } : { state: "running", stage: "splitting", progress_fraction: 0.5, eta_seconds: 3 });
+    }
     if (path === "/v1/audio/music" && method === "POST") {
       const body = JSON.parse(String(init?.body)) as MusicBody;
       fake.submitted.push(body); const id = `mjob-${fake.submitted.length}`; fake.polls.set(id, 0);

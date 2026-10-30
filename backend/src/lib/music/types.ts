@@ -3,7 +3,7 @@ import type { GenerationProvenance } from "@maipai/spec/gen/ts/generation-proven
 export type { GenerationProvenance };
 /** Quick sings the hook. Full sings every part. The length follows the words. */
 export type SongLength = "quick" | "full";
-export type MusicTask = "text2music" | "cover" | "repaint" | "extend" | "remake" | "variation" | "trim" | "fade" | "loudness";
+export type MusicTask = "text2music" | "cover" | "repaint" | "extend" | "remake" | "variation" | "trim" | "fade" | "loudness" | "stems";
 export interface MusicRequest {
   description: string; lyrics?: string; written_lyrics?: string; title?: string; instrumental: boolean; seconds: number;
   cut?: "asked" | "ceiling"; max_seconds?: number; retried?: boolean;
