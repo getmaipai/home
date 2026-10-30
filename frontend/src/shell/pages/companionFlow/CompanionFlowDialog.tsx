@@ -48,7 +48,7 @@ export function CompanionFlowDialog({ companionId, initialName, initialStep = 0 
     <>
     <Dialog open onOpenChange={(open) => { if (!open) void close(); }}>
       {/* Opening on a later screen (editing) puts focus on the dialog itself, not on whichever control comes first, so no control shows a stray focus ring. */}
-      <DialogContent variant="flow" onInteractOutside={(event) => event.preventDefault()} onOpenAutoFocus={(event) => { if (initialStep > 0) { event.preventDefault(); (event.currentTarget as HTMLElement | null)?.focus(); } }}>
+      <DialogContent variant="flow" size="xl" onInteractOutside={(event) => event.preventDefault()} onOpenAutoFocus={(event) => { if (initialStep > 0) { event.preventDefault(); (event.currentTarget as HTMLElement | null)?.focus(); } }}>
         <DialogHeader>
           <DialogTitle size="xl">{current.title}</DialogTitle>
           <DialogDescription>{`Step ${step + 1} of 3 · ${current.line}`}</DialogDescription>

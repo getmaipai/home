@@ -211,7 +211,7 @@ export function CreateCharacterStep({ creating, companionId, initialName, onDraf
 
   return (
     <>
-    <DialogBody columns="two">
+    <DialogBody columns="three">
       <div className="flex flex-col gap-6">
         <DialogSection title="Character name">
           <Input aria-label="Character name" shape="pill" placeholder="Enter character name" maxLength={40} value={name} disabled={locked}
@@ -227,8 +227,10 @@ export function CreateCharacterStep({ creating, companionId, initialName, onDraf
             : <Input ref={fileInput} aria-label="Photo" type="file" shape="pill" accept="image/png,image/jpeg,image/webp" disabled={locked || making.disabled} aria-describedby={making.reason ? reasonId : undefined} onChange={(e) => { const chosen = e.target.files?.[0] ?? null; setFile(chosen); setUploadedId(null); maybeUpload(chosen); }} />}
           {mode === "upload" && thumb ? <div className="flex items-center gap-3"><img src={thumb} alt="Your upload" draggable={false} className="size-14 rounded-xl object-cover" /><p className="min-w-0 truncate text-sm text-muted-foreground">{file?.name}</p></div> : null}
         </DialogSection>
+      </div>
+      <div className="flex flex-col gap-6">
         <DialogSection title="Choose a style">
-          {tiles.length ? <div className="grid grid-cols-4 gap-3">
+          {tiles.length ? <div className="grid grid-cols-3 gap-3">
             {tiles.map((tile) => <CharacterTile key={tile.id} variant="picture" name={tile.label} selected={style === tile.id}
               media={tile.custom ? <Palette className="size-6 text-muted-foreground" aria-hidden="true" /> : tile.id === "keep" ? <User className="size-6 text-muted-foreground" aria-hidden="true" /> : <Sparkles className="size-6 text-muted-foreground" aria-hidden="true" />}
               onSelect={() => { if (!locked) chooseStyle(tile.id); }} />)}
