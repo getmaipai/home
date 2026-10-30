@@ -186,7 +186,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `frontend/src/shell/media/VisualizerMenu.tsx` | VisualizerMenu |
 | `frontend/src/shell/mediaHost.tsx` | hlsPathFor, createMediaStore, MediaDockContext, useMediaDock, MediaHostProvider, MediaLinkRedirect |
 | `frontend/src/shell/pageContext.tsx` | ambientPageContextForRoute, AmbientPageContextProvider, useAmbientPageContext, useSetPageContext |
-| `frontend/src/shell/pageHeaderTitle.tsx` | PageHeaderTitle |
+| `frontend/src/shell/pageHeaderTitle.tsx` | headerEntryFor, HeaderTitle, PageHeaderTitle, PageHeaderActions |
 | `frontend/src/shell/pages/AllAppsPage.tsx` | AllAppsPage |
 | `frontend/src/shell/pages/BackupsPage.tsx` | BackupsIcon, BackupsPage |
 | `frontend/src/shell/pages/ChatColumn.tsx` | CHAT_COLUMN_ID, CHAT_COLUMN_AUTO_COLLAPSE_MAX_WIDTH, CHAT_SETTINGS_PATH, chatColumnShortcutLabel, useChatThreadListState, searchableThreadsFor |
@@ -239,7 +239,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `frontend/src/shell/pages/dashboard/HomeShelves.tsx` | ContinueShelf, FamilyShelf, HomeMedia |
 | `frontend/src/shell/pages/dashboard/TodaySection.tsx` | TODAY_CARD_BUDGET, todaySlots, TodaySection |
 | `frontend/src/shell/pages/dataTableControls.tsx` | useDataTableControls |
-| `frontend/src/shell/pages/packageAppHeaderBar.tsx` | publishPackageAppHeader, PackageAppHeaderTitle, PackageAppHeaderActions, sectionsBarEntries |
+| `frontend/src/shell/pages/packageAppHeaderBar.tsx` | publishPackageAppHeader, PackageAppHeaderActions, sectionsBarEntries |
 | `frontend/src/shell/pages/performance/DiskHardwareBody.tsx` | DiskHardwareBody |
 | `frontend/src/shell/pages/performance/EnginesHealthBody.tsx` | EnginesHealthBody |
 | `frontend/src/shell/pages/performance/LabelsBody.tsx` | LabelsBody |
