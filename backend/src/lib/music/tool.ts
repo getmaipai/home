@@ -1,4 +1,5 @@
 // MUSIC-GEN-03: the model chooses the tool. Policy and source ownership are checked again before admission.
+import { tierArgument } from "@/lib/tiers";
 import { z } from "zod";
 import type { PersonRow } from "@/types";
 import type { TurnState, ToolExecutionOutcome } from "@/lib/turnMachine/contract";
@@ -22,7 +23,7 @@ const common = {
   description: z.string().trim().min(3).max(1200).optional(), lyrics: z.string().max(4000).optional(),
   bpm: z.number().finite().min(20).max(300).optional(), key: z.string().max(20).regex(/^[A-G][#b]?\s?(major|minor|maj|min|m)?$/i).optional(),
 };
-export const generateMusicArgs = z.object({ ...common, description: common.description.unwrap(), instrumental: z.boolean().optional(), length: z.enum(["quick", "full"]).optional(), seconds: z.number().finite().min(10).optional(), language: z.string().max(20).regex(/^([a-z]{2,3}(-[A-Za-z]{2,4})?|unknown)$/).optional(), title: z.string().max(200).optional() });
+export const generateMusicArgs = z.object({ ...common, description: common.description.unwrap(), instrumental: z.boolean().optional(), length: z.enum(["quick", "full"]).optional(), tier: z.enum(["standard", "boost", "max"]).optional(), seconds: z.number().finite().min(10).optional(), language: z.string().max(20).regex(/^([a-z]{2,3}(-[A-Za-z]{2,4})?|unknown)$/).optional(), title: z.string().max(200).optional() });
 export const editMusicArgs = z.object({
   ...common, track: z.string().min(1).max(80), change: z.enum(["remake", "restyle", "instrumental", "rewrite_section", "extend", "variation", "trim", "fade", "loudness", "make_full", "make_quick"]),
   section: z.string().max(80).optional(), from_s: z.number().finite().min(0).optional(), to_s: z.number().finite().positive().optional(),
@@ -189,6 +190,9 @@ async function runMusic(input: MusicToolInput, editing: boolean): Promise<ToolEx
   }
   // A request stored before the Stack named a default (or an edit of an older song) takes the Stack's default now.
   request.max_seconds = engine!.limits.max_seconds;
+  // TIER-HOME-03: the typed tier argument of a new song. Boost is the engine's Detailed maker when it has one; a lowered request says why in one line.
+  const tierAsked = editing ? null : tierArgument({ person: actor, category: "music", arg: args.tier, band: musicAudienceOf(state, input.spoken).band });
+  if (tierAsked?.quality && (tierAsked.quality === "quick" || engine!.quality.includes("detailed"))) request.quality = tierAsked.quality;
   request.quality ??= defaultQualityOf(engine!); body.quality = request.quality;
   // Check the effective request, including inherited words and a section replacement, before any job exists.
   const inherited = refuseMusicPrompt([request.description, request.lyrics, request.written_lyrics, request.title, request.key, request.language].join(" "));
@@ -198,7 +202,7 @@ async function runMusic(input: MusicToolInput, editing: boolean): Promise<ToolEx
   try {
     const job = await startMusicJob({ actor, conversationId: state.conversationId, turnId: state.turnId, companionId: state.persona?.id ?? null, temporary, task, request, body, parentFileId });
     return outcomeOf({ callId, packageId, status: "succeeded", via: "tool_call", args, durationMs: 0, result: {
-      reply: { text: songOnItsWay(request) },
+      reply: { text: `${songOnItsWay(request)}${tierAsked?.line ? ` ${tierAsked.line}` : ""}` },
       data: { musicJobId: job.id }, actions: [],
     } });
   } catch (error) {

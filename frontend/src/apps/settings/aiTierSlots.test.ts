@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { configurableTiers, consequences, draftOf, isOn, optionDefs, sameDraft, toStored, whoChoices, withOn, type SlotDrafts } from "./aiTierSlots";
+import { levelsLine, configurableTiers, consequences, draftOf, isOn, optionDefs, sameDraft, toStored, whoChoices, withOn, type SlotDrafts } from "./aiTierSlots";
 
 const drafts = (over: Partial<SlotDrafts> = {}): SlotDrafts => ({ reduced: draftOf(undefined, "reduced"), standard: draftOf(undefined, "standard"), boost: draftOf(undefined, "boost"), max: draftOf(undefined, "max"), ...over });
 
@@ -40,5 +40,12 @@ describe("slot drafts", () => {
     expect(lines.some((l) => l.startsWith("Boost is off for video"))).toBe(true);
     expect(lines.some((l) => l.startsWith("Max is off for video"))).toBe(true);
     expect(lines.join(" ")).not.toMatch(/Big jobs will not simplify/);
+  });
+
+  test("the levels line names models and states, never a person or an app", () => {
+    const line = levelsLine(drafts({ max: withOn(draftOf(undefined, "max"), false) }), "chat", []);
+    expect(line).toBe("Standard: recommended · Boost: recommended · Max: off · Simplify chat for big jobs: off. Max is for admins and anyone an admin assigns.");
+    expect(levelsLine(drafts({ max: draftOf({ model: "big-one", options: {} }, "max") }), "videos", [{ id: "big-one", label: "Big One" }])).toContain("Max: Big One");
+    expect(levelsLine(drafts(), "videos", [])).toContain("Max: no model of its own yet");
   });
 });

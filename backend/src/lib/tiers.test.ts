@@ -3,7 +3,7 @@ import { db } from "@/db";
 import { people, settingsValues } from "@/db/schema";
 import { createGrant } from "@/lib/grants";
 import { getHouseholdSettingValue, setHouseholdSettingValue } from "@/lib/settings";
-import { MAX_NEEDS_ADMIN_LINE, MAX_NOT_ON_THIS_COMPUTER_LINE, tierArgument, authorizeTier, allowedQuality, clampTier, readSlot, slotKey, slotOptionsFor, type TierCategory, type TierDeps } from "@/lib/tiers";
+import { maxOffered, MAX_NEEDS_ADMIN_LINE, MAX_NOT_ON_THIS_COMPUTER_LINE, tierArgument, authorizeTier, allowedQuality, clampTier, readSlot, slotKey, slotOptionsFor, type TierCategory, type TierDeps } from "@/lib/tiers";
 import { householdDetailedEnabled, householdQuickModel } from "@/lib/pictures/policy";
 import { migrateTierSlots } from "@/lib/tierSlotMigration";
 import type { AgeBand } from "@/lib/ageBand";
@@ -149,5 +149,32 @@ describe("tierArgument (the typed tier of a generating tool)", () => {
     const child = addPerson("person-child001", "child");
     expect(tierArgument({ person: teen, category: "chat", arg: "max" })).toEqual({ quality: "quick", tier: "standard", line: null });
     expect(tierArgument({ person: child, category: "image", arg: "boost" })).toMatchObject({ quality: "quick", line: null });
+  });
+});
+
+describe("Max on a card (TIER-HOME-03)", () => {
+  beforeEach(() => resetDb());
+
+  test("Max is offered only when a Max model is set, the slot is on and the person holds it", () => {
+    const owner = addPerson("person-owner001", "owner");
+    const adult = addPerson("person-adult001", "adult");
+    expect(maxOffered(owner, "video")).toBe(false);
+    expect(setHouseholdSettingValue(slotKey("video", "max"), { model: "ltx-big", options: {} }).ok).toBe(true);
+    expect(maxOffered(owner, "video")).toBe(true);
+    expect(maxOffered(adult, "video")).toBe(false);
+    expect(tierArgument({ person: owner, category: "video", arg: "max" }).line).toBeNull();
+    expect(setHouseholdSettingValue(slotKey("video", "max"), { model: "off", options: {} }).ok).toBe(true);
+    expect(maxOffered(owner, "video")).toBe(false);
+  });
+
+  test("a teen's Max picture needs the grant; a child never sees it", () => {
+    const owner = addPerson("person-owner001", "owner");
+    const teen = addPerson("person-teen0001", "teen");
+    const child = addPerson("person-child001", "child");
+    setHouseholdSettingValue(slotKey("image", "max"), { model: "big-picture", options: {} });
+    expect(maxOffered(teen, "image")).toBe(false);
+    createGrant({ id: owner.id, role: "owner" }, { person: teen.id, action: "tier.max:image", effect: "allow" });
+    expect(maxOffered(teen, "image")).toBe(true);
+    expect(maxOffered(child, "image")).toBe(false);
   });
 });

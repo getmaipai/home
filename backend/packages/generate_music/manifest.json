@@ -100,6 +100,16 @@
         ],
         "grounded": false,
         "description": "quick (about 45 seconds) unless the person asks for a whole or full song or a long piece; then full (about 3 minutes) and write every part: intro, verses, chorus, bridge, outro."
+      },
+      "tier": {
+        "type": "string",
+        "enum": [
+          "standard",
+          "boost",
+          "max"
+        ],
+        "grounded": false,
+        "description": "Optional typed level: standard, boost or max. Use it only when the person asks for more or less of the computer than usual: \"use max quality\" or \"the biggest model\" is max, \"a better one\" is boost, \"just a quick one\" is standard. Leave it out otherwise. Max is for people an admin allowed; if it is not allowed the tool says so, and you tell the person in your own words. Do not use it for age or content reasons."
       }
     }
   },

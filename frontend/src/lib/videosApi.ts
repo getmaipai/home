@@ -20,6 +20,8 @@ export interface VideoItem {
   /** VIDEO-LTX-01: Quick (about two minutes, no sound) or Detailed (with sound and speech), and the other kind this video can be made again as (null: a style binds it, or the other kind is not on this computer). */
   quality?: "quick" | "detailed";
   switch_to?: "quick" | "detailed" | null;
+  /** TIER-HOME-03: this person is shown Max on the card. */
+  max_offered?: boolean;
   clip: VideoClip | null;
 }
 export interface VideoCard { id: string; conversation_id: string | null; items: VideoItem[]; can_make_another: boolean; limits: string }
@@ -48,7 +50,7 @@ export const videosApi = {
   messagesUrl: (id: string) => `/api/videos/jobs/${encodeURIComponent(id)}/messages.mp4`,
   card: (id: string, signal?: AbortSignal) => send<VideoCard>(`/api/videos/jobs/${encodeURIComponent(id)}`, signal ? { signal } : {}),
   stop: (id: string) => send<VideoCard>(`/api/videos/jobs/${encodeURIComponent(id)}/cancel`, { method: "POST" }),
-  another: (id: string, quality?: "quick" | "detailed", prompt?: string) => send<VideoCard>(`/api/videos/jobs/${encodeURIComponent(id)}/another`, { method: "POST", ...(quality || prompt ? { headers: { "content-type": "application/json" }, body: JSON.stringify({ ...(quality ? { quality } : {}), ...(prompt ? { prompt } : {}) }) } : {}) }),
+  another: (id: string, quality?: "quick" | "detailed", prompt?: string, tier?: "standard" | "boost" | "max") => send<VideoCard>(`/api/videos/jobs/${encodeURIComponent(id)}/another`, { method: "POST", ...(quality || prompt || tier ? { headers: { "content-type": "application/json" }, body: JSON.stringify({ ...(quality ? { quality } : {}), ...(prompt ? { prompt } : {}), ...(tier ? { tier } : {}) }) } : {}) }),
   animate: (input: { conversation_id: string; turn_id: string; file_id?: string; prompt?: string }) => send<VideoCard>("/api/videos/animate", json(input)),
   settings: () => send<VideoSettings>("/api/videos/settings"),
   setAdapter: (id: string, patch: { enabled?: boolean; classification?: "all-ages" | "adult-only" }) => send<VideoAdapterRow>(`/api/videos/adapters/${encodeURIComponent(id)}`, { method: "PATCH", headers: { "content-type": "application/json" }, body: JSON.stringify(patch) }),

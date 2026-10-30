@@ -21,6 +21,23 @@ afterEach(() => fake.restore());
 
 const reply = (o: { result?: { reply?: { text?: string } } }) => o.result?.reply?.text ?? "";
 
+describe("the typed tier of a new song (TIER-HOME-03)", () => {
+  const ask = (tier: string) => runGenerateMusic({ state: musicState(people.owner), args: { description: "a folk song", lyrics: LYRICS, tier }, callId: tier, spoken: false });
+  test("Boost asks the engine for its Detailed maker", async () => {
+    expect((await ask("boost")).status).toBe("succeeded");
+    expect((fake.submitted.at(-1) as { quality?: string }).quality).toBe("detailed");
+  });
+  test("Standard asks for Quick", async () => {
+    await ask("standard");
+    expect((fake.submitted.at(-1) as { quality?: string }).quality).toBe("quick");
+  });
+  test("Max is made at Boost and says Max is not on this computer yet", async () => {
+    const out = await ask("max");
+    expect(reply(out)).toContain("Max is not available on this computer yet");
+    expect((fake.submitted.at(-1) as { quality?: string }).quality).toBe("detailed");
+  });
+});
+
 describe("song lengths", () => {
   test("seconds per kind stay inside their ranges", () => {
     expect(songSecondsFor("quick", undefined, undefined, 240)).toBe(QUICK_SONG.default);

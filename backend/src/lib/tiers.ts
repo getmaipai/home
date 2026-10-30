@@ -104,6 +104,17 @@ export function allowedQuality(person: PersonRow, category: TierCategory, qualit
   return authorizeTier({ person, category, requested: "boost", ...(band ? { band } : {}) }).tier === "standard" ? "quick" : "detailed";
 }
 
+/** Max exists for a category only when an admin pointed its Max slot at a model of its own (the recommended Max is empty until the evaluations fill it). */
+export function maxAvailable(category: TierCategory): boolean {
+  const slot = readSlot(category, "max");
+  return slot.model !== "off" && slot.model !== "recommended" && slot.model !== readSlot(category, "boost").model;
+}
+
+/** Whether this person is shown a Max control on a card: they hold Max, their band reaches it, the slot is on and a Max model exists. */
+export function maxOffered(person: PersonRow, category: TierCategory, band?: AgeBand): boolean {
+  return maxAvailable(category) && authorizeTier({ person, category, requested: "max", ...(band ? { band } : {}) }).tier === "max";
+}
+
 export const MAX_NEEDS_ADMIN_LINE = "Max needs an admin's OK. Ask an admin.";
 export const MAX_NOT_ON_THIS_COMPUTER_LINE = "Max is not available on this computer yet, so this one is made at Boost.";
 
@@ -115,10 +126,11 @@ export const MAX_NOT_ON_THIS_COMPUTER_LINE = "Max is not available on this compu
 export function tierArgument(input: { person: PersonRow; category: TierCategory; arg: unknown; band?: AgeBand; maxAvailable?: boolean }): { quality: "quick" | "detailed" | undefined; tier: Tier | undefined; line: string | null } {
   if (!isTier(input.arg)) return { quality: undefined, tier: undefined, line: null };
   const band = input.band ?? speakerAgeBand(input.person, new Date());
+  const available = input.maxAvailable ?? maxAvailable(input.category);
   const choice = authorizeTier({ person: input.person, category: input.category, requested: input.arg, band });
   let line: string | null = null;
   if (choice.note === "max_not_granted" && band === "adult") line = MAX_NEEDS_ADMIN_LINE;
-  else if (choice.tier === "max" && !input.maxAvailable) line = MAX_NOT_ON_THIS_COMPUTER_LINE;
-  const effective: Tier = choice.tier === "max" && !input.maxAvailable ? "boost" : choice.tier;
+  else if (choice.tier === "max" && !available) line = MAX_NOT_ON_THIS_COMPUTER_LINE;
+  const effective: Tier = choice.tier === "max" && !available ? "boost" : choice.tier;
   return { quality: effective === "standard" ? "quick" : "detailed", tier: choice.tier, line };
 }

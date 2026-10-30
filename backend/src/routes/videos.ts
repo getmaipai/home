@@ -20,7 +20,7 @@ import { hasAudioTrack, messagesCopyOf, videoFileName, videoTitle } from "@/lib/
 import { addVideoLora, removeVideoLora, StackVideoError, updateVideoLora } from "@/lib/videos/stack";
 import { latestGeneratedPictureId } from "@/lib/videos/tool";
 import { prepareVideoRerun } from "@/lib/videos/rerun";
-import { allowedQuality } from "@/lib/tiers";
+import { allowedQuality, maxOffered, tierArgument } from "@/lib/tiers";
 import { chooseVideoQuality, detailedVideoReady, isVideoQuality, quickVideoReady, VIDEO_SIZES_BY_QUALITY } from "@/lib/videos/quality";
 import { householdVideoQuality } from "@/lib/videos/policy";
 import { and, eq } from "drizzle-orm";
@@ -56,6 +56,7 @@ const ItemSchema = z.object({
   error: z.string().nullable(),
   quality: z.enum(["quick", "detailed"]).describe("Which kind made it: Quick (about two minutes, no sound) or Detailed (with sound and speech)."),
   switch_to: z.enum(["quick", "detailed"]).nullable().describe("The other kind this video can be made again as, or null (it uses a style made for one kind, or the other kind is not on this computer)."),
+  max_offered: z.boolean().describe("Whether this person is shown Make it Max: they hold Max, the age band reaches it and a Max model is set for this kind."),
   clip: z.object({ url: z.string(), poster_url: z.string(), width: z.number(), height: z.number(), seconds: z.number().nullable(), seed: z.number().nullable(), file_id: z.string(), poster_file_id: z.string(), has_sound: z.boolean().describe("The clip has a sound track the model made (speech included).") }).nullable(),
 });
 const CardSchema = z.object({ id: z.string(), conversation_id: z.string().nullable(), items: z.array(ItemSchema), can_make_another: z.boolean(), limits: z.string() });
@@ -92,6 +93,7 @@ function itemView(job: VideoJob, actor: PersonRow, ready: { quick: boolean; deta
     ...(job.state === "running" ? (({ eta_seconds, step, steps, preview_url }) => ({ eta_seconds, step, steps, preview_url: laneOfPerson(actor) === "adult" ? preview_url : null }))(liveCardFields(job.id, (version) => `/api/videos/jobs/${encodeURIComponent(job.id)}/preview?v=${version}`)) : { eta_seconds: null, step: null, steps: null, preview_url: null }), started_at: new Date(job.createdAt).getTime(), prompt: job.prompt, kind: job.kind,
     error: job.state === "failed" ? job.error : null,
     ...qualityFields(job, ready),
+    max_offered: job.state === "done" && laneOfPerson(actor) === "adult" && maxOffered(actor, "video"),
     clip: file ? { url: clipUrl(job, file), poster_url: posterUrl(job, file), width: file.width, height: file.height, seconds: file.seconds, seed: file.seed, file_id: file.id, poster_file_id: file.poster_id, has_sound: file.audio === true } : null,
   };
 }
@@ -244,14 +246,14 @@ async function gateRoute(actor: PersonRow, prompt: string): Promise<{ status: 40
 
 const anotherRoute = createRoute({
   method: "post", path: "/jobs/{id}/another", tags: ["Videos"], summary: "Make another clip from the same words with a new seed (also Try again after a failed or stopped one, and Make it Detailed or Quick)", middleware: [requireAuth] as const,
-  request: { params: idParams, body: { required: false, content: { "application/json": { schema: z.object({ quality: z.enum(["quick", "detailed"]).optional().describe("Make it again as this kind. Left out, the video keeps its own kind."), prompt: z.string().trim().min(1).max(2000).optional().describe("Remix: new words describing the changes. Left out, the clip is made again from its own words.") }) } } } },
+  request: { params: idParams, body: { required: false, content: { "application/json": { schema: z.object({ quality: z.enum(["quick", "detailed"]).optional().describe("Make it again as this kind. Left out, the video keeps its own kind."), tier: z.enum(["standard", "boost", "max"]).optional().describe("Make it again at this level. Max needs an admin's OK and a Max model; a level the person may not use is lowered."), prompt: z.string().trim().min(1).max(2000).optional().describe("Remix: new words describing the changes. Left out, the clip is made again from its own words.") }) } } } },
   responses: { 200: { content: { "application/json": { schema: CardSchema } }, description: "The card, with a new clip queued." }, ...refusals },
 });
 videosRoutes.openapi(anotherRoute, async (c) => {
   const actor = c.get("person");
   const source = getVideoJobFor(actor, c.req.valid("param").id);
   if (!source || source.state === "queued" || source.state === "running") return c.json({ error: "That video isn't available any more. Ask for it again." }, 404) as never;
-  const asked = (await c.req.json().catch(() => ({}))) as { quality?: unknown; prompt?: unknown };
+  const asked = (await c.req.json().catch(() => ({}))) as { quality?: unknown; tier?: unknown; prompt?: unknown };
   const words = typeof asked.prompt === "string" && asked.prompt.trim() ? asked.prompt.trim().slice(0, 2000) : source.prompt;
   const blocked = await gateRoute(actor, words);
   if (blocked) return c.json(blocked.body, blocked.status) as never;
@@ -262,7 +264,7 @@ videosRoutes.openapi(anotherRoute, async (c) => {
   // VIDEO-LTX-01: Quick or Detailed again. Left out, the video keeps its own kind; a style made for one model decides.
   const engine = await videoEngineStatus();
   const used = source.request.loras.flatMap((id) => { const found = adapters.find((a) => a.id === id); return found ? [found] : []; });
-  const choice = chooseVideoQuality({ requested: allowedQuality(actor, "video", isVideoQuality(asked.quality) ? asked.quality : source.request.quality ?? "quick", audience.band), style: used[0] ?? null, seconds: source.request.seconds, engine, hasPicture: source.request.source_file_id !== null, quickOnly: laneOf(audience) !== "adult" || allowedQuality(actor, "video", "detailed", audience.band) === "quick" });
+  const choice = chooseVideoQuality({ requested: allowedQuality(actor, "video", isVideoQuality(asked.quality) ? asked.quality : tierArgument({ person: actor, category: "video", arg: asked.tier, band: audience.band }).quality ?? source.request.quality ?? "quick", audience.band), style: used[0] ?? null, seconds: source.request.seconds, engine, hasPicture: source.request.source_file_id !== null, quickOnly: laneOf(audience) !== "adult" || allowedQuality(actor, "video", "detailed", audience.band) === "quick" });
   const portrait = (() => { const [w, h] = source.request.size.split("x").map(Number); return Boolean(w && h && h > w); })();
   const size = VIDEO_SIZES_BY_QUALITY[choice.quality][portrait ? "portrait" : "landscape"];
   // Only LoRAs this person may still use ride along; one turned off since is dropped.

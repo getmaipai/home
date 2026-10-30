@@ -22,7 +22,7 @@ import { FreeUpSpaceDialog } from "@/apps/settings/FreeUpSpaceDialog";
 import { Dialog, DialogContent } from "@maipai/ui/src/ui/dialog";
 import { AiModelChoices } from "@/apps/settings/AiModelDialog";
 import { AiSlotChoices } from "@/apps/settings/AiSlotDialog";
-import { TIERED_JOBS, configurableTiers, draftOf, sameDraft, slotKey, toStored, type SlotDrafts } from "@/apps/settings/aiTierSlots";
+import { TIERED_JOBS, configurableTiers, draftOf, sameDraft, slotKey, toStored, levelsLine, type SlotDrafts } from "@/apps/settings/aiTierSlots";
 import { useAiChoices } from "@/apps/settings/useAiChoices";
 import { ENGINE_ROLE, JOB_ICONS, JOB_ORDER, OFF, buildRows, counts, fill, missingRows, project, stageFor, type GlanceRow, type StagedMap } from "@/apps/settings/aiGlanceRows";
 import { sizeGb } from "../../../../shared/diskPlanMath";
@@ -183,7 +183,7 @@ export function AiGlance({ card }: SettingsViewProps) {
         <p className="text-base text-muted-foreground" data-testid="ai-counter">{fill(copy.counter ?? "", tally)}</p>
       </div>
       <ItemGroup variant="card" role="group" aria-label={copy.glance}>
-        {rows.map((row) => glanceRow({ row, copy, onSwitch: (on) => stage(row, on ? (row.shown?.id ?? row.recommended?.id ?? OFF) : OFF), onEdit: () => setEditing(row), onLevels: TIERED_JOBS[row.job] ? () => { setLevelsError(null); setLevels(row); } : null, onReset: () => setResetting(row), onDownload: () => download.mutate([row]) }))}
+        {rows.map((row) => glanceRow({ row, copy, onSwitch: (on) => stage(row, on ? (row.shown?.id ?? row.recommended?.id ?? OFF) : OFF), onEdit: () => setEditing(row), levelsLine: TIERED_JOBS[row.job] ? levelsLine(slotDrafts(row), row.job, row.options) : null, onLevels: TIERED_JOBS[row.job] ? () => { setLevelsError(null); setLevels(row); } : null, onReset: () => setResetting(row), onDownload: () => download.mutate([row]) }))}
       </ItemGroup>
 
       <p className="text-base text-muted-foreground">
@@ -231,7 +231,7 @@ export function AiGlance({ card }: SettingsViewProps) {
 }
 
 /** One row, drawn by a plain function so no Home component has a kit Item as its root (rule 9). */
-function glanceRow({ row, copy, onSwitch, onEdit, onLevels, onReset, onDownload }: { row: GlanceRow; copy: Record<string, string>; onSwitch: (on: boolean) => void; onEdit: () => void; onLevels: (() => void) | null; onReset: () => void; onDownload: () => void }) {
+function glanceRow({ row, copy, onSwitch, onEdit, onLevels, levelsLine: levels, onReset, onDownload }: { row: GlanceRow; levelsLine: string | null; copy: Record<string, string>; onSwitch: (on: boolean) => void; onEdit: () => void; onLevels: (() => void) | null; onReset: () => void; onDownload: () => void }) {
   const Icon = getIcon(JOB_ICONS[row.job]);
   const Reset = getIcon("rotate-ccw");
   const Gear = getIcon("settings");
@@ -252,6 +252,7 @@ function glanceRow({ row, copy, onSwitch, onEdit, onLevels, onReset, onDownload 
           {row.offered && row.shown?.id === "chat.uncensored" ? <Badge variant="outline" tone="warning">Uncensored</Badge> : null}
         </ItemTitle>
         <ItemDescription clamp={false}>{model && row.offered ? `${model.label}. ` : ""}{line}</ItemDescription>
+        {levels && row.offered ? <ItemDescription clamp={false} data-testid={`ai-levels-${row.job}`}>{levels}</ItemDescription> : null}
         {model && row.offered ? <ItemDescription clamp={false}>{model.details.map((part) => part.name).join(", ")}</ItemDescription> : null}
         {row.job === "wakeword" && row.offered ? <ItemDescription clamp={false}>{copy.wakeword_note}</ItemDescription> : null}
         {progress ? (

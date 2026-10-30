@@ -10,7 +10,7 @@ import { adapterAudiencesFor, adultAdaptersAllowed, pictureDenial, PICTURE_DENIA
 import { cancelPictureJob, fileUrl, getPictureJob, pictureJobsForTurn, plainFailure, startPictureJob, type PictureJob } from "@/lib/pictures/jobs";
 import { adaptersFor, withTriggerWords } from "@/lib/pictures/adapters";
 import { pictureEngineStatus, pictureEngineReady, pictureNotReadyReason } from "@/lib/pictures/ready";
-import { allowedQuality } from "@/lib/tiers";
+import { allowedQuality, maxOffered, tierArgument } from "@/lib/tiers";
 import { chooseQuality, detailedReady, isPictureQuality } from "@/lib/pictures/quality";
 import { StackPicturesError } from "@/lib/pictures/stack";
 import { laneOfPerson } from "@/lib/pictures/laneGate";
@@ -41,6 +41,7 @@ const JobSchema = z.object({
   can_vary: z.boolean(),
   quality: z.enum(["quick", "detailed"]).describe("Which kind made it: Quick (about 15 to 25 seconds) or Detailed (slower, finer, more styles)."),
   switch_to: z.enum(["quick", "detailed"]).nullable().describe("The other kind this picture can be made again as, or null (it uses a style made for one kind, or the other kind is not on this computer)."),
+  max_offered: z.boolean().describe("Whether this person is shown Make it Max: they hold Max, the age band reaches it and a Max model is set for this kind."),
   size: z.string().describe("The size being made, like 1024x1024."),
   stop_id: z.string().describe("The id to POST to /jobs/{id}/cancel to stop what is being made now."),
 });
@@ -95,6 +96,7 @@ export function cardView(actor: PersonRow, root: PictureJob, canVary: boolean, d
     error: active ? null : last.state === "failed" || last.state === "cancelled" ? last.error : null, files, size: shown.request.size, stop_id: (active ?? root).id,
     can_vary: canVary && root.kind !== "edit" && !active && files.length > 0 && files.length < 12,
     ...qualityFields(last, detailedReadyNow, canVary && root.kind !== "edit" && !active),
+    max_offered: canVary && root.kind !== "edit" && !active && !kid && maxOffered(actor, "image"),
   };
 }
 
@@ -160,7 +162,7 @@ picturesRoutes.openapi(cancelRoute, async (c) => {
 
 const variationRoute = createRoute({
   method: "post", path: "/jobs/{id}/variation", tags: ["Pictures"], summary: "Make another version of a picture with a new seed, or try a failed or stopped one again", middleware: [requireAuth] as const,
-  request: { params: idParams, body: { required: false, content: { "application/json": { schema: z.object({ quality: z.enum(["quick", "detailed"]).optional().describe("Make it again as this kind. Left out, the picture keeps its own kind."), prompt: z.string().trim().min(1).max(2000).optional().describe("Remix: new words describing the changes. Left out, the picture is made again from its own words.") }) } } } },
+  request: { params: idParams, body: { required: false, content: { "application/json": { schema: z.object({ quality: z.enum(["quick", "detailed"]).optional().describe("Make it again as this kind. Left out, the picture keeps its own kind."), tier: z.enum(["standard", "boost", "max"]).optional().describe("Make it again at this level. Max needs an admin's OK and a Max model; a level the person may not use is lowered."), prompt: z.string().trim().min(1).max(2000).optional().describe("Remix: new words describing the changes. Left out, the picture is made again from its own words.") }) } } } },
   responses: { 200: { content: { "application/json": { schema: JobSchema } }, description: "A new job in the same chat." }, ...refusals },
 });
 picturesRoutes.openapi(variationRoute, async (c) => {
@@ -172,7 +174,7 @@ picturesRoutes.openapi(variationRoute, async (c) => {
   // One at a time: a card with a picture still being made takes no second one.
   const group = source.turnId ? pictureJobsForTurn(actor, source.turnId) : [source];
   if (group.some((j) => j.state === "queued" || j.state === "running")) return c.json({ error: "A picture is still being made. Wait for it or stop it first.", code: "busy" }, 409) as never;
-  const asked = (await c.req.json().catch(() => ({}))) as { quality?: unknown; prompt?: unknown };
+  const asked = (await c.req.json().catch(() => ({}))) as { quality?: unknown; tier?: unknown; prompt?: unknown };
   const words = typeof asked.prompt === "string" && asked.prompt.trim() ? asked.prompt.trim().slice(0, 2000) : source.prompt;
   const adapters = await adaptersFor(adapterAudiencesFor(routeAudience(actor)));
   // Only styles this person may still use ride along (one turned off since is dropped); their trigger words go with them.
@@ -186,7 +188,7 @@ picturesRoutes.openapi(variationRoute, async (c) => {
   if (kid && picturesMadeToday(actor) + 1 > kidsDailyPictures()) return c.json({ error: CHILD_LIMIT_LINE, code: "daily_limit" }, 422) as never;
   if (!(await pictureEngineReady())) return c.json({ error: pictureNotReadyReason(await pictureEngineStatus()), code: "not_installed" }, 503) as never;
   // IMGGEN-QUALITY-01: Quick or Detailed again. Left out, the picture keeps its own kind; a style made for one maker decides.
-  const choice = kid ? { quality: "quick" as const, model: "flux2-klein-4b", note: null, announce: false } : chooseQuality({ requested: allowedQuality(actor, "image", isPictureQuality(asked.quality) ? asked.quality : source.request.quality ?? "quick", routeAudience(actor).band), style: used[0] ?? null, engine: await pictureEngineStatus() });
+  const choice = kid ? { quality: "quick" as const, model: "flux2-klein-4b", note: null, announce: false } : chooseQuality({ requested: allowedQuality(actor, "image", isPictureQuality(asked.quality) ? asked.quality : tierArgument({ person: actor, category: "image", arg: asked.tier, band: routeAudience(actor).band }).quality ?? source.request.quality ?? "quick", routeAudience(actor).band), style: used[0] ?? null, engine: await pictureEngineStatus() });
   const loras = used.map((a) => ({ id: a.id, scale: a.strength_default }));
   const slot = kid ? reserveKid(actor, "picture", 1, words) : null;
   if (kid && !slot) return c.json({ error: CHILD_LIMIT_LINE, code: "daily_limit" }, 422) as never;

@@ -561,6 +561,13 @@ export const PictureToolRender: ToolCallMessagePartComponent<Record<string, neve
       disabled: retrying || making.disabled,
       onSelect: () => { setRetrying(true); void picturesApi.again(card.id, card.switch_to!).then(() => query.refetch()).catch(() => undefined).finally(() => setRetrying(false)); },
     }] : [];
+    const maxActions = card.max_offered && card.can_vary ? [{
+      id: "make-max",
+      label: "Make it Max",
+      hint: making.reason ?? "The biggest model. It uses the whole computer, so other big jobs wait",
+      disabled: retrying || making.disabled,
+      onSelect: () => { setRetrying(true); void picturesApi.again(card.id, "detailed", undefined, "max").then(() => query.refetch()).catch(() => undefined).finally(() => setRetrying(false)); },
+    }] : [];
     const remixActions = card.can_vary ? [{ id: "remix", label: "Remix", hint: making.reason ?? "Change the words and make a new one", disabled: retrying || making.disabled, onSelect: () => { void askRemix("picture", card.prompt).then((words) => { if (!words) return; setRetrying(true); void picturesApi.again(card.id, undefined, words).then(() => query.refetch()).catch(() => undefined).finally(() => setRetrying(false)); }); } }] : [];
     return (
       <ImageGallery
@@ -569,7 +576,7 @@ export const PictureToolRender: ToolCallMessagePartComponent<Record<string, neve
         size="large"
         {...(edit ? { onEditImage: (image: { id: string; src: string; alt: string }) => edit.onEdit(target(image)), canEditImage: editable, editLabel: edit.label ?? "Edit picture" } : {})}
         /* IMGGEN-QUALITY-01: the on-the-fly choice. A Quick picture offers Detailed (slower, finer); a Detailed one offers Quick. No model names. */
-        {...(editActions.length + qualityActions.length + remixActions.length > 0 ? { actions: [...editActions, ...remixActions, ...qualityActions] } : {})}
+        {...(editActions.length + qualityActions.length + remixActions.length + maxActions.length > 0 ? { actions: [...editActions, ...remixActions, ...qualityActions, ...maxActions] } : {})}
       />
     );
   }
@@ -658,7 +665,7 @@ export const VideoToolRender: ToolCallMessagePartComponent<Record<string, never>
         onShare: () => { void shareClip({ prepared: prepared.data, title: item.prompt, nav: navigator, fallback: () => navigate(`/files?file=${encodeURIComponent(clip.file_id)}`) }); },
         // VIDEO-LTX-01: the on-the-fly choice, the same two words as pictures. A Quick video offers Detailed (with sound and speech); a Detailed one offers Quick. No model names.
         actions: [
-          ...(item.switch_to && card.can_make_another ? [<TierSegment key="tier" label="Quality" value={item.quality === "detailed" ? "boost" : "standard"} tiers={[{ id: "standard", label: "Standard", hint: "No sound, up to 5 seconds, can start from a picture", ...(making.reason ? { disabledReason: making.reason } : {}) }, { id: "boost", label: "Boost", hint: "With sound and speech, up to 10 seconds", ...(making.reason ? { disabledReason: making.reason } : {}) }]} onValueChange={(tier) => { void videosApi.another(item.id, tier === "boost" ? "detailed" : "quick").then(refresh).catch(refresh); }} />] : []),
+          ...(item.switch_to && card.can_make_another ? [<TierSegment key="tier" label="Quality" value={item.quality === "detailed" ? "boost" : "standard"} tiers={[{ id: "standard", label: "Standard", hint: "No sound, up to 5 seconds, can start from a picture", ...(making.reason ? { disabledReason: making.reason } : {}) }, { id: "boost", label: "Boost", hint: "With sound and speech, up to 10 seconds", ...(making.reason ? { disabledReason: making.reason } : {}) }, ...(item.max_offered ? [{ id: "max" as const, label: "Max", hint: "The biggest model", confirm: "Max uses the whole computer. Other big jobs wait, and Home goes back to normal by itself when it is done. Continue?", ...(making.reason ? { disabledReason: making.reason } : {}) }] : [])]} onValueChange={(tier) => { void videosApi.another(item.id, tier === "standard" ? "quick" : "detailed", undefined, tier === "max" ? "max" : undefined).then(refresh).catch(refresh); }} />] : []),
           ...(card.can_make_another ? [<Button key="remix" type="button" variant="ghost" size="sm" disabled={making.disabled} title={making.reason ?? undefined} onClick={() => { void askRemix("video", item.prompt).then((words) => { if (words) void videosApi.another(item.id, undefined, words).then(refresh).catch(refresh); }); }}>Remix</Button>] : []),
           <Button key="original" type="button" variant="ghost" size="sm" onClick={() => saveClip({ url: clip.url, name: (prepared.data?.name ?? "video.mp4").replace(/\.mp4$/, "-original.mp4") })}>Download original</Button>,
         ],

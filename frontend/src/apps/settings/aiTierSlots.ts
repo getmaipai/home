@@ -69,3 +69,12 @@ export function consequences(drafts: SlotDrafts, job: AiJobId, title: string): s
   if (isOn(drafts.boost) && drafts.boost.model !== "recommended" && drafts.boost.model === drafts.standard.model && JSON.stringify(drafts.boost.options) === JSON.stringify(drafts.standard.options)) lines.push("Boost is the same as Standard, so Boost will be hidden.");
   return lines;
 }
+
+/** The one line under a row on AI and models: what each level is, in words. A person's name or an app's name never appears (making-space note section 9); Max says who holds it. */
+export function levelsLine(drafts: SlotDrafts, job: AiJobId, models: ReadonlyArray<{ id: string; label: string }>): string {
+  const name = (d: SlotDraft) => !isOn(d) ? "off" : d.model === "recommended" ? "recommended" : models.find((m) => m.id === d.model)?.label ?? "your pick";
+  const parts = [`Standard: ${name(drafts.standard)}`, `Boost: ${name(drafts.boost)}`];
+  parts.push(!isOn(drafts.max) ? "Max: off" : drafts.max.model === "recommended" ? "Max: no model of its own yet" : `Max: ${name(drafts.max)}`);
+  if (job === "chat") parts.push(`Simplify chat for big jobs: ${isOn(drafts.reduced) ? "on" : "off"}`);
+  return `${parts.join(" · ")}. Max is for admins and anyone an admin assigns.`;
+}

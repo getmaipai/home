@@ -25,6 +25,8 @@ export interface PictureCard {
   /** IMGGEN-QUALITY-01: which maker made it, and the other kind it can be made again as (null: a style binds it, or the other kind is not on this computer). */
   quality: "quick" | "detailed";
   switch_to: "quick" | "detailed" | null;
+  /** TIER-HOME-03: this person is shown Make it Max (they hold it and a Max model is set). */
+  max_offered?: boolean;
   size: string;
   stop_id: string;
 }
@@ -41,7 +43,7 @@ export const picturesApi = {
   status: () => send<PictureStatus>("/api/pictures/status"),
   card: (id: string, signal?: AbortSignal) => send<PictureCard>(`/api/pictures/jobs/${encodeURIComponent(id)}`, signal ? { signal } : {}),
   stop: (id: string) => send<PictureCard>(`/api/pictures/jobs/${encodeURIComponent(id)}/cancel`, { method: "POST" }),
-  again: (id: string, quality?: "quick" | "detailed", prompt?: string) => send<PictureCard>(`/api/pictures/jobs/${encodeURIComponent(id)}/variation`, { method: "POST", ...(quality || prompt ? { headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ...(quality ? { quality } : {}), ...(prompt ? { prompt } : {}) }) } : {}) }),
+  again: (id: string, quality?: "quick" | "detailed", prompt?: string, tier?: "standard" | "boost" | "max") => send<PictureCard>(`/api/pictures/jobs/${encodeURIComponent(id)}/variation`, { method: "POST", ...(quality || prompt || tier ? { headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ...(quality ? { quality } : {}), ...(prompt ? { prompt } : {}), ...(tier ? { tier } : {}) }) } : {}) }),
 };
 
 // IMGGEN-SET-01: the admin side (/api/pictures/admin), for the Pictures and videos settings view.

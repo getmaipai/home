@@ -57307,6 +57307,10 @@
                       ],
                       "description": "The other kind this picture can be made again as, or null (it uses a style made for one kind, or the other kind is not on this computer)."
                     },
+                    "max_offered": {
+                      "type": "boolean",
+                      "description": "Whether this person is shown Make it Max: they hold Max, the age band reaches it and a Max model is set for this kind."
+                    },
                     "size": {
                       "type": "string",
                       "description": "The size being made, like 1024x1024."
@@ -57337,6 +57341,7 @@
                     "can_vary",
                     "quality",
                     "switch_to",
+                    "max_offered",
                     "size",
                     "stop_id"
                   ]
@@ -57640,6 +57645,10 @@
                       ],
                       "description": "The other kind this picture can be made again as, or null (it uses a style made for one kind, or the other kind is not on this computer)."
                     },
+                    "max_offered": {
+                      "type": "boolean",
+                      "description": "Whether this person is shown Make it Max: they hold Max, the age band reaches it and a Max model is set for this kind."
+                    },
                     "size": {
                       "type": "string",
                       "description": "The size being made, like 1024x1024."
@@ -57670,6 +57679,7 @@
                     "can_vary",
                     "quality",
                     "switch_to",
+                    "max_offered",
                     "size",
                     "stop_id"
                   ]
@@ -57782,6 +57792,15 @@
                       "detailed"
                     ],
                     "description": "Make it again as this kind. Left out, the picture keeps its own kind."
+                  },
+                  "tier": {
+                    "type": "string",
+                    "enum": [
+                      "standard",
+                      "boost",
+                      "max"
+                    ],
+                    "description": "Make it again at this level. Max needs an admin's OK and a Max model; a level the person may not use is lowered."
                   },
                   "prompt": {
                     "type": "string",
@@ -57947,6 +57966,10 @@
                       ],
                       "description": "The other kind this picture can be made again as, or null (it uses a style made for one kind, or the other kind is not on this computer)."
                     },
+                    "max_offered": {
+                      "type": "boolean",
+                      "description": "Whether this person is shown Make it Max: they hold Max, the age band reaches it and a Max model is set for this kind."
+                    },
                     "size": {
                       "type": "string",
                       "description": "The size being made, like 1024x1024."
@@ -57977,6 +58000,7 @@
                     "can_vary",
                     "quality",
                     "switch_to",
+                    "max_offered",
                     "size",
                     "stop_id"
                   ]
@@ -58247,6 +58271,10 @@
                             ],
                             "description": "The other kind this video can be made again as, or null (it uses a style made for one kind, or the other kind is not on this computer)."
                           },
+                          "max_offered": {
+                            "type": "boolean",
+                            "description": "Whether this person is shown Make it Max: they hold Max, the age band reaches it and a Max model is set for this kind."
+                          },
                           "clip": {
                             "type": "object",
                             "nullable": true,
@@ -58311,6 +58339,7 @@
                           "error",
                           "quality",
                           "switch_to",
+                          "max_offered",
                           "clip"
                         ]
                       }
@@ -58688,6 +58717,10 @@
                             ],
                             "description": "The other kind this video can be made again as, or null (it uses a style made for one kind, or the other kind is not on this computer)."
                           },
+                          "max_offered": {
+                            "type": "boolean",
+                            "description": "Whether this person is shown Make it Max: they hold Max, the age band reaches it and a Max model is set for this kind."
+                          },
                           "clip": {
                             "type": "object",
                             "nullable": true,
@@ -58752,6 +58785,7 @@
                           "error",
                           "quality",
                           "switch_to",
+                          "max_offered",
                           "clip"
                         ]
                       }
@@ -58870,6 +58904,15 @@
                     ],
                     "description": "Make it again as this kind. Left out, the video keeps its own kind."
                   },
+                  "tier": {
+                    "type": "string",
+                    "enum": [
+                      "standard",
+                      "boost",
+                      "max"
+                    ],
+                    "description": "Make it again at this level. Max needs an admin's OK and a Max model; a level the person may not use is lowered."
+                  },
                   "prompt": {
                     "type": "string",
                     "minLength": 1,
@@ -58979,6 +59022,10 @@
                             ],
                             "description": "The other kind this video can be made again as, or null (it uses a style made for one kind, or the other kind is not on this computer)."
                           },
+                          "max_offered": {
+                            "type": "boolean",
+                            "description": "Whether this person is shown Make it Max: they hold Max, the age band reaches it and a Max model is set for this kind."
+                          },
                           "clip": {
                             "type": "object",
                             "nullable": true,
@@ -59043,6 +59090,7 @@
                           "error",
                           "quality",
                           "switch_to",
+                          "max_offered",
                           "clip"
                         ]
                       }
@@ -59267,6 +59315,10 @@
                             ],
                             "description": "The other kind this video can be made again as, or null (it uses a style made for one kind, or the other kind is not on this computer)."
                           },
+                          "max_offered": {
+                            "type": "boolean",
+                            "description": "Whether this person is shown Make it Max: they hold Max, the age band reaches it and a Max model is set for this kind."
+                          },
                           "clip": {
                             "type": "object",
                             "nullable": true,
@@ -59331,6 +59383,7 @@
                           "error",
                           "quality",
                           "switch_to",
+                          "max_offered",
                           "clip"
                         ]
                       }
