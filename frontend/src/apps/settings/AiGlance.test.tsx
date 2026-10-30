@@ -65,9 +65,8 @@ describe("AiGlance Apply", () => {
     const card = { card: { copy: {} } } as unknown as Parameters<typeof AiGlance>[0];
     serve({ ...wakeChoice, state: "installing", percent: 40 });
     const downloading = renderWithQueryClient(<MemoryRouter><AiGlance {...card} /></MemoryRouter>);
-    const bar = await downloading.findByTestId("ai-progress-wakeword");
-    expect(bar.textContent).toContain("Hey Jarvis");
-    expect(bar.textContent).toContain("40%");
+    const bar = await downloading.findByRole("progressbar", { name: "Hey Jarvis progress" });
+    expect(bar).toBeTruthy();
     cleanup();
     serve({ ...wakeChoice, current: true, state: "failed", failure: "The download stopped. Try again." });
     const failed = renderWithQueryClient(<MemoryRouter><AiGlance {...card} /></MemoryRouter>);

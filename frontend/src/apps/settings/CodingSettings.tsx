@@ -14,11 +14,12 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@maipai/ui/src/dashboard/components/ui/alert-dialog";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@maipai/ui/src/dashboard/components/ui/card";
 import { Item, ItemActions, ItemContent, ItemDescription, ItemGroup, ItemTitle, ItemSeparator } from "@maipai/ui/src/dashboard/components/ui/item";
-import { Progress } from "@maipai/ui/src/dashboard/components/ui/progress";
+import { JobProgress } from "@maipai/ui/src/elements/job-progress";
 import { AsyncState } from "@maipai/ui/src/primitives/AsyncState";
 import { SettingsRenderer } from "@maipai/ui/src/settings/SettingsRenderer";
 import { api, ApiError, type AdminApiKey, type CodingGrant, type CodingModeReadinessItemId, type CodingModeView, type CodingPiece, type PersonalApiKey, type PersonRosterEntry, type Roster } from "@/lib/api";
 import codingModeReasons from "@maipai/spec/vocab/coding-mode-readiness-reasons.json";
+import { downloadProgress } from "@/lib/downloadProgress";
 
 const KEYS = ["coding.enabled", "coding.home_mode", "coding.paused", "coding.adults_by_default", "coding.max_streams_per_person", "coding.requests_per_minute_per_key", "coding.daily_tokens_per_person", "coding.keep_warm_minutes", "coding.thinking_budget", "coding.thinking_budget_ceiling", "coding.api.enabled", "coding.api.away"];
 const codingKeysQuery = (personId?: string) => ["coding-api-keys", personId ?? "self"] as const;
@@ -68,6 +69,8 @@ export function CodingAdminSettings() {
   // The poll is scheduled from the options of the render that follows the start, so ask once more after that render.
   useEffect(() => { if (testStartedAt !== null) void mode.refetch(); }, [testStartedAt]);
   const downloading = pieces.data?.pieces.filter((piece) => piece.state === "installing") ?? [];
+  const pieceCard = (piece: CodingPiece) => <JobProgress key={piece.id} {...downloadProgress({ title: piece.label, state: "running", status: "Downloading and installing", percent: piece.percent ?? undefined })} variant="full" />;
+  const downloadCards = downloading.map(pieceCard);
   const [pieceError, setPieceError] = useState<string | null>(null);
   const [modeActionBusy, setModeActionBusy] = useState<CodingModeReadinessItemId | null>(null);
   const [modeActionError, setModeActionError] = useState<string | null>(null);
@@ -132,7 +135,7 @@ export function CodingAdminSettings() {
             {item.state !== "done" ? <ItemDescription>{codingModeReasons[item.reason_key]}</ItemDescription> : null}
             {item.id === "self_test" && selfTest.running ? <ItemDescription>Home is loading the large model, checking it, and switching back. This takes a few minutes. You can leave this page.</ItemDescription> : null}
             {item.id === "self_test" && selfTest.failure ? <ItemDescription role="alert">{selfTest.failure}</ItemDescription> : null}
-            {item.id === "pieces" ? downloading.map((piece) => <div key={piece.id}><ItemDescription>{`${piece.label} · ${piece.percent ?? 0}%`}</ItemDescription><Progress value={piece.percent ?? 0} aria-label={`Installing ${piece.label}`} /></div>) : null}
+            {item.id === "pieces" ? downloadCards : null}
             {item.state === "manual" ? <ItemDescription><Link to={`/docs/user/coding-mode#${item.doc_anchor}`}>How</Link></ItemDescription> : null}
           </ItemContent>
           {item.state === "can_do" ? <ItemActions><Button type="button" variant="outline" disabled={modeActionBusy !== null || (item.id === "pieces" && downloading.length > 0) || (item.id === "self_test" && selfTest.running)} onClick={() => void runModeAction(item.id)}>{modeActionBusy === item.id ? item.id === "self_test" ? "Running" : "Working" : item.id === "pieces" && downloading.length > 0 ? "Installing" : item.id === "self_test" && selfTest.running ? "Running" : item.id === "pieces" ? "Install" : item.id === "self_test" ? "Run the test" : "Turn coding on"}</Button></ItemActions> : null}
@@ -159,7 +162,7 @@ export function CodingAdminSettings() {
     <Card><CardHeader><CardTitle>What Coding needs</CardTitle><CardDescription>Home downloads these parts to this computer. Home does not install a coding app.</CardDescription></CardHeader><CardContent>
       <AsyncState data={pieces.data} error={pieces.isError} isFetching={pieces.isFetching} onRetry={() => void pieces.refetch()} errorMessage="Could not load Coding setup." loadingLabel="Loading Coding setup">
         {(view) => view.pieces.length === 0 ? <p className="text-sm text-muted-foreground">Coding needs these pieces.</p> : <ItemGroup variant="card" aria-label="Coding pieces">{view.pieces.map((piece) => <Item key={piece.id}>
-          <ItemContent><ItemTitle>{piece.label} <Badge variant={piece.state === "installed" ? "secondary" : piece.state === "failed" ? "destructive" : "outline"}>{piece.state === "installed" ? "Installed" : piece.state === "notInstalled" ? "Not installed" : piece.state === "installing" ? "Installing" : piece.state === "unsupported" ? "Not supported" : "Needs attention"}</Badge></ItemTitle><ItemDescription>{piece.summary} · {sizeText(piece.size_bytes)}{piece.state === "installing" ? ` · ${piece.percent ?? 0}%` : ""}</ItemDescription>{piece.state === "installing" ? <Progress value={piece.percent ?? 0} aria-label={`Installing ${piece.label}`} /> : null}{piece.failure ? <ItemDescription>{piece.failure}</ItemDescription> : null}{piece.remove_block && !piece.can_remove ? <ItemDescription>{piece.remove_block}</ItemDescription> : null}{piece.install_block && !piece.can_install ? <ItemDescription>{piece.install_block}</ItemDescription> : null}</ItemContent>
+          <ItemContent><ItemTitle>{piece.label} <Badge variant={piece.state === "installed" ? "secondary" : piece.state === "failed" ? "destructive" : "outline"}>{piece.state === "installed" ? "Installed" : piece.state === "notInstalled" ? "Not installed" : piece.state === "installing" ? "Installing" : piece.state === "unsupported" ? "Not supported" : "Needs attention"}</Badge></ItemTitle><ItemDescription>{piece.summary} · {sizeText(piece.size_bytes)}{piece.state === "installing" ? ` · ${piece.percent ?? 0}%` : ""}</ItemDescription>{piece.state === "installing" ? pieceCard(piece) : null}{piece.failure ? <ItemDescription>{piece.failure}</ItemDescription> : null}{piece.remove_block && !piece.can_remove ? <ItemDescription>{piece.remove_block}</ItemDescription> : null}{piece.install_block && !piece.can_install ? <ItemDescription>{piece.install_block}</ItemDescription> : null}</ItemContent>
           <ItemActions><Button type="button" onClick={() => void install(piece)} disabled={!piece.can_install || piece.state === "installing" || pending[piece.id] === "install"}>{pending[piece.id] === "install" || piece.state === "installing" ? "Installing" : "Install"}</Button><Button type="button" variant="outline" disabled={!piece.can_remove || pending[piece.id] === "remove"} onClick={() => setRemovePiece(piece)}>{pending[piece.id] === "remove" ? "Removing" : "Remove"}</Button></ItemActions>
         </Item>)}</ItemGroup>}
       </AsyncState>

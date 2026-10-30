@@ -24,7 +24,7 @@ export const GIB = 1_073_741_824;
 export function needGb(bytes: number): string { const gb = bytes / GIB; return gb >= 10 ? String(Math.ceil(gb)) : (Math.ceil(gb * 10) / 10).toFixed(1); }
 export function freeGb(bytes: number): string { const gb = bytes / GIB; return gb >= 10 ? String(Math.floor(gb)) : (Math.floor(gb * 10) / 10).toFixed(1); }
 /** A row's size for a list: what it takes once installed. */
-export function sizeGb(bytes: number): string { const gb = bytes / GIB; return gb >= 10 ? `${Math.round(gb)} GB` : gb >= 0.95 ? `${gb.toFixed(1)} GB` : `${Math.max(1, Math.round(bytes / 1_048_576))} MB`; }
+export function sizeGb(bytes: number): string { const gb = bytes / 1e9; return gb >= 10 ? `${Math.round(gb)} GB` : gb >= 0.95 ? `${gb.toFixed(1)} GB` : `${Math.max(1, Math.round(bytes / 1e6))} MB`; }
 
 /** Room set aside for Home's own records (people, chats, memories) beside the install. */
 export const DATA_RESERVE_BYTES = 2 * GIB;

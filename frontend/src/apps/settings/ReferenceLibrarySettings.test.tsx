@@ -42,8 +42,8 @@ describe("Offline data settings", () => {
     expect(view.getByRole("group", { name: "Health and medicine" })).toBeTruthy();
     expect(view.getByRole("switch", { name: "Vikidia: on" }).getAttribute("aria-checked")).toBe("true");
     expect(view.getByRole("switch", { name: "MedlinePlus: off" }).getAttribute("aria-checked")).toBe("false");
-    expect(view.getByText(/1863 GB drive/)).toBeTruthy();
-    expect(view.getByText(/931 GB free · 1.9 GB of offline books/)).toBeTruthy();
+    expect(view.getByText(/2000 GB drive/)).toBeTruthy();
+    expect(view.getByText(/1000 GB free · 2.0 GB of offline books/)).toBeTruthy();
     expect(view.getAllByText("For children").length).toBe(2);
     view.restore();
   });

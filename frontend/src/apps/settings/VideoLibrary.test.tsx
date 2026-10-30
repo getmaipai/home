@@ -80,6 +80,12 @@ describe("video settings view", () => {
     v.restore();
   });
 
+  test("Detailed videos downloading shows the download card with its percent", async () => {
+    const v = mount(settings(withDetailed()), detailedRow({ state: "installing", percent: 40 }));
+    expect(await v.findByRole("progressbar", { name: "Detailed videos progress" })).toBeTruthy();
+    v.restore();
+  });
+
   test("Detailed videos: the plain size on the button, the licence read and accepted once, then the install starts with that licence", async () => {
     const v = mount(settings(withDetailed()));
     const get = await v.findByRole("button", { name: /Get Detailed videos \(74 GB\)/ });

@@ -8,7 +8,7 @@ import { ApiError } from "@/lib/api";
 
 afterEach(cleanup);
 
-const GB = 1_073_741_824;
+const GB = 1_000_000_000;
 const list = (): UnusedList => ({
   total_bytes: 107 * GB,
   items: [

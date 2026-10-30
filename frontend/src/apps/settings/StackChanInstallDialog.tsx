@@ -1,10 +1,11 @@
 import { useEffect, useRef, useState } from "react";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@maipai/ui/src/ui/dialog";
 import { Button } from "@maipai/ui/src/ui/button";
-import { Progress } from "@maipai/ui/src/ui/progress";
+import { JobProgress } from "@maipai/ui/src/elements/job-progress";
 import { Alert, AlertDescription } from "@maipai/ui/src/ui/alert";
 import { api, ApiError } from "@/lib/api";
 import { addLogLine, browserCanFlash, createBrowserSerialTransport, FLASH_BYTES, installStackChan, STALL_TIMEOUT_MESSAGE, type FlashStage, type FlashTransport } from "@/lib/stackchan/flash";
+import { downloadProgress } from "@/lib/downloadProgress";
 
 const BROWSER_MESSAGE = "Installing needs Chrome or Edge on a computer, with Home opened at its https address. Open Home there and try again.";
 const PORT_HELP = "When Chrome asks which port to use, choose \"USB JTAG/serial debug unit\" (it may be listed as usbmodem). Do not choose a Bluetooth entry.";
@@ -123,7 +124,7 @@ export function StackChanInstallDialog({ updateOf, install = installStackChan, r
             <p><strong>Back up first, then install.</strong> Saves the StackChan's whole memory, then installs. About 6 minutes longer.</p>
             <p><strong>Install without a backup.</strong> Faster, about 1 to 2 minutes. The firmware now on the StackChan is replaced and cannot be restored from Home.</p>
           </> : null}
-          {working ? <><p>{stage ?? "Preparing"}</p><Progress value={progress} />{stageNote ? <p>{stageNote}</p> : null}</> : null}
+          {working ? <><p>{stage ?? "Preparing"}</p><JobProgress {...downloadProgress({ title: "StackChan", state: "running", status: stage ?? "Preparing", percent: progress })} variant="full" />{stageNote ? <p>{stageNote}</p> : null}</> : null}
           {installFinished && deviceId && !online && !onlineFailed ? <p>On a phone, join the robot's Wi-Fi hotspot and choose your home Wi-Fi. Home never asks for the Wi-Fi password.</p> : null}
           {onlineFailed ? <Alert variant="destructive"><AlertDescription>{ONLINE_MESSAGE}</AlertDescription></Alert> : null}
           {online ? <p>The robot is online.</p> : null}

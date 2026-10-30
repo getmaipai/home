@@ -14,13 +14,14 @@ import { Label } from "@maipai/ui/src/ui/label";
 import { Switch } from "@maipai/ui/src/ui/switch";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@maipai/ui/src/ui/collapsible";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@maipai/ui/src/ui/table";
-import { Progress } from "@maipai/ui/src/dashboard/components/ui/progress";
+import { JobProgress } from "@maipai/ui/src/elements/job-progress";
 import { RadioGroup, RadioGroupItem } from "@maipai/ui/src/dashboard/components/ui/radio-group";
 import { Item, ItemActions, ItemContent, ItemDescription, ItemGroup, ItemTitle } from "@maipai/ui/src/dashboard/components/ui/item";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@maipai/ui/src/dashboard/components/ui/alert-dialog";
 import { ApiError } from "@/lib/api";
 import { videosApi, type VideoAdapterRow, type VideoSettings } from "@/lib/videosApi";
 import { componentsApi } from "@/lib/componentsApi";
+import { downloadProgress } from "@/lib/downloadProgress";
 
 const KEY = ["video-settings"] as const;
 const size = (n: number) => (n >= 1e9 ? `${n >= 1e10 ? Math.round(n / 1e9) : (n / 1e9).toFixed(1)} GB` : n >= 1e6 ? `${Math.round(n / 1e6)} MB` : `${Math.max(1, Math.round(n / 1e3))} KB`);
@@ -49,6 +50,7 @@ function VideoQualitySection({ data, refresh }: { data: VideoSettings; refresh: 
   const components = useQuery({ queryKey: ["components"], queryFn: componentsApi.list, enabled: !!detailed, refetchInterval: (q) => (q.state.data?.components?.some((row) => row.id === detailed?.component && row.state === "installing") ? 2000 : 30_000) });
   const row = components.data?.components.find((candidate) => candidate.id === detailed?.component);
   const installing = row?.state === "installing";
+  const card = installing ? <JobProgress {...downloadProgress({ title: "Detailed videos", state: "running", status: "Downloading and installing", percent: row?.percent ?? undefined })} variant="full" /> : null;
   async function install(accepted?: string) {
     if (!detailed) return;
     setError(null);
@@ -76,7 +78,7 @@ function VideoQualitySection({ data, refresh }: { data: VideoSettings; refresh: 
               <ItemContent>
                 <ItemTitle>Detailed</ItemTitle>
                 <ItemDescription clamp={false}>Adds sound and spoken words, runs up to 10 seconds from words, and has many more styles to add. About a minute or two. {detailed?.installed ? "" : detailed?.reason ?? ""}</ItemDescription>
-                {installing ? <Progress value={row?.percent ?? 0} aria-label="Getting Detailed videos" /> : null}
+                {card}
                 {error ? <p role="alert" className="text-sm text-destructive">{error}</p> : null}
               </ItemContent>
               <ItemActions>

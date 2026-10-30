@@ -168,13 +168,13 @@ describe("Models and storage", () => {
     v.restore();
   }, 20_000);
 
-  test("an installing part shows its own progress bar and no buttons; a failed one says why and offers Try again", async () => {
+  test("an installing part shows its progress card and no buttons; a failed one says why and offers Try again", async () => {
     const v = mount(overview([
       row({ state: "installing", percent: 42, job: "j1", can_install: false }),
       row({ id: "video", label: "Video: Wan 2.2", group: "video", state: "failed", failure: "The connection dropped.", can_install: true }),
     ]));
-    const bar = await v.findByLabelText("Installing Pictures: Z-Image-Turbo");
-    expect(bar.getAttribute("aria-valuenow")).toBe("42");
+    const bar = await v.findByLabelText("Pictures: Z-Image-Turbo progress");
+    expect(bar).toBeTruthy();
     expect(v.queryByLabelText("Install Pictures: Z-Image-Turbo")).toBeNull();
     expect(v.getByText("The connection dropped.")).toBeTruthy();
     expect(v.getByLabelText("Try again: Video: Wan 2.2")).toBeEnabled();

@@ -9,11 +9,12 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Alert, AlertDescription, AlertTitle } from "@maipai/ui/src/ui/alert";
 import { Badge } from "@maipai/ui/src/ui/badge";
 import { Button } from "@maipai/ui/src/ui/button";
-import { Progress } from "@maipai/ui/src/dashboard/components/ui/progress";
+import { JobProgress } from "@maipai/ui/src/elements/job-progress";
 import { Item, ItemActions, ItemContent, ItemDescription, ItemGroup, ItemTitle } from "@maipai/ui/src/dashboard/components/ui/item";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@maipai/ui/src/dashboard/components/ui/alert-dialog";
 import { ApiError } from "@/lib/api";
 import { componentsApi, type ComponentGroup, type ComponentRow } from "@/lib/componentsApi";
+import { downloadProgress } from "@/lib/downloadProgress";
 
 const KEY = ["components"] as const;
 const GROUPS: Array<{ id: ComponentGroup; title: string }> = [
@@ -81,7 +82,7 @@ function Row({ row, refresh, setError }: { row: ComponentRow; refresh: () => voi
         <ItemContent>
           <ItemTitle>{row.label} <Badge variant={badge.variant}>{badge.text}</Badge></ItemTitle>
           <ItemDescription clamp={false}>{row.summary}{facts ? ` ${facts}` : ""}</ItemDescription>
-          {row.state === "installing" ? <Progress value={row.percent ?? 0} aria-label={`Installing ${row.label}`} /> : null}
+          {row.state === "installing" ? <JobProgress {...downloadProgress({ title: row.label, state: "running", status: "Downloading and installing", percent: row.percent ?? undefined })} variant="full" /> : null}
           {reason ? <p className="text-sm text-muted-foreground">{reason}</p> : null}
         </ItemContent>
         <ItemActions>

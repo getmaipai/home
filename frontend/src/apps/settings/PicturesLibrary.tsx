@@ -10,7 +10,7 @@ import { Button } from "@maipai/ui/src/ui/button";
 import { Checkbox } from "@maipai/ui/src/ui/checkbox";
 import { Input } from "@maipai/ui/src/ui/input";
 import { Label } from "@maipai/ui/src/ui/label";
-import { Progress } from "@maipai/ui/src/dashboard/components/ui/progress";
+import { JobProgress } from "@maipai/ui/src/elements/job-progress";
 import { Switch } from "@maipai/ui/src/ui/switch";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@maipai/ui/src/ui/collapsible";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@maipai/ui/src/ui/table";
@@ -19,6 +19,7 @@ import { Item, ItemActions, ItemContent, ItemDescription, ItemFooter, ItemGroup,
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@maipai/ui/src/dashboard/components/ui/alert-dialog";
 import { ApiError } from "@/lib/api";
 import { picturesAdminApi, type AdminAdapter, type AdminOverview } from "@/lib/picturesApi";
+import { downloadProgress } from "@/lib/downloadProgress";
 
 const OVERVIEW_KEY = ["pictures-admin"] as const;
 /** Home takes a request body of at most 128 MiB (the server's own limit); a bigger style comes by its Hugging Face link. */
@@ -56,6 +57,7 @@ function PictureModelSection({ overview, refresh }: { overview: AdminOverview; r
   const installed = engine.models.filter((m) => m.installed);
   const detailed = engine.models.find((m) => m.id === DETAILED_MODEL_ID);
   const installing = job !== null && progress?.state !== "failed";
+  const card = installing ? <JobProgress {...downloadProgress({ title: "The picture model", state: "running", status: progress?.label || "Downloading and installing", percent: progress?.percent ?? 0 })} variant="full" /> : null;
   async function install(which?: string) {
     setError(null);
     setFamily(which);
@@ -134,7 +136,7 @@ function PictureModelSection({ overview, refresh }: { overview: AdminOverview; r
           </ItemFooter>
         </Item>
       )}
-      {installing ? <Progress value={progress?.percent ?? 0} aria-label="Installing the picture model" /> : null}
+      {card}
       {progress?.state === "failed" ? <p role="alert" className="text-sm text-destructive">{progress.error}</p> : null}
       {error ? <p role="alert" className="text-sm text-destructive">{error}</p> : null}
     </section>
@@ -234,6 +236,7 @@ function AddStyle({ refresh }: { refresh: () => void }) {
   const [error, setError] = useState<string | null>(null);
   const [job, setJob] = useState<string | null>(null);
   const progress = useJob(job, () => { setJob(null); refresh(); });
+  const card = job && progress?.state !== "failed" ? <JobProgress {...downloadProgress({ title: "The style", state: "running", status: progress?.label || "Fetching the style", percent: progress?.percent ?? 0 })} variant="full" /> : null;
 
   async function submit(event: React.FormEvent) {
     event.preventDefault();
@@ -311,7 +314,7 @@ function AddStyle({ refresh }: { refresh: () => void }) {
         </div>
         <p className="text-sm text-muted-foreground">The picture engine checks that the file can be used. Content decisions belong to the model; Home keeps its CSAM and age protections.</p>
         {error ? <p role="alert" className="text-sm text-destructive">{error}</p> : null}
-        {job ? <Progress value={progress?.percent ?? 0} aria-label="Fetching the style" /> : null}
+        {card}
         {progress?.state === "failed" ? <p role="alert" className="text-sm text-destructive">{progress.error}</p> : null}
         <div><Button type="submit" disabled={busy || job !== null}>{busy ? "Adding…" : "Add style"}</Button></div>
       </form>

@@ -7,7 +7,7 @@ import { useMutation, useQuery } from "@tanstack/react-query";
 import { Alert, AlertDescription, AlertTitle } from "@maipai/ui/src/ui/alert";
 import { Badge } from "@maipai/ui/src/ui/badge";
 import { Button } from "@maipai/ui/src/ui/button";
-import { Progress } from "@maipai/ui/src/ui/progress";
+import { JobProgress } from "@maipai/ui/src/elements/job-progress";
 import { RouteSkeleton } from "@maipai/ui/src/primitives/RouteSkeleton";
 import { Switch } from "@maipai/ui/src/ui/switch";
 import { StorageBar } from "@maipai/ui/src/primitives/StorageBar";
@@ -29,6 +29,7 @@ import { ENGINE_ROLE, JOB_ICONS, JOB_ORDER, OFF, buildRows, counts, fill, missin
 import { sizeGb } from "../../../../shared/diskPlanMath";
 import type { AiJobId } from "../../../../shared/aiChoices";
 import type { SettingsViewProps } from "@/shell/pages/settings/settingsViews";
+import { downloadProgress } from "@/lib/downloadProgress";
 
 const GB = 1_000_000_000;
 const messageOf = (error: unknown, fallback: string) => (error instanceof ApiError ? error.message : fallback);
@@ -243,12 +244,7 @@ function glanceRow({ row, copy, onSwitch, onEdit, onLevels, levelsLine: levels, 
         {levels && row.offered ? <ItemDescription clamp={false} data-testid={`ai-levels-${row.job}`}>{levels}</ItemDescription> : null}
         {model && row.offered ? <ItemDescription clamp={false}>{model.details.map((part) => part.name).join(", ")}</ItemDescription> : null}
         {row.job === "wakeword" && row.offered ? <ItemDescription clamp={false}>{copy.wakeword_note}</ItemDescription> : null}
-        {progress ? (
-          <div className="flex flex-col gap-1" data-testid={`ai-progress-${row.job}`}>
-            <ItemDescription clamp={false}>{progress.text}</ItemDescription>
-            {progress.percent !== null ? <Progress value={progress.percent} aria-label={progress.text} /> : null}
-          </div>
-        ) : null}
+        {progress && busy ? <JobProgress {...downloadProgress({ title: busy.label, state: "running", status: progress.text, percent: progress.percent ?? undefined })} variant="full" /> : null}
         {failed ? <p className="text-base text-destructive">{failed.failure ?? failed.stateText}</p> : null}
       </ItemContent>
       <ItemActions>
