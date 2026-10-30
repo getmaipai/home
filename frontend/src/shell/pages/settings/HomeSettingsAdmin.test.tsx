@@ -1,3 +1,4 @@
+import { api } from "@/lib/api";
 // ADMIN-HOME-SETTINGS-01: Home settings is the one household area. A person
 // who is not an owner or admin lands on Account; the five household sections
 // that had no entry draw inside it as trail views; and the area holds
@@ -60,6 +61,17 @@ describe("who may open Home settings", () => {
     const view = open(makePerson(role), "/settings/household");
     expect(await view.findByText("Only a parent or admin can change these settings. Ask the person who set up Home.")).toBeTruthy();
     expect(fixture!.requests.filter((r) => r.includes("scope=household"))).toEqual([]);
+  });
+
+  test("the Reference library tab shows the library alone, not the Web search block of the Search tab", async () => {
+    const original = { state: api.referenceState, catalog: api.referenceCatalog };
+    api.referenceState = async () => ({ installed: [], jobs: [], matchesPresets: [] });
+    api.referenceCatalog = async () => [];
+    try {
+      const view = open(makePerson("owner"), "/settings/search?tab=reference-library");
+      expect(await view.findByText(/Offline data/)).toBeTruthy();
+      expect(view.queryByText("SearXNG address")).toBeNull();
+    } finally { Object.assign(api, { referenceState: original.state, referenceCatalog: original.catalog }); }
   });
 
   test.each(["owner", "admin"] as const)("an %s opens it", async (role) => {

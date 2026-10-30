@@ -138,7 +138,8 @@ export function SettingsSectionContent(props: SectionContentProps) {
   const places = { household: usePlaceAdapter("household", { enabled: drawsPlaces, incognito }), person: usePlaceAdapter("person", { enabled: drawsPlaces, incognito }) };
   const tabView = section.tabs?.find((item) => item.id === props.tab)?.view;
   if (section.kind === "view") return <>{tabView ? <SettingsView view={tabView} {...viewProps} /> : section.view ? <SettingsView view={section.view} {...viewProps} /> : null}</>;
-  const webSearchBlock = section.id === "search" && (viewer.role === "owner" || viewer.role === "admin");
+  // Web search belongs to the Search tab only; the Reference library tab shows its own page and nothing of web search.
+  const webSearchBlock = section.id === "search" && !tabView && (viewer.role === "owner" || viewer.role === "admin");
   return (
     <div className="flex min-w-0 flex-col gap-14">
       {webSearchBlock ? <WebSearchSettings minorsControl={<SettingsRenderer scope="household" scopeValue={scopeValueFor("household", props.person.id)} honouredBy="home" only={["household.search"]} includeKeys={MINOR_DDGS_ONLY} titleOverrides={MINOR_DDGS_TITLE} beforeChange={beforeSettingChange} focusKey={props.focusKey} />} /> : null}
