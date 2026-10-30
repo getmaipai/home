@@ -107,3 +107,25 @@ READER-01 and 02 do not depend on READER-00 and can land first; the response fie
 
 - Zimit books (crawled websites): `generic` profile reads them through the same extractor, which may drop most of their content.
   Check against one real Zimit ZIM before any Zimit book is offered in the library; no slice owns it yet.
+
+## 10. Owner's mockup (Jesse, 2026-10-29): the look target
+
+Jesse sent a mockup of the modern reader the same day ([owner-mockup.webp](assets/kiwix-reader-2026-10-29/owner-mockup.webp), his words:
+"here's my mockup for a modern reader"). It is the look for the reader and the Wikipedia app and outranks section 2's
+"copy the Wikipedia site" (S2: the owner's own picture of the app is the native app being copied). Everything above stays; this
+section says how the mockup maps onto it. The mockup's name "lore" is a placeholder: the app is called Wikipedia.
+
+| In the mockup | Built as |
+|---|---|
+| App sidebar: Home, Explore, Saved, Offline | The app's own sidebar (S1: app sections live in the app, not the main rail), kit `SectionSidebar`. Home: search, random, recent. Explore: random picks and the book's main-page links. Saved: READER-05. Offline: the existing "Keep on this device" action (KEEP-OFFLINE-01) listing what is kept; READER-04 registers a `reference` provider in `backend/src/lib/offline/` (today only `media.ts` exists there) that serves a kept article's blocks and pictures. |
+| Centred search bar, bookmark at the right | The app's header row (S2): the search box with type-ahead in the middle, the Saved bookmark and the ambient companion avatar at the right. The brand is the app name. |
+| Kicker (NATURE · EARTH), huge title, dek, "Wikipedia · 12 min read" | `ArticleView` kicker, title, dek and the existing source line. Kicker is the article's first category when the book carries one, else omitted (never invented). Reading time is counted from the article's words by the hub. |
+| Wide hero picture with a small label chip | `ArticleView` `image`, plus a new `image.badge` text drawn as a chip on the picture. Only when `reference.images` allows. The chip text is the picture's own caption from the book, shortened to 30 characters; no caption, no chip (never invented). |
+| Save, Listen, Share row under the hero | A labelled action row on a wide screen (new `actionRow` layout in the kit); the phone keeps PHONE-02's floating pill. Listen reads the article through the existing read-aloud. |
+| Bold lead sentence, then body | New `ArticleViewData.lead`: the article's own first sentence, drawn as the standfirst. It is the book's text, never model-written. |
+| Quick fact card, Related list with thumbnails (right rail) | `quick_fact` (one fact from the infobox's first row pair, as plain text) and `related` (up to 5 linked articles from the article's own links, each with `preview` thumbnail and title) in the rail, above the infobox and contents. `related` uses READER-02's preview route. `related` follows the article route's own link rule (`allowLinks: band === "adult"`, `backend/src/routes/reference.ts`): a child and a teen get none, as they get no links today. An adult's `related` is not floor-checked, the same as an adult's article (the adult rule blocks only CSAM). The rail is part of `ArticleView`'s own article layout (like the infobox and Key points), not a second pane beside the app. |
+| Dark look | Theme tokens only (no fixed colours); it is the dark theme when the person's theme is dark. |
+
+New slices: **READER-00b** (kit: `image.badge`, `lead`, `actionRow`, `quick_fact`, `related`; before the tag, so one tag carries
+READER-00 and 00b) and **READER-02b** (backend: `lead`, `reading_minutes`, `kicker` from the book's category when present,
+`quick_fact`, `related` on the article response, additive). READER-03 and 04 draw the mockup; READER-04 gains Explore and Offline.
