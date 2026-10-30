@@ -354,7 +354,11 @@ profile-menu list and the "every width" wording. Owner-approved 2026-10-17: S6
 record: "make a rule for that: we already have a pattern and mechanisms to relay system
 status to the user". Owner-approved 2026-10-23: S1 (one Settings entry; household
 pages live in the same column for owner and admin); his words: "get rid of household
-settings now since settings includes both".
+settings now since settings includes both". Owner-approved 2026-10-29: the S6 row "Pictures and video
+are not ready" and its one recovery toast (record: [status surfaces review](status-surfaces-review-2026-10-29.md),
+"Owner's ruling 2026-10-29"); his words: "We have a design for how we enable/disable functionality based on
+status and how we show that status to users and admins. It works well in chat. You need to extend this
+everywhere going forward".
 
 Governs: frontend/src/shell/**, frontend/src/apps/**, backend/src/settings/**, backend/src/wire.ts, backend/src/lib/roleHealth.ts, backend/src/lib/healthSnapshot.ts, backend/src/lib/installStatus.ts, backend/src/lib/issues.ts
 
@@ -468,13 +472,16 @@ S6. **System status reaches the person through the existing mechanisms.**
     running, an install in progress, a service down, a failed background
     action) uses the surface that already carries that kind of status and
     feeds its data source a new reason or state. It never adds a banner, dot,
-    panel, toast or polling loop of its own.
+    panel, toast or polling loop of its own; the one exception is the single
+    recovery toast of the "Pictures and video are not ready" row below
+    (Owner-approved 2026-10-29).
 
     | Kind of status | Surface (file) | Data source | Who sees it |
     |---|---|---|---|
     | Background progress (engine setup, model downloads) | the progress strip, `InstallStrip.tsx` (`ShellInstallStrip`, the setup wizard, the Home ask box) | `lib/installStatus.ts` over the Stack's job list, `/api/install` | everyone, while it runs |
     | Something needs fixing | a Repairs item with Try again, `RepairsPage.tsx` | `lib/issues.ts` `raiseIssue` / `resolveIssue`, `/api/repairs` (the Stack link raises one in `lib/stack/linkRepairs.ts`) | owner and admin |
     | The AI or chat is not ready | the chat paused or starting state: composer line, Send hold, Welcome state, `useEngineDownReason` | `lib/roleHealth.ts` through `lib/healthSnapshot.ts` (`/api/health`, `availability`, `reason`, `cause`); the admin pause switch is `lib/chatPause.ts` | everyone in chat; a child gets only the composer line |
+    | Pictures and video are not ready (Owner-approved 2026-10-29; record [status surfaces review](status-surfaces-review-2026-10-29.md), "Owner's ruling 2026-10-29") | every control that starts a picture or a clip is disabled, with one line where the person acts (the screen's existing muted line, or the control's own hint in a chat card or menu); when the pause ends with a request still waiting on that screen, one dismissable kit toast, once | `lib/roleHealth.ts` `image` and `video` rows (the Stack's role list, its memory watchdog, coding mode and a remembered media refusal) through `lib/healthSnapshot.ts` (`/api/health`, `engines.image`, `engines.video`, `availability`, `cause`, `notice` from `lib/failureCopy.ts` `makingNotice`, never a figure); read by `useMakingAvailability` on the same `["health"]` query | the person acting, every band; a child gets the child line |
     | Whole-system health | the Status page and the header pill and rail menu, `StatusPage.tsx`, `StatusIndicator.tsx` | `lib/statusApps.ts`, `lib/statusBoard.ts`, `/api/status` (the Stack's health list is synced by `lib/stackHealthSync.ts`) | the Status page everyone; the pill hidden from a child |
     | One job's progress | that job's own card (picture, video, download) | the job record | whoever started it |
     | A companion's summary of one person's jobs (Owner-approved 2026-10-24) | one line on that companion's Yours card, "1 working · 2 waiting on you", the kit Status Element as shipped | the same job records, the viewer's own rows only (rule 6a) | the person whose jobs they are |

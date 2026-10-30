@@ -29,6 +29,13 @@ export interface StackMemoryLedger {
   chat_paged_out: boolean;
 }
 
+/** The memory watchdog block of GET /stack/v1/memory (stack/backend/src/routes/memory.ts). While `generation_paused` is true the
+ * Stack refuses new picture and video jobs with 503 `no_memory`. Older Stacks omit it. Home reads only these two fields. */
+export interface StackMemoryWatchdog {
+  level: "normal" | "warn" | "critical";
+  generation_paused: boolean;
+}
+
 export interface StackVoice {
   id: string; name: string; description: string; language: string; country: string;
   gender: "female" | "male" | "neutral" | "unknown";

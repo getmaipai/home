@@ -274,6 +274,20 @@ function rememberStackRefusal(role: string, err: StackError): void {
   refusals.set(role, { offline_reason: err.offline_reason, state: err.state, kind, household: FAILURE_COPY[kind].adult, facts, at: Date.now() });
 }
 
+/** ENGINE-STATUS-MEDIA-01: the picture and video calls go to the Stack's
+ * OpenAI-style routes through their own clients (pictures/stack.ts,
+ * videos/stack.ts), so they record a refusal here themselves: a 503 the Stack
+ * gave because memory is low or it is restarting. roleHealth("image" | "video")
+ * reads it the way chat reads its own; the next call the Stack accepts forgets it. */
+export function rememberMediaRefusal(role: "image" | "video", cause: "memory" | "restarting", code: string, household: string): void {
+  const kind: FailureKind = cause === "memory" ? "memory" : "unreachable";
+  refusals.set(role, { offline_reason: undefined, state: undefined, kind, household, facts: { stack_error: code }, at: Date.now() });
+}
+
+export function forgetMediaRefusal(role: "image" | "video"): void {
+  refusals.delete(role);
+}
+
 /** The Stack's most recent refusal of this role, if it is younger than
  * STACK_REFUSAL_TTL_MS and no call has been served since; null
  * otherwise. Keyed by the role name the Stack call sites use ("chat",

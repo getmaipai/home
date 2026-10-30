@@ -794,12 +794,14 @@ export interface EngineHealthEntry {
   context_message?: string | null;
   /** CHAT-CALM-ERRORS-01d: the composer line for each band while chat
    * cannot answer (failureCopy.ts's composerNotice); absent or null when
-   * the engine is ready. Additive: clients that ignore it lose nothing. */
+   * the engine is ready. Additive: clients that ignore it lose nothing.
+   * On the `image` and `video` rows it is the line a disabled picture or
+   * clip control shows (ENGINE-STATUS-MEDIA-01). */
   notice?: ComposerNotice | null;
   /** CHAT-PAUSE-01: why chat cannot answer, when Home knows (additive):
    * the Stack is restarting, low on memory, not installed, or an admin
    * paused chat. Absent when ready or when the cause is unknown. */
-  cause?: "restarting" | "memory" | "not_installed" | "paused_by_admin" | "mode_change" | null;
+  cause?: "restarting" | "memory" | "not_installed" | "paused_by_admin" | "mode_change" | "offline" | null;
 }
 
 /** Mirrors lib/failureCopy.ts's ComposerNotice (that file stays import-free). */
@@ -816,7 +818,9 @@ export interface HealthStatus {
   /** False when any engine that should be up is not answering, or a
    * sidecar is unhealthy/crashed. */
   ok: boolean;
-  engines: { chat: EngineHealthEntry; embed: EngineHealthEntry; background: EngineHealthEntry; voice: EngineHealthEntry };
+  /** ENGINE-STATUS-MEDIA-01 (additive): `image` and `video` say whether a picture or a clip can be started now, with `cause` and a
+   * per-band `notice` (failureCopy.ts's makingNotice) while not ready. They never change `ok`. Absent from an older hub. */
+  engines: { chat: EngineHealthEntry; embed: EngineHealthEntry; background: EngineHealthEntry; voice: EngineHealthEntry; image?: EngineHealthEntry; video?: EngineHealthEntry };
   uptimeSeconds: number;
   sidecars: SidecarStatusEntry[];
 }

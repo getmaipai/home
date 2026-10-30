@@ -12,7 +12,8 @@ import { dayData, statusStripSummary } from "@/shell/pages/status/statusHistoryF
 import "@/shell/pages/status/statusLegend.css";
 
 interface StatusPartsProps { person: Roster; health: HealthStatus; maintenance?: string[]; history?: StatusHistory; engineComputer?: EngineComputerStatusData; }
-type EngineKey = keyof HealthStatus["engines"];
+// The Status page lists the four engines that make up "is Home up"; the picture and video rows (ENGINE-STATUS-MEDIA-01) are read by the making controls instead.
+type EngineKey = "chat" | "embed" | "background" | "voice";
 type StatusPartId = EngineKey | "library" | "hub";
 type EngineState = { label: string; status: "online" | "offline" | "degraded" };
 

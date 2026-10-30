@@ -2,6 +2,7 @@
 // then, so the model never sees a tool that would fail for want of a model (rule 6 still covers a failure after the
 // offer). A read failure is "not ready"; the answer is cached briefly so a chat turn pays for it at most once every
 // 20 seconds.
+import { plainEngineLine } from "@/lib/pictures/plainLine";
 import { isStackConfigured } from "@/lib/stackEngine";
 import { videoStatus, type StackVideoStatus } from "./stack";
 import { detailedVideoReady, quickVideoReady } from "./quality";
@@ -63,5 +64,5 @@ const VIDEO_ENGINE_UNREACHABLE = "I can't reach the video engine on this compute
 
 /** Why a video cannot be made now, in the person's terms (see pictureNotReadyReason). */
 export function videoNotReadyReason(engine: StackVideoStatus | null): string {
-  return engine?.reason ?? (engine === null ? VIDEO_ENGINE_UNREACHABLE : NO_VIDEO_MODEL);
+  return (engine?.reason ? plainEngineLine(engine.reason) : null) ?? (engine === null ? VIDEO_ENGINE_UNREACHABLE : NO_VIDEO_MODEL);
 }

@@ -37,7 +37,7 @@ export function chatPollInterval(down: boolean, hidden: boolean, now = Date.now(
   return elapsed < 30_000 ? 2_000 : elapsed < 120_000 ? 5_000 : 10_000;
 }
 
-function useHealthQuery() {
+export function useHealthQuery() {
   return useQuery<HealthStatus>({
     queryKey: ["health"],
     queryFn: () => api.health(),

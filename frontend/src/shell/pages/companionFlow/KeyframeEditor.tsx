@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useId, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@maipai/ui/src/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogSection, DialogTitle } from "@maipai/ui/src/ui/dialog";
@@ -9,6 +9,7 @@ import { api, type CompanionLookJob, type CompanionStateRow } from "@/lib/api";
 import { companionStatesKey } from "@/shell/pages/useCompanionStates";
 import { flowErrorText } from "@/shell/pages/companionFlow/errors";
 import { DEFAULT_FRAME, PreviewControls, type PictureFrame } from "@/shell/pages/companionFlow/PreviewControls";
+import { useMakingAvailability } from "@/apps/chat/useMakingAvailability";
 
 const running = (job: CompanionLookJob | undefined, jobId: string | null) => jobId !== null && (job === undefined || job.state === "queued" || job.state === "running");
 
@@ -17,6 +18,8 @@ export function KeyframeEditor({ companionId, row, open, onOpenChange }: {
   companionId: string; row: CompanionStateRow; open: boolean; onOpenChange: (open: boolean) => void;
 }) {
   const client = useQueryClient();
+  const making = useMakingAvailability("image");
+  const reasonId = useId();
   const [instruction, setInstruction] = useState("");
   const [file, setFile] = useState<File | null>(null);
   const [jobId, setJobId] = useState<string | null>(null);
@@ -74,10 +77,11 @@ export function KeyframeEditor({ companionId, row, open, onOpenChange }: {
           ? <img src={`${keyframe.url}${keyframe.edited_at ? `?v=${encodeURIComponent(keyframe.edited_at)}` : ""}`} alt={`${row.label} keyframe`} draggable={false} className="aspect-square w-full rounded-2xl bg-muted object-contain" />
           : <p className="text-sm text-muted-foreground">This animation has no picture yet. Make one to start from.</p>}
         {working ? <p className="text-sm text-muted-foreground">{job?.label ?? "Working on the picture"}</p> : null}
+        {making.reason ? <p id={reasonId} role="status" className="text-sm text-muted-foreground">{making.reason}</p> : null}
         {keyframe ? <>
           <DialogSection title="Describe a change">
             <Textarea aria-label="Describe a change" shape="rounded" placeholder="For example, make the smile bigger" maxLength={500} value={instruction} disabled={working} onChange={(e) => setInstruction(e.target.value)} />
-            <Button shape="pill" disabled={working || instruction.trim().length === 0} onClick={() => void change()}><Sparkles aria-hidden="true" />Change picture</Button>
+            <Button shape="pill" disabled={working || making.disabled || instruction.trim().length === 0} aria-describedby={making.reason ? reasonId : undefined} title={making.reason ?? undefined} onClick={() => void change()}><Sparkles aria-hidden="true" />Change picture</Button>
           </DialogSection>
           <DialogSection title="Upload a replacement">
             <Input aria-label="Replacement picture" type="file" shape="pill" accept="image/png,image/jpeg,image/webp" disabled={working} onChange={(e) => setFile(e.target.files?.[0] ?? null)} />
@@ -85,7 +89,7 @@ export function KeyframeEditor({ companionId, row, open, onOpenChange }: {
           </DialogSection>
           <PreviewControls idPrefix="keyframe" position frame={frame} disabled={working}
             onFrameChange={setFrame} onFrameCommit={(next) => void prepare(next)} />
-        </> : <Button shape="pill" disabled={working} onClick={() => void make()}><Sparkles aria-hidden="true" />Make picture</Button>}
+        </> : <Button shape="pill" disabled={working || making.disabled} aria-describedby={making.reason ? reasonId : undefined} title={making.reason ?? undefined} onClick={() => void make()}><Sparkles aria-hidden="true" />Make picture</Button>}
         {error ? <p role="alert" className="text-sm text-destructive">{error}</p> : null}
         <DialogFooter>
           <Button variant="outline" shape="pill" onClick={() => onOpenChange(false)}>Done</Button>

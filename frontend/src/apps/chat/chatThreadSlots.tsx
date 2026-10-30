@@ -2,6 +2,7 @@
 // thinking indicator, welcome, reasoning group, sources and message footer),
 // moved verbatim out of ChatPage.tsx (SHARED-THREAD-01). ChatThread.tsx
 // hands them to the kit Thread.
+import { useMakingAvailability } from "@/apps/chat/useMakingAvailability";
 import { useReplyFeedbackForm } from "@/apps/chat/chatFeedbackDialog";
 import { CharacterHero } from "@maipai/ui/src/elements/character-hero";
 import { FeedbackDialog } from "@maipai/ui/src/elements/feedback-dialog";
@@ -416,12 +417,15 @@ export function MakeVariationMenuItem() {
   });
   const card = useQuery({ queryKey: ["picture", pictureId], queryFn: () => picturesApi.card(pictureId!), enabled: pictureId !== undefined, staleTime: 5_000 });
   const [busy, setBusy] = useState(false);
+  // ENGINE-STATUS-MEDIA-01: greyed out with the reason while the picture engine cannot take work.
+  const making = useMakingAvailability("image");
   if (!pictureId || !card.data?.can_vary) return null;
   return (
     <ActionBarMorePrimitive.Item
       // eslint-disable-next-line shadcn/no-unknown-classes -- aui-action-bar-more-item is a kit ActionBarMorePrimitive class, not a Tailwind utility
       className="aui-action-bar-more-item hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground flex cursor-pointer items-center gap-2 rounded-lg px-2.5 py-1.5 text-sm outline-none select-none disabled:pointer-events-none disabled:opacity-50"
-      disabled={busy}
+      disabled={busy || making.disabled}
+      title={making.reason ?? undefined}
       onSelect={(e) => {
         e.preventDefault();
         setBusy(true);
@@ -450,6 +454,7 @@ export function AnimatePictureMenuItem() {
   const card = useQuery({ queryKey: ["picture", pictureId], queryFn: () => picturesApi.card(pictureId!), enabled: pictureId !== undefined, staleTime: 5_000 });
   const status = useQuery({ queryKey: ["video-status"], queryFn: () => videosApi.status(), enabled: pictureId !== undefined, staleTime: 30_000 });
   const [busy, setBusy] = useState(false);
+  const making = useMakingAvailability("video");
   const latest = card.data?.files[card.data.files.length - 1];
   if (!pictureId || !turnId || hasVideo || !latest || !card.data?.conversation_id || !status.data?.can_make) return null;
   const conversationId = card.data.conversation_id;
@@ -457,7 +462,8 @@ export function AnimatePictureMenuItem() {
     <ActionBarMorePrimitive.Item
       // eslint-disable-next-line shadcn/no-unknown-classes -- aui-action-bar-more-item is a kit ActionBarMorePrimitive class, not a Tailwind utility
       className="aui-action-bar-more-item hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground flex cursor-pointer items-center gap-2 rounded-lg px-2.5 py-1.5 text-sm outline-none select-none disabled:pointer-events-none disabled:opacity-50"
-      disabled={busy}
+      disabled={busy || making.disabled}
+      title={making.reason ?? undefined}
       onSelect={(e) => {
         e.preventDefault();
         setBusy(true);

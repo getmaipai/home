@@ -1,6 +1,7 @@
 // The chat thread's tool-call renderers (spec sheet, artifact card, confirm,
 // project, tool timeline), moved verbatim out of ChatPage.tsx
 // (SHARED-THREAD-01). elementBindings.ts maps tool ids to these.
+import { useMakingAvailability } from "@/apps/chat/useMakingAvailability";
 import { useCallback, useContext, useEffect, useState, type MutableRefObject, type ReactNode } from "react";
 import { useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
@@ -535,6 +536,8 @@ export const PictureProgressToolRender: ToolCallMessagePartComponent<Record<stri
 export const PictureToolRender: ToolCallMessagePartComponent<Record<string, never>, { id: string }> = ({ result }) => {
   const query = usePictureCard(result?.id);
   const [retrying, setRetrying] = useState(false);
+  // ENGINE-STATUS-MEDIA-01: the actions that ask for a new picture are greyed out, with the reason as their hint, while the engine cannot take work.
+  const making = useMakingAvailability("image");
   const edit = useContext(ImageEditContext);
   const card = query.data;
   if (!result) return null;
@@ -553,11 +556,11 @@ export const PictureToolRender: ToolCallMessagePartComponent<Record<string, neve
     const qualityActions = card.switch_to && card.can_vary ? [{
       id: "switch-quality",
       label: card.switch_to === "detailed" ? "Make it Detailed" : "Make it Quick",
-      hint: card.switch_to === "detailed" ? "Slower, with finer detail" : "Faster, a few seconds",
-      disabled: retrying,
+      hint: making.reason ?? (card.switch_to === "detailed" ? "Slower, with finer detail" : "Faster, a few seconds"),
+      disabled: retrying || making.disabled,
       onSelect: () => { setRetrying(true); void picturesApi.again(card.id, card.switch_to!).then(() => query.refetch()).catch(() => undefined).finally(() => setRetrying(false)); },
     }] : [];
-    const remixActions = card.can_vary ? [{ id: "remix", label: "Remix", hint: "Change the words and make a new one", disabled: retrying, onSelect: () => { void askRemix("picture", card.prompt).then((words) => { if (!words) return; setRetrying(true); void picturesApi.again(card.id, undefined, words).then(() => query.refetch()).catch(() => undefined).finally(() => setRetrying(false)); }); } }] : [];
+    const remixActions = card.can_vary ? [{ id: "remix", label: "Remix", hint: making.reason ?? "Change the words and make a new one", disabled: retrying || making.disabled, onSelect: () => { void askRemix("picture", card.prompt).then((words) => { if (!words) return; setRetrying(true); void picturesApi.again(card.id, undefined, words).then(() => query.refetch()).catch(() => undefined).finally(() => setRetrying(false)); }); } }] : [];
     return (
       <ImageGallery
         images={galleryImagesOf(card)}
@@ -610,6 +613,7 @@ function videoStatusOf(item: VideoItem): "queued" | "generating" | "ready" | "fa
 export const VideoToolRender: ToolCallMessagePartComponent<Record<string, never>, { id: string }> = ({ result }) => {
   const query = useVideoCard(result?.id);
   const navigate = useNavigate();
+  const making = useMakingAvailability("video");
   const card = query.data;
   // The messaging copy is fetched when the clip is on the card, so Share can call the system share sheet inside the click
   // (a share call after an await loses the user gesture and Safari refuses it).
@@ -653,8 +657,8 @@ export const VideoToolRender: ToolCallMessagePartComponent<Record<string, never>
         onShare: () => { void shareClip({ prepared: prepared.data, title: item.prompt, nav: navigator, fallback: () => navigate(`/files?file=${encodeURIComponent(clip.file_id)}`) }); },
         // VIDEO-LTX-01: the on-the-fly choice, the same two words as pictures. A Quick video offers Detailed (with sound and speech); a Detailed one offers Quick. No model names.
         actions: [
-          ...(item.switch_to && card.can_make_another ? [<Button key="switch-quality" type="button" variant="ghost" size="sm" title={item.switch_to === "detailed" ? "With sound and speech, up to 10 seconds" : "No sound, up to 5 seconds, can start from a picture"} onClick={() => { void videosApi.another(item.id, item.switch_to!).then(refresh).catch(refresh); }}>{item.switch_to === "detailed" ? "Make it Detailed" : "Make it Quick"}</Button>] : []),
-          ...(card.can_make_another ? [<Button key="remix" type="button" variant="ghost" size="sm" onClick={() => { void askRemix("video", item.prompt).then((words) => { if (words) void videosApi.another(item.id, undefined, words).then(refresh).catch(refresh); }); }}>Remix</Button>] : []),
+          ...(item.switch_to && card.can_make_another ? [<Button key="switch-quality" type="button" variant="ghost" size="sm" disabled={making.disabled} title={making.reason ?? (item.switch_to === "detailed" ? "With sound and speech, up to 10 seconds" : "No sound, up to 5 seconds, can start from a picture")} onClick={() => { void videosApi.another(item.id, item.switch_to!).then(refresh).catch(refresh); }}>{item.switch_to === "detailed" ? "Make it Detailed" : "Make it Quick"}</Button>] : []),
+          ...(card.can_make_another ? [<Button key="remix" type="button" variant="ghost" size="sm" disabled={making.disabled} title={making.reason ?? undefined} onClick={() => { void askRemix("video", item.prompt).then((words) => { if (words) void videosApi.another(item.id, undefined, words).then(refresh).catch(refresh); }); }}>Remix</Button>] : []),
           <Button key="original" type="button" variant="ghost" size="sm" onClick={() => saveClip({ url: clip.url, name: (prepared.data?.name ?? "video.mp4").replace(/\.mp4$/, "-original.mp4") })}>Download original</Button>,
         ],
       } : {})}

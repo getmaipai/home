@@ -2,6 +2,7 @@
 // offered only then, so the model never sees a tool that would fail for want of a model (rule 6 still covers a
 // failure after the offer). A read failure is "not ready"; the answer is cached briefly so a chat turn pays for
 // it at most once every 20 seconds.
+import { plainEngineLine } from "@/lib/pictures/plainLine";
 import { isStackConfigured } from "@/lib/stackEngine";
 import { imageStatus, type StackImageStatus } from "./stack";
 
@@ -60,5 +61,5 @@ const PICTURE_ENGINE_UNREACHABLE = "I can't reach the picture engine on this com
 /** Why a picture cannot be made now, in the person's terms: the engine's own reason, else "cannot reach it" when the Stack
  * did not answer at all, else "no model". A Stack that is down is not a missing model (found by the generation QA). */
 export function pictureNotReadyReason(engine: StackImageStatus | null): string {
-  return engine?.reason ?? (engine === null ? PICTURE_ENGINE_UNREACHABLE : NO_PICTURE_MODEL);
+  return (engine?.reason ? plainEngineLine(engine.reason) : null) ?? (engine === null ? PICTURE_ENGINE_UNREACHABLE : NO_PICTURE_MODEL);
 }

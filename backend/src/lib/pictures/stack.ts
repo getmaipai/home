@@ -2,8 +2,8 @@
 // section 9, and the Stack's own routes under /v1/images and /stack/v1/image). One module, loopback only
 // (the Stack's URL setting already guarantees it). The prompt and the pictures travel in bodies and are
 // never logged or put in an error message (rule 6a). A test replaces `fetch` with `__setPicturesFetchForTests`.
-import { plainEngineLine } from "@/lib/pictures/plainLine";
-import { getStackUrl } from "@/lib/stackEngine";
+import { makingStateOf, plainMakingLine } from "@/lib/pictures/plainLine";
+import { forgetMediaRefusal, getStackUrl, rememberMediaRefusal } from "@/lib/stackEngine";
 import type { StackLiveFields } from "@/lib/genLive";
 
 export type StackPicState = "queued" | "running" | "done" | "failed" | "cancelled";
@@ -121,7 +121,11 @@ async function request(path: string, init: RequestInit & { timeoutMs?: number } 
 async function failure(res: Response): Promise<never> {
   let body: { error?: unknown; code?: unknown; job?: unknown } = {};
   try { body = await res.json() as typeof body; } catch { /* a body that is not JSON carries no detail */ }
-  const message = typeof body.error === "string" && body.error ? plainEngineLine(body.error) : `The picture engine answered ${res.status}.`;
+  const code = typeof body.code === "string" ? body.code : null;
+  const message = plainMakingLine("image", code, typeof body.error === "string" && body.error ? body.error : `The picture engine answered ${res.status}.`);
+  // ENGINE-STATUS-MEDIA-01: a refusal that is a state Home can show in advance is remembered for the health row.
+  const state = makingStateOf(code);
+  if (state === "memory" || state === "restarting") rememberMediaRefusal("image", state, code!, message);
   throw new StackPicturesError(res.status, typeof body.code === "string" ? body.code : `http_${res.status}`, message, typeof body.job === "string" ? body.job : undefined);
 }
 
@@ -129,6 +133,7 @@ async function failure(res: Response): Promise<never> {
 export async function submitGeneration(body: GenerationBody): Promise<{ job: string; done: StackPic[] | null }> {
   const res = await request("/v1/images/generations", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
   if (res.status === 202 || res.status === 200) {
+    forgetMediaRefusal("image");
     const parsed = await res.json() as { job?: string; data?: StackPic[] };
     if (!parsed.job) throw new StackPicturesError(502, "bad_reply", "The picture engine's answer was not understood. Try again.");
     return { job: parsed.job, done: res.status === 200 && Array.isArray(parsed.data) && parsed.data.length > 0 ? parsed.data : null };
@@ -140,6 +145,7 @@ export async function submitGeneration(body: GenerationBody): Promise<{ job: str
 export async function submitEdit(form: FormData): Promise<{ job: string }> {
   const res = await request("/v1/images/edits", { method: "POST", body: form, timeoutMs: 30_000 });
   if (res.status === 202 || res.status === 200) {
+    forgetMediaRefusal("image");
     const parsed = await res.json() as { job?: string };
     if (!parsed.job) throw new StackPicturesError(502, "bad_reply", "The picture engine's answer was not understood. Try again.");
     return { job: parsed.job };
@@ -158,7 +164,7 @@ export async function getGenerationJob(job: string): Promise<StackPicJob> {
     progress: typeof body.progress === "number" ? body.progress : 0,
     phase_progress: body.phase_progress ?? null,
     position: body.position ?? null,
-    error: typeof body.error === "string" ? plainEngineLine(body.error) : null,
+    error: typeof body.error === "string" ? plainMakingLine("image", typeof body.code === "string" ? body.code : null, body.error) : null,
     code: body.code ?? null,
     data: Array.isArray(body.data) ? body.data : [],
     progress_fraction: body.progress_fraction ?? null, stage: body.stage ?? null, stage_label: body.stage_label ?? null, step: body.step ?? null, steps: body.steps ?? null,

@@ -402,7 +402,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/episodes.ts` | replyIsAnAnswer, recordEpisodes, embedPendingEpisodes, deleteEpisodesForTurns, deleteEpisodesForPerson, listEpisodes |
 | `backend/src/lib/faceModelPins.ts` | SFACE_MODEL_ID, SFACE_SHA256, SFACE_DIM |
 | `backend/src/lib/factoryReset.ts` | FACTORY_RESET_CONFIRMATION_PHRASE, stageFactoryReset, pendingFactoryReset, cancelPendingFactoryReset, applyPendingFactoryReset |
-| `backend/src/lib/failureCopy.ts` | VOICE_FAILURE_COPY, voiceFailureLine, FAILURE_COPY, composerNotice, adminPauseLine, stackRefusalKind |
+| `backend/src/lib/failureCopy.ts` | VOICE_FAILURE_COPY, voiceFailureLine, FAILURE_COPY, composerNotice, makingNotice, makingRefusalLine |
 | `backend/src/lib/favicons.ts` | faviconsDir, pngFromIco, iconImageBytes, isUsableIcon, iconLinksOf, __setFaviconDnsLookupForTests |
 | `backend/src/lib/fileBlobs.ts` | digestOfFile, reclaimQueuedBlobs, reclaimQueuedBlobsInBackground |
 | `backend/src/lib/fileContent.ts` | FILE_REFERENCE_KINDS, contentFor, ensureContent, expectedReferences, syncFileReferences, syncAllFileReferences |
@@ -633,7 +633,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/pictures/laneGate.ts` | CHILD_SAFETY_SCHEMA, CHILD_SAFETY_SYSTEM_PROMPT, MIN_CHILD_CONFIDENCE, parseChildSafety, childSafetyOk, __setChildSafetyRunnerForTests |
 | `backend/src/lib/pictures/minorLine.ts` | MINOR_MARKERS, SEXUAL_WORDS, UNCLOTHED_PHRASES, normalise, hasWord, mentionsSexualWord |
 | `backend/src/lib/pictures/people.ts` | __setPeopleRetryPauseForTests, runPictureTool |
-| `backend/src/lib/pictures/plainLine.ts` | plainEngineLine |
+| `backend/src/lib/pictures/plainLine.ts` | plainEngineLine, makingStateOf, plainMakingLine |
 | `backend/src/lib/pictures/policy.ts` | GENERATION_ADULTS_KEY, GENERATION_ADULT_ADAPTERS_KEY, PICTURE_STARTED_CONFIRM_NOTE, GENERATION_PICTURE_QUALITY_KEY, PICTURE_DENIAL_LINE, PICTURE_NOT_HERE_LINE |
 | `backend/src/lib/pictures/quality.ts` | QUICK_MODEL, ERNIE_MODEL, DETAILED_MODEL, qualityOfModel, isPictureQuality, quickModelFor |
 | `backend/src/lib/pictures/ready.ts` | __setPictureStatusForTests, __setPictureStatusReaderForTests, pictureEngineStatus, dropPictureStatusCache, pictureEngineReady, readyStatusForTests |
@@ -715,7 +715,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/robotVision.ts` | SCENE_TTL_MS, MIN_FRAME_INTERVAL_MS, SCENE_FRAME_INTERVAL_MS, MAX_FRAME_BYTES, FRESH_ENOUGH_MS, robotVisionMode |
 | `backend/src/lib/robots.ts` | ROBOTS_OFF_MESSAGE, robotsEnabled |
 | `backend/src/lib/robotsSwitchMigration.ts` | migrateRobotsSwitch |
-| `backend/src/lib/roleHealth.ts` | __setRoleHealthForTests, cachedRoleHealth, STACK_REFUSAL_KEY, localRoleHealthEntry, roleHealth, chatContextStatus |
+| `backend/src/lib/roleHealth.ts` | MAKING_ROLES, __setRoleHealthForTests, cachedRoleHealth, STACK_REFUSAL_KEY, localRoleHealthEntry, roleHealth |
 | `backend/src/lib/routing.ts` | embedUtterance, __embedCallCountForTests, __resetEmbedCallCountForTests |
 | `backend/src/lib/ruleNames.ts` | RUNGS, isTypedSourcePackage, isLookupPackage, rungOf, RULES, RULE_NAMES |
 | `backend/src/lib/safeSearch.ts` | safeSearchDefaultFor, safeSearchStrictness, applySafeSearchLimits, resolveSafeSearchLevel, safeSearchNumericLevel |

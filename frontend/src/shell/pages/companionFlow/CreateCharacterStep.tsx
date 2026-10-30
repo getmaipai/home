@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type MutableRefObject } from "react";
+import { useEffect, useId, useRef, useState, type MutableRefObject } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@maipai/ui/src/ui/button";
 import { DialogBody, DialogSection } from "@maipai/ui/src/ui/dialog";
@@ -14,6 +14,7 @@ import { useFillCutOff } from "@/lib/imaging/useFillCutOff";
 import { flowErrorText } from "@/shell/pages/companionFlow/errors";
 import { DraggablePicture } from "@/shell/pages/companionFlow/DraggablePicture";
 import { DEFAULT_FRAME, type PictureFrame } from "@/shell/pages/companionFlow/PreviewControls";
+import { MAKING_BACK_LINE, useMakingAvailability, useMakingRecovery } from "@/apps/chat/useMakingAvailability";
 
 export const lookKey = (id: string) => ["companions", id, "look"] as const;
 const running = (job: CompanionLookJob | undefined, jobId: string | null) => jobId !== null && (job === undefined || job.state === "queued" || job.state === "running");
@@ -24,6 +25,9 @@ export function CreateCharacterStep({ creating, companionId, initialName, onDraf
   onDraft: (state: { id: string | null; pictures: number; name: string }) => void; onApproved: (sheetJob: string | null) => void;
 }) {
   const client = useQueryClient();
+  // ENGINE-STATUS-MEDIA-01: every control here that asks the picture engine for work waits while it cannot take any.
+  const making = useMakingAvailability("image");
+  const reasonId = useId();
   const [draftId, setDraftId] = useState<string | null>(companionId);
   const [name, setName] = useState(initialName);
   const [draftName, setDraftName] = useState(companionId ? initialName : "");
@@ -57,6 +61,7 @@ export function CreateCharacterStep({ creating, companionId, initialName, onDraf
   });
   const job = jobQuery.data;
   const generating = running(job, jobId);
+  useMakingRecovery(making, generating, MAKING_BACK_LINE.picture);
   const busy = busyKind !== null;
   const locked = generating || busy;
   // Moving the character stays possible while an earlier placement is being made; only the newest one is shown.
@@ -95,10 +100,10 @@ export function CreateCharacterStep({ creating, companionId, initialName, onDraf
   const customSelected = style === "custom";
   const picture = look?.versions.find((v) => v.id === shownId) ?? null;
   const ready = name.trim().length > 0 && (mode === "describe" ? description.trim().length > 0 : file !== null) && (!customSelected || customStyle.trim().length > 0);
-  const canGenerate = ready && !locked && (look?.can_generate ?? true);
+  const canGenerate = ready && !locked && !making.disabled && (look?.can_generate ?? true);
 
   // A picture that is cut off at an edge has the missing parts drawn in, once, without asking.
-  useFillCutOff(picture, { skip: locked || (picture?.id === look?.rest && look?.sheet != null), fill: () => void complete() });
+  useFillCutOff(picture, { skip: locked || making.disabled || (picture?.id === look?.rest && look?.sheet != null), fill: () => void complete() });
   /** A new picture (made, uploaded or reopened) starts centred; any pending move for the old one is dropped. */
   function choose(id: string) {
     if (placing.current.timer) { clearTimeout(placing.current.timer); placing.current.timer = null; }
@@ -219,7 +224,7 @@ export function CreateCharacterStep({ creating, companionId, initialName, onDraf
           </ToggleGroup>
           {mode === "describe"
             ? <Textarea aria-label="Describe the character" shape="rounded" placeholder="Describe the character you want to create..." value={description} disabled={locked} onChange={(e) => setDescription(e.target.value)} />
-            : <Input ref={fileInput} aria-label="Photo" type="file" shape="pill" accept="image/png,image/jpeg,image/webp" disabled={locked} onChange={(e) => { const chosen = e.target.files?.[0] ?? null; setFile(chosen); setUploadedId(null); maybeUpload(chosen); }} />}
+            : <Input ref={fileInput} aria-label="Photo" type="file" shape="pill" accept="image/png,image/jpeg,image/webp" disabled={locked || making.disabled} aria-describedby={making.reason ? reasonId : undefined} onChange={(e) => { const chosen = e.target.files?.[0] ?? null; setFile(chosen); setUploadedId(null); maybeUpload(chosen); }} />}
           {mode === "upload" && thumb ? <div className="flex items-center gap-3"><img src={thumb} alt="Your upload" draggable={false} className="size-14 rounded-xl object-cover" /><p className="min-w-0 truncate text-sm text-muted-foreground">{file?.name}</p></div> : null}
         </DialogSection>
         <DialogSection title="Choose a style">
@@ -231,8 +236,9 @@ export function CreateCharacterStep({ creating, companionId, initialName, onDraf
           {customSelected ? <Input aria-label="Custom style" shape="pill" placeholder="Type a style, for example paper cut-out" maxLength={120} value={customStyle} disabled={locked} onChange={(e) => setCustomStyle(e.target.value)} /> : null}
         </DialogSection>
         <div className="flex flex-col gap-2">
-          <Button shape="pill" width="full" disabled={!canGenerate || (mode === "upload" && style === "keep")} aria-busy={makingCharacter} onClick={() => void generate()}>{makingCharacter ? <><Spinner className="animate-spin" aria-hidden="true" />Making your character...</> : <><Sparkles aria-hidden="true" />Generate Character</>}</Button>
+          <Button shape="pill" width="full" disabled={!canGenerate || (mode === "upload" && style === "keep")} aria-describedby={making.reason ? reasonId : undefined} title={making.reason ?? undefined} aria-busy={makingCharacter} onClick={() => void generate()}>{makingCharacter ? <><Spinner className="animate-spin" aria-hidden="true" />Making your character...</> : <><Sparkles aria-hidden="true" />Generate Character</>}</Button>
           {look && !look.can_generate && look.generate_reason ? <p className="text-sm text-muted-foreground">{look.generate_reason}</p> : null}
+          {making.reason ? <p id={reasonId} role="status" className="text-sm text-muted-foreground">{making.reason}</p> : null}
           {error ? <p role="alert" className="text-sm text-destructive">{error}</p> : null}
         </div>
       </div>
@@ -257,7 +263,7 @@ export function CreateCharacterStep({ creating, companionId, initialName, onDraf
         {busyKind === "prepare" ? <p role="status" className="text-sm text-muted-foreground">Placing your character...</p> : null}
         {preparingPhoto ? <p role="status" className="text-sm text-muted-foreground">Getting your photo ready...</p> : null}
         {busyKind === "complete" ? <p role="status" className="text-sm text-muted-foreground">Filling in the parts that were cut off...</p> : null}
-        <Button shape="pill" width="full" disabled={!picture || locked} aria-busy={busyKind === "approve"} onClick={() => void approve()}>
+        <Button shape="pill" width="full" disabled={!picture || locked || making.disabled} aria-describedby={making.reason ? reasonId : undefined} title={making.reason ?? undefined} aria-busy={busyKind === "approve"} onClick={() => void approve()}>
           {busyKind === "approve" ? <><Spinner className="animate-spin" aria-hidden="true" />Getting your character ready...</> : <>Approve &amp; Continue</>}
         </Button>
         {previewError ? <p role="alert" className="text-sm text-destructive">{previewError}</p> : null}

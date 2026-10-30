@@ -176,6 +176,80 @@ export function composerNotice(availability: "ready" | "starting" | "unavailable
   return null;
 }
 
+/** ENGINE-STATUS-MEDIA-01 (RULES.md S6, "Pictures and video are not ready"):
+ * the one line a picture or clip control shows while it is disabled, per band,
+ * in the same ComposerNotice shape the chat line uses, so every client reads
+ * the words from the health row (`engines.image.notice`, `engines.video.notice`).
+ * No figure (no sizes, no percentages) ever appears in these lines. */
+export type MakingKind = "image" | "video";
+export type MakingCause = "restarting" | "memory" | "not_installed" | "mode_change" | "offline";
+
+const MAKING_NOUN: Record<MakingKind, { thing: string; Thing: string; things: string; engine: string }> = {
+  image: { thing: "picture", Thing: "Picture", things: "Pictures", engine: "picture engine" },
+  video: { thing: "video", Thing: "Video", things: "Videos", engine: "video engine" },
+};
+
+function makingNoticeFor(kind: MakingKind, cause: MakingCause | "starting" | "unknown"): ComposerNotice {
+  const { thing, Thing, things, engine } = MAKING_NOUN[kind];
+  switch (cause) {
+    case "memory": return {
+      adult: `This computer is low on memory, so ${thing} making is paused. It starts again by itself when memory frees up.`,
+      teen: `This computer is low on memory, so ${thing} making is paused. It starts again by itself when memory frees up.`,
+      child: `${things} are resting for a bit. Try again soon.`,
+      repairs_link: null,
+    };
+    case "not_installed": return {
+      adult: `${Thing} making isn't set up on this computer yet. An owner can add it in Settings, Pictures and videos.`,
+      teen: `${Thing} making isn't set up on this computer yet. Ask an owner to add it.`,
+      child: `${things} aren't ready yet. Ask a grown-up.`,
+      repairs_link: null,
+    };
+    case "mode_change": return {
+      adult: `Home is busy with a big job, so ${thing} making is paused. It comes back when the job finishes.`,
+      teen: `Home is busy with a big job, so ${thing} making is paused. It comes back when the job finishes.`,
+      child: "I'm busy with a big job. Try again later.",
+      repairs_link: null,
+    };
+    case "restarting": return {
+      adult: `The ${engine} is restarting. ${things} will be back by themselves in a minute.`,
+      teen: `The ${engine} is restarting. ${things} will be back by themselves in a minute.`,
+      child: `${things} are waking up. Try again in a minute.`,
+      repairs_link: null,
+    };
+    case "starting": return {
+      adult: `The ${engine} is getting ready. Try again in a moment.`,
+      teen: `The ${engine} is getting ready. Try again in a moment.`,
+      child: `${things} are waking up. Try again in a moment.`,
+      repairs_link: null,
+    };
+    case "offline": return {
+      adult: `The ${engine} isn't answering. An owner can check Repairs.`,
+      teen: `The ${engine} isn't answering. Ask a grown-up to check Repairs.`,
+      child: `${things} aren't working right now. Ask a grown-up.`,
+      repairs_link: "Check Repairs",
+    };
+    default: return {
+      adult: `${Thing} making isn't working right now. Try again later, or an owner can check Repairs.`,
+      teen: `${Thing} making isn't working right now. Try again later.`,
+      child: `${things} aren't working right now. Ask a grown-up.`,
+      repairs_link: "Open Repairs",
+    };
+  }
+}
+
+/** The line for a disabled picture or clip control, or null while it is ready. */
+export function makingNotice(kind: MakingKind, availability: "ready" | "starting" | "unavailable", cause?: MakingCause | null): ComposerNotice | null {
+  if (availability === "ready") return null;
+  return makingNoticeFor(kind, cause ?? (availability === "starting" ? "starting" : "unknown"));
+}
+
+/** The adult line for a Stack refusal of a picture or clip call that Home
+ * knows as a state (memory, a restart, coding mode). Used at the Stack call
+ * boundary so the engine's own sentence, with its figures, never travels on. */
+export function makingRefusalLine(kind: MakingKind, cause: MakingCause): string {
+  return makingNoticeFor(kind, cause).adult;
+}
+
 /** The pause line the turn routes answer with while an admin has chat paused. */
 export function adminPauseLine(adminMessage?: string | null): string {
   return composerNotice("unavailable", "paused_by_admin", adminMessage)!.adult;

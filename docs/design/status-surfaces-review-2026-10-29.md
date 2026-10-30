@@ -64,6 +64,29 @@ same three steps (health row, copy with no figures, the hook), written in `docs/
 3. Keep the install dock as the only collapsible status, with media pauses as an admin row in it (recommended), or add a floating one.
 4. Child accounts: keep the existing child rule (a child sees the line where they act and no pill), applied to pictures and video too.
 
+## Owner's ruling 2026-10-29
+
+Jesse's words, on the incident that started this review: "it is not about plain-words memory messages. We have a design for how we
+enable/disable functionality based on status and how we show that status to users and admins. It works well in chat. You need to extend
+this everywhere going forward." His decisions on the four questions above, as relayed to the building session on 2026-10-29:
+
+1. Adopted: the prominence ladder (Quiet, In place, Interrupt, Admin). While picture or video making is paused or not ready, the controls
+   are greyed out (disabled) and one line says why, the same as the chat composer; never a pressable button that fails with an error.
+2. Adopted, the recommended option: when the pause ends and the person had a request waiting (a queued picture, a clip run), one small
+   dismissable kit toast, once, only while they are still on the screen ("Picture making is back, your animation is going."). With
+   nothing waiting the controls just turn normal again, with no message.
+3. Adopted: no floating panel. Media pauses may appear to admins as one row in the existing install dock (not built yet).
+4. Adopted: children see the same one line where they act, and no header pill, as in chat.
+
+Built by ENGINE-STATUS-MEDIA-01 as the RULES.md S6 row "Pictures and video are not ready"; how to give a later engine the same treatment
+is in `docs/dev/engine-status.md`.
+
+## Supersedes
+
+- RULES.md S6's "It never adds a banner, dot, panel, toast or polling loop of its own" is narrowed for one case only: the single recovery
+  toast in decision 2, through the kit's own Toaster. Every other status still adds no toast.
+- The sentence above, "It changes no rule", which was true of this review as first written and is replaced by the ruling in this section.
+
 ## Not verified
 
 This is a read of the rules and code, not a user test. I did not check how each surface renders at phone width, and I did not read every

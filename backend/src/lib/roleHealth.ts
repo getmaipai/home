@@ -4,7 +4,10 @@ import { getStackClient, isStackConfigured, stackRefusal } from "@/lib/stackEngi
 import type { EngineHealthEntry } from "@/wire";
 import type { ChatRoleContext } from "@maipai/spec/stack/ts/role-context.js";
 
-export type HealthRole = "chat" | "embed" | "background" | "voice";
+export type HealthRole = "chat" | "embed" | "background" | "voice" | MakingRole;
+/** ENGINE-STATUS-MEDIA-01: picture and video making, read the same way so a control can be disabled before a person presses it. */
+export type MakingRole = "image" | "video";
+export const MAKING_ROLES: readonly MakingRole[] = ["image", "video"];
 /** THIN-1C (fixes part of getmaipai/home#203): `detail`, present only
  * when the Stack itself refused the role (a 503 with its reason), is
  * that reason in the household's wording - the same line the chat reply
@@ -24,7 +27,7 @@ const STACK_ROLE_ID: Partial<Record<HealthRole, string>> = { embed: "embed", bac
  * (llm.ts, tts.ts, stt.ts) - what a remembered refusal is keyed by,
  * which is not always the Stack's own role id above (the background
  * worker calls the "judge" role under the name "background"). */
-export const STACK_REFUSAL_KEY: Record<HealthRole, string> = { chat: "chat", embed: "embed", background: "background", voice: "tts" };
+export const STACK_REFUSAL_KEY: Record<HealthRole, string> = { chat: "chat", embed: "embed", background: "background", voice: "tts", image: "image", video: "video" };
 const STACK_IDLE_REASON = "No request through the public route in the last hour.";
 
 export async function localRoleHealthEntry(role: HealthRole): Promise<EngineHealthEntry> {
@@ -42,6 +45,7 @@ export async function localRoleHealthEntry(role: HealthRole): Promise<EngineHeal
 export async function roleHealth(role: HealthRole, opts: { live?: boolean } = {}): Promise<RoleHealth> {
   if (roleHealthForTests[role]) return roleHealthForTests[role]!;
   if (!isStackConfigured()) return { availability: "unavailable", reason: "stack_unreachable", cause: "restarting" };
+  if (role === "image" || role === "video") return makingHealth(role);
   if (role === "chat") {
     try {
       const mode = await getStackClient().getCodingMode();
@@ -77,6 +81,40 @@ export async function roleHealth(role: HealthRole, opts: { live?: boolean } = {}
   }
 }
 
+/** One read of the Stack's role list, memory watchdog and mode for both making roles, shared by the image and video rows of one
+ * health snapshot (the same requests the chat row already makes, plus the memory read), so a health poll costs one round. */
+let makingInputs: { at: number; read: Promise<MakingInputs> } | null = null;
+type MakingInputs = { roles: Awaited<ReturnType<ReturnType<typeof getStackClient>["roles"]>>["roles"] | null; paused: boolean; coding: boolean };
+function readMakingInputs(): Promise<MakingInputs> {
+  if (makingInputs && Date.now() - makingInputs.at < 1_000) return makingInputs.read;
+  const safe = async <T,>(read: () => Promise<T>, fallback: T): Promise<T> => { try { return await read(); } catch { return fallback; } };
+  const read = Promise.all([
+    safe(async () => (await getStackClient().roles()).roles, null),
+    safe(async () => (await getStackClient().memory?.())?.watchdog?.generation_paused === true, false),
+    safe(async () => { const mode = await getStackClient().getCodingMode(); return mode.mode === "coding" || mode.state === "switching"; }, false),
+  ]).then(([roles, paused, coding]) => ({ roles, paused, coding }));
+  makingInputs = { at: Date.now(), read };
+  return read;
+}
+export function __resetMakingHealthForTests(): void { makingInputs = null; }
+
+/** ENGINE-STATUS-MEDIA-01 (RULES.md S6): whether a picture or a clip can be started now. Not installed outranks every passing
+ * state; then a remembered Stack refusal (the same rule chat follows), then coding mode, then the memory watchdog pausing generation,
+ * then the role's own state. A role that is installed but idle reads ready: a job waits for the engine to load. No raw Stack reason
+ * reaches the row; the household line is chosen from `cause` in failureCopy.ts. */
+async function makingHealth(role: MakingRole): Promise<RoleHealth> {
+  const { roles, paused, coding } = await readMakingInputs();
+  if (!roles) return { availability: "starting", reason: "stack_unreachable", cause: "restarting" };
+  const row = roles.find((item) => item.id === role);
+  if (!row || row.state.state === "notInstalled") return { availability: "unavailable", reason: "not_installed", cause: "not_installed" };
+  const refusal = stackRefusal(STACK_REFUSAL_KEY[role]);
+  if (refusal) return refusal.kind === "memory" ? { availability: "unavailable", reason: "stack_refused", cause: "memory" } : { availability: "starting", reason: "stack_refused", cause: "restarting" };
+  if (coding) return { availability: "unavailable", reason: null, cause: "mode_change" };
+  if (paused) return { availability: "unavailable", reason: null, cause: "memory" };
+  if (row.state.state === "offline") return { availability: "unavailable", reason: "failed_start", ...(/memory/i.test(row.state.reason ?? "") ? { cause: "memory" as const } : {}) };
+  return { availability: "ready", reason: null };
+}
+
 /** Resolve llama-server's launched context to the actual per-request window.
  * Only Stack's explicit per-slot value is used to size the turn window. */
 export function chatContextStatus(row: ChatRoleContext) {
@@ -109,6 +147,11 @@ export function roleHealthEntry(role: HealthRole, local: EngineHealthEntry, stat
   // remembered Stack refusal, already in household wording) - a raw
   // role-list reason ("model crashed") never reaches the wire here, the
   // same as before.
+  if (role === "image" || role === "video") {
+    // ENGINE-STATUS-MEDIA-01: a making row carries availability and cause only; its words come from failureCopy.ts's makingNotice.
+    if (state.availability === "ready") return { ...local, alive: true, availability: "ready", reason: null };
+    return { ...local, kind: state.availability === "starting" ? "starting" : "failed", alive: state.availability === "starting", availability: state.availability, reason: state.cause === "not_installed" ? "not_installed" : state.availability === "starting" ? null : "failed_start", ...(state.cause ? { cause: state.cause } : {}) };
+  }
   const context = role === "chat" ? { context_length: state.contextLength ?? null, context_slots: state.slots ?? null, context_per_slot: state.contextPerSlot ?? null, context_scope: state.contextScope ?? null } : {};
   if (state.reason === "stack_unreachable" || state.availability === "unavailable") return { ...local, ...context, kind: "failed", alive: false, availability: "unavailable", reason: "failed_start", ...(state.detail !== undefined ? { detail: state.detail } : {}), ...(state.cause ? { cause: state.cause } : {}) };
   if (state.availability === "starting") return { ...local, ...context, kind: "starting", alive: true, availability: "starting", reason: null, ...(state.cause ? { cause: state.cause } : {}), ...(state.detail ? { detail: state.detail } : {}) };

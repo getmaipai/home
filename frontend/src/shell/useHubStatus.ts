@@ -38,6 +38,8 @@ export function platformLabel(platform: string): string {
 
 export function engineCount(health: HealthStatus | undefined): { running: number; total: number } {
   if (!health) return { running: 0, total: 0 };
-  const entries = Object.values(health.engines);
+  // The picture and video rows are not engines that must be up (a computer may not make videos); they stay out of the count.
+  const { chat, embed, background, voice } = health.engines;
+  const entries = [chat, embed, background, voice];
   return { running: entries.filter((entry) => entry.alive === true).length, total: entries.length };
 }

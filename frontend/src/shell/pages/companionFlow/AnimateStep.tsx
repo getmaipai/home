@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useId, useMemo, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Button } from "@maipai/ui/src/ui/button";
 import { DialogBody, DialogFooter, DialogSection } from "@maipai/ui/src/ui/dialog";
@@ -15,6 +15,7 @@ import { lookKey } from "@/shell/pages/companionFlow/CreateCharacterStep";
 import { flowErrorText } from "@/shell/pages/companionFlow/errors";
 import { useSheetWait } from "@/shell/pages/companionFlow/useSheetWait";
 import { KeyframeEditor } from "@/shell/pages/companionFlow/KeyframeEditor";
+import { MAKING_BACK_LINE, useMakingAvailability, useMakingRecovery } from "@/apps/chat/useMakingAvailability";
 
 const keyframeSrc = (row: CompanionStateRow) => row.keyframe ? `${row.keyframe.url}${row.keyframe.edited_at ? `?v=${encodeURIComponent(row.keyframe.edited_at)}` : ""}` : null;
 const made = (row: CompanionStateRow) => row.approved !== null;
@@ -46,6 +47,9 @@ function ClipPlayer({ urls, label }: { urls: CompanionStateUrls; label: string }
 /** Screen 2, Animate Character: thirteen animations, four required and nine optional, each with an editable keyframe. */
 export function AnimateStep({ companionId, name, sheetJob = null, autoMake = false, onBack, onContinue }: { companionId: string; name: string; sheetJob?: string | null; autoMake?: boolean; onBack: () => void; onContinue: () => void }) {
   const states = useCompanionStates(companionId, true);
+  // ENGINE-STATUS-MEDIA-01: animations need the video engine; a keyframe needs the picture engine. Each control waits for its own.
+  const clips = useMakingAvailability("video"), pictures = useMakingAvailability("image");
+  const reasonId = useId();
   const look = useQuery({ queryKey: lookKey(companionId), queryFn: () => api.companionLook(companionId), retry: false });
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [ticked, setTicked] = useState<ReadonlySet<string>>(new Set());
@@ -61,6 +65,8 @@ export function AnimateStep({ companionId, name, sheetJob = null, autoMake = fal
   const picturing = states.data?.busy ?? null;
   const rowBusy = rows.some((row) => row.busy || row.status === "waiting");
   const running = states.running || sheet.waiting || picturing !== null || rowBusy || states.data?.run != null;
+  useMakingRecovery(clips, running, MAKING_BACK_LINE.animation);
+  const pausedLine = clips.reason ?? pictures.reason;
   const missingRequired = required.filter((row) => !made(row)).map((row) => row.id);
   const pending = useMemo(() => optional.filter((row) => ticked.has(row.id) && !made(row)).map((row) => row.id), [optional, ticked]);
   const allTicked = optional.length > 0 && optional.every((row) => ticked.has(row.id));
@@ -81,10 +87,10 @@ export function AnimateStep({ companionId, name, sheetJob = null, autoMake = fal
   // Once the character is ready, the four required animations start by themselves, once.
   const autoStarted = useRef(false);
   useEffect(() => {
-    if (!autoMake || autoStarted.current || !states.data?.sheet_ready || running || missingRequired.length === 0 || states.error) return;
+    if (!autoMake || autoStarted.current || clips.disabled || !states.data?.sheet_ready || running || missingRequired.length === 0 || states.error) return;
     autoStarted.current = true; generate(missingRequired, "required");
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [states.data?.sheet_ready, running, missingRequired.length]);
+  }, [states.data?.sheet_ready, running, missingRequired.length, clips.disabled]);
   const toggle = (id: string, on: boolean) => setTicked((current) => { const next = new Set(current); if (on) next.add(id); else next.delete(id); return next; });
   const tile = (row: CompanionStateRow) => {
     const base = tileWord(row), word = running && requested.has(row.id) && !made(row) && base === "No animation yet" ? "Waiting its turn" : base, src = keyframeSrc(row) ?? portrait;
@@ -109,10 +115,11 @@ export function AnimateStep({ companionId, name, sheetJob = null, autoMake = fal
             : previewImage ? <img src={previewImage} alt={`${label}, ${selected ? `${selected.label} keyframe` : "portrait"}`} draggable={false} className="absolute inset-0 size-full object-contain" /> : null}
         </GenerationStage>
         <div className="flex flex-wrap gap-3">
-          <Button shape="pill" disabled={!selected || running} onClick={() => selected && generate([selected.id], "one")}><Sparkles aria-hidden="true" />Make another</Button>
-          <Button variant="outline" shape="pill" disabled={!selected || running} onClick={() => setEditing(true)}><Pencil aria-hidden="true" />Edit keyframe</Button>
+          <Button shape="pill" disabled={!selected || running || clips.disabled} aria-describedby={clips.reason ? reasonId : undefined} title={clips.reason ?? undefined} onClick={() => selected && generate([selected.id], "one")}><Sparkles aria-hidden="true" />Make another</Button>
+          <Button variant="outline" shape="pill" disabled={!selected || running || pictures.disabled} aria-describedby={pictures.reason ? reasonId : undefined} title={pictures.reason ?? undefined} onClick={() => setEditing(true)}><Pencil aria-hidden="true" />Edit keyframe</Button>
         </div>
         {selected ? <p className="text-sm text-muted-foreground">{selected.when_it_plays}</p> : null}
+        {pausedLine ? <p id={reasonId} role="status" className="text-sm text-muted-foreground">{pausedLine}</p> : null}
       </DialogSection>
       <div className="flex flex-col gap-6">
         {sheet.waiting || picturing ? <div role="status" className="flex flex-col gap-2"><p className="text-sm text-foreground">{sheet.waiting || picturing?.kind === "sheet" ? "Drawing your character from the sides and with its mouth open, so every animation matches. This takes a few minutes, and your animations start by themselves when it is done." : `${picturing?.label ?? "Making a picture"} for your animations...`}</p><Progress mode="determinate" value={sheet.waiting ? sheet.percent : picturing?.percent ?? 0} label="Progress" /></div> : null}
@@ -122,7 +129,7 @@ export function AnimateStep({ companionId, name, sheetJob = null, autoMake = fal
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
             {required.map((row) => <CharacterTile key={row.id} variant="animation" locked {...tile(row)} />)}
           </div>
-          <Button shape="pill" width="full" disabled={running || missingRequired.length === 0} onClick={() => generate(missingRequired, "required")}>{group === "required" ? <Spinner className="animate-spin" aria-hidden="true" /> : <Sparkles aria-hidden="true" />}{group === "required" ? doing : "Generate Required"}</Button>
+          <Button shape="pill" width="full" disabled={running || clips.disabled || missingRequired.length === 0} aria-describedby={clips.reason ? reasonId : undefined} title={clips.reason ?? undefined} onClick={() => generate(missingRequired, "required")}>{group === "required" ? <Spinner className="animate-spin" aria-hidden="true" /> : <Sparkles aria-hidden="true" />}{group === "required" ? doing : "Generate Required"}</Button>
           {group === "required" ? <Button variant="outline" shape="pill" width="full" onClick={stop}>Stop</Button> : null}
         </DialogSection>
         <Separator />
@@ -131,7 +138,7 @@ export function AnimateStep({ companionId, name, sheetJob = null, autoMake = fal
           <div className="grid grid-cols-3 gap-3 xl:grid-cols-5">
             {optional.map((row) => <CharacterTile key={row.id} variant="animation" checked={ticked.has(row.id)} onCheckedChange={(on) => toggle(row.id, on)} {...tile(row)} />)}
           </div>
-          <Button variant="secondary" shape="pill" width="full" disabled={running || pending.length === 0} onClick={() => generate(pending, "optional")}>{group === "optional" ? doing : `Generate Optional (${pending.length})`}</Button>
+          <Button variant="secondary" shape="pill" width="full" disabled={running || clips.disabled || pending.length === 0} aria-describedby={clips.reason ? reasonId : undefined} title={clips.reason ?? undefined} onClick={() => generate(pending, "optional")}>{group === "optional" ? doing : `Generate Optional (${pending.length})`}</Button>
           {group === "optional" ? <Button variant="outline" shape="pill" width="full" onClick={stop}>Stop</Button> : null}
         </DialogSection>
         {states.data && !states.data.sheet_ready && !errorLine ? <p className="text-sm text-muted-foreground">Finish your character on the first screen before making animations.</p> : null}

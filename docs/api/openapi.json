@@ -263,6 +263,19 @@
                                 "child",
                                 "repairs_link"
                               ]
+                            },
+                            "cause": {
+                              "type": "string",
+                              "nullable": true,
+                              "enum": [
+                                "restarting",
+                                "memory",
+                                "not_installed",
+                                "paused_by_admin",
+                                "mode_change",
+                                "offline",
+                                null
+                              ]
                             }
                           },
                           "required": [
@@ -346,6 +359,19 @@
                                 "teen",
                                 "child",
                                 "repairs_link"
+                              ]
+                            },
+                            "cause": {
+                              "type": "string",
+                              "nullable": true,
+                              "enum": [
+                                "restarting",
+                                "memory",
+                                "not_installed",
+                                "paused_by_admin",
+                                "mode_change",
+                                "offline",
+                                null
                               ]
                             }
                           },
@@ -431,6 +457,19 @@
                                 "child",
                                 "repairs_link"
                               ]
+                            },
+                            "cause": {
+                              "type": "string",
+                              "nullable": true,
+                              "enum": [
+                                "restarting",
+                                "memory",
+                                "not_installed",
+                                "paused_by_admin",
+                                "mode_change",
+                                "offline",
+                                null
+                              ]
                             }
                           },
                           "required": [
@@ -514,6 +553,213 @@
                                 "teen",
                                 "child",
                                 "repairs_link"
+                              ]
+                            },
+                            "cause": {
+                              "type": "string",
+                              "nullable": true,
+                              "enum": [
+                                "restarting",
+                                "memory",
+                                "not_installed",
+                                "paused_by_admin",
+                                "mode_change",
+                                "offline",
+                                null
+                              ]
+                            }
+                          },
+                          "required": [
+                            "kind",
+                            "pid",
+                            "alive"
+                          ]
+                        },
+                        "image": {
+                          "type": "object",
+                          "properties": {
+                            "kind": {
+                              "type": "string",
+                              "enum": [
+                                "url",
+                                "override",
+                                "selection",
+                                "stub",
+                                "stopped",
+                                "starting",
+                                "stalled",
+                                "none",
+                                "spawned",
+                                "restarting",
+                                "failed",
+                                "blocked"
+                              ]
+                            },
+                            "pid": {
+                              "type": "number",
+                              "nullable": true
+                            },
+                            "alive": {
+                              "type": "boolean",
+                              "nullable": true
+                            },
+                            "availability": {
+                              "type": "string",
+                              "enum": [
+                                "ready",
+                                "starting",
+                                "unavailable"
+                              ]
+                            },
+                            "reason": {
+                              "type": "string",
+                              "nullable": true,
+                              "enum": [
+                                "stopped",
+                                "crashed",
+                                "blocked_port",
+                                "not_installed",
+                                "failed_start",
+                                null
+                              ]
+                            },
+                            "detail": {
+                              "type": "string",
+                              "nullable": true
+                            },
+                            "notice": {
+                              "type": "object",
+                              "nullable": true,
+                              "properties": {
+                                "adult": {
+                                  "type": "string"
+                                },
+                                "teen": {
+                                  "type": "string"
+                                },
+                                "child": {
+                                  "type": "string"
+                                },
+                                "repairs_link": {
+                                  "type": "string",
+                                  "nullable": true
+                                }
+                              },
+                              "required": [
+                                "adult",
+                                "teen",
+                                "child",
+                                "repairs_link"
+                              ]
+                            },
+                            "cause": {
+                              "type": "string",
+                              "nullable": true,
+                              "enum": [
+                                "restarting",
+                                "memory",
+                                "not_installed",
+                                "paused_by_admin",
+                                "mode_change",
+                                "offline",
+                                null
+                              ]
+                            }
+                          },
+                          "required": [
+                            "kind",
+                            "pid",
+                            "alive"
+                          ]
+                        },
+                        "video": {
+                          "type": "object",
+                          "properties": {
+                            "kind": {
+                              "type": "string",
+                              "enum": [
+                                "url",
+                                "override",
+                                "selection",
+                                "stub",
+                                "stopped",
+                                "starting",
+                                "stalled",
+                                "none",
+                                "spawned",
+                                "restarting",
+                                "failed",
+                                "blocked"
+                              ]
+                            },
+                            "pid": {
+                              "type": "number",
+                              "nullable": true
+                            },
+                            "alive": {
+                              "type": "boolean",
+                              "nullable": true
+                            },
+                            "availability": {
+                              "type": "string",
+                              "enum": [
+                                "ready",
+                                "starting",
+                                "unavailable"
+                              ]
+                            },
+                            "reason": {
+                              "type": "string",
+                              "nullable": true,
+                              "enum": [
+                                "stopped",
+                                "crashed",
+                                "blocked_port",
+                                "not_installed",
+                                "failed_start",
+                                null
+                              ]
+                            },
+                            "detail": {
+                              "type": "string",
+                              "nullable": true
+                            },
+                            "notice": {
+                              "type": "object",
+                              "nullable": true,
+                              "properties": {
+                                "adult": {
+                                  "type": "string"
+                                },
+                                "teen": {
+                                  "type": "string"
+                                },
+                                "child": {
+                                  "type": "string"
+                                },
+                                "repairs_link": {
+                                  "type": "string",
+                                  "nullable": true
+                                }
+                              },
+                              "required": [
+                                "adult",
+                                "teen",
+                                "child",
+                                "repairs_link"
+                              ]
+                            },
+                            "cause": {
+                              "type": "string",
+                              "nullable": true,
+                              "enum": [
+                                "restarting",
+                                "memory",
+                                "not_installed",
+                                "paused_by_admin",
+                                "mode_change",
+                                "offline",
+                                null
                               ]
                             }
                           },

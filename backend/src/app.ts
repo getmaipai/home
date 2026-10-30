@@ -146,6 +146,8 @@ const EngineHealthSchema = z.object({
   // CHAT-CALM-ERRORS-01d: the composer line per band while chat cannot
   // answer (failureCopy.ts); absent when the engine is ready.
   notice: z.object({ adult: z.string(), teen: z.string(), child: z.string(), repairs_link: z.string().nullable() }).nullable().optional(),
+  // CHAT-PAUSE-01 and ENGINE-STATUS-MEDIA-01: why the role is not ready, when Home knows.
+  cause: z.enum(["restarting", "memory", "not_installed", "paused_by_admin", "mode_change", "offline"]).nullable().optional(),
 });
 const HealthResponseSchema = z.object({
   brain: z.string(),
@@ -153,7 +155,8 @@ const HealthResponseSchema = z.object({
   /** False when any engine that should be up is not answering, or any
    * registered sidecar is unhealthy/crashed. The Health page's headline. */
   ok: z.boolean(),
-  engines: z.object({ chat: EngineHealthSchema, embed: EngineHealthSchema, background: EngineHealthSchema, voice: EngineHealthSchema }),
+  // ENGINE-STATUS-MEDIA-01: `image` and `video` say whether a picture or a clip can be started now; they never change `ok`.
+  engines: z.object({ chat: EngineHealthSchema, embed: EngineHealthSchema, background: EngineHealthSchema, voice: EngineHealthSchema, image: EngineHealthSchema.optional(), video: EngineHealthSchema.optional() }),
   // Settings -> Household -> Health (2026-09-07): the plainest single
   // signal of "is the app actually up," next to which that page puts the
   // restart control (routes/host.ts's POST /api/host/restart).
