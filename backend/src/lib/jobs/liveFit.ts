@@ -25,6 +25,8 @@ export interface FitResult {
   reason: "fits" | "profile_lowered" | "lead_lowered" | "no_room_now" | "never_fits";
   /** Internal comparison baseline used by appliedProfile; contains no app or person data. */
   requested?: ProfileRow;
+  /** MEM-SPACE-10: counts and bytes of the apps the close step quit for this job; never names. */
+  closed?: { apps: number; bytes: number };
 }
 
 const categories: Category[] = ["chat", "voice", "picture", "video", "music", "tools"];
@@ -140,8 +142,8 @@ export function askLine(result: FitResult, audience: "admin" | "adult" | "child"
   return audience === "admin" ? `${sentence} (${picked} needs about ${Math.round(result.requestedNeedGb)} GB, ${Math.round(result.haveGb)} GB is free). Wait for ${picked} instead?` : `${sentence}. Wait for ${picked} instead?`;
 }
 
-export function appliedProfile(result: FitResult): { lowered: number; queued: number; off: number; closed_apps: 0; closed_bytes: 0 } {
-  const profile = { lowered: 0, queued: 0, off: 0, closed_apps: 0 as const, closed_bytes: 0 as const };
+export function appliedProfile(result: FitResult): { lowered: number; queued: number; off: number; closed_apps: number; closed_bytes: number } {
+  const profile = { lowered: 0, queued: 0, off: 0, closed_apps: result.closed?.apps ?? 0, closed_bytes: result.closed?.bytes ?? 0 };
   if (!result.applied) return profile;
   for (const [category, cell] of Object.entries(result.applied.cells) as [Category, ProfileCell][]) {
     if (category === result.applied.lead) continue;

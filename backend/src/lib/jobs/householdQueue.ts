@@ -1,6 +1,7 @@
 /** The shared household order for heavy jobs. This module has no database or notification dependency. */
 import { DEFAULT_POLICY, scoreJobs, type JobCategory, type ScoreJob, type ScorePolicy, type ScoreReason } from "./jobScore";
 import type { Category, CellState } from "./profileTable";
+import { jobsAwaitingReopen, reopenForJob } from "./closeApps";
 import { setReducedChat } from "@/lib/reducedChat";
 import { fitForAdmission,admissionFitAskLine, admissionFitProfile, getProfileSource, type BudgetNow } from "./admissionFit";
 export type QueueClass = "picture" | "video" | "other";
@@ -347,6 +348,11 @@ export async function releaseHouseholdQueue(): Promise<void> {
       const runningMax = jobs.find((job) => job.state === "running" && job.tier === "max");
       tierState.windowOpenFor = runningMax?.id ?? null;
       currentEntries = entries;
+      for (const id of jobsAwaitingReopen()) {
+        if (jobs.some((item) => item.id === id)) continue;
+        const close = getProfileSource()?.close;
+        await reopenForJob(id, close ?? { mode: "off", always: [], never: [], reopen: false, noReopen: [] });
+      }
       if (activePlan && !jobs.some((item) => item.id === activePlan!.jobId)) activePlan = null;
       for (const entry of entries) {
         if (entry.job.state !== "queued") continue;
@@ -366,7 +372,7 @@ export async function releaseHouseholdQueue(): Promise<void> {
         if (!entry?.release || !admitted.has(item.id) || blockedClasses.has(entry.job.jobClass) || runningPeople.has(entry.job.personId) || heldByPlan(entry.job)) continue;
         if ((entry.job.tier === "boost" || entry.job.tier === "max") && getProfileSource() !== null) {
           try {
-            const fit = await fitForAdmission(entry.job as { jobClass: "picture" | "video" | "other"; category?: string; tier: "boost" | "max" }, stackBudget);
+            const fit = await fitForAdmission(entry.job as { id: string; jobClass: "picture" | "video" | "other"; category?: string; tier: "boost" | "max" }, stackBudget);
             if (fit) {
               const admission = { outcome: fit.outcome, profile: admissionFitProfile(fit), askLine: admissionFitAskLine(fit, (entry.job as QueueJob & { audience?: "adult" | "child" }).audience ?? "adult") } as NonNullable<QueueJob["fit"]>;
               entry.job.fit = admission;

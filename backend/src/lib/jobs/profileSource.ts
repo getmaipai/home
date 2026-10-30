@@ -1,5 +1,6 @@
 import type { Category, CellState, Hardware, ProfileRow, Tier } from "./profileTable";
 import type { ProfileSource } from "./admissionFit";
+import { closeSettingsFrom } from "./closeApps";
 
 // The Studio hardware class (resource-tiers note section 4): budget 116.8 GB, margin 20 GB. Every figure below is a measured peak or
 // resident size from docs/design/tier-evaluations-2026-10-30.md; a slot with no measurement has no figure, so its row is not fitted.
@@ -62,5 +63,5 @@ export function profileSourceFromSettings(read: (key: string) => unknown, hw: Ha
   if (table.length === 0) return null;
   const lowerWithoutAsking: Partial<Record<Category, boolean>> = {};
   for (const [kind, category] of [["chat", "chat"], ["image", "picture"], ["video", "video"], ["music", "music"]] as const) lowerWithoutAsking[category] = read(`resources.lower_without_asking.${kind}`) === true;
-  return { table, hw, pins: {}, priorityWeight: weightsFromPriority(read("resources.priority")), lowerWithoutAsking };
+  return { table, hw, pins: {}, priorityWeight: weightsFromPriority(read("resources.priority")), lowerWithoutAsking, close: closeSettingsFrom(read) };
 }

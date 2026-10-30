@@ -54,3 +54,18 @@ export function askHelper(request: Record<string, unknown>, path = helperSocketP
     socket.on("close", () => finish(null));
   });
 }
+
+export type HelperQuit = "quit" | "still_running" | "not_running" | "refused_floor" | "unavailable";
+
+/** MEM-SPACE-10: asks the app to quit the way its Quit menu does and waits. The helper sends no signal; an app that keeps a save prompt is `still_running` and is left alone. */
+export async function quitHelperApp(bundleId: string, waitSeconds = 20, path = helperSocketPath()): Promise<HelperQuit> {
+  const reply = await askHelper({ op: "quit", bundleId, waitSeconds }, path, (waitSeconds + 5) * 1000);
+  const outcome = reply?.ok === true ? reply.outcome : undefined;
+  return outcome === "quit" || outcome === "still_running" || outcome === "not_running" || outcome === "refused_floor" ? outcome : "unavailable";
+}
+
+/** MEM-SPACE-10: opens the app again without bringing it to the front. */
+export async function reopenHelperApp(bundleId: string, path = helperSocketPath()): Promise<boolean> {
+  const reply = await askHelper({ op: "reopen", bundleId }, path, 10_000);
+  return reply?.ok === true && reply.reopened === true;
+}
