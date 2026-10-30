@@ -18,7 +18,7 @@ import { AsyncState } from "@maipai/ui/src/primitives/AsyncState";
 import { RadioGroup, RadioGroupItem } from "@maipai/ui/src/dashboard/components/ui/radio-group";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@maipai/ui/src/dashboard/components/ui/accordion";
 import { Field, FieldContent, FieldLabel } from "@maipai/ui/src/dashboard/components/ui/field";
-import { api, ApiError } from "@/lib/api";
+import { api, ApiError, request } from "@/lib/api";
 import type { SetupState } from "@maipai/spec/gen/ts/setup-state.js";
 import { setupChecklistCountLine } from "@/shell/useSetupChecklist";
 import { SetupPreviewBar } from "./preview/SetupPreviewBar";
@@ -27,6 +27,7 @@ import { InstallStrip } from "@/shell/InstallStrip";
 import { PlanStep } from "./PlanStep";
 import { HostTuneStep, useHostTuneSupported } from "./HostTuneStep";
 import { CloseAppsStep, useCloseAppsQuestion } from "./CloseAppsStep";
+import { CapabilityTable } from "@/apps/settings/CapabilityTable";
 import { WebSearchStep } from "./WebSearchStep";
 import { StorageStep, type StorageChoice } from "./StorageStep";
 import { NewPersonForm } from "@/apps/people/NewPersonForm";
@@ -47,7 +48,7 @@ const PHASES: WizardStep[] = [
 ];
 // Steps older installs recorded that no screen shows any more.
 const RETIRED_STEPS = new Set<string>(["away", "face", "profile", "hello"]);
-const SCREEN_IDS = ["welcome", "before_start", "engine_location", "storage", "host_tune", "checks", "plan", "web_search", "owner", "coding_mode", "close_apps", "backup", "done"] as const;
+const SCREEN_IDS = ["welcome", "before_start", "engine_location", "storage", "host_tune", "checks", "capabilities", "plan", "web_search", "owner", "coding_mode", "close_apps", "backup", "done"] as const;
 type ScreenId = (typeof SCREEN_IDS)[number];
 const SCREEN_TITLE: Record<ScreenId, string> = {
   welcome: "Welcome to MaiPai Home",
@@ -61,6 +62,7 @@ const SCREEN_TITLE: Record<ScreenId, string> = {
   owner: "Create your owner account",
   coding_mode: "Coding on this Home",
   close_apps: "Close apps for big jobs",
+  capabilities: "What this computer can do",
   backup: "Save your backup key",
   done: "You're all set",
 };
@@ -89,6 +91,7 @@ const SCREEN_DESCRIPTION: Record<ScreenId, string> = {
   owner: "Create the account that manages this Home.",
   coding_mode: "Choose whether to set up Coding on this computer.",
   close_apps: "Optional. Not now is fine.",
+  capabilities: "Home only downloads what fits here.",
   backup: "Save this key somewhere other than this computer.",
   done: "Your Home is ready to use.",
 };
@@ -103,6 +106,7 @@ const SCREEN_ART: Partial<Record<ScreenId, string>> = {
   owner: "/setup-art/owner.webp",
   coding_mode: "/setup-art/coding.webp",
   close_apps: "/setup-art/tune.webp",
+  capabilities: "/setup-art/tune.webp",
   backup: "/setup-art/backup.webp",
   checks: "/setup-art/checking.webp",
   done: "/setup-art/done.webp",
@@ -182,6 +186,14 @@ export function SetupWizard({ onDone, initialScreen }: SetupWizardProps) {
   const hostTuneShown = useHostTuneSupported(engine === "this_computer");
   // The Close apps question shows once the owner exists, and only on a Mac used as a regular computer (MEM-SPACE-12).
   const closeAppsShown = useCloseAppsQuestion(engine === "this_computer" && (screen === "coding_mode" || screen === "close_apps") && Boolean(state && stepIsDone(state, "owner")));
+  // MEM-SPACE-05: the capability table shows only when the Stack can already answer (an older or not yet running Stack skips it).
+  const [capabilitiesShown, setCapabilitiesShown] = useState(false);
+  useEffect(() => {
+    if (engine !== "this_computer" || (screen !== "checks" && screen !== "capabilities")) return;
+    let active = true;
+    request<{ available: boolean }>("/api/setup/capabilities").then((view) => { if (active) setCapabilitiesShown(view.available); }, () => { if (active) setCapabilitiesShown(false); });
+    return () => { active = false; };
+  }, [engine, screen]);
   const codingReadyPieces = Boolean(codingSetup.data && codingSetup.data.pieces.length > 0 && codingSetup.data.pieces.every((piece) => piece.state === "installed"));
   const codingSetupStarted = Boolean(codingBusy === "set_up" || codingSetup.data?.pieces.some((piece) => piece.state === "installing"));
   const finishCodingChoice = () => setScreen(neighbour("coding_mode", 1) ?? "backup");
@@ -209,6 +221,7 @@ export function SetupWizard({ onDone, initialScreen }: SetupWizardProps) {
     // The Web search screen shows only when Home's own search is not ready (SETUP-SEARCH-02).
     if (SCREEN_IDS[index] === "web_search" && !searchNeeded) index += step;
     if (SCREEN_IDS[index] === "close_apps" && !closeAppsShown) index += step;
+    if (SCREEN_IDS[index] === "capabilities" && !capabilitiesShown) index += step;
     return SCREEN_IDS[index];
   };
 
@@ -340,6 +353,7 @@ export function SetupWizard({ onDone, initialScreen }: SetupWizardProps) {
     const stepId = screen === "before_start" ? "welcome" : screen;
     if (screen === "web_search") { await (searchContinue.current ?? (async () => { setScreen(neighbour(screen, 1) ?? "owner"); }))(); return; }
     if (screen === "host_tune") { setScreen(neighbour(screen, 1) ?? "checks"); return; }
+    if (screen === "capabilities") { setScreen(neighbour(screen, 1) ?? "plan"); return; }
     if (screen === "close_apps") { setScreen(neighbour(screen, 1) ?? "backup"); return; }
     const deferred = (["checks", "plan"].includes(stepId) && !(stepId === "plan" && planInstalled.current)) || (screen === "engine_location" && engine === "another_computer");
     // The models folder belongs to the engine computer on a split setup, so it is never sent.
@@ -427,6 +441,7 @@ export function SetupWizard({ onDone, initialScreen }: SetupWizardProps) {
     case "engine_location": body = renderSetupReviewScreen({ screen: "engine_location", engine, onEngineChange: setEngine, showTitle: false }); break;
     case "storage": body = <StorageStep split={engine === "another_computer"} value={storageChoice} onChange={(value, blocked) => { setStorageChoice(value); setStorageBlocked(blocked); }} />; break;
     case "host_tune": body = <HostTuneStep onSkip={() => void next()} />; break;
+    case "capabilities": body = <div className="flex flex-col gap-4"><p className="text-base text-muted-foreground md:text-lg">Boost and Max downloads are offered only where this computer can run them. While a big job runs, chat may get simpler.</p><CapabilityTable path="/api/setup/capabilities" /></div>; break;
     case "close_apps": body = <CloseAppsStep onDone={() => setScreen(neighbour("close_apps", 1) ?? "backup")} />; break;
     case "checks": {
       body = initialScreen === "checks" ? renderSetupReviewScreen({ screen: "checks", checkRows, checkError, checksFetching, showTitle: false, onRetryChecks: () => { setCheckError(false); setChecksFetching(true); void api.setupChecks().then((result) => { setCheckRows(result.rows); setState(result.state); rememberSearch(result); }, () => setCheckError(true)).finally(() => setChecksFetching(false)); } }) : <div>

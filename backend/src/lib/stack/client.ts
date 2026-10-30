@@ -34,6 +34,9 @@ import type {
   StackCodingMode,
   StackMemoryLedger,
   StackDevLoad,
+  StackCapabilities,
+  StackReclaimList,
+  StackReclaimResult,
   StackMemoryWatchdog,
 } from "./types";
 
@@ -167,6 +170,11 @@ export interface StackClient {
   modelAction(id: string, action: string, opts?: { signal?: AbortSignal }): Promise<Record<string, unknown>>;
   health(opts?: { signal?: AbortSignal }): Promise<{ health: HealthItem[] }>;
   /** GET /stack/v1/memory. The ledger block is absent on older Stacks. */
+  /** GET /stack/v1/capabilities. Absent on older Stacks (404). */
+  capabilities?(opts?: { signal?: AbortSignal }): Promise<StackCapabilities>;
+  /** GET and POST /stack/v1/memory/reclaim. Absent on older Stacks (404). */
+  reclaimList?(opts?: { signal?: AbortSignal }): Promise<StackReclaimList>;
+  reclaimRun?(opts?: { signal?: AbortSignal }): Promise<StackReclaimResult>;
   memory?(opts?: { signal?: AbortSignal }): Promise<{ ledger?: StackMemoryLedger; watchdog?: StackMemoryWatchdog; dev_load?: StackDevLoad }>;
   healthFix(code: string, opts?: { signal?: AbortSignal }): Promise<Record<string, unknown>>;
   /** ROBUST-01: crashes per day and the Stack's own restarts; absent on a Stack older than the route. */
@@ -497,6 +505,9 @@ export function createStackClient(options: StackClientOptions = {}): StackClient
     inspectModel: (body, opts) => call("/stack/v1/models/inspect", jsonInit(body), json<Record<string, unknown>>, opts),
     modelAction: (id, action, opts) => call(`/stack/v1/models/${encodeURIComponent(id)}/actions`, jsonInit({ action }), json<Record<string, unknown>>, opts),
     health: (opts) => call("/stack/v1/health", { method: "GET" }, json<{ health: HealthItem[] }>, opts),
+    capabilities: (opts) => call("/stack/v1/capabilities", { method: "GET" }, json<StackCapabilities>, opts),
+    reclaimList: (opts) => call("/stack/v1/memory/reclaim", { method: "GET" }, json<StackReclaimList>, opts),
+    reclaimRun: (opts) => call("/stack/v1/memory/reclaim", { method: "POST" }, json<StackReclaimResult>, opts),
     memory: (opts) => call("/stack/v1/memory", { method: "GET" }, json<{ ledger?: StackMemoryLedger; watchdog?: StackMemoryWatchdog; dev_load?: StackDevLoad }>, opts),
     mediaRoots: (opts) => call("/stack/v1/media", { method: "GET" }, async (res) => {
       const body = await json<{ media?: { roots?: { read?: unknown; write?: unknown } } }>(res);

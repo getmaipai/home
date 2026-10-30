@@ -3,6 +3,7 @@ import { apiRouter, errorResponses } from "@/lib/openapi";
 import { requireRole } from "@/middleware/auth";
 import { listHelperApps } from "@/lib/appHelperClient";
 import { readOtherApps } from "@/lib/otherApps";
+import { readCapabilities, readReclaim, runReclaim } from "@/lib/memoryRoom";
 
 export const performanceAppsRoutes = apiRouter();
 const AppsResponse = z.object({
@@ -19,3 +20,23 @@ const otherAppsRoute = createRoute({ method: "get", path: "/other-apps", tags: [
   middleware: [requireRole("owner", "admin")] as const,
   responses: { 200: { content: { "application/json": { schema: OtherAppsResponse } }, description: "The biggest other apps, from the Mac app helper when it is installed, else the Stack's dev-load reading. Names reach admins only and are never stored." }, ...errorResponses({ 401: "Not signed in", 403: "Owner/admin only" }) } });
 performanceAppsRoutes.openapi(otherAppsRoute, async (c) => c.json(await readOtherApps(), 200));
+
+const ReclaimResponse = z.object({ available: z.boolean(), models: z.number(), bytes: z.number() });
+const reclaimRoute = createRoute({ method: "get", path: "/reclaim", tags: ["Performance"], summary: "What Free up memory would unload, for admins",
+  middleware: [requireRole("owner", "admin")] as const,
+  responses: { 200: { content: { "application/json": { schema: ReclaimResponse } }, description: "How many idle models and about how many bytes. available is false on an older Stack." }, ...errorResponses({ 401: "Not signed in", 403: "Owner/admin only" }) } });
+performanceAppsRoutes.openapi(reclaimRoute, async (c) => c.json(await readReclaim(), 200));
+
+const reclaimRunRoute = createRoute({ method: "post", path: "/reclaim", tags: ["Performance"], summary: "Unload idle models to free memory, for admins",
+  middleware: [requireRole("owner", "admin")] as const,
+  responses: { 200: { content: { "application/json": { schema: z.object({ available: z.boolean(), unloaded: z.number(), freed_bytes: z.number() }) } }, description: "Only Home-owned idle models are unloaded; chat, busy work and other apps are never touched." }, ...errorResponses({ 401: "Not signed in", 403: "Owner/admin only" }) } });
+performanceAppsRoutes.openapi(reclaimRunRoute, async (c) => c.json(await runReclaim(), 200));
+
+export const CapabilityResponse = z.object({
+  available: z.boolean(), machine_class: z.string(),
+  rows: z.array(z.object({ category: z.enum(["chat", "image", "video", "music", "voice"]), label: z.string(), cells: z.array(z.object({ tier: z.enum(["standard", "boost", "max"]), fits: z.boolean(), needs_bytes: z.number().nullable() })) })),
+});
+const capabilitiesRoute = createRoute({ method: "get", path: "/capabilities", tags: ["Performance"], summary: "What this computer can run, per category and tier, for admins",
+  middleware: [requireRole("owner", "admin")] as const,
+  responses: { 200: { content: { "application/json": { schema: CapabilityResponse } }, description: "From the Stack's fits_ever. available is false on an older Stack." }, ...errorResponses({ 401: "Not signed in", 403: "Owner/admin only" }) } });
+performanceAppsRoutes.openapi(capabilitiesRoute, async (c) => c.json(await readCapabilities(), 200));

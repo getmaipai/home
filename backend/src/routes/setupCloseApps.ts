@@ -5,6 +5,7 @@ import { apiRouter } from "@/lib/openapi";
 import { accessRefusal } from "@/routes/setupFolders";
 import { listHelperApps } from "@/lib/appHelperClient";
 import { probeCloseApps } from "@/lib/closeAppsProbe";
+import { readCapabilities } from "@/lib/memoryRoom";
 
 export const setupCloseAppsRoutes = apiRouter();
 const ErrorBody = z.object({ error: z.string() });
@@ -33,4 +34,14 @@ setupCloseAppsRoutes.openapi(testRoute, async (c) => {
   const refusal = accessRefusal(c);
   if (refusal) return refusal as never;
   return c.json({ result: await probeCloseApps() }, 200);
+});
+
+const capRoute = createRoute({
+  method: "get", path: "/capabilities", tags: ["Setup"], summary: "What this computer can run, per category and tier, before anything is downloaded",
+  responses: { 200: { content: { "application/json": { schema: z.object({ available: z.boolean(), machine_class: z.string(), rows: z.array(z.object({ category: z.enum(["chat", "image", "video", "music", "voice"]), label: z.string(), cells: z.array(z.object({ tier: z.enum(["standard", "boost", "max"]), fits: z.boolean(), needs_bytes: z.number().nullable() })) })) }) } }, description: "From the Stack's fits_ever. available is false when the Stack is not running yet or is older." }, ...errs },
+});
+setupCloseAppsRoutes.openapi(capRoute, async (c) => {
+  const refusal = accessRefusal(c);
+  if (refusal) return refusal as never;
+  return c.json(await readCapabilities(), 200);
 });
