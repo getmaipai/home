@@ -21,6 +21,23 @@ def rss_gb(pid):
     o = subprocess.run(["ps", "-o", "rss=", "-p", str(pid)], capture_output=True, text=True).stdout.strip()
     return round(int(o) / 1048576, 2) if o else None
 
+
+import threading, re
+ABORT = {"hit": False}
+def _free_pct():
+    o = subprocess.run(["memory_pressure"], capture_output=True, text=True).stdout
+    m = re.search(r"free percentage: (\d+)", o); return int(m.group(1)) if m else 100
+def _guard(pid):
+    low = 100
+    while p.poll() is None and not ABORT["hit"]:
+        f = _free_pct(); low = min(low, f); res_guard["lowest_free_pct"] = low
+        if f < 15:
+            ABORT["hit"] = True; res_guard["aborted_at_free_pct"] = f
+            try: os.kill(pid, signal.SIGTERM)
+            except Exception: pass
+            return
+        time.sleep(5)
+res_guard = {}
 t0 = time.time()
 if os.environ.get("E1_MLX"):
     cmd = [os.environ["E1_MLX"], "--model", gguf, "--port", str(port), "--host", "127.0.0.1", "--max-tokens", "4096"]
@@ -29,6 +46,7 @@ else:
     p = subprocess.Popen([LS, "--model", gguf, "--port", str(port), "--host", "127.0.0.1", "-c", "40960", "-fa", "on",
     "-ngl", "all", "--reasoning", "off", "-ub", "1024", "--no-webui", "--metrics", "--jinja", "--cache-reuse", "256",
     "--parallel", "1", "-ctk", "q8_0", "-ctv", "q8_0"], stdout=open(f"{OUT}/{label}.server.log", "w"), stderr=subprocess.STDOUT)
+threading.Thread(target=_guard, args=(p.pid,), daemon=True).start()
 try:
     while True:
         try:
@@ -41,7 +59,7 @@ try:
 
     def chat(messages, tools=None, max_tokens=400, temp=0.7):
         body = {"messages": messages, "max_tokens": max_tokens, "temperature": temp, "stream": True,
-                "chat_template_kwargs": {"enable_thinking": False}}
+                "chat_template_kwargs": json.loads(os.environ.get("E1_KWARGS", '{"enable_thinking": false}'))}
         if tools: body["tools"] = tools
         req = urllib.request.Request(base + "/v1/chat/completions", json.dumps(body).encode(), {"Content-Type": "application/json"})
         ts = time.time(); first = None; text = ""; calls = {}; n = 0
@@ -103,7 +121,7 @@ try:
     res["tool_decision"] = td
     res["tool_recall"] = sum(x["called"] for x in td["need_search"]), len(td["need_search"])
     res["false_search"] = sum(x["called"] for x in td["no_search"]), len(td["no_search"])
-    res["peak_rss_gb"] = rss_gb(p.pid); res["footprint_end"] = footprint(p.pid)
+    res["peak_rss_gb"] = rss_gb(p.pid); res["footprint_end"] = footprint(p.pid); res["guard"] = res_guard
     t1 = time.time(); p.send_signal(signal.SIGTERM); p.wait(); res["unload_s"] = round(time.time() - t1, 2)
     json.dump(res, open(f"{OUT}/{label}.json", "w"), indent=1)
     print(json.dumps({k: v for k, v in res.items() if k not in ("turns", "tool_decision")}, indent=1))
