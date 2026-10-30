@@ -22,6 +22,7 @@ import { installed, libraryRequest } from "@/lib/kiwixClient";
 import { searchReference } from "@/lib/referenceSearch";
 import { addReferenceSave, listReferenceSaves, removeReferenceSave } from "@/lib/reference/saves";
 import { ReferenceSave } from "@maipai/spec/gen/ts/reference-save.js";
+import { articlePayloadFor, loadArticleFor, readArticleImage } from "@/lib/reference/article";
 
 export const referenceRoutes = apiRouter();
 
@@ -88,60 +89,14 @@ referenceRoutes.openapi(SEARCH_ROUTE, async (c) => {
 });
 
 async function loadArticle(c: any, book: string, path: string) {
-  const person = c.get("person"); const band = speakerAgeBand(person, new Date()); const base = kiwixBaseUrl();
-  if (!base || path.split("/").includes("..")) return null;
-  try {
-    const names = await installed(base); const rb = readableBooks(names, band).books.find((x) => x.book === book); if (!rb) return null;
-    const res = await libraryRequest(base, `/content/${encodeURIComponent(book)}/${path.split("/").map(encodeURIComponent).join("/")}`); if (!res.ok) return null;
-    const html = await res.text();
-    const imagesAllowed = getPersonSettingValue(person, "reference.images") === true;
-    const full = extractFullArticle(html, { book, allowedBooks: new Set(names), allowLinks: band === "adult", allowImages: imagesAllowed });
-    if (full.redirectTo) {
-      const target = new URL(full.redirectTo, "http://kiwix.local").pathname.match(/^\/(?:content\/)?([^/]+)\/(.+)$/);
-      if (target && decodeURIComponent(target[1]!) === book && !decodeURIComponent(target[2]!).split("/").includes("..")) {
-        return { redirect: `/api/reference/article/${encodeURIComponent(book)}/${encodeURIComponent(decodeURIComponent(target[2]!))}` };
-      }
-    }
-    const fallback = extractArticle(html); const title = full.title || fallback.title || path;
-    const plain = full.blocks.flatMap((b) => b.type === "paragraph" ? b.inlines.map((i) => i.text) : b.type === "heading" ? [b.text] : b.type === "rows" ? b.rows.flatMap((r) => [r.label, r.value]) : []).concat(full.summary ?? "", full.hatnote ?? "", full.infobox?.rows.flatMap((r) => [r.label, r.value]) ?? []).join(" ");
-    if (band !== "adult" && tripsMinorFloor(`${title}. ${plain}. ${full.kicker ?? ""}. ${full.infobox?.rows[0]?.label ?? ""}. ${full.infobox?.rows[0]?.value ?? ""}`)) return null;
-    // One path segment: the media route takes `{path}` as a single segment, so the slashes inside an image path are encoded too.
-    const rewrite = (imagePath: string) => `/api/reference/media/${encodeURIComponent(book)}/${encodeURIComponent(imagePath)}`;
-    const leadImg = imagesAllowed ? extractArticleImages(html, { book, articlePath: path, limit: 1 }).find((image) => image.lead) : undefined;
-    const blocks = full.blocks.map((block) => {
-      if (block.type !== "figure") return block;
-      if (!imagesAllowed) return null;
-      const resolved = extractArticleImages(`<figure><img src="${block.src.replace(/&/g, "&amp;").replace(/"/g, "&quot;")}" alt=""></figure>`, { book, articlePath: path }).find((image) => image.imagePath);
-      return resolved ? { ...block, src: rewrite(resolved.imagePath) } : null;
-    }).filter((block): block is NonNullable<typeof block> => block !== null);
-    const firstParagraph = full.blocks.find((block) => block.type === "paragraph");
-    const leadText = firstParagraph?.type === "paragraph" ? firstParagraph.inlines.map((inline) => inline.text).join("") : "";
-    const wordText = full.blocks.flatMap((block) => block.type === "paragraph" ? [block.inlines.map((inline) => inline.text).join("")] : block.type === "list" ? block.items.map((item) => item.map((inline) => inline.text).join("")) : block.type === "heading" ? [block.text] : []).join(" ");
-    const lead = leadText ? cutAtSentence(leadText, 300) : undefined;
-    const quickFactRow = full.infobox?.rows[0];
-    const quickFact = quickFactRow ? `${quickFactRow.label}: ${quickFactRow.value}`.slice(0, 160).trimEnd() : undefined;
-    const badge = imagesAllowed && leadImg?.caption ? leadImg.caption.length <= 30 ? leadImg.caption : leadImg.caption.slice(0, 30).replace(/\s+\S*$/, "").trim() : undefined;
-    const links = [...new Map(full.blocks.flatMap((block) => block.type === "paragraph" ? block.inlines : []).flatMap((inline) => inline.type === "link" && inline.target ? [`${inline.target.book}\0${inline.target.path}`] : []).map((key) => { const [linkBook, linkPath] = key.split("\0"); return [key, { book: linkBook!, path: linkPath! }] as const; })).values()].filter((target) => !(target.book === book && target.path === path) && target.book === book);
-    const leadImage = leadImg ? { src: rewrite(leadImg.imagePath), alt: leadImg.alt } : undefined;
-    return { rb, title, full: { ...full, blocks }, lead, reading_minutes: Math.max(1, Math.ceil(wordText.trim().split(/\s+/).filter(Boolean).length / 200)), ...(full.kicker ? { kicker: full.kicker } : {}), ...(quickFact ? { quick_fact: quickFact } : {}), ...(badge ? { badge } : {}), relatedTargets: band === "adult" ? links : [], ...(leadImage ? { lead_image: leadImage } : {}), ...(leadImage && full.infobox ? { infoboxImage: leadImage } : {}), profile: sourceForBook(book)?.id.startsWith("wikipedia-") ? "wikipedia" : "generic" };
-  } catch { return null; }
+  return loadArticleFor(c.get("person"), book, path);
 }
 
 referenceRoutes.openapi(ARTICLE_ROUTE, async (c) => {
   const { book, path } = c.req.valid("param"); const result = await loadArticle(c, book, path);
   if (!result) return unavailable(c); if ("redirect" in result) return c.redirect(result.redirect!, 302);
-  const base = kiwixBaseUrl()!;
   c.header("Cache-Control", "private, max-age=600"); c.header("X-Content-Type-Options", "nosniff");
-  let related: Array<{ book: string; path: string; title: string; thumbnail?: { src: string; alt: string } }> | undefined;
-  if (result.relatedTargets.length) {
-    related = [];
-    for (let i = 0; i < result.relatedTargets.length && related.length < 5; i += 4) {
-      const batch = result.relatedTargets.slice(i, i + 4);
-      const loaded = await Promise.all(batch.map(async (target: { book: string; path: string }) => { const article = await loadArticle(c, target.book, target.path); return !article || "redirect" in article ? null : { book: target.book, path: target.path, title: article.title, ...(article.lead_image ? { thumbnail: article.lead_image } : {}) }; }));
-      related.push(...loaded.filter((x): x is NonNullable<typeof x> => x !== null).slice(0, 5 - related.length));
-    }
-  }
-  return c.json({ title: result.title, book, path, source_label: result.rb.source.label, licence: licenceLabel(result.rb.source.licence), snapshot_date: await dateFor(base, book), blocks: result.full.blocks, toc: result.full.toc, ...(result.full.infobox ? { infobox: { ...result.full.infobox, ...(result.infoboxImage ? { image: result.infoboxImage } : {}) } } : {}), ...(result.full.description ? { description: result.full.description } : {}), ...(result.full.summary ? { summary: result.full.summary } : {}), ...(result.full.hatnote ? { hatnote: result.full.hatnote } : {}), profile: result.profile, ...(result.lead_image ? { lead_image: result.lead_image } : {}), ...(result.lead ? { lead: result.lead } : {}), reading_minutes: result.reading_minutes, ...(result.kicker ? { kicker: result.kicker } : {}), ...(result.quick_fact ? { quick_fact: result.quick_fact } : {}), ...(result.badge ? { badge: result.badge } : {}), ...(related ? { related } : {}) }, 200);
+  return c.json(await articlePayloadFor(c.get("person"), result), 200);
 });
 
 referenceRoutes.openapi(PREVIEW_ROUTE, async (c) => {
@@ -169,15 +124,10 @@ referenceRoutes.openapi(RANDOM_ROUTE, async (c) => {
 
 referenceRoutes.openapi(MEDIA_ROUTE, async (c) => {
   const { book, path } = c.req.valid("param"); const person = c.get("person"); const band = speakerAgeBand(person, new Date()); const base = kiwixBaseUrl();
-  if (!base || !path || path.split("/").includes("..") || getPersonSettingValue(person, "reference.images") !== true) return unavailable(c);
-  try {
-    const names = await installed(base); if (!readableBooks(names, band).books.some((x) => x.book === book)) return unavailable(c);
-    const safePath = decodeURIComponent(path); if (/^(?:https?:|data:|javascript:)/i.test(safePath)) return unavailable(c);
-    const res = await libraryRequest(base, `/raw/${encodeURIComponent(book)}/${safePath.split("/").map(encodeURIComponent).join("/")}`); if (!res.ok) return unavailable(c);
-    const type = (res.headers.get("content-type") ?? "").split(";")[0]!.toLowerCase(); if (!["image/png", "image/jpeg", "image/webp", "image/svg+xml"].includes(type)) return unavailable(c);
-    c.header("Content-Type", type); c.header("X-Content-Type-Options", "nosniff"); c.header("Content-Security-Policy", "default-src 'none'; sandbox"); c.header("Cross-Origin-Resource-Policy", "same-origin"); c.header("Cache-Control", "private, max-age=600");
-    return c.body(await res.arrayBuffer(), 200);
-  } catch { return unavailable(c); }
+  const image = await readArticleImage(person, book, path);
+  if (!base || !image) return unavailable(c);
+  c.header("Content-Type", image.type); c.header("X-Content-Type-Options", "nosniff"); c.header("Content-Security-Policy", "default-src 'none'; sandbox"); c.header("Cross-Origin-Resource-Policy", "same-origin"); c.header("Cache-Control", "private, max-age=600");
+  return c.body(image.bytes, 200);
 });
 
 referenceRoutes.openapi(SAVES_ROUTE, async (c) => {
