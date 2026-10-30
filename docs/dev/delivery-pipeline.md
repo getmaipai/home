@@ -37,7 +37,7 @@ Where it ended up (measured on the Studio):
 1. **Sessions only edit, look, commit and push.** One process on the machine, the lander, owns `main`. A session never waits for another and never holds a machine-wide lock.
 2. **Landing runs a 15 to 60 second static check, not the tests.** Tests run once after landing, on the exact `main` commit, by one watcher. A red names the commit that caused it. Shipping waits for the watcher's green mark, or the owner says so explicitly.
 3. **One heavy process at a time, and nobody hand-edits the files everyone conflicts on.** Backlog status lines, regenerated files and pins are written by the lander or `pin.sh`.
-   Heavy runs (RUN-GUARD-01, 2026-10-30): `gate-lock.sh heavy <name> -- <cmd>` allows two at once machine-wide, waits (at most 15 minutes, with a plain message) while load is over 20 or free memory is under 25%, runs at background priority (`taskpolicy -b`), and stops its own process group by group id if it passes a memory cap. `wt.sh check` wraps the beside-tests, `--pre` and the gate this way; `MAIPAI_HEAVY=0` turns it off. The cap for the full gate is not set yet (its peak is unmeasured).
+   Heavy runs (RUN-GUARD-01, 2026-10-30): `gate-lock.sh heavy <name> -- <cmd>` allows two at once machine-wide, waits (at most 15 minutes, with a plain message) while load is over 20 or free memory is under 25%, runs at background priority (`taskpolicy -b`), and stops its own process group by group id if it passes a memory cap. `wt.sh check` wraps the beside-tests, `--pre` and the gate this way; `MAIPAI_HEAVY=0` turns it off. The default cap is 8 GB; the full gate's measured peak was 3.0 GB (2026-10-30, through the a11y step), so the gate runs under it with headroom.
 
 ## 3. The flow
 
