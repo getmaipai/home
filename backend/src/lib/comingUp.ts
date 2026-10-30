@@ -17,8 +17,10 @@ export function listComingUp(actor: PersonRow): ComingUpRow[] {
     let inputs: Record<string, unknown> = {};
     try { inputs = JSON.parse(row.inputs) as Record<string, unknown>; } catch { /* malformed legacy inputs have no text */ }
     const kind: ComingUpKind = row.job === "alarms.fire" ? "alarm" : row.job === "timers.fire" ? "timer" : "reminder";
+    // An alarm that has its own record is listed from `GET /api/alarms`; this list is only the one-time alarms made by chat.
+    if (typeof inputs.alarmId === "string") return null;
     return { id: row.id, kind, text: typeof inputs[kind === "timer" ? "label" : "task"] === "string" ? inputs[kind === "timer" ? "label" : "task"] as string : "", at: row.nextRunAt };
-  }).sort((a, b) => Date.parse(a.at) - Date.parse(b.at));
+  }).filter((row): row is ComingUpRow => row !== null).sort((a, b) => Date.parse(a.at) - Date.parse(b.at));
 }
 
 export function doneComingUp(actor: PersonRow, id: string) {

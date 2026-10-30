@@ -1,7 +1,9 @@
 import { beforeEach, describe, expect, test } from "bun:test";
 import { eq } from "drizzle-orm";
 import { db } from "@/db";
-import { scheduledJobs } from "@/db/schema";
+import { people, scheduledJobs } from "@/db/schema";
+import { listComingUp } from "@/lib/comingUp";
+import { scheduleCoreJob } from "@/lib/scheduler";
 import { TestClient } from "./client";
 import { resetDb } from "./reset-db";
 
@@ -103,5 +105,19 @@ describe("coming up", () => {
     add("child-alarm", childId, "alarms.fire", "2099-01-01T09:00:00.000Z", { task: "School" });
     add("owner-alarm", ownerId, "alarms.fire", "2099-01-01T08:00:00.000Z", { task: "Private" });
     expect(await (await child.get("/api/coming-up")).json()).toEqual([{ id: "child-alarm", kind: "alarm", text: "School", at: "2099-01-01T09:00:00.000Z" }]);
+  });
+});
+
+describe("alarm records are not listed as one-time alarms", () => {
+  test("an alarms.fire job that has an alarmId stays out of the Coming up list", async () => {
+    const client = new TestClient();
+    await client.post("/api/auth/setup", { displayName: "Sage", secret: "correcthorse" });
+    const actor = db.select().from(people).where(eq(people.displayName, "Sage")).get()!;
+    const made = await client.post("/api/alarms", { time: "07:00", days: [1, 2, 3, 4, 5], label: "Gentle wake" });
+    expect(made.status).toBe(201);
+    const once = scheduleCoreJob(actor, "alarms.fire", "2099-01-01T00:00:00.000Z", { task: "chat alarm" });
+    expect(once.ok).toBe(true);
+    const list = listComingUp(actor);
+    expect(list.map((row) => row.text)).toEqual(["chat alarm"]);
   });
 });

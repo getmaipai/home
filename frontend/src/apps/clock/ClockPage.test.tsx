@@ -2,17 +2,23 @@ import { afterEach, describe, expect, test, mock, vi } from "bun:test";
 import { cleanup, fireEvent, waitFor, within } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { ClockPage } from "@/apps/clock/ClockPage";
+import { openClockAlarmEditor } from "@/apps/clock/clockHeader";
 import { renderWithQueryClient } from "../../../tests/renderWithQueryClient";
 
 afterEach(cleanup);
 
-function stub(items: Array<{ id: string; kind: "alarm" | "reminder" | "timer"; text: string; at: string }>) {
+function stub(items: Array<{ id: string; kind: "alarm" | "reminder" | "timer"; text: string; at: string }>, records: Array<Record<string, unknown>> = []) {
   const original = globalThis.fetch;
-  const calls: string[] = [];
+  const calls: Array<{ url: string; method: string; body?: unknown }> = [];
   globalThis.fetch = mock((input: RequestInfo | URL, init?: RequestInit) => {
     const url = String(input);
+    const method = init?.method ?? "GET";
+    if (url.endsWith("/api/alarms") && method === "GET") return Promise.resolve(Response.json(records));
     if (url.endsWith("/api/coming-up") && (!init?.method || init.method === "GET")) return Promise.resolve(Response.json(items));
-    calls.push(url);
+    calls.push({ url, method, body: init?.body ? JSON.parse(String(init.body)) : undefined });
+    if (method === "POST" && url.endsWith("/api/alarms")) return Promise.resolve(Response.json({ id: "alarm-created1", next_at: null }));
+    if (method === "POST" && url.endsWith("/skip-next")) return Promise.resolve(Response.json({ id: "alarm-abcdef", next_at: null }));
+    if (url.endsWith("/api/alarms") || url.includes("/api/alarms/")) return Promise.resolve(Response.json({ id: "alarm-abcdef", next_at: null }));
     return Promise.resolve(Response.json({ ok: true }));
   }) as unknown as typeof fetch;
   return { calls, restore: () => { globalThis.fetch = original; } };
@@ -33,7 +39,7 @@ describe("ClockPage", () => {
       expect(await view.findByText("Tea")).toBeInTheDocument();
       expect(view.getByText(/remaining/)).toBeInTheDocument();
       fireEvent.click(view.getByRole("button", { name: "Done" }));
-      expect(api.calls.some((url) => url.endsWith("/t1/done"))).toBe(true);
+      expect(api.calls.some((call) => call.url.endsWith("/t1/done"))).toBe(true);
     } finally { api.restore(); }
   });
 
@@ -89,9 +95,9 @@ describe("ClockPage", () => {
       fireEvent.pointerDown(within(item).getByRole("button", { name: "Snooze" }), { button: 0, ctrlKey: false });
       await waitFor(() => expect(view.getByText("15 minutes")).toBeInTheDocument());
       fireEvent.click(view.getByText("15 minutes"));
-      await waitFor(() => expect(api.calls.some((url) => url.endsWith("/a1/snooze"))).toBe(true));
+      await waitFor(() => expect(api.calls.some((call) => call.url.endsWith("/a1/snooze"))).toBe(true));
       fireEvent.click(within(item).getByRole("button", { name: "Done" }));
-      await waitFor(() => expect(api.calls.some((url) => url.endsWith("/a1/done"))).toBe(true));
+      await waitFor(() => expect(api.calls.some((call) => call.url.endsWith("/a1/done"))).toBe(true));
     } finally { api.restore(); }
   });
 
@@ -103,5 +109,71 @@ describe("ClockPage", () => {
       fireEvent.click(view.getByRole("tab", { name: "Timers" }));
       expect(await view.findByText("No timers")).toBeInTheDocument();
     } finally { api.restore(); }
+  });
+
+  test("record row gives repeat text, day names, switch name, next time, and PATCHes its day circles and switch", async () => {
+    const record = { id: "alarm-abcdef", time: "06:30", days: [1, 2, 3, 4, 5], label: "Wake up", tag: "Wake up", enabled: true, sound: "gentle_wake", snooze_minutes: null, next_at: new Date(Date.now() + 7 * 60 * 60_000 + 12 * 60_000).toISOString() };
+    const api = stub([], [record]);
+    try {
+      const view = renderWithQueryClient(<MemoryRouter><ClockPage /></MemoryRouter>);
+      expect(await view.findByText("Weekdays · Gentle wake")).toBeInTheDocument();
+      expect(view.getByRole("button", { name: "Monday" })).toHaveAttribute("aria-pressed", "true");
+      expect(view.getByRole("button", { name: "Saturday" })).toHaveAttribute("aria-pressed", "false");
+      expect(view.getByRole("switch", { name: /6:30 AM, weekdays, Wake up, on/i })).toBeInTheDocument();
+      expect(await view.findByText(/Rings in/)).toBeInTheDocument();
+      fireEvent.click(view.getByRole("button", { name: "Monday" }));
+      await waitFor(() => expect(api.calls.find((call) => call.method === "PATCH")?.body).toMatchObject({ days: [2, 3, 4, 5] }));
+      fireEvent.click(view.getByRole("switch", { name: /6:30 AM/i }));
+      await waitFor(() => expect(api.calls.find((call) => call.method === "PATCH" && (call.body as { enabled?: boolean }).enabled === false)).toBeTruthy());
+    } finally { api.restore(); }
+  });
+
+  test("editor creates, edits, confirms delete, skips next, and the header plus opens an empty editor", async () => {
+    const record = { id: "alarm-abcdef", time: "06:30", days: [1, 2, 3, 4, 5], label: "Wake up", tag: "Wake up", enabled: true, sound: "gentle_wake", snooze_minutes: null, next_at: null };
+    const api = stub([], [record]);
+    try {
+      const view = renderWithQueryClient(<MemoryRouter><ClockPage /></MemoryRouter>);
+      openClockAlarmEditor();
+      await waitFor(() => expect(view.queryByRole("dialog")).toBeTruthy());
+      expect(await view.findByRole("dialog")).toBeInTheDocument();
+      fireEvent.change(view.getByLabelText("Time"), { target: { value: "07:15" } });
+      fireEvent.change(view.getByLabelText("Label"), { target: { value: "Stretch" } });
+      fireEvent.click(view.getByRole("button", { name: "Save" }));
+      await waitFor(() => expect(api.calls.find((call) => call.method === "POST" && call.url.endsWith("/api/alarms"))?.body).toMatchObject({ time: "07:15", label: "Stretch" }));
+    } finally { api.restore(); }
+  });
+
+  test("an existing alarm opens for edit, can skip next and deletes after confirmation", async () => {
+    const record = { id: "alarm-abcdef", time: "06:30", days: [1, 2, 3, 4, 5], label: "Wake up", tag: "Wake up", enabled: true, sound: "gentle_wake", snooze_minutes: null, next_at: null };
+    const api = stub([], [record]);
+    try {
+      const view = renderWithQueryClient(<MemoryRouter><ClockPage /></MemoryRouter>);
+      fireEvent.click(await view.findByRole("button", { name: /6:30 AM, weekdays, Wake up/i }));
+      expect(await view.findByLabelText("Label")).toHaveValue("Wake up");
+      fireEvent.click(view.getByRole("button", { name: "Skip next" }));
+      await waitFor(() => expect(view.getByText("Skipping the next one")).toBeInTheDocument());
+      expect(api.calls.some((call) => call.method === "POST" && call.url.endsWith("/alarm-abcdef/skip-next"))).toBe(true);
+      fireEvent.click(view.getByRole("button", { name: "Delete" }));
+      expect(await view.findByRole("alertdialog")).toBeInTheDocument();
+      fireEvent.click(view.getByRole("button", { name: "Delete alarm" }));
+      await waitFor(() => expect(api.calls.some((call) => call.method === "DELETE")).toBe(true));
+    } finally { api.restore(); }
+  });
+
+  test("legacy one-time rows retain Done and Snooze, and the phone editor uses the bottom sheet", async () => {
+    const api = stub([{ id: "legacy1", kind: "alarm", text: "gym", at: new Date(Date.now() + 3_600_000).toISOString() }]);
+    const width = window.innerWidth;
+    const media = window.matchMedia;
+    window.matchMedia = ((query: string) => ({ matches: query.includes("639.98") ? true : false, media: query, onchange: null, addListener: () => {}, removeListener: () => {}, addEventListener: () => {}, removeEventListener: () => {}, dispatchEvent: () => false })) as typeof window.matchMedia;
+    try {
+      Object.defineProperty(window, "innerWidth", { configurable: true, value: 360 });
+      const view = renderWithQueryClient(<MemoryRouter><ClockPage /></MemoryRouter>);
+      expect(await view.findByRole("button", { name: "Done" })).toBeInTheDocument();
+      expect(view.getByRole("button", { name: "Snooze" })).toBeInTheDocument();
+      openClockAlarmEditor();
+      await waitFor(() => expect(view.queryByRole("dialog")).toBeTruthy());
+      await view.findByRole("dialog");
+      expect(view.getByTestId("alarm-sheet-content").className).toContain("inset-x-0");
+    } finally { api.restore(); window.matchMedia = media; Object.defineProperty(window, "innerWidth", { configurable: true, value: width }); }
   });
 });

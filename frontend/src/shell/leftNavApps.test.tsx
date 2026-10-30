@@ -29,6 +29,7 @@ function start(pinnedApps?: string[]) {
     if (url.startsWith("/api/apps")) return Promise.resolve(Response.json(rows));
     if (url.endsWith("/api/lists")) return Promise.resolve(Response.json([]));
     if (url.endsWith("/api/coming-up")) return Promise.resolve(Response.json([]));
+    if (url.endsWith("/api/alarms")) return Promise.resolve(Response.json([]));
     return baseFetch(input, init);
   }) as typeof fetch;
 }
