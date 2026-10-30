@@ -18,7 +18,7 @@ export type Selection = { source: string; flavour: "mini" | "maxi" | "nopic" | "
 type SetSpec = { source: string; flavour: string; book: string; language: string; catalogFlavour: string; child: boolean; wikipedia: boolean };
 export type PlannedSet = { id: string; source: string; flavour: string; name: string; snapshotDate: string | null; sizeBytes: number; sha256: string; installed: boolean; child: boolean; wikipedia: boolean };
 export type ReferencePlan = { preset: PresetId | "custom"; sets: PlannedSet[]; totalBytes: number; freeBytes: number; freeAfterInstallBytes: number; requiredFreeBytes: number; refusal: string | null; swapHeadroomBytes: number; estimatedSeconds: number | null; warnings: string[]; settings: Record<string, string | number | boolean> };
-export type ReferenceJob = { id: string; setId: string; state: "queued" | "waiting_window" | "downloading" | "paused" | "done" | "failed" | "cancelled"; completedBytes: number; totalBytes: number; message: string | null };
+export type ReferenceJob = { id: string; setId: string; state: "queued" | "waiting_window" | "downloading" | "paused" | "done" | "failed" | "cancelled"; completedBytes: number; totalBytes: number; message: string | null; /** Set when you press Apply or Start now: this job ignores the nightly window. */ force?: boolean };
 type StateFile = { jobs: ReferenceJob[]; order: string[]; selection: Selection; settings: Record<string, string | number | boolean>; location?: string };
 const statePath = () => join(referenceLibraryDir(), ".reference-jobs.json");
 const knownSources = new Set(["vikidia", "wikipedia-simple", "wikipedia-en", "wiktionary-simple", "wiktionary-en", "wikivoyage", "wikibooks", "world-factbook", "medlineplus", "stackexchange"]);
@@ -163,8 +163,7 @@ export async function applyReference(preset: PresetId | "custom", custom?: Selec
   const childFirst = new Set(preset === "custom" ? selection.filter((m) => BAND_SOURCE_IDS.child.includes(m.source)).map((m) => `${m.source}:${m.flavour}`) : presetLibrary.presets.find((p) => p.id === preset)!.members.filter((m) => m.bands.includes("child")).map((m) => `${m.source}:${m.flavour}`));
   const order = selection.map((r) => setSpec(r.source, r.flavour)).sort((a,b) => Number(a.wikipedia) - Number(b.wikipedia) || Number(childFirst.has(`${b.source}:${b.flavour}`)) - Number(childFirst.has(`${a.source}:${a.flavour}`))).map((s) => `${s.source}:${s.flavour}`);
   const byId = new Map(plan.sets.map((s) => [s.id, s]));
-  const jobs: ReferenceJob[] = order.map((id) => byId.get(id)).filter((s): s is PlannedSet => Boolean(s && !s.installed)).map((s) => ({ id: newJobId(), setId: s.id, state: "queued", completedBytes: 0, totalBytes: s.sizeBytes, message: null }));
-  if (currentSetting("reference.download.when", "window") === "window" && !inWindow()) for (const job of jobs) { job.state = "waiting_window"; job.message = "Waiting for the nightly download window."; }
+  const jobs: ReferenceJob[] = order.map((id) => byId.get(id)).filter((s): s is PlannedSet => Boolean(s && !s.installed)).map((s) => ({ id: newJobId(), setId: s.id, state: "queued", completedBytes: 0, totalBytes: s.sizeBytes, message: null, force: true }));
   saveState({ jobs, order, selection, settings, location: resolveReferenceLibraryLocation(location) });
   void runQueue();
   return { jobs, idempotent: false };
@@ -177,7 +176,7 @@ async function runQueue(): Promise<void> {
       const state = loadState();
       const job = state.jobs.find((j) => j.state === "queued" || j.state === "waiting_window");
       if (!job) break;
-      if (currentSetting("reference.download.when", "window") === "window" && !inWindow()) {
+      if (!job.force && currentSetting("reference.download.when", "window") === "window" && !inWindow()) {
         job.state = "waiting_window"; job.message = "Waiting for the nightly download window."; saveState(state);
         if (windowTimer) clearTimeout(windowTimer);
         windowTimer = setTimeout(() => { windowTimer = null; void runQueue(); }, 60_000);
@@ -210,7 +209,7 @@ export function resumeReferenceJobsOnBoot(): void { void runQueue(); }
 export function controlReferenceJob(id: string, action: "pause" | "resume" | "cancel"): ReferenceJob | null {
   const state = loadState(); const job = state.jobs.find((j) => j.id === id); if (!job) return null;
   if (action === "pause" || action === "cancel") { if (action === "cancel") job.state = "cancelled"; else job.state = "paused"; controllers.get(id)?.abort(); }
-  else if (["paused", "waiting_window"].includes(job.state)) { job.state = "queued"; void runQueue(); }
+  else if (["paused", "waiting_window"].includes(job.state)) { if (job.state === "waiting_window") job.force = true; job.state = "queued"; void runQueue(); }
   saveState(state); return job;
 }
 export async function installOneReference(source: string, flavour: string, location?: string): Promise<ReferenceJob> {

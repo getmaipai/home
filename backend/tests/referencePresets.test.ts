@@ -91,14 +91,14 @@ describe("KS-REF-PRESETS-01 engine", () => {
     expect(listInstalledReferenceFlavours()).toEqual([]); expect(readFileSync(foreign, "utf8")).toBe("foreign");
   });
 
-  test("window mode queues but does not begin outside quiet hours", async () => {
+  test("Apply starts the download at once even when the nightly window is on and closed", async () => {
     setHouseholdSettingValue("reference.download.when", "window");
     setHouseholdSettingValue("household.quiet_hours.from", "00:00");
     setHouseholdSettingValue("household.quiet_hours.to", "00:01");
     const result = await applyReference("custom", [{ source: "vikidia", flavour: "default" }]);
-    await new Promise((resolve) => setTimeout(resolve, 20));
-    expect(result.jobs[0]?.state).toBe("waiting_window");
-    expect(getReferenceState().jobs[0]?.state).toBe("waiting_window");
+    expect(result.jobs[0]?.state).toBe("queued");
+    await new Promise((resolve) => setTimeout(resolve, 300));
+    expect(getReferenceState().jobs.some((j) => j.state === "waiting_window")).toBe(false);
   });
 
   test("remove deletes a recorded installed ZIM and metadata only", async () => {
