@@ -13,8 +13,19 @@ import { NO_RECORD_BUDGET, resolveTurnBudgetBase, withTurnToolGates } from "@/li
 import { budgetWithTurnToolGates } from "@/lib/turnMachine/toolGates";
 import { toolSpecFor } from "@/lib/turnMachine/nodes/model";
 
-export async function turnWarmupPrompt(): Promise<WarmupPrompt> {
-  const system = buildStablePrefix(DEFAULT_PERSONA, "written");
+export async function turnWarmupPrompt(surfaceClass: "written" | "spoken" = "written"): Promise<WarmupPrompt> {
+  const { system, specs } = await warmupParts(surfaceClass);
+  return { system, tools: specs.map(toToolDefinition) };
+}
+
+/** The same prompt as ToolSpec objects, for the request the prefix prewarm sends (lib/prefixPrewarm.ts). */
+export async function turnWarmupRequest(surfaceClass: "written" | "spoken"): Promise<{ system: string; tools: ToolSpec[] }> {
+  const { system, specs } = await warmupParts(surfaceClass);
+  return { system, tools: specs };
+}
+
+async function warmupParts(surfaceClass: "written" | "spoken"): Promise<{ system: string; specs: ToolSpec[] }> {
+  const system = buildStablePrefix(DEFAULT_PERSONA, surfaceClass);
   let budget = NO_RECORD_BUDGET;
   try {
     const baseBudget = resolveTurnBudgetBase(undefined, "adult");
@@ -25,8 +36,8 @@ export async function turnWarmupPrompt(): Promise<WarmupPrompt> {
         actor: primaryAdult,
         band: "adult",
         surface: "chat",
-        surfaceClass: "written",
-        spoken: false,
+        surfaceClass,
+        spoken: surfaceClass === "spoken",
         temporary: false,
         bare: false,
         ephemeral: false,
@@ -43,5 +54,5 @@ export async function turnWarmupPrompt(): Promise<WarmupPrompt> {
     }
   }
   const tools = budget.tools_offered.slice().sort().map((id) => toolSpecFor(id)).filter((t): t is ToolSpec => t !== null);
-  return { system, tools: tools.map(toToolDefinition) };
+  return { system, specs: tools };
 }

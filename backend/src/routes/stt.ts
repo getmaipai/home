@@ -19,7 +19,7 @@ import { apiRouter, errorResponses } from "@/lib/openapi";
 
 export const sttRoutes = apiRouter();
 
-const SESSION_CONFIG = { sampleRate: 16_000, silenceTimeoutS: 0.6, partialIntervalS: 1.5 };
+const SESSION_CONFIG = { sampleRate: 16_000, silenceTimeoutS: 0.75, partialIntervalS: 1.5 };
 const robotSttSockets = new Set<{ close(code: number, reason: string): void }>();
 
 export function closeRobotSttSockets(): void {

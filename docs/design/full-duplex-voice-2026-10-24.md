@@ -366,3 +366,7 @@ Jesse's report: Home stops dead the moment he speaks and never makes a sound beh
 ## Call sounds (VOICE-SOUNDS-01, 2026-10-29)
 
 Starting a call with a companion plays a short bright climb (three notes, triangle and sine, 392 to 1047 Hz); hanging up plays a soft two-step down (587 to 262 Hz). They differ from each other and from the wake chime (two plain sine notes at 660, 880 and 440 Hz); a wake cue that played in the last 3 s stands in for either. Synthesized with Web Audio in `lib/voice/callSounds.ts`, played from `liveVoiceSession.tsx` when the overlay opens and closes.
+
+## Cold first turn and early cut-offs (2026-10-29)
+
+Read from the live chat log: the first spoken turn after a hub restart took 3.0 s to the first word (later turns 0.9 to 1.3 s), because the prefix prewarm remembers prompts in memory and a restart empties it. The hub now warms the shared start of the default spoken prompt (tools block and persona text) about 5 s after it starts, retrying every 20 s while the Stack loads (`warmSpokenPrefixAtBoot`). The same log showed fragments ("I didn't", "Who's") sent as whole turns after the 0.6 s end-of-speech silence, so it is 0.75 s again; the end-of-turn model that would decide better is still unmeasured on real speech.

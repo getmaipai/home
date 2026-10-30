@@ -23,7 +23,8 @@ import { startKiwixSidecar } from "@/lib/kiwixSidecar";
 import { resumeReferenceJobsOnBoot } from "@/lib/referencePresetEngine";
 import { initCrashBootHold } from "@/lib/dirtyBoot";
 import { sweepOrphanEngineProcesses, getChatClient, setWarmupPrompt } from "@/lib/llmSupervisor";
-import { turnWarmupPrompt } from "@/lib/turnMachine/warmup";
+import { turnWarmupPrompt, turnWarmupRequest } from "@/lib/turnMachine/warmup";
+import { warmSpokenPrefixAtBoot } from "@/lib/prefixPrewarm";
 import { engineWarmupsForStackRoles } from "@/lib/engineBoot";
 import { runAllSmokeTests } from "@/lib/smoke";
 import { startConversationTitleSweep } from "@/lib/conversationTitle";
@@ -110,6 +111,8 @@ catch (err) { console.error(`[index] engine link failed to start: ${(err as Erro
 void syncStackRequirementIssue();
 // STACK-WARM-01: ask the Stack to have chat, memory and voice loaded so the first message is not a cold start.
 void warmStack();
+// VOICE-PREWARM-01: the first spoken turn after a restart should not read the prompt cold; warm its shared start.
+warmSpokenPrefixAtBoot(() => turnWarmupRequest("spoken"));
 // COMPANION-ART-CHECK-01: companion art that was live before art was checked is checked once; what fails is narrowed to the audience it does pass.
 startLiveArtSweep();
 try { sweepAbandonedDrafts(); } catch { /* maintenance sweep is disposable */ }

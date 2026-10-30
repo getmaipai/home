@@ -24,11 +24,11 @@ export function notePrefix(actorId: string, surfaceClass: string, messages: read
 }
 
 /** Primes the engine's prompt cache with this person's last prefix. Best effort, never throws. Returns whether a request was sent. */
-export async function prewarmPrefix(actorId: string, surfaceClass: string, now = Date.now()): Promise<boolean> {
+export async function prewarmPrefix(actorId: string, surfaceClass: string, now = Date.now(), force = false): Promise<boolean> {
   const key = keyFor(actorId, surfaceClass);
   const prefix = recorded.get(key);
   if (!prefix) return false;
-  if (now - (lastWarm.get(key) ?? 0) < MIN_GAP_MS) return false;
+  if (!force && now - (lastWarm.get(key) ?? 0) < MIN_GAP_MS) return false;
   lastWarm.set(key, now);
   try {
     const result = await complete("chat", [prefix.system, { role: "user", content: "hi" }], {
@@ -38,6 +38,23 @@ export async function prewarmPrefix(actorId: string, surfaceClass: string, now =
   } catch {
     return false;
   }
+}
+
+/** A hub that just started has recorded nothing, so the first spoken turn after every restart read the whole prompt cold (3 s to the first word,
+ * measured 2026-10-29). Warm the shared start of the spoken prompt (tools block and persona text) with the default prompt, retrying while the Stack loads. */
+const BOOT_WARM_TRIES = 6;
+const BOOT_WARM_GAP_MS = 20_000;
+export function warmSpokenPrefixAtBoot(build: () => Promise<{ system: string; tools?: ToolSpec[] }>, tries = BOOT_WARM_TRIES, gapMs = BOOT_WARM_GAP_MS, firstDelayMs = 5_000): void {
+  const attempt = async (left: number): Promise<void> => {
+    try {
+      const { system, tools } = await build();
+      notePrefix("boot", "spoken", [{ role: "system", content: system }], tools ?? []);
+      if (await prewarmPrefix("boot", "spoken", Date.now(), true)) return;
+    } catch { /* retry below */ }
+    if (left > 1) { const timer = setTimeout(() => { void attempt(left - 1); }, gapMs); (timer as { unref?: () => void }).unref?.(); }
+  };
+  const first = setTimeout(() => { void attempt(tries); }, firstDelayMs);
+  (first as { unref?: () => void }).unref?.();
 }
 
 export function __resetPrefixPrewarmForTests(): void { recorded.clear(); lastWarm.clear(); }

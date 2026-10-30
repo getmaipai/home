@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, test } from "bun:test";
-import { __resetPrefixPrewarmForTests, notePrefix, prewarmPrefix } from "@/lib/prefixPrewarm";
+import { __resetPrefixPrewarmForTests, notePrefix, prewarmPrefix, warmSpokenPrefixAtBoot } from "@/lib/prefixPrewarm";
 
 beforeEach(() => { __resetPrefixPrewarmForTests(); });
 
@@ -23,5 +23,12 @@ describe("prefix prewarm", () => {
     notePrefix("person-a", "written", [{ role: "system", content: "x" }], [], undefined, 100_000);
     expect(await prewarmPrefix("person-a", "spoken", 200_000)).toBe(false);
     expect(await prewarmPrefix("person-b", "written", 200_000)).toBe(false);
+  });
+
+  test("the boot warm-up builds the default spoken prompt and keeps trying while the engine is not up", async () => {
+    let built = 0;
+    warmSpokenPrefixAtBoot(async () => { built++; return { system: "You are a helper.", tools: [] }; }, 2, 5, 5);
+    await new Promise((resolve) => setTimeout(resolve, 60));
+    expect(built).toBeGreaterThanOrEqual(1);
   });
 });
