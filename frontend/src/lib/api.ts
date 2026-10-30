@@ -180,7 +180,15 @@ export interface ReferenceArticleView {
   title: string; book: string; path: string; source_label: string; licence: string;
   snapshot_date: string | null; blocks: ReferenceBlock[];
   toc: Array<{ id: string; title: string; level: number }>;
+  // READER-01, 02b and 10: all optional; a child's or teen's copy carries no `related`.
+  profile?: "wikipedia" | "generic";
+  description?: string; kicker?: string; lead?: string; hatnote?: string; summary?: string; reading_minutes?: number; quick_fact?: string; badge?: string;
+  lead_image?: { src: string; alt: string };
+  infobox?: { title?: string; image?: { src: string; alt: string }; rows: Array<{ label: string; value: string }> };
+  related?: Array<{ book: string; path: string; title: string; thumbnail?: { src: string; alt: string } }>;
 }
+export interface ReferencePreview { title: string; summary: string; description?: string; kicker?: string; lead?: string; thumbnail?: { src: string; alt: string } }
+export interface ReferenceSearchPage { hits: ReferenceSearchHit[]; total: number }
 
 export type PersonRosterEntry = Omit<Person, "birthdate"> & {
   sessionLockRequired: boolean;
@@ -972,7 +980,16 @@ export const api = {
   referenceBooks: () => request<ReferenceBookView[]>("/api/reference/books"),
   referenceSuggest: (book: string | undefined, q: string) => request<ReferenceSuggestion[]>(`/api/reference/suggest?${book ? `book=${encodeURIComponent(book)}&` : ""}q=${encodeURIComponent(q)}`),
   referenceSearch: (q: string, book?: string) => request<ReferenceSearchHit[]>(`/api/reference/search?q=${encodeURIComponent(q)}${book ? `&book=${encodeURIComponent(book)}` : ""}`),
-  referenceArticle: (book: string, path: string) => request<ReferenceArticleView>(`/api/reference/article/${encodeURIComponent(book)}/${path.split("/").map(encodeURIComponent).join("/")}`),
+  referenceArticle: (book: string, path: string) => request<ReferenceArticleView>(`/api/reference/article/${encodeURIComponent(book)}/${encodeURIComponent(path)}`),
+  referencePreview: (book: string, path: string) => request<ReferencePreview>(`/api/reference/preview/${encodeURIComponent(book)}/${encodeURIComponent(path)}`),
+  referenceRandom: (book: string) => request<{ title: string; book: string; path: string }>(`/api/reference/random/${encodeURIComponent(book)}`),
+  referenceSearchPage: async (q: string, book?: string): Promise<ReferenceSearchPage> => {
+    const res = await fetch(`/api/reference/search?q=${encodeURIComponent(q)}${book ? `&book=${encodeURIComponent(book)}` : ""}`, { credentials: "include" });
+    if (!res.ok) throw new ApiError(res.statusText, res.status);
+    const hits = await res.json() as ReferenceSearchHit[];
+    const total = Number(res.headers.get("X-Total-Results"));
+    return { hits, total: Number.isFinite(total) && total >= hits.length ? total : hits.length };
+  },
   referenceState: () => request<ReferenceLibraryState>("/api/reference/state"),
   referenceCatalog: () => request<ReferenceCatalogSet[]>("/api/reference/catalog"),
   referencePlan: (preset: "minimum" | "moderate" | "full" | "custom", selection?: ReferenceSelection[]) => request<ReferencePlan>("/api/reference/plan", { method: "POST", body: JSON.stringify({ preset, selection }) }),

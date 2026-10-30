@@ -124,13 +124,14 @@ async function loadArticle(c: any, book: string, path: string) {
     if (full.redirectTo) {
       const target = new URL(full.redirectTo, "http://kiwix.local").pathname.match(/^\/(?:content\/)?([^/]+)\/(.+)$/);
       if (target && decodeURIComponent(target[1]!) === book && !decodeURIComponent(target[2]!).split("/").includes("..")) {
-        return { redirect: `/api/reference/article/${encodeURIComponent(book)}/${decodeURIComponent(target[2]!).split("/").map(encodeURIComponent).join("/")}` };
+        return { redirect: `/api/reference/article/${encodeURIComponent(book)}/${encodeURIComponent(decodeURIComponent(target[2]!))}` };
       }
     }
     const fallback = extractArticle(html); const title = full.title || fallback.title || path;
     const plain = full.blocks.flatMap((b) => b.type === "paragraph" ? b.inlines.map((i) => i.text) : b.type === "heading" ? [b.text] : b.type === "rows" ? b.rows.flatMap((r) => [r.label, r.value]) : []).concat(full.summary ?? "", full.hatnote ?? "", full.infobox?.rows.flatMap((r) => [r.label, r.value]) ?? []).join(" ");
     if (band !== "adult" && tripsMinorFloor(`${title}. ${plain}. ${full.kicker ?? ""}. ${full.infobox?.rows[0]?.label ?? ""}. ${full.infobox?.rows[0]?.value ?? ""}`)) return null;
-    const rewrite = (imagePath: string) => `/api/reference/media/${encodeURIComponent(book)}/${imagePath.split("/").map(encodeURIComponent).join("/")}`;
+    // One path segment: the media route takes `{path}` as a single segment, so the slashes inside an image path are encoded too.
+    const rewrite = (imagePath: string) => `/api/reference/media/${encodeURIComponent(book)}/${encodeURIComponent(imagePath)}`;
     const leadImg = imagesAllowed ? extractArticleImages(html, { book, articlePath: path, limit: 1 }).find((image) => image.lead) : undefined;
     const blocks = full.blocks.map((block) => {
       if (block.type !== "figure") return block;

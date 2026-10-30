@@ -20,7 +20,7 @@ const article: ReferenceArticleView = {
 };
 
 const books = [{ id: "wiki_en", source_label: "English Wikipedia", language: "en", size_bytes: 2_000_000, snapshot_date: "2026-09-01", licence: "CC BY-SA 4.0", article_count: 45 }];
-const originals = { books: api.referenceBooks, suggest: api.referenceSuggest, search: api.referenceSearch, article: api.referenceArticle };
+const originals = { books: api.referenceBooks, suggest: api.referenceSuggest, search: api.referenceSearchPage, article: api.referenceArticle, preview: api.referencePreview };
 
 function mount(initial = "/reference") {
   const view = renderWithQueryClient(<MemoryRouter initialEntries={[initial]}><Routes><Route path="/reference/*" element={<ReferencePage />} /></Routes></MemoryRouter>);
@@ -31,10 +31,11 @@ describe("Reference reader", () => {
   beforeEach(() => {
     api.referenceBooks = async () => books;
     api.referenceSuggest = async () => [{ title: "Moon suggestion", book: "wiki_en", path: "A/Moon" }];
-    api.referenceSearch = async () => [{ title: "Moon", snippet: "Earth's satellite", book: "wiki_en", path: "A/Moon" }];
+    api.referenceSearchPage = async () => ({ hits: [{ title: "Moon", snippet: "Earth's satellite", book: "wiki_en", path: "A/Moon" }], total: 24300 });
+    api.referencePreview = async () => ({ title: "Moon", summary: "The Moon is Earth's natural satellite.", description: "Natural satellite", kicker: "Space" });
     api.referenceArticle = async () => article;
   });
-  afterEach(() => { cleanup(); Object.assign(api, { referenceBooks: originals.books, referenceSuggest: originals.suggest, referenceSearch: originals.search, referenceArticle: originals.article }); });
+  afterEach(() => { cleanup(); Object.assign(api, { referenceBooks: originals.books, referenceSuggest: originals.suggest, referenceSearchPage: originals.search, referenceArticle: originals.article, referencePreview: originals.preview }); });
 
   test("library home lists the readable book and its snapshot metadata", async () => {
     const view = mount();
@@ -96,5 +97,34 @@ describe("Reference reader", () => {
     await view.findByText("First");
     expect(document.querySelector("article ol")).not.toBeNull();
     expect(view.getByText("Cap")).toBeTruthy();
+  });
+
+  test("READER-11: results show the count, a chip per book, a card that fills in from its preview, and Related searches", async () => {
+    const seen = globalThis.IntersectionObserver;
+    globalThis.IntersectionObserver = class { constructor(private cb: IntersectionObserverCallback) {} observe(el: Element) { this.cb([{ isIntersecting: true, target: el } as IntersectionObserverEntry], this as unknown as IntersectionObserver); } disconnect() {} unobserve() {} takeRecords() { return []; } } as unknown as typeof IntersectionObserver;
+    api.referenceBooks = async () => [...books, { ...books[0]!, id: "simple_en", source_label: "Simple English Wikipedia" }];
+    api.referenceSuggest = async () => [{ title: "Moon", book: "wiki_en", path: "A/Moon" }, { title: "Moon landing", book: "wiki_en", path: "A/Moon_landing" }];
+    try {
+      const view = mount("/reference?q=moon");
+      expect(await view.findByText("Search results for “moon”")).toBeTruthy();
+      expect(await view.findByText("About 24,300 results")).toBeTruthy();
+      expect(await view.findByText("Natural satellite")).toBeTruthy();
+      expect(view.getByText("Space")).toBeTruthy();
+      expect(view.getByRole("button", { name: "All" }).getAttribute("aria-pressed")).toBe("true");
+      expect(view.getByRole("button", { name: "Simple English Wikipedia" })).toBeTruthy();
+      expect(await view.findByRole("button", { name: "Moon landing" })).toBeTruthy();
+      expect(within(view.getByRole("group", { name: "Related searches" })).queryByRole("button", { name: "Moon" })).toBeNull();
+    } finally { globalThis.IntersectionObserver = seen; }
+  });
+
+  test("READER-03: the article draws the kit's new parts: kicker chip, breadcrumb from the app's own home, lead cut from the first paragraph", async () => {
+    api.referenceArticle = async () => ({ ...article, kicker: "Space", lead: "Plain strongemphasis", reading_minutes: 4, quick_fact: "Orbit: Earth", infobox: { title: "Moon", rows: [{ label: "Orbit", value: "Earth" }] } });
+    const view = mount("/reference/wiki_en/A/Moon");
+    await view.findByText("A note");
+    expect(document.querySelector('[data-slot="article-kicker-chip"]')?.textContent).toBe("Space");
+    expect(document.querySelector('nav[aria-label="Breadcrumb"]')?.textContent).toContain("Reference");
+    expect(document.querySelector('[data-slot="article-standfirst"]')?.textContent).toBe("Plain strongemphasis");
+    expect(document.querySelector('[data-slot="article-quick-fact"]')?.textContent).toContain("Orbit: Earth");
+    expect(document.querySelector('[data-slot="article-infobox"]')?.textContent).toContain("Earth");
   });
 });

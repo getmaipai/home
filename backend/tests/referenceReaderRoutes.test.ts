@@ -57,6 +57,18 @@ describe("reference reader routes", () => {
     expect(data.infobox.rows).toHaveLength(3); expect(data.blocks.some((b: any) => b.type === "rows")).toBe(false);
     expect(data.lead_image.src).toMatch(/^\/api\/reference\/media\//);
   });
+  test("the picture addresses the article returns can be fetched, even for a path with a slash", async () => {
+    const html = `<div class="mw-parser-output"><h1>Pic</h1><table class="infobox"><caption>Pic facts</caption><tr><th>A</th><td>One</td></tr><tr><td colspan="2"><img src="/content/${SIMPLE}/I/lead.jpg" alt="Lead" width="300" height="200"></td></tr></table><p>Pic has a sentence.</p></div>`;
+    start([{ ...book(SIMPLE, { Pic: { title: "Pic", html }, "AC/DC": { title: "AC/DC", html } }), images: { "I/lead.jpg": { type: "image/jpeg", bytes: new Uint8Array([255, 216, 255, 217]) } } }]);
+    const adult = await owner();
+    const { setValue } = await import("@/lib/settings"); const { db } = await import("@/db"); const { people } = await import("@/db/schema");
+    const self = db.select().from(people).get()!; setValue(self, `person:${self.id}`, "reference.images", true);
+    const data = await (await adult.get(articleUrl(SIMPLE, "Pic"))).json() as any;
+    const media = await adult.get(data.lead_image.src);
+    expect(media.status).toBe(200); expect(media.headers.get("content-type")).toBe("image/jpeg");
+    const slash = await adult.get(`/api/reference/article/${SIMPLE}/${encodeURIComponent("AC/DC")}`);
+    expect(slash.status).toBe(200);
+  });
   test("article description and infobox image are optional and follow the existing images setting", async () => {
     const html = `<div class="shortdescription" style="display:none">A book supplied description.</div><div class="mw-parser-output"><h1>Picture</h1><table class="infobox"><tr><td><img src="/content/${SIMPLE}/I/lead.jpg" alt="The lead" /></td></tr></table><p>A safe lead sentence.</p></div>`;
     start([book(SIMPLE, { Picture: { title: "Picture", html } })]); const adult = await owner();
