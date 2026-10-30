@@ -686,7 +686,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/retrieval/ddgsSource.ts` | DDGS_DESTINATION_HOST, __resetDdgsForTests, __setDdgsClockForTests, ddgsQuietUntil, ddgsSearch |
 | `backend/src/lib/retrieval/ddgsStackSync.ts` | refreshDdgsFromStack, startDdgsStackSync |
 | `backend/src/lib/retrieval/dictionaryFallback.ts` | WIKTIONARY_ORIGIN, WIKTIONARY_LABEL, __resetDictionaryFallbackForTests, headwordOf, dictionaryLookup |
-| `backend/src/lib/retrieval/extractArticle.ts` | LEAD_MAX_CHARS, safeOutboundHref, extractFullArticle, cleanText, extractArticle |
+| `backend/src/lib/retrieval/extractArticle.ts` | LEAD_MAX_CHARS, safeOutboundHref, extractFullArticle, cleanText, cutAtSentence, extractArticle |
 | `backend/src/lib/retrieval/fetchCache.ts` | FETCH_CACHE_GB_KEY, FETCH_TTL_S, setNewsHostMatcher, ttlSecondsFor, openFetchCache, sharedFetchCache |
 | `backend/src/lib/retrieval/knowledgeDb.ts` | openKnowledgeDb, sharedKnowledgeDb, __resetSharedKnowledgeDbForTests |
 | `backend/src/lib/retrieval/lookup.ts` | parseScope, referenceUrl, referenceToLookupRow, webTimeRange, federatedLookup |
