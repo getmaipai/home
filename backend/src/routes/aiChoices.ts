@@ -22,7 +22,8 @@ import { setHouseholdSettingValue } from "@/lib/settings";
 import { catalogEntries } from "@/lib/modelCatalog";
 import { addedChatChoiceStates, startChatModelChoice, uncensoredChoiceState } from "@/lib/chatModelSwitch";
 import { addChatModel, AddModelError, inspectForAdd } from "@/lib/addModel";
-import { endMaxWindow, openMaxWindow } from "@/lib/jobs/householdQueue";
+import { activeProfileLine, endMaxWindow, openMaxWindow } from "@/lib/jobs/householdQueue";
+import { closedAppsLines } from "@/lib/jobs/closeApps";
 import { readAiSettings } from "@/lib/aiChoicesState";
 import { resetInstallStatusCache } from "@/lib/installStatus";
 import { dropPictureStatusCache } from "@/lib/pictures/ready";
@@ -205,13 +206,13 @@ aiChoicesRoutes.openapi(choicesRoute, async (c) => {
 const TIER_STACK_CATEGORY: Record<string, TierStackCategory> = { chat: "chat", pictures: "pictures", videos: "video", music: "music", voice: "voice" };
 const MAX_RUNNING_LINE = "A Max job is running and everything big waits. Stop it to give the room back; chat returns to normal.";
 const windowRoute = createRoute({
-  method: "get", path: "/tier-window", tags: ["AI"], summary: "Whether a Max job holds the computer, with the one Status line for it (TIER-HOME-03)",
+  method: "get", path: "/tier-window", tags: ["AI"], summary: "Whether a Max job holds the computer, what each category does meanwhile and which apps were closed, for admins only (TIER-HOME-03, TIER-PRIO-05)",
   middleware: [requireRole("owner", "admin")] as const,
-  responses: { 200: { content: { "application/json": { schema: z.object({ open: z.boolean(), minutes_left: z.number().int().nullable(), line: z.string().nullable() }) } }, description: "The open Max window, if any." }, ...refusals },
+  responses: { 200: { content: { "application/json": { schema: z.object({ open: z.boolean(), minutes_left: z.number().int().nullable(), line: z.string().nullable(), profile: z.string().nullable(), closed_apps: z.array(z.string()) }) } }, description: "The open Max window, if any." }, ...refusals },
 });
 aiChoicesRoutes.openapi(windowRoute, (c) => {
   const open = openMaxWindow();
-  return c.json({ open: open !== null, minutes_left: open?.minutesLeft ?? null, line: open ? MAX_RUNNING_LINE : null }, 200);
+  return c.json({ open: open !== null, minutes_left: open?.minutesLeft ?? null, line: open ? MAX_RUNNING_LINE : null, profile: activeProfileLine(), closed_apps: closedAppsLines() }, 200);
 });
 const stopWindowRoute = createRoute({
   method: "post", path: "/tier-window/stop", tags: ["AI"], summary: "Stop the running Max job so the room and chat come back (TIER-HOME-03)",
