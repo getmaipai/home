@@ -117,3 +117,20 @@ describe("GET /api/search/web-results", () => {
     expect(calls).toHaveLength(0);
   });
 });
+
+describe("the reasons are worded for the person, not the model", () => {
+  test("a child with the household's child web switch off, and a teen whose block lists are not loaded, see plain lines", async () => {
+    const calls = fakeSource(async () => ({ text: "x", rows: [{ title: "T", url: "https://example.com", snippet: null }] }));
+    const ownerClient = await owner();
+    const child = await addPerson(ownerClient, "Nova", "child");
+    const teen = await addPerson(ownerClient, "Marlow", "teen");
+    for (const client of [child, teen]) {
+      const { body } = await web(client, "tea");
+      expect(body.results).toEqual([]);
+      expect(body.note).toBeTruthy();
+      expect(body.note).not.toContain("Do not tell them");
+      expect(body.note).not.toContain("offline library was searched");
+    }
+    expect(calls).toHaveLength(0);
+  });
+});

@@ -9,10 +9,10 @@ import { resolveSafeSearchLevel } from "@/lib/safeSearch";
 import { NO_SOURCE_FOR_BAND_TEXT } from "@/lib/retrieval/webSources";
 import { MINOR_QUERY_PERSONAL_NOTE, minorQueryHit } from "@/lib/retrieval/minorQueryCheck";
 import { minorRowAllowed } from "@/lib/retrieval/minorRowFloor";
-import { refuseWeb, webSideOff } from "@/lib/retrieval/sourceMode";
+import { bandSwitchOff, webSideOff } from "@/lib/retrieval/sourceMode";
 import { websearchGateAllows } from "@/lib/searchAssist/minorGate";
 import { runAsBlockViewer } from "@/lib/blocklists/blockViewer";
-import { WEB_TAB_NOT_ALLOWED, WEB_TAB_NOT_ANSWERING } from "@/lib/failureCopy";
+import { WEB_TAB_GETTING_READY, WEB_TAB_NOT_ALLOWED, WEB_TAB_NOT_ANSWERING, WEB_TAB_OFF_ADULT, WEB_TAB_OFF_MINOR } from "@/lib/failureCopy";
 import { searchPickedWebSources } from "@/lib/packageHost";
 import type { Role } from "@/middleware/auth";
 
@@ -40,7 +40,7 @@ export async function webTabSearch(actor: PersonRow, rawQuery: string, signal?: 
   // A guest carries no age signal, so they get no web search from the palette (decision 3).
   if (actor.role === "guest") return { results: [], note: WEB_TAB_NOT_ALLOWED };
   const band = speakerAgeBand(actor, new Date());
-  if (webSideOff(band)) return { results: [], note: refuseWeb(band) };
+  if (webSideOff(band)) return { results: [], note: band === "adult" ? WEB_TAB_OFF_ADULT : bandSwitchOff(band) ? WEB_TAB_OFF_MINOR : WEB_TAB_GETTING_READY };
   if (!websearchGateAllows({ personId: actor.id, role: actor.role as Role, band, anonymous: false }, { crisis: false, temporary: false })) {
     return { results: [], note: WEB_TAB_NOT_ALLOWED };
   }

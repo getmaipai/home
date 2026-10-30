@@ -418,3 +418,8 @@ export function crisisSupportFor(crisisResources: string | undefined, band: "adu
 /** WEB-TAB-01: the search palette's Web tab, when the search itself fails (the other reasons reuse the chat's own refusal lines). */
 export const WEB_TAB_NOT_ANSWERING = "Web search is not answering right now. Try again in a moment.";
 export const WEB_TAB_NOT_ALLOWED = "Web search is not available for this profile.";
+// The chat's own refusal lines (refuseWeb) are written for the model and say "only the offline library was searched", which the
+// palette did not do, so the Web tab words its own.
+export const WEB_TAB_OFF_ADULT = "Web search is turned off in this household. An admin can turn it on in Settings, Search.";
+export const WEB_TAB_OFF_MINOR = "Web search isn't turned on for you. Please ask a grown-up.";
+export const WEB_TAB_GETTING_READY = "Web search is getting ready. Try again in a minute.";
