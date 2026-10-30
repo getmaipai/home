@@ -58712,7 +58712,7 @@
                 "properties": {
                   "prompt": {
                     "type": "string",
-                    "maxLength": 600
+                    "maxLength": 20000
                   },
                   "style": {
                     "type": "string",
@@ -59258,17 +59258,17 @@
                       "zoom": {
                         "type": "number",
                         "minimum": 1,
-                        "maximum": 4
+                        "maximum": 200
                       },
                       "x": {
                         "type": "number",
-                        "minimum": 0,
-                        "maximum": 1
+                        "minimum": -1,
+                        "maximum": 2
                       },
                       "y": {
                         "type": "number",
-                        "minimum": 0,
-                        "maximum": 1
+                        "minimum": -1,
+                        "maximum": 2
                       }
                     },
                     "required": [
@@ -61272,17 +61272,17 @@
                       "zoom": {
                         "type": "number",
                         "minimum": 1,
-                        "maximum": 4
+                        "maximum": 200
                       },
                       "x": {
                         "type": "number",
-                        "minimum": 0,
-                        "maximum": 1
+                        "minimum": -1,
+                        "maximum": 2
                       },
                       "y": {
                         "type": "number",
-                        "minimum": 0,
-                        "maximum": 1
+                        "minimum": -1,
+                        "maximum": 2
                       }
                     },
                     "required": [

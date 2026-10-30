@@ -351,7 +351,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/commands.ts` | __resetCommandsCacheForTests, createCommand, listCommands, deleteCommand, matchCommand, runCommand |
 | `backend/src/lib/companionArt.ts` | COMPANION_STILL_MODEL_MISSING_LINE, COMPANION_CLIP_MODEL_MISSING_LINE, COMPANION_MODEL_MISMATCH_LINE, COMPANION_EDIT_MODEL, __setCompanionArtStatusReadersForTests, promptHash |
 | `backend/src/lib/companionArtCheck.ts` | ArtWithheldError, audienceLane, companionAudience, checkCompanionArt, requireCompanionPictureOk, takeAssets |
-| `backend/src/lib/companionLook.ts` | LookSchema, EMPTY_LOOK, LOOK_LIMIT_LINE, lookPromptFor, KEY_ALPHA_START, KEY_ALPHA_END |
+| `backend/src/lib/companionLook.ts` | LookSchema, EMPTY_LOOK, PROMPT_MAX_CHARS, LOOK_LIMIT_LINE, lookPromptFor, KEY_ALPHA_START |
 | `backend/src/lib/companionLookJobs.ts` | LOOK_JOB_BUSY_LINE, LOOK_PICTURE_UNREAD_LINE, LOOK_PROMPT_REQUIRED_LINE, LOOK_EDIT_PROMPT_LINE, LOOK_ENGINE_NOT_READY_LINE, runningSheetJob |
 | `backend/src/lib/companionLookStyles.ts` | LOOK_STYLES, LOOK_STYLE_IDS, DEFAULT_LOOK_STYLE, stylesForBand, capOfStyle, lookStylePhrase |
 | `backend/src/lib/companionPersonality.ts` | COMPANION_DIALS, PERSONALITY_DIALS, COMPANION_PERSONALITIES, cleanStyleNotes, backstoryTagline, safeExamples |
@@ -442,7 +442,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/imaging/backdrop.ts` | compositeOnNeutral, borderLooksKeyed, cutOutBackground |
 | `backend/src/lib/imaging/crop.ts` | cropToFrame |
 | `backend/src/lib/imaging/fill.ts` | planFillCutOff |
-| `backend/src/lib/imaging/fit.ts` | fitToFrame |
+| `backend/src/lib/imaging/fit.ts` | PLACEMENT_ZOOM_MAX, PLACEMENT_POSITION_MIN, PLACEMENT_POSITION_MAX, fitToFrame |
 | `backend/src/lib/imaging/focal.ts` | __setNewsFocalForTests, focalCentre, focalPointOf |
 | `backend/src/lib/imaging/headSwap.ts` | headSwapInstruction, swapHead |
 | `backend/src/lib/imaging/instructions.ts` | FACE_AND_BODY, restyleInstruction, fillCutOffInstruction, bodyFillInstruction |
