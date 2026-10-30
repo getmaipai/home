@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import { db } from "../src/db";
 import { notificationDeliveries } from "../src/db/schema";
-import { resetFitMemoryForTests, requestTier, resetTierStateForTests, setBudgetReader, trackChatLease, DEFAULT_QUIET, chatActivity, decideDownshift, mayRestoreNow, noteChatInFlight, noteChatTurn, quietSecondsFor, resetChatActivityForTests, admit, order, recordUsage, usageLastHour, requeueAfterCritical, registerQueueProvider, releaseHouseholdQueue, endMaxWindow, stillRunningMinutes, writePositions, type QueueJob, type TierState } from "../src/lib/jobs/householdQueue";
+import { resetFitMemoryForTests, requestTier, resetTierStateForTests, setBudgetReader, trackChatLease, DEFAULT_QUIET, chatActivity, decideDownshift, mayRestoreNow, noteChatInFlight, noteChatTurn, quietSecondsFor, resetChatActivityForTests, admit, order, recordUsage, usageLastHour, requeueAfterCritical, registerQueueProvider, releaseHouseholdQueue, endMaxWindow, activeProfileLine, resetActivePlanForTests, stillRunningMinutes, writePositions, type QueueJob, type TierState } from "../src/lib/jobs/householdQueue";
 import { DEFAULT_POLICY } from "../src/lib/jobs/jobScore";
 import { reducedChatState, setReducedChat } from "../src/lib/reducedChat";
 import { setProfileSource, type ProfileSource } from "../src/lib/jobs/admissionFit";
@@ -376,5 +376,33 @@ describe("household queue", () => {
       expect(reducedChatState()).toBeNull();
       expect(await endMaxWindow()).toBe(false);
     } finally { remove(); setProfileSource(null); setBudgetReader(null); resetTierStateForTests(); setReducedChat(null); }
+  });
+  test("while a Max video runs, a music job its plan queues waits with profile_lowered, and the admin line names each category (TIER-PRIO-05)", async () => {
+    resetTierStateForTests(); resetFitMemoryForTests(); resetActivePlanForTests();
+    const row: ProfileRow = { lead: "video", tier: "max", cells: { chat: { state: "reduced" }, video: { state: "max" }, picture: { state: "boost" }, music: { state: "queued" } } };
+    setProfileSource({ table: [row], hw: { budgetGb: 80, marginGb: 2, peakGb: { video: { max: 30 } }, residentGb: { chat: { reduced: 5 }, picture: { boost: 10 } } }, pins: {}, priorityWeight: {}, lowerWithoutAsking: {} });
+    setBudgetReader(async () => ({ freeMemoryBytes: 70e9, loaded: [] }));
+    const video = job("v-plan", "p-plan-a", "video", now, { tier: "max" });
+    const song = job("m-plan", "p-plan-b", "other", now + 1000, { category: "music" });
+    let songReleased = 0; let saves = 0;
+    const remove = registerQueueProvider(() => [
+      { job: video, save: () => undefined, applyFit: () => undefined, release: async () => { video.state = "running"; video.remainingSeconds = 300; } },
+      { job: song, save: () => { saves += 1; }, release: async () => { songReleased += 1; } },
+    ]);
+    try {
+      await releaseHouseholdQueue();
+      await releaseHouseholdQueue();
+      expect(activeProfileLine()).toBe("Chat: Reduced · Pictures: Boost · Video: Max · Music: waiting");
+      expect(songReleased).toBe(0);
+      expect(song.riseReason).toBe("profile_lowered");
+      expect(saves).toBe(1);
+      video.state = "done" as QueueJob["state"];
+      remove();
+      const again = registerQueueProvider(() => [{ job: song, save: () => { saves += 1; }, release: async () => { songReleased += 1; } }]);
+      try { await releaseHouseholdQueue(); } finally { again(); }
+      expect(activeProfileLine()).toBeNull();
+      expect(song.riseReason).toBeNull();
+      expect(songReleased).toBe(1);
+    } finally { setProfileSource(null); setBudgetReader(null); resetTierStateForTests(); resetActivePlanForTests(); setReducedChat(null); }
   });
 });

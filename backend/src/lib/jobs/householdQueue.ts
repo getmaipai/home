@@ -1,5 +1,6 @@
 /** The shared household order for heavy jobs. This module has no database or notification dependency. */
 import { DEFAULT_POLICY, scoreJobs, type JobCategory, type ScoreJob, type ScorePolicy, type ScoreReason } from "./jobScore";
+import type { Category, CellState } from "./profileTable";
 import { setReducedChat } from "@/lib/reducedChat";
 import { fitForAdmission,admissionFitAskLine, admissionFitProfile, getProfileSource, type BudgetNow } from "./admissionFit";
 export type QueueClass = "picture" | "video" | "other";
@@ -14,7 +15,7 @@ export interface QueueJob {
   createdAt: string | number;
   position?: number | null;
   estimateSeconds?: number | null;
-  riseReason?: "higher_class" | "other_person_first" | "requeued_memory" | "class" | "aging" | "fair_share" | "boost" | null;
+  riseReason?: "higher_class" | "other_person_first" | "requeued_memory" | "class" | "aging" | "fair_share" | "boost" | "profile_lowered" | null;
   category?: JobCategory;
   adminBoost?: number;
   /** The job can use otherwise idle room while the head waits. */
@@ -41,6 +42,31 @@ type QueueProvider = () => QueueStoreEntry[];
 /** The Max job whose plan lowered chat to Reduced (TIER-HOME-03): the chat line under the input shows while it runs. */
 let reducedChatJobId: string | null = null;
 let currentEntries: QueueStoreEntry[] = [];
+
+/** The plan of the Boost or Max job now running (TIER-PRIO-04/05): what each category does while it runs. Kept in memory only; no person, no app name. */
+interface ActivePlan { jobId: string; lead: Category; cells: Partial<Record<Category, CellState>> }
+let activePlan: ActivePlan | null = null;
+let pendingPlan: ActivePlan | null = null;
+const PLAN_WORDS: Partial<Record<Category, string>> = { chat: "Chat", picture: "Pictures", video: "Video", music: "Music", tools: "Tools" };
+const PLAN_ORDER: Category[] = ["chat", "picture", "video", "music", "tools"];
+/** The admin-only status text, for example `Chat: Reduced · Pictures: Boost · Video: Max · Music: waiting`. Null when no profile is active. */
+export function activeProfileLine(): string | null {
+  if (!activePlan) return null;
+  const plan = activePlan;
+  const parts = PLAN_ORDER.filter((category) => plan.cells[category] !== undefined).map((category) => {
+    const state = plan.cells[category]!;
+    return `${PLAN_WORDS[category]}: ${state === "queued" ? "waiting" : state === "off" ? "off" : state[0]!.toUpperCase() + state.slice(1)}`;
+  });
+  return parts.length > 0 ? parts.join(" · ") : null;
+}
+export function resetActivePlanForTests(): void { activePlan = null; reducedChatJobId = null; }
+function jobCategory(job: QueueJob): Category { return job.jobClass === "picture" ? "picture" : job.jobClass === "video" ? "video" : job.category === "music" ? "music" : "tools"; }
+/** A category the running plan queues or turns off waits for that job; the lead's own category is never held by its own plan. */
+function heldByPlan(job: QueueJob): boolean {
+  if (!activePlan || job.id === activePlan.jobId) return false;
+  const state = activePlan.cells[jobCategory(job)];
+  return state === "queued" || state === "off";
+}
 
 /** Admin Stop for the open Max window: ends the running Max job through its own store, which frees the room and lets chat return. False when no Max job runs. */
 export async function endMaxWindow(): Promise<boolean> {
@@ -228,7 +254,7 @@ export function writePositions<T extends QueueJob>(jobs: readonly T[], now: numb
   for (const job of jobs) {
     const next = byId.get(job.id) ?? null;
     const old = previous.get(job.id) ?? null;
-    let riseReason: QueueJob["riseReason"] = job.riseReason === "requeued_memory" ? "requeued_memory" : null;
+    let riseReason: QueueJob["riseReason"] = job.riseReason === "requeued_memory" || job.riseReason === "profile_lowered" ? job.riseReason : null;
     if (next !== null && old !== null && next > old) {
       const overtaker = positions.filter((item) => item.position < next && item.position < (previous.get(item.id) ?? Infinity)).sort((a, b) => b.position - a.position)[0];
       if (overtaker) {
@@ -315,6 +341,13 @@ export async function releaseHouseholdQueue(): Promise<void> {
       const runningMax = jobs.find((job) => job.state === "running" && job.tier === "max");
       tierState.windowOpenFor = runningMax?.id ?? null;
       currentEntries = entries;
+      if (activePlan && !jobs.some((item) => item.id === activePlan!.jobId)) activePlan = null;
+      for (const entry of entries) {
+        if (entry.job.state !== "queued") continue;
+        const held = heldByPlan(entry.job);
+        if (held && entry.job.riseReason !== "profile_lowered") { entry.job.riseReason = "profile_lowered"; entry.save(); }
+        else if (!held && entry.job.riseReason === "profile_lowered") { entry.job.riseReason = null; entry.save(); }
+      }
       if (runningMax && runningMax.id === reducedChatJobId) setReducedChat({ minutesLeft: stillRunningMinutes(runningMax) });
       else { reducedChatJobId = null; setReducedChat(null); }
       if (runningMax) tierState.lastMaxPersonId = runningMax.personId;
@@ -324,7 +357,7 @@ export async function releaseHouseholdQueue(): Promise<void> {
       const runningPeople = new Set(entries.filter((entry) => entry.job.state === "running").map((entry) => entry.job.personId));
       for (const item of positions) {
         const entry = byId.get(item.id);
-        if (!entry?.release || !admitted.has(item.id) || blockedClasses.has(entry.job.jobClass) || runningPeople.has(entry.job.personId)) continue;
+        if (!entry?.release || !admitted.has(item.id) || blockedClasses.has(entry.job.jobClass) || runningPeople.has(entry.job.personId) || heldByPlan(entry.job)) continue;
         if ((entry.job.tier === "boost" || entry.job.tier === "max") && getProfileSource() !== null) {
           try {
             const fit = await fitForAdmission(entry.job as { jobClass: "picture" | "video" | "other"; category?: string; tier: "boost" | "max" }, stackBudget);
@@ -336,13 +369,15 @@ export async function releaseHouseholdQueue(): Promise<void> {
               if (lastFit.get(entry.job.id) !== key) { lastFit.set(entry.job.id, key); entry.applyFit?.(admission); }
               if (fit.outcome !== "run") continue;
               if (entry.job.tier === "max" && fit.applied?.cells.chat?.state === "reduced") reducedChatJobId = entry.job.id;
+              if (fit.applied) pendingPlan = { jobId: entry.job.id, lead: fit.applied.lead, cells: Object.fromEntries(Object.entries(fit.applied.cells).map(([category, cell]) => [category, cell.state])) };
             }
           } catch { /* Fit is advisory: admission proceeds as it did before. */ }
         }
         blockedClasses.add(entry.job.jobClass);
+        if (pendingPlan && pendingPlan.jobId !== entry.job.id) pendingPlan = null;
         if (entry.job.tier === "max") { tierState.startedSinceMax = []; tierState.lastMaxPersonId = entry.job.personId; }
         else if (!tierState.startedSinceMax.includes(entry.job.personId)) tierState.startedSinceMax = [...tierState.startedSinceMax, entry.job.personId];
-        try { await entry.release(); } catch { /* The job store records a submit failure; other kinds can proceed. */ }
+        try { await entry.release(); if (pendingPlan?.jobId === entry.job.id) activePlan = pendingPlan; } catch { /* The job store records a submit failure; other kinds can proceed. */ }
       }
     } while (releaseAgain);
   } finally { releasing = false; }
