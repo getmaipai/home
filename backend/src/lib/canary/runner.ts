@@ -56,7 +56,7 @@ async function applyResult(check: CanaryCheck, result: CheckResult, outcome: Out
     resolveIssue(ISSUE_SOURCE, check.id);
   }
   if (check.id === "chat_hello" && verdict.raise) await maybeRestart(deps);
-  if (check.id === "gpu_metal" && verdict.firstFailure) await restartOwnEngines(deps);
+  if (check.id === "gpu_metal" && outcome.kind === "fail") await restartOwnEngines(deps);
   // The canary must never become the load: a hello far slower than usual pauses scheduled checks.
   if (check.id === "chat_hello" && result.status === "pass" && before.length >= 5 && result.durationMs > 3 * median(before)) {
     schedule.slowUntil = deps.now() + SLOW_BACKOFF_MS;

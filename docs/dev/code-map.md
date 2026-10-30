@@ -348,10 +348,10 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/bootGuard.ts` | instanceLock |
 | `backend/src/lib/botRelease.ts` | __setBotReleaseForTests, hasBotReleaseAssets, botReleaseVersion, botReleaseSigningKeys, ensureBotRelease, ensureStackChanFirmware |
 | `backend/src/lib/bundledPackages.ts` | hashPackageDir, isDirectory |
-| `backend/src/lib/canary/checks.ts` | SEARCH_PHRASES, LOOPBACK_PHRASE, WEATHER_PHRASE, wordMatch, CHECKS, CHECK_BY_ID |
+| `backend/src/lib/canary/checks.ts` | SEARCH_PHRASES, LOOPBACK_PHRASE, WEATHER_PHRASE, GPU_CAUSE, GPU_FIX, wordMatch |
 | `backend/src/lib/canary/identity.ts` | HEALTH_ACTOR_ID, healthActor |
 | `backend/src/lib/canary/index.ts` | startCanary |
-| `backend/src/lib/canary/probes.ts` | chatProbe, loopbackProbe, imageProbe, stackBlocker, stackRestart, loadIsHigh |
+| `backend/src/lib/canary/probes.ts` | chatProbe, loopbackProbe, imageProbe, stackBlocker, stackRestart, stackGpuCompile |
 | `backend/src/lib/canary/restartBudget.ts` | RESTART_WINDOW_MS, fileRestartBudget |
 | `backend/src/lib/canary/results.ts` | HISTORY_LIMIT, RAISE_AFTER, record, last, history, failuresInARow |
 | `backend/src/lib/canary/runner.ts` | ISSUE_SOURCE, __resetCanaryRunnerForTests, isRunning, MANUAL_DEBOUNCE_MS, runSuite, runNow |
@@ -756,7 +756,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/robotVision.ts` | SCENE_TTL_MS, MIN_FRAME_INTERVAL_MS, SCENE_FRAME_INTERVAL_MS, MAX_FRAME_BYTES, FRESH_ENOUGH_MS, robotVisionMode |
 | `backend/src/lib/robots.ts` | ROBOTS_OFF_MESSAGE, robotsEnabled |
 | `backend/src/lib/robotsSwitchMigration.ts` | migrateRobotsSwitch |
-| `backend/src/lib/roleHealth.ts` | MAKING_ROLES, __setRoleHealthForTests, cachedRoleHealth, STACK_REFUSAL_KEY, localRoleHealthEntry, roleHealth |
+| `backend/src/lib/roleHealth.ts` | MAKING_ROLES, __setRoleHealthForTests, cachedRoleHealth, STACK_REFUSAL_KEY, localRoleHealthEntry, gpuCompilerFault |
 | `backend/src/lib/routing.ts` | embedUtterance, __embedCallCountForTests, __resetEmbedCallCountForTests |
 | `backend/src/lib/ruleNames.ts` | RUNGS, isTypedSourcePackage, isLookupPackage, rungOf, RULES, RULE_NAMES |
 | `backend/src/lib/safeSearch.ts` | safeSearchDefaultFor, safeSearchStrictness, applySafeSearchLimits, resolveSafeSearchLevel, safeSearchNumericLevel |
