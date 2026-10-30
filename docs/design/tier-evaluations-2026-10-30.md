@@ -374,11 +374,9 @@ What remains after this pass: the real chat benches for the Max choice (EVAL-05)
 prompts and a Qwen-Image-Edit Q4 run (EVAL-04), and listening checks on the music, stems and voice clips. Sizes below are what the Hugging Face file lists showed on 2026-10-30; the models marked
 "on disk" are on the Studio, and everything listed as downloaded is in `~/tier-eval-models` outside the repository.
 
-Downloaded 2026-10-30 into `~/tier-eval-models` (about 283 GB plus the 36 GB Qwen-Image 2512 build, with 787 GB free before): ACE-Step XL turbo MLX 4-bit and 8-bit (4.3 and 7.0 GB), the official ACE-Step XL turbo and SFT
-(19 GB each), htdemucs MLX, htdemucs_ft MLX and htdemucs_6s Core ML (0.2, 0.6, 0.7 GB), ERNIE-Image base Q8 (12.3 GB), Qwen-Image 2.1 Q4 (9.6 GB, needs a custom loader, unused), Qwen-Image-Edit-2511 Q4 (28.9 GB, unused),
-Qwen-Image 2512 Q8 (36 GB), Gemma 4 26B-A4B MLX 4-bit (15.3 GB), LTX-2.3 MLX Q4 (39.9 GB, wrong runtime for the pinned engine), gpt-oss-120b MXFP4-Q4 (62.3 GB), Qwen3.5-122B-A10B MLX 4-bit (69.6 GB) and
-Mistral Small 4 119B MLX 4-bit (67.8 GB). Not downloaded: the LTX-2.3 dev checkpoint (about 46 GB, needed for the two-stage run), the larger LTX builds (87.5 and 139.7 GB) and the 2.1 Qwen-Image weights beyond
-the Q4. Delete what a verdict makes unnecessary.
+Downloads kept in `~/tier-eval-models` after the verdicts (191 GB, outside the repository): Qwen-Image 2512 Q8 (the Max picture slot), the official ACE-Step XL SFT (a Max music candidate), Gemma 4 26B-A4B MLX 4-bit
+(a Boost candidate), and gpt-oss-120b and Mistral Small 4 119B (for the real chat benches). Deleted 2026-10-30 as unneeded after the verdicts: ERNIE-Image base, the three Demucs MLX and Core ML builds, the two
+ACE-Step XL turbo MLX builds and the official XL turbo, Qwen-Image 2.1 Q4, Qwen-Image-Edit-2511 Q4, LTX-2.3 MLX Q4 and Qwen3.5-122B-A10B (about 175 GB). Not downloaded: the LTX-2.3 dev checkpoint (about 46 GB, for the two-stage run) and the larger LTX builds.
 
 Also open: CHAT-AB-01 and KS-BENCH-01 are named by the E5 row but their harnesses are not in this repository; the chat comparison needs them
 brought over (or rewritten) first.
