@@ -28688,7 +28688,7 @@
         "tags": [
           "AI"
         ],
-        "summary": "Whether a Max job holds the computer, with the one Status line for it (TIER-HOME-03)",
+        "summary": "Whether a Max job holds the computer, what each category does meanwhile and which apps were closed, for admins only (TIER-HOME-03, TIER-PRIO-05)",
         "responses": {
           "200": {
             "description": "The open Max window, if any.",
@@ -28707,12 +28707,24 @@
                     "line": {
                       "type": "string",
                       "nullable": true
+                    },
+                    "profile": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "closed_apps": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
                     }
                   },
                   "required": [
                     "open",
                     "minutes_left",
-                    "line"
+                    "line",
+                    "profile",
+                    "closed_apps"
                   ]
                 }
               }
