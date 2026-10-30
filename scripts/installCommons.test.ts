@@ -525,3 +525,36 @@ describe("setup plan option", () => {
   });
 });
 
+
+describe("link_commons_siblings", () => {
+  // deps lines are "<package> <tag dir> <tag>"; ui-v1 needs ../spec next to it.
+  function layout() {
+    const work = mkdtempSync(join(tmpdir(), "link-siblings-"));
+    mkdirSync(join(work, "commons-tags", "ui-ui-v1", "ui"), { recursive: true });
+    writeFileSync(join(work, "commons-tags", "ui-ui-v1", "ui", "package.json"), JSON.stringify({ name: "@maipai/ui", dependencies: { "@maipai/spec": "file:../spec" } }));
+    for (const tag of ["spec-v0.1.272", "spec-v0.1.275"]) mkdirSync(join(work, "commons-tags", `spec-${tag}`, "spec"), { recursive: true });
+    const deps = "ui ui-ui-v1 ui-v1\nspec spec-spec-v0.1.275 spec-v0.1.275\n";
+    return { work, deps };
+  }
+
+  test("points a link made for an older spec tag at the spec this Home names", () => {
+    const { work, deps } = layout();
+    try {
+      Bun.spawnSync(["ln", "-s", "../spec-spec-v0.1.272/spec", join(work, "commons-tags", "ui-ui-v1", "spec")]);
+      const result = bashCall(`link_commons_siblings "${work}" "$(printf '%s' '${deps}')"`);
+      expect(result.exitCode).toBe(0);
+      expect(Bun.spawnSync(["readlink", join(work, "commons-tags", "ui-ui-v1", "spec")]).stdout.toString().trim()).toBe("../spec-spec-v0.1.275/spec");
+    } finally { rmSync(work, { recursive: true, force: true }); }
+  });
+
+  test("leaves a real folder alone", () => {
+    const { work, deps } = layout();
+    try {
+      mkdirSync(join(work, "commons-tags", "ui-ui-v1", "spec"));
+      const result = bashCall(`link_commons_siblings "${work}" "$(printf '%s' '${deps}')"`);
+      expect(result.exitCode).toBe(0);
+      expect(statSync(join(work, "commons-tags", "ui-ui-v1", "spec")).isDirectory()).toBe(true);
+      expect(Bun.spawnSync(["readlink", join(work, "commons-tags", "ui-ui-v1", "spec")]).stdout.toString().trim()).toBe("");
+    } finally { rmSync(work, { recursive: true, force: true }); }
+  });
+});
