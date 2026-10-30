@@ -615,12 +615,14 @@ export function ChatWelcome() {
   );
 }
 
-/** The four starter chips, drawn under the composer on a new chat (the kit's below-composer slot). Generic and the same for everyone:
- * never drawn from memory, history or a profile (see chatStarterSuggestions). */
+/** The kit's below-composer slot takes a component, so this connects the kit's chips to the composer: data (the generic list, the same for
+ * everyone, never drawn from memory, history or a profile: see chatStarterSuggestions), the engine-down state and the send handler. It
+ * adds no box or style of its own. */
 export function ChatStarterPills() {
   const aui = useAui();
   const engineDown = useEngineDownReason();
   return (
+    <>
     <EmptyStateSuggestions>
       {STARTER_SUGGESTIONS.map((suggestion, index) => (
         <EmptyStateSuggestion
@@ -638,6 +640,7 @@ export function ChatStarterPills() {
         </EmptyStateSuggestion>
       ))}
     </EmptyStateSuggestions>
+    </>
   );
 }
 
