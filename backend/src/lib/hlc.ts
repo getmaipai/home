@@ -48,6 +48,7 @@ export const HLC_BEARING_TABLES = [
   "grants",
   "routing_embeddings",
   "lists",
+  "alarms",
   "open_questions",
   "reply_constraints",
   "reply_feedback",

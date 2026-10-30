@@ -1773,6 +1773,14 @@ export const lists = sqliteTable("lists", {
   hlc: text("hlc").notNull(),
 });
 
+export const alarms = sqliteTable("alarms", {
+  id: text("id").primaryKey(), person: text("person").notNull().references(() => people.id), time: text("time").notNull(),
+  days: text("days").notNull(), label: text("label").notNull().default(""), tag: text("tag").notNull().default(""),
+  enabled: integer("enabled", { mode: "boolean" }).notNull().default(true), skipUntil: text("skip_until"), sound: text("sound").notNull(),
+  snoozeMinutes: integer("snooze_minutes"), source: text("source").notNull(), createdAt: text("created_at").notNull(),
+  updatedAt: text("updated_at").notNull(), deletedAt: text("deleted_at"), hlc: text("hlc").notNull(),
+});
+
 // Step 9: "NAS mounts declared with scan paths" (plan 4.15). Declaration
 // only, matching backup_targets' own "admin mounts the share at the OS
 // level" posture - this is not an SMB client either, just a record of

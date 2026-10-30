@@ -32,6 +32,8 @@ import { dispatchRobotOffers, sweepRobotOffers } from "@/lib/robotOffers";
 import { eq, and, lte, isNull, inArray, notInArray } from "drizzle-orm";
 import { db } from "@/db";
 import { scheduledJobs, people, jobs } from "@/db/schema";
+import { alarms } from "@/db/schema";
+import { getSettingValueForPerson } from "@/lib/settings";
 import { newJobId } from "@/lib/id";
 import { isOwnerOrAdmin } from "@/lib/access";
 import { runMaintenance, drainPendingEmbeddings } from "@/lib/memory";
@@ -106,6 +108,41 @@ export function parseWhen(when: string, from: Date = new Date()): ParsedWhen | n
   if (Number.isNaN(oneShot.getTime())) return null;
   if (oneShot.getTime() < from.getTime()) return null;
   return { nextRunAt: oneShot, recurring: false };
+}
+
+/** Weekly local-wall-clock recurrence shared with ROUTINES-01. */
+export function nextOccurrence(input: { time: string; days: number[]; zone: string; after: Date; skipUntil?: string | null }): Date | null {
+  const [hour, minute] = input.time.split(":").map(Number) as [number, number];
+  // One formatter for the whole call: building one per probe made this ~100 ms for a weekday alarm.
+  const wall = new Intl.DateTimeFormat("en-US", { timeZone: input.zone, hourCycle: "h23", year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit" });
+  const wallOf = (date: Date) => {
+    const p = Object.fromEntries(wall.formatToParts(date).map((v) => [v.type, v.value])) as Record<string, string>;
+    const [y, mo, d] = [Number(p.year), Number(p.month), Number(p.day)] as [number, number, number];
+    return { y, mo, d, minutes: Number(p.hour) * 60 + Number(p.minute), utc: Date.UTC(y, mo - 1, d, Number(p.hour), Number(p.minute)) };
+  };
+  const today = wallOf(input.after);
+  const base = Date.UTC(today.y, today.mo - 1, today.d);
+  const skipUntil = input.skipUntil ? new Date(input.skipUntil) : null;
+  // A one-time alarm rings at the next time that clock reading comes round: today, or tomorrow when today's has passed.
+  for (let offset = 0; offset <= (input.days.length ? 14 : 1); offset++) {
+    const dayUtc = base + offset * 86400000;
+    if (input.days.length && !input.days.includes(((new Date(dayUtc).getUTCDay() + 6) % 7) + 1)) continue;
+    const target = new Date(dayUtc);
+    const targetY = target.getUTCFullYear(), targetM = target.getUTCMonth() + 1, targetD = target.getUTCDate();
+    const targetUtc = dayUtc + (hour * 60 + minute) * 60000;
+    // The zone's offset near that wall time, so the search below is a few hours wide, not a whole day.
+    const guess = targetUtc - (wallOf(new Date(targetUtc)).utc - targetUtc);
+    let found: Date | null = null;
+    // The earliest instant on that local date at or after the wall time (a spring-forward gap rings at the first valid minute).
+    for (let delta = -180; delta <= 180; delta++) {
+      const candidate = new Date(guess + delta * 60000);
+      const w = wallOf(candidate);
+      if (w.y === targetY && w.mo === targetM && w.d === targetD && w.minutes >= hour * 60 + minute) { found = candidate; break; }
+    }
+    if (!found || found <= input.after || (skipUntil && found <= skipUntil)) continue;
+    return found;
+  }
+  return null;
 }
 
 /** Schedules a "plugin" job: re-runs `packageId` for `actor` with `inputs`
@@ -387,8 +424,25 @@ const CORE_JOBS: Record<string, CoreJobHandler> = {
     await trigger("remind.due", { task }, { personId: row.personId ?? undefined });
   },
   "alarms.fire": async (row) => {
-    const { task } = JSON.parse(row.inputs) as { task: string };
-    await trigger("alarm.due", { task }, { personId: row.personId ?? undefined, subjectJobId: row.id });
+    const { task, alarmId } = JSON.parse(row.inputs) as { task: string; alarmId?: string };
+    await trigger("alarm.due", { task: task ? `Alarm: ${task}` : "Alarm" }, { personId: row.personId ?? undefined, subjectJobId: row.id });
+    if (alarmId) {
+      const alarm = db.select().from(alarms).where(eq(alarms.id, alarmId)).get();
+      if (alarm && !alarm.deletedAt && alarm.enabled) {
+        const days = JSON.parse(alarm.days) as number[];
+        if (!days.length) {
+          db.update(alarms).set({ enabled: false, updatedAt: new Date().toISOString() }).where(eq(alarms.id, alarm.id)).run();
+          db.update(scheduledJobs).set({ status: "done", lastRunAt: new Date().toISOString() }).where(eq(scheduledJobs.id, row.id)).run();
+        } else {
+          const zoneValue = getSettingValueForPerson(alarm.person, "time.time_zone");
+          const zone = typeof zoneValue === "string" && zoneValue ? zoneValue : Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
+          const next = nextOccurrence({ time: alarm.time, days, zone, after: new Date(Math.max(Date.now(), Date.parse(row.nextRunAt))), skipUntil: alarm.skipUntil });
+          if (next) db.update(scheduledJobs).set({ nextRunAt: next.toISOString(), when: next.toISOString(), status: "pending", lastRunAt: null }).where(eq(scheduledJobs.id, row.id)).run();
+        }
+      } else if (alarmId) {
+        db.update(scheduledJobs).set({ status: "done", lastRunAt: new Date().toISOString() }).where(eq(scheduledJobs.id, row.id)).run();
+      }
+    }
   },
   "timers.fire": async (row) => {
     const { label } = JSON.parse(row.inputs) as { label: string };
@@ -565,6 +619,7 @@ async function runDueJobsUnguarded(
       markIdle(busyName);
     }
 
+    const currentAfterHandler = db.select().from(scheduledJobs).where(eq(scheduledJobs.id, row.id)).get();
     if (row.recurring) {
       // Advance from the job's own scheduled nextRunAt, not from `now`,
       // and land on the next slot at or after `now` in one step rather
@@ -588,6 +643,8 @@ async function runDueJobsUnguarded(
         })
         .where(eq(scheduledJobs.id, row.id))
         .run();
+      } else if (currentAfterHandler?.status === "pending" && JSON.parse(row.inputs || "{}").alarmId) {
+        db.update(scheduledJobs).set({ lastRunAt: now.toISOString(), lastError: error }).where(eq(scheduledJobs.id, row.id)).run();
       } else {
       db.update(scheduledJobs)
         .set({ status: "done", lastRunAt: now.toISOString(), lastError: error })

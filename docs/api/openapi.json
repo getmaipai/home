@@ -40281,6 +40281,1078 @@
         }
       }
     },
+    "/api/alarms": {
+      "get": {
+        "tags": [
+          "Alarms"
+        ],
+        "summary": "List my alarms",
+        "responses": {
+          "200": {
+            "description": "Alarms",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "type": "string",
+                        "pattern": "^alarm-[a-z0-9]{6,}$",
+                        "description": "Stable id, never reused, even after deleted_at is set."
+                      },
+                      "person": {
+                        "type": "string",
+                        "pattern": "^person-[a-z0-9]{6,}$",
+                        "description": "Person who owns this alarm."
+                      },
+                      "time": {
+                        "type": "string",
+                        "pattern": "^([01]\\d|2[0-3]):[0-5]\\d$",
+                        "description": "Local wall-clock time in 24-hour HH:MM form."
+                      },
+                      "days": {
+                        "type": "array",
+                        "items": {
+                          "type": "integer",
+                          "minimum": 1,
+                          "maximum": 7
+                        },
+                        "description": "ISO weekdays, Monday is 1. Empty means a one-time alarm."
+                      },
+                      "label": {
+                        "type": "string",
+                        "maxLength": 120
+                      },
+                      "tag": {
+                        "type": "string",
+                        "maxLength": 40
+                      },
+                      "enabled": {
+                        "type": "boolean",
+                        "default": true
+                      },
+                      "skip_until": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "format": "date-time",
+                            "description": "An occurrence before this instant is skipped."
+                          },
+                          {
+                            "nullable": true,
+                            "description": "An occurrence before this instant is skipped."
+                          },
+                          {
+                            "nullable": true
+                          }
+                        ],
+                        "default": null,
+                        "description": "An occurrence before this instant is skipped."
+                      },
+                      "sound": {
+                        "type": "string",
+                        "enum": [
+                          "default",
+                          "none",
+                          "bell",
+                          "chime",
+                          "digital",
+                          "rise",
+                          "gentle",
+                          "gentle_wake"
+                        ]
+                      },
+                      "snooze_minutes": {
+                        "anyOf": [
+                          {
+                            "type": "number",
+                            "enum": [
+                              5
+                            ]
+                          },
+                          {
+                            "type": "number",
+                            "enum": [
+                              10
+                            ]
+                          },
+                          {
+                            "type": "number",
+                            "enum": [
+                              15
+                            ]
+                          },
+                          {
+                            "type": "number",
+                            "enum": [
+                              30
+                            ]
+                          },
+                          {
+                            "type": "number",
+                            "enum": [
+                              60
+                            ]
+                          },
+                          {
+                            "type": "object",
+                            "nullable": true,
+                            "enum": [
+                              null
+                            ]
+                          },
+                          {
+                            "nullable": true
+                          }
+                        ],
+                        "description": "Null means use the person's default snooze duration."
+                      },
+                      "source": {
+                        "type": "string",
+                        "enum": [
+                          "hub",
+                          "local"
+                        ]
+                      },
+                      "created_at": {
+                        "type": "string",
+                        "format": "date-time"
+                      },
+                      "updated_at": {
+                        "type": "string",
+                        "format": "date-time"
+                      },
+                      "deleted_at": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "format": "date-time"
+                          },
+                          {
+                            "nullable": true
+                          }
+                        ],
+                        "default": null
+                      },
+                      "hlc": {
+                        "type": "string",
+                        "pattern": "^[0-9]+:[0-9]+:[a-z0-9]{6,}$"
+                      },
+                      "next_at": {
+                        "type": "string",
+                        "nullable": true
+                      }
+                    },
+                    "required": [
+                      "id",
+                      "person",
+                      "time",
+                      "days",
+                      "label",
+                      "tag",
+                      "sound",
+                      "snooze_minutes",
+                      "source",
+                      "created_at",
+                      "updated_at",
+                      "hlc",
+                      "next_at"
+                    ],
+                    "additionalProperties": false
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Alarms"
+        ],
+        "summary": "Create an alarm",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "time": {
+                    "type": "string"
+                  },
+                  "days": {
+                    "type": "array",
+                    "items": {
+                      "type": "integer",
+                      "minimum": 1,
+                      "maximum": 7
+                    }
+                  },
+                  "label": {
+                    "type": "string"
+                  },
+                  "tag": {
+                    "type": "string"
+                  },
+                  "enabled": {
+                    "type": "boolean"
+                  },
+                  "sound": {
+                    "type": "string",
+                    "enum": [
+                      "default",
+                      "none",
+                      "bell",
+                      "chime",
+                      "digital",
+                      "rise",
+                      "gentle",
+                      "gentle_wake"
+                    ]
+                  },
+                  "snooze_minutes": {
+                    "anyOf": [
+                      {
+                        "type": "number",
+                        "enum": [
+                          5
+                        ]
+                      },
+                      {
+                        "type": "number",
+                        "enum": [
+                          10
+                        ]
+                      },
+                      {
+                        "type": "number",
+                        "enum": [
+                          15
+                        ]
+                      },
+                      {
+                        "type": "number",
+                        "enum": [
+                          30
+                        ]
+                      },
+                      {
+                        "type": "number",
+                        "enum": [
+                          60
+                        ]
+                      },
+                      {
+                        "nullable": true
+                      }
+                    ]
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "pattern": "^alarm-[a-z0-9]{6,}$",
+                      "description": "Stable id, never reused, even after deleted_at is set."
+                    },
+                    "person": {
+                      "type": "string",
+                      "pattern": "^person-[a-z0-9]{6,}$",
+                      "description": "Person who owns this alarm."
+                    },
+                    "time": {
+                      "type": "string",
+                      "pattern": "^([01]\\d|2[0-3]):[0-5]\\d$",
+                      "description": "Local wall-clock time in 24-hour HH:MM form."
+                    },
+                    "days": {
+                      "type": "array",
+                      "items": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 7
+                      },
+                      "description": "ISO weekdays, Monday is 1. Empty means a one-time alarm."
+                    },
+                    "label": {
+                      "type": "string",
+                      "maxLength": 120
+                    },
+                    "tag": {
+                      "type": "string",
+                      "maxLength": 40
+                    },
+                    "enabled": {
+                      "type": "boolean",
+                      "default": true
+                    },
+                    "skip_until": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "format": "date-time",
+                          "description": "An occurrence before this instant is skipped."
+                        },
+                        {
+                          "nullable": true,
+                          "description": "An occurrence before this instant is skipped."
+                        },
+                        {
+                          "nullable": true
+                        }
+                      ],
+                      "default": null,
+                      "description": "An occurrence before this instant is skipped."
+                    },
+                    "sound": {
+                      "type": "string",
+                      "enum": [
+                        "default",
+                        "none",
+                        "bell",
+                        "chime",
+                        "digital",
+                        "rise",
+                        "gentle",
+                        "gentle_wake"
+                      ]
+                    },
+                    "snooze_minutes": {
+                      "anyOf": [
+                        {
+                          "type": "number",
+                          "enum": [
+                            5
+                          ]
+                        },
+                        {
+                          "type": "number",
+                          "enum": [
+                            10
+                          ]
+                        },
+                        {
+                          "type": "number",
+                          "enum": [
+                            15
+                          ]
+                        },
+                        {
+                          "type": "number",
+                          "enum": [
+                            30
+                          ]
+                        },
+                        {
+                          "type": "number",
+                          "enum": [
+                            60
+                          ]
+                        },
+                        {
+                          "type": "object",
+                          "nullable": true,
+                          "enum": [
+                            null
+                          ]
+                        },
+                        {
+                          "nullable": true
+                        }
+                      ],
+                      "description": "Null means use the person's default snooze duration."
+                    },
+                    "source": {
+                      "type": "string",
+                      "enum": [
+                        "hub",
+                        "local"
+                      ]
+                    },
+                    "created_at": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "updated_at": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "deleted_at": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "format": "date-time"
+                        },
+                        {
+                          "nullable": true
+                        }
+                      ],
+                      "default": null
+                    },
+                    "hlc": {
+                      "type": "string",
+                      "pattern": "^[0-9]+:[0-9]+:[a-z0-9]{6,}$"
+                    },
+                    "next_at": {
+                      "type": "string",
+                      "nullable": true
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "person",
+                    "time",
+                    "days",
+                    "label",
+                    "tag",
+                    "sound",
+                    "snooze_minutes",
+                    "source",
+                    "created_at",
+                    "updated_at",
+                    "hlc",
+                    "next_at"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid alarm",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/alarms/{id}": {
+      "patch": {
+        "tags": [
+          "Alarms"
+        ],
+        "summary": "Edit my alarm",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "alarm-a1b2c3"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "time": {
+                    "type": "string"
+                  },
+                  "days": {
+                    "type": "array",
+                    "items": {
+                      "type": "integer",
+                      "minimum": 1,
+                      "maximum": 7
+                    }
+                  },
+                  "label": {
+                    "type": "string"
+                  },
+                  "tag": {
+                    "type": "string"
+                  },
+                  "enabled": {
+                    "type": "boolean"
+                  },
+                  "sound": {
+                    "type": "string",
+                    "enum": [
+                      "default",
+                      "none",
+                      "bell",
+                      "chime",
+                      "digital",
+                      "rise",
+                      "gentle",
+                      "gentle_wake"
+                    ]
+                  },
+                  "snooze_minutes": {
+                    "anyOf": [
+                      {
+                        "type": "number",
+                        "enum": [
+                          5
+                        ]
+                      },
+                      {
+                        "type": "number",
+                        "enum": [
+                          10
+                        ]
+                      },
+                      {
+                        "type": "number",
+                        "enum": [
+                          15
+                        ]
+                      },
+                      {
+                        "type": "number",
+                        "enum": [
+                          30
+                        ]
+                      },
+                      {
+                        "type": "number",
+                        "enum": [
+                          60
+                        ]
+                      },
+                      {
+                        "nullable": true
+                      }
+                    ]
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Updated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "pattern": "^alarm-[a-z0-9]{6,}$",
+                      "description": "Stable id, never reused, even after deleted_at is set."
+                    },
+                    "person": {
+                      "type": "string",
+                      "pattern": "^person-[a-z0-9]{6,}$",
+                      "description": "Person who owns this alarm."
+                    },
+                    "time": {
+                      "type": "string",
+                      "pattern": "^([01]\\d|2[0-3]):[0-5]\\d$",
+                      "description": "Local wall-clock time in 24-hour HH:MM form."
+                    },
+                    "days": {
+                      "type": "array",
+                      "items": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 7
+                      },
+                      "description": "ISO weekdays, Monday is 1. Empty means a one-time alarm."
+                    },
+                    "label": {
+                      "type": "string",
+                      "maxLength": 120
+                    },
+                    "tag": {
+                      "type": "string",
+                      "maxLength": 40
+                    },
+                    "enabled": {
+                      "type": "boolean",
+                      "default": true
+                    },
+                    "skip_until": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "format": "date-time",
+                          "description": "An occurrence before this instant is skipped."
+                        },
+                        {
+                          "nullable": true,
+                          "description": "An occurrence before this instant is skipped."
+                        },
+                        {
+                          "nullable": true
+                        }
+                      ],
+                      "default": null,
+                      "description": "An occurrence before this instant is skipped."
+                    },
+                    "sound": {
+                      "type": "string",
+                      "enum": [
+                        "default",
+                        "none",
+                        "bell",
+                        "chime",
+                        "digital",
+                        "rise",
+                        "gentle",
+                        "gentle_wake"
+                      ]
+                    },
+                    "snooze_minutes": {
+                      "anyOf": [
+                        {
+                          "type": "number",
+                          "enum": [
+                            5
+                          ]
+                        },
+                        {
+                          "type": "number",
+                          "enum": [
+                            10
+                          ]
+                        },
+                        {
+                          "type": "number",
+                          "enum": [
+                            15
+                          ]
+                        },
+                        {
+                          "type": "number",
+                          "enum": [
+                            30
+                          ]
+                        },
+                        {
+                          "type": "number",
+                          "enum": [
+                            60
+                          ]
+                        },
+                        {
+                          "type": "object",
+                          "nullable": true,
+                          "enum": [
+                            null
+                          ]
+                        },
+                        {
+                          "nullable": true
+                        }
+                      ],
+                      "description": "Null means use the person's default snooze duration."
+                    },
+                    "source": {
+                      "type": "string",
+                      "enum": [
+                        "hub",
+                        "local"
+                      ]
+                    },
+                    "created_at": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "updated_at": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "deleted_at": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "format": "date-time"
+                        },
+                        {
+                          "nullable": true
+                        }
+                      ],
+                      "default": null
+                    },
+                    "hlc": {
+                      "type": "string",
+                      "pattern": "^[0-9]+:[0-9]+:[a-z0-9]{6,}$"
+                    },
+                    "next_at": {
+                      "type": "string",
+                      "nullable": true
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "person",
+                    "time",
+                    "days",
+                    "label",
+                    "tag",
+                    "sound",
+                    "snooze_minutes",
+                    "source",
+                    "created_at",
+                    "updated_at",
+                    "hlc",
+                    "next_at"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid alarm",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such alarm",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Alarms"
+        ],
+        "summary": "Delete my alarm",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "alarm-a1b2c3"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Deleted",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "id"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such alarm",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/alarms/{id}/skip-next": {
+      "post": {
+        "tags": [
+          "Alarms"
+        ],
+        "summary": "Skip the next occurrence",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "alarm-a1b2c3"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Skipped",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "pattern": "^alarm-[a-z0-9]{6,}$",
+                      "description": "Stable id, never reused, even after deleted_at is set."
+                    },
+                    "person": {
+                      "type": "string",
+                      "pattern": "^person-[a-z0-9]{6,}$",
+                      "description": "Person who owns this alarm."
+                    },
+                    "time": {
+                      "type": "string",
+                      "pattern": "^([01]\\d|2[0-3]):[0-5]\\d$",
+                      "description": "Local wall-clock time in 24-hour HH:MM form."
+                    },
+                    "days": {
+                      "type": "array",
+                      "items": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 7
+                      },
+                      "description": "ISO weekdays, Monday is 1. Empty means a one-time alarm."
+                    },
+                    "label": {
+                      "type": "string",
+                      "maxLength": 120
+                    },
+                    "tag": {
+                      "type": "string",
+                      "maxLength": 40
+                    },
+                    "enabled": {
+                      "type": "boolean",
+                      "default": true
+                    },
+                    "skip_until": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "format": "date-time",
+                          "description": "An occurrence before this instant is skipped."
+                        },
+                        {
+                          "nullable": true,
+                          "description": "An occurrence before this instant is skipped."
+                        },
+                        {
+                          "nullable": true
+                        }
+                      ],
+                      "default": null,
+                      "description": "An occurrence before this instant is skipped."
+                    },
+                    "sound": {
+                      "type": "string",
+                      "enum": [
+                        "default",
+                        "none",
+                        "bell",
+                        "chime",
+                        "digital",
+                        "rise",
+                        "gentle",
+                        "gentle_wake"
+                      ]
+                    },
+                    "snooze_minutes": {
+                      "anyOf": [
+                        {
+                          "type": "number",
+                          "enum": [
+                            5
+                          ]
+                        },
+                        {
+                          "type": "number",
+                          "enum": [
+                            10
+                          ]
+                        },
+                        {
+                          "type": "number",
+                          "enum": [
+                            15
+                          ]
+                        },
+                        {
+                          "type": "number",
+                          "enum": [
+                            30
+                          ]
+                        },
+                        {
+                          "type": "number",
+                          "enum": [
+                            60
+                          ]
+                        },
+                        {
+                          "type": "object",
+                          "nullable": true,
+                          "enum": [
+                            null
+                          ]
+                        },
+                        {
+                          "nullable": true
+                        }
+                      ],
+                      "description": "Null means use the person's default snooze duration."
+                    },
+                    "source": {
+                      "type": "string",
+                      "enum": [
+                        "hub",
+                        "local"
+                      ]
+                    },
+                    "created_at": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "updated_at": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "deleted_at": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "format": "date-time"
+                        },
+                        {
+                          "nullable": true
+                        }
+                      ],
+                      "default": null
+                    },
+                    "hlc": {
+                      "type": "string",
+                      "pattern": "^[0-9]+:[0-9]+:[a-z0-9]{6,}$"
+                    },
+                    "next_at": {
+                      "type": "string",
+                      "nullable": true
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "person",
+                    "time",
+                    "days",
+                    "label",
+                    "tag",
+                    "sound",
+                    "snooze_minutes",
+                    "source",
+                    "created_at",
+                    "updated_at",
+                    "hlc",
+                    "next_at"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "No next occurrence",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such alarm",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/coming-up": {
       "get": {
         "tags": [

@@ -287,6 +287,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/aiChoicesState.ts` | readAiSettings, SETUP_CHOICE_KEYS, setupCards |
 | `backend/src/lib/aiCopy.ts` | aiCopy, ADDED_CHAT_DESCRIPTION |
 | `backend/src/lib/aiUnused.ts` | plainPartName, notUsedSince, whyKept, qualified, findUnused |
+| `backend/src/lib/alarms.ts` | syncAlarmJob, listAlarms, createAlarm, updateAlarm, skipNext, deleteAlarm |
 | `backend/src/lib/allowance.ts` | dailyMinutesAllowed |
 | `backend/src/lib/almanacCompute.ts` | WEEKDAYS, parseDateQuestion, computeDateAnswer, dateRelation |
 | `backend/src/lib/answerBlocks.ts` | filterAnswerBlocks |
@@ -725,7 +726,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `backend/src/lib/safety.ts` | evaluateSafety, forOutput, carriesCrisisSignal, evaluateReply, refusePackageReplyIfUnsafe |
 | `backend/src/lib/safetyAlarm.ts` | safetySensorMappings, refreshSafetyAlarmSensors, initSafetyAlarm, applyAlarmAction, applyRobotAlarmAction, listActiveSafetyAlarms |
 | `backend/src/lib/sayEvidence.ts` | sayFields |
-| `backend/src/lib/scheduler.ts` | parseWhen, scheduleJob, scheduleCoreJob, ensureCoreJob, listJobs, cancelJob |
+| `backend/src/lib/scheduler.ts` | parseWhen, nextOccurrence, scheduleJob, scheduleCoreJob, ensureCoreJob, listJobs |
 | `backend/src/lib/search/providers.ts` | SEARCH_PROVIDERS |
 | `backend/src/lib/searchAddressSave.ts` | SEARXNG_URL_KEY, __resetSearchTestPassedForTests, testOrSaveSearchAddress, clearSearchAddress |
 | `backend/src/lib/searchAssist/counters.ts` | SEARCH_ASSIST_COUNTER_NAMES, bumpSearchAssistCounter, searchAssistCounters, __resetSearchAssistCountersForTests |

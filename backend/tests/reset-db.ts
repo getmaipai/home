@@ -21,6 +21,7 @@ import { __resetRateLimiterForTests } from "@/lib/rateLimiter";
 import { __forgetStackOutagesForTests } from "@/lib/stackEngine";
 import {
   people,
+  alarms,
   personCredentials,
   sessions,
   personApiTokens,
@@ -184,6 +185,7 @@ export function resetDb(): void {
   db.delete(commands).run();
   __resetCommandsCacheForTests();
   db.delete(scheduledJobs).run();
+  db.delete(alarms).run();
   db.delete(jobs).run();
   db.delete(modelDownloadJobs).run();
   db.delete(clonedVoices).run();
@@ -280,6 +282,7 @@ export function resetDb(): void {
   // installed set (boot); a fresh database is a fresh boot.
   __resetOutputNotificationsForTests(); // CHAT-02: once-per-turn notification keys
   db.delete(idSequences).run();
+  db.delete(alarms).run();
   db.delete(apiKeys).run();
   db.delete(personApiTokens).run();
   db.delete(personCredentials).run();
