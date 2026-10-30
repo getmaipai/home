@@ -4241,6 +4241,23 @@
       "group": "right",
       "verdict": "later",
       "verdictReason": "Defer to AMBIENT-04, which migrates Chat panels into the standard right pane."
+    },
+    {
+      "file": "moon-disc.tsx",
+      "name": "moon-disc",
+      "group": "weather",
+      "verdict": "later",
+      "backendNeeded": null,
+      "effort": null,
+      "specTagNeeded": false,
+      "newDependency": false,
+      "bindings": [],
+      "size": "S",
+      "showcaseScenario": null,
+      "batch": null,
+      "replacesHandBuilt": [],
+      "realTurnToday": false,
+      "verdictReason": "Added to the kit (ui-v0.5.425) for the Weather moon card; no Home screen draws it yet. Wire it when the moon look lands in Home."
     }
   ]
 }

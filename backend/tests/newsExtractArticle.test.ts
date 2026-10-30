@@ -94,7 +94,10 @@ describe("inline whitespace around a link (verification pass: 'Readthe full repo
 test("news cleans promos and CMS chrome while reference keeps them", () => {
   const html = '<html><body><article><p>Story text.</p><p>Get our newsletter</p><div data-component="ad-slot-inline"><p>Advert</p></div><p role="note">Note</p></article></body></html>';
   expect(extractFullArticle(html, { ...base, allowLinks: true }).blocks).toEqual([{ type: "paragraph", inlines: [{ type: "text", text: "Story text." }] }]);
-  expect(extractFullArticle(html, { ...base, mode: "reference", allowLinks: true }).blocks).toHaveLength(4);
+  // Reference keeps the promo and the ad text; a role=note paragraph is the article's hatnote now (READER-01), so it is a field, not a block.
+  const reference = extractFullArticle(html, { ...base, mode: "reference", allowLinks: true });
+  expect(reference.blocks).toHaveLength(3);
+  expect(reference.hatnote).toBe("Note");
 });
 test("news removes skip links, timestamps and credits and keeps long Get ready prose", () => {
   const prose = `Get ready for the garden opening. ${"The paths wind through native flowers and offer visitors a chance to learn about the landscape. ".repeat(3)}`.trim();
@@ -134,5 +137,5 @@ for (const author of ['"Nova Vale"', '{"name":"Nova Vale"}', '["Nova Vale", {"na
 test("meta author is news metadata only", () => {
   const html = '<html><head><meta name="author" content="Nova Vale"></head><body><article><p>Story.</p></article></body></html>';
   expect(extractFullArticle(html, { ...base, allowLinks: true }).byline).toBe("Nova Vale");
-  expect(extractFullArticle(html, { ...base, mode: "reference", allowLinks: true })).toEqual({ title: "", blocks: [{ type: "paragraph", inlines: [{ type: "text", text: "Story." }] }], toc: [] });
+  expect(extractFullArticle(html, { ...base, mode: "reference", allowLinks: true })).toEqual({ title: "", blocks: [{ type: "paragraph", inlines: [{ type: "text", text: "Story." }] }], toc: [], summary: "Story." });
 });
