@@ -119,6 +119,7 @@ Where display rules apply: a package screen (news, music, buddy and the rest) is
 | `frontend/src/apps/settings/AiGlance.tsx` | AiGlance |
 | `frontend/src/apps/settings/AiJobCardView.tsx` | AiAlwaysOnView |
 | `frontend/src/apps/settings/AiModelDialog.tsx` | AiModelChoices |
+| `frontend/src/apps/settings/AiSlotDialog.tsx` | AiSlotChoices |
 | `frontend/src/apps/settings/AssistantKeysSettings.tsx` | AssistantKeysSettings |
 | `frontend/src/apps/settings/AwaySessionsSection.tsx` | AwaySessionsSection |
 | `frontend/src/apps/settings/BackupsSection.tsx` | EMERGENCY_KIT_SAVED_KEY, BackupsSection |
