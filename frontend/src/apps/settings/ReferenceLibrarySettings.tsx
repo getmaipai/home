@@ -236,7 +236,7 @@ function rowOf({ row, wanted, installed, jobFor, onChoose, onJob }: { row: Sourc
   const current = row.versions.find((set) => set.id === wanted) ?? null;
   const shown = current ?? row.versions.find((set) => set.id === installed) ?? row.versions[0]!;
   const job = row.versions.map(jobFor).find(Boolean);
-  const forKids = row.versions.some((set) => set.bands.includes("child"));
+  const forKids = row.versions.some((set) => set.child);
   const pending = wanted !== installed;
   const status = installed ? "Installed" : "Not installed";
   const blocked = Boolean(job) || row.versions.every((set) => !set.installed && !set.available);

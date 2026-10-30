@@ -11,7 +11,7 @@ const set = (over: Partial<ReferenceCatalogSet> & Pick<ReferenceCatalogSet, "sou
 });
 const catalog: ReferenceCatalogSet[] = [
   set({ source: "vikidia", flavour: "default", name: "Vikidia", installed: true, child: true, bands: ["child", "teen", "adult"] }),
-  set({ source: "wikipedia-simple", flavour: "default", name: "Simple English Wikipedia", bands: ["child", "teen", "adult"], sizeBytes: 3_000_000_000 }),
+  set({ source: "wikipedia-simple", flavour: "default", name: "Simple English Wikipedia", child: true, bands: ["child", "teen", "adult"], sizeBytes: 3_000_000_000 }),
   set({ source: "wikipedia-en", flavour: "mini", name: "Wikipedia Mini", sizeBytes: 5_000_000_000, wikipedia: true }),
   set({ source: "wikipedia-en", flavour: "maxi", name: "Wikipedia with pictures", sizeBytes: 100_000_000_000, wikipedia: true }),
   set({ source: "medlineplus", flavour: "default", name: "MedlinePlus", sizeBytes: 1_000_000_000 }),
