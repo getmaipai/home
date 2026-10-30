@@ -69,7 +69,7 @@ describe("CHAT-FOCUS-01 composer focus", () => {
 });
 
 describe("header search focus", () => {
-  const input = () => document.querySelector("[cmdk-input]") as HTMLInputElement | null;
+  const input = () => document.querySelector("input[role=\"combobox\"]") as HTMLInputElement | null;
   const settle = () => act(async () => { await new Promise((resolve) => setTimeout(resolve, 150)); });
 
   test("the box has focus on open, on reopen, and from Ctrl+K", async () => {
